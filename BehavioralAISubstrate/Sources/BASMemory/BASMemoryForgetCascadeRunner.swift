@@ -1,0 +1,284 @@
+import Foundation
+import BASRuntimeCore
+
+/// M101 — `BASMemoryForgetCascadeRunner`: substrate-side pure-value
+/// executor for L8 forget cascades.
+///
+/// ## Why this exists
+///
+/// Plan `l2-silly-piglet.md` §T5 ("L8 Sanctum Vault operator
+/// workflow + ForgetCascade 真实执行") calls for "a runnable
+/// `BASMemoryForgetCascade` runner that actually removes atoms
+/// from the atom store". Pre-M101 the substrate had a
+/// `BASMemoryForgetCascade` schema with a free-text
+/// `executionState: String` and **no runner** —— callers that
+/// wanted to execute a cascade had to hand-roll the record
+/// mutation + deduplication + state transition themselves.
+///
+/// M101 lands a pure-function runner in the M94 discipline
+/// (typed execution-state enum + pure-value transform + no
+/// runtime integration beyond the substrate). A sovereign-lock
+/// gate sits at the composition layer (future M102+) — substrate
+/// runner is value-type-only, does not consult sovereign state.
+///
+/// ## What it does
+///
+/// `apply(_:to:now:)` takes a cascade + a `BASTemporalMemoryField`
+/// and returns:
+///   1. A new field with the cascade's `rootTargets` +
+///      `dependentRefs` scrubbed from the `records` collection.
+///   2. An updated cascade value stamped with `.completed` (or
+///      `.skipped` when nothing matched) and the list of
+///      successfully removed record IDs.
+///
+/// The runner is **pure**: same inputs → same outputs, no global
+/// state, no I/O. Host-side orchestration (sovereign lock check,
+/// audit ledger append, L14 LINEAGE_CUT marker) is the caller's
+/// responsibility — the runner just transforms the data.
+///
+/// ## DAG discipline
+///
+/// Pure `Foundation` + `BASRuntimeCore`-visible schema. No Qinao
+/// imports. No actor. No async. Composition layer
+/// (`EBrainHostRuntime+MemoryService`) can wrap the runner in an
+/// actor for thread safety; the runner itself stays pure so tests
+/// and audit replays can reason about it without concurrency
+/// overhead.
+
+// MARK: - BASForgetCascadeExecutionState
+
+/// Typed lifecycle state for a forget-cascade runner outcome.
+///
+/// Stable raw values that cross-layer consumers can key on without
+/// importing the substrate. Parallels
+/// `BASRetractionExecutionState` (M94) — same 5-state machine,
+/// distinct typed surface for forget-cascade audit trails.
+public enum BASForgetCascadeExecutionState:
+    String, Sendable, Equatable, Codable, Hashable, CaseIterable
+{
+    /// The cascade is queued but has not started. Present so
+    /// callers can initialize a cascade from schema + transition
+    /// through the runner deterministically.
+    case queued = "queued"
+    /// The runner picked up the cascade and is in the middle of
+    /// applying it.
+    case inFlight = "in-flight"
+    /// The cascade finished successfully — at least one target
+    /// was removed.
+    case completed = "completed"
+    /// The runner ran but found no matching records — the cascade
+    /// was a no-op. Distinguished from `.completed` so audit
+    /// surfaces can tell "removed something" from "wanted to
+    /// remove but nothing matched".
+    case skipped = "skipped"
+    /// The runner could not apply the cascade (e.g. the cascade
+    /// was malformed). `reasonCodes` on the outcome carries the
+    /// why.
+    case failed = "failed"
+
+    /// Whether this state is terminal (the cascade cannot be
+    /// transitioned out of this state).
+    public var isTerminal: Bool {
+        switch self {
+        case .queued, .inFlight: return false
+        case .completed, .skipped, .failed: return true
+        }
+    }
+}
+
+// MARK: - BASForgetCascadeOutcome
+
+/// Pure-value report of a single `apply(...)` invocation. Carries
+/// the updated cascade, the list of record IDs that were actually
+/// removed, and timing metadata. Pure `Codable` so audit pipelines
+/// can stream it into the ledger alongside a `LINEAGE_CUT` marker.
+public struct BASForgetCascadeOutcome: BASSchemaVersioned, Equatable {
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    /// The cascade after state transition — `executionState`
+    /// reflects the terminal state chosen by the runner.
+    public var cascade: BASMemoryForgetCascade
+    /// Typed terminal state the runner decided.
+    public var terminalState: BASForgetCascadeExecutionState
+    /// Record IDs (matching `BASTemporalMemoryRecord.recordID`)
+    /// that were actually removed from the input field. Empty
+    /// when `terminalState == .skipped` or `.failed`.
+    public var removedRecordIDs: [String]
+    /// Free-text reason codes — e.g. `"nothing-to-remove"` when
+    /// `.skipped`, or `"target-id-not-found"` when `.failed`.
+    public var reasonCodes: [String]
+    /// When the runner started the apply.
+    public var startedAt: Date
+    /// When the runner finished the apply.
+    public var finishedAt: Date
+
+    public init(
+        schemaVersion: String
+            = BASForgetCascadeOutcome.currentSchemaVersion,
+        cascade: BASMemoryForgetCascade,
+        terminalState: BASForgetCascadeExecutionState,
+        removedRecordIDs: [String] = [],
+        reasonCodes: [String] = [],
+        startedAt: Date,
+        finishedAt: Date
+    ) {
+        self.schemaVersion = schemaVersion
+        self.cascade = cascade
+        self.terminalState = terminalState
+        self.removedRecordIDs = removedRecordIDs
+        self.reasonCodes = reasonCodes
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+    }
+}
+
+// MARK: - BASMemoryForgetCascadeRunner
+
+/// Pure-function forget-cascade executor. Value-type; every call
+/// returns new values, no internal state.
+///
+/// The runner matches cascade targets (`rootTargets` +
+/// `dependentRefs`) against the record IDs in the supplied
+/// `BASTemporalMemoryField.records` and emits a new field with
+/// the matched records removed. The input field is never
+/// mutated — callers threading the field through a pipeline can
+/// safely share references.
+public struct BASMemoryForgetCascadeRunner: Sendable {
+    public init() {}
+
+    /// Apply a forget cascade to a memory field.
+    ///
+    /// Behavior:
+    ///
+    /// 1. **Validation (pre-flight)** — empty `rootTargets` AND
+    ///    empty `dependentRefs` → return `.failed` with reason
+    ///    `"empty-cascade-targets"`, field unchanged.
+    /// 2. **No-match short-circuit** — cascade has targets but
+    ///    none match any record in the field → `.skipped` with
+    ///    reason `"nothing-to-remove"`, field unchanged.
+    /// 3. **Happy path** — at least one target matched a record
+    ///    → remove those records from the field, return
+    ///    `.completed` with the list of removed IDs and an
+    ///    updated cascade.
+    ///
+    /// The "target ID" vs "record ID" matching uses
+    /// `BASTemporalMemoryRecord.memoryID` against the union of
+    /// `cascade.rootTargets + cascade.dependentRefs`.
+    ///
+    /// - Parameters:
+    ///   - cascade: the cascade to apply. Input is not mutated;
+    ///     `outcome.cascade` carries the updated copy.
+    ///   - field: the memory field to transform. Input is not
+    ///     mutated; return tuple's `.field` is the new copy.
+    ///   - now: clock for `startedAt` / `finishedAt`. Defaults to
+    ///     `Date()` but injectable for deterministic tests.
+    ///
+    /// - Returns: `(field: BASTemporalMemoryField, outcome:
+    ///   BASForgetCascadeOutcome)` — pure pair; caller threads
+    ///   the new field forward, caller writes the outcome into
+    ///   audit pipelines.
+    public func apply(
+        _ cascade: BASMemoryForgetCascade,
+        to field: BASTemporalMemoryField,
+        now: @escaping () -> Date = { Date() }
+    ) -> (
+        field: BASTemporalMemoryField,
+        outcome: BASForgetCascadeOutcome
+    ) {
+        let startedAt = now()
+
+        // Pre-flight: empty cascade is a bug — fail fast with a
+        // stable reason so the caller's audit surface can key on
+        // it.
+        if cascade.rootTargets.isEmpty
+            && cascade.dependentRefs.isEmpty {
+            let finishedAt = now()
+            var failedCascade = cascade
+            failedCascade.executionState =
+                BASForgetCascadeExecutionState.failed.rawValue
+            return (
+                field: field,
+                outcome: BASForgetCascadeOutcome(
+                    cascade: failedCascade,
+                    terminalState: .failed,
+                    reasonCodes: ["empty-cascade-targets"],
+                    startedAt: startedAt,
+                    finishedAt: finishedAt))
+        }
+
+        // Union the target IDs. Set for O(1) membership checks.
+        var targetIDs = Set<String>()
+        for id in cascade.rootTargets {
+            targetIDs.insert(id)
+        }
+        for id in cascade.dependentRefs {
+            targetIDs.insert(id)
+        }
+
+        // Match records. Removed list preserves the field's
+        // insertion order so audit replay sees a deterministic
+        // sequence.
+        var remainingRecords: [BASTemporalMemoryRecord] = []
+        var removedIDs: [String] = []
+        remainingRecords.reserveCapacity(field.records.count)
+        for record in field.records {
+            if targetIDs.contains(record.memoryID) {
+                removedIDs.append(record.memoryID)
+            } else {
+                remainingRecords.append(record)
+            }
+        }
+
+        // No-match short-circuit: field is unchanged; cascade is
+        // marked skipped so the audit surface sees "ran but
+        // no-op".
+        if removedIDs.isEmpty {
+            let finishedAt = now()
+            var skippedCascade = cascade
+            skippedCascade.executionState =
+                BASForgetCascadeExecutionState.skipped.rawValue
+            return (
+                field: field,
+                outcome: BASForgetCascadeOutcome(
+                    cascade: skippedCascade,
+                    terminalState: .skipped,
+                    reasonCodes: ["nothing-to-remove"],
+                    startedAt: startedAt,
+                    finishedAt: finishedAt))
+        }
+
+        // Happy path: build new field with matched records
+        // removed. Every other collection on the field
+        // (temperatureProfiles / provenanceSeals / episodeArcs /
+        // etc.) is preserved byte-for-byte. The cascade itself
+        // stays in `forgetCascades` (caller decides whether to
+        // prune it after audit) — the runner does not self-delete.
+        let newField = BASTemporalMemoryField(
+            schemaVersion: field.schemaVersion,
+            records: remainingRecords,
+            temperatureProfiles: field.temperatureProfiles,
+            provenanceSeals: field.provenanceSeals,
+            episodeArcs: field.episodeArcs,
+            conflictClusters: field.conflictClusters,
+            continuityAnchors: field.continuityAnchors,
+            replayFrames: field.replayFrames,
+            quarantineRecords: field.quarantineRecords,
+            sanctumEntries: field.sanctumEntries,
+            forgetCascades: field.forgetCascades)
+
+        let finishedAt = now()
+        var completedCascade = cascade
+        completedCascade.executionState =
+            BASForgetCascadeExecutionState.completed.rawValue
+        return (
+            field: newField,
+            outcome: BASForgetCascadeOutcome(
+                cascade: completedCascade,
+                terminalState: .completed,
+                removedRecordIDs: removedIDs,
+                reasonCodes: [],
+                startedAt: startedAt,
+                finishedAt: finishedAt))
+    }
+}
