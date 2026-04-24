@@ -319,6 +319,12 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASEvidenceGradient.self,
             tests: ["schema.evidence_gradient.current", "schema.evidence_gradient.backward"]
         ),
+        // M111 — L6 Presence Eye whitepaper §5 aggregator.
+        entry(
+            "SituationField",
+            versionedType: BASSituationField.self,
+            tests: ["schema.situation_field.current", "schema.situation_field.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,

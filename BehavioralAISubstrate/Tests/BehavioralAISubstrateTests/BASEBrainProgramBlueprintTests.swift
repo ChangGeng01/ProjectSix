@@ -111,6 +111,7 @@ struct BASEBrainProgramBlueprintTests {
             "BoundaryPrior",
             "TemporalKnowledgeTier",
             "EvidenceGradient",
+            "SituationField",  // M111 L6 §5 key-object closure
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",

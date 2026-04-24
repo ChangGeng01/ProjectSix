@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 134)  // M106 +PowerLedger, M107 +CortexPacket, M109 +7 L4 types
+        #expect(governedObjects.count == 135)  // M106 +PowerLedger, M107 +CortexPacket, M109 +7 L4, M111 +SituationField
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -185,6 +185,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "BoundaryPrior": BASBoundaryPrior.currentSchemaVersion,  // M109
             "TemporalKnowledgeTier": BASTemporalKnowledgeTier.currentSchemaVersion,  // M109
             "EvidenceGradient": BASEvidenceGradient.currentSchemaVersion,  // M109
+            "SituationField": BASSituationField.currentSchemaVersion,  // M111
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,

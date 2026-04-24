@@ -57,6 +57,14 @@ public struct BASRoleGeometry: BASSchemaVersioned {
     public var relationClass: String
     public var asymmetryFlags: [String]
     public var intimacyDistance: Double
+    /// M111 — L6 whitepaper §5 `RoleGeometry.edges[]` coverage.
+    /// Edge tuples like "alice:coworker:bob" or similar string
+    /// encodings describing pairwise relations between `actors[]`.
+    /// Distinct from `relationClass` (single summary string) — edges
+    /// capture the full pairwise graph when present. Defaults `[]`
+    /// for backward-compat; custom decoder uses decodeIfPresent so
+    /// pre-M111 JSON decodes unchanged.
+    public var edges: [String]
 
     public init(
         schemaVersion: String = BASRoleGeometry.currentSchemaVersion,
@@ -64,7 +72,8 @@ public struct BASRoleGeometry: BASSchemaVersioned {
         roleTypes: [String] = [],
         relationClass: String,
         asymmetryFlags: [String] = [],
-        intimacyDistance: Double = 0.5
+        intimacyDistance: Double = 0.5,
+        edges: [String] = []
     ) {
         self.schemaVersion = schemaVersion
         self.actors = actors
@@ -72,6 +81,41 @@ public struct BASRoleGeometry: BASSchemaVersioned {
         self.relationClass = relationClass.trimmingCharacters(in: .whitespacesAndNewlines)
         self.asymmetryFlags = asymmetryFlags
         self.intimacyDistance = min(max(intimacyDistance, 0), 1)
+        self.edges = edges
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case actors
+        case roleTypes
+        case relationClass
+        case asymmetryFlags
+        case intimacyDistance
+        case edges
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.schemaVersion = try c.decodeIfPresent(
+            String.self, forKey: .schemaVersion)
+            ?? BASRoleGeometry.currentSchemaVersion
+        self.actors = try c.decodeIfPresent(
+            [String].self, forKey: .actors) ?? []
+        self.roleTypes = try c.decodeIfPresent(
+            [String].self, forKey: .roleTypes) ?? []
+        self.relationClass = try c.decode(
+            String.self, forKey: .relationClass)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.asymmetryFlags = try c.decodeIfPresent(
+            [String].self, forKey: .asymmetryFlags) ?? []
+        self.intimacyDistance = min(max(
+            try c.decodeIfPresent(
+                Double.self, forKey: .intimacyDistance) ?? 0.5,
+            0), 1)
+        // M111 — new field; decodeIfPresent keeps pre-M111 JSON
+        // backward-compat (missing key → []).
+        self.edges = try c.decodeIfPresent(
+            [String].self, forKey: .edges) ?? []
     }
 }
 
@@ -302,6 +346,98 @@ public struct BASContextRouteHint: BASSchemaVersioned {
         self.sovereignHintLevel = sovereignHintLevel.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
+
+// MARK: - M111 L6 whitepaper §5 parity
+
+/// L6 whitepaper §5 `SituationField` — the aggregator schema that
+/// binds scene + channel + role + power + emotion + urgency +
+/// consequence + manipulation + host-resonance + continuity +
+/// ambiguity + confidence refs into one field. Distinct from
+/// `BASContextFrame` (which carries the same semantics via
+/// direct struct refs rather than string IDs): `BASSituationField`
+/// is the ID-refs shape the whitepaper §5 specifies literally,
+/// suitable for audit trail / cross-layer serialization that
+/// only needs IDs. Use `BASContextFrame` when you need the
+/// inline sub-structs; use `BASSituationField` when you need
+/// whitepaper-literal ID refs for ledger / audit.
+public struct BASSituationField: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var sceneID: String
+    public var utteranceRef: String?
+    public var channelType: String
+    public var sceneType: String
+    public var actorSet: [String]
+    public var roleGeometryRef: String?
+    public var powerGradientRef: String?
+    public var emotionalWeatherRef: String?
+    public var urgencyTruthRef: String?
+    public var consequenceHorizonRef: String?
+    public var ambiguityBand: Double
+    public var manipulationTraceRef: String?
+    public var hostResonanceRef: String?
+    public var continuityAnchorRef: String?
+    public var confidenceBand: Double
+
+    public init(
+        schemaVersion: String
+            = BASSituationField.currentSchemaVersion,
+        sceneID: String,
+        utteranceRef: String? = nil,
+        channelType: String,
+        sceneType: String,
+        actorSet: [String] = [],
+        roleGeometryRef: String? = nil,
+        powerGradientRef: String? = nil,
+        emotionalWeatherRef: String? = nil,
+        urgencyTruthRef: String? = nil,
+        consequenceHorizonRef: String? = nil,
+        ambiguityBand: Double = 0,
+        manipulationTraceRef: String? = nil,
+        hostResonanceRef: String? = nil,
+        continuityAnchorRef: String? = nil,
+        confidenceBand: Double = 0
+    ) {
+        self.schemaVersion = schemaVersion
+        self.sceneID = sceneID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.utteranceRef = utteranceRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.channelType = channelType
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sceneType = sceneType
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.actorSet = actorSet
+        self.roleGeometryRef = roleGeometryRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.powerGradientRef = powerGradientRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.emotionalWeatherRef = emotionalWeatherRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.urgencyTruthRef = urgencyTruthRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.consequenceHorizonRef = consequenceHorizonRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.ambiguityBand = min(1, max(0, ambiguityBand))
+        self.manipulationTraceRef = manipulationTraceRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.hostResonanceRef = hostResonanceRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.continuityAnchorRef = continuityAnchorRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.confidenceBand = min(1, max(0, confidenceBand))
+    }
+}
+
+/// M111 — L6 whitepaper §5 `RouteHint` typealias. Provides the
+/// whitepaper-literal name as a compile-time alias for the
+/// substrate's `BASContextRouteHint`; both names refer to the
+/// same type. Matches the M108 alias pattern for field-name
+/// drift.
+public typealias BASRouteHint = BASContextRouteHint
 
 public struct BASContextFrame: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.2.0"
