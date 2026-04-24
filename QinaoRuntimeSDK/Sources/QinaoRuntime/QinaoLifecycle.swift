@@ -306,6 +306,71 @@ public actor QinaoLifecycle {
         await currentReading().guardLevel
     }
 
+    // MARK: - M104 per-tier thermal snapshot (T3)
+
+    /// Project the live scalar `BASThermalTwin.Reading` into a
+    /// three-tier `BASComputeTierThermalSnapshot` suitable for
+    /// `BASComputeRouter.route(snapshot:)`.
+    ///
+    /// The scalar twin carries a single `BASThermalLevel` (today's
+    /// substrate only knows one thermal domain via
+    /// `ProcessInfo.thermalState`). The projection maps that level
+    /// to a normalized headroom uniformly across CPU / GPU / NPU:
+    ///
+    /// | BASThermalLevel | Headroom |
+    /// |-----------------|----------|
+    /// | .nominal        | 1.0      |
+    /// | .warm           | 0.7      |
+    /// | .hot            | 0.3      |
+    /// | .critical       | 0.0      |
+    ///
+    /// All three tiers receive the SAME headroom under this naïve
+    /// projection — the scalar twin cannot distinguish per-tier
+    /// pressure, so the router's preferred-order tie-breaker
+    /// (NPU > GPU > CPU by default) carries the decision.
+    ///
+    /// Future platform adapters (IOKit CPU pressure / Metal
+    /// performance query / ANE pressure) will replace this
+    /// projection with real per-tier signals. Until then the
+    /// router at least has a non-stub snapshot to act on, which
+    /// is strictly better than refusing to route.
+    ///
+    /// - Parameter observedAt: timestamp for the per-tier readings
+    ///   and the snapshot wrapper. Defaults to `Date()`.
+    /// - Returns: three-tier snapshot populated from the live
+    ///   scalar reading.
+    public func computeTierThermalSnapshot(
+        observedAt: Date = Date()
+    ) async -> BASComputeTierThermalSnapshot {
+        let reading = await currentReading()
+        let headroom = Self.headroom(for: reading.thermalLevel)
+        let tiers: [BASComputeTier] = [.cpu, .gpu, .npu]
+        let readings = tiers.map { tier in
+            BASComputeTierThermalReading(
+                tier: tier,
+                level: reading.thermalLevel,
+                headroom: headroom,
+                observedAt: observedAt)
+        }
+        return BASComputeTierThermalSnapshot(
+            readings: readings,
+            snapshotAt: observedAt)
+    }
+
+    /// Pure mapping from scalar level to normalized headroom.
+    /// Extracted as `static` so tests can exercise the mapping
+    /// without driving a full lifecycle fixture.
+    internal static func headroom(
+        for level: BASThermalLevel
+    ) -> Double {
+        switch level {
+        case .nominal: return 1.0
+        case .warm: return 0.7
+        case .hot: return 0.3
+        case .critical: return 0.0
+        }
+    }
+
     // MARK: - Budget-frame routing (M69)
 
     /// Stamp the lifecycle's live thermal guard level onto a planned
