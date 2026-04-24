@@ -2,6 +2,8 @@
 
 这份矩阵描述的是当前仓库的真实工程状态，不是目标态宣传文案。
 
+**2026-04-24 更新（M106-M120 session）**：substrate whitepaper §5 parity 达到 14/14 层 100% — L1-L14 每层白皮书字面命名的 key objects + fields 全部在 substrate 有对应 `BASSchemaVersioned` Swift struct + governance registry entry + declarative parity-lock 测试。M120 的 `scripts/check_whitepaper_schema_parity.sh` lint 自动检测未注册 schemas · drift detection 自动化 · 是 quality gate 的第 6 个边界闸。累计：+57 new struct / +23 new enum · registry 125 → 187 entries · BAS test suite 1249 → 1429 (+180)。此 session 成果不改 runtime 或 product 层成熟度 —— 仅是 schema 层白皮书 parity 从不均到 14/14 完整。
+
 `L3 / L4 / L5 / L6 / L7 / L8 / L9 / L10 / L11 / L12 / L13 / L14` 的 `v∞` target-state 文档都属于 `target-state reference`。矩阵仍只陈述当前 repo 真相，不把未来路线折算成现状。
 
 `L3` 的目标态白皮书现见 [EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_TARGET_VINF.md)，当前 repo-real 第二阶段骨架现见 [EBRAIN_L3_FOLDED_LUNG_V2.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_L3_FOLDED_LUNG_V2.md)。前者描述理想完全体，后者描述当前仓库已经落地的 `Breath-Fold-Resume + Sovereign rollback bridge` 范围，不改变本矩阵对 `L3` 现状的表述。

@@ -558,6 +558,49 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASDeadStopLatch.self,
             tests: ["schema.dead_stop_latch.current", "schema.dead_stop_latch.backward"]
         ),
+        // M120 — parity-lint backfill: 8 BASSchemaVersioned structs
+        // the M120 check_whitepaper_schema_parity.sh script found
+        // declared but unregistered.
+        entry(
+            "ForgetCascadeOutcome",
+            versionedType: BASForgetCascadeOutcome.self,
+            tests: ["schema.forget_cascade_outcome.current", "schema.forget_cascade_outcome.backward"]
+        ),
+        entry(
+            "OrganDeltaPlan",
+            versionedType: BASOrganDeltaPlan.self,
+            tests: ["schema.organ_delta_plan.current", "schema.organ_delta_plan.backward"]
+        ),
+        entry(
+            "OrganPackage",
+            versionedType: BASOrganPackage.self,
+            tests: ["schema.organ_package.current", "schema.organ_package.backward"]
+        ),
+        entry(
+            "SovereignLedgerRotationPlan",
+            versionedType: BASSovereignLedgerRotationPlan.self,
+            tests: ["schema.sovereign_ledger_rotation_plan.current", "schema.sovereign_ledger_rotation_plan.backward"]
+        ),
+        entry(
+            "SovereignLedgerSegment",
+            versionedType: BASSovereignLedgerSegment.self,
+            tests: ["schema.sovereign_ledger_segment.current", "schema.sovereign_ledger_segment.backward"]
+        ),
+        entry(
+            "SovereignLineageCutOutcome",
+            versionedType: BASSovereignLineageCutOutcome.self,
+            tests: ["schema.sovereign_lineage_cut_outcome.current", "schema.sovereign_lineage_cut_outcome.backward"]
+        ),
+        entry(
+            "SovereignLineageCutRequest",
+            versionedType: BASSovereignLineageCutRequest.self,
+            tests: ["schema.sovereign_lineage_cut_request.current", "schema.sovereign_lineage_cut_request.backward"]
+        ),
+        entry(
+            "SurfaceDecision",
+            versionedType: BASSurfaceDecision.self,
+            tests: ["schema.surface_decision.current", "schema.surface_decision.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,

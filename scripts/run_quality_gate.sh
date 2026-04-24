@@ -247,6 +247,9 @@ run_step "Qinao SDK sovereign redaction check" \
 run_step "Sovereign auditTurn choke-point lint" \
   "$ROOT/scripts/check_sovereign_choke_point.sh"
 
+run_step "Whitepaper schema parity lint" \
+  "$ROOT/scripts/check_whitepaper_schema_parity.sh"
+
 run_step "Qinao SDK full test suite" \
   swift test --package-path "$ROOT/QinaoRuntimeSDK"
 

@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 179)  // +M119 9 L14 §5 types → 14/14 layers complete
+        #expect(governedObjects.count == 187)  // +M120 8 parity-lint backfills
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -252,6 +252,23 @@ struct BASEBrainSchemaGovernanceRegistryTests {
                 BASRollbackWrit.currentSchemaVersion,
             "DeadStopLatch":
                 BASDeadStopLatch.currentSchemaVersion,
+            // M120 parity-lint backfill:
+            "ForgetCascadeOutcome":
+                BASForgetCascadeOutcome.currentSchemaVersion,
+            "OrganDeltaPlan":
+                BASOrganDeltaPlan.currentSchemaVersion,
+            "OrganPackage":
+                BASOrganPackage.currentSchemaVersion,
+            "SovereignLedgerRotationPlan":
+                BASSovereignLedgerRotationPlan.currentSchemaVersion,
+            "SovereignLedgerSegment":
+                BASSovereignLedgerSegment.currentSchemaVersion,
+            "SovereignLineageCutOutcome":
+                BASSovereignLineageCutOutcome.currentSchemaVersion,
+            "SovereignLineageCutRequest":
+                BASSovereignLineageCutRequest.currentSchemaVersion,
+            "SurfaceDecision":
+                BASSurfaceDecision.currentSchemaVersion,
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,
