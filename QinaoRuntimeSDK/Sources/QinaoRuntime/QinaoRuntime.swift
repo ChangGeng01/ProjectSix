@@ -5,6 +5,7 @@ import BASLeaseLife
 import BASOrchestration
 import BASMemory
 import BASPolicy
+import BASObservability
 import QinaoHost
 import QinaoMemory
 import QinaoRisk
@@ -362,7 +363,8 @@ public actor QinaoRuntime {
         contextFrame: BASContextFrame? = nil,
         decomposeFrame: BASDecomposeFrame? = nil,
         memoryBundle: BASMemoryBundle? = nil,
-        thoughtFrame: BASThoughtFrame? = nil
+        thoughtFrame: BASThoughtFrame? = nil,
+        updateTickets: [BASUpdateTicket] = []
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -634,6 +636,42 @@ public actor QinaoRuntime {
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L10")
             autoInjectedLayerCodes.append("L11")
+        }
+
+        // M138 — L13 evolutionFurnace shadow-trial stream.
+        //
+        // CRITICAL — whitepaper invariant #3 "宿主私有经验不进权重":
+        // L13 per-turn observations record the turn's UPDATE
+        // TICKETS (proposed changes: memory-write / host-change /
+        // rule-candidate / profile-change suggestions) as
+        // SHADOW-LEVEL LEDGER ENTRIES only. M138 does NOT:
+        //   * touch any neural weights
+        //   * commit any memory write
+        //   * merge any host-change candidate into the active
+        //     constitution
+        //   * execute any ticket's suggested change
+        //
+        // All that M138 does is: if the caller passes one or more
+        // tickets through `updateTickets`, they flow through the
+        // shadow-stream path — derive L13 observation bundle,
+        // append its coverage summary, write to L14 ledger. The
+        // tickets stay "requires review" semantically (hosts
+        // must still approve via QinaoHost.approve(candidateID:)
+        // or the equivalent memory-write commit path). L14 ledger
+        // gains an audit trail of "what was PROPOSED this turn"
+        // separate from "what was COMMITTED this turn" — this is
+        // the shadow-trial record the whitepaper calls for.
+        if !updateTickets.isEmpty {
+            let l13Bundle =
+                BASUpdateTicketObservationBundle.derive(
+                    fromUpdateTickets: updateTickets,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l13Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L13")
         }
 
         // Expand the expectation set only when the caller accepted

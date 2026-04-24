@@ -229,3 +229,32 @@ extension BASHippocampalMemoryObservationBundle {
             emittedAt: emittedAt)
     }
 }
+
+// MARK: - L13 evolution furnace (M138)
+//
+// Closes the 14-layer coverage projection matrix: L13
+// `BASUpdateTicketObservationBundle` gets the same neutral
+// coverageSummary edge that L1-L12 already have, so sendSession's
+// M138 shadow-trial path can stream the summary into L14 ledger
+// alongside the other layers.
+
+extension BASUpdateTicketObservationBundle {
+    /// Neutral coverage summary for L13. `distinctSubjectCount`
+    /// maps to the distinct ticketIDs observed this turn.
+    /// `hasCoreSignalCoverage` surfaces the existing
+    /// `hasAnySubmission` predicate — L13 is "healthy" when at
+    /// least one ticket submission was observed in the turn.
+    public var coverageSummary: BASObservationCoverageSummary {
+        BASObservationCoverageSummary(
+            layer: .evolutionFurnace,
+            turnID: turnID,
+            sessionID: sessionID,
+            totalObservations: observations.count,
+            distinctSubjectCount: subjectIDs.count,
+            hasCoreSignalCoverage: hasCoreSignalCoverage,
+            budgetTotalCost:
+                BASUpdateTicketObservationBudget
+                    .totalCost(for: self),
+            emittedAt: emittedAt)
+    }
+}

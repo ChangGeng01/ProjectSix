@@ -139,6 +139,10 @@ let package = Package(
                 // BASPolicy; needed so sendSession can co-derive L10
                 // and L11 from one caller-supplied thoughtFrame.
                 .product(name: "BASPolicy", package: "BehavioralAISubstrate"),
+                // M138 — L13 `BASUpdateTicket` lives in
+                // BASObservability. Required for shadow-trial
+                // streaming in sendSession.
+                .product(name: "BASObservability", package: "BehavioralAISubstrate"),
                 // M82 — main-trunk turn-artifacts projection: the
                 // composition layer is the only place that may carry
                 // the substrate's turn-result type across the seam
