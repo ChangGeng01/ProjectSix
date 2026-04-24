@@ -148,6 +148,12 @@ struct BASEBrainProgramBlueprintTests {
             "AgencyHandle",
             "DisclosureProfile",
             "SilentStub",
+            // M118 L13 §4 Evolution Furnace organ schemas
+            // (M94 shipped; M118 registers):
+            "VersionArboretum",
+            "ArboretumDelta",
+            "RetractionFurnace",
+            "RetractionFurnaceEntry",
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",

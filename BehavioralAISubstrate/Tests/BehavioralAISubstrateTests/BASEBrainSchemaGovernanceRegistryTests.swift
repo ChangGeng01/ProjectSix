@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 166)  // +M117 12 L12 types
+        #expect(governedObjects.count == 170)  // +M118 4 L13 §4 organ schemas
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -224,6 +224,15 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "AgencyHandle": BASAgencyHandle.currentSchemaVersion,
             "DisclosureProfile": BASDisclosureProfile.currentSchemaVersion,
             "SilentStub": BASSilentStub.currentSchemaVersion,
+            // M118 L13 §4:
+            "VersionArboretum":
+                BASVersionArboretum.currentSchemaVersion,
+            "ArboretumDelta":
+                BASArboretumDelta.currentSchemaVersion,
+            "RetractionFurnace":
+                BASRetractionFurnace.currentSchemaVersion,
+            "RetractionFurnaceEntry":
+                BASRetractionFurnaceEntry.currentSchemaVersion,
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,

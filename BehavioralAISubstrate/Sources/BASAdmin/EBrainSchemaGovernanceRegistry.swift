@@ -489,6 +489,29 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASSilentStub.self,
             tests: ["schema.silent_stub.current", "schema.silent_stub.backward"]
         ),
+        // M118 — L13 Evolution Furnace §4 organ-schema family
+        // (M94 shipped the structs closing "whitepaper-named
+        // zero-hit" audit; M118 registers them in governance).
+        entry(
+            "VersionArboretum",
+            versionedType: BASVersionArboretum.self,
+            tests: ["schema.version_arboretum.current", "schema.version_arboretum.backward"]
+        ),
+        entry(
+            "ArboretumDelta",
+            versionedType: BASArboretumDelta.self,
+            tests: ["schema.arboretum_delta.current", "schema.arboretum_delta.backward"]
+        ),
+        entry(
+            "RetractionFurnace",
+            versionedType: BASRetractionFurnace.self,
+            tests: ["schema.retraction_furnace.current", "schema.retraction_furnace.backward"]
+        ),
+        entry(
+            "RetractionFurnaceEntry",
+            versionedType: BASRetractionFurnaceEntry.self,
+            tests: ["schema.retraction_furnace_entry.current", "schema.retraction_furnace_entry.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,
