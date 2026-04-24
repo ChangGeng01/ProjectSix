@@ -331,7 +331,8 @@ public actor QinaoRuntime {
         plannedBudget: BASBudgetFrame? = nil,
         turnDurationSeconds: Double? = nil,
         additionalCoverageSummaries: [BASObservationCoverageSummary]?
-            = nil
+            = nil,
+        surfaceRetryPolicy: SurfaceRetryPolicy = .default
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -639,7 +640,9 @@ public actor QinaoRuntime {
                 surfaceDecision: Self.deriveSurfaceDecision(
                     auditSeverity: report.severity,
                     coverageSeverity: coverage.severity,
-                    auditRef: report.auditRef))
+                    auditRef: report.auditRef,
+                    routedBudget: routedBudget,
+                    retryPolicy: surfaceRetryPolicy))
         }
 
         // M70 — healthy turn path: record the turn on the lifecycle
@@ -671,10 +674,13 @@ public actor QinaoRuntime {
             surfaceDecision: Self.deriveSurfaceDecision(
                 auditSeverity: report.severity,
                 coverageSeverity: coverage.severity,
-                auditRef: report.auditRef))
+                auditRef: report.auditRef,
+                routedBudget: routedBudget,
+                retryPolicy: surfaceRetryPolicy))
     }
 
     // MARK: - M125 · L12 surface-decision derivation (皮肤)
+    // MARK: - M126 · retry policy + thermal/maintenance awareness
     //
     // The healthy-path + auto-halt-but-returned path of sendSession
     // derives a BASSurfaceDecision so hosts immediately know which
@@ -686,37 +692,149 @@ public actor QinaoRuntime {
     // call in the host — no typed bridge helper is needed, QinaoUI
     // stays a zero-dep leaf.
     //
-    // Mapping (audit severity is the primary signal; coverage
-    // severity escalates a healthy audit to advisory when the
-    // structural reader flagged something sub-critical):
+    // M126 upgrades the M125 derivation on three axes:
     //
-    //   auditSeverity == .pass  + coverageSeverity == .clean
-    //     → draft-shell + user-affirm + minimal
-    //       substitute = .render(candidateID: <deterministic>)
+    // 1. **Retry policy is a value type, not a magic number.**
+    //    Pre-M126 every `.throttle / .shadowLock / .toolCut /
+    //    .memoryFreeze / .quarantine` severity returned
+    //    `deferToLater(retryAfterSeconds: 60)` — a hard-coded
+    //    literal that had no place to tune per-severity or per-
+    //    thermal. `SurfaceRetryPolicy` carries five fields (one
+    //    seconds-value per severity that triggers the delay path)
+    //    and also a `thermalMultiplier(for:)` hook that lets a
+    //    hotter device stretch the retry window without changing
+    //    the base numbers.
     //
-    //   auditSeverity == .pass  + coverageSeverity == .advisory
-    //     → draft-shell + user-affirm + reasoned (surface the
-    //       coverage advisory reason codes without blocking)
+    // 2. **Thermal + maintenance signal feed disclosure + reason
+    //    codes.** Pre-M126 the `.pass` disclosure only depended on
+    //    coverage severity. Post-M126 we also escalate to
+    //    `.reasoned` when the routed budget's thermal guard level
+    //    is `.throttle`/`.emergency` or maintenance class is
+    //    `.deferred`, because those are device-side reasons the
+    //    user ought to see surfaced.
     //
-    //   auditSeverity == .throttle / .shadowLock / .toolCut /
-    //   .memoryFreeze / .quarantine
-    //     → delay-packet + host-override + minimal
-    //       substitute = .deferToLater(retryAfterSeconds: 60)
-    //
-    //   auditSeverity == .rollback → boundary-script + host-override
-    //     + explicit + substitute = .refuse(auditReference: ...)
-    //
-    //   auditSeverity == .deadStop → silent-stub + host-override
-    //     + silent + substitute = .refuse(auditReference: ...)
+    // 3. **Reason codes carry routed-budget context.** When a
+    //    routedBudget is present the decision's `reasonCodes`
+    //    include `"thermal:<level>"` and
+    //    `"maintenance:<class>"` so the UI layer (and the audit
+    //    replay) can trace exactly which device-side condition
+    //    drove a given surface choice.
     //
     // `auditReference` on the decision is always set to the report's
     // `auditRef` so downstream UI can link back to the ledger entry.
+
+    /// M126 — Per-severity retry-window policy. Every
+    /// delay-packet-producing audit severity has its own seconds
+    /// value; hotter devices can stretch the window via the
+    /// thermal multiplier. All fields are `Int` seconds so the
+    /// value round-trips cleanly to `BASSurfaceSubstitute
+    /// .deferToLater(retryAfterSeconds: Int)`.
+    public struct SurfaceRetryPolicy: Sendable, Equatable, Codable {
+        public let throttleSeconds: Int
+        public let shadowLockSeconds: Int
+        public let toolCutSeconds: Int
+        public let memoryFreezeSeconds: Int
+        public let quarantineSeconds: Int
+
+        public init(
+            throttleSeconds: Int = 30,
+            shadowLockSeconds: Int = 60,
+            toolCutSeconds: Int = 120,
+            memoryFreezeSeconds: Int = 180,
+            quarantineSeconds: Int = 300
+        ) {
+            self.throttleSeconds = throttleSeconds
+            self.shadowLockSeconds = shadowLockSeconds
+            self.toolCutSeconds = toolCutSeconds
+            self.memoryFreezeSeconds = memoryFreezeSeconds
+            self.quarantineSeconds = quarantineSeconds
+        }
+
+        /// Default policy used when `sendSession`'s caller does
+        /// not pass one. Numbers are deliberately monotonic with
+        /// severity — throttle retries in 30s, shadowLock in 60s,
+        /// toolCut in 2 min, memoryFreeze in 3 min, quarantine in
+        /// 5 min — so audit replay can tell "why so long" from
+        /// the severity ladder alone.
+        public static let `default` = SurfaceRetryPolicy()
+
+        /// Base seconds for a given severity, or `nil` for
+        /// severities that do not produce a delay packet
+        /// (`.pass` / `.rollback` / `.deadStop`).
+        public func baseSeconds(
+            for severity:
+                QinaoSovereignControlPlane.AuditSeverity
+        ) -> Int? {
+            switch severity {
+            case .throttle:       return throttleSeconds
+            case .shadowLock:     return shadowLockSeconds
+            case .toolCut:        return toolCutSeconds
+            case .memoryFreeze:   return memoryFreezeSeconds
+            case .quarantine:     return quarantineSeconds
+            case .pass, .rollback, .deadStop: return nil
+            }
+        }
+
+        /// Thermal multiplier: nominal = 1.0, watch = 1.25,
+        /// throttle = 1.5, emergency = 2.0. A hotter device
+        /// should wait longer to retry so it can cool off — this
+        /// stretches the retry window transparently to the
+        /// caller without changing the severity mapping.
+        public static func thermalMultiplier(
+            for level: BASThermalGuardLevel?
+        ) -> Double {
+            guard let level = level else { return 1.0 }
+            switch level {
+            case .nominal:    return 1.0
+            case .watch:      return 1.25
+            case .throttle:   return 1.5
+            case .emergency:  return 2.0
+            }
+        }
+
+        /// Effective retry seconds = base × thermal-multiplier,
+        /// rounded to the nearest Int. Returns `nil` when
+        /// `severity` is not a delay-producing state.
+        public func effectiveSeconds(
+            for severity:
+                QinaoSovereignControlPlane.AuditSeverity,
+            thermalLevel: BASThermalGuardLevel?
+        ) -> Int? {
+            guard let base = baseSeconds(for: severity) else {
+                return nil
+            }
+            let multiplier = Self.thermalMultiplier(
+                for: thermalLevel)
+            return Int((Double(base) * multiplier).rounded())
+        }
+    }
+
     nonisolated static func deriveSurfaceDecision(
         auditSeverity: QinaoSovereignControlPlane.AuditSeverity,
         coverageSeverity:
             QinaoSovereignControlPlane.CoverageSeverity,
-        auditRef: String
+        auditRef: String,
+        routedBudget: BASBudgetFrame? = nil,
+        retryPolicy: SurfaceRetryPolicy = .default
     ) -> BASSurfaceDecision {
+        // Reason codes accumulate context about WHY a particular
+        // surface was chosen — the L14 audit trail reads them
+        // directly. Order: audit severity first, then coverage
+        // escalation, then device-side context (thermal +
+        // maintenance).
+        var codes = ["audit.severity:" + auditSeverity.rawValue]
+
+        // M126 — device-side context feeds both reasonCodes and
+        // (for .pass) disclosure escalation.
+        let thermal = routedBudget?.thermalGuardLevel
+        let maintenance = routedBudget?.maintenanceClass
+        if let thermal = thermal {
+            codes.append("thermal:" + thermal.rawValue)
+        }
+        if let maintenance = maintenance {
+            codes.append("maintenance:" + maintenance.rawValue)
+        }
+
         switch auditSeverity {
         case .deadStop:
             return BASSurfaceDecision(
@@ -724,7 +842,7 @@ public actor QinaoRuntime {
                 agency: .hostOverride,
                 disclosure: .silent,
                 substitute: .refuse(auditReference: auditRef),
-                reasonCodes: ["audit.severity:deadStop"],
+                reasonCodes: codes,
                 auditReference: auditRef)
 
         case .rollback:
@@ -733,38 +851,56 @@ public actor QinaoRuntime {
                 agency: .hostOverride,
                 disclosure: .explicit,
                 substitute: .refuse(auditReference: auditRef),
-                reasonCodes: ["audit.severity:rollback"],
+                reasonCodes: codes,
                 auditReference: auditRef)
 
         case .throttle, .shadowLock, .toolCut,
              .memoryFreeze, .quarantine:
+            // M126 — base seconds × thermal multiplier. Fallback
+            // to 60 only if policy somehow returns nil (not
+            // possible today but defensive).
+            let seconds = retryPolicy.effectiveSeconds(
+                for: auditSeverity,
+                thermalLevel: thermal) ?? 60
             return BASSurfaceDecision(
                 surface: .delayPacket,
                 agency: .hostOverride,
                 disclosure: .minimal,
                 substitute: .deferToLater(
-                    retryAfterSeconds: 60),
-                reasonCodes: [
-                    "audit.severity:" + auditSeverity.rawValue,
-                ],
+                    retryAfterSeconds: seconds),
+                reasonCodes: codes,
                 auditReference: auditRef)
 
         case .pass:
-            // Coverage severity escalates disclosure when clean
-            // audit still has structural warnings.
-            let disclosure: BASSurfaceDisclosure
-            var codes = ["audit.severity:pass"]
+            // Pass path: disclosure escalates on three inputs —
+            // coverage advisory, hot thermal, deferred
+            // maintenance. Any one tips us from minimal to
+            // reasoned so the user sees WHY the system isn't
+            // running at full strength.
+            var disclosure: BASSurfaceDisclosure = .minimal
             switch coverageSeverity {
             case .clean:
-                disclosure = .minimal
+                break
             case .advisory:
                 disclosure = .reasoned
                 codes.append("coverage.severity:advisory")
             case .halt:
-                // Theoretically unreachable: coverage == .halt
+                // Theoretically unreachable — coverage.halt
                 // throws before the healthy return; defensive.
                 disclosure = .explicit
                 codes.append("coverage.severity:halt")
+            }
+            if let thermal = thermal,
+               thermal == .throttle || thermal == .emergency
+            {
+                disclosure = max(
+                    disclosure, .reasoned,
+                    by: Self.disclosureOrdinal)
+            }
+            if maintenance == .deferred {
+                disclosure = max(
+                    disclosure, .reasoned,
+                    by: Self.disclosureOrdinal)
             }
             return BASSurfaceDecision(
                 surface: .draftShell,
@@ -774,6 +910,32 @@ public actor QinaoRuntime {
                 reasonCodes: codes,
                 auditReference: auditRef)
         }
+    }
+
+    /// Disclosure ordering helper for the escalation logic above.
+    /// Higher = more transparency to the user. `.silent` never
+    /// appears on `.pass` paths so its ordinal is a placeholder.
+    private static func disclosureOrdinal(
+        _ d: BASSurfaceDisclosure
+    ) -> Int {
+        switch d {
+        case .silent:   return 0
+        case .minimal:  return 1
+        case .reasoned: return 2
+        case .explicit: return 3
+        }
+    }
+
+    /// Helper: non-generic "max" comparing two disclosures via a
+    /// key function. Swift stdlib's `max(_:_:)` only works on
+    /// `Comparable`, and we deliberately keep `BASSurfaceDisclosure`
+    /// a raw-value enum without a comparability contract.
+    private static func max(
+        _ lhs: BASSurfaceDisclosure,
+        _ rhs: BASSurfaceDisclosure,
+        by key: (BASSurfaceDisclosure) -> Int
+    ) -> BASSurfaceDisclosure {
+        key(lhs) >= key(rhs) ? lhs : rhs
     }
 
     // MARK: - M69 lifecycle-aware budget routing
