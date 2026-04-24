@@ -1774,6 +1774,215 @@ public actor QinaoSovereignControlPlane {
         return TurnResidueVerification(findings: findings)
     }
 
+    // MARK: - M133 · L14 self-heal actions
+    //
+    // L14 whitepaper §5 spells out four sovereign actions in
+    // response to integrity breaks: `halt`, `quarantine`,
+    // `rotate (lineage-cut)`, and `rollback`. Pre-M133 the Qinao
+    // surface only shipped `halt` via `markSessionHalted(_:reason:)`
+    // (invoked on every fail-closed path in sendSession + by hosts
+    // directly). M129 added chain-integrity DETECTION via
+    // `verifyTurnResidueStrong`. M133 adds the policy-driven
+    // RECOVERY layer that turns detection into real action:
+    // halt / quarantine / rotate. A future milestone can extend
+    // the same shape with `rollback` once snapshot registry lookup
+    // by lastVerifiedAuditID is wired.
+
+    /// M133 — what the recovery path should do when the ledger's
+    /// `verifyChainIntegrity()` fails for the sessions passed into
+    /// `autoHealChainIntegrity(policy:affectedSessionIDs:)`.
+    public enum ChainBreakRecoveryPolicy: Sendable, Equatable {
+        /// Match M129 pre-M133 behavior: mark each affected
+        /// session halted and return. Host is responsible for
+        /// any archival/quarantine/rotate follow-up.
+        case haltOnly
+        /// Mark halted + record a quarantine reason prefix so
+        /// audit replay can bucket the affected turns separately.
+        /// `reason` is appended to the literal
+        /// `"chain-break-quarantine:"` prefix so downstream
+        /// filtering can dispatch on the known prefix.
+        case quarantineAffectedSessions(reason: String)
+        /// Same halt+quarantine discipline, PLUS attempt a
+        /// segment rotation for each affected session (best
+        /// effort; sessions with no open segment are skipped
+        /// silently). The rotation uses
+        /// `BASSovereignLedgerRotationReason.lineageCut` since
+        /// semantically a chain-break-triggered rotation IS a
+        /// lineage cut — the tail before the break is closed
+        /// and a new segment opens anchored to the last clean
+        /// entry.
+        case rotateSegmentOnBreak(reason: String)
+    }
+
+    /// M133 — structured outcome of `autoHealChainIntegrity(...)`.
+    /// Describes what the heal path actually did — key for audit
+    /// replay so an operator can tell "was there a break, and
+    /// what recovery action did the sovereign take?".
+    public struct ChainBreakRecoveryOutcome:
+        Sendable, Equatable
+    {
+        /// `true` when the chain was intact at heal-time (no
+        /// break). A healthy chain means no recovery action was
+        /// taken; `haltedSessionIDs` and `rotatedSegmentIDs` are
+        /// both empty in this case.
+        public let wasHealthy: Bool
+        /// Short action tag — one of `"noop"` (healthy) /
+        /// `"halt"` / `"quarantine"` / `"rotate"` /
+        /// `"unknown-error"`. Stable raw strings so tests and
+        /// audit replay can dispatch on them.
+        public let action: String
+        /// From the ledger's integrity check: audit ID of the
+        /// last clean entry before the break. `nil` when the
+        /// chain is healthy OR when the break is at genesis.
+        public let lastVerifiedAuditID: String?
+        /// Sessions the recovery marked as halted. For `.haltOnly`
+        /// and `.quarantineAffectedSessions(_:)` this equals
+        /// the input `affectedSessionIDs`; for
+        /// `.rotateSegmentOnBreak(_:)` same, but the
+        /// rotation step is in addition.
+        public let haltedSessionIDs: [String]
+        /// Segment IDs that were successfully closed by the
+        /// rotation path. Empty for `.haltOnly` /
+        /// `.quarantineAffectedSessions(_:)` (they don't rotate).
+        /// For `.rotateSegmentOnBreak(_:)`: one segment ID per
+        /// session that had an open segment at heal-time (others
+        /// are silently skipped — a session with nothing to
+        /// rotate has nothing to close).
+        public let rotatedSegmentIDs: [String]
+        public let emittedAt: Date
+
+        public init(
+            wasHealthy: Bool,
+            action: String,
+            lastVerifiedAuditID: String?,
+            haltedSessionIDs: [String],
+            rotatedSegmentIDs: [String],
+            emittedAt: Date
+        ) {
+            self.wasHealthy = wasHealthy
+            self.action = action
+            self.lastVerifiedAuditID = lastVerifiedAuditID
+            self.haltedSessionIDs = haltedSessionIDs
+            self.rotatedSegmentIDs = rotatedSegmentIDs
+            self.emittedAt = emittedAt
+        }
+    }
+
+    /// M133 — Run the ledger's chain-integrity check; on break
+    /// execute the recovery `policy` for each session in
+    /// `affectedSessionIDs`. Returns a structured outcome
+    /// describing what was done.
+    ///
+    /// Callers decide their own `affectedSessionIDs` set — the
+    /// ledger does not track "which sessions touched which
+    /// entries" in a way that tells us which session's segment is
+    /// implicated by a break at a given ID. In practice hosts
+    /// will pass the currently-live sessions or the complete
+    /// session set known to their scheduler.
+    public func autoHealChainIntegrity(
+        policy: ChainBreakRecoveryPolicy,
+        affectedSessionIDs: [String]
+    ) async -> ChainBreakRecoveryOutcome {
+        do {
+            try await auditLedger.verifyChainIntegrity()
+        } catch let BASSovereign
+            .BASSovereignAuditLedger.LedgerError
+            .chainIntegrityBroken(
+                lastVerifiedAuditID: lastClean
+            )
+        {
+            return await runRecoveryActions(
+                policy: policy,
+                affectedSessionIDs: affectedSessionIDs,
+                lastVerifiedAuditID: lastClean)
+        } catch {
+            // Any unexpected ledger error (non-chain-integrity)
+            // is surfaced as a distinct action tag. No halt or
+            // rotate — the caller gets told it could not verify.
+            return ChainBreakRecoveryOutcome(
+                wasHealthy: false,
+                action: "unknown-error",
+                lastVerifiedAuditID: nil,
+                haltedSessionIDs: [],
+                rotatedSegmentIDs: [],
+                emittedAt: now())
+        }
+        // Chain was intact — noop.
+        return ChainBreakRecoveryOutcome(
+            wasHealthy: true,
+            action: "noop",
+            lastVerifiedAuditID: nil,
+            haltedSessionIDs: [],
+            rotatedSegmentIDs: [],
+            emittedAt: now())
+    }
+
+    /// Helper: execute the policy actions. Split out so the
+    /// top-level method stays focused on the happy vs. failure
+    /// dispatch.
+    private func runRecoveryActions(
+        policy: ChainBreakRecoveryPolicy,
+        affectedSessionIDs: [String],
+        lastVerifiedAuditID: String?
+    ) async -> ChainBreakRecoveryOutcome {
+        var halted: [String] = []
+        var rotated: [String] = []
+        let action: String
+        let reason: String
+        let shouldRotate: Bool
+
+        switch policy {
+        case .haltOnly:
+            action = "halt"
+            reason = "chain-break:halt"
+            shouldRotate = false
+        case .quarantineAffectedSessions(let r):
+            action = "quarantine"
+            reason = "chain-break-quarantine:" + r
+            shouldRotate = false
+        case .rotateSegmentOnBreak(let r):
+            action = "rotate"
+            reason = "chain-break-rotate:" + r
+            shouldRotate = true
+        }
+
+        for sid in affectedSessionIDs {
+            // markSessionHalted is a sync method on this same
+            // actor — no `await` needed since we're already
+            // inside the actor context.
+            markSessionHalted(
+                sessionID: sid, reason: reason)
+            halted.append(sid)
+            if shouldRotate {
+                let plan = BASSovereignLedgerRotationPlan(
+                    rotationID: "rotate."
+                        + sid + "."
+                        + UUID().uuidString,
+                    sessionID: sid,
+                    beforeTurnID: nil,
+                    reason: .lineageCut,
+                    requestedAt: now())
+                do {
+                    let closed = try await auditLedger
+                        .rotate(plan: plan)
+                    rotated.append(closed.segmentID)
+                } catch {
+                    // Best-effort rotation — sessions without an
+                    // open segment throw `.noOpenSegment` and we
+                    // silently skip them. Halt still applies.
+                }
+            }
+        }
+
+        return ChainBreakRecoveryOutcome(
+            wasHealthy: false,
+            action: action,
+            lastVerifiedAuditID: lastVerifiedAuditID,
+            haltedSessionIDs: halted,
+            rotatedSegmentIDs: rotated,
+            emittedAt: now())
+    }
+
     /// M129 — stronger `verifyTurnResidue` variant that also runs
     /// the ledger's cryptographic chain-integrity check. Unlike
     /// the pure M124 `verifyTurnResidue(_:)` path, this one does
