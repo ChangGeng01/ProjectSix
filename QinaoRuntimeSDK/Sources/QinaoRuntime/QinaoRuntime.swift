@@ -443,6 +443,67 @@ public actor QinaoRuntime {
         }
     }
 
+    // MARK: - M154 · AutoInjectPipeline
+    //
+    // Collapses the 4-line "append summary + track code" pattern
+    // that Phase 3 of sendSession used to repeat 14 times into a
+    // single `.inject(_:_:)` call. Pre-M154 every layer block
+    // looked like:
+    //
+    //     var combined = finalAdditionalSummaries ?? []
+    //     combined.append(bundle.coverageSummary)
+    //     finalAdditionalSummaries = combined
+    //     autoInjectedLayerCodes.append("L<n>")
+    //
+    // Post-M154 it's:
+    //
+    //     pipeline.inject(bundle.coverageSummary, "L<n>")
+    //
+    // Same observable behavior — the struct carries the exact
+    // append-order semantics the M152 one-source-of-truth
+    // signature depends on (M153 parity test pins it). Net saving:
+    // ~30 lines across the 14 layer blocks.
+    private struct AutoInjectPipeline {
+        /// Caller's initial extra summaries (may be nil).
+        private var seedSummaries:
+            [BASObservationCoverageSummary]?
+        /// Summaries injected by auto-stream, in insertion order.
+        private(set) var autoSummaries:
+            [BASObservationCoverageSummary] = []
+        /// Layer codes in the same insertion order; drives the
+        /// `expectedCoverageLayerIDs` expansion step.
+        private(set) var layerCodes: [String] = []
+
+        init(initial: [BASObservationCoverageSummary]?) {
+            self.seedSummaries = initial
+        }
+
+        /// Append one summary + its layer code. Called once per
+        /// layer gate in Phase 3. Pre-M154 this was four lines
+        /// of boilerplate inline.
+        mutating func inject(
+            _ summary: BASObservationCoverageSummary,
+            _ layerCode: String
+        ) {
+            autoSummaries.append(summary)
+            layerCodes.append(layerCode)
+        }
+
+        /// Final summaries list for `recordTurnCoverage`. If the
+        /// caller passed no initial extras AND auto-stream
+        /// produced none, returns `nil` to preserve pre-M95
+        /// "don't trigger the streaming branch" semantics. Any
+        /// non-nil caller seed OR any auto-inject flips to the
+        /// streaming path.
+        var finalSummaries:
+            [BASObservationCoverageSummary]? {
+            if let seed = seedSummaries {
+                return seed + autoSummaries
+            }
+            return autoSummaries.isEmpty ? nil : autoSummaries
+        }
+    }
+
     /// Main-path turn entry. Runs the completed turn's observations
     /// through the sovereign audit, returns the report, and — per the
     /// three-invariant ledger-first discipline — halts the session
@@ -513,11 +574,18 @@ public actor QinaoRuntime {
         // PHASE 3 — auto-stream L1..L13 observation summaries.
         //           Order: unconditional (L3, L5) → gated.
         // =========================================================
-        var finalAdditionalSummaries =
-            inputs.additionalCoverageSummaries
+        //
+        // M154 — AutoInjectPipeline collapses the 4-line
+        // append/code pattern into a single `.inject(...)` call
+        // per layer. The 14 per-layer blocks are still inline
+        // (each layer's derive wants access to other main-body
+        // locals like `l3Fold` / `l5Constitution` that Phase 5
+        // and 7 reuse), but the append-and-track boilerplate is
+        // now one line instead of four.
         var finalExpectedLayerIDs =
             inputs.expectedCoverageLayerIDs
-        var autoInjectedLayerCodes: [String] = []
+        var pipeline = AutoInjectPipeline(
+            initial: inputs.additionalCoverageSummaries)
 
         // L1 (M121) — gated by lifecycle + routed budget.
         if let lifecycle = lifecycle,
@@ -528,10 +596,7 @@ public actor QinaoRuntime {
                     sessionID: inputs.observations.sessionID,
                     turnID: inputs.observations.turnID,
                     emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l1Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L1")
+            pipeline.inject(l1Bundle.coverageSummary, "L1")
         }
 
         // L3 (M122) — unconditional; minimum-viable fold.
@@ -543,15 +608,12 @@ public actor QinaoRuntime {
             restorePointer: inputs.observations.snapshotRef,
             checksum: inputs.observations.policyHash,
             snapshotRef: inputs.observations.snapshotRef)
-        do {
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l3Fold.coverageSummary(
+        pipeline.inject(
+            l3Fold.coverageSummary(
                 turnID: inputs.observations.turnID,
                 sessionID: inputs.observations.sessionID,
-                emittedAt: now()))
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L3")
-        }
+                emittedAt: now()),
+            "L3")
 
         // L5 (M122) — unconditional; read host state.
         let l5Constitution = await host.currentConstitution()
@@ -564,12 +626,7 @@ public actor QinaoRuntime {
                 turnID: inputs.observations.turnID,
                 sessionID: inputs.observations.sessionID,
                 emittedAt: now())
-        do {
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l5Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L5")
-        }
+        pipeline.inject(l5Bundle.coverageSummary, "L5")
 
         // L6 (M134) — gated by contextFrame.
         if let ctxFrame = inputs.contextFrame {
@@ -578,10 +635,7 @@ public actor QinaoRuntime {
                 turnID: inputs.observations.turnID,
                 sessionID: inputs.observations.sessionID,
                 emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l6Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L6")
+            pipeline.inject(l6Bundle.coverageSummary, "L6")
         }
 
         // L7 (M135) — gated by decomposeFrame.
@@ -592,10 +646,7 @@ public actor QinaoRuntime {
                     turnID: inputs.observations.turnID,
                     sessionID: inputs.observations.sessionID,
                     emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l7Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L7")
+            pipeline.inject(l7Bundle.coverageSummary, "L7")
         }
 
         // L8 (M136) — gated by memoryBundle.
@@ -606,10 +657,7 @@ public actor QinaoRuntime {
                     turnID: inputs.observations.turnID,
                     sessionID: inputs.observations.sessionID,
                     emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l8Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L8")
+            pipeline.inject(l8Bundle.coverageSummary, "L8")
         }
 
         // L4 + L10 + L11 (M137 + M139) — co-gated by thoughtFrame.
@@ -629,14 +677,9 @@ public actor QinaoRuntime {
                 turnID: inputs.observations.turnID,
                 sessionID: inputs.observations.sessionID,
                 emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l4Bundle.coverageSummary)
-            combined.append(l10Bundle.coverageSummary)
-            combined.append(l11Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L4")
-            autoInjectedLayerCodes.append("L10")
-            autoInjectedLayerCodes.append("L11")
+            pipeline.inject(l4Bundle.coverageSummary, "L4")
+            pipeline.inject(l10Bundle.coverageSummary, "L10")
+            pipeline.inject(l11Bundle.coverageSummary, "L11")
         }
 
         // L13 (M138) — gated by updateTickets.
@@ -647,10 +690,7 @@ public actor QinaoRuntime {
                     turnID: inputs.observations.turnID,
                     sessionID: inputs.observations.sessionID,
                     emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l13Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L13")
+            pipeline.inject(l13Bundle.coverageSummary, "L13")
         }
 
         // L2 (M140) — gated by neuralOrganMap.
@@ -660,10 +700,7 @@ public actor QinaoRuntime {
                 turnID: inputs.observations.turnID,
                 sessionID: inputs.observations.sessionID,
                 emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l2Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L2")
+            pipeline.inject(l2Bundle.coverageSummary, "L2")
         }
 
         // L12 (M141) — co-gated by thoughtFrame + renderedOutput.
@@ -676,10 +713,7 @@ public actor QinaoRuntime {
                 turnID: inputs.observations.turnID,
                 sessionID: inputs.observations.sessionID,
                 emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l12Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L12")
+            pipeline.inject(l12Bundle.coverageSummary, "L12")
         }
 
         // L9 (M142) — gated by candidateFrontier.
@@ -689,17 +723,14 @@ public actor QinaoRuntime {
                 turnID: inputs.observations.turnID,
                 sessionID: inputs.observations.sessionID,
                 emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l9Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L9")
+            pipeline.inject(l9Bundle.coverageSummary, "L9")
         }
 
         // Expand expected-layer set only when caller left default.
         if inputs.expectedCoverageLayerIDs == ["L14"]
-           && !autoInjectedLayerCodes.isEmpty {
+           && !pipeline.layerCodes.isEmpty {
             finalExpectedLayerIDs =
-                ["L14"] + autoInjectedLayerCodes
+                ["L14"] + pipeline.layerCodes
         }
 
         // =========================================================
@@ -710,7 +741,7 @@ public actor QinaoRuntime {
             turnID: inputs.observations.turnID,
             budgetCeiling: inputs.coverageBudgetCeiling,
             expectedLayerIDs: finalExpectedLayerIDs,
-            additionalSummaries: finalAdditionalSummaries)
+            additionalSummaries: pipeline.finalSummaries)
 
         // =========================================================
         // PHASE 5 — sovereign frame aggregator (M123 + M144 + M147).
