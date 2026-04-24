@@ -941,9 +941,47 @@ public actor QinaoRuntime {
         // agencyReservationRef from the same synthetic refs we
         // used for the sovereign frame. Render frame now picks up
         // the L12 surface's upstream bindings: risk → permit →
-        // agency reservation → surface decision. 4 of its 12
-        // optional refs are populated deterministically when the
-        // thoughtFrame carries the source data.
+        // agency reservation → surface decision.
+        //
+        // M148 — fill the last 4 render-frame nil fields with
+        // synthetic per-turn refs, gated on their natural source:
+        //   situationRef → synthetic when decomposeFrame exists
+        //                  (the L7 decompose captures the situation
+        //                  context)
+        //   mirrorRef    → synthetic when decomposeFrame has a
+        //                  mirrorDraft (L7 mirror blade output)
+        //   toneProfileRef → synthetic when renderedOutput exists
+        //                    (L12 rendered output carries tone)
+        //   forceCurveRef → synthetic when renderedOutput AND
+        //                   thoughtFrame.riskCard both exist
+        //                   (force curve is risk × render joint)
+        // Post-M148 render frame ref completeness: 12/12.
+        let situationRef: String? =
+            decomposeFrame.map { _ in
+                "situation."
+                + observations.sessionID
+                + "." + observations.turnID
+            }
+        let mirrorRef: String? =
+            decomposeFrame?.mirrorDraft.map { _ in
+                "mirror."
+                + observations.sessionID
+                + "." + observations.turnID
+            }
+        let toneProfileRef: String? =
+            renderedOutput.map { _ in
+                "tone."
+                + observations.sessionID
+                + "." + observations.turnID
+            }
+        let forceCurveRef: String? =
+            (renderedOutput != nil
+             && thoughtFrame?.riskCard != nil)
+            ? ("force-curve."
+               + observations.sessionID
+               + "." + observations.turnID)
+            : nil
+
         let renderFrame = BASRenderFrame(
             frameID: "render."
                 + observations.sessionID
@@ -953,19 +991,15 @@ public actor QinaoRuntime {
             agencyReservationRef: agencyReservationRef,
             hostStyleRef: l5Constitution.activeVersion.isEmpty
                 ? nil : l5Constitution.activeVersion,
-            situationRef: nil,
-            // → future: wire to L7 situation frame ref.
-            mirrorRef: nil,
-            // → future: wire to L7 mirror-blade output ref.
+            situationRef: situationRef,
+            mirrorRef: mirrorRef,
             substituteRef:
                 computedSurfaceDecision.substitute.kind.rawValue,
             sovereignSurfaceRef: sovereignFrame.frameID,
             outputSurfaceRef:
                 computedSurfaceDecision.surface.rawValue,
-            toneProfileRef: nil,
-            // → future: wire to L12 tone engine.
-            forceCurveRef: nil,
-            // → future: wire to L12 force-curve engine.
+            toneProfileRef: toneProfileRef,
+            forceCurveRef: forceCurveRef,
             disclosureProfileRef:
                 computedSurfaceDecision.disclosure.rawValue)
         await sovereign.recordRenderFrame(
