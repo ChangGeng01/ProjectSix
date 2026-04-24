@@ -1462,10 +1462,20 @@ public actor QinaoSovereignControlPlane {
     //     in the SnapshotManager — future M124+n once snapshot
     //     registration becomes a first-class action on sendSession.
 
-    /// M124 — The three-residue imprint for one (sessionID, turnID):
-    /// coverage reading, observation bundle, sovereign frame. Every
-    /// component is optional because production ledgers can have
-    /// partial turns (halt paths, pre-halted sessions, etc.).
+    /// M124 — The per-turn residue bundle for one (sessionID,
+    /// turnID). Covers the four parallel storages:
+    ///
+    ///   * `coverageReading`    — M45 cross-layer verdict
+    ///   * `observationBundle`  — M90 per-turn layer summaries
+    ///   * `sovereignFrame`     — M123 L14 §5.1 aggregator
+    ///   * `renderFrame`        — M131: L12 render aggregator
+    ///                             (was missing from M124's
+    ///                             original shape — M127 added the
+    ///                             storage, M131 adds the field)
+    ///
+    /// Every component is optional because production ledgers can
+    /// have partial turns (halt paths, pre-halted sessions, direct-
+    /// constructed fixtures).
     public struct TurnResidue: Sendable, Equatable {
         public let sessionID: String
         public let turnID: String
@@ -1473,6 +1483,12 @@ public actor QinaoSovereignControlPlane {
         public let observationBundle:
             BASObservationReconciliationReport?
         public let sovereignFrame: BASSovereignFrame?
+        /// M131 — the L12 render-frame recorded on the control
+        /// plane's parallel storage (M127). Missing from pre-M131
+        /// residues even if the render frame was recorded; added
+        /// here so the residue is complete. `nil` for halt paths /
+        /// direct-constructed fixtures / pre-M127 call sites.
+        public let renderFrame: BASRenderFrame?
 
         public init(
             sessionID: String,
@@ -1480,22 +1496,26 @@ public actor QinaoSovereignControlPlane {
             coverageReading: CoverageReading?,
             observationBundle:
                 BASObservationReconciliationReport?,
-            sovereignFrame: BASSovereignFrame?
+            sovereignFrame: BASSovereignFrame?,
+            renderFrame: BASRenderFrame? = nil
         ) {
             self.sessionID = sessionID
             self.turnID = turnID
             self.coverageReading = coverageReading
             self.observationBundle = observationBundle
             self.sovereignFrame = sovereignFrame
+            self.renderFrame = renderFrame
         }
 
-        /// `true` when all three residue components are present.
+        /// `true` when all four residue components are present.
         /// Partial residues (coverage without bundle, bundle without
-        /// frame) occur on halt paths or pre-halted sessions.
+        /// frame, frame without render) occur on halt paths or
+        /// pre-halted sessions.
         public var isComplete: Bool {
             coverageReading != nil
                 && observationBundle != nil
                 && sovereignFrame != nil
+                && renderFrame != nil
         }
     }
 
@@ -1540,13 +1560,33 @@ public actor QinaoSovereignControlPlane {
             /// `verifyTurnResidue(_:)` path never fires this
             /// finding because it deliberately does no I/O.
             case chainIntegrityBroken(lastVerifiedAuditID: String?)
+            /// M131 — residue lacks the L12 render frame. Fires
+            /// when a post-M127 sendSession call would have
+            /// recorded one but the residue snapshot missed it,
+            /// or when a direct-constructed residue omitted the
+            /// field.
+            case missingRenderFrame
+            /// M131 — render frame's `frameID` does not follow
+            /// "render.<sessionID>.<turnID>".
+            case renderFrameIDConventionMismatch(
+                expected: String, got: String)
+            /// M131 — render frame's `sovereignSurfaceRef` does
+            /// not back-reference the sovereign frame's frameID
+            /// (render → sovereign link broken).
+            case renderSovereignBackRefBroken(
+                renderSurfaceRef: String?,
+                sovereignFrameID: String?)
+            /// M131 — render frame's `mergedChoiceRef` does not
+            /// follow the L3 fold convention "fold.<session>.<turn>".
+            case renderMergedChoiceRefConventionMismatch(
+                expected: String, got: String)
         }
     }
 
-    /// M124 — Fetch the three-residue imprint for one (sessionID,
-    /// turnID). All three parallel-storage reads happen inside the
-    /// same actor hop so the values represent a coherent snapshot
-    /// of the ledger at one moment.
+    /// M124 — Fetch the per-turn residue for one (sessionID,
+    /// turnID). All four parallel-storage reads happen on the same
+    /// actor so the values represent a coherent snapshot.
+    /// M131 — added `renderFrame` to the bundle.
     public func turnResidue(
         sessionID: String,
         turnID: String
@@ -1557,12 +1597,20 @@ public actor QinaoSovereignControlPlane {
             forSession: sessionID, turn: turnID)
         let frame = await auditLedger.sovereignFrame(
             forSession: sessionID, turn: turnID)
+        // M131 — render frame lives on this control plane (not
+        // the BAS ledger) because BASRenderFrame is in
+        // BASOrchestration. Read it from the private storage
+        // directly since we're inside the actor.
+        let rframe = renderFrameEntries.first {
+            $0.sessionID == sessionID && $0.turnID == turnID
+        }?.frame
         return TurnResidue(
             sessionID: sessionID,
             turnID: turnID,
             coverageReading: cov,
             observationBundle: bundle,
-            sovereignFrame: frame)
+            sovereignFrame: frame,
+            renderFrame: rframe)
     }
 
     /// M124 — Verify cross-surface integrity of a turn residue.
@@ -1628,6 +1676,50 @@ public actor QinaoSovereignControlPlane {
                     .thoughtFoldRefConventionMismatch(
                         expected: expectedFoldRef,
                         got: ref))
+            }
+        }
+
+        // M131 — render frame checks. Only fired when the residue
+        // claims the sovereign frame is present (otherwise the
+        // render frame being nil is expected for halt/partial
+        // paths). When both are present, we pin the render-frame
+        // naming convention + the render → sovereign back-ref.
+        if residue.sovereignFrame != nil
+           && residue.renderFrame == nil
+        {
+            findings.append(.missingRenderFrame)
+        }
+        if let rframe = residue.renderFrame {
+            let expectedRenderFrameID =
+                "render." + residue.sessionID
+                + "." + residue.turnID
+            if rframe.frameID != expectedRenderFrameID {
+                findings.append(
+                    .renderFrameIDConventionMismatch(
+                        expected: expectedRenderFrameID,
+                        got: rframe.frameID))
+            }
+            let expectedMergedChoiceRef =
+                "fold." + residue.sessionID
+                + "." + residue.turnID
+            if let ref = rframe.mergedChoiceRef,
+               ref != expectedMergedChoiceRef
+            {
+                findings.append(
+                    .renderMergedChoiceRefConventionMismatch(
+                        expected: expectedMergedChoiceRef,
+                        got: ref))
+            }
+            // render → sovereign back-ref: expect non-nil
+            // sovereignSurfaceRef AND equal to sovereignFrame.frameID.
+            if let sframe = residue.sovereignFrame,
+               rframe.sovereignSurfaceRef != sframe.frameID
+            {
+                findings.append(
+                    .renderSovereignBackRefBroken(
+                        renderSurfaceRef:
+                            rframe.sovereignSurfaceRef,
+                        sovereignFrameID: sframe.frameID))
             }
         }
 

@@ -637,6 +637,21 @@ public actor QinaoRuntime {
         //   toneProfileRef / forceCurveRef — L12 tone/force engine
         // Each nil comment-documented below so future milestones
         // can trace the hook.
+        // M131 dedup — compute the surface decision ONCE and reuse
+        // it for (a) render-frame ref derivation and (b) TurnOutcome
+        // population. Pre-M131 sendSession called
+        // `deriveSurfaceDecision` four times per turn (3 inline
+        // helpers + 1 in the outcome return); the function is pure
+        // and deterministic, so the calls all produced the same
+        // value — just wasted work. This binding folds them into
+        // one compute; the outcome-return sites below read it too.
+        let computedSurfaceDecision = Self.deriveSurfaceDecision(
+            auditSeverity: report.severity,
+            coverageSeverity: coverage.severity,
+            auditRef: report.auditRef,
+            routedBudget: routedBudget,
+            retryPolicy: surfaceRetryPolicy)
+
         let renderFrame = BASRenderFrame(
             frameID: "render."
                 + observations.sessionID
@@ -652,50 +667,21 @@ public actor QinaoRuntime {
             // → future: wire to L7 situation frame ref.
             mirrorRef: nil,
             // → future: wire to L7 mirror-blade output ref.
-            substituteRef: deriveSubstituteRef(),
+            substituteRef:
+                computedSurfaceDecision.substitute.kind.rawValue,
             sovereignSurfaceRef: sovereignFrame.frameID,
-            outputSurfaceRef: deriveOutputSurfaceRef(),
+            outputSurfaceRef:
+                computedSurfaceDecision.surface.rawValue,
             toneProfileRef: nil,
             // → future: wire to L12 tone engine.
             forceCurveRef: nil,
             // → future: wire to L12 force-curve engine.
             disclosureProfileRef:
-                deriveDisclosureProfileRef())
+                computedSurfaceDecision.disclosure.rawValue)
         await sovereign.recordRenderFrame(
             renderFrame,
             sessionID: observations.sessionID,
             turnID: observations.turnID)
-
-        // Helpers closed over surfaceDecision derivation. Defined
-        // inline because they capture the audit+coverage+budget
-        // shape once; if M127+n adds more refs, they can hoist.
-        func deriveSubstituteRef() -> String {
-            let decision = Self.deriveSurfaceDecision(
-                auditSeverity: report.severity,
-                coverageSeverity: coverage.severity,
-                auditRef: report.auditRef,
-                routedBudget: routedBudget,
-                retryPolicy: surfaceRetryPolicy)
-            return decision.substitute.kind.rawValue
-        }
-        func deriveOutputSurfaceRef() -> String {
-            let decision = Self.deriveSurfaceDecision(
-                auditSeverity: report.severity,
-                coverageSeverity: coverage.severity,
-                auditRef: report.auditRef,
-                routedBudget: routedBudget,
-                retryPolicy: surfaceRetryPolicy)
-            return decision.surface.rawValue
-        }
-        func deriveDisclosureProfileRef() -> String {
-            let decision = Self.deriveSurfaceDecision(
-                auditSeverity: report.severity,
-                coverageSeverity: coverage.severity,
-                auditRef: report.auditRef,
-                routedBudget: routedBudget,
-                retryPolicy: surfaceRetryPolicy)
-            return decision.disclosure.rawValue
-        }
 
         // Fail-closed: the coordinator was laxer than the independent
         // engine — the coordinator allowed something the engine would
@@ -760,12 +746,10 @@ public actor QinaoRuntime {
                 sessionHalted: true,
                 routedBudget: routedBudget,
                 turnRecorded: nil,
-                surfaceDecision: Self.deriveSurfaceDecision(
-                    auditSeverity: report.severity,
-                    coverageSeverity: coverage.severity,
-                    auditRef: report.auditRef,
-                    routedBudget: routedBudget,
-                    retryPolicy: surfaceRetryPolicy),
+                // M131 dedup — reuse `computedSurfaceDecision`
+                // captured once above, same value the render
+                // frame used.
+                surfaceDecision: computedSurfaceDecision,
                 residue: residue)
         }
 
@@ -798,12 +782,11 @@ public actor QinaoRuntime {
             sessionHalted: false,
             routedBudget: routedBudget,
             turnRecorded: turnRecorded,
-            surfaceDecision: Self.deriveSurfaceDecision(
-                auditSeverity: report.severity,
-                coverageSeverity: coverage.severity,
-                auditRef: report.auditRef,
-                routedBudget: routedBudget,
-                retryPolicy: surfaceRetryPolicy),
+            // M131 dedup — reuse the single surface-decision
+            // compute from above so one sendSession call makes
+            // exactly one deriveSurfaceDecision call instead of
+            // four (render frame × 3 helpers + outcome return).
+            surfaceDecision: computedSurfaceDecision,
             residue: residue)
     }
 
@@ -864,6 +847,14 @@ public actor QinaoRuntime {
         public let memoryFreezeSeconds: Int
         public let quarantineSeconds: Int
 
+        /// M131 — every value is clamped to `max(0, …)` at init
+        /// time. A negative retry window has no meaningful UI
+        /// semantics — `deferToLater(retryAfterSeconds: -45)`
+        /// would render a nonsensical "retry 45 seconds ago"
+        /// label — so the policy refuses to store one. Callers
+        /// that pass a negative value silently get 0 (retry
+        /// immediately); this is the conservative failure mode
+        /// that keeps the UI sensible without surfacing a throw.
         public init(
             throttleSeconds: Int = 30,
             shadowLockSeconds: Int = 60,
@@ -871,11 +862,19 @@ public actor QinaoRuntime {
             memoryFreezeSeconds: Int = 180,
             quarantineSeconds: Int = 300
         ) {
-            self.throttleSeconds = throttleSeconds
-            self.shadowLockSeconds = shadowLockSeconds
-            self.toolCutSeconds = toolCutSeconds
-            self.memoryFreezeSeconds = memoryFreezeSeconds
-            self.quarantineSeconds = quarantineSeconds
+            // `Swift.max` qualifier — the enclosing QinaoRuntime
+            // actor defines a private static `max(_:_:by:)`
+            // helper for BASSurfaceDisclosure ordering, which
+            // shadows the global `max` inside the actor's scope.
+            self.throttleSeconds =
+                Swift.max(0, throttleSeconds)
+            self.shadowLockSeconds =
+                Swift.max(0, shadowLockSeconds)
+            self.toolCutSeconds = Swift.max(0, toolCutSeconds)
+            self.memoryFreezeSeconds =
+                Swift.max(0, memoryFreezeSeconds)
+            self.quarantineSeconds =
+                Swift.max(0, quarantineSeconds)
         }
 
         /// Default policy used when `sendSession`'s caller does
@@ -922,7 +921,10 @@ public actor QinaoRuntime {
 
         /// Effective retry seconds = base × thermal-multiplier,
         /// rounded to the nearest Int. Returns `nil` when
-        /// `severity` is not a delay-producing state.
+        /// `severity` is not a delay-producing state. M131 pins
+        /// the result ≥ 0 via `max(0, …)` — init already clamps
+        /// base, but multiplication by a future multiplier < 1.0
+        /// could drift due to rounding. Defense in depth.
         public func effectiveSeconds(
             for severity:
                 QinaoSovereignControlPlane.AuditSeverity,
@@ -933,7 +935,9 @@ public actor QinaoRuntime {
             }
             let multiplier = Self.thermalMultiplier(
                 for: thermalLevel)
-            return Int((Double(base) * multiplier).rounded())
+            let raw = Int(
+                (Double(base) * multiplier).rounded())
+            return Swift.max(0, raw)
         }
     }
 
