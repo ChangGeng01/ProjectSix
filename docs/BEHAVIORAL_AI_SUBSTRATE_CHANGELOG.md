@@ -2,6 +2,86 @@
 
 ## 2026-04-25
 
+- **M146 — 白皮书 scope 总收官 capstone (M121-M145 · 一次性 solve-through session · 14/14 L1-L14 auto-stream + L14 §5 四动作 quartet + 所有 Swift-only-whitepaper-scope self-critique items closed)**：承前 21 个 milestone (M121 L1 → M145 surfaceDecision non-optional)，本条目为 session 总收官 · 记录里程碑矩阵 + 最终状态 + honesty board 更新。
+
+### 14/14 L1-L14 per-turn auto-stream 矩阵（完整白皮书织网）
+
+  Always:                        L14 sovereign (M9 · 每轮 auditTurn)
+  Unconditional:                 L3 thoughtFold (M122), L5 hostConstitution (M122)
+  lifecycle + plannedBudget:     L1 leaseLife (M121)
+  contextFrame:                  L6 presenceEye (M134)
+  decomposeFrame:                L7 mirrorBlade (M135)
+  memoryBundle:                  L8 hippocampalWell (M136)
+  thoughtFrame:                  L4 worldPrior (M139), L10 triSelfTribunal (M137), L11 riskClimate (M137)
+  thoughtFrame + renderedOutput: L12 gentleHand (M141)
+  updateTickets:                 L13 evolutionFurnace (M138 · invariant #3 hard-pinned)
+  neuralOrganMap:                L2 neuralOrgan (M140)
+  candidateFrontier:             L9 dreamLoop (M142 · BAS-side derive shipped alongside)
+
+### L14 §5 sovereign action quartet 全集
+
+  halt        — markSessionHalted("chain-break:halt" / fail-closed paths) — M133
+  quarantine  — ChainBreakRecoveryPolicy.quarantineAffectedSessions(reason:) — M133
+  rotate      — ChainBreakRecoveryPolicy.rotateSegmentOnBreak(reason:) + ledger.rotate(plan: .lineageCut) — M133
+  **rollback** — ChainBreakRecoveryPolicy.rollbackToLastClean(reason:hostVersionID:) + requestRollback(sessionID:fromVersionID:) → RollbackPlan — **M143**
+
+### sovereign + render frame ref completeness
+
+Sovereign frame (13 optional refs): 5/13 pre-M144 → **7/13** (+riskCardRef, +actionPermitRef via M144).  
+Render frame (12 optional refs): 7/12 pre-M144 → **9/12** (+actionPermitRef, +agencyReservationRef via M144).
+
+### API tightening
+
+M145 · TurnOutcome.surfaceDecision: BASSurfaceDecision? → **BASSurfaceDecision** (non-optional). Compile-time proof of "every returned TurnOutcome carries a surface decision". BREAKING for direct-construction call sites; migration documented in commit.
+
+### Self-critique 10 条最终状态（始于上一个"满意吗"自我盘点）
+
+  #1 M125 hardcode mapping → M126 SurfaceRetryPolicy configurable · ✅
+  #2 M117 idle struct pile → M127 BASRenderFrame activated + M144 refs populated · ✅
+  #3 surfaceDecision optional 假 → M145 non-optional · ✅
+  #4 60s 魔数 → M126 clamped + thermal multiplier · ✅
+  #5 verifier 不查加密 → M129 verifyTurnResidueStrong + M131 chain integrity finding · ✅
+  #6 sovereignFrame 8 nil fields → M144 partial close (7/13 now; 6 still nil pending future source plumbing) · ⚠️ partial
+  #7 真机 thermal → 跨 session (需 iOS target + 真机)
+  #8 L2 神经双脑 → 跨 session (需 CoreML / MLX 基础设施)
+  #9 API overlap 冗余 → M128 TurnOutcome.residue expose · ✅
+  #10 pattern 8 命名 → M130 显式退回 · ✅
+
+**7/10 closed · 1/10 partial · 2/10 跨 session (出白皮书 scope 或需真机)**
+
+### honesty-board 最终分数（白皮书 scope 内）
+
+| 维度 | 起 | 终 | 进步 |
+|---|---|---|---|
+| 自演化 | 2/10 | 3/10 | +1 (M138 L13 shadow stream 记录但不触权重) |
+| 自调度 | 4/10 | 4/10 | 0 (iOS target 不在本 session scope) |
+| 自适应 | 5/10 | 5/10 | 0 (语义漂移适应需 L2 真双脑) |
+| **自修复** | 3/10 | **9/10** | +6 (M133+M143 quartet 全集：halt/quarantine/rotate/rollback 四动作全 shipped) |
+| 模块化 | 9/10 | 9/10 | 0 (已饱和) |
+| 可复用 | 6/10 | 6/10 | 0 (actor 耦合需更大 refactor) |
+| **架构级** | 9/10 | **10/10** | +1 (14/14 L1-L14 每轮主链消费 + L14 §5 action 四全) |
+| 企业级 | 3/10 | 3/10 | 0 (scope 外 — 多租户/observability/合规) |
+
+**41/80 (session 起) → 49/80 (session 终) ≈ 61%** · 白皮书 scope 内可做的结构性抬升基本走满。
+
+### 本 session 最终统计 (M121 → M145 · 25 milestones)
+
+- BAS: 1429 XCTest + 417 swift-testing 全程不变（M138 + M142 仅 additive schema 扩）
+- **Qinao: 454 → 570 (+116 tests)**
+- 5 边界闸每 commit 全绿 (import / redaction / sdk / residuals / whitepaper schema parity — 186 declared / 187 registered)
+- 25 个独立 commit + push · 每个含完整 regression + tests
+- 14 个白皮书 L1-L14 层全部 per-turn main-path consumption · L14 §5 quartet 全集 · cross-surface integrity 4 surfaces + 2 verifier variants (pure + strong)
+
+### 下一 session 候选 (都是跨 session / scope 外)
+
+1. **#7 真机 thermal + BGTaskScheduler**（iOS target · 需 Xcode 真机 build）
+2. **#8 L2 Scout/Core 真实双模型**（CoreML/MLX infra · 或 Apple FoundationModels 增强）
+3. **企业级 observability** — OTel seam · multi-tenant plumbing · SLO定义
+4. **#6 剩余 6 frame nil fields** — 需新 source type plumbed through sendSession (jurisdictionRef / timeLockRef / contamination refs / pending digests / situationRef / mirrorRef / toneProfileRef / forceCurveRef)
+5. **L13 真蒸馏 pipeline** — 挑战 invariant #3 · 需要设计原则讨论
+
+这些任选推进 · 本 session 已交付所有 Swift-only-whitepaper-scope 的结构性进化。
+
 - **M126-M130 session capstone — 前 session 10 条自我批评的 5 条收口 + 纪律纠正（pattern 8 "cross-surface-integrity" 命名收回 · 归入 pattern 7 runtime-wiring 的 sub-variant 不独立命名 · pattern 系列防止过度抽象）**：用户 "全面进化" 口径后的落地 session。M121-M125 完 "血液/骨架/筋脉/皮肤" 四元 metaphor 后我自己列了 10 条不满意 · 本 session 按 "效益/成本" 排序推进可做的 5 条（#1 #2 #4 #5 #9）· 3 条大项（#3 TurnOutcome.surfaceDecision 非 optional / #7 真机 thermal / #8 L2 神经）跨 session 留 · 2 条（#6 sovereignFrame 8 nil 字段 / #10 pattern 8 命名）用 M127 deeper wiring + M130 docs cleanup 处理。**本 session 5 个里程碑一气呵成**：(i) **M126 真·L12**：引入 `QinaoRuntime.SurfaceRetryPolicy` 值类型（5 severity × seconds + thermal multiplier）· `deriveSurfaceDecision` 新吃 `routedBudget` 参数 · `.pass` 路径 disclosure 升级三输入（coverage advisory + thermal throttle/emergency + maintenance deferred 任一即 reasoned）· reasonCodes 加 `thermal:<level>` 和 `maintenance:<class>` · 消除 60s 魔数；7 XCTest (`testDefaultPolicyProducesMonotonicBaseSeconds` / `testThermalMultiplierStretchesEffectiveSeconds` / `testCustomPolicyOverridesDefaults` / `testPassWithThrottleThermalEscalatesDisclosure` / `testPassWithDeferredMaintenanceEscalatesDisclosure` / `testReasonCodesIncludeDeviceContext` / `testNoRoutedBudgetMeansNoDeviceCodes`)；(ii) **M127 BASRenderFrame 激活**：13-ref L12 aggregator 从 M117 shipped-idle 升级为每轮 build · `QinaoSovereignControlPlane` 新 `renderFrameEntries[]` private storage + 5-method public API（recordRenderFrame / renderFrame / renderFrames forSession / renderFrameCount）· sendSession 每轮构造并 record · 7/13 refs deterministic 填（frameID / mergedChoiceRef → L3 fold / hostStyleRef → L5 activeVersion / sovereignSurfaceRef → M123 frame ID / outputSurfaceRef / substituteRef / disclosureProfileRef）· 6 nil refs 每条 comment 写 future-wiring 来源（actionPermit / agencyReservation / situation / mirror / tone / forceCurve）· BASSovereign 不能加 BASOrchestration dep（会形成 cycle） · 所以 render frame storage 放 Qinao composition layer 而非 BAS ledger；8 XCTest；**关键决策记录**：我最初版本写在 BASSovereignAuditLedger 里 · 发现 cycle 后 revert 改 QinaoSovereignControlPlane · 这是 "一刻误判 → 立刻 revert 选对层" 的纪律；(iii) **M128 TurnOutcome.residue expose**：消除 self-critique #9 API overlap · `TurnOutcome` 新 `residue: TurnResidue?` 字段 · sendSession 两个 return 点各调 `sovereign.turnResidue(...)` 一次并塞进 outcome · host 无须二次 round-trip · backward-compat `nil` default 不破既有 test fixture；5 XCTest；(iv) **M129 verifyTurnResidueStrong**：M124 pure verifier 保不变 · 新 async 强变体 `verifyTurnResidueStrong(_:)` 内部除跑 M124 cross-surface 校验外再调 `auditLedger.verifyChainIntegrity()` · `LedgerError.chainIntegrityBroken` 转为结构化 `.chainIntegrityBroken(lastVerifiedAuditID:)` finding；callers 二选一（pure O(findings) 每帧可跑 vs strong 跨 session boundary / integrity-sensitive halt 可跑）；3 XCTest；(v) **M130 docs capstone + pattern 8 命名收回**：M124 的 "pattern 8 cross-surface-integrity" 命名只用了 2 次（M124 fetch+verify · M125 produce+hint · M127 produce+store · M129 verify+crypto）· 虽然 4 个例子但其实都是 pattern 7 runtime-wiring 的 "在现有 ledger parallel storage 上加 accessor" 或 "在现有 verifier 上加 finding" 的变体 · 不足以独立命名；本条显式退回 pattern 8 · 改为 "pattern 7 的 sub-variant: residue-query + residue-verify"；未来若有独立 >=5 个真新例子再命名。**全 session 5 milestone 统计**：Qinao 475 → 498 (+23 tests)；每 milestone 独立 commit + push + 全栈回归 + 5 gates 绿；每 milestone 独立 self-critique 条目对应 close。**self-critique 10 条状态更新**：#1 ✓ closed (M126) · #2 ✓ closed (M127 — 13/17 idle structs 已动 · 剩 4 rendered-guide struct + `BASRenderedBoundaryGuide` 等为 optional 次级 surface) · #3 ⏳ 跨 session (TurnOutcome.surfaceDecision 非 optional 需破 API · 要谨慎) · #4 ✓ closed (M126) · #5 ✓ closed (M129) · #6 ⚠️ partial (M123 sovereignFrame 8 nil 字段仍 nil · 每条 M127-doc 命名了 future-wiring 来源 · 但 upstream 信号源未就位) · #7 ⏳ 跨 session (真机 thermal · 需 iOS target · 离线 testing 不可) · #8 ⏳ 跨 session (L2 neural organ 深化 · 需实模型) · #9 ✓ closed (M128) · #10 ✓ closed (M130)。**Post-mortem**：(1) **"每 session 先列 self-critique 再 execute 的价值"** —— 本 session 是第一次沿 "自己列 10 条 → user 一句 push → 按条推进" 的路径；结果 5 条 closed · 3 条明确跨 session 留 · 2 条 partial；这比 M121-M125 的 "metaphor-driven" 更可审计（条目化）· 未来 session 可能沿此模式；(2) **命名克制** —— M124 急于抽象 "pattern 8" · 本 session 显式退回；规则确立：**pattern 命名需 ≥5 个真不同的例子 · 不同点必须不能归入既有 pattern · 否则延用 pattern 7 sub-variant**；(3) **revert 成本** —— M127 第一版写在 BAS ledger 发现 cycle 后整块 revert · 损失 ~5 分钟但避免 package 层污染 · "当前 minimum viable 存放位置" 需每个 milestone 开始时判断 · 不能惯性复用前一 milestone 的 "BAS ledger parallel storage"；(4) **nil + doc-comment + future-milestone-name 模式成熟** —— M123/M127 都用此 pattern · 6 个 nil 字段各有 "→ future M127+n: wire to X" 行 · 这让 "schema 完整但一半 nil" 变为 "显式局部骨架 + 明确下一步 roadmap"；比"隐式期待 future work" 好；(5) **"自我批评 → user push → 落地"循环** —— 上 session 用户问 "你满意吗" 我自己列 10 条 · 本 session 用户说 "全面进化" 落地 5 条 · 这循环比"user 直指" 更有效（因为 self-critique 条目是 specific + actionable 而非 metaphorical）；未来沿此节奏可能更稳。**下一 session 候选**：(a) #3 TurnOutcome.surfaceDecision 非 optional（API break · 需审 host usage）· (b) #6 sovereignFrame 8 nil 字段 upstream 信号接入（riskCardRef 从 QinaoRiskGate.surfaceAction / actionPermitRef 从 M103 permit event）· (c) #8 L2 深化（Apple Foundation Models adapter scout/core 差异化 / MLX fallback）· (d) #7 真机 thermal BGTaskScheduler 测试（需 iOS target）。
 
 - **M125 — "皮肤润泽"：TurnOutcome.surfaceDecision 每轮 L12 surface decision 推导（血液/皮肤/骨架/筋脉 四元 metaphor 收官 · M117 shipped 的 L12 surface types 从 idle 升为 sendSession 产出 · QinaoUI 不加任何 dep 就能 mount 正确的五 surface component 之一 · M88 pinned raw-value parity 让 bridge 为零行代码）**：承 M124 筋脉收尾 · 用户口径 "皮肤需要润泽" 落地。**发现**：M88 shipped BASSurfaceMatrix（BASSurfaceMode/Agency/Disclosure/Substitute/Decision 5 types · raw value 与 QinaoUI.ComponentID 与 QinaoRiskGate.SurfaceMode byte-equal）· M117 shipped BASRenderFrame 13-ref aggregator · 两个 family 共 17 structs 静躺 · sendSession 的 healthy-path 产出只有 TurnOutcome 的 5 字段（audit / coverage / sessionHalted / routedBudget / turnRecorded）· 不 carry L12 surface 决策 · 结果 host app 必须自己再跑一轮 risk.surfaceAction(for:) 才能决定 mount 哪个 UI component。**M125 让 sendSession 自己产 decision**。**修改 `QinaoRuntimeSDK/Sources/QinaoRuntime/QinaoRuntime.swift`（+130 行）**：(A) `TurnOutcome` 新字段 `public let surfaceDecision: BASSurfaceDecision?`（optional 留未来 non-standard 路径空间 · 但 contract 是 "every returned TurnOutcome has one"；M21 backward-compat · init 尾部新增 `surfaceDecision: BASSurfaceDecision? = nil` default 不破旧 call site；长 comment 说明 raw-value parity 让 host 一行 `QinaoUI.ComponentID(decision.surface.rawValue)` 完成 bridge · QinaoUI 仍 zero-dep leaf）；(B) 新 `nonisolated static func deriveSurfaceDecision(auditSeverity:coverageSeverity:auditRef:) -> BASSurfaceDecision` pure function · 8 种 audit severity 各走独立 case：`.deadStop` → silentStub + hostOverride + silent + refuse · `.rollback` → boundaryScript + hostOverride + explicit + refuse · `.throttle/.shadowLock/.toolCut/.memoryFreeze/.quarantine` 5 种 → delayPacket + hostOverride + minimal + deferToLater(60) · `.pass` → draftShell + userAffirm + {minimal if coverage == .clean else reasoned} + render(candidateID: auditRef)；reasonCodes 每 case 都 carry `"audit.severity:<severity>"` 加 coverage 相关附加码；auditReference 全 case 都 = auditRef；(C) sendSession 两个 return 点都 populated：healthy 正常 return · rollback/deadStop auto-halt return · 合 2 个 TurnOutcome 构造点都加 `surfaceDecision: Self.deriveSurfaceDecision(...)`。**新建测试 `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoRuntimeSurfaceDecisionTests.swift`（+260 行 · 6 条 XCTest 全绿）**：(1) **`testHealthyCleanTurnGetsDraftShellMinimal`** — 实际 sendSession → 硬锁 surface == .draftShell + agency == .userAffirm · disclosure ∈ {minimal, reasoned}（coverage 侧依环境而异 · 硬锁两者之一）；(2) **`testSurfaceDecisionCarriesAuditRef`** — decision.auditReference == outcome.audit.auditRef · ledger-rehook 保证；(3) **`testSurfaceRawValueMapsToComponentID`** — `QinaoUI.ComponentID(decision.surface.rawValue) == .draftShell` · M88 raw parity 在 runtime 路径上真实存在不仅是 schema；(4) **`testDeriveSurfaceDecisionIsDeterministic`** — 相同 input 两次 call 返回 equal · pure function 硬锁；(5) **`testAllAuditSeveritiesMapToSurface`** — 8 severity cases 逐一 case · pin surface + agency + auditReference · table-driven 保未来加 severity 不默默破；(6) **`testCoverageAdvisoryEscalatesDisclosureToReasoned`** — pass audit + clean coverage → minimal；pass audit + advisory coverage → reasoned + 加 "coverage.severity:advisory" reasonCode · escalation 语义硬锁。**全栈回归**：BAS **1429 不变**；Qinao **469 → 475（+6 M125）tests green**；**5 边界闸全绿**。**honesty-board 影响**：**"会保护不接管"整体性质从 "L12 5 模式 schema 齐 + risk gate 独立 provide" 升为 "sendSession 每轮 TurnOutcome 自带 surfaceDecision · host 开箱可 mount component"**。M117 17 idle struct 中 5 个（BASSurfaceDecision + 4 axis enums）从静态 schema 变主链消费；剩余 12 个（BASRenderFrame + 11 rendered guide structs）留未来 M125+n。**session 四元 metaphor 全收**：M121 血液（L1 · 1 层）→ M122 血液（L3+L5 · 2 层）→ M123 骨架（SovereignFrame aggregator · ledger 3rd parallel storage）→ M124 筋脉（TurnResidue + verifyTurnResidue 跨表面一致性 verifier）→ **M125 皮肤（TurnOutcome.surfaceDecision + host-side ComponentID bridge）** · "血液流动 + 皮肤润泽 + 骨架不屈 + 筋脉稳定" 真正落地；每 milestone 独立 commit + push + 全栈回归绿 · 每 milestone 按 pattern 7 `runtime-wiring` 或 pattern 8 `cross-surface-integrity` 模式执行。**pattern 累进**：本 session 新抽象的 pattern 8 `cross-surface-integrity` 继 M124 再次实战（M125 不同点：M124 是 "fetch 三件 + 校验" · M125 是 "produce 第四件 + 下游 mount 指示"）· 两者都是 "让隐式约定变 typed API" 的例子。**Post-mortem**：(1) **coverage.severity 影响 disclosure 的正确性** —— healthy audit `.pass` 情况下 disclosure 跟 coverage severity 走 · 这保证 "audit 清白但结构有 advisory 时 UI 依然暴露 reason codes 给用户判断"；硬编码 minimal 会掩盖 advisory · 让用户误以为系统"完全干净"；reasoned disclosure 的意义是 "你可以签 · 但这里有提示 · 自己看"；(2) **test 1 的 softening 启示** —— 原本硬锁 `disclosure == .minimal` 失败 · 因为测试 fixture 的 L14 coverage 有 `hasCoreSignalCoverage == false`（thin audit environment · L14 summary 的 core signal metric 在 non-live 场景返 false）· 触发 coverage.severity = advisory；修复方式：test 1 接受 `{minimal, reasoned}` 而 test 5/6 用纯 derive 函数直接 pin 精确语义（pure function 不依环境）· 这教训是 "live-path tests 宽松 assert + pure-function tests 严格 assert" 的分工；(3) **nonisolated static func 第三次用** —— M121 QinaoLifecycle / M124 QinaoSovereignControlPlane / M125 QinaoRuntime · nonisolated 模式已成 pattern · pure 映射函数放 actor 上可用 nonisolated static 避免 await · 加 doc comment 声明 "pure"；(4) **QinaoUI 保零 dep 的价值** —— 不让 QinaoUI import BASOrchestration · 让 UI leaf 保持 headless 服务器可用 · 这是 M7 era 的 discipline · M125 守住；bridge 的 "零行代码" 由 M88 raw-value parity 在 substrate side 和 UI side 独立 pin 完成 · 两侧都有 rawValue literal `"draft-shell"` 等 · 字面等于 string。**这是本 session 的最终 milestone** —— M121-M125 完 "全面进化" 五步 metaphor 收官；下一 session 候选：(a) BASRenderFrame 12 个 idle struct 的 deeper wiring（per-ref 填充 · e.g. actionPermitRef / hostStyleRef）；(b) L9 dream loop + L10 tribunal 的 cross-surface observation bundle wiring；(c) Long-session real-device thermal + BGTaskScheduler 实机测试；(d) L11 permit event stream（M99/M103 pipeline deeper consumer）；(e) SQLite ledger persistence（M91 shipped · 测未充分 cross-process）。
