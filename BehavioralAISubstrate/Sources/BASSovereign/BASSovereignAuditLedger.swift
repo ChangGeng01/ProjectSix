@@ -147,6 +147,21 @@ public actor BASSovereignAuditLedger {
     private var observationBundles:
         [BASObservationReconciliationReport] = []
 
+    /// M91 — optional cross-process storage. Defaults to
+    /// `BASSovereignLedgerNullStorage` (in-memory-only, pre-M91
+    /// behaviour byte-for-byte). When a `BASSovereignLedgerSQLiteStorage`
+    /// is supplied at init, every `append(_:)` and segment state
+    /// change is mirrored to disk. A later cold-start init with the
+    /// same storage rehydrates the chain + segments before the
+    /// ledger accepts new writes. See `BASSovereignLedgerStorage.swift`
+    /// for the full M91 scope + partition rationale (what IS persisted
+    /// vs what stays in-memory).
+    ///
+    /// Synchronous `BASSovereignLedgerStorage` dispatches happen only
+    /// from inside this actor, so protocol conformance does not need
+    /// `Sendable` — serialization is the actor's job.
+    private let storage: any BASSovereignLedgerStorage
+
     // MARK: - M83 state
     //
     // The ledger started life as one flat append-only chain. M83 adds
@@ -185,12 +200,25 @@ public actor BASSovereignAuditLedger {
     /// signingNamespace:)` so verifiers can re-check entries without
     /// holding the signing secret. See `BASSovereignEd25519Signing.swift`
     /// for the full rationale.
+    ///
+    /// M91 — pass `storage:` to persist audit entries + segments to
+    /// disk across process restarts. Default is
+    /// `BASSovereignLedgerNullStorage` (pre-M91 in-memory only).
     public init(
         signingSecret: SymmetricKey,
-        signingNamespace: String = BASSovereignTrustConstants.signingNamespace
+        signingNamespace: String = BASSovereignTrustConstants.signingNamespace,
+        storage: any BASSovereignLedgerStorage =
+            BASSovereignLedgerNullStorage()
     ) {
         self.signingMode = .hmac(signingSecret)
         self.signingNamespace = signingNamespace
+        self.storage = storage
+        Self.rehydrate(
+            storage: storage,
+            entries: &self.entries,
+            auditRefIndex: &self.auditRefIndex,
+            segments: &self.segments,
+            openSegmentBySession: &self.openSegmentBySession)
     }
 
     /// M87 — Ed25519 constructor for production cross-verifier
@@ -202,12 +230,68 @@ public actor BASSovereignAuditLedger {
     /// _:publicKey:signingNamespace:)`). The private key stays in
     /// the ledger — no verifier needs to see it. This is the
     /// production-grade signing path.
+    ///
+    /// M91 — pass `storage:` to persist audit entries + segments to
+    /// disk across process restarts.
     public init(
         ed25519KeyPair: BASSovereignEd25519KeyPair,
-        signingNamespace: String = BASSovereignTrustConstants.signingNamespace
+        signingNamespace: String = BASSovereignTrustConstants.signingNamespace,
+        storage: any BASSovereignLedgerStorage =
+            BASSovereignLedgerNullStorage()
     ) {
         self.signingMode = .ed25519(ed25519KeyPair)
         self.signingNamespace = signingNamespace
+        self.storage = storage
+        Self.rehydrate(
+            storage: storage,
+            entries: &self.entries,
+            auditRefIndex: &self.auditRefIndex,
+            segments: &self.segments,
+            openSegmentBySession: &self.openSegmentBySession)
+    }
+
+    /// M91 — Replay storage into actor state on init.
+    ///
+    /// Called from every public init that wires `storage:`. On cold
+    /// start the storage returns `([], [])` so this is a no-op. On
+    /// reopen it rebuilds the chain order, the audit ref index, the
+    /// segments array, and the open-segment-by-session map. Segments
+    /// missing `tailHash` are considered OPEN and their session keys
+    /// point here; segments with non-nil `tailHash` are closed and
+    /// excluded from the open map.
+    ///
+    /// If storage throws during `loadState()` the init **traps** —
+    /// integrity-over-availability doctrine: a ledger that cannot
+    /// honestly load its prior chain must not accept new writes.
+    /// Hosts that want a graceful fallback should probe the storage
+    /// independently before constructing the ledger.
+    private static func rehydrate(
+        storage: any BASSovereignLedgerStorage,
+        entries: inout [AppendedEntry],
+        auditRefIndex: inout [String: Int],
+        segments: inout [BASSovereignLedgerSegment],
+        openSegmentBySession: inout [String: Int]
+    ) {
+        let loaded: (entries: [AppendedEntry],
+                     segments: [BASSovereignLedgerSegment])
+        do {
+            loaded = try storage.loadState()
+        } catch {
+            fatalError(
+                "BASSovereignAuditLedger rehydrate: storage.loadState() failed — \(error)")
+        }
+        entries = loaded.entries
+        for (idx, appended) in entries.enumerated() {
+            auditRefIndex[appended.entry.auditID] = idx
+        }
+        segments = loaded.segments
+        // A segment with non-nil `tailHash` is closed; open segments
+        // have `tailHash == nil`. Map the latter back into the
+        // sessionID → index lookup so new appends land in the
+        // existing open segment rather than opening a duplicate.
+        for (idx, seg) in segments.enumerated() where seg.tailHash == nil {
+            openSegmentBySession[seg.sessionID] = idx
+        }
     }
 
     /// Convenience factory that derives a deterministic HMAC secret
@@ -314,6 +398,19 @@ public actor BASSovereignAuditLedger {
             startAnchor: priorHash,
             openedAt: sealed.appendedAt)
         segments[segIndex].entryCount += 1
+
+        // M91 — mirror to persistent storage. Entries first so
+        // readers that tail the storage see the chain grow; then
+        // the updated segment (entryCount and any open-to-closed
+        // transition). Both are best-effort in the sense that any
+        // throw here propagates out of `append(_:)` — the actor
+        // state has already been mutated, which is acceptable
+        // because the ledger is integrity-over-availability: a
+        // storage write failure fails the whole append so the caller
+        // can decide whether to retry or abort.
+        try storage.persistAppended(appended)
+        try storage.persistSegment(segments[segIndex])
+
         return appended
     }
 
@@ -588,6 +685,13 @@ public actor BASSovereignAuditLedger {
         closing.closingRotationID = plan.rotationID
         segments[segIndex] = closing
         openSegmentBySession.removeValue(forKey: plan.sessionID)
+
+        // M91 — persist the now-closed segment so reopened ledgers
+        // see the rotation state. Open-to-closed is the primary
+        // transition whose metadata is not derivable from entries
+        // alone.
+        try storage.persistSegment(closing)
+
         return closing
     }
 
