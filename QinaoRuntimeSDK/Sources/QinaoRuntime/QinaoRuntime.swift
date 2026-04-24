@@ -6,6 +6,7 @@ import BASOrchestration
 import BASMemory
 import BASPolicy
 import BASObservability
+import BASWorldPrior
 import QinaoHost
 import QinaoMemory
 import QinaoRisk
@@ -630,10 +631,26 @@ public actor QinaoRuntime {
                     turnID: observations.turnID,
                     sessionID: observations.sessionID,
                     emittedAt: now())
+            // M139 — L4 worldPrior piggybacks on the same
+            // thoughtFrame source that drives L10+L11. The
+            // whitepaper L4 "world-prior vault" per-turn
+            // observation bundle derives from the same frame:
+            // candidate claims → horizon matches → causal
+            // templates → counterfactual seeds. One caller-
+            // supplied thoughtFrame therefore drives THREE
+            // layers (L4, L10, L11) with zero new API surface.
+            let l4Bundle =
+                BASWorldPriorObservationBundle.derive(
+                    fromThoughtFrame: tframe,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
             var combined = finalAdditionalSummaries ?? []
+            combined.append(l4Bundle.coverageSummary)
             combined.append(l10Bundle.coverageSummary)
             combined.append(l11Bundle.coverageSummary)
             finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L4")
             autoInjectedLayerCodes.append("L10")
             autoInjectedLayerCodes.append("L11")
         }
