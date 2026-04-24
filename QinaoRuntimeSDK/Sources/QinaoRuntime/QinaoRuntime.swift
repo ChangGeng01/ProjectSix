@@ -359,7 +359,8 @@ public actor QinaoRuntime {
             = nil,
         surfaceRetryPolicy: SurfaceRetryPolicy = .default,
         contextFrame: BASContextFrame? = nil,
-        decomposeFrame: BASDecomposeFrame? = nil
+        decomposeFrame: BASDecomposeFrame? = nil,
+        memoryBundle: BASMemoryBundle? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -581,6 +582,28 @@ public actor QinaoRuntime {
             combined.append(l7Bundle.coverageSummary)
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L7")
+        }
+
+        // M136 — L8 hippocampalWell auto-stream. The underlying
+        // `BASHippocampalMemoryObservationBundle.derive(...)`
+        // handles a nil memory bundle gracefully (produces an
+        // empty-observations bundle) — but we gate on non-nil
+        // to preserve backward-compat: callers that never pass
+        // a memory bundle shouldn't suddenly see an empty L8
+        // coverage summary added to their ledger. When the
+        // caller passes a real bundle (retrieval events / pin
+        // events / forget events), L8 streams normally.
+        if let mb = memoryBundle {
+            let l8Bundle =
+                BASHippocampalMemoryObservationBundle.derive(
+                    fromMemoryBundle: mb,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l8Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L8")
         }
 
         // Expand the expectation set only when the caller accepted
