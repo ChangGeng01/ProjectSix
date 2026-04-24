@@ -495,6 +495,213 @@ public actor BASSovereignAuditLedger {
         entries
     }
 
+    // MARK: - M92 · BR-013 integrity sentinel primitive
+
+    /// M92 — one category of corruption `auditChainFull()` can
+    /// surface. All three map to "this entry fails its share of the
+    /// chain invariant"; the distinction lets sentinels / audit
+    /// consumers render a precise diagnostic per entry rather than
+    /// a generic "broken".
+    public enum BASSignatureAuditReason:
+        String, Sendable, Equatable, Codable, CaseIterable {
+        /// The entry's stored signature fails to verify under the
+        /// ledger's active signing mode. For HMAC this means the
+        /// recomputed MAC differs; for Ed25519 this means
+        /// `publicKey.isValidSignature(_:for:)` returned false or
+        /// the base64 signature was malformed.
+        case signatureInvalid = "signature-invalid"
+        /// The entry's stored `selfHash` differs from the SHA-256
+        /// recomputed over its canonical bytes. This is a tamper in
+        /// the entry fields themselves.
+        case selfHashMismatch = "self-hash-mismatch"
+        /// The entry's stored `priorHash` does not equal the
+        /// immediately-preceding entry's `selfHash` (or the genesis
+        /// sentinel for the first entry). This is a tamper in the
+        /// chain linkage — either the prior entry was rewritten or
+        /// this entry's priorHash was rewritten.
+        case priorHashBroken = "prior-hash-broken"
+    }
+
+    /// M92 — one structured corruption finding for a single entry.
+    ///
+    /// `position` is the zero-based index in the ledger's chain
+    /// order. `auditID` is the offending entry's stable ID for
+    /// downstream audit logging. `reasons` may carry multiple codes
+    /// when a single entry exhibits more than one broken invariant
+    /// (e.g. both prior-hash-broken AND signature-invalid) — this
+    /// preserves every signal rather than hiding them behind the
+    /// first failure.
+    public struct BASSignatureAuditCorruption:
+        Sendable, Equatable, Codable, Hashable {
+        public let position: Int
+        public let auditID: String
+        public let reasons: [BASSignatureAuditReason]
+
+        public init(
+            position: Int,
+            auditID: String,
+            reasons: [BASSignatureAuditReason]
+        ) {
+            self.position = position
+            self.auditID = auditID
+            self.reasons = reasons
+        }
+    }
+
+    /// M92 — full-chain audit result. `isClean == true` iff
+    /// `corruptions.isEmpty`. `totalEntriesScanned` is always equal
+    /// to the chain length at the time of the scan.
+    public struct BASSignatureAuditReport:
+        Sendable, Equatable, Codable {
+        public let isClean: Bool
+        public let totalEntriesScanned: Int
+        public let corruptions: [BASSignatureAuditCorruption]
+
+        public init(
+            isClean: Bool,
+            totalEntriesScanned: Int,
+            corruptions: [BASSignatureAuditCorruption]
+        ) {
+            self.isClean = isClean
+            self.totalEntriesScanned = totalEntriesScanned
+            self.corruptions = corruptions
+        }
+    }
+
+    /// M92 — walk the full chain and collect every integrity
+    /// corruption into a structured report.
+    ///
+    /// ## Why this exists (alongside `verifyChainIntegrity()`)
+    ///
+    /// `verifyChainIntegrity()` throws at the first corruption.
+    /// That's the right semantic for guard checks on the hot path
+    /// (fail-closed, integrity > availability). But for the
+    /// **BR-013 integrity sentinel** — a runtime observer whose job
+    /// is to describe the extent of tamper rather than just detect
+    /// its presence — the host needs every broken entry, not just
+    /// the first. `auditChainFull()` scans every entry, reports
+    /// every finding, and returns without throwing.
+    ///
+    /// ## Semantics
+    ///
+    /// For each entry in chain order:
+    /// - Reconstruct canonical bytes via the ledger's canonical
+    ///   byte layout (`basSovereignAuditCanonicalBytes`).
+    /// - Compute `selfHash = SHA-256(canonical)`; if `≠ entry.selfHash`,
+    ///   append `.selfHashMismatch` to this entry's reasons.
+    /// - Verify signature against `canonical`:
+    ///   - HMAC mode: recompute MAC; if `≠ entry.signature`, append
+    ///     `.signatureInvalid`.
+    ///   - Ed25519 mode: `publicKey.isValidSignature(sigData, for:
+    ///     canonical)`; if false OR base64 malformed, append
+    ///     `.signatureInvalid`.
+    /// - Compare `entry.priorHash` to the expected link (genesis
+    ///   sentinel for position 0, else `entries[i-1].selfHash`). If
+    ///   mismatch, append `.priorHashBroken`.
+    /// - If any reasons collected for this entry, append a
+    ///   `BASSignatureAuditCorruption` to the report.
+    ///
+    /// ## Non-throwing + non-halting
+    ///
+    /// This method **never throws** and **never halts the ledger**.
+    /// The returned report is the full picture; hosts decide next
+    /// action (halt session, emit sovereign verdict, notify host,
+    /// request rotation, etc.). This is the BR-013 primitive; the
+    /// runtime sentinel that consumes it is a future milestone.
+    ///
+    /// ## Cost
+    ///
+    /// O(N) in chain length with 1 canonical-byte computation, 1
+    /// hash, and 1 signature verify per entry. On Ed25519 chains the
+    /// per-entry cost is dominated by the signature verify (constant
+    /// but non-trivial); hosts should call this on demand or on a
+    /// low-frequency schedule rather than every turn.
+    public func auditChainFull() -> BASSignatureAuditReport {
+        var corruptions: [BASSignatureAuditCorruption] = []
+        var expectedPrior = Self.genesisHash
+
+        for (position, appended) in entries.enumerated() {
+            var reasons: [BASSignatureAuditReason] = []
+
+            // 1. Prior-hash linkage.
+            if appended.priorHash != expectedPrior {
+                reasons.append(.priorHashBroken)
+            }
+
+            // 2. Canonical-bytes-dependent checks.
+            let canonical = canonicalBytes(
+                for: appended.entry,
+                priorHash: appended.priorHash)
+
+            // 2a. Self-hash.
+            if appended.selfHash != hash(canonical) {
+                reasons.append(.selfHashMismatch)
+            }
+
+            // 2b. Signature.
+            switch signingMode {
+            case .hmac:
+                if appended.entry.signature != sign(canonical) {
+                    reasons.append(.signatureInvalid)
+                }
+            case .ed25519(let keyPair):
+                let valid: Bool
+                if let sigData = Data(
+                    base64Encoded: appended.entry.signature)
+                {
+                    valid = keyPair.publicKey.isValidSignature(
+                        sigData, for: canonical)
+                } else {
+                    valid = false
+                }
+                if !valid {
+                    reasons.append(.signatureInvalid)
+                }
+            }
+
+            if !reasons.isEmpty {
+                corruptions.append(BASSignatureAuditCorruption(
+                    position: position,
+                    auditID: appended.entry.auditID,
+                    reasons: reasons))
+            }
+
+            // Advance expected-prior for next position. Even if
+            // this entry's selfHash was tampered, we want to
+            // continue scanning from the STORED selfHash so the
+            // next entry's prior-hash check is meaningful (we
+            // already flagged the mismatch on THIS entry).
+            expectedPrior = appended.selfHash
+        }
+
+        return BASSignatureAuditReport(
+            isClean: corruptions.isEmpty,
+            totalEntriesScanned: entries.count,
+            corruptions: corruptions)
+    }
+
+    /// M92 test-only tamper primitive.
+    ///
+    /// Directly mutates an entry at `position` in the actor's
+    /// internal chain. Used by `BASSignatureAuditReportTests` to
+    /// simulate disk corruption / memory tampering without requiring
+    /// a full SQLite round-trip. Production callers **MUST NOT** use
+    /// this — it reaches past every public contract the ledger
+    /// otherwise enforces. The leading underscore + `TestTamper`
+    /// suffix are the Swift convention for test-only hooks.
+    ///
+    /// Marked `internal` (default) rather than `private` so
+    /// `@testable import BASSovereign` from the test module can
+    /// reach it. Swift does not have a cleaner "test-only"
+    /// visibility tier; discipline falls on the naming + doc.
+    func _m92TestTamper(
+        position: Int,
+        replacement: @Sendable (AppendedEntry) -> AppendedEntry
+    ) {
+        guard position >= 0, position < entries.count else { return }
+        entries[position] = replacement(entries[position])
+    }
+
     // MARK: - Coverage-verdict storage (M45)
     //
     // The M44 verdict engine produces `BASObservationReconciliationVerdict`
