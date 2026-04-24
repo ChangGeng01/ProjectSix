@@ -1531,6 +1531,15 @@ public actor QinaoSovereignControlPlane {
             /// Observation bundle is missing the always-present
             /// L14 (sovereign) summary.
             case missingL14InBundle
+            /// M129 — the audit ledger's hash chain failed
+            /// `verifyChainIntegrity()`. `lastVerifiedAuditID` is
+            /// the last clean audit ID before the break (may be
+            /// nil if the break is at genesis). This finding only
+            /// appears when the caller uses the async
+            /// `verifyTurnResidueStrong(_:)` variant — the pure
+            /// `verifyTurnResidue(_:)` path never fires this
+            /// finding because it deliberately does no I/O.
+            case chainIntegrityBroken(lastVerifiedAuditID: String?)
         }
     }
 
@@ -1620,6 +1629,54 @@ public actor QinaoSovereignControlPlane {
                         expected: expectedFoldRef,
                         got: ref))
             }
+        }
+
+        return TurnResidueVerification(findings: findings)
+    }
+
+    /// M129 — stronger `verifyTurnResidue` variant that also runs
+    /// the ledger's cryptographic chain-integrity check. Unlike
+    /// the pure M124 `verifyTurnResidue(_:)` path, this one does
+    /// I/O (the ledger re-walks the chain end-to-end, recomputing
+    /// each entry's canonical bytes + signature, verifying
+    /// priorHash links). On any break, a
+    /// `.chainIntegrityBroken(lastVerifiedAuditID:)` finding
+    /// appears alongside whatever cross-surface findings the pure
+    /// verifier produced.
+    ///
+    /// Callers pick the variant to match their performance
+    /// envelope: the pure verifier is O(findings) and safe to run
+    /// on every frame; the strong verifier walks every past ledger
+    /// entry and should be used at session boundaries / audit-
+    /// replay time / integrity-sensitive halt paths.
+    public func verifyTurnResidueStrong(
+        _ residue: TurnResidue
+    ) async -> TurnResidueVerification {
+        // Start from the pure cross-surface findings.
+        var findings = verifyTurnResidue(residue).findings
+
+        // Run the ledger's crypto-level chain walk. The ledger
+        // throws `chainIntegrityBroken(lastVerifiedAuditID:)` on
+        // any priorHash break or signature mismatch; unwrap that
+        // into the appropriate finding. Any other error is
+        // propagated as `.chainIntegrityBroken(lastVerifiedAuditID:
+        // nil)` — we deliberately convert throws to structured
+        // findings so hosts can react uniformly.
+        do {
+            try await auditLedger.verifyChainIntegrity()
+        } catch let BASSovereign
+            .BASSovereignAuditLedger.LedgerError
+            .chainIntegrityBroken(
+                lastVerifiedAuditID: lastClean
+            )
+        {
+            findings.append(
+                .chainIntegrityBroken(
+                    lastVerifiedAuditID: lastClean))
+        } catch {
+            findings.append(
+                .chainIntegrityBroken(
+                    lastVerifiedAuditID: nil))
         }
 
         return TurnResidueVerification(findings: findings)
