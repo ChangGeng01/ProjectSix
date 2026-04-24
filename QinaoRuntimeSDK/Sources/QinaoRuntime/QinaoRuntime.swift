@@ -474,15 +474,430 @@ public actor QinaoRuntime {
     /// value-type that groups identity + per-layer sources +
     /// sovereign refs + budget/coverage config. See `TurnInputs`
     /// for field-by-field documentation.
+    ///
+    /// M153 — the primary body lives here directly (no
+    /// `sendSessionImpl` delegation layer). The legacy 22-param
+    /// overload below is a thin wrapper that builds TurnInputs
+    /// and calls this method.
     public func sendSession(
         _ inputs: TurnInputs
     ) async throws -> TurnOutcome {
-        // The body that used to live in the 22-parameter signature
-        // moves here verbatim, addressing fields via `inputs.`
-        // instead of bare names. The legacy 22-param overload is
-        // a one-line delegator below that builds TurnInputs and
-        // calls this method.
-        return try await sendSessionImpl(inputs: inputs)
+        // =========================================================
+        // PHASE 0 — pre-flight: refuse if already halted.
+        // =========================================================
+        if await sovereign.isSessionHalted(
+            inputs.observations.sessionID)
+        {
+            throw TurnError.sessionAlreadyHalted(
+                id: inputs.observations.sessionID)
+        }
+
+        // =========================================================
+        // PHASE 1 — lifecycle-routed budget (M70).
+        // =========================================================
+        let routedBudget: BASBudgetFrame?
+        if let planned = inputs.plannedBudget {
+            routedBudget = await prepareBudgetForTurn(planned)
+        } else {
+            routedBudget = nil
+        }
+
+        // =========================================================
+        // PHASE 2 — L14 sovereign audit (M9).
+        // =========================================================
+        let report = try await sovereign.auditTurn(
+            observations: inputs.observations,
+            coordinatorSeverity: inputs.coordinatorSeverity)
+
+        // =========================================================
+        // PHASE 3 — auto-stream L1..L13 observation summaries.
+        //           Order: unconditional (L3, L5) → gated.
+        // =========================================================
+        var finalAdditionalSummaries =
+            inputs.additionalCoverageSummaries
+        var finalExpectedLayerIDs =
+            inputs.expectedCoverageLayerIDs
+        var autoInjectedLayerCodes: [String] = []
+
+        // L1 (M121) — gated by lifecycle + routed budget.
+        if let lifecycle = lifecycle,
+           let routed = routedBudget {
+            let l1Bundle = lifecycle
+                .deriveLeaseLifeObservationBundle(
+                    fromRoutedBudget: routed,
+                    sessionID: inputs.observations.sessionID,
+                    turnID: inputs.observations.turnID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l1Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L1")
+        }
+
+        // L3 (M122) — unconditional; minimum-viable fold.
+        let l3Fold = BASThoughtFold(
+            foldID: "fold."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID,
+            hostEffectSummary: "",
+            restorePointer: inputs.observations.snapshotRef,
+            checksum: inputs.observations.policyHash,
+            snapshotRef: inputs.observations.snapshotRef)
+        do {
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l3Fold.coverageSummary(
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now()))
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L3")
+        }
+
+        // L5 (M122) — unconditional; read host state.
+        let l5Constitution = await host.currentConstitution()
+        let l5VersionTree = await host.currentVersionTree()
+        let l5Bundle = BASHostConstitutionObservationBundle
+            .derive(
+                fromHostConstitution: l5Constitution,
+                versionTree: l5VersionTree,
+                forgetRequest: nil,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+        do {
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l5Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L5")
+        }
+
+        // L6 (M134) — gated by contextFrame.
+        if let ctxFrame = inputs.contextFrame {
+            let l6Bundle = BASPresenceObservationBundle.derive(
+                from: ctxFrame,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l6Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L6")
+        }
+
+        // L7 (M135) — gated by decomposeFrame.
+        if let dframe = inputs.decomposeFrame {
+            let l7Bundle =
+                BASDecompositionObservationBundle.derive(
+                    from: dframe,
+                    turnID: inputs.observations.turnID,
+                    sessionID: inputs.observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l7Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L7")
+        }
+
+        // L8 (M136) — gated by memoryBundle.
+        if let mb = inputs.memoryBundle {
+            let l8Bundle =
+                BASHippocampalMemoryObservationBundle.derive(
+                    fromMemoryBundle: mb,
+                    turnID: inputs.observations.turnID,
+                    sessionID: inputs.observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l8Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L8")
+        }
+
+        // L4 + L10 + L11 (M137 + M139) — co-gated by thoughtFrame.
+        if let tframe = inputs.thoughtFrame {
+            let l10Bundle = BASTribunalObservationBundle.derive(
+                from: tframe,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+            let l11Bundle = BASRiskObservationBundle.derive(
+                from: tframe,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+            let l4Bundle = BASWorldPriorObservationBundle.derive(
+                fromThoughtFrame: tframe,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l4Bundle.coverageSummary)
+            combined.append(l10Bundle.coverageSummary)
+            combined.append(l11Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L4")
+            autoInjectedLayerCodes.append("L10")
+            autoInjectedLayerCodes.append("L11")
+        }
+
+        // L13 (M138) — gated by updateTickets.
+        if !inputs.updateTickets.isEmpty {
+            let l13Bundle =
+                BASUpdateTicketObservationBundle.derive(
+                    fromUpdateTickets: inputs.updateTickets,
+                    turnID: inputs.observations.turnID,
+                    sessionID: inputs.observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l13Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L13")
+        }
+
+        // L2 (M140) — gated by neuralOrganMap.
+        if let organMap = inputs.neuralOrganMap {
+            let l2Bundle = BASNeuralOrganObservationBundle.derive(
+                fromOrganMap: organMap,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l2Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L2")
+        }
+
+        // L12 (M141) — co-gated by thoughtFrame + renderedOutput.
+        if let tf = inputs.thoughtFrame,
+           let rendered = inputs.renderedOutput
+        {
+            let l12Bundle = BASSoftHandObservationBundle.derive(
+                from: tf,
+                renderedOutput: rendered,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l12Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L12")
+        }
+
+        // L9 (M142) — gated by candidateFrontier.
+        if let frontier = inputs.candidateFrontier {
+            let l9Bundle = BASCandidateObservationBundle.derive(
+                fromFrontier: frontier,
+                turnID: inputs.observations.turnID,
+                sessionID: inputs.observations.sessionID,
+                emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l9Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L9")
+        }
+
+        // Expand expected-layer set only when caller left default.
+        if inputs.expectedCoverageLayerIDs == ["L14"]
+           && !autoInjectedLayerCodes.isEmpty {
+            finalExpectedLayerIDs =
+                ["L14"] + autoInjectedLayerCodes
+        }
+
+        // =========================================================
+        // PHASE 4 — coverage reconciliation (M45/M90).
+        // =========================================================
+        let coverage = await sovereign.recordTurnCoverage(
+            sessionID: inputs.observations.sessionID,
+            turnID: inputs.observations.turnID,
+            budgetCeiling: inputs.coverageBudgetCeiling,
+            expectedLayerIDs: finalExpectedLayerIDs,
+            additionalSummaries: finalAdditionalSummaries)
+
+        // =========================================================
+        // PHASE 5 — sovereign frame aggregator (M123 + M144 + M147).
+        // =========================================================
+        let riskCardRef: String? =
+            inputs.thoughtFrame?.riskCard.map { _ in
+                "risk-card."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID
+            }
+        let actionPermitRef: String? =
+            inputs.thoughtFrame?.actionPermit.map { _ in
+                "permit."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID
+            }
+        let agencyReservationRef: String? =
+            inputs.thoughtFrame?.agencyReservation.map { _ in
+                "agency-reservation."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID
+            }
+        let contaminationRefs =
+            inputs.contaminationLineages.map(\.lineageID)
+
+        let sovereignFrame = BASSovereignFrame(
+            frameID: "frame."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID,
+            sessionID: inputs.observations.sessionID,
+            turnID: inputs.observations.turnID,
+            deviceStateRef: routedBudget?.leaseID,
+            hostVersionRef: l5Constitution.activeVersion.isEmpty
+                ? nil : l5Constitution.activeVersion,
+            continuityRef: inputs.observations.snapshotRef
+                .isEmpty ? nil : inputs.observations.snapshotRef,
+            thoughtFoldRef: l3Fold.foldID,
+            riskCardRef: riskCardRef,
+            actionPermitRef: actionPermitRef,
+            pendingActionDigest: inputs.pendingActionDigest,
+            pendingMutationDigest:
+                inputs.pendingMutationDigest,
+            pendingMemoryDigest: inputs.pendingMemoryDigest,
+            jurisdictionRef: inputs.jurisdictionMap?.mapID,
+            timeLockRef: inputs.timeLockRef,
+            contaminationRefs: contaminationRefs,
+            policyHash: inputs.observations.policyHash)
+        await sovereign.recordSovereignFrame(sovereignFrame)
+
+        // =========================================================
+        // PHASE 6 — single surface-decision compute (M131 dedup).
+        // =========================================================
+        let computedSurfaceDecision = Self.deriveSurfaceDecision(
+            auditSeverity: report.severity,
+            coverageSeverity: coverage.severity,
+            auditRef: report.auditRef,
+            routedBudget: routedBudget,
+            retryPolicy: inputs.surfaceRetryPolicy)
+
+        // =========================================================
+        // PHASE 7 — render frame aggregator (M127 + M144 + M148).
+        // =========================================================
+        let situationRef: String? =
+            inputs.decomposeFrame.map { _ in
+                "situation."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID
+            }
+        let mirrorRef: String? =
+            inputs.decomposeFrame?.mirrorDraft.map { _ in
+                "mirror."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID
+            }
+        let toneProfileRef: String? =
+            inputs.renderedOutput.map { _ in
+                "tone."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID
+            }
+        let forceCurveRef: String? =
+            (inputs.renderedOutput != nil
+             && inputs.thoughtFrame?.riskCard != nil)
+            ? ("force-curve."
+               + inputs.observations.sessionID
+               + "." + inputs.observations.turnID)
+            : nil
+
+        let renderFrame = BASRenderFrame(
+            frameID: "render."
+                + inputs.observations.sessionID
+                + "." + inputs.observations.turnID,
+            mergedChoiceRef: l3Fold.foldID,
+            actionPermitRef: actionPermitRef,
+            agencyReservationRef: agencyReservationRef,
+            hostStyleRef: l5Constitution.activeVersion.isEmpty
+                ? nil : l5Constitution.activeVersion,
+            situationRef: situationRef,
+            mirrorRef: mirrorRef,
+            substituteRef:
+                computedSurfaceDecision.substitute.kind
+                    .rawValue,
+            sovereignSurfaceRef: sovereignFrame.frameID,
+            outputSurfaceRef:
+                computedSurfaceDecision.surface.rawValue,
+            toneProfileRef: toneProfileRef,
+            forceCurveRef: forceCurveRef,
+            disclosureProfileRef:
+                computedSurfaceDecision.disclosure.rawValue)
+        await sovereign.recordRenderFrame(
+            renderFrame,
+            sessionID: inputs.observations.sessionID,
+            turnID: inputs.observations.turnID)
+
+        // =========================================================
+        // PHASE 8 — halt branches (fail-closed).
+        // =========================================================
+        // 8a. Parity fail-closed (coordinator laxer than engine).
+        if !report.isAcceptable {
+            await sovereign.markSessionHalted(
+                sessionID: inputs.observations.sessionID,
+                reason: "audit-parity:coordinator-laxer")
+            throw TurnError.auditParityFailure(
+                sessionID: inputs.observations.sessionID,
+                severity: report.severity,
+                auditRef: report.auditRef)
+        }
+        // 8b. Coverage halt (structural budget breach).
+        if coverage.severity == .halt {
+            await sovereign.markSessionHalted(
+                sessionID: inputs.observations.sessionID,
+                reason: "coverage-halt")
+            throw TurnError.coverageHalt(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID,
+                findings: coverage.findings)
+        }
+        // 8c. Severity-driven halt (rollback/deadStop — returns
+        //     outcome rather than throwing).
+        let autoHaltSeverities: Set<
+            QinaoSovereignControlPlane.AuditSeverity
+        > = [.rollback, .deadStop]
+        if autoHaltSeverities.contains(report.severity) {
+            await sovereign.markSessionHalted(
+                sessionID: inputs.observations.sessionID,
+                reason: "audit-severity:"
+                    + report.severity.rawValue)
+            let residue = await sovereign.turnResidue(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID)
+            return TurnOutcome(
+                audit: report,
+                coverage: coverage,
+                sessionHalted: true,
+                routedBudget: routedBudget,
+                turnRecorded: nil,
+                surfaceDecision: computedSurfaceDecision,
+                residue: residue)
+        }
+
+        // =========================================================
+        // PHASE 9 — healthy turn: record lifecycle + return.
+        // =========================================================
+        let turnRecorded: BASLeaseLifeCoordinator.TurnRecorded?
+        if
+            let planned = inputs.plannedBudget,
+            let duration = inputs.turnDurationSeconds
+        {
+            turnRecorded = await recordTurnOnLifecycle(
+                runMode: QinaoRunMode(
+                    bridging: planned.runMode),
+                durationSeconds: duration)
+        } else {
+            turnRecorded = nil
+        }
+
+        let residue = await sovereign.turnResidue(
+            sessionID: inputs.observations.sessionID,
+            turnID: inputs.observations.turnID)
+        return TurnOutcome(
+            audit: report,
+            coverage: coverage,
+            sessionHalted: false,
+            routedBudget: routedBudget,
+            turnRecorded: turnRecorded,
+            surfaceDecision: computedSurfaceDecision,
+            residue: residue)
     }
 
     /// M152 — legacy 22-parameter signature retained as a thin
@@ -546,777 +961,14 @@ public actor QinaoRuntime {
         inputs.pendingActionDigest = pendingActionDigest
         inputs.pendingMutationDigest = pendingMutationDigest
         inputs.pendingMemoryDigest = pendingMemoryDigest
-        return try await sendSessionImpl(inputs: inputs)
+        // M153 — delegate directly to the primary overload.
+        // Pre-M153 this went through a private `sendSessionImpl`
+        // intermediary; M153 inlined that into the primary
+        // method so both paths now share one implementation
+        // body (no extra hop, no extra method).
+        return try await sendSession(inputs)
     }
 
-    /// M152 — the single source of truth for sendSession's body.
-    /// Both public overloads dispatch here. Reads fields off
-    /// `inputs.` instead of bare-name locals so no other logic
-    /// changed from pre-M152. Marked `private` so callers MUST
-    /// go through the value-typed overload or the legacy
-    /// compatibility wrapper.
-    private func sendSessionImpl(
-        inputs: TurnInputs
-    ) async throws -> TurnOutcome {
-        let observations = inputs.observations
-        let coordinatorSeverity = inputs.coordinatorSeverity
-        let coverageBudgetCeiling = inputs.coverageBudgetCeiling
-        let expectedCoverageLayerIDs =
-            inputs.expectedCoverageLayerIDs
-        let plannedBudget = inputs.plannedBudget
-        let turnDurationSeconds = inputs.turnDurationSeconds
-        let additionalCoverageSummaries =
-            inputs.additionalCoverageSummaries
-        let surfaceRetryPolicy = inputs.surfaceRetryPolicy
-        let contextFrame = inputs.contextFrame
-        let decomposeFrame = inputs.decomposeFrame
-        let memoryBundle = inputs.memoryBundle
-        let thoughtFrame = inputs.thoughtFrame
-        let updateTickets = inputs.updateTickets
-        let neuralOrganMap = inputs.neuralOrganMap
-        let renderedOutput = inputs.renderedOutput
-        let candidateFrontier = inputs.candidateFrontier
-        let jurisdictionMap = inputs.jurisdictionMap
-        let contaminationLineages = inputs.contaminationLineages
-        let timeLockRef = inputs.timeLockRef
-        let pendingActionDigest = inputs.pendingActionDigest
-        let pendingMutationDigest = inputs.pendingMutationDigest
-        let pendingMemoryDigest = inputs.pendingMemoryDigest
-        // Pre-flight: refuse if the session was already halted.
-        if await sovereign.isSessionHalted(observations.sessionID) {
-            throw TurnError.sessionAlreadyHalted(
-                id: observations.sessionID)
-        }
-
-        // M70 — route the planned budget through the lifecycle's live
-        // thermal reading BEFORE audit, so the budget used for this
-        // turn reflects the actual device state rather than the
-        // caller's plan. `prepareBudgetForTurn` is identity when no
-        // lifecycle is attached, so callers that do not pass a
-        // `plannedBudget` or that built the runtime without a
-        // lifecycle see pre-M70 behavior byte-for-byte. When a
-        // `plannedBudget` IS passed, the routed copy lands in
-        // `TurnOutcome.routedBudget` for the caller to use in the
-        // next turn's planner or for audit diffs.
-        let routedBudget: BASBudgetFrame?
-        if let planned = plannedBudget {
-            routedBudget = await prepareBudgetForTurn(planned)
-        } else {
-            routedBudget = nil
-        }
-
-        let report = try await sovereign.auditTurn(
-            observations: observations,
-            coordinatorSeverity: coordinatorSeverity)
-
-        // M45 — the cross-layer coverage verdict MUST be computed every
-        // turn, even on parity/severity halt paths, so the ledger's
-        // per-turn coverage row is present and governance tooling can
-        // diff "what the coordinator said" against "what the structural
-        // coverage read said" after-the-fact. Compute it before any
-        // throw so it also lands in the halt branches below.
-        // M95 — when the caller streams L1–L13 coverage summaries,
-        // forward them to the sovereign ledger alongside the
-        // always-present L14 summary. Nil (default) preserves the
-        // pre-M95 L14-only contract: zero additional summaries
-        // recorded, ledger `observationBundleCount` unchanged,
-        // verdict's expected-layer set still limited to
-        // `expectedCoverageLayerIDs`. When the caller passes a
-        // non-nil array (even empty), the path that records the full
-        // per-turn observation bundle in the ledger's parallel
-        // `observationBundles[]` storage fires — this is the single
-        // hook by which host pipelines (L1 lifecycle, L3 fold, L4
-        // world-prior, L5 host-constitution, …) get their per-turn
-        // coverage into the audit surface through the same
-        // choke-point `sendSession` uses for `auditTurn`.
-        // M121 — when lifecycle is wired AND plannedBudget is
-        // passed, auto-derive the L1 observation bundle from the
-        // routed budget and fold its coverageSummary into
-        // additionalCoverageSummaries. This is the first
-        // production path where M95's streaming hook actually
-        // produces real data — previously sendSession shipped
-        // only L14 coverage unless the caller manually built
-        // L1-L13 summaries. M121 makes L1 automatic whenever
-        // lifecycle is present. When either lifecycle or
-        // plannedBudget is nil, we fall through to the caller-
-        // supplied additionalCoverageSummaries exactly as pre-M121.
-        //
-        // Expanded expectedLayerIDs logic: if the caller passes
-        // the default ["L14"] AND we auto-inject L1, we expand to
-        // ["L14", "L1"] so the coverage verdict expects (and
-        // validates) L1's presence. Callers that pass a custom
-        // expectedLayerIDs are trusted and not modified.
-        // M122 血液流动 — L1 / L3 / L5 auto-stream discipline
-        //
-        // M121 wired L1 (lease-life) on the condition that both
-        // lifecycle and plannedBudget are present. M122 extends the
-        // same choke-point to L3 (thought-fold) and L5 (host-
-        // constitution) so every healthy turn leaves an L1+L3+L5+L14
-        // residue in the ledger rather than a lone L14 stub.
-        //
-        //   L1 (lease-life)        — needs lifecycle + routedBudget
-        //                            (M121, unchanged).
-        //   L3 (thought-fold)      — derived from a minimum-viable
-        //                            `BASThoughtFold` built out of
-        //                            the TurnObservations (sessionID/
-        //                            turnID/snapshotRef/policyHash);
-        //                            always fires when the caller
-        //                            has a sessionID + turnID, which
-        //                            is every healthy call site.
-        //   L5 (host-constitution) — derived from the pipeline's
-        //                            committed constitution + version
-        //                            tree via QinaoHost pass-throughs;
-        //                            always fires on turns where a
-        //                            host is attached (every call
-        //                            site today).
-        //
-        // The expected-layer-ID set is expanded in lockstep with the
-        // injected layers, but only when the caller left the default
-        // ["L14"] — custom expectation sets are treated as an explicit
-        // statement of what the caller wants validated and the auto-
-        // inject never rewrites them.
-        //
-        // Rationale for the minimum-viable fold:
-        //   * `foldID`           — deterministic per (session, turn)
-        //                           so the ledger row is stable.
-        //   * `restorePointer`   — the observations' snapshotRef;
-        //                           an L3 observation always points
-        //                           back at the same snapshot the L14
-        //                           audit row references.
-        //   * `checksum`         — policyHash; any policy drift is
-        //                           visible as a fold-checksum drift.
-        //   * `snapshotRef`      — same — produces a
-        //                           `.snapshotAnchored` signal whenever
-        //                           the turn has a non-empty
-        //                           snapshotRef (the production path).
-        // Every other field is left defaulted, so this stays a thin
-        // but real blood vessel; the fully-typed fold produced by the
-        // coordinator (`BASThoughtFoldAssembly`) remains the main
-        // path for richer derivations when a host wires it into the
-        // additionalCoverageSummaries parameter explicitly.
-        var finalAdditionalSummaries =
-            additionalCoverageSummaries
-        var finalExpectedLayerIDs = expectedCoverageLayerIDs
-        var autoInjectedLayerCodes: [String] = []
-
-        // L1 auto-stream (M121 — unchanged).
-        if let lifecycle = lifecycle,
-           let routed = routedBudget {
-            let l1Bundle = lifecycle
-                .deriveLeaseLifeObservationBundle(
-                    fromRoutedBudget: routed,
-                    sessionID: observations.sessionID,
-                    turnID: observations.turnID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l1Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L1")
-        }
-
-        // M122 — L3 auto-stream. A minimum-viable BASThoughtFold is
-        // built from the TurnObservations; see rationale above.
-        // Unlike L1/L5 (bundle-level projections), L3's coverage
-        // summary hangs off `BASThoughtFold` itself because the fold
-        // is the compact-slot/signature/ref-weighted artifact the
-        // coverage budget references. We invoke the fold-level
-        // projection directly so the summary is byte-stable under a
-        // deterministic (fold, turnID, sessionID, emittedAt) tuple.
-        let l3Fold = BASThoughtFold(
-            foldID: "fold."
-                + observations.sessionID
-                + "." + observations.turnID,
-            hostEffectSummary: "",
-            restorePointer: observations.snapshotRef,
-            checksum: observations.policyHash,
-            snapshotRef: observations.snapshotRef)
-        do {
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l3Fold.coverageSummary(
-                turnID: observations.turnID,
-                sessionID: observations.sessionID,
-                emittedAt: now()))
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L3")
-        }
-
-        // M122 — L5 auto-stream. Pulls the committed constitution +
-        // version tree off QinaoHost's pipeline. Forget requests are
-        // not surfaced through the pipeline, so we pass nil; a future
-        // milestone can route the in-flight forget request through
-        // here once QinaoHost exposes it.
-        let l5Constitution = await host.currentConstitution()
-        let l5VersionTree = await host.currentVersionTree()
-        let l5Bundle = BASHostConstitutionObservationBundle.derive(
-            fromHostConstitution: l5Constitution,
-            versionTree: l5VersionTree,
-            forgetRequest: nil,
-            turnID: observations.turnID,
-            sessionID: observations.sessionID,
-            emittedAt: now())
-        do {
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l5Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L5")
-        }
-
-        // M134 — L6 presenceEye auto-stream. Unlike L3/L5 (which
-        // can be derived from always-present state: observations
-        // for L3, host pipeline for L5), L6 requires a real
-        // `BASContextFrame` carrying the turn's utterance + scene
-        // + emotional weather + urgency truth + manipulation
-        // trace. Fabricating one with neutral zeros would emit
-        // meaningless observations that pollute the ledger, so
-        // L6 streams ONLY when the caller passes a contextFrame
-        // — this is the same "opt-in via lifecycle/budget" pattern
-        // M121 established for L1. Callers that want L6 in the
-        // ledger pass their real frame; callers that don't see
-        // backward-compat identity behavior (no L6 bundle, no
-        // ["L6"] expansion).
-        if let ctxFrame = contextFrame {
-            let l6Bundle = BASPresenceObservationBundle.derive(
-                from: ctxFrame,
-                turnID: observations.turnID,
-                sessionID: observations.sessionID,
-                emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l6Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L6")
-        }
-
-        // M135 — L7 mirrorBlade auto-stream. Same gated pattern
-        // as L6: derivation needs a real `BASDecomposeFrame`
-        // (fact shards / emotion cards / hypothesis cards /
-        // horizon shards / counterfactual seeds), so fabrication
-        // is useless. Streams only when caller passes the frame.
-        if let dframe = decomposeFrame {
-            let l7Bundle =
-                BASDecompositionObservationBundle.derive(
-                    from: dframe,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l7Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L7")
-        }
-
-        // M136 — L8 hippocampalWell auto-stream. The underlying
-        // `BASHippocampalMemoryObservationBundle.derive(...)`
-        // handles a nil memory bundle gracefully (produces an
-        // empty-observations bundle) — but we gate on non-nil
-        // to preserve backward-compat: callers that never pass
-        // a memory bundle shouldn't suddenly see an empty L8
-        // coverage summary added to their ledger. When the
-        // caller passes a real bundle (retrieval events / pin
-        // events / forget events), L8 streams normally.
-        if let mb = memoryBundle {
-            let l8Bundle =
-                BASHippocampalMemoryObservationBundle.derive(
-                    fromMemoryBundle: mb,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l8Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L8")
-        }
-
-        // M137 — L10 triSelfTribunal + L11 riskGate co-derivation.
-        // Both layers' `.derive(from:...)` take the SAME
-        // `BASThoughtFrame` — the tribunal derives from voice
-        // votes + vetoMarks, the risk layer derives from
-        // `riskBindings`. One caller-supplied thoughtFrame
-        // therefore drives both layers in a single gated path,
-        // avoiding two separate parameters for the same source.
-        if let tframe = thoughtFrame {
-            let l10Bundle =
-                BASTribunalObservationBundle.derive(
-                    from: tframe,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            let l11Bundle =
-                BASRiskObservationBundle.derive(
-                    from: tframe,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            // M139 — L4 worldPrior piggybacks on the same
-            // thoughtFrame source that drives L10+L11. The
-            // whitepaper L4 "world-prior vault" per-turn
-            // observation bundle derives from the same frame:
-            // candidate claims → horizon matches → causal
-            // templates → counterfactual seeds. One caller-
-            // supplied thoughtFrame therefore drives THREE
-            // layers (L4, L10, L11) with zero new API surface.
-            let l4Bundle =
-                BASWorldPriorObservationBundle.derive(
-                    fromThoughtFrame: tframe,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l4Bundle.coverageSummary)
-            combined.append(l10Bundle.coverageSummary)
-            combined.append(l11Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L4")
-            autoInjectedLayerCodes.append("L10")
-            autoInjectedLayerCodes.append("L11")
-        }
-
-        // M138 — L13 evolutionFurnace shadow-trial stream.
-        //
-        // CRITICAL — whitepaper invariant #3 "宿主私有经验不进权重":
-        // L13 per-turn observations record the turn's UPDATE
-        // TICKETS (proposed changes: memory-write / host-change /
-        // rule-candidate / profile-change suggestions) as
-        // SHADOW-LEVEL LEDGER ENTRIES only. M138 does NOT:
-        //   * touch any neural weights
-        //   * commit any memory write
-        //   * merge any host-change candidate into the active
-        //     constitution
-        //   * execute any ticket's suggested change
-        //
-        // All that M138 does is: if the caller passes one or more
-        // tickets through `updateTickets`, they flow through the
-        // shadow-stream path — derive L13 observation bundle,
-        // append its coverage summary, write to L14 ledger. The
-        // tickets stay "requires review" semantically (hosts
-        // must still approve via QinaoHost.approve(candidateID:)
-        // or the equivalent memory-write commit path). L14 ledger
-        // gains an audit trail of "what was PROPOSED this turn"
-        // separate from "what was COMMITTED this turn" — this is
-        // the shadow-trial record the whitepaper calls for.
-        if !updateTickets.isEmpty {
-            let l13Bundle =
-                BASUpdateTicketObservationBundle.derive(
-                    fromUpdateTickets: updateTickets,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l13Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L13")
-        }
-
-        // M140 — L2 neuralOrgan auto-stream.
-        //
-        // Whitepaper L2 per-turn observation bundle derives from
-        // a sealed `BASNeuralOrganMap` (active organs, precision
-        // map, routing policy, sovereign constraints, head
-        // guarantees). Same gated pattern as L6/L7/L8: streams
-        // only when the caller supplies a real map. `nil` leaves
-        // L2 absent from the bundle (backward-compat).
-        if let organMap = neuralOrganMap {
-            let l2Bundle =
-                BASNeuralOrganObservationBundle.derive(
-                    fromOrganMap: organMap,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l2Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L2")
-        }
-
-        // M141 — L12 gentleHand auto-stream.
-        //
-        // Whitepaper L12 per-turn observation bundle derives from
-        // BOTH a thoughtFrame (for risk bindings / decision
-        // package) AND a renderedOutput (for the final surface
-        // the host ended up presenting). So L12 requires BOTH
-        // upstream inputs — it only streams when the caller
-        // passes both. Missing either leaves L12 out of the
-        // bundle (backward-compat).
-        if let tf = thoughtFrame,
-           let rendered = renderedOutput
-        {
-            let l12Bundle =
-                BASSoftHandObservationBundle.derive(
-                    from: tf,
-                    renderedOutput: rendered,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l12Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L12")
-        }
-
-        // M142 — L9 dreamLoop auto-stream.
-        //
-        // Whitepaper L9 per-turn observation bundle derives from
-        // the turn's `BASCandidateFrontier` — dominance order +
-        // reversible paths + guardian branches + diversity score
-        // + delay recommendations. M142 ships a new BAS-side
-        // derive helper (pure value transform) and wires sendSession
-        // to call it when the caller passes the frontier. Same
-        // opt-in pattern as L6/L7/L8/L13/L2.
-        //
-        // Missing until M142 because the BAS side never shipped a
-        // `derive(fromFrontier:...)` helper — M24 landed the
-        // primitive `BASCandidateObservationBundle` type but left
-        // the construction path to be filled by callers. M142's
-        // BAS addition closes that gap.
-        if let frontier = candidateFrontier {
-            let l9Bundle =
-                BASCandidateObservationBundle.derive(
-                    fromFrontier: frontier,
-                    turnID: observations.turnID,
-                    sessionID: observations.sessionID,
-                    emittedAt: now())
-            var combined = finalAdditionalSummaries ?? []
-            combined.append(l9Bundle.coverageSummary)
-            finalAdditionalSummaries = combined
-            autoInjectedLayerCodes.append("L9")
-        }
-
-        // Expand the expectation set only when the caller accepted
-        // the default ["L14"]; a custom expectation is treated as an
-        // explicit statement and left alone.
-        if expectedCoverageLayerIDs == ["L14"]
-           && !autoInjectedLayerCodes.isEmpty {
-            finalExpectedLayerIDs =
-                ["L14"] + autoInjectedLayerCodes
-        }
-
-        let coverage = await sovereign.recordTurnCoverage(
-            sessionID: observations.sessionID,
-            turnID: observations.turnID,
-            budgetCeiling: coverageBudgetCeiling,
-            expectedLayerIDs: finalExpectedLayerIDs,
-            additionalSummaries: finalAdditionalSummaries)
-
-        // M123 骨架 — sovereign-frame aggregator.
-        //
-        // The L14 whitepaper §5.1 `BASSovereignFrame` is the 17-field
-        // aggregator that binds one turn's sovereign surface. M119
-        // shipped the struct; M123 actually builds one per turn and
-        // streams it into the ledger's parallel `sovereignFrames[]`
-        // storage alongside the observation bundle (M90/M122).
-        //
-        // Fields we can populate deterministically from sendSession
-        // state:
-        //   * frameID / sessionID / turnID — identity
-        //   * deviceStateRef   — the routed budget's leaseID when
-        //                        lifecycle+budget present (live
-        //                        thermal reading has already landed
-        //                        in the routedBudget).
-        //   * hostVersionRef   — the L5 constitution's activeVersion
-        //                        (already fetched for L5 auto-stream;
-        //                        reuse to avoid a second actor hop).
-        //   * continuityRef    — observations.snapshotRef; this is
-        //                        the only snapshot anchor the caller
-        //                        carries for the turn.
-        //   * thoughtFoldRef   — the L3 fold's foldID (matches the
-        //                        deterministic "fold.<sess>.<turn>"
-        //                        we built above).
-        //   * policyHash       — observations.policyHash verbatim.
-        // Fields left `nil` today (call-site-invented:
-        // riskCardRef / actionPermitRef / pending* digests /
-        // jurisdictionRef / timeLockRef / contaminationRefs) will be
-        // populated in future milestones as they surface in the
-        // TurnObservations shape or via dedicated bridge types. `nil`
-        // preserves the whitepaper's optional-semantics for those
-        // refs (they are only expected when an actual artifact was
-        // bound for the turn).
-        // M144 — synthetic refs for risk card + action permit +
-        // agency reservation when the caller-supplied thoughtFrame
-        // carries them. Neither `BASRiskCard`, `BASActionPermit`,
-        // nor `BASAgencyReservation` carries a natural stable ID
-        // in its schema, so we synthesize deterministic refs of
-        // the form `"<prefix>.<sessionID>.<turnID>"` — same
-        // discipline as the M123 frame ID and M127 render ID.
-        // Callers who want their own IDs can layer on top via
-        // future milestones that thread explicit IDs through.
-        let riskCardRef: String? =
-            thoughtFrame?.riskCard.map { _ in
-                "risk-card."
-                + observations.sessionID
-                + "." + observations.turnID
-            }
-        let actionPermitRef: String? =
-            thoughtFrame?.actionPermit.map { _ in
-                "permit."
-                + observations.sessionID
-                + "." + observations.turnID
-            }
-        let agencyReservationRef: String? =
-            thoughtFrame?.agencyReservation.map { _ in
-                "agency-reservation."
-                + observations.sessionID
-                + "." + observations.turnID
-            }
-
-        // M147 — final 6 sovereignFrame nil fields wired. When
-        // the caller passes a `jurisdictionMap`, its natural
-        // `mapID` is the ref; when `contaminationLineages` has
-        // entries, their `lineageID`s form the refs array;
-        // timeLock + 3 pending digests are plain-string inputs
-        // so they pass through directly. Empty defaults preserve
-        // backward-compat — every pre-M147 call site produces a
-        // byte-equal sovereignFrame as before.
-        let contaminationRefs =
-            contaminationLineages.map(\.lineageID)
-
-        let sovereignFrame = BASSovereignFrame(
-            frameID: "frame."
-                + observations.sessionID
-                + "." + observations.turnID,
-            sessionID: observations.sessionID,
-            turnID: observations.turnID,
-            deviceStateRef: routedBudget?.leaseID,
-            hostVersionRef: l5Constitution.activeVersion.isEmpty
-                ? nil : l5Constitution.activeVersion,
-            continuityRef: observations.snapshotRef.isEmpty
-                ? nil : observations.snapshotRef,
-            thoughtFoldRef: l3Fold.foldID,
-            riskCardRef: riskCardRef,
-            actionPermitRef: actionPermitRef,
-            pendingActionDigest: pendingActionDigest,
-            pendingMutationDigest: pendingMutationDigest,
-            pendingMemoryDigest: pendingMemoryDigest,
-            jurisdictionRef: jurisdictionMap?.mapID,
-            timeLockRef: timeLockRef,
-            contaminationRefs: contaminationRefs,
-            policyHash: observations.policyHash)
-        await sovereign.recordSovereignFrame(sovereignFrame)
-
-        // M127 皮肤扩深 — L12 `BASRenderFrame` per-turn build.
-        //
-        // Siblings with the M123 sovereign frame: the sovereign
-        // frame binds the L14 audit surface (device/host/continuity
-        // + policy); the render frame binds the L12 render surface
-        // (merged choice / permit / style / surface mode /
-        // disclosure). Pre-M127 the struct was M117-shipped but
-        // idle — M127 builds one per healthy turn and records it
-        // on QinaoSovereignControlPlane's parallel storage.
-        //
-        // 7 of 12 refs populated deterministically from state the
-        // sendSession already has:
-        //   * frameID              — "render.<sess>.<turn>"
-        //   * mergedChoiceRef      — L3 fold.foldID (the
-        //                             thought-fold IS the merged
-        //                             choice artifact)
-        //   * hostStyleRef         — L5 constitution.activeVersion
-        //                             (host style lives with the
-        //                             host constitution)
-        //   * sovereignSurfaceRef  — sovereign frame's frameID
-        //                             (renderFrame → sovereignFrame
-        //                             back-reference)
-        //   * outputSurfaceRef     — surface decision's raw value
-        //                             string (one of 5 stable IDs)
-        //   * disclosureProfileRef — surface decision disclosure
-        //                             raw value
-        //   * substituteRef        — substitute kind's raw value
-        //                             (via .kind discriminator)
-        // 5 remain nil for future wiring:
-        //   actionPermitRef — waits on M103 permit path integration
-        //   agencyReservationRef — L11 agency reservation stream
-        //   situationRef / mirrorRef — L7 mirror blade output
-        //   toneProfileRef / forceCurveRef — L12 tone/force engine
-        // Each nil comment-documented below so future milestones
-        // can trace the hook.
-        // M131 dedup — compute the surface decision ONCE and reuse
-        // it for (a) render-frame ref derivation and (b) TurnOutcome
-        // population. Pre-M131 sendSession called
-        // `deriveSurfaceDecision` four times per turn (3 inline
-        // helpers + 1 in the outcome return); the function is pure
-        // and deterministic, so the calls all produced the same
-        // value — just wasted work. This binding folds them into
-        // one compute; the outcome-return sites below read it too.
-        let computedSurfaceDecision = Self.deriveSurfaceDecision(
-            auditSeverity: report.severity,
-            coverageSeverity: coverage.severity,
-            auditRef: report.auditRef,
-            routedBudget: routedBudget,
-            retryPolicy: surfaceRetryPolicy)
-
-        // M144 — wire render frame's actionPermitRef +
-        // agencyReservationRef from the same synthetic refs we
-        // used for the sovereign frame. Render frame now picks up
-        // the L12 surface's upstream bindings: risk → permit →
-        // agency reservation → surface decision.
-        //
-        // M148 — fill the last 4 render-frame nil fields with
-        // synthetic per-turn refs, gated on their natural source:
-        //   situationRef → synthetic when decomposeFrame exists
-        //                  (the L7 decompose captures the situation
-        //                  context)
-        //   mirrorRef    → synthetic when decomposeFrame has a
-        //                  mirrorDraft (L7 mirror blade output)
-        //   toneProfileRef → synthetic when renderedOutput exists
-        //                    (L12 rendered output carries tone)
-        //   forceCurveRef → synthetic when renderedOutput AND
-        //                   thoughtFrame.riskCard both exist
-        //                   (force curve is risk × render joint)
-        // Post-M148 render frame ref completeness: 12/12.
-        let situationRef: String? =
-            decomposeFrame.map { _ in
-                "situation."
-                + observations.sessionID
-                + "." + observations.turnID
-            }
-        let mirrorRef: String? =
-            decomposeFrame?.mirrorDraft.map { _ in
-                "mirror."
-                + observations.sessionID
-                + "." + observations.turnID
-            }
-        let toneProfileRef: String? =
-            renderedOutput.map { _ in
-                "tone."
-                + observations.sessionID
-                + "." + observations.turnID
-            }
-        let forceCurveRef: String? =
-            (renderedOutput != nil
-             && thoughtFrame?.riskCard != nil)
-            ? ("force-curve."
-               + observations.sessionID
-               + "." + observations.turnID)
-            : nil
-
-        let renderFrame = BASRenderFrame(
-            frameID: "render."
-                + observations.sessionID
-                + "." + observations.turnID,
-            mergedChoiceRef: l3Fold.foldID,
-            actionPermitRef: actionPermitRef,
-            agencyReservationRef: agencyReservationRef,
-            hostStyleRef: l5Constitution.activeVersion.isEmpty
-                ? nil : l5Constitution.activeVersion,
-            situationRef: situationRef,
-            mirrorRef: mirrorRef,
-            substituteRef:
-                computedSurfaceDecision.substitute.kind.rawValue,
-            sovereignSurfaceRef: sovereignFrame.frameID,
-            outputSurfaceRef:
-                computedSurfaceDecision.surface.rawValue,
-            toneProfileRef: toneProfileRef,
-            forceCurveRef: forceCurveRef,
-            disclosureProfileRef:
-                computedSurfaceDecision.disclosure.rawValue)
-        await sovereign.recordRenderFrame(
-            renderFrame,
-            sessionID: observations.sessionID,
-            turnID: observations.turnID)
-
-        // Fail-closed: the coordinator was laxer than the independent
-        // engine — the coordinator allowed something the engine would
-        // have blocked. Halt the session before returning so the
-        // caller cannot accidentally continue the conversation.
-        //
-        // M70: do NOT record the turn on the lifecycle — a halted
-        // turn is a failed outcome and must not advance the lung
-        // accumulator or resample the thermal twin. The caller sees
-        // `throw`, not a `TurnOutcome`, so there is no place to
-        // report `turnRecorded` anyway; the explicit contract is
-        // "halt paths leave lifecycle state untouched".
-        if !report.isAcceptable {
-            await sovereign.markSessionHalted(
-                sessionID: observations.sessionID,
-                reason: "audit-parity:coordinator-laxer")
-            throw TurnError.auditParityFailure(
-                sessionID: observations.sessionID,
-                severity: report.severity,
-                auditRef: report.auditRef)
-        }
-
-        // M45 coverage-severity halt: the cross-layer coverage read
-        // returned `.halt` (typically a wake-budget overspend). This
-        // is a structural ceiling the coordinator does not see; the
-        // runtime halts the session and throws so the caller cannot
-        // advance past a budget breach. M70: same no-record contract
-        // as the parity halt above.
-        if coverage.severity == .halt {
-            await sovereign.markSessionHalted(
-                sessionID: observations.sessionID,
-                reason: "coverage-halt")
-            throw TurnError.coverageHalt(
-                sessionID: observations.sessionID,
-                turnID: observations.turnID,
-                findings: coverage.findings)
-        }
-
-        // Severity-driven halt path: the audit itself asked for a
-        // hard stop (rollback / deadStop). Halt the session and
-        // return the report so the caller can act on it (rollback
-        // prompt UI, human-intervention banner, etc.).
-        //
-        // M70: halt returns a `TurnOutcome` rather than throwing, so
-        // we DO have a place to surface `routedBudget` (the caller
-        // still wants to see what budget the turn ran under, even if
-        // the turn is being halted). But `turnRecorded` stays `nil`
-        // — a halted turn must not distort lifecycle state.
-        let autoHaltSeverities: Set<
-            QinaoSovereignControlPlane.AuditSeverity
-        > = [.rollback, .deadStop]
-        if autoHaltSeverities.contains(report.severity) {
-            await sovereign.markSessionHalted(
-                sessionID: observations.sessionID,
-                reason: "audit-severity:\(report.severity.rawValue)")
-            let residue = await sovereign.turnResidue(
-                sessionID: observations.sessionID,
-                turnID: observations.turnID)
-            return TurnOutcome(
-                audit: report,
-                coverage: coverage,
-                sessionHalted: true,
-                routedBudget: routedBudget,
-                turnRecorded: nil,
-                // M131 dedup — reuse `computedSurfaceDecision`
-                // captured once above, same value the render
-                // frame used.
-                surfaceDecision: computedSurfaceDecision,
-                residue: residue)
-        }
-
-        // M70 — healthy turn path: record the turn on the lifecycle
-        // so the lung accumulator and thermal twin advance. This
-        // only fires when (a) the caller passed a `plannedBudget`
-        // (so we know the run mode), (b) the caller passed a
-        // `turnDurationSeconds`, and (c) a lifecycle is attached.
-        // Any of those being absent leaves `turnRecorded` `nil` and
-        // the lifecycle state unchanged — identical to pre-M70
-        // behavior.
-        let turnRecorded: BASLeaseLifeCoordinator.TurnRecorded?
-        if
-            let planned = plannedBudget,
-            let duration = turnDurationSeconds
-        {
-            turnRecorded = await recordTurnOnLifecycle(
-                runMode: QinaoRunMode(bridging: planned.runMode),
-                durationSeconds: duration)
-        } else {
-            turnRecorded = nil
-        }
-
-        let residue = await sovereign.turnResidue(
-            sessionID: observations.sessionID,
-            turnID: observations.turnID)
-        return TurnOutcome(
-            audit: report,
-            coverage: coverage,
-            sessionHalted: false,
-            routedBudget: routedBudget,
-            turnRecorded: turnRecorded,
-            // M131 dedup — reuse the single surface-decision
-            // compute from above so one sendSession call makes
-            // exactly one deriveSurfaceDecision call instead of
-            // four (render frame × 3 helpers + outcome return).
-            surfaceDecision: computedSurfaceDecision,
-            residue: residue)
-    }
 
     // MARK: - M125 · L12 surface-decision derivation (皮肤)
     // MARK: - M126 · retry policy + thermal/maintenance awareness
