@@ -367,7 +367,8 @@ public actor QinaoRuntime {
         thoughtFrame: BASThoughtFrame? = nil,
         updateTickets: [BASUpdateTicket] = [],
         neuralOrganMap: BASNeuralOrganMap? = nil,
-        renderedOutput: BASRenderedOutput? = nil
+        renderedOutput: BASRenderedOutput? = nil,
+        candidateFrontier: BASCandidateFrontier? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -737,6 +738,34 @@ public actor QinaoRuntime {
             combined.append(l12Bundle.coverageSummary)
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L12")
+        }
+
+        // M142 — L9 dreamLoop auto-stream.
+        //
+        // Whitepaper L9 per-turn observation bundle derives from
+        // the turn's `BASCandidateFrontier` — dominance order +
+        // reversible paths + guardian branches + diversity score
+        // + delay recommendations. M142 ships a new BAS-side
+        // derive helper (pure value transform) and wires sendSession
+        // to call it when the caller passes the frontier. Same
+        // opt-in pattern as L6/L7/L8/L13/L2.
+        //
+        // Missing until M142 because the BAS side never shipped a
+        // `derive(fromFrontier:...)` helper — M24 landed the
+        // primitive `BASCandidateObservationBundle` type but left
+        // the construction path to be filled by callers. M142's
+        // BAS addition closes that gap.
+        if let frontier = candidateFrontier {
+            let l9Bundle =
+                BASCandidateObservationBundle.derive(
+                    fromFrontier: frontier,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l9Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L9")
         }
 
         // Expand the expectation set only when the caller accepted
