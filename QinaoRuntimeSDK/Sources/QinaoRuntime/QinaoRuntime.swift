@@ -302,7 +302,9 @@ public actor QinaoRuntime {
         coverageBudgetCeiling: Double = 1.0,
         expectedCoverageLayerIDs: [String] = ["L14"],
         plannedBudget: BASBudgetFrame? = nil,
-        turnDurationSeconds: Double? = nil
+        turnDurationSeconds: Double? = nil,
+        additionalCoverageSummaries: [BASObservationCoverageSummary]?
+            = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -337,11 +339,26 @@ public actor QinaoRuntime {
         // diff "what the coordinator said" against "what the structural
         // coverage read said" after-the-fact. Compute it before any
         // throw so it also lands in the halt branches below.
+        // M95 — when the caller streams L1–L13 coverage summaries,
+        // forward them to the sovereign ledger alongside the
+        // always-present L14 summary. Nil (default) preserves the
+        // pre-M95 L14-only contract: zero additional summaries
+        // recorded, ledger `observationBundleCount` unchanged,
+        // verdict's expected-layer set still limited to
+        // `expectedCoverageLayerIDs`. When the caller passes a
+        // non-nil array (even empty), the path that records the full
+        // per-turn observation bundle in the ledger's parallel
+        // `observationBundles[]` storage fires — this is the single
+        // hook by which host pipelines (L1 lifecycle, L3 fold, L4
+        // world-prior, L5 host-constitution, …) get their per-turn
+        // coverage into the audit surface through the same
+        // choke-point `sendSession` uses for `auditTurn`.
         let coverage = await sovereign.recordTurnCoverage(
             sessionID: observations.sessionID,
             turnID: observations.turnID,
             budgetCeiling: coverageBudgetCeiling,
-            expectedLayerIDs: expectedCoverageLayerIDs)
+            expectedLayerIDs: expectedCoverageLayerIDs,
+            additionalSummaries: additionalCoverageSummaries)
 
         // Fail-closed: the coordinator was laxer than the independent
         // engine — the coordinator allowed something the engine would

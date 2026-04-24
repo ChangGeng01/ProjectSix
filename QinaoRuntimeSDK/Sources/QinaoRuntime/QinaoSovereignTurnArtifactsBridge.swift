@@ -455,7 +455,9 @@ extension QinaoRuntime {
         coverageBudgetCeiling: Double = 1.0,
         expectedCoverageLayerIDs: [String] = ["L14"],
         plannedBudget: BASBudgetFrame? = nil,
-        turnDurationSeconds: Double? = nil
+        turnDurationSeconds: Double? = nil,
+        additionalCoverageSummaries: [BASObservationCoverageSummary]?
+            = nil
     ) async throws -> TurnOutcome {
         try await sendSession(
             artifacts.turnObservations,
@@ -463,6 +465,7 @@ extension QinaoRuntime {
             coverageBudgetCeiling: coverageBudgetCeiling,
             expectedCoverageLayerIDs: expectedCoverageLayerIDs,
             plannedBudget: plannedBudget,
-            turnDurationSeconds: turnDurationSeconds)
+            turnDurationSeconds: turnDurationSeconds,
+            additionalCoverageSummaries: additionalCoverageSummaries)
     }
 }
