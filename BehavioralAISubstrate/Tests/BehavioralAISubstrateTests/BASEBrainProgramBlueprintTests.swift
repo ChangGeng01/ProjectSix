@@ -103,6 +103,14 @@ struct BASEBrainProgramBlueprintTests {
             "EmergencyBrake",
             "PowerLedger",  // M106 L1 §6 key-object closure
             "CortexPacket",  // M107 L2 §7 key-object closure
+            // M109 L4 §5 whitepaper-parity key objects:
+            "HorizonPrior",
+            "WorldFrame",
+            "AbstractionMap",
+            "UncertaintyMap",
+            "BoundaryPrior",
+            "TemporalKnowledgeTier",
+            "EvidenceGradient",
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",

@@ -4,6 +4,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASWorldPrior
 
 public enum BASEBrainSchemaGovernanceRegistry {
     public static let governedSchemas: [BASSchemaGovernanceEntry] = [
@@ -281,6 +282,42 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "CortexPacket",
             versionedType: BASCortexPacket.self,
             tests: ["schema.cortex_packet.current", "schema.cortex_packet.backward"]
+        ),
+        // M109 — L4 Horizon Layer whitepaper §5 key objects.
+        entry(
+            "HorizonPrior",
+            versionedType: BASHorizonPrior.self,
+            tests: ["schema.horizon_prior.current", "schema.horizon_prior.backward"]
+        ),
+        entry(
+            "WorldFrame",
+            versionedType: BASWorldFrame.self,
+            tests: ["schema.world_frame.current", "schema.world_frame.backward"]
+        ),
+        entry(
+            "AbstractionMap",
+            versionedType: BASAbstractionMap.self,
+            tests: ["schema.abstraction_map.current", "schema.abstraction_map.backward"]
+        ),
+        entry(
+            "UncertaintyMap",
+            versionedType: BASUncertaintyMap.self,
+            tests: ["schema.uncertainty_map.current", "schema.uncertainty_map.backward"]
+        ),
+        entry(
+            "BoundaryPrior",
+            versionedType: BASBoundaryPrior.self,
+            tests: ["schema.boundary_prior.current", "schema.boundary_prior.backward"]
+        ),
+        entry(
+            "TemporalKnowledgeTier",
+            versionedType: BASTemporalKnowledgeTier.self,
+            tests: ["schema.temporal_knowledge_tier.current", "schema.temporal_knowledge_tier.backward"]
+        ),
+        entry(
+            "EvidenceGradient",
+            versionedType: BASEvidenceGradient.self,
+            tests: ["schema.evidence_gradient.current", "schema.evidence_gradient.backward"]
         ),
         entry(
             "CandidateFrontier",

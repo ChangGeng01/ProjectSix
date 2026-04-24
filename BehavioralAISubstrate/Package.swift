@@ -61,7 +61,7 @@ let package = Package(
             name: "BASEvaluation",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASObservability"]
         ),
-        .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASEvaluation"]),
+        .target(name: "BASAdmin", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASEvaluation", "BASWorldPrior"]),
         .target(
             name: "BASAppleAdapters",
             dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy", "BASSovereign", "BASOrchestration", "BASObservability", "BASAdmin", "BASOrgan", "BASLeaseLife"]

@@ -5,6 +5,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASWorldPrior
 
 @Suite("BASEBrain schema governance registry")
 struct BASEBrainSchemaGovernanceRegistryTests {
@@ -29,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 127)  // M106 +PowerLedger, M107 +CortexPacket
+        #expect(governedObjects.count == 134)  // M106 +PowerLedger, M107 +CortexPacket, M109 +7 L4 types
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -177,6 +178,13 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "EmergencyBrake": BASEmergencyBrake.currentSchemaVersion,
             "PowerLedger": BASPowerLedger.currentSchemaVersion,  // M106
             "CortexPacket": BASCortexPacket.currentSchemaVersion,  // M107
+            "HorizonPrior": BASHorizonPrior.currentSchemaVersion,  // M109
+            "WorldFrame": BASWorldFrame.currentSchemaVersion,  // M109
+            "AbstractionMap": BASAbstractionMap.currentSchemaVersion,  // M109
+            "UncertaintyMap": BASUncertaintyMap.currentSchemaVersion,  // M109
+            "BoundaryPrior": BASBoundaryPrior.currentSchemaVersion,  // M109
+            "TemporalKnowledgeTier": BASTemporalKnowledgeTier.currentSchemaVersion,  // M109
+            "EvidenceGradient": BASEvidenceGradient.currentSchemaVersion,  // M109
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,
