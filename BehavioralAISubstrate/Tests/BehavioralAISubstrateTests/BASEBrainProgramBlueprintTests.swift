@@ -112,6 +112,11 @@ struct BASEBrainProgramBlueprintTests {
             "TemporalKnowledgeTier",
             "EvidenceGradient",
             "SituationField",  // M111 L6 §5 key-object closure
+            // M112 L7 §5 key-object closure:
+            "IntentVector",
+            "AffectLayer",
+            "UnknownSet",
+            "CognitiveDissectionFrame",
             "SovereignActuationCommand",
             "SovereignExecutionReceipt",
             "SovereignVerdict",

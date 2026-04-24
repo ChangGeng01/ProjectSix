@@ -325,6 +325,27 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASSituationField.self,
             tests: ["schema.situation_field.current", "schema.situation_field.backward"]
         ),
+        // M112 — L7 Mirror Blade whitepaper §5 object family.
+        entry(
+            "IntentVector",
+            versionedType: BASIntentVector.self,
+            tests: ["schema.intent_vector.current", "schema.intent_vector.backward"]
+        ),
+        entry(
+            "AffectLayer",
+            versionedType: BASAffectLayer.self,
+            tests: ["schema.affect_layer.current", "schema.affect_layer.backward"]
+        ),
+        entry(
+            "UnknownSet",
+            versionedType: BASUnknownSet.self,
+            tests: ["schema.unknown_set.current", "schema.unknown_set.backward"]
+        ),
+        entry(
+            "CognitiveDissectionFrame",
+            versionedType: BASCognitiveDissectionFrame.self,
+            tests: ["schema.cognitive_dissection_frame.current", "schema.cognitive_dissection_frame.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,

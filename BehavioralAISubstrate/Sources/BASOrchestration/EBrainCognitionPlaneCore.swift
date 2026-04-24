@@ -939,6 +939,219 @@ public struct BASCanonicalCognitiveFrame: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - M112 L7 whitepaper §5 parity
+
+/// L7 whitepaper §5 `IntentVector` — captures the explicit /
+/// latent / steering intents of one utterance, with a confidence
+/// score. Parallel object-family to `BASDecomposeFrame`'s inline
+/// shards; ships as a separate whitepaper-literal schema so
+/// cross-layer consumers (L9 dream / L10 tribunal / L11 risk)
+/// can reference it by the whitepaper-named field.
+public struct BASIntentVector: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var vectorID: String
+    /// What the speaker says they want ("please send the report").
+    public var explicitIntent: String
+    /// What the speaker actually seems to be pursuing beneath the
+    /// surface ("want the meeting moved so they don't have to
+    /// present").
+    public var latentIntent: String
+    /// What the speaker may be trying to shape YOUR next move
+    /// toward ("make you volunteer to present in their place").
+    public var steeringIntent: String
+    /// [0, 1] confidence in the inferred latent / steering
+    /// decomposition.
+    public var confidence: Double
+
+    public init(
+        schemaVersion: String = BASIntentVector.currentSchemaVersion,
+        vectorID: String,
+        explicitIntent: String = "",
+        latentIntent: String = "",
+        steeringIntent: String = "",
+        confidence: Double = 0
+    ) {
+        self.schemaVersion = schemaVersion
+        self.vectorID = vectorID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.explicitIntent = explicitIntent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.latentIntent = latentIntent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.steeringIntent = steeringIntent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.confidence = min(1, max(0, confidence))
+    }
+}
+
+/// L7 whitepaper §5 `AffectLayer` — one emotion layer observed in
+/// an utterance, scored for volatility + spillover + coupling to
+/// host goals.
+public struct BASAffectLayer: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var tone: String
+    public var intensity: Double
+    public var volatility: Double
+    public var spilloverRisk: Double
+    public var coupledGoalRefs: [String]
+
+    public init(
+        schemaVersion: String = BASAffectLayer.currentSchemaVersion,
+        tone: String,
+        intensity: Double,
+        volatility: Double,
+        spilloverRisk: Double,
+        coupledGoalRefs: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.tone = tone
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.intensity = min(1, max(0, intensity))
+        self.volatility = min(1, max(0, volatility))
+        self.spilloverRisk = min(1, max(0, spilloverRisk))
+        self.coupledGoalRefs = coupledGoalRefs
+    }
+}
+
+/// L7 whitepaper §5 `UnknownSet` — aggregator of the missing
+/// knowledge the turn cannot resolve without explicit clarification.
+/// Distinct from `BASUnknownRecord` which is per-item; this one is
+/// the whitepaper-literal 5-list container keyed by "what kind of
+/// gap this is".
+public struct BASUnknownSet: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var missingFacts: [String]
+    public var missingRoles: [String]
+    public var missingConstraints: [String]
+    public var unresolvedPermissions: [String]
+    public var ambiguityNotes: [String]
+
+    public init(
+        schemaVersion: String = BASUnknownSet.currentSchemaVersion,
+        missingFacts: [String] = [],
+        missingRoles: [String] = [],
+        missingConstraints: [String] = [],
+        unresolvedPermissions: [String] = [],
+        ambiguityNotes: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.missingFacts = missingFacts
+        self.missingRoles = missingRoles
+        self.missingConstraints = missingConstraints
+        self.unresolvedPermissions = unresolvedPermissions
+        self.ambiguityNotes = ambiguityNotes
+    }
+
+    /// Empty baseline — no gaps identified yet.
+    public static let empty = BASUnknownSet()
+
+    /// True iff at least one list is non-empty.
+    public var hasAny: Bool {
+        !missingFacts.isEmpty
+            || !missingRoles.isEmpty
+            || !missingConstraints.isEmpty
+            || !unresolvedPermissions.isEmpty
+            || !ambiguityNotes.isEmpty
+    }
+}
+
+/// L7 whitepaper §5 `ContradictionNode` typealias. Substrate uses
+/// `BASContradictionRecord` (node_id→nodeID, contradiction_type→
+/// kind, both named structurally the same but "Record" is the
+/// substrate's canonical naming). Shape match is close enough
+/// that a typealias suffices for whitepaper-literal parity.
+public typealias BASContradictionNode = BASContradictionRecord
+
+/// L7 whitepaper §5 `CognitiveDissectionFrame` — aggregator that
+/// binds the full L7 decomposition of one turn (fact shards +
+/// claim shards + intent vectors + goal spine + affect layers +
+/// unknown set + contradictions + pressure vectors + manipulation
+/// patterns + boundary touches + provenance + mirror draft +
+/// canonical frame + confidence band).
+///
+/// Parallel to `BASDecomposeFrame` (substrate's authoritative
+/// runtime frame): `BASCognitiveDissectionFrame` exposes the
+/// whitepaper-literal shape for audit / cross-layer serialization.
+/// Both can co-exist; callers choose based on use case.
+public struct BASCognitiveDissectionFrame: BASSchemaVersioned,
+    Equatable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var frameID: String
+    public var situationRef: String?
+    public var factShards: [BASFactShard]
+    public var claimShards: [BASClaimShard]
+    public var intentVectors: [BASIntentVector]
+    public var goalSpineLocal: BASGoalSpineLocal?
+    public var affectLayers: [BASAffectLayer]
+    public var unknownSet: BASUnknownSet
+    public var contradictionNodes: [BASContradictionNode]
+    public var pressureVectors: [BASPressureVector]
+    public var manipulationPatterns: [BASManipulationPattern]
+    public var boundaryTouches: [BASBoundaryTouch]
+    public var provenanceMap: [String: String]
+    public var mirrorDraftRef: String?
+    public var canonicalFrameRef: String?
+    public var confidenceBand: Double
+
+    public init(
+        schemaVersion: String
+            = BASCognitiveDissectionFrame.currentSchemaVersion,
+        frameID: String,
+        situationRef: String? = nil,
+        factShards: [BASFactShard] = [],
+        claimShards: [BASClaimShard] = [],
+        intentVectors: [BASIntentVector] = [],
+        goalSpineLocal: BASGoalSpineLocal? = nil,
+        affectLayers: [BASAffectLayer] = [],
+        unknownSet: BASUnknownSet = .empty,
+        contradictionNodes: [BASContradictionNode] = [],
+        pressureVectors: [BASPressureVector] = [],
+        manipulationPatterns: [BASManipulationPattern] = [],
+        boundaryTouches: [BASBoundaryTouch] = [],
+        provenanceMap: [String: String] = [:],
+        mirrorDraftRef: String? = nil,
+        canonicalFrameRef: String? = nil,
+        confidenceBand: Double = 0
+    ) {
+        self.schemaVersion = schemaVersion
+        self.frameID = frameID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.situationRef = situationRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.factShards = factShards
+        self.claimShards = claimShards
+        self.intentVectors = intentVectors
+        self.goalSpineLocal = goalSpineLocal
+        self.affectLayers = affectLayers
+        self.unknownSet = unknownSet
+        self.contradictionNodes = contradictionNodes
+        self.pressureVectors = pressureVectors
+        self.manipulationPatterns = manipulationPatterns
+        self.boundaryTouches = boundaryTouches
+        self.provenanceMap = provenanceMap
+        self.mirrorDraftRef = mirrorDraftRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.canonicalFrameRef = canonicalFrameRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.confidenceBand = min(1, max(0, confidenceBand))
+    }
+}
+
 public struct BASDecomposeFrame: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.2.0"
 
