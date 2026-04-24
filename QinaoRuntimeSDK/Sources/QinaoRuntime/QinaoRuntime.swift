@@ -326,6 +326,123 @@ public actor QinaoRuntime {
             findings: [QinaoSovereignControlPlane.CoverageFinding])
     }
 
+    // MARK: - M152 · TurnInputs value type
+    //
+    // Pre-M152 sendSession grew to 22 parameters across its M121-M147
+    // evolution — one per layer gate, one per sovereign ref. The
+    // signature worked but violated elegance hard: readers had to
+    // visually parse positional arguments, callers had to remember
+    // which of 16 optional params mattered, and adding a new layer
+    // meant one more parameter on a signature already at the eye-
+    // strain boundary.
+    //
+    // M152 collapses the 22-arg call-site pattern into a single
+    // value-type `TurnInputs`. The type's fields group by semantic
+    // intent — identity / layers / sovereign refs / budget &
+    // coverage. Mutable struct fields + public default init let
+    // callers build one with exactly as much as they need:
+    //
+    //     var inputs = QinaoRuntime.TurnInputs(
+    //         observations: obs, coordinatorSeverity: .pass)
+    //     inputs.thoughtFrame = tf
+    //     inputs.memoryBundle = mb
+    //     let outcome = try await runtime.sendSession(inputs)
+    //
+    // Or fluent:
+    //
+    //     let outcome = try await runtime.sendSession(
+    //         .init(observations: obs, coordinatorSeverity: .pass)
+    //             .with { $0.thoughtFrame = tf })
+    //
+    // The legacy 22-parameter signature stays (no @available
+    // deprecation yet to avoid compile-warning noise across 500+
+    // call sites) as a thin wrapper that builds a TurnInputs and
+    // delegates. Internal implementation lives on the TurnInputs
+    // path — one source of truth.
+
+    /// M152 — one value-typed argument that replaces the 22
+    /// positional parameters. Fields are grouped by semantic
+    /// intent; defaults preserve backward-compat behavior.
+    public struct TurnInputs: Sendable {
+        // MARK: Identity
+        /// Required — the completed-turn observations the
+        /// coordinator sealed.
+        public var observations:
+            QinaoSovereignControlPlane.TurnObservations
+        /// Optional — the coordinator's own severity estimate,
+        /// used to compute parity against the independent audit.
+        public var coordinatorSeverity:
+            QinaoSovereignControlPlane.AuditSeverity?
+
+        // MARK: Per-turn layer inputs (gated by non-nil)
+        /// L6 source (presenceEye)
+        public var contextFrame: BASContextFrame?
+        /// L7 source (mirrorBlade)
+        public var decomposeFrame: BASDecomposeFrame?
+        /// L8 source (hippocampalWell)
+        public var memoryBundle: BASMemoryBundle?
+        /// L4 + L10 + L11 source (worldPrior + tribunal + risk)
+        public var thoughtFrame: BASThoughtFrame?
+        /// L13 source (evolutionFurnace shadow tickets)
+        public var updateTickets: [BASUpdateTicket] = []
+        /// L2 source (neuralOrgan)
+        public var neuralOrganMap: BASNeuralOrganMap?
+        /// L12 source (gentleHand — needs thoughtFrame too)
+        public var renderedOutput: BASRenderedOutput?
+        /// L9 source (dreamLoop)
+        public var candidateFrontier: BASCandidateFrontier?
+
+        // MARK: Sovereign frame extra refs (L14 §5.1 aggregator)
+        public var jurisdictionMap: BASJurisdictionMap?
+        public var contaminationLineages:
+            [BASContaminationLineage] = []
+        public var timeLockRef: String?
+        public var pendingActionDigest: String?
+        public var pendingMutationDigest: String?
+        public var pendingMemoryDigest: String?
+
+        // MARK: Budget & coverage
+        public var coverageBudgetCeiling: Double = 1.0
+        public var expectedCoverageLayerIDs: [String] = ["L14"]
+        public var plannedBudget: BASBudgetFrame?
+        public var turnDurationSeconds: Double?
+        public var additionalCoverageSummaries:
+            [BASObservationCoverageSummary]?
+        public var surfaceRetryPolicy: SurfaceRetryPolicy =
+            .default
+
+        /// Minimal init — only identity is required. Everything
+        /// else can be set through property assignment or the
+        /// fluent `.with { ... }` helper.
+        public init(
+            observations:
+                QinaoSovereignControlPlane.TurnObservations,
+            coordinatorSeverity:
+                QinaoSovereignControlPlane.AuditSeverity?
+        ) {
+            self.observations = observations
+            self.coordinatorSeverity = coordinatorSeverity
+        }
+
+        /// Fluent builder — returns a copy with the closure
+        /// applied. Enables single-expression call sites:
+        ///
+        ///     let outcome = try await runtime.sendSession(
+        ///         .init(observations: obs,
+        ///               coordinatorSeverity: .pass)
+        ///             .with { $0.thoughtFrame = tf })
+        ///
+        /// The closure signature is `inout Self` so callers can
+        /// mutate fields in-place without ceremony.
+        public func with(
+            _ configure: (inout Self) -> Void
+        ) -> Self {
+            var copy = self
+            configure(&copy)
+            return copy
+        }
+    }
+
     /// Main-path turn entry. Runs the completed turn's observations
     /// through the sovereign audit, returns the report, and — per the
     /// three-invariant ledger-first discipline — halts the session
@@ -353,6 +470,32 @@ public actor QinaoRuntime {
     /// elevates "神经不直接掌权" from "side-effect path has three
     /// signatures" to "every turn has an independent second signature
     /// on the outcome".
+    /// M152 — one-parameter sendSession. Takes a `TurnInputs`
+    /// value-type that groups identity + per-layer sources +
+    /// sovereign refs + budget/coverage config. See `TurnInputs`
+    /// for field-by-field documentation.
+    public func sendSession(
+        _ inputs: TurnInputs
+    ) async throws -> TurnOutcome {
+        // The body that used to live in the 22-parameter signature
+        // moves here verbatim, addressing fields via `inputs.`
+        // instead of bare names. The legacy 22-param overload is
+        // a one-line delegator below that builds TurnInputs and
+        // calls this method.
+        return try await sendSessionImpl(inputs: inputs)
+    }
+
+    /// M152 — legacy 22-parameter signature retained as a thin
+    /// delegator. All existing call sites continue to work
+    /// unchanged; the body builds a `TurnInputs` and dispatches
+    /// to `sendSession(_ inputs:)`. No behavior change.
+    ///
+    /// Prefer the new overload for new code:
+    ///
+    ///     var inputs = QinaoRuntime.TurnInputs(
+    ///         observations: obs, coordinatorSeverity: .pass)
+    ///     inputs.thoughtFrame = tf
+    ///     let out = try await runtime.sendSession(inputs)
     public func sendSession(
         _ observations: QinaoSovereignControlPlane.TurnObservations,
         coordinatorSeverity: QinaoSovereignControlPlane.AuditSeverity?,
@@ -378,6 +521,67 @@ public actor QinaoRuntime {
         pendingMutationDigest: String? = nil,
         pendingMemoryDigest: String? = nil
     ) async throws -> TurnOutcome {
+        var inputs = TurnInputs(
+            observations: observations,
+            coordinatorSeverity: coordinatorSeverity)
+        inputs.coverageBudgetCeiling = coverageBudgetCeiling
+        inputs.expectedCoverageLayerIDs =
+            expectedCoverageLayerIDs
+        inputs.plannedBudget = plannedBudget
+        inputs.turnDurationSeconds = turnDurationSeconds
+        inputs.additionalCoverageSummaries =
+            additionalCoverageSummaries
+        inputs.surfaceRetryPolicy = surfaceRetryPolicy
+        inputs.contextFrame = contextFrame
+        inputs.decomposeFrame = decomposeFrame
+        inputs.memoryBundle = memoryBundle
+        inputs.thoughtFrame = thoughtFrame
+        inputs.updateTickets = updateTickets
+        inputs.neuralOrganMap = neuralOrganMap
+        inputs.renderedOutput = renderedOutput
+        inputs.candidateFrontier = candidateFrontier
+        inputs.jurisdictionMap = jurisdictionMap
+        inputs.contaminationLineages = contaminationLineages
+        inputs.timeLockRef = timeLockRef
+        inputs.pendingActionDigest = pendingActionDigest
+        inputs.pendingMutationDigest = pendingMutationDigest
+        inputs.pendingMemoryDigest = pendingMemoryDigest
+        return try await sendSessionImpl(inputs: inputs)
+    }
+
+    /// M152 — the single source of truth for sendSession's body.
+    /// Both public overloads dispatch here. Reads fields off
+    /// `inputs.` instead of bare-name locals so no other logic
+    /// changed from pre-M152. Marked `private` so callers MUST
+    /// go through the value-typed overload or the legacy
+    /// compatibility wrapper.
+    private func sendSessionImpl(
+        inputs: TurnInputs
+    ) async throws -> TurnOutcome {
+        let observations = inputs.observations
+        let coordinatorSeverity = inputs.coordinatorSeverity
+        let coverageBudgetCeiling = inputs.coverageBudgetCeiling
+        let expectedCoverageLayerIDs =
+            inputs.expectedCoverageLayerIDs
+        let plannedBudget = inputs.plannedBudget
+        let turnDurationSeconds = inputs.turnDurationSeconds
+        let additionalCoverageSummaries =
+            inputs.additionalCoverageSummaries
+        let surfaceRetryPolicy = inputs.surfaceRetryPolicy
+        let contextFrame = inputs.contextFrame
+        let decomposeFrame = inputs.decomposeFrame
+        let memoryBundle = inputs.memoryBundle
+        let thoughtFrame = inputs.thoughtFrame
+        let updateTickets = inputs.updateTickets
+        let neuralOrganMap = inputs.neuralOrganMap
+        let renderedOutput = inputs.renderedOutput
+        let candidateFrontier = inputs.candidateFrontier
+        let jurisdictionMap = inputs.jurisdictionMap
+        let contaminationLineages = inputs.contaminationLineages
+        let timeLockRef = inputs.timeLockRef
+        let pendingActionDigest = inputs.pendingActionDigest
+        let pendingMutationDigest = inputs.pendingMutationDigest
+        let pendingMemoryDigest = inputs.pendingMemoryDigest
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
             throw TurnError.sessionAlreadyHalted(
