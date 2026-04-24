@@ -365,7 +365,8 @@ public actor QinaoRuntime {
         decomposeFrame: BASDecomposeFrame? = nil,
         memoryBundle: BASMemoryBundle? = nil,
         thoughtFrame: BASThoughtFrame? = nil,
-        updateTickets: [BASUpdateTicket] = []
+        updateTickets: [BASUpdateTicket] = [],
+        neuralOrganMap: BASNeuralOrganMap? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -689,6 +690,27 @@ public actor QinaoRuntime {
             combined.append(l13Bundle.coverageSummary)
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L13")
+        }
+
+        // M140 — L2 neuralOrgan auto-stream.
+        //
+        // Whitepaper L2 per-turn observation bundle derives from
+        // a sealed `BASNeuralOrganMap` (active organs, precision
+        // map, routing policy, sovereign constraints, head
+        // guarantees). Same gated pattern as L6/L7/L8: streams
+        // only when the caller supplies a real map. `nil` leaves
+        // L2 absent from the bundle (backward-compat).
+        if let organMap = neuralOrganMap {
+            let l2Bundle =
+                BASNeuralOrganObservationBundle.derive(
+                    fromOrganMap: organMap,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l2Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L2")
         }
 
         // Expand the expectation set only when the caller accepted
