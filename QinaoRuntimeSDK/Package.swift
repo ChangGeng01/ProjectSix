@@ -135,6 +135,10 @@ let package = Package(
                 .product(name: "BASMemory", package: "BehavioralAISubstrate"),
                 .product(name: "BASSovereign", package: "BehavioralAISubstrate"),
                 .product(name: "BASOrchestration", package: "BehavioralAISubstrate"),
+                // M137 — L11 `BASRiskObservationBundle` lives in
+                // BASPolicy; needed so sendSession can co-derive L10
+                // and L11 from one caller-supplied thoughtFrame.
+                .product(name: "BASPolicy", package: "BehavioralAISubstrate"),
                 // M82 — main-trunk turn-artifacts projection: the
                 // composition layer is the only place that may carry
                 // the substrate's turn-result type across the seam

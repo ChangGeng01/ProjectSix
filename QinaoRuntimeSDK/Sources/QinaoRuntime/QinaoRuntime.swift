@@ -4,6 +4,7 @@ import BASOrgan
 import BASLeaseLife
 import BASOrchestration
 import BASMemory
+import BASPolicy
 import QinaoHost
 import QinaoMemory
 import QinaoRisk
@@ -360,7 +361,8 @@ public actor QinaoRuntime {
         surfaceRetryPolicy: SurfaceRetryPolicy = .default,
         contextFrame: BASContextFrame? = nil,
         decomposeFrame: BASDecomposeFrame? = nil,
-        memoryBundle: BASMemoryBundle? = nil
+        memoryBundle: BASMemoryBundle? = nil,
+        thoughtFrame: BASThoughtFrame? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -604,6 +606,34 @@ public actor QinaoRuntime {
             combined.append(l8Bundle.coverageSummary)
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L8")
+        }
+
+        // M137 — L10 triSelfTribunal + L11 riskGate co-derivation.
+        // Both layers' `.derive(from:...)` take the SAME
+        // `BASThoughtFrame` — the tribunal derives from voice
+        // votes + vetoMarks, the risk layer derives from
+        // `riskBindings`. One caller-supplied thoughtFrame
+        // therefore drives both layers in a single gated path,
+        // avoiding two separate parameters for the same source.
+        if let tframe = thoughtFrame {
+            let l10Bundle =
+                BASTribunalObservationBundle.derive(
+                    from: tframe,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            let l11Bundle =
+                BASRiskObservationBundle.derive(
+                    from: tframe,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l10Bundle.coverageSummary)
+            combined.append(l11Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L10")
+            autoInjectedLayerCodes.append("L11")
         }
 
         // Expand the expectation set only when the caller accepted
