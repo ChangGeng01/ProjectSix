@@ -117,3 +117,82 @@ extension BASSoftHandObservationBundle {
             emittedAt: emittedAt)
     }
 }
+
+// MARK: - L1 lease & life (M97)
+//
+// Added M97 to close the "three bundles exist but no coverage-summary
+// projection" gap found while auditing the M95 observation streaming
+// hook. Pre-M97 the L1/L2/L5 bundles were first-class types derived
+// every turn (M60/M55/M65) but could not be fed through
+// `QinaoSovereignControlPlane.recordTurnCoverage(additionalSummaries:)`
+// because they had no `BASObservationCoverageSummary` edge. M97 lands
+// the three projections so hosts can stream L1/L2/L5 alongside the
+// L3/L4/L6/L7/L9/L10/L11/L12/L13 projections that were already present.
+
+extension BASLeaseLifeObservationBundle {
+    /// Neutral coverage summary for L1. `distinctSubjectCount` maps
+    /// to the number of distinct kernel-subject IDs (leaseID / run
+    /// mode / thermal level / guard level / maintenance class /
+    /// device route) the bundle carries this turn.
+    /// `hasCoreSignalCoverage` surfaces the existing bundle-level
+    /// "kernel baseline fired" predicate (lease grant + runMode +
+    /// thermal reading + device route).
+    public var coverageSummary: BASObservationCoverageSummary {
+        BASObservationCoverageSummary(
+            layer: .leaseLife,
+            turnID: turnID,
+            sessionID: sessionID,
+            totalObservations: observations.count,
+            distinctSubjectCount: subjectIDs.count,
+            hasCoreSignalCoverage: hasCoreSignalCoverage,
+            budgetTotalCost:
+                BASLeaseLifeSignalBudget.totalCost(for: self),
+            emittedAt: emittedAt)
+    }
+}
+
+// MARK: - L2 neural organ (M97)
+
+extension BASNeuralOrganObservationBundle {
+    /// Neutral coverage summary for L2. `distinctSubjectCount`
+    /// maps to the distinct L2 subjects (morph-graph refs / head
+    /// IDs / organ package refs) the bundle touched this turn.
+    /// `hasCoreSignalCoverage` surfaces the existing `hasMapSealed`
+    /// predicate — L2 is "healthy" when the neural-organ map was
+    /// sealed for the turn.
+    public var coverageSummary: BASObservationCoverageSummary {
+        BASObservationCoverageSummary(
+            layer: .neuralOrgan,
+            turnID: turnID,
+            sessionID: sessionID,
+            totalObservations: observations.count,
+            distinctSubjectCount: subjectIDs.count,
+            hasCoreSignalCoverage: hasCoreSignalCoverage,
+            budgetTotalCost:
+                BASNeuralOrganSignalBudget.totalCost(for: self),
+            emittedAt: emittedAt)
+    }
+}
+
+// MARK: - L5 host constitution (M97)
+
+extension BASHostConstitutionObservationBundle {
+    /// Neutral coverage summary for L5. `distinctSubjectCount`
+    /// maps to the distinct host-constitution subjects (domain
+    /// refs / anchor refs / candidate refs / version refs) touched
+    /// this turn. `hasCoreSignalCoverage` surfaces the existing
+    /// `hasAnyAnchor` predicate — L5 is "healthy" when at least one
+    /// anchor was observed in the turn.
+    public var coverageSummary: BASObservationCoverageSummary {
+        BASObservationCoverageSummary(
+            layer: .hostConstitution,
+            turnID: turnID,
+            sessionID: sessionID,
+            totalObservations: observations.count,
+            distinctSubjectCount: subjectIDs.count,
+            hasCoreSignalCoverage: hasCoreSignalCoverage,
+            budgetTotalCost:
+                BASHostConstitutionSignalBudget.totalCost(for: self),
+            emittedAt: emittedAt)
+    }
+}
