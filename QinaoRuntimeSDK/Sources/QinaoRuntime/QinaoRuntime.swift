@@ -370,7 +370,13 @@ public actor QinaoRuntime {
         updateTickets: [BASUpdateTicket] = [],
         neuralOrganMap: BASNeuralOrganMap? = nil,
         renderedOutput: BASRenderedOutput? = nil,
-        candidateFrontier: BASCandidateFrontier? = nil
+        candidateFrontier: BASCandidateFrontier? = nil,
+        jurisdictionMap: BASJurisdictionMap? = nil,
+        contaminationLineages: [BASContaminationLineage] = [],
+        timeLockRef: String? = nil,
+        pendingActionDigest: String? = nil,
+        pendingMutationDigest: String? = nil,
+        pendingMemoryDigest: String? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -847,6 +853,17 @@ public actor QinaoRuntime {
                 + "." + observations.turnID
             }
 
+        // M147 — final 6 sovereignFrame nil fields wired. When
+        // the caller passes a `jurisdictionMap`, its natural
+        // `mapID` is the ref; when `contaminationLineages` has
+        // entries, their `lineageID`s form the refs array;
+        // timeLock + 3 pending digests are plain-string inputs
+        // so they pass through directly. Empty defaults preserve
+        // backward-compat — every pre-M147 call site produces a
+        // byte-equal sovereignFrame as before.
+        let contaminationRefs =
+            contaminationLineages.map(\.lineageID)
+
         let sovereignFrame = BASSovereignFrame(
             frameID: "frame."
                 + observations.sessionID
@@ -861,6 +878,12 @@ public actor QinaoRuntime {
             thoughtFoldRef: l3Fold.foldID,
             riskCardRef: riskCardRef,
             actionPermitRef: actionPermitRef,
+            pendingActionDigest: pendingActionDigest,
+            pendingMutationDigest: pendingMutationDigest,
+            pendingMemoryDigest: pendingMemoryDigest,
+            jurisdictionRef: jurisdictionMap?.mapID,
+            timeLockRef: timeLockRef,
+            contaminationRefs: contaminationRefs,
             policyHash: observations.policyHash)
         await sovereign.recordSovereignFrame(sovereignFrame)
 
