@@ -358,7 +358,8 @@ public actor QinaoRuntime {
         additionalCoverageSummaries: [BASObservationCoverageSummary]?
             = nil,
         surfaceRetryPolicy: SurfaceRetryPolicy = .default,
-        contextFrame: BASContextFrame? = nil
+        contextFrame: BASContextFrame? = nil,
+        decomposeFrame: BASDecomposeFrame? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -562,6 +563,24 @@ public actor QinaoRuntime {
             combined.append(l6Bundle.coverageSummary)
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L6")
+        }
+
+        // M135 — L7 mirrorBlade auto-stream. Same gated pattern
+        // as L6: derivation needs a real `BASDecomposeFrame`
+        // (fact shards / emotion cards / hypothesis cards /
+        // horizon shards / counterfactual seeds), so fabrication
+        // is useless. Streams only when caller passes the frame.
+        if let dframe = decomposeFrame {
+            let l7Bundle =
+                BASDecompositionObservationBundle.derive(
+                    from: dframe,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l7Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L7")
         }
 
         // Expand the expectation set only when the caller accepted
