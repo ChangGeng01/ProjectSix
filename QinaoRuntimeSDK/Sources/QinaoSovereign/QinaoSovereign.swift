@@ -2,6 +2,7 @@ import Foundation
 import CryptoKit
 import BASRuntimeCore
 import BASSovereign
+import BASOrchestration
 
 /// QinaoSovereign — the *control plane* of the second brain, exposed
 /// to hosts through a minimal, redaction-clean public API.
@@ -584,6 +585,20 @@ public actor QinaoSovereignControlPlane {
     private let now: @Sendable () -> Date
     private var haltedSessions: Set<String> = []
     private var haltReasons: [String: String] = [:]
+
+    /// M127 — per-turn L12 render-frame storage. Sibling to the
+    /// BAS ledger's `sovereignFrames[]` (M123), but living on the
+    /// Qinao composition layer because `BASRenderFrame` lives in
+    /// `BASOrchestration` (L12 cognition plane) while the BAS
+    /// ledger lives in `BASSovereign` (L14) — BASSovereign cannot
+    /// import BASOrchestration without creating a dep cycle, so
+    /// the storage lands here. Same LWW-on-(sessionID, turnID)
+    /// semantics; shadow index keyed on the tuple because
+    /// `BASRenderFrame`'s schema doesn't carry sessionID/turnID
+    /// inline.
+    private var renderFrameEntries:
+        [(sessionID: String, turnID: String,
+          frame: BASRenderFrame)] = []
 
     /// Cache of planID → internal plan, so `verifyRestore` can hand
     /// the coordinator the exact plan it emitted (the plan's
@@ -1356,6 +1371,67 @@ public actor QinaoSovereignControlPlane {
     /// (re-emit must not accrete).
     public func sovereignFrameCount() async -> Int {
         await auditLedger.sovereignFrameCount()
+    }
+
+    // MARK: - M127 · Render frame streaming (L12 surface 汇聚)
+    //
+    // L12 `BASRenderFrame` (M117-shipped) is the second per-turn
+    // aggregator: 12 optional refs pointing back at the artifacts
+    // that drove the surface shown to the user. Lives on
+    // `QinaoSovereignControlPlane` rather than on the BAS ledger
+    // because BASRenderFrame is in BASOrchestration, which depends
+    // on BASSovereign (the ledger's home) — storing it on the
+    // ledger would create a dep cycle. Same last-write-wins-on-
+    // (sessionID, turnID) semantics; first-seen-tuple order
+    // preserved.
+
+    /// M127 — record a per-turn `BASRenderFrame`. `sessionID` and
+    /// `turnID` are explicit because the L12 schema doesn't
+    /// embed them in the frame itself. If an entry exists for
+    /// the same `(sessionID, turnID)`, replaces in place.
+    public func recordRenderFrame(
+        _ frame: BASRenderFrame,
+        sessionID: String,
+        turnID: String
+    ) {
+        if let idx = renderFrameEntries.firstIndex(where: {
+            $0.sessionID == sessionID && $0.turnID == turnID
+        }) {
+            renderFrameEntries[idx] = (
+                sessionID: sessionID,
+                turnID: turnID,
+                frame: frame)
+        } else {
+            renderFrameEntries.append((
+                sessionID: sessionID,
+                turnID: turnID,
+                frame: frame))
+        }
+    }
+
+    /// M127 — look up a per-turn render frame, or `nil`.
+    public func renderFrame(
+        sessionID: String,
+        turnID: String
+    ) -> BASRenderFrame? {
+        renderFrameEntries.first {
+            $0.sessionID == sessionID && $0.turnID == turnID
+        }?.frame
+    }
+
+    /// M127 — every render frame recorded for a session, in
+    /// first-seen turn order.
+    public func renderFrames(
+        forSession sessionID: String
+    ) -> [BASRenderFrame] {
+        renderFrameEntries
+            .filter { $0.sessionID == sessionID }
+            .map { $0.frame }
+    }
+
+    /// M127 — total render frames across every session.
+    public func renderFrameCount() -> Int {
+        renderFrameEntries.count
     }
 
     // MARK: - M124 · Turn residue + cross-surface integrity (筋脉)

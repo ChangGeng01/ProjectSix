@@ -577,6 +577,101 @@ public actor QinaoRuntime {
             policyHash: observations.policyHash)
         await sovereign.recordSovereignFrame(sovereignFrame)
 
+        // M127 皮肤扩深 — L12 `BASRenderFrame` per-turn build.
+        //
+        // Siblings with the M123 sovereign frame: the sovereign
+        // frame binds the L14 audit surface (device/host/continuity
+        // + policy); the render frame binds the L12 render surface
+        // (merged choice / permit / style / surface mode /
+        // disclosure). Pre-M127 the struct was M117-shipped but
+        // idle — M127 builds one per healthy turn and records it
+        // on QinaoSovereignControlPlane's parallel storage.
+        //
+        // 7 of 12 refs populated deterministically from state the
+        // sendSession already has:
+        //   * frameID              — "render.<sess>.<turn>"
+        //   * mergedChoiceRef      — L3 fold.foldID (the
+        //                             thought-fold IS the merged
+        //                             choice artifact)
+        //   * hostStyleRef         — L5 constitution.activeVersion
+        //                             (host style lives with the
+        //                             host constitution)
+        //   * sovereignSurfaceRef  — sovereign frame's frameID
+        //                             (renderFrame → sovereignFrame
+        //                             back-reference)
+        //   * outputSurfaceRef     — surface decision's raw value
+        //                             string (one of 5 stable IDs)
+        //   * disclosureProfileRef — surface decision disclosure
+        //                             raw value
+        //   * substituteRef        — substitute kind's raw value
+        //                             (via .kind discriminator)
+        // 5 remain nil for future wiring:
+        //   actionPermitRef — waits on M103 permit path integration
+        //   agencyReservationRef — L11 agency reservation stream
+        //   situationRef / mirrorRef — L7 mirror blade output
+        //   toneProfileRef / forceCurveRef — L12 tone/force engine
+        // Each nil comment-documented below so future milestones
+        // can trace the hook.
+        let renderFrame = BASRenderFrame(
+            frameID: "render."
+                + observations.sessionID
+                + "." + observations.turnID,
+            mergedChoiceRef: l3Fold.foldID,
+            actionPermitRef: nil,
+            // → future M127+n: wire to M103 permit audit entry ID.
+            agencyReservationRef: nil,
+            // → future: wire to L11 agency reservation stream.
+            hostStyleRef: l5Constitution.activeVersion.isEmpty
+                ? nil : l5Constitution.activeVersion,
+            situationRef: nil,
+            // → future: wire to L7 situation frame ref.
+            mirrorRef: nil,
+            // → future: wire to L7 mirror-blade output ref.
+            substituteRef: deriveSubstituteRef(),
+            sovereignSurfaceRef: sovereignFrame.frameID,
+            outputSurfaceRef: deriveOutputSurfaceRef(),
+            toneProfileRef: nil,
+            // → future: wire to L12 tone engine.
+            forceCurveRef: nil,
+            // → future: wire to L12 force-curve engine.
+            disclosureProfileRef:
+                deriveDisclosureProfileRef())
+        await sovereign.recordRenderFrame(
+            renderFrame,
+            sessionID: observations.sessionID,
+            turnID: observations.turnID)
+
+        // Helpers closed over surfaceDecision derivation. Defined
+        // inline because they capture the audit+coverage+budget
+        // shape once; if M127+n adds more refs, they can hoist.
+        func deriveSubstituteRef() -> String {
+            let decision = Self.deriveSurfaceDecision(
+                auditSeverity: report.severity,
+                coverageSeverity: coverage.severity,
+                auditRef: report.auditRef,
+                routedBudget: routedBudget,
+                retryPolicy: surfaceRetryPolicy)
+            return decision.substitute.kind.rawValue
+        }
+        func deriveOutputSurfaceRef() -> String {
+            let decision = Self.deriveSurfaceDecision(
+                auditSeverity: report.severity,
+                coverageSeverity: coverage.severity,
+                auditRef: report.auditRef,
+                routedBudget: routedBudget,
+                retryPolicy: surfaceRetryPolicy)
+            return decision.surface.rawValue
+        }
+        func deriveDisclosureProfileRef() -> String {
+            let decision = Self.deriveSurfaceDecision(
+                auditSeverity: report.severity,
+                coverageSeverity: coverage.severity,
+                auditRef: report.auditRef,
+                routedBudget: routedBudget,
+                retryPolicy: surfaceRetryPolicy)
+            return decision.disclosure.rawValue
+        }
+
         // Fail-closed: the coordinator was laxer than the independent
         // engine — the coordinator allowed something the engine would
         // have blocked. Halt the session before returning so the

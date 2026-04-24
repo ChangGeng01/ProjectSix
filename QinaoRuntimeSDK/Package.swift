@@ -73,7 +73,12 @@ let package = Package(
             name: "QinaoSovereign",
             dependencies: [
                 .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
-                .product(name: "BASSovereign", package: "BehavioralAISubstrate")
+                .product(name: "BASSovereign", package: "BehavioralAISubstrate"),
+                // M127 — L12 BASRenderFrame (in BASOrchestration) is the
+                // second per-turn aggregator we store on this control
+                // plane. Added so render-frame streaming methods can
+                // take the type by value without a bridge struct.
+                .product(name: "BASOrchestration", package: "BehavioralAISubstrate")
             ]),
         // QinaoLoop — L9 dream loop + L10 tribunal façade.
         // Optionally folds L4 world priors (`QinaoWorldPrior`) into
