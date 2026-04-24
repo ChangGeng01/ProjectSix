@@ -353,12 +353,51 @@ public actor QinaoRuntime {
         // world-prior, L5 host-constitution, …) get their per-turn
         // coverage into the audit surface through the same
         // choke-point `sendSession` uses for `auditTurn`.
+        // M121 — when lifecycle is wired AND plannedBudget is
+        // passed, auto-derive the L1 observation bundle from the
+        // routed budget and fold its coverageSummary into
+        // additionalCoverageSummaries. This is the first
+        // production path where M95's streaming hook actually
+        // produces real data — previously sendSession shipped
+        // only L14 coverage unless the caller manually built
+        // L1-L13 summaries. M121 makes L1 automatic whenever
+        // lifecycle is present. When either lifecycle or
+        // plannedBudget is nil, we fall through to the caller-
+        // supplied additionalCoverageSummaries exactly as pre-M121.
+        //
+        // Expanded expectedLayerIDs logic: if the caller passes
+        // the default ["L14"] AND we auto-inject L1, we expand to
+        // ["L14", "L1"] so the coverage verdict expects (and
+        // validates) L1's presence. Callers that pass a custom
+        // expectedLayerIDs are trusted and not modified.
+        var finalAdditionalSummaries =
+            additionalCoverageSummaries
+        var finalExpectedLayerIDs = expectedCoverageLayerIDs
+        if let lifecycle = lifecycle,
+           let routed = routedBudget {
+            let l1Bundle = lifecycle
+                .deriveLeaseLifeObservationBundle(
+                    fromRoutedBudget: routed,
+                    sessionID: observations.sessionID,
+                    turnID: observations.turnID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l1Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            // Expand expectation set to include L1 when caller
+            // left the default ["L14"]; custom sets stay
+            // untouched.
+            if expectedCoverageLayerIDs == ["L14"] {
+                finalExpectedLayerIDs = ["L14", "L1"]
+            }
+        }
+
         let coverage = await sovereign.recordTurnCoverage(
             sessionID: observations.sessionID,
             turnID: observations.turnID,
             budgetCeiling: coverageBudgetCeiling,
-            expectedLayerIDs: expectedCoverageLayerIDs,
-            additionalSummaries: additionalCoverageSummaries)
+            expectedLayerIDs: finalExpectedLayerIDs,
+            additionalSummaries: finalAdditionalSummaries)
 
         // Fail-closed: the coordinator was laxer than the independent
         // engine — the coordinator allowed something the engine would

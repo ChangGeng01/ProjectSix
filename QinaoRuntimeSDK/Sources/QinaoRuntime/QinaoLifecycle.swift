@@ -1,6 +1,7 @@
 import Foundation
 import BASRuntimeCore
 import BASLeaseLife
+import BASOrchestration
 
 // MARK: - M66 lifecycle façade
 //
@@ -369,6 +370,38 @@ public actor QinaoLifecycle {
         case .hot: return 0.3
         case .critical: return 0.0
         }
+    }
+
+    // MARK: - M121 L1 observation bundle derive (runtime wiring)
+
+    /// Build the per-turn L1 `BASLeaseLifeObservationBundle` from
+    /// a routed budget frame using the M60
+    /// `BASLeaseLifeObservationBundle.derive(...)` pure function.
+    ///
+    /// Pre-M121 this derive API existed but no production path
+    /// called it — M97 added the `coverageSummary` projection
+    /// but no auto-stream. M121 makes lifecycle the canonical
+    /// per-turn producer: QinaoRuntime.sendSession calls this
+    /// with the routed budget + turn IDs and gets back a bundle
+    /// whose `.coverageSummary` can be streamed into the L14
+    /// ledger via `additionalCoverageSummaries:` (M95).
+    ///
+    /// Returns a populated bundle (always at least 4 baseline
+    /// signals: leaseGranted / runModeDetermined /
+    /// thermalReadingObserved / deviceRouteSelected). Higher-level
+    /// signals (guardLevelEscalated / maintenanceClassified) fire
+    /// only when the budget carries the relevant escalation.
+    public nonisolated func deriveLeaseLifeObservationBundle(
+        fromRoutedBudget budget: BASBudgetFrame,
+        sessionID: String,
+        turnID: String,
+        emittedAt: Date = Date()
+    ) -> BASLeaseLifeObservationBundle {
+        BASLeaseLifeObservationBundle.derive(
+            fromBudgetFrame: budget,
+            turnID: turnID,
+            sessionID: sessionID,
+            emittedAt: emittedAt)
     }
 
     // MARK: - Budget-frame routing (M69)
