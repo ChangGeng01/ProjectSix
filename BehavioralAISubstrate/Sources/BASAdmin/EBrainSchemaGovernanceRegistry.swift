@@ -352,6 +352,54 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASMemoryPromotionPetition.self,
             tests: ["schema.memory_promotion_petition.current", "schema.memory_promotion_petition.backward"]
         ),
+        // M115 — L10 TriSelf Court whitepaper §5 object family.
+        // All structs pre-existed (M89 closed names); M115 registers
+        // them so governance audit sees the full L10 surface.
+        entry(
+            "ArbitrationFrame",
+            versionedType: BASArbitrationFrame.self,
+            tests: ["schema.arbitration_frame.current", "schema.arbitration_frame.backward"]
+        ),
+        entry(
+            "IdImpulseProfile",
+            versionedType: BASIdImpulseProfile.self,
+            tests: ["schema.id_impulse_profile.current", "schema.id_impulse_profile.backward"]
+        ),
+        entry(
+            "EgoRealityAssessment",
+            versionedType: BASEgoRealityAssessment.self,
+            tests: ["schema.ego_reality_assessment.current", "schema.ego_reality_assessment.backward"]
+        ),
+        entry(
+            "SuperegoJudgment",
+            versionedType: BASSuperegoJudgment.self,
+            tests: ["schema.superego_judgment.current", "schema.superego_judgment.backward"]
+        ),
+        entry(
+            "TradeoffLedger",
+            versionedType: BASTradeoffLedger.self,
+            tests: ["schema.tradeoff_ledger.current", "schema.tradeoff_ledger.backward"]
+        ),
+        entry(
+            "VetoMark",
+            versionedType: BASVetoMark.self,
+            tests: ["schema.veto_mark.current", "schema.veto_mark.backward"]
+        ),
+        entry(
+            "AgencyReservation",
+            versionedType: BASAgencyReservation.self,
+            tests: ["schema.agency_reservation.current", "schema.agency_reservation.backward"]
+        ),
+        entry(
+            "RemandOrder",
+            versionedType: BASRemandOrder.self,
+            tests: ["schema.remand_order.current", "schema.remand_order.backward"]
+        ),
+        entry(
+            "CourtDecisionDraft",
+            versionedType: BASCourtDecisionDraft.self,
+            tests: ["schema.court_decision_draft.current", "schema.court_decision_draft.backward"]
+        ),
         // M114 — L9 Dream Loop whitepaper §5 object family.
         entry(
             "ThoughtLoopState",

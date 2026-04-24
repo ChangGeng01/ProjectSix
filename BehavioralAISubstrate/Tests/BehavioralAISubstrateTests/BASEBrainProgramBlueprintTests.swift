@@ -118,6 +118,17 @@ struct BASEBrainProgramBlueprintTests {
             "UnknownSet",
             "CognitiveDissectionFrame",
             "MemoryPromotionPetition",  // M113 L8 §5
+            // M115 L10 TriSelf Court §5 object family (pre-existed
+            // from M89; M115 registers them in governance):
+            "ArbitrationFrame",
+            "IdImpulseProfile",
+            "EgoRealityAssessment",
+            "SuperegoJudgment",
+            "TradeoffLedger",
+            "VetoMark",
+            "AgencyReservation",
+            "RemandOrder",
+            "CourtDecisionDraft",
             // M114 L9 §5 dream-loop object family:
             "ThoughtLoopState",
             "CounterfactualBranch",
