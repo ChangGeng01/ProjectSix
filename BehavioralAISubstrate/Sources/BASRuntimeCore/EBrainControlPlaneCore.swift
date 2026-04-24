@@ -720,6 +720,395 @@ public struct BASSovereignCommitToken: BASSchemaVersioned {
     }
 }
 
+// MARK: - M119 L14 whitepaper §5 parity (9 new structs + 2 enums)
+
+/// L14 whitepaper §5 `MutationPetition.mutation_type` vocab.
+public enum BASSovereignMutationType:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    case host
+    case memory
+    case rule
+    case permission
+}
+
+/// L14 whitepaper §5 `QuarantineMandate.zone` vocab.
+public enum BASSovereignQuarantineZone:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    case session
+    case memory
+    case host
+    case tool
+    case cache
+    case deviceDomain
+}
+
+/// L14 whitepaper §5.1 `SovereignFrame` — the aggregator that
+/// binds one turn's sovereign surface: session/turn IDs + 5
+/// state refs + 3 pending-action digests + jurisdiction + time
+/// lock + contamination refs + policy hash.
+public struct BASSovereignFrame: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var frameID: String
+    public var sessionID: String
+    public var turnID: String
+    public var deviceStateRef: String?
+    public var hostVersionRef: String?
+    public var continuityRef: String?
+    public var thoughtFoldRef: String?
+    public var riskCardRef: String?
+    public var actionPermitRef: String?
+    public var pendingActionDigest: String?
+    public var pendingMutationDigest: String?
+    public var pendingMemoryDigest: String?
+    public var jurisdictionRef: String?
+    public var timeLockRef: String?
+    public var contaminationRefs: [String]
+    public var policyHash: String
+
+    public init(
+        schemaVersion: String
+            = BASSovereignFrame.currentSchemaVersion,
+        frameID: String,
+        sessionID: String,
+        turnID: String,
+        deviceStateRef: String? = nil,
+        hostVersionRef: String? = nil,
+        continuityRef: String? = nil,
+        thoughtFoldRef: String? = nil,
+        riskCardRef: String? = nil,
+        actionPermitRef: String? = nil,
+        pendingActionDigest: String? = nil,
+        pendingMutationDigest: String? = nil,
+        pendingMemoryDigest: String? = nil,
+        jurisdictionRef: String? = nil,
+        timeLockRef: String? = nil,
+        contaminationRefs: [String] = [],
+        policyHash: String = ""
+    ) {
+        self.schemaVersion = schemaVersion
+        let trim: (String) -> String = {
+            $0.trimmingCharacters(
+                in: .whitespacesAndNewlines)
+        }
+        self.frameID = trim(frameID)
+        self.sessionID = trim(sessionID)
+        self.turnID = trim(turnID)
+        self.deviceStateRef = deviceStateRef.map(trim)
+        self.hostVersionRef = hostVersionRef.map(trim)
+        self.continuityRef = continuityRef.map(trim)
+        self.thoughtFoldRef = thoughtFoldRef.map(trim)
+        self.riskCardRef = riskCardRef.map(trim)
+        self.actionPermitRef = actionPermitRef.map(trim)
+        self.pendingActionDigest =
+            pendingActionDigest.map(trim)
+        self.pendingMutationDigest =
+            pendingMutationDigest.map(trim)
+        self.pendingMemoryDigest =
+            pendingMemoryDigest.map(trim)
+        self.jurisdictionRef = jurisdictionRef.map(trim)
+        self.timeLockRef = timeLockRef.map(trim)
+        self.contaminationRefs = contaminationRefs
+        self.policyHash = trim(policyHash)
+    }
+}
+
+/// L14 whitepaper §5.2 `JurisdictionMap`.
+public struct BASJurisdictionMap: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var mapID: String
+    public var domains: [String]
+    public var requiredSeals: [String]
+    public var escalationRules: [String]
+    public var crossDomainConstraints: [String]
+
+    public init(
+        schemaVersion: String
+            = BASJurisdictionMap.currentSchemaVersion,
+        mapID: String,
+        domains: [String] = [],
+        requiredSeals: [String] = [],
+        escalationRules: [String] = [],
+        crossDomainConstraints: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.mapID = mapID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.domains = domains
+        self.requiredSeals = requiredSeals
+        self.escalationRules = escalationRules
+        self.crossDomainConstraints = crossDomainConstraints
+    }
+}
+
+/// L14 whitepaper §5.3 `IntegrityWitness`.
+public struct BASIntegrityWitness: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var witnessID: String
+    public var artifactHashes: [String]
+    public var snapshotHash: String
+    public var foldChecksums: [String]
+    public var runtimeAttestation: String
+    public var confidence: Double
+    public var validUntil: Date?
+
+    public init(
+        schemaVersion: String
+            = BASIntegrityWitness.currentSchemaVersion,
+        witnessID: String,
+        artifactHashes: [String] = [],
+        snapshotHash: String = "",
+        foldChecksums: [String] = [],
+        runtimeAttestation: String = "",
+        confidence: Double = 1.0,
+        validUntil: Date? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        self.witnessID = witnessID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.artifactHashes = artifactHashes
+        self.snapshotHash = snapshotHash
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.foldChecksums = foldChecksums
+        self.runtimeAttestation = runtimeAttestation
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.confidence = min(1, max(0, confidence))
+        self.validUntil = validUntil
+    }
+}
+
+/// L14 whitepaper §5.4 `ContinuitySeal`.
+public struct BASContinuitySeal: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var sealID: String
+    public var sessionLineageRef: String
+    public var hostVersionRef: String?
+    public var restorePathRef: String?
+    public var samenessScore: Double
+    public var conflictFlags: [String]
+
+    public init(
+        schemaVersion: String
+            = BASContinuitySeal.currentSchemaVersion,
+        sealID: String,
+        sessionLineageRef: String,
+        hostVersionRef: String? = nil,
+        restorePathRef: String? = nil,
+        samenessScore: Double = 1.0,
+        conflictFlags: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.sealID = sealID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sessionLineageRef = sessionLineageRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.hostVersionRef = hostVersionRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.restorePathRef = restorePathRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.samenessScore = min(1, max(0, samenessScore))
+        self.conflictFlags = conflictFlags
+    }
+}
+
+/// L14 whitepaper §5.5 `MutationPetition`.
+public struct BASMutationPetition: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var petitionID: String
+    public var mutationType: BASSovereignMutationType
+    public var proposedDelta: [String]
+    public var evidenceRefs: [String]
+    public var consentRefs: [String]
+    public var cooldownUntil: Date?
+    public var jurisdictionDomain: String
+    public var approvalState: String
+
+    public init(
+        schemaVersion: String
+            = BASMutationPetition.currentSchemaVersion,
+        petitionID: String,
+        mutationType: BASSovereignMutationType,
+        proposedDelta: [String] = [],
+        evidenceRefs: [String] = [],
+        consentRefs: [String] = [],
+        cooldownUntil: Date? = nil,
+        jurisdictionDomain: String = "default",
+        approvalState: String = "pending"
+    ) {
+        self.schemaVersion = schemaVersion
+        self.petitionID = petitionID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.mutationType = mutationType
+        self.proposedDelta = proposedDelta
+        self.evidenceRefs = evidenceRefs
+        self.consentRefs = consentRefs
+        self.cooldownUntil = cooldownUntil
+        self.jurisdictionDomain = jurisdictionDomain
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.approvalState = approvalState
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// L14 whitepaper §5.6 `ContaminationLineage`.
+public struct BASContaminationLineage: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var lineageID: String
+    public var rootRef: String
+    public var descendantRefs: [String]
+    public var contaminationType: String
+    public var severity: Double
+    public var cutRecommended: Bool
+
+    public init(
+        schemaVersion: String
+            = BASContaminationLineage.currentSchemaVersion,
+        lineageID: String,
+        rootRef: String,
+        descendantRefs: [String] = [],
+        contaminationType: String,
+        severity: Double = 0,
+        cutRecommended: Bool = false
+    ) {
+        self.schemaVersion = schemaVersion
+        self.lineageID = lineageID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.rootRef = rootRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.descendantRefs = descendantRefs
+        self.contaminationType = contaminationType
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.severity = min(1, max(0, severity))
+        self.cutRecommended = cutRecommended
+    }
+}
+
+/// L14 whitepaper §5.8 `QuarantineMandate`.
+public struct BASQuarantineMandate: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var mandateID: String
+    public var zone: BASSovereignQuarantineZone
+    public var targetRefs: [String]
+    public var reasonCodes: [String]
+    public var releaseConditions: [String]
+
+    public init(
+        schemaVersion: String
+            = BASQuarantineMandate.currentSchemaVersion,
+        mandateID: String,
+        zone: BASSovereignQuarantineZone,
+        targetRefs: [String] = [],
+        reasonCodes: [String] = [],
+        releaseConditions: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.mandateID = mandateID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.zone = zone
+        self.targetRefs = targetRefs
+        self.reasonCodes = reasonCodes
+        self.releaseConditions = releaseConditions
+    }
+}
+
+/// L14 whitepaper §5.9 `RollbackWrit`.
+public struct BASRollbackWrit: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var writID: String
+    public var anchorRef: String
+    public var rollbackScope: String
+    public var purgeRefs: [String]
+    public var rebuildMode: String
+
+    public init(
+        schemaVersion: String
+            = BASRollbackWrit.currentSchemaVersion,
+        writID: String,
+        anchorRef: String,
+        rollbackScope: String = "session",
+        purgeRefs: [String] = [],
+        rebuildMode: String = "safe"
+    ) {
+        self.schemaVersion = schemaVersion
+        self.writID = writID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.anchorRef = anchorRef
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.rollbackScope = rollbackScope
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.purgeRefs = purgeRefs
+        self.rebuildMode = rebuildMode
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// L14 whitepaper §5.10 `DeadStopLatch`.
+public struct BASDeadStopLatch: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var latchID: String
+    public var scope: String
+    public var reasonCodes: [String]
+    public var releaseAuthority: String
+    public var createdAt: Date
+
+    public init(
+        schemaVersion: String
+            = BASDeadStopLatch.currentSchemaVersion,
+        latchID: String,
+        scope: String,
+        reasonCodes: [String] = [],
+        releaseAuthority: String = "sovereign",
+        createdAt: Date = Date()
+    ) {
+        self.schemaVersion = schemaVersion
+        self.latchID = latchID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.scope = scope
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.reasonCodes = reasonCodes
+        self.releaseAuthority = releaseAuthority
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.createdAt = createdAt
+    }
+}
+
 public struct BASSovereignWarrant: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.1.0"
 

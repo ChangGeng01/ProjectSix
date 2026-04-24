@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 170)  // +M118 4 L13 §4 organ schemas
+        #expect(governedObjects.count == 179)  // +M119 9 L14 §5 types → 14/14 layers complete
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -233,6 +233,25 @@ struct BASEBrainSchemaGovernanceRegistryTests {
                 BASRetractionFurnace.currentSchemaVersion,
             "RetractionFurnaceEntry":
                 BASRetractionFurnaceEntry.currentSchemaVersion,
+            // M119 L14 §5 Black Ring:
+            "SovereignFrame":
+                BASSovereignFrame.currentSchemaVersion,
+            "JurisdictionMap":
+                BASJurisdictionMap.currentSchemaVersion,
+            "IntegrityWitness":
+                BASIntegrityWitness.currentSchemaVersion,
+            "ContinuitySeal":
+                BASContinuitySeal.currentSchemaVersion,
+            "MutationPetition":
+                BASMutationPetition.currentSchemaVersion,
+            "ContaminationLineage":
+                BASContaminationLineage.currentSchemaVersion,
+            "QuarantineMandate":
+                BASQuarantineMandate.currentSchemaVersion,
+            "RollbackWrit":
+                BASRollbackWrit.currentSchemaVersion,
+            "DeadStopLatch":
+                BASDeadStopLatch.currentSchemaVersion,
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,

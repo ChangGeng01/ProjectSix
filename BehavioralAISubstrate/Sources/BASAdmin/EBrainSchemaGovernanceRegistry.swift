@@ -512,6 +512,52 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASRetractionFurnaceEntry.self,
             tests: ["schema.retraction_furnace_entry.current", "schema.retraction_furnace_entry.backward"]
         ),
+        // M119 — L14 Black Ring whitepaper §5 object family.
+        entry(
+            "SovereignFrame",
+            versionedType: BASSovereignFrame.self,
+            tests: ["schema.sovereign_frame.current", "schema.sovereign_frame.backward"]
+        ),
+        entry(
+            "JurisdictionMap",
+            versionedType: BASJurisdictionMap.self,
+            tests: ["schema.jurisdiction_map.current", "schema.jurisdiction_map.backward"]
+        ),
+        entry(
+            "IntegrityWitness",
+            versionedType: BASIntegrityWitness.self,
+            tests: ["schema.integrity_witness.current", "schema.integrity_witness.backward"]
+        ),
+        entry(
+            "ContinuitySeal",
+            versionedType: BASContinuitySeal.self,
+            tests: ["schema.continuity_seal.current", "schema.continuity_seal.backward"]
+        ),
+        entry(
+            "MutationPetition",
+            versionedType: BASMutationPetition.self,
+            tests: ["schema.mutation_petition.current", "schema.mutation_petition.backward"]
+        ),
+        entry(
+            "ContaminationLineage",
+            versionedType: BASContaminationLineage.self,
+            tests: ["schema.contamination_lineage.current", "schema.contamination_lineage.backward"]
+        ),
+        entry(
+            "QuarantineMandate",
+            versionedType: BASQuarantineMandate.self,
+            tests: ["schema.quarantine_mandate.current", "schema.quarantine_mandate.backward"]
+        ),
+        entry(
+            "RollbackWrit",
+            versionedType: BASRollbackWrit.self,
+            tests: ["schema.rollback_writ.current", "schema.rollback_writ.backward"]
+        ),
+        entry(
+            "DeadStopLatch",
+            versionedType: BASDeadStopLatch.self,
+            tests: ["schema.dead_stop_latch.current", "schema.dead_stop_latch.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,
