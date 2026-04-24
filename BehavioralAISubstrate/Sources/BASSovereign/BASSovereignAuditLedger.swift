@@ -140,6 +140,13 @@ public actor BASSovereignAuditLedger {
     /// coverage readings.
     private var coverageVerdicts: [BASObservationReconciliationVerdict] = []
 
+    /// M90 — per-turn observation bundles the host chose to stream.
+    /// Parallel to `coverageVerdicts[]`; same "off-chain" discipline.
+    /// See the long doc-comment above `recordObservationBundle(_:)`
+    /// for the contract.
+    private var observationBundles:
+        [BASObservationReconciliationReport] = []
+
     // MARK: - M83 state
     //
     // The ledger started life as one flat append-only chain. M83 adds
@@ -448,6 +455,87 @@ public actor BASSovereignAuditLedger {
         -> [BASObservationReconciliationVerdict]
     {
         coverageVerdicts
+    }
+
+    // MARK: - M90 · Observation-bundle streaming (L1–L13)
+    //
+    // The M45 coverage-verdict surface above stores ONE verdict per
+    // turn — the cross-layer rollup. Hosts that want to stream the
+    // underlying per-layer observation bundles (L1–L13) for an audit
+    // replay need a richer record: every layer's raw observation
+    // summary, preserved turn-by-turn, queryable without reading the
+    // hash chain.
+    //
+    // M90 adds a parallel `observationBundles[]` storage alongside
+    // `coverageVerdicts[]`. It uses the same "parallel to but not
+    // on" hash-chain design:
+    //
+    //   - Hash chain stays the sole home of append-only sovereign
+    //     verdicts — BR-012 integrity is unaffected.
+    //   - `coverageVerdicts[]` (M45) holds the cross-layer rollup.
+    //   - `observationBundles[]` (M90) holds the per-layer detail a
+    //     caller chose to stream.
+    //
+    // A ledger that never receives `recordObservationBundle(_:)`
+    // calls keeps the pre-M90 behaviour (L14-only audit chain +
+    // L14-only coverage verdict). Streaming is opt-in.
+
+    /// Record a per-turn observation bundle — typically the
+    /// `BASObservationReconciliationReport` carrying L1–L13 summaries
+    /// for one turn, built by the coordinator after every layer has
+    /// emitted its observation bundle.
+    ///
+    /// If a report already exists for the same `(sessionID, turnID)`
+    /// it is replaced in place (last-write-wins) so a coordinator
+    /// that re-emits mid-turn doesn't accrete stale bundles. Ordering
+    /// of first-seen `(session, turn)` keys is preserved for
+    /// deterministic iteration.
+    public func recordObservationBundle(
+        _ report: BASObservationReconciliationReport
+    ) {
+        if let idx = observationBundles.firstIndex(where: {
+            $0.sessionID == report.sessionID
+                && $0.turnID == report.turnID
+        }) {
+            observationBundles[idx] = report
+        } else {
+            observationBundles.append(report)
+        }
+    }
+
+    /// Look up the per-turn observation bundle for a specific
+    /// `(sessionID, turnID)` pair, or `nil` if the ledger never
+    /// received one for that turn (i.e. the host did not stream
+    /// L1–L13 on that turn).
+    public func observationBundle(
+        forSession sessionID: String,
+        turn turnID: String
+    ) -> BASObservationReconciliationReport? {
+        observationBundles.first {
+            $0.sessionID == sessionID && $0.turnID == turnID
+        }
+    }
+
+    /// Every per-turn observation bundle streamed for a session, in
+    /// first-seen turn order.
+    public func observationBundles(
+        forSession sessionID: String
+    ) -> [BASObservationReconciliationReport] {
+        observationBundles.filter { $0.sessionID == sessionID }
+    }
+
+    /// Total number of per-turn observation bundles across every
+    /// session.
+    public func observationBundleCount() -> Int {
+        observationBundles.count
+    }
+
+    /// Full value-copy export of observation bundles for replay /
+    /// governance. Parallel to `coverageVerdictSnapshot()`.
+    public func observationBundleSnapshot()
+        -> [BASObservationReconciliationReport]
+    {
+        observationBundles
     }
 
     // MARK: - M83 · Rotation

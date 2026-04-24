@@ -1191,12 +1191,31 @@ public actor QinaoSovereignControlPlane {
     /// (via the M45 parallel coverage-verdict slot) and returned to
     /// the caller in host-facing shape.
     ///
-    /// Today only L14 produces hot-path data on every turn — hosts do
-    /// not yet stream per-turn observation bundles for L1..L13 into
-    /// the ledger. The default `expectedLayerIDs == ["L14"]` reflects
-    /// that reality; call sites that wire additional layers pass a
-    /// broader expectation set and any silent layer becomes a
-    /// `.missingLayer` finding in the returned verdict.
+    /// L14 always produces hot-path data (its coverage summary is
+    /// pulled from the audit ledger itself). Hosts MAY additionally
+    /// stream per-turn observation bundles for L1–L13 by passing
+    /// `additionalSummaries:` — one `BASObservationCoverageSummary`
+    /// per layer, typically derived from the coordinator's per-layer
+    /// observation bundles (`BASTribunalObservationBundle`,
+    /// `BASRiskObservationBundle`, …) via each bundle's
+    /// `.coverageSummary` projection. When `additionalSummaries` is
+    /// non-empty, two things happen in addition to the L14-only flow:
+    ///
+    ///   1. The reconciliation report's `summaries` carries L14 +
+    ///      the caller's L1–L13 entries so the verdict engine sees
+    ///      the full 14-layer picture.
+    ///   2. The ledger also stores the full report via
+    ///      `recordObservationBundle(_:)`, making the per-turn L1–L13
+    ///      detail available for audit replay alongside the verdict.
+    ///
+    /// When `additionalSummaries` is nil (default) the method keeps
+    /// the pre-M90 L14-only contract bit-for-bit so existing call
+    /// sites are unaffected.
+    ///
+    /// The default `expectedLayerIDs == ["L14"]` still reflects the
+    /// minimum host contract. Call sites that stream additional
+    /// layers should pass a broader expectation set so silent layers
+    /// become `.missingLayer` findings in the returned verdict.
     ///
     /// - Parameters:
     ///   - sessionID: session the coverage belongs to
@@ -1206,6 +1225,9 @@ public actor QinaoSovereignControlPlane {
     ///     Clamped to `[0, 1]` before use.
     ///   - expectedLayerIDs: layer raw IDs (`"L1"`..`"L14"`) that
     ///     should have reported. Defaults to `["L14"]`.
+    ///   - additionalSummaries: optional L1–L13 per-layer coverage
+    ///     summaries the host streams into the ledger in addition to
+    ///     the L14 summary. Nil (default) preserves pre-M90 behaviour.
     ///
     /// - Returns: `CoverageReading` the runtime can act on. `.halt`
     ///   severity is a hard signal to stop the session; `.advisory`
@@ -1217,17 +1239,26 @@ public actor QinaoSovereignControlPlane {
         budgetCeiling: Double = 1.0,
         expectedLayerIDs: [String] = [
             BASCognitiveLayer.sovereign.rawValue
-        ]
+        ],
+        additionalSummaries: [BASObservationCoverageSummary]? = nil
     ) async -> CoverageReading {
         let emittedAt = now()
         let l14Summary = await auditLedger.coverageSummary(
             turnID: turnID,
             sessionID: sessionID,
             emittedAt: emittedAt)
+        // M90 — compose the full per-turn summary set. L14 always
+        // included; L1–L13 appended when streamed by the host. The
+        // order (L14 first + streamed afterwards) is stable so audit
+        // replay gets a deterministic layout per turn.
+        var summaries: [BASObservationCoverageSummary] = [l14Summary]
+        if let additional = additionalSummaries {
+            summaries.append(contentsOf: additional)
+        }
         let report = BASObservationReconciliationReport(
             turnID: turnID,
             sessionID: sessionID,
-            summaries: [l14Summary])
+            summaries: summaries)
         let expected = expectedLayerIDs.compactMap {
             BASCognitiveLayer(rawValue: $0)
         }
@@ -1238,7 +1269,30 @@ public actor QinaoSovereignControlPlane {
                 budgetCeiling: budgetCeiling,
                 emittedAt: emittedAt)
         await auditLedger.recordCoverageVerdict(basVerdict)
+        // M90 — stream the full report into the ledger's parallel
+        // observation-bundle storage ONLY when the caller supplied
+        // L1–L13 summaries. Pre-M90 hosts (no `additionalSummaries`)
+        // never trigger this path, preserving ledger size + semantics.
+        if additionalSummaries != nil {
+            await auditLedger.recordObservationBundle(report)
+        }
         return Self.toCoverageReading(basVerdict)
+    }
+
+    /// M90 — read back the per-turn observation bundle previously
+    /// streamed via `recordTurnCoverage(..., additionalSummaries:)`.
+    /// Returns `nil` when no bundle was recorded for the given
+    /// `(session, turn)` pair (either the turn never happened, or
+    /// the host chose not to stream L1–L13 on that turn).
+    ///
+    /// Intended for audit replay / governance tooling that wants the
+    /// full per-layer detail rather than the cross-layer verdict.
+    public func observationBundle(
+        sessionID: String,
+        turnID: String
+    ) async -> BASObservationReconciliationReport? {
+        await auditLedger.observationBundle(
+            forSession: sessionID, turn: turnID)
     }
 
     /// Read back a coverage reading previously recorded via
