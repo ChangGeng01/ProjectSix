@@ -366,7 +366,8 @@ public actor QinaoRuntime {
         memoryBundle: BASMemoryBundle? = nil,
         thoughtFrame: BASThoughtFrame? = nil,
         updateTickets: [BASUpdateTicket] = [],
-        neuralOrganMap: BASNeuralOrganMap? = nil
+        neuralOrganMap: BASNeuralOrganMap? = nil,
+        renderedOutput: BASRenderedOutput? = nil
     ) async throws -> TurnOutcome {
         // Pre-flight: refuse if the session was already halted.
         if await sovereign.isSessionHalted(observations.sessionID) {
@@ -711,6 +712,31 @@ public actor QinaoRuntime {
             combined.append(l2Bundle.coverageSummary)
             finalAdditionalSummaries = combined
             autoInjectedLayerCodes.append("L2")
+        }
+
+        // M141 — L12 gentleHand auto-stream.
+        //
+        // Whitepaper L12 per-turn observation bundle derives from
+        // BOTH a thoughtFrame (for risk bindings / decision
+        // package) AND a renderedOutput (for the final surface
+        // the host ended up presenting). So L12 requires BOTH
+        // upstream inputs — it only streams when the caller
+        // passes both. Missing either leaves L12 out of the
+        // bundle (backward-compat).
+        if let tf = thoughtFrame,
+           let rendered = renderedOutput
+        {
+            let l12Bundle =
+                BASSoftHandObservationBundle.derive(
+                    from: tf,
+                    renderedOutput: rendered,
+                    turnID: observations.turnID,
+                    sessionID: observations.sessionID,
+                    emittedAt: now())
+            var combined = finalAdditionalSummaries ?? []
+            combined.append(l12Bundle.coverageSummary)
+            finalAdditionalSummaries = combined
+            autoInjectedLayerCodes.append("L12")
         }
 
         // Expand the expectation set only when the caller accepted
