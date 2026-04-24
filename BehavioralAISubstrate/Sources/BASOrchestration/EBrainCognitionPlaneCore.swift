@@ -4826,6 +4826,496 @@ public struct BASRenderedSurfaceGuide: Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - M117 L12 whitepaper §5 parity
+
+/// L12 whitepaper §5 `OutputSurface.surface_type` 8-case vocab.
+/// Matches §5 exactly.
+public enum BASOutputSurfaceType:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    case answer
+    case mirror
+    case comparePanel
+    case draftShell
+    case localStep
+    case boundaryScript
+    case delayPacket
+    case silentStub
+}
+
+// Note: L12 whitepaper §5 `MirrorResponse.mirror_mode` vocab
+// matches the existing `BASMirrorMode` enum at line ~877 exactly
+// (silent / soft / hard). Reusing that enum below.
+
+/// L12 whitepaper §5 `BoundaryScript.script_type` 6-case vocab.
+public enum BASBoundaryScriptType:
+    String, Codable, Sendable, Equatable, Hashable, CaseIterable
+{
+    case block
+    case delay
+    case localOnly
+    case draftOnly
+    case noEscalation
+    case noTool
+}
+
+/// L12 whitepaper §5.1 `RenderFrame` — the aggregator that binds
+/// every rendering decision for a turn (merged choice + permit +
+/// agency + host style + situation + mirror + substitute +
+/// sovereign surface + output surface + tone + force curve +
+/// disclosure). All refs are String IDs matching whitepaper
+/// literal shape.
+public struct BASRenderFrame: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var frameID: String
+    public var mergedChoiceRef: String?
+    public var actionPermitRef: String?
+    public var agencyReservationRef: String?
+    public var hostStyleRef: String?
+    public var situationRef: String?
+    public var mirrorRef: String?
+    public var substituteRef: String?
+    public var sovereignSurfaceRef: String?
+    public var outputSurfaceRef: String?
+    public var toneProfileRef: String?
+    public var forceCurveRef: String?
+    public var disclosureProfileRef: String?
+
+    public init(
+        schemaVersion: String
+            = BASRenderFrame.currentSchemaVersion,
+        frameID: String,
+        mergedChoiceRef: String? = nil,
+        actionPermitRef: String? = nil,
+        agencyReservationRef: String? = nil,
+        hostStyleRef: String? = nil,
+        situationRef: String? = nil,
+        mirrorRef: String? = nil,
+        substituteRef: String? = nil,
+        sovereignSurfaceRef: String? = nil,
+        outputSurfaceRef: String? = nil,
+        toneProfileRef: String? = nil,
+        forceCurveRef: String? = nil,
+        disclosureProfileRef: String? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        let trim: (String) -> String = {
+            $0.trimmingCharacters(
+                in: .whitespacesAndNewlines)
+        }
+        self.frameID = trim(frameID)
+        self.mergedChoiceRef = mergedChoiceRef.map(trim)
+        self.actionPermitRef = actionPermitRef.map(trim)
+        self.agencyReservationRef =
+            agencyReservationRef.map(trim)
+        self.hostStyleRef = hostStyleRef.map(trim)
+        self.situationRef = situationRef.map(trim)
+        self.mirrorRef = mirrorRef.map(trim)
+        self.substituteRef = substituteRef.map(trim)
+        self.sovereignSurfaceRef =
+            sovereignSurfaceRef.map(trim)
+        self.outputSurfaceRef = outputSurfaceRef.map(trim)
+        self.toneProfileRef = toneProfileRef.map(trim)
+        self.forceCurveRef = forceCurveRef.map(trim)
+        self.disclosureProfileRef =
+            disclosureProfileRef.map(trim)
+    }
+}
+
+/// L12 whitepaper §5.2 `OutputSurface`.
+public struct BASOutputSurface: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var surfaceID: String
+    public var surfaceType: BASOutputSurfaceType
+    public var channel: String
+    public var interactionDepth: String
+
+    public init(
+        schemaVersion: String
+            = BASOutputSurface.currentSchemaVersion,
+        surfaceID: String,
+        surfaceType: BASOutputSurfaceType,
+        channel: String,
+        interactionDepth: String = "standard"
+    ) {
+        self.schemaVersion = schemaVersion
+        self.surfaceID = surfaceID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.surfaceType = surfaceType
+        self.channel = channel
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.interactionDepth = interactionDepth
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// L12 whitepaper §5.3 `ToneProfile` — 8-axis tone quantification.
+/// Named `BASToneWeaveProfile` (not `BASToneProfile`) to avoid
+/// collision with the existing `BASToneProfile` enum (categorical
+/// tone classification) in `BASRuntimeCore/AdaptiveRuntimeCore`.
+/// The "Weave" prefix matches L12 §4.2 "Tone Weave Loom" organ.
+public struct BASToneWeaveProfile: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var warmth: Double
+    public var firmness: Double
+    public var distance: Double
+    public var density: Double
+    public var pace: Double
+    public var explicitness: Double
+    public var authority: Double
+    public var tenderness: Double
+
+    public init(
+        schemaVersion: String
+            = BASToneWeaveProfile.currentSchemaVersion,
+        warmth: Double = 0.5,
+        firmness: Double = 0.5,
+        distance: Double = 0.5,
+        density: Double = 0.5,
+        pace: Double = 0.5,
+        explicitness: Double = 0.5,
+        authority: Double = 0.5,
+        tenderness: Double = 0.5
+    ) {
+        self.schemaVersion = schemaVersion
+        self.warmth = min(1, max(0, warmth))
+        self.firmness = min(1, max(0, firmness))
+        self.distance = min(1, max(0, distance))
+        self.density = min(1, max(0, density))
+        self.pace = min(1, max(0, pace))
+        self.explicitness = min(1, max(0, explicitness))
+        self.authority = min(1, max(0, authority))
+        self.tenderness = min(1, max(0, tenderness))
+    }
+}
+
+/// L12 whitepaper §5.4 `ForceCurve`.
+public struct BASForceCurve: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var openingForce: Double
+    public var middleForce: Double
+    public var closingForce: Double
+    public var pausePoints: [String]
+    public var emphasisNodes: [String]
+    public var boundaryAnchorStrength: Double
+
+    public init(
+        schemaVersion: String
+            = BASForceCurve.currentSchemaVersion,
+        openingForce: Double = 0.5,
+        middleForce: Double = 0.5,
+        closingForce: Double = 0.5,
+        pausePoints: [String] = [],
+        emphasisNodes: [String] = [],
+        boundaryAnchorStrength: Double = 0.5
+    ) {
+        self.schemaVersion = schemaVersion
+        self.openingForce = min(1, max(0, openingForce))
+        self.middleForce = min(1, max(0, middleForce))
+        self.closingForce = min(1, max(0, closingForce))
+        self.pausePoints = pausePoints
+        self.emphasisNodes = emphasisNodes
+        self.boundaryAnchorStrength = min(
+            1, max(0, boundaryAnchorStrength))
+    }
+}
+
+/// L12 whitepaper §5.5 `MirrorResponse`.
+public struct BASMirrorResponse: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var responseID: String
+    public var mirrorMode: BASMirrorMode
+    public var summary: String
+    public var calibrationPoints: [String]
+    public var emotionalLoad: Double
+    public var nonInductiveGuard: Bool
+
+    public init(
+        schemaVersion: String
+            = BASMirrorResponse.currentSchemaVersion,
+        responseID: String,
+        mirrorMode: BASMirrorMode = .soft,
+        summary: String = "",
+        calibrationPoints: [String] = [],
+        emotionalLoad: Double = 0,
+        nonInductiveGuard: Bool = true
+    ) {
+        self.schemaVersion = schemaVersion
+        self.responseID = responseID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.mirrorMode = mirrorMode
+        self.summary = summary
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.calibrationPoints = calibrationPoints
+        self.emotionalLoad = min(1, max(0, emotionalLoad))
+        self.nonInductiveGuard = nonInductiveGuard
+    }
+}
+
+/// L12 whitepaper §5.6 `BoundaryScript`.
+public struct BASBoundaryScript: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var scriptID: String
+    public var scriptType: BASBoundaryScriptType
+    public var wording: String
+    public var firmnessLevel: Double
+    public var dignityGuard: Bool
+    public var substituteRef: String?
+
+    public init(
+        schemaVersion: String
+            = BASBoundaryScript.currentSchemaVersion,
+        scriptID: String,
+        scriptType: BASBoundaryScriptType,
+        wording: String = "",
+        firmnessLevel: Double = 0.5,
+        dignityGuard: Bool = true,
+        substituteRef: String? = nil
+    ) {
+        self.schemaVersion = schemaVersion
+        self.scriptID = scriptID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.scriptType = scriptType
+        self.wording = wording
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.firmnessLevel = min(1, max(0, firmnessLevel))
+        self.dignityGuard = dignityGuard
+        self.substituteRef = substituteRef?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// L12 whitepaper §5.7 `ComparePanel`.
+public struct BASComparePanel: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var panelID: String
+    public var options: [String]
+    public var differences: [String]
+    public var sacrifices: [String]
+    public var reversiblePoints: [String]
+    public var chooseLaterAllowed: Bool
+
+    public init(
+        schemaVersion: String
+            = BASComparePanel.currentSchemaVersion,
+        panelID: String,
+        options: [String] = [],
+        differences: [String] = [],
+        sacrifices: [String] = [],
+        reversiblePoints: [String] = [],
+        chooseLaterAllowed: Bool = true
+    ) {
+        self.schemaVersion = schemaVersion
+        self.panelID = panelID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.options = options
+        self.differences = differences
+        self.sacrifices = sacrifices
+        self.reversiblePoints = reversiblePoints
+        self.chooseLaterAllowed = chooseLaterAllowed
+    }
+}
+
+/// L12 whitepaper §5.8 `StepBundle`.
+public struct BASStepBundle: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var bundleID: String
+    public var microSteps: [String]
+    public var localOnly: Bool
+    public var editable: Bool
+    public var confirmNodes: [String]
+
+    public init(
+        schemaVersion: String
+            = BASStepBundle.currentSchemaVersion,
+        bundleID: String,
+        microSteps: [String] = [],
+        localOnly: Bool = true,
+        editable: Bool = true,
+        confirmNodes: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.bundleID = bundleID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.microSteps = microSteps
+        self.localOnly = localOnly
+        self.editable = editable
+        self.confirmNodes = confirmNodes
+    }
+}
+
+/// L12 whitepaper §5.9 `DelayPacket`.
+public struct BASDelayPacket: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var packetID: String
+    public var delayWindow: String
+    public var rationale: String
+    public var allowedIntermediateActions: [String]
+    public var reentryHint: String
+
+    public init(
+        schemaVersion: String
+            = BASDelayPacket.currentSchemaVersion,
+        packetID: String,
+        delayWindow: String = "",
+        rationale: String = "",
+        allowedIntermediateActions: [String] = [],
+        reentryHint: String = ""
+    ) {
+        self.schemaVersion = schemaVersion
+        self.packetID = packetID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.delayWindow = delayWindow
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.rationale = rationale
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.allowedIntermediateActions =
+            allowedIntermediateActions
+        self.reentryHint = reentryHint
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// L12 whitepaper §5.11 `AgencyHandle`.
+public struct BASAgencyHandle: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var handleID: String
+    public var compareEnabled: Bool
+    public var delayEnabled: Bool
+    public var secondCheckRequired: Bool
+    public var chooseLaterAllowed: Bool
+    public var userFinalSay: Bool
+
+    public init(
+        schemaVersion: String
+            = BASAgencyHandle.currentSchemaVersion,
+        handleID: String,
+        compareEnabled: Bool = true,
+        delayEnabled: Bool = true,
+        secondCheckRequired: Bool = false,
+        chooseLaterAllowed: Bool = true,
+        userFinalSay: Bool = true
+    ) {
+        self.schemaVersion = schemaVersion
+        self.handleID = handleID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.compareEnabled = compareEnabled
+        self.delayEnabled = delayEnabled
+        self.secondCheckRequired = secondCheckRequired
+        self.chooseLaterAllowed = chooseLaterAllowed
+        self.userFinalSay = userFinalSay
+    }
+}
+
+/// L12 whitepaper §5.12 `DisclosureProfile`.
+public struct BASDisclosureProfile: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var profileID: String
+    public var revealItems: [String]
+    public var suppressItems: [String]
+    public var uncertaintyVisible: Bool
+    public var sovereignMinimalMode: Bool
+    public var chainOfThoughtHidden: Bool
+
+    public init(
+        schemaVersion: String
+            = BASDisclosureProfile.currentSchemaVersion,
+        profileID: String,
+        revealItems: [String] = [],
+        suppressItems: [String] = [],
+        uncertaintyVisible: Bool = true,
+        sovereignMinimalMode: Bool = false,
+        chainOfThoughtHidden: Bool = true
+    ) {
+        self.schemaVersion = schemaVersion
+        self.profileID = profileID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.revealItems = revealItems
+        self.suppressItems = suppressItems
+        self.uncertaintyVisible = uncertaintyVisible
+        self.sovereignMinimalMode = sovereignMinimalMode
+        self.chainOfThoughtHidden = chainOfThoughtHidden
+    }
+}
+
+/// L12 whitepaper §5.13 `SilentStub`.
+public struct BASSilentStub: BASSchemaVersioned,
+    Hashable, Sendable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+    public var stubID: String
+    public var minimalText: String
+    public var surfaceMode: String
+    public var dignityGuard: Bool
+    public var noExtraLeak: Bool
+
+    public init(
+        schemaVersion: String
+            = BASSilentStub.currentSchemaVersion,
+        stubID: String,
+        minimalText: String = "",
+        surfaceMode: String = "stub",
+        dignityGuard: Bool = true,
+        noExtraLeak: Bool = true
+    ) {
+        self.schemaVersion = schemaVersion
+        self.stubID = stubID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.minimalText = minimalText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.surfaceMode = surfaceMode
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.dignityGuard = dignityGuard
+        self.noExtraLeak = noExtraLeak
+    }
+}
+
 public struct BASRenderedOutput: BASSchemaVersioned {
     public static let currentSchemaVersion = "1.1.0"
 

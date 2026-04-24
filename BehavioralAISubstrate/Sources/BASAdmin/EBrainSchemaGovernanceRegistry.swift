@@ -426,6 +426,69 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASHostAlignmentMap.self,
             tests: ["schema.host_alignment_map.current", "schema.host_alignment_map.backward"]
         ),
+        // M117 — L12 Gentle Hand whitepaper §5 object family
+        // (12 new types; ProtectiveSubstitute reused from L11,
+        // MirrorMode enum reused from existing).
+        entry(
+            "RenderFrame",
+            versionedType: BASRenderFrame.self,
+            tests: ["schema.render_frame.current", "schema.render_frame.backward"]
+        ),
+        entry(
+            "OutputSurface",
+            versionedType: BASOutputSurface.self,
+            tests: ["schema.output_surface.current", "schema.output_surface.backward"]
+        ),
+        entry(
+            "ToneWeaveProfile",
+            versionedType: BASToneWeaveProfile.self,
+            tests: ["schema.tone_weave_profile.current", "schema.tone_weave_profile.backward"]
+        ),
+        entry(
+            "ForceCurve",
+            versionedType: BASForceCurve.self,
+            tests: ["schema.force_curve.current", "schema.force_curve.backward"]
+        ),
+        entry(
+            "MirrorResponse",
+            versionedType: BASMirrorResponse.self,
+            tests: ["schema.mirror_response.current", "schema.mirror_response.backward"]
+        ),
+        entry(
+            "BoundaryScript",
+            versionedType: BASBoundaryScript.self,
+            tests: ["schema.boundary_script.current", "schema.boundary_script.backward"]
+        ),
+        entry(
+            "ComparePanel",
+            versionedType: BASComparePanel.self,
+            tests: ["schema.compare_panel.current", "schema.compare_panel.backward"]
+        ),
+        entry(
+            "StepBundle",
+            versionedType: BASStepBundle.self,
+            tests: ["schema.step_bundle.current", "schema.step_bundle.backward"]
+        ),
+        entry(
+            "DelayPacket",
+            versionedType: BASDelayPacket.self,
+            tests: ["schema.delay_packet.current", "schema.delay_packet.backward"]
+        ),
+        entry(
+            "AgencyHandle",
+            versionedType: BASAgencyHandle.self,
+            tests: ["schema.agency_handle.current", "schema.agency_handle.backward"]
+        ),
+        entry(
+            "DisclosureProfile",
+            versionedType: BASDisclosureProfile.self,
+            tests: ["schema.disclosure_profile.current", "schema.disclosure_profile.backward"]
+        ),
+        entry(
+            "SilentStub",
+            versionedType: BASSilentStub.self,
+            tests: ["schema.silent_stub.current", "schema.silent_stub.backward"]
+        ),
         entry(
             "CandidateFrontier",
             versionedType: BASCandidateFrontier.self,

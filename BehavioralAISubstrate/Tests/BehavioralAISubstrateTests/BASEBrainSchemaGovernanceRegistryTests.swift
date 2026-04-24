@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 154)  // +M115 9 L10 types
+        #expect(governedObjects.count == 166)  // +M117 12 L12 types
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -211,6 +211,19 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "OutcomeProjection": BASOutcomeProjection.currentSchemaVersion,  // M114
             "AdversarialBrief": BASAdversarialBrief.currentSchemaVersion,  // M114
             "HostAlignmentMap": BASHostAlignmentMap.currentSchemaVersion,  // M114
+            // M117 L12:
+            "RenderFrame": BASRenderFrame.currentSchemaVersion,
+            "OutputSurface": BASOutputSurface.currentSchemaVersion,
+            "ToneWeaveProfile": BASToneWeaveProfile.currentSchemaVersion,
+            "ForceCurve": BASForceCurve.currentSchemaVersion,
+            "MirrorResponse": BASMirrorResponse.currentSchemaVersion,
+            "BoundaryScript": BASBoundaryScript.currentSchemaVersion,
+            "ComparePanel": BASComparePanel.currentSchemaVersion,
+            "StepBundle": BASStepBundle.currentSchemaVersion,
+            "DelayPacket": BASDelayPacket.currentSchemaVersion,
+            "AgencyHandle": BASAgencyHandle.currentSchemaVersion,
+            "DisclosureProfile": BASDisclosureProfile.currentSchemaVersion,
+            "SilentStub": BASSilentStub.currentSchemaVersion,
             "SovereignActuationCommand": BASSovereignActuationCommand.currentSchemaVersion,
             "SovereignExecutionReceipt": BASSovereignExecutionReceipt.currentSchemaVersion,
             "SovereignVerdict": BASSovereignVerdict.currentSchemaVersion,
