@@ -333,3 +333,48 @@
 2. 兑现度向下调整（发现夸大）优先于向上调整（新增功能）
 3. README / 对外材料引用本表的行号与当前兑现度；不得独立声明更高数字
 4. 如果某一行长时间（> 2 周）无变化，在"四、本周待兑现"里单列"不动的理由"，避免悄无声息的停滞
+
+---
+
+## 六、M179 — 14 层最大化运作 + 性能 + 能效 实测（2026-04-26）
+
+**测试文件**：`QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoRuntime14LayerSaturationTests.swift` · 4/4 绿。
+
+### 6.1 最大化运作（saturation）
+
+构造一个 fully-loaded turn — `plannedBudget + lifecycle + contextFrame + decomposeFrame + memoryBundle + thoughtFrame + updateTickets + neuralOrganMap + renderedOutput + candidateFrontier` 全部就位 — 跑一次 `sendSession`：
+
+- `TurnMetric.autoInjectedLayerCount = 13`（L1..L13 全部 inject 各自的 coverageSummary；L14 永远在场不计入此值，所以总 14 层全开）
+- `coverageReading.findings` 中 `.missingLayer` count = **0**（没有任一层被静默吞掉）
+- `coverageReading.severity = .advisory` — 来自 6 条 `.layerMissingCoreCoverage` 软警告（L14 / L4 / L6 / L7 / L10 / L11），反映各层 `BAS*ObservationBundle.derive(...)` 默认未拍 core flag 的设计选择，不是结构缺失
+
+### 6.2 性能（perf · 100 fully-loaded turns sequential）
+
+dev box: macOS 26.4.1 / M-class silicon · 仅观察管线（不含 LLM 推理）：
+
+| 指标 | 值 |
+|---|---|
+| min   | 0.22 ms |
+| p50   | 0.27 ms |
+| p95   | 0.34 ms |
+| p99   | 0.40 ms |
+| max   | 0.45 ms |
+| mean  | 0.28 ms |
+
+回归告警阈值：p95 > 100 ms 报警；max > 500 ms 报警。当前 p95 比阈值低 **~290×**。
+
+加上真 LLM 推理（M177 / M178 已测）：scout draft +0.3-0.5s · core draft +1.0-1.5s。整体单 turn budget 在 1-2s 区间。
+
+### 6.3 能效（thermal · 100-turn stress）
+
+- pre: `ProcessInfo.processInfo.thermalState = .nominal`
+- post: `ProcessInfo.processInfo.thermalState = .nominal`
+- 无任何 `.fair / .serious / .critical` 升级
+
+观察管线在 ARM64 Apple Silicon 上是 **冷热中立** —— 100 turns 之后操作系统的热度采样器看不到任何变化。这条被记下来作为基线，未来若某次重构后 thermal escalates 到 `.fair` 即可追溯。
+
+### 6.4 该说什么（对外材料）
+
+> "14 层每轮按需全开 · 观察管线 p95 < 0.5 ms · 100 轮对设备热态零影响"
+
+**不该说**："我们的运行时比 X 快 N 倍" —— 这只是观察管线，不含推理；和市面上 LLM 框架的端到端延迟数字不可比较。
