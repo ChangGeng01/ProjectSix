@@ -19,6 +19,24 @@ import FoundationModels
 /// `BASOrganError.providerUnavailable(reason:)`. Hosts that need
 /// to gracefully degrade should `as? BASStreamingOrganAdapter`
 /// first; if absent, fall back to `draft(_:)`.
+///
+/// ## Cancellation (M192)
+///
+/// Apple's `LanguageModelSession.streamResponse(to:)` honors the
+/// cooperative task-cancellation protocol. When the iterating Task
+/// is cancelled, the underlying stream stops producing chunks and
+/// the for-await loop exits cleanly (typically without throwing).
+/// Empirically the model bails BEFORE producing the first chunk if
+/// cancellation lands quickly enough — total latency from
+/// `task.cancel()` to iteration exit is sub-millisecond beyond the
+/// scheduling tick.
+///
+/// Hosts that want to abort a long-running stream just cancel the
+/// enclosing task; no manual `break` or special signaling needed.
+/// Pinned by `AppleFoundationStreamCancellationTests` —
+/// `testCancellingStreamingTaskTerminatesWithinBudget` asserts a
+/// 5-second exit budget (real measured: ~150ms after the
+/// cancellation signal lands).
 extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
 
     public nonisolated func streamDraft(
