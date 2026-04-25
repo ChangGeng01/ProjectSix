@@ -716,6 +716,89 @@ public actor QinaoLoop {
         }
     }
 
+    /// M188 — incremental body stream for token-stream UI patterns.
+    ///
+    /// Returns an `AsyncThrowingStream` of
+    /// `OrganResponseChunk` values, each carrying the cumulative
+    /// body so far + delta since the previous chunk. Stream
+    /// completion = end-of-response.
+    ///
+    /// Streaming is intentionally **separate** from
+    /// `generateCandidates(...)`. The frontier scoring formula
+    /// requires the full body + numeric host-supplied fields,
+    /// neither available mid-stream. Hosts that want both streaming
+    /// UI AND frontier-scored candidates call `streamBody(...)` for
+    /// UI render, then `generateCandidates(...)` once the stream
+    /// completes for the canonical frontier-scored version.
+    ///
+    /// Failure modes (terminate stream with `LoopError`):
+    /// - `organUnavailable("no-endpoint-configured")` if no endpoint
+    ///   wired
+    /// - `organUnavailable("endpoint-not-streaming")` if the endpoint
+    ///   doesn't conform to `QinaoStreamingOrganEndpoint`
+    /// - any `BASOrganError` translated through the same reason-code
+    ///   matrix `produceBody(...)` uses (M181)
+    public nonisolated func streamBody(
+        sessionID: String,
+        prompt: String,
+        context: [String] = [],
+        role: OrganRole = .core
+    ) -> AsyncThrowingStream<OrganResponseChunk, Error> {
+        AsyncThrowingStream { continuation in
+            Task { [weak self] in
+                guard let self = self else {
+                    continuation.finish()
+                    return
+                }
+                let probe = await self.endpointStreamingProbe()
+                switch probe {
+                case .streaming(let streaming):
+                    let inner = streaming.streamBody(
+                        prompt: prompt,
+                        context: context,
+                        role: role,
+                        sessionID: sessionID)
+                    do {
+                        for try await chunk in inner {
+                            continuation.yield(chunk)
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                case .nonStreamingEndpoint:
+                    continuation.finish(
+                        throwing: LoopError.organUnavailable(
+                            reason: "endpoint-not-streaming"))
+                case .noEndpoint:
+                    continuation.finish(
+                        throwing: LoopError.organUnavailable(
+                            reason: "no-endpoint-configured"))
+                }
+            }
+        }
+    }
+
+    /// Result of probing the configured endpoint for streaming
+    /// support. Three discriminating cases let `streamBody(...)`
+    /// emit the correct stable reason code in each rejection
+    /// scenario.
+    private enum EndpointStreamingProbe {
+        case streaming(any QinaoStreamingOrganEndpoint)
+        case nonStreamingEndpoint
+        case noEndpoint
+    }
+
+    private func endpointStreamingProbe() -> EndpointStreamingProbe {
+        guard let endpoint = organEndpoint else {
+            return .noEndpoint
+        }
+        if let streaming = endpoint as? QinaoStreamingOrganEndpoint {
+            return .streaming(streaming)
+        }
+        return .nonStreamingEndpoint
+    }
+
     /// M77 — Budget-aware generation overload.
     ///
     /// Same pipeline as `generateCandidates(sessionID:seeds:)` with

@@ -22,7 +22,9 @@ import BASOrgan
 /// used instead of `registry.adapter(for:)` so tests can drive a
 /// captured adapter without having to register+re-register. Hosts
 /// use `registry` only.
-package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint {
+package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint,
+    QinaoStreamingOrganEndpoint
+{
     package let registry: BASOrganRegistry?
     package let adapterOverride: (@Sendable (BASOrganRole) async throws -> any BASOrganAdapter)?
     package let presetForRole: @Sendable (BASOrganRole) -> BASOrganPreset
@@ -71,6 +73,102 @@ package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint {
             context: context,
             internalRole: internalRole,
             preset: preset)
+    }
+
+    // MARK: - QinaoStreamingOrganEndpoint (M188)
+
+    /// Resolve the adapter, probe it for `BASStreamingOrganAdapter`,
+    /// and translate `BASOrganDraftChunk` → `OrganResponseChunk`
+    /// per chunk. If the resolved adapter doesn't conform to the
+    /// streaming protocol, terminate the stream with
+    /// `LoopError.organUnavailable(reason:"endpoint-not-streaming")`.
+    package func streamBody(
+        prompt: String,
+        context: [String],
+        role: QinaoLoop.OrganRole,
+        sessionID: String
+    ) -> AsyncThrowingStream<
+        QinaoLoop.OrganResponseChunk, Error>
+    {
+        let internalRole = Self.toInternalRole(role)
+        let preset = presetForRole(internalRole)
+        let resolvedRequestID = nextRequestID()
+
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let adapter: any BASOrganAdapter
+                    if let override = adapterOverride {
+                        adapter = try await override(internalRole)
+                    } else if let registry = registry {
+                        adapter = try await registry
+                            .adapter(for: internalRole)
+                    } else {
+                        continuation.finish(
+                            throwing: QinaoLoop.LoopError
+                                .organUnavailable(
+                                    reason: "no-endpoint-configured"))
+                        return
+                    }
+
+                    guard
+                        let streamingAdapter =
+                            adapter as? BASStreamingOrganAdapter
+                    else {
+                        continuation.finish(
+                            throwing: QinaoLoop.LoopError
+                                .organUnavailable(
+                                    reason: "endpoint-not-streaming"))
+                        return
+                    }
+
+                    let request = BASOrganRequest(
+                        requestID: resolvedRequestID,
+                        role: internalRole,
+                        preset: preset,
+                        instruction: prompt,
+                        context: context)
+                    let stream = streamingAdapter
+                        .streamDraft(request)
+                    for try await chunk in stream {
+                        continuation.yield(
+                            QinaoLoop.OrganResponseChunk(
+                                bodyDelta: chunk.bodyDelta,
+                                cumulativeBody: chunk.cumulativeBody,
+                                providerID: chunk.providerID))
+                    }
+                    continuation.finish()
+                } catch let error as QinaoLoop.LoopError {
+                    continuation.finish(throwing: error)
+                } catch let error as BASOrganError {
+                    continuation.finish(
+                        throwing: QinaoLoop.LoopError
+                            .organUnavailable(
+                                reason: Self.reasonCode(
+                                    for: error)))
+                } catch let error
+                    as BASOrganRegistry.RegistryError
+                {
+                    switch error {
+                    case .noAdapterForRole(let r):
+                        continuation.finish(
+                            throwing: QinaoLoop.LoopError
+                                .organUnavailable(
+                                    reason:
+                                        "no-adapter-for-role:" +
+                                        r.rawValue))
+                    case .unknownProvider(let id):
+                        continuation.finish(
+                            throwing: QinaoLoop.LoopError
+                                .organUnavailable(
+                                    reason:
+                                        "unknown-provider:" + id))
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
     // MARK: - Shared adapter-call path
