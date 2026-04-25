@@ -96,6 +96,11 @@ public actor BASThermalTwin {
     private var lastReading: Reading?
     private var accumulatedPressure: Double = 0
     private var observers: [UUID: AsyncStream<Reading>.Continuation] = [:]
+    /// M216 — task that owns the
+    /// `ProcessInfo.thermalStateDidChangeNotification` AsyncSequence
+    /// loop. `nil` until `startObservingSystemNotifications()` is
+    /// called; cancelled by `stop...()` or actor deinit.
+    private var notificationTask: Task<Void, Never>?
 
     public init(
         reader: @escaping Reader = BASThermalTwin.defaultReader,
@@ -162,6 +167,57 @@ public actor BASThermalTwin {
     }
 
     public func observerCount() -> Int { observers.count }
+
+    // MARK: - System notification integration (M216)
+
+    /// Start auto-sampling on
+    /// `ProcessInfo.thermalStateDidChangeNotification`. While
+    /// active, every system thermal-state change triggers
+    /// `sample()` and yields a fresh Reading to every active
+    /// subscriber — without a manual `sample()` call.
+    ///
+    /// `notificationCenter` is injected (default
+    /// `NotificationCenter.default`) so tests can post synthetic
+    /// notifications onto a private center without mutating the
+    /// process-wide one. Calling this method again replaces any
+    /// prior task; calling `stopObservingSystemNotifications()`
+    /// cancels it.
+    ///
+    /// Idempotent: calling twice cancels the first observer Task
+    /// before starting the second.
+    @available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
+    public func startObservingSystemNotifications(
+        notificationCenter: NotificationCenter = .default
+    ) {
+        notificationTask?.cancel()
+        notificationTask = Task { [weak self] in
+            let stream = notificationCenter.notifications(
+                named: ProcessInfo
+                    .thermalStateDidChangeNotification)
+            for await _ in stream {
+                guard let self else { break }
+                if Task.isCancelled { break }
+                await self.sample()
+            }
+        }
+    }
+
+    /// Cancel the notification observer task started by
+    /// `startObservingSystemNotifications(...)`. No-op if not
+    /// running.
+    public func stopObservingSystemNotifications() {
+        notificationTask?.cancel()
+        notificationTask = nil
+    }
+
+    /// `true` while a notification observer task is active.
+    public func isObservingSystemNotifications() -> Bool {
+        notificationTask != nil
+    }
+
+    deinit {
+        notificationTask?.cancel()
+    }
 
     // MARK: - Mapping (pure; safe to unit-test)
 
