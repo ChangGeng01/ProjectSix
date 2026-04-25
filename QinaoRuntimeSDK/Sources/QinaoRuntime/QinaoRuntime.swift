@@ -324,6 +324,51 @@ public actor QinaoRuntime {
             sessionID: String,
             turnID: String,
             findings: [QinaoSovereignControlPlane.CoverageFinding])
+        /// M159 — input validation rejection. Pre-M159 the runtime
+        /// silently accepted any string (including empty / whitespace
+        /// / arbitrarily long) as `sessionID` / `turnID`. Pre-M159 a
+        /// caller passing `sessionID = ""` would propagate empty
+        /// string into ledger entries, synthetic refs, halt-reason
+        /// strings — corrupting audit-replay. M159 rejects malformed
+        /// inputs at Phase 0 of sendSession with this typed error
+        /// before any state mutation.
+        case invalidInput(field: String, reason: String)
+    }
+
+    // MARK: - M159 · Input validation
+
+    /// Maximum allowed length for `sessionID` / `turnID` strings.
+    /// 256 chars is generous: UUID is 36, an "OAuth subject + 64
+    /// random hex" is 96, etc. Anything longer is almost certainly
+    /// a bug or attack attempt. Cap is exposed for tests.
+    public static let maxIdentifierLength: Int = 256
+
+    /// M159 — validate a session/turn identifier. Throws
+    /// `TurnError.invalidInput(...)` on:
+    ///   * empty string after whitespace trim
+    ///   * length > maxIdentifierLength
+    ///
+    /// Used by `sendSession` Phase 0 before any state mutation.
+    /// `nonisolated` because pure value transform — no actor hop.
+    static func validateIdentifier(
+        _ value: String,
+        field: String
+    ) throws {
+        let trimmed = value.trimmingCharacters(
+            in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            throw TurnError.invalidInput(
+                field: field,
+                reason: "empty or whitespace-only")
+        }
+        if value.count > maxIdentifierLength {
+            throw TurnError.invalidInput(
+                field: field,
+                reason:
+                    "exceeds maximum length "
+                    + String(maxIdentifierLength)
+                    + " (got " + String(value.count) + ")")
+        }
     }
 
     // MARK: - M152 · TurnInputs value type
@@ -544,8 +589,21 @@ public actor QinaoRuntime {
         _ inputs: TurnInputs
     ) async throws -> TurnOutcome {
         // =========================================================
-        // PHASE 0 — pre-flight: refuse if already halted.
+        // PHASE 0 — pre-flight: input validation + halt check.
         // =========================================================
+        // M159 — reject malformed identifiers BEFORE any state
+        // mutation. Empty / whitespace-only / too-long strings get
+        // a typed `.invalidInput(field:reason:)` error. Done
+        // here (not in TurnInputs.init) because Swift `throws`
+        // initializers are awkward and `init` is on the value
+        // boundary; the runtime is the right enforcement seam.
+        try Self.validateIdentifier(
+            inputs.observations.sessionID,
+            field: "observations.sessionID")
+        try Self.validateIdentifier(
+            inputs.observations.turnID,
+            field: "observations.turnID")
+
         if await sovereign.isSessionHalted(
             inputs.observations.sessionID)
         {
