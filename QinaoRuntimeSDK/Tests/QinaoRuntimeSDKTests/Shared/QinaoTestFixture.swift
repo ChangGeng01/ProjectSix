@@ -87,7 +87,8 @@ public struct QinaoTestFixture: Sendable {
         renderFrameCapacity: Int =
             QinaoSovereignControlPlane
                 .defaultRenderFrameCapacity,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        metricsRecorder: QinaoRuntime.MetricsRecorder? = nil
     ) async -> QinaoTestFixture {
         let recorder = ToolRecorder()
 
@@ -171,7 +172,8 @@ public struct QinaoTestFixture: Sendable {
             host: host, memory: memory, risk: risk,
             sovereign: sovereign, loop: loop,
             toolExecutor: executor, now: now,
-            lifecycle: lifecycle)
+            lifecycle: lifecycle,
+            metricsRecorder: metricsRecorder)
 
         return QinaoTestFixture(
             runtime: runtime,

@@ -98,6 +98,87 @@ public actor QinaoRuntime {
     public let risk: QinaoRiskGate
     public let sovereign: QinaoSovereignControlPlane
     public let loop: QinaoLoop
+
+    // MARK: - M160 · Observability seam
+    //
+    // Pre-M160 the runtime had zero metrics emission. Production
+    // hosts couldn't answer "what's my p99 sendSession latency"
+    // or "how many turns halted on audit parity yesterday". M160
+    // adds one per-turn `TurnMetric` callback emitted at end of
+    // every sendSession call (success or halt path). Hosts plug
+    // an OTel / Prometheus / Datadog adapter into `metricsRecorder`
+    // at runtime construction; nil default keeps backward-compat
+    // (zero overhead when not wired).
+
+    /// M160 — per-turn observability snapshot. One emitted at the
+    /// end of every sendSession call. Carries enough fields for an
+    /// OTel adapter to produce: a span attribute set, a per-
+    /// severity counter, a per-phase histogram bucket, a halt-
+    /// reason tag.
+    public struct TurnMetric: Sendable, Equatable {
+        public let sessionID: String
+        public let turnID: String
+        /// Audit severity reached by this turn. `.pass` on a
+        /// healthy return; the auto-halt severity (rollback /
+        /// deadStop) when the runtime halted-and-returned;
+        /// the parity severity when the runtime threw
+        /// `.auditParityFailure`.
+        public let auditSeverity:
+            QinaoSovereignControlPlane.AuditSeverity
+        /// Coverage severity from the M45 cross-layer reading.
+        public let coverageSeverity:
+            QinaoSovereignControlPlane.CoverageSeverity
+        /// Number of L1..L13 observation summaries auto-streamed
+        /// this turn. Excludes the always-present L14. Useful for
+        /// "how rich was this turn's residue" gauge.
+        public let autoInjectedLayerCount: Int
+        /// `true` when the turn ended in a halted state — either
+        /// returned with `sessionHalted == true` (rollback /
+        /// deadStop) or threw a halt error
+        /// (`auditParityFailure` / `coverageHalt` /
+        /// `sessionAlreadyHalted` / `invalidInput`).
+        public let halted: Bool
+        /// When `halted == true`, a short reason tag —
+        /// `"audit-parity:coordinator-laxer"` /
+        /// `"coverage-halt"` /
+        /// `"audit-severity:rollback"` etc. Stable strings so
+        /// downstream metric labels are stable.
+        public let haltReason: String?
+        public let emittedAt: Date
+
+        public init(
+            sessionID: String,
+            turnID: String,
+            auditSeverity:
+                QinaoSovereignControlPlane.AuditSeverity,
+            coverageSeverity:
+                QinaoSovereignControlPlane.CoverageSeverity,
+            autoInjectedLayerCount: Int,
+            halted: Bool,
+            haltReason: String?,
+            emittedAt: Date
+        ) {
+            self.sessionID = sessionID
+            self.turnID = turnID
+            self.auditSeverity = auditSeverity
+            self.coverageSeverity = coverageSeverity
+            self.autoInjectedLayerCount =
+                autoInjectedLayerCount
+            self.halted = halted
+            self.haltReason = haltReason
+            self.emittedAt = emittedAt
+        }
+    }
+
+    /// M160 — host-supplied callback invoked once per sendSession
+    /// turn with the final `TurnMetric`. `Sendable` because it
+    /// runs from inside the runtime actor. Default `nil` =
+    /// no-op (backward-compat).
+    public typealias MetricsRecorder = @Sendable (
+        TurnMetric
+    ) -> Void
+
+    public nonisolated let metricsRecorder: MetricsRecorder?
     /// Optional L1 lease & life lifecycle (M66). When present, the
     /// runtime can thread the live thermal reading into per-turn
     /// `BASBudgetFrame` via `prepareBudgetForTurn(_:)` (M69) and
@@ -124,7 +205,8 @@ public actor QinaoRuntime {
         loop: QinaoLoop,
         toolExecutor: @escaping ToolExecutor,
         now: @escaping @Sendable () -> Date = { Date() },
-        lifecycle: QinaoLifecycle? = nil
+        lifecycle: QinaoLifecycle? = nil,
+        metricsRecorder: MetricsRecorder? = nil
     ) {
         self.host = host
         self.memory = memory
@@ -134,6 +216,7 @@ public actor QinaoRuntime {
         self.lifecycle = lifecycle
         self.toolExecutor = toolExecutor
         self.now = now
+        self.metricsRecorder = metricsRecorder
     }
 
     /// Execute a tool call under the three-signature gate. This is
@@ -922,6 +1005,17 @@ public actor QinaoRuntime {
             await sovereign.markSessionHalted(
                 sessionID: inputs.observations.sessionID,
                 reason: "audit-parity:coordinator-laxer")
+            // M160 — emit metric BEFORE throw so observability
+            // sees every turn regardless of outcome.
+            emitMetric(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID,
+                auditSeverity: report.severity,
+                coverageSeverity: coverage.severity,
+                autoInjectedLayerCount:
+                    pipeline.layerCodes.count,
+                halted: true,
+                haltReason: "audit-parity:coordinator-laxer")
             throw TurnError.auditParityFailure(
                 sessionID: inputs.observations.sessionID,
                 severity: report.severity,
@@ -932,6 +1026,15 @@ public actor QinaoRuntime {
             await sovereign.markSessionHalted(
                 sessionID: inputs.observations.sessionID,
                 reason: "coverage-halt")
+            emitMetric(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID,
+                auditSeverity: report.severity,
+                coverageSeverity: coverage.severity,
+                autoInjectedLayerCount:
+                    pipeline.layerCodes.count,
+                halted: true,
+                haltReason: "coverage-halt")
             throw TurnError.coverageHalt(
                 sessionID: inputs.observations.sessionID,
                 turnID: inputs.observations.turnID,
@@ -950,6 +1053,16 @@ public actor QinaoRuntime {
             let residue = await sovereign.turnResidue(
                 sessionID: inputs.observations.sessionID,
                 turnID: inputs.observations.turnID)
+            emitMetric(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID,
+                auditSeverity: report.severity,
+                coverageSeverity: coverage.severity,
+                autoInjectedLayerCount:
+                    pipeline.layerCodes.count,
+                halted: true,
+                haltReason: "audit-severity:"
+                    + report.severity.rawValue)
             return TurnOutcome(
                 audit: report,
                 coverage: coverage,
@@ -979,6 +1092,15 @@ public actor QinaoRuntime {
         let residue = await sovereign.turnResidue(
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID)
+        // M160 — healthy-return metric.
+        emitMetric(
+            sessionID: inputs.observations.sessionID,
+            turnID: inputs.observations.turnID,
+            auditSeverity: report.severity,
+            coverageSeverity: coverage.severity,
+            autoInjectedLayerCount: pipeline.layerCodes.count,
+            halted: false,
+            haltReason: nil)
         return TurnOutcome(
             audit: report,
             coverage: coverage,
@@ -987,6 +1109,33 @@ public actor QinaoRuntime {
             turnRecorded: turnRecorded,
             surfaceDecision: computedSurfaceDecision,
             residue: residue)
+    }
+
+    /// M160 — single emit point. Captures the turn metric as a
+    /// value type and dispatches to the host's recorder closure
+    /// if one is wired. nonisolated so a Sendable closure can be
+    /// invoked without an actor hop.
+    nonisolated private func emitMetric(
+        sessionID: String,
+        turnID: String,
+        auditSeverity: QinaoSovereignControlPlane.AuditSeverity,
+        coverageSeverity:
+            QinaoSovereignControlPlane.CoverageSeverity,
+        autoInjectedLayerCount: Int,
+        halted: Bool,
+        haltReason: String?
+    ) {
+        guard let recorder = metricsRecorder else { return }
+        let metric = TurnMetric(
+            sessionID: sessionID,
+            turnID: turnID,
+            auditSeverity: auditSeverity,
+            coverageSeverity: coverageSeverity,
+            autoInjectedLayerCount: autoInjectedLayerCount,
+            halted: halted,
+            haltReason: haltReason,
+            emittedAt: now())
+        recorder(metric)
     }
 
     /// M152 — legacy 22-parameter signature retained as a thin
