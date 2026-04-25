@@ -194,9 +194,7 @@ final class QinaoRuntime14LayerSaturationTests: XCTestCase {
         let fx = await QinaoTestFixture.make(
             withLifecycle: true,
             now: now,
-            metricsRecorder: { metric in
-                Task { await captured.append(metric) }
-            })
+            metricsRecorder: { captured.append($0) })
 
         try await runFullyLoadedTurn(
             on: fx,
@@ -204,10 +202,7 @@ final class QinaoRuntime14LayerSaturationTests: XCTestCase {
             turnID: "turn.sat",
             now: now)
 
-        // Wait briefly for the async metric Task to land.
-        try await Task.sleep(nanoseconds: 50_000_000)
-
-        let metrics = await captured.snapshot()
+        let metrics = captured.snapshot()
         XCTAssertEqual(metrics.count, 1)
         guard let m = metrics.first else { return }
         XCTAssertEqual(
@@ -232,17 +227,13 @@ final class QinaoRuntime14LayerSaturationTests: XCTestCase {
         let fx = await QinaoTestFixture.make(
             withLifecycle: true,
             now: now,
-            metricsRecorder: { metric in
-                Task { await captured.append(metric) }
-            })
+            metricsRecorder: { captured.append($0) })
 
         try await runFullyLoadedTurn(
             on: fx,
             sessionID: "sess.m179.cov",
             turnID: "turn.cov",
             now: now)
-
-        try await Task.sleep(nanoseconds: 50_000_000)
 
         let reading = await fx.sovereign.coverageReading(
             sessionID: "sess.m179.cov", turnID: "turn.cov")
@@ -302,9 +293,7 @@ final class QinaoRuntime14LayerSaturationTests: XCTestCase {
         let fx = await QinaoTestFixture.make(
             withLifecycle: true,
             now: now,
-            metricsRecorder: { metric in
-                Task { await captured.append(metric) }
-            })
+            metricsRecorder: { captured.append($0) })
 
         for i in 0..<100 {
             try await runFullyLoadedTurn(
@@ -313,10 +302,8 @@ final class QinaoRuntime14LayerSaturationTests: XCTestCase {
                 turnID: "turn.\(i)",
                 now: now)
         }
-        // Drain the metric Task queue.
-        try await Task.sleep(nanoseconds: 200_000_000)
 
-        let metrics = await captured.snapshot()
+        let metrics = captured.snapshot()
         XCTAssertEqual(
             metrics.count, 100,
             "100 turns must emit 100 metrics")
@@ -411,16 +398,35 @@ final class QinaoRuntime14LayerSaturationTests: XCTestCase {
     }
 }
 
-// MARK: - MetricCapture (actor)
+// MARK: - MetricCapture (lock-protected for deterministic append)
+//
+// Pre-M180 this was an `actor` and the metricsRecorder closure
+// `Task { await captured.append(metric) }`-spawned a fire-and-forget
+// Task. The recorder is `@Sendable (TurnMetric) -> Void` —
+// synchronous — so the only way to call into an actor is via Task.
+// That made the test rely on `Task.sleep(50_000_000)` to drain the
+// queue before `snapshot()`. Reliable in practice but fragile under
+// scheduler pressure: a starved Task could lose a metric.
+//
+// Switching to `final class @unchecked Sendable` + `NSLock` lets the
+// recorder closure append synchronously. No Task, no sleep,
+// deterministic ordering.
 
-private actor MetricCapture {
+private final class MetricCapture: @unchecked Sendable {
+    private let lock = NSLock()
     private var metrics: [QinaoRuntime.TurnMetric] = []
 
     func append(_ m: QinaoRuntime.TurnMetric) {
+        lock.lock()
+        defer { lock.unlock() }
         metrics.append(m)
     }
 
-    func snapshot() -> [QinaoRuntime.TurnMetric] { metrics }
+    func snapshot() -> [QinaoRuntime.TurnMetric] {
+        lock.lock()
+        defer { lock.unlock() }
+        return metrics
+    }
 }
 
 // MARK: - LatencyStats

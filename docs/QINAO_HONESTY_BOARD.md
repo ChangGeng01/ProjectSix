@@ -378,3 +378,47 @@ dev box: macOS 26.4.1 / M-class silicon · 仅观察管线（不含 LLM 推理�
 > "14 层每轮按需全开 · 观察管线 p95 < 0.5 ms · 100 轮对设备热态零影响"
 
 **不该说**："我们的运行时比 X 快 N 倍" —— 这只是观察管线，不含推理；和市面上 LLM 框架的端到端延迟数字不可比较。
+
+---
+
+## 七、M180 — 公开 Apple FoundationModels factory + M179 capture 去 race（2026-04-26）
+
+### 7.1 公开 helper（host 接入降到 1 行）
+
+新增 SPM library `QinaoAppleFoundation`（package.swift `targets`）：opt-in 依赖 — 不想 Apple-specific 代码 / 不想 link `FoundationModels` 的宿主**不 import 这个 library**，QinaoLoop 生产依赖图保持干净。
+
+```swift
+import QinaoAppleFoundation
+let endpoint = await QinaoLoop.makeAppleFoundationEndpoint()
+let loop = QinaoLoop(organEndpoint: endpoint)
+```
+
+旧的 25 行 host 抄写模板（`QinaoOrganEndpoint` 自定义 conformance + `BASOrganRegistry` + adapter 注册 + role 翻译）废止。
+
+`includeDeterministicFallback: true` 可选让 deterministic stub 作为兜底（offline dev / CI 不依赖真模型时）。Apple FM 仍然 wins 当 reachable，落到 stub 当不 reachable。
+
+### 7.2 内部支撑改动
+
+`BASOrganRegistryEndpoint` 从 `internal` 升 `package` —— 让新 target 可以在不暴露 BAS 名字到公开符号图的前提下 reuse 既有 dispatch 逻辑。redaction 扫描仍然 0 违规。
+
+### 7.3 M179 capture 从 Task 火球去 race
+
+`MetricCapture` 从 `actor` 改成 `final class @unchecked Sendable + NSLock`。`metricsRecorder` closure 同步 `captured.append($0)`，去掉 `Task { await ... }` 火球 + 250ms `Task.sleep` 等待 —— 测试时长从 0.382s → 0.062s · p95 latency 从 0.34ms → 0.32ms（噪声下降 + 真值更紧）。
+
+### 7.4 测试金字塔（Apple FM 真路径覆盖）
+
+| 层 | 测试套件 | 测试数 | 覆盖 |
+|---|---|---|---|
+| **substrate** | `AppleFoundationE2ETests` | 5/5 | BAS `BASOrganAdapter` 接口 → real `LanguageModelSession` |
+| **Qinao 手动** | `QinaoAppleFoundationE2ETests` | 3/3 | host 写 25 行 `QinaoOrganEndpoint` → real LLM |
+| **Qinao 工厂** | `QinaoAppleFoundationFactoryTests` | 4/4（2 离线 + 2 真机） | `QinaoLoop.makeAppleFoundationEndpoint()` → real LLM |
+| **饱和/性能** | `QinaoRuntime14LayerSaturationTests` | 4/4 | 14 层全开 + 100-turn perf + thermal |
+
+env-gated 路径（实际真打 Apple LLM）共 **8 条** —— 经 BAS / Qinao 手动 / Qinao 工厂三个入口都被证实端到端可达。
+
+### 7.5 包结构（M180 后）
+
+| Library | 用途 | 依赖 |
+|---|---|---|
+| QinaoRuntime, QinaoHost, QinaoMemory, QinaoLoop, QinaoRisk, QinaoSovereign, QinaoWorldPrior, QinaoUI | 7 模块 + UI | 不依赖 BASAppleAdapters |
+| **QinaoAppleFoundation** | Apple LLM 一行接入 | QinaoLoop + BASAppleAdapters |

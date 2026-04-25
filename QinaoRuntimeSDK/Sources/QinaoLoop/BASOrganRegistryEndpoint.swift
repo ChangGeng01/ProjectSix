@@ -22,13 +22,13 @@ import BASOrgan
 /// used instead of `registry.adapter(for:)` so tests can drive a
 /// captured adapter without having to register+re-register. Hosts
 /// use `registry` only.
-struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint {
-    let registry: BASOrganRegistry?
-    let adapterOverride: (@Sendable (BASOrganRole) async throws -> any BASOrganAdapter)?
-    let presetForRole: @Sendable (BASOrganRole) -> BASOrganPreset
-    let nextRequestID: @Sendable () -> String
+package struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint {
+    package let registry: BASOrganRegistry?
+    package let adapterOverride: (@Sendable (BASOrganRole) async throws -> any BASOrganAdapter)?
+    package let presetForRole: @Sendable (BASOrganRole) -> BASOrganPreset
+    package let nextRequestID: @Sendable () -> String
 
-    init(
+    package init(
         registry: BASOrganRegistry? = nil,
         adapterOverride: (@Sendable (BASOrganRole) async throws -> any BASOrganAdapter)? = nil,
         presetForRole: @escaping @Sendable (BASOrganRole) -> BASOrganPreset = Self.defaultPreset,
@@ -42,7 +42,7 @@ struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint {
 
     // MARK: - QinaoOrganEndpoint (legacy role-only path)
 
-    func produceBody(
+    package func produceBody(
         prompt: String,
         context: [String],
         role: QinaoLoop.OrganRole,
@@ -58,7 +58,7 @@ struct BASOrganRegistryEndpoint: QinaoBudgetAwareOrganEndpoint {
 
     // MARK: - QinaoBudgetAwareOrganEndpoint (M77 decision-aware path)
 
-    func produceBody(
+    package func produceBody(
         prompt: String,
         context: [String],
         sessionID: String,

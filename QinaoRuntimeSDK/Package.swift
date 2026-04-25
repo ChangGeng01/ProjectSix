@@ -32,7 +32,13 @@ let package = Package(
         .library(name: "QinaoRisk", targets: ["QinaoRisk"]),
         .library(name: "QinaoSovereign", targets: ["QinaoSovereign"]),
         .library(name: "QinaoWorldPrior", targets: ["QinaoWorldPrior"]),
-        .library(name: "QinaoUI", targets: ["QinaoUI"])
+        .library(name: "QinaoUI", targets: ["QinaoUI"]),
+        // M180 — opt-in Apple FoundationModels endpoint factory.
+        // Hosts wanting Apple LLM `import QinaoAppleFoundation`;
+        // hosts that don't keep a substrate-only QinaoLoop graph.
+        .library(
+            name: "QinaoAppleFoundation",
+            targets: ["QinaoAppleFoundation"])
     ],
     dependencies: [
         .package(path: "../BehavioralAISubstrate")
@@ -158,6 +164,17 @@ let package = Package(
         .target(
             name: "QinaoUI",
             dependencies: []),
+        // M180 — public factory wiring Apple FoundationModels
+        // behind QinaoOrganEndpoint. Optional library: hosts that
+        // don't want Apple-specific code (or BASAppleAdapters'
+        // FoundationModels link) skip this target.
+        .target(
+            name: "QinaoAppleFoundation",
+            dependencies: [
+                "QinaoLoop",
+                .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
+                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
+            ]),
         .testTarget(
             name: "QinaoRuntimeSDKTests",
             dependencies: [
@@ -169,6 +186,9 @@ let package = Package(
                 "QinaoSovereign",
                 "QinaoWorldPrior",
                 "QinaoUI",
+                // M180 — exercise the public factory directly so the
+                // host pattern is covered end-to-end.
+                "QinaoAppleFoundation",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 // M178 — env-gated end-to-end test (`BAS_FM_E2E=1`)
                 // wires `AppleFoundationOrganAdapter` through a
