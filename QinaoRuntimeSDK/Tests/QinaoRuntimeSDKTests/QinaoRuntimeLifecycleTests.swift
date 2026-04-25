@@ -152,7 +152,11 @@ final class QinaoRuntimeLifecycleTests: XCTestCase {
 
     func testPrepareBudgetWithoutLifecycleIsIdentity() async throws {
         let runtime = makeRuntime(lifecycle: nil)
-        let planned = plannedBudget(thermalGuardLevel: .watch)
+        // M162 — the default `BudgetThermalAdapter` is 1.0× under
+        // `.nominal`, so a no-lifecycle + nominal-planned call is
+        // byte-identity. Hot planned levels under default adapter
+        // would compress (covered by M162 tests).
+        let planned = plannedBudget(thermalGuardLevel: .nominal)
 
         let routed = await runtime.prepareBudgetForTurn(planned)
 
@@ -162,8 +166,29 @@ final class QinaoRuntimeLifecycleTests: XCTestCase {
         let a = try encoder.encode(planned)
         let b = try encoder.encode(routed)
         XCTAssertEqual(a, b,
-            "without a lifecycle, prepareBudgetForTurn must return "
-            + "the planned frame byte-for-byte unchanged")
+            "without a lifecycle and under nominal thermal, "
+            + "prepareBudgetForTurn must return the planned frame "
+            + "byte-for-byte unchanged")
+    }
+
+    /// M162 — same call but with explicit `.identity` adapter is
+    /// byte-identity even when planned thermal is hot. Hosts that
+    /// run their own compression elsewhere can opt out this way.
+    func testPrepareBudgetWithoutLifecycleIdentityAdapterPreservesHotPlan()
+        async throws {
+        let runtime = makeRuntime(lifecycle: nil)
+        let planned = plannedBudget(thermalGuardLevel: .emergency)
+
+        let routed = await runtime.prepareBudgetForTurn(
+            planned, thermalAdapter: .identity)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let a = try encoder.encode(planned)
+        let b = try encoder.encode(routed)
+        XCTAssertEqual(a, b,
+            "with .identity adapter, prepareBudgetForTurn is "
+            + "byte-identity even at .emergency planned thermal")
     }
 
     func testRecordTurnOnLifecycleWithoutLifecycleReturnsNil() async {
@@ -188,7 +213,13 @@ final class QinaoRuntimeLifecycleTests: XCTestCase {
         let runtime = makeRuntime(lifecycle: lifecycle)
 
         let planned = plannedBudget(thermalGuardLevel: .nominal)
-        let routed = await runtime.prepareBudgetForTurn(planned)
+        // M162 — exercise pre-compression behavior here so the M69
+        // contract (live thermal lands on the routed frame) is
+        // pinned without entanglement with the M162 work-volume
+        // compressor. M162 compression is exhaustively covered by
+        // QinaoRuntimeM162ThermalAdaptiveBudgetTests.
+        let routed = await runtime.prepareBudgetForTurn(
+            planned, thermalAdapter: .identity)
 
         XCTAssertEqual(routed.thermalGuardLevel, .emergency,
             ".critical reader → guard .emergency on the routed frame")
@@ -196,6 +227,39 @@ final class QinaoRuntimeLifecycleTests: XCTestCase {
         // to drift if a future refactor broke the helper).
         XCTAssertEqual(routed.runMode, planned.runMode)
         XCTAssertEqual(routed.maxLoops, planned.maxLoops)
+        XCTAssertEqual(routed.deviceRoute, planned.deviceRoute)
+        XCTAssertEqual(routed.leaseID, planned.leaseID)
+        XCTAssertEqual(routed.allowedHeads, planned.allowedHeads)
+        XCTAssertEqual(routed.policyDecisionIDs,
+                       planned.policyDecisionIDs)
+    }
+
+    /// M162 — same lifecycle path but under the default adapter:
+    /// `.critical` reader → routed `.emergency` thermal AND the
+    /// numeric work-volume fields are compressed by 0.25×. This
+    /// pins the integrated M69 + M162 behavior on the main
+    /// `prepareBudgetForTurn` call.
+    func testPrepareBudgetWithLifecycleAndDefaultAdapterCompressesUnderEmergency()
+        async {
+        let thermal = ThermalSource()
+        thermal.set(.critical)
+        let lifecycle = makeLifecycle(thermal: thermal)
+        let runtime = makeRuntime(lifecycle: lifecycle)
+
+        let planned = plannedBudget(thermalGuardLevel: .nominal)
+        let routed = await runtime.prepareBudgetForTurn(planned)
+
+        XCTAssertEqual(routed.thermalGuardLevel, .emergency)
+        // 3 × 0.25 = 0.75 → banker-rounded to 1.
+        XCTAssertEqual(routed.maxLoops, 1)
+        // 5 × 0.25 = 1.25 → rounded to 1.
+        XCTAssertEqual(routed.maxCandidates, 1)
+        // 128 × 0.25 = 32 → 32.
+        XCTAssertEqual(routed.maxDecodeTokens, 32)
+        // 4 × 0.25 = 1.0 → 1.
+        XCTAssertEqual(routed.retrievalDepth, 1)
+        // Non-numeric fields preserved.
+        XCTAssertEqual(routed.runMode, planned.runMode)
         XCTAssertEqual(routed.deviceRoute, planned.deviceRoute)
         XCTAssertEqual(routed.leaseID, planned.leaseID)
         XCTAssertEqual(routed.allowedHeads, planned.allowedHeads)

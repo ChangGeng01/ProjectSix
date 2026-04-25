@@ -454,15 +454,23 @@ final class QinaoRuntimeGenerationTests: XCTestCase {
     func testRoutedGenerationNoLifecyclePreservesPlannedBudget() async throws {
         let endpoint = BudgetAwareSpyEndpoint()
         let runtime = makeRuntime(lifecycle: nil, organEndpoint: endpoint)
-        let planned = plannedBudget(thermalGuardLevel: .watch)
+        // M162 — the default `BudgetThermalAdapter` is 1.0× under
+        // `.nominal`, so a no-lifecycle + nominal-planned call is
+        // byte-identity. Hot planned levels would compress under
+        // the default adapter (covered by M162 tests), which is
+        // the M162 hot-path improvement — this test pins the
+        // M69 / M78 contract that no-lifecycle is otherwise a
+        // pass-through transformation.
+        let planned = plannedBudget(thermalGuardLevel: .nominal)
         let result = try await runtime.generateCandidatesForTurn(
             sessionID: "s-no-life",
             seeds: [makeSeed("c1", role: .core)],
             plannedBudget: planned)
 
-        // Without a lifecycle, prepareBudgetForTurn is an identity;
-        // routedBudget must round-trip byte-for-byte with the plan.
-        // This is the same guarantee M69 ships at the lifecycle seam —
+        // Without a lifecycle and at nominal thermal,
+        // prepareBudgetForTurn is a byte-identity; routedBudget
+        // must round-trip byte-for-byte with the plan. This is
+        // the same guarantee M69 ships at the lifecycle seam —
         // M78 must not introduce any side effect on top of it.
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -471,6 +479,7 @@ final class QinaoRuntimeGenerationTests: XCTestCase {
         let a = try encoder.encode(planned)
         let b = try encoder.encode(routed)
         XCTAssertEqual(a, b,
-            "no lifecycle → routedBudget byte-equal to plannedBudget")
+            "no lifecycle + nominal thermal → routedBudget "
+            + "byte-equal to plannedBudget")
     }
 }

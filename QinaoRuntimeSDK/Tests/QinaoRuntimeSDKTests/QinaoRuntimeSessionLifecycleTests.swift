@@ -215,7 +215,12 @@ final class QinaoRuntimeSessionLifecycleTests: XCTestCase {
     func testCleanTurnWithBudgetButNoLifecycleRoutesIdentity() async throws {
         let fx = await makeRuntime(lifecycle: nil)
         let obs = observations(sessionID: "sess.m70.no-lifecycle")
-        let planned = plannedBudget(thermalGuardLevel: .watch)
+        // M162 — at `.nominal` planned thermal the default
+        // `BudgetThermalAdapter` is 1.0× (byte-identity); at hot
+        // planned thermal it would compress (covered by M162
+        // tests). This test pins the M70 invariant that the
+        // no-lifecycle path is otherwise a pass-through.
+        let planned = plannedBudget(thermalGuardLevel: .nominal)
 
         let outcome = try await fx.runtime.sendSession(
             obs,
@@ -223,14 +228,16 @@ final class QinaoRuntimeSessionLifecycleTests: XCTestCase {
             plannedBudget: planned,
             turnDurationSeconds: 2.0)
 
-        // No lifecycle → routedBudget is identity of plannedBudget.
+        // No lifecycle + nominal thermal → routedBudget is
+        // byte-identity of plannedBudget.
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let routed = try XCTUnwrap(outcome.routedBudget)
         XCTAssertEqual(
             try encoder.encode(routed),
             try encoder.encode(planned),
-            "no lifecycle → routedBudget must equal plannedBudget byte-for-byte")
+            "no lifecycle + nominal thermal → routedBudget must "
+            + "equal plannedBudget byte-for-byte")
 
         // No lifecycle → turnRecorded is nil even though duration was passed.
         XCTAssertNil(outcome.turnRecorded,

@@ -1517,9 +1517,134 @@ public actor QinaoRuntime {
     }
 
     // MARK: - M69 lifecycle-aware budget routing
+    //         + M162 thermal-adaptive work compression
+
+    /// M162 — Per-thermal-level work-volume compressor for
+    /// `BASBudgetFrame`. Generalizes the `SurfaceRetryPolicy`
+    /// thermal-multiplier idea from "stretch retry windows when
+    /// hot" to "shrink work volume when hot": the four numeric
+    /// budget fields that drive turn cost (`maxLoops`,
+    /// `maxCandidates`, `maxDecodeTokens`, `retrievalDepth`) are
+    /// scaled by a per-level multiplier so a `.throttle` device
+    /// runs at half the planned work volume and an `.emergency`
+    /// device runs at a quarter.
+    ///
+    /// The defaults (1.0 / 0.75 / 0.5 / 0.25) are chosen so that:
+    ///
+    /// - `.nominal` is byte-identity (no compression). Hosts that
+    ///   never go hot see pre-M162 behavior.
+    /// - `.watch` trims a quarter — light defensive backoff before
+    ///   the device actually heats.
+    /// - `.throttle` halves — meaningful work reduction when the
+    ///   thermal twin signals real heat.
+    /// - `.emergency` quarters — minimum work surface so the
+    ///   runtime can still respond ("throttled, retry shortly")
+    ///   without piling on heat.
+    ///
+    /// Compression preserves the structural minimums encoded in
+    /// `BASBudgetFrame.init` (maxCandidates ≥ 1; the others ≥ 0):
+    /// `compress(_:)` constructs a new frame via that init so the
+    /// clamping runs naturally. All non-numeric fields
+    /// (precisionProfile / deviceRoute / leaseID / allowedHeads /
+    /// policyDecisionIDs / etc.) pass through byte-for-byte.
+    ///
+    /// Hosts that want pre-M162 behavior pass `.identity` to
+    /// `prepareBudgetForTurn(_:thermalAdapter:)`.
+    public struct BudgetThermalAdapter:
+        Sendable, Equatable, Codable
+    {
+        public let nominalMultiplier: Double
+        public let watchMultiplier: Double
+        public let throttleMultiplier: Double
+        public let emergencyMultiplier: Double
+
+        /// Each multiplier is clamped to `[0, ∞)` at init time —
+        /// a negative multiplier would invert the budget which has
+        /// no defensible semantics. Multipliers above 1.0 are
+        /// allowed (a host could theoretically expand work when
+        /// `.nominal`) but the default keeps every value at or
+        /// below 1.0.
+        public init(
+            nominal: Double = 1.0,
+            watch: Double = 0.75,
+            throttle: Double = 0.5,
+            emergency: Double = 0.25
+        ) {
+            self.nominalMultiplier = Swift.max(0, nominal)
+            self.watchMultiplier = Swift.max(0, watch)
+            self.throttleMultiplier = Swift.max(0, throttle)
+            self.emergencyMultiplier = Swift.max(0, emergency)
+        }
+
+        /// Default M162 compression curve.
+        public static let `default` = BudgetThermalAdapter()
+
+        /// Pre-M162 behavior: every level is 1.0 (no compression
+        /// at any thermal level). Useful for tests and for hosts
+        /// that handle their own compression elsewhere.
+        public static let identity = BudgetThermalAdapter(
+            nominal: 1.0,
+            watch: 1.0,
+            throttle: 1.0,
+            emergency: 1.0)
+
+        /// Multiplier for a given thermal guard level.
+        public func multiplier(
+            for level: BASThermalGuardLevel
+        ) -> Double {
+            switch level {
+            case .nominal:    return nominalMultiplier
+            case .watch:      return watchMultiplier
+            case .throttle:   return throttleMultiplier
+            case .emergency:  return emergencyMultiplier
+            }
+        }
+
+        /// Apply the per-level multiplier to the four numeric
+        /// work-volume fields of `frame`. Returns a new frame; the
+        /// input is never mutated. When the multiplier is `>= 1.0`
+        /// the input is returned unchanged (byte-identity short
+        /// circuit) — this is the common `.nominal` path.
+        public func compress(
+            _ frame: BASBudgetFrame
+        ) -> BASBudgetFrame {
+            let m = multiplier(for: frame.thermalGuardLevel)
+            // Short-circuit when no compression is needed. Avoids
+            // re-running BASBudgetFrame.init which trims string
+            // fields — the input is already in canonical form.
+            if m >= 1.0 { return frame }
+            // Banker-rounded scale, floored at 0. The
+            // BASBudgetFrame init clamps maxCandidates to ≥ 1, so
+            // an extreme multiplier that drops to 0 still yields
+            // a runnable frame (1 candidate, no loops/tokens).
+            func scale(_ x: Int) -> Int {
+                Swift.max(0, Int((Double(x) * m).rounded()))
+            }
+            return BASBudgetFrame(
+                schemaVersion: frame.schemaVersion,
+                runMode: frame.runMode,
+                maxLoops: scale(frame.maxLoops),
+                maxCandidates: scale(frame.maxCandidates),
+                maxDecodeTokens: scale(frame.maxDecodeTokens),
+                retrievalDepth: scale(frame.retrievalDepth),
+                precisionProfile: frame.precisionProfile,
+                deviceRoute: frame.deviceRoute,
+                thermalGuardLevel: frame.thermalGuardLevel,
+                maintenanceAllowed: frame.maintenanceAllowed,
+                leaseID: frame.leaseID,
+                leaseExpiresAt: frame.leaseExpiresAt,
+                maintenanceClass: frame.maintenanceClass,
+                wakeIntentID: frame.wakeIntentID,
+                allowedHeads: frame.allowedHeads,
+                policyBundleVersion: frame.policyBundleVersion,
+                policyDecisionIDs: frame.policyDecisionIDs)
+        }
+    }
 
     /// Route the live thermal guard level from the runtime's attached
-    /// `QinaoLifecycle` into a planned per-turn `BASBudgetFrame`.
+    /// `QinaoLifecycle` into a planned per-turn `BASBudgetFrame`,
+    /// then compress the work-volume fields per the active
+    /// `BudgetThermalAdapter`.
     ///
     /// This is the M69 seam that closes invariant #1's last inch —
     /// "先醒再答" stops being caller-invented and becomes main-chain
@@ -1532,27 +1657,48 @@ public actor QinaoRuntime {
     ///     await runtime.recordTurnOnLifecycle(                // decay
     ///         runMode: .engage, durationSeconds: elapsed)
     ///
-    /// When the runtime was constructed without a `QinaoLifecycle`
-    /// (pre-M69 call sites), this method returns `planned` unchanged
-    /// — byte-for-byte — so existing hosts see no behavioral change
-    /// until they explicitly wire a lifecycle in.
+    /// **M162 — thermal-adaptive work compression.** After the live
+    /// thermal guard level lands on the routed frame (via the
+    /// lifecycle when attached, or pass-through from `planned` when
+    /// not), `thermalAdapter.compress(_:)` scales `maxLoops` /
+    /// `maxCandidates` / `maxDecodeTokens` / `retrievalDepth` by the
+    /// per-level multiplier. Defaults: 1.0 / 0.75 / 0.5 / 0.25 for
+    /// `.nominal` / `.watch` / `.throttle` / `.emergency`. A nominal
+    /// device gets byte-identity; a throttling device runs at half
+    /// the planned work surface; an emergency device at a quarter.
+    /// Hosts that want pre-M162 (no-compression) behavior pass
+    /// `.identity` for `thermalAdapter`.
     ///
-    /// When a lifecycle is attached, the method delegates to
-    /// `QinaoLifecycle.applyLiveThermalGuardLevel(to:)`, which uses
-    /// the twin's cached reading when warm and force-samples when
-    /// cold — so the returned frame always carries a live reading
-    /// rather than a stale default.
+    /// When the runtime was constructed without a `QinaoLifecycle`,
+    /// the lifecycle-routing step is skipped — the planned frame's
+    /// own `thermalGuardLevel` drives the adapter. Hosts that pre-
+    /// set `.nominal` see the same byte-identity behavior they had
+    /// before M162; hosts that pre-set hot levels start opting into
+    /// compression on the same call.
     ///
-    /// - Parameter planned: The budget frame the host planned for
-    ///   the upcoming turn.
-    /// - Returns: `planned` unchanged when no lifecycle is attached;
-    ///   otherwise `planned` with `thermalGuardLevel` replaced by
-    ///   the lifecycle's live value and every other field preserved.
+    /// - Parameters:
+    ///   - planned: The budget frame the host planned for the
+    ///     upcoming turn.
+    ///   - thermalAdapter: The compression curve. Defaults to
+    ///     `BudgetThermalAdapter.default` (M162 curve). Pass
+    ///     `.identity` to opt out of compression.
+    /// - Returns: A new budget frame whose `thermalGuardLevel` is
+    ///   the live lifecycle value (or `planned`'s when no lifecycle
+    ///   is attached) and whose four numeric work-volume fields are
+    ///   scaled per the adapter. Every other field passes through
+    ///   byte-for-byte.
     public func prepareBudgetForTurn(
-        _ planned: BASBudgetFrame
+        _ planned: BASBudgetFrame,
+        thermalAdapter: BudgetThermalAdapter = .default
     ) async -> BASBudgetFrame {
-        guard let lifecycle = lifecycle else { return planned }
-        return await lifecycle.applyLiveThermalGuardLevel(to: planned)
+        let live: BASBudgetFrame
+        if let lifecycle = lifecycle {
+            live = await lifecycle
+                .applyLiveThermalGuardLevel(to: planned)
+        } else {
+            live = planned
+        }
+        return thermalAdapter.compress(live)
     }
 
     /// End-of-turn lifecycle telemetry. Forwards to the attached
