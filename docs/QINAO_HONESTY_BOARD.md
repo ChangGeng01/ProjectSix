@@ -571,3 +571,87 @@ L2 / Neural Organ Runtime 行（§三 14 层表）40% **保持不动**——M177
 仍然 **不该说**：
 - ANE 算子级 / "比某 LLM 框架快 N 倍" — 不可比
 - "Apple FM 是模型层完全体" — 不是，仍 §9.6 Swift-only 边界内
+
+---
+
+## 十、M188 + M189 + M190 — Qinao 公开面收口三件套（2026-04-26）
+
+### 10.1 M188 — `QinaoLoop.streamBody` Qinao 公开流式入口
+
+M184 在 substrate 层加了 `BASStreamingOrganAdapter`，但 Qinao 公开 API 还是只有非流式的 `generateCandidates`。host 想做 token-stream UI 必须直接打 BAS 适配器。M188 把流式抬到 Qinao 公开面：
+
+**新增**：
+- `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoStreamingOrganEndpoint.swift` — `public protocol QinaoStreamingOrganEndpoint: QinaoOrganEndpoint` + `public struct OrganResponseChunk(bodyDelta, cumulativeBody, providerID)`
+- `BASOrganRegistryEndpoint` 加 conformance（package access），`as? BASStreamingOrganAdapter` 探测下层适配器
+- `QinaoLoop.streamBody(sessionID:prompt:context:role:)` public nonisolated 方法，走 `EndpointStreamingProbe` 三档判定（`.streaming` / `.nonStreamingEndpoint` / `.noEndpoint`）
+
+**测试**（`QinaoLoopStreamBodyTests.swift` · 5 测试 · 3 离线 + 2 真机）：
+- 离线：no-endpoint / not-streaming / factory-supports-streaming sanity
+- 真机：multiple chunks + Σ delta == cumulative invariant 在 Qinao 公开边界上钉住
+
+### 10.2 M189 — Qinao 公开面 ledger 持久化
+
+M91 已经 ship 了 `BASSovereignLedgerSQLiteStorage`（substrate 层）。M189 是 Qinao 公开面的 on-ramp。
+
+**修改**：
+- `QinaoSovereignControlPlane.Configuration` 加 `public let ledgerDatabasePath: String?`（默认 nil → in-memory，pre-M189 行为保持）
+- `bootstrap(configuration:)` 当 path 非 nil 时构造 `BASSovereignLedgerSQLiteStorage` 并传给 ledger init；存储打开失败 fatal trap（"integrity > availability" doctrine 与 BAS rehydrate 一致）
+- 新增 `public func auditEntryCount() async -> Int` — 唯一 Qinao-public 标量证明"chain 真的过了 reopen"，不暴露 BAS 类型
+
+**测试**（`QinaoSovereignPersistentLedgerTests.swift` · 4 测试，**全部离线**因为不依赖 LLM）：
+- `testNilPathBootstrapsInMemoryLedger` — 不传 path 仍跑（向后兼容）
+- `testFreshPathCreatesSqliteFile` — 传 path 真在文件系统创建 SQLite 文件
+- `testReopenSamePathRecoversAuditChain` — phase A 跑 `auditTurn(...)` 得 chain 长度 N → actor 出 scope → phase B 同 path 重 bootstrap → `auditEntryCount()` 仍 ≥ N（**跨"进程"恢复证明**）
+- `testTwoDistinctPathsAreIndependent` — 两 path 独立 ledger，互不污染
+
+**意义**：M91 的 substrate 实现 + M189 的 Qinao 公开面让"audit chain 真的能跨进程恢复"从"接口合约"升级为"测试钉住"。host 配 `ledgerDatabasePath: "/path/to/audit.sqlite"` 一行就开。
+
+### 10.3 M190 — L11 风闸 + L12 柔手矩阵真模型驱动
+
+M186 钉了"真 LLM 驱动 intent → 三签门"happy + 错配签名 path。M190 钉的是**同 LLM body 配不同风险信号 → 不同 surface 决策**：
+
+**新增**（`QinaoAppleFoundationRiskGateTests.swift` · 3 测试 · 2 真机 + 1 离线）：
+
+- `testLowRiskSignalsProduceDraftShellOnRealLLMBody` 0.504s — 真 Apple FM body + `RiskSignals.safe` → `surface == .draftShell`（LLM 输出落在 draft shell 前，user 看见）
+- `testHighRiskSignalsRefuseRealLLMBodyDirectly` 0.977s — 同 body + 高风险信号（irreversibility 0.95 + manipulation 0.85 + harmSeverity 0.9 等）→ `surface != .draftShell`（**会保护不接管** 不让 LLM body 直达 user）+ reasonCodes 非空（拒绝必须解释）
+- `testSurfaceDecisionIsPureGivenIdenticalInputs` 0.000s — 离线钉 `requestSurfaceAction` 纯函数性
+
+**意义**：「神经产生 intent，但 gate 决定 user 是否看见」这条 invariant #2 + 整体性质 "会保护不接管" 的核心断言，现在在真模型链上有可重现证据。
+
+### 10.4 测试金字塔最终态（M190 后）
+
+| 入口 | 套件 | 数 | 真打 LLM |
+|---|---|---|---|
+| BAS adapter | `AppleFoundationE2ETests` | 5 | ✅ |
+| BAS streaming | `AppleFoundationStreamingTests` | 5 | ✅ |
+| Qinao 手动 | `QinaoAppleFoundationE2ETests` | 3 | ✅ |
+| Qinao 工厂 | `QinaoAppleFoundationFactoryTests` | 4 | 部分 |
+| Qinao 并发 | `QinaoAppleFoundationConcurrencyTests` | 2 | ✅ |
+| Qinao 审计链 | `QinaoAppleFoundationAuditChainTests` | 2 | ✅ |
+| Qinao 三签门 | `QinaoAppleFoundationGateChainTests` | 2 | ✅ |
+| **Qinao 流式** | `QinaoLoopStreamBodyTests` | 5 | ✅ |
+| **Qinao 持久化** | `QinaoSovereignPersistentLedgerTests` | **4** | ❌ |
+| **Qinao 风闸/柔手** | `QinaoAppleFoundationRiskGateTests` | **3** | ✅ |
+| 14 层饱和 | `QinaoRuntime14LayerSaturationTests` | 4 | ❌ |
+| 错误翻译 | `QinaoOrganErrorTranslationTests` | 8 | ❌ |
+
+- **18 条 env-gated 真模型路径** + **22 条离线契约钉**
+- M177-M190 共 **12 条新测试套件 / 47 个测试方法**
+
+### 10.5 不变量兑现率（M190 之后）
+
+| 不变量 | M186 | M190 | 备注 |
+|---|---|---|---|
+| 先醒再答 | 100% | 100% | 不动 |
+| 神经不直接掌权 | 100% | 100% | M186 钉了 digest 错配拒绝；M190 钉了高风险信号下 LLM body 不到 draftShell 也是 invariant #2 的另一面 |
+| 宿主私有经验不进基础权重 | 100% | 100% | 不动；M189 让"删除/回滚/审计"路径在跨进程后也可恢复 |
+
+### 10.6 整体性质行刷新（5 条）
+
+| 性质 | 之前 | 现在 | 关键证据 |
+|---|---|---|---|
+| 会醒会停 | 99% | 99% | 不动 |
+| 懂世界也懂宿主 | 100% | 100% | 不动 |
+| 会想不自转 | 99% | 99% | 不动 |
+| **会保护不接管** | 100% | **100%（+ 真模型链证据）** | M190 钉了"高风险信号 + 真 LLM body → not-draftShell + reasonCodes 非空"在真模型上 |
+| 会成长不乱长 | 100% | **100%（+ 跨进程恢复）** | M189 让 audit chain 跨进程持久；删除/回滚/influence 路径在 host 进程 crash 后仍可审计 |

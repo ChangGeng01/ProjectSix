@@ -570,19 +570,37 @@ public actor QinaoSovereignControlPlane {
         public let ledgerSigningSecret: Data
         public let tokenSigningKey: Data?
         public let now: @Sendable () -> Date
+        /// M189 — opt-in cross-process audit-ledger persistence.
+        /// When non-nil, the bootstrapped control plane wires a
+        /// SQLite-backed ledger storage at `ledgerDatabasePath`.
+        /// Audit entries + segment rotations survive process
+        /// restart; reopening the same path rehydrates the chain
+        /// + verifies integrity (fatal trap if storage corrupted —
+        /// integrity > availability).
+        ///
+        /// On cold start the file is created. On reopen the prior
+        /// state is loaded. Hosts that want to keep the ledger
+        /// in-memory only (default pre-M189 behavior) leave this
+        /// nil. Pass an explicit empty string to force the
+        /// in-memory path even when a storage path is otherwise
+        /// configured (defensive override).
+        public let ledgerDatabasePath: String?
 
         public init(
             warrantTTLSeconds: TimeInterval = 30,
             ledgerSigningSecret: Data,
             tokenSigningKey: Data? = nil,
+            ledgerDatabasePath: String? = nil,
             now: @escaping @Sendable () -> Date = { Date() }
         ) {
             self.warrantTTLSeconds = warrantTTLSeconds
             self.ledgerSigningSecret = ledgerSigningSecret
             self.tokenSigningKey = tokenSigningKey
+            self.ledgerDatabasePath = ledgerDatabasePath
             self.now = now
         }
     }
+
 
     /// Host-facing handle onto the internal snapshot manager +
     /// host version tree. M174 — both inner types are `public
@@ -597,12 +615,46 @@ public actor QinaoSovereignControlPlane {
     /// Build a fully-configured control plane. The ledger, token
     /// authority, snapshot manager, and version tree are all owned
     /// by the returned pair — the host never imports `BASSovereign`.
+    ///
+    /// M189 — when `configuration.ledgerDatabasePath != nil` the
+    /// bootstrapped ledger uses SQLite-backed persistence at that
+    /// path. The file is created on cold start; rehydrated on
+    /// reopen. Storage open failure (file-system permission denied,
+    /// existing file corrupt, etc.) is FATAL: matches BAS
+    /// `rehydrate` doctrine — a ledger that can't honestly load
+    /// its prior chain must not accept new writes. Hosts wanting
+    /// graceful fallback should probe the path with
+    /// `BASSovereignLedgerSQLiteStorage(path:)` themselves first
+    /// (or skip persistence entirely by leaving the path nil).
+    ///
+    /// When nil (default), the ledger stays in-memory (pre-M189
+    /// behavior).
     public static func bootstrap(
         configuration: Configuration
     ) -> (controlPlane: QinaoSovereignControlPlane, handle: SubstrateHandle) {
-        let ledger = BASSovereignAuditLedger(
-            signingSecret: SymmetricKey(
-                data: configuration.ledgerSigningSecret))
+        let ledger: BASSovereignAuditLedger
+        if let path = configuration.ledgerDatabasePath, !path.isEmpty {
+            let storage: BASSovereignLedgerSQLiteStorage
+            do {
+                storage = try BASSovereignLedgerSQLiteStorage(
+                    path: path)
+            } catch {
+                fatalError(
+                    "QinaoSovereignControlPlane.bootstrap: " +
+                    "ledger storage open failed at '\(path)' — " +
+                    "\(error). Integrity-over-availability " +
+                    "doctrine: a ledger that cannot honestly " +
+                    "load its chain must not accept writes.")
+            }
+            ledger = BASSovereignAuditLedger(
+                signingSecret: SymmetricKey(
+                    data: configuration.ledgerSigningSecret),
+                storage: storage)
+        } else {
+            ledger = BASSovereignAuditLedger(
+                signingSecret: SymmetricKey(
+                    data: configuration.ledgerSigningSecret))
+        }
         let tokenAuthority = BASSovereignTokenAuthority(
             now: configuration.now)
         let snapshotManager = BASSovereignSnapshotManager()
@@ -1733,6 +1785,15 @@ public actor QinaoSovereignControlPlane {
             signature: "",  // ledger will sign internally
             appendedAt: issuedAt)
         _ = try await auditLedger.append(draft)
+    }
+
+    /// M189 — number of hash-chained audit entries currently held
+    /// by the underlying audit ledger. Persisted across process
+    /// restart when `Configuration.ledgerDatabasePath` is set. The
+    /// only Qinao-public scalar that proves "the chain made it
+    /// through reopen" without exposing BAS types.
+    public func auditEntryCount() async -> Int {
+        await auditLedger.count()
     }
 
     /// Read back a coverage reading previously recorded via
