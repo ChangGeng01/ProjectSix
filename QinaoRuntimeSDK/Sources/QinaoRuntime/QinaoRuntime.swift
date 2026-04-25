@@ -869,143 +869,24 @@ public actor QinaoRuntime {
             residue: residue)
     }
 
-    /// Helper for PHASE 3 — drives the 14 layer-derive blocks
-    /// that auto-inject coverage summaries through the pipeline.
+    /// PHASE 3 dispatcher. M172 — replaces the pre-M172 ~140-line
+    /// inline body with a 5-line loop over the
+    /// `Self.observationLayers` registry. Adding a new
+    /// observation layer is now: add one struct in
+    /// `QinaoRuntime+ObservationLayers.swift` + one entry in the
+    /// `observationLayers` array. The "L 轴 × Phase 轴 耦合"
+    /// (item 14) is structurally fixed: layers no longer share a
+    /// single function body.
     private func streamObservationLayers(
         state: inout TurnState
     ) async {
-        let sid = state.inputs.observations.sessionID
-        let tid = state.inputs.observations.turnID
-
-        // L1 — gated by lifecycle + routed budget.
-        if let lifecycle = lifecycle,
-           let routed = state.routedBudget {
-            let l1Bundle = lifecycle
-                .deriveLeaseLifeObservationBundle(
-                    fromRoutedBudget: routed,
-                    sessionID: sid,
-                    turnID: tid,
-                    emittedAt: now())
-            state.pipeline.inject(l1Bundle.coverageSummary, "L1")
+        for layer in Self.observationLayers {
+            await layer.process(
+                state: &state,
+                host: host,
+                lifecycle: lifecycle,
+                now: now)
         }
-
-        // L3 — unconditional; minimum-viable fold.
-        state.l3Fold = BASThoughtFold(
-            foldID: QinaoSovereignControlPlane.syntheticRef(
-                prefix: "fold",
-                sessionID: sid, turnID: tid),
-            hostEffectSummary: "",
-            restorePointer: state.inputs.observations.snapshotRef,
-            checksum: state.inputs.observations.policyHash,
-            snapshotRef: state.inputs.observations.snapshotRef)
-        state.pipeline.inject(
-            state.l3Fold.coverageSummary(
-                turnID: tid,
-                sessionID: sid,
-                emittedAt: now()),
-            "L3")
-
-        // L5 — unconditional; read host state.
-        state.l5Constitution = await host.currentConstitution()
-        let l5VersionTree = await host.currentVersionTree()
-        let l5Bundle = BASHostConstitutionObservationBundle
-            .derive(
-                fromHostConstitution: state.l5Constitution,
-                versionTree: l5VersionTree,
-                forgetRequest: nil,
-                turnID: tid,
-                sessionID: sid,
-                emittedAt: now())
-        state.pipeline.inject(l5Bundle.coverageSummary, "L5")
-
-        // L6 — gated by contextFrame.
-        if let ctxFrame = state.inputs.contextFrame {
-            let l6Bundle = BASPresenceObservationBundle.derive(
-                from: ctxFrame,
-                turnID: tid, sessionID: sid,
-                emittedAt: now())
-            state.pipeline.inject(l6Bundle.coverageSummary, "L6")
-        }
-
-        // L7 — gated by decomposeFrame.
-        if let dframe = state.inputs.decomposeFrame {
-            let l7Bundle =
-                BASDecompositionObservationBundle.derive(
-                    from: dframe,
-                    turnID: tid, sessionID: sid,
-                    emittedAt: now())
-            state.pipeline.inject(l7Bundle.coverageSummary, "L7")
-        }
-
-        // L8 — gated by memoryBundle.
-        if let mb = state.inputs.memoryBundle {
-            let l8Bundle =
-                BASHippocampalMemoryObservationBundle.derive(
-                    fromMemoryBundle: mb,
-                    turnID: tid, sessionID: sid,
-                    emittedAt: now())
-            state.pipeline.inject(l8Bundle.coverageSummary, "L8")
-        }
-
-        // L4 + L10 + L11 — co-gated by thoughtFrame.
-        if let tframe = state.inputs.thoughtFrame {
-            let l10Bundle = BASTribunalObservationBundle.derive(
-                from: tframe,
-                turnID: tid, sessionID: sid,
-                emittedAt: now())
-            let l11Bundle = BASRiskObservationBundle.derive(
-                from: tframe,
-                turnID: tid, sessionID: sid,
-                emittedAt: now())
-            let l4Bundle = BASWorldPriorObservationBundle.derive(
-                fromThoughtFrame: tframe,
-                turnID: tid, sessionID: sid,
-                emittedAt: now())
-            state.pipeline.inject(l4Bundle.coverageSummary, "L4")
-            state.pipeline.inject(l10Bundle.coverageSummary, "L10")
-            state.pipeline.inject(l11Bundle.coverageSummary, "L11")
-        }
-
-        // L13 — gated by updateTickets.
-        if !state.inputs.updateTickets.isEmpty {
-            let l13Bundle =
-                BASUpdateTicketObservationBundle.derive(
-                    fromUpdateTickets: state.inputs.updateTickets,
-                    turnID: tid, sessionID: sid,
-                    emittedAt: now())
-            state.pipeline.inject(l13Bundle.coverageSummary, "L13")
-        }
-
-        // L2 — gated by neuralOrganMap.
-        if let organMap = state.inputs.neuralOrganMap {
-            let l2Bundle = BASNeuralOrganObservationBundle.derive(
-                fromOrganMap: organMap,
-                turnID: tid, sessionID: sid,
-                emittedAt: now())
-            state.pipeline.inject(l2Bundle.coverageSummary, "L2")
-        }
-
-        // L12 — co-gated by thoughtFrame + renderedOutput.
-        if let tf = state.inputs.thoughtFrame,
-           let rendered = state.inputs.renderedOutput
-        {
-            let l12Bundle = BASSoftHandObservationBundle.derive(
-                from: tf,
-                renderedOutput: rendered,
-                turnID: tid, sessionID: sid,
-                emittedAt: now())
-            state.pipeline.inject(l12Bundle.coverageSummary, "L12")
-        }
-
-        // L9 — gated by candidateFrontier.
-        if let frontier = state.inputs.candidateFrontier {
-            let l9Bundle = BASCandidateObservationBundle.derive(
-                fromFrontier: frontier,
-                turnID: tid, sessionID: sid,
-                emittedAt: now())
-            state.pipeline.inject(l9Bundle.coverageSummary, "L9")
-        }
-
         // Expand expected-layer set only when caller left default.
         if state.inputs.expectedCoverageLayerIDs == ["L14"]
            && !state.pipeline.layerCodes.isEmpty {
