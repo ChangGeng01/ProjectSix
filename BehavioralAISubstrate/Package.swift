@@ -29,7 +29,29 @@ let package = Package(
         // only want on-device adapters skip it.
         .library(
             name: "BASChatCompletionsAdapter",
-            targets: ["BASChatCompletionsAdapter"])
+            targets: ["BASChatCompletionsAdapter"]),
+        // M220 — opt-in MLX (Apple Silicon, on-device) organ
+        // provider for downloaded Gemma 3 / 3n weights. Pulls in
+        // mlx-swift-lm + swift-transformers transitive deps; hosts
+        // that only want Apple FoundationModels or remote HTTP
+        // providers skip this library.
+        .library(
+            name: "BASMLXAdapter",
+            targets: ["BASMLXAdapter"])
+    ],
+    dependencies: [
+        // M220 — pinned to a known-good revision (護欄 #1 from the
+        // M220 plan: explicit revision, not from: semver). Update
+        // by bumping the hash deliberately; do not migrate to
+        // .upToNextMajor without an audit pass.
+        .package(
+            url: "https://github.com/ml-explore/mlx-swift-lm",
+            revision:
+                "7e2b7107be52ffbfe488f3c7987d3f52c1858b4b"),
+        .package(
+            url: "https://github.com/huggingface/swift-transformers",
+            revision:
+                "15bcc471a2de73ce3c17c08781f34a1f9bebaf70")
     ],
     targets: [
         .target(name: "BASRuntimeCore"),
@@ -64,6 +86,30 @@ let package = Package(
         .target(
             name: "BASChatCompletionsAdapter",
             dependencies: ["BASRuntimeCore", "BASOrgan"]),
+        // M220 — MLX organ adapter. Loads quantized Gemma weights
+        // from Hugging Face and runs on-device inference via
+        // mlx-swift-lm. Implementation behind
+        // `#if canImport(MLXLLM)` so watchOS (no Metal) and
+        // unsupported platforms compile to a stub that reports
+        // unavailable through `currentCapacity()`.
+        .target(
+            name: "BASMLXAdapter",
+            dependencies: [
+                "BASRuntimeCore",
+                "BASOrgan",
+                .product(
+                    name: "MLXLLM",
+                    package: "mlx-swift-lm"),
+                .product(
+                    name: "MLXLMCommon",
+                    package: "mlx-swift-lm"),
+                .product(
+                    name: "Tokenizers",
+                    package: "swift-transformers"),
+                .product(
+                    name: "Hub",
+                    package: "swift-transformers")
+            ]),
         .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
         // BASOrchestration depends on BASObservability because M58
         // `BASUpdateTicketObservationDerivation` needs to read
@@ -109,7 +155,8 @@ let package = Package(
             "BASEvaluation",
             "BASAdmin",
             "BASAppleAdapters",
-            "BASChatCompletionsAdapter"
+            "BASChatCompletionsAdapter",
+            "BASMLXAdapter"
         ])
     ]
 )
