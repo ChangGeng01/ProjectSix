@@ -218,7 +218,9 @@ extension QinaoRuntime {
                 = .pureInference,
             evidenceSufficient: Bool = true
         ) {
-            func clamp(_ v: Double) -> Double { min(max(v, 0), 1) }
+            func clamp(_ v: Double) -> Double {
+                Swift.min(Swift.max(v, 0), 1)
+            }
             self.sessionID = sessionID
             self.turnID = turnID
             self.snapshotRef = snapshotRef
@@ -237,7 +239,7 @@ extension QinaoRuntime {
             self.uncertaintyScore = clamp(uncertaintyScore)
             self.gsiScore = clamp(gsiScore)
             self.hostGateValue = clamp(hostGateValue)
-            self.quarantineCount = max(0, quarantineCount)
+            self.quarantineCount = Swift.max(0, quarantineCount)
             self.mode = mode
             self.brake = brake
             self.operation = operation

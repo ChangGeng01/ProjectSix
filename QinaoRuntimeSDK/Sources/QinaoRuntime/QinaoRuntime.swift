@@ -109,7 +109,9 @@ public actor QinaoRuntime {
     public nonisolated let lifecycle: QinaoLifecycle?
 
     private let toolExecutor: ToolExecutor
-    private let now: @Sendable () -> Date
+    /// `package` (M171) so phase extension files in this same
+    /// SPM package can stamp `emittedAt` consistently.
+    package let now: @Sendable () -> Date
 
     public init(
         host: QinaoHost,
@@ -276,7 +278,7 @@ public actor QinaoRuntime {
     /// summaries while preserving insertion order and the pre-M95
     /// nil-when-empty semantic that `recordTurnCoverage`
     /// distinguishes.
-    private struct AutoInjectPipeline {
+    package struct AutoInjectPipeline {
         private var seedSummaries:
             [BASObservationCoverageSummary]?
         private(set) var autoSummaries:
@@ -389,7 +391,7 @@ public actor QinaoRuntime {
     }
 
     /// Stable (phase, tag) labels for the host's metric pipeline.
-    nonisolated private static func classifyTurnError(
+    nonisolated package static func classifyTurnError(
         _ e: TurnError
     ) -> (TurnPhase, String) {
         switch e {
@@ -411,7 +413,7 @@ public actor QinaoRuntime {
         }
     }
 
-    nonisolated private static func elapsedMs(
+    nonisolated package static func elapsedMs(
         since started: ContinuousClock.Instant
     ) -> Double {
         let d = ContinuousClock.now - started
@@ -420,336 +422,283 @@ public actor QinaoRuntime {
             + Double(comps.attoseconds) / 1e15
     }
 
+    /// M171 — state that flows through every phase of
+    /// `sendSessionBody`. Pre-M171 these were 12 local variables
+    /// strewn across 400+ inline lines; the senior review
+    /// pointed out that "用注释画状态机而不用类型" — the comments
+    /// `// PHASE N` were the only enforcement of phase ordering.
+    /// M171 makes the state explicit and the phase boundaries
+    /// type-checked.
+    ///
+    /// Implicitly-unwrapped optionals on the late-arriving
+    /// fields capture "set by phase N, read by phase N+k". A
+    /// phase that touches a field before its setter ran is a
+    /// nil-deref crash at the boundary — which is what we want
+    /// rather than a silent wrong-default.
+    package struct TurnState {
+        package var inputs: TurnInputs
+        package let started: ContinuousClock.Instant
+        package var routedBudget: BASBudgetFrame?
+        package var report:
+            QinaoSovereignControlPlane.AuditReport!
+        package var pipeline: AutoInjectPipeline
+        package var finalExpectedLayerIDs: [String]
+        package var l3Fold: BASThoughtFold!
+        package var l5Constitution: BASHostConstitution!
+        package var coverage:
+            QinaoSovereignControlPlane.CoverageReading!
+        package var sovereignFrame: BASSovereignFrame!
+        package var actionPermitRef: String?
+        package var agencyReservationRef: String?
+        package var computedSurfaceDecision:
+            BASSurfaceDecision!
+    }
+
     private func sendSessionBody(
         inputs inputsParam: TurnInputs,
         started: ContinuousClock.Instant,
         claimToCleanup: inout (sessionID: String, turnID: String)?
     ) async throws -> TurnOutcome {
-        var inputs = inputsParam
-        // PHASE 0 — pre-flight: validation + canonical IDs +
-        // atomic halt-and-claim.
+        var state = TurnState(
+            inputs: inputsParam,
+            started: started,
+            pipeline: AutoInjectPipeline(
+                initial: inputsParam.additionalCoverageSummaries),
+            finalExpectedLayerIDs:
+                inputsParam.expectedCoverageLayerIDs)
+        // M171 — phase machine. Each phase mutates state in place
+        // and either returns void (proceeds) or returns a
+        // pre-PHASE-9 halt outcome (severity-halt path). Throws
+        // bubble up to the outer-scope error-metric wrapper.
+        try runPhase0Preflight(
+            state: &state, claimToCleanup: &claimToCleanup)
+        try await phase0Claim(
+            state: state, claimToCleanup: &claimToCleanup)
+        await runPhase1RouteBudget(state: &state)
+        try await runPhase2Audit(
+            state: &state, claimToCleanup: &claimToCleanup)
+        await runPhase3AutoStream(state: &state)
+        await runPhase4CoverageReconciliation(state: &state)
+        await runPhase5SovereignFrame(state: &state)
+        runPhase6SurfaceDecision(state: &state)
+        await runPhase7RenderFrame(state: &state)
+        if let halted = try await runPhase8HaltGates(
+            state: &state) {
+            return halted
+        }
+        return await runPhase9HealthyReturn(state: &state)
+    }
+
+    // MARK: - M171 phase machine
+
+    /// PHASE 0 — pre-flight: validate IDs, NFC-canonicalise, and
+    /// atomically claim the (sessionID, turnID) slot in a single
+    /// halt-and-claim actor hop.
+    private func runPhase0Preflight(
+        state: inout TurnState,
+        claimToCleanup: inout (sessionID: String, turnID: String)?
+    ) throws {
         let canonicalSessionID = try Self.validateIdentifier(
-            inputs.observations.sessionID,
+            state.inputs.observations.sessionID,
             field: "observations.sessionID")
         let canonicalTurnID = try Self.validateIdentifier(
-            inputs.observations.turnID,
+            state.inputs.observations.turnID,
             field: "observations.turnID")
-        // Rebuild observations with canonical IDs so every key,
-        // synthetic ref, ledger entry, and metric downstream
-        // hashes to the same M161/M164 claim slot.
-        inputs.observations = inputs.observations
-            .withCanonicalIdentifiers(
-                sessionID: canonicalSessionID,
-                turnID: canonicalTurnID)
+        state.inputs.observations =
+            state.inputs.observations
+                .withCanonicalIdentifiers(
+                    sessionID: canonicalSessionID,
+                    turnID: canonicalTurnID)
+    }
 
-        // `claimTurnIfNotHalted` collapses halt-check and claim
-        // into a single actor hop; the two-step pattern had a
-        // TOCTOU where a `markSessionHalted` between the awaits
-        // let a doomed turn claim a slot in an already-halted
-        // session.
+    /// Runs the atomic halt-and-claim. Split out so the synchronous
+    /// `runPhase0Preflight` stays sync; this method awaits the
+    /// sovereign actor.
+    private func phase0Claim(
+        state: TurnState,
+        claimToCleanup: inout (sessionID: String, turnID: String)?
+    ) async throws {
         switch await sovereign.claimTurnIfNotHalted(
-            sessionID: inputs.observations.sessionID,
-            turnID: inputs.observations.turnID)
+            sessionID: state.inputs.observations.sessionID,
+            turnID: state.inputs.observations.turnID)
         {
         case .sessionHalted:
             throw TurnError.sessionAlreadyHalted(
-                id: inputs.observations.sessionID)
+                id: state.inputs.observations.sessionID)
         case .alreadyProcessed:
             throw TurnError.duplicateTurnAlreadyProcessed(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID)
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID)
         case .alreadyClaimed:
             throw TurnError.duplicateTurnInFlight(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID)
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID)
         case .claimed:
-            // Arm the cancel-safe cleanup; the outer-scope
-            // `defer` releases this if Task.cancel or an
-            // unexpected throw bypasses the audit catch.
             claimToCleanup = (
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID)
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID)
         }
+    }
 
-        // PHASE 1 — lifecycle-routed budget.
-        let routedBudget: BASBudgetFrame?
-        if let planned = inputs.plannedBudget {
-            routedBudget = await prepareBudgetForTurn(planned)
+    /// PHASE 1 — lifecycle-routed budget. Returns the planned
+    /// frame compressed by the active `BudgetThermalAdapter`.
+    private func runPhase1RouteBudget(
+        state: inout TurnState
+    ) async {
+        if let planned = state.inputs.plannedBudget {
+            state.routedBudget = await prepareBudgetForTurn(
+                planned)
         } else {
-            routedBudget = nil
+            state.routedBudget = nil
         }
+    }
 
-        // PHASE 2 — L14 sovereign audit.
-        let report: QinaoSovereignControlPlane.AuditReport
+    /// PHASE 2 — L14 sovereign audit. On throw releases the claim
+    /// so M164 retry semantics hold; on success finalises so the
+    /// turn is "processed" regardless of downstream halt branches.
+    private func runPhase2Audit(
+        state: inout TurnState,
+        claimToCleanup: inout (sessionID: String, turnID: String)?
+    ) async throws {
         do {
-            report = try await sovereign.auditTurn(
-                observations: inputs.observations,
-                coordinatorSeverity: inputs.coordinatorSeverity)
+            state.report = try await sovereign.auditTurn(
+                observations: state.inputs.observations,
+                coordinatorSeverity:
+                    state.inputs.coordinatorSeverity)
         } catch {
-            // Audit threw → release the claim so the caller can
-            // retry with the same turnID; clear `claimToCleanup`
-            // so the outer defer doesn't double-release.
             await sovereign.releaseTurnClaim(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID)
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID)
             claimToCleanup = nil
             throw error
         }
-        // Finalize before halt-branch decisions: a halted turn is
-        // still a "processed" outcome, not a retry opportunity.
         await sovereign.finalizeTurnClaim(
-            sessionID: inputs.observations.sessionID,
-            turnID: inputs.observations.turnID)
+            sessionID: state.inputs.observations.sessionID,
+            turnID: state.inputs.observations.turnID)
         claimToCleanup = nil
+    }
 
-        // PHASE 3 — auto-stream L1..L13 observation summaries
-        // through the AutoInjectPipeline.
-        var finalExpectedLayerIDs =
-            inputs.expectedCoverageLayerIDs
-        var pipeline = AutoInjectPipeline(
-            initial: inputs.additionalCoverageSummaries)
+    /// PHASE 3 — auto-stream L1..L13 observation summaries
+    /// through the `AutoInjectPipeline`.
+    private func runPhase3AutoStream(
+        state: inout TurnState
+    ) async {
+        await streamObservationLayers(state: &state)
+    }
 
-        // L1 — gated by lifecycle + routed budget.
-        if let lifecycle = lifecycle,
-           let routed = routedBudget {
-            let l1Bundle = lifecycle
-                .deriveLeaseLifeObservationBundle(
-                    fromRoutedBudget: routed,
-                    sessionID: inputs.observations.sessionID,
-                    turnID: inputs.observations.turnID,
-                    emittedAt: now())
-            pipeline.inject(l1Bundle.coverageSummary, "L1")
-        }
+    /// PHASE 4 — coverage reconciliation against the M45 budget
+    /// ceiling.
+    private func runPhase4CoverageReconciliation(
+        state: inout TurnState
+    ) async {
+        state.coverage = await sovereign.recordTurnCoverage(
+            sessionID: state.inputs.observations.sessionID,
+            turnID: state.inputs.observations.turnID,
+            budgetCeiling: state.inputs.coverageBudgetCeiling,
+            expectedLayerIDs: state.finalExpectedLayerIDs,
+            additionalSummaries: state.pipeline.finalSummaries)
+    }
 
-        // L3 — unconditional; minimum-viable fold.
-        let l3Fold = BASThoughtFold(
-            foldID: QinaoSovereignControlPlane.syntheticRef(
-                prefix: "fold",
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID),
-            hostEffectSummary: "",
-            restorePointer: inputs.observations.snapshotRef,
-            checksum: inputs.observations.policyHash,
-            snapshotRef: inputs.observations.snapshotRef)
-        pipeline.inject(
-            l3Fold.coverageSummary(
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now()),
-            "L3")
-
-        // L5 — unconditional; read host state.
-        let l5Constitution = await host.currentConstitution()
-        let l5VersionTree = await host.currentVersionTree()
-        let l5Bundle = BASHostConstitutionObservationBundle
-            .derive(
-                fromHostConstitution: l5Constitution,
-                versionTree: l5VersionTree,
-                forgetRequest: nil,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-        pipeline.inject(l5Bundle.coverageSummary, "L5")
-
-        // L6 — gated by contextFrame.
-        if let ctxFrame = inputs.contextFrame {
-            let l6Bundle = BASPresenceObservationBundle.derive(
-                from: ctxFrame,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-            pipeline.inject(l6Bundle.coverageSummary, "L6")
-        }
-
-        // L7 — gated by decomposeFrame.
-        if let dframe = inputs.decomposeFrame {
-            let l7Bundle =
-                BASDecompositionObservationBundle.derive(
-                    from: dframe,
-                    turnID: inputs.observations.turnID,
-                    sessionID: inputs.observations.sessionID,
-                    emittedAt: now())
-            pipeline.inject(l7Bundle.coverageSummary, "L7")
-        }
-
-        // L8 — gated by memoryBundle.
-        if let mb = inputs.memoryBundle {
-            let l8Bundle =
-                BASHippocampalMemoryObservationBundle.derive(
-                    fromMemoryBundle: mb,
-                    turnID: inputs.observations.turnID,
-                    sessionID: inputs.observations.sessionID,
-                    emittedAt: now())
-            pipeline.inject(l8Bundle.coverageSummary, "L8")
-        }
-
-        // L4 + L10 + L11 — co-gated by thoughtFrame.
-        if let tframe = inputs.thoughtFrame {
-            let l10Bundle = BASTribunalObservationBundle.derive(
-                from: tframe,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-            let l11Bundle = BASRiskObservationBundle.derive(
-                from: tframe,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-            let l4Bundle = BASWorldPriorObservationBundle.derive(
-                fromThoughtFrame: tframe,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-            pipeline.inject(l4Bundle.coverageSummary, "L4")
-            pipeline.inject(l10Bundle.coverageSummary, "L10")
-            pipeline.inject(l11Bundle.coverageSummary, "L11")
-        }
-
-        // L13 — gated by updateTickets.
-        if !inputs.updateTickets.isEmpty {
-            let l13Bundle =
-                BASUpdateTicketObservationBundle.derive(
-                    fromUpdateTickets: inputs.updateTickets,
-                    turnID: inputs.observations.turnID,
-                    sessionID: inputs.observations.sessionID,
-                    emittedAt: now())
-            pipeline.inject(l13Bundle.coverageSummary, "L13")
-        }
-
-        // L2 — gated by neuralOrganMap.
-        if let organMap = inputs.neuralOrganMap {
-            let l2Bundle = BASNeuralOrganObservationBundle.derive(
-                fromOrganMap: organMap,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-            pipeline.inject(l2Bundle.coverageSummary, "L2")
-        }
-
-        // L12 — co-gated by thoughtFrame + renderedOutput.
-        if let tf = inputs.thoughtFrame,
-           let rendered = inputs.renderedOutput
-        {
-            let l12Bundle = BASSoftHandObservationBundle.derive(
-                from: tf,
-                renderedOutput: rendered,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-            pipeline.inject(l12Bundle.coverageSummary, "L12")
-        }
-
-        // L9 — gated by candidateFrontier.
-        if let frontier = inputs.candidateFrontier {
-            let l9Bundle = BASCandidateObservationBundle.derive(
-                fromFrontier: frontier,
-                turnID: inputs.observations.turnID,
-                sessionID: inputs.observations.sessionID,
-                emittedAt: now())
-            pipeline.inject(l9Bundle.coverageSummary, "L9")
-        }
-
-        // Expand expected-layer set only when caller left default.
-        if inputs.expectedCoverageLayerIDs == ["L14"]
-           && !pipeline.layerCodes.isEmpty {
-            finalExpectedLayerIDs =
-                ["L14"] + pipeline.layerCodes
-        }
-
-        // PHASE 4 — coverage reconciliation.
-        let coverage = await sovereign.recordTurnCoverage(
-            sessionID: inputs.observations.sessionID,
-            turnID: inputs.observations.turnID,
-            budgetCeiling: inputs.coverageBudgetCeiling,
-            expectedLayerIDs: finalExpectedLayerIDs,
-            additionalSummaries: pipeline.finalSummaries)
-
-        // PHASE 5 — sovereign frame aggregator. All synthetic
-        // refs route through `syntheticRef(...)` so dotted IDs
-        // never collide.
-        let sid = inputs.observations.sessionID
-        let tid = inputs.observations.turnID
+    /// PHASE 5 — assemble the per-turn `BASSovereignFrame` (L14
+    /// §5.1 aggregator) and record it.
+    private func runPhase5SovereignFrame(
+        state: inout TurnState
+    ) async {
+        let sid = state.inputs.observations.sessionID
+        let tid = state.inputs.observations.turnID
         let riskCardRef: String? =
-            inputs.thoughtFrame?.riskCard.map { _ in
+            state.inputs.thoughtFrame?.riskCard.map { _ in
                 QinaoSovereignControlPlane.syntheticRef(
                     prefix: "risk-card",
                     sessionID: sid, turnID: tid)
             }
-        let actionPermitRef: String? =
-            inputs.thoughtFrame?.actionPermit.map { _ in
+        state.actionPermitRef =
+            state.inputs.thoughtFrame?.actionPermit.map { _ in
                 QinaoSovereignControlPlane.syntheticRef(
                     prefix: "permit",
                     sessionID: sid, turnID: tid)
             }
-        let agencyReservationRef: String? =
-            inputs.thoughtFrame?.agencyReservation.map { _ in
-                QinaoSovereignControlPlane.syntheticRef(
-                    prefix: "agency-reservation",
-                    sessionID: sid, turnID: tid)
-            }
+        state.agencyReservationRef =
+            state.inputs.thoughtFrame?
+                .agencyReservation.map { _ in
+                    QinaoSovereignControlPlane.syntheticRef(
+                        prefix: "agency-reservation",
+                        sessionID: sid, turnID: tid)
+                }
         let contaminationRefs =
-            inputs.contaminationLineages.map(\.lineageID)
+            state.inputs.contaminationLineages.map(\.lineageID)
 
-        let sovereignFrame = BASSovereignFrame(
+        state.sovereignFrame = BASSovereignFrame(
             frameID: QinaoSovereignControlPlane.syntheticRef(
                 prefix: "frame",
                 sessionID: sid, turnID: tid),
-            sessionID: inputs.observations.sessionID,
-            turnID: inputs.observations.turnID,
-            deviceStateRef: routedBudget?.leaseID,
-            hostVersionRef: l5Constitution.activeVersion.isEmpty
-                ? nil : l5Constitution.activeVersion,
-            continuityRef: inputs.observations.snapshotRef
-                .isEmpty ? nil : inputs.observations.snapshotRef,
-            thoughtFoldRef: l3Fold.foldID,
+            sessionID: state.inputs.observations.sessionID,
+            turnID: state.inputs.observations.turnID,
+            deviceStateRef: state.routedBudget?.leaseID,
+            hostVersionRef:
+                state.l5Constitution.activeVersion.isEmpty
+                ? nil : state.l5Constitution.activeVersion,
+            continuityRef:
+                state.inputs.observations.snapshotRef.isEmpty
+                ? nil : state.inputs.observations.snapshotRef,
+            thoughtFoldRef: state.l3Fold.foldID,
             riskCardRef: riskCardRef,
-            actionPermitRef: actionPermitRef,
-            pendingActionDigest: inputs.pendingActionDigest,
+            actionPermitRef: state.actionPermitRef,
+            pendingActionDigest:
+                state.inputs.pendingActionDigest,
             pendingMutationDigest:
-                inputs.pendingMutationDigest,
-            pendingMemoryDigest: inputs.pendingMemoryDigest,
-            jurisdictionRef: inputs.jurisdictionMap?.mapID,
-            timeLockRef: inputs.timeLockRef,
+                state.inputs.pendingMutationDigest,
+            pendingMemoryDigest:
+                state.inputs.pendingMemoryDigest,
+            jurisdictionRef:
+                state.inputs.jurisdictionMap?.mapID,
+            timeLockRef: state.inputs.timeLockRef,
             contaminationRefs: contaminationRefs,
-            policyHash: inputs.observations.policyHash)
-        await sovereign.recordSovereignFrame(sovereignFrame)
+            policyHash: state.inputs.observations.policyHash)
+        await sovereign.recordSovereignFrame(state.sovereignFrame)
+    }
 
-        // =========================================================
-        // PHASE 6 — single surface-decision compute (M131 dedup).
-        // =========================================================
-        let computedSurfaceDecision = Self.deriveSurfaceDecision(
-            auditSeverity: report.severity,
-            coverageSeverity: coverage.severity,
-            auditRef: report.auditRef,
-            routedBudget: routedBudget,
-            retryPolicy: inputs.surfaceRetryPolicy)
+    /// PHASE 6 — derive the L12 `BASSurfaceDecision` once.
+    private func runPhase6SurfaceDecision(
+        state: inout TurnState
+    ) {
+        state.computedSurfaceDecision = Self.deriveSurfaceDecision(
+            auditSeverity: state.report.severity,
+            coverageSeverity: state.coverage.severity,
+            auditRef: state.report.auditRef,
+            routedBudget: state.routedBudget,
+            retryPolicy: state.inputs.surfaceRetryPolicy)
+    }
 
-        // =========================================================
-        // PHASE 7 — render frame aggregator (M127 + M144 + M148).
-        // =========================================================
-        // M163 — same percent-escape convention via
-        // `syntheticRef(...)` — `sid` / `tid` reused from PHASE 5.
+    /// PHASE 7 — assemble the per-turn `BASRenderFrame` and
+    /// record it on the L12 surface storage.
+    private func runPhase7RenderFrame(
+        state: inout TurnState
+    ) async {
+        let sid = state.inputs.observations.sessionID
+        let tid = state.inputs.observations.turnID
         let situationRef: String? =
-            inputs.decomposeFrame.map { _ in
+            state.inputs.decomposeFrame.map { _ in
                 QinaoSovereignControlPlane.syntheticRef(
                     prefix: "situation",
                     sessionID: sid, turnID: tid)
             }
         let mirrorRef: String? =
-            inputs.decomposeFrame?.mirrorDraft.map { _ in
-                QinaoSovereignControlPlane.syntheticRef(
-                    prefix: "mirror",
-                    sessionID: sid, turnID: tid)
-            }
+            state.inputs.decomposeFrame?.mirrorDraft
+                .map { _ in
+                    QinaoSovereignControlPlane.syntheticRef(
+                        prefix: "mirror",
+                        sessionID: sid, turnID: tid)
+                }
         let toneProfileRef: String? =
-            inputs.renderedOutput.map { _ in
+            state.inputs.renderedOutput.map { _ in
                 QinaoSovereignControlPlane.syntheticRef(
                     prefix: "tone",
                     sessionID: sid, turnID: tid)
             }
         let forceCurveRef: String? =
-            (inputs.renderedOutput != nil
-             && inputs.thoughtFrame?.riskCard != nil)
+            (state.inputs.renderedOutput != nil
+             && state.inputs.thoughtFrame?.riskCard != nil)
             ? QinaoSovereignControlPlane.syntheticRef(
                 prefix: "force-curve",
                 sessionID: sid, turnID: tid)
@@ -759,130 +708,134 @@ public actor QinaoRuntime {
             frameID: QinaoSovereignControlPlane.syntheticRef(
                 prefix: "render",
                 sessionID: sid, turnID: tid),
-            mergedChoiceRef: l3Fold.foldID,
-            actionPermitRef: actionPermitRef,
-            agencyReservationRef: agencyReservationRef,
-            hostStyleRef: l5Constitution.activeVersion.isEmpty
-                ? nil : l5Constitution.activeVersion,
+            mergedChoiceRef: state.l3Fold.foldID,
+            actionPermitRef: state.actionPermitRef,
+            agencyReservationRef: state.agencyReservationRef,
+            hostStyleRef:
+                state.l5Constitution.activeVersion.isEmpty
+                ? nil : state.l5Constitution.activeVersion,
             situationRef: situationRef,
             mirrorRef: mirrorRef,
             substituteRef:
-                computedSurfaceDecision.substitute.kind
+                state.computedSurfaceDecision.substitute.kind
                     .rawValue,
-            sovereignSurfaceRef: sovereignFrame.frameID,
+            sovereignSurfaceRef: state.sovereignFrame.frameID,
             outputSurfaceRef:
-                computedSurfaceDecision.surface.rawValue,
+                state.computedSurfaceDecision.surface.rawValue,
             toneProfileRef: toneProfileRef,
             forceCurveRef: forceCurveRef,
             disclosureProfileRef:
-                computedSurfaceDecision.disclosure.rawValue)
+                state.computedSurfaceDecision.disclosure.rawValue)
         await sovereign.recordRenderFrame(
             renderFrame,
-            sessionID: inputs.observations.sessionID,
-            turnID: inputs.observations.turnID)
+            sessionID: state.inputs.observations.sessionID,
+            turnID: state.inputs.observations.turnID)
+    }
 
-        // =========================================================
-        // PHASE 8 — halt branches (fail-closed).
-        // =========================================================
-        // 8a. Parity fail-closed (coordinator laxer than engine).
-        if !report.isAcceptable {
+    /// PHASE 8 — fail-closed halt branches:
+    ///   * 8a parity (`coordinator-laxer`) → throw
+    ///     `auditParityFailure`
+    ///   * 8b coverage halt → throw `coverageHalt`
+    ///   * 8c severity halt (rollback / deadStop) → return
+    ///     `TurnOutcome` with `sessionHalted = true`
+    ///
+    /// Returning `nil` means proceed to PHASE 9.
+    private func runPhase8HaltGates(
+        state: inout TurnState
+    ) async throws -> TurnOutcome? {
+        if !state.report.isAcceptable {
             await sovereign.markSessionHalted(
-                sessionID: inputs.observations.sessionID,
+                sessionID: state.inputs.observations.sessionID,
                 reason: "audit-parity:coordinator-laxer")
-            // M160 — emit metric BEFORE throw so observability
-            // sees every turn regardless of outcome. M165 — adds
-            // latency / phase / errorTag so the metric carries
-            // enough labels for production dashboards.
             emitMetric(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID,
-                auditSeverity: report.severity,
-                coverageSeverity: coverage.severity,
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID,
+                auditSeverity: state.report.severity,
+                coverageSeverity: state.coverage.severity,
                 autoInjectedLayerCount:
-                    pipeline.layerCodes.count,
+                    state.pipeline.layerCodes.count,
                 halted: true,
                 haltReason: "audit-parity:coordinator-laxer",
-                latencyMs: Self.elapsedMs(since: started),
+                latencyMs: Self.elapsedMs(since: state.started),
                 phase: .parity,
                 errorTag: "audit-parity:coordinator-laxer",
                 isErrorPath: true)
             throw TurnError.auditParityFailure(
-                sessionID: inputs.observations.sessionID,
-                severity: report.severity,
-                auditRef: report.auditRef)
+                sessionID: state.inputs.observations.sessionID,
+                severity: state.report.severity,
+                auditRef: state.report.auditRef)
         }
-        // 8b. Coverage halt (structural budget breach).
-        if coverage.severity == .halt {
+        if state.coverage.severity == .halt {
             await sovereign.markSessionHalted(
-                sessionID: inputs.observations.sessionID,
+                sessionID: state.inputs.observations.sessionID,
                 reason: "coverage-halt")
             emitMetric(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID,
-                auditSeverity: report.severity,
-                coverageSeverity: coverage.severity,
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID,
+                auditSeverity: state.report.severity,
+                coverageSeverity: state.coverage.severity,
                 autoInjectedLayerCount:
-                    pipeline.layerCodes.count,
+                    state.pipeline.layerCodes.count,
                 halted: true,
                 haltReason: "coverage-halt",
-                latencyMs: Self.elapsedMs(since: started),
+                latencyMs: Self.elapsedMs(since: state.started),
                 phase: .coverage,
                 errorTag: "coverage-halt",
                 isErrorPath: true)
             throw TurnError.coverageHalt(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID,
-                findings: coverage.findings)
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID,
+                findings: state.coverage.findings)
         }
-        // 8c. Severity-driven halt (rollback/deadStop — returns
-        //     outcome rather than throwing).
         let autoHaltSeverities: Set<
             QinaoSovereignControlPlane.AuditSeverity
         > = [.rollback, .deadStop]
-        if autoHaltSeverities.contains(report.severity) {
+        if autoHaltSeverities.contains(state.report.severity) {
             await sovereign.markSessionHalted(
-                sessionID: inputs.observations.sessionID,
+                sessionID: state.inputs.observations.sessionID,
                 reason: "audit-severity:"
-                    + report.severity.rawValue)
+                    + state.report.severity.rawValue)
             let residue = await sovereign.turnResidue(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID)
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID)
             emitMetric(
-                sessionID: inputs.observations.sessionID,
-                turnID: inputs.observations.turnID,
-                auditSeverity: report.severity,
-                coverageSeverity: coverage.severity,
+                sessionID: state.inputs.observations.sessionID,
+                turnID: state.inputs.observations.turnID,
+                auditSeverity: state.report.severity,
+                coverageSeverity: state.coverage.severity,
                 autoInjectedLayerCount:
-                    pipeline.layerCodes.count,
+                    state.pipeline.layerCodes.count,
                 halted: true,
                 haltReason: "audit-severity:"
-                    + report.severity.rawValue,
-                latencyMs: Self.elapsedMs(since: started),
+                    + state.report.severity.rawValue,
+                latencyMs: Self.elapsedMs(since: state.started),
                 phase: .severity,
                 errorTag: "audit-severity:"
-                    + report.severity.rawValue,
-                // M165 — severity halt RETURNS a TurnOutcome
-                // (sessionHalted=true) rather than throwing, so
-                // it's not an error path from the caller's POV
-                // even though it's a halt outcome.
+                    + state.report.severity.rawValue,
+                // Severity halt RETURNS a TurnOutcome rather than
+                // throwing; from the caller's POV not an error.
                 isErrorPath: false)
             return TurnOutcome(
-                audit: report,
-                coverage: coverage,
+                audit: state.report,
+                coverage: state.coverage,
                 sessionHalted: true,
-                routedBudget: routedBudget,
+                routedBudget: state.routedBudget,
                 turnRecorded: nil,
-                surfaceDecision: computedSurfaceDecision,
+                surfaceDecision: state.computedSurfaceDecision,
                 residue: residue)
         }
+        return nil  // proceed to PHASE 9
+    }
 
-        // =========================================================
-        // PHASE 9 — healthy turn: record lifecycle + return.
-        // =========================================================
+    /// PHASE 9 — healthy return: record lifecycle telemetry,
+    /// build residue, emit metric, return outcome.
+    private func runPhase9HealthyReturn(
+        state: inout TurnState
+    ) async -> TurnOutcome {
         let turnRecorded: BASLeaseLifeCoordinator.TurnRecorded?
         if
-            let planned = inputs.plannedBudget,
-            let duration = inputs.turnDurationSeconds
+            let planned = state.inputs.plannedBudget,
+            let duration = state.inputs.turnDurationSeconds
         {
             turnRecorded = await recordTurnOnLifecycle(
                 runMode: QinaoRunMode(
@@ -891,36 +844,179 @@ public actor QinaoRuntime {
         } else {
             turnRecorded = nil
         }
-
         let residue = await sovereign.turnResidue(
-            sessionID: inputs.observations.sessionID,
-            turnID: inputs.observations.turnID)
-        // M160 + M165 — healthy-return metric with latency.
+            sessionID: state.inputs.observations.sessionID,
+            turnID: state.inputs.observations.turnID)
         emitMetric(
-            sessionID: inputs.observations.sessionID,
-            turnID: inputs.observations.turnID,
-            auditSeverity: report.severity,
-            coverageSeverity: coverage.severity,
-            autoInjectedLayerCount: pipeline.layerCodes.count,
+            sessionID: state.inputs.observations.sessionID,
+            turnID: state.inputs.observations.turnID,
+            auditSeverity: state.report.severity,
+            coverageSeverity: state.coverage.severity,
+            autoInjectedLayerCount: state.pipeline.layerCodes.count,
             halted: false,
             haltReason: nil,
-            latencyMs: Self.elapsedMs(since: started),
+            latencyMs: Self.elapsedMs(since: state.started),
             phase: .healthy,
             errorTag: nil,
             isErrorPath: false)
         return TurnOutcome(
-            audit: report,
-            coverage: coverage,
+            audit: state.report,
+            coverage: state.coverage,
             sessionHalted: false,
-            routedBudget: routedBudget,
+            routedBudget: state.routedBudget,
             turnRecorded: turnRecorded,
-            surfaceDecision: computedSurfaceDecision,
+            surfaceDecision: state.computedSurfaceDecision,
             residue: residue)
+    }
+
+    /// Helper for PHASE 3 — drives the 14 layer-derive blocks
+    /// that auto-inject coverage summaries through the pipeline.
+    private func streamObservationLayers(
+        state: inout TurnState
+    ) async {
+        let sid = state.inputs.observations.sessionID
+        let tid = state.inputs.observations.turnID
+
+        // L1 — gated by lifecycle + routed budget.
+        if let lifecycle = lifecycle,
+           let routed = state.routedBudget {
+            let l1Bundle = lifecycle
+                .deriveLeaseLifeObservationBundle(
+                    fromRoutedBudget: routed,
+                    sessionID: sid,
+                    turnID: tid,
+                    emittedAt: now())
+            state.pipeline.inject(l1Bundle.coverageSummary, "L1")
+        }
+
+        // L3 — unconditional; minimum-viable fold.
+        state.l3Fold = BASThoughtFold(
+            foldID: QinaoSovereignControlPlane.syntheticRef(
+                prefix: "fold",
+                sessionID: sid, turnID: tid),
+            hostEffectSummary: "",
+            restorePointer: state.inputs.observations.snapshotRef,
+            checksum: state.inputs.observations.policyHash,
+            snapshotRef: state.inputs.observations.snapshotRef)
+        state.pipeline.inject(
+            state.l3Fold.coverageSummary(
+                turnID: tid,
+                sessionID: sid,
+                emittedAt: now()),
+            "L3")
+
+        // L5 — unconditional; read host state.
+        state.l5Constitution = await host.currentConstitution()
+        let l5VersionTree = await host.currentVersionTree()
+        let l5Bundle = BASHostConstitutionObservationBundle
+            .derive(
+                fromHostConstitution: state.l5Constitution,
+                versionTree: l5VersionTree,
+                forgetRequest: nil,
+                turnID: tid,
+                sessionID: sid,
+                emittedAt: now())
+        state.pipeline.inject(l5Bundle.coverageSummary, "L5")
+
+        // L6 — gated by contextFrame.
+        if let ctxFrame = state.inputs.contextFrame {
+            let l6Bundle = BASPresenceObservationBundle.derive(
+                from: ctxFrame,
+                turnID: tid, sessionID: sid,
+                emittedAt: now())
+            state.pipeline.inject(l6Bundle.coverageSummary, "L6")
+        }
+
+        // L7 — gated by decomposeFrame.
+        if let dframe = state.inputs.decomposeFrame {
+            let l7Bundle =
+                BASDecompositionObservationBundle.derive(
+                    from: dframe,
+                    turnID: tid, sessionID: sid,
+                    emittedAt: now())
+            state.pipeline.inject(l7Bundle.coverageSummary, "L7")
+        }
+
+        // L8 — gated by memoryBundle.
+        if let mb = state.inputs.memoryBundle {
+            let l8Bundle =
+                BASHippocampalMemoryObservationBundle.derive(
+                    fromMemoryBundle: mb,
+                    turnID: tid, sessionID: sid,
+                    emittedAt: now())
+            state.pipeline.inject(l8Bundle.coverageSummary, "L8")
+        }
+
+        // L4 + L10 + L11 — co-gated by thoughtFrame.
+        if let tframe = state.inputs.thoughtFrame {
+            let l10Bundle = BASTribunalObservationBundle.derive(
+                from: tframe,
+                turnID: tid, sessionID: sid,
+                emittedAt: now())
+            let l11Bundle = BASRiskObservationBundle.derive(
+                from: tframe,
+                turnID: tid, sessionID: sid,
+                emittedAt: now())
+            let l4Bundle = BASWorldPriorObservationBundle.derive(
+                fromThoughtFrame: tframe,
+                turnID: tid, sessionID: sid,
+                emittedAt: now())
+            state.pipeline.inject(l4Bundle.coverageSummary, "L4")
+            state.pipeline.inject(l10Bundle.coverageSummary, "L10")
+            state.pipeline.inject(l11Bundle.coverageSummary, "L11")
+        }
+
+        // L13 — gated by updateTickets.
+        if !state.inputs.updateTickets.isEmpty {
+            let l13Bundle =
+                BASUpdateTicketObservationBundle.derive(
+                    fromUpdateTickets: state.inputs.updateTickets,
+                    turnID: tid, sessionID: sid,
+                    emittedAt: now())
+            state.pipeline.inject(l13Bundle.coverageSummary, "L13")
+        }
+
+        // L2 — gated by neuralOrganMap.
+        if let organMap = state.inputs.neuralOrganMap {
+            let l2Bundle = BASNeuralOrganObservationBundle.derive(
+                fromOrganMap: organMap,
+                turnID: tid, sessionID: sid,
+                emittedAt: now())
+            state.pipeline.inject(l2Bundle.coverageSummary, "L2")
+        }
+
+        // L12 — co-gated by thoughtFrame + renderedOutput.
+        if let tf = state.inputs.thoughtFrame,
+           let rendered = state.inputs.renderedOutput
+        {
+            let l12Bundle = BASSoftHandObservationBundle.derive(
+                from: tf,
+                renderedOutput: rendered,
+                turnID: tid, sessionID: sid,
+                emittedAt: now())
+            state.pipeline.inject(l12Bundle.coverageSummary, "L12")
+        }
+
+        // L9 — gated by candidateFrontier.
+        if let frontier = state.inputs.candidateFrontier {
+            let l9Bundle = BASCandidateObservationBundle.derive(
+                fromFrontier: frontier,
+                turnID: tid, sessionID: sid,
+                emittedAt: now())
+            state.pipeline.inject(l9Bundle.coverageSummary, "L9")
+        }
+
+        // Expand expected-layer set only when caller left default.
+        if state.inputs.expectedCoverageLayerIDs == ["L14"]
+           && !state.pipeline.layerCodes.isEmpty {
+            state.finalExpectedLayerIDs =
+                ["L14"] + state.pipeline.layerCodes
+        }
     }
 
     /// Single emit point. `nonisolated` so the host's `Sendable`
     /// recorder closure runs without an actor hop.
-    nonisolated private func emitMetric(
+    nonisolated package func emitMetric(
         sessionID: String,
         turnID: String,
         auditSeverity: QinaoSovereignControlPlane.AuditSeverity,
@@ -1111,7 +1207,7 @@ public actor QinaoRuntime {
 
     /// Higher = more transparency. `.silent` never appears on
     /// `.pass` paths so its ordinal is a placeholder.
-    private static func disclosureOrdinal(
+    package static func disclosureOrdinal(
         _ d: BASSurfaceDisclosure
     ) -> Int {
         switch d {
@@ -1124,7 +1220,7 @@ public actor QinaoRuntime {
 
     /// Non-generic max over a key. `BASSurfaceDisclosure` is a
     /// raw-value enum without a `Comparable` contract.
-    private static func max(
+    package static func max(
         _ lhs: BASSurfaceDisclosure,
         _ rhs: BASSurfaceDisclosure,
         by key: (BASSurfaceDisclosure) -> Int
