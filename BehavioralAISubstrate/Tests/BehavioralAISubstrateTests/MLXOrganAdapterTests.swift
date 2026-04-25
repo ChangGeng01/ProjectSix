@@ -48,7 +48,7 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     // MARK: - 2. Draft path is honestly unavailable in M220
 
-    func testDraftThrowsProviderUnavailableUntilM221() async {
+    func testDraftThrowsProviderUnavailableWhenModelNotLoaded() async {
         let adapter = MLXOrganAdapter()
         let request = BASOrganRequest(
             requestID: "req-1",
@@ -59,19 +59,18 @@ final class MLXOrganAdapterTests: XCTestCase {
         do {
             _ = try await adapter.draft(request)
             XCTFail(
-                "M220 must not return a draft — model loading is " +
-                "M221; got a draft instead which means we " +
-                "regressed and started silently producing fake " +
-                "output")
+                "fresh adapter must not produce a draft — " +
+                "loadModel(progressHandler:) has not been called " +
+                "so MLX has no ModelContainer to drive inference")
         } catch BASOrganError.providerUnavailable(let reason) {
-            // Either the loaded-yet path or the build-unavailable
+            // Either the not-loaded path or the build-unavailable
             // path is acceptable; both are honest "we cannot serve
             // this request" responses.
             XCTAssertTrue(
-                reason.contains("mlx-organ-adapter-not-loaded-yet")
+                reason.contains("mlx-organ-adapter-not-loaded")
                     || reason.contains("MLXLLM framework"),
-                "expected a stable M220-or-build reason; got: " +
-                "\(reason)")
+                "expected a stable not-loaded-or-build reason; " +
+                "got: \(reason)")
         } catch {
             XCTFail(
                 "expected providerUnavailable but got \(error)")
@@ -106,7 +105,7 @@ final class MLXOrganAdapterTests: XCTestCase {
         XCTAssertTrue(cap.underPressure)
         XCTAssertEqual(cap.availableInputTokens, 0)
         XCTAssertEqual(cap.availableOutputTokens, 0)
-        let valid = ["MLX_NOT_LOADED_M221", "MLX_UNAVAILABLE_BUILD"]
+        let valid = ["MLX_NOT_LOADED", "MLX_UNAVAILABLE_BUILD"]
         XCTAssertTrue(
             cap.reasonCodes.contains(where: { valid.contains($0) }),
             "expected one of \(valid); got \(cap.reasonCodes)")

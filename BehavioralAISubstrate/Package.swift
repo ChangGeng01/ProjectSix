@@ -51,7 +51,14 @@ let package = Package(
         .package(
             url: "https://github.com/huggingface/swift-transformers",
             revision:
-                "15bcc471a2de73ce3c17c08781f34a1f9bebaf70")
+                "15bcc471a2de73ce3c17c08781f34a1f9bebaf70"),
+        // M221 — explicit top-level pin so BASMLXAdapter can list
+        // `HuggingFace` as a target dep (transitive visibility from
+        // swift-transformers is not enough for SPM product binding).
+        .package(
+            url: "https://github.com/huggingface/swift-huggingface",
+            revision:
+                "b721959445b617d0bf03910b2b4aced345fd93bf")
     ],
     targets: [
         .target(name: "BASRuntimeCore"),
@@ -108,7 +115,17 @@ let package = Package(
                     package: "swift-transformers"),
                 .product(
                     name: "Hub",
-                    package: "swift-transformers")
+                    package: "swift-transformers"),
+                // M221 — MLXHuggingFace freestanding macros
+                // (#hubDownloader / #huggingFaceTokenizerLoader)
+                // bridge HuggingFace.HubClient + Tokenizers into
+                // MLXLMCommon.Downloader + TokenizerLoader.
+                .product(
+                    name: "MLXHuggingFace",
+                    package: "mlx-swift-lm"),
+                .product(
+                    name: "HuggingFace",
+                    package: "swift-huggingface")
             ]),
         .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
         // BASOrchestration depends on BASObservability because M58
