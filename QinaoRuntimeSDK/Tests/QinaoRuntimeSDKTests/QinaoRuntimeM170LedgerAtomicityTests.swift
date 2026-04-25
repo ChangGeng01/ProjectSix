@@ -172,7 +172,91 @@ final class QinaoRuntimeM170LedgerAtomicityTests: XCTestCase {
         }
     }
 
-    // MARK: - 4. Concurrent submissions → exactly 1 ledger entry
+    // MARK: - 4. Partial-write hazard pin (item 13 evidence)
+
+    /// M170 — pin the M164 post-finalize invariant: when the
+    /// parity check (PHASE 8) throws, ALL the side effects from
+    /// PHASES 2-7 must already be in place. The senior review
+    /// (item 13) flagged the partial-write hazard:
+    ///
+    /// > PHASE 5 抛出时 audit ledger 已经写了一条，frame 没建,
+    /// > render frame 没建。partial-write 状态在该 turnID 上永久
+    /// > 冻结。
+    ///
+    /// This is THEORETICAL today because PHASES 5 and 7 in the
+    /// current code call non-throwing methods on the sovereign
+    /// actor. Nothing between `finalizeTurnClaim` (Phase 2) and
+    /// the parity throw (Phase 8) actually throws.
+    ///
+    /// This test pins that invariant: if a future commit adds a
+    /// throwing call between finalize and PHASE 8, this test
+    /// fails — forcing the developer to either make the new
+    /// call non-throwing, or address the partial-write hazard
+    /// structurally (M171 phase-machine refactor will do this
+    /// with a `defer`-based cleanup discipline).
+    func testParityThrowLeavesAllSideEffectsConsistent()
+        async throws {
+        let fx = await QinaoTestFixture.make()
+        let sid = "sess.partial"
+        let tid = "turn.partial"
+
+        do {
+            _ = try await fx.runtime.sendSession(
+                obs(sessionID: sid,
+                    turnID: tid,
+                    coordinatorLaxer: true),
+                coordinatorSeverity: .pass)
+            XCTFail("expected auditParityFailure")
+        } catch QinaoRuntime.TurnError.auditParityFailure {
+            // expected
+        } catch {
+            XCTFail("unexpected: \(error)")
+        }
+
+        // PHASE 2 — audit entry recorded (engine.evaluate
+        // appended before parity check).
+        let entries = await fx.ledger.entries(
+            forSession: sid, turn: tid)
+        XCTAssertEqual(
+            entries.count, 1,
+            "PHASE 2 audit entry must be present after parity throw")
+
+        // PHASE 4 — coverage verdict recorded.
+        let coverage = await fx.ledger.coverageVerdict(
+            forSession: sid, turn: tid)
+        XCTAssertNotNil(
+            coverage,
+            "PHASE 4 coverage verdict must be recorded — its " +
+            "absence indicates a regression that introduced a " +
+            "throw between finalize and PHASE 4")
+
+        // PHASE 5 — sovereign frame recorded.
+        let sovereignFrame = await fx.sovereign.sovereignFrame(
+            sessionID: sid, turnID: tid)
+        XCTAssertNotNil(
+            sovereignFrame,
+            "PHASE 5 sovereign frame must be recorded — its " +
+            "absence indicates a regression that introduced a " +
+            "throw between finalize and PHASE 5")
+
+        // PHASE 7 — render frame recorded.
+        let renderFrame = await fx.sovereign.renderFrame(
+            sessionID: sid, turnID: tid)
+        XCTAssertNotNil(
+            renderFrame,
+            "PHASE 7 render frame must be recorded — its " +
+            "absence indicates a regression that introduced a " +
+            "throw between PHASE 5 and PHASE 7")
+
+        // M164 — turn marked as processed (finalize ran).
+        let processed = await fx.sovereign.processedTurnCount()
+        XCTAssertEqual(
+            processed, 1,
+            "claim must be finalized; M164 retry semantics treat " +
+            "parity failure as terminal, not retry-eligible")
+    }
+
+    // MARK: - 5. Concurrent submissions → exactly 1 ledger entry
 
     /// `QinaoRuntimeM165ConcurrencyTests` pinned that exactly one
     /// of N concurrent submissions wins. M170 pins the ledger
