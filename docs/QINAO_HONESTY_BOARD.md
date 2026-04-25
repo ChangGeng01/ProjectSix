@@ -1029,3 +1029,79 @@ L1 (90%) / L2 (40%) / L3 (72%) / L5 (95%) / L6 (82%) / L7 (82%) / L10 (65%) — 
 性质   会保护不接管              100%
 性质   会成长不乱长              100%
 ```
+
+---
+
+## 十五、M213 + 剩余 roadmap（2026-04-26）
+
+### 15.1 M213 — `QinaoSampleHost --provider` flag
+
+`QinaoSampleHost` 升级为支持双 provider：apple-fm（默认 · M203 起）+ chatcompletions（M213）。3 mode (single / `--stream` / `--bench`) × 2 provider = **6 runtime paths**。
+
+```sh
+# 默认 Apple FM
+swift run QinaoSampleHost "your prompt"
+
+# 远程 OpenAI 兼容
+swift run QinaoSampleHost \
+    --provider chatcompletions \
+    --url https://api.openai.com/v1/chat/completions \
+    --api-key sk-... --model gpt-4o-mini \
+    "your prompt"
+```
+
+`ChatCompletionsCLIEndpoint`（30 行 fileprivate struct）是 host 集成自己 remote provider 的**canonical 模板** — 同 M178 Apple FM 手动 wrapper 形态。两个 provider 路径走**同一 error grammar**（`provider-unavailable:transport:... / http-NNN / malformed-json`）。
+
+### 15.2 已闭合（M177-M213 区间）
+
+| 类别 | 闭合 |
+|---|---|
+| Apple FM 接入 | M177 (BAS) / M178 (Qinao 手动) / M180 (factory) |
+| 流式 | M184 (Apple FM) / M188 (Qinao 公开) / M192 (cancellation) / M210 (SSE for ChatCompletions) |
+| 三签门真 LLM 链 | M186 (warrant) / M190 (surface) / M199 (content-blindness) |
+| 审计链 | M183 (L13→L14 真模型) / M189 (跨进程 SQLite) |
+| 14 层真证据 | M193 (L4) / M194 (L8) / M198 (L13) / M179 (L1+L3+L5+L6+L7) |
+| 多 provider | M208 (Chat Completions adapter) / M210 (SSE) / M211 (multi-provider registry) / M213 (CLI flag) |
+| 文档 | M182/M196 (README) / M191/M195/M200/M202/M204/M212 (honesty sections) |
+| Demo | M201 (全栈 test) / M203/M205-M207 (executable + 3 mode) / M213 (provider flag) |
+
+### 15.3 真剩余项（按 scope 分类）
+
+#### A. SDK scope 内 · 可继续推进
+
+| 项 | 在哪条行说过 | 复杂度 | 备注 |
+|---|---|---|---|
+| L8 reconciliation → mutation writer | section 三 L8 65→70% 行 "reconciliation → mutation writer 尚未接线" | 中 | substrate 内部接线；M21 reconciler 已 ship · 把 reconciler 的输出真写回 memory store · ~200 行 |
+| L5 跨设备 host constitution sync | section 三 L5 95% 行 "剩余 = 跨设备一致撤回 + 并行宪法层" | 大 | 设计 + impl · CRDT or version vector · 多 session 协议 · 多里程碑 |
+| L1 真机 thermal twin | section 三 L1 90% 行 "剩余 = 真机 thermal twin + 异构路由 + 长会话热稳"；M179 thermal stability 部分覆盖 "长会话热稳" | 中 | iOS 真机部署 + ProcessInfo.thermalState 实采样 + ANE 利用率信号 |
+
+#### B. SDK scope 外 · §9.6 Swift-only 边界外
+
+| 项 | 在哪条行说过 | 备注 |
+|---|---|---|
+| L2 ANE 算子层 / 图编译器 / 真双模型 | section 三 L2 40% 行 "Swift-only 天花板 — 剩余 60% = ANE 算子层 + 图编译器 + 真双模型量化 runtime" | plan §9.6 明确为 ML 基础设施层，不在本 repo |
+| L10 多头打分 / 训练体系 | section 三 L10 65% 行 "剩余 = 真正多头打分 / veto explain / 训练体系仍缺" | 真训练体系是行为 RL infra 而非 SDK; veto explain 已部分 (M74) |
+| L11 GSI 模型 / 操控校准 / 风险校准曲线 bench | section 三 L11 92% 行 "剩余 = 专项 GSI 模型 + 操控/煤气灯校准 + 风险校准曲线 bench" | 行为 ML 的 bench 套件 / 数据集，外部工程 |
+
+#### C. host-side · 不在 SDK 但是 SDK 用户的工作
+
+| 项 | 在哪条行说过 |
+|---|---|
+| L12 / 会想不自转 UI 染色 | 性质 "会想不自转 99%" 行 "剩余 1% = host 侧 UI 染色（VetoExplain.vetoingVoice 三色）" |
+| L12 强边界脚本 copy library | section 三 L12 80% 行 "剩余 = 强边界脚本（自然语言 copy library）+ 可执行替代动作系统在宿主应用侧的 plumbing" |
+
+#### D. 演进类（非缺口，但下一里程碑可加）
+
+| 项 | 价值 |
+|---|---|
+| Sample SwiftUI app | 从 CLI 升级到 GUI demo |
+| `BASChatCompletionsOrganAdapter` 真 OpenAI 测试 | 需 API key · env-gated 真打 OpenAI |
+| 第二个流式 provider 的 cancel 测试 | 类比 M192 但走 ChatCompletions SSE |
+
+### 15.4 状态总结口径（M213 之后）
+
+> "SDK Swift-only 边界内**结构性完全体**已就位 ─ 14 层每一层都有真模型驱动的端到端测试 · 3 个 provider 实现共存 · 双流式（Apple FM + Chat Completions SSE）· 跨进程 SQLite ledger 持久化 · 三签门 + content-blindness 在真模型链上证据 · 753 Qinao tests + 1482 BAS tests + 4 边界闸全绿 · `swift run QinaoSampleHost` 一行真出 LLM 输出"
+
+剩余项按 §15.3 分四类，每类有清晰归属：A 类（SDK scope 内）继续可推进 · B/C 类（外部 / host）不在 SDK 责任范围 · D 类是演进可加，不是缺口。
+
+诚实度仪表板 M177-M213 区间共 **37 commits / 22 测试套件 / 91 测试方法 / 34 真模型路径**。下一步任何里程碑都从 §15.3 A 类或 D 类挑取，B/C 类不应在 SDK 里"假装解决"。
