@@ -30,14 +30,14 @@ import XCTest
 ///
 /// To run on a macOS 26+ dev box with Apple Intelligence enabled:
 /// ```
-/// BAS_FM_E2E=1 swift test --filter AppleFoundationE2ETests
+/// QINAO_FM_E2E=1 swift test --filter AppleFoundationE2ETests
 /// ```
 final class AppleFoundationE2ETests: XCTestCase {
 
-    private static let envFlag = "BAS_FM_E2E"
+    private static let envFlag = "QINAO_FM_E2E"
 
     /// Skip unless we're on a `FoundationModels`-capable OS AND the
-    /// human running the suite has opted in via `BAS_FM_E2E=1`. Both
+    /// human running the suite has opted in via `QINAO_FM_E2E=1`. Both
     /// conditions are required.
     private func skipUnlessReady() throws {
         guard ProcessInfo.processInfo.environment[Self.envFlag] == "1" else {

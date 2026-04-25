@@ -20,11 +20,11 @@ import QinaoAppleFoundation
 ///
 /// ## Gating
 ///
-/// Same `BAS_FM_E2E=1` + macOS 26+ availability as M177/M178/M180.
+/// Same `QINAO_FM_E2E=1` + macOS 26+ availability as M177/M178/M180.
 /// CI default skips the suite to keep `swift test` fast and offline.
 final class QinaoAppleFoundationConcurrencyTests: XCTestCase {
 
-    private static let envFlag = "BAS_FM_E2E"
+    private static let envFlag = "QINAO_FM_E2E"
 
     private func skipUnlessReady() throws {
         guard

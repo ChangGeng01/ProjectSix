@@ -28,11 +28,11 @@ import QinaoLoop
 /// ## Gating
 ///
 /// Same gates as `AppleFoundationE2ETests` in BAS:
-/// - `BAS_FM_E2E=1` env var (opt-in)
+/// - `QINAO_FM_E2E=1` env var (opt-in)
 /// - macOS 26+ / iOS 26+ / visionOS 26+ availability
 ///
 /// ```
-/// BAS_FM_E2E=1 swift test --filter QinaoAppleFoundationE2ETests
+/// QINAO_FM_E2E=1 swift test --filter QinaoAppleFoundationE2ETests
 /// ```
 
 /// Test-fixture endpoint. Wraps a `BASOrganRegistry` and translates
@@ -70,7 +70,7 @@ private struct AppleFoundationTestEndpoint: QinaoOrganEndpoint {
 
 final class QinaoAppleFoundationE2ETests: XCTestCase {
 
-    private static let envFlag = "BAS_FM_E2E"
+    private static let envFlag = "QINAO_FM_E2E"
 
     private func skipUnlessReady() throws {
         guard

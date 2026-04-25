@@ -31,7 +31,7 @@ import FoundationModels
 ///   Runs on every OS the test target can build for.
 /// - `AppleFoundationE2ETests` (M177) — real `LanguageModelSession`
 ///   invocation through the `BASOrganAdapter` contract. Gated
-///   behind `BAS_FM_E2E=1` and macOS 26+ / iOS 26+ / visionOS 26+
+///   behind `QINAO_FM_E2E=1` and macOS 26+ / iOS 26+ / visionOS 26+
 ///   so default `swift test` stays fast and offline.
 public actor AppleFoundationOrganAdapter: BASOrganAdapter {
     public nonisolated let descriptor: BASOrganDescriptor

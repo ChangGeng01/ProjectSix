@@ -24,7 +24,7 @@ import XCTest
 ///    pins the scaffolding regardless of OS version.
 ///
 /// The real on-device `LanguageModelSession` invocation is exercised
-/// by `AppleFoundationE2ETests` (M177), gated behind `BAS_FM_E2E=1`
+/// by `AppleFoundationE2ETests` (M177), gated behind `QINAO_FM_E2E=1`
 /// so default `swift test` runs stay fast and offline.
 final class AppleFoundationOrganAdapterTests: XCTestCase {
 

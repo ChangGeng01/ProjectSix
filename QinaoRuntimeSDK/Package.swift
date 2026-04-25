@@ -190,7 +190,7 @@ let package = Package(
                 // host pattern is covered end-to-end.
                 "QinaoAppleFoundation",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
-                // M178 — env-gated end-to-end test (`BAS_FM_E2E=1`)
+                // M178 — env-gated end-to-end test (`QINAO_FM_E2E=1`)
                 // wires `AppleFoundationOrganAdapter` through a
                 // host-style `QinaoOrganEndpoint` conformance and
                 // drives `QinaoLoop.generateCandidates` with the real

@@ -77,7 +77,7 @@ demo for each lives under
 
 ---
 
-## Eight public modules
+## Nine public modules
 
 ```
                QinaoRuntime
@@ -92,22 +92,61 @@ demo for each lives under
                          │
                          ▼
                       QinaoUI
+
+  (opt-in) QinaoAppleFoundation  ── on-device LLM endpoint factory
 ```
 
-| Module             | Role                                                         |
-| ------------------ | ------------------------------------------------------------ |
-| `QinaoRuntime`     | Session lifecycle, three-signature gate, tool execution.     |
-| `QinaoHost`        | Host constitution: submit / preview / approve / reject / rollback / freeze / thaw. |
-| `QinaoMemory`      | Session memory: admit / recall / forget across hot·warm·cold tiers. |
-| `QinaoLoop`        | Candidate frontier, compare panel, guardian branch.          |
-| `QinaoRisk`        | Risk signals → four-way assessment with stable reason codes. |
-| `QinaoWorldPrior`  | Horizons, axioms, causal templates, domain bridges, counterfactual branches, and boundary-bedrock override evaluation. |
-| `QinaoSovereign`   | Control plane: rollback plan, warrant issuance, session halt. |
-| `QinaoUI`          | Five soft-hand SwiftUI surfaces (compare panel · draft shell · delay packet · boundary script · silent stub). |
+| Module                  | Role                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| `QinaoRuntime`          | Session lifecycle, three-signature gate, tool execution.     |
+| `QinaoHost`             | Host constitution: submit / preview / approve / reject / rollback / freeze / thaw. |
+| `QinaoMemory`           | Session memory: admit / recall / forget across hot·warm·cold tiers. |
+| `QinaoLoop`             | Candidate frontier, compare panel, guardian branch.          |
+| `QinaoRisk`             | Risk signals → four-way assessment with stable reason codes. |
+| `QinaoWorldPrior`       | Horizons, axioms, causal templates, domain bridges, counterfactual branches, and boundary-bedrock override evaluation. |
+| `QinaoSovereign`        | Control plane: rollback plan, warrant issuance, session halt. |
+| `QinaoUI`               | Five soft-hand SwiftUI surfaces (compare panel · draft shell · delay packet · boundary script · silent stub). |
+| `QinaoAppleFoundation`  | **Opt-in.** One-call factory for the Apple FoundationModels endpoint. Hosts that don't want Apple-specific code (or to link `FoundationModels`) skip this library. |
 
 Every public type in every module is `Sendable`. Every public error is
 typed and carries stable reason codes. Nothing in a module's public
 surface names the internal machinery that implements it.
+
+---
+
+## Wiring the on-device LLM
+
+The default neural provider is Apple's on-device `FoundationModels`
+framework. With the opt-in `QinaoAppleFoundation` library, hosts wire
+the model in one line:
+
+```swift
+import QinaoLoop
+import QinaoAppleFoundation
+
+let endpoint = await QinaoLoop.makeAppleFoundationEndpoint()
+let loop = QinaoLoop(organEndpoint: endpoint)
+```
+
+On macOS 26+ / iOS 26+ / visionOS 26+ with Apple Intelligence
+enabled, `loop.generateCandidates(...)` drives a real
+`LanguageModelSession`. On older OS or with Apple Intelligence
+disabled, the loop surfaces `LoopError.organUnavailable(reason:)`
+with a stable code so hosts can render a typed refusal.
+
+Pass `includeDeterministicFallback: true` for a deterministic
+in-memory stub that always responds — useful for offline development
+and CI:
+
+```swift
+let endpoint = await QinaoLoop.makeAppleFoundationEndpoint(
+    includeDeterministicFallback: true)
+```
+
+Hosts that want a different provider (or to compose multiple) write a
+custom `QinaoOrganEndpoint` conformance and pass it to
+`QinaoLoop(organEndpoint:)`. The loop itself never speaks the
+provider's native dialect.
 
 ---
 
@@ -120,6 +159,7 @@ import QinaoHost
 import QinaoMemory
 import QinaoLoop
 import QinaoRisk
+import QinaoAppleFoundation
 
 // 1. Bootstrap the control plane — the Configuration only carries
 // plain value types (Data, TimeInterval, @Sendable () -> Date).
@@ -130,21 +170,27 @@ let config = QinaoSovereignControlPlane.Configuration(
 let (sovereign, substrate) = QinaoSovereignControlPlane.bootstrap(
     configuration: config)
 
-// 2. Compose the risk gate and loop.
+// 2. Compose the risk gate and the loop with an Apple-FM-backed
+// organ endpoint.
 let risk = QinaoRiskGate(permitTTLSeconds: 30,
                          defaultDelaySeconds: 60,
                          now: { Date() })
-let loop = QinaoLoop()
+let endpoint = await QinaoLoop.makeAppleFoundationEndpoint()
+let loop = QinaoLoop(organEndpoint: endpoint)
 
-// 3. Submit candidates; read the frontier and guardian branch.
-try await loop.submit(sessionID: "s1", candidates: [
-    QinaoLoop.CandidateInput(
-        candidateID: "c1", title: "Take a walk",
-        actionSummary: "step outside for 10 minutes",
-        expectedBenefit: 0.8, expectedCost: 0.1,
-        reversibility: 0.95, confidence: 0.7)
-])
-let frontier = try await loop.candidateFrontier(sessionID: "s1")
+// 3. Generate candidates from prompts (real on-device LLM):
+let result = try await loop.generateCandidates(
+    sessionID: "s1",
+    seeds: [
+        QinaoLoop.CandidateSeed(
+            candidateID: "c1", title: "Mindful break",
+            prompt: "Suggest one short break activity in 12 words.",
+            role: .core,
+            expectedBenefit: 0.8, expectedCost: 0.1,
+            reversibility: 0.95, confidence: 0.7)
+    ])
+// result[0].body is a real Apple FoundationModels response.
+// result[0].providerID == "apple.foundation-models.v1"
 
 // 4. When a candidate is chosen, collect the three signatures.
 let permit = try await risk.requestActionPermit(for: intent)
@@ -158,6 +204,33 @@ try await runtime.execute(
     payload: payload,
     intent: intent,
     signatures: .init(permit: permit, warrant: warrant, proof: proof))
+```
+
+---
+
+## Measured numbers
+
+Snapshot from the live regression suite running on a macOS 26.4.1
+Apple-Silicon dev box. All numbers come from green tests under
+`Tests/QinaoRuntimeSDKTests/` and are printed as part of the test
+output.
+
+| Property                                | Result                                              | Test |
+| --------------------------------------- | --------------------------------------------------- | ---- |
+| 14-layer saturation per turn            | 13/13 hot-path layers fire when prerequisites met; layer 14 is always present | `QinaoRuntime14LayerSaturationTests.testFullyLoadedTurnInjectsAll13Layers` |
+| Observation-pipeline latency, p95       | 0.32 ms (100 sequential fully-loaded turns)         | `QinaoRuntime14LayerSaturationTests.testHundredSequentialTurnsLatencyDistribution` |
+| Apple FoundationModels round-trip, scout | ~0.3 s (one short-reply prompt)                     | `AppleFoundationE2ETests.testRealScoutDraftReturnsNonEmptyBody` |
+| Apple FoundationModels round-trip, core | ~1.2 s (one short-paragraph prompt)                 | `AppleFoundationE2ETests.testRealCoreDraftReturnsNonEmptyBody` |
+| Cross-session real parallelism          | 2 sessions complete in ~0.35 s (both hit the model) | `QinaoAppleFoundationConcurrencyTests.testTwoConcurrentSessionsBothReachAppleFM` |
+| Thermal stability (100-turn stress)     | nominal → nominal (no escalation)                   | `QinaoRuntime14LayerSaturationTests.testThermalStateDoesNotEscalateAcross100Turns` |
+| Error-translation reason-code matrix    | 7 deterministic mappings pinned                     | `QinaoOrganErrorTranslationTests` |
+
+The Apple-FM round-trip tests are gated behind `QINAO_FM_E2E=1` so the
+default `swift test` run stays fast and offline. Set the env var to
+exercise the real on-device model:
+
+```sh
+QINAO_FM_E2E=1 swift test --filter AppleFoundationE2ETests
 ```
 
 ---
@@ -210,6 +283,10 @@ promise. All listed tests are part of the default `swift test` run on
 | **Candidate frontier + compare panel + guardian branch** | `QinaoLoop` (`QinaoLoopTests`, `ThinkNotSpinDemo`) |
 | **Control plane: rollback / halt / release** | `QinaoSovereignControlPlane` (`QinaoSovereignTests`) |
 | **Five soft-hand surfaces (answer / compare / delay / block / replace)** | `QinaoUI` (`QinaoUITests`) |
+| **Apple FoundationModels driven end-to-end through the public API** | `QinaoLoop.makeAppleFoundationEndpoint()` factory routes `QinaoLoop.generateCandidates(...)` to a real on-device `LanguageModelSession` (`AppleFoundationE2ETests`, `QinaoAppleFoundationE2ETests`, `QinaoAppleFoundationFactoryTests`) |
+| **Concurrent sessions are race-safe** | Two parallel sessions on independent `QinaoLoop` actors both reach the model without deadlock or cross-talk (`QinaoAppleFoundationConcurrencyTests.testTwoConcurrentSessionsBothReachAppleFM`) |
+| **Reason-code grammar pinned across providers** | Every `QinaoOrganEndpoint` error translates to a stable `LoopError.organUnavailable(reason:)` code (`QinaoOrganErrorTranslationTests`) |
+| **14-layer per-turn observation streaming + perf budget** | `QinaoRuntime.sendSession` injects every applicable layer's observation summary; pipeline p95 < 0.5 ms; thermal state stable across 100-turn stress (`QinaoRuntime14LayerSaturationTests`) |
 
 ---
 

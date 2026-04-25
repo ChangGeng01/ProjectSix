@@ -26,12 +26,12 @@ import QinaoAppleFoundation
 /// ## Real-LLM tests are env-gated
 ///
 /// The test that exercises real Apple FM (`testFactoryWithoutFallbackHitsRealAppleFM`)
-/// uses the same `BAS_FM_E2E=1` gate as M177/M178. Default
+/// uses the same `QINAO_FM_E2E=1` gate as M177/M178. Default
 /// `swift test` runs only the deterministic-fallback path, which
 /// is offline + fast.
 final class QinaoAppleFoundationFactoryTests: XCTestCase {
 
-    private static let envFlag = "BAS_FM_E2E"
+    private static let envFlag = "QINAO_FM_E2E"
 
     private func skipUnlessRealLLMReady() throws {
         guard

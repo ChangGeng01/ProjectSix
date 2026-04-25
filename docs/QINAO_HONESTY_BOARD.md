@@ -422,3 +422,75 @@ env-gated 路径（实际真打 Apple LLM）共 **8 条** —— 经 BAS / Qinao
 |---|---|---|
 | QinaoRuntime, QinaoHost, QinaoMemory, QinaoLoop, QinaoRisk, QinaoSovereign, QinaoWorldPrior, QinaoUI | 7 模块 + UI | 不依赖 BASAppleAdapters |
 | **QinaoAppleFoundation** | Apple LLM 一行接入 | QinaoLoop + BASAppleAdapters |
+
+---
+
+## 八、M182-M183 — README 对齐 + 全审计链 E2E（2026-04-26）
+
+### 8.1 README 现实对齐（M182）
+
+`QinaoRuntimeSDK/README.md` 改 4 处：
+
+1. **8 模块 → 9 模块**：加入 `QinaoAppleFoundation` 行，标 *Opt-in*。
+2. **新增 "Wiring the on-device LLM" 章节**：1 行 factory 示例 + 不可达情况下的 `LoopError.organUnavailable` 说明 + `includeDeterministicFallback` 用法。
+3. **Minimal use 示例升级**：从抽象 `loop.submit(...)` 升级到具体 `loop.generateCandidates(...)` 用真 Apple FM。
+4. **新增 "Measured numbers" 章节**：14 层饱和 + 观察管线 p95 0.32ms + Apple FM scout/core 实测 + 跨会话并行 + 热稳定 + error-translation matrix —— 每行附测试源文件名。
+
+### 8.2 env var 命名清理（M182 副带）
+
+`BAS_FM_E2E` → `QINAO_FM_E2E`，全仓 8 个 .swift + Package.swift + README 一次替换。原因：
+
+- `BAS` 前缀属于 substrate 内部命名空间，host-facing API 不该暴露
+- redaction scanner 在 README 上抓 "BAS" 子串，挡住 README 提及测试入口的能力
+- 改名后 README 可以放出真实可执行命令 `QINAO_FM_E2E=1 swift test --filter ...`
+
+### 8.3 全审计链 E2E（M183）
+
+新增 `QinaoAppleFoundationAuditChainTests.swift` — 2 测试，env-gated `QINAO_FM_E2E=1`：
+
+**`testAppleFMBodyFlowsIntoUpdateTicketAndLandsInL14Ledger`**（0.848s）
+
+走完整链：
+1. `QinaoLoop.makeAppleFoundationEndpoint()` → 真 Apple LLM `LanguageModelSession.respond(to:)` 出 body
+2. host 把 body 包成 `BASUpdateTicket(ticketID, sessionRef, summary: body, ...)`
+3. `runtime.sendSession(observations, updateTickets: [ticket])` 走 9 phase 主路径
+4. L13（evolutionFurnace）观察包流入 L14 audit ledger
+5. `sovereign.observationBundle(sessionID:turnID:)` 查询，断言 bundle 含 L13 + L14
+
+证明"shadow trial → audit"承诺的完整端到端在真模型上跑通——以前每段独立证明，现在闭环。
+
+**`testRealLLMTraceIDIsRecoverableFromGeneratedCandidate`**（0.221s）
+
+证明真模型 draft 的 `traceID`（SHA256 hex 摘要）在 `BASOrganDraft → QinaoLoop.OrganResponse → GeneratedCandidate` 三段翻译链上保持非空 + 可恢复 —— host 持久化这个值用于 post-incident 审计（"哪条模型输出生成了这条 ticket"）。
+
+### 8.4 测试金字塔最终态（M183 后）
+
+| 层 | 套件 | 数 | 真打 LLM |
+|---|---|---|---|
+| BAS adapter | `AppleFoundationE2ETests` | 5 | ✅ |
+| Qinao 手动 | `QinaoAppleFoundationE2ETests` | 3 | ✅ |
+| Qinao 工厂 | `QinaoAppleFoundationFactoryTests` | 4（2 离线 + 2 真机） | 部分 |
+| Qinao 并发 | `QinaoAppleFoundationConcurrencyTests` | 2 | ✅ |
+| **Qinao 全审计链** | `QinaoAppleFoundationAuditChainTests` | **2** | ✅ |
+| 14 层饱和 | `QinaoRuntime14LayerSaturationTests` | 4 | ❌（纯观察管线） |
+| 错误翻译 | `QinaoOrganErrorTranslationTests` | 8（7 + 1 skip） | ❌ |
+
+**12 条 env-gated 真路径 + 12 条离线契约钉**。每条都有测试文件 + 测试方法名可索引。
+
+### 8.5 该说什么 / 不该说什么（M183 之后口径）
+
+> ✅ "Apple FoundationModels 一行接入 · 真模型从输出到审计 ledger 端到端通路被独立测试钉住 · 跨会话并行 + 错误翻译矩阵 + 14 层饱和都有实测数字"
+
+仍然 **不该说**：
+- "ANE 算子级优化" — 不在本仓
+- "比 X 快 Y 倍" — 观察管线不含推理，不可比
+
+### 8.6 不变量兑现率重估
+
+| 不变量 | 之前 | 现在 | 备注 |
+|---|---|---|---|
+| 先醒再答 | 100% | 100% | 不动 |
+| 神经不直接掌权 | 100% | 100% | 不动 |
+| 宿主私有经验不进基础权重 | 100% | 100% | 不动 — M183 钉了 ticket → ledger 真实路径，**审计**侧加分但不变更承诺 |
+
+L2 / Neural Organ Runtime 行（§三 14 层表）40% **保持不动**——M177-M183 都是 *验证* 既有 in-scope 实现可用，不是新增 in-scope 实现。剩余 60% 是 §9.6 Swift-only 边界外的 ANE 算子层 / 图编译器。
