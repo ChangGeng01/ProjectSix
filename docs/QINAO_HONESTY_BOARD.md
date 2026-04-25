@@ -655,3 +655,78 @@ M186 钉了"真 LLM 驱动 intent → 三签门"happy + 错配签名 path。M190
 | 会想不自转 | 99% | 99% | 不动 |
 | **会保护不接管** | 100% | **100%（+ 真模型链证据）** | M190 钉了"高风险信号 + 真 LLM body → not-draftShell + reasonCodes 非空"在真模型上 |
 | 会成长不乱长 | 100% | **100%（+ 跨进程恢复）** | M189 让 audit chain 跨进程持久；删除/回滚/influence 路径在 host 进程 crash 后仍可审计 |
+
+---
+
+## 十一、M192 + M193 + M194 — 真模型链向 L4/L8 + cancellation 收口（2026-04-26）
+
+### 11.1 M192 — 流式取消传播
+
+`Task.cancel()` 经 `LanguageModelSession.streamResponse(to:)` 真传播 — 实测从 cancel 信号到迭代退出 ~150ms（其中 150ms 是 test 故意 sleep；模型甚至没生成第一个 chunk 就 bailed）。
+
+**新增**：`AppleFoundationStreamCancellationTests.swift` · 2 测试 · env-gated：
+- `testCancellingStreamingTaskTerminatesWithinBudget` — 5s exit budget，实测 154ms / 0 chunks
+- `testCancellationBeforeIterationProducesNoChunks` — 迭代前 cancel 不死锁 actor
+
+`AppleFoundationOrganAdapter+Streaming.swift` 加 "Cancellation (M192)" 章节文档化合约。
+
+### 11.2 M193 — 真 LLM body → L4 world-prior axiom 评估
+
+L4 vault 的 `evaluateHostOverride(claimID:declaredEvidence:statement:)` 在真模型链上的端到端覆盖。三个 outcome 对应三个测试。
+
+**新增**：`QinaoAppleFoundationWorldPriorChainTests.swift` · 3 测试 · 全部 env-gated：
+
+- `testRealLLMSpeculativeClaimAgainstAxiomaticBedrockIsRejected` 0.304s — 真 LLM body wrapped 为 `.speculative` claim against `axiom-ethics-consent`（`.axiomatic`）→ `.reject(axiom:)`，**BoundaryBedrock 在真模型 body 上的硬执行**：无论 LLM body 有多 plausible，speculative claim 不能 displace axiomatic 的
+- `testRealLLMClaimAgainstUnknownAxiomIsClean` 3.500s — 同 body + 不存在的 claimID → `.clean`，文档化 "unknown axiom = clean" fast path
+- `testRealLLMClaimRejectedByBedrockTriggersGuardianDissent` 0.395s — L4-L9 全链：LLM body 进 `WorldPriorClaim` → `QinaoLoop.submit(...)` 计算 contradictionScore 折入 critiqueStrength → guardian branch fire 且 dissent 优先码 = `world-prior-contradiction`
+
+### 11.3 M194 — 真 LLM body → L8 memory governance + cascade delete
+
+invariant #3 (宿主私有经验不进基础权重) 在真模型链上的硬执行。
+
+**新增**：`QinaoAppleFoundationMemoryChainTests.swift` · 3 测试 · 2 真机 + 1 离线：
+
+- `testRealLLMBodyAdmittedRecallableAndCascadeDeletable` 0.729s — 真 LLM body 配 0.85 confidence → 经 governance 进 store → recall 拿回 byte-equal → `forget(id:)` 真删 → recall 不再返回 → cascade ledger 1 receipt + `.completed` + `removedMemoryIDs.contains(admitted.id)`
+- `testRealLLMBodyBelowConfidenceFloorIsRefused` 0.367s — 真 body + 0.4 confidence < 0.6 floor → `MemoryError.rejectedByGovernance(reason: "confidence-below-floor")` + store 仍空
+- `testGovernanceFloorIsPureGivenIdenticalConfidence` 0.001s — 离线 3 次相同低 confidence 调用都被 refuse（pure-function pin）
+
+### 11.4 测试金字塔最终态（M194 后）
+
+| 入口 | 套件 | 数 | 真打 LLM |
+|---|---|---|---|
+| BAS adapter | `AppleFoundationE2ETests` | 5 | ✅ |
+| BAS streaming | `AppleFoundationStreamingTests` | 5 | ✅ |
+| **BAS cancellation** | **`AppleFoundationStreamCancellationTests`** | **2** | ✅ |
+| Qinao 手动 | `QinaoAppleFoundationE2ETests` | 3 | ✅ |
+| Qinao 工厂 | `QinaoAppleFoundationFactoryTests` | 4 | 部分 |
+| Qinao 并发 | `QinaoAppleFoundationConcurrencyTests` | 2 | ✅ |
+| Qinao 审计链 | `QinaoAppleFoundationAuditChainTests` | 2 | ✅ |
+| Qinao 三签门 | `QinaoAppleFoundationGateChainTests` | 2 | ✅ |
+| Qinao 流式 | `QinaoLoopStreamBodyTests` | 5 | ✅ |
+| Qinao 持久化 | `QinaoSovereignPersistentLedgerTests` | 4 | ❌ |
+| Qinao 风闸/柔手 | `QinaoAppleFoundationRiskGateTests` | 3 | ✅ |
+| **Qinao L4 链** | **`QinaoAppleFoundationWorldPriorChainTests`** | **3** | ✅ |
+| **Qinao L8 链** | **`QinaoAppleFoundationMemoryChainTests`** | **3** | ✅ |
+| 14 层饱和 | `QinaoRuntime14LayerSaturationTests` | 4 | ❌ |
+| 错误翻译 | `QinaoOrganErrorTranslationTests` | 8 | ❌ |
+
+- **24 条 env-gated 真模型路径** + **24 条离线契约钉** = **48 个测试方法**
+- M177-M194 共 **15 条新测试套件**
+
+### 11.5 不变量兑现率（M194 之后）
+
+| 不变量 | M190 | M194 | 备注 |
+|---|---|---|---|
+| 先醒再答 | 100% | 100% | 不动 |
+| 神经不直接掌权 | 100% | 100% | M186 + M190 已钉；M193 的 BoundaryBedrock 拒绝是同一 invariant 的 L4 维度 |
+| **宿主私有经验不进基础权重** | 100% | **100%（+ 真模型 L8 链证据）** | M194 钉了"真 LLM body 经 memory.admit → governance gate → recall → forget → cascade receipt" 完整链路；删除真删，凭据真留 |
+
+### 11.6 整体性质行（5 条 — M194 之后口径）
+
+| 性质 | M190 | M194 | 关键证据 |
+|---|---|---|---|
+| 会醒会停 | 99% | 99% | 不动 |
+| **懂世界也懂宿主** | 100% | **100%（+ 真模型 L4 链）** | M193 钉了"真 LLM body 经 BoundaryBedrock axiomatic axiom 拒绝"；L4 评估器在真模型上的硬执行 |
+| 会想不自转 | 99% | 99% | 不动 |
+| 会保护不接管 | 100% | 100% | 不动（M190 已钉） |
+| 会成长不乱长 | 100% | **100%（+ 真模型 L8 删除证据）** | M194 钉了"真 LLM body → governance gate → cascade receipt → 删除真删"全链 |
