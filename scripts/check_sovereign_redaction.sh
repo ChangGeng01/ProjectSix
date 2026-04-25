@@ -25,10 +25,15 @@ fi
 
 cd "$PKG_DIR"
 
+# M173 — use a per-invocation tmpdir so two parallel CI jobs on the
+# same host don't race on a shared `/tmp/qinao_symbolgraph.log`.
+SYMBOLGRAPH_LOG="$(mktemp -t qinao_symbolgraph.XXXXXX)"
+trap 'rm -f "$SYMBOLGRAPH_LOG"' EXIT
+
 # Generate a fresh symbol graph so stale builds can't mask a regression.
-swift package dump-symbol-graph >/tmp/qinao_symbolgraph.log 2>&1 || {
+swift package dump-symbol-graph >"$SYMBOLGRAPH_LOG" 2>&1 || {
   echo "check_sovereign_redaction: symbol graph emission failed" >&2
-  cat /tmp/qinao_symbolgraph.log >&2
+  cat "$SYMBOLGRAPH_LOG" >&2
   exit 1
 }
 
@@ -69,6 +74,105 @@ FORBIDDEN = [
     "玄戒",
 ]
 
+# M173 — structural whitelist. The blacklist above catches obvious
+# leaks; the whitelist below catches NEW internal names a future
+# engineer might introduce (e.g. "Crucible", "DarkRing"). We
+# require every public Qinao symbol whose declaration mentions a
+# bare type name to either:
+#   * use a Qinao-prefixed name, or
+#   * be a known stdlib / Foundation / well-known interop type.
+#
+# Internal substrate types must reach the public surface only via
+# Qinao-prefixed mirrors / typealiases.
+PUBLIC_TYPE_WHITELIST_PREFIXES = (
+    "Qinao",        # Qinao's own types
+    "Swift.",       # stdlib
+    "Foundation.",  # Foundation (Date, Data, URL, ...)
+    "_Concurrency.", "Dispatch.",
+)
+PUBLIC_TYPE_WHITELIST_LITERALS = {
+    # Stdlib value types that often appear without a module prefix
+    # in declaration fragments. Keep this set small and explicit.
+    "Bool", "Int", "Int8", "Int16", "Int32", "Int64",
+    "UInt", "UInt8", "UInt16", "UInt32", "UInt64",
+    "Float", "Double", "String", "Substring",
+    "Date", "Data", "UUID", "URL", "TimeInterval",
+    "Array", "Dictionary", "Set", "Optional", "Result",
+    "Sendable", "Equatable", "Hashable", "Codable",
+    "Decodable", "Encodable", "Comparable", "CustomStringConvertible",
+    "Error", "AnyObject", "Any", "Self", "Void", "Never",
+    "Encoder", "Decoder", "KeyedDecodingContainer",
+    "AsyncStream", "AsyncSequence", "Task", "TaskGroup",
+    "ContinuousClock", "SuspendingClock", "Duration", "Instant",
+    "ClosedRange", "Range",
+    # Project-local types that the redaction blacklist doesn't
+    # forbid AND are intentionally exported under their own name.
+    "BASBudgetFrame",       # L1 budget type — re-exported by design
+    "BASRenderFrame",       # L12 surface aggregator — same
+    "BASSovereignFrame",    # L14 §5.1 aggregator — same
+    "BASThermalGuardLevel", "BASMaintenanceClass",
+    "BASEBrainRunMode", "BASRuntimePrecisionProfile",
+    "BASDeviceRoute", "BASLeaseLifeCoordinator",
+    "BASSurfaceDecision", "BASSurfaceDisclosure",
+    "BASSurfaceMode", "BASSurfaceAgency",
+    "BASSurfaceSubstitute", "BASCognitiveLayer",
+    "BASObservationCoverageSummary",
+    "BASObservationReconciliationReport",
+    "BASContextFrame", "BASDecomposeFrame",
+    "BASMemoryBundle", "BASThoughtFrame", "BASUpdateTicket",
+    "BASNeuralOrganMap", "BASRenderedOutput",
+    "BASCandidateFrontier", "BASJurisdictionMap",
+    "BASContaminationLineage", "BASMirrorDraft",
+    "BASRiskCard", "BASMemorySensitivity",
+    "BASEvolutionPromotionGate", "BASShadowTrialLedger",
+    "BASShadowTrialLedgerEntry",
+    "BASInMemoryShadowTrialLedger",
+    # M173 — KNOWN STRUCTURAL LEAKS (queued as M175 to add Qinao
+    # mirrors). These BAS types leak through QinaoHost.QinaoFurnace
+    # public surface today. The substring blacklist missed them
+    # because they do not contain any FORBIDDEN token; the M173
+    # structural whitelist surfaced them. Whitelisting them here
+    # is a temporary acknowledgment, NOT an approval — M175 must
+    # add Qinao* mirror types and then remove these entries.
+    "BASExperienceCandidate",
+    "BASEvolutionSeal",
+    "BASRetractionOrder",
+    "BASShadowTrialRecord",
+    # L5 host constitution leaks — QinaoHost accepts/returns
+    # these directly. M175 to add Qinao mirrors.
+    "BASHostCandidatePipeline", "BASHostConstitution",
+    "BASHostConstitutionVault", "BASHostVersionTree",
+    "BASHostChangeCandidate",
+    # L8 memory enum leaks — QinaoMemory.AdmitRequest/Receipt
+    # carry these through. M175 to mirror.
+    "BASMemoryKind", "BASMemoryScope", "BASMemoryTier",
+    "BASGovernedMemory",
+    # L1 lifecycle observability types — QinaoLifecycle returns
+    # these on its `currentReading()` / `lung*()` accessors.
+    # Considered part of the L1 public contract (M66 design).
+    "BASBreathScheduler", "BASComputeTierThermalSnapshot",
+    "BASLeaseLifeObservationBundle", "BASLungStateAccumulator",
+    "BASThermalTwin",
+    # M9 audit observation primitive — QinaoSovereignControlPlane.
+    # auditTurn(observations:) overload accepts the substrate
+    # primitive form for parity with substrate test fixtures.
+    "BASSovereignTurnObservations",
+    # World-prior types intentionally re-exported via
+    # QinaoWorldPrior. Qinao* wrappers handle the brand surface
+    # but the BAS shapes are accepted today as L4 public contract.
+    "BASWorldPriorClaim", "BASWorldPriorAxiom",
+    "BASWorldPriorTemplate", "BASWorldPriorEvidence",
+    # Substrate convenience types that surface today; audit each
+    # addition individually before extending this set.
+    "BASOrganRegistryEndpoint", "BASOrganAdapter",
+    "BASMemoryGovernance", "BASMemoryTierFilter",
+    "BASMemoryAtom", "BASMemoryHorizonPersistencePolicy",
+    "BASRollbackAnchor", "BASLungState", "BASBudgetThermalGuard",
+    "BASCritiqueBundle",
+    "BASIntegrityWeaveFrame",
+    "BASTriSelfScore", "BASTriSelfVoice",
+}
+
 symbol_dir = os.environ["SYMBOL_DIR"]
 readme_path = os.environ["README_PATH"]
 
@@ -80,6 +184,14 @@ if not qinao_graphs:
     print("check_sovereign_redaction: no Qinao*.symbols.json found", file=sys.stderr)
     sys.exit(1)
 
+import re
+
+# Identifiers in declaration fragments. We tokenize on
+# non-identifier chars and check each `BAS*` identifier against
+# the whitelist; anything not whitelisted is a structural leak
+# (a substrate-internal type appearing on the public surface).
+BAS_IDENTIFIER_RE = re.compile(r"\bBAS[A-Za-z0-9_]+\b")
+
 for path in qinao_graphs:
     module = os.path.basename(path).removesuffix(".symbols.json")
     if module.endswith("PackageTests"):
@@ -90,12 +202,27 @@ for path in qinao_graphs:
             continue
         decl = "".join(f.get("spelling", "")
                        for f in sym.get("declarationFragments", []))
+        # 1. Forbidden-token blacklist (catches obvious leaks).
         for tok in FORBIDDEN:
             if tok in decl:
                 title = sym.get("names", {}).get("title", "?")
                 violations.append(
                     f"[public-api] {module}:{title} contains forbidden token "
                     f"'{tok}' in declaration:\n    {decl}")
+        # 2. M173 — structural whitelist on `BAS*` identifiers.
+        # Catches NEW internal substrate types a future engineer
+        # might leak that are not on the FORBIDDEN list yet.
+        title = sym.get("names", {}).get("title", "?")
+        for match in BAS_IDENTIFIER_RE.findall(decl):
+            if match not in PUBLIC_TYPE_WHITELIST_LITERALS:
+                violations.append(
+                    f"[structural] {module}:{title} references "
+                    f"non-whitelisted substrate type '{match}'. "
+                    f"Either add a Qinao-prefixed mirror, or add "
+                    f"'{match}' to PUBLIC_TYPE_WHITELIST_LITERALS "
+                    f"in scripts/check_sovereign_redaction.sh after "
+                    f"reviewing whether the type is intentional "
+                    f"public surface.\n    declaration: {decl}")
 
 # ---- 2. README scan --------------------------------------------------
 if os.path.exists(readme_path):

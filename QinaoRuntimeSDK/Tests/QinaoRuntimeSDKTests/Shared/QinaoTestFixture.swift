@@ -12,73 +12,43 @@ import BASOrchestration
 @testable import QinaoSovereign
 @testable import QinaoLoop
 
-/// M155 — shared test fixture.
+/// Shared test fixture. Replaces the per-file `makeRuntime(...)`
+/// boilerplate that used to ripple across every test file when a
+/// constructor signature changed.
 ///
-/// Pre-M155 every test file repeated ~80-100 lines of boilerplate:
+/// `package` access (M169) — this is a test util, not a public
+/// SDK surface. `package` keeps it visible across test targets
+/// in the same SPM package without polluting the SemVer surface.
 ///
-///   actor ToolRecorder { ... }
-///   struct Fixture: Sendable { runtime; sovereign }
-///   private func makeRuntime(...) async -> Fixture {
-///       let snapshotManager = ...; let versionTree = ...;
-///       let ledger = ...; let coordinator = ...;
-///       let tokenAuthority = ...; let engine = ...;
-///       let verifier = ...; let sovereign = ...;
-///       let risk = ...; let constitution = ...;
-///       let tree = ...; let pipeline = ...;
-///       let host = ...; let memory = ...; let loop = ...;
-///       let executor = ...; let runtime = ...;
-///       return Fixture(...)
-///   }
-///
-/// Across 15-20 test files this ballooned to ~1500-2000 lines of
-/// mechanical duplication. Any fixture adjustment (new field on
-/// an actor, ctor signature change) had to ripple to every file.
-///
-/// Post-M155: one `QinaoTestFixture.make(...)` factory replaces
-/// all of that. Test bodies keep the assertions; setup collapses
-/// from ~100 lines per file to 1 line:
-///
-///     let fx = await QinaoTestFixture.make()
-///     // or customized:
-///     let fx = await QinaoTestFixture.make(
-///         hostID: "host.custom", withLifecycle: true)
-///
-/// The factory is `async` because it crosses actor boundaries
-/// and returns the seven most-accessed runtime surfaces as stored
-/// properties (runtime / sovereign / host / memory / loop / risk /
-/// ledger). Test files that need rare internals (e.g. the
-/// snapshot manager) can build a QinaoRuntime directly; most
-/// don't.
-public struct QinaoTestFixture: Sendable {
+/// `now: @Sendable () -> Date` is a REQUIRED parameter (M169) —
+/// no wall-clock default. TTL-based tests on slow CI flake when
+/// the wall clock advances mid-test; every fixture call site
+/// must pass a `FakeClock`-style closure or
+/// `QinaoTestFixture.frozenClock(at:)` so the test owns time.
+package struct QinaoTestFixture: Sendable {
 
-    public let runtime: QinaoRuntime
-    public let sovereign: QinaoSovereignControlPlane
-    public let host: QinaoHost
-    public let memory: QinaoMemory
-    public let loop: QinaoLoop
-    public let risk: QinaoRiskGate
-    public let ledger: BASSovereignAuditLedger
+    package let runtime: QinaoRuntime
+    package let sovereign: QinaoSovereignControlPlane
+    package let host: QinaoHost
+    package let memory: QinaoMemory
+    package let loop: QinaoLoop
+    package let risk: QinaoRiskGate
+    package let ledger: BASSovereignAuditLedger
 
-    /// Build a fixture with defaults that satisfy the vast
-    /// majority of tests. Every parameter has a sensible default;
-    /// tests override only what they need.
-    ///
-    /// - Parameters:
-    ///   - hostID: passed to `BASHostConstitution.hostID`.
-    ///   - activeVersion: passed to
-    ///     `BASHostConstitution.activeVersion` and registered
-    ///     as the single `BASHostVersion` in the version tree.
-    ///   - withLifecycle: when `true`, wires a real
-    ///     `QinaoLifecycle` using `makeForTesting(...)` with
-    ///     nominal thermal + no-op submitter/canceller.
-    ///   - warrantTTLSeconds: forwarded to
-    ///     `QinaoSovereignControlPlane`.
-    ///   - permitTTLSeconds: forwarded to `QinaoRiskGate`.
-    ///   - renderFrameCapacity: forwarded to
-    ///     `QinaoSovereignControlPlane` (M132 cap).
-    ///   - now: the shared clock for every time-sensitive
-    ///     substrate component.
-    public static func make(
+    /// Frozen `now` closure pinned to a specific instant.
+    /// Default fixture argument when the call site doesn't care
+    /// about time but should NOT inherit wall-clock flakiness.
+    package static func frozenClock(
+        at instant: Date = Date(timeIntervalSince1970: 1_700_000_000)
+    ) -> @Sendable () -> Date {
+        { instant }
+    }
+
+    /// Build a fixture. M169 — `now` is required (no wall-clock
+    /// default); pass `QinaoTestFixture.frozenClock()` for tests
+    /// that don't exercise time advancement, or a closure backed
+    /// by a stepping `actor` for tests that do.
+    package static func make(
         hostID: String = "host.test",
         activeVersion: String = "host.v1",
         withLifecycle: Bool = false,
@@ -87,7 +57,8 @@ public struct QinaoTestFixture: Sendable {
         renderFrameCapacity: Int =
             QinaoSovereignControlPlane
                 .defaultRenderFrameCapacity,
-        now: @escaping @Sendable () -> Date = { Date() },
+        now: @escaping @Sendable () -> Date =
+            QinaoTestFixture.frozenClock(),
         metricsRecorder: QinaoRuntime.MetricsRecorder? = nil
     ) async -> QinaoTestFixture {
         let recorder = ToolRecorder()

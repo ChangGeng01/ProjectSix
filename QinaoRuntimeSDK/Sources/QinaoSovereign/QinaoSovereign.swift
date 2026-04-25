@@ -584,12 +584,12 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    /// Host-facing handle onto the internal snapshot manager + host
-    /// version tree, so hosts can register snapshots and versions
-    /// without seeing the substrate types. The handle is opaque; its
-    /// only useful operations are the methods exposed on
-    /// `QinaoSovereignControlPlane`.
-    public struct SubstrateHandle: @unchecked Sendable {
+    /// Host-facing handle onto the internal snapshot manager +
+    /// host version tree. M174 — both inner types are `public
+    /// actor` (Sendable by inheritance), so the wrapper is now
+    /// regular `Sendable`; the previous `@unchecked Sendable`
+    /// was concurrency-checker bypass for no actual reason.
+    public struct SubstrateHandle: Sendable {
         internal let snapshotManager: BASSovereignSnapshotManager
         internal let hostVersionTree: BASSovereignHostVersionTree
     }
