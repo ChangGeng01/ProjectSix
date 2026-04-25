@@ -24,10 +24,15 @@ import FoundationModels
 /// reports unavailability through `currentCapacity()` — callers can
 /// fall back to another registered provider.
 ///
-/// The availability-guarded path is not exercised by `swift test` on
-/// macOS 14 (CryptoKit-only). The stub path IS exercised so the
-/// substrate can at minimum prove the integration is wired correctly
-/// and adapters fall through gracefully when the framework is absent.
+/// ## Test coverage
+///
+/// - `AppleFoundationOrganAdapterTests` — descriptor, role
+///   enforcement, stub-fallthrough on OS<26, pure prompt helpers.
+///   Runs on every OS the test target can build for.
+/// - `AppleFoundationE2ETests` (M177) — real `LanguageModelSession`
+///   invocation through the `BASOrganAdapter` contract. Gated
+///   behind `BAS_FM_E2E=1` and macOS 26+ / iOS 26+ / visionOS 26+
+///   so default `swift test` stays fast and offline.
 public actor AppleFoundationOrganAdapter: BASOrganAdapter {
     public nonisolated let descriptor: BASOrganDescriptor
 

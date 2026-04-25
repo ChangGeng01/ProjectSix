@@ -3,24 +3,29 @@ import XCTest
 @testable import BASOrgan
 @testable import BASAppleAdapters
 
-/// Tests the `AppleFoundationOrganAdapter`.
+/// Tests the `AppleFoundationOrganAdapter` — the parts that can be
+/// asserted regardless of whether `FoundationModels` is actually
+/// available on the test box.
 ///
-/// ## What this suite can and cannot prove
-///
-/// `swift test` on the M1 CI is macOS 14 (CryptoKit-only). That
-/// means the availability-guarded FoundationModels path (iOS 26+ /
-/// macOS 26+) *cannot run here*. We test the two things that can
-/// always be tested:
+/// ## What this suite covers
 ///
 /// 1. **Descriptor & role contract.** The adapter advertises the
 ///    right descriptor and rejects unsupported roles before touching
-///    FoundationModels.
-/// 2. **Stub fallthrough.** On macOS 14, `draft()` throws
-///    `providerUnavailable` — a registered consumer can then fall
-///    back to another adapter (e.g. `BASOrganDeterministicAdapter`).
+///    `FoundationModels`.
+/// 2. **OS-unavailable fallthrough.** When the OS guard fails (older
+///    macOS / iOS), `draft()` throws `providerUnavailable` so a
+///    registered consumer can fall back to another adapter (e.g.
+///    `BASOrganDeterministicAdapter`). These tests use
+///    `if #available(macOS 26, ...) { return }` to skip themselves
+///    on capable OSes — there's no negative behaviour to assert
+///    when the real path is reachable.
 /// 3. **Pure prompt helpers.** `systemInstructions(for:)` and
 ///    `prompt(for:)` are pure static functions; exercising them here
 ///    pins the scaffolding regardless of OS version.
+///
+/// The real on-device `LanguageModelSession` invocation is exercised
+/// by `AppleFoundationE2ETests` (M177), gated behind `BAS_FM_E2E=1`
+/// so default `swift test` runs stay fast and offline.
 final class AppleFoundationOrganAdapterTests: XCTestCase {
 
     // MARK: - Descriptor
