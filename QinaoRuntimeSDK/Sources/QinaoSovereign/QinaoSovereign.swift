@@ -502,85 +502,46 @@ public actor QinaoSovereignControlPlane {
     /// warm-cache from the persisted ledger.
     ///
     /// `_processedTurnKeysSet` mirrors `_processedTurnKeysOrder`
-    /// for O(1) `contains`. Both are kept in lockstep — every
-    /// insert appends to the order array and the set; eviction
-    /// pops from the front of the array and removes from the set.
+    /// for O(1) `contains`; both are kept in lockstep.
     private var _processedTurnKeysSet: Set<String> = []
     private var _processedTurnKeysOrder: [String] = []
 
-    /// M165 — turns that have passed Phase 0 claim but not yet
-    /// completed Phase 2 audit. The pre-M164 design had a race
-    /// window between `hasProcessedTurn` (Phase 0) and
-    /// `registerProcessedTurn` (Phase 2). M164 closes that window
-    /// by holding an in-flight claim in this set; M165 hardens it
-    /// further by handing the cancel/release path through Phase 2
-    /// `defer` in sendSession. Concurrent submissions hitting the
-    /// in-flight state are rejected with `.alreadyClaimed`.
+    /// Turns that have passed Phase 0 claim but not yet completed
+    /// Phase 2 audit. Concurrent submissions hitting an in-flight
+    /// key are rejected with `.alreadyClaimed`.
     private var inFlightTurnKeys: Set<String> = []
 
-    /// M127 — per-turn L12 render-frame storage. Sibling to the
-    /// BAS ledger's `sovereignFrames[]` (M123), but living on the
-    /// Qinao composition layer because `BASRenderFrame` lives in
-    /// `BASOrchestration` (L12 cognition plane) while the BAS
-    /// ledger lives in `BASSovereign` (L14) — BASSovereign cannot
-    /// import BASOrchestration without creating a dep cycle, so
-    /// the storage lands here. Same LWW-on-(sessionID, turnID)
-    /// semantics; shadow index keyed on the tuple because
-    /// `BASRenderFrame`'s schema doesn't carry sessionID/turnID
-    /// inline.
+    /// L12 render-frame storage. Lives on the composition layer
+    /// rather than the BAS ledger because `BASRenderFrame` is in
+    /// `BASOrchestration` and `BASSovereign` cannot import that
+    /// without a dep cycle. LWW on `(sessionID, turnID)`.
     private var renderFrameEntries:
         [(sessionID: String, turnID: String,
           frame: BASRenderFrame)] = []
 
-    /// M132 — global FIFO capacity for `renderFrameEntries[]`.
-    ///
-    /// Unlike the BAS ledger's `observationBundles[]` + `coverage
-    /// Verdicts[]` + `sovereignFrames[]` (all three are the chain's
-    /// off-chain mirror and share the chain's audit-lifetime
-    /// retention), the Qinao-side `renderFrameEntries[]` is a
-    /// convenience surface for host UI mounting — it doesn't need
-    /// to carry the full session history forever. A long-running
-    /// chat session (hundreds of turns over hours) would otherwise
-    /// accrete an unbounded array in memory; M132 caps it at a
-    /// configurable ceiling with first-in-first-out eviction so
-    /// the newest turns (the ones the UI actually wants to render)
-    /// always win.
-    ///
-    /// Default = 4096 entries. Callers that expect longer sessions
-    /// or multi-session servers can bump via the bootstrap init;
-    /// callers that want deterministic unit-test behavior can cap
-    /// at a small integer (the M132 test suite uses 8).
-    ///
-    /// LWW-on-(sessionID, turnID) still applies: re-emitting the
-    /// same turn replaces in place without incrementing size.
-    /// Only NEW (sessionID, turnID) tuples that would push the
-    /// array past the cap trigger eviction of the oldest entry.
+    /// FIFO cap for `renderFrameEntries`. The BAS ledger's
+    /// off-chain mirror keeps full history; this Qinao-side
+    /// surface is for host UI mounting and doesn't need to.
     public static let defaultRenderFrameCapacity: Int = 4096
     private let renderFrameCapacity: Int
 
-    /// M165 — global FIFO capacity for `_processedTurnKeysOrder`.
-    /// Default is 16384 (4× the render-frame cap because turn
-    /// claims are smaller and longer-lived). The cap is process-
-    /// scoped: this is NOT a substitute for ledger-side
-    /// uniqueness — duplicates ACROSS process restarts are out of
-    /// scope until the ledger persists and a startup warm-cache
-    /// reseeds this set from the ledger's M83 segments.
+    /// FIFO cap for `_processedTurnKeysOrder`. Process-scoped:
+    /// not a substitute for ledger-side uniqueness, which the
+    /// `warmCacheProcessedTurnsFromLedger()` seam takes care of
+    /// once a persistent ledger ships.
     public static let defaultProcessedTurnCapacity: Int = 16_384
     private let processedTurnCapacity: Int
 
-    /// Cache of planID → internal plan, so `verifyRestore` can hand
-    /// the coordinator the exact plan it emitted (the plan's
+    /// `planID → RebootPlan` so `verifyRestore` can hand the
+    /// coordinator the exact plan it emitted (the plan's
     /// initializer is substrate-internal by design).
     private var planCache:
         [String: BASSovereignCleanRebootCoordinator.RebootPlan] = [:]
 
-    /// Substrate-typed initializer kept `internal` on purpose: taking
-    /// `BASSovereign*` types here would surface the internal verdict
-    /// machinery names on the public API. Hosts must use
-    /// `QinaoSovereignControlPlane.bootstrap(configuration:)` instead,
-    /// which encapsulates the substrate construction.
-    ///
-    /// The test suite reaches this init via `@testable import`.
+    /// `internal` because the substrate types in the parameter
+    /// list would otherwise leak into the public symbol graph.
+    /// Hosts go through `bootstrap(configuration:)` instead.
+    /// Tests reach this init via `@testable import`.
     internal init(
         coordinator: BASSovereignCleanRebootCoordinator,
         tokenAuthority: BASSovereignTokenAuthority,
@@ -601,13 +562,10 @@ public actor QinaoSovereignControlPlane {
         self.auditLedger = auditLedger
         self.warrantTTL = warrantTTLSeconds
         self.now = now
-        // M132 — clamp to at least 1; a zero or negative cap
-        // would make the storage write-only (every record
-        // followed by immediate eviction) which is never what
-        // hosts want.
+        // Clamp to ≥ 1; a zero/negative cap would make the
+        // storage write-only.
         self.renderFrameCapacity =
             Swift.max(1, renderFrameCapacity)
-        // M165 — same clamp rationale.
         self.processedTurnCapacity =
             Swift.max(1, processedTurnCapacity)
     }
@@ -830,68 +788,34 @@ public actor QinaoSovereignControlPlane {
         haltReasons[sessionID] = reason
     }
 
-    // MARK: - M161 + M164 · idempotency / duplicate-turn detection
+    // MARK: - Idempotency / duplicate-turn detection
     //
-    // M161 originally shipped a two-step pattern: `hasProcessedTurn`
-    // at Phase 0, then `registerProcessedTurn` after Phase 2 audit.
-    // Between those two awaits the runtime task suspends (audit
-    // hops to the BAS sovereign actor and back), so a concurrent
-    // sendSession arriving in the gap could also see "not
-    // processed" and proceed. Both turns then registered, producing
-    // duplicate audit-chain entries.
-    //
-    // M164 closes that race by introducing an atomic three-method
-    // pattern executed entirely inside the Qinao sovereign actor:
-    //
-    //   claimTurn(...)         — Phase 0 atomic check-and-claim;
-    //                            returns .alreadyProcessed |
-    //                            .alreadyClaimed | .claimed.
-    //   finalizeTurnClaim(...) — Phase 2 success; moves the claim
-    //                            from `inFlightTurnKeys` to
-    //                            `processedTurnKeys`.
-    //   releaseTurnClaim(...)  — Phase 2 failure (audit threw);
-    //                            removes the claim so the caller
-    //                            can retry with the same turnID.
-    //
-    // The legacy M161 `registerProcessedTurn` / `hasProcessedTurn`
-    // surface stays available for direct host use and tests, but
-    // sendSession itself uses the M164 atomic flow.
-    //
-    // Compound key encoding: M164 percent-escapes both ID segments
-    // before joining with `|`, so a sessionID containing `|` or
-    // `%` cannot collide with adjacent (sess', turn') pairs. This
-    // mirrors the M163 synthetic-ref escape on the storage-key
-    // side.
+    // sendSession's Phase 0 uses the atomic three-method flow
+    // below to close two race windows:
+    //   * `claimTurn` returning false then `registerProcessedTurn`
+    //     much later let two concurrent submissions both pass.
+    //   * `isSessionHalted` then `claimTurn` as separate awaits
+    //     let a `markSessionHalted` slip between them.
+    // `claimTurnIfNotHalted` collapses both reads into one actor
+    // hop. Compound key uses `QinaoIDEncoding` so dotted IDs
+    // cannot collide.
 
-    /// M164 + M165 — atomic claim outcome. M165 adds
-    /// `.sessionHalted` so the second TOCTOU (between
-    /// `isSessionHalted` and `claimTurn`) is closed by collapsing
-    /// both reads into one actor hop via `claimTurnIfNotHalted`.
     public enum TurnClaimResult: Sendable, Equatable {
         case claimed
         case alreadyClaimed
         case alreadyProcessed
-        /// M165 — atomic halt rejection. The session was already
-        /// halted at the moment the claim was attempted; no claim
-        /// was placed.
+        /// Halt observed atomically with the claim attempt.
         case sessionHalted
     }
 
-    /// M164 — atomic Phase 0 claim. Replaces the M161 two-step
-    /// `hasProcessedTurn` + `registerProcessedTurn` pattern with a
-    /// single actor-isolated method so concurrent submissions
-    /// cannot both pass Phase 0. M165 — prefer
-    /// `claimTurnIfNotHalted(...)` from sendSession; this method
-    /// stays available for hosts that want claim-only semantics.
+    /// Phase 0 atomic check-and-claim. Use
+    /// `claimTurnIfNotHalted(...)` from `sendSession` to also
+    /// close the halt TOCTOU; this overload is for hosts that
+    /// want claim-only semantics.
     ///
-    /// - Returns:
-    ///   - `.alreadyProcessed` when `(sessionID, turnID)` has
-    ///     completed a previous Phase 2.
-    ///   - `.alreadyClaimed` when another in-flight `sendSession`
-    ///     has the claim and has not yet finalized or released.
-    ///   - `.claimed` when the claim was newly held; caller must
-    ///     either `finalizeTurnClaim(...)` after audit success or
-    ///     `releaseTurnClaim(...)` after audit failure.
+    /// On `.claimed` the caller MUST either
+    /// `finalizeTurnClaim(...)` (audit success) or
+    /// `releaseTurnClaim(...)` (audit failure).
     public func claimTurn(
         sessionID: String, turnID: String
     ) -> TurnClaimResult {
@@ -907,21 +831,7 @@ public actor QinaoSovereignControlPlane {
         return .claimed
     }
 
-    /// M165 — atomic halt-then-claim. Closes the second TOCTOU
-    /// window M164 left open: pre-M165 sendSession did
-    /// `isSessionHalted` and `claimTurn` as two separate awaits,
-    /// so a `markSessionHalted` slipping between them let a turn
-    /// claim a slot in an already-halted session and run audit.
-    /// This method does both reads inside one actor hop so the
-    /// halt status is observed atomically with the claim.
-    ///
-    /// - Returns:
-    ///   - `.sessionHalted` when the session is halted; no claim
-    ///     was placed and the caller MUST throw
-    ///     `TurnError.sessionAlreadyHalted(...)`.
-    ///   - `.alreadyProcessed` / `.alreadyClaimed` / `.claimed` —
-    ///     same semantics as `claimTurn`. The caller is
-    ///     responsible for finalizing or releasing on success.
+    /// Atomic halt-and-claim — both reads inside one actor hop.
     public func claimTurnIfNotHalted(
         sessionID: String, turnID: String
     ) -> TurnClaimResult {
@@ -932,10 +842,8 @@ public actor QinaoSovereignControlPlane {
             sessionID: sessionID, turnID: turnID)
     }
 
-    /// M164 — release a previously-held claim. Called when audit
-    /// fails so the caller can retry with the same turnID. No-op
-    /// if no claim exists (defensive — host code that double-
-    /// releases must not hard-fail).
+    /// Release a previously-held claim (audit failure path).
+    /// No-op if no claim exists.
     public func releaseTurnClaim(
         sessionID: String, turnID: String
     ) {
@@ -944,25 +852,20 @@ public actor QinaoSovereignControlPlane {
         inFlightTurnKeys.remove(key)
     }
 
-    /// M164 + M165 — finalize a previously-held claim. Atomically
-    /// removes the in-flight marker and adds the key to the
-    /// processed FIFO so subsequent `claimTurn(...)` calls return
-    /// `.alreadyProcessed`. Idempotent — calling twice is a no-op
-    /// after the first call. M165 — when the FIFO would exceed
-    /// `processedTurnCapacity`, the oldest finalized key is
-    /// evicted (eviction is observable: a previously-processed
-    /// turn whose key was evicted re-runs as a fresh claim).
+    /// Move the claim from `inFlightTurnKeys` to the processed
+    /// FIFO. Idempotent. When the FIFO exceeds
+    /// `processedTurnCapacity` the oldest entry is evicted —
+    /// observable as a previously-processed turn re-running as a
+    /// fresh claim.
     public func finalizeTurnClaim(
         sessionID: String, turnID: String
     ) {
         let key = Self.compoundTurnKey(
             sessionID: sessionID, turnID: turnID)
         inFlightTurnKeys.remove(key)
-        // Idempotent — duplicate finalize is a no-op.
         if _processedTurnKeysSet.contains(key) { return }
         _processedTurnKeysSet.insert(key)
         _processedTurnKeysOrder.append(key)
-        // M165 — bound the FIFO. Eviction is FIFO (oldest first).
         while _processedTurnKeysOrder.count
             > processedTurnCapacity
         {
@@ -971,18 +874,13 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    /// M164 — number of currently-in-flight claims. Test-oriented
-    /// telemetry: in steady state this should sit near 0; a
-    /// growing in-flight count signals a host code path that
-    /// released or finalized incorrectly. M165 — `package` access
-    /// so it stays callable from QinaoRuntime + tests but does
-    /// not enter the public SemVer surface.
+    /// Count of currently-in-flight claims. Test-oriented
+    /// telemetry; a growing count signals a host that missed a
+    /// finalize or release.
     package func inFlightTurnCount() -> Int {
         inFlightTurnKeys.count
     }
 
-    /// M164 + M165 — compound key construction. Routes through
-    /// the unified `QinaoIDEncoding` helper.
     private nonisolated static func compoundTurnKey(
         sessionID: String, turnID: String
     ) -> String {
@@ -1001,8 +899,7 @@ public actor QinaoSovereignControlPlane {
             sessionID: sessionID, turnID: turnID)
     }
 
-    /// M165 — `package` access. Consults the FIFO; in-flight
-    /// claims are NOT reported as processed.
+    /// In-flight claims are NOT reported as processed.
     package func hasProcessedTurn(
         sessionID: String, turnID: String
     ) -> Bool {
@@ -1011,48 +908,25 @@ public actor QinaoSovereignControlPlane {
                 sessionID: sessionID, turnID: turnID))
     }
 
-    /// M165 — `package` access. Test-oriented telemetry; the
-    /// number is bounded by `processedTurnCapacity` so
-    /// long-running deployments don't see runaway growth.
+    /// Bounded by `processedTurnCapacity`.
     package func processedTurnCount() -> Int {
         _processedTurnKeysSet.count
     }
 
-    /// M168 — seed `processedTurnKeys` from the audit ledger so
-    /// the M161/M164 idempotency guarantee survives process
-    /// restarts. Pre-M168 the guarantee was process-scoped: a
-    /// host that restarted the process re-accepted the same
-    /// `(sessionID, turnID)` pair and wrote a duplicate audit
-    /// entry. M168 closes that gap by walking the ledger at
-    /// startup and registering every prior turn into the FIFO.
-    ///
-    /// Cross-process uniqueness is real ONLY when the underlying
-    /// ledger persists across restarts. With the default
-    /// in-memory ledger this method is architecturally correct
-    /// but practically a no-op (the ledger is empty after
-    /// restart). Once a persistent ledger lands (M91 SQLite or
-    /// equivalent), this method automatically promotes
-    /// idempotency to system-scope without any other code
-    /// change.
-    ///
-    /// - Returns: number of `(sessionID, turnID)` keys seeded.
-    ///   Hosts log this for sanity (`"warm-cache loaded N
-    ///   prior turns"`). When the result equals the FIFO cap,
-    ///   the cap may need raising — older entries beyond the
-    ///   cap are NOT seeded and would re-process on a
-    ///   conflicting submission.
+    /// Seed `processedTurnKeys` from the audit ledger so
+    /// idempotency survives process restarts. Cross-process
+    /// uniqueness is real ONLY when the underlying ledger
+    /// persists; with an in-memory ledger this is architecturally
+    /// correct but practically a no-op (the ledger is empty after
+    /// restart anyway). Returns the number of keys seeded; when
+    /// it equals `processedTurnCapacity`, the cap may need
+    /// raising.
     @discardableResult
     public func warmCacheProcessedTurnsFromLedger() async -> Int {
-        // Drain entries in chain order so the FIFO eviction
-        // matches the temporal order the ledger recorded.
+        // Chain order so FIFO eviction matches temporal order.
         let entries = await auditLedger.snapshot()
         var seeded = 0
         for appended in entries {
-            // M168 — `BASSovereignAuditEntry` carries sessionID +
-            // turnID. We seed every entry rather than dedupe
-            // because the FIFO uses `Set` for O(1) `contains` and
-            // a duplicate insert is a no-op; the order array
-            // dedupes via the same set.
             let entry = appended.entry
             let key = Self.compoundTurnKey(
                 sessionID: entry.sessionID,
@@ -1061,7 +935,6 @@ public actor QinaoSovereignControlPlane {
             _processedTurnKeysSet.insert(key)
             _processedTurnKeysOrder.append(key)
             seeded += 1
-            // Respect the FIFO cap. Drop oldest if we exceed it.
             while _processedTurnKeysOrder.count
                 > processedTurnCapacity
             {
