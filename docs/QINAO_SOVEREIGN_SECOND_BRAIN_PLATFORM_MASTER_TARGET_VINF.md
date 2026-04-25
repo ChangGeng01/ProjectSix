@@ -14,6 +14,10 @@
 >
 > 若需查看按“现状态判断 → 理想态定义 → 可研发落地路线”重组的项目级总览，请参考 [QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_TOP_PROJECT_OUTLINE_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_TOP_PROJECT_OUTLINE_V1.md)。
 >
+> 若需查看用户可请求思考力度、系统可校正，以及结构化过程视图不裸露隐藏思维的交互治理协议，请参考 [QINAO_EFFORT_PROCESS_VIEW_PROTOCOL_TARGET_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_EFFORT_PROCESS_VIEW_PROTOCOL_TARGET_V1.md)。
+>
+> 若需查看用户可自定义多 agent 人格属性、但人格只能作为席位投影而不能成为独立主权中心的协议，请参考 [QINAO_AGENT_PERSONA_PROJECTION_PROTOCOL_TARGET_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_AGENT_PERSONA_PROJECTION_PROTOCOL_TARGET_V1.md)。
+>
 > 若需查看与深渊治理法则对称的昆仑正轴 doctrine，请参考 [QINAO_KUNLUN_AXIS_DOCTRINE_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_KUNLUN_AXIS_DOCTRINE_TARGET_VINF.md)。
 >
 > 若需查看昆仑文化融合的专项研发技术路线，请参考 [QINAO_KUNLUN_INTEGRATION_RND_TECH_OUTLINE_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_KUNLUN_INTEGRATION_RND_TECH_OUTLINE_V1.md)。

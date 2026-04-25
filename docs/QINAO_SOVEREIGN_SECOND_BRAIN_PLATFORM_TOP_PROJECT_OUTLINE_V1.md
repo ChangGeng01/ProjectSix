@@ -7,6 +7,10 @@
 > 它不是当前实现完成声明，不改变当前仓库真实工程状态。当前实现仍以 [EBRAIN_13L_COMPLETION_MATRIX.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_COMPLETION_MATRIX.md)、[EBRAIN_13L_EXECUTION_V12.md](/Users/changgeng/Project/Project06/Project06/docs/EBRAIN_13L_EXECUTION_V12.md)、[QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_RND_TECH_OUTLINE_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_RND_TECH_OUTLINE_V1.md)、[QINAO_KUNLUN_INTEGRATION_RND_TECH_OUTLINE_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_KUNLUN_INTEGRATION_RND_TECH_OUTLINE_V1.md)、[QinaoRuntimeSDK/README.md](/Users/changgeng/Project/Project06/Project06/QinaoRuntimeSDK/README.md) 与 Swift 源码为准。
 >
 > 本文的定位是“项目级总览白皮书”。更完整的平台目标态见 [QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_MASTER_TARGET_VINF.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_MASTER_TARGET_VINF.md)，更细的研发技术总纲见 [QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_RND_TECH_OUTLINE_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_RND_TECH_OUTLINE_V1.md)。
+>
+> 若需查看用户自定义思考力度与结构化过程视图的交互治理协议，请参考 [QINAO_EFFORT_PROCESS_VIEW_PROTOCOL_TARGET_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_EFFORT_PROCESS_VIEW_PROTOCOL_TARGET_V1.md)。
+>
+> 若需查看多 agent 人格投影、Agent Studio 与单宿主单主权下的席位人格配置协议，请参考 [QINAO_AGENT_PERSONA_PROJECTION_PROTOCOL_TARGET_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_AGENT_PERSONA_PROJECTION_PROTOCOL_TARGET_V1.md)。
 
 ⸻
 

@@ -8,6 +8,10 @@
 >
 > 若需查看更偏项目判断、P0 收缩、现状态缺口与顶级路线摘要的版本，请参考 [QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_TOP_PROJECT_OUTLINE_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_TOP_PROJECT_OUTLINE_V1.md)。
 >
+> Effort 与 Process View 的交互治理协议见 [QINAO_EFFORT_PROCESS_VIEW_PROTOCOL_TARGET_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_EFFORT_PROCESS_VIEW_PROTOCOL_TARGET_V1.md)；该文档定义 `requested_effort / applied_effort`、分级结构化过程视图、redaction 与 `L14` 裁剪红线。
+>
+> 多 agent 人格投影与 Agent Studio 协议见 [QINAO_AGENT_PERSONA_PROJECTION_PROTOCOL_TARGET_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_AGENT_PERSONA_PROJECTION_PROTOCOL_TARGET_V1.md)；该文档定义 `AgentPersonaSpec / AgentPersonaVersion`、人格浓度分层、requested/applied persona 覆盖与单宿主单主权红线。
+>
 > 昆仑文化融合的专项研发路线见 [QINAO_KUNLUN_INTEGRATION_RND_TECH_OUTLINE_V1.md](/Users/changgeng/Project/Project06/Project06/docs/QINAO_KUNLUN_INTEGRATION_RND_TECH_OUTLINE_V1.md)；该文档细化 `Axis Plane`、昆仑对象体系、训练实验、SDK Pack 与文化-结构评测指标。
 
 ⸻
