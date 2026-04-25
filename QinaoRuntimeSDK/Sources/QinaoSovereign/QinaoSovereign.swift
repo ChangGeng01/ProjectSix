@@ -589,9 +589,23 @@ public actor QinaoSovereignControlPlane {
     /// M161 — track which (sessionID, turnID) tuples have already
     /// passed Phase 2 audit. Prevents the same turn from being
     /// submitted twice and accreting duplicate audit-chain
-    /// entries. Compound key `"<sessionID>|<turnID>"` because
-    /// neither sessionID nor turnID alone is unique.
+    /// entries. M164 — the compound key now uses percent-escaped
+    /// segments (via `compoundTurnKey(_:_:)`) so neither
+    /// sessionID nor turnID containing `|` or `%` can collide.
     private var processedTurnKeys: Set<String> = []
+
+    /// M164 — turns that have passed Phase 0 claim but not yet
+    /// completed Phase 2 audit. The pre-M164 design had a race
+    /// window between `hasProcessedTurn` (Phase 0) and
+    /// `registerProcessedTurn` (Phase 2): a second `sendSession`
+    /// arriving in that window would also see "not processed" and
+    /// proceed, producing duplicate audit-chain entries. M164
+    /// closes the window by holding an in-flight claim in this
+    /// set from the moment Phase 0 succeeds until either Phase 2
+    /// finalizes (claim → processed) or Phase 2 fails (claim
+    /// released). Concurrent submissions hitting the in-flight
+    /// state are rejected with `.alreadyClaimed`.
+    private var inFlightTurnKeys: Set<String> = []
 
     /// M127 — per-turn L12 render-frame storage. Sibling to the
     /// BAS ledger's `sovereignFrames[]` (M123), but living on the
@@ -889,27 +903,169 @@ public actor QinaoSovereignControlPlane {
         haltReasons[sessionID] = reason
     }
 
-    // MARK: - M161 · idempotency / duplicate-turn detection
+    // MARK: - M161 + M164 · idempotency / duplicate-turn detection
+    //
+    // M161 originally shipped a two-step pattern: `hasProcessedTurn`
+    // at Phase 0, then `registerProcessedTurn` after Phase 2 audit.
+    // Between those two awaits the runtime task suspends (audit
+    // hops to the BAS sovereign actor and back), so a concurrent
+    // sendSession arriving in the gap could also see "not
+    // processed" and proceed. Both turns then registered, producing
+    // duplicate audit-chain entries.
+    //
+    // M164 closes that race by introducing an atomic three-method
+    // pattern executed entirely inside the Qinao sovereign actor:
+    //
+    //   claimTurn(...)         — Phase 0 atomic check-and-claim;
+    //                            returns .alreadyProcessed |
+    //                            .alreadyClaimed | .claimed.
+    //   finalizeTurnClaim(...) — Phase 2 success; moves the claim
+    //                            from `inFlightTurnKeys` to
+    //                            `processedTurnKeys`.
+    //   releaseTurnClaim(...)  — Phase 2 failure (audit threw);
+    //                            removes the claim so the caller
+    //                            can retry with the same turnID.
+    //
+    // The legacy M161 `registerProcessedTurn` / `hasProcessedTurn`
+    // surface stays available for direct host use and tests, but
+    // sendSession itself uses the M164 atomic flow.
+    //
+    // Compound key encoding: M164 percent-escapes both ID segments
+    // before joining with `|`, so a sessionID containing `|` or
+    // `%` cannot collide with adjacent (sess', turn') pairs. This
+    // mirrors the M163 synthetic-ref escape on the storage-key
+    // side.
+
+    /// M164 — atomic claim outcome. Distinguishes "already
+    /// finalized" (audit completed previously) from "currently in
+    /// flight" (audit started but not finalized) so the runtime
+    /// can map each onto `TurnError.duplicateTurnSubmission(...)`
+    /// without conflating the two states.
+    public enum TurnClaimResult: Sendable, Equatable {
+        case claimed
+        case alreadyClaimed
+        case alreadyProcessed
+    }
+
+    /// M164 — atomic Phase 0 claim. Replaces the M161 two-step
+    /// `hasProcessedTurn` + `registerProcessedTurn` pattern with a
+    /// single actor-isolated method so concurrent submissions
+    /// cannot both pass Phase 0.
+    ///
+    /// - Returns:
+    ///   - `.alreadyProcessed` when `(sessionID, turnID)` has
+    ///     completed a previous Phase 2.
+    ///   - `.alreadyClaimed` when another in-flight `sendSession`
+    ///     has the claim and has not yet finalized or released.
+    ///   - `.claimed` when the claim was newly held; caller must
+    ///     either `finalizeTurnClaim(...)` after audit success or
+    ///     `releaseTurnClaim(...)` after audit failure.
+    public func claimTurn(
+        sessionID: String, turnID: String
+    ) -> TurnClaimResult {
+        let key = Self.compoundTurnKey(
+            sessionID: sessionID, turnID: turnID)
+        if processedTurnKeys.contains(key) {
+            return .alreadyProcessed
+        }
+        if inFlightTurnKeys.contains(key) {
+            return .alreadyClaimed
+        }
+        inFlightTurnKeys.insert(key)
+        return .claimed
+    }
+
+    /// M164 — release a previously-held claim. Called when audit
+    /// fails so the caller can retry with the same turnID. No-op
+    /// if no claim exists (defensive — host code that double-
+    /// releases must not hard-fail).
+    public func releaseTurnClaim(
+        sessionID: String, turnID: String
+    ) {
+        let key = Self.compoundTurnKey(
+            sessionID: sessionID, turnID: turnID)
+        inFlightTurnKeys.remove(key)
+    }
+
+    /// M164 — finalize a previously-held claim. Atomically removes
+    /// the in-flight marker and adds the key to `processedTurnKeys`
+    /// so subsequent `claimTurn(...)` calls return
+    /// `.alreadyProcessed`. Idempotent — calling twice is a no-op
+    /// after the first call.
+    public func finalizeTurnClaim(
+        sessionID: String, turnID: String
+    ) {
+        let key = Self.compoundTurnKey(
+            sessionID: sessionID, turnID: turnID)
+        inFlightTurnKeys.remove(key)
+        processedTurnKeys.insert(key)
+    }
+
+    /// M164 — number of currently-in-flight claims. Useful for
+    /// tests (asserting release/finalize correctness) and for
+    /// host-side metrics (a leaking claim count signals a bug
+    /// where a release/finalize call was missed).
+    public func inFlightTurnCount() -> Int {
+        inFlightTurnKeys.count
+    }
+
+    /// M164 — internal compound storage key. Percent-escapes both
+    /// ID segments before joining with `|` so a sessionID
+    /// containing `|` or `%` cannot collide with an adjacent
+    /// (sess', turn') pair. The escape is independent of the M163
+    /// synthetic-ref escape: visual refs care about `.` (the ref
+    /// separator); compound keys care about `|` (the key
+    /// separator). Both require `%` to be escaped first so the
+    /// encoding stays self-inverse, but the second character
+    /// differs.
+    ///
+    /// Pre-M164 the storage key was `sessionID + "|" + turnID`
+    /// (no escape), so (sessionID="A|", turnID="B") collided with
+    /// (sessionID="A", turnID="|B"). M164 makes the separator
+    /// unambiguous.
+    private nonisolated static func compoundTurnKey(
+        sessionID: String, turnID: String
+    ) -> String {
+        Self.escapeCompoundSegment(sessionID)
+            + "|" + Self.escapeCompoundSegment(turnID)
+    }
+
+    /// M164 — segment-level escape used by `compoundTurnKey`.
+    /// Order matters: `%` first (so `%7C` payloads don't get
+    /// double-encoded), `|` second (the separator). Pure value
+    /// transform — `nonisolated`.
+    private nonisolated static func escapeCompoundSegment(
+        _ value: String
+    ) -> String {
+        value
+            .replacingOccurrences(of: "%", with: "%25")
+            .replacingOccurrences(of: "|", with: "%7C")
+    }
 
     /// M161 — record that `(sessionID, turnID)` has been processed
-    /// through Phase 2 audit. sendSession calls this immediately
-    /// after auditTurn succeeds; subsequent sendSession calls with
-    /// the same key will fail at Phase 0 via `hasProcessedTurn`.
+    /// through Phase 2 audit. M164 — also clears any in-flight
+    /// marker so the legacy single-step API stays consistent with
+    /// the atomic claim flow used by sendSession. Hosts that
+    /// previously called `registerProcessedTurn` directly (without
+    /// claiming first) keep the same observable semantics.
     public func registerProcessedTurn(
         sessionID: String, turnID: String
     ) {
-        processedTurnKeys.insert(
-            sessionID + "|" + turnID)
+        finalizeTurnClaim(
+            sessionID: sessionID, turnID: turnID)
     }
 
     /// M161 — check whether a `(sessionID, turnID)` has already
-    /// been processed. Used by sendSession Phase 0 to reject
-    /// duplicate submissions before any state mutation.
+    /// been processed. Used by sendSession Phase 0 (legacy path)
+    /// and by tests. M164 — only consults `processedTurnKeys`;
+    /// in-flight claims are NOT reported as processed (a turn that
+    /// hasn't completed audit hasn't been "processed").
     public func hasProcessedTurn(
         sessionID: String, turnID: String
     ) -> Bool {
         processedTurnKeys.contains(
-            sessionID + "|" + turnID)
+            Self.compoundTurnKey(
+                sessionID: sessionID, turnID: turnID))
     }
 
     /// M161 — total number of (sessionID, turnID) keys tracked.

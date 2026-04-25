@@ -701,16 +701,24 @@ public actor QinaoRuntime {
             throw TurnError.sessionAlreadyHalted(
                 id: inputs.observations.sessionID)
         }
-        // M161 — duplicate-turn rejection. The same
-        // (sessionID, turnID) cannot be processed twice; a
-        // retry must use a new turnID.
-        if await sovereign.hasProcessedTurn(
+        // M161 + M164 — atomic claim closes the concurrent-
+        // submission race. The pre-M164 code did
+        // `hasProcessedTurn` here and `registerProcessedTurn`
+        // after Phase 2; the gap let two concurrent submissions
+        // both pass Phase 0. M164 holds an in-flight claim from
+        // here through Phase 2, finalizing on audit success and
+        // releasing on audit failure so the retry semantics that
+        // M161 documented still hold for honest retries.
+        switch await sovereign.claimTurn(
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID)
         {
+        case .alreadyProcessed, .alreadyClaimed:
             throw TurnError.duplicateTurnSubmission(
                 sessionID: inputs.observations.sessionID,
                 turnID: inputs.observations.turnID)
+        case .claimed:
+            break  // proceed to Phase 1
         }
 
         // =========================================================
@@ -726,16 +734,28 @@ public actor QinaoRuntime {
         // =========================================================
         // PHASE 2 — L14 sovereign audit (M9).
         // =========================================================
-        let report = try await sovereign.auditTurn(
-            observations: inputs.observations,
-            coordinatorSeverity: inputs.coordinatorSeverity)
-        // M161 — register the turn AFTER audit succeeds so a
-        // pre-audit failure (which would throw above) can be
-        // retried with the same turnID. Register before any
-        // halt-branch decisions so even halted turns count as
-        // "processed" — a halt is a final state, not retry-
-        // opportunity.
-        await sovereign.registerProcessedTurn(
+        let report: QinaoSovereignControlPlane.AuditReport
+        do {
+            report = try await sovereign.auditTurn(
+                observations: inputs.observations,
+                coordinatorSeverity: inputs.coordinatorSeverity)
+        } catch {
+            // M164 — audit threw → release the claim so the
+            // caller can retry with the same turnID. This
+            // preserves the M161 retry semantics for transient
+            // audit failures.
+            await sovereign.releaseTurnClaim(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID)
+            throw error
+        }
+        // M161 + M164 — finalize the claim AFTER audit succeeds
+        // so a pre-audit failure (which throws above and routes
+        // through `releaseTurnClaim`) can be retried with the
+        // same turnID. Finalize before any halt-branch decisions
+        // so even halted turns count as "processed" — a halt is a
+        // final state, not a retry opportunity.
+        await sovereign.finalizeTurnClaim(
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID)
 
