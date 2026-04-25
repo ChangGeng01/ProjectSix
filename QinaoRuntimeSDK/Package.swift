@@ -39,6 +39,15 @@ let package = Package(
         .library(
             name: "QinaoAppleFoundation",
             targets: ["QinaoAppleFoundation"]),
+        // M222 — opt-in MLX (downloaded Gemma) endpoint factory.
+        // Mirrors QinaoAppleFoundation: hosts wanting open-weights
+        // Gemma 3 / 3n via MLX `import QinaoMLX`; hosts that only
+        // want Apple FM or remote API stay decoupled from the
+        // mlx-swift-lm + swift-transformers + swift-huggingface
+        // dep tree.
+        .library(
+            name: "QinaoMLX",
+            targets: ["QinaoMLX"]),
         // M203 — runnable demo executable. `swift run QinaoSampleHost
         // "<prompt>"` drives QinaoLoop with the real Apple LLM
         // endpoint and prints the frontier candidate end-to-end.
@@ -190,12 +199,26 @@ let package = Package(
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
             ]),
-        // M219 — SwiftUI macOS GUI demo target.
+        // M222 — public factory wiring downloaded MLX Gemma weights
+        // behind QinaoOrganEndpoint. Mirrors QinaoAppleFoundation;
+        // optional library for hosts that want open-weights Gemma
+        // via the mlx-swift-lm pipeline.
+        .target(
+            name: "QinaoMLX",
+            dependencies: [
+                "QinaoLoop",
+                .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
+                .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate")
+            ]),
+        // M219 — SwiftUI macOS GUI demo target. M222 adds QinaoMLX
+        // dep so the picker's three Gemma entries can drive real
+        // MLX inference instead of falling back to Apple FM.
         .executableTarget(
             name: "QinaoSampleApp",
             dependencies: [
                 "QinaoLoop",
-                "QinaoAppleFoundation"
+                "QinaoAppleFoundation",
+                "QinaoMLX"
             ]),
         // M203 — runnable demo executable target. CLI that takes a
         // prompt argument, drives QinaoLoop with Apple FM, prints
@@ -231,6 +254,9 @@ let package = Package(
                 // M180 — exercise the public factory directly so the
                 // host pattern is covered end-to-end.
                 "QinaoAppleFoundation",
+                // M222 — exercise QinaoMLX façade in unit tests
+                // (factory shape, model identity, redaction).
+                "QinaoMLX",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 // M178 — env-gated end-to-end test (`QINAO_FM_E2E=1`)
                 // wires `AppleFoundationOrganAdapter` through a
