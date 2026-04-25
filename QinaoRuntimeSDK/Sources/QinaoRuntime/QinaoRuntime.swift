@@ -480,12 +480,17 @@ public actor QinaoRuntime {
                 return outcome
             }
         }
-        // Unreachable — Phase 9 always returns an outcome. The
-        // fallback throw documents the contract: the registry
-        // MUST end with a terminal phase that returns non-nil.
-        throw TurnError.invalidInput(
-            field: "phaseDrivers",
-            reason: "phase registry did not terminate")
+        // Unreachable — Phase 9 always returns an outcome. M176
+        // — `fatalError` (not `TurnError.invalidInput`): a
+        // non-terminating registry is a programmer error, not a
+        // user-input rejection. Reaching here means a future
+        // commit removed P9HealthyReturnDriver from the registry
+        // or made it return nil. The pin test
+        // `testTerminalPhaseIsLast` is the first-line defense;
+        // this trap is the second.
+        fatalError(
+            "QinaoRuntime.phaseDrivers must terminate with a " +
+            "phase returning non-nil TurnOutcome (P9 by default).")
     }
 
     // MARK: - M171 phase machine
