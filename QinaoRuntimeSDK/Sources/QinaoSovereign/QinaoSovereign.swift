@@ -1018,6 +1018,60 @@ public actor QinaoSovereignControlPlane {
         _processedTurnKeysSet.count
     }
 
+    /// M168 — seed `processedTurnKeys` from the audit ledger so
+    /// the M161/M164 idempotency guarantee survives process
+    /// restarts. Pre-M168 the guarantee was process-scoped: a
+    /// host that restarted the process re-accepted the same
+    /// `(sessionID, turnID)` pair and wrote a duplicate audit
+    /// entry. M168 closes that gap by walking the ledger at
+    /// startup and registering every prior turn into the FIFO.
+    ///
+    /// Cross-process uniqueness is real ONLY when the underlying
+    /// ledger persists across restarts. With the default
+    /// in-memory ledger this method is architecturally correct
+    /// but practically a no-op (the ledger is empty after
+    /// restart). Once a persistent ledger lands (M91 SQLite or
+    /// equivalent), this method automatically promotes
+    /// idempotency to system-scope without any other code
+    /// change.
+    ///
+    /// - Returns: number of `(sessionID, turnID)` keys seeded.
+    ///   Hosts log this for sanity (`"warm-cache loaded N
+    ///   prior turns"`). When the result equals the FIFO cap,
+    ///   the cap may need raising — older entries beyond the
+    ///   cap are NOT seeded and would re-process on a
+    ///   conflicting submission.
+    @discardableResult
+    public func warmCacheProcessedTurnsFromLedger() async -> Int {
+        // Drain entries in chain order so the FIFO eviction
+        // matches the temporal order the ledger recorded.
+        let entries = await auditLedger.snapshot()
+        var seeded = 0
+        for appended in entries {
+            // M168 — `BASSovereignAuditEntry` carries sessionID +
+            // turnID. We seed every entry rather than dedupe
+            // because the FIFO uses `Set` for O(1) `contains` and
+            // a duplicate insert is a no-op; the order array
+            // dedupes via the same set.
+            let entry = appended.entry
+            let key = Self.compoundTurnKey(
+                sessionID: entry.sessionID,
+                turnID: entry.turnID)
+            if _processedTurnKeysSet.contains(key) { continue }
+            _processedTurnKeysSet.insert(key)
+            _processedTurnKeysOrder.append(key)
+            seeded += 1
+            // Respect the FIFO cap. Drop oldest if we exceed it.
+            while _processedTurnKeysOrder.count
+                > processedTurnCapacity
+            {
+                let evicted = _processedTurnKeysOrder.removeFirst()
+                _processedTurnKeysSet.remove(evicted)
+            }
+        }
+        return seeded
+    }
+
     /// Reason code attached to a halted session, if any. Returns
     /// `nil` when the session is not halted or was halted without
     /// a reason.
