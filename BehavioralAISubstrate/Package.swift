@@ -40,25 +40,21 @@ let package = Package(
             targets: ["BASMLXAdapter"])
     ],
     dependencies: [
-        // M220 — pinned to a known-good revision (護欄 #1 from the
-        // M220 plan: explicit revision, not from: semver). Update
-        // by bumping the hash deliberately; do not migrate to
-        // .upToNextMajor without an audit pass.
-        .package(
-            url: "https://github.com/ml-explore/mlx-swift-lm",
-            revision:
-                "7e2b7107be52ffbfe488f3c7987d3f52c1858b4b"),
-        .package(
-            url: "https://github.com/huggingface/swift-transformers",
-            revision:
-                "15bcc471a2de73ce3c17c08781f34a1f9bebaf70"),
-        // M221 — explicit top-level pin so BASMLXAdapter can list
-        // `HuggingFace` as a target dep (transitive visibility from
-        // swift-transformers is not enough for SPM product binding).
-        .package(
-            url: "https://github.com/huggingface/swift-huggingface",
-            revision:
-                "b721959445b617d0bf03910b2b4aced345fd93bf")
+        // M224 — vendor freeze. All MLX / HuggingFace dependencies
+        // live in BehavioralAISubstrate/Vendor/ as path packages.
+        // Build is now self-contained: no GitHub fetch is required
+        // to resolve the substrate. The 15 vendored packages were
+        // copied at the M220 + M221 + M222 pinned revisions and
+        // stripped of `Tests/` / `Documentation/` / `cmake/` for
+        // size discipline (~75 MB total).
+        //
+        // Why the full transitive set is vendored: pinning only
+        // direct deps still leaves SPM resolving transitives from
+        // remote URLs, which defeats the purpose if upstream is
+        // unreachable. Updates require an explicit `Vendor/` swap.
+        .package(path: "Vendor/mlx-swift-lm"),
+        .package(path: "Vendor/swift-transformers"),
+        .package(path: "Vendor/swift-huggingface")
     ],
     targets: [
         .target(name: "BASRuntimeCore"),
