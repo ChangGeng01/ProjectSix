@@ -169,7 +169,14 @@ let package = Package(
                 "QinaoSovereign",
                 "QinaoWorldPrior",
                 "QinaoUI",
-                .product(name: "BASOrgan", package: "BehavioralAISubstrate")
+                .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
+                // M178 — env-gated end-to-end test (`BAS_FM_E2E=1`)
+                // wires `AppleFoundationOrganAdapter` through a
+                // host-style `QinaoOrganEndpoint` conformance and
+                // drives `QinaoLoop.generateCandidates` with the real
+                // on-device LLM. Test-target-only dep so production
+                // QinaoLoop stays decoupled from Apple adapters.
+                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
             ])
     ]
 )
