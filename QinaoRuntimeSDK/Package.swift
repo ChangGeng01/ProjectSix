@@ -191,7 +191,17 @@ let package = Package(
             name: "QinaoSampleHost",
             dependencies: [
                 "QinaoLoop",
-                "QinaoAppleFoundation"
+                "QinaoAppleFoundation",
+                // M213 — `--provider chatcompletions` flag uses the
+                // generic OpenAI-compatible HTTP adapter. Optional
+                // dep at build time but required when the flag is
+                // selected at run time.
+                .product(
+                    name: "BASChatCompletionsAdapter",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASOrgan",
+                    package: "BehavioralAISubstrate")
             ]),
         .testTarget(
             name: "QinaoRuntimeSDKTests",

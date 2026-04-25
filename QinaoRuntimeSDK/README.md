@@ -294,6 +294,23 @@ swift run QinaoSampleHost --stream "Reply with three short adjectives."
 # Benchmark — runs N sequential turns, reports min / p50 / p95 /
 # max / mean latency.
 swift run QinaoSampleHost --bench 10
+
+# Drive a remote OpenAI-compatible provider instead of Apple FM
+# (M213). Requires --url and --model; --api-key is optional.
+swift run QinaoSampleHost \
+    --provider chatcompletions \
+    --url https://api.openai.com/v1/chat/completions \
+    --api-key sk-... \
+    --model gpt-4o-mini \
+    "your prompt here"
+
+# Same provider, streaming mode:
+swift run QinaoSampleHost --stream \
+    --provider chatcompletions \
+    --url https://api.openai.com/v1/chat/completions \
+    --api-key sk-... \
+    --model gpt-4o-mini \
+    "your prompt"
 ```
 
 Real measurements on a macOS 26.4.1 Apple-Silicon dev box:
