@@ -466,27 +466,26 @@ public actor QinaoRuntime {
                 initial: inputsParam.additionalCoverageSummaries),
             finalExpectedLayerIDs:
                 inputsParam.expectedCoverageLayerIDs)
-        // M171 — phase machine. Each phase mutates state in place
-        // and either returns void (proceeds) or returns a
-        // pre-PHASE-9 halt outcome (severity-halt path). Throws
+        // M171b — data-driven phase dispatch. Each phase is a
+        // PhaseDriver value type in `phaseDrivers`; the loop
+        // stops at the first non-nil outcome (Phase 8 severity
+        // halt or Phase 9 terminal healthy return). Throws
         // bubble up to the outer-scope error-metric wrapper.
-        try runPhase0Preflight(
-            state: &state, claimToCleanup: &claimToCleanup)
-        try await phase0Claim(
-            state: state, claimToCleanup: &claimToCleanup)
-        await runPhase1RouteBudget(state: &state)
-        try await runPhase2Audit(
-            state: &state, claimToCleanup: &claimToCleanup)
-        await runPhase3AutoStream(state: &state)
-        await runPhase4CoverageReconciliation(state: &state)
-        await runPhase5SovereignFrame(state: &state)
-        runPhase6SurfaceDecision(state: &state)
-        await runPhase7RenderFrame(state: &state)
-        if let halted = try await runPhase8HaltGates(
-            state: &state) {
-            return halted
+        for driver in Self.phaseDrivers {
+            if let outcome = try await driver.run(
+                state: &state,
+                runtime: self,
+                claimToCleanup: &claimToCleanup)
+            {
+                return outcome
+            }
         }
-        return await runPhase9HealthyReturn(state: &state)
+        // Unreachable — Phase 9 always returns an outcome. The
+        // fallback throw documents the contract: the registry
+        // MUST end with a terminal phase that returns non-nil.
+        throw TurnError.invalidInput(
+            field: "phaseDrivers",
+            reason: "phase registry did not terminate")
     }
 
     // MARK: - M171 phase machine
@@ -494,7 +493,7 @@ public actor QinaoRuntime {
     /// PHASE 0 — pre-flight: validate IDs, NFC-canonicalise, and
     /// atomically claim the (sessionID, turnID) slot in a single
     /// halt-and-claim actor hop.
-    private func runPhase0Preflight(
+    package func runPhase0Preflight(
         state: inout TurnState,
         claimToCleanup: inout (sessionID: String, turnID: String)?
     ) throws {
@@ -514,7 +513,7 @@ public actor QinaoRuntime {
     /// Runs the atomic halt-and-claim. Split out so the synchronous
     /// `runPhase0Preflight` stays sync; this method awaits the
     /// sovereign actor.
-    private func phase0Claim(
+    package func phase0Claim(
         state: TurnState,
         claimToCleanup: inout (sessionID: String, turnID: String)?
     ) async throws {
@@ -542,7 +541,7 @@ public actor QinaoRuntime {
 
     /// PHASE 1 — lifecycle-routed budget. Returns the planned
     /// frame compressed by the active `BudgetThermalAdapter`.
-    private func runPhase1RouteBudget(
+    package func runPhase1RouteBudget(
         state: inout TurnState
     ) async {
         if let planned = state.inputs.plannedBudget {
@@ -556,7 +555,7 @@ public actor QinaoRuntime {
     /// PHASE 2 — L14 sovereign audit. On throw releases the claim
     /// so M164 retry semantics hold; on success finalises so the
     /// turn is "processed" regardless of downstream halt branches.
-    private func runPhase2Audit(
+    package func runPhase2Audit(
         state: inout TurnState,
         claimToCleanup: inout (sessionID: String, turnID: String)?
     ) async throws {
@@ -580,7 +579,7 @@ public actor QinaoRuntime {
 
     /// PHASE 3 — auto-stream L1..L13 observation summaries
     /// through the `AutoInjectPipeline`.
-    private func runPhase3AutoStream(
+    package func runPhase3AutoStream(
         state: inout TurnState
     ) async {
         await streamObservationLayers(state: &state)
@@ -588,7 +587,7 @@ public actor QinaoRuntime {
 
     /// PHASE 4 — coverage reconciliation against the M45 budget
     /// ceiling.
-    private func runPhase4CoverageReconciliation(
+    package func runPhase4CoverageReconciliation(
         state: inout TurnState
     ) async {
         state.coverage = await sovereign.recordTurnCoverage(
@@ -601,7 +600,7 @@ public actor QinaoRuntime {
 
     /// PHASE 5 — assemble the per-turn `BASSovereignFrame` (L14
     /// §5.1 aggregator) and record it.
-    private func runPhase5SovereignFrame(
+    package func runPhase5SovereignFrame(
         state: inout TurnState
     ) async {
         let sid = state.inputs.observations.sessionID
@@ -659,7 +658,7 @@ public actor QinaoRuntime {
     }
 
     /// PHASE 6 — derive the L12 `BASSurfaceDecision` once.
-    private func runPhase6SurfaceDecision(
+    package func runPhase6SurfaceDecision(
         state: inout TurnState
     ) {
         state.computedSurfaceDecision = Self.deriveSurfaceDecision(
@@ -672,7 +671,7 @@ public actor QinaoRuntime {
 
     /// PHASE 7 — assemble the per-turn `BASRenderFrame` and
     /// record it on the L12 surface storage.
-    private func runPhase7RenderFrame(
+    package func runPhase7RenderFrame(
         state: inout TurnState
     ) async {
         let sid = state.inputs.observations.sessionID
@@ -740,7 +739,7 @@ public actor QinaoRuntime {
     ///     `TurnOutcome` with `sessionHalted = true`
     ///
     /// Returning `nil` means proceed to PHASE 9.
-    private func runPhase8HaltGates(
+    package func runPhase8HaltGates(
         state: inout TurnState
     ) async throws -> TurnOutcome? {
         if !state.report.isAcceptable {
@@ -829,7 +828,7 @@ public actor QinaoRuntime {
 
     /// PHASE 9 — healthy return: record lifecycle telemetry,
     /// build residue, emit metric, return outcome.
-    private func runPhase9HealthyReturn(
+    package func runPhase9HealthyReturn(
         state: inout TurnState
     ) async -> TurnOutcome {
         let turnRecorded: BASLeaseLifeCoordinator.TurnRecorded?
@@ -877,7 +876,7 @@ public actor QinaoRuntime {
     /// `observationLayers` array. The "L 轴 × Phase 轴 耦合"
     /// (item 14) is structurally fixed: layers no longer share a
     /// single function body.
-    private func streamObservationLayers(
+    package func streamObservationLayers(
         state: inout TurnState
     ) async {
         for layer in Self.observationLayers {
