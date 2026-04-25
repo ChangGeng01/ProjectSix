@@ -148,6 +148,24 @@ custom `QinaoOrganEndpoint` conformance and pass it to
 `QinaoLoop(organEndpoint:)`. The loop itself never speaks the
 provider's native dialect.
 
+### Third-party / remote LLM providers
+
+A generic OpenAI-compatible HTTP organ adapter ships with the
+substrate. Any provider that exposes a Chat Completions–shaped
+endpoint plugs into the same registry the on-device adapter uses:
+
+- OpenAI (`api.openai.com/v1/chat/completions`)
+- Anthropic via OpenAI-compatible proxy
+- Mistral, Together AI, Groq, Fireworks, etc.
+- Local servers: llama.cpp, vLLM, LM Studio, Ollama
+
+The adapter takes a URL, a header dictionary, and a model ID;
+hosts wire a `QinaoOrganEndpoint` around it the same way they
+wire the on-device adapter. Failure modes are mapped to the same
+stable `LoopError.organUnavailable(reason:)` grammar:
+`http-401` / `http-500` / `malformed-json` /
+`transport:<message>` / `unsupported-role:<role>`.
+
 ---
 
 ## Minimal use
@@ -351,6 +369,7 @@ promise. All listed tests are part of the default `swift test` run on
 | **Cross-process audit-ledger persistence** | `Configuration.ledgerDatabasePath` opens SQLite-backed storage; tearing down the control plane and reopening on the same path rehydrates the chain (`QinaoSovereignPersistentLedgerTests`) |
 | **Real LLM body honors boundary bedrock** | A real `LanguageModelSession` body wrapped as `.speculative` host claim against `axiom-ethics-consent` (axiomatic) is rejected by the L4 vault; the L4-L9 chain raises a guardian branch with `world-prior-contradiction` dissent (`QinaoAppleFoundationWorldPriorChainTests`) |
 | **Real LLM body honors L8 governance + cascade delete** | Real body + sufficient confidence → admitted, retrievable, then `forget(id:)` removes it from `recall(...)` AND lands a cascade receipt with the deleted UUID; sub-floor confidence is refused with the stable `confidence-below-floor` reason (`QinaoAppleFoundationMemoryChainTests`) |
+| **Provider-agnostic adapter contract** | A generic HTTP organ adapter (M208) drops into the same registry/loop machinery as the on-device adapter. Speaks OpenAI Chat Completions JSON; works against OpenAI / Anthropic-compatible / Mistral / Together / Groq / llama.cpp / vLLM / LM Studio / Ollama. URLProtocol-stub tests cover happy path + HTTP 401/500 + malformed JSON + role enforcement (`ChatCompletionsOrganAdapterTests`, 11/11 offline) |
 
 ---
 

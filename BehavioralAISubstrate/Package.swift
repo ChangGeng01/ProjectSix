@@ -22,7 +22,14 @@ let package = Package(
         .library(name: "BASSovereign", targets: ["BASSovereign"]),
         .library(name: "BASWorldPrior", targets: ["BASWorldPrior"]),
         .library(name: "BASLeaseLife", targets: ["BASLeaseLife"]),
-        .library(name: "BASOrgan", targets: ["BASOrgan"])
+        .library(name: "BASOrgan", targets: ["BASOrgan"]),
+        // M208 — generic OpenAI/Anthropic/llama.cpp-compatible
+        // HTTP organ provider. Proves BASOrganAdapter protocol is
+        // truly provider-agnostic. Optional library — hosts that
+        // only want on-device adapters skip it.
+        .library(
+            name: "BASChatCompletionsAdapter",
+            targets: ["BASChatCompletionsAdapter"])
     ],
     targets: [
         .target(name: "BASRuntimeCore"),
@@ -49,6 +56,14 @@ let package = Package(
         // fake for tests. Platform providers (Apple FoundationModels,
         // MLX, remote LLMs) live in adapter layers.
         .target(name: "BASOrgan", dependencies: ["BASRuntimeCore"]),
+        // BASChatCompletionsAdapter — generic remote-LLM organ
+        // provider. URLSession-backed, OpenAI Chat Completions
+        // JSON shape. Conforms to BASOrganAdapter so it drops into
+        // any registry the same way the deterministic / Apple FM
+        // adapters do.
+        .target(
+            name: "BASChatCompletionsAdapter",
+            dependencies: ["BASRuntimeCore", "BASOrgan"]),
         .target(name: "BASObservability", dependencies: ["BASRuntimeCore", "BASMemory", "BASPolicy"]),
         // BASOrchestration depends on BASObservability because M58
         // `BASUpdateTicketObservationDerivation` needs to read
@@ -93,7 +108,8 @@ let package = Package(
             "BASObservability",
             "BASEvaluation",
             "BASAdmin",
-            "BASAppleAdapters"
+            "BASAppleAdapters",
+            "BASChatCompletionsAdapter"
         ])
     ]
 )
