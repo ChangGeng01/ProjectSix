@@ -46,7 +46,14 @@ let package = Package(
         // not just a test framework.
         .executable(
             name: "QinaoSampleHost",
-            targets: ["QinaoSampleHost"])
+            targets: ["QinaoSampleHost"]),
+        // M219 — SwiftUI macOS GUI demo. `swift run QinaoSampleApp`
+        // opens a window with provider picker / prompt input /
+        // response panel. Same SDK calls as QinaoSampleHost, just
+        // visible.
+        .executable(
+            name: "QinaoSampleApp",
+            targets: ["QinaoSampleApp"])
     ],
     dependencies: [
         .package(path: "../BehavioralAISubstrate")
@@ -182,6 +189,13 @@ let package = Package(
                 "QinaoLoop",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
+            ]),
+        // M219 — SwiftUI macOS GUI demo target.
+        .executableTarget(
+            name: "QinaoSampleApp",
+            dependencies: [
+                "QinaoLoop",
+                "QinaoAppleFoundation"
             ]),
         // M203 — runnable demo executable target. CLI that takes a
         // prompt argument, drives QinaoLoop with Apple FM, prints
