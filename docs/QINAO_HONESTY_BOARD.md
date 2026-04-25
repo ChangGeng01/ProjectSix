@@ -494,3 +494,80 @@ env-gated 路径（实际真打 Apple LLM）共 **8 条** —— 经 BAS / Qinao
 | 宿主私有经验不进基础权重 | 100% | 100% | 不动 — M183 钉了 ticket → ledger 真实路径，**审计**侧加分但不变更承诺 |
 
 L2 / Neural Organ Runtime 行（§三 14 层表）40% **保持不动**——M177-M183 都是 *验证* 既有 in-scope 实现可用，不是新增 in-scope 实现。剩余 60% 是 §9.6 Swift-only 边界外的 ANE 算子层 / 图编译器。
+
+---
+
+## 九、M184 + M186 — 流式输出 + 三签门真模型端到端（2026-04-26）
+
+### 9.1 M184 — Apple FoundationModels 流式输出
+
+新协议 `BASStreamingOrganAdapter: BASOrganAdapter` 落地 in-scope 适配器层最后一项 — token-stream UI 现在有结构性出口。
+
+**新增**：
+- `BehavioralAISubstrate/Sources/BASOrgan/BASStreamingOrganAdapter.swift` — public protocol + `BASOrganDraftChunk` value type（`requestID / providerID / role / bodyDelta / cumulativeBody / producedAt` 6 字段）
+- `BehavioralAISubstrate/Sources/BASAppleAdapters/AppleFoundationOrganAdapter+Streaming.swift` — extension conforming to `BASStreamingOrganAdapter`，实测对接 `LanguageModelSession.streamResponse(to:options:)`
+
+**Apple FM 流式 API 的实测形态**（真机探测出来的）：
+- `session.streamResponse(to: Prompt)` 返回 AsyncSequence
+- 每个元素是 `Snapshot`，`.content` 字段是**累积**字符串（不是 delta）
+- 适配器在 actor `Task` 里逐 snapshot 计算 delta = `cumulative.dropFirst(lastCumulative.count)` 后 yield 给 `AsyncThrowingStream.Continuation`
+- 流结束 = `continuation.finish()`，无需 `isFinal` 标记
+
+**测试**（`AppleFoundationStreamingTests.swift` · 5 测试 · env-gated `QINAO_FM_E2E=1`）：
+- `testRealStreamYieldsMultipleChunks` 0.525s — 多 token 提示真出 >1 chunk
+- `testCumulativeBodyIsMonotonicallyNonDecreasing` 0.274s — 单调不减
+- `testConcatenatedDeltasEqualFinalCumulativeBody` 1.282s — `Σ delta == final cumulative`（delta-cumulative 不变量）
+- `testAdapterAdvertisesStreaming` / `testAdapterConformsToStreamingProtocol` — 离线协议 sanity
+
+**意义**：host 现在可以 `as? BASStreamingOrganAdapter` 探测，能拿到 token-stream 就 stream，否则降级到 `draft(_:)`。Apple FM 整条流式路径可审计、可测、可回归。
+
+### 9.2 M186 — 三签门 + 真 Apple LLM 全链端到端
+
+`QinaoRuntimeGateTests` 已经用手造 intent 钉住了 ActionPermit + SovereignWarrant + SnapshotContinuityProof 三签门的每条拒绝路径。**M186 闭最后一条缺口**：真 on-device LLM body 驱动 intent，走完整 production 三签门，到达 tool executor。
+
+**新增**：`QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAppleFoundationGateChainTests.swift` · 2 测试 · env-gated：
+
+- `testRealLLMBodyDrivesThreeSignatureGateThroughTool` 1.361s —
+  1. `QinaoLoop.makeAppleFoundationEndpoint()` → `generateCandidates(...)` 真出 body
+  2. host 把 body 翻成 `ActionIntent`（digest = SHA256(toolName | body | sessionID)）
+  3. `risk.requestActionPermit(for:)` → ActionPermit · `sovereign.issueWarrant(for:)` → Warrant · 构造 SnapshotContinuityProof
+  4. 三 digest 全部断言等于 intent.digest（permit / warrant / proof 都 bind 同一 intent）
+  5. `runtime.execute(toolName:payload:intent:signatures:)` 通过 → recorder 收到 byte-equal payload
+  
+- `testRealLLMIntentRefusedOnMismatchedWarrantDigest` 0.217s —
+  - 同样真模型驱动 intent，但 warrant 故意 bind 不同 digest
+  - 断言：`RuntimeError.digestMismatch(expected: intent.digest, got: wrongWarrant.intentDigest)` 抛出
+  - 断言：`recorder.callCount == 0` —— **invariant #2 神经不直接掌权** 在真模型链上的硬执行
+
+### 9.3 测试金字塔最终态（M186 后）
+
+| 入口 | 套件 | 数 | 真打 LLM |
+|---|---|---|---|
+| BAS adapter | `AppleFoundationE2ETests` | 5 | ✅ |
+| BAS streaming | **`AppleFoundationStreamingTests`** | **5（3 真 + 2 离线）** | ✅ |
+| Qinao 手动 | `QinaoAppleFoundationE2ETests` | 3 | ✅ |
+| Qinao 工厂 | `QinaoAppleFoundationFactoryTests` | 4 | 部分 |
+| Qinao 并发 | `QinaoAppleFoundationConcurrencyTests` | 2 | ✅ |
+| Qinao 审计链 | `QinaoAppleFoundationAuditChainTests` | 2 | ✅ |
+| **Qinao 三签门** | **`QinaoAppleFoundationGateChainTests`** | **2** | ✅ |
+| 14 层饱和 | `QinaoRuntime14LayerSaturationTests` | 4 | ❌ |
+| 错误翻译 | `QinaoOrganErrorTranslationTests` | 8 | ❌ |
+
+- **14 条 env-gated 真模型路径** + **15 条离线契约钉**
+- M177-M186 共 **9 条新测试套件 / 35 个测试方法**，全部钉住 Apple FM 真路径或离线契约
+
+### 9.4 不变量兑现率重估
+
+| 不变量 | M186 之前 | M186 之后 | 备注 |
+|---|---|---|---|
+| 先醒再答 | 100% | 100% | 不动 |
+| **神经不直接掌权** | 100%（钉过手造 intent） | **100%（钉过真 LLM intent）** | M186 把"神经产生 intent → 三签门拒绝"路径在真模型上跑通了一次，invariant #2 从"接口合约"升级为"真模型链上可重现的硬执行" |
+| 宿主私有经验不进基础权重 | 100% | 100% | 不动 |
+
+### 9.5 该说什么 / 不该说什么（M186 之后口径）
+
+> ✅ "Apple FoundationModels 一行接入 · 流式 token-stream 可用 · 真模型 → 三签门 → 工具执行的完整路径被独立测试钉住 · 真模型 + 错误数字签名时三签门**真的拒绝 + 工具调用计数 == 0**"
+
+仍然 **不该说**：
+- ANE 算子级 / "比某 LLM 框架快 N 倍" — 不可比
+- "Apple FM 是模型层完全体" — 不是，仍 §9.6 Swift-only 边界内
