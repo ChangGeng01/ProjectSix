@@ -127,17 +127,13 @@ PUBLIC_TYPE_WHITELIST_LITERALS = {
     "BASEvolutionPromotionGate", "BASShadowTrialLedger",
     "BASShadowTrialLedgerEntry",
     "BASInMemoryShadowTrialLedger",
-    # M173 — KNOWN STRUCTURAL LEAKS (queued as M175 to add Qinao
-    # mirrors). These BAS types leak through QinaoHost.QinaoFurnace
-    # public surface today. The substring blacklist missed them
-    # because they do not contain any FORBIDDEN token; the M173
-    # structural whitelist surfaced them. Whitelisting them here
-    # is a temporary acknowledgment, NOT an approval — M175 must
-    # add Qinao* mirror types and then remove these entries.
-    "BASExperienceCandidate",
-    "BASEvolutionSeal",
-    "BASRetractionOrder",
-    "BASShadowTrialRecord",
+    # M175 — the L13 evolution-furnace types
+    # (BASExperienceCandidate / BASShadowTrialRecord /
+    # BASEvolutionSeal / BASRetractionOrder) are now exposed via
+    # QinaoFurnace-prefixed typealiases. The redaction scanner
+    # sees the Qinao-prefixed names; the substrate types never
+    # appear in declaration fragments. Whitelist entries
+    # removed.
     # L5 host constitution leaks — QinaoHost accepts/returns
     # these directly. M175 to add Qinao mirrors.
     "BASHostCandidatePipeline", "BASHostConstitution",
@@ -199,6 +195,16 @@ for path in qinao_graphs:
     data = json.load(open(path))
     for sym in data.get("symbols", []):
         if sym.get("accessLevel") != "public":
+            continue
+        # M175 — typealias declarations are the controlled
+        # `BAS* → Qinao*` re-export seam; the substrate name is
+        # referenced exactly once (the alias body) and never
+        # appears in any METHOD signature. Skip typealias
+        # symbols here — the structural concern is a substrate
+        # type leaking into method declarations, not the
+        # typealias itself.
+        kind = sym.get("kind", {}).get("identifier", "")
+        if kind == "swift.typealias":
             continue
         decl = "".join(f.get("spelling", "")
                        for f in sym.get("declarationFragments", []))

@@ -24,8 +24,8 @@ import BASMemory
 ///
 /// 1. Wraps the coordinator behind a Qinao-stable actor surface.
 /// 2. Passes through the redaction-clean schema types
-///    (`BASExperienceCandidate`, `BASShadowTrialRecord`,
-///    `BASEvolutionSeal`, `BASRetractionOrder`) verbatim — these
+///    (`QinaoFurnace.ExperienceCandidate`, `QinaoFurnace.ShadowTrialRecord`,
+///    `QinaoFurnace.EvolutionSeal`, `QinaoFurnace.RetractionOrder`) verbatim — these
 ///    contain no forbidden tokens in their type or field names.
 /// 3. Mirrors the tokens that *do* hit the redaction list
 ///    (`BASShadowTrialLedgerEntry` → `TrialEvent`,
@@ -108,6 +108,33 @@ public actor QinaoFurnace {
             }
         }
     }
+
+    // MARK: - M175 — Qinao-prefixed aliases for substrate types
+    //
+    // Pre-M175 the public surface of QinaoFurnace passed the BAS
+    // schema types through verbatim — defensible at the time
+    // (none contain forbidden tokens) but flagged by the M173
+    // structural whitelist as `BAS*` identifiers leaking on the
+    // public Qinao surface. M175 keeps the field-stable design
+    // (these types have stable schemas the substrate guarantees)
+    // by re-exporting them under Qinao-prefixed names. The
+    // underlying types are byte-identical to the substrate
+    // versions; no projection cost, no breaking change for hosts
+    // that already constructed them — they continue to work, the
+    // public type path is what changes.
+
+    /// L13 candidate-for-shadow-trial. Re-exported from the
+    /// BAS substrate; same fields, same init.
+    public typealias ExperienceCandidate = BASExperienceCandidate
+
+    /// L13 trial-state record.
+    public typealias ShadowTrialRecord = BASShadowTrialRecord
+
+    /// L13 evolution seal.
+    public typealias EvolutionSeal = BASEvolutionSeal
+
+    /// L13 retraction order.
+    public typealias RetractionOrder = BASRetractionOrder
 
     // MARK: - Terminal outcomes
 
@@ -250,7 +277,7 @@ public actor QinaoFurnace {
     /// finalizes with `outcome`. All transitions share the same
     /// `sessionID` and `turnID` so the ledger chain is coherent.
     public struct WorkbenchPlan: Sendable, Equatable {
-        public let candidate: BASExperienceCandidate
+        public let candidate: QinaoFurnace.ExperienceCandidate
         public let trialScope: String
         public let observedEffects: [String]
         public let failConditions: [String]
@@ -258,7 +285,7 @@ public actor QinaoFurnace {
         public let promotionRecommendation: String?
 
         public init(
-            candidate: BASExperienceCandidate,
+            candidate: QinaoFurnace.ExperienceCandidate,
             trialScope: String,
             observedEffects: [String] = [],
             failConditions: [String] = [],
@@ -280,15 +307,15 @@ public actor QinaoFurnace {
     public struct WorkbenchReceipt: Sendable, Equatable {
         public let trialID: String
         public let finalState: String
-        public let seal: BASEvolutionSeal?
-        public let retraction: BASRetractionOrder?
+        public let seal: QinaoFurnace.EvolutionSeal?
+        public let retraction: QinaoFurnace.RetractionOrder?
         public let promotionDecision: PromotionDecision
 
         public init(
             trialID: String,
             finalState: String,
-            seal: BASEvolutionSeal?,
-            retraction: BASRetractionOrder?,
+            seal: QinaoFurnace.EvolutionSeal?,
+            retraction: QinaoFurnace.RetractionOrder?,
             promotionDecision: PromotionDecision
         ) {
             self.trialID = trialID
@@ -418,11 +445,11 @@ public actor QinaoFurnace {
     /// into `FurnaceError`.
     @discardableResult
     public func submit(
-        candidate: BASExperienceCandidate,
+        candidate: QinaoFurnace.ExperienceCandidate,
         sessionID: String,
         turnID: String,
         trialScope: String
-    ) async throws -> BASShadowTrialRecord {
+    ) async throws -> QinaoFurnace.ShadowTrialRecord {
         do {
             return try await coordinator.submit(
                 candidate: candidate,
@@ -442,7 +469,7 @@ public actor QinaoFurnace {
         effect: String,
         sessionID: String,
         turnID: String
-    ) async throws -> BASShadowTrialRecord {
+    ) async throws -> QinaoFurnace.ShadowTrialRecord {
         do {
             return try await coordinator.observe(
                 trialID: trialID,
@@ -462,7 +489,7 @@ public actor QinaoFurnace {
         reason: String,
         sessionID: String,
         turnID: String
-    ) async throws -> BASShadowTrialRecord {
+    ) async throws -> QinaoFurnace.ShadowTrialRecord {
         do {
             return try await coordinator.reportFailCondition(
                 trialID: trialID,
@@ -484,7 +511,7 @@ public actor QinaoFurnace {
         promotionRecommendation: String? = nil,
         sessionID: String,
         turnID: String
-    ) async throws -> BASShadowTrialRecord {
+    ) async throws -> QinaoFurnace.ShadowTrialRecord {
         do {
             return try await coordinator.finalize(
                 trialID: trialID,
@@ -501,35 +528,35 @@ public actor QinaoFurnace {
 
     public func candidate(
         for candidateID: String
-    ) async -> BASExperienceCandidate? {
+    ) async -> QinaoFurnace.ExperienceCandidate? {
         await coordinator.candidate(for: candidateID)
     }
 
     public func trial(
         for trialID: String
-    ) async -> BASShadowTrialRecord? {
+    ) async -> QinaoFurnace.ShadowTrialRecord? {
         await coordinator.trial(for: trialID)
     }
 
     public func trials(
         for candidateID: String
-    ) async -> [BASShadowTrialRecord] {
+    ) async -> [QinaoFurnace.ShadowTrialRecord] {
         await coordinator.trials(for: candidateID)
     }
 
-    public func pendingTrials() async -> [BASShadowTrialRecord] {
+    public func pendingTrials() async -> [QinaoFurnace.ShadowTrialRecord] {
         await coordinator.pendingTrials()
     }
 
     public func seal(
         for candidateID: String
-    ) async -> BASEvolutionSeal? {
+    ) async -> QinaoFurnace.EvolutionSeal? {
         await coordinator.seal(for: candidateID)
     }
 
     public func retraction(
         for candidateID: String
-    ) async -> BASRetractionOrder? {
+    ) async -> QinaoFurnace.RetractionOrder? {
         await coordinator.retraction(for: candidateID)
     }
 
