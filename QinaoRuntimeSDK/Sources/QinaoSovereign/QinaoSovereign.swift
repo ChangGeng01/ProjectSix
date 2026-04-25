@@ -425,6 +425,44 @@ public actor QinaoSovereignControlPlane {
             self.operation = operation
             self.evidenceSufficient = evidenceSufficient
         }
+
+        /// M165 — return a copy with `sessionID` and `turnID`
+        /// replaced; every other field passes through. Used by
+        /// `QinaoRuntime.sendSession` to swap raw caller IDs for
+        /// the canonical (trimmed + NFC-normalized) form before
+        /// they reach claim/audit/ledger paths.
+        public func withCanonicalIdentifiers(
+            sessionID: String, turnID: String
+        ) -> TurnObservations {
+            TurnObservations(
+                sessionID: sessionID,
+                turnID: turnID,
+                snapshotRef: self.snapshotRef,
+                policyHash: self.policyHash,
+                policyLineageMissing: self.policyLineageMissing,
+                auditEntryMissing: self.auditEntryMissing,
+                runtimeUnstableInHighRisk:
+                    self.runtimeUnstableInHighRisk,
+                riskPermitHeadConflict:
+                    self.riskPermitHeadConflict,
+                externalSideEffectWithoutSCT:
+                    self.externalSideEffectWithoutSCT,
+                hostRemovalBypassed: self.hostRemovalBypassed,
+                unauthorizedSelfMutation:
+                    self.unauthorizedSelfMutation,
+                memoryOrHostWriteBypass:
+                    self.memoryOrHostWriteBypass,
+                irreversibilityScore: self.irreversibilityScore,
+                manipulationStrength: self.manipulationStrength,
+                uncertaintyScore: self.uncertaintyScore,
+                gsiScore: self.gsiScore,
+                hostGateValue: self.hostGateValue,
+                quarantineCount: self.quarantineCount,
+                mode: self.mode,
+                brake: self.brake,
+                operation: self.operation,
+                evidenceSufficient: self.evidenceSufficient)
+        }
     }
 
     // MARK: - Public value types · M83 audit-trail rotation + LINEAGE_CUT
@@ -586,25 +624,33 @@ public actor QinaoSovereignControlPlane {
     private var haltedSessions: Set<String> = []
     private var haltReasons: [String: String] = [:]
 
-    /// M161 — track which (sessionID, turnID) tuples have already
-    /// passed Phase 2 audit. Prevents the same turn from being
-    /// submitted twice and accreting duplicate audit-chain
-    /// entries. M164 — the compound key now uses percent-escaped
-    /// segments (via `compoundTurnKey(_:_:)`) so neither
-    /// sessionID nor turnID containing `|` or `%` can collide.
-    private var processedTurnKeys: Set<String> = []
+    /// Processed turn slots; M165 — bounded FIFO replaces M161's
+    /// unbounded `Set`. Pre-M165 a long-running sovereign accreted
+    /// one entry per finalized turn forever, growing into hundreds
+    /// of MB on multi-day workloads. The Set was also process-
+    /// local; restart cleared it, so the M161 "no duplicate audit
+    /// chain entries" guarantee was process-scoped, not system-
+    /// scoped. M165 caps the slot at `processedTurnCapacity` with
+    /// FIFO eviction (oldest finalized key drops first); the
+    /// system-scope guarantee remains a roadmap item that needs
+    /// either a ledger-side uniqueness constraint or a startup
+    /// warm-cache from the persisted ledger.
+    ///
+    /// `_processedTurnKeysSet` mirrors `_processedTurnKeysOrder`
+    /// for O(1) `contains`. Both are kept in lockstep — every
+    /// insert appends to the order array and the set; eviction
+    /// pops from the front of the array and removes from the set.
+    private var _processedTurnKeysSet: Set<String> = []
+    private var _processedTurnKeysOrder: [String] = []
 
-    /// M164 — turns that have passed Phase 0 claim but not yet
+    /// M165 — turns that have passed Phase 0 claim but not yet
     /// completed Phase 2 audit. The pre-M164 design had a race
     /// window between `hasProcessedTurn` (Phase 0) and
-    /// `registerProcessedTurn` (Phase 2): a second `sendSession`
-    /// arriving in that window would also see "not processed" and
-    /// proceed, producing duplicate audit-chain entries. M164
-    /// closes the window by holding an in-flight claim in this
-    /// set from the moment Phase 0 succeeds until either Phase 2
-    /// finalizes (claim → processed) or Phase 2 fails (claim
-    /// released). Concurrent submissions hitting the in-flight
-    /// state are rejected with `.alreadyClaimed`.
+    /// `registerProcessedTurn` (Phase 2). M164 closes that window
+    /// by holding an in-flight claim in this set; M165 hardens it
+    /// further by handing the cancel/release path through Phase 2
+    /// `defer` in sendSession. Concurrent submissions hitting the
+    /// in-flight state are rejected with `.alreadyClaimed`.
     private var inFlightTurnKeys: Set<String> = []
 
     /// M127 — per-turn L12 render-frame storage. Sibling to the
@@ -647,6 +693,16 @@ public actor QinaoSovereignControlPlane {
     public static let defaultRenderFrameCapacity: Int = 4096
     private let renderFrameCapacity: Int
 
+    /// M165 — global FIFO capacity for `_processedTurnKeysOrder`.
+    /// Default is 16384 (4× the render-frame cap because turn
+    /// claims are smaller and longer-lived). The cap is process-
+    /// scoped: this is NOT a substitute for ledger-side
+    /// uniqueness — duplicates ACROSS process restarts are out of
+    /// scope until the ledger persists and a startup warm-cache
+    /// reseeds this set from the ledger's M83 segments.
+    public static let defaultProcessedTurnCapacity: Int = 16_384
+    private let processedTurnCapacity: Int
+
     /// Cache of planID → internal plan, so `verifyRestore` can hand
     /// the coordinator the exact plan it emitted (the plan's
     /// initializer is substrate-internal by design).
@@ -669,7 +725,10 @@ public actor QinaoSovereignControlPlane {
         now: @escaping @Sendable () -> Date = { Date() },
         renderFrameCapacity: Int =
             QinaoSovereignControlPlane
-                .defaultRenderFrameCapacity
+                .defaultRenderFrameCapacity,
+        processedTurnCapacity: Int =
+            QinaoSovereignControlPlane
+                .defaultProcessedTurnCapacity
     ) {
         self.coordinator = coordinator
         self.tokenAuthority = tokenAuthority
@@ -683,6 +742,9 @@ public actor QinaoSovereignControlPlane {
         // hosts want.
         self.renderFrameCapacity =
             Swift.max(1, renderFrameCapacity)
+        // M165 — same clamp rationale.
+        self.processedTurnCapacity =
+            Swift.max(1, processedTurnCapacity)
     }
 
     // MARK: - Public bootstrap
@@ -936,21 +998,26 @@ public actor QinaoSovereignControlPlane {
     // mirrors the M163 synthetic-ref escape on the storage-key
     // side.
 
-    /// M164 — atomic claim outcome. Distinguishes "already
-    /// finalized" (audit completed previously) from "currently in
-    /// flight" (audit started but not finalized) so the runtime
-    /// can map each onto `TurnError.duplicateTurnSubmission(...)`
-    /// without conflating the two states.
+    /// M164 + M165 — atomic claim outcome. M165 adds
+    /// `.sessionHalted` so the second TOCTOU (between
+    /// `isSessionHalted` and `claimTurn`) is closed by collapsing
+    /// both reads into one actor hop via `claimTurnIfNotHalted`.
     public enum TurnClaimResult: Sendable, Equatable {
         case claimed
         case alreadyClaimed
         case alreadyProcessed
+        /// M165 — atomic halt rejection. The session was already
+        /// halted at the moment the claim was attempted; no claim
+        /// was placed.
+        case sessionHalted
     }
 
     /// M164 — atomic Phase 0 claim. Replaces the M161 two-step
     /// `hasProcessedTurn` + `registerProcessedTurn` pattern with a
     /// single actor-isolated method so concurrent submissions
-    /// cannot both pass Phase 0.
+    /// cannot both pass Phase 0. M165 — prefer
+    /// `claimTurnIfNotHalted(...)` from sendSession; this method
+    /// stays available for hosts that want claim-only semantics.
     ///
     /// - Returns:
     ///   - `.alreadyProcessed` when `(sessionID, turnID)` has
@@ -965,7 +1032,7 @@ public actor QinaoSovereignControlPlane {
     ) -> TurnClaimResult {
         let key = Self.compoundTurnKey(
             sessionID: sessionID, turnID: turnID)
-        if processedTurnKeys.contains(key) {
+        if _processedTurnKeysSet.contains(key) {
             return .alreadyProcessed
         }
         if inFlightTurnKeys.contains(key) {
@@ -973,6 +1040,31 @@ public actor QinaoSovereignControlPlane {
         }
         inFlightTurnKeys.insert(key)
         return .claimed
+    }
+
+    /// M165 — atomic halt-then-claim. Closes the second TOCTOU
+    /// window M164 left open: pre-M165 sendSession did
+    /// `isSessionHalted` and `claimTurn` as two separate awaits,
+    /// so a `markSessionHalted` slipping between them let a turn
+    /// claim a slot in an already-halted session and run audit.
+    /// This method does both reads inside one actor hop so the
+    /// halt status is observed atomically with the claim.
+    ///
+    /// - Returns:
+    ///   - `.sessionHalted` when the session is halted; no claim
+    ///     was placed and the caller MUST throw
+    ///     `TurnError.sessionAlreadyHalted(...)`.
+    ///   - `.alreadyProcessed` / `.alreadyClaimed` / `.claimed` —
+    ///     same semantics as `claimTurn`. The caller is
+    ///     responsible for finalizing or releasing on success.
+    public func claimTurnIfNotHalted(
+        sessionID: String, turnID: String
+    ) -> TurnClaimResult {
+        if haltedSessions.contains(sessionID) {
+            return .sessionHalted
+        }
+        return claimTurn(
+            sessionID: sessionID, turnID: turnID)
     }
 
     /// M164 — release a previously-held claim. Called when audit
@@ -987,92 +1079,78 @@ public actor QinaoSovereignControlPlane {
         inFlightTurnKeys.remove(key)
     }
 
-    /// M164 — finalize a previously-held claim. Atomically removes
-    /// the in-flight marker and adds the key to `processedTurnKeys`
-    /// so subsequent `claimTurn(...)` calls return
+    /// M164 + M165 — finalize a previously-held claim. Atomically
+    /// removes the in-flight marker and adds the key to the
+    /// processed FIFO so subsequent `claimTurn(...)` calls return
     /// `.alreadyProcessed`. Idempotent — calling twice is a no-op
-    /// after the first call.
+    /// after the first call. M165 — when the FIFO would exceed
+    /// `processedTurnCapacity`, the oldest finalized key is
+    /// evicted (eviction is observable: a previously-processed
+    /// turn whose key was evicted re-runs as a fresh claim).
     public func finalizeTurnClaim(
         sessionID: String, turnID: String
     ) {
         let key = Self.compoundTurnKey(
             sessionID: sessionID, turnID: turnID)
         inFlightTurnKeys.remove(key)
-        processedTurnKeys.insert(key)
+        // Idempotent — duplicate finalize is a no-op.
+        if _processedTurnKeysSet.contains(key) { return }
+        _processedTurnKeysSet.insert(key)
+        _processedTurnKeysOrder.append(key)
+        // M165 — bound the FIFO. Eviction is FIFO (oldest first).
+        while _processedTurnKeysOrder.count
+            > processedTurnCapacity
+        {
+            let evicted = _processedTurnKeysOrder.removeFirst()
+            _processedTurnKeysSet.remove(evicted)
+        }
     }
 
-    /// M164 — number of currently-in-flight claims. Useful for
-    /// tests (asserting release/finalize correctness) and for
-    /// host-side metrics (a leaking claim count signals a bug
-    /// where a release/finalize call was missed).
-    public func inFlightTurnCount() -> Int {
+    /// M164 — number of currently-in-flight claims. Test-oriented
+    /// telemetry: in steady state this should sit near 0; a
+    /// growing in-flight count signals a host code path that
+    /// released or finalized incorrectly. M165 — `package` access
+    /// so it stays callable from QinaoRuntime + tests but does
+    /// not enter the public SemVer surface.
+    package func inFlightTurnCount() -> Int {
         inFlightTurnKeys.count
     }
 
-    /// M164 — internal compound storage key. Percent-escapes both
-    /// ID segments before joining with `|` so a sessionID
-    /// containing `|` or `%` cannot collide with an adjacent
-    /// (sess', turn') pair. The escape is independent of the M163
-    /// synthetic-ref escape: visual refs care about `.` (the ref
-    /// separator); compound keys care about `|` (the key
-    /// separator). Both require `%` to be escaped first so the
-    /// encoding stays self-inverse, but the second character
-    /// differs.
-    ///
-    /// Pre-M164 the storage key was `sessionID + "|" + turnID`
-    /// (no escape), so (sessionID="A|", turnID="B") collided with
-    /// (sessionID="A", turnID="|B"). M164 makes the separator
-    /// unambiguous.
+    /// M164 + M165 — compound key construction. Routes through
+    /// the unified `QinaoIDEncoding` helper.
     private nonisolated static func compoundTurnKey(
         sessionID: String, turnID: String
     ) -> String {
-        Self.escapeCompoundSegment(sessionID)
-            + "|" + Self.escapeCompoundSegment(turnID)
+        QinaoIDEncoding.compoundTurnKey(
+            sessionID: sessionID, turnID: turnID)
     }
 
-    /// M164 — segment-level escape used by `compoundTurnKey`.
-    /// Order matters: `%` first (so `%7C` payloads don't get
-    /// double-encoded), `|` second (the separator). Pure value
-    /// transform — `nonisolated`.
-    private nonisolated static func escapeCompoundSegment(
-        _ value: String
-    ) -> String {
-        value
-            .replacingOccurrences(of: "%", with: "%25")
-            .replacingOccurrences(of: "|", with: "%7C")
-    }
-
-    /// M161 — record that `(sessionID, turnID)` has been processed
-    /// through Phase 2 audit. M164 — also clears any in-flight
-    /// marker so the legacy single-step API stays consistent with
-    /// the atomic claim flow used by sendSession. Hosts that
-    /// previously called `registerProcessedTurn` directly (without
-    /// claiming first) keep the same observable semantics.
-    public func registerProcessedTurn(
+    /// M165 — `package` so the legacy single-step API stays
+    /// callable from tests but does not appear on the public
+    /// SemVer surface. Routes through `finalizeTurnClaim` so the
+    /// FIFO cap and in-flight cleanup apply identically.
+    package func registerProcessedTurn(
         sessionID: String, turnID: String
     ) {
         finalizeTurnClaim(
             sessionID: sessionID, turnID: turnID)
     }
 
-    /// M161 — check whether a `(sessionID, turnID)` has already
-    /// been processed. Used by sendSession Phase 0 (legacy path)
-    /// and by tests. M164 — only consults `processedTurnKeys`;
-    /// in-flight claims are NOT reported as processed (a turn that
-    /// hasn't completed audit hasn't been "processed").
-    public func hasProcessedTurn(
+    /// M165 — `package` access. Consults the FIFO; in-flight
+    /// claims are NOT reported as processed.
+    package func hasProcessedTurn(
         sessionID: String, turnID: String
     ) -> Bool {
-        processedTurnKeys.contains(
+        _processedTurnKeysSet.contains(
             Self.compoundTurnKey(
                 sessionID: sessionID, turnID: turnID))
     }
 
-    /// M161 — total number of (sessionID, turnID) keys tracked.
-    /// Used by tests; informational for hosts (memory growth
-    /// indicator on long-running sovereigns).
-    public func processedTurnCount() -> Int {
-        processedTurnKeys.count
+    /// M165 — `package` access. Test-oriented telemetry; the
+    /// number is bounded by `processedTurnCapacity` so
+    /// long-running deployments don't see runaway growth.
+    package func processedTurnCount() -> Int {
+        _processedTurnKeysSet.count
     }
 
     /// Reason code attached to a halted session, if any. Returns
@@ -1677,64 +1755,35 @@ public actor QinaoSovereignControlPlane {
 
     // MARK: - M163 · Synthetic ref construction (collision-free)
 
-    /// M163 — Assemble a deterministic synthetic ref from a fixed
-    /// prefix and the (sessionID, turnID) pair. The dot ('.') is
-    /// the fixed separator between segments. To preserve unambiguous
-    /// `(prefix, sessionID, turnID)` round-tripping when the IDs
-    /// themselves contain dots, every '.' inside an ID is escaped
-    /// to `%2E` and every '%' is escaped to `%25` to keep the
-    /// encoding self-inverse.
-    ///
-    /// **Pre-M163 ambiguity.** With `(sessionID="sess.A", turnID="B")`
-    /// the ref `"frame.sess.A.B"` collides with
-    /// `(sessionID="sess", turnID="A.B")` which also produces
-    /// `"frame.sess.A.B"`. Two different turns therefore got
-    /// labelled with the same ref string in audit chains. M163
-    /// closes this gap: the two pairs above now produce
-    /// `"frame.sess%2EA.B"` and `"frame.sess.A%2EB"` respectively
-    /// — unique and reversible.
-    ///
-    /// **Used at the four Qinao construction sites** (sovereign
-    /// frame `frameID`, render frame `frameID`, thought-fold
-    /// `foldID`, force-curve back-ref) and at the two convention
-    /// validators in `verifyTurnResidue` that mirror them. The
-    /// helper is `nonisolated` because it is a pure value
-    /// transform — no actor hop, no I/O, no allocation beyond the
-    /// returned `String`.
+    /// M163 + M165 — synthetic-ref construction. Routes through
+    /// the unified `QinaoIDEncoding` helper so there's one source
+    /// of truth for how IDs are escaped. See
+    /// `QinaoIDEncoding.syntheticRef(...)` for the algorithm and
+    /// rationale.
     public nonisolated static func syntheticRef(
         prefix: String,
         sessionID: String,
         turnID: String
     ) -> String {
-        prefix + "." + percentEscape(sessionID)
-            + "." + percentEscape(turnID)
+        QinaoIDEncoding.syntheticRef(
+            prefix: prefix,
+            sessionID: sessionID,
+            turnID: turnID)
     }
 
-    /// M163 — percent-escape `%` first (so `%25` becomes literal
-    /// "%25") and `.` second (so the resulting `%2E` doesn't get
-    /// re-escaped). Idempotent — calling twice on the output of
-    /// `percentEscape(percentEscape(x))` produces the same as
-    /// calling once on a string that already has those sequences,
-    /// because the source `%` was already mapped.
+    /// M163 + M165 — back-compat thin wrappers. Routed through
+    /// `QinaoIDEncoding`. Tests and downstream tooling reference
+    /// these by name; the public surface stays stable.
     public nonisolated static func percentEscape(
         _ value: String
     ) -> String {
-        value
-            .replacingOccurrences(of: "%", with: "%25")
-            .replacingOccurrences(of: ".", with: "%2E")
+        QinaoIDEncoding.escape(value, for: .syntheticRef)
     }
 
-    /// M163 — inverse of `percentEscape`. Decodes `%2E` to `.` and
-    /// `%25` to `%`. Order matters: decode `%2E` first so a literal
-    /// `%2E` payload doesn't get double-decoded into `.`. Useful
-    /// for tooling that wants to recover the original IDs from a
-    /// ref segment.
     public nonisolated static func percentUnescape(
         _ value: String
     ) -> String {
-        value
-            .replacingOccurrences(of: "%2E", with: ".")
-            .replacingOccurrences(of: "%25", with: "%")
+        QinaoIDEncoding.unescape(value, for: .syntheticRef)
     }
 
     // MARK: - M124 · Turn residue + cross-surface integrity (筋脉)

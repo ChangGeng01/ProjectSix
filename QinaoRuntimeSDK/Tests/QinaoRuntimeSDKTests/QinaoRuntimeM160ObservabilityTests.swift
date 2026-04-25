@@ -107,20 +107,19 @@ final class QinaoRuntimeM160ObservabilityTests: XCTestCase {
     // MARK: - 4. Recorder fires on auto-halt severity (return,
     //         not throw)
 
-    /// `.deadStop` severity from the engine results in an
-    /// auto-halt outcome RETURN with sessionHalted=true. Recorder
-    /// should still fire.
-    func testRecorderFiresOnAutoHaltSeverity() async throws {
+    /// M165 — pre-halt path now emits an error-path metric so
+    /// observability sees ALL turn rejections, not only audit-
+    /// stage halts. The pre-M165 design left invalid-input,
+    /// session-halted, and duplicate-* throws silent because the
+    /// caller "already knows from the typed throw" — but
+    /// production dashboards aggregate by recorder, not by
+    /// per-call try/catch, so silent throws read as "0 turns
+    /// rejected" on the metric side.
+    func testRecorderFiresOnPreHaltedSession() async throws {
         let collector = MetricsCollector()
         let fx = await QinaoTestFixture.make(
             metricsRecorder: makeRecorder(
                 collector: collector))
-        // Pre-halt the session, then send a fresh turn with
-        // .pass coordinator. Pre-halt path doesn't go through
-        // the metrics emit (it throws sessionAlreadyHalted
-        // BEFORE Phase 0 audit completes — at validation
-        // boundary). So this test pins the validation/halt
-        // throw path.
         await fx.sovereign.markSessionHalted(
             sessionID: "sess.m160", reason: "pretest")
         do {
@@ -133,16 +132,20 @@ final class QinaoRuntimeM160ObservabilityTests: XCTestCase {
         } catch {
             XCTFail("unexpected: \(error)")
         }
-        // M160 doesn't emit on the pre-halt path (validation
-        // throw path) — that's a documented design choice (we
-        // emit only after auditTurn runs). Pin: collector empty.
         await Task.yield()
         try await Task.sleep(nanoseconds: 50_000_000)
         let metrics = await collector.collected
         XCTAssertEqual(
-            metrics.count, 0,
-            "pre-halt + invalid-input throws don't emit metric" +
-                " (caller already knows from typed throw)")
+            metrics.count, 1,
+            "M165 — pre-halt rejection emits an error-path "
+            + "metric so production dashboards see the volume")
+        let m = try XCTUnwrap(metrics.first)
+        XCTAssertTrue(m.isErrorPath)
+        XCTAssertEqual(m.phase, .preflightHalt)
+        XCTAssertEqual(m.errorTag, "session-halted")
+        XCTAssertGreaterThanOrEqual(
+            m.latencyMs, 0,
+            "monotonic latencyMs is always non-negative")
     }
 
     // MARK: - 5. Multiple turns produce multiple metrics
@@ -177,7 +180,11 @@ final class QinaoRuntimeM160ObservabilityTests: XCTestCase {
             autoInjectedLayerCount: 3,
             halted: false,
             haltReason: nil,
-            emittedAt: Date(timeIntervalSince1970: 0))
+            emittedAt: Date(timeIntervalSince1970: 0),
+            latencyMs: 12.5,
+            phase: .healthy,
+            errorTag: nil,
+            isErrorPath: false)
         let b = QinaoRuntime.TurnMetric(
             sessionID: "s", turnID: "t",
             auditSeverity: .pass,
@@ -185,7 +192,11 @@ final class QinaoRuntimeM160ObservabilityTests: XCTestCase {
             autoInjectedLayerCount: 3,
             halted: false,
             haltReason: nil,
-            emittedAt: Date(timeIntervalSince1970: 0))
+            emittedAt: Date(timeIntervalSince1970: 0),
+            latencyMs: 12.5,
+            phase: .healthy,
+            errorTag: nil,
+            isErrorPath: false)
         XCTAssertEqual(a, b)
     }
 }

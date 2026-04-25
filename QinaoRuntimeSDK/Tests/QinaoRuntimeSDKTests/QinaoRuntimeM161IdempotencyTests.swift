@@ -55,10 +55,11 @@ final class QinaoRuntimeM161IdempotencyTests: XCTestCase {
             _ = try await fx.runtime.sendSession(
                 obs(turnID: "turn.dup"),
                 coordinatorSeverity: .pass)
-            XCTFail("expected duplicateTurnSubmission throw")
+            XCTFail("expected duplicate-turn throw")
         } catch let QinaoRuntime.TurnError
-            .duplicateTurnSubmission(sid, tid)
+            .duplicateTurnAlreadyProcessed(sid, tid)
         {
+            // M165 — finalized turn → "already processed" case.
             XCTAssertEqual(sid, "sess.m161")
             XCTAssertEqual(tid, "turn.dup")
         } catch {
@@ -99,8 +100,12 @@ final class QinaoRuntimeM161IdempotencyTests: XCTestCase {
                 coordinatorSeverity: .pass)
             XCTFail("expected sessionAlreadyHalted")
         } catch QinaoRuntime.TurnError.sessionAlreadyHalted {
-            // expected — halt check fires first
-        } catch QinaoRuntime.TurnError.duplicateTurnSubmission {
+            // expected — halt check fires first (M165 atomic
+            // halt-and-claim returns `.sessionHalted` ahead of
+            // any duplicate detection).
+        } catch QinaoRuntime.TurnError
+            .duplicateTurnAlreadyProcessed,
+                QinaoRuntime.TurnError.duplicateTurnInFlight {
             XCTFail(
                 "duplicate fired before halt — wrong order")
         } catch {

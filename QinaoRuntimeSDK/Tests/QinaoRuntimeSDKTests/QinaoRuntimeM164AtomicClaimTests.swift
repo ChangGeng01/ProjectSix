@@ -217,14 +217,16 @@ final class QinaoRuntimeM164AtomicClaimTests: XCTestCase {
             obs(turnID: "turn.dup"),
             coordinatorSeverity: .pass)
 
-        // Same (s, t) again — must throw duplicate.
+        // Same (s, t) again — must throw "already processed"
+        // (M165 split: previously-finalized goes here, in-flight
+        // goes to `.duplicateTurnInFlight`).
         do {
             _ = try await fx.runtime.sendSession(
                 obs(turnID: "turn.dup"),
                 coordinatorSeverity: .pass)
-            XCTFail("expected duplicateTurnSubmission")
+            XCTFail("expected duplicateTurnAlreadyProcessed")
         } catch let QinaoRuntime.TurnError
-            .duplicateTurnSubmission(sid, tid)
+            .duplicateTurnAlreadyProcessed(sid, tid)
         {
             XCTAssertEqual(sid, "sess.m164")
             XCTAssertEqual(tid, "turn.dup")
@@ -250,12 +252,16 @@ final class QinaoRuntimeM164AtomicClaimTests: XCTestCase {
                 obs(turnID: "turn.in-flight"),
                 coordinatorSeverity: .pass)
             XCTFail(
-                "expected duplicateTurnSubmission for in-flight "
+                "expected duplicateTurnInFlight for in-flight "
                 + "claim — sendSession Phase 0 must reject when "
                 + "another submission is mid-flight")
         } catch let QinaoRuntime.TurnError
-            .duplicateTurnSubmission(sid, tid)
+            .duplicateTurnInFlight(sid, tid)
         {
+            // M165 — in-flight rejection now has its own typed
+            // case so hosts can distinguish "retry useless"
+            // (already-processed) from "retry-after-backoff"
+            // (in-flight).
             XCTAssertEqual(sid, "sess.m164")
             XCTAssertEqual(tid, "turn.in-flight")
         } catch {

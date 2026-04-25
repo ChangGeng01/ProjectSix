@@ -115,14 +115,17 @@ public actor QinaoRuntime {
     /// OTel adapter to produce: a span attribute set, a per-
     /// severity counter, a per-phase histogram bucket, a halt-
     /// reason tag.
-    public struct TurnMetric: Sendable, Equatable {
+    public struct TurnMetric: Sendable, Equatable, Hashable {
         public let sessionID: String
         public let turnID: String
         /// Audit severity reached by this turn. `.pass` on a
         /// healthy return; the auto-halt severity (rollback /
         /// deadStop) when the runtime halted-and-returned;
         /// the parity severity when the runtime threw
-        /// `.auditParityFailure`.
+        /// `.auditParityFailure`. M165 — `.pass` is also the
+        /// nominal value when the metric represents an error
+        /// path that threw before audit could run; in that case
+        /// `errorTag` carries the discriminator.
         public let auditSeverity:
             QinaoSovereignControlPlane.AuditSeverity
         /// Coverage severity from the M45 cross-layer reading.
@@ -134,9 +137,7 @@ public actor QinaoRuntime {
         public let autoInjectedLayerCount: Int
         /// `true` when the turn ended in a halted state — either
         /// returned with `sessionHalted == true` (rollback /
-        /// deadStop) or threw a halt error
-        /// (`auditParityFailure` / `coverageHalt` /
-        /// `sessionAlreadyHalted` / `invalidInput`).
+        /// deadStop) or threw any error-path turn termination.
         public let halted: Bool
         /// When `halted == true`, a short reason tag —
         /// `"audit-parity:coordinator-laxer"` /
@@ -144,7 +145,36 @@ public actor QinaoRuntime {
         /// `"audit-severity:rollback"` etc. Stable strings so
         /// downstream metric labels are stable.
         public let haltReason: String?
+        /// M165 — wall-clock emission timestamp. Useful for
+        /// human-readable debugging; do NOT use for latency math.
+        /// Use `latencyMs` instead — that's monotonic.
         public let emittedAt: Date
+        /// M165 — turn duration in milliseconds, measured by
+        /// `ContinuousClock` (monotonic, immune to wall-clock
+        /// drift / NTP jumps / leap seconds). Starts ticking at
+        /// the very first line of `sendSession` and stops at the
+        /// metric emission point so the value covers Phase 0
+        /// validation through Phase 9 telemetry uniformly.
+        public let latencyMs: Double
+        /// M165 — terminal phase (the phase the turn was in when
+        /// it ended). `.healthy` on a clean return,
+        /// `.preflightValidation` / `.preflightHalt` /
+        /// `.preflightDuplicate` on Phase 0 rejections, etc.
+        public let phase: TurnPhase
+        /// M165 — short error tag. `nil` on healthy returns;
+        /// stable string on every error path so downstream
+        /// metric labels are stable. Examples:
+        /// `"invalid-input:observations.sessionID"`,
+        /// `"duplicate-already-processed"`,
+        /// `"duplicate-in-flight"`,
+        /// `"audit-throw:<error-type>"`.
+        public let errorTag: String?
+        /// M165 — true when the metric originates from an
+        /// error-path termination. `false` on healthy returns
+        /// AND on the controlled rollback/deadStop auto-halt
+        /// path (which returns a TurnOutcome rather than
+        /// throwing).
+        public let isErrorPath: Bool
 
         public init(
             sessionID: String,
@@ -156,7 +186,11 @@ public actor QinaoRuntime {
             autoInjectedLayerCount: Int,
             halted: Bool,
             haltReason: String?,
-            emittedAt: Date
+            emittedAt: Date,
+            latencyMs: Double,
+            phase: TurnPhase,
+            errorTag: String?,
+            isErrorPath: Bool
         ) {
             self.sessionID = sessionID
             self.turnID = turnID
@@ -167,7 +201,27 @@ public actor QinaoRuntime {
             self.halted = halted
             self.haltReason = haltReason
             self.emittedAt = emittedAt
+            self.latencyMs = latencyMs
+            self.phase = phase
+            self.errorTag = errorTag
+            self.isErrorPath = isErrorPath
         }
+    }
+
+    /// M165 — terminal phase of a sendSession invocation. Not a
+    /// state machine; just a label for `TurnMetric.phase`.
+    public enum TurnPhase: String, Sendable, Equatable, Hashable,
+        Codable
+    {
+        case preflightValidation
+        case preflightHalt
+        case preflightDuplicate
+        case audit
+        case coverage
+        case parity
+        case severity
+        case healthy
+        case unknown
     }
 
     /// M160 — host-supplied callback invoked once per sendSession
@@ -416,35 +470,85 @@ public actor QinaoRuntime {
         /// inputs at Phase 0 of sendSession with this typed error
         /// before any state mutation.
         case invalidInput(field: String, reason: String)
-        /// M161 — the same `(sessionID, turnID)` was already
-        /// processed by sendSession. Pre-M161 a re-submission
-        /// would silently append a duplicate audit entry,
-        /// corrupting the chain. M161 throws this error at
-        /// Phase 0 before any state mutation. Hosts that want
-        /// retry-after-error semantics must use a fresh turnID.
-        case duplicateTurnSubmission(
+        /// M161 + M165 — the same `(sessionID, turnID)` was
+        /// already processed and finalized by a previous
+        /// `sendSession`. Pre-M161 a re-submission would silently
+        /// append a duplicate audit entry; M161 rejects at Phase
+        /// 0 before any state mutation. Hosts MUST NOT retry the
+        /// same turnID on this case — the work happened, retry is
+        /// meaningless. Use a fresh turnID.
+        case duplicateTurnAlreadyProcessed(
             sessionID: String, turnID: String)
+        /// M165 — the same `(sessionID, turnID)` is currently
+        /// in-flight: another `sendSession` task already passed
+        /// claim and is mid-Phase-2. Hosts MAY retry after a
+        /// short backoff (a few hundred ms is reasonable) since
+        /// the in-flight task could finalize OR release. The
+        /// previous M161 / M164 design collapsed this into the
+        /// generic "duplicate" case; M165 splits it so host retry
+        /// strategy can distinguish "retry useless" from "retry
+        /// later".
+        case duplicateTurnInFlight(
+            sessionID: String, turnID: String)
+        /// M165 — back-compat alias. `TurnError` was previously
+        /// shipped with a `duplicateTurnSubmission` case that
+        /// conflated both states. Hosts pattern-matching on the
+        /// old case can keep doing so via this static helper that
+        /// matches either of the new two cases. The old case is
+        /// no longer thrown by the runtime.
+        public static func isDuplicateTurnSubmission(
+            _ error: any Error
+        ) -> Bool {
+            guard let e = error as? TurnError else { return false }
+            switch e {
+            case .duplicateTurnAlreadyProcessed,
+                 .duplicateTurnInFlight:
+                return true
+            default:
+                return false
+            }
+        }
     }
 
-    // MARK: - M159 · Input validation
+    // MARK: - M159 (M165 hardened) · Input validation
 
-    /// Maximum allowed length for `sessionID` / `turnID` strings.
-    /// 256 chars is generous: UUID is 36, an "OAuth subject + 64
-    /// random hex" is 96, etc. Anything longer is almost certainly
-    /// a bug or attack attempt. Cap is exposed for tests.
-    public static let maxIdentifierLength: Int = 256
+    /// Maximum allowed identifier length, measured in UTF-8 bytes
+    /// (NOT extended grapheme clusters). M165 — counting bytes
+    /// closes the "256 emojis ≈ several KB" amplification gap that
+    /// the grapheme-count cap left open.
+    public static let maxIdentifierByteLength: Int = 256
 
-    /// M159 — validate a session/turn identifier. Throws
-    /// `TurnError.invalidInput(...)` on:
-    ///   * empty string after whitespace trim
-    ///   * length > maxIdentifierLength
+    /// M165 — back-compat alias for `maxIdentifierByteLength`.
+    /// Kept so external callers that referenced the M159 constant
+    /// keep compiling; new code should use the byte-length name.
+    public static var maxIdentifierLength: Int {
+        maxIdentifierByteLength
+    }
+
+    /// M159 + M165 — validate a session/turn identifier and return
+    /// the canonical normalized form. The runtime stores and keys
+    /// on this canonical form so two visually-identical inputs
+    /// (e.g. NFC vs NFD, with vs without trailing whitespace) hash
+    /// to the same M161/M164 claim slot.
     ///
-    /// Used by `sendSession` Phase 0 before any state mutation.
+    /// Rejection reasons:
+    ///   * empty or whitespace-only after trim
+    ///   * UTF-8 byte length > `maxIdentifierByteLength`
+    ///   * any disallowed control character (C0 / C1 / `DEL` /
+    ///     LRM/RLM/zero-width-joiner family)
+    ///
+    /// Canonicalization (applied after rejection but before key
+    /// use):
+    ///   * trim leading/trailing whitespace
+    ///   * Unicode NFC normalize so `é` (U+00E9) and `é`
+    ///     (U+0065 U+0301) hash to the same slot
+    ///
+    /// - Returns: the canonical NFC-normalized + trimmed string.
     /// `nonisolated` because pure value transform — no actor hop.
     static func validateIdentifier(
         _ value: String,
         field: String
-    ) throws {
+    ) throws -> String {
         let trimmed = value.trimmingCharacters(
             in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
@@ -452,13 +556,63 @@ public actor QinaoRuntime {
                 field: field,
                 reason: "empty or whitespace-only")
         }
-        if value.count > maxIdentifierLength {
+        // M165 — byte-length cap (UTF-8). 256 graphemes can be
+        // multi-KB; 256 bytes is the ceiling that actually bounds
+        // memory.
+        let byteLength = trimmed.utf8.count
+        if byteLength > maxIdentifierByteLength {
             throw TurnError.invalidInput(
                 field: field,
                 reason:
-                    "exceeds maximum length "
-                    + String(maxIdentifierLength)
-                    + " (got " + String(value.count) + ")")
+                    "exceeds maximum UTF-8 byte length "
+                    + String(maxIdentifierByteLength)
+                    + " (got " + String(byteLength) + ")")
+        }
+        // M165 — control characters are disallowed. They can
+        // smuggle log injection (newlines / NUL / ANSI escape) or
+        // bidi overrides (U+202A..U+202E) into ledger entries and
+        // halt-reason strings. The substrate's audit chain treats
+        // these as opaque text but downstream tooling almost
+        // always re-renders them, where the damage lands.
+        for scalar in trimmed.unicodeScalars {
+            if isDisallowedControl(scalar) {
+                throw TurnError.invalidInput(
+                    field: field,
+                    reason:
+                        "contains disallowed control character "
+                        + "U+" + String(
+                            scalar.value, radix: 16, uppercase: true))
+            }
+        }
+        // M165 — NFC normalize so visually-identical strings
+        // produced by different input methods hash to the same
+        // M161/M164 claim slot. Without this, `"caf\u{00E9}"` and
+        // `"cafe\u{0301}"` would be two different turnIDs even
+        // though every UI shows them identically.
+        return trimmed.precomposedStringWithCanonicalMapping
+    }
+
+    /// M165 — disallow C0 (U+0000..U+001F), DEL (U+007F), C1
+    /// (U+0080..U+009F), and the bidi/zero-width family commonly
+    /// abused in log/UI confusion attacks. Whitespace inside the
+    /// string is allowed (trimming already removed leading/
+    /// trailing); only categorically-control chars are blocked.
+    private nonisolated static func isDisallowedControl(
+        _ scalar: Unicode.Scalar
+    ) -> Bool {
+        let v = scalar.value
+        if v <= 0x1F { return true }            // C0 controls
+        if v == 0x7F { return true }            // DEL
+        if v >= 0x80 && v <= 0x9F { return true } // C1 controls
+        // Bidi overrides + LRM/RLM + zero-width family.
+        switch v {
+        case 0x200B, 0x200C, 0x200D, 0x200E, 0x200F,
+             0x202A, 0x202B, 0x202C, 0x202D, 0x202E,
+             0x2066, 0x2067, 0x2068, 0x2069,
+             0xFEFF:
+            return true
+        default:
+            return false
         }
     }
 
@@ -679,6 +833,129 @@ public actor QinaoRuntime {
     public func sendSession(
         _ inputs: TurnInputs
     ) async throws -> TurnOutcome {
+        // M165 — `started` is the monotonic latency reference for
+        // every emit point in this turn (healthy or error). Wall
+        // clock is unsafe for histograms (NTP drift / leap
+        // seconds); ContinuousClock is monotonic and process-
+        // local.
+        let started = ContinuousClock.now
+
+        // M165 — track a claim that needs to be released on any
+        // abnormal exit (Task cancellation, unexpected throw past
+        // the do/catch). The body sets it AFTER claim succeeds and
+        // clears it on finalize / explicit release. Any path that
+        // exits without clearing falls through to the deferred
+        // cleanup below — which spawns a fire-and-forget Task to
+        // release on the sovereign actor.
+        var claimToCleanup: (sessionID: String, turnID: String)?
+        defer {
+            if let c = claimToCleanup {
+                let plane = self.sovereign
+                Task {
+                    await plane.releaseTurnClaim(
+                        sessionID: c.sessionID,
+                        turnID: c.turnID)
+                }
+            }
+        }
+
+        // M165 — capture raw IDs before canonicalization so the
+        // error-metric closure has something to label by even if
+        // validation throws first.
+        let rawSessionID = inputs.observations.sessionID
+        let rawTurnID = inputs.observations.turnID
+
+        do {
+            return try await sendSessionBody(
+                inputs: inputs,
+                started: started,
+                claimToCleanup: &claimToCleanup)
+        } catch let e as TurnError {
+            // M165 — error-path metric. Maps each TurnError case
+            // onto its phase + tag so observability sees every
+            // turn outcome, not only healthy returns.
+            let (phase, tag) = Self.classifyTurnError(e)
+            emitMetric(
+                sessionID: rawSessionID,
+                turnID: rawTurnID,
+                auditSeverity: .pass,
+                coverageSeverity: .clean,
+                autoInjectedLayerCount: 0,
+                halted: true,
+                haltReason: tag,
+                latencyMs: Self.elapsedMs(since: started),
+                phase: phase,
+                errorTag: tag,
+                isErrorPath: true)
+            throw e
+        } catch {
+            // M165 — non-TurnError throw (CancellationError, BAS
+            // verifier throw, etc.). Still emit so dashboards see
+            // the volume.
+            emitMetric(
+                sessionID: rawSessionID,
+                turnID: rawTurnID,
+                auditSeverity: .pass,
+                coverageSeverity: .clean,
+                autoInjectedLayerCount: 0,
+                halted: true,
+                haltReason: "throw:" + String(describing:
+                    type(of: error)),
+                latencyMs: Self.elapsedMs(since: started),
+                phase: .unknown,
+                errorTag: "throw:" + String(describing:
+                    type(of: error)),
+                isErrorPath: true)
+            throw error
+        }
+    }
+
+    /// M165 — classify a `TurnError` into its (phase, tag) pair.
+    /// The values are stable strings so downstream metric labels
+    /// stay constant across releases.
+    nonisolated private static func classifyTurnError(
+        _ e: TurnError
+    ) -> (TurnPhase, String) {
+        switch e {
+        case .invalidInput(let field, _):
+            return (.preflightValidation,
+                    "invalid-input:" + field)
+        case .sessionAlreadyHalted:
+            return (.preflightHalt, "session-halted")
+        case .duplicateTurnAlreadyProcessed:
+            return (.preflightDuplicate,
+                    "duplicate-already-processed")
+        case .duplicateTurnInFlight:
+            return (.preflightDuplicate,
+                    "duplicate-in-flight")
+        case .auditParityFailure:
+            return (.parity, "audit-parity:coordinator-laxer")
+        case .coverageHalt:
+            return (.coverage, "coverage-halt")
+        }
+    }
+
+    /// M165 — monotonic elapsed time in milliseconds since
+    /// `started`.
+    nonisolated private static func elapsedMs(
+        since started: ContinuousClock.Instant
+    ) -> Double {
+        let d = ContinuousClock.now - started
+        let comps = d.components
+        return Double(comps.seconds) * 1000.0
+            + Double(comps.attoseconds) / 1e15
+    }
+
+    /// M165 — extracted sendSession body. Was inline in the
+    /// public `sendSession`; lifted here so the public method can
+    /// own the latency clock + cancel-safe `defer` + error-path
+    /// metric wrap without further nesting.
+    private func sendSessionBody(
+        inputs inputsParam: TurnInputs,
+        started: ContinuousClock.Instant,
+        claimToCleanup: inout (sessionID: String, turnID: String)?
+    ) async throws -> TurnOutcome {
+        var inputs = inputsParam
         // =========================================================
         // PHASE 0 — pre-flight: input validation + halt check.
         // =========================================================
@@ -688,37 +965,59 @@ public actor QinaoRuntime {
         // here (not in TurnInputs.init) because Swift `throws`
         // initializers are awkward and `init` is on the value
         // boundary; the runtime is the right enforcement seam.
-        try Self.validateIdentifier(
+        let canonicalSessionID = try Self.validateIdentifier(
             inputs.observations.sessionID,
             field: "observations.sessionID")
-        try Self.validateIdentifier(
+        let canonicalTurnID = try Self.validateIdentifier(
             inputs.observations.turnID,
             field: "observations.turnID")
+        // M165 — replace `inputs.observations` with a copy carrying
+        // canonical (trimmed + NFC-normalized) IDs so every key,
+        // synthetic ref, ledger entry, and metric downstream uses
+        // the same canonical form. Without this rebuild, M161/M164
+        // could be bypassed by appending whitespace or sending
+        // NFD-decomposed IDs.
+        inputs.observations = inputs.observations
+            .withCanonicalIdentifiers(
+                sessionID: canonicalSessionID,
+                turnID: canonicalTurnID)
 
-        if await sovereign.isSessionHalted(
-            inputs.observations.sessionID)
-        {
-            throw TurnError.sessionAlreadyHalted(
-                id: inputs.observations.sessionID)
-        }
-        // M161 + M164 — atomic claim closes the concurrent-
-        // submission race. The pre-M164 code did
-        // `hasProcessedTurn` here and `registerProcessedTurn`
-        // after Phase 2; the gap let two concurrent submissions
-        // both pass Phase 0. M164 holds an in-flight claim from
-        // here through Phase 2, finalizing on audit success and
-        // releasing on audit failure so the retry semantics that
-        // M161 documented still hold for honest retries.
-        switch await sovereign.claimTurn(
+        // M161 + M164 + M165 — atomic halt-and-claim closes both
+        // TOCTOU windows in Phase 0:
+        //   1. Pre-M164: `hasProcessedTurn` → audit →
+        //      `registerProcessedTurn` could let two concurrent
+        //      submissions both pass.
+        //   2. Pre-M165: `isSessionHalted` → `claimTurn` were two
+        //      separate actor hops, so a `markSessionHalted`
+        //      slipping between them let a doomed turn claim a
+        //      slot in an already-halted session.
+        // `claimTurnIfNotHalted` reads halt state and inserts the
+        // claim inside the same actor hop, then sendSession maps
+        // each outcome onto a distinct typed error.
+        switch await sovereign.claimTurnIfNotHalted(
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID)
         {
-        case .alreadyProcessed, .alreadyClaimed:
-            throw TurnError.duplicateTurnSubmission(
+        case .sessionHalted:
+            throw TurnError.sessionAlreadyHalted(
+                id: inputs.observations.sessionID)
+        case .alreadyProcessed:
+            throw TurnError.duplicateTurnAlreadyProcessed(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID)
+        case .alreadyClaimed:
+            throw TurnError.duplicateTurnInFlight(
                 sessionID: inputs.observations.sessionID,
                 turnID: inputs.observations.turnID)
         case .claimed:
-            break  // proceed to Phase 1
+            // M165 — claim succeeded; arm cancel-safe cleanup.
+            // The deferred Task in `sendSession` releases this
+            // claim if any abnormal exit (Task cancellation,
+            // unexpected throw bypassing the audit catch path)
+            // skips the finalize/release calls below.
+            claimToCleanup = (
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID)
         }
 
         // =========================================================
@@ -741,12 +1040,14 @@ public actor QinaoRuntime {
                 coordinatorSeverity: inputs.coordinatorSeverity)
         } catch {
             // M164 — audit threw → release the claim so the
-            // caller can retry with the same turnID. This
-            // preserves the M161 retry semantics for transient
-            // audit failures.
+            // caller can retry with the same turnID. M165 —
+            // explicitly clear `claimToCleanup` here so the
+            // outer-scope `defer` doesn't redundantly fire a
+            // second release on the same key.
             await sovereign.releaseTurnClaim(
                 sessionID: inputs.observations.sessionID,
                 turnID: inputs.observations.turnID)
+            claimToCleanup = nil
             throw error
         }
         // M161 + M164 — finalize the claim AFTER audit succeeds
@@ -758,6 +1059,9 @@ public actor QinaoRuntime {
         await sovereign.finalizeTurnClaim(
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID)
+        // M165 — claim is finalized; cancel-safe defer is now a
+        // no-op for this turn.
+        claimToCleanup = nil
 
         // =========================================================
         // PHASE 3 — auto-stream L1..L13 observation summaries.
@@ -1064,7 +1368,9 @@ public actor QinaoRuntime {
                 sessionID: inputs.observations.sessionID,
                 reason: "audit-parity:coordinator-laxer")
             // M160 — emit metric BEFORE throw so observability
-            // sees every turn regardless of outcome.
+            // sees every turn regardless of outcome. M165 — adds
+            // latency / phase / errorTag so the metric carries
+            // enough labels for production dashboards.
             emitMetric(
                 sessionID: inputs.observations.sessionID,
                 turnID: inputs.observations.turnID,
@@ -1073,7 +1379,11 @@ public actor QinaoRuntime {
                 autoInjectedLayerCount:
                     pipeline.layerCodes.count,
                 halted: true,
-                haltReason: "audit-parity:coordinator-laxer")
+                haltReason: "audit-parity:coordinator-laxer",
+                latencyMs: Self.elapsedMs(since: started),
+                phase: .parity,
+                errorTag: "audit-parity:coordinator-laxer",
+                isErrorPath: true)
             throw TurnError.auditParityFailure(
                 sessionID: inputs.observations.sessionID,
                 severity: report.severity,
@@ -1092,7 +1402,11 @@ public actor QinaoRuntime {
                 autoInjectedLayerCount:
                     pipeline.layerCodes.count,
                 halted: true,
-                haltReason: "coverage-halt")
+                haltReason: "coverage-halt",
+                latencyMs: Self.elapsedMs(since: started),
+                phase: .coverage,
+                errorTag: "coverage-halt",
+                isErrorPath: true)
             throw TurnError.coverageHalt(
                 sessionID: inputs.observations.sessionID,
                 turnID: inputs.observations.turnID,
@@ -1120,7 +1434,16 @@ public actor QinaoRuntime {
                     pipeline.layerCodes.count,
                 halted: true,
                 haltReason: "audit-severity:"
-                    + report.severity.rawValue)
+                    + report.severity.rawValue,
+                latencyMs: Self.elapsedMs(since: started),
+                phase: .severity,
+                errorTag: "audit-severity:"
+                    + report.severity.rawValue,
+                // M165 — severity halt RETURNS a TurnOutcome
+                // (sessionHalted=true) rather than throwing, so
+                // it's not an error path from the caller's POV
+                // even though it's a halt outcome.
+                isErrorPath: false)
             return TurnOutcome(
                 audit: report,
                 coverage: coverage,
@@ -1150,7 +1473,7 @@ public actor QinaoRuntime {
         let residue = await sovereign.turnResidue(
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID)
-        // M160 — healthy-return metric.
+        // M160 + M165 — healthy-return metric with latency.
         emitMetric(
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID,
@@ -1158,7 +1481,11 @@ public actor QinaoRuntime {
             coverageSeverity: coverage.severity,
             autoInjectedLayerCount: pipeline.layerCodes.count,
             halted: false,
-            haltReason: nil)
+            haltReason: nil,
+            latencyMs: Self.elapsedMs(since: started),
+            phase: .healthy,
+            errorTag: nil,
+            isErrorPath: false)
         return TurnOutcome(
             audit: report,
             coverage: coverage,
@@ -1169,10 +1496,12 @@ public actor QinaoRuntime {
             residue: residue)
     }
 
-    /// M160 — single emit point. Captures the turn metric as a
-    /// value type and dispatches to the host's recorder closure
-    /// if one is wired. nonisolated so a Sendable closure can be
-    /// invoked without an actor hop.
+    /// M160 + M165 — single emit point. Captures the turn metric
+    /// as a value type and dispatches to the host's recorder
+    /// closure if one is wired. M165 — adds latency / phase /
+    /// errorTag / isErrorPath so error-path turns are NOT silent.
+    /// `nonisolated` so a `Sendable` closure can be invoked
+    /// without an actor hop.
     nonisolated private func emitMetric(
         sessionID: String,
         turnID: String,
@@ -1181,7 +1510,11 @@ public actor QinaoRuntime {
             QinaoSovereignControlPlane.CoverageSeverity,
         autoInjectedLayerCount: Int,
         halted: Bool,
-        haltReason: String?
+        haltReason: String?,
+        latencyMs: Double,
+        phase: TurnPhase,
+        errorTag: String?,
+        isErrorPath: Bool
     ) {
         guard let recorder = metricsRecorder else { return }
         let metric = TurnMetric(
@@ -1192,7 +1525,11 @@ public actor QinaoRuntime {
             autoInjectedLayerCount: autoInjectedLayerCount,
             halted: halted,
             haltReason: haltReason,
-            emittedAt: now())
+            emittedAt: now(),
+            latencyMs: latencyMs,
+            phase: phase,
+            errorTag: errorTag,
+            isErrorPath: isErrorPath)
         recorder(metric)
     }
 
@@ -1638,17 +1975,34 @@ public actor QinaoRuntime {
         public func compress(
             _ frame: BASBudgetFrame
         ) -> BASBudgetFrame {
-            let m = multiplier(for: frame.thermalGuardLevel)
+            compress(frame, level: frame.thermalGuardLevel)
+        }
+
+        /// M165 — explicit-level overload. Lets the caller pass
+        /// the thermal level the adapter should compress against,
+        /// instead of having the adapter re-read `frame.
+        /// thermalGuardLevel` (which the lifecycle wrote a moment
+        /// ago). Avoids the "thermal seen twice" split-brain risk.
+        public func compress(
+            _ frame: BASBudgetFrame,
+            level: BASThermalGuardLevel
+        ) -> BASBudgetFrame {
+            let m = multiplier(for: level)
             // Short-circuit when no compression is needed. Avoids
             // re-running BASBudgetFrame.init which trims string
             // fields — the input is already in canonical form.
-            if m >= 1.0 { return frame }
-            // Banker-rounded scale, floored at 0. The
-            // BASBudgetFrame init clamps maxCandidates to ≥ 1, so
-            // an extreme multiplier that drops to 0 still yields
-            // a runnable frame (1 candidate, no loops/tokens).
+            // M165 — adapter is a one-way valve: it can only
+            // shrink the planned budget, never grow it. A multiplier
+            // > 1.0 would let the adapter exceed the host's plan.
+            // We clamp at 1.0 so the contract holds independent of
+            // BudgetThermalAdapter's init clamping.
+            let capped = Swift.min(1.0, m)
+            if capped >= 1.0 { return frame }
+            // Pure scale; no defensive max. multiplier ≥ 0 by
+            // adapter init contract, so `Double(x) * m` is ≥ 0
+            // and `.rounded()` keeps it ≥ 0.
             func scale(_ x: Int) -> Int {
-                Swift.max(0, Int((Double(x) * m).rounded()))
+                Int((Double(x) * capped).rounded())
             }
             return BASBudgetFrame(
                 schemaVersion: frame.schemaVersion,
