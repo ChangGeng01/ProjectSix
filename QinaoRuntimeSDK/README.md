@@ -260,6 +260,36 @@ Run all real-LLM tests at once:
 QINAO_FM_E2E=1 swift test
 ```
 
+### Runnable demo
+
+`QinaoSampleHost` is a CLI that drives the SDK end-to-end on real
+Apple FM. Three modes:
+
+```sh
+# Single turn — prints provider / trace / score / body.
+swift run QinaoSampleHost "your prompt here"
+
+# Streaming — appends each chunk as it arrives, then summarises
+# time-to-first-chunk + total elapsed.
+swift run QinaoSampleHost --stream "Reply with three short adjectives."
+
+# Benchmark — runs N sequential turns, reports min / p50 / p95 /
+# max / mean latency.
+swift run QinaoSampleHost --bench 10
+```
+
+Real measurements on a macOS 26.4.1 Apple-Silicon dev box:
+
+| Mode | Result (sample run) |
+| ---- | --------------------- |
+| Single | provider `apple.foundation-models.v1`, score 0.475, body present |
+| Stream | 2 chunks, time-to-first ~330 ms, total ~390 ms |
+| Bench (5 turns) | min 224 ms / p50 228 ms / p95 260 ms / mean 233 ms |
+
+On macOS / iOS / visionOS < 26 (or with Apple Intelligence disabled)
+the CLI exits with a stable error code and a recovery hint pointing
+at `includeDeterministicFallback: true`.
+
 ---
 
 ## Contract discipline
