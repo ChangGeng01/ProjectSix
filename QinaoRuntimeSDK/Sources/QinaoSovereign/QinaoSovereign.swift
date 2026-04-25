@@ -476,18 +476,17 @@ public actor QinaoSovereignControlPlane {
 
     // MARK: - Internals (never re-exported)
 
-    private let coordinator: BASSovereignCleanRebootCoordinator
-    private let tokenAuthority: BASSovereignTokenAuthority
-    private let turnVerifier: BASSovereignTurnVerifier
-    /// The shared audit ledger. Held directly (not just indirectly via
-    /// the coordinator/engine) so M45 coverage verdicts can be
-    /// recorded and queried without reaching back through intermediate
-    /// components.
-    private let auditLedger: BASSovereignAuditLedger
-    private let warrantTTL: TimeInterval
-    private let now: @Sendable () -> Date
-    private var haltedSessions: Set<String> = []
-    private var haltReasons: [String: String] = [:]
+    package let coordinator: BASSovereignCleanRebootCoordinator
+    package let tokenAuthority: BASSovereignTokenAuthority
+    package let turnVerifier: BASSovereignTurnVerifier
+    /// Held directly (not just via coordinator/engine) so M45
+    /// coverage verdicts can be recorded and queried without
+    /// reaching back through intermediates.
+    package let auditLedger: BASSovereignAuditLedger
+    package let warrantTTL: TimeInterval
+    package let now: @Sendable () -> Date
+    package var haltedSessions: Set<String> = []
+    package var haltReasons: [String: String] = [:]
 
     /// Processed turn slots; M165 — bounded FIFO replaces M161's
     /// unbounded `Set`. Pre-M165 a long-running sovereign accreted
@@ -501,41 +500,33 @@ public actor QinaoSovereignControlPlane {
     /// either a ledger-side uniqueness constraint or a startup
     /// warm-cache from the persisted ledger.
     ///
-    /// `_processedTurnKeysSet` mirrors `_processedTurnKeysOrder`
-    /// for O(1) `contains`; both are kept in lockstep.
-    private var _processedTurnKeysSet: Set<String> = []
-    private var _processedTurnKeysOrder: [String] = []
+    /// Mirror of `_processedTurnKeysOrder` for O(1) `contains`;
+    /// both are kept in lockstep.
+    package var _processedTurnKeysSet: Set<String> = []
+    package var _processedTurnKeysOrder: [String] = []
 
-    /// Turns that have passed Phase 0 claim but not yet completed
-    /// Phase 2 audit. Concurrent submissions hitting an in-flight
-    /// key are rejected with `.alreadyClaimed`.
-    private var inFlightTurnKeys: Set<String> = []
+    /// Turns past Phase 0 claim but pre-Phase 2 audit. Concurrent
+    /// submissions hitting an in-flight key are rejected with
+    /// `.alreadyClaimed`.
+    package var inFlightTurnKeys: Set<String> = []
 
     /// L12 render-frame storage. Lives on the composition layer
     /// rather than the BAS ledger because `BASRenderFrame` is in
     /// `BASOrchestration` and `BASSovereign` cannot import that
     /// without a dep cycle. LWW on `(sessionID, turnID)`.
-    private var renderFrameEntries:
+    package var renderFrameEntries:
         [(sessionID: String, turnID: String,
           frame: BASRenderFrame)] = []
 
-    /// FIFO cap for `renderFrameEntries`. The BAS ledger's
-    /// off-chain mirror keeps full history; this Qinao-side
-    /// surface is for host UI mounting and doesn't need to.
     public static let defaultRenderFrameCapacity: Int = 4096
-    private let renderFrameCapacity: Int
+    package let renderFrameCapacity: Int
 
-    /// FIFO cap for `_processedTurnKeysOrder`. Process-scoped:
-    /// not a substitute for ledger-side uniqueness, which the
-    /// `warmCacheProcessedTurnsFromLedger()` seam takes care of
-    /// once a persistent ledger ships.
     public static let defaultProcessedTurnCapacity: Int = 16_384
-    private let processedTurnCapacity: Int
+    package let processedTurnCapacity: Int
 
     /// `planID → RebootPlan` so `verifyRestore` can hand the
-    /// coordinator the exact plan it emitted (the plan's
-    /// initializer is substrate-internal by design).
-    private var planCache:
+    /// coordinator the plan it emitted.
+    package var planCache:
         [String: BASSovereignCleanRebootCoordinator.RebootPlan] = [:]
 
     /// `internal` because the substrate types in the parameter
@@ -952,189 +943,10 @@ public actor QinaoSovereignControlPlane {
         haltReasons[sessionID]
     }
 
-    // MARK: - M83 · Audit-trail rotation + LINEAGE_CUT
-
-    /// Errors surfaced by rotation and lineage-cut operations.
-    public enum TrailError: Error, Equatable, Sendable {
-        /// Rotation was requested for a session that has no open
-        /// segment — either the session has never appended or the
-        /// last segment was just closed without an intervening append.
-        case noOpenSegment(sessionID: String)
-        /// LINEAGE_CUT referenced a root audit ref that doesn't exist
-        /// in the trail.
-        case lineageRootNotFound(auditRef: String)
-        /// The cut's `cutID` / `sessionID` / `rootAuditRef` was empty.
-        case invalidRequest(String)
-        /// The session is halted; trail operations are refused while
-        /// halted to prevent a compromised session from trimming its
-        /// own lineage.
-        case sessionHalted(sessionID: String)
-    }
-
-    /// Rotate the audit trail for a session. Closes the currently-
-    /// open segment (stamping its tail hash) so subsequent appends
-    /// start a fresh successor anchored to that tail. Returns the
-    /// closed segment.
-    ///
-    /// Rotation is safe for BR-012: no hash-chain content is
-    /// modified, only segment-boundary bookkeeping is added. A
-    /// rotated trail still verifies end-to-end with the same
-    /// SHA-256 discipline as a flat one.
-    ///
-    /// A halted session refuses rotation — halted sessions are not
-    /// allowed to decide their own rotation cadence. Clear the halt
-    /// (e.g. via `requestRollback` / explicit operator action)
-    /// before attempting rotation on a halted session.
-    @discardableResult
-    public func rotateAuditTrail(
-        sessionID: String,
-        reason: TrailRotationReason = .scheduledRotation,
-        rotationID: String? = nil
-    ) async throws -> TrailSegment {
-        if haltedSessions.contains(sessionID) {
-            throw TrailError.sessionHalted(sessionID: sessionID)
-        }
-        let plan = BASSovereignLedgerRotationPlan(
-            rotationID: rotationID
-                ?? "rot-\(UUID().uuidString)",
-            sessionID: sessionID,
-            beforeTurnID: nil,
-            reason: Self.toBASRotationReason(reason),
-            requestedAt: now())
-        do {
-            let closed = try await auditLedger.rotate(plan: plan)
-            return Self.externalize(closed)
-        } catch BASSovereignAuditLedger.LedgerError.noOpenSegment(
-            let session)
-        {
-            throw TrailError.noOpenSegment(sessionID: session)
-        }
-    }
-
-    /// Apply a sovereign-approved LINEAGE_CUT. Cascades downstream
-    /// from `rootAuditRef` up to the requested depth, skipping any
-    /// entry whose rule set intersects `protectedRuleIDs` (and
-    /// halting the cascade at those entries — their own downstream
-    /// is preserved alongside them).
-    ///
-    /// The cut writes a hash-chained marker entry into the trail and
-    /// immediately rotates the segment so the marker becomes the
-    /// closing tail. Downstream consumers (host forget queues,
-    /// version arboretum prune workers, evolution furnace bias
-    /// cleaners) read `affectedAuditRefs` from the returned outcome
-    /// to drive their own removal state machines.
-    ///
-    /// BR-012 compliance: LINEAGE_CUT does NOT delete any audit
-    /// entry. The `affectedAuditRefs` remain queryable in the trail;
-    /// the cut merely records the sovereign intent to propagate
-    /// removal to *downstream consumers*, not to the trail itself.
-    @discardableResult
-    public func cutLineage(
-        cutID: String,
-        sessionID: String,
-        rootAuditRef: String,
-        depth: LineageCutDepth = .entireLineage,
-        reason: String,
-        protectedRuleIDs: Set<String> = []
-    ) async throws -> LineageCutOutcome {
-        if haltedSessions.contains(sessionID) {
-            throw TrailError.sessionHalted(sessionID: sessionID)
-        }
-        guard !cutID.isEmpty else {
-            throw TrailError.invalidRequest("cutID must be non-empty")
-        }
-        guard !sessionID.isEmpty else {
-            throw TrailError.invalidRequest("sessionID must be non-empty")
-        }
-        guard !rootAuditRef.isEmpty else {
-            throw TrailError.invalidRequest(
-                "rootAuditRef must be non-empty")
-        }
-        let request = BASSovereignLineageCutRequest(
-            cutID: cutID,
-            sessionID: sessionID,
-            rootAuditID: rootAuditRef,
-            depth: Self.toBASDepth(depth),
-            reason: reason,
-            protectedRuleIDs: protectedRuleIDs,
-            requestedAt: now())
-        do {
-            let outcome = try await auditLedger.lineageCut(
-                request: request)
-            // After lineage-cut, the closed segment is available via
-            // `segments(forSession:)` — find the one stamped with
-            // our rotationID.
-            let segs = await auditLedger.segments(
-                forSession: sessionID)
-            let closed = segs.first {
-                $0.closingRotationID == outcome.rotation.rotationID
-            }
-            guard let closed else {
-                // Can't happen: lineageCut always rotates. Defensive.
-                throw TrailError.invalidRequest(
-                    "lineageCut produced no closing segment")
-            }
-            return LineageCutOutcome(
-                cutID: outcome.cutID,
-                sessionID: outcome.sessionID,
-                affectedAuditRefs: outcome.affectedAuditIDs,
-                protectedAuditRefs: outcome.protectedAuditIDs,
-                markerAuditRef: outcome.markerAuditID,
-                closedSegment: Self.externalize(closed),
-                rotationID: outcome.rotation.rotationID,
-                completedAt: outcome.completedAt)
-        } catch BASSovereignAuditLedger.LedgerError
-            .lineageRootNotFound(let id)
-        {
-            throw TrailError.lineageRootNotFound(auditRef: id)
-        } catch BASSovereignAuditLedger.LedgerError.invalidEntry(let msg) {
-            throw TrailError.invalidRequest(msg)
-        }
-    }
-
-    /// Read back the currently-open trail segment for a session, or
-    /// `nil` when no segment is open (no appends since the last
-    /// rotation or the session is fresh).
-    public func currentAuditSegment(
-        sessionID: String
-    ) async -> TrailSegment? {
-        await auditLedger.currentSegment(forSession: sessionID)
-            .map(Self.externalize)
-    }
-
-    /// Every trail segment (closed + open) for a session, in
-    /// creation order.
-    public func auditSegments(
-        sessionID: String
-    ) async -> [TrailSegment] {
-        await auditLedger.segments(forSession: sessionID)
-            .map(Self.externalize)
-    }
-
-    /// Look up a previously-applied cut by its marker audit ref.
-    /// Returns `nil` if no cut with that marker has been recorded.
-    public func lineageCutOutcome(
-        markerAuditRef: String
-    ) async -> LineageCutOutcome? {
-        guard let bas = await auditLedger.lineageCutOutcome(
-            markerAuditID: markerAuditRef)
-        else { return nil }
-        let segs = await auditLedger.segments(
-            forSession: bas.sessionID)
-        let closed = segs.first {
-            $0.closingRotationID == bas.rotation.rotationID
-        }
-        guard let closed else { return nil }
-        return LineageCutOutcome(
-            cutID: bas.cutID,
-            sessionID: bas.sessionID,
-            affectedAuditRefs: bas.affectedAuditIDs,
-            protectedAuditRefs: bas.protectedAuditIDs,
-            markerAuditRef: bas.markerAuditID,
-            closedSegment: Self.externalize(closed),
-            rotationID: bas.rotation.rotationID,
-            completedAt: bas.completedAt)
-    }
+    // M166b — `TrailError`, `rotateAuditTrail`, `cutLineage`,
+    // `currentAuditSegment`, `auditSegments`, and
+    // `lineageCutOutcome` were extracted to
+    // `QinaoSovereign+AuditTrailRotation.swift`.
 
     // MARK: - Warrant issuance
 
@@ -1170,7 +982,7 @@ public actor QinaoSovereignControlPlane {
 
     // MARK: - Internal bridge (never made public)
 
-    private static func externalize(
+    package static func externalize(
         _ plan: BASSovereignCleanRebootCoordinator.RebootPlan
     ) -> RollbackPlan {
         RollbackPlan(
@@ -1185,7 +997,7 @@ public actor QinaoSovereignControlPlane {
             auditRef: plan.auditRef)
     }
 
-    private static func externalize(
+    package static func externalize(
         _ action: BASSovereignCleanRebootCoordinator.RebootAction
     ) -> RollbackPlan.Step {
         switch action {
@@ -1204,7 +1016,7 @@ public actor QinaoSovereignControlPlane {
     /// codes, revoked permissions, policy hashes) that the façade
     /// deliberately hides — at this layer we just need a well-typed
     /// `rollback` or `deadStop` to pass through.
-    private static func makeVerdict(
+    package static func makeVerdict(
         id: String,
         level: BASSovereignVerdictLevel
     ) -> BASSovereignVerdict {
@@ -1471,79 +1283,8 @@ public actor QinaoSovereignControlPlane {
         await auditLedger.sovereignFrameCount()
     }
 
-    // MARK: - M127 · Render frame streaming (L12 surface 汇聚)
-    //
-    // L12 `BASRenderFrame` (M117-shipped) is the second per-turn
-    // aggregator: 12 optional refs pointing back at the artifacts
-    // that drove the surface shown to the user. Lives on
-    // `QinaoSovereignControlPlane` rather than on the BAS ledger
-    // because BASRenderFrame is in BASOrchestration, which depends
-    // on BASSovereign (the ledger's home) — storing it on the
-    // ledger would create a dep cycle. Same last-write-wins-on-
-    // (sessionID, turnID) semantics; first-seen-tuple order
-    // preserved.
-
-    /// M127 — record a per-turn `BASRenderFrame`. `sessionID` and
-    /// `turnID` are explicit because the L12 schema doesn't
-    /// embed them in the frame itself. If an entry exists for
-    /// the same `(sessionID, turnID)`, replaces in place.
-    ///
-    /// M132 — honors `renderFrameCapacity`. When a NEW (sessionID,
-    /// turnID) tuple would push the array past the cap, the
-    /// oldest entry (index 0) is evicted FIFO-style so the cap
-    /// holds. LWW on existing keys does not trigger eviction
-    /// because the size is unchanged.
-    public func recordRenderFrame(
-        _ frame: BASRenderFrame,
-        sessionID: String,
-        turnID: String
-    ) {
-        if let idx = renderFrameEntries.firstIndex(where: {
-            $0.sessionID == sessionID && $0.turnID == turnID
-        }) {
-            // LWW — replace in place, no size change, no eviction.
-            renderFrameEntries[idx] = (
-                sessionID: sessionID,
-                turnID: turnID,
-                frame: frame)
-            return
-        }
-        // New key — check cap BEFORE append. If at capacity,
-        // evict the oldest entry first so the count stays ≤ cap
-        // after the append.
-        if renderFrameEntries.count >= renderFrameCapacity {
-            renderFrameEntries.removeFirst()
-        }
-        renderFrameEntries.append((
-            sessionID: sessionID,
-            turnID: turnID,
-            frame: frame))
-    }
-
-    /// M127 — look up a per-turn render frame, or `nil`.
-    public func renderFrame(
-        sessionID: String,
-        turnID: String
-    ) -> BASRenderFrame? {
-        renderFrameEntries.first {
-            $0.sessionID == sessionID && $0.turnID == turnID
-        }?.frame
-    }
-
-    /// M127 — every render frame recorded for a session, in
-    /// first-seen turn order.
-    public func renderFrames(
-        forSession sessionID: String
-    ) -> [BASRenderFrame] {
-        renderFrameEntries
-            .filter { $0.sessionID == sessionID }
-            .map { $0.frame }
-    }
-
-    /// M127 — total render frames across every session.
-    public func renderFrameCount() -> Int {
-        renderFrameEntries.count
-    }
+    // M166b — render-frame storage methods extracted to
+    // `QinaoSovereign+RenderFrame.swift`.
 
     // MARK: - M163 · Synthetic ref construction (collision-free)
 
@@ -1626,154 +1367,8 @@ public actor QinaoSovereignControlPlane {
     // actor body because they touch actor-isolated storage.
 
     /// M124 — Fetch the per-turn residue for one (sessionID,
-    /// turnID). All four parallel-storage reads happen on the same
-    /// actor so the values represent a coherent snapshot.
-    /// M131 — added `renderFrame` to the bundle.
-    public func turnResidue(
-        sessionID: String,
-        turnID: String
-    ) async -> TurnResidue {
-        let cov = await coverageReading(
-            sessionID: sessionID, turnID: turnID)
-        let bundle = await auditLedger.observationBundle(
-            forSession: sessionID, turn: turnID)
-        let frame = await auditLedger.sovereignFrame(
-            forSession: sessionID, turn: turnID)
-        // M131 — render frame lives on this control plane (not
-        // the BAS ledger) because BASRenderFrame is in
-        // BASOrchestration. Read it from the private storage
-        // directly since we're inside the actor.
-        let rframe = renderFrameEntries.first {
-            $0.sessionID == sessionID && $0.turnID == turnID
-        }?.frame
-        return TurnResidue(
-            sessionID: sessionID,
-            turnID: turnID,
-            coverageReading: cov,
-            observationBundle: bundle,
-            sovereignFrame: frame,
-            renderFrame: rframe)
-    }
-
-    /// M124 — Verify cross-surface integrity of a turn residue.
-    /// Pure function (no I/O, no actor hop) — callers pass a value
-    /// previously fetched via `turnResidue(sessionID:turnID:)`.
-    public nonisolated func verifyTurnResidue(
-        _ residue: TurnResidue
-    ) -> TurnResidueVerification {
-        var findings:
-            [TurnResidueVerification.Finding] = []
-
-        if residue.coverageReading == nil {
-            findings.append(.missingCoverage)
-        }
-        if residue.observationBundle == nil {
-            findings.append(.missingObservationBundle)
-        }
-        if residue.sovereignFrame == nil {
-            findings.append(.missingSovereignFrame)
-        }
-
-        if let bundle = residue.observationBundle {
-            let hasL14 = bundle.summaries.contains {
-                $0.layer == .sovereign
-            }
-            if !hasL14 {
-                findings.append(.missingL14InBundle)
-            }
-        }
-
-        if let bundle = residue.observationBundle,
-           let frame = residue.sovereignFrame
-        {
-            if bundle.sessionID != frame.sessionID {
-                findings.append(.sessionIDMismatch(
-                    bundle: bundle.sessionID,
-                    frame: frame.sessionID))
-            }
-            if bundle.turnID != frame.turnID {
-                findings.append(.turnIDMismatch(
-                    bundle: bundle.turnID,
-                    frame: frame.turnID))
-            }
-        }
-
-        if let frame = residue.sovereignFrame {
-            // M163 — convention uses percent-escaped IDs in
-            // segments so dotted sessionIDs cannot collide.
-            let expectedFrameID = Self.syntheticRef(
-                prefix: "frame",
-                sessionID: frame.sessionID,
-                turnID: frame.turnID)
-            if frame.frameID != expectedFrameID {
-                findings.append(
-                    .frameIDConventionMismatch(
-                        expected: expectedFrameID,
-                        got: frame.frameID))
-            }
-            let expectedFoldRef = Self.syntheticRef(
-                prefix: "fold",
-                sessionID: frame.sessionID,
-                turnID: frame.turnID)
-            if let ref = frame.thoughtFoldRef,
-               ref != expectedFoldRef
-            {
-                findings.append(
-                    .thoughtFoldRefConventionMismatch(
-                        expected: expectedFoldRef,
-                        got: ref))
-            }
-        }
-
-        // M131 — render frame checks. Only fired when the residue
-        // claims the sovereign frame is present (otherwise the
-        // render frame being nil is expected for halt/partial
-        // paths). When both are present, we pin the render-frame
-        // naming convention + the render → sovereign back-ref.
-        if residue.sovereignFrame != nil
-           && residue.renderFrame == nil
-        {
-            findings.append(.missingRenderFrame)
-        }
-        if let rframe = residue.renderFrame {
-            // M163 — convention uses percent-escaped IDs.
-            let expectedRenderFrameID = Self.syntheticRef(
-                prefix: "render",
-                sessionID: residue.sessionID,
-                turnID: residue.turnID)
-            if rframe.frameID != expectedRenderFrameID {
-                findings.append(
-                    .renderFrameIDConventionMismatch(
-                        expected: expectedRenderFrameID,
-                        got: rframe.frameID))
-            }
-            let expectedMergedChoiceRef = Self.syntheticRef(
-                prefix: "fold",
-                sessionID: residue.sessionID,
-                turnID: residue.turnID)
-            if let ref = rframe.mergedChoiceRef,
-               ref != expectedMergedChoiceRef
-            {
-                findings.append(
-                    .renderMergedChoiceRefConventionMismatch(
-                        expected: expectedMergedChoiceRef,
-                        got: ref))
-            }
-            // render → sovereign back-ref: expect non-nil
-            // sovereignSurfaceRef AND equal to sovereignFrame.frameID.
-            if let sframe = residue.sovereignFrame,
-               rframe.sovereignSurfaceRef != sframe.frameID
-            {
-                findings.append(
-                    .renderSovereignBackRefBroken(
-                        renderSurfaceRef:
-                            rframe.sovereignSurfaceRef,
-                        sovereignFrameID: sframe.frameID))
-            }
-        }
-
-        return TurnResidueVerification(findings: findings)
-    }
+    // M166b — `turnResidue` and `verifyTurnResidue` were
+    // extracted to `QinaoSovereign+TurnResidue.swift`.
 
     // MARK: - M133 · L14 self-heal actions
     //
@@ -2156,7 +1751,7 @@ public actor QinaoSovereignControlPlane {
 
     // MARK: - Coverage-reading translators
 
-    private static func toCoverageReading(
+    package static func toCoverageReading(
         _ v: BASObservationReconciliationVerdict
     ) -> CoverageReading {
         CoverageReading(
@@ -2167,7 +1762,7 @@ public actor QinaoSovereignControlPlane {
             emittedAt: v.emittedAt)
     }
 
-    private static func toCoverageSeverity(
+    package static func toCoverageSeverity(
         _ s: BASObservationReconciliationSeverity
     ) -> CoverageSeverity {
         switch s {
@@ -2177,7 +1772,7 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    private static func toCoverageFinding(
+    package static func toCoverageFinding(
         _ f: BASObservationReconciliationFinding
     ) -> CoverageFinding {
         switch f {
@@ -2241,7 +1836,7 @@ public actor QinaoSovereignControlPlane {
     /// but this indirection is what keeps the forbidden-token scan
     /// clean: the mirror enum lives in Qinao, never references the
     /// substrate typename in any public signature.
-    private static func toEngineLevel(
+    package static func toEngineLevel(
         _ severity: AuditSeverity
     ) -> BASSovereignVerdictLevel {
         switch severity {
@@ -2256,7 +1851,7 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    private static func toAuditSeverity(
+    package static func toAuditSeverity(
         _ level: BASSovereignVerdictLevel
     ) -> AuditSeverity {
         switch level {
@@ -2271,7 +1866,7 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    private static func toAuditParity(
+    package static func toAuditParity(
         _ parity: BASSovereignTurnParity
     ) -> AuditParity {
         switch parity {
@@ -2284,7 +1879,7 @@ public actor QinaoSovereignControlPlane {
 
     // MARK: - M83 · mirror translators
 
-    private static func toBASRotationReason(
+    package static func toBASRotationReason(
         _ reason: TrailRotationReason
     ) -> BASSovereignLedgerRotationReason {
         switch reason {
@@ -2296,7 +1891,7 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    private static func toTrailRotationReason(
+    package static func toTrailRotationReason(
         _ reason: BASSovereignLedgerRotationReason
     ) -> TrailRotationReason {
         switch reason {
@@ -2308,7 +1903,7 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    private static func toBASDepth(
+    package static func toBASDepth(
         _ depth: LineageCutDepth
     ) -> BASSovereignLineageCutDepth {
         switch depth {
@@ -2318,7 +1913,7 @@ public actor QinaoSovereignControlPlane {
         }
     }
 
-    private static func externalize(
+    package static func externalize(
         _ segment: BASSovereignLedgerSegment
     ) -> TrailSegment {
         TrailSegment(

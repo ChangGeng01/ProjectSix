@@ -5,6 +5,146 @@ import BASSovereign
 
 extension QinaoSovereignControlPlane {
 
+    /// Per-turn residue snapshot: coverage + observation bundle +
+    /// sovereign frame + render frame. All four reads happen on
+    /// the same actor hop for a coherent view.
+    public func turnResidue(
+        sessionID: String,
+        turnID: String
+    ) async -> TurnResidue {
+        let cov = await coverageReading(
+            sessionID: sessionID, turnID: turnID)
+        let bundle = await auditLedger.observationBundle(
+            forSession: sessionID, turn: turnID)
+        let frame = await auditLedger.sovereignFrame(
+            forSession: sessionID, turn: turnID)
+        let rframe = renderFrameEntries.first {
+            $0.sessionID == sessionID && $0.turnID == turnID
+        }?.frame
+        return TurnResidue(
+            sessionID: sessionID,
+            turnID: turnID,
+            coverageReading: cov,
+            observationBundle: bundle,
+            sovereignFrame: frame,
+            renderFrame: rframe)
+    }
+
+    /// Pure cross-surface integrity check; pass a value
+    /// previously fetched via `turnResidue(sessionID:turnID:)`.
+    public nonisolated func verifyTurnResidue(
+        _ residue: TurnResidue
+    ) -> TurnResidueVerification {
+        var findings:
+            [TurnResidueVerification.Finding] = []
+
+        if residue.coverageReading == nil {
+            findings.append(.missingCoverage)
+        }
+        if residue.observationBundle == nil {
+            findings.append(.missingObservationBundle)
+        }
+        if residue.sovereignFrame == nil {
+            findings.append(.missingSovereignFrame)
+        }
+
+        if let bundle = residue.observationBundle {
+            let hasL14 = bundle.summaries.contains {
+                $0.layer == .sovereign
+            }
+            if !hasL14 {
+                findings.append(.missingL14InBundle)
+            }
+        }
+
+        if let bundle = residue.observationBundle,
+           let frame = residue.sovereignFrame
+        {
+            if bundle.sessionID != frame.sessionID {
+                findings.append(.sessionIDMismatch(
+                    bundle: bundle.sessionID,
+                    frame: frame.sessionID))
+            }
+            if bundle.turnID != frame.turnID {
+                findings.append(.turnIDMismatch(
+                    bundle: bundle.turnID,
+                    frame: frame.turnID))
+            }
+        }
+
+        if let frame = residue.sovereignFrame {
+            let expectedFrameID = Self.syntheticRef(
+                prefix: "frame",
+                sessionID: frame.sessionID,
+                turnID: frame.turnID)
+            if frame.frameID != expectedFrameID {
+                findings.append(
+                    .frameIDConventionMismatch(
+                        expected: expectedFrameID,
+                        got: frame.frameID))
+            }
+            let expectedFoldRef = Self.syntheticRef(
+                prefix: "fold",
+                sessionID: frame.sessionID,
+                turnID: frame.turnID)
+            if let ref = frame.thoughtFoldRef,
+               ref != expectedFoldRef
+            {
+                findings.append(
+                    .thoughtFoldRefConventionMismatch(
+                        expected: expectedFoldRef,
+                        got: ref))
+            }
+        }
+
+        // Render-frame checks fire only when the residue has a
+        // sovereign frame; without one the render frame's absence
+        // is the expected halt-path behavior.
+        if residue.sovereignFrame != nil
+           && residue.renderFrame == nil
+        {
+            findings.append(.missingRenderFrame)
+        }
+        if let rframe = residue.renderFrame {
+            let expectedRenderFrameID = Self.syntheticRef(
+                prefix: "render",
+                sessionID: residue.sessionID,
+                turnID: residue.turnID)
+            if rframe.frameID != expectedRenderFrameID {
+                findings.append(
+                    .renderFrameIDConventionMismatch(
+                        expected: expectedRenderFrameID,
+                        got: rframe.frameID))
+            }
+            let expectedMergedChoiceRef = Self.syntheticRef(
+                prefix: "fold",
+                sessionID: residue.sessionID,
+                turnID: residue.turnID)
+            if let ref = rframe.mergedChoiceRef,
+               ref != expectedMergedChoiceRef
+            {
+                findings.append(
+                    .renderMergedChoiceRefConventionMismatch(
+                        expected: expectedMergedChoiceRef,
+                        got: ref))
+            }
+            if let sframe = residue.sovereignFrame,
+               rframe.sovereignSurfaceRef != sframe.frameID
+            {
+                findings.append(
+                    .renderSovereignBackRefBroken(
+                        renderSurfaceRef:
+                            rframe.sovereignSurfaceRef,
+                        sovereignFrameID: sframe.frameID))
+            }
+        }
+
+        return TurnResidueVerification(findings: findings)
+    }
+}
+
+extension QinaoSovereignControlPlane {
+
     /// M124 + M131 — per-turn residue bundle. Snapshot of the
     /// four parallel storages keyed on `(sessionID, turnID)`:
     ///   * `coverageReading` — M45 cross-layer verdict
