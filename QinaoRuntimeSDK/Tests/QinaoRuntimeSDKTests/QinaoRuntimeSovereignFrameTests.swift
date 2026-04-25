@@ -142,6 +142,8 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
     // MARK: - 4. Re-emit replaces in place (LWW)
 
     func testReEmitReplacesFrameInPlace() async throws {
+        // M161 — sendSession rejects duplicate (sess, turn).
+        // LWW invariant tested at recordSovereignFrame layer.
         let fx = await QinaoTestFixture.make(hostID: "host.m123", withLifecycle: false)
         let obs = observations(turnID: "turn.rewrite")
 
@@ -149,8 +151,15 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
             obs, coordinatorSeverity: .pass)
         let firstCount = await fx.sovereign.sovereignFrameCount()
 
-        _ = try await fx.runtime.sendSession(
-            obs, coordinatorSeverity: .pass)
+        // Re-record same (sess, turn) directly — proves
+        // storage-level LWW.
+        let replacement = BASSovereignFrame(
+            frameID: "frame."
+                + obs.sessionID + "." + obs.turnID,
+            sessionID: obs.sessionID,
+            turnID: obs.turnID,
+            policyHash: obs.policyHash)
+        await fx.sovereign.recordSovereignFrame(replacement)
         let secondCount = await fx.sovereign.sovereignFrameCount()
 
         XCTAssertEqual(

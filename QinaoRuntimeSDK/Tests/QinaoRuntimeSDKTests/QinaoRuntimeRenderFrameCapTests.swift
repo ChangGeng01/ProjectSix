@@ -173,31 +173,35 @@ final class QinaoRuntimeRenderFrameCapTests: XCTestCase {
     // MARK: - 3. LWW on existing key does not evict
 
     func testLWWDoesNotTriggerEviction() async throws {
+        // M161 — sendSession now rejects duplicate (sess, turn)
+        // submissions. The LWW property is a STORAGE-LAYER
+        // invariant tested by direct recordRenderFrame calls
+        // (which the M127 storage retains for hosts that re-emit
+        // mid-turn). Test rewritten to call the lower-level
+        // record API directly.
         let fx = await makeRuntime(cap: 2)
-        // Fill to capacity with two distinct turns.
+        // Fill to capacity with two distinct (sess, turn) keys
+        // via direct record calls.
         for i in 0..<2 {
-            let obs = QinaoSovereignControlPlane
-                .TurnObservations(
-                    sessionID: "sess.lww",
-                    turnID: "turn.\(i)",
-                    snapshotRef: "s",
-                    policyHash: "p")
-            _ = try await fx.runtime.sendSession(
-                obs, coordinatorSeverity: .pass)
+            let frame = BASRenderFrame(
+                frameID: "render.sess.lww.turn.\(i)")
+            await fx.sovereign.recordRenderFrame(
+                frame,
+                sessionID: "sess.lww",
+                turnID: "turn.\(i)")
         }
         let countAfterFill = await fx.sovereign
             .renderFrameCount()
         XCTAssertEqual(countAfterFill, 2)
-        // Re-emit turn.0 many times — LWW, no accretion, no eviction.
+        // Re-record turn.0 50 times — LWW replaces in place;
+        // count stays 2; no eviction triggers.
         for _ in 0..<50 {
-            let obs = QinaoSovereignControlPlane
-                .TurnObservations(
-                    sessionID: "sess.lww",
-                    turnID: "turn.0",
-                    snapshotRef: "s",
-                    policyHash: "p")
-            _ = try await fx.runtime.sendSession(
-                obs, coordinatorSeverity: .pass)
+            let frame = BASRenderFrame(
+                frameID: "render.sess.lww.turn.0")
+            await fx.sovereign.recordRenderFrame(
+                frame,
+                sessionID: "sess.lww",
+                turnID: "turn.0")
         }
         let frames = await fx.sovereign.renderFrames(
             forSession: "sess.lww")

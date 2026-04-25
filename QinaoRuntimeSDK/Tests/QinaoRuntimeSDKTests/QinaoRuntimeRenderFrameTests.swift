@@ -173,6 +173,9 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
     // MARK: - 7. Re-emit replaces in place (LWW)
 
     func testReEmitReplacesRenderFrameInPlace() async throws {
+        // M161 — sendSession rejects duplicate (sess, turn) so
+        // LWW re-emit must be tested at the storage-API layer
+        // (recordRenderFrame), not via sendSession.
         let fx = await QinaoTestFixture.make(hostID: "host.m127")
         let obs = observations(turnID: "turn.rewrite")
 
@@ -180,8 +183,15 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
             obs, coordinatorSeverity: .pass)
         let c1 = await fx.sovereign.renderFrameCount()
 
-        _ = try await fx.runtime.sendSession(
-            obs, coordinatorSeverity: .pass)
+        // Re-record the same (sess, turn) directly via the
+        // record API — proves storage-level LWW invariant.
+        let replacement = BASRenderFrame(
+            frameID: "render."
+                + obs.sessionID + "." + obs.turnID)
+        await fx.sovereign.recordRenderFrame(
+            replacement,
+            sessionID: obs.sessionID,
+            turnID: obs.turnID)
         let c2 = await fx.sovereign.renderFrameCount()
 
         XCTAssertEqual(c1, c2, "re-emit must not accrete")

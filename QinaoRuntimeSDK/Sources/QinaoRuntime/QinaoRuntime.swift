@@ -416,6 +416,14 @@ public actor QinaoRuntime {
         /// inputs at Phase 0 of sendSession with this typed error
         /// before any state mutation.
         case invalidInput(field: String, reason: String)
+        /// M161 — the same `(sessionID, turnID)` was already
+        /// processed by sendSession. Pre-M161 a re-submission
+        /// would silently append a duplicate audit entry,
+        /// corrupting the chain. M161 throws this error at
+        /// Phase 0 before any state mutation. Hosts that want
+        /// retry-after-error semantics must use a fresh turnID.
+        case duplicateTurnSubmission(
+            sessionID: String, turnID: String)
     }
 
     // MARK: - M159 · Input validation
@@ -693,6 +701,17 @@ public actor QinaoRuntime {
             throw TurnError.sessionAlreadyHalted(
                 id: inputs.observations.sessionID)
         }
+        // M161 — duplicate-turn rejection. The same
+        // (sessionID, turnID) cannot be processed twice; a
+        // retry must use a new turnID.
+        if await sovereign.hasProcessedTurn(
+            sessionID: inputs.observations.sessionID,
+            turnID: inputs.observations.turnID)
+        {
+            throw TurnError.duplicateTurnSubmission(
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID)
+        }
 
         // =========================================================
         // PHASE 1 — lifecycle-routed budget (M70).
@@ -710,6 +729,15 @@ public actor QinaoRuntime {
         let report = try await sovereign.auditTurn(
             observations: inputs.observations,
             coordinatorSeverity: inputs.coordinatorSeverity)
+        // M161 — register the turn AFTER audit succeeds so a
+        // pre-audit failure (which would throw above) can be
+        // retried with the same turnID. Register before any
+        // halt-branch decisions so even halted turns count as
+        // "processed" — a halt is a final state, not retry-
+        // opportunity.
+        await sovereign.registerProcessedTurn(
+            sessionID: inputs.observations.sessionID,
+            turnID: inputs.observations.turnID)
 
         // =========================================================
         // PHASE 3 — auto-stream L1..L13 observation summaries.

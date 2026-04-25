@@ -586,6 +586,13 @@ public actor QinaoSovereignControlPlane {
     private var haltedSessions: Set<String> = []
     private var haltReasons: [String: String] = [:]
 
+    /// M161 — track which (sessionID, turnID) tuples have already
+    /// passed Phase 2 audit. Prevents the same turn from being
+    /// submitted twice and accreting duplicate audit-chain
+    /// entries. Compound key `"<sessionID>|<turnID>"` because
+    /// neither sessionID nor turnID alone is unique.
+    private var processedTurnKeys: Set<String> = []
+
     /// M127 — per-turn L12 render-frame storage. Sibling to the
     /// BAS ledger's `sovereignFrames[]` (M123), but living on the
     /// Qinao composition layer because `BASRenderFrame` lives in
@@ -880,6 +887,36 @@ public actor QinaoSovereignControlPlane {
     ) {
         haltedSessions.insert(sessionID)
         haltReasons[sessionID] = reason
+    }
+
+    // MARK: - M161 · idempotency / duplicate-turn detection
+
+    /// M161 — record that `(sessionID, turnID)` has been processed
+    /// through Phase 2 audit. sendSession calls this immediately
+    /// after auditTurn succeeds; subsequent sendSession calls with
+    /// the same key will fail at Phase 0 via `hasProcessedTurn`.
+    public func registerProcessedTurn(
+        sessionID: String, turnID: String
+    ) {
+        processedTurnKeys.insert(
+            sessionID + "|" + turnID)
+    }
+
+    /// M161 — check whether a `(sessionID, turnID)` has already
+    /// been processed. Used by sendSession Phase 0 to reject
+    /// duplicate submissions before any state mutation.
+    public func hasProcessedTurn(
+        sessionID: String, turnID: String
+    ) -> Bool {
+        processedTurnKeys.contains(
+            sessionID + "|" + turnID)
+    }
+
+    /// M161 — total number of (sessionID, turnID) keys tracked.
+    /// Used by tests; informational for hosts (memory growth
+    /// indicator on long-running sovereigns).
+    public func processedTurnCount() -> Int {
+        processedTurnKeys.count
     }
 
     /// Reason code attached to a halted session, if any. Returns
