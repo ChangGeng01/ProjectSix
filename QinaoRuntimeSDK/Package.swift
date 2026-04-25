@@ -38,7 +38,15 @@ let package = Package(
         // hosts that don't keep a substrate-only QinaoLoop graph.
         .library(
             name: "QinaoAppleFoundation",
-            targets: ["QinaoAppleFoundation"])
+            targets: ["QinaoAppleFoundation"]),
+        // M203 — runnable demo executable. `swift run QinaoSampleHost
+        // "<prompt>"` drives QinaoLoop with the real Apple LLM
+        // endpoint and prints the frontier candidate end-to-end.
+        // Proves the public API is consumable as an actual program,
+        // not just a test framework.
+        .executable(
+            name: "QinaoSampleHost",
+            targets: ["QinaoSampleHost"])
     ],
     dependencies: [
         .package(path: "../BehavioralAISubstrate")
@@ -174,6 +182,16 @@ let package = Package(
                 "QinaoLoop",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
+            ]),
+        // M203 — runnable demo executable target. CLI that takes a
+        // prompt argument, drives QinaoLoop with Apple FM, prints
+        // the frontier candidate. Single-file main.swift; no extra
+        // module structure.
+        .executableTarget(
+            name: "QinaoSampleHost",
+            dependencies: [
+                "QinaoLoop",
+                "QinaoAppleFoundation"
             ]),
         .testTarget(
             name: "QinaoRuntimeSDKTests",
