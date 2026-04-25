@@ -65,6 +65,15 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
     private let endpoint: Endpoint
     private let urlSession: URLSession
 
+    /// M210 — nonisolated mirrors of `endpoint` and `urlSession`
+    /// so the streaming extension (which builds an
+    /// `AsyncThrowingStream` from outside the actor) can read
+    /// them without an `await` hop. Both fields are immutable
+    /// `let`s; the actor's state machine never mutates them so
+    /// reading them off-actor is data-race-free.
+    nonisolated let nonisolatedEndpoint: Endpoint
+    nonisolated let nonisolatedURLSession: URLSession
+
     public init(
         endpoint: Endpoint,
         providerID: String,
@@ -76,6 +85,8 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
     ) {
         self.endpoint = endpoint
         self.urlSession = urlSession
+        self.nonisolatedEndpoint = endpoint
+        self.nonisolatedURLSession = urlSession
         self.descriptor = BASOrganDescriptor(
             providerID: providerID,
             providerName: providerName,

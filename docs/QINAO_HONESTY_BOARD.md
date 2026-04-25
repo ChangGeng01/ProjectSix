@@ -310,10 +310,10 @@
 | L6 | Presence Eye / 临场眼 | **82%** | M22 per-channel observation primitives + budget + ledger + M32 L6 coverage 投影 + **M53 ContextFrame 主链真产 M22 primitives**（`BASContextFrame.presenceObservationBundle` + `withDerivedPresenceObservationBundle(...)` 拷贝助手 + `BASPresenceObservationBundle.derive(from:turnID:sessionID:emittedAt:)`；`EBrainRuntimeCoordinator.run(request:)` 在 `analyzeContext` 调用点用与 `buildRuntimeTrace` 同一公式派生 sessionID/turnID，load-bearing coverage 投影从 test-only sidecar 升级为主链输出；18/18 XCTest 绿）；剩余 = L14 audit 表面直接 reconcile 与 ContextFrame-to-downstream 消费者主链耦合 |
 | L7 | Mirror Blade / 镜刃 | **82%** | M23 per-signal decomposition primitives + budget + ledger + M32 L7 coverage 投影 + **M54 DecomposeFrame 主链真产 M23 primitives**（`BASDecomposeFrame.decompositionObservationBundle` + `withDerivedDecompositionObservationBundle(...)` 拷贝助手 + `BASDecompositionObservationBundle.derive(from:turnID:sessionID:emittedAt:)`；`EBrainRuntimeCoordinator.run(request:)` 在 `decompose` / `mirror` / `checkContradiction` seam 上**复用 M53 derived IDs**，L6 与 L7 bundle 在同一 turn 共享严格相等的 (sessionID, turnID) 对；load-bearing coverage 投影从 test-only sidecar 升级为主链输出；26/26 XCTest 绿，含 6 档结构性门控、budget 1.35→1.0 clamp、legacy JSON `decodeIfPresent` 兜底）；剩余 = L14 audit 表面直接 reconcile 与 DecomposeFrame-to-downstream 消费者主链耦合 |
 | L8 | Hippocampal Well / 海马井 | **70%** | M20 四带政策 + M21 reconciler + 审计日志 + Temporal Memory Field Stage 1（provenance seal / episode arc / conflict cluster / replay frame / quarantine / sanctum / forget skeleton）+ M37 tier coverage 投影 + **M63 MemoryBundle 主链真产 hippocampal-memory observation primitives**（`BASThoughtFrame.hippocampalMemoryObservationBundle` + schemaVersion 1.12.0 → 1.13.0 + `withDerivedHippocampalMemoryObservationBundle(...)` 拷贝助手 + `BASHippocampalMemoryObservationBundle.derive(fromMemoryBundle:turnID:sessionID:emittedAt:)`（nil → 合法 "no-memory turn" 空 bundle）派生 4 段 `.bundleRetrieved`（baseline · subjectID = activeHostVersion trim 空值退 `"<unversioned>"` · 0.50 · 附 atoms/tags/conflicts 三计数）/ 每条 atom（非空 memoryID）派 promotion-state 分类 `frozen ∨ .frozen → .atomFrozen`（0.80）/ `.admitted → .atomAdmitted`（0.55）/ `.candidate → .atomCandidate`（0.45）/ `.retired → .atomRetired`（0.70）/ 每条 conflictRefs trim 非空派 `.conflictFlagged`（0.75）/ `temporalField.quarantineRecords` 每条派 `.quarantineRecorded`（0.90）/ `temporalField.forgetCascades` 每条派 `.forgetCascadeBound`（0.95） · 5 shape precedence `forgetting（active deletion · 最高关切）→ quarantined → conflicted → empty → quiet` · `EBrainRuntimeCoordinator.run(request:)` 在 memory bundle 归一化完成之后的 seam 上复用 M53 derived IDs · 31/31 XCTest 绿 · load-bearing 扩展到 L8）；reconciliation → mutation writer 尚未接线 |
-| L9 | Dream Loop / 梦环 | **78%** | M24 per-candidate observation primitives + 预算 + M32 L9 coverage 投影 + **M51 L4 消费路径**（`QinaoLoop` 通过 `evaluateHostOverride` 直接吃 L4 axiom → contradictionScore 折入 critiqueStrength + guardian dissent 优先输出 `world-prior-contradiction`；12/12 XCTest 绿）+ **M52 frontier 主链真产 M24 primitives**（`materializeThoughtArtifacts` 每次同 pass 派生 `BASCandidateObservationBundle`，load-bearing coverage 投影从 test-only sidecar 升级为主链输出；14/14 XCTest 绿）；frontier 接 `sendSession` 的跨-runtime 集成仍未接线 |
+| L9 | Dream Loop / 梦环 | **82%** | M24 per-candidate observation primitives + 预算 + M32 L9 coverage 投影 + **M51 L4 消费路径**（`QinaoLoop` 通过 `evaluateHostOverride` 直接吃 L4 axiom → contradictionScore 折入 critiqueStrength + guardian dissent 优先输出 `world-prior-contradiction`；12/12 XCTest 绿）+ **M52 frontier 主链真产 M24 primitives**（`materializeThoughtArtifacts` 每次同 pass 派生 `BASCandidateObservationBundle`，load-bearing coverage 投影从 test-only sidecar 升级为主链输出；14/14 XCTest 绿）；frontier 接 `sendSession` 的跨-runtime 集成仍未接线 |
 | L10 | Tri-Self Tribunal / 三我庭 | **65%** | M25 per-voice tribunal primitives + 法定人数 + 收敛启发式 + M32 L10 coverage 投影 + **M55 ThoughtFrame 主链真产 M25 primitives**（`BASThoughtFrame.tribunalObservationBundle` + `withDerivedTribunalObservationBundle(...)` 拷贝助手 + `BASTribunalObservationBundle.derive(from:turnID:sessionID:emittedAt:)`；`EBrainRuntimeCoordinator.run(request:)` 在 `triSelfService.mergeChoice` + reconciliation 重跑完成后的 seam 上**复用 M53 derived IDs**，L6 / L7 / L10 bundle 在同一 turn 共享严格相等的 (sessionID, turnID) 对；load-bearing coverage 投影从 test-only sidecar 升级为主链输出；25/25 XCTest 绿，含 voice↔score / voice↔vetoType 映射表、三重守卫 convergence 门控、12 votes + 2 vetos + 2 remands 预算 1.70+→1.0 clamp、合成 Codable 兜底 pre-M55 payload）；剩余 = 真正多头打分 / veto explain / 训练体系仍缺 |
 | L11 | Risk Climate / 风闸 | **92%** | M13 world-prior fold + M26 per-dimension risk primitives + 三支柱 coverage + M32 L11 coverage 投影 + **M56 ThoughtFrame 主链真产 M26 primitives**（`BASThoughtFrame.riskObservationBundle` + `withDerivedRiskObservationBundle(...)` 拷贝助手 + `BASRiskObservationBundle.derive(from:turnID:sessionID:emittedAt:)`；`EBrainRuntimeCoordinator.run(request:)` 在 `thoughtFrame.riskDecisionPackage` 归一化完成之后的 seam 上**复用 M53 derived IDs**，L6 / L7 / L10 / L11 bundle 在同一 turn 共享严格相等的 (sessionID, turnID) 对；load-bearing coverage 投影从 test-only sidecar 升级为主链输出；26/26 XCTest 绿，含每条 binding 3 核心信号 + 3 档 gated 信号结构性门控、hazard/irreversibility/harmPotential 三支柱必需、dense 6 bindings × 6 signals 预算 6.60→1.0 clamp、合成 Codable 兜底 pre-M56 payload）；剩余 = 专项 GSI 模型 + 操控/煤气灯校准 + 风险校准曲线 bench |
-| L12 | Gentle Hand / 柔手 | **76%** | M27 per-mode soft-hand primitives + renderedAsSelected 健康检查 + M32 L12 coverage 投影 + **M57 ThoughtFrame 主链真产 M27 primitives**（`BASThoughtFrame.softHandObservationBundle` + `withDerivedSoftHandObservationBundle(renderedOutput:turnID:sessionID:emittedAt:)` 拷贝助手 + `BASSoftHandObservationBundle.derive(from:renderedOutput:turnID:sessionID:emittedAt:)`；`EBrainRuntimeCoordinator.run(request:)` 在 `renderedOutput` 封印完成之后、`evolutionService.buildTickets` 读取 frame 之前的 seam 上**复用 M53 derived IDs**，L6 / L7 / L10 / L11 / L12 bundle 在同一 turn 共享严格相等的 (sessionID, turnID) 对；load-bearing coverage 投影从 test-only sidecar 升级为主链输出；三条派生路径 primary bindings × fallback package × empty-empty stepIndex × 6 档信号严格结构性门控 × 9→5 permit→softhand 映射 × 与 M56 共享 answer=0..escalate=8 rank 表 MAINTAIN WITH M56 两处；39/39 XCTest 绿含 9-mode 映射矩阵 + 72 对 rank-delta direction + dense 6-kind 预算 clamp + Codable 兜底 pre-M57 payload）+ **M75 Qinao 公开面 surface matrix 四维结构完整落地**：`QinaoRiskGate` 新增 `SurfaceMode / SurfaceAgency / SurfaceDisclosure / SubstitutePayload(w/ 5 discriminated-union Codable cases) / SurfaceAction` 5 个 public 类型 + 静态纯投影 `surfaceAction(for:auditReference:candidateIDs:consentPromptKey:)` + actor 便捷 `requestSurfaceAction(...)` + world-aware 重载；5 条投影规则（block→silentStub/refuse · delay→delayPacket/deferToLater(60s default) · replace+consent-required→boundaryScript/requestConsent · replace+非 consent→comparePanel/mirrorAndCompare agency 按候选 count 降级 · allow→draftShell/render）；`SurfaceMode.rawValue` 与 `QinaoUI.ComponentID.rawValue` 跨模块硬断言相等使 QinaoRisk 保 leaf target 同时把组件选择结构化；20/20 `QinaoRiskSurfaceMatrixTests` 绿覆盖 5 投影 + agency 降级 + 默认回退 + Codable round-trip + world-aware consent + unknownTemplate 错路径；剩余 = 强边界脚本（自然语言 copy library）+ 可执行替代动作系统在宿主应用侧的 plumbing + 底座 M27 primitives 对齐新四轴词汇表仍缺 |
+| L12 | Gentle Hand / 柔手 | **80%** | M27 per-mode soft-hand primitives + renderedAsSelected 健康检查 + M32 L12 coverage 投影 + **M57 ThoughtFrame 主链真产 M27 primitives**（`BASThoughtFrame.softHandObservationBundle` + `withDerivedSoftHandObservationBundle(renderedOutput:turnID:sessionID:emittedAt:)` 拷贝助手 + `BASSoftHandObservationBundle.derive(from:renderedOutput:turnID:sessionID:emittedAt:)`；`EBrainRuntimeCoordinator.run(request:)` 在 `renderedOutput` 封印完成之后、`evolutionService.buildTickets` 读取 frame 之前的 seam 上**复用 M53 derived IDs**，L6 / L7 / L10 / L11 / L12 bundle 在同一 turn 共享严格相等的 (sessionID, turnID) 对；load-bearing coverage 投影从 test-only sidecar 升级为主链输出；三条派生路径 primary bindings × fallback package × empty-empty stepIndex × 6 档信号严格结构性门控 × 9→5 permit→softhand 映射 × 与 M56 共享 answer=0..escalate=8 rank 表 MAINTAIN WITH M56 两处；39/39 XCTest 绿含 9-mode 映射矩阵 + 72 对 rank-delta direction + dense 6-kind 预算 clamp + Codable 兜底 pre-M57 payload）+ **M75 Qinao 公开面 surface matrix 四维结构完整落地**：`QinaoRiskGate` 新增 `SurfaceMode / SurfaceAgency / SurfaceDisclosure / SubstitutePayload(w/ 5 discriminated-union Codable cases) / SurfaceAction` 5 个 public 类型 + 静态纯投影 `surfaceAction(for:auditReference:candidateIDs:consentPromptKey:)` + actor 便捷 `requestSurfaceAction(...)` + world-aware 重载；5 条投影规则（block→silentStub/refuse · delay→delayPacket/deferToLater(60s default) · replace+consent-required→boundaryScript/requestConsent · replace+非 consent→comparePanel/mirrorAndCompare agency 按候选 count 降级 · allow→draftShell/render）；`SurfaceMode.rawValue` 与 `QinaoUI.ComponentID.rawValue` 跨模块硬断言相等使 QinaoRisk 保 leaf target 同时把组件选择结构化；20/20 `QinaoRiskSurfaceMatrixTests` 绿覆盖 5 投影 + agency 降级 + 默认回退 + Codable round-trip + world-aware consent + unknownTemplate 错路径；剩余 = 强边界脚本（自然语言 copy library）+ 可执行替代动作系统在宿主应用侧的 plumbing + 底座 M27 primitives 对齐新四轴词汇表仍缺 |
 | L13 | Evolution Furnace / 蜕变炉 | **85%** | M14 triple-gate 离线导出（scrubbed/privacySafe/sovereignSafe）+ M28 per-ticket shadow-trial primitives + M32 L13 coverage 投影 + Stage 1 governance spine + **M58 UpdateTicket list 主链真产 observation bundle**（新 `BASUpdateTicketObservation` 原语族在 `BASOrchestration` 下落地：5 档 shape + 6 档 signal kind + budget + 128 容量 ring-buffer actor ledger；`BASOrchestration` 首次跨模块边界 import `BASObservability`（`BASUpdateTicket` 住那儿，无环）；`BASThoughtFrame.updateTicketObservationBundle` + schemaVersion 1.7.0 → 1.8.0 + `withDerivedUpdateTicketObservationBundle(...)` 拷贝助手不改 `evolutionService.buildTickets` / `evolutionGovernance.judge` 签名；`BASUpdateTicketObservationBundle.derive(fromUpdateTickets:turnID:sessionID:emittedAt:)` 从 governed `[BASUpdateTicket]` 派生，按源序每 ticket 产 `.submission` + gated `.hostChangeProposed/.memoryWriteProposed/.ruleCandidateProposed/.conflictDetected/.reviewRequired` 每档严格结构性门控；空路径零观测是合法"no-evolution turn"信号 L14 audit 不应当作 coverage gap；`EBrainRuntimeCoordinator.run(request:)` 在 `updateTickets` 封印之后 `buildThoughtFold` 读取 frame 之前的 seam 上**复用 M53 derived IDs**，L6 / L7 / L10 / L11 / L12 / L13 六 bundle 同一 turn 共享严格相等 (sessionID, turnID)；load-bearing coverage 投影从 test-only sidecar 升级为主链输出；52/52 XCTest 绿含 empty-path 合法零信号 + 5 shape 分类 + 6-kind 结构性门控 + duplicate-ticketID 发射两次但 subjectIDs dedup + `l13.submission.ticket:…confidence:0.XX` deterministic + 20 full-stack tickets 预算 clamp 1.0 + 128 容量 ring buffer 淘汰 + Codable round-trip）；workflow/guard/bias/export/risk-pattern 的 runtime 行为化仍在外部工程 |
 | L14 | Sovereign Microkernel | **96%** | M1-M2 九模块（IntegritySentinel / PrivilegeArbiter / ContaminationGuard / SnapshotManager / VerdictEngine / TokenAuthority / AuditLedger / SovereignLockManager / StubRenderer）+ M7/M9 双审计 + M15 主路径 turn audit + M31 cross-layer 协调支架 + M37–M42 六层增量投影（闭环至 14-of-14）+ M38 自投影 + M43 组合证明 + M44 verdict engine + M45 load-bearing 热路径 + M47 跨会话隔离压力证据 + **M91 Ed25519 跨进程 verifier** + **M186 真 LLM 驱动 warrant + 三签门 + 错配签名拒绝** + **M189 跨进程 SQLite ledger persistence**（Configuration.ledgerDatabasePath / auditEntryCount / cross-process recovery 测试） + **M201 全栈 demo 一测验证 audit chain 真增长** |
 
@@ -937,3 +937,95 @@ swift run QinaoSampleHost "your prompt"
 ```
 
 三个入口，从离线契约 → 真模型测试 → 可运行 demo，逐层递进。SDK 完全体（Swift-only 边界内）已就位。
+
+---
+
+## 十四、M205-M212 — CLI 三 mode + 第三方 provider + SSE 流式 + 多 provider + section 三 row 续核（2026-04-26）
+
+### 14.1 M205-M207 — CLI 三 mode + README demo
+
+`QinaoSampleHost` 升级为 3 mode：single-turn / `--stream`（token-stream append）/ `--bench N`（latency p50/p95）。README 加 "Runnable demo" 章节附实测表。详见 section 十三。
+
+### 14.2 M208 — `BASChatCompletionsOrganAdapter` 新 BAS library
+
+`BASOrganAdapter` 协议第一次有非 Apple 实现：通用 OpenAI Chat Completions JSON shape 适配器。兼容 OpenAI / Anthropic-compat / Mistral / Together / Groq / Fireworks / llama.cpp / vLLM / LM Studio / Ollama。
+
+**架构**：URLSession 注入 → 离线 URLProtocol stub 测试。`Endpoint(url, headers, model)` 三字段 config + actor pattern 封装 actor isolation。**11 测试全离线**：descriptor + role enforcement + 纯函数 buildRequestBody/parseResponseBody + URLProtocol stub end-to-end + HTTP 401/500/malformed-body 三档错误映射 + registry 兼容。
+
+### 14.3 M210 — `BASStreamingOrganAdapter` SSE 实现
+
+第二个流式 adapter（M184 是 Apple FM）。OpenAI SSE 解析 + `[DONE]` 终止 + `delta.content` 累积。
+
+**新增**：`BASChatCompletionsOrganAdapter+Streaming.swift` 加 `BASStreamingOrganAdapter` conformance。新 helper `buildStreamingRequestBody` 复用 non-stream body 加 `"stream": true`。pure-function `parseSSEDataLine` / `isSSEDoneLine` 钉死 SSE 词法。
+
+**15 测试全离线**：parser 单元（unicode / [DONE] / comment / empty / missing delta / malformed JSON 全覆盖）+ streaming body 与 non-stream body 字节差异验证（仅多 stream:true）+ adapter conformance probe + role-mismatch fail-closed + 模拟事件序列 Σ delta == final body 不变量。
+
+### 14.4 M211 — 多 provider 共存测试
+
+7 测试钉 `BASOrganRegistry` 多 provider 路由：on-device 优先 / unregister 后 fallback 到 remote / 重新注册回到 on-device 优先 / role mismatch 时 fallback / empty registry 抛 `noAdapterForRole` typed 错。
+
+**意义**：BASOrganAdapter 协议第一次有 3 个实现（deterministic / Apple FM / ChatCompletions）共存 + 实测 registry 路由规则正确。
+
+### 14.5 M212 — Section 三 续核（L9 / L12 bump）
+
+| 层 | 之前 | 现在 | 关键证据 |
+|---|---|---|---|
+| L9 | 78% | **82%** | + M178/M180 真 Apple LLM 经 `generateCandidates` 真出 candidate frontier · + M193 L9 guardian dissent 真 LLM 触发（`world-prior-contradiction` 优先码） |
+| L12 | 76% | **80%** | + M190 真 LLM body 经 surface decision matrix · + M199 content-blindness（同 body / 不同 signals → 不同 surface ∧ 不同 body / 同 signals → 同 surface） |
+
+L1 (90%) / L2 (40%) / L3 (72%) / L5 (95%) / L6 (82%) / L7 (82%) / L10 (65%) — 7 行 M177-M211 无新增 in-scope 证据 / 剩余 % 全在 SDK scope 外（ANE / ML 训练系统 / 行为 runtime）。
+
+### 14.6 测试金字塔最终态（M211 后）
+
+| 入口 | 套件 | 数 | 真打 LLM |
+|---|---|---|---|
+| BAS adapter | `AppleFoundationE2ETests` | 5 | ✅ |
+| BAS streaming | `AppleFoundationStreamingTests` | 5 | ✅ |
+| BAS cancellation | `AppleFoundationStreamCancellationTests` | 2 | ✅ |
+| BAS stateless | `AppleFoundationStatelessTests` | 3 | ✅ |
+| **BAS Chat Completions** | **`BASChatCompletionsOrganAdapterTests`** | **11** | ❌ (URLProtocol stub) |
+| **BAS Chat Completions Stream** | **`BASChatCompletionsStreamingTests`** | **15** | ❌ |
+| **BAS multi-provider** | **`BASMultiProviderRegistryTests`** | **7** | ❌ |
+| Qinao 手动 | `QinaoAppleFoundationE2ETests` | 3 | ✅ |
+| Qinao 工厂 | `QinaoAppleFoundationFactoryTests` | 4 | 部分 |
+| Qinao 并发 | `QinaoAppleFoundationConcurrencyTests` | 2 | ✅ |
+| Qinao 审计链 | `QinaoAppleFoundationAuditChainTests` | 2 | ✅ |
+| Qinao 三签门 | `QinaoAppleFoundationGateChainTests` | 2 | ✅ |
+| Qinao 流式 | `QinaoLoopStreamBodyTests` | 5 | ✅ |
+| Qinao 持久化 | `QinaoSovereignPersistentLedgerTests` | 4 | ❌ |
+| Qinao 风闸/柔手 | `QinaoAppleFoundationRiskGateTests` | 3 | ✅ |
+| Qinao L4 链 | `QinaoAppleFoundationWorldPriorChainTests` | 3 | ✅ |
+| Qinao L8 链 | `QinaoAppleFoundationMemoryChainTests` | 3 | ✅ |
+| Qinao L13 furnace | `QinaoAppleFoundationFurnaceChainTests` | 2 | ✅ |
+| Qinao injection guard | `QinaoAppleFoundationPromptInjectionTests` | 2 | ✅ |
+| Qinao full-stack demo | `QinaoSampleHostFlowTests` | 1 | ✅ |
+| 14 层饱和 | `QinaoRuntime14LayerSaturationTests` | 4 | ❌ |
+| 错误翻译 | `QinaoOrganErrorTranslationTests` | 8 | ❌ |
+
+- **34 条 env-gated 真模型路径** + **57 条离线契约钉**
+- M177-M211 共 **22 条新测试套件 / 91 个测试方法**
+
+### 14.7 Provider 矩阵 + 流式覆盖
+
+| Provider | Adapter | 真模型测试 | 流式 |
+|---|---|---|---|
+| 本地 deterministic | `BASOrganDeterministicAdapter` | offline | ❌ |
+| 本地 Apple LLM | `AppleFoundationOrganAdapter` (M5) | 5 + 5 + 2 + 3 = **15** | ✅ (M184) |
+| **远程 OpenAI 兼容** | **`BASChatCompletionsOrganAdapter` (M208)** | **offline 11 + 15 = 26** | **✅ (M210)** |
+
+`BASOrganAdapter` + `BASStreamingOrganAdapter` 协议在 3 种迥异 provider 形态（确定性桩 / Apple framework / HTTP API）上**真 portable**。
+
+### 14.8 不变量 / 整体性质（M211 后）
+
+不变量 / 整体性质百分比与 M204 一致（M205-M211 都是横向扩展，不是垂直深耕）：
+
+```
+不变量 #1 先醒再答             100%
+不变量 #2 神经不掌权             100%
+不变量 #3 宿主私有经验不进基础权重 100%
+性质   会醒会停                100%
+性质   懂世界也懂宿主            100%
+性质   会想不自转                99%
+性质   会保护不接管              100%
+性质   会成长不乱长              100%
+```
