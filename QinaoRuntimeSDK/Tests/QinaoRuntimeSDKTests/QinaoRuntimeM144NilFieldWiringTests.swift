@@ -120,7 +120,9 @@ final class QinaoRuntimeM144NilFieldWiringTests: XCTestCase {
             sessionID: o.sessionID, turnID: o.turnID)
         XCTAssertEqual(
             sf?.riskCardRef,
-            "risk-card.sess.m144.turn.risk",
+            // M163 — IDs containing '.' are percent-escaped to
+            // prevent (sess, turn) collisions in the ref space.
+            "risk-card.sess%2Em144.turn%2Erisk",
             "synthetic ref deterministic per (sess, turn)")
     }
 
@@ -138,7 +140,8 @@ final class QinaoRuntimeM144NilFieldWiringTests: XCTestCase {
             sessionID: o.sessionID, turnID: o.turnID)
         let rf = await fx.sovereign.renderFrame(
             sessionID: o.sessionID, turnID: o.turnID)
-        let expected = "permit.sess.m144.turn.permit"
+        // M163 — percent-escape per syntheticRef convention.
+        let expected = "permit.sess%2Em144.turn%2Epermit"
         XCTAssertEqual(sf?.actionPermitRef, expected)
         XCTAssertEqual(rf?.actionPermitRef, expected)
         XCTAssertEqual(
@@ -160,7 +163,8 @@ final class QinaoRuntimeM144NilFieldWiringTests: XCTestCase {
             sessionID: o.sessionID, turnID: o.turnID)
         XCTAssertEqual(
             rf?.agencyReservationRef,
-            "agency-reservation.sess.m144.turn.agency")
+            // M163 — percent-escaped per syntheticRef convention.
+            "agency-reservation.sess%2Em144.turn%2Eagency")
     }
 
     // MARK: - 5. All three present → all three populated

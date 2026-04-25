@@ -769,10 +769,13 @@ public actor QinaoRuntime {
         }
 
         // L3 (M122) — unconditional; minimum-viable fold.
+        // M163 — fold ID uses percent-escaped IDs to avoid
+        // collisions when sessionID/turnID contain dots.
         let l3Fold = BASThoughtFold(
-            foldID: "fold."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID,
+            foldID: QinaoSovereignControlPlane.syntheticRef(
+                prefix: "fold",
+                sessionID: inputs.observations.sessionID,
+                turnID: inputs.observations.turnID),
             hostEffectSummary: "",
             restorePointer: inputs.observations.snapshotRef,
             checksum: inputs.observations.policyHash,
@@ -915,31 +918,36 @@ public actor QinaoRuntime {
         // =========================================================
         // PHASE 5 — sovereign frame aggregator (M123 + M144 + M147).
         // =========================================================
+        // M163 — every synthetic ref built here goes through
+        // `QinaoSovereignControlPlane.syntheticRef(...)` so dotted
+        // session/turn IDs never collide.
+        let sid = inputs.observations.sessionID
+        let tid = inputs.observations.turnID
         let riskCardRef: String? =
             inputs.thoughtFrame?.riskCard.map { _ in
-                "risk-card."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID
+                QinaoSovereignControlPlane.syntheticRef(
+                    prefix: "risk-card",
+                    sessionID: sid, turnID: tid)
             }
         let actionPermitRef: String? =
             inputs.thoughtFrame?.actionPermit.map { _ in
-                "permit."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID
+                QinaoSovereignControlPlane.syntheticRef(
+                    prefix: "permit",
+                    sessionID: sid, turnID: tid)
             }
         let agencyReservationRef: String? =
             inputs.thoughtFrame?.agencyReservation.map { _ in
-                "agency-reservation."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID
+                QinaoSovereignControlPlane.syntheticRef(
+                    prefix: "agency-reservation",
+                    sessionID: sid, turnID: tid)
             }
         let contaminationRefs =
             inputs.contaminationLineages.map(\.lineageID)
 
         let sovereignFrame = BASSovereignFrame(
-            frameID: "frame."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID,
+            frameID: QinaoSovereignControlPlane.syntheticRef(
+                prefix: "frame",
+                sessionID: sid, turnID: tid),
             sessionID: inputs.observations.sessionID,
             turnID: inputs.observations.turnID,
             deviceStateRef: routedBudget?.leaseID,
@@ -973,36 +981,38 @@ public actor QinaoRuntime {
         // =========================================================
         // PHASE 7 — render frame aggregator (M127 + M144 + M148).
         // =========================================================
+        // M163 — same percent-escape convention via
+        // `syntheticRef(...)` — `sid` / `tid` reused from PHASE 5.
         let situationRef: String? =
             inputs.decomposeFrame.map { _ in
-                "situation."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID
+                QinaoSovereignControlPlane.syntheticRef(
+                    prefix: "situation",
+                    sessionID: sid, turnID: tid)
             }
         let mirrorRef: String? =
             inputs.decomposeFrame?.mirrorDraft.map { _ in
-                "mirror."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID
+                QinaoSovereignControlPlane.syntheticRef(
+                    prefix: "mirror",
+                    sessionID: sid, turnID: tid)
             }
         let toneProfileRef: String? =
             inputs.renderedOutput.map { _ in
-                "tone."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID
+                QinaoSovereignControlPlane.syntheticRef(
+                    prefix: "tone",
+                    sessionID: sid, turnID: tid)
             }
         let forceCurveRef: String? =
             (inputs.renderedOutput != nil
              && inputs.thoughtFrame?.riskCard != nil)
-            ? ("force-curve."
-               + inputs.observations.sessionID
-               + "." + inputs.observations.turnID)
+            ? QinaoSovereignControlPlane.syntheticRef(
+                prefix: "force-curve",
+                sessionID: sid, turnID: tid)
             : nil
 
         let renderFrame = BASRenderFrame(
-            frameID: "render."
-                + inputs.observations.sessionID
-                + "." + inputs.observations.turnID,
+            frameID: QinaoSovereignControlPlane.syntheticRef(
+                prefix: "render",
+                sessionID: sid, turnID: tid),
             mergedChoiceRef: l3Fold.foldID,
             actionPermitRef: actionPermitRef,
             agencyReservationRef: agencyReservationRef,

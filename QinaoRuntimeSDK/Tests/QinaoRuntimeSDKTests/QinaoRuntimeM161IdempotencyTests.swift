@@ -143,8 +143,14 @@ final class QinaoRuntimeM161IdempotencyTests: XCTestCase {
             obs(turnID: "turn.lww"),
             coordinatorSeverity: .pass)
         // Direct re-record at storage layer should succeed.
+        // M163 — frameID uses the percent-escaped synthetic ref
+        // convention so the manually-constructed replacement
+        // matches what `sendSession` would have produced.
         let replacement = BASSovereignFrame(
-            frameID: "frame.sess.m161.turn.lww",
+            frameID: QinaoSovereignControlPlane.syntheticRef(
+                prefix: "frame",
+                sessionID: "sess.m161",
+                turnID: "turn.lww"),
             sessionID: "sess.m161",
             turnID: "turn.lww",
             policyHash: "p")

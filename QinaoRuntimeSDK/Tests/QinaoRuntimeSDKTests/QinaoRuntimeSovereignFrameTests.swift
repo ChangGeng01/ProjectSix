@@ -103,8 +103,10 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
             sessionID: obs.sessionID, turnID: obs.turnID)
         XCTAssertEqual(
             frame?.frameID,
-            "frame.sess.det.turn.det",
-            "frameID = 'frame.<sessionID>.<turnID>' deterministic")
+            // M163 — percent-escaped per syntheticRef convention:
+            // dots in IDs become "%2E".
+            "frame.sess%2Edet.turn%2Edet",
+            "frameID = 'frame.<percent-escape(s)>.<percent-escape(t)>' deterministic")
     }
 
     // MARK: - 3. Source fields byte-equal their TurnObservations
@@ -135,7 +137,8 @@ final class QinaoRuntimeSovereignFrameTests: XCTestCase {
             "hostVersionRef = L5 constitution.activeVersion")
         XCTAssertEqual(
             frame?.thoughtFoldRef,
-            "fold.sess.verbatim.turn.verbatim",
+            // M163 — percent-escaped per syntheticRef convention.
+            "fold.sess%2Everbatim.turn%2Everbatim",
             "thoughtFoldRef = L3 fold's deterministic foldID")
     }
 

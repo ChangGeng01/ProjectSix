@@ -1519,6 +1519,68 @@ public actor QinaoSovereignControlPlane {
         renderFrameEntries.count
     }
 
+    // MARK: - M163 · Synthetic ref construction (collision-free)
+
+    /// M163 — Assemble a deterministic synthetic ref from a fixed
+    /// prefix and the (sessionID, turnID) pair. The dot ('.') is
+    /// the fixed separator between segments. To preserve unambiguous
+    /// `(prefix, sessionID, turnID)` round-tripping when the IDs
+    /// themselves contain dots, every '.' inside an ID is escaped
+    /// to `%2E` and every '%' is escaped to `%25` to keep the
+    /// encoding self-inverse.
+    ///
+    /// **Pre-M163 ambiguity.** With `(sessionID="sess.A", turnID="B")`
+    /// the ref `"frame.sess.A.B"` collides with
+    /// `(sessionID="sess", turnID="A.B")` which also produces
+    /// `"frame.sess.A.B"`. Two different turns therefore got
+    /// labelled with the same ref string in audit chains. M163
+    /// closes this gap: the two pairs above now produce
+    /// `"frame.sess%2EA.B"` and `"frame.sess.A%2EB"` respectively
+    /// — unique and reversible.
+    ///
+    /// **Used at the four Qinao construction sites** (sovereign
+    /// frame `frameID`, render frame `frameID`, thought-fold
+    /// `foldID`, force-curve back-ref) and at the two convention
+    /// validators in `verifyTurnResidue` that mirror them. The
+    /// helper is `nonisolated` because it is a pure value
+    /// transform — no actor hop, no I/O, no allocation beyond the
+    /// returned `String`.
+    public nonisolated static func syntheticRef(
+        prefix: String,
+        sessionID: String,
+        turnID: String
+    ) -> String {
+        prefix + "." + percentEscape(sessionID)
+            + "." + percentEscape(turnID)
+    }
+
+    /// M163 — percent-escape `%` first (so `%25` becomes literal
+    /// "%25") and `.` second (so the resulting `%2E` doesn't get
+    /// re-escaped). Idempotent — calling twice on the output of
+    /// `percentEscape(percentEscape(x))` produces the same as
+    /// calling once on a string that already has those sequences,
+    /// because the source `%` was already mapped.
+    public nonisolated static func percentEscape(
+        _ value: String
+    ) -> String {
+        value
+            .replacingOccurrences(of: "%", with: "%25")
+            .replacingOccurrences(of: ".", with: "%2E")
+    }
+
+    /// M163 — inverse of `percentEscape`. Decodes `%2E` to `.` and
+    /// `%25` to `%`. Order matters: decode `%2E` first so a literal
+    /// `%2E` payload doesn't get double-decoded into `.`. Useful
+    /// for tooling that wants to recover the original IDs from a
+    /// ref segment.
+    public nonisolated static func percentUnescape(
+        _ value: String
+    ) -> String {
+        value
+            .replacingOccurrences(of: "%2E", with: ".")
+            .replacingOccurrences(of: "%25", with: "%")
+    }
+
     // MARK: - M124 · Turn residue + cross-surface integrity (筋脉)
     //
     // M121 landed blood flow (L1), M122 extended it to L3+L5, M123
@@ -1532,9 +1594,9 @@ public actor QinaoSovereignControlPlane {
     // callers decide the policy response):
     //   * Every residue component present (or documented missing)
     //   * Frame's `frameID` follows the M123 convention
-    //     "frame.<sessionID>.<turnID>"
+    //     "frame.<percent-escape(sessionID)>.<percent-escape(turnID)>"
     //   * Frame's `thoughtFoldRef` follows the M122 convention
-    //     "fold.<sessionID>.<turnID>"
+    //     "fold.<percent-escape(sessionID)>.<percent-escape(turnID)>"
     //   * Observation bundle carries the always-present L14 summary
     //   * Bundle and frame agree on sessionID + turnID
     //
@@ -1742,18 +1804,22 @@ public actor QinaoSovereignControlPlane {
         }
 
         if let frame = residue.sovereignFrame {
-            let expectedFrameID =
-                "frame." + frame.sessionID
-                + "." + frame.turnID
+            // M163 — convention uses percent-escaped IDs in
+            // segments so dotted sessionIDs cannot collide.
+            let expectedFrameID = Self.syntheticRef(
+                prefix: "frame",
+                sessionID: frame.sessionID,
+                turnID: frame.turnID)
             if frame.frameID != expectedFrameID {
                 findings.append(
                     .frameIDConventionMismatch(
                         expected: expectedFrameID,
                         got: frame.frameID))
             }
-            let expectedFoldRef =
-                "fold." + frame.sessionID
-                + "." + frame.turnID
+            let expectedFoldRef = Self.syntheticRef(
+                prefix: "fold",
+                sessionID: frame.sessionID,
+                turnID: frame.turnID)
             if let ref = frame.thoughtFoldRef,
                ref != expectedFoldRef
             {
@@ -1775,18 +1841,21 @@ public actor QinaoSovereignControlPlane {
             findings.append(.missingRenderFrame)
         }
         if let rframe = residue.renderFrame {
-            let expectedRenderFrameID =
-                "render." + residue.sessionID
-                + "." + residue.turnID
+            // M163 — convention uses percent-escaped IDs.
+            let expectedRenderFrameID = Self.syntheticRef(
+                prefix: "render",
+                sessionID: residue.sessionID,
+                turnID: residue.turnID)
             if rframe.frameID != expectedRenderFrameID {
                 findings.append(
                     .renderFrameIDConventionMismatch(
                         expected: expectedRenderFrameID,
                         got: rframe.frameID))
             }
-            let expectedMergedChoiceRef =
-                "fold." + residue.sessionID
-                + "." + residue.turnID
+            let expectedMergedChoiceRef = Self.syntheticRef(
+                prefix: "fold",
+                sessionID: residue.sessionID,
+                turnID: residue.turnID)
             if let ref = rframe.mergedChoiceRef,
                ref != expectedMergedChoiceRef
             {

@@ -65,7 +65,8 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
             sessionID: o.sessionID, turnID: o.turnID)
         XCTAssertEqual(
             rf?.situationRef,
-            "situation.sess.m148.turn.situ")
+            // M163 — percent-escaped per syntheticRef convention.
+            "situation.sess%2Em148.turn%2Esitu")
     }
 
     func testDecomposeFrameWithMirrorPopulatesMirrorRef()
@@ -87,7 +88,8 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
             sessionID: o.sessionID, turnID: o.turnID)
         XCTAssertEqual(
             rf?.mirrorRef,
-            "mirror.sess.m148.turn.mir")
+            // M163 — percent-escaped per syntheticRef convention.
+            "mirror.sess%2Em148.turn%2Emir")
     }
 
     func testRenderedOutputPopulatesToneRef() async throws {
@@ -107,7 +109,8 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
             sessionID: o.sessionID, turnID: o.turnID)
         XCTAssertEqual(
             rf?.toneProfileRef,
-            "tone.sess.m148.turn.tone")
+            // M163 — percent-escaped per syntheticRef convention.
+            "tone.sess%2Em148.turn%2Etone")
     }
 
     func testForceCurveRefJointGate() async throws {
@@ -153,7 +156,8 @@ final class QinaoRuntimeM148RenderNilsTests: XCTestCase {
             sessionID: o2.sessionID, turnID: o2.turnID)
         XCTAssertEqual(
             rf2?.forceCurveRef,
-            "force-curve.sess.m148.turn.with-risk")
+            // M163 — percent-escaped per syntheticRef convention.
+            "force-curve.sess%2Em148.turn%2Ewith-risk")
     }
 
     func testAllFourWithFullSources() async throws {

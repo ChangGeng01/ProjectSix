@@ -162,10 +162,12 @@ final class QinaoRuntimeRenderFrameCapTests: XCTestCase {
         let ids = frames.map(\.frameID)
         XCTAssertEqual(
             ids,
+            // M163 — IDs containing '.' are percent-escaped per
+            // QinaoSovereignControlPlane.syntheticRef convention.
             [
-                "render.sess.fifo.turn.2",
-                "render.sess.fifo.turn.3",
-                "render.sess.fifo.turn.4",
+                "render.sess%2Efifo.turn%2E2",
+                "render.sess%2Efifo.turn%2E3",
+                "render.sess%2Efifo.turn%2E4",
             ],
             "oldest evicted, newest preserved in order")
     }
@@ -181,10 +183,17 @@ final class QinaoRuntimeRenderFrameCapTests: XCTestCase {
         // record API directly.
         let fx = await makeRuntime(cap: 2)
         // Fill to capacity with two distinct (sess, turn) keys
-        // via direct record calls.
+        // via direct record calls. M163 — frameIDs use the
+        // percent-escape syntheticRef convention.
+        func renderRef(_ i: Int) -> String {
+            QinaoSovereignControlPlane.syntheticRef(
+                prefix: "render",
+                sessionID: "sess.lww",
+                turnID: "turn.\(i)")
+        }
         for i in 0..<2 {
             let frame = BASRenderFrame(
-                frameID: "render.sess.lww.turn.\(i)")
+                frameID: renderRef(i))
             await fx.sovereign.recordRenderFrame(
                 frame,
                 sessionID: "sess.lww",
@@ -197,7 +206,7 @@ final class QinaoRuntimeRenderFrameCapTests: XCTestCase {
         // count stays 2; no eviction triggers.
         for _ in 0..<50 {
             let frame = BASRenderFrame(
-                frameID: "render.sess.lww.turn.0")
+                frameID: renderRef(0))
             await fx.sovereign.recordRenderFrame(
                 frame,
                 sessionID: "sess.lww",
@@ -210,10 +219,7 @@ final class QinaoRuntimeRenderFrameCapTests: XCTestCase {
         // turn.1 at position 1 — LWW rewrites in place.
         XCTAssertEqual(
             frames.map(\.frameID),
-            [
-                "render.sess.lww.turn.0",
-                "render.sess.lww.turn.1",
-            ])
+            [renderRef(0), renderRef(1)])
     }
 
     // MARK: - 4. Zero / negative cap clamps to 1
@@ -241,7 +247,8 @@ final class QinaoRuntimeRenderFrameCapTests: XCTestCase {
                 forSession: "sess.clamp")
             XCTAssertEqual(
                 frames.first?.frameID,
-                "render.sess.clamp.turn.2",
+                // M163 — percent-escaped per syntheticRef convention.
+                "render.sess%2Eclamp.turn%2E2",
                 "newest turn survives after FIFO eviction")
         }
     }
@@ -286,17 +293,18 @@ final class QinaoRuntimeRenderFrameCapTests: XCTestCase {
             forSession: "sess.A")
         let bFrames = await fx.sovereign.renderFrames(
             forSession: "sess.B")
+        // M163 — percent-escaped per syntheticRef convention.
         XCTAssertEqual(
             aFrames.map(\.frameID),
             [
-                "render.sess.A.turn.1",
-                "render.sess.A.turn.2",
+                "render.sess%2EA.turn%2E1",
+                "render.sess%2EA.turn%2E2",
             ])
         XCTAssertEqual(
             bFrames.map(\.frameID),
             [
-                "render.sess.B.turn.1",
-                "render.sess.B.turn.2",
+                "render.sess%2EB.turn%2E1",
+                "render.sess%2EB.turn%2E2",
             ])
     }
 }

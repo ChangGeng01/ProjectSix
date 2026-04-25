@@ -114,13 +114,19 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
             obs, coordinatorSeverity: .pass)
 
         // Overwrite the recorded frame with a mis-named frameID
-        // to simulate a corrupt / drifted aggregator.
+        // to simulate a corrupt / drifted aggregator. M163 — the
+        // canonical thoughtFoldRef is the percent-escaped form;
+        // setting it correctly here isolates the drift to the
+        // frameID alone.
         let badFrame = BASSovereignFrame(
             frameID: "mismatch.id.0",  // wrong convention
             sessionID: obs.sessionID,
             turnID: obs.turnID,
-            thoughtFoldRef:
-                "fold." + obs.sessionID + "." + obs.turnID,
+            thoughtFoldRef: QinaoSovereignControlPlane
+                .syntheticRef(
+                    prefix: "fold",
+                    sessionID: obs.sessionID,
+                    turnID: obs.turnID),
             policyHash: obs.policyHash)
         await fx.sovereign.recordSovereignFrame(badFrame)
 
@@ -133,7 +139,9 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
             if case .frameIDConventionMismatch(
                 let expected, let got) = $0
             {
-                return expected == "frame.sess.m124.turn.drift"
+                // M163 — convention validator emits the
+                // percent-escaped expected ref.
+                return expected == "frame.sess%2Em124.turn%2Edrift"
                     && got == "mismatch.id.0"
             }
             return false
@@ -153,8 +161,14 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
             obs, coordinatorSeverity: .pass)
 
         // Overwrite with a frame whose thoughtFoldRef drifts.
+        // M163 — the canonical frameID is the percent-escaped
+        // form; setting it correctly here isolates the drift to
+        // the thoughtFoldRef alone.
         let badFrame = BASSovereignFrame(
-            frameID: "frame." + obs.sessionID + "." + obs.turnID,
+            frameID: QinaoSovereignControlPlane.syntheticRef(
+                prefix: "frame",
+                sessionID: obs.sessionID,
+                turnID: obs.turnID),
             sessionID: obs.sessionID,
             turnID: obs.turnID,
             thoughtFoldRef: "not.a.fold",
@@ -169,8 +183,10 @@ final class QinaoRuntimeTurnResidueTests: XCTestCase {
             if case .thoughtFoldRefConventionMismatch(
                 let expected, let got) = $0
             {
+                // M163 — convention validator emits the
+                // percent-escaped expected ref.
                 return expected ==
-                    "fold.sess.m124.turn.fold-drift"
+                    "fold.sess%2Em124.turn%2Efold-drift"
                     && got == "not.a.fold"
             }
             return false

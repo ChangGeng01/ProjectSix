@@ -81,8 +81,10 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
         let rf = try XCTUnwrap(rfOpt)
         XCTAssertEqual(
             rf.frameID,
-            "render.sess.convention.turn.convention",
-            "frameID = 'render.<session>.<turn>'")
+            // M163 — percent-escaped per syntheticRef convention:
+            // dots in IDs become "%2E".
+            "render.sess%2Econvention.turn%2Econvention",
+            "frameID = 'render.<percent-escape(s)>.<percent-escape(t)>'")
     }
 
     // MARK: - 3. mergedChoiceRef → L3 fold
@@ -101,7 +103,8 @@ final class QinaoRuntimeRenderFrameTests: XCTestCase {
         let rf = try XCTUnwrap(rfOpt)
         XCTAssertEqual(
             rf.mergedChoiceRef,
-            "fold.sess.m3.turn.m3",
+            // M163 — percent-escaped per syntheticRef convention.
+            "fold.sess%2Em3.turn%2Em3",
             "mergedChoiceRef = L3 fold's deterministic foldID")
     }
 
