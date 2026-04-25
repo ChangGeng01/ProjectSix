@@ -222,8 +222,10 @@ output.
 | Apple FoundationModels round-trip, scout | ~0.3 s (one short-reply prompt)                     | `AppleFoundationE2ETests.testRealScoutDraftReturnsNonEmptyBody` |
 | Apple FoundationModels round-trip, core | ~1.2 s (one short-paragraph prompt)                 | `AppleFoundationE2ETests.testRealCoreDraftReturnsNonEmptyBody` |
 | Cross-session real parallelism          | 2 sessions complete in ~0.35 s (both hit the model) | `QinaoAppleFoundationConcurrencyTests.testTwoConcurrentSessionsBothReachAppleFM` |
+| Stream cancellation latency             | ~150 ms from `task.cancel()` to iteration exit      | `AppleFoundationStreamCancellationTests.testCancellingStreamingTaskTerminatesWithinBudget` |
 | Thermal stability (100-turn stress)     | nominal → nominal (no escalation)                   | `QinaoRuntime14LayerSaturationTests.testThermalStateDoesNotEscalateAcross100Turns` |
 | Error-translation reason-code matrix    | 7 deterministic mappings pinned                     | `QinaoOrganErrorTranslationTests` |
+| Cross-process audit-ledger recovery     | phase-A entries survive actor teardown + reopen     | `QinaoSovereignPersistentLedgerTests.testReopenSamePathRecoversAuditChain` |
 
 The Apple-FM round-trip tests are gated behind `QINAO_FM_E2E=1` so the
 default `swift test` run stays fast and offline. Set the env var to
@@ -231,6 +233,31 @@ exercise the real on-device model:
 
 ```sh
 QINAO_FM_E2E=1 swift test --filter AppleFoundationE2ETests
+```
+
+### Real-LLM coverage pyramid
+
+Tests that drive a real Apple FoundationModels session:
+
+| Suite | Tests | Layer covered |
+| ----- | ----- | ------------- |
+| `AppleFoundationE2ETests` | 5 | L2 — adapter contract |
+| `AppleFoundationStreamingTests` | 5 | L2 — token streaming |
+| `AppleFoundationStreamCancellationTests` | 2 | L2 — task cancellation propagation |
+| `QinaoAppleFoundationE2ETests` | 3 | L9 — host-written endpoint pattern |
+| `QinaoAppleFoundationFactoryTests` | 4 | L9 — public factory ergonomics |
+| `QinaoAppleFoundationConcurrencyTests` | 2 | L9 — cross-session parallelism |
+| `QinaoLoopStreamBodyTests` | 5 | L9 — public streaming surface |
+| `QinaoAppleFoundationGateChainTests` | 2 | L11 + L14 — three-signature gate |
+| `QinaoAppleFoundationRiskGateTests` | 3 | L11 + L12 — risk → soft-hand surface |
+| `QinaoAppleFoundationAuditChainTests` | 2 | L13 + L14 — shadow trial → audit ledger |
+| `QinaoAppleFoundationWorldPriorChainTests` | 3 | L4 — boundary bedrock + guardian dissent |
+| `QinaoAppleFoundationMemoryChainTests` | 3 | L8 — admit, recall, cascade delete |
+
+Run all real-LLM tests at once:
+
+```sh
+QINAO_FM_E2E=1 swift test
 ```
 
 ---
@@ -287,6 +314,13 @@ promise. All listed tests are part of the default `swift test` run on
 | **Concurrent sessions are race-safe** | Two parallel sessions on independent `QinaoLoop` actors both reach the model without deadlock or cross-talk (`QinaoAppleFoundationConcurrencyTests.testTwoConcurrentSessionsBothReachAppleFM`) |
 | **Reason-code grammar pinned across providers** | Every `QinaoOrganEndpoint` error translates to a stable `LoopError.organUnavailable(reason:)` code (`QinaoOrganErrorTranslationTests`) |
 | **14-layer per-turn observation streaming + perf budget** | `QinaoRuntime.sendSession` injects every applicable layer's observation summary; pipeline p95 < 0.5 ms; thermal state stable across 100-turn stress (`QinaoRuntime14LayerSaturationTests`) |
+| **Token-streaming surface** | `QinaoLoop.streamBody(...)` yields `OrganResponseChunk` values driven by `LanguageModelSession.streamResponse(to:)` — cumulative-body monotonic, Σ delta == final cumulative, sub-second cancellation propagation (`QinaoLoopStreamBodyTests`, `AppleFoundationStreamingTests`, `AppleFoundationStreamCancellationTests`) |
+| **Three-signature gate end-to-end with real LLM** | Real `LanguageModelSession` body drives `ActionIntent` through `QinaoRiskGate.requestActionPermit` + `QinaoSovereignControlPlane.issueWarrant` + `SnapshotContinuityProof` to `QinaoRuntime.execute`; mismatched warrant digest produces `digestMismatch` and tool-execution count == 0 (`QinaoAppleFoundationGateChainTests`) |
+| **Risk gate routes real LLM body to a soft-hand surface** | Same real-LLM body + risk signals → `requestSurfaceAction` returns `.draftShell` for safe inputs and a non-`.draftShell` surface with reason codes for high-risk inputs (`QinaoAppleFoundationRiskGateTests`) |
+| **Audit chain end-to-end with real LLM** | Real `LanguageModelSession` body becomes a shadow-trial ticket; `sendSession` streams the L13 layer summary into the L14 audit ledger; `observationBundle(sessionID:turnID:)` returns the bundle (`QinaoAppleFoundationAuditChainTests`) |
+| **Cross-process audit-ledger persistence** | `Configuration.ledgerDatabasePath` opens SQLite-backed storage; tearing down the control plane and reopening on the same path rehydrates the chain (`QinaoSovereignPersistentLedgerTests`) |
+| **Real LLM body honors boundary bedrock** | A real `LanguageModelSession` body wrapped as `.speculative` host claim against `axiom-ethics-consent` (axiomatic) is rejected by the L4 vault; the L4-L9 chain raises a guardian branch with `world-prior-contradiction` dissent (`QinaoAppleFoundationWorldPriorChainTests`) |
+| **Real LLM body honors L8 governance + cascade delete** | Real body + sufficient confidence → admitted, retrievable, then `forget(id:)` removes it from `recall(...)` AND lands a cascade receipt with the deleted UUID; sub-floor confidence is refused with the stable `confidence-below-floor` reason (`QinaoAppleFoundationMemoryChainTests`) |
 
 ---
 
