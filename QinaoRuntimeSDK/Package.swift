@@ -48,6 +48,14 @@ let package = Package(
         .library(
             name: "QinaoMLX",
             targets: ["QinaoMLX"]),
+        // M228 — testable SwiftUI library backing QinaoSampleApp.
+        // Lifted out of the executable target so test suites can
+        // exercise ContentView + SampleSession with mocked endpoint
+        // builders. Hosts wanting a SwiftUI demo surface ready to
+        // embed into their own app `import QinaoSample`.
+        .library(
+            name: "QinaoSample",
+            targets: ["QinaoSample"]),
         // M203 — runnable demo executable. `swift run QinaoSampleHost
         // "<prompt>"` drives QinaoLoop with the real Apple LLM
         // endpoint and prints the frontier candidate end-to-end.
@@ -210,15 +218,24 @@ let package = Package(
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 .product(name: "BASMLXAdapter", package: "BehavioralAISubstrate")
             ]),
-        // M219 — SwiftUI macOS GUI demo target. M222 adds QinaoMLX
-        // dep so the picker's three Gemma entries can drive real
-        // MLX inference instead of falling back to Apple FM.
-        .executableTarget(
-            name: "QinaoSampleApp",
+        // M228 — testable SwiftUI library backing QinaoSampleApp.
+        // ContentView / SampleSession / SampleProvider live here so
+        // tests can `@testable import QinaoSample` instead of trying
+        // to drive an executable target.
+        .target(
+            name: "QinaoSample",
             dependencies: [
                 "QinaoLoop",
                 "QinaoAppleFoundation",
                 "QinaoMLX"
+            ]),
+        // M219 — SwiftUI macOS GUI demo executable. M228 thinned to
+        // just @main + window scene; UI lives in the QinaoSample
+        // library so snapshot tests can render ContentView headless.
+        .executableTarget(
+            name: "QinaoSampleApp",
+            dependencies: [
+                "QinaoSample"
             ]),
         // M203 — runnable demo executable target. CLI that takes a
         // prompt argument, drives QinaoLoop with Apple FM, prints
@@ -257,6 +274,9 @@ let package = Package(
                 // M222 — exercise QinaoMLX façade in unit tests
                 // (factory shape, model identity, redaction).
                 "QinaoMLX",
+                // M228 — exercise QinaoSample SwiftUI library
+                // (SampleSession caching + ContentView snapshot).
+                "QinaoSample",
                 .product(name: "BASOrgan", package: "BehavioralAISubstrate"),
                 // M178 — env-gated end-to-end test (`QINAO_FM_E2E=1`)
                 // wires `AppleFoundationOrganAdapter` through a

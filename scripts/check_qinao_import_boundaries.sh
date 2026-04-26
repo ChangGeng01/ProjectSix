@@ -34,7 +34,7 @@ if [[ ! -d "$SOURCES_DIR" ]]; then
 fi
 
 ALLOWED_SOURCE_IMPORT_REGEX='^import (Foundation|CryptoKit|SwiftUI|Combine|Observation|os|BackgroundTasks|BAS[A-Za-z]+|Qinao[A-Za-z]+)$'
-ALLOWED_TEST_IMPORT_REGEX='^(@testable )?import (XCTest|Foundation|CryptoKit|SwiftUI|BackgroundTasks|BAS[A-Za-z]+|Qinao[A-Za-z]+)$'
+ALLOWED_TEST_IMPORT_REGEX='^(@testable )?import (XCTest|Foundation|CryptoKit|SwiftUI|BackgroundTasks|AppKit|UIKit|BAS[A-Za-z]+|Qinao[A-Za-z]+)$'
 FORBIDDEN_HOST_PACKAGES_REGEX='^import (Before|SampleHost|BeforeWatch|BeforeWidgetExtension)[A-Za-z]*$'
 
 violations=0
