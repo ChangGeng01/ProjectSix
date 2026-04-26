@@ -153,4 +153,117 @@ final class MLXOrganAdapterTests: XCTestCase {
         XCTAssertEqual(
             adapter.model, MLXModelCatalog.gemma3n_E4B_4bit)
     }
+
+    // MARK: - 6. Preset → GenerateParameters mapping (M226)
+
+    /// Pinning the preset → GenerateParameters translation so a
+    /// future tweak to scout/core temperatures gets a visible test
+    /// diff. Without this test, swapping the values silently keeps
+    /// the suite green while changing every real inference.
+    #if canImport(MLXLLM)
+    func testGenerateParametersScoutPresetUsesLowTemperature() async {
+        let adapter = MLXOrganAdapter()
+        let params = await adapter._generateParameters(for: .scout)
+        XCTAssertEqual(
+            params.temperature, Float(BASOrganPreset.scout.temperature),
+            accuracy: 1e-6,
+            "scout temperature must mirror BASOrganPreset.scout.temperature")
+        XCTAssertEqual(
+            params.topP, Float(BASOrganPreset.scout.topP),
+            accuracy: 1e-6,
+            "scout topP must mirror BASOrganPreset.scout.topP")
+    }
+
+    func testGenerateParametersCorePresetUsesMidTemperature() async {
+        let adapter = MLXOrganAdapter()
+        let params = await adapter._generateParameters(for: .core)
+        XCTAssertEqual(
+            params.temperature, Float(BASOrganPreset.core.temperature),
+            accuracy: 1e-6,
+            "core temperature must mirror BASOrganPreset.core.temperature")
+        XCTAssertEqual(
+            params.topP, Float(BASOrganPreset.core.topP),
+            accuracy: 1e-6,
+            "core topP must mirror BASOrganPreset.core.topP")
+    }
+
+    func testGenerateParametersScoutAndCoreDiffer() async {
+        // The two presets exist precisely so `.scout` is more
+        // deterministic than `.core`. If they ever produce equal
+        // GenerateParameters, the architecture's two-tier organ
+        // contract has silently collapsed.
+        let adapter = MLXOrganAdapter()
+        let scout = await adapter._generateParameters(for: .scout)
+        let core = await adapter._generateParameters(for: .core)
+        XCTAssertNotEqual(
+            scout.temperature, core.temperature,
+            "scout and core must produce distinct temperatures " +
+            "(otherwise the two-tier organ contract is broken)")
+    }
+    #endif
+
+    // MARK: - 7. Prompt builder coverage (M226)
+
+    /// Pure prompt-builder helpers exposed for cross-provider
+    /// stability — `AppleFoundationOrganAdapter.prompt(for:)` and
+    /// `MLXOrganAdapter.prompt(for:)` produce the same shape, so
+    /// audit logs from either provider are byte-comparable.
+    func testPromptForBareInstructionHasNoContextSection() {
+        let request = BASOrganRequest(
+            requestID: "r1",
+            role: .core,
+            preset: .core,
+            instruction: "say hi",
+            context: [])
+        let prompt = MLXOrganAdapter.prompt(for: request)
+        XCTAssertTrue(prompt.contains("Instruction:"))
+        XCTAssertTrue(prompt.contains("say hi"))
+        XCTAssertFalse(
+            prompt.contains("Context:"),
+            "no context items → no Context: section")
+    }
+
+    func testPromptWithContextNumbersItemsStartingAtOne() {
+        let request = BASOrganRequest(
+            requestID: "r2",
+            role: .core,
+            preset: .core,
+            instruction: "summarize",
+            context: ["fact one", "fact two", "fact three"])
+        let prompt = MLXOrganAdapter.prompt(for: request)
+        XCTAssertTrue(prompt.contains("[1] fact one"))
+        XCTAssertTrue(prompt.contains("[2] fact two"))
+        XCTAssertTrue(prompt.contains("[3] fact three"))
+    }
+
+    func testSystemInstructionsScoutIsShorter() {
+        // Scout's system instructions are explicitly the
+        // "low-commitment / structured" tier — pin that they
+        // mention "Scout" and stay separate from core's wording.
+        let scoutReq = BASOrganRequest(
+            requestID: "r3",
+            role: .scout,
+            preset: .scout,
+            instruction: "anything",
+            context: [])
+        let coreReq = BASOrganRequest(
+            requestID: "r4",
+            role: .core,
+            preset: .core,
+            instruction: "anything",
+            context: [])
+        let scoutText = MLXOrganAdapter.systemInstructions(
+            for: scoutReq)
+        let coreText = MLXOrganAdapter.systemInstructions(
+            for: coreReq)
+        XCTAssertNotEqual(
+            scoutText, coreText,
+            "scout vs core system instructions must differ")
+        XCTAssertTrue(
+            scoutText.contains("Scout"),
+            "scout system instructions must mention the role name")
+        XCTAssertTrue(
+            coreText.contains("Core"),
+            "core system instructions must mention the role name")
+    }
 }
