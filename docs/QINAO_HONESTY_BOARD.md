@@ -1211,3 +1211,102 @@ L2 Neural Organ 区间从 40% → **55%** —— 第三个真 provider 实装 + 
 
 剩余项继续在 §15.3 A 类（SDK scope 内）— 不在外壳层"假装解决" B/C 类。
 
+---
+
+## 十七、M228–M233 — Sample E2E + 100k soak + 训练路线诚实补登（2026-04-26）
+
+### 17.1 区间内里程碑速查
+
+| Mx | 主题 | 关键产物 |
+|---|---|---|
+| M228 | SwiftUI sample app E2E | `QinaoSample` library + 19 tests (10 behavior + 9 ImageRenderer snapshot) |
+| M229 | vendor 升级辅助 | `scripts/vendor_state.sh` + `scripts/vendor_diff.sh` |
+| M230 | enriched soak bench | `--bench` 加 errors / unique-bodies / Q1→Q4 drift / progress logging |
+| **M231** | **训练路线诚实补登** | **本节（§十七）— 承认 T0-T8 + L2 9 阶段全部 0% 实做** |
+| M232 | T2/T3 in-context 课程提示 | Risk Spine + Permit Knot system prompts |
+| M233 | T4 LoRA 训练脚手架 | `BASLoRAAdapter` 包装 `LoRATrain` |
+
+### 17.2 100k Apple FM soak 真实 baseline（M230 后实跑）
+
+```
+QinaoSampleHost --bench 100000  (2026-04-26 11:29 → 18:20, 6h51m)
+  min            200 ms
+  p50            219 ms
+  p95            437 ms
+  p99            614 ms
+  max           3242 ms (single outlier)
+  mean           247 ms
+  errors           0 / 100,000
+  unique bodies   15 / 100,000
+  drift Q1→Q4    -6.7%  (warmup, no thermal stall)
+```
+
+这是任何后续 SDK 改动的 regression baseline。零失败 / 6h51m 真模型连续调用 / drift 反向（在加速）—— 系统在 inference 层面通过 100k turn 真模型 burn-in。
+
+### 17.3 ⚠️ 训练路线 — 白皮书 vs 现状（M231 必须补登）
+
+之前 §一-§十六 全部口径都把"模型 inference 跑通"当作"完整体"。这是对白皮书的 doctrine drift —— [`EBRAIN_13L_EXECUTION_V12.md`](EBRAIN_13L_EXECUTION_V12.md):201 明确写了 **T0-T8 训练路线**，[`EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md`](EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md):854 写了 **L2 完全体 9 阶段组织化训练**。SDK 全部走 inference 承载层，**训练 0%**。
+
+#### T0-T8 实做账（2026-04-26）
+
+| 阶段 | 白皮书要的 | 现状 | M-计划 |
+|---|---|---|---|
+| **T0** 基座预训练 | 自训 4B-8B 模型 from random init | **0%** — wrap 别人的（Apple FM / Gemma 3·3n / OpenAI 兼容） | 不做（需 4×H100 + 几周 + $50k-$500k 算力 — SDK scope 外） |
+| **T1** 结构课程 | 教模型 "先醒再答" 等结构 | 0% | 跟 T0 同量级，不做 |
+| **T2** 风险/边界课程 | Risk Spine 训权重 | 0%，**M232 走 in-context 路径**（system prompt + few-shot）替代权重训练 | M232 |
+| **T3** 教师编排循环 | distill from teacher | 0%，**M232 部分用** in-context teacher | M232 |
+| **T4** 多头监督微调 | Scout / Risk / Permit 头分化 | **M233 起步** — wrap vendored `LoRATrain` 做 LoRA 微调 | M233 |
+| **T5** 宿主/记忆训练 | Memory Codec 训权重 | 0%，要长上下文 + RAG infra；LoRA 路径可作部分 host modulation 训练（M234+ 候选） | 待定 |
+| **T6** 循环策略蒸馏 | L9 dream-loop 蒸成权重 | 0%，需先有 L9 dream-loop 的真 best-candidate 量产 | 待定 |
+| **T7** 量化端侧 | 4-bit on-device | mlx-community 已做完，Vendor/ 直接 4-bit 入手；SDK 自己没量化 | 不做（消费就够） |
+| **T8** 试运行复盘 | A/B 上线后回放 | 0%，需要真用户 + telemetry pipeline | 等 ship 给真用户后 |
+
+#### L2 完全体 9 阶段实做账
+
+[`EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md`](EBRAIN_L2_BRAIN_TISSUE_TARGET_VINF.md):854 9 阶段全部 **0% 实做**。M232 + M233 触及第 1-3 阶段（基座骨架 / 器官分化 / 多候选前沿）的 **prompt 路径** 替代。第 4-9 阶段（Simu Ring / Critic Blade / 风险-Permit 神经绑定 / 宿主调制隔离 / 可折页状态 / 主权服从）100% 待定。
+
+#### 校正后 L2 进度
+
+之前 §16.2 报 L2 = 55% 是把 inference 端 3 provider 计入。**修正口径**：
+- L2 inference 承载层（BASOrganAdapter + 3 provider）：**55%**
+- L2 训练分化（9 阶段）：**0%**（M232+M233 后预计 ~5-8%）
+- L2 综合（含训练）：**~30%**
+
+诚实板从此 **L2 inference / L2 training 分两栏报**，避免再一次合并造成 doctrine drift。
+
+### 17.4 整体性质百分比 — 训练补登后修正
+
+| 性质 | 之前报 | 修正后 | 修正原因 |
+|---|---|---|---|
+| 会想不自转 | 99.5% | **70%** | L9 候选前沿是 prompt-only 实现，不是神经器官（白皮书 894 行 "训练 Simu Ring，让未来投影成为神经器官，而不是 prompt 幻觉"），权重路径未训 |
+| 懂世界也懂宿主 | 100% | **75%** | L4 World Prior + L5 Host Constitution 都在 schema 层；T5 训练（Memory Codec / Host Modulation Mesh 权重）= 0% |
+| 三条不变量 | 100/100/100 | **100/100/100** | 不动 — 这三条是接口契约，不是权重要求 |
+| 会醒会停 | 98% | 98% | 不动（L1 调度跟训练无关） |
+| 会保护不接管 | 100% | 100% | 不动（L11/L14 是 schema + runtime control plane，不需要权重训） |
+| 会成长不乱长 | 100% | **40%** | L13 蒸变炉的 "影子试演 + 蒸馏" 路径里 **蒸馏权重 = 0%**；schema + audit 全 ready 但没真蒸 |
+
+### 17.5 SDK scope 边界（M231 后正式划定）
+
+**SDK 内能做**（Swift-only / 单机 Apple Silicon 限定）：
+- ✅ inference 承载层（M177-M222 已做）
+- ✅ vendor freeze（M224）
+- ✅ in-context 课程（M232 — system prompt 路径替代 T2/T3 权重训）
+- ✅ LoRA 微调脚手架（M233 — 部分 T4，单机 24-48h 一轮可做）
+- ✅ schema 完备性（L1-L14 所有结构类型）
+
+**SDK 外（必须有 cloud GPU / Python / 真 ML infra）**：
+- ❌ T0 基座预训练
+- ❌ T1 结构课程（量级跟 T0 同）
+- ❌ T3 教师编排循环（多机多卡）
+- ❌ T5 宿主/记忆训练（长上下文 + RAG 训练管线）
+- ❌ T6 循环策略蒸馏（量级中等，但需要 L9 真 dream-loop telemetry）
+
+**SDK 不做但可以接管线**：M233 后 SDK 能加载 LoRA adapter；外部训出来的 LoRA 权重可以经 `BASLoRAAdapter` 灌进去。SDK 是消费方 + 微调方，不是 from-scratch 训练方。
+
+### 17.6 调整后状态总结口径（M231 后）
+
+> "SDK 完全体 = inference 承载 + 自给自足 + 部分 in-context 课程 + LoRA 微调脚手架。**不是** ML 训练完整体。T0 基座预训练 / T1 结构课程 / T3 教师编排 / T5 宿主记忆 / T6 循环策略蒸馏明确在 SDK scope 外，需要 cloud GPU + 训练管线另起项目。"
+
+之前的"完全体"口径对 inference 承载层准确，对 ML 训练路线虚高。现在两栏分报，不再骗自己。
+
+
