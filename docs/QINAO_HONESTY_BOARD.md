@@ -1366,6 +1366,91 @@ M236 把 Gemma 3n 从 SDK 全部移除（catalog / Qinao enum / picker / 所有 
 
 > "SDK 三 provider：Apple FM（含 M234 curriculum 注入）/ MLX Gemma 4 e4b·e2b + Gemma 3 4B / Chat Completions HTTP。LoRA 微调（M233）目标基座 = Gemma 4 E2B。Apple FM 是关源不可训，但 curriculum 路径让它输出 [RISK]/[NEEDS_PERMIT] 结构化 marker。Gemma 3n 已从 SDK 全部移除。"
 
+---
+
+## 十九、M237 14k eval 中止 — Apple FM 单进程退化实测发现（2026-04-27）
+
+### 19.1 经过
+
+M237 `--apple-fm-curriculum-eval N` 模式跑 N=20000（4 类 × 4000 实际组合上限 = 14000 真 prompts × 2 路径 = 28k 真 Apple FM 调用）做 curriculum 效力测量。
+
+```
+计划:    14000 prompts in ~9h
+实际:    跑到 4760/14000 (34%) 时手动 kill
+原因:    Apple FM 单进程内部状态累积导致 5h 后单 prompt 推理时间从 2.05s
+         飙到 16s/prompt，且 1.1% 错误率持续上升
+```
+
+### 19.2 实测劣化曲线
+
+| prompt# | 累积 elapsed | 增量 / 140 | 推理速度 |
+|---|---|---|---|
+| 140 | 318s | 318s | **2.27 s/prompt**（smoke 节奏）|
+| 280 | 653s | 335s | 2.39 |
+| 420 | 1009s | 356s | 2.54 |
+| 560 | 1410s | 401s | 2.86 |
+| 1400 | 3324s | (1k avg) | 2.37 |
+| 2800 | 6379s | (1k avg) | 2.18（稳定段）|
+| 4200 | 11813s | (1k avg) | 3.88 ← 开始劣化 |
+| **4760** | **17431s** | **(600 avg)** | **9.36** ← 严重劣化 |
+
+**前 ~3000 prompts 稳态 ~2.3 s/prompt，之后陡升到 9+ s/prompt**。
+
+### 19.3 错误模式
+
+```
+total errors:                54 / 4760 = 1.1%
+  exceededContextWindowSize:  53  ← "Content contains 4089-4091 tokens, exceeds 4096"
+  guardrailViolation:          1
+```
+
+**100% 的 context-overflow 错误**：Apple FM 报告"输入有 4090 tokens"，但我们的 prompt 才 ~10 tokens。说明 Apple FoundationModels 框架在**单进程生命周期内累积内部状态**（KV cache / safety guard buffer / 隐藏 system prompt），跨 LanguageModelSession 实例累积——即使我们每次都构造新 session。
+
+**不是我们的 bug**——`AppleFoundationOrganAdapter` 每次 draft 都 `LanguageModelSession(instructions:)` 全新构造。这是 Apple Intelligence 子系统的 process-level 状态泄漏。
+
+### 19.4 对照证据
+
+| 场景 | distinct prompts | 单进程总调用 | 错误率 | 速度 |
+|---|---|---|---|---|
+| M230 100k bench | 1（同一 prompt 重复）| 100,000 | **0%** | 247ms 稳态 |
+| M237 14k eval | 14,000（每个不同）| 已跑 9520 | **1.1% 且上升** | 2→16 s/prompt |
+
+差异说明：**Apple FM 对同一 prompt 走 KV cache hit，对 distinct prompts 每次都触发完整推理 + 累积 state**。这是单进程下 Apple FM 不能可靠跑大规模 distinct-prompt eval 的实测证据。
+
+### 19.5 SDK doctrine 含义
+
+| 用 Apple FM 时 | 单进程内安全调用次数 |
+|---|---|
+| 同 prompt 重复（缓存友好）| 100k+ ✓（M230 100k 0 err 实证）|
+| Distinct prompts 长 soak | **~3000 之后劣化** ⚠ |
+
+**Hosts 想跑大量 distinct-prompt 真 Apple FM 调用，必须分 chunk 用 subprocess**——每 1000-3000 调用换一个全新进程，避免单进程内部 state 累积。
+
+### 19.6 stats 数据丢失反思
+
+M237 把 stats 留在内存里，没每 N prompts checkpoint 到 disk → process kill 时 4760 prompts 的 marker 命中 / latency 数据**全丢**。没救回来。
+
+设计错误：**任何长程真模型 eval 都必须 periodic checkpoint**，否则 mid-flight 失败 = 全废。
+
+### 19.7 M238 (后续) 设计修正
+
+为防同样浪费：
+- ✅ Chunked subprocess：每 1000 prompts 起一个全新 swift run，子进程内累积 state 不影响下一段
+- ✅ Per-chunk JSON checkpoint：每段结束写 stats 到 `/tmp/eval_chunk_<N>.json`
+- ✅ 终止条件：单 prompt > 5s 就 abort 当前段（劣化警报）
+- ✅ 主程跑结束聚合所有 chunk JSON 出最终报告
+
+工期：~30 min 重写 + ~6-8h 真跑。但产出真可信 stats（每段都 fresh 进程）。
+
+### 19.8 这次浪费的代价
+
+- 5h03m 真机 Apple FM 计算
+- ~9520 次真模型调用
+- 0 可用 marker 数据
+- 1 个清晰 SDK doctrine 发现：Apple FM 单进程 distinct-prompt 大规模不稳定
+
+净结果：**有发现，无数据**。M238 修正后再跑能拿到数据。
+
 
 
 
