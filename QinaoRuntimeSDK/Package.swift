@@ -246,6 +246,18 @@ let package = Package(
             dependencies: [
                 "QinaoLoop",
                 "QinaoAppleFoundation",
+                // M233 — `--lora-train` mode uses MLXLoRATrainer.
+                // M234 — `--apple-fm-curriculum` mode uses
+                // AppleFoundationOrganAdapter directly with
+                // includeRiskCurriculum / includePermitCurriculum
+                // flags wired in BAS.
+                "QinaoMLX",
+                .product(
+                    name: "BASMLXAdapter",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASAppleAdapters",
+                    package: "BehavioralAISubstrate"),
                 // M213 — `--provider chatcompletions` flag uses the
                 // generic OpenAI-compatible HTTP adapter. Optional
                 // dep at build time but required when the flag is

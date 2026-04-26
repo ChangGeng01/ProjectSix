@@ -36,13 +36,26 @@ import FoundationModels
 public actor AppleFoundationOrganAdapter: BASOrganAdapter {
     public nonisolated let descriptor: BASOrganDescriptor
 
+    /// M234 — opt-in T2 (Risk Spine) curriculum injection.
+    /// Default `false` keeps the pre-M234 system prompt byte-equal
+    /// for every existing audit ledger entry. When `true`, the
+    /// adapter delegates to `BASOrganCurriculum` to append the
+    /// Risk Spine block to the role base.
+    public nonisolated let includeRiskCurriculum: Bool
+
+    /// M234 — opt-in T3 (Permit Knot) curriculum injection.
+    /// Same backward-compat semantics as `includeRiskCurriculum`.
+    public nonisolated let includePermitCurriculum: Bool
+
     public init(
         providerID: String = "apple.foundation-models.v1",
         providerName: String = "Apple FoundationModels",
         supportsStreaming: Bool = true,
         maxInputTokens: Int = 4_096,
         maxOutputTokens: Int = 4_096,
-        supportedRoles: Set<BASOrganRole> = [.scout, .core]
+        supportedRoles: Set<BASOrganRole> = [.scout, .core],
+        includeRiskCurriculum: Bool = false,
+        includePermitCurriculum: Bool = false
     ) {
         self.descriptor = BASOrganDescriptor(
             providerID: providerID,
@@ -52,6 +65,8 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
             maxOutputTokens: maxOutputTokens,
             runsOnDevice: true,
             supportedRoles: supportedRoles)
+        self.includeRiskCurriculum = includeRiskCurriculum
+        self.includePermitCurriculum = includePermitCurriculum
     }
 
     public func draft(
@@ -105,7 +120,7 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         // responsible for cross-turn state; the organ stays
         // stateless.
         let session = LanguageModelSession(
-            instructions: Self.systemInstructions(for: request))
+            instructions: instructions(for: request))
         let options = GenerationOptions(
             temperature: request.preset.temperature)
 
@@ -136,24 +151,34 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
     /// System-level instruction derived from role + preset. This is
     /// what we send to FoundationModels as the "instructions"
     /// parameter when opening a session.
+    ///
+    /// Pre-M234 this returned bare scout/core text. M234 makes it
+    /// curriculum-aware: actor-instance method `instructions(for:)`
+    /// honors the adapter's `includeRiskCurriculum` /
+    /// `includePermitCurriculum` flags. The legacy `static func
+    /// systemInstructions(for:)` is preserved for tests and
+    /// backward-compatible call sites — it always returns the
+    /// no-curriculum role base.
     public static func systemInstructions(
         for request: BASOrganRequest
     ) -> String {
-        switch request.role {
-        case .scout:
-            return """
-            You are the Scout tier of a behavioural AI substrate.
-            Keep answers short, structured, and low-commitment.
-            Prefer identifying risks and candidate angles over
-            producing final prose.
-            """
-        case .core:
-            return """
-            You are the Core tier of a behavioural AI substrate.
-            Produce a considered response; you are being called
-            because a draft has been admitted for full consideration.
-            """
-        }
+        BASOrganCurriculum.composedSystemPrompt(
+            role: request.role,
+            includeRiskCurriculum: false,
+            includePermitCurriculum: false)
+    }
+
+    /// M234 instance-method form of `systemInstructions` that
+    /// honors the adapter's curriculum flags. `nonisolated` so
+    /// streaming continuations (also nonisolated) can call it
+    /// without actor hops; reads only `nonisolated let` flags.
+    public nonisolated func instructions(
+        for request: BASOrganRequest
+    ) -> String {
+        BASOrganCurriculum.composedSystemPrompt(
+            role: request.role,
+            includeRiskCurriculum: includeRiskCurriculum,
+            includePermitCurriculum: includePermitCurriculum)
     }
 
     public static func prompt(for request: BASOrganRequest) -> String {

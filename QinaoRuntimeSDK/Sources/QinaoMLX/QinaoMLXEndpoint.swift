@@ -71,6 +71,38 @@ public extension QinaoLoop {
         await registry.register(adapter)
         return BASOrganRegistryEndpoint(registry: registry)
     }
+
+    /// M234 — public factory for the Qinao + MLX LoRA fine-tuning
+    /// path. Returns the substrate trainer typed against
+    /// `QinaoMLXModel` so callers don't import BASMLXAdapter.
+    ///
+    /// Hosts wanting on-device LoRA fine-tune `import QinaoMLX` and
+    /// drive:
+    ///
+    /// ```swift
+    /// let trainer = QinaoLoop.makeLoRATrainer(
+    ///     model: .gemma3nE2B,
+    ///     configuration: .init(rank: 4, iterations: 20))
+    /// try await trainer.loadFoundationModel { progress in /* ui */ }
+    /// try await trainer.train(
+    ///     trainingCorpus: corpus,
+    ///     validationCorpus: validate)
+    /// try await trainer.saveAdapter(to: url)
+    /// ```
+    ///
+    /// Substrate redaction keeps `MLXOrganAdapter` /
+    /// `MLXModelCatalog` invisible to consumers; the `MLXLoRATrainer`
+    /// type is opaque-ish (consumers see it but don't need to name
+    /// any vendored MLX type).
+    static func makeLoRATrainer(
+        model: QinaoMLXModel = .gemma3nE2B,
+        configuration: MLXLoRATrainer.Configuration =
+            MLXLoRATrainer.Configuration()
+    ) -> MLXLoRATrainer {
+        MLXLoRATrainer(
+            model: model.catalogEntry,
+            configuration: configuration)
+    }
 }
 
 /// Qinao-owned model identity. Mirrors the three `mlx-community`

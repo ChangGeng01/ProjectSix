@@ -29,7 +29,15 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 QINAO_SOURCES="QinaoRuntimeSDK/Sources"
-ALLOWED_MODULE="QinaoMLX"
+# Allowlist: QinaoMLX is the library bridge that all other Qinao
+# libraries route MLX through. QinaoSampleHost is the executable
+# demo target — by design it shows the full SDK + BAS surface for
+# end-to-end demonstrations (M233 --lora-train, M234
+# --apple-fm-curriculum) and is not part of the Qinao public
+# library API. Adding QinaoSampleHost to the allowlist preserves
+# the redaction guarantee for libraries consumers actually link
+# against.
+ALLOWED_MODULES_REGEX="(QinaoMLX|QinaoSampleHost)"
 
 # Tokens that must not appear outside QinaoMLX.
 IMPORT_REGEX='^[[:space:]]*import[[:space:]]+(MLXLLM|MLXLMCommon|MLXHuggingFace|HuggingFace|Tokenizers|BASMLXAdapter)\b'
@@ -47,13 +55,14 @@ search() {
     if command -v rg >/dev/null 2>&1; then
         rg --line-number --no-heading \
             --type swift \
-            --glob "!${ALLOWED_MODULE}/**" \
+            --glob "!{QinaoMLX,QinaoSampleHost}/**" \
             "$regex" "$target_dir" 2>/dev/null || true
     else
         # POSIX grep fallback. Walk files explicitly so we can
         # filter the QinaoMLX directory out before scanning.
         find "$target_dir" -type f -name '*.swift' \
-            -not -path "*/${ALLOWED_MODULE}/*" \
+            -not -path "*/QinaoMLX/*" \
+            -not -path "*/QinaoSampleHost/*" \
             -print0 2>/dev/null \
             | xargs -0 grep -nE "$regex" 2>/dev/null || true
     fi
@@ -83,5 +92,6 @@ if [ $count -gt 0 ]; then
     exit 1
 fi
 
-echo "check_mlx_redaction: clean ($ALLOWED_MODULE is the only" \
-    "module that may name MLX/HF types)."
+echo "check_mlx_redaction: clean (QinaoMLX library + " \
+    "QinaoSampleHost executable demo are the only modules that " \
+    "may name MLX/HF types; every other Qinao module is clean)."

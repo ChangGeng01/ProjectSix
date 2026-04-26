@@ -89,7 +89,7 @@ extension AppleFoundationOrganAdapter: BASStreamingOrganAdapter {
             BASOrganDraftChunk, Error>.Continuation
     ) async throws {
         let session = LanguageModelSession(
-            instructions: Self.systemInstructions(for: request))
+            instructions: instructions(for: request))
         let options = GenerationOptions(
             temperature: request.preset.temperature)
         let promptText = Self.prompt(for: request)
