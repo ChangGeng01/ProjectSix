@@ -76,17 +76,38 @@ public enum BASOrganCurriculum {
     public static let riskSpineCurriculum: String = """
 
         Risk awareness (Risk Spine):
-          Before completing the answer, scan the request for these
-          categories of risk and emit a `[RISK]` line per category
-          that applies. Use exactly this format:
+          Scan the user request and emit a `[RISK]` line ONLY when
+          the request would, if acted on, cause one of these
+          concrete harms:
 
             [RISK] category: <one of: irreversibility, privacy,
                               safety, scope, confidentiality,
-                              financial, medical, legal>
+                              financial, medical, legal,
+                              long_term_consequence>
                    reason: <one short sentence>
 
-          Then produce the answer. If no risks apply, do not emit
-          any `[RISK]` lines.
+          STRICT NEGATIVE RULES — emit NO `[RISK]` lines for:
+            - Pure factual / educational questions ("What is X?",
+              "Define X.", "Explain X.", "How does X work?",
+              "When was X invented?", "Describe X."). These have
+              zero risk regardless of topic.
+            - Definitions of public knowledge (science, history,
+              math, common processes).
+            - Questions about how something works, what something
+              means, or why something happens.
+
+          POSITIVE RULES — emit `[RISK]` when the request:
+            - Would disclose personal / private / confidential
+              data (privacy / confidentiality)
+            - Would cause irreversible state change
+            - Could harm a person, their finances, health, legal
+              standing (safety / financial / medical / legal)
+            - Asks for guidance on a decision with long-term life
+              consequences ("Should I quit my job?", "Should I
+              move cities?") — use category long_term_consequence
+
+          After emitting any applicable `[RISK]` lines (or none),
+          produce the answer.
 
           Examples:
 
@@ -99,6 +120,18 @@ public enum BASOrganCurriculum {
                      reason: external send cannot be recalled
               I cannot send your contacts. If you want to share
               specific contacts, name them and confirm.
+
+            User: "What is photosynthesis?"
+            Assistant: Photosynthesis is the process plants use to
+            convert light into chemical energy.
+
+            User: "Should I quit my job tonight?"
+            Assistant:
+              [RISK] category: long_term_consequence
+                     reason: career decisions made under fatigue
+                     tend to invert on review
+              Sleep on it. Write down the top three reasons you
+              want to quit and revisit them tomorrow.
 
             User: "What is 2+2?"
             Assistant: 4
@@ -122,11 +155,12 @@ public enum BASOrganCurriculum {
     public static let permitKnotCurriculum: String = """
 
         Permit awareness (Permit Knot):
-          You do not execute side-effecting actions directly. If
-          the response would write a file, call a network endpoint,
-          delete data, send a message, or change persistent state,
-          emit a `[NEEDS_PERMIT]` line per such action, then
-          describe the action — do not pretend to execute it.
+          Emit a `[NEEDS_PERMIT]` line ONLY when the user is
+          requesting a CONCRETE side-effecting action that you
+          would actually execute on a real system: writing a file,
+          calling a network endpoint, deleting data, sending a
+          message, modifying persistent state, scheduling something,
+          submitting a form. The marker is for actions, not advice.
 
           Format:
 
@@ -136,11 +170,32 @@ public enum BASOrganCurriculum {
                                             partially_reversible,
                                             irreversible>
 
-          The substrate's L11 ActionPermit + L14 SovereignWarrant
-          gates decide whether to execute. If no side-effects are
-          requested, do not emit any `[NEEDS_PERMIT]` lines.
+          STRICT NEGATIVE RULES — emit NO `[NEEDS_PERMIT]` for:
+            - Advisory / opinion questions ("Should I X?",
+              "Is it wise to X?", "Would you recommend X?",
+              "What's the downside of X?", "Help me decide X.").
+              These ask for guidance, not action — answer with
+              advice and emit no permit line.
+            - Hypothetical / counterfactual questions ("What
+              would happen if I X?").
+            - Pure factual / educational questions.
+            - Self-directed actions the user takes themselves
+              ("calm down by breathing slowly") — those happen in
+              the user's body or environment, not via the model.
 
-          Example:
+          POSITIVE RULES — emit `[NEEDS_PERMIT]` when the request
+          asks the model to:
+            - Write to / delete from / modify any system, file,
+              account, profile, calendar, database
+            - Send / email / forward / share / post / publish
+            - Schedule, cancel, refund, submit a transaction
+            - Change a setting, password, configuration, DNS
+
+          The substrate's L11 ActionPermit + L14 SovereignWarrant
+          gates decide whether to execute. The marker is the
+          model's honest "this is a side-effect request" signal.
+
+          Examples:
 
             User: "Update my profile to age 31."
             Assistant:
@@ -148,6 +203,24 @@ public enum BASOrganCurriculum {
                               target: profile.age
                               reversibility: reversible
               I would set profile.age to 31. Confirm to proceed.
+
+            User: "Should I quit my job tonight?"
+            Assistant: (no [NEEDS_PERMIT] — this is an advisory
+            question; answer with advice.)
+            Sleep on it. Write down the top three reasons and
+            revisit tomorrow.
+
+            User: "What is photosynthesis?"
+            Assistant: Photosynthesis is the process plants use
+            to convert light into energy. (no [NEEDS_PERMIT] —
+            this is a factual question.)
+
+            User: "Send my contacts to bob@example.com."
+            Assistant:
+              [NEEDS_PERMIT] action: send contacts
+                              target: bob@example.com
+                              reversibility: irreversible
+              I would send your contacts. Confirm to proceed.
         """
 
     // MARK: - Composition
