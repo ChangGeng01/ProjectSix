@@ -1105,3 +1105,109 @@ swift run QinaoSampleHost \
 剩余项按 §15.3 分四类，每类有清晰归属：A 类（SDK scope 内）继续可推进 · B/C 类（外部 / host）不在 SDK 责任范围 · D 类是演进可加，不是缺口。
 
 诚实度仪表板 M177-M213 区间共 **37 commits / 22 测试套件 / 91 测试方法 / 34 真模型路径**。下一步任何里程碑都从 §15.3 A 类或 D 类挑取，B/C 类不应在 SDK 里"假装解决"。
+
+---
+
+## 十六、M214–M226 — Sample SwiftUI 应用 + MLX Gemma provider + vendor freeze（2026-04-26）
+
+### 16.1 区间内里程碑速查
+
+| Mx | 主题 | 关键产物 |
+|---|---|---|
+| M214 | honesty board roadmap 分类 A/B/C/D | §15.3 4 类清单 |
+| M215 | L8 memory mutation writer + atom store | `BASMemoryAtomStore`, `BASMemoryMutationWriter` |
+| M216 | L1 thermal twin NotificationCenter 集成 | `BASThermalTwin.startObservingSystemNotifications` |
+| M217 | L5 host version tree CRDT 跨设备合并 | `BASHostVersionTree.merging(_:)` |
+| M218 | L1 异构设备路由（CPU / GPU / NPU） | `BASDeviceRouting.recommend(...)` |
+| M219 | SwiftUI macOS GUI demo | `QinaoSampleApp` executable target |
+| **M220** | **MLX organ adapter scaffolding + dep tree** | **`BASMLXAdapter` library + 9 unit tests** |
+| **M221** | **MLX 真模型加载 + ChatSession.respond + 流式** | **`MLXOrganAdapter.loadModel/draft/streamDraft` + 4 env-gated E2E** |
+| **M222** | **QinaoMLX façade + sample app picker 真接通** | **`QinaoMLX` library + `QinaoLoop.makeMLXEndpoint` + 6 unit tests + `check_mlx_redaction.sh`** |
+| **M224** | **vendor freeze（自给自足）** | **`BehavioralAISubstrate/Vendor/` × 15 包，path: 替换 url:** |
+| **M225** | **vendor remote-leak CI 守门** | **`scripts/check_vendor_remote_leak.sh`** |
+| **M226** | **MLX preset → params + prompt builder 单测覆盖** | **`MLXOrganAdapterTests` 9→15 tests** |
+
+### 16.2 Provider 矩阵（M222 后真实 ship 状态）
+
+| 维度 | Apple FM | Chat Completions HTTP | **MLX Gemma 3 / 3n（M222 起）** |
+|---|---|---|---|
+| 设计意图 | 苹果生态 on-device | 远程 OpenAI 兼容 | **开权重 on-device** |
+| BAS adapter | `AppleFoundationOrganAdapter` | `BASChatCompletionsOrganAdapter` | **`MLXOrganAdapter`** |
+| Qinao 公开 façade | `QinaoLoop.makeAppleFoundationEndpoint` (M180) | `QinaoSampleHost --provider chatcompletions` (M213) | **`QinaoLoop.makeMLXEndpoint` (M222)** |
+| 模型路径 | LanguageModelSession.respond | URLSession + SSE | **HF Hub download → ChatSession.respond** |
+| 流式 | M184 | M210 (SSE) | **M221 (streamResponse)** |
+| 单元测试 | full | full | **15 unit + 4 env-gated E2E** |
+| 真模型链测试 | M186 | M211 | **M221 `QINAO_MLX_E2E=1`** |
+| 端到端 demo | M203 / M205 / M219 | M213 (CLI) | **M222 (sample app picker)** |
+| Provider matrix 覆盖 | ✅ | ✅ | **✅** |
+
+L2 Neural Organ 区间从 40% → **55%** —— 第三个真 provider 实装 + sample app 直接消费 + 流式与非流式两条路径都过测。
+
+### 16.3 三条不变量（M222 后状态）
+
+| 不变量 | M213 | M222 | 变化原因 |
+|---|---|---|---|
+| 先醒再答 | 100% | 100% | 不动（L1 调度对 provider 无关） |
+| 神经不直接掌权 | 100% | 100% | MLX 仍走三签门（L11 permit + L14 warrant + snapshot proof） |
+| 宿主私有经验不进基础权重 | 100% | 100% | MLX 也是只读 organ；不写 L5 / L13 |
+
+### 16.4 五整体性质（M222 后状态）
+
+| 性质 | M213 | M222 | 变化原因 |
+|---|---|---|---|
+| 会醒会停 | 98% | 98% | 不动 |
+| 懂世界也懂宿主 | 100% | 100% | 不动 |
+| 会想不自转 | 99% | **99.5%** | M218 异构路由 + M222 MLX 让"L9 候选前沿"在不同 provider 上都能 ship |
+| 会保护不接管 | 100% | 100% | 不动 |
+| 会成长不乱长 | 100% | 100% | 不动 |
+
+### 16.5 M224 vendor freeze（自给自足）
+
+**承诺**：BAS clean build 不执行任何远程 git fetch。15 个 transitive 包全部位于 `BehavioralAISubstrate/Vendor/` 作为 path: 包。
+
+**核验**：
+- `BehavioralAISubstrate/.build/workspace-state.json`：15/15 都 `kind: "fileSystem"`
+- `swift package show-dependencies`：所有版本字段 = `unspecified`（path: 信号）
+- `scripts/check_vendor_remote_leak.sh`（M225）作 boundary 闸自动巡检
+- 残留 `.package(url:...)` 仅 2 处 swift-docc-plugin，包在 `if Context.environment["MLX_SWIFT_BUILD_DOC"] == "1"` 内 → BAS 默认 build 不触发
+
+**License**：15/15 齐 — 4 MIT（EventSource / mlx-swift-lm / mlx-swift / yyjson）+ 11 Apache-2.0。
+
+**体积**：75 MB（mlx-swift Cmlx C++ 占 25 MB / swift-crypto 15 MB / yyjson 10 MB / swift-syntax 9 MB / 其他 16 MB）。
+
+### 16.6 Reason code 稳定性契约
+
+下列 reason code 进入"接口契约"层，host 可在 audit log / fall-back 逻辑里 pattern-match：
+
+| 符号 | 来源 | 含义 |
+|---|---|---|
+| `MLX_NOT_LOADED` | `MLXOrganAdapter.currentCapacity()` | adapter 已构造但 `loadModel(...)` 未跑过；`draft` / `streamDraft` 会抛 `providerUnavailable` |
+| `MLX_UNAVAILABLE_BUILD` | `MLXOrganAdapter.currentCapacity()` | 当前 build 不能 import MLXLLM（watchOS / 非 Apple Silicon / OS 版本过旧）|
+| `mlx-organ-adapter-not-loaded` | `BASOrganError.providerUnavailable.reason` | `draft(_:)` 在未 load 时抛出的稳定 reason 文本 |
+| `MLXLLM framework unavailable in this build` | `BASOrganError.providerUnavailable.reason` | build-time MLXLLM 不可达时抛出 |
+
+测试用例 `MLXOrganAdapterTests.testCapacityReportsUnderPressureWithStableReason` + `testDraftThrowsProviderUnavailableWhenModelNotLoaded` 把这些值钉死。修改任意一个会破测试。
+
+### 16.7 测试金字塔最终态（M226 后）
+
+| 层 | 数量 | 状态 |
+|---|---|---|
+| BAS Swift Testing | 417 | ✅ 全绿 |
+| BAS XCTest | 1535+（含新 6 个 M226） | ✅ 全绿（含 4 env-gated MLX E2E skipped） |
+| QinaoRuntimeSDK XCTest | 759（含 6 M222 新 + 6 M226 新） | ✅ 全绿（26 env-gated skipped） |
+| 边界闸 | 6 | ✅ 全绿（`check_qinao_import_boundaries` / `check_substrate_residuals` / `check_sovereign_redaction` / `check_sdk_import_boundaries` / `check_mlx_redaction` / `check_vendor_remote_leak`） |
+
+### 16.8 M214-M226 区间产物
+
+- **新代码**：BASMLXAdapter / QinaoMLX / Vendor/ 共 ~4500 文件
+- **新测试**：21 个 unit + 4 env-gated E2E
+- **新边界闸**：2（`check_mlx_redaction` + `check_vendor_remote_leak`）
+- **新文档块**：本节（§16）+ README.md provider matrix 更新（M227）
+- **deps 锁定**：mlx-swift-lm @ 7e2b7107 / swift-transformers @ 15bcc471 / swift-huggingface @ b7219594 + 12 transitive
+
+### 16.9 状态总结口径（M226 后）
+
+> "SDK 完全体 + 自给自足：14 层每一层都有真模型驱动端到端测试 · **3 个 provider** 实现共存（Apple FM + Chat Completions HTTP + MLX Gemma 3 / 3n）· 双流式 · SQLite ledger 跨进程持久化 · 三签门 + content-blindness 真模型链证据 · vendor 全栈自给自足 · 759 Qinao tests + 417 BAS Swift Testing + 1500+ BAS XCTest + 6 边界闸全绿 · `swift run QinaoSampleApp` 一窗驱动 macOS / iOS 真出 Apple FM / Gemma 3 / Gemma 3n 三 provider 输出"
+
+剩余项继续在 §15.3 A 类（SDK scope 内）— 不在外壳层"假装解决" B/C 类。
+
