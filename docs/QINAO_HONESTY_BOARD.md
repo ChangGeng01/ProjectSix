@@ -1309,4 +1309,63 @@ QinaoSampleHost --bench 100000  (2026-04-26 11:29 → 18:20, 6h51m)
 
 之前的"完全体"口径对 inference 承载层准确，对 ML 训练路线虚高。现在两栏分报，不再骗自己。
 
+---
+
+## 十八、M234 + M235 + M236 — Apple FM curriculum + Gemma 4 catalog 全替换 3n（2026-04-26）
+
+### 18.1 区间内里程碑速查
+
+| Mx | 主题 | 关键产物 |
+|---|---|---|
+| M234 | Apple FM in-context curriculum 注入 | `AppleFoundationOrganAdapter` 新增 `includeRiskCurriculum` / `includePermitCurriculum` flags（默认 false 保 backward compat） + `--apple-fm-curriculum` 真模型 demo + 8 backward-compat 测试 |
+| M235 | Gemma 4 e4b/e2b 入栈 | mlx-community/gemma-4-e4b-it-4bit + e2b-it-4bit 加入 catalog；turn 终止符 `<turn\|>`（不同于 Gemma 3 的 `<end_of_turn>`） |
+| **M236** | **删除 Gemma 3n，全栈 Gemma 4** | `gemma3n_E4B_4bit` / `gemma3n_E2B_4bit` 从 MLXModelCatalog 移除；`QinaoMLXModel.gemma3nE4B/E2B` 删；SampleProvider 删 `mlxGemma3nE4B/E2B` picker 项；所有 default 切到 Gemma 4 |
+
+### 18.2 Provider 矩阵（M236 后）
+
+| 维度 | Apple FM | Chat Completions HTTP | **MLX Gemma 4 / 3 4B** |
+|---|---|---|---|
+| BAS adapter | `AppleFoundationOrganAdapter` | `BASChatCompletionsOrganAdapter` | `MLXOrganAdapter` |
+| Qinao 公开 façade | `QinaoLoop.makeAppleFoundationEndpoint` | `QinaoSampleHost --provider chatcompletions` | `QinaoLoop.makeMLXEndpoint(model:)` |
+| **支持模型** | Apple Intelligence 黑盒 | OpenAI 兼容 / Ollama / OpenRouter / 任何 | **Gemma 4 E4B（默认）/ Gemma 4 E2B / Gemma 3 4B（长上下文）** |
+| Curriculum 注入（M234） | ✅ T2/T3 in-context | 待加 | 待加 |
+| 流式 | ✅ M184 | ✅ M210 SSE | ✅ M221 streamResponse |
+| LoRA 微调（M233） | ❌ 关源不可训 | ❌ 远程 API | ✅ MLXLoRATrainer |
+
+### 18.3 Apple FM curriculum 实跑数据（M234 demo, 2026-04-26）
+
+5 个测试 prompt × 2 路径（base / curriculum）= 10 次真 Apple FM 调用：
+
+```
+curriculum surfaced [RISK] when base did not:           2 / 5
+curriculum surfaced [NEEDS_PERMIT] when base did not:   5 / 5
+```
+
+5 个含副作用的 prompt 全数被 curriculum 路径打上结构化 `[NEEDS_PERMIT]` marker — base 路径只能"Sorry I cannot"模糊话，hosts 没法 parse。**T2 Risk Spine + T3 Permit Knot in-context 在 Apple FM 上有可见行为提升**，权重未动。
+
+### 18.4 Gemma 4 vs Gemma 3n 替换原因（M236）
+
+Gemma 3n（MatFormer）在 mlx-community 短暂主流，但 Gemma 4 e4b/e2b 发布后：
+- 同等参数量级（~4B / ~2B effective）但新架构表现更好
+- mlx-swift-lm 已带 Gemma4Configuration / Gemma4Model 全套
+- mlx-community 已发布 4-bit 量化版
+- 用户主动选择全切 Gemma 4
+
+M236 把 Gemma 3n 从 SDK 全部移除（catalog / Qinao enum / picker / 所有 default）。Gemma 3 4B 保留作为长上下文 (128K) 的 outlier。
+
+### 18.5 测试金字塔（M236 后）
+
+| 层 | 数量 | 状态 |
+|---|---|---|
+| BAS Swift Testing | 417 | ✅ |
+| BAS XCTest | 1500+（含新 8 + 16 + 14 = M234/M235/M232） | ✅ |
+| QinaoRuntimeSDK XCTest | 778 (26 env-gated skipped) | ✅ |
+| 边界闸 | 6 | ✅ |
+
+### 18.6 修正后的状态口径（M236 后）
+
+> "SDK 三 provider：Apple FM（含 M234 curriculum 注入）/ MLX Gemma 4 e4b·e2b + Gemma 3 4B / Chat Completions HTTP。LoRA 微调（M233）目标基座 = Gemma 4 E2B。Apple FM 是关源不可训，但 curriculum 路径让它输出 [RISK]/[NEEDS_PERMIT] 结构化 marker。Gemma 3n 已从 SDK 全部移除。"
+
+
+
 

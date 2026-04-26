@@ -19,13 +19,13 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     func testDescriptorPicksUpCatalogIdentityByDefault() async {
         let adapter = MLXOrganAdapter(
-            model: MLXModelCatalog.gemma3n_E4B_4bit)
+            model: MLXModelCatalog.gemma4_E4B_4bit)
         XCTAssertEqual(
             adapter.descriptor.providerID,
-            "mlx.gemma3n.e4b.it.4bit")
+            "mlx.gemma4.e4b.it.4bit")
         XCTAssertEqual(
             adapter.descriptor.providerName,
-            "Gemma 3n E4B (MLX, 4-bit)")
+            "Gemma 4 E4B (MLX, 4-bit)")
         XCTAssertTrue(adapter.descriptor.runsOnDevice)
         XCTAssertTrue(adapter.descriptor.supportsStreaming)
         XCTAssertEqual(
@@ -115,22 +115,20 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     func testDefaultCatalogShipsCanonicalGemmaEntries() {
         let entries = MLXModelCatalog.defaultEntries
-        // M235 added Gemma 4 e4b/e2b alongside the existing
-        // Gemma 3 4B + Gemma 3n e4b/e2b. The canonical mlx-community
-        // Gemma family is now five entries.
-        XCTAssertEqual(entries.count, 5)
+        // M236 retired Gemma 3n entries; the catalog is now Gemma
+        // 4 e4b/e2b (recommended) + Gemma 3 4B (long-context
+        // outlier).
+        XCTAssertEqual(entries.count, 3)
         let ids = Set(entries.map(\.id))
         XCTAssertEqual(ids, [
             "mlx-community/gemma-4-e4b-it-4bit",
             "mlx-community/gemma-4-e2b-it-4bit",
-            "mlx-community/gemma-3-4b-it-4bit",
-            "mlx-community/gemma-3n-E4B-it-lm-4bit",
-            "mlx-community/gemma-3n-E2B-it-lm-4bit"
+            "mlx-community/gemma-3-4b-it-4bit"
         ])
     }
 
     func testEachEntryDeclaresGemmaTurnTerminatorForCorrectStop() {
-        // Gemma 3 / 3n use `<end_of_turn>`; Gemma 4 uses `<turn|>`.
+        // Gemma 3 4B uses `<end_of_turn>`; Gemma 4 uses `<turn|>`.
         // Every entry must declare at least one of these so
         // generation stops at the reply boundary.
         let validTerminators = ["<end_of_turn>", "<turn|>"]
@@ -143,7 +141,7 @@ final class MLXOrganAdapterTests: XCTestCase {
                 "entry \(entry.id) must list one of " +
                 "\(validTerminators) as an extra EOS token; " +
                 "without it generation runs past the reply " +
-                "(Gemma 3/3n use <end_of_turn>, Gemma 4 uses " +
+                "(Gemma 3 4B uses <end_of_turn>, Gemma 4 uses " +
                 "<turn|>)")
         }
     }
@@ -152,12 +150,6 @@ final class MLXOrganAdapterTests: XCTestCase {
         // Pin the Gemma 3 family → <end_of_turn> mapping.
         XCTAssertTrue(
             MLXModelCatalog.gemma3_4B_it_4bit.extraEOSTokens
-                .contains("<end_of_turn>"))
-        XCTAssertTrue(
-            MLXModelCatalog.gemma3n_E4B_4bit.extraEOSTokens
-                .contains("<end_of_turn>"))
-        XCTAssertTrue(
-            MLXModelCatalog.gemma3n_E2B_4bit.extraEOSTokens
                 .contains("<end_of_turn>"))
         // Pin the Gemma 4 family → <turn|> mapping.
         XCTAssertTrue(
@@ -187,13 +179,12 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     // MARK: - 5. Default pick is the recommended one
 
-    func testInitDefaultsToGemma3nE4Bit() async {
-        // Recommended pick per M220 plan §3.1 — Gemma 3n e4b
-        // gives Gemma-3-4B-class quality with lower runtime
-        // memory and higher tok/s on Apple Silicon.
+    func testInitDefaultsToGemma4E4B() async {
+        // M236 retired Gemma 3n; default is now Gemma 4 E4B
+        // (newest architecture, recommended for new hosts).
         let adapter = MLXOrganAdapter()
         XCTAssertEqual(
-            adapter.model, MLXModelCatalog.gemma3n_E4B_4bit)
+            adapter.model, MLXModelCatalog.gemma4_E4B_4bit)
     }
 
     // MARK: - 6. Preset → GenerateParameters mapping (M226)

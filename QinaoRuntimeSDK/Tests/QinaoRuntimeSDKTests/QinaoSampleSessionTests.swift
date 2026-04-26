@@ -93,8 +93,8 @@ final class QinaoSampleSessionTests: XCTestCase {
         }
 
         // Two calls with the SAME provider — should hit cache.
-        _ = try await session.endpoint(for: .mlxGemma3nE4B)
-        _ = try await session.endpoint(for: .mlxGemma3nE4B)
+        _ = try await session.endpoint(for: .mlxGemma4E4B)
+        _ = try await session.endpoint(for: .mlxGemma4E4B)
         XCTAssertEqual(
             recorder.calls.count, 1,
             "same MLX model should be cached")
@@ -106,7 +106,7 @@ final class QinaoSampleSessionTests: XCTestCase {
             "switching MLX models must invalidate the cache and " +
             "re-build")
         XCTAssertEqual(
-            recorder.calls[0].provider, .mlxGemma3nE4B)
+            recorder.calls[0].provider, .mlxGemma4E4B)
         XCTAssertEqual(
             recorder.calls[1].provider, .mlxGemma3_4B)
     }
@@ -119,9 +119,9 @@ final class QinaoSampleSessionTests: XCTestCase {
         }
 
         _ = try await session.endpoint(for: .appleFoundation)
-        _ = try await session.endpoint(for: .mlxGemma3nE4B)
+        _ = try await session.endpoint(for: .mlxGemma4E4B)
         _ = try await session.endpoint(for: .appleFoundation)
-        _ = try await session.endpoint(for: .mlxGemma3nE4B)
+        _ = try await session.endpoint(for: .mlxGemma4E4B)
 
         XCTAssertEqual(
             recorder.calls.count, 2,
@@ -143,7 +143,7 @@ final class QinaoSampleSessionTests: XCTestCase {
             session.isLoading,
             "fresh session must not start in loading state")
 
-        _ = try await session.endpoint(for: .mlxGemma3nE4B)
+        _ = try await session.endpoint(for: .mlxGemma4E4B)
 
         // Defer block in SampleSession.endpoint(for:) should have
         // reset all three loading flags.
@@ -210,16 +210,14 @@ final class QinaoSampleSessionTests: XCTestCase {
         // Pinning the picker labels so a future rename in the enum
         // surfaces as a visible test diff (the rawValue strings
         // are visible in the picker UI and in audit logs).
-        // M235 inserts Gemma 4 e4b/e2b at the top of the MLX
-        // provider list (newest architecture first).
+        // M236 retired Gemma 3n picker entries; the MLX list is
+        // now Gemma 4 e4b/e2b + Gemma 3 4B (long-context outlier).
         let labels = SampleProvider.allCases.map(\.rawValue)
         XCTAssertEqual(labels, [
             "Apple Foundation Models",
             "Gemma 4 E4B (MLX, 4-bit)",
             "Gemma 4 E2B (MLX, 4-bit)",
             "Gemma 3 4B (MLX, 4-bit)",
-            "Gemma 3n E4B (MLX, 4-bit)",
-            "Gemma 3n E2B (MLX, 4-bit)",
             "OpenAI-compatible API (M223)"
         ])
     }
@@ -229,8 +227,6 @@ final class QinaoSampleSessionTests: XCTestCase {
         XCTAssertTrue(SampleProvider.mlxGemma4E4B.isAvailable)
         XCTAssertTrue(SampleProvider.mlxGemma4E2B.isAvailable)
         XCTAssertTrue(SampleProvider.mlxGemma3_4B.isAvailable)
-        XCTAssertTrue(SampleProvider.mlxGemma3nE4B.isAvailable)
-        XCTAssertTrue(SampleProvider.mlxGemma3nE2B.isAvailable)
         XCTAssertFalse(
             SampleProvider.chatCompletions.isAvailable,
             "ChatCompletions remains a placeholder until M223")
@@ -243,10 +239,6 @@ final class QinaoSampleSessionTests: XCTestCase {
             SampleProvider.mlxGemma4E2B.mlxModel, .gemma4E2B)
         XCTAssertEqual(
             SampleProvider.mlxGemma3_4B.mlxModel, .gemma3_4B)
-        XCTAssertEqual(
-            SampleProvider.mlxGemma3nE4B.mlxModel, .gemma3nE4B)
-        XCTAssertEqual(
-            SampleProvider.mlxGemma3nE2B.mlxModel, .gemma3nE2B)
         XCTAssertNil(SampleProvider.appleFoundation.mlxModel)
         XCTAssertNil(SampleProvider.chatCompletions.mlxModel)
     }

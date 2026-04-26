@@ -94,7 +94,7 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     #endif
 
     public init(
-        model: MLXModelCatalog.Entry = MLXModelCatalog.gemma3n_E4B_4bit,
+        model: MLXModelCatalog.Entry = MLXModelCatalog.gemma4_E4B_4bit,
         providerID: String? = nil,
         providerName: String? = nil,
         supportsStreaming: Bool = true,

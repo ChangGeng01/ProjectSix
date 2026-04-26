@@ -99,7 +99,7 @@ final class QinaoSampleSnapshotTests: XCTestCase {
         try skipUnlessRenderable()
         let view = ContentView(
             session: mockSession(),
-            provider: .mlxGemma3nE4B)
+            provider: .mlxGemma4E4B)
         let data = renderTIFF(view)
         XCTAssertNotNil(data)
     }
@@ -137,7 +137,7 @@ final class QinaoSampleSnapshotTests: XCTestCase {
         session.loadingProgress = 0.42
         let view = ContentView(
             session: session,
-            provider: .mlxGemma3nE4B)
+            provider: .mlxGemma4E4B)
         let data = renderTIFF(view)
         XCTAssertNotNil(data)
     }

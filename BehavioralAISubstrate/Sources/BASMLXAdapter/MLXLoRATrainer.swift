@@ -39,8 +39,8 @@ import Tokenizers
 ///   5. Default unit tests covering parameter validation + the
 ///      not-loaded path
 ///   6. Env-gated E2E test (`QINAO_MLX_LORA_E2E=1`) that does a
-///      tiny real run against gemma3n_E2B (~5–15 min on Apple
-///      Silicon, requires HF cache hit or 1.4 GB download)
+///      tiny real run against gemma4_E2B (~5–15 min on Apple
+///      Silicon, requires HF cache hit or download)
 ///
 /// ## What this is NOT
 ///
@@ -184,7 +184,7 @@ public actor MLXLoRATrainer {
     #endif
 
     public init(
-        model: MLXModelCatalog.Entry = MLXModelCatalog.gemma3n_E2B_4bit,
+        model: MLXModelCatalog.Entry = MLXModelCatalog.gemma4_E2B_4bit,
         configuration: Configuration = Configuration()
     ) {
         self.model = model

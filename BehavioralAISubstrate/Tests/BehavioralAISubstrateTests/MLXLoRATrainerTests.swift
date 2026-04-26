@@ -46,14 +46,15 @@ final class MLXLoRATrainerTests: XCTestCase {
 
     // MARK: - 2. Default model + configuration init
 
-    func testDefaultInitUsesGemma3nE2B() async {
+    func testDefaultInitUsesGemma4E2B() async {
         let trainer = MLXLoRATrainer()
-        // gemma3n_E2B_4bit is the smallest Gemma → fastest soak +
+        // gemma4_E2B_4bit is the smallest Gemma → fastest soak +
         // E2E run + smallest disk + memory footprint, the right
         // default for "first-run feels reasonable on Apple
-        // Silicon".
+        // Silicon". M236 promoted Gemma 4 E2B over the retired
+        // Gemma 3n E2B.
         XCTAssertEqual(
-            trainer.model, MLXModelCatalog.gemma3n_E2B_4bit)
+            trainer.model, MLXModelCatalog.gemma4_E2B_4bit)
         let cfg = trainer.configuration
         XCTAssertEqual(cfg.rank, 8)
         XCTAssertEqual(cfg.iterations, 100)

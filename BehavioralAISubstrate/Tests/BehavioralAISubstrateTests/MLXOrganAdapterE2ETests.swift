@@ -6,7 +6,7 @@ import XCTest
 /// download + MLX inference path. These tests are *not* part of
 /// the default `swift test` run because:
 ///
-///   1. First run downloads ~1.4 GB (Gemma 3n E2B 4-bit) of weights
+///   1. First run downloads Gemma 4 E2B 4-bit weights
 ///      from `huggingface.co` — expensive in CI.
 ///   2. Inference itself takes 1–10 seconds per draft on Apple
 ///      Silicon, depending on the model and prompt length.
@@ -14,7 +14,7 @@ import XCTest
 ///      flake the offline test suite.
 ///
 /// Gated behind `QINAO_MLX_E2E=1`. Pick the smallest entry
-/// (`gemma3n_E2B_4bit`) so re-runs are tolerable; tests that need
+/// (`gemma4_E2B_4bit`) so re-runs are tolerable; tests that need
 /// the larger Gemma 3 4B variants must opt in explicitly via the
 /// `QINAO_MLX_E2E_FULL=1` flag.
 final class MLXOrganAdapterE2ETests: XCTestCase {
@@ -28,7 +28,7 @@ final class MLXOrganAdapterE2ETests: XCTestCase {
         else {
             throw XCTSkip(
                 "set \(Self.envFlag)=1 to exercise MLX " +
-                "end-to-end (downloads ~1.4 GB + runs inference)")
+                "end-to-end (downloads Gemma 4 E2B + runs inference)")
         }
     }
 
@@ -38,7 +38,7 @@ final class MLXOrganAdapterE2ETests: XCTestCase {
         try skipUnlessReady()
 
         let adapter = MLXOrganAdapter(
-            model: MLXModelCatalog.gemma3n_E2B_4bit)
+            model: MLXModelCatalog.gemma4_E2B_4bit)
 
         // First-run download path. Ignore progress in tests; UI
         // hosts wire a non-empty handler in M222.
@@ -66,7 +66,7 @@ final class MLXOrganAdapterE2ETests: XCTestCase {
         XCTAssertEqual(draft.requestID, "e2e-1")
         XCTAssertEqual(
             draft.providerID,
-            MLXModelCatalog.gemma3n_E2B_4bit.providerID)
+            MLXModelCatalog.gemma4_E2B_4bit.providerID)
         XCTAssertGreaterThan(
             draft.outputTokensEstimated, 0,
             "non-empty body should yield a positive output-token " +
@@ -79,7 +79,7 @@ final class MLXOrganAdapterE2ETests: XCTestCase {
         try skipUnlessReady()
 
         let adapter = MLXOrganAdapter(
-            model: MLXModelCatalog.gemma3n_E2B_4bit)
+            model: MLXModelCatalog.gemma4_E2B_4bit)
         try await adapter.loadModel()
 
         let request = BASOrganRequest(
@@ -124,7 +124,7 @@ final class MLXOrganAdapterE2ETests: XCTestCase {
         try skipUnlessReady()
 
         let adapter = MLXOrganAdapter(
-            model: MLXModelCatalog.gemma3n_E2B_4bit)
+            model: MLXModelCatalog.gemma4_E2B_4bit)
 
         // Pre-load: underPressure with MLX_NOT_LOADED.
         let pre = await adapter.currentCapacity()
@@ -150,7 +150,7 @@ final class MLXOrganAdapterE2ETests: XCTestCase {
         try skipUnlessReady()
 
         let adapter = MLXOrganAdapter(
-            model: MLXModelCatalog.gemma3n_E2B_4bit)
+            model: MLXModelCatalog.gemma4_E2B_4bit)
 
         try await adapter.loadModel()
         let firstLoaded = await adapter.isModelLoaded()

@@ -48,9 +48,9 @@ struct QinaoSampleHost {
         // Mode dispatch.
         if args.contains("--lora-train") {
             // M233 — small on-device LoRA fine-tune demo. Runs
-            // MLXLoRATrainer against gemma3n_E2B_4bit with a
-            // 20-example hardcoded curriculum + 5-example
-            // validation set. Saves adapter to /tmp.
+            // MLXLoRATrainer against gemma4_E2B_4bit (M236
+            // default) with a 20-example hardcoded curriculum +
+            // 5-example validation set. Saves adapter to /tmp.
             await runLoRATrain()
             return
         }
@@ -611,7 +611,7 @@ struct QinaoSampleHost {
 
         print("""
             QinaoSampleHost --lora-train (small smoke run):
-              model:        gemma3n_E2B_4bit (mlx-community)
+              model:        gemma4_E2B_4bit (mlx-community)
               rank:         \(cfg.rank)
               batch:        \(cfg.batchSize)
               iterations:   \(cfg.iterations)
@@ -622,7 +622,7 @@ struct QinaoSampleHost {
             """)
 
         let trainer = MLXLoRATrainer(
-            model: MLXModelCatalog.gemma3n_E2B_4bit,
+            model: MLXModelCatalog.gemma4_E2B_4bit,
             configuration: cfg)
 
         do {

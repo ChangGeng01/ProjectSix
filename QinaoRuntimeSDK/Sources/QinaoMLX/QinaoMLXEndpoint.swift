@@ -17,7 +17,7 @@ import QinaoLoop
 /// ```swift
 /// import QinaoMLX
 /// let endpoint = try await QinaoLoop.makeMLXEndpoint(
-///     model: .gemma3nE4B,
+///     model: .gemma4E4B,
 ///     progressHandler: { progress in /* update UI */ })
 /// let loop = QinaoLoop(organEndpoint: endpoint)
 /// ```
@@ -48,8 +48,7 @@ public extension QinaoLoop {
     ///
     /// - Parameters:
     ///   - model: which Gemma variant to load. Default
-    ///     `.gemma3nE4B` (best balance of quality + memory + speed
-    ///     on Apple Silicon).
+    ///     `.gemma4E4B` (newest architecture; recommended).
     ///   - progressHandler: receives `Progress` updates during the
     ///     Hugging Face download. Defaults to ignored. Sample-app
     ///     hosts pass a closure that updates a SwiftUI binding so
@@ -59,7 +58,7 @@ public extension QinaoLoop {
     /// - Throws: any error from the model download or load path —
     ///   network failures, disk-full, corrupted weights, etc.
     static func makeMLXEndpoint(
-        model: QinaoMLXModel = .gemma3nE4B,
+        model: QinaoMLXModel = .gemma4E4B,
         progressHandler: @Sendable @escaping (Progress) -> Void
             = { _ in }
     ) async throws -> any QinaoOrganEndpoint {
@@ -81,7 +80,7 @@ public extension QinaoLoop {
     ///
     /// ```swift
     /// let trainer = QinaoLoop.makeLoRATrainer(
-    ///     model: .gemma3nE2B,
+    ///     model: .gemma4E2B,
     ///     configuration: .init(rank: 4, iterations: 20))
     /// try await trainer.loadFoundationModel { progress in /* ui */ }
     /// try await trainer.train(
@@ -95,7 +94,7 @@ public extension QinaoLoop {
     /// type is opaque-ish (consumers see it but don't need to name
     /// any vendored MLX type).
     static func makeLoRATrainer(
-        model: QinaoMLXModel = .gemma3nE2B,
+        model: QinaoMLXModel = .gemma4E2B,
         configuration: MLXLoRATrainer.Configuration =
             MLXLoRATrainer.Configuration()
     ) -> MLXLoRATrainer {
@@ -131,17 +130,6 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     /// quality / longer context (128K) variant. ~3 GB on disk.
     case gemma3_4B = "gemma-3-4b-it-4bit"
 
-    /// Gemma 3n E4B instruction-tuned, 4-bit quantized. MatFormer
-    /// architecture; same effective parameter count as Gemma 3 4B
-    /// but lower runtime memory and faster generation. Pre-M235
-    /// default; kept for hosts that have weights cached locally.
-    case gemma3nE4B = "gemma-3n-E4B-it-lm-4bit"
-
-    /// Gemma 3n E2B instruction-tuned, 4-bit quantized. Smallest
-    /// pre-Gemma-4 variant; ~1.4 GB on disk. Pick for Watch /
-    /// iPhone with tight memory budgets.
-    case gemma3nE2B = "gemma-3n-E2B-it-lm-4bit"
-
     public var id: String { rawValue }
 
     /// Human-readable display name suitable for picker UIs.
@@ -153,10 +141,6 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
             return "Gemma 4 E2B (MLX, 4-bit)"
         case .gemma3_4B:
             return "Gemma 3 4B (MLX, 4-bit)"
-        case .gemma3nE4B:
-            return "Gemma 3n E4B (MLX, 4-bit)"
-        case .gemma3nE2B:
-            return "Gemma 3n E2B (MLX, 4-bit)"
         }
     }
 
@@ -178,10 +162,6 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
             return MLXModelCatalog.gemma4_E2B_4bit
         case .gemma3_4B:
             return MLXModelCatalog.gemma3_4B_it_4bit
-        case .gemma3nE4B:
-            return MLXModelCatalog.gemma3n_E4B_4bit
-        case .gemma3nE2B:
-            return MLXModelCatalog.gemma3n_E2B_4bit
         }
     }
 }

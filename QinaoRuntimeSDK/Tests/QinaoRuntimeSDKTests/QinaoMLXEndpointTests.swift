@@ -8,10 +8,10 @@ import XCTest
 /// These tests pin the Qinao-side API shape that is callable
 /// without ever touching Hugging Face:
 ///
-///   - `QinaoMLXModel` covers exactly the three default Gemma
-///     entries the substrate ships.
+///   - `QinaoMLXModel` covers the three default Gemma entries
+///     the substrate ships (M236: Gemma 4 e4b + e2b + Gemma 3 4B).
 ///   - Each model has a stable display name and providerID.
-///   - The default pick is the recommended `.gemma3nE4B`.
+///   - The default pick is the recommended `.gemma4E4B`.
 ///   - `Codable` round-trips so hosts can persist user choice.
 final class QinaoMLXEndpointTests: XCTestCase {
 
@@ -19,14 +19,12 @@ final class QinaoMLXEndpointTests: XCTestCase {
 
     func testAllCasesShipsCanonicalGemmaVariants() {
         let cases = QinaoMLXModel.allCases
-        // M235 added Gemma 4 e4b/e2b alongside the existing
-        // Gemma 3 4B + Gemma 3n e4b/e2b. Five canonical Gemma
-        // variants in the picker.
-        XCTAssertEqual(cases.count, 5)
+        // M236 retired Gemma 3n cases; canonical pickers ship
+        // Gemma 4 e4b + e2b plus Gemma 3 4B (long-context outlier).
+        XCTAssertEqual(cases.count, 3)
         XCTAssertEqual(
             Set(cases),
-            [.gemma4E4B, .gemma4E2B,
-             .gemma3_4B, .gemma3nE4B, .gemma3nE2B])
+            [.gemma4E4B, .gemma4E2B, .gemma3_4B])
     }
 
     // MARK: - 2. Display + provider identity
@@ -35,9 +33,7 @@ final class QinaoMLXEndpointTests: XCTestCase {
         let pairs: [(QinaoMLXModel, String)] = [
             (.gemma4E4B, "Gemma 4 E4B (MLX, 4-bit)"),
             (.gemma4E2B, "Gemma 4 E2B (MLX, 4-bit)"),
-            (.gemma3_4B, "Gemma 3 4B (MLX, 4-bit)"),
-            (.gemma3nE4B, "Gemma 3n E4B (MLX, 4-bit)"),
-            (.gemma3nE2B, "Gemma 3n E2B (MLX, 4-bit)")
+            (.gemma3_4B, "Gemma 3 4B (MLX, 4-bit)")
         ]
         for (model, expected) in pairs {
             XCTAssertEqual(
@@ -88,14 +84,15 @@ final class QinaoMLXEndpointTests: XCTestCase {
 
     // MARK: - 5. Recommended default
 
-    func testGemma3nE4BIsTheRecommendedDefault() {
+    func testGemma4E4BIsTheRecommendedDefault() {
         // Asserted by the makeMLXEndpoint(model:progressHandler:)
         // signature default. Pinning it here so any future change
-        // to the recommended model gets a visible test diff.
-        let signatureDefault: QinaoMLXModel = .gemma3nE4B
+        // to the recommended model gets a visible test diff. M236
+        // promoted Gemma 4 E4B over the retired Gemma 3n E4B.
+        let signatureDefault: QinaoMLXModel = .gemma4E4B
         XCTAssertEqual(
-            signatureDefault, .gemma3nE4B,
-            "recommended default must remain Gemma 3n E4B until a " +
+            signatureDefault, .gemma4E4B,
+            "recommended default must remain Gemma 4 E4B until a " +
             "subsequent milestone explicitly retires it")
     }
 }

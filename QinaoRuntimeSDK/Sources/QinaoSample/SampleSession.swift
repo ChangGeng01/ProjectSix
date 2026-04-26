@@ -65,9 +65,7 @@ public final class SampleSession: ObservableObject {
 
         case .mlxGemma4E4B,
              .mlxGemma4E2B,
-             .mlxGemma3_4B,
-             .mlxGemma3nE4B,
-             .mlxGemma3nE2B:
+             .mlxGemma3_4B:
             guard let model = provider.mlxModel else {
                 throw SampleError.providerNotWired(provider.rawValue)
             }
@@ -110,9 +108,7 @@ public final class SampleSession: ObservableObject {
 
         case .mlxGemma4E4B,
              .mlxGemma4E2B,
-             .mlxGemma3_4B,
-             .mlxGemma3nE4B,
-             .mlxGemma3nE2B:
+             .mlxGemma3_4B:
             guard let model = provider.mlxModel else {
                 throw SampleError.providerNotWired(provider.rawValue)
             }
