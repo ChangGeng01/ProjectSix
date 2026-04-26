@@ -84,10 +84,32 @@ public struct MLXModelCatalog: Sendable, Equatable {
         providerName: "Gemma 3n E2B (MLX, 4-bit)",
         extraEOSTokens: ["<end_of_turn>"])
 
-    /// All three default Gemma entries, in the order they should
-    /// appear in UI pickers. The array is `Sendable` so hosts can
-    /// freely capture it in tasks.
+    /// Gemma 4 E4B instruction-tuned, 4-bit quantized (M235).
+    /// Newer than Gemma 3n E4B; same effective parameter count
+    /// (~4B) but with Gemma 4 architecture improvements. Note the
+    /// turn terminator is `<turn|>` (not `<end_of_turn>`) — without
+    /// it Gemma 4 generation runs past the reply.
+    public static let gemma4_E4B_4bit = Entry(
+        id: "mlx-community/gemma-4-e4b-it-4bit",
+        providerID: "mlx.gemma4.e4b.it.4bit",
+        providerName: "Gemma 4 E4B (MLX, 4-bit)",
+        extraEOSTokens: ["<turn|>"])
+
+    /// Gemma 4 E2B instruction-tuned, 4-bit quantized (M235).
+    /// Smallest Gemma 4 variant; pairs with Gemma 3n E2B as the
+    /// "tight memory" pick. Same `<turn|>` terminator.
+    public static let gemma4_E2B_4bit = Entry(
+        id: "mlx-community/gemma-4-e2b-it-4bit",
+        providerID: "mlx.gemma4.e2b.it.4bit",
+        providerName: "Gemma 4 E2B (MLX, 4-bit)",
+        extraEOSTokens: ["<turn|>"])
+
+    /// Default Gemma entries, in the order they should appear in
+    /// UI pickers. M235 adds Gemma 4 E4B/E2B at the front (newer
+    /// architecture, recommended where available).
     public static let defaultEntries: [Entry] = [
+        gemma4_E4B_4bit,
+        gemma4_E2B_4bit,
         gemma3n_E4B_4bit,
         gemma3_4B_it_4bit,
         gemma3n_E2B_4bit

@@ -17,18 +17,24 @@ final class QinaoMLXEndpointTests: XCTestCase {
 
     // MARK: - 1. Catalog completeness
 
-    func testAllCasesShipsExactlyThreeGemmaVariants() {
+    func testAllCasesShipsCanonicalGemmaVariants() {
         let cases = QinaoMLXModel.allCases
-        XCTAssertEqual(cases.count, 3)
+        // M235 added Gemma 4 e4b/e2b alongside the existing
+        // Gemma 3 4B + Gemma 3n e4b/e2b. Five canonical Gemma
+        // variants in the picker.
+        XCTAssertEqual(cases.count, 5)
         XCTAssertEqual(
             Set(cases),
-            [.gemma3_4B, .gemma3nE4B, .gemma3nE2B])
+            [.gemma4E4B, .gemma4E2B,
+             .gemma3_4B, .gemma3nE4B, .gemma3nE2B])
     }
 
     // MARK: - 2. Display + provider identity
 
     func testDisplayNameMatchesCatalogEntry() {
         let pairs: [(QinaoMLXModel, String)] = [
+            (.gemma4E4B, "Gemma 4 E4B (MLX, 4-bit)"),
+            (.gemma4E2B, "Gemma 4 E2B (MLX, 4-bit)"),
             (.gemma3_4B, "Gemma 3 4B (MLX, 4-bit)"),
             (.gemma3nE4B, "Gemma 3n E4B (MLX, 4-bit)"),
             (.gemma3nE2B, "Gemma 3n E2B (MLX, 4-bit)")

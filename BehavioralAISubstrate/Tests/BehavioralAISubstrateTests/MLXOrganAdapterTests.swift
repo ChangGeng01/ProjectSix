@@ -113,25 +113,67 @@ final class MLXOrganAdapterTests: XCTestCase {
 
     // MARK: - 4. Catalog stability
 
-    func testDefaultCatalogShipsExactlyThreeGemmaEntries() {
+    func testDefaultCatalogShipsCanonicalGemmaEntries() {
         let entries = MLXModelCatalog.defaultEntries
-        XCTAssertEqual(entries.count, 3)
+        // M235 added Gemma 4 e4b/e2b alongside the existing
+        // Gemma 3 4B + Gemma 3n e4b/e2b. The canonical mlx-community
+        // Gemma family is now five entries.
+        XCTAssertEqual(entries.count, 5)
         let ids = Set(entries.map(\.id))
         XCTAssertEqual(ids, [
+            "mlx-community/gemma-4-e4b-it-4bit",
+            "mlx-community/gemma-4-e2b-it-4bit",
             "mlx-community/gemma-3-4b-it-4bit",
             "mlx-community/gemma-3n-E4B-it-lm-4bit",
             "mlx-community/gemma-3n-E2B-it-lm-4bit"
         ])
     }
 
-    func testEachEntryDeclaresGemmaEndOfTurnTokenForCorrectStop() {
+    func testEachEntryDeclaresGemmaTurnTerminatorForCorrectStop() {
+        // Gemma 3 / 3n use `<end_of_turn>`; Gemma 4 uses `<turn|>`.
+        // Every entry must declare at least one of these so
+        // generation stops at the reply boundary.
+        let validTerminators = ["<end_of_turn>", "<turn|>"]
         for entry in MLXModelCatalog.defaultEntries {
+            let hasOne = entry.extraEOSTokens.contains(where: {
+                validTerminators.contains($0)
+            })
             XCTAssertTrue(
-                entry.extraEOSTokens.contains("<end_of_turn>"),
-                "entry \(entry.id) must list <end_of_turn> as an " +
-                "extra EOS token; otherwise generation runs past " +
-                "the reply (Gemma 3 / 3n turn terminator)")
+                hasOne,
+                "entry \(entry.id) must list one of " +
+                "\(validTerminators) as an extra EOS token; " +
+                "without it generation runs past the reply " +
+                "(Gemma 3/3n use <end_of_turn>, Gemma 4 uses " +
+                "<turn|>)")
         }
+    }
+
+    func testGemmaGenerationFamilyMapsToCorrectTerminator() {
+        // Pin the Gemma 3 family → <end_of_turn> mapping.
+        XCTAssertTrue(
+            MLXModelCatalog.gemma3_4B_it_4bit.extraEOSTokens
+                .contains("<end_of_turn>"))
+        XCTAssertTrue(
+            MLXModelCatalog.gemma3n_E4B_4bit.extraEOSTokens
+                .contains("<end_of_turn>"))
+        XCTAssertTrue(
+            MLXModelCatalog.gemma3n_E2B_4bit.extraEOSTokens
+                .contains("<end_of_turn>"))
+        // Pin the Gemma 4 family → <turn|> mapping.
+        XCTAssertTrue(
+            MLXModelCatalog.gemma4_E4B_4bit.extraEOSTokens
+                .contains("<turn|>"))
+        XCTAssertTrue(
+            MLXModelCatalog.gemma4_E2B_4bit.extraEOSTokens
+                .contains("<turn|>"))
+        // Confirm the families don't accidentally use the wrong
+        // terminator (a copy-paste mistake would surface here).
+        XCTAssertFalse(
+            MLXModelCatalog.gemma3_4B_it_4bit.extraEOSTokens
+                .contains("<turn|>"))
+        XCTAssertFalse(
+            MLXModelCatalog.gemma4_E4B_4bit.extraEOSTokens
+                .contains("<end_of_turn>"))
     }
 
     func testCatalogProviderIDsAreUniqueAndStable() {

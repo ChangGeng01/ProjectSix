@@ -210,9 +210,13 @@ final class QinaoSampleSessionTests: XCTestCase {
         // Pinning the picker labels so a future rename in the enum
         // surfaces as a visible test diff (the rawValue strings
         // are visible in the picker UI and in audit logs).
+        // M235 inserts Gemma 4 e4b/e2b at the top of the MLX
+        // provider list (newest architecture first).
         let labels = SampleProvider.allCases.map(\.rawValue)
         XCTAssertEqual(labels, [
             "Apple Foundation Models",
+            "Gemma 4 E4B (MLX, 4-bit)",
+            "Gemma 4 E2B (MLX, 4-bit)",
             "Gemma 3 4B (MLX, 4-bit)",
             "Gemma 3n E4B (MLX, 4-bit)",
             "Gemma 3n E2B (MLX, 4-bit)",
@@ -222,6 +226,8 @@ final class QinaoSampleSessionTests: XCTestCase {
 
     func testAvailabilityFlagsReflectWiredProviders() {
         XCTAssertTrue(SampleProvider.appleFoundation.isAvailable)
+        XCTAssertTrue(SampleProvider.mlxGemma4E4B.isAvailable)
+        XCTAssertTrue(SampleProvider.mlxGemma4E2B.isAvailable)
         XCTAssertTrue(SampleProvider.mlxGemma3_4B.isAvailable)
         XCTAssertTrue(SampleProvider.mlxGemma3nE4B.isAvailable)
         XCTAssertTrue(SampleProvider.mlxGemma3nE2B.isAvailable)
@@ -231,6 +237,10 @@ final class QinaoSampleSessionTests: XCTestCase {
     }
 
     func testMLXModelMappingIsExhaustive() {
+        XCTAssertEqual(
+            SampleProvider.mlxGemma4E4B.mlxModel, .gemma4E4B)
+        XCTAssertEqual(
+            SampleProvider.mlxGemma4E2B.mlxModel, .gemma4E2B)
         XCTAssertEqual(
             SampleProvider.mlxGemma3_4B.mlxModel, .gemma3_4B)
         XCTAssertEqual(

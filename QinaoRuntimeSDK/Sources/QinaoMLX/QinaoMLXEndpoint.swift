@@ -116,19 +116,30 @@ public extension QinaoLoop {
 public enum QinaoMLXModel: String, Sendable, Equatable,
     CaseIterable, Hashable, Codable, Identifiable
 {
+    /// Gemma 4 E4B instruction-tuned, 4-bit quantized (M235).
+    /// Newest Gemma architecture; same effective ~4B parameter
+    /// count as Gemma 3n E4B but with Gemma 4 improvements.
+    /// **Recommended default for QinaoSampleApp** (M235).
+    case gemma4E4B = "gemma-4-e4b-it-4bit"
+
+    /// Gemma 4 E2B instruction-tuned, 4-bit quantized (M235).
+    /// Smallest Gemma 4 variant; same role as Gemma 3n E2B but
+    /// newer architecture.
+    case gemma4E2B = "gemma-4-e2b-it-4bit"
+
     /// Gemma 3 4B instruction-tuned, 4-bit quantized. Higher
     /// quality / longer context (128K) variant. ~3 GB on disk.
     case gemma3_4B = "gemma-3-4b-it-4bit"
 
     /// Gemma 3n E4B instruction-tuned, 4-bit quantized. MatFormer
     /// architecture; same effective parameter count as Gemma 3 4B
-    /// but lower runtime memory and faster generation.
-    /// **Recommended default for QinaoSampleApp.**
+    /// but lower runtime memory and faster generation. Pre-M235
+    /// default; kept for hosts that have weights cached locally.
     case gemma3nE4B = "gemma-3n-E4B-it-lm-4bit"
 
     /// Gemma 3n E2B instruction-tuned, 4-bit quantized. Smallest
-    /// variant; ~1.4 GB on disk. Pick for Watch / iPhone with
-    /// tight memory budgets.
+    /// pre-Gemma-4 variant; ~1.4 GB on disk. Pick for Watch /
+    /// iPhone with tight memory budgets.
     case gemma3nE2B = "gemma-3n-E2B-it-lm-4bit"
 
     public var id: String { rawValue }
@@ -136,6 +147,10 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     /// Human-readable display name suitable for picker UIs.
     public var displayName: String {
         switch self {
+        case .gemma4E4B:
+            return "Gemma 4 E4B (MLX, 4-bit)"
+        case .gemma4E2B:
+            return "Gemma 4 E2B (MLX, 4-bit)"
         case .gemma3_4B:
             return "Gemma 3 4B (MLX, 4-bit)"
         case .gemma3nE4B:
@@ -157,6 +172,10 @@ public enum QinaoMLXModel: String, Sendable, Equatable,
     /// `MLXModelCatalog`.
     var catalogEntry: MLXModelCatalog.Entry {
         switch self {
+        case .gemma4E4B:
+            return MLXModelCatalog.gemma4_E4B_4bit
+        case .gemma4E2B:
+            return MLXModelCatalog.gemma4_E2B_4bit
         case .gemma3_4B:
             return MLXModelCatalog.gemma3_4B_it_4bit
         case .gemma3nE4B:

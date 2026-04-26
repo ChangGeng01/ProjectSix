@@ -11,6 +11,8 @@ public enum SampleProvider: String, CaseIterable, Identifiable,
     Sendable, Equatable, Hashable
 {
     case appleFoundation = "Apple Foundation Models"
+    case mlxGemma4E4B = "Gemma 4 E4B (MLX, 4-bit)"
+    case mlxGemma4E2B = "Gemma 4 E2B (MLX, 4-bit)"
     case mlxGemma3_4B = "Gemma 3 4B (MLX, 4-bit)"
     case mlxGemma3nE4B = "Gemma 3n E4B (MLX, 4-bit)"
     case mlxGemma3nE2B = "Gemma 3n E2B (MLX, 4-bit)"
@@ -30,6 +32,8 @@ public enum SampleProvider: String, CaseIterable, Identifiable,
     /// MLX factory.
     public var mlxModel: QinaoMLXModel? {
         switch self {
+        case .mlxGemma4E4B: return .gemma4E4B
+        case .mlxGemma4E2B: return .gemma4E2B
         case .mlxGemma3_4B: return .gemma3_4B
         case .mlxGemma3nE4B: return .gemma3nE4B
         case .mlxGemma3nE2B: return .gemma3nE2B

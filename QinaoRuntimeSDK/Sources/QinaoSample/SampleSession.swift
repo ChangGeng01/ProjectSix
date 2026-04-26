@@ -63,7 +63,9 @@ public final class SampleSession: ObservableObject {
             cachedAppleEndpoint = endpoint
             return endpoint
 
-        case .mlxGemma3_4B,
+        case .mlxGemma4E4B,
+             .mlxGemma4E2B,
+             .mlxGemma3_4B,
              .mlxGemma3nE4B,
              .mlxGemma3nE2B:
             guard let model = provider.mlxModel else {
@@ -106,7 +108,9 @@ public final class SampleSession: ObservableObject {
             return await QinaoLoop
                 .makeAppleFoundationEndpoint()
 
-        case .mlxGemma3_4B,
+        case .mlxGemma4E4B,
+             .mlxGemma4E2B,
+             .mlxGemma3_4B,
              .mlxGemma3nE4B,
              .mlxGemma3nE2B:
             guard let model = provider.mlxModel else {
