@@ -251,6 +251,11 @@ struct QinaoSampleHost {
 
         var latencies: [Double] = []
         latencies.reserveCapacity(turns)
+        var errorCount = 0
+        var bodyHashes = Set<UInt64>()
+        // Progress every 1% of run (or every 100 turns for small N).
+        let progressEvery = max(100, turns / 100)
+        let runStart = ContinuousClock().now
 
         let prompt = "Reply with one short word."
         for i in 0..<turns {
@@ -265,32 +270,77 @@ struct QinaoSampleHost {
                 confidence: 0.5)
             let start = ContinuousClock().now
             do {
-                _ = try await loop.generateCandidates(
+                let drafts = try await loop.generateCandidates(
                     sessionID: "bench.\(i)",
                     seeds: [seed])
+                if let body = drafts.first?.body {
+                    bodyHashes.insert(
+                        UInt64(bitPattern: Int64(body.hashValue)))
+                }
             } catch {
-                handle(error: error)
-                return
+                errorCount += 1
+                if errorCount <= 5 {
+                    stderr(
+                        "bench turn \(i) error: \(error)\n")
+                }
+                if errorCount == 6 {
+                    stderr(
+                        "(suppressing further per-turn error " +
+                        "logs; final summary will count them)\n")
+                }
             }
             let elapsed = ContinuousClock().now - start
             latencies.append(elapsedMs(elapsed))
+
+            if (i + 1) % progressEvery == 0 || i == turns - 1 {
+                let recentSlice = latencies.suffix(progressEvery)
+                let recentMean =
+                    recentSlice.reduce(0, +)
+                    / Double(recentSlice.count)
+                let totalElapsed = ContinuousClock().now - runStart
+                let totalSec = elapsedMs(totalElapsed) / 1000.0
+                stderr(String(
+                    format: "[bench] %d/%d  recent-mean=%.0fms  " +
+                    "errors=%d  unique-bodies=%d  elapsed=%.1fs\n",
+                    i + 1, turns, recentMean, errorCount,
+                    bodyHashes.count, totalSec))
+            }
         }
 
+        // Latency stats over all turns (errors recorded as their
+        // dispatch latency, which is real cost paid).
         let sorted = latencies.sorted()
         let stats = (
             min: sorted.first ?? 0,
             p50: percentile(sorted, p: 0.50),
             p95: percentile(sorted, p: 0.95),
+            p99: percentile(sorted, p: 0.99),
             max: sorted.last ?? 0,
             mean: sorted.reduce(0, +) / Double(turns))
 
+        // Drift detection: compare first 25% of turns to last 25%.
+        let q1End = max(1, turns / 4)
+        let q4Start = turns - q1End
+        let q1Mean = latencies.prefix(q1End).reduce(0, +)
+            / Double(q1End)
+        let q4Mean = latencies.suffix(turns - q4Start).reduce(0, +)
+            / Double(max(1, turns - q4Start))
+        let driftPct = q1Mean > 0
+            ? ((q4Mean - q1Mean) / q1Mean) * 100.0
+            : 0
+
         print("""
             QinaoSampleHost bench (\(turns) sequential real-LLM turns):
-              min:   \(format(ms: stats.min))
-              p50:   \(format(ms: stats.p50))
-              p95:   \(format(ms: stats.p95))
-              max:   \(format(ms: stats.max))
-              mean:  \(format(ms: stats.mean))
+              min:           \(format(ms: stats.min))
+              p50:           \(format(ms: stats.p50))
+              p95:           \(format(ms: stats.p95))
+              p99:           \(format(ms: stats.p99))
+              max:           \(format(ms: stats.max))
+              mean:          \(format(ms: stats.mean))
+              errors:        \(errorCount) / \(turns)
+              unique bodies: \(bodyHashes.count) / \(turns)
+              drift Q1→Q4:   \(format(ms: q1Mean)) → \
+            \(format(ms: q4Mean))  (\(String(format: "%+.1f%%", driftPct)))
             """)
     }
 
