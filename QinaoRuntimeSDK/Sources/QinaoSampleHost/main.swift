@@ -63,13 +63,27 @@ struct QinaoSampleHost {
             await runLoRACurriculumTrain()
             return
         }
+        if args.contains("--lora-curriculum-train-m247") {
+            // M247 — re-trains the curriculum LoRA against the
+            // EXACT chat-template format Gemma 4 E2B sees at
+            // inference (`<bos><|turn>system\n...<turn|>\n
+            // <|turn>user\nInstruction:\nP<turn|>\n<|turn>model\n
+            // R<turn|>`). M246 used a bare "Instruction: P\n
+            // Response: R<turn|>" format which mismatched
+            // inference, so the LoRA's marker-emission behavior
+            // got dominated by the system prompt's
+            // "short, structured, low-commitment" framing.
+            await runLoRACurriculumTrainM247()
+            return
+        }
         if args.contains("--curriculum-compare") {
             // D — 3-way comparison demo. Runs the same fixed
             // prompt set through:
             //   1. Apple FM + M239 curriculum (no training)
             //   2. Bare Gemma 4 E2B (no curriculum, no LoRA)
-            //   3. LoRA-trained Gemma 4 E2B (loads adapter from
-            //      /tmp/qinao_curriculum_lora.safetensors)
+            //   3. LoRA-trained Gemma 4 E2B (M247 — loads adapter
+            //      from /tmp/qinao_curriculum_lora_m247.safetensors;
+            //      falls back to M246 path if absent)
             // Prints side-by-side bodies + per-path marker counts.
             await runCurriculumCompare()
             return
@@ -1582,6 +1596,86 @@ struct QinaoSampleHost {
             response: "[NEEDS_PERMIT] action: save wiki page\n                target: auth wiki page\n                reversibility: reversible\nI would save. Confirm to proceed."),
     ]
 
+    // MARK: - M247 chat-template-matched curriculum corpus
+    //
+    // Inference path: `MLXOrganAdapter.draft(_:)` builds a
+    // `ChatSession` with `instructions: <scoutBase>`, then calls
+    // `session.respond(to: <prompt(for:)>)`. The session feeds
+    // those messages through Gemma 4's chat template, which renders
+    // as:
+    //
+    //   <bos><|turn>system
+    //   <scoutBase><turn|>
+    //   <|turn>user
+    //   Instruction:
+    //   <prompt><turn|>
+    //   <|turn>model
+    //   <model fills in here>
+    //
+    // M246 trained against bare `"Instruction: <p>\nResponse:
+    // <r><turn|>"` strings — the LoRA never saw the system block
+    // at training time, so at inference the system prompt's
+    // "short, structured, low-commitment" framing dominated and
+    // the LoRA's marker-emission behavior never surfaced
+    // (D test: 0/5 RISK + 0/5 NEEDS_PERMIT vs Apple FM's
+    // 3/5 + 3/5 with the same M239 curriculum). M247 wraps each
+    // training sample in the exact chat-template tokens the
+    // model receives at inference, so the LoRA's gradient sees
+    // the system block + "Instruction:\n<p>" + model-turn shape
+    // it has to override.
+
+    private static func curriculumChatTemplateSample(
+        prompt: String, response: String
+    ) -> String {
+        // System prompt mirrors `MLXOrganAdapter.systemInstructions`
+        // for `.scout` — same literal text the inference path
+        // pushes into the chat session.
+        let system = BASOrganCurriculum.scoutBase
+        // User content mirrors `MLXOrganAdapter.prompt(for:)` for
+        // a context-free request (parts joined by '\n').
+        let user = "Instruction:\n\(prompt)"
+        return "<bos><|turn>system\n\(system)<turn|>\n" +
+               "<|turn>user\n\(user)<turn|>\n" +
+               "<|turn>model\n\(response)<turn|>"
+    }
+
+    /// Re-parse one M246-format string ("Instruction: P\nResponse:
+    /// R<turn|>") and re-wrap it as a M247 chat-template sample so
+    /// the existing 80+20 curriculum stays single-source.
+    private static func reformatAsChatTemplate(
+        _ raw: String
+    ) -> String {
+        let prefix = "Instruction: "
+        let mid = "\nResponse: "
+        let suffix = "<turn|>"
+        guard raw.hasPrefix(prefix), raw.hasSuffix(suffix),
+              let midRange = raw.range(of: mid) else {
+            return raw  // unrecognised; leave as-is
+        }
+        let promptStart = raw.index(
+            raw.startIndex, offsetBy: prefix.count)
+        let prompt = String(
+            raw[promptStart..<midRange.lowerBound])
+        let respStart = midRange.upperBound
+        let respEnd = raw.index(
+            raw.endIndex, offsetBy: -suffix.count)
+        let response = String(raw[respStart..<respEnd])
+        return curriculumChatTemplateSample(
+            prompt: prompt, response: response)
+    }
+
+    /// 80 chat-template-wrapped training examples derived from
+    /// `curriculumTrainingCorpus`.
+    private static var curriculumTrainingCorpusM247: [String] {
+        curriculumTrainingCorpus.map(reformatAsChatTemplate)
+    }
+
+    /// 20 chat-template-wrapped validation examples derived from
+    /// `curriculumValidationCorpus`.
+    private static var curriculumValidationCorpusM247: [String] {
+        curriculumValidationCorpus.map(reformatAsChatTemplate)
+    }
+
     private static func runLoRACurriculumTrain() async {
         // Real curriculum LoRA training. Bigger than --lora-train
         // smoke: 80 train examples, 200 iterations, rank 8.
@@ -1678,6 +1772,110 @@ struct QinaoSampleHost {
         }
     }
 
+    /// M247 — same trainer config as M246, but training samples
+    /// match the exact chat-template tokens Gemma 4 E2B sees at
+    /// inference. See `curriculumChatTemplateSample(prompt:response:)`
+    /// for rationale.
+    private static func runLoRACurriculumTrainM247() async {
+        let adapterURL = URL(
+            fileURLWithPath:
+                "/tmp/qinao_curriculum_lora_m247.safetensors")
+        let cfg = MLXLoRATrainer.Configuration(
+            rank: 8,
+            scale: 10.0,
+            batchSize: 2,
+            iterations: 200,
+            learningRate: 1e-4,
+            stepsPerReport: 10,
+            stepsPerEval: 50,
+            saveEvery: 50,
+            validationBatches: 4,
+            adapterURL: adapterURL)
+
+        let train = curriculumTrainingCorpusM247
+        let validate = curriculumValidationCorpusM247
+
+        print("""
+            QinaoSampleHost --lora-curriculum-train-m247:
+              model:        gemma4_E2B_4bit
+              format:       chat-template (system+user+model)
+              rank:         \(cfg.rank)
+              batch:        \(cfg.batchSize)
+              iterations:   \(cfg.iterations)
+              learningRate: \(cfg.learningRate)
+              corpus:       \(train.count) train,
+                            \(validate.count) validate
+              save path:    \(adapterURL.path)
+            """)
+
+        let trainer = MLXLoRATrainer(
+            model: MLXModelCatalog.gemma4_E2B_4bit,
+            configuration: cfg)
+
+        do {
+            stderr("[curriculum-lora-m247] loading foundation model…\n")
+            let loadStart = ContinuousClock().now
+            try await trainer.loadFoundationModel()
+            let loadElapsed = elapsedMs(
+                ContinuousClock().now - loadStart) / 1000.0
+            stderr(String(
+                format:
+                    "[curriculum-lora-m247] model loaded in %.1fs\n",
+                loadElapsed))
+
+            let trainStart = ContinuousClock().now
+            try await trainer.train(
+                trainingCorpus: train,
+                validationCorpus: validate,
+                progressHandler: { event in
+                    switch event {
+                    case .trainStep(let it, let loss, let tps):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m247] step %d  " +
+                                "loss=%.4f  %.0f tok/s\n",
+                            it + 1, loss, tps))
+                    case .validation(let it, let loss):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m247] step %d  " +
+                                "validation loss=%.4f\n",
+                            it + 1, loss))
+                    case .saved(let it, let url):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m247] step %d  " +
+                                "checkpoint → %@\n",
+                            it + 1, url.path as NSString))
+                    case .complete(let total):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m247] complete after " +
+                                "%d iterations\n", total))
+                    }
+                })
+            let trainElapsed = elapsedMs(
+                ContinuousClock().now - trainStart) / 1000.0
+
+            try await trainer.saveAdapter(to: adapterURL)
+            let savedSize = (try? FileManager.default
+                .attributesOfItem(atPath: adapterURL.path)[.size]
+                as? Int) ?? 0
+
+            print("""
+
+                Curriculum LoRA training (M247) complete:
+                  training time:  \(String(format: "%.1f", trainElapsed)) s
+                  adapter saved:  \(adapterURL.path)
+                  adapter bytes:  \(savedSize) bytes
+                """)
+        } catch {
+            stderr(
+                "error: lora-curriculum-train-m247 failed: \(error)\n")
+            exit(2)
+        }
+    }
+
     /// D — real 3-way comparison: 5 hand-picked prompts run
     /// through three paths (Apple FM + M239 curriculum / bare
     /// Gemma 4 E2B / LoRA-tuned Gemma 4 E2B). Prints bodies
@@ -1723,9 +1921,17 @@ struct QinaoSampleHost {
         // ----- Path C: LoRA Gemma 4 E2B -----
         let loraGemma = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E2B_4bit)
-        let adapterURL = URL(
+        // Prefer the M247 chat-template-trained adapter; fall back
+        // to M246 (raw "Instruction:/Response:" format) if M247
+        // hasn't been produced yet.
+        let m247URL = URL(
+            fileURLWithPath:
+                "/tmp/qinao_curriculum_lora_m247.safetensors")
+        let m246URL = URL(
             fileURLWithPath:
                 "/tmp/qinao_curriculum_lora.safetensors")
+        let adapterURL = FileManager.default.fileExists(
+            atPath: m247URL.path) ? m247URL : m246URL
         do {
             try await loraGemma.loadModel()
             try await loraGemma.loadAdapter(from: adapterURL)
@@ -1733,6 +1939,7 @@ struct QinaoSampleHost {
             stderr("error: LoRA-gemma load failed: \(error)\n")
             exit(2)
         }
+        let adapterTag = adapterURL == m247URL ? "M247" : "M246"
 
         var pathAStats = (risk: 0, permit: 0)
         var pathBStats = (risk: 0, permit: 0)
@@ -1804,7 +2011,7 @@ struct QinaoSampleHost {
                 }
                 print("""
 
-                  [C LoRA gemma 4 E2B] (\(format(ms: ms)))
+                  [C LoRA gemma 4 E2B \(adapterTag)] (\(format(ms: ms)))
                   \(indented(draft.body))
                 """)
             } catch {
@@ -1815,10 +2022,10 @@ struct QinaoSampleHost {
         print("""
 
             ━━━ Marker summary across 5 prompts ━━━
-            path                               [RISK]   [NEEDS_PERMIT]
-            A apple-fm + M239 curriculum        \(pathAStats.risk)/5      \(pathAStats.permit)/5
-            B bare gemma 4 E2B                  \(pathBStats.risk)/5      \(pathBStats.permit)/5
-            C LoRA-trained gemma 4 E2B          \(pathCStats.risk)/5      \(pathCStats.permit)/5
+            path                                [RISK]   [NEEDS_PERMIT]
+            A apple-fm + M239 curriculum         \(pathAStats.risk)/5      \(pathAStats.permit)/5
+            B bare gemma 4 E2B                   \(pathBStats.risk)/5      \(pathBStats.permit)/5
+            C LoRA gemma 4 E2B (\(adapterTag))           \(pathCStats.risk)/5      \(pathCStats.permit)/5
             """)
     }
 
