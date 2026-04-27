@@ -116,9 +116,22 @@ struct QinaoSampleHost {
             // .safetensors` and tallies per-category marker rates
             // for direct A/B against the existing Apple FM
             // N=2000 baseline.
+            //
+            // Optional flags:
+            //   --category <name>  filter to one of harm_risk /
+            //                      info_only / advisory / side_effect
+            //   (per-prompt JSONL is always written to
+            //    /tmp/qinao_mlx_eval_per_prompt.jsonl as of M250
+            //    so we can post-mortem any FP)
             let n: Int = (args.dropFirst(mlxEvalIdx + 1).first
                 .flatMap(Int.init)) ?? 100
-            await runMLXCurriculumEval(N: n)
+            var categoryFilter: String? = nil
+            if let catIdx = args.firstIndex(of: "--category"),
+               catIdx + 1 < args.count {
+                categoryFilter = args[catIdx + 1]
+            }
+            await runMLXCurriculumEval(
+                N: n, categoryFilter: categoryFilter)
             return
         }
         if let evalIdx = args.firstIndex(of:
@@ -776,15 +789,36 @@ struct QinaoSampleHost {
     /// describe the SAME prompt distribution. Single-process —
     /// MLX's compute path doesn't accumulate Apple-FM-style state
     /// between calls.
-    private static func runMLXCurriculumEval(N: Int) async {
+    private static func runMLXCurriculumEval(
+        N: Int,
+        categoryFilter: String? = nil
+    ) async {
         guard N > 0 else {
             stderr(
                 "error: --mlx-curriculum-eval N requires N > 0\n")
             exit(2)
         }
-        let perCategory = max(1, N / 4)
-        let categories = generateEvalCategories(
+        // When a category filter is set, allocate the full N to
+        // that one category instead of N/4. Default = all four
+        // categories with N/4 each.
+        let perCategory = max(1,
+            categoryFilter == nil ? N / 4 : N)
+        let allCategories = generateEvalCategories(
             perCategory: perCategory)
+        let categories: [EvalPromptCategory]
+        if let filter = categoryFilter {
+            categories = allCategories.filter {
+                $0.name == filter
+            }
+            guard !categories.isEmpty else {
+                stderr("error: unknown category '\(filter)'. " +
+                       "Valid: harm_risk / info_only / " +
+                       "advisory / side_effect\n")
+                exit(2)
+            }
+        } else {
+            categories = allCategories
+        }
         let actualTotal = categories.reduce(0) {
             $0 + $1.prompts.count
         }
@@ -841,6 +875,16 @@ struct QinaoSampleHost {
             stats[cat.name] = MLXCategoryStats()
         }
 
+        // M250 — open per-prompt JSONL for FP post-mortem.
+        // Hand-rolled escape so we don't have to make
+        // BASOrganDraft Codable just for diagnostics.
+        let jsonlPath =
+            "/tmp/qinao_mlx_eval_per_prompt.jsonl"
+        FileManager.default.createFile(
+            atPath: jsonlPath, contents: nil)
+        let jsonlHandle = FileHandle(
+            forWritingAtPath: jsonlPath)
+
         let runStart = ContinuousClock().now
         var processed = 0
         let total = actualTotal
@@ -854,22 +898,29 @@ struct QinaoSampleHost {
                     preset: .scout,
                     instruction: prompt)
                 let start = ContinuousClock().now
+                var bodyForLog = ""
+                var hadRisk = false
+                var hadPermit = false
+                var lastErrorString: String? = nil
+                var lastMs: Double = 0
                 do {
                     let draft = try await adapter.draft(req)
                     let ms = elapsedMs(
                         ContinuousClock().now - start)
+                    lastMs = ms
+                    bodyForLog = draft.body
+                    hadRisk = draft.body.contains("[RISK]")
+                    hadPermit = draft.body.contains(
+                        "[NEEDS_PERMIT]")
                     var s = stats[cat.name]
                         ?? MLXCategoryStats()
                     s.n += 1
                     s.latencyMs += ms
-                    if draft.body.contains("[RISK]") {
-                        s.risk += 1
-                    }
-                    if draft.body.contains("[NEEDS_PERMIT]") {
-                        s.permit += 1
-                    }
+                    if hadRisk { s.risk += 1 }
+                    if hadPermit { s.permit += 1 }
                     stats[cat.name] = s
                 } catch {
+                    lastErrorString = "\(error)"
                     var s = stats[cat.name]
                         ?? MLXCategoryStats()
                     s.errorCount += 1
@@ -877,6 +928,21 @@ struct QinaoSampleHost {
                     stderr(
                         "[mlx-eval] error on prompt \(processed):" +
                         " \(error)\n")
+                }
+                if let h = jsonlHandle {
+                    let line = jsonlEscape(
+                        category: cat.name,
+                        prompt: prompt,
+                        body: bodyForLog,
+                        risk: hadRisk,
+                        permit: hadPermit,
+                        latencyMs: lastMs,
+                        errorString: lastErrorString)
+                    if let data = (line + "\n")
+                        .data(using: .utf8)
+                    {
+                        try? h.write(contentsOf: data)
+                    }
                 }
                 if processed % 20 == 0 || processed == total {
                     let elapsedSec = elapsedMs(
@@ -892,6 +958,8 @@ struct QinaoSampleHost {
                 }
             }
         }
+        try? jsonlHandle?.close()
+        stderr("[mlx-eval] per-prompt JSONL → \(jsonlPath)\n")
 
         let runElapsed = elapsedMs(
             ContinuousClock().now - runStart) / 1000.0
@@ -981,6 +1049,55 @@ struct QinaoSampleHost {
         print("\nTotal wall time: " +
               String(format: "%.1f min (%.0f s).",
                      mins, runElapsed))
+    }
+
+    /// Hand-rolled JSON-line for one eval row. Escapes `"`,
+    /// `\`, control characters in body/prompt. Avoids JSONEncoder
+    /// because the eval tuple isn't Codable and we don't want
+    /// to wrap it in a struct just for diagnostics.
+    private static func jsonlEscape(
+        category: String,
+        prompt: String,
+        body: String,
+        risk: Bool,
+        permit: Bool,
+        latencyMs: Double,
+        errorString: String?
+    ) -> String {
+        func esc(_ s: String) -> String {
+            var out = ""
+            out.reserveCapacity(s.count)
+            for c in s {
+                switch c {
+                case "\"": out += "\\\""
+                case "\\": out += "\\\\"
+                case "\n": out += "\\n"
+                case "\r": out += "\\r"
+                case "\t": out += "\\t"
+                default:
+                    if c.asciiValue ?? 32 < 0x20 {
+                        out += String(
+                            format: "\\u%04x",
+                            Int(c.asciiValue ?? 0))
+                    } else {
+                        out.append(c)
+                    }
+                }
+            }
+            return out
+        }
+        var parts: [String] = []
+        parts.append("\"category\":\"\(esc(category))\"")
+        parts.append("\"prompt\":\"\(esc(prompt))\"")
+        parts.append("\"body\":\"\(esc(body))\"")
+        parts.append("\"risk\":\(risk)")
+        parts.append("\"permit\":\(permit)")
+        parts.append(String(format:
+            "\"latency_ms\":%.1f", latencyMs))
+        if let e = errorString {
+            parts.append("\"error\":\"\(esc(e))\"")
+        }
+        return "{" + parts.joined(separator: ",") + "}"
     }
 
     /// Right-pad string with spaces to width.
