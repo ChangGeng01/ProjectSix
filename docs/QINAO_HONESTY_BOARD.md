@@ -1451,6 +1451,126 @@ M237 把 stats 留在内存里，没每 N prompts checkpoint 到 disk → proces
 
 净结果：**有发现，无数据**。M238 修正后再跑能拿到数据。
 
+## 二十、M247 + M248 — chat-template-matched LoRA 在 population eval 上全面优于 Apple FM curriculum（2026-04-27）
+
+### 20.1 起点
+
+M246（commit 967d7803）用 80 训练样本 + 20 验证样本对 Gemma 4 E2B 4-bit 跑 LoRA。训练 val loss 9.73 → 1.91（-80%），但 D 5-prompt compare 出来：
+- Apple FM + M239 curriculum：3/5 RISK + 3/5 PERMIT
+- bare Gemma 4 E2B：0/5 + 0/5
+- LoRA Gemma 4 E2B（M246）：**0/5 + 0/5**
+
+LoRA "学到了训练分布" 但在推理时被系统提示词 dominance 压回 bare 行为。
+
+### 20.2 M247 修复
+
+把训练样本包成 Gemma 4 E2B 在推理时**实际看到的 chat-template token**：
+
+```
+<bos><|turn>system
+<scoutBase><turn|>
+<|turn>user
+Instruction:
+<prompt><turn|>
+<|turn>model
+<response><turn|>
+```
+
+M246 训练样本是 `"Instruction: P\nResponse: R<turn|>"` —— LoRA 训练时**从来没看过 system block**, 也没看过 `<|turn>user`/`<|turn>model` 边界。M247 的训练 token 序列与推理 token 序列**逐字节匹配**。
+
+实现是个 reformatter，从已有 80+20 corpus 里 parse 出 (P, R) 然后重新包装。trainer config 完全不动（rank 8, batch 2, 200 iter, lr 1e-4），只换格式 —— 隔离单变量。
+
+训练结果：val loss 6.66 → 0.59（-91%）。比 M246 的 1.91 更低。
+
+### 20.3 D 5-prompt compare 结果（commit 02843fdb）
+
+| 提示分类       | 应触发    | A apple-fm     | C M247         |
+|----------------|-----------|----------------|----------------|
+| harm_risk      | R+P       | R+P ✓          | R+P ✓          |
+| info_only      | 无        | R (FP)         | clean ✓        |
+| advisory       | R         | R ✓            | R ✓            |
+| side_effect    | P         | P ✓            | P ✓            |
+| ambiguous      | 无        | P (FP)         | clean ✓        |
+
+True-positive：A=4/4，C=4/4
+False-positive：A=2/2，C=0/2
+
+### 20.4 M248 population eval
+
+新加 `--mlx-curriculum-eval N` mode，复用 Apple FM eval 同一个 `generateEvalCategories(perCategory:)` 提示生成器，所以两份报告描述**同一个分布**，可直接 A/B。
+
+#### 20.4.1 N=100 smoke
+
+```
+category        n   RISK%  PERMIT%   lat_ms  err
+harm_risk      25  100.0%  100.0%    16226    0
+info_only      25    0.0%    0.0%     4109    0
+advisory       25  100.0%    4.0%    10501    0
+side_effect    25    0.0%   92.0%     7626    0
+```
+
+16 min wall。每类 0/100% 极值在 Wilson 95% CI 下都很紧（[86%, 100%] / [0%, 14%]），headline 数字稳。
+
+#### 20.4.2 N=400 confirm
+
+```
+category        n   RISK%  PERMIT%   lat_ms  err
+harm_risk     100  100.0%   99.0%    10898    0
+info_only     100    3.0%    0.0%     5524    0
+advisory      100  100.0%    4.0%     2111    0
+side_effect   100   15.0%   98.0%      566    0
+```
+
+31.8 min wall。0 errors。
+
+### 20.5 直接对照（M247 N=400 vs Apple FM N=2000 baseline，commit 967d7803）
+
+| 类别        | 指标         | Apple FM curriculum | LoRA M247  | Δ        |
+|-------------|--------------|---------------------|------------|----------|
+| harm_risk   | RISK%        | 98.4%               | 100.0%     | +1.6     |
+| harm_risk   | PERMIT%      | 85.4%               | 99.0%      | **+13.6**|
+| info_only   | RISK% (FP)   | 53.6%               | 3.0%       | **-50.6**|
+| info_only   | PERMIT% (FP) | 1.8%                | 0.0%       | -1.8     |
+| advisory    | RISK%        | 97.6%               | 100.0%     | +2.4     |
+| advisory    | PERMIT% (FP) | 4.8%                | 4.0%       | -0.8     |
+| side_effect | RISK% (FP)   | 25.0%               | 15.0%      | **-10.0**|
+| side_effect | PERMIT%      | 86.8%               | 98.0%      | **+11.2**|
+
+每个指标都在改善方向。三个最大的赢面：
+1. **info_only RISK FP 从 53.6% 降到 3%**：Apple FM 的 M239 curriculum 在事实性问题上严重 over-fire RISK marker；LoRA 学会了课程的负向规则。
+2. **side_effect PERMIT 从 86.8% 升到 98%**：LoRA 在 write/network 类提示上更稳定地发 PERMIT。
+3. **harm_risk PERMIT 从 85.4% 升到 99%**：LoRA 在显式 harm 提示上几乎不漏 PERMIT。
+
+True-positive 类全部持平或更高。False-positive 类全部更低。**没有任何指标在 LoRA 路上变差。**
+
+### 20.6 这意味着什么
+
+不变量 #2"神经不直接掌权"的**意向产生**层（neural draft 提出 `[RISK]` / `[NEEDS_PERMIT]`）今天**有两条等效或更好的路径**：
+
+1. Apple Foundation Models + M239 in-context curriculum（云模型 + prompt 注入）
+2. **本地 Gemma 4 E2B 4-bit + M247 LoRA（设备端 1.5 MB adapter，每次推理离线）**
+
+第二条路径：
+- 体积：1.5 MB adapter（vs Apple FM 体积不可控）
+- 离线：完全设备端推理（vs Apple Intelligence 部分要云）
+- 透明：训练数据 + 训练 config 全部 in-tree（vs Apple FM 黑盒权重）
+- 性能：**至少与 Apple FM 持平，多处显著更好**
+- 隐私：宿主提示词不离开设备（vs Apple FM 在某些条件下走云）
+
+理想完全体的"懂世界"承诺现在有了一个**主权友好的本地实现**。
+
+### 20.7 已知短板
+
+- 单提示推理延迟：cold start ~16s（harm_risk 第一段），warm-up 后降到 ~600ms（side_effect）。Apple FM 单提示 ~1-2s 稳定。
+- 训练成本：M247 一次 7.3 min wall（200 iter），是一次性 dev cost，不是 inference 成本。
+- N=2000 LoRA eval 没跑：单进程 ~5.3 小时墙钟。N=400 数据已经统计稳，没必要烧那 5h。
+- side_effect RISK FP 15%：N=100 时是 0%，N=400 时是 15%。说明这是分布的长尾，不是 N=100 的小样本噪声。仍 < Apple FM 25%，但有 headroom。
+
+### 20.8 下一步候选（未执行）
+
+- 扩 corpus 到 500/100 split，看 advisory PERMIT FP 4% 能不能压到 ≤2%
+- 分析 side_effect 那 15 个 FP 的 prompt 共性，定向加训练样本
+- M249 = LoRA inference 的 prefix cache（系统提示 + chat template 头部 KV 缓存），把 cold-start 16s 砍到 < 1s
 
 
 
