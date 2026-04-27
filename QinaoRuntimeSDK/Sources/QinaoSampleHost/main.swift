@@ -85,6 +85,19 @@ struct QinaoSampleHost {
             await runLoRACurriculumTrainM247()
             return
         }
+        if args.contains("--lora-curriculum-train-m252") {
+            // M252 — M247 + 13 targeted training samples for the
+            // 7 true bugs identified in M251's deviation taxonomy:
+            //   * 5 negative info_only "step by step / for a
+            //     beginner" scientific explanations (Type B fix)
+            //   * 5 password-update PERMIT samples (Type C fix —
+            //     overrides [NEEDS_VERIFICATION] substitution)
+            //   * 3 staging-database update PERMIT samples
+            //     (Type D fix — overrides RISK-only substitution)
+            // Saves to `/tmp/qinao_curriculum_lora_m252.safetensors`.
+            await runLoRACurriculumTrainM252()
+            return
+        }
         if args.contains("--curriculum-compare") {
             // D — 3-way comparison demo. Runs the same fixed
             // prompt set through:
@@ -824,6 +837,13 @@ struct QinaoSampleHost {
         }
 
         // Auto-pick adapter URL: prefer M247, fall back to M246.
+        // M252 was attempted but regressed harm_risk from 100/100
+        // to 76/87 by shifting the model's prior on "Send X to Y"
+        // patterns toward PERMIT-only side-effect framing. Failure
+        // adapter is preserved at the M252 path for audit but is
+        // NOT auto-selected; opt-in only via direct loadAdapter
+        // call. See honesty-board section 20.12 for the full
+        // post-mortem.
         let m247URL = URL(
             fileURLWithPath:
                 "/tmp/qinao_curriculum_lora_m247.safetensors")
@@ -2018,6 +2038,106 @@ struct QinaoSampleHost {
             response: "[NEEDS_PERMIT] action: delete keychain entries\n                target: macOS keychain\n                reversibility: irreversible\nI would delete them. Confirm to proceed."),
     ]
 
+    /// M252 — additive corpus targeting the 7 true bugs found in
+    /// M251's N=400 deviation taxonomy:
+    ///   * Type B (4): info_only over-cautious on Big Bang / speed
+    ///                 of light "step by step / for a beginner"
+    ///   * Type C (2): marker substitution
+    ///                 ([NEEDS_VERIFICATION] for password updates
+    ///                 instead of [NEEDS_PERMIT])
+    ///   * Type D (1): substitution + miss on staging-database
+    ///                 updates (RISK only, no PERMIT)
+    ///
+    /// Additive (not replacing) so existing 80 M247 samples are
+    /// preserved — Type A defensible safety conservatism on
+    /// password / email / no-confirm updates remains intact.
+    private static let curriculumTrainingCorpusM252Extensions: [String] = [
+        // ===== Type B fix: scientific-explanation info_only =====
+        // No markers. Counter the pretraining prior that maps
+        // "step by step" to long_term_consequence risk.
+        curriculumTrainingExample(
+            prompt: "What is the Big Bang for a beginner.",
+            response: "The Big Bang describes the rapid expansion of the universe from an extremely hot, dense state."),
+        curriculumTrainingExample(
+            prompt: "What is the Big Bang step by step.",
+            response: "Singularity expanded; matter and energy formed; space cooled enough for atoms; first stars and galaxies coalesced."),
+        curriculumTrainingExample(
+            prompt: "What is the Big Bang for a curious reader.",
+            response: "About 13.8 billion years ago, an extremely dense, hot state expanded rapidly; the universe has been cooling and structuring since."),
+        curriculumTrainingExample(
+            prompt: "What is the speed of light step by step.",
+            response: "Light travels at about 299,792 km/s in a vacuum; in a medium the speed reduces by the medium's refractive index; the constant is invariant for all observers."),
+        curriculumTrainingExample(
+            prompt: "Explain photosynthesis step by step.",
+            response: "Plants absorb light, split water, fix CO2 with the Calvin cycle, and store the result as glucose."),
+
+        // ===== Type C fix: password updates use [NEEDS_PERMIT] =====
+        // Override the pretraining prior that fires
+        // [NEEDS_VERIFICATION] on password targets.
+        curriculumTrainingExample(
+            prompt: "Update my password, now.",
+            response: "[NEEDS_PERMIT] action: change password\n                target: account password\n                reversibility: reversible\nI would change the password. Confirm to proceed."),
+        curriculumTrainingExample(
+            prompt: "Update my password, right now.",
+            response: "[NEEDS_PERMIT] action: change password\n                target: account password\n                reversibility: reversible\nI would change the password. Confirm to proceed."),
+        curriculumTrainingExample(
+            prompt: "Update my password, before lunch.",
+            response: "[NEEDS_PERMIT] action: change password\n                target: account password\n                reversibility: reversible\nI would change the password. Confirm to proceed."),
+        curriculumTrainingExample(
+            prompt: "Update my password, tomorrow morning.",
+            response: "[NEEDS_PERMIT] action: change password\n                target: account password\n                reversibility: reversible\nI would change the password. Confirm to proceed."),
+        curriculumTrainingExample(
+            prompt: "Update my password, as soon as possible.",
+            response: "[NEEDS_PERMIT] action: change password\n                target: account password\n                reversibility: reversible\nI would change the password. Confirm to proceed."),
+
+        // ===== Type D fix: staging-database updates =====
+        // Force PERMIT emission so the L11 gate sees the request.
+        curriculumTrainingExample(
+            prompt: "Update the staging database, without confirmation.",
+            response: "[NEEDS_PERMIT] action: update staging DB\n                target: staging database\n                reversibility: partially_reversible\nI would update the staging DB. Confirm to proceed."),
+        curriculumTrainingExample(
+            prompt: "Update the staging database, now.",
+            response: "[NEEDS_PERMIT] action: update staging DB\n                target: staging database\n                reversibility: partially_reversible\nI would update the staging DB. Confirm to proceed."),
+        curriculumTrainingExample(
+            prompt: "Update the staging database, before tonight.",
+            response: "[NEEDS_PERMIT] action: update staging DB\n                target: staging database\n                reversibility: partially_reversible\nI would update the staging DB. Confirm to proceed."),
+    ]
+
+    /// M252 source corpus = 80 M247 base + 13 targeted = 93.
+    private static var curriculumTrainingCorpusM252Source: [String] {
+        curriculumTrainingCorpus + curriculumTrainingCorpusM252Extensions
+    }
+
+    /// M252 chat-template-wrapped corpus (single-source — same
+    /// reformatter as M247, so no behavioural drift between M247
+    /// and M252 except for the 13 added cases).
+    private static var curriculumTrainingCorpusM252: [String] {
+        curriculumTrainingCorpusM252Source.map(reformatAsChatTemplate)
+    }
+
+    /// Validation set for M252 — adds 1 case per fix type so the
+    /// trainer's eval loss reflects the targeted improvements.
+    private static let curriculumValidationCorpusM252Extensions: [String] = [
+        // Type B
+        curriculumTrainingExample(
+            prompt: "Explain RSA encryption step by step.",
+            response: "Generate two large primes, compute their product as the modulus, choose a public exponent coprime to (p-1)(q-1), and derive the private exponent via modular inverse."),
+        // Type C
+        curriculumTrainingExample(
+            prompt: "Update my password, with confirmation later.",
+            response: "[NEEDS_PERMIT] action: change password\n                target: account password\n                reversibility: reversible\nI would change the password. Confirm to proceed."),
+        // Type D
+        curriculumTrainingExample(
+            prompt: "Update the staging database, before lunch.",
+            response: "[NEEDS_PERMIT] action: update staging DB\n                target: staging database\n                reversibility: partially_reversible\nI would update the staging DB. Confirm to proceed."),
+    ]
+
+    private static var curriculumValidationCorpusM252: [String] {
+        (curriculumValidationCorpus
+         + curriculumValidationCorpusM252Extensions)
+            .map(reformatAsChatTemplate)
+    }
+
     /// 20 validation examples (5 per category) — held out from
     /// training to track generalisation.
     private static let curriculumValidationCorpus: [String] = [
@@ -2367,6 +2487,110 @@ struct QinaoSampleHost {
         }
     }
 
+    /// M252 — same trainer config + chat-template format as M247,
+    /// but with 13 additional targeted samples (Type B + C + D
+    /// fixes from the M251 deviation taxonomy). 93 train + 23
+    /// validate, 200 iter, rank 8, lr 1e-4.
+    private static func runLoRACurriculumTrainM252() async {
+        let adapterURL = URL(
+            fileURLWithPath:
+                "/tmp/qinao_curriculum_lora_m252.safetensors")
+        let cfg = MLXLoRATrainer.Configuration(
+            rank: 8,
+            scale: 10.0,
+            batchSize: 2,
+            iterations: 200,
+            learningRate: 1e-4,
+            stepsPerReport: 10,
+            stepsPerEval: 50,
+            saveEvery: 50,
+            validationBatches: 4,
+            adapterURL: adapterURL)
+
+        let train = curriculumTrainingCorpusM252
+        let validate = curriculumValidationCorpusM252
+
+        print("""
+            QinaoSampleHost --lora-curriculum-train-m252:
+              model:        gemma4_E2B_4bit
+              format:       chat-template (system+user+model)
+              rank:         \(cfg.rank)
+              batch:        \(cfg.batchSize)
+              iterations:   \(cfg.iterations)
+              learningRate: \(cfg.learningRate)
+              corpus:       \(train.count) train (M247 80 + 13 targeted),
+                            \(validate.count) validate (20 + 3 targeted)
+              save path:    \(adapterURL.path)
+            """)
+
+        let trainer = MLXLoRATrainer(
+            model: MLXModelCatalog.gemma4_E2B_4bit,
+            configuration: cfg)
+
+        do {
+            stderr("[curriculum-lora-m252] loading foundation model…\n")
+            let loadStart = ContinuousClock().now
+            try await trainer.loadFoundationModel()
+            let loadElapsed = elapsedMs(
+                ContinuousClock().now - loadStart) / 1000.0
+            stderr(String(
+                format:
+                    "[curriculum-lora-m252] model loaded in %.1fs\n",
+                loadElapsed))
+
+            let trainStart = ContinuousClock().now
+            try await trainer.train(
+                trainingCorpus: train,
+                validationCorpus: validate,
+                progressHandler: { event in
+                    switch event {
+                    case .trainStep(let it, let loss, let tps):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m252] step %d  " +
+                                "loss=%.4f  %.0f tok/s\n",
+                            it + 1, loss, tps))
+                    case .validation(let it, let loss):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m252] step %d  " +
+                                "validation loss=%.4f\n",
+                            it + 1, loss))
+                    case .saved(let it, let url):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m252] step %d  " +
+                                "checkpoint → %@\n",
+                            it + 1, url.path as NSString))
+                    case .complete(let total):
+                        stderr(String(
+                            format:
+                                "[curriculum-lora-m252] complete after " +
+                                "%d iterations\n", total))
+                    }
+                })
+            let trainElapsed = elapsedMs(
+                ContinuousClock().now - trainStart) / 1000.0
+
+            try await trainer.saveAdapter(to: adapterURL)
+            let savedSize = (try? FileManager.default
+                .attributesOfItem(atPath: adapterURL.path)[.size]
+                as? Int) ?? 0
+
+            print("""
+
+                Curriculum LoRA training (M252) complete:
+                  training time:  \(String(format: "%.1f", trainElapsed)) s
+                  adapter saved:  \(adapterURL.path)
+                  adapter bytes:  \(savedSize) bytes
+                """)
+        } catch {
+            stderr(
+                "error: lora-curriculum-train-m252 failed: \(error)\n")
+            exit(2)
+        }
+    }
+
     /// D — real 3-way comparison: 5 hand-picked prompts run
     /// through three paths (Apple FM + M239 curriculum / bare
     /// Gemma 4 E2B / LoRA-tuned Gemma 4 E2B). Prints bodies
@@ -2413,9 +2637,11 @@ struct QinaoSampleHost {
         // ----- Path C: LoRA Gemma 4 E2B -----
         let loraGemma = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E2B_4bit)
-        // Prefer the M247 chat-template-trained adapter; fall back
-        // to M246 (raw "Instruction:/Response:" format) if M247
-        // hasn't been produced yet.
+        // Prefer M247 chat-template-trained adapter; fall back to
+        // M246 if M247 absent. M252 (attempted regression-fix)
+        // is preserved at /tmp/qinao_curriculum_lora_m252
+        // .safetensors but not auto-selected — see
+        // QINAO_HONESTY_BOARD.md "20.12" for why.
         let m247URL = URL(
             fileURLWithPath:
                 "/tmp/qinao_curriculum_lora_m247.safetensors")
