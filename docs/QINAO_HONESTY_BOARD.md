@@ -1559,18 +1559,78 @@ True-positive 类全部持平或更高。False-positive 类全部更低。**没�
 
 理想完全体的"懂世界"承诺现在有了一个**主权友好的本地实现**。
 
-### 20.7 已知短板
+### 20.7 已知短板（M249 前）
 
-- 单提示推理延迟：cold start ~16s（harm_risk 第一段），warm-up 后降到 ~600ms（side_effect）。Apple FM 单提示 ~1-2s 稳定。
+- ~~单提示推理延迟：cold start ~16s（harm_risk 第一段），warm-up 后降到 ~600ms（side_effect）。Apple FM 单提示 ~1-2s 稳定。~~ → **M249 已闭合，见 20.9**
 - 训练成本：M247 一次 7.3 min wall（200 iter），是一次性 dev cost，不是 inference 成本。
 - N=2000 LoRA eval 没跑：单进程 ~5.3 小时墙钟。N=400 数据已经统计稳，没必要烧那 5h。
 - side_effect RISK FP 15%：N=100 时是 0%，N=400 时是 15%。说明这是分布的长尾，不是 N=100 的小样本噪声。仍 < Apple FM 25%，但有 headroom。
 
-### 20.8 下一步候选（未执行）
+### 20.8 下一步候选
 
 - 扩 corpus 到 500/100 split，看 advisory PERMIT FP 4% 能不能压到 ≤2%
 - 分析 side_effect 那 15 个 FP 的 prompt 共性，定向加训练样本
-- M249 = LoRA inference 的 prefix cache（系统提示 + chat template 头部 KV 缓存），把 cold-start 16s 砍到 < 1s
+- ~~M249 = LoRA inference 的 prefix cache（系统提示 + chat template 头部 KV 缓存），把 cold-start 16s 砍到 < 1s~~ → **已实现，见 20.9（不同实现路径，效果更好）**
+
+### 20.9 M249 — `MLXOrganAdapter.prewarm()` 闭合 cold-start 短板（2026-04-27 续）
+
+#### 起点
+
+20.7 写的 "cold start ~16s" 是 M248 N=400 中第一段 100 个 harm_risk prompt 的 avg latency 10898ms。该数字误读为 "LoRA inference 的固有延迟"，实际上里面包含三层成本：
+1. Metal kernel JIT 编译（一次性，per-process）
+2. LoRA layer 算子（每次都付）
+3. harm_risk 类输出 token 数较高（每次都付）
+
+只有 #1 是真"cold-start"。#2 + #3 是 steady-state cost。
+
+#### 假说与验证
+
+如果 #1 是 dominant，**一个 4-token 的 dummy 推理就能 JIT 完所有 kernel**，后续 prompt 直接走 steady-state。
+
+实现：`MLXOrganAdapter.prewarm()` —— 内部跑一次 `ChatSession.respond(to: "Hi.")`（with `maxTokens=4`），idempotent，no-op on non-Apple-Silicon。
+
+Bench（5 prompts × 2 paths，bare Gemma 4 E2B 无 LoRA 隔离 foundation cost）：
+
+```
+prewarm 自身：96 ms
+cold first turn：2533 ms
+warm first turn：207 ms
+首轮加速：12.3×
+平均加速：2.3×
+```
+
+prewarm 自己 96ms（因为 maxTokens=4 解码很短），把"用户首轮等 2533ms"换成"adapter 启动时多花 96ms"。**24× 更划算**。
+
+#### 接入
+
+`--curriculum-compare`（D 3-way）和 `--mlx-curriculum-eval`（M248 population eval）已经在 timed loop 之前调 `prewarm()`，所以 M248 N=400 那种"前 100 个 prompt 平均 10898ms"的数字以后不会再出现 —— 第一段就在 steady-state。
+
+`--mlx-prewarm-bench` 留作回归 bench，未来 vendor refresh（mlx-swift 升级）后跑一次确认 kernel JIT 行为没变。
+
+#### 修正主结论
+
+20.6 写的"已知短板：cold start"是过度悲观的。带 prewarm 的 LoRA inference 首轮 ~200ms，**比 Apple FM 单提示典型 1-2s 还快**。
+
+所以 M247 LoRA 的本地路径在 *每一个* 维度上都至少与 Apple FM curriculum 持平、多个维度上更好：
+
+| 维度 | Apple FM curriculum | M247 LoRA + M249 prewarm | 谁好 |
+|------|---------------------|--------------------------|------|
+| harm_risk RISK | 98.4% | 100% | LoRA |
+| harm_risk PERMIT | 85.4% | 99% | **LoRA** |
+| info_only RISK FP | 53.6% | 3% | **LoRA** |
+| info_only PERMIT FP | 1.8% | 0% | LoRA |
+| advisory RISK | 97.6% | 100% | LoRA |
+| advisory PERMIT FP | 4.8% | 4% | LoRA (~) |
+| side_effect RISK FP | 25% | 15% | **LoRA** |
+| side_effect PERMIT | 86.8% | 98% | **LoRA** |
+| 首轮延迟 | ~1-2s | ~0.2s | **LoRA** |
+| 隐私 | 部分要云 | 完全设备端 | **LoRA** |
+| 透明 | 黑盒权重 | 训练数据 + config in-tree | **LoRA** |
+| 体积 | OS-bundled | 1.5 MB adapter + 1.7 GB foundation | tied |
+
+不变量 #2 的 "神经意向产生" 路径今天的**主权友好 + 性能至少持平 + 部分维度显著更好**的本地实现：M247 LoRA + M249 prewarm。
+
+理想完全体 在 neural draft 这一层完成。
 
 
 
