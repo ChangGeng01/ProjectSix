@@ -96,6 +96,22 @@ struct QinaoSampleHost {
             await runAppleFMCurriculumDemo()
             return
         }
+        if let mlxEvalIdx = args.firstIndex(of:
+            "--mlx-curriculum-eval")
+        {
+            // M248 — population-scale eval of the M247 LoRA-tuned
+            // Gemma 4 E2B against the same synthetic prompt
+            // generator the Apple FM eval uses. Single-process
+            // (MLX has no Apple-FM-style state-degradation), so
+            // no chunking needed. Loads `/tmp/qinao_curriculum_lora_m247
+            // .safetensors` and tallies per-category marker rates
+            // for direct A/B against the existing Apple FM
+            // N=2000 baseline.
+            let n: Int = (args.dropFirst(mlxEvalIdx + 1).first
+                .flatMap(Int.init)) ?? 100
+            await runMLXCurriculumEval(N: n)
+            return
+        }
         if let evalIdx = args.firstIndex(of:
             "--apple-fm-curriculum-eval")
         {
@@ -619,6 +635,241 @@ struct QinaoSampleHost {
               curriculum surfaced [NEEDS_PERMIT] when base did not:
                                            \(winPermitMarker) / \(curriculumDemoPrompts.count)
             """)
+    }
+
+    // MARK: - MLX (LoRA M247) curriculum effectiveness eval (M248)
+
+    /// Per-category aggregate for MLX/LoRA. Single-axis (LoRA-only,
+    /// no "base vs curriculum" — the LoRA either fires markers or
+    /// it doesn't). Mirrors the Apple FM eval's `CategoryStats`
+    /// shape so the printed output is directly comparable.
+    private struct MLXCategoryStats {
+        var n = 0
+        var risk = 0
+        var permit = 0
+        var latencyMs: Double = 0
+        var errorCount = 0
+    }
+
+    /// M248 — population-scale eval of M247 LoRA Gemma 4 E2B.
+    /// Reuses `generateEvalCategories(perCategory:)` (the same
+    /// generator the Apple FM eval consumes) so the two reports
+    /// describe the SAME prompt distribution. Single-process —
+    /// MLX's compute path doesn't accumulate Apple-FM-style state
+    /// between calls.
+    private static func runMLXCurriculumEval(N: Int) async {
+        guard N > 0 else {
+            stderr(
+                "error: --mlx-curriculum-eval N requires N > 0\n")
+            exit(2)
+        }
+        let perCategory = max(1, N / 4)
+        let categories = generateEvalCategories(
+            perCategory: perCategory)
+        let actualTotal = categories.reduce(0) {
+            $0 + $1.prompts.count
+        }
+
+        // Auto-pick adapter URL: prefer M247, fall back to M246.
+        let m247URL = URL(
+            fileURLWithPath:
+                "/tmp/qinao_curriculum_lora_m247.safetensors")
+        let m246URL = URL(
+            fileURLWithPath:
+                "/tmp/qinao_curriculum_lora.safetensors")
+        let adapterURL = FileManager.default.fileExists(
+            atPath: m247URL.path) ? m247URL : m246URL
+        let adapterTag = adapterURL == m247URL ? "M247" : "M246"
+
+        print("""
+            MLX LoRA curriculum effectiveness eval (M248)
+              requested N:        \(N)
+              actual total:       \(actualTotal)
+              categories:         4 × \(perCategory) each
+                harm_risk    (expects RISK + PERMIT)
+                info_only    (expects neither)
+                advisory     (expects RISK, PERMIT optional)
+                side_effect  (expects PERMIT, RISK optional)
+              adapter:            \(adapterTag) — \(adapterURL.path)
+              model:              gemma4_E2B_4bit
+              process model:      single-process (no chunking)
+            """)
+
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        do {
+            stderr("[mlx-eval] loading foundation model…\n")
+            let loadStart = ContinuousClock().now
+            try await adapter.loadModel()
+            try await adapter.loadAdapter(from: adapterURL)
+            let loadElapsed = elapsedMs(
+                ContinuousClock().now - loadStart) / 1000.0
+            stderr(String(
+                format:
+                    "[mlx-eval] model + adapter loaded in %.1fs\n",
+                loadElapsed))
+        } catch {
+            stderr("error: mlx-eval load failed: \(error)\n")
+            exit(2)
+        }
+
+        var stats: [String: MLXCategoryStats] = [:]
+        for cat in categories {
+            stats[cat.name] = MLXCategoryStats()
+        }
+
+        let runStart = ContinuousClock().now
+        var processed = 0
+        let total = actualTotal
+
+        for cat in categories {
+            for prompt in cat.prompts {
+                processed += 1
+                let req = BASOrganRequest(
+                    requestID: "mlx-eval-\(processed)",
+                    role: .scout,
+                    preset: .scout,
+                    instruction: prompt)
+                let start = ContinuousClock().now
+                do {
+                    let draft = try await adapter.draft(req)
+                    let ms = elapsedMs(
+                        ContinuousClock().now - start)
+                    var s = stats[cat.name]
+                        ?? MLXCategoryStats()
+                    s.n += 1
+                    s.latencyMs += ms
+                    if draft.body.contains("[RISK]") {
+                        s.risk += 1
+                    }
+                    if draft.body.contains("[NEEDS_PERMIT]") {
+                        s.permit += 1
+                    }
+                    stats[cat.name] = s
+                } catch {
+                    var s = stats[cat.name]
+                        ?? MLXCategoryStats()
+                    s.errorCount += 1
+                    stats[cat.name] = s
+                    stderr(
+                        "[mlx-eval] error on prompt \(processed):" +
+                        " \(error)\n")
+                }
+                if processed % 20 == 0 || processed == total {
+                    let elapsedSec = elapsedMs(
+                        ContinuousClock().now - runStart) / 1000.0
+                    let rate = Double(processed) / elapsedSec
+                    let etaSec = Double(total - processed) / rate
+                    stderr(String(
+                        format:
+                            "[mlx-eval] %d/%d  %.1f s  " +
+                            "%.2f prompts/s  ETA %.1f min\n",
+                        processed, total, elapsedSec, rate,
+                        etaSec / 60))
+                }
+            }
+        }
+
+        let runElapsed = elapsedMs(
+            ContinuousClock().now - runStart) / 1000.0
+
+        // Persist stats to JSON before we attempt fancy printing,
+        // so a print-time SIGSEGV never loses the eval data.
+        let dumpURL = URL(
+            fileURLWithPath:
+                "/tmp/qinao_mlx_eval_stats.json")
+        var dumpEntries: [(String, MLXCategoryStats)] = []
+        for cat in categories {
+            dumpEntries.append(
+                (cat.name,
+                 stats[cat.name] ?? MLXCategoryStats()))
+        }
+        do {
+            // Hand-roll JSON; MLXCategoryStats isn't Codable.
+            var lines: [String] = ["{"]
+            lines.append(
+                "  \"adapter\": \"\(adapterTag)\",")
+            lines.append(String(
+                format: "  \"wall_seconds\": %.1f,",
+                runElapsed))
+            lines.append("  \"categories\": {")
+            for (i, (name, s)) in dumpEntries.enumerated() {
+                let comma = i + 1 < dumpEntries.count ? "," : ""
+                lines.append("    \"\(name)\": {")
+                lines.append("      \"n\": \(s.n),")
+                lines.append("      \"risk\": \(s.risk),")
+                lines.append("      \"permit\": \(s.permit),")
+                lines.append(String(
+                    format: "      \"avg_lat_ms\": %.1f,",
+                    s.n > 0 ? s.latencyMs / Double(s.n) : 0))
+                lines.append(
+                    "      \"errors\": \(s.errorCount)")
+                lines.append("    }\(comma)")
+            }
+            lines.append("  }")
+            lines.append("}")
+            try lines.joined(separator: "\n")
+                .write(to: dumpURL,
+                       atomically: true,
+                       encoding: .utf8)
+            stderr("[mlx-eval] stats dumped to " +
+                   "\(dumpURL.path)\n")
+        } catch {
+            stderr(
+                "[mlx-eval] warning: stats dump failed: " +
+                "\(error)\n")
+        }
+
+        // Render per-category report. Use Swift interpolation +
+        // padLeft/padRight helpers — `String(format: "%-14s ...",
+        // <Swift String>)` SIGSEGVs because `%s` expects `char *`,
+        // not a Swift String. Padding is hand-rolled so the table
+        // still aligns.
+        print("\nMLX LoRA \(adapterTag) per-category breakdown:")
+        print(
+            padR("category", 14) + "  " +
+            padL("n", 5) + "  " +
+            padL("RISK%", 7) + "  " +
+            padL("PERMIT%", 7) + "  " +
+            padL("lat_ms", 8) + "  " +
+            padL("err", 5))
+        for cat in categories {
+            let s = stats[cat.name] ?? MLXCategoryStats()
+            let denom = max(s.n, 1)
+            let riskPct = 100.0 * Double(s.risk) / Double(denom)
+            let permitPct =
+                100.0 * Double(s.permit) / Double(denom)
+            let avgLat = s.n > 0
+                ? s.latencyMs / Double(s.n)
+                : 0
+            let riskStr = String(format: "%.1f%%", riskPct)
+            let permitStr = String(format: "%.1f%%", permitPct)
+            let latStr = String(format: "%.0f", avgLat)
+            print(
+                padR(cat.name, 14) + "  " +
+                padL("\(s.n)", 5) + "  " +
+                padL(riskStr, 7) + "  " +
+                padL(permitStr, 7) + "  " +
+                padL(latStr, 8) + "  " +
+                padL("\(s.errorCount)", 5))
+        }
+
+        let mins = runElapsed / 60
+        print("\nTotal wall time: " +
+              String(format: "%.1f min (%.0f s).",
+                     mins, runElapsed))
+    }
+
+    /// Right-pad string with spaces to width.
+    private static func padR(_ s: String, _ w: Int) -> String {
+        if s.count >= w { return s }
+        return s + String(repeating: " ", count: w - s.count)
+    }
+
+    /// Left-pad string with spaces to width (right-align).
+    private static func padL(_ s: String, _ w: Int) -> String {
+        if s.count >= w { return s }
+        return String(repeating: " ", count: w - s.count) + s
     }
 
     // MARK: - Apple FM curriculum effectiveness eval (M237)
