@@ -215,6 +215,52 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         #endif
     }
 
+    /// M249 — kick off a tiny dummy turn to JIT-compile Metal
+    /// kernels and warm the model's compute path. The first real
+    /// `draft(_:)` call after this returns in steady-state
+    /// latency (~600ms for short outputs on Apple Silicon) instead
+    /// of cold-start latency (~10–16s while kernels compile).
+    ///
+    /// Idempotent: safe to call any number of times. Skipped on
+    /// non-Apple-Silicon builds. Caller must have completed
+    /// `loadModel(...)`.
+    ///
+    /// On the M248 N=400 run, the first 100 prompts averaged
+    /// 10898 ms while the last 100 averaged 566 ms — a 19×
+    /// difference dominated by Metal kernel JIT. Prewarm
+    /// captures most of that delta at adapter-load time so end
+    /// users don't pay it on their first turn.
+    public func prewarm() async throws {
+        #if canImport(MLXLLM)
+        guard let container = modelContainer else {
+            throw BASOrganError.providerUnavailable(
+                reason:
+                    "mlx-organ-adapter-not-loaded — call " +
+                    "loadModel(...) before prewarm()")
+        }
+        let role: BASOrganRole = descriptor.supportedRoles
+            .contains(.scout) ? .scout : .core
+        let dummyRequest = BASOrganRequest(
+            requestID: "prewarm",
+            role: role,
+            preset: role == .scout ? .scout : .core,
+            instruction: "Hi.")
+        var params = _generateParameters(
+            for: dummyRequest.preset)
+        // Cap decode at 4 tokens — we only need to JIT the kernels
+        // and exercise the prefill→decode boundary, not generate
+        // a full response.
+        params.maxTokens = 4
+        let session = ChatSession(
+            container,
+            instructions:
+                Self.systemInstructions(for: dummyRequest),
+            generateParameters: params)
+        _ = try await session.respond(
+            to: Self.prompt(for: dummyRequest))
+        #endif
+    }
+
     // MARK: - Draft
 
     public func draft(

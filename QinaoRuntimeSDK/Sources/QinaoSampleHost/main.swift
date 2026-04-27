@@ -63,6 +63,15 @@ struct QinaoSampleHost {
             await runLoRACurriculumTrain()
             return
         }
+        if args.contains("--mlx-prewarm-bench") {
+            // M249 — micro-benchmark: 5 prompts cold (no
+            // prewarm) vs 5 prompts warmed via
+            // `MLXOrganAdapter.prewarm()`. Confirms the prewarm
+            // call captures the kernel JIT cost so first-turn
+            // latency drops to steady-state.
+            await runMLXPrewarmBench()
+            return
+        }
         if args.contains("--lora-curriculum-train-m247") {
             // M247 — re-trains the curriculum LoRA against the
             // EXACT chat-template format Gemma 4 E2B sees at
@@ -637,6 +646,116 @@ struct QinaoSampleHost {
             """)
     }
 
+    // MARK: - M249 prewarm micro-benchmark
+
+    /// 5 prompts run cold (fresh adapter, no prewarm) vs 5
+    /// prompts run after `prewarm()`. Each side gets its OWN
+    /// adapter instance so the "cold" run sees a truly cold
+    /// MLX state. Same model + adapter weights both sides.
+    private static func runMLXPrewarmBench() async {
+        let prompts = [
+            "Hello, nice to meet you.",
+            "What is photosynthesis briefly?",
+            "Define entropy in plain English.",
+            "Tell me about the Krebs cycle in one sentence.",
+            "Explain RSA encryption concisely.",
+        ]
+        print("""
+            MLX prewarm bench (M249):
+              5 prompts × 2 paths
+                cold: fresh adapter, no prewarm()
+                warm: fresh adapter + prewarm() before timed turns
+              model: gemma4_E2B_4bit (no LoRA — bench targets the
+                     foundation-model warm cost, not the adapter)
+            """)
+
+        // ---- Cold path ----
+        let coldAdapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        do {
+            try await coldAdapter.loadModel()
+        } catch {
+            stderr("error: cold-adapter load failed: \(error)\n")
+            exit(2)
+        }
+        var coldLatencies: [Double] = []
+        for (i, p) in prompts.enumerated() {
+            let req = BASOrganRequest(
+                requestID: "cold-\(i)",
+                role: .scout,
+                preset: .scout,
+                instruction: p)
+            let start = ContinuousClock().now
+            do {
+                _ = try await coldAdapter.draft(req)
+            } catch {
+                stderr("[cold] error on \(i): \(error)\n")
+            }
+            let ms = elapsedMs(ContinuousClock().now - start)
+            coldLatencies.append(ms)
+            print("  cold #\(i + 1): \(format(ms: ms))")
+        }
+
+        // ---- Warm path ----
+        let warmAdapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        do {
+            try await warmAdapter.loadModel()
+            stderr("[warm] running prewarm()…\n")
+            let prewarmStart = ContinuousClock().now
+            try await warmAdapter.prewarm()
+            let prewarmMs = elapsedMs(
+                ContinuousClock().now - prewarmStart)
+            stderr("[warm] prewarm done in " +
+                   "\(format(ms: prewarmMs))\n")
+        } catch {
+            stderr("error: warm-adapter setup failed: \(error)\n")
+            exit(2)
+        }
+        var warmLatencies: [Double] = []
+        for (i, p) in prompts.enumerated() {
+            let req = BASOrganRequest(
+                requestID: "warm-\(i)",
+                role: .scout,
+                preset: .scout,
+                instruction: p)
+            let start = ContinuousClock().now
+            do {
+                _ = try await warmAdapter.draft(req)
+            } catch {
+                stderr("[warm] error on \(i): \(error)\n")
+            }
+            let ms = elapsedMs(ContinuousClock().now - start)
+            warmLatencies.append(ms)
+            print("  warm #\(i + 1): \(format(ms: ms))")
+        }
+
+        // ---- Summary ----
+        let coldTotal = coldLatencies.reduce(0, +)
+        let warmTotal = warmLatencies.reduce(0, +)
+        let coldAvg = coldTotal / Double(coldLatencies.count)
+        let warmAvg = warmTotal / Double(warmLatencies.count)
+        let firstColdMs = coldLatencies.first ?? 0
+        let firstWarmMs = warmLatencies.first ?? 0
+
+        print("""
+
+            ━━━ Bench summary ━━━
+            cold path total:    \(format(ms: coldTotal))
+            warm path total:    \(format(ms: warmTotal))
+            cold avg per turn:  \(format(ms: coldAvg))
+            warm avg per turn:  \(format(ms: warmAvg))
+            cold first turn:    \(format(ms: firstColdMs))
+            warm first turn:    \(format(ms: firstWarmMs))
+            speedup first:      \(String(format: "%.1fx",
+                                         firstColdMs / max(
+                                             firstWarmMs, 1)))
+            speedup avg:        \(String(format: "%.1fx",
+                                         coldAvg / max(
+                                             warmAvg, 1)))
+            """)
+    }
+
     // MARK: - MLX (LoRA M247) curriculum effectiveness eval (M248)
 
     /// Per-category aggregate for MLX/LoRA. Single-axis (LoRA-only,
@@ -702,11 +821,15 @@ struct QinaoSampleHost {
             let loadStart = ContinuousClock().now
             try await adapter.loadModel()
             try await adapter.loadAdapter(from: adapterURL)
+            // M249 — pay the Metal JIT cost up-front so the
+            // first-prompt latency reflects steady-state, not
+            // kernel compilation.
+            try await adapter.prewarm()
             let loadElapsed = elapsedMs(
                 ContinuousClock().now - loadStart) / 1000.0
             stderr(String(
                 format:
-                    "[mlx-eval] model + adapter loaded in %.1fs\n",
+                    "[mlx-eval] model + adapter + prewarm in %.1fs\n",
                 loadElapsed))
         } catch {
             stderr("error: mlx-eval load failed: \(error)\n")
@@ -2164,6 +2287,7 @@ struct QinaoSampleHost {
             model: MLXModelCatalog.gemma4_E2B_4bit)
         do {
             try await bareGemma.loadModel()
+            try await bareGemma.prewarm()  // M249
         } catch {
             stderr("error: bare-gemma load failed: \(error)\n")
             exit(2)
@@ -2186,6 +2310,7 @@ struct QinaoSampleHost {
         do {
             try await loraGemma.loadModel()
             try await loraGemma.loadAdapter(from: adapterURL)
+            try await loraGemma.prewarm()  // M249
         } catch {
             stderr("error: LoRA-gemma load failed: \(error)\n")
             exit(2)
