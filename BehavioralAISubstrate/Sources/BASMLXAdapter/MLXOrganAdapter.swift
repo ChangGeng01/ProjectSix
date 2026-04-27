@@ -7,6 +7,8 @@ import MLXLMCommon
 import MLXHuggingFace
 import HuggingFace
 import Tokenizers
+import MLX
+import MLXNN
 #endif
 
 /// MLX organ adapter (Apple Silicon, on-device, downloaded
@@ -148,6 +150,57 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             reason:
                 "MLXLLM framework unavailable in this build " +
                 "(watchOS / non-Apple-Silicon target)")
+        #endif
+    }
+
+    /// M246 — Load a previously-trained LoRA adapter (saved via
+    /// `MLXLoRATrainer.saveAdapter`) into the loaded foundation
+    /// model. Subsequent `draft(_:)` / `streamDraft(_:)` calls will
+    /// use the LoRA-tuned model instead of the bare base.
+    ///
+    /// Must be called AFTER `loadModel(...)`. Idempotent in the
+    /// sense that calling twice with the same URL is harmless
+    /// (second call overwrites the LoRA params with the same data).
+    /// Calling with a different URL replaces the loaded adapter.
+    ///
+    /// - Parameter url: file URL pointing to a `.safetensors` file
+    ///   produced by `MLXLoRATrainer.saveAdapter`. Must match the
+    ///   trainer's `Configuration.rank` (default 8).
+    public func loadAdapter(from url: URL) async throws {
+        #if canImport(MLXLLM)
+        guard let container = modelContainer else {
+            throw BASOrganError.providerUnavailable(
+                reason:
+                    "mlx-organ-adapter-not-loaded — call " +
+                    "loadModel(...) before loadAdapter(...)")
+        }
+        // M246 — apply LoRA layers + load adapter weights via the
+        // container's perform action so all model mutation runs on
+        // the container's executor. Sendable-correct: weights are
+        // loaded INSIDE the closure (NestedDictionary<MLXArray>
+        // isn't Sendable across actor boundaries).
+        let loraParams = LoRAConfiguration.LoRAParameters(
+            rank: 8, scale: 10.0, keys: nil)
+        let loraConfig = LoRAConfiguration(
+            numLayers: 4,
+            fineTuneType: .lora,
+            loraParameters: loraParams)
+        let adapterURL = url
+
+        try await container.perform { (ctx: ModelContext) in
+            _ = try LoRAContainer.from(
+                model: ctx.model,
+                configuration: loraConfig)
+            let weights = try MLX.loadArrays(url: adapterURL)
+            let parameters = ModuleParameters.unflattened(weights)
+            try ctx.model.update(
+                parameters: parameters,
+                verify: .noUnusedKeys)
+        }
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason:
+                "MLXLLM framework unavailable in this build")
         #endif
     }
 
