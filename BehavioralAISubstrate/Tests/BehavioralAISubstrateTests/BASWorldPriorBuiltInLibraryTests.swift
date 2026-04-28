@@ -13,7 +13,13 @@ final class BASWorldPriorBuiltInLibraryTests: XCTestCase {
     // MARK: - Counts pin §9.3 commitments
 
     func testTwentyCausalTemplates() {
-        XCTAssertEqual(
+        // §9.3 demands at least 20 causal templates. M2 shipped
+        // exactly 20; M258 expanded the library to 36 with 16
+        // additional templates spread across the 8 domains
+        // (~2 each). The test stays "at least 20" so future
+        // additions don't trip it; per-domain coverage is
+        // checked separately by `testEightDomainsCovered`.
+        XCTAssertGreaterThanOrEqual(
             BASWorldPriorBuiltInLibrary.allTemplates.count, 20,
             "§9.3 demands at least 20 causal templates.")
     }
@@ -138,7 +144,9 @@ final class BASWorldPriorBuiltInLibraryTests: XCTestCase {
         let axCount = await vault.registeredAxiomCount()
         let horizonCount = await vault.registeredHorizonCount()
 
-        XCTAssertEqual(tmplCount, 20)
+        XCTAssertGreaterThanOrEqual(
+            tmplCount, 20,
+            "M2 minimum is 20; M258 raised the library to 36")
         XCTAssertEqual(bridgeCount, 8)
         XCTAssertGreaterThanOrEqual(axCount, 5)
         XCTAssertEqual(horizonCount, 8)
@@ -151,5 +159,68 @@ final class BASWorldPriorBuiltInLibraryTests: XCTestCase {
         let sleep = await vault.template(id: "tmpl-body-sleep-debt")
         XCTAssertNotNil(sleep)
         XCTAssertEqual(sleep?.domain, .body)
+    }
+
+    // MARK: - M258 expansion (16 added templates across 8 domains)
+
+    func testM258TemplatesAreLoaded() {
+        // Spot-check one new template per domain.
+        let ids = Set(
+            BASWorldPriorBuiltInLibrary.allTemplates.map(\.id))
+        XCTAssertTrue(ids.contains("tmpl-physics-friction-wear"))
+        XCTAssertTrue(ids.contains("tmpl-physics-electrical-shock"))
+        XCTAssertTrue(ids.contains("tmpl-body-caffeine-tail"))
+        XCTAssertTrue(ids.contains("tmpl-body-repetitive-strain"))
+        XCTAssertTrue(ids.contains("tmpl-time-context-decay"))
+        XCTAssertTrue(ids.contains("tmpl-time-meeting-overflow"))
+        XCTAssertTrue(ids.contains("tmpl-money-fixed-cost-creep"))
+        XCTAssertTrue(ids.contains("tmpl-money-late-tax-filing"))
+        XCTAssertTrue(
+            ids.contains("tmpl-social-public-disclosure"))
+        XCTAssertTrue(
+            ids.contains("tmpl-social-relationship-investment"))
+        XCTAssertTrue(ids.contains("tmpl-language-jargon-barrier"))
+        XCTAssertTrue(
+            ids.contains("tmpl-language-translation-loss"))
+        XCTAssertTrue(
+            ids.contains("tmpl-learning-feedback-vacuum"))
+        XCTAssertTrue(ids.contains("tmpl-learning-novelty-block"))
+        XCTAssertTrue(ids.contains("tmpl-ethics-asymmetric-power"))
+        XCTAssertTrue(ids.contains("tmpl-ethics-precedent-set"))
+    }
+
+    func testEachDomainHasAtLeastTwoTemplatesAfterM258() {
+        // Per-domain density check: M258 spread additions evenly,
+        // so every domain should have ≥2 templates.
+        var byDomain: [BASWorldPriorDomain: Int] = [:]
+        for tmpl in BASWorldPriorBuiltInLibrary.allTemplates {
+            byDomain[tmpl.domain, default: 0] += 1
+        }
+        for (domain, count) in byDomain {
+            XCTAssertGreaterThanOrEqual(
+                count, 2,
+                "domain \(domain.rawValue) has only " +
+                "\(count) template(s) — expected ≥2 after M258")
+        }
+    }
+
+    func testM258AddsIrreversibleHighRiskTemplates() {
+        // The M251 risk-gate test surface should see new
+        // irreversible templates from M258 (electrical shock,
+        // public disclosure). These let L11 GSI find more
+        // catastrophic causal paths.
+        let irreversibleIDs =
+            BASWorldPriorBuiltInLibrary.allTemplates
+                .filter { $0.reversibility == .irreversible }
+                .map(\.id)
+        XCTAssertTrue(
+            irreversibleIDs.contains(
+                "tmpl-physics-electrical-shock"),
+            "physics electrical shock should be irreversible")
+        XCTAssertTrue(
+            irreversibleIDs.contains(
+                "tmpl-social-public-disclosure"),
+            "social public-disclosure should be irreversible " +
+            "(search engines index permanently)")
     }
 }

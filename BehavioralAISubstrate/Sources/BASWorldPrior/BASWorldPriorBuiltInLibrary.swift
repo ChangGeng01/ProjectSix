@@ -81,6 +81,29 @@ public enum BASWorldPriorBuiltInLibrary {
             reversibility: .bounded,
             latency: .gradual,
             evidence: .axiomatic
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-physics-friction-wear",
+            domain: .physics,
+            preconditions: ["repeated mechanical contact under load"],
+            effect: "Cumulative material wear; surface fatigue accrues.",
+            effectKind: .physicalChange,
+            blockers: ["lubrication", "load reduction"],
+            reversibility: .costly,
+            latency: .cumulative,
+            evidence: .wellSupported
+        ),
+        .init(
+            id: "tmpl-physics-electrical-shock",
+            domain: .physics,
+            preconditions: ["conductive path through body", "voltage exceeds skin breakdown threshold"],
+            effect: "Tissue injury, possibly cardiac arrest.",
+            effectKind: .physicalChange,
+            blockers: ["insulation", "voltage below threshold"],
+            reversibility: .irreversible,
+            latency: .immediate,
+            evidence: .axiomatic
         )
     ]
 
@@ -118,6 +141,29 @@ public enum BASWorldPriorBuiltInLibrary {
             reversibility: .trivial,
             latency: .prompt,
             evidence: .plausible
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-body-caffeine-tail",
+            domain: .body,
+            preconditions: ["caffeine intake within 6h of bedtime"],
+            effect: "Sleep-onset latency lengthens; deep sleep duration reduced.",
+            effectKind: .stateTransition,
+            blockers: ["caffeine-tolerant phenotype (rare)"],
+            reversibility: .bounded,
+            latency: .gradual,
+            evidence: .wellSupported
+        ),
+        .init(
+            id: "tmpl-body-repetitive-strain",
+            domain: .body,
+            preconditions: ["repeated motion at high tempo without rest"],
+            effect: "Cumulative tendon/joint inflammation; chronic injury risk rises.",
+            effectKind: .stateTransition,
+            blockers: ["task variation", "scheduled microbreaks"],
+            reversibility: .costly,
+            latency: .cumulative,
+            evidence: .wellSupported
         )
     ]
 
@@ -144,6 +190,29 @@ public enum BASWorldPriorBuiltInLibrary {
             reversibility: .bounded,
             latency: .gradual,
             evidence: .wellSupported
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-time-context-decay",
+            domain: .time,
+            preconditions: ["task abandoned for extended period (≥1 week)"],
+            effect: "Context-recovery cost rises super-linearly with elapsed time.",
+            effectKind: .informationShift,
+            blockers: ["written handoff notes", "frequent status check-ins"],
+            reversibility: .costly,
+            latency: .gradual,
+            evidence: .wellSupported
+        ),
+        .init(
+            id: "tmpl-time-meeting-overflow",
+            domain: .time,
+            preconditions: ["back-to-back meetings without buffer", "decisions required in each"],
+            effect: "Decision quality degrades through context-switch fatigue.",
+            effectKind: .stateTransition,
+            blockers: ["explicit transition buffer", "delegated note-taking"],
+            reversibility: .bounded,
+            latency: .immediate,
+            evidence: .plausible
         )
     ]
 
@@ -180,6 +249,29 @@ public enum BASWorldPriorBuiltInLibrary {
             blockers: ["counterparty voluntarily refunds"],
             reversibility: .irreversible,
             latency: .immediate,
+            evidence: .axiomatic
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-money-fixed-cost-creep",
+            domain: .money,
+            preconditions: ["new recurring subscription added", "no offsetting cancellation"],
+            effect: "Monthly fixed-cost baseline rises; runway shortens.",
+            effectKind: .valueTransfer,
+            blockers: ["subscription cancellation within trial period"],
+            reversibility: .trivial,
+            latency: .immediate,
+            evidence: .axiomatic
+        ),
+        .init(
+            id: "tmpl-money-late-tax-filing",
+            domain: .money,
+            preconditions: ["tax filing past statutory deadline"],
+            effect: "Interest and penalty accrue on owed amount.",
+            effectKind: .valueTransfer,
+            blockers: ["filing extension secured before deadline"],
+            reversibility: .bounded,
+            latency: .gradual,
             evidence: .axiomatic
         )
     ]
@@ -218,6 +310,29 @@ public enum BASWorldPriorBuiltInLibrary {
             reversibility: .trivial,
             latency: .prompt,
             evidence: .plausible
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-social-public-disclosure",
+            domain: .social,
+            preconditions: ["private content posted to public-indexed surface"],
+            effect: "Search engines + archives index the content; recall is unreliable.",
+            effectKind: .informationShift,
+            blockers: ["surface guarantees noindex", "deletion within indexer window"],
+            reversibility: .irreversible,
+            latency: .immediate,
+            evidence: .axiomatic
+        ),
+        .init(
+            id: "tmpl-social-relationship-investment",
+            domain: .social,
+            preconditions: ["sustained attention to a relationship over months"],
+            effect: "Counterparty's trust deepens; reciprocal openness rises.",
+            effectKind: .relationshipChange,
+            blockers: ["broken promise without repair", "extended absence"],
+            reversibility: .bounded,
+            latency: .cumulative,
+            evidence: .plausible
         )
     ]
 
@@ -244,6 +359,29 @@ public enum BASWorldPriorBuiltInLibrary {
             reversibility: .bounded,
             latency: .immediate,
             evidence: .wellSupported
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-language-jargon-barrier",
+            domain: .language,
+            preconditions: ["domain jargon used to non-expert audience"],
+            effect: "Comprehension drops; alienation or false agreement risk.",
+            effectKind: .informationShift,
+            blockers: ["explicit translation to lay terms", "audience asks for clarification"],
+            reversibility: .trivial,
+            latency: .immediate,
+            evidence: .wellSupported
+        ),
+        .init(
+            id: "tmpl-language-translation-loss",
+            domain: .language,
+            preconditions: ["metaphor or idiom translated literally across cultures"],
+            effect: "Meaning shifts or unintended connotation; offense risk.",
+            effectKind: .informationShift,
+            blockers: ["culturally-aware paraphrase", "explicit framing as figurative"],
+            reversibility: .bounded,
+            latency: .immediate,
+            evidence: .plausible
         )
     ]
 
@@ -281,6 +419,29 @@ public enum BASWorldPriorBuiltInLibrary {
             reversibility: .bounded,
             latency: .cumulative,
             evidence: .wellSupported
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-learning-feedback-vacuum",
+            domain: .learning,
+            preconditions: ["practice repeated without external feedback signal"],
+            effect: "Wrong patterns ossify; later correction is more costly.",
+            effectKind: .skillGainOrLoss,
+            blockers: ["periodic external review", "explicit self-test against ground truth"],
+            reversibility: .costly,
+            latency: .cumulative,
+            evidence: .wellSupported
+        ),
+        .init(
+            id: "tmpl-learning-novelty-block",
+            domain: .learning,
+            preconditions: ["new concept introduced before prerequisites consolidated"],
+            effect: "Confusion compounds; both new and prior material weaken.",
+            effectKind: .skillGainOrLoss,
+            blockers: ["explicit prerequisite check", "remedial pass on weak prereq"],
+            reversibility: .bounded,
+            latency: .gradual,
+            evidence: .plausible
         )
     ]
 
@@ -306,6 +467,29 @@ public enum BASWorldPriorBuiltInLibrary {
             blockers: [],
             reversibility: .costly,
             latency: .gradual,
+            evidence: .wellSupported
+        ),
+        // M258 — added templates
+        .init(
+            id: "tmpl-ethics-asymmetric-power",
+            domain: .ethics,
+            preconditions: ["decision affects party with no representation"],
+            effect: "Equity duty rises proportionally with power asymmetry.",
+            effectKind: .relationshipChange,
+            blockers: ["affected party brought into decision via proxy"],
+            reversibility: .costly,
+            latency: .gradual,
+            evidence: .wellSupported
+        ),
+        .init(
+            id: "tmpl-ethics-precedent-set",
+            domain: .ethics,
+            preconditions: ["first-time choice in novel domain that observers will note"],
+            effect: "Choice frames future expectations and sets norm.",
+            effectKind: .informationShift,
+            blockers: ["choice explicitly framed as one-off, not template"],
+            reversibility: .costly,
+            latency: .immediate,
             evidence: .wellSupported
         )
     ]
