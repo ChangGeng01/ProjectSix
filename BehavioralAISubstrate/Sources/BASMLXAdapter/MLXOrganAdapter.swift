@@ -313,7 +313,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
                 for: request.preset))
 
         let prompt = Self.prompt(for: request)
-        let body = try await session.respond(to: prompt)
+        let rawBody = try await session.respond(to: prompt)
+        let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
         return BASOrganDraft(
             requestID: request.requestID,
@@ -401,7 +402,8 @@ public actor MLXOrganAdapter: BASOrganAdapter {
         }
 
         let prompt = Self.prompt(for: request)
-        let body = try await box.session.respond(to: prompt)
+        let rawBody = try await box.session.respond(to: prompt)
+        let body = Self.applyMarkerPostprocessing(rawBody)  // M256
 
         return BASOrganDraft(
             requestID: request.requestID,
@@ -502,6 +504,28 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             because a draft has been admitted for full consideration.
             """
         }
+    }
+
+    /// M256 — rewrite known LoRA marker substitutions back to the
+    /// canonical curriculum vocabulary so L11 ActionPermit / L14
+    /// SovereignWarrant parsers recognize them. Today only handles
+    /// `[NEEDS_VERIFICATION]` → `[NEEDS_PERMIT]` (M251 N=400 found
+    /// 2/400 cases where the M247 LoRA emits `[NEEDS_VERIFICATION]`
+    /// on `Update my password, *` prompts; the substring isn't in
+    /// the M239 curriculum vocabulary so the gate would otherwise
+    /// pass these requests through as plain text).
+    ///
+    /// Pure function — deterministic, content-preserving (rewrites
+    /// only the marker token, not the surrounding body), exposed
+    /// `public static` so tests can pin the rewrite rules.
+    /// Future substitutions caught by population eval get added
+    /// here as additional `replacingOccurrences` calls.
+    public static func applyMarkerPostprocessing(
+        _ body: String
+    ) -> String {
+        body.replacingOccurrences(
+            of: "[NEEDS_VERIFICATION]",
+            with: "[NEEDS_PERMIT]")
     }
 
     /// Compose the user-visible prompt from `instruction` + numbered

@@ -299,4 +299,186 @@ final class MLXOrganAdapterTests: XCTestCase {
             coreText.contains("Core"),
             "core system instructions must mention the role name")
     }
+
+    // MARK: - 7. M256 marker post-processor
+
+    func testMarkerPostprocessingRewritesNeedsVerification() {
+        // M251 N=400 found 2/400 cases where M247 LoRA emits
+        // [NEEDS_VERIFICATION] for password-update prompts. The
+        // post-processor rewrites that marker to [NEEDS_PERMIT]
+        // so L11 / L14 gates parse it.
+        let raw = "[NEEDS_VERIFICATION] action required. " +
+                  "Unable to proceed."
+        let processed =
+            MLXOrganAdapter.applyMarkerPostprocessing(raw)
+        XCTAssertTrue(
+            processed.contains("[NEEDS_PERMIT]"),
+            "[NEEDS_VERIFICATION] must be rewritten to " +
+            "[NEEDS_PERMIT]")
+        XCTAssertFalse(
+            processed.contains("[NEEDS_VERIFICATION]"),
+            "[NEEDS_VERIFICATION] must not survive rewrite")
+    }
+
+    func testMarkerPostprocessingPreservesBodyAroundMarker() {
+        // Only the marker token gets rewritten; surrounding
+        // text is byte-identical.
+        let raw = "[NEEDS_VERIFICATION] action required. " +
+                  "Unable to proceed."
+        let processed =
+            MLXOrganAdapter.applyMarkerPostprocessing(raw)
+        XCTAssertTrue(
+            processed.contains("action required."),
+            "body text after marker preserved verbatim")
+        XCTAssertTrue(
+            processed.contains("Unable to proceed."),
+            "body text after marker preserved verbatim")
+        XCTAssertEqual(
+            processed,
+            "[NEEDS_PERMIT] action required. Unable to proceed.")
+    }
+
+    func testMarkerPostprocessingNoOpForCanonicalBody() {
+        // Bodies that already use the canonical [NEEDS_PERMIT]
+        // marker pass through unchanged.
+        let canonical = """
+            [NEEDS_PERMIT] action: update profile field
+                            target: profile.age
+                            reversibility: reversible
+            I would update the age field. Confirm to proceed.
+            """
+        XCTAssertEqual(
+            MLXOrganAdapter.applyMarkerPostprocessing(canonical),
+            canonical,
+            "canonical body must pass through unchanged")
+    }
+
+    func testMarkerPostprocessingNoOpForRiskOnlyBody() {
+        // RISK-emitting bodies without any verification marker
+        // pass through unchanged. Don't accidentally munge them.
+        let body = """
+            [RISK] category: privacy
+                   reason: bulk-disclose contact data
+            I cannot send your contacts.
+            """
+        XCTAssertEqual(
+            MLXOrganAdapter.applyMarkerPostprocessing(body),
+            body)
+    }
+
+    func testMarkerPostprocessingRewritesMultipleOccurrences() {
+        // If the model emits the substituted marker twice in
+        // one body (rare but possible in multi-tool contexts),
+        // both get rewritten.
+        let raw = "[NEEDS_VERIFICATION] step 1\n" +
+                  "[NEEDS_VERIFICATION] step 2"
+        let processed =
+            MLXOrganAdapter.applyMarkerPostprocessing(raw)
+        XCTAssertEqual(
+            processed,
+            "[NEEDS_PERMIT] step 1\n[NEEDS_PERMIT] step 2")
+    }
+
+    func testMarkerPostprocessingIsIdempotent() {
+        // Running the post-processor twice must produce the same
+        // output as running it once. Hosts that rely on the
+        // post-processed body can re-process safely.
+        let raw = "[NEEDS_VERIFICATION] x"
+        let once =
+            MLXOrganAdapter.applyMarkerPostprocessing(raw)
+        let twice =
+            MLXOrganAdapter.applyMarkerPostprocessing(once)
+        XCTAssertEqual(
+            once, twice,
+            "post-processor must be idempotent")
+    }
+
+    // MARK: - 8. M254 multi-turn session pool surface
+
+    func testSessionCountIsZeroOnFreshAdapter() async {
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        let count = await adapter.sessionCount()
+        XCTAssertEqual(
+            count, 0,
+            "fresh adapter must have no cached sessions")
+    }
+
+    func testClearAllSessionsIsIdempotent() async {
+        // Calling clearAllSessions on a fresh adapter is a no-op
+        // and must not crash. Subsequent calls return same count.
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        await adapter.clearAllSessions()
+        let countA = await adapter.sessionCount()
+        await adapter.clearAllSessions()
+        let countB = await adapter.sessionCount()
+        XCTAssertEqual(countA, 0)
+        XCTAssertEqual(countB, 0)
+    }
+
+    func testClearSessionByIDIsNoOpForUnknownID() async {
+        // Clearing an unknown session ID is a defensive no-op
+        // (no thrown error, no crash). Hosts that don't track
+        // which IDs they used can call this freely.
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        await adapter.clearSession(
+            sessionID: "never-existed-\(UUID().uuidString)")
+        let count = await adapter.sessionCount()
+        XCTAssertEqual(count, 0)
+    }
+
+    func testDraftMultiTurnThrowsProviderUnavailableWhenNotLoaded()
+    async {
+        // Same honest-error pattern as draft(_:) — calling
+        // draftMultiTurn before loadModel(...) yields a stable
+        // reason code so callers can pattern-match.
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        let req = BASOrganRequest(
+            requestID: "test-mt",
+            role: .scout,
+            preset: .scout,
+            instruction: "hello")
+        do {
+            _ = try await adapter.draftMultiTurn(
+                req, sessionID: "test-session")
+            XCTFail(
+                "expected providerUnavailable when model is " +
+                "not loaded")
+        } catch BASOrganError.providerUnavailable(let reason) {
+            XCTAssertTrue(
+                reason.contains("not-loaded") ||
+                reason.contains("MLXLLM framework unavailable"),
+                "reason should point at the missing prereq, " +
+                "got: \(reason)")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    func testDraftMultiTurnRejectsUnsupportedRole() async {
+        // Same role enforcement as draft(_:). If the adapter is
+        // configured with only .scout, calling with .core throws.
+        let adapter = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit,
+            supportedRoles: [.scout])
+        let req = BASOrganRequest(
+            requestID: "test-mt-role",
+            role: .core,
+            preset: .core,
+            instruction: "hello")
+        do {
+            _ = try await adapter.draftMultiTurn(
+                req, sessionID: "test-session")
+            XCTFail(
+                "expected unsupportedRole when adapter is " +
+                "scout-only")
+        } catch BASOrganError.unsupportedRole(let role) {
+            XCTAssertEqual(role, .core)
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
 }

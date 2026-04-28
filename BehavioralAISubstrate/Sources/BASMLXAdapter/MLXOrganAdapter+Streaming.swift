@@ -74,12 +74,23 @@ extension MLXOrganAdapter: BASStreamingOrganAdapter {
 
         for try await delta in session.streamResponse(to: prompt) {
             cumulative += delta
+            // M256 — `bodyDelta` stays raw (so concatenation by
+            // downstream consumers stays consistent), but
+            // `cumulativeBody` is post-processed so any
+            // `[NEEDS_VERIFICATION]` substring becomes
+            // `[NEEDS_PERMIT]` — same gate-recognition guarantee
+            // as non-streaming `draft(_:)`. Consumers that scan
+            // `cumulativeBody` for markers (the recommended path,
+            // per `BASOrganDraftChunk` docs) see the corrected
+            // tokens.
             let chunk = BASOrganDraftChunk(
                 requestID: request.requestID,
                 providerID: descriptor.providerID,
                 role: request.role,
                 bodyDelta: delta,
-                cumulativeBody: cumulative,
+                cumulativeBody:
+                    MLXOrganAdapter.applyMarkerPostprocessing(
+                        cumulative),
                 producedAt: Date())
             continuation.yield(chunk)
         }
