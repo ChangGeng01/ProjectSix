@@ -9,6 +9,15 @@ import HuggingFace
 import Tokenizers
 import MLX
 import MLXNN
+
+/// M254 — `@unchecked Sendable` wrapper for `ChatSession`. See
+/// `MLXOrganAdapter.sessions` doc for the safety argument: the box
+/// only ever crosses the actor's executor, so no cross-task
+/// aliasing is possible. Marked fileprivate so the unchecked
+/// guarantee never leaks out of this file.
+fileprivate struct ChatSessionBox: @unchecked Sendable {
+    let session: ChatSession
+}
 #endif
 
 /// MLX organ adapter (Apple Silicon, on-device, downloaded
@@ -73,6 +82,25 @@ public actor MLXOrganAdapter: BASOrganAdapter {
     /// The loaded model container. `nil` until `loadModel(...)` has
     /// completed at least once on this actor instance.
     private var modelContainer: ModelContainer?
+
+    /// M254 — multi-turn session pool. Keys are
+    /// `"\(callerSessionID)#\(role.rawValue)"` so the same
+    /// caller-side session ID with different roles gets separate
+    /// `ChatSession` instances (different system instructions).
+    /// `ChatSession` is not thread-safe but lives entirely on this
+    /// actor, so per-session calls serialize through actor
+    /// isolation and never race.
+    ///
+    /// Wrapped in a `@unchecked Sendable` box because `ChatSession`
+    /// itself isn't `Sendable` (it's a `final class` with internal
+    /// `SerialAccessContainer<Cache>` mutable state). Storing it in
+    /// actor state and calling its `respond(...)` method —
+    /// `nonisolated async` — would otherwise fail Swift 6's data-
+    /// race check. The wrapper asserts the contract this actor
+    /// enforces: each session is reached only via this actor's
+    /// executor, so no cross-task aliasing is possible. The wrapper
+    /// stays `fileprivate` — never escapes the type.
+    private var sessions: [String: ChatSessionBox] = [:]
 
     /// Read accessor for the streaming extension (different file,
     /// same module). Cannot be `private` because extensions in
@@ -305,6 +333,124 @@ public actor MLXOrganAdapter: BASOrganAdapter {
             reason:
                 "MLXLLM framework unavailable in this build " +
                 "(watchOS / non-Apple-Silicon target)")
+        #endif
+    }
+
+    // MARK: - Multi-turn (M254)
+
+    /// M254 — multi-turn variant of `draft(_:)`. Reuses a
+    /// `ChatSession` keyed by `(sessionID, role)` so KV cache +
+    /// conversation history persist across turns. Each call after
+    /// the first only prefills the new user-turn tokens; the
+    /// system instructions + prior turns stay cached.
+    ///
+    /// Use this for any flow where conversational context matters
+    /// (follow-up questions, multi-step reasoning, slot filling).
+    /// For one-shot turns where each request is independent (the
+    /// curriculum / RISK-PERMIT use case), use `draft(_:)` — it's
+    /// stateless.
+    ///
+    /// Concurrency: `ChatSession` itself is not thread-safe, but
+    /// every operation here runs on the actor's executor, so calls
+    /// against the same session serialize naturally. Two callers
+    /// using DIFFERENT session IDs can interleave without
+    /// stomping on each other's KV state.
+    ///
+    /// - Parameters:
+    ///   - request: same shape as `draft(_:)` — instruction +
+    ///     optional context + role + preset
+    ///   - sessionID: caller-supplied conversation ID. Same ID
+    ///     across calls = same KV cache + history. Pass a fresh
+    ///     UUID per conversation; use `clearSession(sessionID:)`
+    ///     to evict.
+    ///
+    /// - Returns: `BASOrganDraft` with the model's response. Same
+    ///   shape as `draft(_:)` — callers can swap the two methods
+    ///   without changing downstream code.
+    public func draftMultiTurn(
+        _ request: BASOrganRequest,
+        sessionID: String
+    ) async throws -> BASOrganDraft {
+        guard descriptor.supportedRoles.contains(request.role) else {
+            throw BASOrganError.unsupportedRole(request.role)
+        }
+
+        #if canImport(MLXLLM)
+        guard let container = modelContainer else {
+            throw BASOrganError.providerUnavailable(
+                reason:
+                    "mlx-organ-adapter-not-loaded — call " +
+                    "loadModel(...) before draftMultiTurn(...)")
+        }
+
+        // Composite key — same caller session ID with different
+        // role gets its own ChatSession (different system prompt).
+        let key = "\(sessionID)#\(request.role.rawValue)"
+        let box: ChatSessionBox
+        if let existing = sessions[key] {
+            box = existing
+        } else {
+            let fresh = ChatSession(
+                container,
+                instructions:
+                    Self.systemInstructions(for: request),
+                generateParameters: _generateParameters(
+                    for: request.preset))
+            box = ChatSessionBox(session: fresh)
+            sessions[key] = box
+        }
+
+        let prompt = Self.prompt(for: request)
+        let body = try await box.session.respond(to: prompt)
+
+        return BASOrganDraft(
+            requestID: request.requestID,
+            providerID: descriptor.providerID,
+            role: request.role,
+            body: body,
+            inputTokensEstimated: BASOrganDeterministicAdapter
+                .estimateTokens(
+                    from: [request.instruction] + request.context),
+            outputTokensEstimated: BASOrganDeterministicAdapter
+                .estimateTokens(from: [body]),
+            producedAt: Date(),
+            traceID: BASOrganDeterministicAdapter.digest(
+                for: request, providerID: descriptor.providerID))
+        #else
+        throw BASOrganError.providerUnavailable(
+            reason:
+                "MLXLLM framework unavailable in this build " +
+                "(watchOS / non-Apple-Silicon target)")
+        #endif
+    }
+
+    /// Drop the `ChatSession` keyed by `sessionID` for both roles.
+    /// Frees its KV cache; future calls with that ID start fresh.
+    /// No-op if no session under that ID exists.
+    public func clearSession(sessionID: String) {
+        #if canImport(MLXLLM)
+        sessions.removeValue(
+            forKey: "\(sessionID)#\(BASOrganRole.scout.rawValue)")
+        sessions.removeValue(
+            forKey: "\(sessionID)#\(BASOrganRole.core.rawValue)")
+        #endif
+    }
+
+    /// Evict every cached session at once. Useful for memory
+    /// pressure events (L1 thermal/budget pressure) and for tests.
+    public func clearAllSessions() {
+        #if canImport(MLXLLM)
+        sessions.removeAll()
+        #endif
+    }
+
+    /// Number of active sessions. Hosts use this for UI / metrics
+    /// (e.g. "5 ongoing conversations cached").
+    public func sessionCount() -> Int {
+        #if canImport(MLXLLM)
+        return sessions.count
+        #else
+        return 0
         #endif
     }
 

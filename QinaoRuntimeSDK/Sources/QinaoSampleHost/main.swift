@@ -63,6 +63,23 @@ struct QinaoSampleHost {
             await runLoRACurriculumTrain()
             return
         }
+        if args.contains("--mlx-multiturn-bench") {
+            // M254 — 3-turn conversation bench.
+            //   Run A: 3 turns with FRESH sessions each (current
+            //          stateless `draft(_:)` behavior — model has
+            //          no conversation memory).
+            //   Run B: 3 turns within ONE multi-turn session
+            //          (`draftMultiTurn(_:sessionID:)` — KV cache
+            //          + history persist across turns).
+            // Reports per-turn latency + total. Multi-turn should
+            // win after turn 1 because system prompt + prior turns
+            // stay in KV cache; only the new user-turn tokens
+            // need prefill. Also visualizes whether the model
+            // actually USES the conversation context (e.g.
+            // referring back to a previous answer).
+            await runMLXMultiturnBench()
+            return
+        }
         if args.contains("--mlx-streaming-test") {
             // M253 — verify M247 LoRA works on the streaming
             // inference path (BASStreamingOrganAdapter via
@@ -808,6 +825,132 @@ struct QinaoSampleHost {
         var permit = 0
         var latencyMs: Double = 0
         var errorCount = 0
+    }
+
+    /// M254 — multi-turn vs stateless 3-turn comparison.
+    private static func runMLXMultiturnBench() async {
+        // 3 follow-up prompts that build on each other. With
+        // stateless `draft(_:)` the model can't see prior turns;
+        // with `draftMultiTurn(...)` it can.
+        let turns = [
+            "Tell me about photosynthesis briefly.",
+            "What's the chemical equation?",
+            "Where in the cell does it happen?",
+        ]
+        // Use bare Gemma (no LoRA) — bench is about KV-cache
+        // reuse, not about marker emission. M247 LoRA was trained
+        // single-turn; using it here would produce extra
+        // [RISK]/[NEEDS_PERMIT] noise that doesn't help bench
+        // signal.
+        let model = MLXModelCatalog.gemma4_E2B_4bit
+        print("""
+            MLX multi-turn bench (M254):
+              3 follow-up prompts × 2 paths
+                A: stateless draft(_:) — fresh session each turn
+                B: draftMultiTurn(_:sessionID:) — one session
+              model: \(model.providerID)
+            """)
+
+        // ----- Path A: stateless -----
+        let statelessAdapter = MLXOrganAdapter(model: model)
+        do {
+            try await statelessAdapter.loadModel()
+            try await statelessAdapter.prewarm()  // M249
+        } catch {
+            stderr("error: stateless load failed: \(error)\n")
+            exit(2)
+        }
+        var statelessLatencies: [Double] = []
+        var statelessBodies: [String] = []
+        for (i, t) in turns.enumerated() {
+            let req = BASOrganRequest(
+                requestID: "stateless-\(i)",
+                role: .scout,
+                preset: .scout,
+                instruction: t)
+            let start = ContinuousClock().now
+            do {
+                let draft = try await statelessAdapter.draft(req)
+                let ms = elapsedMs(
+                    ContinuousClock().now - start)
+                statelessLatencies.append(ms)
+                statelessBodies.append(draft.body)
+            } catch {
+                stderr(
+                    "[stateless] error on turn \(i): \(error)\n")
+                statelessLatencies.append(0)
+                statelessBodies.append("ERROR")
+            }
+        }
+
+        // ----- Path B: multi-turn -----
+        let multiAdapter = MLXOrganAdapter(model: model)
+        do {
+            try await multiAdapter.loadModel()
+            try await multiAdapter.prewarm()
+        } catch {
+            stderr("error: multi-turn load failed: \(error)\n")
+            exit(2)
+        }
+        let convoID = "bench-convo-\(UUID().uuidString)"
+        var multiLatencies: [Double] = []
+        var multiBodies: [String] = []
+        for (i, t) in turns.enumerated() {
+            let req = BASOrganRequest(
+                requestID: "multi-\(i)",
+                role: .scout,
+                preset: .scout,
+                instruction: t)
+            let start = ContinuousClock().now
+            do {
+                let draft = try await multiAdapter.draftMultiTurn(
+                    req, sessionID: convoID)
+                let ms = elapsedMs(
+                    ContinuousClock().now - start)
+                multiLatencies.append(ms)
+                multiBodies.append(draft.body)
+            } catch {
+                stderr(
+                    "[multi] error on turn \(i): \(error)\n")
+                multiLatencies.append(0)
+                multiBodies.append("ERROR")
+            }
+        }
+
+        // ----- Side-by-side -----
+        for (i, t) in turns.enumerated() {
+            print("""
+
+                ━━━ Turn \(i + 1)/\(turns.count) ━━━
+                Q: \(t)
+
+                  [A stateless] (\(format(
+                      ms: statelessLatencies[i])))
+                  \(indented(statelessBodies[i]))
+
+                  [B multi-turn] (\(format(
+                      ms: multiLatencies[i])))
+                  \(indented(multiBodies[i]))
+                """)
+        }
+
+        // ----- Summary -----
+        let aTotal = statelessLatencies.reduce(0, +)
+        let bTotal = multiLatencies.reduce(0, +)
+        let multiSessionCount = await multiAdapter.sessionCount()
+        print("""
+
+            ━━━ Bench summary ━━━
+            stateless turn 1:    \(format(ms: statelessLatencies[0]))
+            multi-turn turn 1:   \(format(ms: multiLatencies[0]))
+            stateless turn 2:    \(format(ms: statelessLatencies[1]))
+            multi-turn turn 2:   \(format(ms: multiLatencies[1]))
+            stateless turn 3:    \(format(ms: statelessLatencies[2]))
+            multi-turn turn 3:   \(format(ms: multiLatencies[2]))
+            stateless total:     \(format(ms: aTotal))
+            multi-turn total:    \(format(ms: bTotal))
+            cached sessions:     \(multiSessionCount)
+            """)
     }
 
     /// M253 — streaming sanity check. 5 prompts × streamDraft on
