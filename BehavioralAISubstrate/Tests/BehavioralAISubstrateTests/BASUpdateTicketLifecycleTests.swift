@@ -512,6 +512,144 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
         XCTAssertEqual(entry?.state, .rejected)
     }
 
+    // MARK: - M268 durable storage
+
+    func testJSONFileStorageRoundTripsEmptyEntries() async throws
+    {
+        let url = makeTempFileURL()
+        let storage =
+            BASUpdateTicketLifecycleJSONFileStorage(url: url)
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        try await coordA.persist()  // explicit flush
+
+        // Re-load fresh coordinator from same storage.
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        try await coordB.restore()
+        let count = await coordB.count()
+        XCTAssertEqual(
+            count, 0, "empty round-trip yields empty entries")
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    func testJSONFileStorageRoundTripsAfterFullLifecycle() async
+    throws {
+        let url = makeTempFileURL()
+        let storage =
+            BASUpdateTicketLifecycleJSONFileStorage(url: url)
+
+        // Coord A: submit + walk through full happy path.
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        _ = try await coordA.submit(makeTicket(id: "p1"))
+        try await coordA.startTrial(
+            ticketID: "p1",
+            trialRecordRef: "shadow-p1")
+        try await coordA.markTrialOutcome(
+            ticketID: "p1",
+            outcome: .passed(reasonCodes: ["clean"]))
+        try await coordA.approveForDistillation(
+            ticketID: "p1",
+            sovereignVerdictRef: "vrdct-p1")
+
+        // Submit a second ticket left in proposed.
+        _ = try await coordA.submit(makeTicket(id: "p2"))
+
+        // Coord B: load from disk.
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        try await coordB.restore()
+
+        // Verify both entries restored with correct states.
+        let count = await coordB.count()
+        XCTAssertEqual(count, 2)
+        let p1 = await coordB.entry(ticketID: "p1")
+        XCTAssertEqual(p1?.state, .queuedForDistillation)
+        XCTAssertEqual(
+            p1?.sovereignVerdictRef, "vrdct-p1")
+        XCTAssertEqual(
+            p1?.history.count, 3,
+            "trialing → trialPassed → queued (3 transitions)")
+        let p2 = await coordB.entry(ticketID: "p2")
+        XCTAssertEqual(p2?.state, .proposed)
+        XCTAssertEqual(p2?.history.count, 0)
+
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    func testJSONFileStorageDistillationQueueSurvivesRestart()
+    async throws {
+        let url = makeTempFileURL()
+        let storage =
+            BASUpdateTicketLifecycleJSONFileStorage(url: url)
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        _ = try await coordA.submit(makeTicket(id: "q-a"))
+        try await coordA.startTrial(
+            ticketID: "q-a", trialRecordRef: "t")
+        try await coordA.markTrialOutcome(
+            ticketID: "q-a",
+            outcome: .passed(reasonCodes: []))
+        try await coordA.approveForDistillation(
+            ticketID: "q-a",
+            sovereignVerdictRef: "v")
+
+        // Restart: external pipeline reads the queue.
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        try await coordB.restore()
+        let queue = await coordB.distillationQueue()
+        XCTAssertEqual(queue.count, 1)
+        XCTAssertEqual(queue.first?.ticket.ticketID, "q-a")
+
+        // External pipeline marks distilled — persists.
+        try await coordB.markDistilled(
+            ticketID: "q-a",
+            reasonCodes: ["pipeline:checkpoint"])
+
+        // Yet another restart: verify terminal state survives.
+        let coordC = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        try await coordC.restore()
+        let entry = await coordC.entry(ticketID: "q-a")
+        XCTAssertEqual(entry?.state, .distilled)
+
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    func testNoStorageMakesPersistAndRestoreNoOps() async throws
+    {
+        // Backward compat — coordinator without storage works
+        // identically to M259 baseline. persist() + restore()
+        // are no-ops and don't throw.
+        let coord = BASUpdateTicketLifecycleCoordinator()
+        try await coord.persist()
+        try await coord.restore()
+        _ = try await coord.submit(makeTicket(id: "no-storage"))
+        let count = await coord.count()
+        XCTAssertEqual(count, 1)
+    }
+
+    func testJSONFileStorageHandlesMissingFileOnLoad() async
+    throws {
+        let url = makeTempFileURL()
+        // file deliberately not created — load() must return [:]
+        let storage =
+            BASUpdateTicketLifecycleJSONFileStorage(url: url)
+        let entries = try await storage.load()
+        XCTAssertTrue(
+            entries.isEmpty,
+            "missing storage file should yield empty entries " +
+            "(first-run case)")
+    }
+
+    private func makeTempFileURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "lifecycle-test-\(UUID().uuidString).json")
+    }
+
     // MARK: - Helpers
 
     private func makeTicket(

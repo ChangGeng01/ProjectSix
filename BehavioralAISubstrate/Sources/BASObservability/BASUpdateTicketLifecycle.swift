@@ -136,6 +136,75 @@ public struct BASUpdateTicketLifecycleEntry:
     }
 }
 
+/// M268 — durable storage for lifecycle entries.
+///
+/// `BASUpdateTicketLifecycleCoordinator` runs in-process in
+/// memory by default. For multi-process / cross-restart
+/// continuity, hosts pass a storage adapter at init. The
+/// coordinator calls `load()` on `restore()` to seed entries
+/// from disk and `save(_:)` after every mutation.
+///
+/// Mirror of M91's audit-ledger persistence pattern. The
+/// storage protocol is intentionally narrow (load + save) so
+/// implementations can be plain JSON files, SQLite, CloudKit,
+/// or whatever the host needs. The default implementation
+/// shipped here is a JSON-encoded file at a host-supplied URL.
+public protocol BASUpdateTicketLifecycleStorage: Sendable {
+    /// Load every stored entry. Empty dict on first run /
+    /// missing file. Throws on corrupt data so callers can
+    /// decide to bail vs. start fresh.
+    func load() async throws
+        -> [String: BASUpdateTicketLifecycleEntry]
+
+    /// Persist the current entry set. Called after every
+    /// mutation; implementations should be atomic so partial
+    /// writes don't corrupt prior state.
+    func save(
+        _ entries: [String: BASUpdateTicketLifecycleEntry]
+    ) async throws
+}
+
+/// Default implementation: atomic JSON file. Writes go to a
+/// `.tmp` sibling first, then `replaceItem` rotates it into
+/// place — a partial write or crash mid-save leaves the prior
+/// state intact.
+public final class BASUpdateTicketLifecycleJSONFileStorage:
+    BASUpdateTicketLifecycleStorage
+{
+    public let url: URL
+
+    public init(url: URL) {
+        self.url = url
+    }
+
+    public func load() async throws
+    -> [String: BASUpdateTicketLifecycleEntry] {
+        guard FileManager.default.fileExists(
+            atPath: url.path)
+        else { return [:] }
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(
+            [String: BASUpdateTicketLifecycleEntry].self,
+            from: data)
+    }
+
+    public func save(
+        _ entries: [String: BASUpdateTicketLifecycleEntry]
+    ) async throws {
+        let data = try JSONEncoder().encode(entries)
+        let tmpURL = url.appendingPathExtension("tmp")
+        try data.write(to: tmpURL, options: .atomic)
+        // Use replaceItem so the swap is atomic at FS level.
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(
+                url, withItemAt: tmpURL)
+        } else {
+            try FileManager.default.moveItem(
+                at: tmpURL, to: url)
+        }
+    }
+}
+
 public actor BASUpdateTicketLifecycleCoordinator {
     public enum LifecycleError: Error, Equatable, Sendable {
         case unknownTicket(id: String)
@@ -167,13 +236,51 @@ public actor BASUpdateTicketLifecycleCoordinator {
     private var entries: [String: BASUpdateTicketLifecycleEntry] = [:]
     private let clock: @Sendable () -> Date
     private let auditSink: AuditSink?
+    /// M268 — optional durable storage for entries.
+    private let storage: BASUpdateTicketLifecycleStorage?
 
     public init(
         clock: @escaping @Sendable () -> Date = { .now },
-        auditSink: AuditSink? = nil
+        auditSink: AuditSink? = nil,
+        storage: BASUpdateTicketLifecycleStorage? = nil
     ) {
         self.clock = clock
         self.auditSink = auditSink
+        self.storage = storage
+    }
+
+    // MARK: - M268 durable-state lifecycle
+
+    /// Load entries from durable storage. Idempotent: calling
+    /// twice replays the file's current contents into the
+    /// actor's entries map (overwriting any prior in-memory
+    /// state). Hosts call this once at startup before any
+    /// mutating operation.
+    public func restore() async throws {
+        guard let storage = storage else { return }
+        let loaded = try await storage.load()
+        entries = loaded
+    }
+
+    /// Persist current entries to storage. Called automatically
+    /// after every mutation; exposed publicly for hosts that
+    /// want to force a flush at known checkpoints. Errors are
+    /// absorbed inside the auto-call path so persistence
+    /// failures don't crash the lifecycle. Manual callers see
+    /// the throw.
+    public func persist() async throws {
+        guard let storage = storage else { return }
+        try await storage.save(entries)
+    }
+
+    private func persistQuietly() async {
+        guard storage != nil else { return }
+        do {
+            try await persist()
+        } catch {
+            // absorbed — persistence failures don't crash
+            // lifecycle (mutation already completed in memory)
+        }
     }
 
     // MARK: - Submission
@@ -182,7 +289,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
     @discardableResult
     public func submit(
         _ ticket: BASUpdateTicket
-    ) throws -> BASUpdateTicketLifecycleEntry {
+    ) async throws -> BASUpdateTicketLifecycleEntry {
         if entries[ticket.ticketID] != nil {
             throw LifecycleError.duplicateTicket(
                 id: ticket.ticketID)
@@ -191,6 +298,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
             ticket: ticket,
             state: .proposed)
         entries[ticket.ticketID] = entry
+        await persistQuietly()
         return entry
     }
 
@@ -200,12 +308,13 @@ public actor BASUpdateTicketLifecycleCoordinator {
     public func startTrial(
         ticketID: String,
         trialRecordRef: String
-    ) throws {
+    ) async throws {
         try mutate(ticketID: ticketID, to: .trialing,
                    reasonCodes: [
                     "trial-record-ref:\(trialRecordRef)"]) {
             entry in entry.trialRecordRef = trialRecordRef
         }
+        await persistQuietly()
     }
 
     /// `trialing` → `trialPassed` / `trialFailed` /
@@ -213,7 +322,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
     public func markTrialOutcome(
         ticketID: String,
         outcome: TrialOutcome
-    ) throws {
+    ) async throws {
         let target: BASUpdateTicketLifecycleState
         let reasonCodes: [String]
         switch outcome {
@@ -229,6 +338,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
         }
         try mutate(ticketID: ticketID, to: target,
                    reasonCodes: reasonCodes)
+        await persistQuietly()
     }
 
     /// `trialPassed` → `queuedForDistillation`. Requires a
@@ -236,7 +346,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
     public func approveForDistillation(
         ticketID: String,
         sovereignVerdictRef: String
-    ) throws {
+    ) async throws {
         try mutate(
             ticketID: ticketID,
             to: .queuedForDistillation,
@@ -245,6 +355,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
         ) { entry in
             entry.sovereignVerdictRef = sovereignVerdictRef
         }
+        await persistQuietly()
     }
 
     /// `queuedForDistillation` → `distilled`. Called by the
@@ -256,6 +367,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
     ) async throws {
         try mutate(ticketID: ticketID, to: .distilled,
                    reasonCodes: reasonCodes)
+        await persistQuietly()
         await emitTerminalAudit(
             ticketID: ticketID,
             terminal: .distilled,
@@ -272,6 +384,7 @@ public actor BASUpdateTicketLifecycleCoordinator {
     ) async throws {
         try mutate(ticketID: ticketID, to: .rejected,
                    reasonCodes: reasonCodes)
+        await persistQuietly()
         await emitTerminalAudit(
             ticketID: ticketID,
             terminal: .rejected,
@@ -437,11 +550,11 @@ public actor BASUpdateTicketLifecycleCoordinator {
     @discardableResult
     public func ingestTurn(
         _ tickets: [BASUpdateTicket]
-    ) -> Int {
+    ) async -> Int {
         var newCount = 0
         for ticket in tickets {
             do {
-                _ = try submit(ticket)
+                _ = try await submit(ticket)
                 newCount += 1
             } catch {
                 // duplicateTicket etc. — auto-flow is forgiving

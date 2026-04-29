@@ -41,7 +41,7 @@ public extension BASUpdateTicketLifecycleCoordinator {
     @discardableResult
     func ingestTurnResult(
         _ turn: BASEBrainTurnResult
-    ) -> Int {
-        ingestTurn(turn.updateTickets)
+    ) async -> Int {
+        await ingestTurn(turn.updateTickets)
     }
 }
