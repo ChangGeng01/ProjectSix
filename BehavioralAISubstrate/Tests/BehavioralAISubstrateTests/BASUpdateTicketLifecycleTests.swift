@@ -327,6 +327,63 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
              "no-side-effect-detected"])
     }
 
+    // MARK: - M261 auto-flow ingestion
+
+    func testIngestTurnSubmitsAllNewTickets() async {
+        let coord = BASUpdateTicketLifecycleCoordinator()
+        let tickets = [
+            makeTicket(id: "i1"),
+            makeTicket(id: "i2"),
+            makeTicket(id: "i3"),
+        ]
+        let newCount = await coord.ingestTurn(tickets)
+        XCTAssertEqual(newCount, 3)
+        let count = await coord.count()
+        XCTAssertEqual(count, 3)
+        let proposed = await coord.count(in: .proposed)
+        XCTAssertEqual(proposed, 3)
+    }
+
+    func testIngestTurnSilentlySkipsDuplicates() async throws {
+        let coord = BASUpdateTicketLifecycleCoordinator()
+        _ = try await coord.submit(makeTicket(id: "dup"))
+
+        let tickets = [
+            makeTicket(id: "dup"),    // duplicate
+            makeTicket(id: "fresh"),  // new
+        ]
+        let newCount = await coord.ingestTurn(tickets)
+        XCTAssertEqual(
+            newCount, 1,
+            "only 'fresh' is new; 'dup' is silently skipped")
+        let total = await coord.count()
+        XCTAssertEqual(total, 2)
+    }
+
+    func testIngestTurnIsIdempotentAcrossCalls() async {
+        let coord = BASUpdateTicketLifecycleCoordinator()
+        let tickets = [
+            makeTicket(id: "x1"),
+            makeTicket(id: "x2"),
+        ]
+        let firstCount = await coord.ingestTurn(tickets)
+        let secondCount = await coord.ingestTurn(tickets)
+        XCTAssertEqual(firstCount, 2)
+        XCTAssertEqual(
+            secondCount, 0,
+            "second call sees both as duplicates")
+        let total = await coord.count()
+        XCTAssertEqual(total, 2)
+    }
+
+    func testIngestTurnHandlesEmptyList() async {
+        let coord = BASUpdateTicketLifecycleCoordinator()
+        let newCount = await coord.ingestTurn([])
+        XCTAssertEqual(newCount, 0)
+        let total = await coord.count()
+        XCTAssertEqual(total, 0)
+    }
+
     // MARK: - Helpers
 
     private func makeTicket(

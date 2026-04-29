@@ -197,4 +197,102 @@ final class BASWorldAwareRiskBridgeTests: XCTestCase {
         let ledgerAfter = await stack.ledger.count()
         XCTAssertEqual(ledgerAfter, ledgerBefore + 1)
     }
+
+    // MARK: - M262: M258 templates flow through risk gate
+
+    func testM258ElectricalShockProducesHighRiskScore() async
+    throws {
+        // M258 added `tmpl-physics-electrical-shock` with
+        // .irreversible reversibility and .physicalChange effect.
+        // Should produce a high irreversibleHarmScore — comparable
+        // to the canonical irreversible templates.
+        let stack = try await makeStack()
+        let shock = await stack.vault.assessRisk(
+            templateID: "tmpl-physics-electrical-shock")
+        XCTAssertNotNil(
+            shock,
+            "M258 electrical-shock template must be loaded")
+        XCTAssertEqual(shock?.reversibility, .irreversible)
+        XCTAssertGreaterThan(
+            shock?.irreversibleHarmScore ?? 0, 0.7,
+            "irreversible physical-change should score > 0.7")
+    }
+
+    func testM258PublicDisclosureMarkedIrreversible() async
+    throws {
+        // M258 added `tmpl-social-public-disclosure` with
+        // .irreversible reversibility. The score itself uses
+        // effectKind × reversibility × domain weighting, and
+        // because `.informationShift` (kind weight 0.4) is
+        // lower than `.relationshipChange` (1.0), public-
+        // disclosure's score (~0.4) sits below trust-decay's
+        // (~0.7). That's a feature of the current scoring
+        // function's treatment of information shifts; the test
+        // pins what the gate actually sees: the reversibility
+        // tag is correct + the score is non-zero, so L11 has
+        // the signal to escalate even if the raw float looks
+        // moderate.
+        let stack = try await makeStack()
+        let disclosure = await stack.vault.assessRisk(
+            templateID: "tmpl-social-public-disclosure")
+        XCTAssertNotNil(disclosure)
+        XCTAssertEqual(
+            disclosure?.reversibility, .irreversible,
+            "public-disclosure must be tagged irreversible — " +
+            "search engines do not unindex on demand")
+        XCTAssertGreaterThan(
+            disclosure?.irreversibleHarmScore ?? 0, 0,
+            "score must be > 0 so verdict engine sees a signal")
+    }
+
+    func testM258RepetitiveStrainProducesNonZeroScore() async
+    throws {
+        // M258 added `tmpl-body-repetitive-strain` with .costly
+        // reversibility — not catastrophic but the gate should
+        // still see it as a real signal.
+        let stack = try await makeStack()
+        let strain = await stack.vault.assessRisk(
+            templateID: "tmpl-body-repetitive-strain")
+        XCTAssertNotNil(strain)
+        XCTAssertGreaterThan(
+            strain?.irreversibleHarmScore ?? 0, 0,
+            "costly-reversibility template should produce > 0 score")
+    }
+
+    func testM258FixedCostCreepIsLowRisk() async throws {
+        // M258 added `tmpl-money-fixed-cost-creep` with .trivial
+        // reversibility — should score well below the
+        // irreversible templates (verifies the score ranking
+        // didn't get inverted by the expansion).
+        let stack = try await makeStack()
+        let creep = await stack.vault.assessRisk(
+            templateID: "tmpl-money-fixed-cost-creep")
+        let creepScore = creep?.irreversibleHarmScore ?? 1.0
+        XCTAssertLessThan(
+            creepScore, 0.3,
+            "trivial reversibility must score < 0.3")
+    }
+
+    func testM258TemplateDrivesGateFloorRaiseEndToEnd() async
+    throws {
+        // The bridge accepts a templateID and runs the assessment
+        // through the verdict engine. Verify a new M258 high-risk
+        // template (`electrical-shock`) actually moves the verdict
+        // verdictLevel away from .pass — the bridge consumed the
+        // assessment.
+        let stack = try await makeStack()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m258-1",
+            turnID: "t-m258-1",
+            operation: .toolWrite,
+            matchedTemplateID: "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        let decision = try await stack.bridge.evaluate(
+            intent: intent)
+        XCTAssertNotEqual(
+            decision.verdict.verdictLevel, .pass,
+            "M258 electrical-shock template must trigger " +
+            "non-pass verdict via the gate floor mechanism")
+    }
 }

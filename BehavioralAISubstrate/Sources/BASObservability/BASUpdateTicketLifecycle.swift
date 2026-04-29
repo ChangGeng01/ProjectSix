@@ -351,4 +351,34 @@ public actor BASUpdateTicketLifecycleCoordinator {
         sideEffect(&entry)
         entries[ticketID] = entry
     }
+
+    // MARK: - M261 auto-flow ingestion
+
+    /// Ingest every ticket produced by a turn (typically
+    /// `BASEBrainTurnResult.updateTickets`). Duplicates are
+    /// silently skipped so this is safe to call after every
+    /// turn even if the host occasionally re-presents an old
+    /// ticket. Returns the number of newly-registered tickets
+    /// (those that weren't already in the coordinator).
+    ///
+    /// All other errors are silently absorbed too — the
+    /// auto-flow path must never crash a host runtime, and
+    /// `submit` only throws `duplicateTicket` today. Hosts that
+    /// want stricter handling should iterate manually.
+    @discardableResult
+    public func ingestTurn(
+        _ tickets: [BASUpdateTicket]
+    ) -> Int {
+        var newCount = 0
+        for ticket in tickets {
+            do {
+                _ = try submit(ticket)
+                newCount += 1
+            } catch {
+                // duplicateTicket etc. — auto-flow is forgiving
+                continue
+            }
+        }
+        return newCount
+    }
 }
