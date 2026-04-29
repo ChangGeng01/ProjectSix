@@ -1,5 +1,6 @@
 import XCTest
 @testable import BASOrgan
+@testable import BASObservability
 
 /// M255 — coverage for `BASRoutingOrganAdapter`.
 ///
@@ -309,6 +310,95 @@ final class BASRoutingOrganAdapterTests: XCTestCase {
         let cap = await router.currentCapacity()
         XCTAssertEqual(cap.availableInputTokens, 1024)
         XCTAssertFalse(cap.underPressure)
+    }
+
+    // MARK: - M264 — end-to-end smoke
+
+    /// Compose router + draft + L13 lifecycle in one flow: primary
+    /// down, secondary answers, draft turns into a ticket, ticket
+    /// walks through `proposed → trialing → trialPassed →
+    /// queuedForDistillation → distilled`. Exercises the seams
+    /// every M254-M262 milestone wired up.
+    func testEndToEndRouterFallbackPlusLifecycleHappyPath() async
+    throws {
+        // -- Stage 1: routing adapter with primary down --
+        let primary = StubAdapter(
+            providerID: "primary-down",
+            response: .draftThrows(
+                BASOrganError.providerUnavailable(
+                    reason: "simulated outage")))
+        let secondary = StubAdapter(
+            providerID: "secondary-up",
+            response: .draftSucceeds(
+                body: "[NEEDS_PERMIT] action: write profile " +
+                "field"))
+        let router = BASRoutingOrganAdapter(
+            primary: primary,
+            secondary: secondary)
+
+        // -- Stage 2: draft through router (secondary serves) --
+        let draft = try await router.draft(makeRequest())
+        XCTAssertEqual(
+            draft.providerID, "secondary-up",
+            "fallback must land on secondary")
+        XCTAssertTrue(
+            draft.body.contains("[NEEDS_PERMIT]"),
+            "draft body must contain the marker for L13 ticket " +
+            "to carry forward")
+
+        // -- Stage 3: synthesize a ticket from the draft --
+        // Hosts construct tickets per turn; here we model that.
+        let ticket = BASUpdateTicket(
+            ticketID: "t-e2e-\(UUID().uuidString)",
+            sessionRef: "session-e2e",
+            summary: draft.body,
+            confidence: 0.65)
+
+        // -- Stage 4: ingest via the lifecycle auto-flow --
+        let coord = BASUpdateTicketLifecycleCoordinator()
+        let newCount = await coord.ingestTurn([ticket])
+        XCTAssertEqual(newCount, 1)
+
+        // -- Stage 5: walk through the full state machine --
+        try await coord.startTrial(
+            ticketID: ticket.ticketID,
+            trialRecordRef: "shadow-e2e-1")
+        try await coord.markTrialOutcome(
+            ticketID: ticket.ticketID,
+            outcome: .passed(reasonCodes: [
+                "router-fallback-served",
+                "marker-rewrite-not-needed"]))
+        try await coord.approveForDistillation(
+            ticketID: ticket.ticketID,
+            sovereignVerdictRef: "vrdct-e2e-1")
+
+        // -- Stage 6: queue gating + final distill --
+        let queueBefore = await coord.distillationQueue()
+        XCTAssertEqual(
+            queueBefore.count, 1,
+            "queue should expose the queued ticket")
+        XCTAssertEqual(
+            queueBefore.first?.ticket.ticketID,
+            ticket.ticketID)
+
+        try await coord.markDistilled(
+            ticketID: ticket.ticketID,
+            reasonCodes: ["pipeline-checkpoint:e2e"])
+
+        // -- Stage 7: post-distill state ---
+        let queueAfter = await coord.distillationQueue()
+        XCTAssertEqual(
+            queueAfter.count, 0,
+            "distilled ticket must leave the queue")
+        let entry = await coord.entry(
+            ticketID: ticket.ticketID)
+        XCTAssertEqual(entry?.state, .distilled)
+        XCTAssertEqual(
+            entry?.history.count, 4,
+            "trialing → passed → queued → distilled")
+        XCTAssertEqual(
+            entry?.sovereignVerdictRef, "vrdct-e2e-1",
+            "lineage to sovereign verdict preserved")
     }
 
     // MARK: - Helpers

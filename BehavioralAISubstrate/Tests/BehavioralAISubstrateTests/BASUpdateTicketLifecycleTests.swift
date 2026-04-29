@@ -2,6 +2,15 @@ import XCTest
 @testable import BASObservability
 @testable import BASRuntimeCore
 
+/// Test helper — captures audit entries the coordinator emits.
+/// Actor so the @Sendable closure can mutate state safely.
+private actor AuditCapture {
+    var entries: [BASSovereignAuditEntry] = []
+    func append(_ entry: BASSovereignAuditEntry) {
+        entries.append(entry)
+    }
+}
+
 /// L13 / M259 — coverage for `BASUpdateTicketLifecycleCoordinator`.
 ///
 /// Verifies the legal-transition state machine, the
@@ -382,6 +391,125 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
         XCTAssertEqual(newCount, 0)
         let total = await coord.count()
         XCTAssertEqual(total, 0)
+    }
+
+    // MARK: - M265 audit-sink terminal events
+
+    func testAuditSinkFiresOnDistilled() async throws {
+        let captured = AuditCapture()
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            auditSink: { entry in
+                await captured.append(entry)
+            })
+        _ = try await coord.submit(makeTicket(id: "audit-1"))
+        try await coord.startTrial(
+            ticketID: "audit-1",
+            trialRecordRef: "trial-a")
+        try await coord.markTrialOutcome(
+            ticketID: "audit-1",
+            outcome: .passed(reasonCodes: []))
+        try await coord.approveForDistillation(
+            ticketID: "audit-1",
+            sovereignVerdictRef: "vrdct-a")
+        try await coord.markDistilled(
+            ticketID: "audit-1",
+            reasonCodes: ["pipeline-a"])
+
+        let captured0 = await captured.entries
+        XCTAssertEqual(captured0.count, 1)
+        let entry = captured0[0]
+        XCTAssertEqual(
+            entry.auditID, "lifecycle.distilled.audit-1")
+        XCTAssertEqual(entry.verdictRef, "vrdct-a")
+        XCTAssertTrue(
+            entry.ruleIDs.contains("L13.lifecycle.distilled"))
+        XCTAssertTrue(
+            entry.actionRefs.contains("ticket:audit-1"))
+        XCTAssertTrue(
+            entry.actionRefs.contains("state:distilled"))
+        XCTAssertEqual(entry.signalRefs, ["pipeline-a"])
+    }
+
+    func testAuditSinkFiresOnRejected() async throws {
+        let captured = AuditCapture()
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            auditSink: { entry in
+                await captured.append(entry)
+            })
+        _ = try await coord.submit(makeTicket(id: "rej-1"))
+        try await coord.markRejected(
+            ticketID: "rej-1",
+            reasonCodes: ["operator-veto"])
+
+        let captured0 = await captured.entries
+        XCTAssertEqual(captured0.count, 1)
+        XCTAssertEqual(
+            captured0[0].auditID, "lifecycle.rejected.rej-1")
+        XCTAssertTrue(
+            captured0[0].ruleIDs.contains(
+                "L13.lifecycle.rejected"))
+        // No sovereign verdict was set — audit falls back to
+        // a synthetic verdictRef so ledger validation passes.
+        XCTAssertEqual(
+            captured0[0].verdictRef,
+            "lifecycle.rejected.rej-1")
+    }
+
+    func testAuditSinkSkipsNonTerminalTransitions() async throws
+    {
+        let captured = AuditCapture()
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            auditSink: { entry in
+                await captured.append(entry)
+            })
+        _ = try await coord.submit(makeTicket(id: "mid-1"))
+        try await coord.startTrial(
+            ticketID: "mid-1",
+            trialRecordRef: "trial-b")
+        try await coord.markTrialOutcome(
+            ticketID: "mid-1",
+            outcome: .passed(reasonCodes: []))
+        try await coord.approveForDistillation(
+            ticketID: "mid-1",
+            sovereignVerdictRef: "vrdct-b")
+
+        // 4 transitions, 0 audit emissions — `.queuedForDistillation`
+        // is non-terminal.
+        let captured0 = await captured.entries
+        XCTAssertEqual(
+            captured0.count, 0,
+            "audit sink fires only on terminal transitions")
+    }
+
+    func testAuditSinkErrorsAreAbsorbed() async throws {
+        // Sink that always throws. The lifecycle path must
+        // continue without propagating the error so the actor's
+        // state stays consistent.
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            auditSink: { _ in
+                throw NSError(
+                    domain: "test", code: 1)
+            })
+        _ = try await coord.submit(makeTicket(id: "err-1"))
+        try await coord.markRejected(
+            ticketID: "err-1",
+            reasonCodes: ["x"])
+        let entry = await coord.entry(ticketID: "err-1")
+        XCTAssertEqual(
+            entry?.state, .rejected,
+            "transition still happened despite sink error")
+    }
+
+    func testNoAuditSinkIsNoOp() async throws {
+        // Coordinator without audit sink runs the same way —
+        // backward compatible.
+        let coord = BASUpdateTicketLifecycleCoordinator()
+        _ = try await coord.submit(makeTicket(id: "no-sink"))
+        try await coord.markRejected(
+            ticketID: "no-sink",
+            reasonCodes: ["x"])
+        let entry = await coord.entry(ticketID: "no-sink")
+        XCTAssertEqual(entry?.state, .rejected)
     }
 
     // MARK: - Helpers

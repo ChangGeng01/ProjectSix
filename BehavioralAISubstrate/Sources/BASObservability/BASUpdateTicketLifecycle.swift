@@ -151,13 +151,29 @@ public actor BASUpdateTicketLifecycleCoordinator {
         case contaminated(reasonCodes: [String])
     }
 
+    /// M265 — terminal-transition audit hook. When a ticket
+    /// reaches `.distilled` or `.rejected`, the coordinator
+    /// invokes this closure with a synthesized
+    /// `BASSovereignAuditEntry` so hosts can pipe terminal
+    /// lifecycle events into `BASSovereignAuditLedger` without
+    /// `BASObservability` having to import `BASSovereign`.
+    /// Hosts wire it as `{ try await ledger.append($0) }`.
+    /// Errors thrown by the sink are absorbed (audit failures
+    /// must not crash the lifecycle path); callers that want
+    /// strict failure can log inside the closure.
+    public typealias AuditSink =
+        @Sendable (BASSovereignAuditEntry) async throws -> Void
+
     private var entries: [String: BASUpdateTicketLifecycleEntry] = [:]
     private let clock: @Sendable () -> Date
+    private let auditSink: AuditSink?
 
     public init(
-        clock: @escaping @Sendable () -> Date = { .now }
+        clock: @escaping @Sendable () -> Date = { .now },
+        auditSink: AuditSink? = nil
     ) {
         self.clock = clock
+        self.auditSink = auditSink
     }
 
     // MARK: - Submission
@@ -237,9 +253,13 @@ public actor BASUpdateTicketLifecycleCoordinator {
     public func markDistilled(
         ticketID: String,
         reasonCodes: [String] = []
-    ) throws {
+    ) async throws {
         try mutate(ticketID: ticketID, to: .distilled,
                    reasonCodes: reasonCodes)
+        await emitTerminalAudit(
+            ticketID: ticketID,
+            terminal: .distilled,
+            reasonCodes: reasonCodes)
     }
 
     /// Any pre-terminal state → `rejected`. The reject path is
@@ -249,9 +269,58 @@ public actor BASUpdateTicketLifecycleCoordinator {
     public func markRejected(
         ticketID: String,
         reasonCodes: [String]
-    ) throws {
+    ) async throws {
         try mutate(ticketID: ticketID, to: .rejected,
                    reasonCodes: reasonCodes)
+        await emitTerminalAudit(
+            ticketID: ticketID,
+            terminal: .rejected,
+            reasonCodes: reasonCodes)
+    }
+
+    /// Build + emit a `BASSovereignAuditEntry` for a terminal
+    /// lifecycle transition. Errors from the sink are absorbed
+    /// because audit failures must not crash the lifecycle path
+    /// (a failed write to the ledger is a sovereign-layer
+    /// concern; the lifecycle state machine has already mutated
+    /// successfully and that record stays in `entries`).
+    private func emitTerminalAudit(
+        ticketID: String,
+        terminal: BASUpdateTicketLifecycleState,
+        reasonCodes: [String]
+    ) async {
+        guard let sink = auditSink,
+              let entry = entries[ticketID]
+        else { return }
+        // synthesize an audit entry. verdictRef must be non-
+        // empty per ledger validation — fall back to a
+        // synthetic ID derived from the lifecycle state so the
+        // entry passes ledger.append's contract.
+        let verdictRef = entry.sovereignVerdictRef
+            ?? "lifecycle.\(terminal.rawValue).\(ticketID)"
+        let auditEntry = BASSovereignAuditEntry(
+            auditID: "lifecycle.\(terminal.rawValue)." +
+                "\(ticketID)",
+            sessionID: entry.ticket.sessionRef.isEmpty
+                ? "lifecycle"
+                : entry.ticket.sessionRef,
+            turnID: "lifecycle-terminal",
+            verdictRef: verdictRef,
+            ruleIDs: ["L13.lifecycle.\(terminal.rawValue)"],
+            signalRefs: reasonCodes,
+            actionRefs: [
+                "ticket:\(ticketID)",
+                "state:\(terminal.rawValue)",
+            ],
+            snapshotRef: entry.trialRecordRef ?? "",
+            actor: .system,
+            signature: "",
+            appendedAt: clock())
+        do {
+            try await sink(auditEntry)
+        } catch {
+            // absorbed — audit failures must not crash lifecycle
+        }
     }
 
     // MARK: - Read-only views
