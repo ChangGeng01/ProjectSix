@@ -91,7 +91,22 @@ extension BASWorldPriorVault {
             case .relationshipChange, .valueTransfer: return 1.0
             case .physicalChange: return 0.9
             case .stateTransition: return 0.6
-            case .informationShift: return 0.4
+            case .informationShift:
+                // M266 — irreversible information loss is real
+                // harm: search-engine indexing, public archives,
+                // permanent leaks. Without this conditional bump
+                // `.informationShift × .irreversible` (e.g.
+                // `tmpl-social-public-disclosure`) scored 0.4 —
+                // *below* `tmpl-social-trust-decay` (1.0×0.7×1.0
+                // = 0.7) even though disclosure can never be
+                // unsaid while trust can. The bump to 0.85 keeps
+                // information-shift below relationship/value
+                // (which fully transfer control) but above the
+                // costly-reversibility tier so irreversible info
+                // events lead the gate floor.
+                return t.reversibility == .irreversible
+                    ? 0.85
+                    : 0.4
             case .skillGainOrLoss: return 0.3
             }
         }()

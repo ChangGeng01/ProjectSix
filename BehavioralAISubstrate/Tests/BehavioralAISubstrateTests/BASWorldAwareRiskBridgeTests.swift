@@ -218,31 +218,52 @@ final class BASWorldAwareRiskBridgeTests: XCTestCase {
             "irreversible physical-change should score > 0.7")
     }
 
-    func testM258PublicDisclosureMarkedIrreversible() async
+    func testM258PublicDisclosureScoresAboveTrustDecay() async
     throws {
-        // M258 added `tmpl-social-public-disclosure` with
-        // .irreversible reversibility. The score itself uses
-        // effectKind × reversibility × domain weighting, and
-        // because `.informationShift` (kind weight 0.4) is
-        // lower than `.relationshipChange` (1.0), public-
-        // disclosure's score (~0.4) sits below trust-decay's
-        // (~0.7). That's a feature of the current scoring
-        // function's treatment of information shifts; the test
-        // pins what the gate actually sees: the reversibility
-        // tag is correct + the score is non-zero, so L11 has
-        // the signal to escalate even if the raw float looks
-        // moderate.
+        // M266 fix — `.informationShift × .irreversible` now
+        // weighted 0.85 (was 0.4) so search-engine-indexed
+        // disclosures rank above costly but reversible
+        // relationship damage. Public-disclosure score:
+        //   0.85 × 1.0 × 1.0 = 0.85
+        // Trust-decay score:
+        //   1.0 × 0.7 × 1.0 = 0.7
         let stack = try await makeStack()
         let disclosure = await stack.vault.assessRisk(
             templateID: "tmpl-social-public-disclosure")
+        let trustDecay = await stack.vault.assessRisk(
+            templateID: "tmpl-social-trust-decay")
         XCTAssertNotNil(disclosure)
+        XCTAssertNotNil(trustDecay)
         XCTAssertEqual(
             disclosure?.reversibility, .irreversible,
             "public-disclosure must be tagged irreversible — " +
             "search engines do not unindex on demand")
         XCTAssertGreaterThan(
-            disclosure?.irreversibleHarmScore ?? 0, 0,
-            "score must be > 0 so verdict engine sees a signal")
+            disclosure?.irreversibleHarmScore ?? 0,
+            trustDecay?.irreversibleHarmScore ?? 0,
+            "after M266 reweight, public-disclosure must " +
+            "outrank trust-decay")
+    }
+
+    func testM266ReversibleInfoShiftStaysLow() async throws {
+        // Sanity: M266 only bumps `.informationShift` when the
+        // template is `.irreversible`. Reversible information
+        // shifts (M2's `tmpl-language-ambiguity-loss`,
+        // `tmpl-time-sunk-cost`, `tmpl-language-framing-effect`)
+        // keep their lower 0.4 kind weight.
+        let stack = try await makeStack()
+        let ambiguity = await stack.vault.assessRisk(
+            templateID: "tmpl-language-ambiguity-loss")
+        XCTAssertNotNil(ambiguity)
+        XCTAssertNotEqual(
+            ambiguity?.reversibility, .irreversible,
+            "ambiguity-loss is .bounded, not irreversible")
+        // .informationShift × .bounded × .language(0.7)
+        //   = 0.4 × 0.3 × 0.7 = 0.084
+        XCTAssertLessThan(
+            ambiguity?.irreversibleHarmScore ?? 1.0, 0.2,
+            "reversible info-shift should stay well below " +
+            "the irreversible threshold")
     }
 
     func testM258RepetitiveStrainProducesNonZeroScore() async
