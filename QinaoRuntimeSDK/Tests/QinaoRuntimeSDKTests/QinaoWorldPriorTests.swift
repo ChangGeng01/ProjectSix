@@ -93,20 +93,25 @@ final class QinaoWorldPriorTests: XCTestCase {
 
     // MARK: - Template queries
 
-    /// `.body` contains exactly the three built-in body templates
-    /// (sleep-debt / hydration / exercise-mood). Their IDs are
-    /// stable across builds — if the library changes this test
-    /// will catch it, and the public-promise "懂世界" needs an
-    /// explicit anchor.
+    /// `.body` holds the canonical body templates:
+    /// sleep-debt / hydration / exercise-mood (M2 trio) plus the
+    /// M258 additions (caffeine-tail, repetitive-strain).
+    /// Test pins the canonical IDs and uses `>=` for total
+    /// count so future M258-style expansions don't trip it.
     func testBodyDomainHoldsItsThreeBuiltInTemplates() async throws {
         let vault = try await QinaoWorldPriorVault(
             seedingBuiltIns: true)
         let body = await vault.templates(in: .body)
         let ids = Set(body.map(\.id))
-        XCTAssertEqual(body.count, 3)
+        XCTAssertGreaterThanOrEqual(
+            body.count, 3,
+            "body domain must have ≥3 templates (M2 minimum)")
         XCTAssertTrue(ids.contains("tmpl-body-sleep-debt"))
         XCTAssertTrue(ids.contains("tmpl-body-hydration"))
         XCTAssertTrue(ids.contains("tmpl-body-exercise-mood"))
+        // M258 expansions — present after the library expansion
+        XCTAssertTrue(ids.contains("tmpl-body-caffeine-tail"))
+        XCTAssertTrue(ids.contains("tmpl-body-repetitive-strain"))
     }
 
     /// A known template id round-trips: `template(id:)` returns a
