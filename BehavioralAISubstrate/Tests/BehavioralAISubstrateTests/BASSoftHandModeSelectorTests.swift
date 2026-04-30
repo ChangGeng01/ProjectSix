@@ -203,6 +203,82 @@ final class BASSoftHandModeSelectorTests: XCTestCase {
 
     // MARK: - Helpers
 
+    // MARK: - M282 selector rationale
+
+    func testM282RationaleIncludesVerdictTier() {
+        let r = BASSoftHandModeSelector.selectModeWithRationale(
+            permit: makePermit(.answer),
+            verdict: makeVerdict(.quarantine))
+        XCTAssertEqual(r.mode, .silentStub)
+        XCTAssertTrue(
+            r.reasonCodes.contains("verdict:quarantine"),
+            "quarantine reason must be visible in rationale")
+        XCTAssertTrue(
+            r.reasonCodes.contains("tier:catastrophic"),
+            "tier must be tagged for audit grouping")
+    }
+
+    func testM282RationaleIncludesPermitMode() {
+        let r = BASSoftHandModeSelector.selectModeWithRationale(
+            permit: makePermit(.block),
+            verdict: nil)
+        XCTAssertEqual(r.mode, .boundary)
+        XCTAssertEqual(r.reasonCodes, ["permit:block"])
+    }
+
+    func testM282RationaleAnswerWithCandidateCount() {
+        let r = BASSoftHandModeSelector.selectModeWithRationale(
+            permit: makePermit(.answer),
+            verdict: nil,
+            candidateCount: 3)
+        XCTAssertEqual(r.mode, .compare)
+        XCTAssertTrue(
+            r.reasonCodes.contains("permit:answer"))
+        XCTAssertTrue(
+            r.reasonCodes.contains("candidate-count:3"))
+    }
+
+    func testM282RationaleFallbackTagged() {
+        let r = BASSoftHandModeSelector.selectModeWithRationale(
+            permit: nil, verdict: nil)
+        XCTAssertEqual(r.mode, .silentStub)
+        XCTAssertEqual(
+            r.reasonCodes,
+            ["fallback:no-permit-no-verdict"])
+    }
+
+    func testM282SelectModeMatchesRationaleMode() {
+        // The shorter selectMode entry must always agree with
+        // the rationale-emitting overload's mode field.
+        let cases: [(BASActionPermitMode?, BASSovereignVerdictLevel?, Int)] = [
+            (.answer, .quarantine, 0),
+            (.block, nil, 0),
+            (.delay, nil, 0),
+            (.answer, nil, 5),
+            (.answer, .pass, 1),
+            (nil, nil, 0),
+        ]
+        for (permitMode, verdictLevel, count) in cases {
+            let permit = permitMode.map { makePermit($0) }
+            let verdict = verdictLevel.map { makeVerdict($0) }
+            let modeOnly =
+                BASSoftHandModeSelector.selectMode(
+                    permit: permit,
+                    verdict: verdict,
+                    candidateCount: count)
+            let result =
+                BASSoftHandModeSelector.selectModeWithRationale(
+                    permit: permit,
+                    verdict: verdict,
+                    candidateCount: count)
+            XCTAssertEqual(
+                modeOnly, result.mode,
+                "selectMode and selectModeWithRationale must " +
+                "agree for case (\(String(describing: permitMode)), " +
+                "\(String(describing: verdictLevel)), \(count))")
+        }
+    }
+
     // MARK: - M281 component identifier bridge
 
     func testM281ComponentIdentifierForEveryMode() {

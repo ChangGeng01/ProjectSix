@@ -45,6 +45,37 @@ import BASRuntimeCore
 /// less-restrictive mode than the inputs imply.
 public enum BASSoftHandModeSelector {
 
+    /// M282 — selection result with reasoning trace.
+    ///
+    /// Pure value-type bundle returned by
+    /// `selectModeWithRationale(...)`. Exposes the chosen mode
+    /// alongside ordered reason codes describing which rule
+    /// fired. Observability layers (audit ledger, dream-cycle
+    /// replay, debug logs) consume this so the selector's
+    /// decision is reproducible without re-running the logic.
+    ///
+    /// Reason codes are stable strings of the form
+    /// `"<tier>:<input>"`:
+    ///
+    /// - `"verdict:quarantine"` — verdict-tier rule fired
+    ///   because verdict level was quarantine
+    /// - `"permit:block"` — permit-tier rule fired because
+    ///   permit mode was .block
+    /// - `"candidate-count:3"` — multi-candidate hint applied
+    /// - `"fallback:no-permit-no-verdict"` — fail-safe default
+    public struct SelectionResult: Sendable, Equatable, Hashable {
+        public let mode: BASSoftHandMode
+        public let reasonCodes: [String]
+
+        public init(
+            mode: BASSoftHandMode,
+            reasonCodes: [String]
+        ) {
+            self.mode = mode
+            self.reasonCodes = reasonCodes
+        }
+    }
+
     /// Pure mode selector. Inputs that a turn already has by the
     /// time the surface is being chosen.
     ///
@@ -64,6 +95,23 @@ public enum BASSoftHandModeSelector {
         verdict: BASSovereignVerdict? = nil,
         candidateCount: Int = 0
     ) -> BASSoftHandMode {
+        selectModeWithRationale(
+            permit: permit,
+            verdict: verdict,
+            candidateCount: candidateCount
+        ).mode
+    }
+
+    /// M282 — same mapping as `selectMode(...)` but exposes the
+    /// reasoning trace. Observability / audit layers use this
+    /// to record WHY the selector picked the mode it did,
+    /// without having to re-run the logic with logging
+    /// instrumentation.
+    public static func selectModeWithRationale(
+        permit: BASActionPermit?,
+        verdict: BASSovereignVerdict? = nil,
+        candidateCount: Int = 0
+    ) -> SelectionResult {
         // 1. Verdict tier (highest priority — sovereign override).
         if let v = verdict {
             let lvl = v.verdictLevel
@@ -71,20 +119,32 @@ public enum BASSoftHandModeSelector {
             if lvl.rank >= BASSovereignVerdictLevel
                 .quarantine.rank
             {
-                return .silentStub
+                return SelectionResult(
+                    mode: .silentStub,
+                    reasonCodes: [
+                        "verdict:\(lvl.rawValue)",
+                        "tier:catastrophic"])
             }
             // Hard freeze / cut — surface the boundary
             // explicitly so the host knows execution stopped.
             if lvl.rank >= BASSovereignVerdictLevel
                 .toolCut.rank
             {
-                return .boundary
+                return SelectionResult(
+                    mode: .boundary,
+                    reasonCodes: [
+                        "verdict:\(lvl.rawValue)",
+                        "tier:freeze-or-cut"])
             }
             // Throttle / shadow lock — draft only, no commit.
             if lvl.rank >= BASSovereignVerdictLevel
                 .throttle.rank
             {
-                return .draft
+                return SelectionResult(
+                    mode: .draft,
+                    reasonCodes: [
+                        "verdict:\(lvl.rawValue)",
+                        "tier:throttle"])
             }
             // verdict.pass — fall through to permit-based rules
         }
@@ -93,26 +153,48 @@ public enum BASSoftHandModeSelector {
         if let p = permit {
             switch p.mode {
             case .block, .replace:
-                return .boundary
+                return SelectionResult(
+                    mode: .boundary,
+                    reasonCodes: ["permit:\(p.mode.rawValue)"])
             case .delay:
-                return .delay
+                return SelectionResult(
+                    mode: .delay,
+                    reasonCodes: ["permit:delay"])
             case .draftOnly, .compare:
-                return .compare
+                return SelectionResult(
+                    mode: .compare,
+                    reasonCodes: ["permit:\(p.mode.rawValue)"])
             case .escalate:
-                return .boundary
+                return SelectionResult(
+                    mode: .boundary,
+                    reasonCodes: ["permit:escalate"])
             case .mirror, .localOnly:
-                return .draft
+                return SelectionResult(
+                    mode: .draft,
+                    reasonCodes: ["permit:\(p.mode.rawValue)"])
             case .answer:
                 // Multi-candidate even in answer mode → compare
                 // instead of single draft.
-                return candidateCount >= 2
-                    ? .compare : .draft
+                if candidateCount >= 2 {
+                    return SelectionResult(
+                        mode: .compare,
+                        reasonCodes: [
+                            "permit:answer",
+                            "candidate-count:\(candidateCount)"])
+                }
+                return SelectionResult(
+                    mode: .draft,
+                    reasonCodes: [
+                        "permit:answer",
+                        "candidate-count:\(candidateCount)"])
             }
         }
 
         // 3. Default fail-safe — no permit, verdict.pass / nil →
         // render nothing actionable. Host can override.
-        return .silentStub
+        return SelectionResult(
+            mode: .silentStub,
+            reasonCodes: ["fallback:no-permit-no-verdict"])
     }
 
     /// Convenience: derive only from a verdict (no permit). Used
