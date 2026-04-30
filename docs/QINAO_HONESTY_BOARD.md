@@ -2304,9 +2304,154 @@ L12 现在 **runtime decision 路径完整**——任何 host 一行调用就能
 
 ### 23.5 还没做但已识别（23.x 截止）
 
-- **M281** L12 5 个 SwiftUI 组件：compare panel / draft shell / delay packet / boundary script / silent stub
-- **M282** SQLite ledger storage migration tool（M91 + M270 → 单 `.sqlite`）
-- **L9 dream cycle** 完整白皮书路径
-- **L10 tribunal** 完整 surface coverage
+- ~~**M281** L12 5 个 SwiftUI 组件~~ → 5 个组件已 ship in QinaoUI；M281 编号被 cross-module identifier bridge 占用（commit 763e2f37）
+- ~~**M282** SQLite ledger storage migration tool~~ → 已 ship 为 M283 unified locator（不合并文件，统一目录）
+- ~~**L9 dream cycle** 完整白皮书路径~~ → 已 ship M284 frontier summary
+- ~~**L10 tribunal** 完整 surface coverage~~ → 已 ship M285 coverage check
+
+## 二十四、M281 → M285 — audit replay 路径全栈封口（2026-04-30）
+
+23.5 列了 4 个候选。本节是这一波 5 个 commits（M281+M282+M283+M284+M285）的 doctrine 同步：把 L4/L9/L10/L12/L13/L14 各层 observation surface 都升级到"audit walker 一遍读出 typed 决策摘要"。
+
+### 24.1 M281 — `BASSoftHandMode.componentIdentifier` 跨模块字符串契约（commit 763e2f37）
+
+**问题**：M280 ship 了 `BASSoftHandModeSelector`，QinaoUI 也 ship 了 5 个 SwiftUI 组件，但两边没有显式契约把 mode → 组件 string ID 对上。宿主要么自己写映射（每家不同），要么强行 import。
+
+**修复**：在 `BASSoftHandMode` 上加 `componentIdentifier: String` 计算属性，返回与 `QinaoUI.ComponentID.rawValue` byte-equal 的字符串。**两边不互相 import**，靠字符串契约协调，幂等。
+
+| mode | identifier |
+|---|---|
+| compare | `"compare-panel"` |
+| draft | `"draft-shell"` |
+| delay | `"delay-packet"` |
+| boundary | `"boundary-script"` |
+| silentStub | `"silent-stub"` |
+
+3 unit tests pin contract（个体 + 唯一性 + select 端到端）。
+
+### 24.2 M282 — Selector reasoning trace（commit 475d263f）
+
+**问题**：M280 `selectMode(...)` 只返回 `BASSoftHandMode`，audit ledger 没法记 "为什么选这个 mode"。要重放选择只能再跑一次带 logging 的版本。
+
+**修复**：新加 `SelectionResult` 结构 + `selectModeWithRationale(permit:verdict:candidateCount:)` overload，返回 mode + ordered reasonCodes。原 `selectMode` 改为 delegate（单一 source of truth）。
+
+Reason code grammar：
+- `"verdict:<level>"` — verdict-tier rule fired
+- `"tier:<bucket>"` — verdict landed in catastrophic / freeze-or-cut / throttle
+- `"permit:<mode>"` — permit-tier rule fired
+- `"candidate-count:<n>"` — multi-candidate hint applied
+- `"fallback:no-permit-no-verdict"` — fail-safe default
+
+5 tests pin verdict-tier trace、permit-tier trace、multi-candidate annotation、fallback、selectMode↔Rationale 一致性 invariant。
+
+### 24.3 M283 — Unified storage locator（commit 70a2435a）
+
+**问题**：M91 audit ledger 和 M270 lifecycle 各自有 SQLite，但两个文件路径互不相干。多 host 部署时缺一个统一根目录约定。
+
+**修复**：`BASUnifiedStorageLocator` —— 不合并 .sqlite 文件，但提供统一根目录约定 + per-store 路径助手。
+
+```
+<root>/sovereign-audit.sqlite       — M91 audit ledger
+<root>/lifecycle.sqlite             — M270 lifecycle store
+```
+
+API: `auditLedgerURL(in:)` / `lifecycleURL(in:)` / `ensureRootDirectory(at:)` / `locate(in:)`。最后一个一行 helper 给宿主 wire 进 storage 构造。
+
+**关键设计决定**：保持两个文件分开。M91 audit ledger 的 hash chain 完整性独立于其他表；合并到一个文件会带来 schema 耦合。Layout convention 已经够。
+
+7 tests pin filename canonicality / URL 构造 / directory 创建 idempotence / 错误路径（root is a file）/ locate bundle。
+
+### 24.4 M284 — L9 candidate frontier summary（commit 70a2435a）
+
+**问题**：`BASCandidateObservationBundle` 已经有完整 6-kind observations，但 audit walker 想知道"梦环本轮收敛到 winner 还是被 guardian 卡住"必须 filter 整个 array。
+
+**修复**：mirror M276 `BASWorldPriorObservationBundle` pattern——在 bundle 上加 `summarize() -> BASCandidateFrontierSummary`：
+
+```swift
+public struct BASCandidateFrontierSummary {
+    let candidateCount: Int
+    let dominantCandidateID: String?
+    let reversibleCandidateCount: Int
+    let guardianBranchCount: Int
+    let delayedCandidateCount: Int
+    let emittedDiversitySignal: Bool
+    let statusCode: String  // "empty" / "diversity-only" /
+                            // "dominant-clear" / "guardian-held"
+}
+```
+
+**Status code 语义**（高到低）：`guardian-held` > `dominant-clear` > `diversity-only` > `empty`。`guardian-held` 永远赢——即使有 dominant winner，只要任一 guardianBranch 出现，summary 就报"guardian 卡住"。doctrine 上正确：guardian 是必须升级到 L11/L14 的信号。
+
+6 tests cover empty / diversity-only / dominant-clear / guardian-held override / reversible+delay counts / 去重（同 candidate 多 reversibility 信号只算一次）。
+
+### 24.5 M285 — L10 tribunal coverage check（commit 70a2435a）
+
+**问题**：M89 已 ship full body tribunal（baseSelf / ruleSelf / aspireSelf 三声音 + convergence/dissent 两 tribunal-wide 信号），但 audit code 想知道"3 声音是不是都说话了"必须 filter `voice` 字段。
+
+**修复**：`BASTribunalCoverageCheck.report(for:) -> BASTribunalCoverageReport`：
+
+```swift
+public struct BASTribunalCoverageReport {
+    let voicesPresent: Set<BASTribunalVoice>
+    let subjectIDs: [String]   // distinct vote subjects
+    let hasConvergence: Bool
+    let hasDissent: Bool
+
+    var isFullBody: Bool { voicesPresent.count == 3 }
+    var silentVoices: Set<BASTribunalVoice>  // 不在 voicesPresent 的
+    var statusCode: String  // "empty" / "partial-N-voices" /
+                            // "full-body-incomplete" /
+                            // "full-body-dissent" /
+                            // "full-body-converged"
+}
+```
+
+**Status code 5-state**：
+- `empty` — 0 observations
+- `partial-N-voices` — < 3 voices spoke
+- `full-body-incomplete` — 3 voices 都说了，但 tribunal 没有 emit convergence 也没 emit dissent（罕见，意味着没出 verdict）
+- `full-body-dissent` — 3 voices + dissent signal
+- `full-body-converged` — 3 voices + convergence signal
+
+7 tests cover 全部 5 states + subject-ID 只来自 vote signals + 同 subject 不同 voice 不重复 + 顺序保留。
+
+### 24.6 累计闭环（24.x 末） — audit replay 全栈
+
+每层都有 typed observation summary 给 audit walker：
+
+| 层 | Summary surface | M-number | status codes |
+|---|---|---|---|
+| L4 World Prior | `BASWorldPriorObservationBundle` | M276 | （domain × kind）|
+| L9 Candidate Frontier | `BASCandidateFrontierSummary` | **M284** | empty / diversity-only / dominant-clear / guardian-held |
+| L10 Tribunal | `BASTribunalCoverageReport` | **M285** | empty / partial-N / full-body-incomplete / full-body-dissent / full-body-converged |
+| L11 Risk Gate | `BASActionPermit` | existing | （permit modes 9 cases）|
+| L12 Soft Hand | `BASSoftHandObservationBundle` + `SelectionResult.reasonCodes` | M280 / **M282** | 5 modes + reason code grammar |
+| L13 Lifecycle | `BASUpdateTicketLifecycleEntry.history` | M259 | 8-state typed enum |
+| L14 Sovereign | `BASSovereignAuditLedger` | M91 | hash-chained, signed |
+
+**统一存储**：`BASUnifiedStorageLocator` (M283) 给 L13 + L14 SQLite stores 一个共同根目录约定。
+
+**跨模块字符串契约**：`BASSoftHandMode.componentIdentifier` (M281) 让 BASOrchestration 和 QinaoUI 不互相依赖也能协调 mode → component。
+
+### 24.7 测试统计
+
+| 套件 | M278 末 | M285 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1672 | 1722 | +50（M281+M282+M283+M284+M285 共 5 commits） |
+| BAS swift-testing | 417 | 417 | 0 |
+| Qinao | 778 | 778 | 0 |
+| 4 boundary checks | clean | clean | clean |
+| 总计 | 2867 | **2917** | **+50** |
+
+### 24.8 还没做但已识别（24.x 截止）
+
+23.5 的 4 个全部 closed。剩余架构性候选（不在当前 sprint 范围）：
+
+- **M286+** 真模型多轮对话 + lifecycle 持续 demo（M276 已铺路 + M279 已 wire Apple FM；剩端到端跑通验证）
+- **L9 dream cycle 真模型反事实**：M84 wire 了 counterfactual seed → bridge，但实际宿主 host 在生产 turn 里调用还需要 explicit 接入
+- **L10 tribunal 真模型 vote**：M89 ship 了 schema + 投票路径，but 实际让 LLM 扮演三声音的 prompt-engineering 还没做
+- **L12 SwiftUI 组件 host 接入端到端**：5 个 view 都 ship 了，但宿主代码用它们的 demo 还没专门做（QinaoSampleApp 接 sample SwiftUI 但不展示这 5 个）
+
+这些都是"用上现有 ship 的能力"层面的 demo / integration 工作，不是 substrate 架构层的。Substrate 层 doctrine 已闭合。
 
 
