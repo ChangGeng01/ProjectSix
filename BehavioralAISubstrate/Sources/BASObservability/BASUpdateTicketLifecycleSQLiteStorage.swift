@@ -73,8 +73,23 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     /// is the synchronization point.
     private var db: OpaquePointer?
 
-    public init(url: URL) throws {
+    /// M277 — fire `wal_checkpoint(TRUNCATE)` after this many
+    /// `save(_:)` calls to keep the `-wal` file from growing
+    /// unbounded under sustained high-throughput writes.
+    /// Default 100; pass 0 to disable auto-checkpoint (callers
+    /// who want fully manual checkpoint scheduling).
+    public let autoCheckpointEvery: Int
+
+    /// M277 — count of `save(_:)` calls since the last
+    /// checkpoint. Reset to 0 on every successful checkpoint.
+    private var savesSinceCheckpoint: Int = 0
+
+    public init(
+        url: URL,
+        autoCheckpointEvery: Int = 100
+    ) throws {
         self.url = url
+        self.autoCheckpointEvery = max(0, autoCheckpointEvery)
         try openDatabase()
         try createSchemaIfNeeded()
     }
@@ -199,6 +214,87 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
                 sql: "ROLLBACK", phase: "rollback")
             throw error
         }
+
+        // M277 — auto-checkpoint after threshold writes.
+        // Errors absorbed: checkpoint failure shouldn't fail
+        // a successful save (the data is durable in WAL even
+        // without checkpoint; just the merge to main DB is
+        // deferred).
+        if autoCheckpointEvery > 0 {
+            savesSinceCheckpoint += 1
+            if savesSinceCheckpoint >= autoCheckpointEvery {
+                _ = try? checkpoint()
+                savesSinceCheckpoint = 0
+            }
+        }
+    }
+
+    /// M277 — manually trigger `PRAGMA wal_checkpoint(TRUNCATE)`.
+    /// Merges any committed-but-not-yet-merged WAL pages into
+    /// the main DB and truncates the `-wal` file to zero
+    /// length. Hosts call this at known checkpoint moments
+    /// (idle, app background, before backup) to bound disk
+    /// usage. Returns the number of WAL frames that were
+    /// merged + total frames in WAL before the call (for
+    /// observability).
+    @discardableResult
+    public func checkpoint() throws -> CheckpointResult {
+        // PRAGMA wal_checkpoint(TRUNCATE) returns one row with
+        // 3 columns: busy (0/1), log (frames in WAL),
+        // checkpointed (frames merged).
+        var stmt: OpaquePointer?
+        let sql = "PRAGMA wal_checkpoint(TRUNCATE)"
+        let prepRC = sqlite3_prepare_v2(
+            db, sql, -1, &stmt, nil)
+        if prepRC != SQLITE_OK {
+            throw SQLiteError.prepareFailed(
+                sql: sql,
+                reason: lastErrorMessage()
+                    ?? "rc=\(prepRC)")
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw SQLiteError.stepFailed(
+                sql: sql,
+                reason: lastErrorMessage()
+                    ?? "step != ROW")
+        }
+        let busy = sqlite3_column_int(stmt, 0)
+        let log = sqlite3_column_int(stmt, 1)
+        let checkpointed = sqlite3_column_int(stmt, 2)
+        return CheckpointResult(
+            wasBusy: busy != 0,
+            walFramesAtStart: Int(log),
+            framesMerged: Int(checkpointed))
+    }
+
+    /// M277 — return current `-wal` file size in bytes, or
+    /// `nil` if the file doesn't exist (no writes since last
+    /// checkpoint TRUNCATE). Host observability layers use
+    /// this to size budgets / decide when to call
+    /// `checkpoint()` manually.
+    public func walSizeBytes() -> Int64? {
+        let walURL = url.appendingPathExtension("wal")
+            .deletingPathExtension()
+            .appendingPathExtension("sqlite-wal")
+        // The actual `-wal` file lives at "<base>-wal" not
+        // "<base>.sqlite-wal" — SQLite appends `-wal` to the
+        // exact open path. Construct directly.
+        let walPath = url.path + "-wal"
+        let walFileURL = URL(fileURLWithPath: walPath)
+        _ = walURL  // silence; preserved for readability
+        guard let attrs = try? FileManager.default
+            .attributesOfItem(atPath: walFileURL.path),
+            let size = attrs[.size] as? Int64
+        else { return nil }
+        return size
+    }
+
+    /// M277 — observability bundle for one checkpoint call.
+    public struct CheckpointResult: Sendable, Equatable {
+        public let wasBusy: Bool
+        public let walFramesAtStart: Int
+        public let framesMerged: Int
     }
 
     // MARK: - Helpers

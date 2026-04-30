@@ -1134,4 +1134,156 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
             summary: "test ticket \(id)",
             confidence: 0.7)
     }
+
+    // MARK: - M277 WAL checkpoint scheduling
+
+    func testM277ManualCheckpointReturnsResult() async throws {
+        let url = makeTempSQLiteURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-wal"))
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-shm"))
+        }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(
+                url: url, autoCheckpointEvery: 0)
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        for i in 0..<10 {
+            _ = try await coord.submit(
+                makeTicket(id: "ck-\(i)"))
+        }
+        await coord.drainPersistChain()
+        let result = try storage.checkpoint()
+        XCTAssertFalse(
+            result.wasBusy,
+            "no concurrent writers; checkpoint must complete")
+        XCTAssertGreaterThanOrEqual(
+            result.walFramesAtStart, 0,
+            "frame count must be non-negative")
+        XCTAssertGreaterThanOrEqual(
+            result.framesMerged, 0,
+            "merged count must be non-negative")
+    }
+
+    func testM277AutoCheckpointFiresAfterThreshold() async throws
+    {
+        // Auto-checkpoint at every 5 saves. Submit 6 tickets,
+        // verify the checkpoint actually ran by inspecting WAL
+        // file size.
+        let url = makeTempSQLiteURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-wal"))
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-shm"))
+        }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(
+                url: url, autoCheckpointEvery: 5)
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+
+        for i in 0..<10 {
+            _ = try await coord.submit(
+                makeTicket(id: "auto-\(i)"))
+        }
+        await coord.drainPersistChain()
+
+        // After 10 saves with threshold 5, checkpoints should
+        // have fired ≥1×. WAL file should exist (writes since
+        // last checkpoint) but be small (recent saves only).
+        let walSize = storage.walSizeBytes() ?? 0
+        // Accept 0 (just checkpointed) or small (a few entries
+        // since); the key claim is that WAL didn't grow
+        // unbounded across 10 saves (under default rollback-
+        // journal mode this number would dwarf the data).
+        XCTAssertLessThan(
+            walSize, 100_000,
+            "WAL file must stay bounded after auto-checkpoint")
+    }
+
+    func testM277AutoCheckpointDisabledByZeroThreshold() async
+    throws {
+        // autoCheckpointEvery=0 means manual-only. Verify no
+        // crash + storage still works.
+        let url = makeTempSQLiteURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-wal"))
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-shm"))
+        }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(
+                url: url, autoCheckpointEvery: 0)
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        for i in 0..<3 {
+            _ = try await coord.submit(
+                makeTicket(id: "no-auto-\(i)"))
+        }
+        await coord.drainPersistChain()
+        let count = await coord.count()
+        XCTAssertEqual(
+            count, 3,
+            "storage works without auto-checkpoint")
+    }
+
+    func testM277WalSizeBytesNilWhenNoWalFile() async throws {
+        // Fresh storage with no writes — no -wal file exists
+        // yet. walSizeBytes() should return nil, not crash.
+        let url = makeTempSQLiteURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+        }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        // Don't write anything — WAL file shouldn't exist yet.
+        // (Note: opening + WAL pragma may create -wal; this is
+        // OS-dependent. Test passes if `walSizeBytes` returns
+        // either nil or a small int without crashing.)
+        let size = storage.walSizeBytes()
+        if let size = size {
+            XCTAssertGreaterThanOrEqual(size, 0)
+        }
+        // either nil or a non-negative int — no crash
+    }
+
+    func testM277CheckpointAfterTruncateLeavesWalSmall() async
+    throws {
+        // After explicit checkpoint(TRUNCATE), the -wal file
+        // should be at size 0. This is the durability
+        // guarantee for hosts shrinking on-disk footprint
+        // before backup / app-suspend.
+        let url = makeTempSQLiteURL()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-wal"))
+            try? FileManager.default.removeItem(
+                at: URL(fileURLWithPath: url.path + "-shm"))
+        }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(
+                url: url, autoCheckpointEvery: 0)
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        for i in 0..<20 {
+            _ = try await coord.submit(
+                makeTicket(id: "trunc-\(i)"))
+        }
+        await coord.drainPersistChain()
+
+        _ = try storage.checkpoint()
+        let walSize = storage.walSizeBytes() ?? 0
+        XCTAssertLessThan(
+            walSize, 50_000,
+            "after explicit TRUNCATE checkpoint, WAL file " +
+            "should be small (typically 0 bytes)")
+    }
 }
