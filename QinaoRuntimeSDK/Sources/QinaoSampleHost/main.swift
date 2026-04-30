@@ -3,6 +3,8 @@ import BASOrgan
 import BASChatCompletionsAdapter
 import BASAppleAdapters
 import BASMLXAdapter
+import BASObservability
+import BASRuntimeCore
 import QinaoLoop
 import QinaoAppleFoundation
 import QinaoMLX
@@ -101,6 +103,26 @@ struct QinaoSampleHost {
             // call captures the kernel JIT cost so first-turn
             // latency drops to steady-state.
             await runMLXPrewarmBench()
+            return
+        }
+        if args.contains("--full-stack-demo") {
+            // M272 — orchestrate the M254-M270 surface in one
+            // demo flow:
+            //   1. routing adapter (primary fails →
+            //      secondary serves) — M255
+            //   2. 3-turn conversation via secondary (M254
+            //      multi-turn ChatSession pool)
+            //   3. synthesize tickets + auto-flow into
+            //      lifecycle coordinator (M261 ingestTurn)
+            //   4. walk one ticket through full state machine
+            //      (M259 lifecycle) — proposed → trial →
+            //      passed → queued → distilled
+            //   5. demonstrate cross-restart continuity by
+            //      reloading from M268 JSON storage; verify
+            //      M265 audit-sink fired on terminal
+            //      transitions
+            // Wiring proof, not an eval.
+            await runFullStackDemo()
             return
         }
         if args.contains("--lora-curriculum-train-m247") {
@@ -3175,6 +3197,231 @@ struct QinaoSampleHost {
             stderr("error: lora-train failed: \(error)\n")
             exit(2)
         }
+    }
+
+    // MARK: - M272 full-stack demo
+
+    /// Orchestrate every M254-M270 seam in one demo flow.
+    /// Wiring proof, not an eval — uses bare Gemma so curriculum
+    /// markers don't add noise.
+    private static func runFullStackDemo() async {
+        print("""
+            QinaoSampleHost --full-stack-demo (M272):
+              wires M254 multi-turn + M255 router + M259/M261
+              lifecycle + M265 audit hook + M268 storage in one
+              flow. Bare Gemma (no LoRA).
+            """)
+
+        // 1. Router: primary always fails → secondary serves
+        let primary = StubFailingAdapter()
+        let secondary = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        do {
+            try await secondary.loadModel()
+            try await secondary.prewarm()
+        } catch {
+            stderr("error: secondary load failed: \(error)\n")
+            exit(2)
+        }
+        let router = BASRoutingOrganAdapter(
+            primary: primary,
+            secondary: secondary,
+            strategy: .primaryWithFallback)
+        print("""
+
+            ━━━ Step 1/5 — Router built (M255) ━━━
+            primary:    \(primary.descriptor.providerID) (will fail)
+            secondary:  \(secondary.descriptor.providerID)
+            descriptor: \(router.descriptor.providerID)
+            """)
+
+        // 2. Lifecycle coordinator with audit + storage
+        let storageURL = URL(
+            fileURLWithPath:
+                "/tmp/qinao_full_stack_demo_lifecycle.json")
+        try? FileManager.default.removeItem(at: storageURL)
+        let storage =
+            BASUpdateTicketLifecycleJSONFileStorage(
+                url: storageURL)
+        let auditCapture = AuditCaptureBox()
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            auditSink: { entry in
+                await auditCapture.append(entry)
+            },
+            storage: storage)
+        print("""
+
+            ━━━ Step 2/5 — Lifecycle coordinator built (M259+M265+M268) ━━━
+            audit sink: enabled (in-memory capture)
+            storage:    \(storageURL.lastPathComponent) (JSON)
+            """)
+
+        // 3. 3-turn conversation via secondary (M254)
+        let convoID = "demo-convo-\(UUID().uuidString)"
+        let prompts = [
+            "Tell me about photosynthesis briefly.",
+            "What's the chemical equation?",
+            "Where in the cell does it happen?",
+        ]
+        var drafts: [BASOrganDraft] = []
+        print("""
+
+            ━━━ Step 3/5 — 3-turn conversation (M254) ━━━
+            """)
+        for (i, prompt) in prompts.enumerated() {
+            let req = BASOrganRequest(
+                requestID: "demo-\(i)",
+                role: .scout,
+                preset: .scout,
+                instruction: prompt)
+            let start = ContinuousClock().now
+            do {
+                let draft = try await secondary
+                    .draftMultiTurn(req, sessionID: convoID)
+                let ms = elapsedMs(
+                    ContinuousClock().now - start)
+                drafts.append(draft)
+                print("""
+
+                  Turn \(i + 1): "\(prompt)"
+                  (\(format(ms: ms)))
+                  \(indented(draft.body))
+                """)
+            } catch {
+                print("  Turn \(i + 1) error: \(error)")
+            }
+        }
+
+        // Verify router fallback path
+        do {
+            let routerDraft = try await router.draft(
+                BASOrganRequest(
+                    requestID: "demo-router",
+                    role: .scout,
+                    preset: .scout,
+                    instruction:
+                        "Summarize photosynthesis in one line."))
+            let routerOK = routerDraft.providerID
+                == secondary.descriptor.providerID
+            print("""
+
+              Router fallback verification:
+              served by: \(routerDraft.providerID) \
+              \(routerOK ? "✓" : "⚠")
+            """)
+        } catch {
+            print("  Router error: \(error)")
+        }
+
+        // 4. Synthesize tickets + ingestTurn auto-flow
+        var tickets: [BASUpdateTicket] = []
+        for (i, draft) in drafts.enumerated() {
+            tickets.append(
+                BASUpdateTicket(
+                    ticketID: "demo-tic-\(i)-\(convoID)",
+                    sessionRef: convoID,
+                    summary: draft.body,
+                    confidence: 0.65))
+        }
+        let newCount = await coord.ingestTurn(tickets)
+        print("""
+
+            ━━━ Step 4/5 — \(newCount) tickets ingested (M261 auto-flow) ━━━
+            """)
+
+        // 5. Walk first ticket through full state machine
+        guard let firstTicket = tickets.first else {
+            print("no tickets to walk; aborting demo")
+            return
+        }
+        let id = firstTicket.ticketID
+        do {
+            try await coord.startTrial(
+                ticketID: id, trialRecordRef: "demo-shadow-1")
+            try await coord.markTrialOutcome(
+                ticketID: id,
+                outcome: .passed(reasonCodes: [
+                    "demo:effect-confirmed"]))
+            try await coord.approveForDistillation(
+                ticketID: id,
+                sovereignVerdictRef: "demo-vrdct-1")
+            try await coord.markDistilled(
+                ticketID: id,
+                reasonCodes: ["demo:pipeline-checkpoint"])
+        } catch {
+            print("lifecycle walk error: \(error)")
+        }
+
+        // 6. Restart-and-load via M268 storage
+        let coordReloaded =
+            BASUpdateTicketLifecycleCoordinator(
+                storage: storage)
+        do {
+            try await coordReloaded.restore()
+        } catch {
+            print("restore error: \(error)")
+        }
+        let reloadedEntry = await coordReloaded.entry(
+            ticketID: id)
+        let reloadedCount = await coordReloaded.count()
+        let auditEntries = await auditCapture.entries
+
+        print("""
+
+            ━━━ Step 5/5 — Lifecycle terminal + storage reload (M265+M268) ━━━
+            ticket \(id):
+              state after walk:        \(reloadedEntry?.state.rawValue ?? "MISSING")
+              transition history:      \(reloadedEntry?.history.count ?? 0) entries
+              sovereign verdict ref:   \(reloadedEntry?.sovereignVerdictRef ?? "n/a")
+            reloaded coordinator:
+              total entries on disk:   \(reloadedCount)
+            audit sink fired:
+              terminal events captured: \(auditEntries.count)
+              first audit ID:          \(auditEntries.first?.auditID ?? "none")
+
+            ━━━ Demo complete — every M254-M270 seam exercised ━━━
+            """)
+
+        try? FileManager.default.removeItem(at: storageURL)
+    }
+}
+
+/// Captures audit entries inside `--full-stack-demo`. Actor so the
+/// `@Sendable` audit-sink closure can mutate state safely.
+private actor AuditCaptureBox {
+    var entries: [BASSovereignAuditEntry] = []
+    func append(_ entry: BASSovereignAuditEntry) {
+        entries.append(entry)
+    }
+}
+
+/// Stub adapter that always throws providerUnavailable — drives
+/// the M255 router's primary→secondary fallback in
+/// `--full-stack-demo`.
+private actor StubFailingAdapter: BASOrganAdapter {
+    nonisolated let descriptor: BASOrganDescriptor
+    init() {
+        self.descriptor = BASOrganDescriptor(
+            providerID: "demo.primary.always-down",
+            providerName: "Demo Primary (always fails)",
+            supportsStreaming: false,
+            maxInputTokens: 4096,
+            maxOutputTokens: 4096,
+            runsOnDevice: true,
+            supportedRoles: [.scout, .core])
+    }
+    func draft(
+        _ request: BASOrganRequest
+    ) async throws -> BASOrganDraft {
+        throw BASOrganError.providerUnavailable(
+            reason: "demo: primary intentionally down")
+    }
+    func currentCapacity() async -> BASOrganCapacity {
+        BASOrganCapacity(
+            availableInputTokens: 0,
+            availableOutputTokens: 0,
+            underPressure: true,
+            reasonCodes: ["demo-stub"])
     }
 }
 
