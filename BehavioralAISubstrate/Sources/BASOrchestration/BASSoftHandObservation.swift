@@ -55,6 +55,30 @@ public enum BASSoftHandMode:
     /// 静默桩 — minimal safe placeholder; renders nothing
     /// actionable.
     case silentStub
+
+    /// M281 — stable component identifier matching the
+    /// `QinaoUI.ComponentID` namespace. Hosts call
+    /// `selectMode(...)` (M280) to pick a mode, then use
+    /// `componentIdentifier` to look up the right view in
+    /// `QinaoUI`. Bridge stays a stable string so neither side
+    /// has to import the other's module.
+    ///
+    /// | mode       | identifier        |
+    /// |------------|-------------------|
+    /// | compare    | "compare-panel"   |
+    /// | draft      | "draft-shell"     |
+    /// | delay      | "delay-packet"    |
+    /// | boundary   | "boundary-script" |
+    /// | silentStub | "silent-stub"     |
+    public var componentIdentifier: String {
+        switch self {
+        case .compare: return "compare-panel"
+        case .draft: return "draft-shell"
+        case .delay: return "delay-packet"
+        case .boundary: return "boundary-script"
+        case .silentStub: return "silent-stub"
+        }
+    }
 }
 
 /// The six upstream signals a soft-hand observer pipeline can

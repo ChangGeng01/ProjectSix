@@ -203,6 +203,52 @@ final class BASSoftHandModeSelectorTests: XCTestCase {
 
     // MARK: - Helpers
 
+    // MARK: - M281 component identifier bridge
+
+    func testM281ComponentIdentifierForEveryMode() {
+        // Every BASSoftHandMode case maps to a stable
+        // identifier matching QinaoUI.ComponentID rawValues.
+        // Cross-module string contract — either side can change
+        // independently as long as both sides hold this table.
+        XCTAssertEqual(
+            BASSoftHandMode.compare.componentIdentifier,
+            "compare-panel")
+        XCTAssertEqual(
+            BASSoftHandMode.draft.componentIdentifier,
+            "draft-shell")
+        XCTAssertEqual(
+            BASSoftHandMode.delay.componentIdentifier,
+            "delay-packet")
+        XCTAssertEqual(
+            BASSoftHandMode.boundary.componentIdentifier,
+            "boundary-script")
+        XCTAssertEqual(
+            BASSoftHandMode.silentStub.componentIdentifier,
+            "silent-stub")
+    }
+
+    func testM281IdentifiersAreUnique() {
+        let allIDs = Set(
+            BASSoftHandMode.allCases.map(
+                \.componentIdentifier))
+        XCTAssertEqual(
+            allIDs.count, BASSoftHandMode.allCases.count,
+            "every mode must have a unique component identifier")
+    }
+
+    func testM281SelectThenIdentifierEndToEnd() {
+        // The canonical L12 flow: selector → mode → identifier.
+        // Verdict + permit drive a typed mode; identifier is
+        // the cross-module contract the host uses to look up
+        // the QinaoUI view.
+        let mode = BASSoftHandModeSelector.selectMode(
+            permit: makePermit(.block),
+            verdict: nil)
+        XCTAssertEqual(mode, .boundary)
+        XCTAssertEqual(
+            mode.componentIdentifier, "boundary-script")
+    }
+
     private func makePermit(
         _ mode: BASActionPermitMode
     ) -> BASActionPermit {
