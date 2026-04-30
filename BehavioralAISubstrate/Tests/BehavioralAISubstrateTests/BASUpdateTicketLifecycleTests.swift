@@ -11,6 +11,42 @@ private actor AuditCapture {
     }
 }
 
+/// M273 — captures the order in which `save()` calls land
+/// + the size of each snapshot. Used to prove the chain
+/// serializes saves in snapshot-capture order.
+private actor SaveOrderRecorder {
+    var snapshotCounts: [Int] = []
+    func append(_ count: Int) {
+        snapshotCounts.append(count)
+    }
+}
+
+/// M273 — storage stub that just records the snapshot size of
+/// every save() call (real persistence is irrelevant for the
+/// ordering test).
+private final class OrderRecordingStorage:
+    BASUpdateTicketLifecycleStorage, @unchecked Sendable
+{
+    let recorder: SaveOrderRecorder
+    init(recorder: SaveOrderRecorder) {
+        self.recorder = recorder
+    }
+    func load() async throws
+    -> [String: BASUpdateTicketLifecycleEntry] {
+        return [:]
+    }
+    func save(
+        _ entries: [String: BASUpdateTicketLifecycleEntry]
+    ) async throws {
+        // Tiny artificial delay so concurrent saves can
+        // interleave if the chain is broken — the test
+        // assertion catches misordering only when there's
+        // actual concurrency.
+        try? await Task.sleep(nanoseconds: 1_000_000)
+        await recorder.append(entries.count)
+    }
+}
+
 /// L13 / M259 — coverage for `BASUpdateTicketLifecycleCoordinator`.
 ///
 /// Verifies the legal-transition state machine, the
@@ -805,6 +841,56 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
                 "lifecycle-test-\(UUID().uuidString).sqlite")
     }
 
+    // MARK: - M273 serialized save chain
+
+    func testM273SaveChainIsSerialized() async throws {
+        // Custom storage that records the order of save() calls.
+        // Without M273's chain, two concurrent persistQuietly()
+        // calls could let snapshot N+1's save complete before
+        // snapshot N's. The recorder captures the interleaving;
+        // M273 guarantees order matches snapshot capture order.
+        let recorder = SaveOrderRecorder()
+        let storage = OrderRecordingStorage(recorder: recorder)
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<20 {
+                group.addTask {
+                    _ = try? await coord.submit(
+                        BASUpdateTicket(
+                            ticketID: "ord-\(i)",
+                            sessionRef: "s",
+                            summary: "x",
+                            confidence: 0.5))
+                }
+            }
+        }
+
+        await coord.drainPersistChain()
+
+        // Saves recorded in order. Each save's snapshot count
+        // is monotonically non-decreasing (later saves see
+        // ≥ earlier saves' tickets).
+        let counts = await recorder.snapshotCounts
+        XCTAssertGreaterThan(
+            counts.count, 0,
+            "at least one save must have run")
+        for i in 1..<counts.count {
+            XCTAssertGreaterThanOrEqual(
+                counts[i], counts[i - 1],
+                "save \(i) saw \(counts[i]) tickets but " +
+                "save \(i-1) saw \(counts[i-1]) — chain " +
+                "broke ordering")
+        }
+        // The final save must reflect the full set.
+        XCTAssertEqual(
+            counts.last, 20,
+            "final save in chain must include all 20 tickets")
+    }
+
+    private func makeTempSQLiteURL_unused() -> URL { URL(fileURLWithPath: "/dev/null") }
+
     // MARK: - M271 cross-process / multi-coordinator safety
 
     func testSQLiteStorageHandlesTwoCoordinatorsSerialWrites()
@@ -856,11 +942,15 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
 
     func testSQLiteStorageHandlesParallelTicketIngestion() async
     throws {
-        // 100 parallel submissions through TaskGroup, then
-        // verify all 100 landed in storage. SQLite serializes
-        // at the connection level + tx level; the actor
-        // serializes at the actor level. Combined: linearized
-        // writes, no corruption, no lost updates.
+        // 100 parallel submissions through TaskGroup. M273's
+        // serialized save chain guarantees that even though
+        // the auto-fired `persistQuietly()` runs off-actor,
+        // saves complete in the order their snapshots were
+        // taken. The latest snapshot writes last, so on-disk
+        // state converges to the actor's current entries map.
+        // `drainPersistChain()` is the deterministic barrier:
+        // wait for the chain to finish before reading from a
+        // fresh storage handle.
         let url = makeTempSQLiteURL()
         defer { try? FileManager.default.removeItem(at: url) }
         let storage = try
@@ -881,11 +971,14 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
             }
         }
 
+        // In-memory state is fully consistent.
         let count = await coord.count()
         XCTAssertEqual(count, 100)
 
-        // Restart-equivalent: independent storage handle reads
-        // back the same 100.
+        // M273 drain — wait for the latest chained save to
+        // finish so the file reflects the final actor state.
+        await coord.drainPersistChain()
+
         let storage2 = try
             BASUpdateTicketLifecycleSQLiteStorage(url: url)
         let coord2 = BASUpdateTicketLifecycleCoordinator(
@@ -894,7 +987,8 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
         let count2 = await coord2.count()
         XCTAssertEqual(
             count2, 100,
-            "all 100 parallel writes must be durable")
+            "M273 chain + drain must converge file to current " +
+            "actor entries — all 100 parallel writes durable")
     }
 
     func testSQLiteStorageDistillationQueueIsCrossConsistent()

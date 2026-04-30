@@ -259,6 +259,20 @@ public actor BASUpdateTicketLifecycleCoordinator {
     /// M268 — optional durable storage for entries.
     private let storage: BASUpdateTicketLifecycleStorage?
 
+    /// M273 — chain link for serialized auto-saves. Each
+    /// `persistQuietly()` invocation captures the current snapshot
+    /// of `entries` then awaits the prior save chain link before
+    /// invoking `storage.save(_:)`. This guarantees in-flight
+    /// saves complete in the same order their snapshots were
+    /// taken — the latest snapshot writes last, so the on-disk
+    /// state always converges to the actor's current entries map.
+    ///
+    /// Without this, two concurrent submits could capture
+    /// different snapshots, race to disk, and the LATER snapshot
+    /// (with more entries) could land BEFORE the EARLIER one,
+    /// leaving the file in a stale state.
+    private var saveChain: Task<Void, Never>?
+
     public init(
         clock: @escaping @Sendable () -> Date = { .now },
         auditSink: AuditSink? = nil,
@@ -294,13 +308,38 @@ public actor BASUpdateTicketLifecycleCoordinator {
     }
 
     private func persistQuietly() async {
-        guard storage != nil else { return }
-        do {
-            try await persist()
-        } catch {
-            // absorbed — persistence failures don't crash
-            // lifecycle (mutation already completed in memory)
+        guard let storage = storage else { return }
+        // M273 — chain saves so they execute in the order their
+        // snapshots were taken. Capture the current snapshot
+        // synchronously (still on the actor's executor), then
+        // schedule a Task that awaits the prior save before
+        // running ours. We then await the new task inline so
+        // callers see the storage at the latest snapshot
+        // synchronously after the mutation returns. The chain
+        // prevents misordering between in-flight saves; the
+        // inline await prevents stale reads downstream.
+        let snapshot = entries
+        let prior = saveChain
+        let task = Task { [storage, snapshot, prior] in
+            await prior?.value
+            do {
+                try await storage.save(snapshot)
+            } catch {
+                // absorbed — persistence failures don't crash
+                // lifecycle (mutation already completed in
+                // memory; chain advances regardless)
+            }
         }
+        saveChain = task
+        await task.value
+    }
+
+    /// Wait for any in-flight auto-save chain to drain. Hosts
+    /// running stress workloads (or tests) call this before
+    /// reading the storage from a fresh handle to ensure the
+    /// latest mutation has reached disk.
+    public func drainPersistChain() async {
+        await saveChain?.value
     }
 
     // MARK: - Submission
