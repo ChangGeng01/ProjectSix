@@ -44,13 +44,23 @@ public actor BASWorldAwareRiskBridge {
 
     private let worldVault: BASWorldPriorVault
     private let verdictEngine: BASSovereignVerdictEngine
+    /// M270 — optional counterfactual seeder. When present,
+    /// `evaluate(intent:)` also generates ≥3 counterfactual
+    /// branches over the matched template and includes them in
+    /// `Decision.branches`. Default `nil` keeps the M252 surface
+    /// behavior (empty branches array).
+    private let counterfactualSeeder:
+        BASWorldPriorCounterfactualSeeder?
 
     public init(
         worldVault: BASWorldPriorVault,
-        verdictEngine: BASSovereignVerdictEngine
+        verdictEngine: BASSovereignVerdictEngine,
+        counterfactualSeeder:
+            BASWorldPriorCounterfactualSeeder? = nil
     ) {
         self.worldVault = worldVault
         self.verdictEngine = verdictEngine
+        self.counterfactualSeeder = counterfactualSeeder
     }
 
     /// A proposed intent, described in the terms the bridge needs
@@ -98,11 +108,30 @@ public actor BASWorldAwareRiskBridge {
     }
 
     /// Result bundle: the verdict plus the L4 assessment that
-    /// shaped it. Exposed so tests / observability layers can
-    /// prove "this verdict actually used world-prior knowledge".
+    /// shaped it. M270 added `branches`: ≥3 counterfactual
+    /// branches generated over the matched template when the
+    /// bridge was constructed with a counterfactualSeeder.
+    /// Empty when no seeder was provided (backward-compatible).
+    ///
+    /// Exposed so tests / observability layers can prove "this
+    /// verdict actually used world-prior knowledge — both the
+    /// risk score AND the counterfactual fan-out".
     public struct Decision: Sendable, Equatable {
         public let verdict: BASSovereignVerdict
         public let assessment: BASWorldPriorRiskAssessment
+        public let branches:
+            [BASWorldPriorCounterfactualBranch]
+
+        public init(
+            verdict: BASSovereignVerdict,
+            assessment: BASWorldPriorRiskAssessment,
+            branches:
+                [BASWorldPriorCounterfactualBranch] = []
+        ) {
+            self.verdict = verdict
+            self.assessment = assessment
+            self.branches = branches
+        }
     }
 
     /// Evaluate a proposed intent end-to-end: query L4, build
@@ -152,7 +181,37 @@ public actor BASWorldAwareRiskBridge {
         )
 
         let verdict = try await verdictEngine.evaluate(context)
-        return Decision(verdict: verdict, assessment: assessment)
+
+        // M270 — generate counterfactual branches when a seeder
+        // is wired. Failure modes (unknownTemplate inside the
+        // seeder, e.g. if vault contents drift between init
+        // and call) are absorbed: the verdict already exists
+        // and shouldn't be voided by a downstream observability
+        // gap.
+        let branches = await generateBranches(
+            templateID: intent.matchedTemplateID)
+
+        return Decision(
+            verdict: verdict,
+            assessment: assessment,
+            branches: branches)
+    }
+
+    private func generateBranches(
+        templateID: String
+    ) async -> [BASWorldPriorCounterfactualBranch] {
+        guard let seeder = counterfactualSeeder else {
+            return []
+        }
+        let seed = BASWorldPriorCounterfactualSeed(
+            templateID: templateID,
+            seedDescription:
+                "world-aware-bridge: " + templateID)
+        do {
+            return try await seeder.generate(from: seed)
+        } catch {
+            return []
+        }
     }
 
     // MARK: - Signal merging

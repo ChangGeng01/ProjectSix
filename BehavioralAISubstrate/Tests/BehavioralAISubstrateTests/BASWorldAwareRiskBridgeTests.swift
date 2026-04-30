@@ -316,4 +316,175 @@ final class BASWorldAwareRiskBridgeTests: XCTestCase {
             "M258 electrical-shock template must trigger " +
             "non-pass verdict via the gate floor mechanism")
     }
+
+    // MARK: - M270: counterfactual seeder feeds branches into Decision
+
+    private func makeStackWithSeeder() async throws -> (
+        vault: BASWorldPriorVault,
+        ledger: BASSovereignAuditLedger,
+        engine: BASSovereignVerdictEngine,
+        bridge: BASWorldAwareRiskBridge
+    ) {
+        let vault = BASWorldPriorVault()
+        try await BASWorldPriorBuiltInLibrary.bootstrap(into: vault)
+        let ledger = BASSovereignAuditLedger.withSeed(
+            "test-key-m270")
+        let engine = BASSovereignVerdictEngine(ledger: ledger)
+        let seeder = BASWorldPriorCounterfactualSeeder(
+            vault: vault)
+        let bridge = BASWorldAwareRiskBridge(
+            worldVault: vault,
+            verdictEngine: engine,
+            counterfactualSeeder: seeder)
+        return (vault, ledger, engine, bridge)
+    }
+
+    func testM270BridgeWithoutSeederReturnsEmptyBranches() async
+    throws {
+        // Default bridge (no seeder) must return empty branches
+        // — backward compatible with all M252 callers.
+        let stack = try await makeStack()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m270-empty",
+            turnID: "t-m270-empty",
+            operation: .toolWrite,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        let decision = try await stack.bridge.evaluate(
+            intent: intent)
+        XCTAssertTrue(
+            decision.branches.isEmpty,
+            "no seeder = no branches; backward compat")
+    }
+
+    func testM270BridgeWithSeederGeneratesAtLeastThreeBranches()
+    async throws {
+        // Spec demands ≥3 counterfactual branches per assessed
+        // template. Verify the bridge surfaces them.
+        let stack = try await makeStackWithSeeder()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m270-1",
+            turnID: "t-m270-1",
+            operation: .toolWrite,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        let decision = try await stack.bridge.evaluate(
+            intent: intent)
+        XCTAssertGreaterThanOrEqual(
+            decision.branches.count, 3,
+            "spec-floor: ≥3 counterfactual branches per " +
+            "template")
+        // Each branch must reference the source template ID so
+        // observability can correlate.
+        for branch in decision.branches {
+            XCTAssertEqual(
+                branch.seedTemplateID,
+                "tmpl-physics-electrical-shock")
+        }
+    }
+
+    func testM270M258TemplatesEachProduceAtLeastThreeBranches()
+    async throws {
+        // Cross-check: every M258-added template fans out to
+        // ≥3 branches when the seeder runs. Catches templates
+        // that lack enough preconditions / blockers / bridges
+        // to satisfy the floor (the seeder pads with synthetic
+        // drops in that case, but this test verifies the floor
+        // is actually met).
+        let stack = try await makeStackWithSeeder()
+        let m258TemplateIDs = [
+            "tmpl-physics-friction-wear",
+            "tmpl-physics-electrical-shock",
+            "tmpl-body-caffeine-tail",
+            "tmpl-body-repetitive-strain",
+            "tmpl-time-context-decay",
+            "tmpl-time-meeting-overflow",
+            "tmpl-money-fixed-cost-creep",
+            "tmpl-money-late-tax-filing",
+            "tmpl-social-public-disclosure",
+            "tmpl-social-relationship-investment",
+            "tmpl-language-jargon-barrier",
+            "tmpl-language-translation-loss",
+            "tmpl-learning-feedback-vacuum",
+            "tmpl-learning-novelty-block",
+            "tmpl-ethics-asymmetric-power",
+            "tmpl-ethics-precedent-set",
+        ]
+        for templateID in m258TemplateIDs {
+            let intent = BASWorldAwareRiskBridge.ProposedIntent(
+                sessionID: "s-m270-fan",
+                turnID: "t-m270-\(templateID)",
+                operation: .pureInference,
+                matchedTemplateID: templateID,
+                consentAcknowledged: false
+            )
+            let decision = try await stack.bridge.evaluate(
+                intent: intent)
+            XCTAssertGreaterThanOrEqual(
+                decision.branches.count, 3,
+                "M258 template \(templateID) must fan to ≥3 " +
+                "branches; got \(decision.branches.count)")
+        }
+    }
+
+    func testM270BranchesIncludeMixedPerturbationKinds() async
+    throws {
+        // Templates with non-empty preconditions AND blockers
+        // produce branches across multiple kinds. Verify the
+        // mix isn't all `.dropPrecondition`.
+        let stack = try await makeStackWithSeeder()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m270-mix",
+            turnID: "t-m270-mix",
+            operation: .pureInference,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        let decision = try await stack.bridge.evaluate(
+            intent: intent)
+        let kinds = Set(
+            decision.branches.map(\.perturbKind))
+        // Electrical-shock has both preconditions AND blockers,
+        // so we should see both .dropPrecondition AND
+        // .introduceBlocker in the fan-out.
+        XCTAssertTrue(
+            kinds.contains(.dropPrecondition),
+            "expected at least one .dropPrecondition branch")
+        XCTAssertTrue(
+            kinds.contains(.introduceBlocker),
+            "expected at least one .introduceBlocker branch " +
+            "(template has explicit blockers)")
+    }
+
+    func testM270UnknownTemplateAbsorbsSeederErrorGracefully()
+    async throws {
+        // Bridge surfaces unknownTemplate via the assessRisk
+        // path BEFORE reaching the seeder. So unknown templates
+        // throw via the existing `BridgeError.unknownTemplate`
+        // path, never make it to the seeder. Verify that
+        // contract holds.
+        let stack = try await makeStackWithSeeder()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m270-bad",
+            turnID: "t-m270-bad",
+            operation: .pureInference,
+            matchedTemplateID: "tmpl-does-not-exist",
+            consentAcknowledged: false
+        )
+        do {
+            _ = try await stack.bridge.evaluate(intent: intent)
+            XCTFail("expected unknownTemplate from assessRisk")
+        } catch BASWorldAwareRiskBridge.BridgeError
+            .unknownTemplate(let id)
+        {
+            XCTAssertEqual(id, "tmpl-does-not-exist")
+        } catch {
+            XCTFail("unexpected: \(error)")
+        }
+    }
 }

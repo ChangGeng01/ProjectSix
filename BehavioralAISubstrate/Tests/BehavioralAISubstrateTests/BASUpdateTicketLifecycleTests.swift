@@ -650,6 +650,161 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
                 "lifecycle-test-\(UUID().uuidString).json")
     }
 
+    // MARK: - M270 SQLite storage
+
+    func testSQLiteStorageEmptyRoundTrip() async throws {
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let entries = try await storage.load()
+        XCTAssertTrue(
+            entries.isEmpty,
+            "fresh DB has no rows")
+    }
+
+    func testSQLiteStoragePersistsAndLoadsLifecycle() async
+    throws {
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        _ = try await coordA.submit(makeTicket(id: "sql-1"))
+        try await coordA.startTrial(
+            ticketID: "sql-1",
+            trialRecordRef: "tr-sql-1")
+        try await coordA.markTrialOutcome(
+            ticketID: "sql-1",
+            outcome: .passed(reasonCodes: []))
+        try await coordA.approveForDistillation(
+            ticketID: "sql-1",
+            sovereignVerdictRef: "vr-sql-1")
+        _ = try await coordA.submit(makeTicket(id: "sql-2"))
+
+        // Independent coord, same DB → restore replays
+        // every persisted entry.
+        let storage2 = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storage2)
+        try await coordB.restore()
+
+        let count = await coordB.count()
+        XCTAssertEqual(count, 2)
+        let sql1 = await coordB.entry(ticketID: "sql-1")
+        XCTAssertEqual(sql1?.state, .queuedForDistillation)
+        XCTAssertEqual(
+            sql1?.sovereignVerdictRef, "vr-sql-1")
+        XCTAssertEqual(sql1?.history.count, 3)
+        let sql2 = await coordB.entry(ticketID: "sql-2")
+        XCTAssertEqual(sql2?.state, .proposed)
+    }
+
+    func testSQLiteStorageHandlesIdempotentSaves() async throws {
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        _ = try await coordA.submit(makeTicket(id: "idem"))
+        try await coordA.startTrial(
+            ticketID: "idem", trialRecordRef: "t")
+        try await coordA.markTrialOutcome(
+            ticketID: "idem",
+            outcome: .passed(reasonCodes: []))
+
+        // Force several explicit persists in a row — must not
+        // grow the row set.
+        try await coordA.persist()
+        try await coordA.persist()
+        try await coordA.persist()
+
+        let storage2 = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storage2)
+        try await coordB.restore()
+        let count = await coordB.count()
+        XCTAssertEqual(
+            count, 1,
+            "repeated persist must not duplicate rows")
+        let entry = await coordB.entry(ticketID: "idem")
+        XCTAssertEqual(entry?.state, .trialPassed)
+    }
+
+    func testSQLiteStorageScalesWithLargeTicketSet() async
+    throws {
+        // Performance / scale sanity: SQLite UPSERT-per-mutation
+        // beats the JSON full-rewrite for large pools. This test
+        // doesn't measure latency directly, but verifies a
+        // 200-entry pool round-trips correctly without losing
+        // any tickets.
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+
+        for i in 0..<200 {
+            _ = try await coordA.submit(
+                makeTicket(id: "bulk-\(i)"))
+        }
+
+        let storage2 = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storage2)
+        try await coordB.restore()
+        let count = await coordB.count()
+        XCTAssertEqual(count, 200)
+
+        // Spot-check a few entries restored intact.
+        let sample0 = await coordB.entry(ticketID: "bulk-0")
+        let sample199 = await coordB.entry(
+            ticketID: "bulk-199")
+        XCTAssertEqual(sample0?.state, .proposed)
+        XCTAssertEqual(sample199?.state, .proposed)
+    }
+
+    func testSQLiteStorageLoadsAfterTerminalTransitions() async
+    throws {
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+        _ = try await coordA.submit(makeTicket(id: "term"))
+        try await coordA.markRejected(
+            ticketID: "term",
+            reasonCodes: ["operator-veto"])
+
+        let storage2 = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storage2)
+        try await coordB.restore()
+        let entry = await coordB.entry(ticketID: "term")
+        XCTAssertEqual(entry?.state, .rejected)
+        // Ensure the post-rejection JSON encoding recovered
+        // the reason codes.
+        XCTAssertEqual(
+            entry?.history.last?.reasonCodes,
+            ["operator-veto"])
+    }
+
+    private func makeTempSQLiteURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "lifecycle-test-\(UUID().uuidString).sqlite")
+    }
+
     // MARK: - Helpers
 
     private func makeTicket(
