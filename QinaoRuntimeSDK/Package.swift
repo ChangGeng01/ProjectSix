@@ -267,6 +267,18 @@ let package = Package(
                     package: "BehavioralAISubstrate"),
                 .product(
                     name: "BASOrgan",
+                    package: "BehavioralAISubstrate"),
+                // M272 — `--full-stack-demo` mode wires
+                // M259/M261/M265/M268/M270/M273/M274 lifecycle.
+                // BASObservability owns the
+                // BASUpdateTicketLifecycleCoordinator + storage
+                // protocol. BASRuntimeCore owns
+                // BASSovereignAuditEntry (audit-sink payload).
+                .product(
+                    name: "BASObservability",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASRuntimeCore",
                     package: "BehavioralAISubstrate")
             ]),
         .testTarget(
