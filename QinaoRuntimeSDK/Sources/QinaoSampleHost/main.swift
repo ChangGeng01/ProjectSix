@@ -3206,14 +3206,23 @@ struct QinaoSampleHost {
     /// markers don't add noise.
     private static func runFullStackDemo() async {
         print("""
-            QinaoSampleHost --full-stack-demo (M272):
+            QinaoSampleHost --full-stack-demo (M272+M279):
               wires M254 multi-turn + M255 router + M259/M261
               lifecycle + M265 audit hook + M268 storage in one
-              flow. Bare Gemma (no LoRA).
+              flow. M279: primary is real Apple Foundation
+              Models (serves on iOS 18.1+/macOS 26+ with Apple
+              Intelligence enabled; throws providerUnavailable
+              elsewhere → router falls through to MLX Gemma).
             """)
 
-        // 1. Router: primary always fails → secondary serves
-        let primary = StubFailingAdapter()
+        // 1. Router: real Apple FM primary + MLX Gemma secondary
+        // (M279 — was StubFailingAdapter pre-M279).
+        // Apple FM serves when Apple Intelligence is available;
+        // otherwise it throws providerUnavailable on first
+        // draft and the M255 router falls through to MLX.
+        // Same fallback semantics as the M272 stub demo, but
+        // now hosts with AI enabled actually see Apple FM run.
+        let primary = AppleFoundationOrganAdapter()
         let secondary = MLXOrganAdapter(
             model: MLXModelCatalog.gemma4_E2B_4bit)
         do {
@@ -3229,9 +3238,13 @@ struct QinaoSampleHost {
             strategy: .primaryWithFallback)
         print("""
 
-            ━━━ Step 1/5 — Router built (M255) ━━━
-            primary:    \(primary.descriptor.providerID) (will fail)
+            ━━━ Step 1/5 — Router built (M255+M279) ━━━
+            primary:    \(primary.descriptor.providerID)
+                        (Apple FM — serves if Apple
+                        Intelligence on this device, else
+                        falls through)
             secondary:  \(secondary.descriptor.providerID)
+                        (MLX Gemma — always available)
             descriptor: \(router.descriptor.providerID)
             """)
 
@@ -3292,7 +3305,10 @@ struct QinaoSampleHost {
             }
         }
 
-        // Verify router fallback path
+        // Verify router served via either path (M279 update —
+        // either Apple FM primary or MLX secondary is a
+        // success; the doctrine claim is "router picks one
+        // healthy provider", not "always falls through").
         do {
             let routerDraft = try await router.draft(
                 BASOrganRequest(
@@ -3301,13 +3317,21 @@ struct QinaoSampleHost {
                     preset: .scout,
                     instruction:
                         "Summarize photosynthesis in one line."))
-            let routerOK = routerDraft.providerID
-                == secondary.descriptor.providerID
+            let pid = routerDraft.providerID
+            let primaryServed =
+                pid == primary.descriptor.providerID
+            let fellThrough =
+                pid == secondary.descriptor.providerID
             print("""
 
-              Router fallback verification:
-              served by: \(routerDraft.providerID) \
-              \(routerOK ? "✓" : "⚠")
+              Router verification (M279):
+              served by:  \(pid)
+              served via: \(primaryServed
+                  ? "primary (Apple FM available)"
+                  : (fellThrough
+                      ? "secondary (Apple FM unavailable → MLX fallback)"
+                      : "unknown"))
+              outcome:    \(primaryServed || fellThrough ? "✓" : "⚠")
             """)
         } catch {
             print("  Router error: \(error)")
