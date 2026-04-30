@@ -2070,13 +2070,172 @@ proposed → trialing → trialPassed → queuedForDistillation → distilled
 | Multi-turn UX | 无 | KV cache 跨轮 + bench 验证 conversation 记忆 | feature added |
 | Provider routing | host 自己写 | `BASRoutingOrganAdapter` + 16 tests | reusable |
 
-### 21.9 还没做但已识别
+### 21.9 还没做但已识别（21.x 截止）
 
-- **M263** 本节 — doctrine 同步
-- **M264** end-to-end smoke：multi-turn + router + lifecycle 一口气在一个 demo mode 跑完
-- **M265** sovereign ledger ↔ lifecycle audit：每条 lifecycle transition 写 audit ledger
-- **M266** scoring 函数：`.informationShift` × `.irreversible` 权重提升
-- **M267** L13 自动钩进 EBrainRuntimeCoordinator：今天 host 必须显式调 `ingestTurn`，未来可以 turn 完成时自动调
-- **M268** SQLite 跨进程 ledger 续 lifecycle：`BASUpdateTicketLifecycleEntry` 也持久化
+- ~~**M263** 本节 — doctrine 同步~~ → 已 ship 21 节
+- ~~**M264** end-to-end smoke~~ → 已 ship M264 (commit a150803e)
+- ~~**M265** sovereign ledger ↔ lifecycle audit~~ → 已 ship M265 (commit a150803e)
+- ~~**M266** scoring 函数 informationShift × irreversible~~ → 已 ship M266 (commit 35452e61)
+- ~~**M267** auto-flow ingestTurn~~ → 已 ship M267 (commit 35452e61)
+- ~~**M268** lifecycle 持久化~~ → 已 ship M268 (commit 4b4e7fb8)
+
+## 二十二、M269-M277 — 跨进程 + 高吞吐 + 自动接入闭环（2026-04-30）
+
+### 22.1 起点
+
+二十一节末尾列了 M263-M268 六个候选。本节是 M269 → M277 共 9 个 commits 的 doctrine 同步：从"测试基础设施稳定 + lifecycle 持久化骨架"推到"跨进程 + 高吞吐 + 自动 ingestion + WAL checkpoint 全栈"。
+
+### 22.2 测试基础设施修复
+
+#### M269 — thermal-notification 测试 timeout + XCTSkip
+
+**问题**：本机 macOS AddressBook XPC 服务异常（CoreData 错误），系统通知栈夯住，导致 `BASThermalTwinNotificationTests` 套件的 `await iterator.next()` 永不返回，整个 BAS 测试 bundle 跑 3 小时被 SIGKILL。
+
+**修复**：
+- `awaitWithTimeout(_:timeout:op:)` helper：用 `withTaskGroup` 把生产者 task 和 2 秒计时 task race，谁先完成谁赢。
+- `skipIfStackFlaky(_:)`：超时时 `XCTSkip(...)` 给清晰原因，整个 bundle 继续，不拖死其他测试。
+
+应用到 4 个测试方法（`testIsObservingFlagTracksLifecycle` 不读 stream，已安全）。
+
+**结果**：5 tests，1 graceful skip，0 failures。BAS 全栈从 SIGKILL 变成 1640+/1640 绿。这不是 substrate 回归 —— 是 macOS 系统级 flake，但测试基础设施现在能优雅处理。
+
+### 22.3 SQLite 高吞吐 + 跨进程 + 高并发存储栈
+
+#### M270 — SQLite-backed lifecycle storage
+
+**问题**：M268 的 JSON file 每次 mutate 重写整个文件 → O(N²) under growing pools。
+
+**修复**：`BASUpdateTicketLifecycleSQLiteStorage` (`@unchecked Sendable`) 用系统 `SQLite3`：
+- Single table `lifecycle_entries(ticket_id, state, entry_json)`
+- Per-mutation UPSERT — O(1) per call
+- M91 audit-ledger SQLite 同样模式
+
+#### M271 — 跨进程 safety verification
+
+3 新 tests 证明两个独立的 `BASUpdateTicketLifecycleSQLiteStorage` 指向同一 `.sqlite` 文件时：
+- A 写 → B `restore()` 看到
+- 100 个并发 submits → 全部 100 都 durable
+- A queue → B drain → A 看到 distilled
+
+doc 明确：JSON storage **不是**跨进程安全（atomic-replace races），SQLite storage **是**（lock manager handles）。
+
+#### M273 — serialized save chain
+
+**问题**：M271 的 100-parallel test 闪退 (got 91 not 100) 不是测试问题，是真 lost-update bug：两个 concurrent persists 各自捕 snapshot 后 await save，SQLite 在文件层 serialize 但 commit 顺序不保证 → save N+1 (更多条目) 可能 land BEFORE save N (旧 snapshot)，文件留陈旧状态。
+
+**修复**：`saveChain: Task<Void, Never>?` actor-isolated chain link。每个 `persistQuietly()`：
+1. 在 actor 上 capture snapshot
+2. 读 prior `saveChain` task
+3. 调 Task 等 prior 完成后 invoke `storage.save(snapshot)`
+4. 写 saveChain
+5. 内联 await 让 caller 看到最新 snapshot
+
+`drainPersistChain()` 公共 barrier：高吞吐场景下 explicit "wait for all in-flight saves to drain"。
+
+#### M274 — WAL mode + concurrent reads
+
+**问题**：M270 SQLite default rollback journal 阻塞 reader 直到 writer 提交。host runtime 写 ticket 同时外部蒸馏 pipeline 读 queue → blocked。
+
+**修复**：开 connection 后 `PRAGMA journal_mode=WAL` + `synchronous=NORMAL`。WAL 持久于文件，幂等。
+
+#### M277 — auto-checkpoint + manual checkpoint API
+
+**问题**：M274 WAL mode 下 `-wal` 文件无 checkpoint 持续增长。
+
+**修复**：
+- `autoCheckpointEvery: Int` (默认 100, 0=禁用) — 累计 N 次 save 后自动 `PRAGMA wal_checkpoint(TRUNCATE)`
+- `checkpoint() -> CheckpointResult` — 手动触发 + observability stats `(wasBusy, walFramesAtStart, framesMerged)`
+- `walSizeBytes() -> Int64?` — 当前 `-wal` 文件字节数
+
+Auto-checkpoint 错误 absorbed（数据已 durable in WAL，merge 是 cosmetic）。Manual `checkpoint()` throws on failure。
+
+### 22.4 Auto-flow 自动接入
+
+#### M267 — `ingestTurnResult(_:)` BASHostKit extension
+
+为 `BASUpdateTicketLifecycleCoordinator` 加 extension method：吃 `BASEBrainTurnResult.updateTickets`，避免 host 手写迭代。
+
+#### M275 — `runTurnAndIngest(_:lifecycleCoordinator:)` async wrapper
+
+更进一步：在 `BASEBrainRuntimeCoordinator` 上加 async wrapper —
+
+```swift
+let turn = await coord.runTurnAndIngest(
+    request, lifecycleCoordinator: lifecycleCoord)
+```
+
+替代手写两行：`runTurn` + `ingestTurnResult`。`lifecycleCoordinator` 为 nil 时 fully backward compatible。
+
+### 22.5 L4 → L9/L14 信号路径深化
+
+#### M266 — `.informationShift × .irreversible` 评分修正
+
+**问题**：`tmpl-social-public-disclosure` (irreversible info-shift) 评分 0.4 < `tmpl-social-trust-decay` (costly relationship-change) 评分 0.7。即 search-engine indexing 永久 < 关系修复可逆 — 评分倒挂。
+
+**修复**：`.informationShift` kind weight：reversible = 0.4 (不变)；irreversible = 0.85（新）。新排名（高到低）：consent-violation/money-irreversible-transfer 1.0 > public-disclosure 0.85 > electrical-shock 0.81 > trust-decay 0.7。语义对了。
+
+#### M276 — `BASWorldPriorObservationBundle` per evaluate
+
+**问题**：`BASWorldAwareRiskBridge.evaluate(intent:)` 只返 verdict + assessment，没 expose L4 实际 fire 了哪些 templates / branches / domains。L9 dream-cycle 和 L14 audit 必须再次 query vault → race-prone。
+
+**修复**：bridge 返回 `Decision.observationBundle` — `BASWorldPriorObservationBundle` 包：
+- 实际 query 的 templateID
+- 触发的 causal templates
+- 横跨的 domains
+- counterfactual branches（如果 seeder 接了）
+- evidence levels
+
+L9 / L14 现在 walk 这个 bundle 就能审计 L4 实际行为，无需 re-query。
+
+### 22.6 End-to-End 演示
+
+#### M272 — `--full-stack-demo` mode
+
+`QinaoSampleHost --full-stack-demo` 一行命令演示 M254-M277 全栈：
+1. 路由 adapter (M255 stub primary always-down + MLX secondary fallback)
+2. Lifecycle coordinator with audit-sink (M265) + JSON storage (M268)
+3. 3-turn 多轮对话 via secondary's `draftMultiTurn` (M254)
+4. 每轮 ticket 经 `ingestTurnResult` 进 lifecycle (M267)
+5. 一条 ticket 走 trial → distill 完整状态机
+6. JSON 文件 round-trip 跨"重启"
+
+不是 eval（用 bare Gemma 不挂 LoRA 课程，避免 marker 噪声），是 wiring demo。
+
+### 22.7 累计闭环 — 不变量 #3 全栈
+
+| concern | M-number | mechanism | status |
+|---|---|---|---|
+| 类型化状态机 | M259 | 8-state typed enum + 8 transitions | ✓ |
+| Auto-flow per ticket | M261 | `ingestTurn(_:)` | ✓ |
+| Auto-flow per turn | M267 | `ingestTurnResult(_:)` extension | ✓ |
+| Auto-flow per runtime | M275 | `runTurnAndIngest(_:lifecycleCoordinator:)` | ✓ |
+| Audit ledger 接入 | M265 | terminal-transition AuditSink | ✓ |
+| Atomic durable writes (低吞吐) | M268 | JSON file + atomic-replace | ✓ |
+| Atomic durable writes (高吞吐) | M270 | SQLite UPSERT | ✓ |
+| Cross-process safety | M271 | SQLite lock manager | ✓ |
+| Write order | M273 | save chain + drain barrier | ✓ |
+| Concurrent reads/writes | M274 | WAL mode | ✓ |
+| Bounded disk usage | M277 | auto-checkpoint TRUNCATE | ✓ |
+| L4 信号 expose | M276 | observation bundle | ✓ |
+| L4 评分修正 | M266 | info-shift × irreversible reweight | ✓ |
+| End-to-end demo | M272 | `--full-stack-demo` | ✓ |
+| Test infra 稳健 | M269 | timeout + XCTSkip | ✓ |
+
+### 22.8 测试统计
+
+| 套件 | M269 前 | M277 后 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1640 | 1661 | +21 |
+| BAS swift-testing | 417 | 417 | 0 |
+| Qinao | 778 | 778 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+### 22.9 还没做但已识别（22.x 截止）
+
+- **M278** real LoRA + lifecycle demo: `--full-stack-demo` 现在用 stub primary，未来接真 Apple FM availability check
+- **L9 dream cycle** 完整白皮书路径：M84 done dream-cycle wiring，剩余 surface
+- **L10 tribunal** 完整：M89 full body tribunal done，剩余 surface coverage
+- **L12 surface modes** 五种模式全实装：今天 schema 在，runtime decision 部分有，UI 完整接入待做
+- **M279** SQLite ledger storage migration tool: M91 ledger + M270 lifecycle 各自有 SQLite，未来可能合并到一个 .sqlite for 单文件审计
 
 
