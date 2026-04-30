@@ -218,6 +218,45 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
             throw SQLiteError.openFailed(reason: msg)
         }
         db = handle
+
+        // M274 — WAL (Write-Ahead Logging) journal mode.
+        //
+        // Default rollback journal blocks readers while a write
+        // transaction is in flight. WAL lets readers proceed
+        // concurrently with writers — exactly what hosts running
+        // an external offline-distillation pipeline alongside a
+        // host runtime need (the pipeline reads the queue while
+        // the runtime writes new tickets).
+        //
+        // WAL mode persists in the DB file (one-time set) but
+        // setting on every open is harmless idempotent. Pair
+        // with `synchronous=NORMAL` — safer than OFF (still
+        // crash-safe at WAL-checkpoint boundaries) and faster
+        // than FULL.
+        try execute(sql: "PRAGMA journal_mode=WAL",
+                    phase: "wal-mode")
+        try execute(sql: "PRAGMA synchronous=NORMAL",
+                    phase: "synchronous-normal")
+    }
+
+    /// M274 — return the active journal mode string. Public so
+    /// tests can verify WAL is engaged. Returns `nil` if the
+    /// query fails for any reason (defensive — never crashes
+    /// the storage instance just because a diagnostic read
+    /// errored).
+    public func journalMode() -> String? {
+        let sql = "PRAGMA journal_mode"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            return nil
+        }
+        guard let cstr = sqlite3_column_text(stmt, 0) else {
+            return nil
+        }
+        return String(cString: cstr).lowercased()
     }
 
     private func createSchemaIfNeeded() throws {

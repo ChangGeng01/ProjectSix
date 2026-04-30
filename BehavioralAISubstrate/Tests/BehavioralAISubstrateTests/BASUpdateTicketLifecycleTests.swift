@@ -891,6 +891,90 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
 
     private func makeTempSQLiteURL_unused() -> URL { URL(fileURLWithPath: "/dev/null") }
 
+    // MARK: - M274 WAL mode + concurrent reads
+
+    func testM274SQLiteStorageEngagesWALModeOnOpen() async
+    throws {
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let mode = storage.journalMode()
+        XCTAssertEqual(
+            mode, "wal",
+            "M274 must enable WAL mode on open " +
+            "(got: \(String(describing: mode)))")
+    }
+
+    func testM274WALModeAllowsConcurrentReaderWhileWriting()
+    async throws {
+        // Writer and reader on independent connections to the
+        // same WAL-mode DB. Reader should never block on
+        // writer's in-flight transaction (rollback-journal
+        // mode would block it). Test passes trivially if WAL
+        // is active; the assertion is qualitative — both ops
+        // complete within a tight window without deadlock.
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let writerStorage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let readerStorage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+
+        let writerCoord =
+            BASUpdateTicketLifecycleCoordinator(
+                storage: writerStorage)
+
+        // Seed one ticket so the reader has something to find.
+        _ = try await writerCoord.submit(
+            makeTicket(id: "wal-seed"))
+        await writerCoord.drainPersistChain()
+
+        // Concurrent: writer adds 30 more, reader does 30
+        // restore() reads. Neither should deadlock.
+        let start = Date()
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for i in 0..<30 {
+                    _ = try? await writerCoord.submit(
+                        BASUpdateTicket(
+                            ticketID: "wal-w-\(i)",
+                            sessionRef: "s",
+                            summary: "x",
+                            confidence: 0.5))
+                }
+            }
+            group.addTask {
+                for _ in 0..<30 {
+                    let coord =
+                        BASUpdateTicketLifecycleCoordinator(
+                            storage: readerStorage)
+                    _ = try? await coord.restore()
+                }
+            }
+        }
+        let elapsed = Date().timeIntervalSince(start)
+
+        await writerCoord.drainPersistChain()
+
+        // Sanity: the work didn't take absurdly long
+        // (rollback-journal contention would push this into
+        // multiple seconds with 30 reader/writer pairs).
+        XCTAssertLessThan(
+            elapsed, 5.0,
+            "30 writes + 30 reads under WAL should finish " +
+            "well under 5s; got \(elapsed)s — likely lock " +
+            "contention not WAL")
+
+        // Final state: 31 tickets durable.
+        let finalReader =
+            BASUpdateTicketLifecycleCoordinator(
+                storage: readerStorage)
+        try await finalReader.restore()
+        let count = await finalReader.count()
+        XCTAssertEqual(count, 31)
+    }
+
     // MARK: - M271 cross-process / multi-coordinator safety
 
     func testSQLiteStorageHandlesTwoCoordinatorsSerialWrites()
