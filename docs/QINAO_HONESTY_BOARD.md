@@ -2235,7 +2235,78 @@ L9 / L14 现在 walk 这个 bundle 就能审计 L4 实际行为，无需 re-quer
 - **M278** real LoRA + lifecycle demo: `--full-stack-demo` 现在用 stub primary，未来接真 Apple FM availability check
 - **L9 dream cycle** 完整白皮书路径：M84 done dream-cycle wiring，剩余 surface
 - **L10 tribunal** 完整：M89 full body tribunal done，剩余 surface coverage
-- **L12 surface modes** 五种模式全实装：今天 schema 在，runtime decision 部分有，UI 完整接入待做
-- **M279** SQLite ledger storage migration tool: M91 ledger + M270 lifecycle 各自有 SQLite，未来可能合并到一个 .sqlite for 单文件审计
+- ~~**L12 surface modes** 五种模式全实装：今天 schema 在，runtime decision 部分有，UI 完整接入待做~~ → runtime decision 已 ship M280；剩余 SwiftUI 组件（M281 候选）
+- **M279** ~~SQLite ledger storage migration tool~~ → 编号已被 demo Apple FM 占用；migration 重新编号为 M282
+
+## 二十三、M279 + M280 — production demo shape + L12 selector（2026-04-30 续）
+
+22.9 列了 4 个候选：M278 demo / L9 / L10 / L12。本节是其中 2 个的 doctrine 同步：
+
+### 23.1 M279 — `--full-stack-demo` 升级到真 Apple FM
+
+**问题**：M272 `--full-stack-demo` 用 `StubFailingAdapter` 当 router primary 强制 fallback。这演示了 M255 路由机制，但宿主在自己设备上跑时只看到"primary 总失败 → MLX serve"——脱离生产形态。
+
+**修复**：primary 换成真 `AppleFoundationOrganAdapter()`。路由语义不变：
+- iOS 18.1+ / macOS 26+ Apple Intelligence 启用 → primary serve（Apple FM）
+- Apple Intelligence 不可用 → primary 抛 `providerUnavailable` → router fall through to MLX
+
+宿主在任何设备跑 `swift run QinaoSampleHost --full-stack-demo` 现在看到的都是真 production 路径。verification step 改为"primary OR secondary served = ✓"，更诚实地反映 router 的"挑健康 provider"承诺。
+
+**StubFailingAdapter 保留**：未来需要强制 fallback 测试时仍可用。
+
+### 23.2 M280 — `BASSoftHandModeSelector` 纯函数 mapping
+
+**问题**：`BASSoftHandMode` enum (compare/draft/delay/boundary/silentStub) 早就 ship 但只是 schema。"给定 permit + verdict，宿主该 render 哪个 mode" 这个 runtime decision 散在各 host 代码里，没有 canonical mapping。
+
+**修复**：`BASSoftHandModeSelector.selectMode(permit:verdict:candidateCount:)` 纯函数，把 mapping 表 lockdown：
+
+| 输入 | mode |
+|---|---|
+| verdict ≥ deadStop / quarantine / rollback | silentStub |
+| verdict ≥ memoryFreeze / toolCut | boundary |
+| verdict == throttle / shadowLock | draft |
+| permit.mode == .block / .replace | boundary |
+| permit.mode == .delay | delay |
+| permit.mode == .draftOnly / .compare | compare |
+| permit.mode == .escalate | boundary |
+| permit.mode == .mirror / .localOnly | draft |
+| permit.mode == .answer + ≥2 candidates | compare |
+| permit.mode == .answer + 1 candidate | draft |
+| (no permit, verdict pass / nil) | silentStub |
+
+**Doctrine 锁定**（22 个测试）：
+
+- `silentStub` 是 fail-safe default — 不确定时不 render 可执行内容
+- **verdict 严格 override permit** — 即便 permit 是 `.answer`（最宽松），verdict 是 `.toolCut` 仍 surface `boundary`，testVerdictBeatsPermissivePermit pin 住
+- 多 candidate hint 只在 `.answer` permit 下生效；其他 permit 类别更严格，不需要 multi-candidate fallback
+
+**Convenience**：`selectMode(forVerdict:)` — 用于 sovereign quarantine 在 permit 还没 build 时就需要 force surface mode 的早 path。
+
+### 23.3 L12 surface modes 状态升级
+
+| 层 | M280 前 | M280 后 |
+|---|---|---|
+| 5-mode enum | ✓ schema | ✓ schema |
+| 6-signal observation kind | ✓ schema | ✓ schema |
+| Observation bundle pipeline | ✓ shipped | ✓ shipped |
+| **Pure runtime selector** | ✗ 缺 | **✓ M280** |
+| 5 SwiftUI 组件 | ✗ 缺 | ✗ 缺（M281 候选） |
+
+L12 现在 **runtime decision 路径完整**——任何 host 一行调用就能知道当前 turn 该 render 哪个 surface。UI 组件本身仍是后续工作。
+
+### 23.4 累计影响
+
+| 维度 | M278 末 | M280 末 | Δ |
+|---|---|---|---|
+| BAS XCTest count | 1672 | 1694 | +22（M280 selector tests） |
+| L12 production-ready surface | schema only | schema + selector | ✓ canonical mapping ship |
+| Demo 真实度 | stub primary | 真 Apple FM primary | production shape |
+
+### 23.5 还没做但已识别（23.x 截止）
+
+- **M281** L12 5 个 SwiftUI 组件：compare panel / draft shell / delay packet / boundary script / silent stub
+- **M282** SQLite ledger storage migration tool（M91 + M270 → 单 `.sqlite`）
+- **L9 dream cycle** 完整白皮书路径
+- **L10 tribunal** 完整 surface coverage
 
 
