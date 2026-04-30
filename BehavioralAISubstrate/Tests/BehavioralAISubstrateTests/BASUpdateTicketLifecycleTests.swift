@@ -805,6 +805,146 @@ final class BASUpdateTicketLifecycleTests: XCTestCase {
                 "lifecycle-test-\(UUID().uuidString).sqlite")
     }
 
+    // MARK: - M271 cross-process / multi-coordinator safety
+
+    func testSQLiteStorageHandlesTwoCoordinatorsSerialWrites()
+    async throws {
+        // Two independent storage instances backing the same
+        // SQLite file. Each instance opens its own connection
+        // (mimics two host processes sharing the file).
+        // Writes through coord A should be visible to coord B
+        // after persist, and vice versa.
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let storageA = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let storageB = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storageA)
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storageB)
+
+        // A writes one ticket.
+        _ = try await coordA.submit(makeTicket(id: "host-a"))
+
+        // B sees it after restore (SQLite-level read across
+        // separate connections).
+        try await coordB.restore()
+        let countAfterA = await coordB.count()
+        XCTAssertEqual(
+            countAfterA, 1,
+            "B must see A's writes via SQLite cross-connection")
+
+        // B writes one more.
+        _ = try await coordB.submit(makeTicket(id: "host-b"))
+
+        // A re-restores → sees both.
+        try await coordA.restore()
+        let countAfterBoth = await coordA.count()
+        XCTAssertEqual(
+            countAfterBoth, 2,
+            "A must see B's writes after restore")
+
+        let aSide = await coordA.entry(ticketID: "host-a")
+        let bSide = await coordA.entry(ticketID: "host-b")
+        XCTAssertEqual(aSide?.state, .proposed)
+        XCTAssertEqual(bSide?.state, .proposed)
+    }
+
+    func testSQLiteStorageHandlesParallelTicketIngestion() async
+    throws {
+        // 100 parallel submissions through TaskGroup, then
+        // verify all 100 landed in storage. SQLite serializes
+        // at the connection level + tx level; the actor
+        // serializes at the actor level. Combined: linearized
+        // writes, no corruption, no lost updates.
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storage = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coord = BASUpdateTicketLifecycleCoordinator(
+            storage: storage)
+
+        await withTaskGroup(of: Void.self) { group in
+            for i in 0..<100 {
+                group.addTask {
+                    _ = try? await coord.submit(
+                        BASUpdateTicket(
+                            ticketID: "par-\(i)",
+                            sessionRef: "s-par",
+                            summary: "parallel-\(i)",
+                            confidence: 0.5))
+                }
+            }
+        }
+
+        let count = await coord.count()
+        XCTAssertEqual(count, 100)
+
+        // Restart-equivalent: independent storage handle reads
+        // back the same 100.
+        let storage2 = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coord2 = BASUpdateTicketLifecycleCoordinator(
+            storage: storage2)
+        try await coord2.restore()
+        let count2 = await coord2.count()
+        XCTAssertEqual(
+            count2, 100,
+            "all 100 parallel writes must be durable")
+    }
+
+    func testSQLiteStorageDistillationQueueIsCrossConsistent()
+    async throws {
+        // Coord A queues a ticket; coord B (independent
+        // connection on same file) reads the queue after
+        // restore and sees the ticket exactly once.
+        let url = makeTempSQLiteURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let storageA = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordA = BASUpdateTicketLifecycleCoordinator(
+            storage: storageA)
+        _ = try await coordA.submit(
+            makeTicket(id: "xp-queue"))
+        try await coordA.startTrial(
+            ticketID: "xp-queue",
+            trialRecordRef: "t")
+        try await coordA.markTrialOutcome(
+            ticketID: "xp-queue",
+            outcome: .passed(reasonCodes: []))
+        try await coordA.approveForDistillation(
+            ticketID: "xp-queue",
+            sovereignVerdictRef: "v")
+
+        let storageB = try
+            BASUpdateTicketLifecycleSQLiteStorage(url: url)
+        let coordB = BASUpdateTicketLifecycleCoordinator(
+            storage: storageB)
+        try await coordB.restore()
+        let queue = await coordB.distillationQueue()
+        XCTAssertEqual(
+            queue.count, 1,
+            "B must see A's queued ticket")
+        XCTAssertEqual(
+            queue.first?.ticket.ticketID, "xp-queue")
+
+        // B drains it.
+        try await coordB.markDistilled(
+            ticketID: "xp-queue",
+            reasonCodes: ["pipeline:b"])
+
+        // A re-restores → sees terminal state.
+        try await coordA.restore()
+        let entry = await coordA.entry(ticketID: "xp-queue")
+        XCTAssertEqual(
+            entry?.state, .distilled,
+            "A must see B's terminal write")
+    }
+
     // MARK: - Helpers
 
     private func makeTicket(

@@ -149,6 +149,26 @@ public struct BASUpdateTicketLifecycleEntry:
 /// implementations can be plain JSON files, SQLite, CloudKit,
 /// or whatever the host needs. The default implementation
 /// shipped here is a JSON-encoded file at a host-supplied URL.
+///
+/// ## M271 — concurrency contract
+///
+/// Implementations are responsible for cross-process safety
+/// when the storage backs a file shared by multiple hosts:
+///
+/// - `BASUpdateTicketLifecycleJSONFileStorage`: **NOT**
+///   cross-process safe. Two processes writing the same file
+///   simultaneously can lose one set of changes (atomic-replace
+///   races at the filesystem layer). Single-host only.
+///
+/// - `BASUpdateTicketLifecycleSQLiteStorage` (M270): **IS**
+///   cross-process safe. SQLite's own lock manager handles
+///   serialization via `SQLITE_OPEN_FULLMUTEX` + the natural
+///   `BEGIN TRANSACTION` exclusive lock. Two host processes
+///   pointing at the same `.sqlite` file see consistent state.
+///
+/// Hosts deploying multi-process scenarios (one writer + N
+/// readers, or load-balanced workers) should pick the SQLite
+/// implementation. The JSON file is for single-host workflows.
 public protocol BASUpdateTicketLifecycleStorage: Sendable {
     /// Load every stored entry. Empty dict on first run /
     /// missing file. Throws on corrupt data so callers can
