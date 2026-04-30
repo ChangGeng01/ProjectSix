@@ -764,4 +764,40 @@ public struct BASEBrainRuntimeCoordinator {
         )
     }
 
+    /// M275 — async wrapper that runs a turn AND auto-flows
+    /// every emitted ticket into the supplied lifecycle
+    /// coordinator. Equivalent to:
+    ///
+    /// ```swift
+    /// let turn = coord.runTurn(request)
+    /// await lifecycleCoord.ingestTurnResult(turn)
+    /// return turn
+    /// ```
+    ///
+    /// Hosts that already had a lifecycle coordinator wired
+    /// previously had to call those two lines manually after
+    /// every turn. This wrapper makes that the one-line
+    /// pattern. Pass-through behavior matches `runTurn(_:)`
+    /// exactly when `lifecycleCoordinator` is nil — no auto-
+    /// flow happens. Backward-compatible: existing callers
+    /// keep using `runTurn(_:)` unchanged.
+    ///
+    /// - Parameters:
+    ///   - request: same shape as `runTurn(_:)`
+    ///   - lifecycleCoordinator: optional. When non-nil, every
+    ///     ticket from the result auto-submits via
+    ///     `BASUpdateTicketLifecycleCoordinator
+    ///       .ingestTurnResult(_:)` (M267).
+    public func runTurnAndIngest(
+        _ request: BASEBrainTurnRequest,
+        lifecycleCoordinator:
+            BASUpdateTicketLifecycleCoordinator?
+    ) async -> BASEBrainTurnResult {
+        let turn = runTurn(request)
+        if let coord = lifecycleCoordinator {
+            _ = await coord.ingestTurnResult(turn)
+        }
+        return turn
+    }
+
 }
