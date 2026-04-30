@@ -487,4 +487,185 @@ final class BASWorldAwareRiskBridgeTests: XCTestCase {
             XCTFail("unexpected: \(error)")
         }
     }
+
+    // MARK: - M276 observation ledger emission
+
+    private func makeStackWithObservationLedger() async throws
+    -> (
+        vault: BASWorldPriorVault,
+        ledger: BASSovereignAuditLedger,
+        engine: BASSovereignVerdictEngine,
+        bridge: BASWorldAwareRiskBridge,
+        observationLedger: BASWorldPriorObservationLedger
+    ) {
+        let vault = BASWorldPriorVault()
+        try await BASWorldPriorBuiltInLibrary.bootstrap(into: vault)
+        let ledger = BASSovereignAuditLedger.withSeed(
+            "test-key-m276")
+        let engine = BASSovereignVerdictEngine(ledger: ledger)
+        let seeder = BASWorldPriorCounterfactualSeeder(
+            vault: vault)
+        let observationLedger =
+            BASWorldPriorObservationLedger()
+        let bridge = BASWorldAwareRiskBridge(
+            worldVault: vault,
+            verdictEngine: engine,
+            counterfactualSeeder: seeder,
+            observationLedger: observationLedger)
+        return (vault, ledger, engine, bridge, observationLedger)
+    }
+
+    func testM276NoObservationLedgerLeavesLedgerEmpty() async
+    throws {
+        // Default bridge (no observation ledger) shouldn't
+        // record anything to a freshly-allocated ledger handed
+        // in for verification — backward compatible.
+        let stack = try await makeStack()
+        let observationLedger =
+            BASWorldPriorObservationLedger()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m276-empty",
+            turnID: "t-m276-empty",
+            operation: .pureInference,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        _ = try await stack.bridge.evaluate(intent: intent)
+        let count = await observationLedger.count()
+        XCTAssertEqual(
+            count, 0,
+            "external ledger isn't wired; nothing recorded")
+    }
+
+    func testM276BridgeRecordsBundlePerEvaluate() async throws {
+        let stack = try await makeStackWithObservationLedger()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m276-1",
+            turnID: "t-m276-1",
+            operation: .pureInference,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        _ = try await stack.bridge.evaluate(intent: intent)
+        let count = await stack.observationLedger.count()
+        XCTAssertEqual(
+            count, 1,
+            "one bundle per evaluate call")
+        let bundle = await stack.observationLedger.bundle(
+            forTurn: "t-m276-1")
+        XCTAssertNotNil(bundle)
+        XCTAssertEqual(bundle?.sessionID, "s-m276-1")
+    }
+
+    func testM276BundleHasMatchedAndCounterfactualKinds() async
+    throws {
+        let stack = try await makeStackWithObservationLedger()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m276-kinds",
+            turnID: "t-m276-kinds",
+            operation: .pureInference,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        _ = try await stack.bridge.evaluate(intent: intent)
+        let bundle = await stack.observationLedger.bundle(
+            forTurn: "t-m276-kinds")!
+        let kinds = Set(bundle.observations.map(\.kind))
+        XCTAssertTrue(
+            kinds.contains(.templateMatched),
+            "bundle must include the matched-template signal")
+        XCTAssertTrue(
+            kinds.contains(.counterfactualSeeded),
+            "bundle must include counterfactual signals " +
+            "(M270 seeder is wired)")
+        let matchedCount = bundle.observations(
+            of: .templateMatched).count
+        XCTAssertEqual(
+            matchedCount, 1,
+            "exactly one templateMatched observation per turn")
+        let counterfactualCount = bundle.observations(
+            of: .counterfactualSeeded).count
+        XCTAssertGreaterThanOrEqual(
+            counterfactualCount, 3,
+            "spec-floor: ≥3 counterfactual observations " +
+            "(matches the seeder's branch count)")
+    }
+
+    func testM276BundleTemplateIDsCorrelateWithCounterfactual()
+    async throws {
+        // Every counterfactualSeeded observation should carry
+        // the same templateID as the matched template, so
+        // downstream correlation works.
+        let stack = try await makeStackWithObservationLedger()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m276-correlate",
+            turnID: "t-m276-correlate",
+            operation: .pureInference,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        _ = try await stack.bridge.evaluate(intent: intent)
+        let bundle = await stack.observationLedger.bundle(
+            forTurn: "t-m276-correlate")!
+        let templateIDs = Set(
+            bundle.observations.map(\.templateID))
+        XCTAssertEqual(
+            templateIDs,
+            ["tmpl-physics-electrical-shock"],
+            "bundle should reference exactly the matched " +
+            "template across all observation kinds")
+    }
+
+    func testM276BundleSessionFilterReturnsAllTurns() async
+    throws {
+        let stack = try await makeStackWithObservationLedger()
+        for i in 0..<3 {
+            let intent =
+                BASWorldAwareRiskBridge.ProposedIntent(
+                    sessionID: "s-m276-multi",
+                    turnID: "t-m276-multi-\(i)",
+                    operation: .pureInference,
+                    matchedTemplateID:
+                        "tmpl-physics-electrical-shock",
+                    consentAcknowledged: false)
+            _ = try await stack.bridge.evaluate(intent: intent)
+        }
+        let bundles = await stack.observationLedger.bundles(
+            forSession: "s-m276-multi")
+        XCTAssertEqual(
+            bundles.count, 3,
+            "all three turns recorded under session ID")
+    }
+
+    func testM276MatchedObservationCarriesAssessmentScore() async
+    throws {
+        // Salience of the templateMatched observation should
+        // equal the assessment's irreversibleHarmScore — that
+        // value is what observability layers consume.
+        let stack = try await makeStackWithObservationLedger()
+        let intent = BASWorldAwareRiskBridge.ProposedIntent(
+            sessionID: "s-m276-score",
+            turnID: "t-m276-score",
+            operation: .pureInference,
+            matchedTemplateID:
+                "tmpl-physics-electrical-shock",
+            consentAcknowledged: false
+        )
+        let decision = try await stack.bridge.evaluate(
+            intent: intent)
+        let bundle = await stack.observationLedger.bundle(
+            forTurn: "t-m276-score")!
+        let matched = bundle.observations(
+            of: .templateMatched).first!
+        XCTAssertEqual(
+            matched.salience,
+            decision.assessment.irreversibleHarmScore,
+            accuracy: 0.001,
+            "matched-template salience must equal the " +
+            "assessment's harm score")
+    }
 }

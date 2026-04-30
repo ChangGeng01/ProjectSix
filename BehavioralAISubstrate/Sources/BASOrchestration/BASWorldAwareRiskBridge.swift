@@ -51,16 +51,35 @@ public actor BASWorldAwareRiskBridge {
     /// behavior (empty branches array).
     private let counterfactualSeeder:
         BASWorldPriorCounterfactualSeeder?
+    /// M276 — optional observation ledger. When present, every
+    /// `evaluate(intent:)` call records a
+    /// `BASWorldPriorObservationBundle` capturing both the
+    /// matched template (`templateMatched`) and each
+    /// counterfactual branch (`counterfactualSeeded`). L14
+    /// audit / L9 dream-cycle / L12 surface can then consume
+    /// observations via the ledger without re-querying the
+    /// vault per template, and downstream tooling has a single
+    /// timeline of "what L4 actually emitted this turn."
+    private let observationLedger:
+        BASWorldPriorObservationLedger?
+    /// M276 — clock injection for deterministic
+    /// `observedAt` / `emittedAt` timestamps in tests.
+    private let clock: @Sendable () -> Date
 
     public init(
         worldVault: BASWorldPriorVault,
         verdictEngine: BASSovereignVerdictEngine,
         counterfactualSeeder:
-            BASWorldPriorCounterfactualSeeder? = nil
+            BASWorldPriorCounterfactualSeeder? = nil,
+        observationLedger:
+            BASWorldPriorObservationLedger? = nil,
+        clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.worldVault = worldVault
         self.verdictEngine = verdictEngine
         self.counterfactualSeeder = counterfactualSeeder
+        self.observationLedger = observationLedger
+        self.clock = clock
     }
 
     /// A proposed intent, described in the terms the bridge needs
@@ -191,6 +210,15 @@ public actor BASWorldAwareRiskBridge {
         let branches = await generateBranches(
             templateID: intent.matchedTemplateID)
 
+        // M276 — record observations into the optional ledger so
+        // downstream consumers (L9 dream-cycle, L14 audit) can
+        // walk what L4 emitted without re-querying the vault.
+        await recordObservations(
+            assessment: assessment,
+            branches: branches,
+            sessionID: intent.sessionID,
+            turnID: intent.turnID)
+
         return Decision(
             verdict: verdict,
             assessment: assessment,
@@ -211,6 +239,80 @@ public actor BASWorldAwareRiskBridge {
             return try await seeder.generate(from: seed)
         } catch {
             return []
+        }
+    }
+
+    /// M276 — emit one `BASWorldPriorObservationBundle` per
+    /// `evaluate(intent:)` call. Bundle includes a
+    /// `templateMatched` observation for the assessment's
+    /// matched template plus one `counterfactualSeeded`
+    /// observation per generated branch. No-op when no ledger
+    /// is wired.
+    private func recordObservations(
+        assessment: BASWorldPriorRiskAssessment,
+        branches: [BASWorldPriorCounterfactualBranch],
+        sessionID: String,
+        turnID: String
+    ) async {
+        guard let ledger = observationLedger else { return }
+        let now = clock()
+        var observations: [BASWorldPriorObservation] = []
+
+        // 1. matched template — confidence rises with the
+        //    irreversibleHarmScore (a strong match is "this
+        //    template fired the gate floor").
+        observations.append(
+            BASWorldPriorObservation(
+                kind: .templateMatched,
+                templateID: assessment.matchedTemplateID,
+                evidenceLevel: assessment.evidenceLevel,
+                salience: assessment.irreversibleHarmScore,
+                confidence: assessment.evidenceSufficient
+                    ? 0.9 : 0.5,
+                content:
+                    "bridge.evaluate: template matched, " +
+                    "score=\(String(format: "%.2f", assessment.irreversibleHarmScore))",
+                observedAt: now))
+
+        // 2. each counterfactual branch — salience falls with
+        //    branch evidence rung (the more speculative the
+        //    branch, the lower the salience).
+        for branch in branches {
+            let salience = Self.salience(
+                from: branch.branchEvidence)
+            observations.append(
+                BASWorldPriorObservation(
+                    kind: .counterfactualSeeded,
+                    templateID: branch.seedTemplateID,
+                    evidenceLevel: branch.branchEvidence,
+                    salience: salience,
+                    confidence: salience,
+                    content:
+                        "bridge.evaluate: " +
+                        branch.perturbKind.rawValue +
+                        " — " + branch.description,
+                    observedAt: now))
+        }
+
+        let bundle = BASWorldPriorObservationBundle(
+            turnID: turnID,
+            sessionID: sessionID,
+            observations: observations,
+            emittedAt: now)
+        await ledger.record(bundle)
+    }
+
+    /// Map evidence rung → salience scalar [0, 1].
+    /// `axiomatic` = 1.0 down to `speculative` = 0.1.
+    private static func salience(
+        from evidence: BASWorldPriorEvidenceLevel
+    ) -> Double {
+        switch evidence {
+        case .axiomatic: return 1.0
+        case .wellSupported: return 0.8
+        case .plausible: return 0.5
+        case .contested: return 0.2
+        case .speculative: return 0.1
         }
     }
 
