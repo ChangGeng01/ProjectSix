@@ -32,7 +32,15 @@ import QinaoMLX
 // (e.g. 401 if the key is missing/invalid) preserved as the exit
 // reason.
 
-@main
+// M306 — `@main` removed because the executable now ships a
+// second source file (`MultiSessionContinuity.swift`) that
+// holds testable demo logic. Once Swift sees more than one
+// .swift file in the executable target, an `@main`-annotated
+// struct cannot coexist with `main.swift` (which Swift treats
+// as a top-level-code file by convention). Solution: leave
+// `main.swift` named as such, drop `@main`, and append a single
+// top-level await at the bottom of this file to invoke
+// `QinaoSampleHost.main()`. Behaviour identical pre / post.
 struct QinaoSampleHost {
     static func main() async {
         let args = Array(CommandLine.arguments.dropFirst())
@@ -123,6 +131,30 @@ struct QinaoSampleHost {
             //      transitions
             // Wiring proof, not an eval.
             await runFullStackDemo()
+            return
+        }
+        if args.contains("--multi-session-demo") {
+            // M306 — drive two sequential `BASHostRuntime`
+            // sessions sharing one SQLite-backed audit ledger
+            // (M91) under one `BASUnifiedStorageLocator` root
+            // (M298). Prove cross-session continuity:
+            //   1. Step 1/4: derive shared root + canonical
+            //      audit-ledger URL.
+            //   2. Step 2/4: Session A — fresh runtime, drive
+            //      one turn, append entry to ledger1.
+            //   3. Step 3/4: Session B — close ledger1, open
+            //      a fresh ledger2 against same SQLite file
+            //      (M91 cross-process semantics rehydrate
+            //      session A from disk), drive one turn,
+            //      append entry to ledger2.
+            //   4. Step 4/4: open verification ledger3 against
+            //      the same file; assert chain integrity +
+            //      both audit IDs readable.
+            // No real-model inference (BASHostRuntime drives
+            // the substrate stack with deterministic fixtures);
+            // M298-M305 audit-signal codes are observable per
+            // session.
+            await runMultiSessionDemo()
             return
         }
         if args.contains("--lora-curriculum-train-m247") {
@@ -3435,6 +3467,70 @@ struct QinaoSampleHost {
         try? FileManager.default.removeItem(
             at: unifiedLocations.root)
     }
+
+    // MARK: - M306 multi-session demo
+
+    /// M306 — drive two sequential `BASHostRuntime` sessions
+    /// sharing one SQLite-backed audit ledger and print the
+    /// cross-session continuity outcome. The actual demo logic
+    /// lives in `MultiSessionContinuityDemo.run(...)` so unit
+    /// tests can exercise it without driving the executable.
+    private static func runMultiSessionDemo() async {
+        print("""
+            QinaoSampleHost --multi-session-demo (M306):
+              drive two BASHostRuntime sessions sharing one
+              SQLite-backed audit ledger; verify chain
+              integrity + M298-M305 audit-signal codes appear
+              in both sessions; reload via a third
+              verification ledger.
+            """)
+
+        let demoRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "qinao-multi-session-demo-" +
+                "\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: demoRoot)
+        }
+
+        let outcome: MultiSessionContinuityDemo.Outcome
+        do {
+            outcome = try await MultiSessionContinuityDemo
+                .run(rootDirectory: demoRoot)
+        } catch {
+            stderr("error: multi-session demo failed: \(error)\n")
+            exit(2)
+        }
+
+        print("""
+
+            ━━━ Step 1/4 — Shared unified storage (M298) ━━━
+            unified root:    \(outcome.unifiedRoot.lastPathComponent)
+            audit ledger:    \(outcome.auditLedgerURL.lastPathComponent)
+
+            ━━━ Step 2/4 — Session A ━━━
+            sessionID:       \(outcome.sessionA.sessionID)
+            auditID:         \(outcome.sessionA.auditID)
+            audit codes:     \(outcome.sessionA.m298ThroughM305CodePrefixes
+                .joined(separator: ", "))
+            signalRefs (#):  \(outcome.sessionA.signalRefs.count)
+
+            ━━━ Step 3/4 — Session B ━━━
+            sessionID:       \(outcome.sessionB.sessionID)
+            auditID:         \(outcome.sessionB.auditID)
+            audit codes:     \(outcome.sessionB.m298ThroughM305CodePrefixes
+                .joined(separator: ", "))
+            signalRefs (#):  \(outcome.sessionB.signalRefs.count)
+
+            ━━━ Step 4/4 — Continuity proof (verification ledger) ━━━
+            entries on disk:        \(outcome.ledgerEntryCount)
+            chain integrity:        \(outcome.chainIntegrityVerified ? "✓ verified" : "⚠ FAILED")
+            sessionIDs distinct:    \(outcome.sessionA.sessionID != outcome.sessionB.sessionID ? "✓" : "⚠ SAME")
+            auditIDs distinct:      \(outcome.sessionA.auditID != outcome.sessionB.auditID ? "✓" : "⚠ SAME")
+
+            ━━━ Demo complete — M298 locator + M91 SQLite ledger + M298-M305 audit codes verified across two sessions ━━━
+            """)
+    }
 }
 
 /// Captures audit entries inside `--full-stack-demo`. Actor so the
@@ -3526,3 +3622,7 @@ private struct ChatCompletionsCLIEndpoint: QinaoOrganEndpoint {
         }
     }
 }
+
+// M306 — top-level entry. Replaces the old `@main` attribute
+// (see comment above the `QinaoSampleHost` struct definition).
+await QinaoSampleHost.main()

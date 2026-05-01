@@ -327,6 +327,31 @@ let package = Package(
                     package: "BehavioralAISubstrate"),
                 .product(
                     name: "BASRuntimeCore",
+                    package: "BehavioralAISubstrate"),
+                // M306 — `--multi-session-demo` mode drives
+                // BASHostRuntime.startSession across two
+                // sequential sessions sharing one
+                // SQLite-backed audit ledger to prove
+                // cross-session chain integrity. BASHostKit
+                // owns BASHostRuntime + BASHostConfiguration.
+                // BASMemory owns the host-constitution + vault
+                // primitives the configuration consumes.
+                // BASSovereign owns the SQLite ledger storage
+                // + integrity verification helpers.
+                .product(
+                    name: "BASHostKit",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASMemory",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASSovereign",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASPolicy",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASAdmin",
                     package: "BehavioralAISubstrate")
             ]),
         .testTarget(
