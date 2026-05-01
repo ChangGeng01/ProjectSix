@@ -7894,14 +7894,35 @@ A 类全部 close + Cthulhu schemas 全 close + M296.1 净启 production wire �
 
 | 项 | 障碍 | 估算 |
 |---|---|---|
-| 真模型 AFM 多轮 demo（M310/M314 fallback 已 ship） | 需 macOS 26+ + Apple Intelligence enabled 真机 | 软件无法替代真机 |
+| 真模型 AFM 多轮 demo（M310/M314 fallback 已 ship） | 见 75.8.1 — runtime 选择决定 | 软件实测 |
 | L4 真训练资产（基座预训练） | 需算力（GPU / TPU 集群） | 软件无法替代算力 |
 | M295.1+ authoritative-tier curriculum 内容 | 需 domain experts 审稿 + 签发 `.domainExpertReviewed` envelope | 软件无法替代专家 |
 | M296.2 Dual-key commit 协议落地 | 密码学设计（Ed25519 多签 + TTL + nonce + key ceremony）— weeks of design+implementation | 仓库可做但 weeks |
 | M296.3 Cross-device sync ledger | 分布式系统 doctrine（CRDT vs 主从 + 网络分区策略）— weeks | 仓库可做但 weeks |
 | W1-W5 真世界（招 expert / 审稿 / 训 adapter / 多设备 / host 集成） | 真实世界协调工作 | 仓库永远无法替代 |
 
-M296.2 + M296.3 是仅有的"代码可做但工程量级 weeks"项；其余 4 项需要外部世界协作。
+#### 75.8.1 真模型 AFM 多轮 demo runtime 真相（stale claim 矫正）
+
+**之前 chapter 七十二/七十三/七十五 措辞"需 macOS 26+ Apple Intelligence enabled 真机"过窄。** 实证修正：
+
+| Runtime 场景 | AFM 可用性 | 说明 |
+|---|---|---|
+| **macOS host 直跑**（`swift run QinaoSampleHost --multi-turn-demo`） | **✓ 通常可用** | 走 macOS 本机 FoundationModels；要求 macOS 26+ + Apple Silicon + Apple Intelligence enabled。**最简单的实测路径**——无需模拟器/真机 |
+| **iOS Simulator** | △ 可能可用 | iOS 18.x 起 Apple 逐步开放 Simulator 上的 `FoundationModels.LanguageModelSession`；要求 host macOS 26+ + Apple Intelligence + Simulator runtime iOS 26+；部分 advanced 功能（writing tools / image playground）仍 Simulator-blocked。需实测 |
+| **iPhone 15 Pro+ / iPad M1+ 真机** | ✓ 最可靠 | iOS 26+ + 设备 Apple Intelligence enabled |
+
+**实测验证**：M314 demo 已有 graceful fallback 路径，`provider mode:` banner 字段标真实 runtime：
+- `apple-foundation` → AFM 真接通
+- `mock-fallback-no-afm` → AFM 没接通，走 mock
+- `mock` → 没设 env flag
+
+```bash
+QINAO_AFM_MULTI_TURN_DEMO=1 swift run QinaoSampleHost --multi-turn-demo
+```
+
+**结论**：B 类列表里"AFM 多轮 demo"严格说不是"仓库无法 close"，而是"仓库已 close (M314 fallback) + 实测 AFM 接通需用户本机配置"。划入 B 类是因为接通效果取决于环境而不是代码。
+
+M296.2 + M296.3 是真正"代码可做但工程量级 weeks"项；其余 3 项（L4 训练 / authoritative curriculum / W1-W5）需要外部世界协作。
 
 ### 75.9 一句话总结
 
