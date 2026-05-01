@@ -367,7 +367,16 @@ public struct BASEBrainRuntimeCoordinator {
             thoughtFrame: thoughtFrame
         )
         let boundRiskCard = primaryBinding?.riskCard ?? riskCard
-        let boundActionPermit = primaryBinding?.actionPermit ?? actionPermit
+        // M384 — boundActionPermit is rebound below by the abyssal
+        // permit escalation seam (after M303 pressure + M304 anchor
+        // derive). Mutable here so the escalation result becomes the
+        // canonical permit for audit emission and persistence; all
+        // upstream consumers (organ map, tool intent) ran above and
+        // saw the pre-escalation permit, which is doctrine-correct
+        // for this surgical scope (M384 closes附录 K.2.1 — escalation
+        // metadata becomes audit-visible; gating wider runtime
+        // behavior is deferred to subsequent milestones if needed).
+        var boundActionPermit = primaryBinding?.actionPermit ?? actionPermit
         normalizedRiskDecisionPackage = projectedRiskDecisionPackage(
             from: normalizedRiskDecisionPackage,
             riskCard: boundRiskCard,
@@ -687,6 +696,27 @@ public struct BASEBrainRuntimeCoordinator {
                 riskLevel: boundRiskCard.riskLevel,
                 permitMode: boundActionPermit.mode,
                 candidateCount: thoughtFrame.candidates.count)
+        // M384 — abyssal permit escalation seam. Pure helper reads
+        // M303 pressure + M304 anchor and returns an escalated
+        // permit (or the input permit unchanged when the trigger
+        // floor is not crossed or red line 8 fires). All escalation
+        // is additive: stackedModes never lose entries and `mode`
+        // (the single commit mouth) is never overwritten. The
+        // resulting reason codes propagate into the audit entry via
+        // the permit's `reasonCodes` array; signalRefs already
+        // carry the abyssal magnitude / mode summary from M303 so
+        // there is no double-emit risk. Red line 8 (深渊压强不绕
+        // 过人性锚点) is enforced by the helper itself: when
+        // anchor.recommendedSurfaceTone == .reserved the escalation
+        // is suppressed and a `permit.escalation-skipped:human-
+        // anchor-reserved` reason code is appended instead.
+        let abyssalPermitDecision = BASAbyssalPermitEscalation
+            .escalate(
+                permit: boundActionPermit,
+                pressure: abyssalPressureForAudit,
+                humanAnchor: humanAnchorSignalForAudit)
+        boundActionPermit = abyssalPermitDecision.permit
+        thoughtFrame.actionPermit = boundActionPermit
         // M304 — synthesize seal envelopes from the turn's
         // quarantine records. Each quarantine becomes a
         // sovereign-only seal (the strictest tier short of
