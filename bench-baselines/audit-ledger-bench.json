@@ -1,0 +1,17 @@
+{
+  "benchName" : "audit-ledger-bench",
+  "schemaVersion" : "bas-bench-baseline.v1",
+  "stats" : {
+    "max" : 1.150965690612793,
+    "mean" : 0.10492658615112305,
+    "min" : 0.08893013000488281,
+    "outlierCount" : 9,
+    "p50" : 0.09500980377197266,
+    "p95" : 0.1569986343383789,
+    "p99" : 0.22804737091064453,
+    "p999" : 0.3490447998046875,
+    "sampleCount" : 1000,
+    "standardDeviation" : 0.04203853973768338
+  },
+  "storedAt" : "2026-05-01T21:18:49Z"
+}

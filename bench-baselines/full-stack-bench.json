@@ -1,0 +1,17 @@
+{
+  "benchName" : "full-stack-bench",
+  "schemaVersion" : "bas-bench-baseline.v1",
+  "stats" : {
+    "max" : 97.1839427947998,
+    "mean" : 17.078185081481934,
+    "min" : 5.9490203857421875,
+    "outlierCount" : 0,
+    "p50" : 8.172988891601562,
+    "p95" : 97.1839427947998,
+    "p99" : 97.1839427947998,
+    "p999" : 97.1839427947998,
+    "sampleCount" : 10,
+    "standardDeviation" : 26.7371311941879
+  },
+  "storedAt" : "2026-05-01T21:19:12Z"
+}
