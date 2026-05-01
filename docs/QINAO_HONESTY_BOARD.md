@@ -7383,3 +7383,112 @@ auditIDs distinct:      ✓
 ### 71.8 一句话总结
 
 **M306 用 1 个 surgical PR + 6 个 typed-pin 测试 close A.2 multi-session continuity gap**。`QinaoSampleHost --multi-session-demo` 现在驱动两 BASHostRuntime sessions 共享一个 SQLite-backed audit ledger，第三个 verification ledger 验证 chain integrity；M298-M305 audit codes 在两 session 都 present。doctrine integrity 不动；新发现 doctrine：appending runtime-built audit entries to a sovereign ledger requires clearing `entry.signature` (the runtime's keying ≠ ledger's HMAC keying)。BAS 2136 → 2142 / Qinao 1238 / 全栈 3380 / 0 failures。
+
+## 七十二、 全面开发 batch v4 — 一致性 A-list 收尾（M308-M310）
+
+### 72.1 触发动作
+
+用户问 "A 还差多少"，phase 1 实证扫描后给出 4 条 surgical-shippable A 类（A4 / A2 / A3 / A1，按工期排序）。用户回 `全面开发 a` → 推全 A 类。
+
+发现 **A2 是 stale claim**：50 illustrative starter 早在 chapter 五十四 (M296.x Path A) ship 完了，phase 1 错把它列为 gap。其余 3 项推 ship。
+
+**编号冲突说明**：原 plan 用 M303-M306。本任务起步前另一并发 session（commits `d7e3bdb6 / 7b37da5c` 等 5 件，本 session 不可见）已用掉 M303-M306 + chapter 69-71。本批重新编号为 **M308 / M309 / M310** 避免数字冲撞，A2 不消耗编号。
+
+### 72.2 M308 — `QinaoSeatRegistry.allDefaultLoopSeats(loop:)` one-call factory（A4）
+
+**问题**：仓库已有两个 seat factory，但拼成全 9 席要 host 自己 merge：
+
+| Factory | 席数 | 谁 |
+|---|---|---|
+| `standardLoopSeats(loop:)` (M292.5+M292.6a) | 6 | scout/critic/risk/planner/surface/sovereignSentinel |
+| `adapterBoundSeats(loop:)` (M292.6d) | 3 | memory/hostAlignment/evolutionShadow |
+
+注释里说 "together they register all 9 seats"，但没有 `allDefaultLoopSeats` 一站式 factory，host first-day integration 要写两个 await。
+
+**修复** ([QinaoLoopReaderAdapters.swift](../QinaoRuntimeSDK/Sources/QinaoLoopSeats/QinaoLoopReaderAdapters.swift)): 加 `static func allDefaultLoopSeats(loop:) async -> QinaoSeatRegistry` 直接 register 全 9 席（顺序: standard 6 → adapter-bound 3，方便 audit 读 register sequence）。
+
+**Doctrine 锁定**（6 测试 in [QinaoAllDefaultLoopSeatsTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAllDefaultLoopSeatsTests.swift))：
+- 9 席全 register；Set 等于 `QinaoSeat.allCases`
+- 注册后 `registeredSeats()` raw-value ASC 排序
+- `standardLoopSeats` 仍 6 席不被破坏（backward-compat）
+- `adapterBoundSeats` 仍 3 席（同上）
+- standard ∪ adapter-bound = 9 disjoint cover 全 case
+- 二次调用 idempotent（last-write-wins）
+
+### 72.3 M309 — `QinaoAgentConcurrencyPhase` load-bearing via `dispatchByPhase`（A3）
+
+**问题**：`QinaoAgentFabricDoctrine.swift` 4 typed enums（`QinaoAgentLatencyCondition / ConcurrencyPhase / SwarmPart / Mantra`）+ `QinaoSeat.concurrencyPhase` extension 都 ship 了，但 `QinaoAgentConcurrencyPhase` 0 src 调用 outside-of-self-file。manifesto v4 三阶段并发（perception → cognition → landing）是 typed-pinned 但 dispatch 完全不读 phase；纯 doctrine-as-vocabulary，不 runtime-enforce。
+
+**修复** ([QinaoSeatPhaseDispatch.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoSeatPhaseDispatch.swift) — 新文件):
+
+- `QinaoSeatRegistry.seatsByPhase() -> [Phase: [Seat]]` — 当前 register 状态按 phase 分组（empty phase → empty array，不缺 key）
+- `QinaoSeatRegistry.dispatchByPhase(snapshotID:) async -> [Phase: SeatBoard]` — 三阶段串行（perception → cognition → landing），每阶段内并行；同 `dispatch` 的 task-group + 失败隔离 pattern
+- `QinaoSeatRegistry.registeredSeatImpls()` internal accessor (在 `QinaoSeatRegistry.swift` 加) 让 dispatchByPhase 不破 private encapsulation
+
+**Doctrine 锁定**（7 测试 in [QinaoSeatPhaseDispatchTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSeatPhaseDispatchTests.swift))：
+- 空 registry → 3 phases 都返 empty SeatBoard（不返 nil）
+- 注册 seat 后分组 partition 同 `QinaoSeat.concurrencyPhase` extension
+- 全 register → 3 phases 各产 board，verdicts ASC
+- 阶段内一席 throw → 同阶段其他席仍跑，throw 进 failures，不影响其他阶段
+- legacy `dispatch(snapshotID:)` flat-parallel 行为不动（backward-compat）
+- 跨阶段严格顺序：通过 actor-based PhaseTicker 计 tick，pin perception 全 < cognition 全 < landing 全
+
+剩下 3 enums (`QinaoAgentLatencyCondition / SwarmPart / Mantra`) 仍 typed-vocabulary-only by intentional design — manifesto v4 reference-vocabulary 模式，不需要 runtime enforcement。
+
+### 72.4 M310 — multi-turn end-to-end demo（mock + AFM gated）（A1）
+
+**问题**：QinaoLoop 单 turn E2E 全测覆盖（M178+ 系列），但 honesty board 55.8 / 68.9 列 "real-model multi-turn end-to-end demo" 为 surgical 但未做。`QinaoOrganEndpoint.produceBody(prompt:context:role:sessionID:)` 已支持 `context:` 数组传 prior-turn 历史，缺的是 driver pattern + assertion that context grows monotonically。
+
+**注意**：M310 与 M306（chapter 71，concurrent session ship）解决两个不同维度：
+- M306 = multi-**session** continuity（session A → session B 共享 audit ledger）
+- M310 = multi-**turn** continuity within ONE session（context grows N → N+1）
+
+**修复** ([QinaoMultiTurnEndToEndTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoMultiTurnEndToEndTests.swift) — 新文件):
+
+- `RecordingMockEndpoint` actor 记 (sessionID, prompt, context, role, turnIndex) 供 assertion
+- `driveMultiTurn(endpoint:sessionID:prompts:role:)` 是 host-side multi-turn driver pattern：每 turn 把 prior `user: <prompt>` + `assistant: <response>` 累加进 context
+- `AppleFoundationMultiTurnEndpoint` (test-private) wrap `BASOrganRegistry` + AppleFoundationOrganAdapter (M178 模式)，接 `QinaoOrganEndpoint`
+
+**Doctrine 锁定**（6 测试，5 active + 1 AFM-gated）：
+- mock: sessionID 跨 3 turn 稳定
+- mock: context 单调增长（turn N 见 2*(N-1) 条 user/assistant 对）
+- mock: turn N 必含 turn 1..N-1 的 prompt + response 字面
+- mock: 同 prompt 三次但 turnIndex 不同 → 三个不同 body（pin turn-index 真差异化）
+- mock: 独立 sessionID 不共享 context（host driver 责任，by sessionID 隔离）
+- AFM-gated (`QINAO_AFM_MULTI_TURN_E2E=1`)：3 turn 都产非空 body + provider ID 跨 turn 一致
+
+### 72.5 测试基线（M308-M310 累积）
+
+| 套件 | M306 末 (chapter 71) | M310 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2142 | 2142 | 0（M308-M310 全 Qinao-side） |
+| Qinao XCTest | 1238 | **1257** | +19 (M308 6 + M309 7 + M310 6, 1 AFM-gated 跳过) |
+| 全栈 | 3380 | **3399** | +19 |
+
+0 failures / 0 flakes。
+
+### 72.6 红线 / 不变量
+
+| 红线 / 不变量 | M308 | M309 | M310 |
+|---|---|---|---|
+| #1 先醒再答 | ✓（不动 L1） | ✓（不动 L1） | ✓（不动 L1） |
+| #2 神经不掌权 | ✓（仅 register convenience） | ✓（仅 phase 顺序，不改 verdict） | ✓（仅 transcript driver） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓（每阶段独立 SeatBoard，不 commit） | ✓ |
+
+### 72.7 仍剩 A 类
+
+A 类 4 项中 3 项已 ship，A2（M295.1+ 50-starter）实证后是 stale claim（chapter 五十四 已完成）。
+
+**A 类全部 close**。剩余 surgical-shippable 候选需要新 phase 1 扫描（chapter 七十.5 列的 4 条 Cthulhu schemas — UnknownReserve / AnomalyTrace / NarrativeDistortion / AbyssalBranch / ForbiddenKnowledgeCandidate — 可能仍是 0-runtime-caller，待下次 phase 1 验证）。
+
+不可 surgical（B 类）继续不变：
+- 真模型多轮端到端 demo（M310 mock 部分 ship；AFM-gated 部分需真机）
+- L4 真训练资产（需算力）
+- M295.1+ authoritative-tier 课程内容（需 domain experts）
+- M296.1-3 主权三件 weeks-of-engineering（chapter 71 关掉了 M306 multi-session demo，这一条 down to ~3 已）
+- W1-W5 真世界
+
+### 72.8 一句话总结
+
+**M308-M310 用 3 个 surgical PR close A 类剩 3 项**：9 席一站式 factory + manifesto v4 phase 三阶段 dispatch load-bearing + multi-turn driver pattern (mock 全栈 + AFM gated)。`QinaoAgentConcurrencyPhase` 从纯 typed-vocabulary 推到 runtime-enforced，是本批最大 doctrine-integrity 提升。BAS 2142 / Qinao 1238 → 1257 / 全栈 3399 / 0 failures。
