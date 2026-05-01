@@ -7749,3 +7749,160 @@ A 类 4 项 + 3 production wires 全部 closed：
 ### 74.9 一句话总结
 
 **M316-M318 用 3 个 surgical PR + 17 个 typed-pin 测试 close 3 件仍-0-caller Cthulhu schemas runtime 接入**：narrative distortion 5-轴投影 + anomaly trace deriveOrNil + abyssal branch 多 candidate 投影；都走 M303-M305 同 audit signalRefs additive metadata 模式。doctrine red line 7（watcher hint, not verdict）严格保留。BAS 2142 → 2159 / Qinao 1270 / 全栈 3429 / 0 failures。
+
+## 七十五、 一次性解决 — Cthulhu schemas 收尾 + M296.1 净启 production wire (M320-M322)
+
+### 75.1 触发动作
+
+用户 `一次性 解决掉`。phase 1 实证扫描后剩余 surgical-shippable scope:
+
+| 项 | 实证 |
+|---|---|
+| `BASUnknownReserve` (chapter 七十.5 partial) | 1 caller (governance + comments only)；effectively 0-runtime-caller |
+| `BASForbiddenKnowledgeCandidate` (同上) | 1 caller (同上)；effectively 0-runtime-caller |
+| `BASSovereignCleanRebootCoordinator` (M296.1 净启) | shipped (chapter 56.1) + tested + 0 demo / sample-host wire |
+
+3 件 surgical 全 close 一批；剩 B 类外部依赖项明确不在范围。
+
+### 75.2 M320 — `BASUnknownReserve` runtime wire (white paper §5.4)
+
+**问题**：5-tier `assertionCeiling` ladder（none / metaOnly / qualified / provisional / unrestricted）只在 governance + tests 出现；no runtime path projects from L9 uncertainty into the reserve schema.
+
+**修复** ([BASUnknownReserve.swift](../BehavioralAISubstrate/Sources/BASWorldPrior/BASUnknownReserve.swift)):
+
+- 加 `BASUnknownReserve.derive(reserveID:confidenceFloor:)` static — confidence floor → ceiling ladder mapping:
+  - `≥ 0.8` → `.unrestricted` (no signal worth reporting → audit elides)
+  - `0.6..<0.8` → `.provisional`
+  - `0.4..<0.6` → `.qualified`
+  - `0.2..<0.4` → `.metaOnly`
+  - `< 0.2` → `.none`
+- `unknownRefs` carries single `"confidence-floor:%.3f"` ref so audit walkers can trace projection back to source signal
+- `buildSovereignAuditEntry` 加 optional `unknownReserve: BASUnknownReserve? = nil` 参数 → 当 `assertionCeiling != .unrestricted` 时 append `unknownReserve.assertionCeiling:<tier>` + `unknownReserve.refs:N`
+- `BASHostKit` 加 `BASWorldPrior` 依赖（BASUnknownReserve 模块所在）
+- `runTurn` derive from `thoughtFrame.uncertaintyLedger.confidenceFloor`
+
+**Doctrine 锁定**（6 测试 in [M320UnknownReserveConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M320UnknownReserveConsumptionTests.swift)):
+- 高 confidence (0.9) → unrestricted + 空 refs + `isOpen == false`
+- mid-range (0.55) → qualified + 1 ref
+- 低 (0.1) → none ceiling
+- 5 阈值边界 monotonic mapping
+- 单 confidence-floor ref carrying derive trace
+- runtime 接入：codes 必为 0 或 2 条，结构 well-shaped
+
+### 75.3 M321 — `BASForbiddenKnowledgeCandidate` runtime wire (white paper §5.5)
+
+**问题**：L13 高风险 candidate parking-lot schema 0 runtime caller；white paper §5.5 承诺是纸面。
+
+**修复** ([BASForbiddenKnowledgeCandidate.swift](../BehavioralAISubstrate/Sources/BASMemory/BASForbiddenKnowledgeCandidate.swift)):
+
+- 加 `BASForbiddenKnowledgeCandidate.derive(from: BASQuarantineRecord, coolingPeriod:)` static — 1:1 from quarantine record（mirrors M304 sealEnvelope 模式）
+  - `candidateID ← "forbidden-{quarantineID}"`
+  - `sourceRefs ← [quarantine.sourceRef]`
+  - `riskReasons ← quarantine.reasonCodes`
+  - `contaminationRefs ← [quarantine.zone.rawValue]`
+  - 默认 `.standard` shadow trial / `.held` review state / 24h cooling
+- 加 `Aggregate` struct (count / strictestPolicy / allHeld) + `aggregate(_:)` factory（nil for empty input → audit elides）
+- strictest policy resolution 走 ordered set: `none < manualOnly < restricted < standard < escalated`
+- `buildSovereignAuditEntry` 加 optional `forbiddenAggregate: BASForbiddenKnowledgeCandidate.Aggregate? = nil` 参数 → 当 non-nil 时 append `forbidden.count:N` + `forbidden.policy:<strictest>` + 可选 `forbidden.allHeld:true`
+- `runTurn` derive from quarantine records (1 candidate per quarantine)
+
+**Doctrine 锁定**（6 测试 in [M321ForbiddenKnowledgeConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M321ForbiddenKnowledgeConsumptionTests.swift)):
+- derive 1:1 mirrors quarantine fields
+- 空 input → nil aggregate
+- count = N for non-empty
+- strictestPolicy walks ordered set correctly (escalated > standard)
+- allHeld flips false when any candidate not held
+- runtime 接入：codes 必为 0 / 2 / 3 条，结构 well-shaped
+
+### 75.4 M322 — `QinaoSampleHost --clean-reboot-demo` (M296.1 净启 production wire)
+
+**问题**：`BASSovereignCleanRebootCoordinator` shipped (chapter 56.1) + tested 但 0 sample / production demo path。M296.1 promise 「会退回来」无 first-day integration entry point.
+
+**修复**:
+
+- 新文件 [CleanRebootDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/CleanRebootDemo.swift)：
+  - `ScenarioRecord` + `Outcome` value types
+  - `buildStack()`：v0 (good, anchor bound) ← v1 (tainted) version tree fixture
+  - `run()`：rollback (v1 → v0 + bootstrap) + deadStop (v0 → halt) 两 scenarios
+  - 每 scenario 调 `coord.planReboot(...)` 拿 `RebootPlan`，reduce to `ScenarioRecord` for banner
+- main.swift 加 `--clean-reboot-demo` args 分支 + `runCleanRebootDemo` 私有静态 func 渲染 banner（Step 1 rollback / Step 2 deadStop / 审计 ledger 入数）
+
+**实测 demo 输出**：
+
+```
+━━━ Step 1/2 — Rollback scenario ━━━
+target version:     v0
+actions:            quarantineActiveSession → releaseSovereignLocks
+                    → closeAuditLedgerForSession → restoreSnapshot
+                    → verifyRestoredIntegrity → bootstrapNextSession
+bootstrap next:     ✓
+
+━━━ Step 2/2 — DeadStop scenario ━━━
+target version:     v0
+actions:            ...→ haltAndAwaitHostIntervention
+bootstrap next:     ✓ FALSE (halt expected)
+
+━━━ Audit ledger trail ━━━
+entries appended:   2
+```
+
+**Doctrine 锁定**（4 测试 in [QinaoSampleHostCleanRebootDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostCleanRebootDemoTests.swift)):
+- `BASSovereignVerdictLevel` 暴露 `.rollback` + `.deadStop` (banner relies on raw values)
+- 7 个 `RebootAction` 全 raw values stable (audit grep keys)
+- direct coordinator drive: rollback against tainted lineage 走 v0 + 含 `bootstrapNextSession`
+- direct coordinator drive: deadStop 走 `haltAndAwaitHostIntervention` + 不 bootstrap
+
+### 75.5 测试基线（M320-M322 累积）
+
+| 套件 | M319 末 (ch 七十四) | M322 末 (ch 七十五) | Δ |
+|---|---|---|---|
+| BAS XCTest | 2159 | **2171** | +12 (M320 6 + M321 6) |
+| Qinao XCTest | 1270 | **1274** | +4 (M322 4) |
+| 全栈 | 3429 | **3445** | +16 |
+
+0 failures / 0 flakes。`--clean-reboot-demo` 实测 invoke + exit code 0。
+
+### 75.6 红线 / 不变量
+
+| 红线 / 不变量 | M320 | M321 | M322 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（advisory metadata） | ✓（advisory metadata） | ✓（plan generation only — façade is execution actor） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（additive signalRefs） | ✓（additive signalRefs） | ✓（demo writes own ledger，与生产 audit 不串） |
+| 单提交口 | ✓ | ✓ | ✓（coordinator 不执行 reboot；只产 plan） |
+
+### 75.7 Cthulhu schemas runtime 接入终态
+
+| Schema | 状态 |
+|---|---|
+| BASAbyssalPressure (§5.1) | ✓ M303 ship+wire |
+| BASHumanAnchorSignal (§5.3) | ✓ M304 ship+wire |
+| BASSealEnvelope (§5.2) | ✓ M304 ship+wire |
+| BASEvolutionLifecycleSession | ✓ M305 ship+wire |
+| BASNarrativeDistortion (§7) | ✓ M316 ship+wire |
+| BASAnomalyTrace (§7) | ✓ M317 ship+wire |
+| BASAbyssalBranch (§7) | ✓ M318 ship+wire |
+| **BASUnknownReserve (§5.4)** | **✓ M320 ship+wire** |
+| **BASForbiddenKnowledgeCandidate (§5.5)** | **✓ M321 ship+wire** |
+
+**9/9 fully wired**。所有 white paper §5 + §7 Cthulhu schemas 完成 production-path runtime 接入。
+
+### 75.8 真正剩 — 仓库无法 close 的项
+
+A 类全部 close + Cthulhu schemas 全 close + M296.1 净启 production wire 完成。剩下都是 B 类：**仓库代码层面无法 close**，需要外部资源。
+
+| 项 | 障碍 | 估算 |
+|---|---|---|
+| 真模型 AFM 多轮 demo（M310/M314 fallback 已 ship） | 需 macOS 26+ + Apple Intelligence enabled 真机 | 软件无法替代真机 |
+| L4 真训练资产（基座预训练） | 需算力（GPU / TPU 集群） | 软件无法替代算力 |
+| M295.1+ authoritative-tier curriculum 内容 | 需 domain experts 审稿 + 签发 `.domainExpertReviewed` envelope | 软件无法替代专家 |
+| M296.2 Dual-key commit 协议落地 | 密码学设计（Ed25519 多签 + TTL + nonce + key ceremony）— weeks of design+implementation | 仓库可做但 weeks |
+| M296.3 Cross-device sync ledger | 分布式系统 doctrine（CRDT vs 主从 + 网络分区策略）— weeks | 仓库可做但 weeks |
+| W1-W5 真世界（招 expert / 审稿 / 训 adapter / 多设备 / host 集成） | 真实世界协调工作 | 仓库永远无法替代 |
+
+M296.2 + M296.3 是仅有的"代码可做但工程量级 weeks"项；其余 4 项需要外部世界协作。
+
+### 75.9 一句话总结
+
+**M320-M322 用 3 个 surgical PR + 16 个 typed-pin 测试 close 一次性 close 全 surgical 残项**：UnknownReserve 5-tier ladder projection + ForbiddenKnowledge derive+aggregate + 净启 sample-host demo (rollback + deadStop scenarios)。Cthulhu schemas 9/9 全 wire；M296.1 净启 production-path 闭合；仅剩 B 类（外部资源 / weeks-engineering）项不在 surgical 范围。BAS 2159 → 2171 / Qinao 1270 → 1274 / 全栈 3429 → 3445 / 0 failures。

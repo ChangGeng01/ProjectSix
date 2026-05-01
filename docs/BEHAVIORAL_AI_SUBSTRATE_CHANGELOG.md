@@ -1,5 +1,10 @@
 # BehavioralAISubstrate Changelog
 
+## 2026-05-02
+
+- **M320 — `BASUnknownReserve.derive(reserveID:confidenceFloor:)` runtime wire (white paper §5.4)**: closes honesty-board chapter 七十五.2. Adds 5-tier `assertionCeiling` ladder projection from L9 uncertainty floor (≥0.8 unrestricted / 0.6..<0.8 provisional / 0.4..<0.6 qualified / 0.2..<0.4 metaOnly / <0.2 none). `unknownRefs` carries single confidence-floor trace ref. `buildSovereignAuditEntry` accepts optional `unknownReserve` parameter; emits `unknownReserve.assertionCeiling:<tier>` + `unknownReserve.refs:N` only when ceiling is below `.unrestricted`. BASHostKit gains BASWorldPrior dep. 6 new tests (`M320UnknownReserveConsumptionTests`).
+- **M321 — `BASForbiddenKnowledgeCandidate.derive(from:)` + `.aggregate(_:)` runtime wire (white paper §5.5)**: closes honesty-board chapter 七十五.3. New 1:1 derive from `BASQuarantineRecord` (mirrors M304 sealEnvelope pattern; default `.standard` shadow trial / `.held` review state / 24h cooling). `Aggregate` struct + factory walks ordered policy set (`escalated > standard > restricted > manualOnly > none`) for strictest-tier resolution. `buildSovereignAuditEntry` emits `forbidden.count:N` + `forbidden.policy:<strictest>` + optional `forbidden.allHeld:true` only when aggregate non-nil. 6 new tests (`M321ForbiddenKnowledgeConsumptionTests`).
+
 ## 2026-05-01
 
 - **M316 — `BASNarrativeDistortion.derive(distortionID:riskLevel:permitMode:)` runtime wire (white paper §7)**: closes honesty-board chapter 七十四.2. Adds 5-axis distortion projection from final risk + permit (`forcedClosure` scales with permit tightness, `urgencyMask` scales with high-risk + answer permit, other 3 axes stay 0 for L7/L10 future milestones). `BASNarrativeDistortion.isNonTrivial` + `.maxAxis` computed properties for audit consumer. `buildSovereignAuditEntry` accepts optional `narrativeDistortion` parameter; emits `narrative.maxAxis:%.3f` + `narrative.forcedClosure:%.3f` + `narrative.urgencyMask:%.3f` codes only when at least one axis is non-trivial. 6 new tests (`M316NarrativeDistortionConsumptionTests`).
