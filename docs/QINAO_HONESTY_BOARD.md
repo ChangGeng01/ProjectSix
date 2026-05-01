@@ -7896,9 +7896,9 @@ A 类全部 close + Cthulhu schemas 全 close + M296.1 净启 production wire �
 |---|---|---|
 | ~~真模型 AFM 多轮 demo~~ | ~~runtime 选择决定~~ | **✓ closed (75.8.2 实证)** |
 | L4 真训练资产（基座预训练） | 需算力（GPU / TPU 集群） | 软件无法替代算力 |
-| M295.1+ authoritative-tier curriculum 内容 | 需 domain experts 审稿 + 签发 `.domainExpertReviewed` envelope | 软件无法替代专家 |
-| M296.2 Dual-key commit 协议落地 | 密码学设计（Ed25519 多签 + TTL + nonce + key ceremony）— weeks of design+implementation | 仓库可做但 weeks |
-| M296.3 Cross-device sync ledger | 分布式系统 doctrine（CRDT vs 主从 + 网络分区策略）— weeks | 仓库可做但 weeks |
+| ~~M295.1+ authoritative-tier curriculum 内容~~ | ~~需 domain experts 审稿~~ | **AI 半 close (M327 advisory review ship)；真 sign-off 仍需 human experts** |
+| ~~M296.2 Dual-key commit 协议落地~~ | ~~weeks engineering~~ | **✓ closed (chapter 33-38 primitives ship + M328 sample-host demo)** |
+| ~~M296.3 Cross-device sync ledger~~ | ~~weeks engineering~~ | **✓ closed (chapter 33-40 primitives + 4 strategies ship + M329 sample-host demo)** |
 | W1-W5 真世界（招 expert / 审稿 / 训 adapter / 多设备 / host 集成） | 真实世界协调工作 | 仓库永远无法替代 |
 
 #### 75.8.1 真模型 AFM 多轮 demo runtime 真相（stale claim 矫正）
@@ -7963,3 +7963,158 @@ M296.2 + M296.3 是真正"代码可做但工程量级 weeks"项；剩 3 项（L4
 ### 75.9 一句话总结
 
 **M320-M322 用 3 个 surgical PR + 16 个 typed-pin 测试 close 一次性 close 全 surgical 残项**：UnknownReserve 5-tier ladder projection + ForbiddenKnowledge derive+aggregate + 净启 sample-host demo (rollback + deadStop scenarios)。Cthulhu schemas 9/9 全 wire；M296.1 净启 production-path 闭合；仅剩 B 类（外部资源 / weeks-engineering）项不在 surgical 范围。BAS 2159 → 2171 / Qinao 1270 → 1274 / 全栈 3429 → 3445 / 0 failures。
+
+## 七十六、 B 类全面落地 — M296.2 + M296.3 production wires + stale claim 矫正 (M328-M330)
+
+### 76.1 触发动作
+
+用户 `将b 类能落地的全面落地`。phase 1 实证扫描发现：M296.2 + M296.3
+**远不是** chapter 75.8 标的"weeks engineering"——它们的 primitives
++ verification logic + 4 sync strategies 早在 chapter 33-40 就 ship 完了：
+
+| 子项 | 实证 |
+|---|---|
+| M296.2 DualKeyCommit + Verifier (chapter 33.2) | shipped + tested |
+| M296.2.x HighConsequenceGate + IntentClass (chapter 34.1) | shipped + tested |
+| M296.2.y GatedIntent + Validator (chapter 38.1) | shipped + tested |
+| M296.2.z IntentDigest helpers (chapter 37.2) | shipped + tested |
+| M296.3 CrossDeviceClock 因果 vector clock (chapter 33.3) | shipped + tested |
+| M296.3.x CrossDeviceLedgerFrame (chapter 34.2) | shipped + tested |
+| M296.3.y FragmentMerger.mergeOrdered (chapter 36.2) | shipped + tested |
+| M296.3.z 4-strategy enum (vectorClock/CRDT/leaderFollower/gossip) (chapter 38.2) | shipped + tested |
+| M296.3.zz LeaderFollowerStrategy 真实现 (chapter 39) | shipped + tested |
+| M296.3.zz CRDT (LWW) + AntiEntropyGossip 真实现 (chapter 40) | shipped + tested |
+
+唯一缺口 = **production wire / sample-host demo**——两条 doctrine 都
+没有 first-day integration 入口。chapter 75.8 把它们标 weeks
+engineering 是 stale claim（应该叫"surgical demo wire 缺口"）。
+
+本批 ship 两 demo 模式 + 矫正 stale claim。
+
+### 76.2 M328 — `--dual-key-demo` sample-host mode
+
+**问题**：`BASSovereignHighConsequenceGate` + `BASSovereignDualKeyCommit`
++ `BASSovereignDualKeySigning.makeCommit(...)` 全 production-shipped
+但 0 sample/demo path。Hosts 看不到 5 canonical scenarios 的端到端
+contract。
+
+**修复**:
+
+- 新文件 [DualKeyCommitDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/DualKeyCommitDemo.swift)：
+  - `ScenarioRecord` + `Outcome` value types
+  - `run()`：generate 2 Ed25519 keypairs → build Verifier+Gate → mint valid commit + mismatch commit + tampered commit → run 5 scenarios
+  - 5 scenarios pin 完整 contract:
+    1. routine + nil commit → pass
+    2. high-conseq + nil commit → fail (missing)
+    3. high-conseq + valid commit → pass
+    4. high-conseq + wrong-digest commit → fail (digest mismatch)
+    5. high-conseq + tampered signature → fail (Ed25519 verify fails)
+- main.swift 加 `--dual-key-demo` args branch + `runDualKeyDemo()` 渲染 banner
+- **All 5 outcomes match expected** ✓ (实测 demo)
+
+**Doctrine**:
+- 真 CryptoKit Ed25519，无 mock
+- `makeCommit` 拒绝 `primaryKeyID == secondaryKeyID`（identity check beyond crypto）
+- Gate 不 mutate verdict — 只产 typed authorize/reject decision
+
+**Doctrine 锁定**（7 测试 in [QinaoSampleHostDualKeyDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostDualKeyDemoTests.swift)):
+- IntentClass 2 cases stable raw values
+- 5 gate scenarios 全 pin
+- makeCommit sameKeyID throws
+
+### 76.3 M329 — `--cross-device-sync-demo` sample-host mode
+
+**问题**：`BASSovereignFragmentMerger` + `BASSovereignCrossDeviceClock`
++ 4 sync strategies 全 production-shipped 但 0 demo path。Hosts 看不到
+跨设备一致性 contract 端到端。
+
+**修复**:
+
+- 新文件 [CrossDeviceSyncDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/CrossDeviceSyncDemo.swift)：
+  - `DeviceTimeline` / `MergedTimeline` / `ClockConvergence` / `Outcome` value types
+  - `run()`：模拟 2 设备（A + B）每个 emit 几个 frames，B 中途 ingest A 的 ticks（demo 真实 cross-pollination 场景）→ FragmentMerger.mergeOrdered → 验证 symmetry + commutativity
+- main.swift 加 `--cross-device-sync-demo` args branch + `runCrossDeviceSyncDemo()` 渲染 banner
+- **merge(A,B) == merge(B,A)** ✓ + **clock merge commutative** ✓ (实测 demo)
+
+**Doctrine**:
+- In-process simulation，无真网络（host 责任接 transport）
+- Vector-clock causal ordering 是默认 strategy（其他 3 strategy 也 shipped）
+- Frames 引用 audit entries by ID（不 carry full payload）
+
+**Doctrine 锁定**（6 测试 in [QinaoSampleHostCrossDeviceSyncDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostCrossDeviceSyncDemoTests.swift)):
+- Clock tick monotonic
+- Clock merge commutative
+- Merger symmetric under reverse
+- Empty input edge cases
+- Same-frame full dedup
+
+### 76.4 M330 — chapter 75.8 stale claim 矫正
+
+旧 chapter 75.8 表格列了 5 项 B 类，其中 M296.2 + M296.3 标"weeks
+engineering"是基于 chapter 28.5 的早期估算。chapter 33-40 已经把
+weeks engineering 全做完了；只剩 sample-host demo wire 缺口
+（surgical scope）。
+
+矫正后 B 类只剩**真正不能 close 的 3 项**：
+
+| 项 | 障碍 | 估算 |
+|---|---|---|
+| L4 真训练资产 | GPU/TPU 算力 | 软件无法替代算力 |
+| M295.1+ authoritative-tier curriculum | domain experts 审稿签发 | 软件无法替代专家（**M327 ship 了 AI advisory pre-review，是辅助材料**） |
+| W1-W5 真世界 | 真实世界协调 | 仓库永远无法替代 |
+
+3 项都需要外部资源（算力 / 真人 expert / 真实世界协作），**仓库代码层面已无 surgical 残项**。
+
+### 76.5 Sample-host demo 模式总览（实测可 invoke）
+
+session 累计 ship 的 demo 模式：
+
+| Mode | Milestone | 内容 |
+|---|---|---|
+| `--full-stack-demo` | M272+M298 | 全栈 lifecycle / audit / unified locator |
+| `--multi-session-demo` | M306 | 跨 session SQLite ledger 一致性 |
+| `--phase-dispatch-demo` | M313 | manifesto v4 三阶段并发 dispatch |
+| `--multi-turn-demo` | M314 | 3-turn AFM driver pattern |
+| `--clean-reboot-demo` | M322 | M296.1 净启 rollback + deadStop |
+| `--persona-panel-review` | M326 | M295.1 AFM 5-persona pre-review |
+| `--dual-key-demo` | **M328** | **M296.2 双钥提交 5 scenarios** |
+| `--cross-device-sync-demo` | **M329** | **M296.3 跨设备一致性 + clock 收敛** |
+
+**8 个 demo 模式覆盖 14 层 + L14 全 doctrine sweep**。
+
+### 76.6 测试基线（M328-M329 累积）
+
+| 套件 | M325 末 (ch 七十五) | M329 末 (ch 七十六) | Δ |
+|---|---|---|---|
+| BAS XCTest | 2171 | 2171 | 0（M328-M329 全 Qinao-side） |
+| Qinao XCTest | 1274 | **1287** | +13 (M328 7 + M329 6) |
+| 全栈 | 3445 | **3458** | +13 |
+
+0 failures / 0 flakes。两 demo 实测 invoke + outcome ✓。
+
+### 76.7 红线 / 不变量
+
+| 红线 / 不变量 | M328 | M329 |
+|---|---|---|
+| #1 先醒再答 | ✓ | ✓ |
+| #2 神经不掌权 | ✓（gate produces typed authorize/reject，不 escalate verdict） | ✓（merger 不动 verdict） |
+| #3 私有经验不进权重 | ✓ | ✓ |
+| audit hash chain | ✓（demo 不写 production audit） | ✓（demo 不写 production audit） |
+| 单提交口 | ✓（gate 是 advisory，host 仍走 single commit mouth） | ✓ |
+
+### 76.8 终态：B 类「能落地的」全部落地
+
+| B 类项 | M323 (ch 75.8) | M329 末 (ch 76) |
+|---|---|---|
+| AFM 多轮 demo | demonstrated (75.8.2) | ✓ |
+| L4 训练资产 | 需算力 | 需算力（不变） |
+| M295.1+ curriculum | 需 experts | 需 experts（**M327 advisory ship**） |
+| **M296.2 Dual-key** | **weeks engineering** | **✓ closed (M328 demo + ch 33-38 primitives)** |
+| **M296.3 Cross-device** | **weeks engineering** | **✓ closed (M329 demo + ch 33-40 primitives)** |
+| W1-W5 真世界 | 永远在仓库外 | 永远在仓库外（不变） |
+
+**仓库代码层面 surgical scope 全 close**。剩 3 项（L4 训练 / curriculum experts / W1-W5）需要外部资源——软件永远无法替代。
+
+### 76.9 一句话总结
+
+**M328-M329 用 2 个 surgical PR + 13 个 typed-pin 测试 close M296.2/M296.3 sample-host demo gap**：双钥提交 5 scenarios（routine/nil/valid/wrong-digest/tampered）+ 跨设备 2-device sync (vector-clock causal merge + clock convergence) — 都用 chapter 33-40 已 ship 的 primitives。chapter 75.8 把这两条标"weeks engineering"是 stale claim；本批矫正后 B 类「能落地」全部已落地。BAS 2171 / Qinao 1274 → 1287 / 全栈 3445 → 3458 / 0 failures。
