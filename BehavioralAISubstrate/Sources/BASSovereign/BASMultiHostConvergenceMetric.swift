@@ -52,9 +52,23 @@ public struct BASMultiHostConvergenceMetric:
     public let framesContributedB: Int
     public let framesInConsensus: Int
 
+    /// Distinct frames across both inputs — `|Set(A) ∪ Set(B)|`.
+    /// This is the correct expected consensus cardinality when
+    /// the merger is sound, regardless of whether either input
+    /// contains internal duplicates. Used by `failingInvariants`
+    /// for the consensus-cardinality check (M351 chapter 八十一
+    /// fix — pre-M351 the check used `totalFramesInput -
+    /// frameOverlapCount` which produces false positives when
+    /// either input has internal duplicates because
+    /// `framesContributed*` count array length but
+    /// `frameOverlapCount` counts unique intersection).
+    public let distinctInputFrameCount: Int
+
     /// Frames present in both A and B before merge — contributes
     /// to dedup workload. Always 0 in the canonical disjoint case;
-    /// non-zero when hosts pre-shared frames.
+    /// non-zero when hosts pre-shared frames. Computed via
+    /// `Set(A).intersection(Set(B)).count`, so internal duplicates
+    /// within A or B do not inflate this number.
     public let frameOverlapCount: Int
 
     /// Duplicate frames in the consensus output. Must be 0 by
@@ -84,7 +98,8 @@ public struct BASMultiHostConvergenceMetric:
         duplicateFramesInConsensus: Int,
         mergeIsSymmetric: Bool,
         clockDivergencePeak: UInt64,
-        mergeWallClockSeconds: Double
+        mergeWallClockSeconds: Double,
+        distinctInputFrameCount: Int? = nil
     ) {
         self.framesContributedA = framesContributedA
         self.framesContributedB = framesContributedB
@@ -95,6 +110,64 @@ public struct BASMultiHostConvergenceMetric:
         self.mergeIsSymmetric = mergeIsSymmetric
         self.clockDivergencePeak = clockDivergencePeak
         self.mergeWallClockSeconds = mergeWallClockSeconds
+        // M351 backward-compat: when not supplied, fall back to
+        // pre-M351 cardinality computation so existing call sites
+        // that don't yet pass distinctInputFrameCount keep working.
+        // measure(...) always supplies the correct value.
+        self.distinctInputFrameCount =
+            distinctInputFrameCount
+            ?? (framesContributedA
+                + framesContributedB
+                - frameOverlapCount)
+    }
+
+    // MARK: - Codable backward compatibility (M351)
+
+    /// Custom CodingKeys mirroring property names. Listed
+    /// explicitly so the M351 backward-compat decoder knows which
+    /// keys are pinned.
+    private enum CodingKeys: String, CodingKey {
+        case framesContributedA
+        case framesContributedB
+        case framesInConsensus
+        case distinctInputFrameCount
+        case frameOverlapCount
+        case duplicateFramesInConsensus
+        case mergeIsSymmetric
+        case clockDivergencePeak
+        case mergeWallClockSeconds
+    }
+
+    /// Custom decoder defaults `distinctInputFrameCount` to the
+    /// pre-M351 cardinality formula when missing from JSON. This
+    /// keeps any old serialized metric (no `distinctInputFrameCount`
+    /// key) decoding cleanly into the new shape.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let a = try c.decode(
+            Int.self, forKey: .framesContributedA)
+        let b = try c.decode(
+            Int.self, forKey: .framesContributedB)
+        let overlap = try c.decode(
+            Int.self, forKey: .frameOverlapCount)
+        self.framesContributedA = a
+        self.framesContributedB = b
+        self.framesInConsensus = try c.decode(
+            Int.self, forKey: .framesInConsensus)
+        self.frameOverlapCount = overlap
+        self.duplicateFramesInConsensus = try c.decode(
+            Int.self, forKey: .duplicateFramesInConsensus)
+        self.mergeIsSymmetric = try c.decode(
+            Bool.self, forKey: .mergeIsSymmetric)
+        self.clockDivergencePeak = try c.decode(
+            UInt64.self, forKey: .clockDivergencePeak)
+        self.mergeWallClockSeconds = try c.decode(
+            Double.self, forKey: .mergeWallClockSeconds)
+        self.distinctInputFrameCount =
+            try c.decodeIfPresent(
+                Int.self,
+                forKey: .distinctInputFrameCount)
+            ?? (a + b - overlap)
     }
 
     // MARK: - Derived properties
@@ -106,12 +179,15 @@ public struct BASMultiHostConvergenceMetric:
 
     /// Whether all the doctrinal invariants hold for this
     /// measurement. The regression gate fails when this is false.
+    ///
+    /// M351 fix: uses `distinctInputFrameCount` (= `|Set(A) ∪
+    /// Set(B)|`) as the expected consensus cardinality instead of
+    /// the pre-M351 formula `totalFramesInput - frameOverlapCount`.
+    /// The pre-M351 formula produced false positives when either
+    /// input array contained internal duplicates.
     public var allInvariantsHold: Bool {
-        // Dedup correct: union of unique frames = consensus
-        let expectedConsensus =
-            totalFramesInput - frameOverlapCount
         let dedupOK =
-            framesInConsensus == expectedConsensus
+            framesInConsensus == distinctInputFrameCount
         return dedupOK
             && duplicateFramesInConsensus == 0
             && mergeIsSymmetric
@@ -121,12 +197,10 @@ public struct BASMultiHostConvergenceMetric:
     /// failing. Empty array when `allInvariantsHold == true`.
     public var failingInvariants: [String] {
         var out: [String] = []
-        let expectedConsensus =
-            totalFramesInput - frameOverlapCount
-        if framesInConsensus != expectedConsensus {
+        if framesInConsensus != distinctInputFrameCount {
             out.append(
                 "consensus-cardinality: expected " +
-                "\(expectedConsensus) got " +
+                "\(distinctInputFrameCount) got " +
                 "\(framesInConsensus)")
         }
         if duplicateFramesInConsensus != 0 {
@@ -155,6 +229,11 @@ public struct BASMultiHostConvergenceMetric:
         let setA = Set(framesA)
         let setB = Set(framesB)
         let overlap = setA.intersection(setB).count
+        // M351 fix: count distinct frames across both inputs as
+        // `|Set(A) ∪ Set(B)|`. This is the cardinality the merger
+        // SHOULD produce. Robust to internal duplicates within
+        // either array.
+        let distinctInputCount = setA.union(setB).count
 
         let start = clock()
         let mergedAB = BASSovereignFragmentMerger
@@ -190,6 +269,7 @@ public struct BASMultiHostConvergenceMetric:
             duplicateFramesInConsensus: duplicates,
             mergeIsSymmetric: symmetric,
             clockDivergencePeak: peakDelta,
-            mergeWallClockSeconds: max(0, elapsed))
+            mergeWallClockSeconds: max(0, elapsed),
+            distinctInputFrameCount: distinctInputCount)
     }
 }
