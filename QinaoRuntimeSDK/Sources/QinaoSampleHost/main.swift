@@ -4116,13 +4116,13 @@ struct QinaoSampleHost {
         }()
 
         print("""
-            QinaoSampleHost --throughput-bench (M334):
+            QinaoSampleHost --throughput-bench (M334 + M340 scope pin):
               drive \(turnCount) turns of substrate work
               (lifecycle + thermal/breath cycling) + capture
               latency stats. Default 100 turns; override via
-              QINAO_BENCH_TURN_COUNT=N. No model inference —
-              the bench measures observation pipeline + state-
-              machine throughput, not LLM latency.
+              QINAO_BENCH_TURN_COUNT=N.
+
+              \(ThroughputBenchDemo.scopeStatement)
             """)
 
         let outcome = await ThroughputBenchDemo.run(

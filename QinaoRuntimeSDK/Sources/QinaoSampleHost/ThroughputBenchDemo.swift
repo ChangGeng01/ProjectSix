@@ -22,19 +22,49 @@ import BASRuntimeCore
 /// XCTest. Default = 100 turns; override via
 /// `QINAO_BENCH_TURN_COUNT=N`.
 ///
-/// ## Doctrine
+/// ## Doctrine — REGRESSION ALARM, NOT AN SLA
 ///
-/// - **Regression alarm, not perf goal.** Same model as M179:
-///   p95 < 100ms ceiling exists to alarm if a new dependency
-///   adds slow I/O on the hot path. Tight ceilings would invite
-///   premature optimization.
-/// - **No model inference.** The bench drives lifecycle + thermal
-///   state, not LLM inference. Real-model latency is the
-///   `--multi-turn-demo` (M314 + M325) territory.
-/// - **Pure self-contained workload.** Each turn does a fixed
-///   value-type lifecycle traversal; no actor crossing, no IO.
-///   This makes the latency reproducible across runs.
+/// **DO NOT cite the numbers this bench prints as a customer-facing
+/// performance commitment.** The bench measures *substrate state-machine
+/// cycle latency*, not the latency a real session would experience.
+/// A real session adds (a) Apple Foundation Models inference, (b) audit
+/// ledger I/O, (c) actor hops across QinaoRuntime / QinaoSovereign /
+/// QinaoLoop. Those costs are 100x to 10,000x larger than what shows
+/// up here.
+///
+/// What the bench is for:
+///
+/// - **Regression alarm.** If `BASLeaseLifeCoordinator.recordTurn`
+///   suddenly takes 100x longer because someone added a synchronous
+///   disk write or a new actor hop, this bench flags it before the
+///   change ships. Same model as M179 perf test.
+/// - **Thermal twin smoke check.** The pressure trajectory + guardLevel
+///   escalation count tell you the lung accumulator + thermal twin are
+///   actually doing work, not silently no-op-ing.
+///
+/// What the bench is NOT for:
+///
+/// - Customer-facing latency commitments (SLA / SLO).
+/// - Real-model end-to-end latency (use `--multi-turn-demo` M314 + M325).
+/// - Cold-start latency comparisons (the bench warms the in-process
+///   accumulator on the first turn; cold-start is `--full-stack-demo`
+///   territory).
+///
+/// `scopeStatement` is the canonical machine-readable disclaimer; the
+/// `runThroughputBench` banner emits it at the top of every run, and
+/// `M340ThroughputBenchScopeHonestyTests` pins its contents so that any
+/// future refactor that quietly drops the disclaimer fails CI.
 public struct ThroughputBenchDemo {
+
+    /// Canonical machine-readable scope disclaimer. Pinned by
+    /// `testScopeStatementContainsRegressionAlarmDisclaimer` (M340).
+    /// If you find yourself wanting to weaken any phrase here, ship a
+    /// PR that explains why and updates the test in the same change.
+    public static let scopeStatement: String =
+        "[scope] regression alarm, not an SLA. measures substrate " +
+        "state-machine cycle latency only — no model inference, " +
+        "no audit-ledger I/O, no actor hops across runtime layers. " +
+        "do not quote these numbers as customer-facing latency."
 
     public struct LatencyStats: Sendable, Equatable {
         public let count: Int
