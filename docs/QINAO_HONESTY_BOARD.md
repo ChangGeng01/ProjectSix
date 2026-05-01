@@ -7625,3 +7625,127 @@ A 类 4 项 + 3 production wires 全部 closed：
 ### 73.9 一句话总结
 
 **M312-M314 用 3 个 surgical PR + 13 个 typed-pin 测试 close A 类 production wiring**：M308 9 席 factory 进 `QinaoDefaults`、M309 三阶段 dispatch 进 `--phase-dispatch-demo` mode、M310 multi-turn driver 进 `--multi-turn-demo` mode（mock 默认 + AFM env-gated fallback）。两 demo 模式实测可 `swift run` invoke。doctrine integrity 不动；A 类「全面落地」完成 — 0-caller API 全部有 production consumer。BAS 2142 / Qinao 1257 → 1270 / 全栈 3412 / 0 failures。
+
+## 七十四、 chapter 七十.5 候选收尾 — M316-M318 wire 3 仍-0-caller Cthulhu schemas
+
+### 74.1 触发动作
+
+用户 `continue` 自然延续 chapter 七十二/七十三 模式。chapter 七十.5 列了 5 件 Cthulhu schemas 仍待 runtime 接入；M303-M305 ship 了 3 件（abyssalPressure / humanAnchor+seal / lifecycle），剩 5 件 phase 1 实证状态：
+
+| Schema | 已知 caller | 状态 |
+|---|---|---|
+| `BASUnknownReserve` | 1（在 BASAbyssalProtocol.swift 内部） | partial |
+| `BASAnomalyTrace` | 0（仅 def + tests + governance） | 0-caller |
+| `BASNarrativeDistortion` | 0（仅 def + tests + governance） | 0-caller |
+| `BASAbyssalBranch` | 0（仅 def + tests + governance） | 0-caller |
+| `BASForbiddenKnowledgeCandidate` | 1（在 BASAbyssalProtocol.swift 内部） | partial |
+
+本批关掉 3 件 0-caller，partial 2 件留 next phase。
+
+### 74.2 M316 — `BASNarrativeDistortion` runtime wire (white paper §7)
+
+**问题**：5-轴 narrative distortion 模式（realityDenial / historyRewrite / forcedClosure / roleInversion / urgencyMask）只在 governance 层 ship；no runtime path produces a distortion.
+
+**修复** ([BASAbyssalProtocol.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift)):
+
+- 加 `BASNarrativeDistortion.derive(distortionID:riskLevel:permitMode:)` static 投影：
+  - `forcedClosure ← block 0.7 / delay 0.4 / compare 0.2 / answer 0.0 / 其他模式 0.2`（白皮书"decide right now" reading）
+  - `urgencyMask ← (extreme + answer) 0.9 / (high + answer) 0.6 / (medium + answer) 0.3 / 其他 0.0`（"genuine deliberation disguised as decisive action"）
+  - `realityDenial / historyRewrite / roleInversion = 0`（保留给 L7 mirror blade + L10 voice-shift detection 未来 milestone）
+  - `confidence = 0.5`（结构 projection，不 introspective）
+- 加 `isNonTrivial` + `maxAxis` computed properties
+- `buildSovereignAuditEntry` 加 optional `narrativeDistortion: BASNarrativeDistortion? = nil` 参数 → 当 `isNonTrivial` 时 append `narrative.maxAxis:%.3f` + `narrative.forcedClosure:%.3f` + `narrative.urgencyMask:%.3f` 三条 signalRefs codes
+- `runTurn` derive + 接入
+
+**Doctrine 锁定**（6 测试 in [M316NarrativeDistortionConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M316NarrativeDistortionConsumptionTests.swift)):
+- low risk + answer permit → 5-轴全 0 + `isNonTrivial == false`
+- forcedClosure 严格单调（block > delay > compare > 0）
+- urgencyMask 在 answer permit 下随 risk 单调
+- maxAxis 返 5 轴最大值
+- runtime 接入：codes 必为 0 或 3 条；suffix 全 [0,1] parseable
+- 双 turn determinism
+
+### 74.3 M317 — `BASAnomalyTrace` runtime wire (white paper §7)
+
+**问题**：anomaly trace 在 watcher protocol 接口存在 (`BASAnomalyWatchProtocol.trace(...)`) 但无 runtime caller。
+
+**修复** ([BASAbyssalProtocol.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift)):
+
+- 加 `BASAnomalyTrace.deriveOrNil(traceID:distortion:relationShift:sourceRefs:pressureVector:emitThreshold:)` static — 复用 existing watcher protocol，但当 `anomalyTypes.isEmpty` 时返 nil（doctrine: don't flood ledger with low-signal hints）
+- `buildSovereignAuditEntry` 加 optional `anomalyTrace: BASAnomalyTrace? = nil` 参数 → 当 non-nil 时 append `anomaly.types:<sorted+joined>` + `anomaly.confidence:%.3f`
+- `runTurn` derive from M316 distortion
+
+**Doctrine 锁定**（5 测试 in [M317AnomalyTraceConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M317AnomalyTraceConsumptionTests.swift)):
+- 0-axis distortion → nil trace
+- block permit (forcedClosure 0.7) → trace with `.forcedClosure` type
+- extreme + answer (urgencyMask 0.9) → trace with `.falseUrgency` type
+- 0.3 axis (medium+answer urgencyMask) < 0.4 threshold → nil
+- runtime: codes 必为 0 或 2 条；存在时 `anomaly.types` + `anomaly.confidence` 同时 present
+
+### 74.4 M318 — `BASAbyssalBranch` runtime wire (white paper §7)
+
+**问题**：L9 dream-loop branch annotation `BASAbyssalBranch` 0 runtime caller；white paper 承诺 L9 → L14 escalation 路径完全是纸面。
+
+**修复** ([BASAbyssalProtocol.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift)):
+
+- 加 `BASAbyssalBranch.deriveAll(candidateIDs:pressure:abyssalThreshold:)` static — 当 `pressure.aggregateMagnitude < threshold` 返 empty array；否则每 candidate 一 branch
+  - `unknownLoad / manipulationLoad / ontologyDistortion ← pressure.{unknownLoad / manipulationIndex / ontologyDistortion}`
+  - `triggerReasons ← unknown-load / manipulation-index / ontology-distortion 任一 ≥ threshold`
+  - `requiredClosureConditions ← ["sovereign-review-passed"]` 当 `aggregateMagnitude ≥ 0.7`
+- `buildSovereignAuditEntry` 加 optional `abyssalBranches: [BASAbyssalBranch] = []` 参数 → 当 non-empty 时 append `abyssalBranch.count:N` + `abyssalBranch.maxLoad:%.3f` + 可选 `abyssalBranch.escalation:sovereign-review`
+- `runTurn` derive 用 M303 abyssalPressure + thoughtFrame.candidates IDs
+
+**Doctrine 锁定**（6 测试 in [M318AbyssalBranchConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M318AbyssalBranchConsumptionTests.swift)):
+- 低 pressure → 空 array
+- 高 pressure → 每 candidate 一 branch
+- branch 字段严格 mirror pressure
+- closure conditions 仅在 aggregate ≥ 0.7 populated
+- 空 candidate list → 空 branches
+- runtime low-risk turn → 0 abyssalBranch codes
+
+### 74.5 测试基线（M316-M318 累积）
+
+| 套件 | M315 末 (ch 七十三) | M318 末 (ch 七十四) | Δ |
+|---|---|---|---|
+| BAS XCTest | 2142 | **2159** | +17 (M316 6 + M317 5 + M318 6) |
+| Qinao XCTest | 1270 | 1270 | 0（M316-M318 全 BAS-side） |
+| 全栈 | 3412 | **3429** | +17 |
+
+0 failures / 0 flakes。
+
+### 74.6 红线 / 不变量
+
+| 红线 / 不变量 | M316 | M317 | M318 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权（red line 7：watcher hint，not verdict） | ✓（advisory metadata） | ✓（advisory metadata） | ✓（advisory metadata） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain（仅 additive signalRefs） | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ |
+
+### 74.7 现状 — 8 个 Cthulhu schemas runtime 接入进度
+
+| Schema | M303-M305 | M316-M318 | 总状态 |
+|---|---|---|---|
+| `BASAbyssalPressure` (§5.1) | M303 ship + wire | — | ✓ |
+| `BASHumanAnchorSignal` (§5.3) | M304 ship + wire | — | ✓ |
+| `BASSealEnvelope` (§5.2) | M304 ship + wire | — | ✓ |
+| `BASEvolutionLifecycleSession` (chapter 五十六) | M305 ship + wire | — | ✓ |
+| `BASNarrativeDistortion` (§7) | partial | **M316** ship + wire | ✓ |
+| `BASAnomalyTrace` (§7) | partial | **M317** ship + wire | ✓ |
+| `BASAbyssalBranch` (§7) | 0-caller | **M318** ship + wire | ✓ |
+| `BASUnknownReserve` (§5.4) | partial (1 caller in BASAbyssalProtocol) | — | partial |
+| `BASForbiddenKnowledgeCandidate` (§5.5) | partial (1 caller in BASAbyssalProtocol) | — | partial |
+
+**3/3 0-caller schemas 全 close。** 剩 2 partial schemas 留下次 phase 1 候选（已有 1 caller，audit signalRefs 接入是 stretch goal 不是必须）。
+
+### 74.8 仍剩
+
+不在本批：
+- `BASUnknownReserve` / `BASForbiddenKnowledgeCandidate` audit signalRefs 接入（已有 partial caller，下次 phase 1 决定是否 stretch wire）
+- 真模型 AFM 多轮 demo 真机部分（M314 fallback 已 ship）
+- L4 真训练资产 / M295.1+ authoritative-tier curriculum / M296.1-3 主权三件 / W1-W5 真世界 — B 类 weeks-of-engineering / 外部资源依赖
+
+### 74.9 一句话总结
+
+**M316-M318 用 3 个 surgical PR + 17 个 typed-pin 测试 close 3 件仍-0-caller Cthulhu schemas runtime 接入**：narrative distortion 5-轴投影 + anomaly trace deriveOrNil + abyssal branch 多 candidate 投影；都走 M303-M305 同 audit signalRefs additive metadata 模式。doctrine red line 7（watcher hint, not verdict）严格保留。BAS 2142 → 2159 / Qinao 1270 / 全栈 3429 / 0 failures。
