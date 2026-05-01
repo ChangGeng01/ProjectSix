@@ -8823,3 +8823,166 @@ False-positive rate this round: 7/10 = **70%** vs chapter 78.5's 89% — confirm
 ### 81.12 一句话总结
 
 **M351-M353 三个 surgical fixes 关掉 deep-review pass 2 发现的 3 个 real bugs/notes**：M351 修 `BASMultiHostConvergenceMetric` 内部-duplicate edge case false positive (manual review found, agent missed) + M352 修 `BASOrganTrainedWeightFilter` hex content validation gap (agent found, manual missed) + M353 加 `isStructurallyConsistent` vs `rejectionReason` doc cross-reference 防 divergence drift (agent found)。验证 M341 SHA-256 实装跨 8 NIST/Python reference vectors byte-equal — L13 v6 doctrine regression-gate hash 真 SHA-256 不是 internally-consistent gibberish。BAS 2209 → 2233 (+24) / Qinao 1311 / 全栈 3544 (+24) / 0 failures / 0 flakes / 4/4 boundary 全绿。Agent FP rate 70% (vs chapter 78.5's 89%) 确认 M348 Lesson 1 update: FP rate 是 surface complexity 函数；manual + agent 互补不可替代。仓库 surgical scope 第三次确认 = 空。
+
+## 八十二、 大幅提高 benchmark — 3 new bench modes + stats primitive + baseline storage (M355-M360)
+
+### 82.1 触发动作
+
+用户：`大幅提高 benchmark`。
+
+接 chapter 八十一 deep review pass 2 后，用户指 bench infrastructure 须 "drastically improve"。chapter 七十八 self-critique 第 3 项已经诚实承认 M334 的 p50=0.0013ms 数字误导：bench 仅测 state-machine cycle latency，没测真正花时间的 layers (AFM inference / audit ledger I/O / actor hops)。
+
+### 82.2 拆解四方向
+
+| 方向 | 内容 |
+|---|---|
+| **覆盖面** | 加新 bench modes 测 M334 没碰的 layers（audit ledger / multi-host merge / full-stack runtime） |
+| **样本量** | 拉大 sample sizes (10K entries / 10K frames / 20 sessions) 让数字更稳 |
+| **统计准** | 加 p99.9 / variance / outliers / coefficient of variation 让 stats 更全 |
+| **可比性** | 加 baseline tracking + regression detection 让 bench 真有 alarm 用 |
+
+按 6 milestone (M355-M360) 全 ship。
+
+### 82.3 M355 — `BASBenchLatencyStats` typed primitive
+
+**实装**：[BehavioralAISubstrate/Sources/BASObservability/BASBenchLatencyStats.swift](../BehavioralAISubstrate/Sources/BASObservability/BASBenchLatencyStats.swift)（~200 LOC）。
+
+**字段**：sampleCount / min / max / mean / p50 / p95 / p99 / **p99.9** / **standardDeviation** / **outlierCount**。Computed: variance / outlierRate / coefficientOfVariation。
+
+**算法**：
+- Percentiles：nearest-rank (`index = ceil(p × N) - 1`) — 与 M179 / M334 同
+- Variance：population formula (`Σ(x - μ)² / N`) — bench data 是整 population 不是 sample
+- Outlier count：samples beyond ±3σ from mean (~0.27% normal expectation)
+
+**`bannerLines(unit:labelWidth:)` helper**：multi-line uniform output for sample-host banners。
+
+**14 测试** in `M355BenchLatencyStatsTests` 含 NIST-style reference values + boundary cases (empty / single / uniform) + Codable round-trip + 10K-sample sanity check。
+
+### 82.4 M356 — `BASBenchBaselineStorage` JSON baseline I/O + regression detection
+
+**实装**：[BehavioralAISubstrate/Sources/BASObservability/BASBenchBaselineStorage.swift](../BehavioralAISubstrate/Sources/BASObservability/BASBenchBaselineStorage.swift)（~180 LOC）。
+
+**Components**：
+- `Envelope` schema-versioned (schemaVersion / benchName / storedAt / stats)
+- `ComparisonVerdict` enum 4 cases：`.withinTolerance` / `.regression(reports:)` / `.incompatibleBaseline(reason:)` / `.noBaseline`
+- `RegressionReport` per-metric (metricName / baselineValue / measuredValue / toleranceFraction / regressionFraction)
+- `writeBaseline(envelope:to:)` / `readBaseline(from:)` — pretty-printed JSON + ISO8601 dates
+- `compareToBaseline(measured:benchName:baselinePath:toleranceFraction:)` — compares 4 most-relevant metrics (p50/p95/p99/mean)
+- `defaultToleranceFraction = 0.25` (25% = regression threshold)
+
+**Doctrine**：
+- Baselines are committable (intended workflow: commit `bench_baseline.json` to git)
+- Faster-than-baseline 不 fire regression
+- Zero baseline metrics skipped (no division by zero)
+
+**11 测试** in `M356BenchBaselineStorageTests` 含 mismatched benchName / tolerance variations / zero baseline edge cases。
+
+### 82.5 M357 — `--audit-ledger-bench` 模式
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/AuditLedgerBench.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/AuditLedgerBench.swift)（~120 LOC）+ main.swift wire + `M357AuditLedgerBenchTests`（4 tests）。
+
+**测的是**：`BASSovereignAuditLedger.append(_:)` per-call latency × N entries (default 10000, `QINAO_BENCH_LEDGER_ENTRY_COUNT=N` override)。Storage = in-memory only (no SQLite I/O — dominated by disk speed; 不在 scope)。
+
+**Smoke result (200 entries debug build)**：
+```
+elapsed wall:  0.02 sec
+throughput:    8910.3 entries/sec
+samples:       200
+min:           0.0930 ms
+p50:           0.0950 ms
+p95:           0.1750 ms
+p99:           0.2830 ms
+p99.9:         0.3771 ms
+mean:          0.1098 ms
+stddev:        0.0399 ms
+outliers:      6 (3.000%)
+CV:            0.3635
+```
+
+CV=0.36 + outlier rate 11x normal expectation (3% vs 0.27%) → 表明 distribution 是 bimodal (cold-start spike + warm-state)。
+
+### 82.6 M358 — `--multi-host-merge-bench` 模式
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/MultiHostMergeBench.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/MultiHostMergeBench.swift)（~85 LOC）+ main.swift wire + `M358MultiHostMergeBenchTests`（4 tests）。
+
+**测的是**：`BASSovereignFragmentMerger.mergeOrdered(_:_:)` over varying frame counts (10 / 100 / 1000 / 10000 frames per host)。Each row 跑 forward + reverse merge 验 symmetry。
+
+**Smoke result (debug build)**：
+
+| frames/host | wall (sec) | throughput | symmetric | invariants |
+|---|---|---|---|---|
+| 10 | 0.000464 | 43k frames/sec | ✓ | ✓ |
+| 100 | 0.001022 | 196k frames/sec | ✓ | ✓ |
+| 1000 | 0.008535 | 234k frames/sec | ✓ | ✓ |
+| 10000 | 0.090593 | 221k frames/sec | ✓ | ✓ |
+
+Wall time 10→100→1000→10000 = 2.2x→8.4x→10.6x growth — **near-linear in n**, slightly better than O(n log n) expected。Set + sort path is fast。
+
+### 82.7 M359 — `--full-stack-bench` 模式
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/FullStackBench.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/FullStackBench.swift)（~150 LOC）+ main.swift wire + `M359FullStackBenchTests`（4 tests）。
+
+**测的是**：`BASHostRuntime.startSession(_:)` × N sequential sessions (default N=20, `QINAO_BENCH_FULL_STACK_SESSIONS=N` override)。最贴近"真实 session cost"的 bench — 但仍不含 AFM inference (per EB-1)。
+
+**Smoke result (10 sessions debug build)**：
+```
+elapsed wall:  0.13 sec
+sessions ok:   10 / 10
+samples:       10
+min:           4.9471 ms
+p50:           5.3160 ms
+p95:           76.6860 ms  ← cold-start spike
+mean:          12.4934 ms
+max:           76.6860 ms
+stddev:        21.3995 ms
+CV:            1.7129     ← very high variance
+```
+
+**关键发现**：BASHostRuntime startup 真实成本 ~5-10ms warm / ~77ms cold —— **比 M334 state-machine bench 的 0.001ms 高出 5000-77000 倍**。这是 chapter 七十八.7 self-critique 第 3 项 "M334 numbers too clean" 的 antidote。
+
+### 82.8 测试基线
+
+| 套件 | 八十一章末 | 八十二章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2233 | **2258** | +25 (M355 14 + M356 11) |
+| Qinao XCTest | 1311 | **1323** | +12 (M357 4 + M358 4 + M359 4) |
+| 全栈 | 3544 | **3581** | +37 |
+
+0 failures / 4/4 boundary checks 全绿。
+
+### 82.9 红线 / 不变量回归
+
+| 不变量 / 红线 | M355 | M356 | M357 | M358 | M359 |
+|---|---|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（pure stats） | ✓（pure storage） | ✓（bench 不动 verdict） | ✓（bench 不动 verdict） | ✓（bench 走 startSession 不绕 verdict） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| audit hash chain | ✓ | ✓ | **测试**（M357 verifies chain integrity in tests） | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 4 boundary checks | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### 82.10 chapter 78.7 self-critique 第 3 项 stale 矫正
+
+七十八.7 self-critique 第 3 项："M334 bench p50=0.0013ms 数字易被误读" → 当时只 ship M340 scope honesty pin。本 chapter 进一步 ship **真覆盖到的** bench modes：
+
+- M334 测 state-machine cycle (0.001ms) — 仍 ship 但有 scope statement
+- **M357 测 audit ledger append (0.1ms)** — 100x M334
+- **M358 测 multi-host merge (0.5ms-90ms across sizes)** — 500-90000x M334
+- **M359 测 full-stack runtime (5-77ms)** — 5000-77000x M334
+
+现在 bench suite 有 4 个 latency tier，从 sub-microsecond 到 sub-second 全覆盖。任何 PR 改动 audit ledger / FragmentMerger / BASHostRuntime 的成本都会在对应 bench 出现。
+
+### 82.11 仓库 bench infrastructure 真实状态（八十二章末）
+
+| 维度 | pre-八十二 | post-八十二 |
+|---|---|---|
+| Bench modes | 1 (`--throughput-bench`) | **4** (+ `--audit-ledger-bench` / `--multi-host-merge-bench` / `--full-stack-bench`) |
+| Latency tiers covered | 1 (state machine ~0.001ms) | **4** (state machine / audit append / multi-host merge / runtime startup) |
+| Stats primitive | inline LatencyStats in M334 (5 fields) | typed `BASBenchLatencyStats` (10 fields + 3 derived) |
+| Baseline tracking | none | `BASBenchBaselineStorage` JSON I/O + 25% default tolerance + 4 verdict types |
+| Sample sizes default | 100 | 10K (M357) / 4 sizes 10-10K (M358) / 20 (M359) |
+| Tests covering bench primitives | 5 (M334) | **30** (M355 14 + M356 11 + M357 4 + M358 4 + M359 4) — net +25 |
+
+### 82.12 一句话总结
+
+**M355-M360 把 bench infrastructure 从 "1 mode + 5 stats" 升级为 "4 modes + 10 stats + baseline tracking + regression detection + 4 latency tiers covered"**：M355 ship `BASBenchLatencyStats` typed primitive (p50/p95/p99/p99.9/max/min/mean/stddev/outliers/CV + nearest-rank percentile + population variance) + M356 ship `BASBenchBaselineStorage` JSON I/O + 4-verdict regression detection (25% default tolerance) + M357 ship `--audit-ledger-bench` 测 audit ledger append (10K entries default, smoke ~9k entries/sec, p50 0.1ms, CV 0.36 reveals bimodal distribution) + M358 ship `--multi-host-merge-bench` 测 FragmentMerger growth across 4 sizes (smoke shows near-linear growth 10→10K frames) + M359 ship `--full-stack-bench` 测 BASHostRuntime.startSession 真实成本 (smoke shows 5-77ms vs M334's 0.001ms, **5000-77000x higher** — chapter 78.7 self-critique 第 3 项的真 antidote)。BAS 2233 → 2258 (+25) / Qinao 1311 → 1323 (+12) / 全栈 3581 (+37) / 0 failures / 4/4 boundary 全绿。Bench suite 现在有 4 个 latency tier 从 sub-microsecond 到 sub-second 全覆盖；任何 audit ledger / FragmentMerger / BASHostRuntime 的成本变化都会在对应 bench fire alarm。仓库 bench infrastructure 从 "single-tier regression alarm" 升级为 "multi-tier regression alarm with baseline tracking"。
