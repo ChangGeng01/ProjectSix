@@ -4709,8 +4709,22 @@ struct QinaoSampleHost {
         for line in report.bannerLines() {
             print(line)
         }
-        print("\n══ Markdown table ══\n")
-        print(report.markdownTable(unit: "ms"))
+        // M372 — when QINAO_BENCH_BASELINE_DIR is set, use the
+        // delta-augmented table; otherwise fall back to the
+        // basic table.
+        if let baselineDirPath = ProcessInfo.processInfo
+            .environment["QINAO_BENCH_BASELINE_DIR"]
+        {
+            print("\n══ Markdown table (vs baseline) ══\n")
+            print(report
+                .markdownTableWithBaselineDelta(
+                    unit: "ms",
+                    baselineDirectory: URL(
+                        fileURLWithPath: baselineDirPath)))
+        } else {
+            print("\n══ Markdown table ══\n")
+            print(report.markdownTable(unit: "ms"))
+        }
         // M366 — also dump JSON when env var requests it.
         if ProcessInfo.processInfo.environment[
             "QINAO_BENCH_SUITE_JSON_DUMP"] == "1",
