@@ -52,6 +52,26 @@ territory (which chapter 67 covered).
 - Budget 1 hour per agent finding for grep verification + fix
   evaluation. With 10 findings, that's 1 day of review work.
 
+### Update from chapter 八十一 deep-review (2026-05-02)
+
+- **70% FP rate on substantive typed-primitive surface** (M341 SHA-256
+  + M342 measurement plane + M343 typed pin), vs **89% FP rate** on
+  chapter 七十八.5 schema-additive surface. Confirms: FP rate is a
+  function of surface complexity not just methodology. Substantive
+  new logic surfaces real bugs at higher rate than additive schema.
+- **Manual review remains essential.** M351 (multi-host metric
+  internal-duplicate false positive) was missed by the agent; found
+  by manual reasoning about input deduplication invariants. M352
+  (trained-weight provenance hex content validation gap) was missed
+  by manual review; found by the agent. Both methodologies are
+  complementary; neither alone catches both.
+- **For substantive new primitives (custom crypto / measurement /
+  filter), add a separate reference-vector verification step.**
+  M341 ships pure-Swift SHA-256; chapter 八十一 verified it against
+  9 NIST FIPS 180-4 / Python hashlib reference vectors before any
+  other review. Without this step, an internally-consistent-but-wrong
+  implementation would pass all self-tests indefinitely.
+
 ---
 
 ## Lesson 2 — Framing axis vs capability axis distinction

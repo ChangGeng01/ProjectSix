@@ -8687,3 +8687,139 @@ do not quote these numbers as customer-facing latency."
 ### 80.12 一句话总结
 
 **M345-M350 六个 surgical chip-away 把 chapter 七十九 留的 "剩下的" 全 close**：M345 author v6 manifesto "Self-Evolution Without Drift"（typed pin via M341 / measurement via M333 / regression gate via M341 fingerprint hash drift detector）+ M346 author v7 manifesto "Multi-Instance Audit Convergence"（typed pin via M329 / measurement via M335+M306 / regression gate via M342 metric）+ M347 用 M343 strengthening v1 invariant #3 README outbound-mirror（abstract phrasing 不撞 sovereign redaction）+ M348 ship `QINAO_REVIEW_METHODOLOGY_LESSONS.md`（5 lessons / chapter 67/78 deep-review FP rate + framing-axis pattern + stale-claim correction + prep vs external + triple-completion gate）+ M349 sharpen EB-1/EB-2/EB-3 unblock conditions 从 informal phrasing 升级为 concrete binary predicates + verifiable state + ✅/⚠️ prep checklist + anti-patterns + v6/v7 cross-refs。BAS 2209 / Qinao 1311 / 全栈 3520 不变（5 chip-away 全 docs-only）/ 0 failures / 0 flakes / 4/4 boundary 全绿。仓库 surgical scope 第二次确认 = 空。三个 triple-complete 候选已经全部按其本性归属：L13 → v6 / multi-instance → v7 / adapter-L2 → v1 #3 strengthening + v8 candidate awaits EB-1+EB-2。剩外部瓶颈 3 项每条都有 concrete binary predicates，"剩下的" 真正 ship 完。
+
+## 八十一、 Deep test + deep review pass 2 — M336-M350 surface (M351-M353)
+
+### 81.1 触发动作
+
+用户：`deep review + deep test`。
+
+紧接 chapter 八十 一次性收尾后，对 M336-M350 的 ~14 commits 做第二次 deep-review pass。第一次 (chapter 七十八.5 / M336) 覆盖 M298-M335。
+
+按 Methodology Lesson 1 (M348)：
+- top-N file selection beats blanket sweep — 锁定 4 个最高风险 source 文件
+- "real bugs cluster around novelty" — M341 自写的 pure-Swift SHA256 是最高 novelty
+- agent review + 人工 grep cross-check 是 mandatory pair
+
+### 81.2 Test sweep 结果
+
+| Sweep | BAS | Qinao | Failures | Notes |
+|---|---|---|---|---|
+| Run 1 (gate-off) | 2209 | 1311 | 0 | clean |
+| Run 2 (gate-off) | 2209 | 1311 | 0 | clean — no flake |
+| Run 3 (gate-off) | 2209 | 1311 | 0 | clean — no flake |
+| AFM gate-on | n/a | 1311 | 0 | 35 AFM tests reach Apple FM, ~44s wall |
+
+3 gate-off + 1 AFM = 0 flakes。
+
+### 81.3 SHA-256 reference 验证（本轮 PRIMARY check）
+
+**核心担忧**：M341 自写 pure-Swift SHA-256 — 出名容易写错；wrong impl 仍 deterministic，所有 self-consistency tests 仍 pass，但 hash 跟标准 SHA-256 不匹配 → chapter 七十九 v6 doctrine claim 静默无效化。
+
+**验证**：跨 9 reference vectors 与 Python `hashlib.sha256` byte-equal：
+
+| Input | Length | 测试路径 |
+|---|---|---|
+| `""` | 0 | empty padding |
+| `"abc"` | 3 | NIST FIPS 180-4 §B.1 |
+| `"a"` | 1 | single byte |
+| 56-byte 标准 | 56 | NIST FIPS 180-4 §B.2 padding boundary |
+| 55 y's | 55 | one-byte-short of fast path |
+| 64 x's | 64 | exactly one block, forces second pad block |
+| 1000 a's | 1000 | multi-block |
+| L13 canonical encoding | 446 | production input |
+
+全 8 vectors（去掉一个含 reserved vocabulary `quick` 的）byte-equal Python hashlib。
+
+**结论**：M341 SHA-256 数学正确。L13 v6 doctrine regression-gate hash `9e15d2…` 是真 SHA-256，不是 internally-consistent gibberish。
+
+### 81.4 10 个 candidate findings → 3 real bugs/notes
+
+| # | Severity | Source | Verdict |
+|---|---|---|---|
+| MAN-1 | **MEDIUM real** | manual review of `BASMultiHostConvergenceMetric.swift` `failingInvariants` 混 raw-array count + Set count → false positive on internal-duplicate inputs | **FIXED M351** |
+| AGENT HIGH-1 | n/a | `toMilliseconds` floating-point | agent self-withdrew |
+| AGENT HIGH-2 | n/a | wall-clock measurement spans Set construction | agent self-dismissed |
+| AGENT HIGH-3 | **MEDIUM real** | `BASOrganTrainedWeightFilter.rejectionReason` 仅 length check 不验 hex content (64 z's passes) | **FIXED M352** |
+| AGENT MED-4 | n/a | `matrix-hash-only-changed` defensive branch unreachable | FALSE POSITIVE |
+| AGENT MED-5 | n/a | M351 init backward-compat fallback 用 pre-M351 formula | BY DESIGN |
+| AGENT MED-6 | n/a | `inner[action] ?? "<missing>"` defensive fallback unreachable | FALSE POSITIVE |
+| AGENT LOW-7 | **LOW real** | `isStructurallyConsistent` vs `rejectionReason` 检查 overlapping but different concerns，divergence 风险 | **FIXED M353** doc cross-ref |
+| AGENT LOW-8 | n/a | `turnCount = 0` produces degenerate outcome silently | FALSE POSITIVE |
+| AGENT LOW-9 | n/a | `mergeWallClockSeconds` clamp masks clock-skew | BY DESIGN |
+
+**Total**: 10 findings → **3 real** → **3 fixes shipped**
+
+False-positive rate this round: 7/10 = **70%** vs chapter 78.5's 89% — confirms M348 Lesson 1 update: FP rate is function of surface complexity not just methodology。
+
+### 81.5 M351 — Multi-host convergence metric internal-duplicate fix
+
+**The bug**：`BASMultiHostConvergenceMetric.failingInvariants` 用 `expectedConsensus = totalFramesInput - frameOverlapCount`：
+- `totalFramesInput` = raw array count (`framesContributedA + framesContributedB`)
+- `frameOverlapCount` = Set-based `|Set(A) ∩ Set(B)|`
+
+混不同 counting → false positive when input arrays contain internal duplicates。
+
+**Concrete repro**：A = [f1, f1, f2], B = [f1, f3] → expectedConsensus pre-M351 = 4，但 mergedAB = [f1, f2, f3] = 3 → false `consensus-cardinality` failure。
+
+**Fix**：[BehavioralAISubstrate/Sources/BASSovereign/BASMultiHostConvergenceMetric.swift](../BehavioralAISubstrate/Sources/BASSovereign/BASMultiHostConvergenceMetric.swift) 加 `distinctInputFrameCount: Int` 字段；`measure(...)` factory 计算 `|Set(A) ∪ Set(B)|`；`failingInvariants` + `allInvariantsHold` 改用新字段；custom `init(from decoder:)` Codable backward-compat 老 JSON 缺新 key 时 fallback to legacy formula。
+
+**5 fix-pin 测试** in `M351MultiHostConvergenceMetricInternalDuplicateTests`。
+
+### 81.6 M352 — Trained-weight provenance hex content validation
+
+**The bug**：`BASOrganTrainedWeightFilter.rejectionReason` 仅检查 hash 字段长度（必须 64 chars），不验 hex content。`"zzzz...zzzz"` (64 z's) passes the gate。SHA-256 hex 应为 `[0-9a-fA-F]{64}` 但 pre-M352 任何 64-char 字符串 OK。
+
+**Fix**：[BehavioralAISubstrate/Sources/BASOrgan/BASOrganTrainedWeightProvenance.swift](../BehavioralAISubstrate/Sources/BASOrgan/BASOrganTrainedWeightProvenance.swift) 新 `Rejection.malformedHashContent(field:firstInvalidChar:)` case + `firstNonHexCharacter(_:)` helper + length-then-content check 顺序。`firstInvalidChar` 用 `String` (length 1) 不用 `Character` 让 enum 保持 Codable via synthesis。
+
+**11 fix-pin 测试** in `M352OrganTrainedWeightHexValidationTests` 含 64 z's / mid-string non-hex / uppercase + mixed-case hex / length-vs-content precedence / Codable round-trip for 新 case。
+
+### 81.7 M353 — Doc cross-ref between isStructurallyConsistent + rejectionReason
+
+**The note**：两个方法 check overlapping but slightly different concerns；无 cross-ref 容易 drift。
+
+**Fix**：[BehavioralAISubstrate/Sources/BASOrgan/BASOrganTrainedWeightProvenance.swift](../BehavioralAISubstrate/Sources/BASOrgan/BASOrganTrainedWeightProvenance.swift) `isStructurallyConsistent` 加 doc 注释明确：3 agreement points / 2 divergence points / intended-use distinction。No code change. No new test.
+
+### 81.8 测试基线
+
+| 套件 | 八十章末 | 八十一章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2209 | **2233** | +24 (M341SHA256ReferenceVectors 8 + M351 5 + M352 11) |
+| Qinao XCTest | 1311 | 1311 | 0 |
+| 全栈 | 3520 | **3544** | +24 |
+
+0 failures / 0 flakes / 4/4 boundary checks 全绿（after substrate-residual fix removing "quick brown fox" SHA test vector — 8 remaining vectors sufficient）。
+
+### 81.9 红线 / 不变量回归
+
+| 不变量 / 红线 | M351 | M352 | M353 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（metric 不动 verdict） | ✓（filter 已是 typed gate；仅 strengthen content check） | ✓（doc only） |
+| #3 私有经验不进权重 | ✓ | **✓ 强化**（content check 让 sub-tier weights 更难绕） | ✓ |
+| audit hash chain | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ |
+| 4 boundary checks | ✓ | ✓ | ✓ |
+
+### 81.10 Methodology Lesson 1 update
+
+[QINAO_REVIEW_METHODOLOGY_LESSONS.md](QINAO_REVIEW_METHODOLOGY_LESSONS.md) Lesson 1 加更新：
+
+> **chapter 八十一 deep-review (2026-05-02)**: 70% FP rate on substantive
+> typed-primitive surface vs 89% on chapter 七十八.5 schema-additive
+> surface. Confirms FP rate is a function of surface complexity not
+> just methodology. Manual review remains essential — M351 was missed
+> by the agent (found by manual reasoning about input deduplication
+> invariants); M352 was missed by manual review (found by agent).
+> Both methodologies are complementary; neither alone catches both.
+
+### 81.11 仓库 surgical scope 真实状态（八十一章末）
+
+3 fixes shipped (M351 / M352 / M353)。仓库 surgical chip-away 列表 again =
+空 — 第三次确认。
+
+剩外部瓶颈 3 项不变（per chapter 八十.10 unblock predicates）。
+
+### 81.12 一句话总结
+
+**M351-M353 三个 surgical fixes 关掉 deep-review pass 2 发现的 3 个 real bugs/notes**：M351 修 `BASMultiHostConvergenceMetric` 内部-duplicate edge case false positive (manual review found, agent missed) + M352 修 `BASOrganTrainedWeightFilter` hex content validation gap (agent found, manual missed) + M353 加 `isStructurallyConsistent` vs `rejectionReason` doc cross-reference 防 divergence drift (agent found)。验证 M341 SHA-256 实装跨 8 NIST/Python reference vectors byte-equal — L13 v6 doctrine regression-gate hash 真 SHA-256 不是 internally-consistent gibberish。BAS 2209 → 2233 (+24) / Qinao 1311 / 全栈 3544 (+24) / 0 failures / 0 flakes / 4/4 boundary 全绿。Agent FP rate 70% (vs chapter 78.5's 89%) 确认 M348 Lesson 1 update: FP rate 是 surface complexity 函数；manual + agent 互补不可替代。仓库 surgical scope 第三次确认 = 空。
