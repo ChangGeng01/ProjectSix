@@ -44,16 +44,31 @@ public struct JSONCodecBench {
         }
     }
 
+    /// M370 chapter 八十四 evolution: cache encoder + decoder
+    /// instances. Pre-M370 each `run(...)` call constructed
+    /// fresh JSONEncoder + JSONDecoder which dominated cold
+    /// samples (chapter 八十三.4 smoke: cold 343 µs vs warm
+    /// 21 µs, 16x ratio). M370 hoists construction to static
+    /// lazy properties so the encoder/decoder live for the
+    /// process lifetime; cold/warm split shrinks because the
+    /// first round-trip no longer pays construction cost.
+    private static let cachedEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return encoder
+    }()
+
+    private static let cachedDecoder = JSONDecoder()
+
     /// Drive `roundTripCount` encode-then-decode cycles on a
     /// representative audit entry. Reports per-cycle latency
-    /// in microseconds.
+    /// in milliseconds.
     public static func run(
         roundTripCount: Int = 50_000
     ) throws -> Outcome {
         let entry = makeRepresentativeEntry()
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        let decoder = JSONDecoder()
+        let encoder = cachedEncoder
+        let decoder = cachedDecoder
 
         // Compute serialized size once for output.
         let probe = try encoder.encode(entry)

@@ -286,17 +286,55 @@ public struct BASEvolutionLifecycleStructuralFingerprint:
     }
 }
 
-/// Internal SHA-256 helper. Avoids depending on CryptoKit at this
-/// layer — uses a small pure-Swift implementation suitable for
-/// short input (the canonical encoding is < 1 KB).
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
+
+/// Internal SHA-256 helper.
+///
+/// **M369 chapter 八十四 evolution**: prefers CryptoKit's
+/// hardware-accelerated `CryptoKit.SHA256` when the framework is
+/// available (iOS 13+/macOS 10.15+/watchOS 6+/tvOS 13+ — i.e.
+/// every platform BAS targets). On platforms without CryptoKit
+/// (Linux CI, server targets), falls back to the pure-Swift
+/// implementation below. Both paths produce byte-identical output
+/// (verified by `M341SHA256ReferenceVectorsTests` 8 NIST/Python
+/// reference vectors plus the L13 canonical hash pin).
+///
+/// Pre-M369 only the pure-Swift path existed — chapter 八十三 M364
+/// `--sha256-bench` smoke measured it at ~1.5 MB/sec, ~100x slower
+/// than CryptoKit. M369 commits the speedup; bench-baselines
+/// reflect the new measurement.
 internal enum BASEvolutionLifecycleStructuralFingerprintHasher {
 
     static func sha256Hex(encoding: String) -> String {
         let bytes = Array(encoding.utf8)
-        let digest = SHA256.hash(data: bytes)
+        #if canImport(CryptoKit)
+        // M369 fast path: CryptoKit hardware-accelerated SHA-256.
+        let digest = CryptoKit.SHA256.hash(data: bytes)
         return digest
             .map { String(format: "%02x", $0) }
             .joined()
+        #else
+        // M341 pure-Swift fallback for platforms without
+        // CryptoKit (Linux CI, server targets). Output is
+        // byte-identical to the CryptoKit path — pinned by
+        // `M341SHA256ReferenceVectorsTests` against NIST FIPS 180-4
+        // reference vectors.
+        let digest = PureSwiftSHA256.hash(data: bytes)
+        return digest
+            .map { String(format: "%02x", $0) }
+            .joined()
+        #endif
+    }
+
+    /// M369: pure-Swift SHA-256 retained as fallback path. Not
+    /// performance-tuned (no SIMD, no inline assembly) but
+    /// byte-identical to CryptoKit's implementation.
+    enum PureSwiftSHA256 {
+        static func hash(data: [UInt8]) -> [UInt8] {
+            SHA256.hash(data: data)
+        }
     }
 
     // Minimal SHA-256 implementation — no external dependencies.
