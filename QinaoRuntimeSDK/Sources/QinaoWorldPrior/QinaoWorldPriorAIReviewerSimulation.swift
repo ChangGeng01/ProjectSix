@@ -151,7 +151,10 @@ public struct BASWorldPriorAIReviewAdvisory:
 public enum BASWorldPriorAIReviewerSimulation {
 
     /// Build a prompt asking AFM to review a candidate
-    /// against the 6-item checklist.
+    /// against the 6-item checklist. **Tightened format
+    /// (六十八)**: explicit "no preamble", "no markdown",
+    /// "fill in this template verbatim" — improves AFM
+    /// compliance on the line-oriented format.
     public static func makeReviewPrompt(
         for envelope: BASWorldPriorTemplateEnvelope
     ) -> String {
@@ -161,10 +164,9 @@ public enum BASWorldPriorAIReviewerSimulation {
         let rungs = input.branchEvidenceRungs
             .map(String.init).joined(separator: ", ")
         return """
-            You are reviewing one L4 causal-template candidate \
-            for an AI second brain. Run the 6-item checklist \
-            below and return ONLY the structured format \
-            specified at the end.
+            Review this L4 causal-template candidate. Reply \
+            using ONLY the template below. No preamble. No \
+            markdown. Replace `<...>` placeholders only.
 
             CANDIDATE
             - templateID: \(input.templateID)
@@ -172,36 +174,55 @@ public enum BASWorldPriorAIReviewerSimulation {
             - perturb kinds: \(kinds)
             - branch evidence rungs: \(rungs)
 
-            CHECKLIST
-            1. templateID follows `tmpl-<domain>-<name>` and is non-empty
-            2. description ≥ 30 chars and reads as human language
-            3. perturb kinds cover typical counterfactual failure modes
-            4. branch evidence rungs match literature support level
-            5. cross-template / cross-domain consistent (no obvious dup)
-            6. no obvious cultural blindspot / bias
+            REPLY (fill in exactly):
+            CHECK_1: <PASS or FAIL> - <comment>
+            CHECK_2: <PASS or FAIL> - <comment>
+            CHECK_3: <PASS or FAIL> - <comment>
+            CHECK_4: <PASS or FAIL> - <comment>
+            CHECK_5: <PASS or FAIL> - <comment>
+            CHECK_6: <PASS or FAIL> - <comment>
+            RECOMMENDATION: <approveSuggested or rejectSuggested or needsExpertJudgment>
+            JUSTIFICATION: <one short sentence>
 
-            REPLY FORMAT (LINE-ORIENTED, EXACT)
-            CHECK_1: PASS | FAIL — short comment
-            CHECK_2: PASS | FAIL — short comment
-            CHECK_3: PASS | FAIL — short comment
-            CHECK_4: PASS | FAIL — short comment
-            CHECK_5: PASS | FAIL — short comment
-            CHECK_6: PASS | FAIL — short comment
-            RECOMMENDATION: approveSuggested | rejectSuggested | needsExpertJudgment
-            JUSTIFICATION: <one short sentence on why>
+            CHECKLIST KEY:
+            1. templateID follows `tmpl-<domain>-<name>`
+            2. description ≥ 30 chars + human-readable
+            3. perturb kinds cover counterfactual failure modes
+            4. branch evidence rungs match literature support
+            5. cross-template / cross-domain consistent
+            6. no cultural blindspot or bias
             """
     }
 
     /// Parse AFM reply into a typed report. Returns nil if
     /// any required field is missing or unparseable.
+    ///
+    /// **Robustness** (六十八.1):
+    /// - Tolerates duplicate `CHECK_n` lines — last-write-wins
+    ///   (AFM occasionally echoes the prompt format then
+    ///   provides the actual answer)
+    /// - Word-boundary PASS/FAIL detection — `PASSAT` wouldn't
+    ///   parse as PASS (prefix check uses regex word boundary)
+    /// - Em-dash / en-dash / ASCII hyphen / colon all work
+    ///   as separator; em-dash preferred if present
+    /// - Reject takes priority over approve when both words
+    ///   appear in recommendation line (defensive: "reject
+    ///   because not approve-worthy" should classify as reject)
     public static func parseReviewReport(
         from reply: String,
         templateID: String
     ) -> BASWorldPriorAIReviewReport? {
-        let lines = reply.components(separatedBy: "\n")
-        var checks: [
-            BASWorldPriorAIChecklistResult
-        ] = []
+        // Preprocess: strip markdown fences (```...```) if
+        // AFM wrapped the reply in them. Also strip leading
+        // prose like "Here's my review:" — parser iterates
+        // all lines anyway, but stripping fences is safer.
+        let preprocessed = stripMarkdownFences(reply)
+        let lines = preprocessed.components(
+            separatedBy: "\n")
+        // Use dictionary keyed on index to dedupe (last-write-wins).
+        var checksByIndex: [
+            Int: BASWorldPriorAIChecklistResult
+        ] = [:]
         var rec: BASWorldPriorAIRecommendation?
         var justification: String?
 
@@ -227,15 +248,15 @@ public enum BASWorldPriorAIReviewerSimulation {
                             prefix.count)
                     ).trimmingCharacters(
                         in: .whitespacesAndNewlines)
-                    let passed = body.uppercased()
-                        .hasPrefix("PASS")
+                    let passed = isPassToken(body)
                     let comment = extractComment(
                         afterPassFail: body)
-                    checks.append(
+                    // last-write-wins.
+                    checksByIndex[index] =
                         BASWorldPriorAIChecklistResult(
                             item: item,
                             pass: passed,
-                            comment: comment))
+                            comment: comment)
                 }
             }
             if let v = extractAfterPrefix(
@@ -250,6 +271,11 @@ public enum BASWorldPriorAIReviewerSimulation {
             {
                 justification = v
             }
+        }
+
+        // Reconstruct check list in canonical order.
+        let checks = mapping.compactMap { (index, _) in
+            checksByIndex[index]
         }
 
         guard checks.count == 6,
@@ -288,20 +314,80 @@ public enum BASWorldPriorAIReviewerSimulation {
         return v.isEmpty ? nil : String(v)
     }
 
+    /// Strip markdown code fences from AFM reply. AFM
+    /// sometimes wraps structured output in ```text ... ```
+    /// fences. Returns the body between fences if present;
+    /// otherwise the original reply.
+    private static func stripMarkdownFences(
+        _ reply: String
+    ) -> String {
+        let lines = reply.components(separatedBy: "\n")
+        var inside = false
+        var collected: [String] = []
+        var sawFence = false
+        for line in lines {
+            let trimmed = line.trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("```") {
+                if inside {
+                    inside = false
+                    sawFence = true
+                    break
+                } else {
+                    inside = true
+                    sawFence = true
+                    continue
+                }
+            }
+            if inside {
+                collected.append(line)
+            }
+        }
+        if sawFence && !collected.isEmpty {
+            return collected.joined(separator: "\n")
+        }
+        return reply
+    }
+
+    /// Word-boundary PASS detection. Avoids `PASSAT` ⇒ PASS
+    /// false positive. Returns true iff body's first word
+    /// (uppercased) is exactly "PASS".
+    private static func isPassToken(_ body: String) -> Bool {
+        let upper = body.uppercased()
+        // First non-whitespace token.
+        let firstWord = upper.split(
+            whereSeparator: {
+                $0.isWhitespace
+                    || $0 == ":" || $0 == "—"
+                    || $0 == "-" || $0 == "–"
+                    || $0 == ","
+            }
+        ).first.map(String.init) ?? ""
+        return firstWord == "PASS"
+    }
+
     private static func extractComment(
         afterPassFail body: String
     ) -> String {
         // body starts with PASS or FAIL; comment is what
-        // follows after `—` or `-` (allow ASCII or unicode).
-        let separators: Set<Character> = ["—", "-", "–"]
-        if let dashIndex = body.firstIndex(where: {
-            separators.contains($0)
-        }) {
-            let after = body[
-                body.index(after: dashIndex)...
-            ]
-            return String(after).trimmingCharacters(
-                in: .whitespacesAndNewlines)
+        // follows after the FIRST separator. Em-dash takes
+        // priority over ASCII hyphen — typical AFM-output
+        // pattern is "PASS — short note", but ASCII fallback
+        // is needed since some AFM responses use plain `-`.
+        // Order: em-dash → en-dash → colon → ASCII hyphen.
+        let priority: [Character] = ["—", "–", ":", "-"]
+        for sep in priority {
+            if let idx = body.firstIndex(of: sep) {
+                let after = body[
+                    body.index(after: idx)...
+                ]
+                let comment = String(after)
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines)
+                if !comment.isEmpty {
+                    return comment
+                }
+            }
         }
         return ""
     }
@@ -310,11 +396,16 @@ public enum BASWorldPriorAIReviewerSimulation {
         _ s: String
     ) -> BASWorldPriorAIRecommendation? {
         let lower = s.lowercased()
-        if lower.contains("approve") {
-            return .approveSuggested
-        }
+        // **Order matters**: reject before approve to
+        // defend against AFM saying "reject because not
+        // approve-worthy" — would mis-classify as approve
+        // under naive substring order. Reject takes
+        // priority. expert/judgment last.
         if lower.contains("reject") {
             return .rejectSuggested
+        }
+        if lower.contains("approve") {
+            return .approveSuggested
         }
         if lower.contains("expert")
             || lower.contains("judg")

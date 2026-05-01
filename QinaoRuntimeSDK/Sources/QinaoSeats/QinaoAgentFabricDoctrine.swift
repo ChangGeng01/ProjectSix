@@ -154,13 +154,19 @@ public extension QinaoAgentMantra {
 public extension QinaoSeat {
     /// Which concurrency phase this seat lives in.
     /// Each seat → exactly one phase (typed-pinned partition).
+    /// **Total mapping** — a future seat added without a
+    /// phase assignment in `seatsInPhase` triggers a
+    /// fatalError rather than silently mis-classifying it
+    /// to `.landing`. Tests pin the partition exhaustive.
     var concurrencyPhase: QinaoAgentConcurrencyPhase {
         for phase in QinaoAgentConcurrencyPhase.allCases
         where phase.seatsInPhase.contains(self)
         {
             return phase
         }
-        // Unreachable — partition is exhaustive.
-        return .landing
+        fatalError(
+            "QinaoSeat.\(self) has no concurrency phase " +
+            "assigned — update QinaoAgentConcurrencyPhase" +
+            ".seatsInPhase to include it.")
     }
 }

@@ -84,7 +84,7 @@ final class QinaoAppleFoundationAIPersonaSetE2ETests:
         var lastBody = ""
         var review:
             BASWorldPriorAIPersonaReview?
-        for _ in 0..<3 {
+        for _ in 0..<5 {
             let body = try await draftViaAFM(
                 prompt: prompt)
             lastBody = body

@@ -300,15 +300,19 @@ public enum BASWorldPriorAIPersonaReviewer {
         return v.isEmpty ? nil : String(v)
     }
 
+    /// Reject-over-approve precedence — same robustness
+    /// pattern as `BASWorldPriorAIReviewerSimulation.parseRecommendation`.
+    /// AFM saying "reject because not approve-worthy" must
+    /// classify as reject, not approve.
     private static func parseRecommendation(
         _ s: String
     ) -> BASWorldPriorAIRecommendation? {
         let lower = s.lowercased()
-        if lower.contains("approve") {
-            return .approveSuggested
-        }
         if lower.contains("reject") {
             return .rejectSuggested
+        }
+        if lower.contains("approve") {
+            return .approveSuggested
         }
         if lower.contains("expert")
             || lower.contains("judg")

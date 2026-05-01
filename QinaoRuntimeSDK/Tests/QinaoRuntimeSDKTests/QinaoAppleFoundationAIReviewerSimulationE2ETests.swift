@@ -81,7 +81,7 @@ final class QinaoAppleFoundationAIReviewerSimulationE2ETests:
         var lastBody = ""
         var report:
             BASWorldPriorAIReviewReport?
-        for _ in 0..<3 {
+        for _ in 0..<5 {
             let body = try await draftViaAFM(
                 prompt: prompt)
             lastBody = body
