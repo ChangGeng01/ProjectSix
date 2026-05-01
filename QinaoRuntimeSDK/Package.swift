@@ -362,7 +362,13 @@ let package = Package(
                 // endpoint.
                 "QinaoDefaults",
                 "QinaoSeats",
-                "QinaoLoopSeats"
+                "QinaoLoopSeats",
+                // M326 — `--persona-panel-review` mode runs
+                // BASWorldPriorAIPersonaReviewer against the
+                // 50-template starter curriculum via Apple
+                // Foundation Models. Doctrine A: panel
+                // consensus does NOT promote envelope.
+                "QinaoWorldPrior"
             ]),
         .testTarget(
             name: "QinaoRuntimeSDKTests",

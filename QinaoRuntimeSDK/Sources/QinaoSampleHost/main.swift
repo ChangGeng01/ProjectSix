@@ -14,6 +14,10 @@ import QinaoMLX
 import QinaoDefaults
 import QinaoSeats
 import QinaoLoopSeats
+// M326 — `--persona-panel-review` mode needs
+// BASWorldPriorAIPersonaReviewer + AIRecommendation enum
+// (M295.1 AI advisory pre-review path).
+import QinaoWorldPrior
 
 // QinaoSampleHost
 //
@@ -187,6 +191,15 @@ struct QinaoSampleHost {
             // through rollback + deadStop scenarios so hosts
             // see the M296.1 净启 plan shape end-to-end.
             await runCleanRebootDemo()
+            return
+        }
+        if args.contains("--persona-panel-review") {
+            // M326 — drive
+            // BASWorldPriorAIPersonaReviewer against the Path A
+            // 50-template starter curriculum via real Apple
+            // Foundation Models. Doctrine A pin: panel
+            // consensus does NOT promote envelope.
+            await runPersonaPanelReview()
             return
         }
         if args.contains("--lora-curriculum-train-m247") {
@@ -3717,6 +3730,168 @@ struct QinaoSampleHost {
 
             ━━━ Demo complete — M296.1 净启 (clean reboot) plan generation verified end-to-end ━━━
             """)
+    }
+
+    // MARK: - M326 persona-panel-review
+
+    /// Drive AI persona panel against starter curriculum via
+    /// real AFM. Output JSON to a temp file path that the demo
+    /// prints so the caller can read structured results.
+    private static func runPersonaPanelReview() async {
+        let envFlag = "QINAO_AFM_PANEL_REVIEW"
+        guard
+            ProcessInfo.processInfo.environment[envFlag] == "1"
+        else {
+            stderr("error: set \(envFlag)=1 to drive real AFM\n")
+            exit(2)
+        }
+        let count: Int = {
+            if let raw = ProcessInfo.processInfo
+                .environment["QINAO_PANEL_COUNT"],
+               let n = Int(raw),
+               n > 0 && n <= 50
+            {
+                return n
+            }
+            return 5
+        }()
+
+        print("""
+            QinaoSampleHost --persona-panel-review (M326):
+              drive BASWorldPriorAIPersonaReviewer (5 personas)
+              × \(count) starter-curriculum templates against
+              Apple Foundation Models on device. Output:
+              per-template aggregate (approve / reject / needs-
+              expert) + per-persona structured replies.
+
+              Doctrine A pin: persona panel consensus does NOT
+              promote envelope provenance. Reviews are
+              `.illustrative` regardless of outcome.
+
+              Total AFM calls: \(count) × 5 = \(count * 5)
+              (≈ \(count * 5 * 3) sec at typical AFM throughput)
+            """)
+
+        let outcome: PersonaPanelReviewDemo.Outcome
+        do {
+            outcome = try await PersonaPanelReviewDemo.run(
+                count: count)
+        } catch {
+            stderr(
+                "error: persona-panel-review failed: \(error)\n")
+            exit(2)
+        }
+
+        // Print summary banner.
+        print("""
+
+            ━━━ Step 1/2 — Run summary ━━━
+            templates reviewed:  \(outcome.totalTemplates)
+            total AFM calls:     \(outcome.totalCalls)
+            parse-success rate:  \(outcome.parseSuccessCount) / \(outcome.totalCalls)
+            elapsed:             \(String(format: "%.1f", outcome.elapsedSeconds)) sec
+
+            ━━━ Step 2/2 — Per-template aggregates ━━━
+            """)
+        for o in outcome.outcomes {
+            print("""
+
+              \(o.templateID)
+                approve / reject / needs-expert:
+                  \(o.approveSuggestedCount) / \(o.rejectSuggestedCount) / \(o.needsExpertJudgmentCount)
+                personas:
+            """)
+            for p in o.perPersona {
+                let comment = p.domainComment
+                    .replacingOccurrences(of: "\n", with: " ")
+                let trunc = comment.count > 100
+                    ? String(comment.prefix(100)) + "…"
+                    : comment
+                print(
+                    "    [\(p.persona)] \(p.recommendation): \(trunc)")
+            }
+        }
+
+        // Encode + write JSON to a temp file the caller can grep.
+        let outURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "qinao-persona-panel-review-" +
+                "\(UUID().uuidString.prefix(8)).json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [
+            .prettyPrinted, .sortedKeys,
+        ]
+        do {
+            let payload = try encoder.encode(
+                EncodableOutcome(from: outcome))
+            try payload.write(to: outURL)
+            print("""
+
+                ━━━ JSON output ━━━
+                \(outURL.path)
+
+                ━━━ Demo complete — persona panel ran on \(outcome.totalTemplates) templates; envelope stays .illustrative ━━━
+                """)
+        } catch {
+            stderr(
+                "warning: failed to write JSON output: \(error)\n")
+        }
+    }
+}
+
+/// Codable mirror of `PersonaPanelReviewDemo.Outcome` for JSON
+/// output (the value-types are not Codable; we project to a
+/// flat shape that's easy for downstream consumers to grep).
+private struct EncodableOutcome: Encodable {
+    let totalTemplates: Int
+    let totalCalls: Int
+    let parseSuccessCount: Int
+    let elapsedSeconds: Double
+    let outcomes: [EncodableTemplateOutcome]
+
+    init(from o: PersonaPanelReviewDemo.Outcome) {
+        self.totalTemplates = o.totalTemplates
+        self.totalCalls = o.totalCalls
+        self.parseSuccessCount = o.parseSuccessCount
+        self.elapsedSeconds = o.elapsedSeconds
+        self.outcomes = o.outcomes.map(
+            EncodableTemplateOutcome.init(from:))
+    }
+}
+
+private struct EncodableTemplateOutcome: Encodable {
+    let templateID: String
+    let approveSuggestedCount: Int
+    let rejectSuggestedCount: Int
+    let needsExpertJudgmentCount: Int
+    let perPersona: [EncodablePersonaCallRecord]
+
+    init(from t: PersonaPanelReviewDemo.TemplateOutcome) {
+        self.templateID = t.templateID
+        self.approveSuggestedCount = t.approveSuggestedCount
+        self.rejectSuggestedCount = t.rejectSuggestedCount
+        self.needsExpertJudgmentCount =
+            t.needsExpertJudgmentCount
+        self.perPersona = t.perPersona.map(
+            EncodablePersonaCallRecord.init(from:))
+    }
+}
+
+private struct EncodablePersonaCallRecord: Encodable {
+    let templateID: String
+    let persona: String
+    let recommendation: String
+    let domainComment: String
+    let citedConcepts: [String]
+    let parseSucceeded: Bool
+
+    init(from p: PersonaPanelReviewDemo.PersonaCallRecord) {
+        self.templateID = p.templateID
+        self.persona = p.persona
+        self.recommendation = p.recommendation
+        self.domainComment = p.domainComment
+        self.citedConcepts = p.citedConcepts
+        self.parseSucceeded = p.parseSucceeded
     }
 }
 
