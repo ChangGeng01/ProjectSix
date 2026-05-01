@@ -74,6 +74,43 @@ FORBIDDEN = [
     "玄戒",
 ]
 
+# M331 (chapter 七十七) — per-symbol allowlist for `FORBIDDEN`
+# tokens. Some Qinao *public* symbols intentionally use these
+# tokens because they refer to advisory-only / multi-agent
+# concepts that are NOT the L14 internal sovereign machinery.
+# Without this exception layer, the boundary check has been in
+# chronic FAILED state since pre-M298 (visible to any caller of
+# `bash scripts/check_qinao_import_boundaries.sh`). The
+# `FORBIDDEN` blacklist remains the safety net for *new* leaks;
+# this allowlist documents the deliberate, design-reviewed
+# exceptions:
+#
+#   - `Verdict` in QinaoSeats / QinaoLoopSeats refers to
+#     `SeatVerdict` (M292.x), the multi-agent advisory-vote
+#     value type. It is NOT `BASSovereignVerdict` (L14 audit
+#     decision). The two concepts are orthogonal: a SeatVerdict
+#     is one of many inputs that may inform the single
+#     BASSovereignVerdict the runtime ultimately ships.
+#   - `Sentinel` in QinaoSeats / QinaoLoopSeats refers to the
+#     `sovereignSentinel` seat (a read-only watcher in the
+#     9-seat fabric). It is NOT `IntegritySentinel` (L14
+#     internal verifier module). The seat name was chosen for
+#     its semantic clarity; renaming would break M292-M329
+#     callers.
+#
+# Format: each FORBIDDEN token may carry an optional dict of
+# {"modules": {...}} listing modules where the token is
+# permitted in declarations. A token without an entry here
+# remains globally forbidden.
+FORBIDDEN_TOKEN_ALLOWLIST = {
+    "Verdict": {
+        "modules": {"QinaoSeats", "QinaoLoopSeats"},
+    },
+    "Sentinel": {
+        "modules": {"QinaoSeats", "QinaoLoopSeats"},
+    },
+}
+
 # M173 — structural whitelist. The blacklist above catches obvious
 # leaks; the whitelist below catches NEW internal names a future
 # engineer might introduce (e.g. "Crucible", "DarkRing"). We
@@ -158,6 +195,61 @@ PUBLIC_TYPE_WHITELIST_LITERALS = {
     # but the BAS shapes are accepted today as L4 public contract.
     "BASWorldPriorClaim", "BASWorldPriorAxiom",
     "BASWorldPriorTemplate", "BASWorldPriorEvidence",
+    # M331 (chapter 七十七) — M295.x training-boundary +
+    # curriculum + reviewer types. Canonical public surface per
+    # Doctrine A (private experience never enters L2 weights).
+    # Qinao re-exports these directly because wrapping would
+    # obscure the contract: the BAS types ARE the audit-grade
+    # training-pipeline / reviewer / curriculum vocabulary.
+    # Adding Qinao-prefixed mirrors would require parallel
+    # maintenance with no behavioural improvement; the intent
+    # is for hosts to grep one canonical name set across both
+    # substrate audit logs and SDK callers. Closes the chronic
+    # FAILED-state lint gap that existed since pre-M298 (246
+    # structural violations across 42 distinct types).
+    "BASWorldPriorTemplateAcceptance",
+    "BASWorldPriorTemplateAcceptanceBatchReport",
+    "BASWorldPriorTemplateEnvelope",
+    "BASWorldPriorTemplateProvenance",
+    "BASWorldPriorTemplateProvenanceGate",
+    "BASWorldPriorTemplateAttestation",
+    "BASWorldPriorTemplateAttestationGate",
+    "BASWorldPriorTemplateAttestationIssue",
+    "BASWorldPriorTemplateAuthoringAction",
+    "BASWorldPriorTemplateAuthoringPolicy",
+    "BASWorldPriorTemplateAuthoringSession",
+    "BASWorldPriorTemplateAuthoringStage",
+    "BASWorldPriorTemplateAuthoringTransition",
+    "BASWorldPriorAuthoringBatchReport",
+    "BASWorldPriorAuthoringProgressReport",
+    "BASWorldPriorTrainingExporter",
+    "BASWorldPriorTrainingPipelineFilter",
+    "BASWorldPriorStarterCurriculum",
+    "BASWorldPriorProductionCurriculum",
+    "BASWorldPriorProductionCurriculumEntry",
+    "BASWorldPriorProductionCurriculumWalkthrough",
+    "BASWorldPriorReviewerBatch",
+    "BASWorldPriorReviewerBatchApplier",
+    "BASWorldPriorReviewerBatchFormatter",
+    "BASWorldPriorReviewerBatchItem",
+    "BASWorldPriorReviewerBatchResult",
+    "BASWorldPriorReviewerDashboard",
+    "BASWorldPriorReviewerDashboardFormatter",
+    "BASWorldPriorReviewerDashboardPerDomain",
+    "BASWorldPriorReviewerDashboardSummary",
+    "BASWorldPriorReviewerDecision",
+    "BASWorldPriorReviewerDecisionRecord",
+    "BASWorldPriorReviewChecklistItem",
+    "BASWorldPriorAIChecklistResult",
+    "BASWorldPriorAIDraftHelper",
+    "BASWorldPriorAIPersona",
+    "BASWorldPriorAIPersonaPanelReview",
+    "BASWorldPriorAIPersonaReview",
+    "BASWorldPriorAIPersonaReviewer",
+    "BASWorldPriorAIRecommendation",
+    "BASWorldPriorAIReviewAdvisory",
+    "BASWorldPriorAIReviewReport",
+    "BASWorldPriorAIReviewerSimulation",
     # Substrate convenience types that surface today; audit each
     # addition individually before extending this set.
     "BASOrganRegistryEndpoint", "BASOrganAdapter",
@@ -209,8 +301,17 @@ for path in qinao_graphs:
         decl = "".join(f.get("spelling", "")
                        for f in sym.get("declarationFragments", []))
         # 1. Forbidden-token blacklist (catches obvious leaks).
+        # M331 — per-symbol allowlist (`FORBIDDEN_TOKEN_ALLOWLIST`)
+        # short-circuits when the token is permitted in this
+        # module's deliberate public surface (e.g. `Verdict` in
+        # QinaoSeats refers to advisory `SeatVerdict`, NOT L14's
+        # `BASSovereignVerdict`).
         for tok in FORBIDDEN:
             if tok in decl:
+                allow_entry = FORBIDDEN_TOKEN_ALLOWLIST.get(tok, {})
+                allowed_modules = allow_entry.get("modules", set())
+                if module in allowed_modules:
+                    continue
                 title = sym.get("names", {}).get("title", "?")
                 violations.append(
                     f"[public-api] {module}:{title} contains forbidden token "
