@@ -114,6 +114,15 @@ public actor QinaoSeatRegistry {
         seats.keys.sorted { $0.rawValue < $1.rawValue }
     }
 
+    /// **M309-internal** — snapshot of registered seat impls.
+    /// Used by `dispatchByPhase` (defined in
+    /// `QinaoSeatPhaseDispatch.swift`) to filter seats by their
+    /// concurrency phase without exposing the private storage.
+    /// Not part of the public surface.
+    internal func registeredSeatImpls() -> [any QinaoSeatProtocol] {
+        seats.values.map { $0 }
+    }
+
     /// Dispatch every registered seat in parallel for one turn.
     /// Returns a `SeatBoard` with verdicts in seat raw-value ASC
     /// order. Seats whose `contribute` throws are recorded in
