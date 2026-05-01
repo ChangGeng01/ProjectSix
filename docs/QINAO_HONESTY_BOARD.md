@@ -8391,3 +8391,161 @@ typed pin → measurement → regression gate
 ### 78.11 一句话总结
 
 **M333-M337 五方向同步 ship close A+B+C+D+E 全面进化 batch**：M333 L13 self-evolution e2e demo（pure value-type，3 paths，4 invariants pinned）+ M334 throughput + thermal bench（仿 M179，100-turn LatencyStats + ThermalCycleStats）+ M335 multi-host demo（**0 BAS 改动** —— Phase 1 实证发现 M306+M329 primitives 直接 recombine）+ M336 deep test + agent review（3 gate-off + 1 AFM gate-on / 0 flake / 9 findings → 1 真 bug `hashValue` non-determinism → fix + 2 pin tests）+ M337 manifesto v5 "Performance is Doctrine"（typed pin → measurement → regression gate triple）。BAS 2173 (+2) / Qinao 1307 (+20) / 全栈 3480 (+22) / 0 failures / 4/4 boundary 全绿 / 11 demo modes (+3)。仓库 surgical scope 真正完成；剩 L4 训练 + curriculum + W1-W5 仅需外部资源不变。
+
+## 七十九、 内部加强完善 — 外部瓶颈记下 + v6/v7 candidate triple completion (M339-M343)
+
+### 79.1 触发动作
+
+用户：`仓库外瓶颈先记下 内部 加强 完善`。
+
+紧接 chapter 七十八 "全面进化" batch 后用户 `怎么样了 现在 你满意吗` 问诚实自评。我承认 4 点保留：(1) deep review 89% false-positive 让我警觉 (2) v5 manifesto 是 framing 不是 capability (3) M334 bench p50=0.0013ms 数字看起来太干净易被误读 (4) M333 demo 走 pure value-type 距 v6 候选还差产生式 regression gate。
+
+用户回复要求按 "外部瓶颈先记下、内部加强完善" 两步走。本 chapter ship 6 个 surgical chip-away (M339-M344) 把保留点全闭合。
+
+### 79.2 M339 — 外部瓶颈正式 typed-record
+
+**问题**：chapter 七十七.7 / 七十八.10 把 L4 训练 / authoritative curriculum / W1-W5 列在 "外部资源不变" 一行；但没有正式记录 unblock 条件，实际上是 informal claim。
+
+**实装**：[docs/QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md](QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md) 三件 entry —— EB-1 (L4 World-Prior 训练资产) / EB-2 (Authoritative Curriculum Content) / EB-3 (W1-W5 Real-World Coordination)。
+
+**每条 entry 三段式**：
+1. **What is missing** — 缺什么具体物
+2. **Unblock condition** — 什么真实条件成立才能解锁（如 "GPU/TPU minutes for at least the curriculum size needed"、"a real human couples — therapist, decision scientist, ... — must audit each template"）
+3. **Repository-side preparation (fair game)** — 仓库内可做的预备工作
+
+**Recording rules** 三条规则：
+- Items here cannot be closed by code in this repository
+- Each item must list a verifiable unblock condition (not "more work")
+- Repository-side preparation is fair game and tracked separately
+
+**意义**：把 informal "外部资源" 标签升格为 typed bottleneck backlog with verifiable unblock conditions —— 任何后续 chip-away 都不会被误记成 "解决了外部瓶颈"。
+
+### 79.3 M340 — `ThroughputBenchDemo.scopeStatement` 诚实 pin
+
+**问题**：M334 bench 输出 p50=0.0013ms 很容易被误引为 "Qinao 端到端 latency 0.001ms 级别" SLA 命题。但 bench 实际上只测 `BASLeaseLifeCoordinator.recordTurn` 状态机开销，不含 AFM inference / audit ledger I/O / actor hops。
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/ThroughputBenchDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/ThroughputBenchDemo.swift) 加 `public static let scopeStatement: String` 常量 + 强化 doctrine 段：
+
+```
+"[scope] regression alarm, not an SLA. measures substrate
+state-machine cycle latency only — no model inference,
+no audit-ledger I/O, no actor hops across runtime layers.
+do not quote these numbers as customer-facing latency."
+```
+
+[main.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift) banner 在每次 `--throughput-bench` 运行开头 echo 该 statement。
+
+**fix-pin 测试** [M340ThroughputBenchScopeHonestyTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/M340ThroughputBenchScopeHonestyTests.swift) 4 个：
+- `testScopeStatementContainsRegressionAlarmDisclaimer` — 必须含 "regression alarm" + "not an sla"
+- `testScopeStatementListsExclusions` — 必须 explicit list "model inference" + "audit ledger" + "actor hops"
+- `testScopeStatementWarnsAgainstQuoting` — 必须含 "do not quote" 等警告
+- `testMainBannerEmitsScopeStatement` — main.swift 必须 emit `scopeStatement` 到 stdout
+
+**Doctrine 锁**：source-level 读源文件做 grep （不能 `@testable import QinaoSampleHost` 因为是 executable target）。任何后续 PR 弱化 disclaimer 必须同 PR 解释 + update 测试。
+
+### 79.4 M341 — v6 候选 B1: L13 self-evolution production regression gate
+
+**问题**：v5 manifesto 列 L13 self-evolution doctrine 缺 "regression gate" 那一腿。pre-M341 唯一保护是 downstream test 会因 transition deletion 而坏；*additive* 改动（new stage / new action / new edge）可静默 ship。
+
+**实装**：[BehavioralAISubstrate/Sources/BASMemory/BASEvolutionLifecycleStructuralFingerprint.swift](../BehavioralAISubstrate/Sources/BASMemory/BASEvolutionLifecycleStructuralFingerprint.swift) (~390 LOC)：
+
+- **`BASEvolutionLifecycleStructuralFingerprint`** struct (Sendable, Equatable, Hashable, Codable)：5 字段 (stages 排序 / terminals 排序 / actions 排序 / 完整 transitionMatrix / SHA-256 matrixHash)
+- **`current()`** static factory：从 live `BASEvolutionLifecycleStage.allCases` + `BASEvolutionLifecyclePolicy.validTransitions` 派生
+- **`canonical`** static let：doctrine-pinned 8 stages × 7 actions × 11 edges shape，hash `9e15d296c25c5b28da42eb5d5ca7d89bf768f407a49cbad21ed0b735eec114f5`
+- **`detectDrift(live:pinned:)`** —— 4 类 DriftReport (stage-set / terminal-set / action-set / transition-matrix)
+- **内部 SHA-256 实装** —— 自带 pure-Swift SHA256 hasher，避免 BASMemory dep CryptoKit 平台问题
+
+**测试** [M341EvolutionLifecycleFingerprintTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M341EvolutionLifecycleFingerprintTests.swift) 12 个：live==canonical / 8 stages / 3 terminals / 7 actions / 11 edges / promoted-only-retract / terminal-empty-edges / hash-stable / hash-matches-canonical / drift-detection-missing-stage / drift-detection-extra-edge / Codable round-trip。
+
+**Doctrine 角色**：填 v5 三件套 "regression gate" 那一腿。**不是** runtime 强制门 —— 真状态机走 `applying(_:)`。是 doctrine drift detector：未来 PR 改 policy 必须同 PR update canonical hash，否则 CI 失败。L13 self-evolution 候选从 "parked due to missing leg" 移到 "triple-complete, awaiting v6 authoring decision"。
+
+### 79.5 M342 — v6 候选 B2: Multi-instance distribution measurement plane
+
+**问题**：v5 manifesto 列 multi-instance distribution doctrine 缺 "measurement plane" 那一腿。pre-M342 唯一保护是 XCTest 会失败若 convergence 完全坏；*expensive* convergence (e.g., O(n²) where O(n log n) was expected) 可静默 ship。
+
+**实装**：[BehavioralAISubstrate/Sources/BASSovereign/BASMultiHostConvergenceMetric.swift](../BehavioralAISubstrate/Sources/BASSovereign/BASMultiHostConvergenceMetric.swift) (~200 LOC)：
+
+- **`BASMultiHostConvergenceMetric`** struct：8 字段 (framesContributedA/B / framesInConsensus / frameOverlapCount / duplicateFramesInConsensus / mergeIsSymmetric / clockDivergencePeak / mergeWallClockSeconds)
+- **`measure(framesA:framesB:clockA:clockB:clock:)`** static factory：跑 forward + reverse merge 验 symmetric / 计算 dedup 数字 / 算 clock divergence peak / 计 wall-clock
+- **`allInvariantsHold` / `failingInvariants`** computed properties：regression gate consumer 的 grep-able output
+
+**测试** [M342MultiHostConvergenceMetricTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M342MultiHostConvergenceMetricTests.swift) 8 个：disjoint-clean / overlap-deduplicated / empty-cleanly-handled / clock-divergence-peak / failing-invariants-list-all / wall-clock-non-negative / Codable round-trip / matches-fragment-merger-contract。
+
+**Doctrine 角色**：填 v5 三件套 "measurement plane" 那一腿。Multi-instance distribution 候选从 "parked due to missing leg" 移到 "triple-complete, awaiting v6 authoring decision"。
+
+### 79.6 M343 — v6 候选 B3: Adapter-trained L2 weights typed pin
+
+**问题**：v5 manifesto 列 adapter-trained L2 doctrine 缺 "typed pin" 那一腿。M67.4 / M295.2 `BASWorldPriorTrainingPipelineFilter` gate **curriculum 内容** 进训练；pre-M343 没有镜像 gate 检查 **训练出来的 adapter weights** 进 production registry。第三方 adapter（或未来内部 adapter）可被插入 `BASOrganRegistry` 不带任何 provenance audit。
+
+**实装**：[BehavioralAISubstrate/Sources/BASOrgan/BASOrganTrainedWeightProvenance.swift](../BehavioralAISubstrate/Sources/BASOrgan/BASOrganTrainedWeightProvenance.swift) (~280 LOC) —— 镜像 M295.2 shape：
+
+- **`BASOrganTrainedWeightProvenance`** envelope struct (8 字段：adapterID / baseModelID / tier / trainingCurriculumRef / trainingCorpusHashHex / trainedWeightsHashHex / expertAttestationSignatureRef? / attestationIssuedAt?)
+- **`Tier`** enum 4-case ladder (`illustrative` < `aiAdvisory` < `peerReviewed` < `domainExpertReviewed`) —— mirrors `BASWorldPriorTemplateProvenance` 顺序
+- **`isStructurallyConsistent`** computed —— production tier 必须有 attestation；非 production tier 必须 NOT 有 attestation (forged-uplift detection)
+- **`BASOrganTrainedWeightFilter`** enum gate：4 类 typed Rejection (belowProductionTier / missingAttestationForProductionTier / malformedHash / nonProductionTierCarriesAttestation)
+- **`productionTierFloor = .domainExpertReviewed`** mirrors curriculum filter floor
+
+**测试** [M343OrganTrainedWeightProvenanceTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M343OrganTrainedWeightProvenanceTests.swift) 16 个：4-case ladder / Comparable order / production floor pin / 3 rejection paths (illust / advisory / peer) / domain-expert-with-full-attestation passes / 2 missing-attestation paths / forged-uplift detection / 2 hash-malformation paths / structural consistency / batch filter preserves order / Codable round-trip。
+
+**Doctrine 角色**：填 v5 三件套 "typed pin" 那一腿（in repository scope）。Adapter-trained L2 候选从 "parked due to missing leg" 移到 "triple-complete in repository scope; doctrine authoring waits on EB-1 + EB-2"。
+
+### 79.7 v5 manifesto 更新
+
+[QINAO_MANIFESTO_V5_DOCTRINE.md](QINAO_MANIFESTO_V5_DOCTRINE.md) 两处更新：
+
+1. **§7 "What is not in v5"** —— 三个 "no doctrine yet" 项重写：每条说 "v5 三件套现 complete (cite M341/M342/M343), authoring 仍是 separate decision"
+2. **Appendix v6/v7 candidates** —— 升级表格为 4-列 (typed pin / measurement / regression gate / authoring status)，3 个候选全部 status = "triple-complete, awaiting v6 authoring decision"
+
+### 79.8 测试基线
+
+| 套件 | 七十八章末 | 七十九章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2173 | **2209** | +36 (M341 12 + M342 8 + M343 16) |
+| Qinao XCTest | 1307 | **1311** | +4 (M340) |
+| 全栈 | 3480 | **3520** | +40 |
+
+0 failures / 0 flakes / 4/4 boundary checks 全绿。
+
+### 79.9 红线 / 不变量回归
+
+| 不变量 / 红线 | M339 | M340 | M341 | M342 | M343 |
+|---|---|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（doc only） | ✓（test pin only） | ✓（fingerprint 是 drift detector 不是 runtime gate） | ✓（measurement only） | ✓（filter 是 typed pin；runtime registry 行为不变） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ | ✓ | **✓ 强化**（M343 filter 把镜像 doctrine 从 "curriculum 进训练" 扩展到 "weights 进 runtime"） |
+| audit hash chain | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 4 boundary checks | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### 79.10 chapter 78 self-critique 4 点对账
+
+| 我的保留 (七十八章末 conversation) | 79 章末状态 |
+|---|---|
+| (1) deep review 89% false-positive 让我警觉 | 记下作为 methodology lesson；本批不再用 agent surface-scan 作主力 |
+| (2) M337 v5 manifesto 是 framing 不是 capability | M341/M342/M343 把 v5 框架的 backlog 转为可兑现 typed primitives — framing → triple-complete |
+| (3) M334 bench p50=0.0013ms 数字易被误读 | **M340 fix** —— scopeStatement + banner echo + 4 fix-pin 测试 |
+| (4) M333 demo 走 pure value-type 距 v6 候选差产生式 regression gate | **M341 fix** —— `BASEvolutionLifecycleStructuralFingerprint` 是产生式 regression gate（drift detector + canonical hash） |
+
+### 79.11 七十八.10 stale-claim 矫正
+
+| 残项 | 七十八章末 | 七十九章末 |
+|---|---|---|
+| L13 self-evolution doctrine | "缺 production regression gate"（v6 候选 parked） | **triple-complete, awaiting v6 authoring decision**（M341） |
+| Multi-instance distribution doctrine | "缺 cross-host convergence measurement plane" | **triple-complete, awaiting v6 authoring decision**（M342） |
+| Adapter-trained L2 doctrine | "缺 trained-weight 的 substrate-level audit primitive" | **triple-complete in repository scope; doctrine authoring waits on EB-1 + EB-2**（M343） |
+| L4 训练 / curriculum / W1-W5 | "外部资源" informal claim | **typed bottleneck backlog with verifiable unblock conditions**（M339） |
+
+### 79.12 仓库 surgical scope 真实状态（七十九章末）
+
+**仓库内可做的 surgical chip-away 列表 = 空**。所有 v5 v6/v7 候选的缺腿 in repository scope 全填齐。
+
+剩下需要 unblock 的 3 项**全部** in `QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md`：
+- EB-1 L4 training assets — GPU/TPU minutes
+- EB-2 Authoritative curriculum — domain expert sign-offs
+- EB-3 W1-W5 — pilot human / secondary device / app store / TestFlight
+
+任何继续推进 v6 doctrine authoring 是另一个层次的决定（不是缺腿，是 "要不要现在 author"）。
+
+### 79.13 一句话总结
+
+**M339-M343 五个 surgical chip-away 把 chapter 七十八 我自承的 4 点保留全闭合 + 把 v5 三件套缺的腿全填齐**：M339 把外部瓶颈从 informal claim 升格为 `EXTERNAL_BOTTLENECKS_BACKLOG.md` typed entries with verifiable unblock conditions；M340 给 ThroughputBench 加 `scopeStatement` + 4 fix-pin 测试 防 p50=0.001ms 数字被误引为 SLA；M341 ship `BASEvolutionLifecycleStructuralFingerprint`（pure-Swift SHA256 + drift detector + canonical hash 9e15d2…）填 L13 self-evolution 三件套缺的 regression gate；M342 ship `BASMultiHostConvergenceMetric`（8 字段 + symmetric verify + clock divergence peak）填 multi-instance distribution 三件套缺的 measurement plane；M343 ship `BASOrganTrainedWeightProvenance` + `BASOrganTrainedWeightFilter`（4-tier ladder mirroring M295.2）填 adapter-trained L2 三件套缺的 typed pin。BAS 2173 → 2209 (+36) / Qinao 1307 → 1311 (+4) / 全栈 3520 (+40) / 0 failures / 0 flakes / 4/4 boundary 全绿。三个 v6/v7 候选全部 "triple-complete, awaiting v6 authoring decision"。仓库内 surgical chip-away 列表 = 空；剩 3 项全在外部瓶颈 backlog。

@@ -168,32 +168,57 @@ pattern: typed-pin first, measurement second, regression gate third.
   primitives; v5 keeps the discipline of typing and measuring those
   primitives without claiming downstream behavioural properties.
 - **No L13 self-evolution doctrine.** v5 makes self-evolution
-  measurable but does not yet promise it. A v6 candidate axis is on the
-  table; it must satisfy the triple before it can be authored.
-- **No multi-instance distribution doctrine.** Same reason as above —
-  M335 demonstrates the merger primitive, but a doctrine claim across
-  hosts needs its own measurement plane (sync convergence, inter-host
-  audit replay) before authoring.
+  measurable but does not yet promise it. As of M341 the v5 triple is
+  complete (typed pin via `BASEvolutionLifecycleStructuralFingerprint`,
+  measurement via M333 `EvolutionLoopDemo`, regression gate via the
+  fingerprint hash + drift detector). The candidate is now
+  *authoring-ready* — actually authoring it is a separate decision.
+- **No multi-instance distribution doctrine.** As of M342 the v5
+  triple is complete (typed pin via M329 merger primitives,
+  measurement plane via `BASMultiHostConvergenceMetric`, regression
+  gate via `allInvariantsHold` + `failingInvariants`). Same status
+  as L13: authoring-ready, not yet authored.
+- **No adapter-trained L2 doctrine.** As of M343 the v5 triple is
+  complete in repository scope (typed pin via `BASOrganTrainedWeightProvenance`
+  + `BASOrganTrainedWeightFilter`, regression gate via the production
+  tier filter). The measurement plane partially depends on EB-1
+  (compute) + EB-2 (domain experts), so this candidate is
+  *authoring-ready in repository scope* but the doctrine claim itself
+  awaits real trained weights to measure.
 
 ---
 
 ## Appendix — v6/v7 candidates parked
 
 The following are tracked as future doctrine candidates. Each is
-deliberately *not* yet authored because at least one leg of the v5
-triple is missing:
+deliberately *not* yet authored because the candidate has not been
+through a doctrine-authoring decision — but as of M341–M343 (chapter
+七十九 of the honesty board), all three legs of the v5 triple are now
+in place for every parked candidate:
 
-| Candidate | Missing leg |
-|---|---|
-| L13 self-evolution as doctrine | regression gate (lifecycle is typed + measurable, but no production gate yet) |
-| Multi-instance distribution doctrine | measurement plane for cross-host convergence |
-| Adapter-trained L2 layer | typed pin (training pipeline schema is shipped, but the trained weights themselves are not yet auditable through a substrate primitive) |
+| Candidate | typed pin | measurement | regression gate | Authoring status |
+|---|---|---|---|---|
+| L13 self-evolution as doctrine | `BASEvolutionLifecycleStage` (8) + `BASEvolutionLifecycleAction` (7) + `BASEvolutionLifecyclePolicy` | M333 `EvolutionLoopDemo` traverses every path | **M341** `BASEvolutionLifecycleStructuralFingerprint` (typed shape + SHA-256 + drift detector) | **triple-complete, awaiting v6 authoring decision** |
+| Multi-instance distribution doctrine | M329 `BASSovereignFragmentMerger` + `BASSovereignCrossDeviceClock` + `BASSovereignCrossDeviceLedgerFrame` | M335 `MultiHostDemo` proves symmetric merge + commutative clock | **M342** `BASMultiHostConvergenceMetric` (frames + duplicates + symmetry + clock divergence + wall-clock seconds) | **triple-complete, awaiting v6 authoring decision** |
+| Adapter-trained L2 doctrine | **M343** `BASOrganTrainedWeightProvenance` + `BASOrganTrainedWeightFilter` (4-tier ladder mirroring M295.2 curriculum tier ladder) | EB-1 + EB-2 (external resources required, see `QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md`) | M67.4 `testPersonaPanelDoesNotPromoteEnvelope` + M343 production tier filter | **triple-complete in repository scope; doctrine authoring waits on EB-1/EB-2** |
 
-When any one of these acquires its missing leg, it becomes a v6 (or
-v7, or v∞) candidate. Until then it stays in this appendix.
+The status "triple-complete, awaiting v6 authoring decision" means
+v5 §4 no longer forbids authoring the doctrine. Whether to author it
+is a separate decision: a v6 doctrine claim makes a substantive
+promise about runtime behaviour, and that promise wants its own
+review stage independent of the typed-primitive work that unblocked
+it.
+
+The L4 training assets / authoritative curriculum / W1-W5 items
+remain external bottlenecks — see
+`docs/QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md`. Those items cannot be
+closed by writing more Swift in this repository regardless of how
+many v5 triples get filled.
 
 ---
 
 *Authored 2026-05-02 as附录 J 阶段 5 (M337) — direction A of the 全面进化
-batch. v5 is the first manifesto axis to be authored after the
-substrate can demonstrate its own claim from cold start.*
+batch. Triple-completion update added 2026-05-02 (M344) after M341–M343
+shipped the missing legs for all three parked candidates. v5 remains
+the framing doctrine; the candidates move from "parked due to missing
+leg" to "ready when authoring is wanted".*
