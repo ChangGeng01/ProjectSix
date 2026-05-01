@@ -8549,3 +8549,141 @@ do not quote these numbers as customer-facing latency."
 ### 79.13 一句话总结
 
 **M339-M343 五个 surgical chip-away 把 chapter 七十八 我自承的 4 点保留全闭合 + 把 v5 三件套缺的腿全填齐**：M339 把外部瓶颈从 informal claim 升格为 `EXTERNAL_BOTTLENECKS_BACKLOG.md` typed entries with verifiable unblock conditions；M340 给 ThroughputBench 加 `scopeStatement` + 4 fix-pin 测试 防 p50=0.001ms 数字被误引为 SLA；M341 ship `BASEvolutionLifecycleStructuralFingerprint`（pure-Swift SHA256 + drift detector + canonical hash 9e15d2…）填 L13 self-evolution 三件套缺的 regression gate；M342 ship `BASMultiHostConvergenceMetric`（8 字段 + symmetric verify + clock divergence peak）填 multi-instance distribution 三件套缺的 measurement plane；M343 ship `BASOrganTrainedWeightProvenance` + `BASOrganTrainedWeightFilter`（4-tier ladder mirroring M295.2）填 adapter-trained L2 三件套缺的 typed pin。BAS 2173 → 2209 (+36) / Qinao 1307 → 1311 (+4) / 全栈 3520 (+40) / 0 failures / 0 flakes / 4/4 boundary 全绿。三个 v6/v7 候选全部 "triple-complete, awaiting v6 authoring decision"。仓库内 surgical chip-away 列表 = 空；剩 3 项全在外部瓶颈 backlog。
+
+## 八十、 一次性 收尾 — v6 + v7 doctrine 真 author + methodology lessons + EB sharpened (M345-M350)
+
+### 80.1 触发动作
+
+用户：`剩下的 一次性 解决`。
+
+紧接 chapter 七十九 把 v5 三件套缺的腿全填齐后，"剩下的"分类如下：
+
+| 类别 | 项 | 可做吗 |
+|---|---|---|
+| A — v6/v7 候选 triple-complete, awaiting authoring | L13 self-evolution / Multi-instance distribution / Adapter-trained L2 provenance | **可做** |
+| B — chapter 79.10 留的 methodology 项 | 89% FP rate review lesson / v5 framing-axis pattern | **可做** —— methodology lessons doc |
+| C — EB-1/EB-2/EB-3 外部瓶颈 | GPU/TPU 算力 / domain expert 签字 / W1-W5 真世界 | **不可做**（per M339 recording rule "Items here cannot be closed by code in this repository"）—— 但可 sharpen 每条 unblock 条件 + 加 cross-ref |
+
+按 "一次性 解决" 拆 6 milestone (M345-M350) 全 ship。所有 5 个 chip-away 都是 docs-only —— 不动 source code，不动测试基线。
+
+### 80.2 M345 — author v6 manifesto: Self-Evolution Without Drift
+
+**实装**：[docs/QINAO_MANIFESTO_V6_DOCTRINE.md](QINAO_MANIFESTO_V6_DOCTRINE.md)（~190 行 / §1-§7）。
+
+**v6 promise**：L13 self-evolution lifecycle 的*结构形状*（8 stages, 7 actions, 11 transition edges, terminal/non-terminal partition）是 typed contract 不可静默漂移。系统允许 evolution；evolution 的 shape 不允许 evolution。
+
+**v6 三件套（per v5 §4 强制）**：
+- Typed pin：`BASEvolutionLifecycleStage` + `BASEvolutionLifecycleAction` + `BASEvolutionLifecyclePolicy`
+- Measurement：M333 `EvolutionLoopDemo`
+- Regression gate：M341 `BASEvolutionLifecycleStructuralFingerprint`（hash `9e15d2…`）
+
+**v6 强制 5 条**：(1) Promotion non-terminal (2) Retraction-only post-promotion exit (3) Terminal stages 空 edge sets (4) History un-erasable (5) Lifecycle audit signal refs doctrine-bound（M305 stable telemetry contract）。
+
+**v6 NOT promise 5 条**：not behavioural quality / not training cycle convergence / not v3 schema invariance / not external trained-weight provenance / not unbounded retraction counts。
+
+### 80.3 M346 — author v7 manifesto: Multi-Instance Audit Convergence
+
+**实装**：[docs/QINAO_MANIFESTO_V7_DOCTRINE.md](QINAO_MANIFESTO_V7_DOCTRINE.md)（~210 行 / §1-§7）。
+
+**v7 promise**：consensus timeline 是 deterministic + symmetric (`merge(A,B) == merge(B,A)`) + lossless（每个 distinct frame 出现 exactly once）。
+
+**v7 三件套**：
+- Typed pin：M329 `BASSovereignFragmentMerger` + `BASSovereignCrossDeviceClock` + `BASSovereignCrossDeviceLedgerFrame`
+- Measurement：M335 `MultiHostDemo` + M306 multi-session demo
+- Regression gate：M342 `BASMultiHostConvergenceMetric` (`allInvariantsHold` + `failingInvariants`)
+
+**v7 强制 6 条**：(1) Single commit mouth per host preserved (2) Element-wise max clock merge commutative (3) HostID namespacing isolates constitutions (4) Concurrent frames resolve deterministically via `originDeviceID` ASC + `auditEntryRef` ASC tiebreak (5) Empty fragments preserve other side verbatim (6) 测量平面 reflects merger contract。
+
+**v7 NOT promise 6 条**：not a transport / not byzantine fault tolerance / not real-time consistency / not cross-host weight sharing / not unlimited convergence rounds / not multi-host verdict promotion。
+
+### 80.4 M347 — v1 invariant #3 outbound-mirror strengthening
+
+**实装**：[QinaoRuntimeSDK/README.md](../QinaoRuntimeSDK/README.md) `### 3 · Host secrets stay out of base weights` 段加 "two mirrored gates" 子段：
+
+- **Inbound** —— 训练 pipeline filter 拒收 sub-tier curriculum
+- **Outbound** —— trained-weight filter 拒收 sub-tier adapters 进 production registry
+
+两 gates 用同 4-tier ladder（mirrors M295.2 顺序）。
+
+**doctrine compose**：only signed-curriculum-trained signed-weights 服务 runtime 请求。
+
+**redaction 兼容**：README 不暴露 BAS 类型名（只用"training pipeline filter" / "trained-weight filter" 等抽象 phrase）。`check_sovereign_redaction.sh` 通过。
+
+### 80.5 M348 — methodology lessons doc
+
+**实装**：[docs/QINAO_REVIEW_METHODOLOGY_LESSONS.md](QINAO_REVIEW_METHODOLOGY_LESSONS.md)（~200 行 / 5 lessons + cross-references）。
+
+**5 条 lessons**：
+
+1. **Agent surface-scan FP rate** —— chapter 67 (76%) + chapter 78.5 (89%) 数据 + 4 条 recommendations（top-10 not top-30 / grep verification mandatory / "old code, new load-bearing" pattern / 1 hour budget per finding）
+2. **Framing axis vs capability axis distinction** —— v5 是 framing axis；v1-v4 + v6 + v7 是 capability axis；framing axis 必须在同一 batch 内 paid off（M341-M343 是 v5 paid-off 证据）；triple pattern 可复用
+3. **Stale-claim correction pattern** —— "all close" claims 必须配 "what's not closed" table；chapter wrap 时跑 grep "全 close" sweep；self-critique is doctrine-quality signal（chapter 78 → 79 close）
+4. **Repository-side preparation vs external bottleneck** —— EB 必须 verifiable unblock condition；prep section 永远是 prep 不是 progress；recording rules at bottom of EXTERNAL_BOTTLENECKS doc are doctrine-strength
+5. **Authoring v6/v7+ requires triple-completion** —— v5 §4 是 gate（no exception）；per-candidate triple-completion 是 surgical unit；authoring 是 separate decision from triple-completion
+
+**Lives as methodology document, not manifesto axis** —— per Lesson 2 自身 recommendation（"framing axes only when justified"）。
+
+### 80.6 M349 — sharpen EB-1/EB-2/EB-3 + add v6/v7 cross-refs
+
+**实装**：[docs/QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md](QINAO_EXTERNAL_BOTTLENECKS_BACKLOG.md) 三 entry 各加：
+- **Concrete unblock predicates**（具体 GPU-hour 估算 / signature flow / binary state predicates）
+- **Verifiable state when unblocked**（`swift run` command / typed assertion）
+- **Repository-side preparation as ✅/⚠️ checklist**（区分 done vs 可做但不 unblock）
+- **What does NOT close this item**（明确 anti-patterns）
+- **Cross-references** to v6/v7 manifesto + methodology Lesson 4 / Lesson 5
+
+**关键改动**：从抽象 "compute available" / "expert sign" 升级为 binary state predicates。例如 EB-1.A 现在写 "200 GPU-hours on A100 80GB (LoRA rank-32 adapter on a 50-template curriculum, ~2 epochs)" 不是 "GPU/TPU minutes"。每条 unblock 条件现在都可 yes/no 验证。
+
+### 80.7 测试基线（M345-M349 全 docs-only / no source change）
+
+| 套件 | 七十九章末 | 八十章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2209 | 2209 | 0 |
+| Qinao XCTest | 1311 | 1311 | 0 |
+| 全栈 | 3520 | 3520 | 0 |
+
+0 failures / 0 flakes / 4/4 boundary checks 全绿。M347 README 改动经 `check_sovereign_redaction.sh` 验证（首次写时撞了 BAS-prefix forbidden token，第二版用抽象 phrase 通过）。
+
+### 80.8 红线 / 不变量回归
+
+| 不变量 / 红线 | M345 | M346 | M347 | M348 | M349 |
+|---|---|---|---|---|---|
+| #1 先醒再答 | ✓（doctrine 不破） | ✓ | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（v6 doctrine 强化 lifecycle 结构) | ✓（v7 doctrine 强化 single commit mouth per host） | ✓（v1 #3 outbound mirror 强化） | ✓ | ✓ |
+| #3 私有经验不进权重 | ✓ | **✓ 强化**（v7 §4 explicit "Not cross-host weight sharing"） | **✓ 强化**（README 显式 inbound + outbound 双 gate） | ✓ | ✓ |
+| audit hash chain | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 4 boundary checks | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### 80.9 chapter 七十九.13 stale-claim 矫正
+
+| 残项 | 七十九章末 | 八十章末 |
+|---|---|---|
+| L13 self-evolution doctrine | "triple-complete, awaiting v6 authoring decision"（M341） | **v6 authored** —— `QINAO_MANIFESTO_V6_DOCTRINE.md` |
+| Multi-instance distribution doctrine | "triple-complete, awaiting v6 authoring decision"（M342） | **v7 authored** —— `QINAO_MANIFESTO_V7_DOCTRINE.md` |
+| Adapter-trained L2 doctrine | "triple-complete in repository scope; doctrine authoring waits on EB-1 + EB-2"（M343） | **v1 #3 strengthened** —— README 显式 outbound mirror（不开新 axis）；EB-1/EB-2 unblock 后 v8 候选可考虑 |
+| chapter 79.10 methodology 项（FP rate / framing-axis pattern） | "记下 as methodology lesson；不 ship 单独 doc" | **`QINAO_REVIEW_METHODOLOGY_LESSONS.md` shipped**（5 lessons / cross-refs） |
+| EB-1/EB-2/EB-3 unblock conditions | M339 typed entries with general phrasing | **M349 sharpened** —— 每条带 concrete binary predicates + verifiable state + ✅/⚠️ prep checklist + anti-patterns |
+
+### 80.10 仓库内 surgical scope 真实状态（八十章末）
+
+**仓库内可做的 surgical chip-away 列表 = 空**（第二次确认）。
+
+**v8 候选 backlog**（ship 后可能 author）：
+- v8 candidate "Adapter-Trained L2 Provenance Doctrine"（needs EB-1 unblock 至少 0.5 cycle ship 一个真 trained adapter to demonstrate）
+- 任何 future axis 都必须 satisfy v5 三件套（per Methodology Lesson 5）
+
+**外部瓶颈状态**（per EB sharpened 八十章 M349）：
+- EB-1 L4 training assets — needs concrete GPU-hour commitment OR Apple Foundation Models adapter API access
+- EB-2 Authoritative curriculum — needs at least 1 domain expert to actually sign
+- EB-3 W1-W5 — pilot human / secondary device / W3 depends on EB-1+EB-2 / App Store submission / TestFlight pipeline
+
+### 80.11 七十九.13 一句话总结升级
+
+七十九.13 末说"剩 3 项全在外部瓶颈 backlog"——现在升级为：
+
+**剩 3 项全在外部瓶颈 backlog 且每条都有 concrete binary unblock predicates 而非 informal phrasing**。chapter 七十九 留的两条 methodology 项（FP rate + framing-axis pattern）也 ship 为 `QINAO_REVIEW_METHODOLOGY_LESSONS.md`。三个 triple-complete 候选 (L13 / multi-instance / adapter-L2) 中两个 author 为 v6 / v7 capability doctrine；第三个走 v1 invariant #3 strengthening 路径而不开新 axis（per Methodology Lesson 2 "framing axes only when justified" + adapter-L2 measurement plane partial-depends on EB-1+EB-2 不全在仓库内）。
+
+### 80.12 一句话总结
+
+**M345-M350 六个 surgical chip-away 把 chapter 七十九 留的 "剩下的" 全 close**：M345 author v6 manifesto "Self-Evolution Without Drift"（typed pin via M341 / measurement via M333 / regression gate via M341 fingerprint hash drift detector）+ M346 author v7 manifesto "Multi-Instance Audit Convergence"（typed pin via M329 / measurement via M335+M306 / regression gate via M342 metric）+ M347 用 M343 strengthening v1 invariant #3 README outbound-mirror（abstract phrasing 不撞 sovereign redaction）+ M348 ship `QINAO_REVIEW_METHODOLOGY_LESSONS.md`（5 lessons / chapter 67/78 deep-review FP rate + framing-axis pattern + stale-claim correction + prep vs external + triple-completion gate）+ M349 sharpen EB-1/EB-2/EB-3 unblock conditions 从 informal phrasing 升级为 concrete binary predicates + verifiable state + ✅/⚠️ prep checklist + anti-patterns + v6/v7 cross-refs。BAS 2209 / Qinao 1311 / 全栈 3520 不变（5 chip-away 全 docs-only）/ 0 failures / 0 flakes / 4/4 boundary 全绿。仓库 surgical scope 第二次确认 = 空。三个 triple-complete 候选已经全部按其本性归属：L13 → v6 / multi-instance → v7 / adapter-L2 → v1 #3 strengthening + v8 candidate awaits EB-1+EB-2。剩外部瓶颈 3 项每条都有 concrete binary predicates，"剩下的" 真正 ship 完。
