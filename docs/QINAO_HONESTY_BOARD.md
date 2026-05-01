@@ -7264,3 +7264,122 @@ Cthulhu schemas runtime 接入：**3/8** (从 0/8 → 3/8)。剩 5 件留 M308+ 
 ### 70.10 一句话总结
 
 **M303-M305 用 3 个 surgical-typed PR 把 3/8 Cthulhu schemas + L13 lifecycle scaffold 从「0 runtime caller」推到「audit signalRefs 真消费」**。每条 PR 配 7-8 个 typed-pin 测试。BAS 2114 → 2136 (+22) / Qinao 1231 → 1238 (+7) / 全栈 3374 / 0 failures / 0 flakes。doctrine integrity 不动；不变量 #1/#2/#3 + 红线 7 全保留；hash chain 仍 deterministic。下批 (M308+) closes 5 件剩余 Cthulhu schemas。
+
+## 七十一、 全面开发 batch v3 — M306 multi-session demo close A.2 surgical gap
+
+### 71.1 触发动作
+
+用户问 "B 类能完成吗" → 拆解后选 **推 M306 multi-session demo**。后续追问 "为什么不能使用 afm 预训练" → 物理 / doctrine / 工程三角度回答后用户**确认**仍按 M306 走。本章节 ship M306。
+
+honesty board 章七十.5 + 七十.9 把 M306 列为 surgical 但 deferred 的 A.2：
+> 既有 `--full-stack-demo` 已在单 session 内 multi-turn (3-turn MLX `draftMultiTurn`)
+> 真正缺的是 **multi-session continuity**（session A → session B 跨 audit ledger）
+> 这需要 `BASHostKit` dep + 跨 session 状态机，不是 surgical 一日 PR
+
+本章把 A.2 从 "deferred" 推到 "ship"。
+
+### 71.2 实施
+
+**71.2.1 Package.swift dep 加 5 件 BAS**
+
+`QinaoSampleHost` target 加 BASHostKit / BASMemory / BASSovereign / BASPolicy / BASAdmin。Qinao import boundary check (`scripts/check_qinao_import_boundaries.sh`) 已 allow `BAS[A-Za-z]+`，无需改 script。
+
+**71.2.2 移除 main.swift 的 `@main` 属性**
+
+加新文件 `MultiSessionContinuity.swift` 触发 Swift compiler error：
+> '@main' attribute cannot be used in a module that contains top-level code
+
+main.swift 既文件名为 main.swift（Swift convention "top-level code allowed"）又用 `@main struct`，加新文件后 Swift 拒绝二者并存。Fix：去 `@main`，文件底部加 `await QinaoSampleHost.main()` top-level 调用。行为前后等价。
+
+**71.2.3 新 `MultiSessionContinuityDemo` 助手**
+
+[MultiSessionContinuity.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/MultiSessionContinuity.swift)：
+
+- `Outcome` + `SessionRecord` 纯 value type
+- `run(rootDirectory:signingSecretSeed:) async throws -> Outcome` 4 步：
+  1. `BASUnifiedStorageLocator.locate(in:)` （reuse M298）取 shared root + canonical audit-ledger URL
+  2. Session A — fresh `BASHostRuntime(configuration:)` with `(.interactive, .primary)` drive 1 turn → append entry to ledger1
+  3. Session B — fresh runtime with `(.ambient, .reflective)` 同 SQLite 文件 → ledger2 rehydration 自动 load 入 session A 的 entry → append session B
+  4. 第三个 verification ledger3 → `verifyChainIntegrity()` + `count() == 2`
+
+**关键发现**：必须在 `ledger.append(entry)` 前 **清 `entry.signature`**——`BASSovereignAuditLedger` HMAC canonical-sign，runtime 的 `sovereignDigestHex` 用不同 keying，原 signature 不 match → throws `signatureMismatch`。Fix：`var draft = entry; draft.signature = ""` then append。Doctrine sound：ledger 是 sovereign-audit 链 canonical 权威；runtime signature 是 turn-internal integrity check，不是 ledger commitment。
+
+**71.2.4 main.swift 加 `--multi-session-demo` mode**
+
+`runMultiSessionDemo()` 调 helper + 打印 4-step banner（unified root / sessionA ID + audit ID / sessionB ID + audit ID / chain integrity / sessionIDs+auditIDs distinctness）。
+
+**71.2.5 Tests**
+
+[M306MultiSessionContinuityTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M306MultiSessionContinuityTests.swift)（6 测试，BAS 测试 target 而非 Qinao 测试 target——helper 在 executable target 不可 @testable import）：
+
+1. `testDistinctSessionConfigsProduceDistinctAuditIDs` — `(kind, workflowProfile)` 不同 → sessionIDs 不同 → audit IDs 不同
+2. `testAppendRejectsRuntimeSignatureAndAcceptsCleared` — pin 71.2.3 关键发现的 doctrine
+3. `testRehydrationLoadsPreviousSessionEntries` — close ledger1 + reopen ledger2 → ledger2.count() == 1
+4. `testVerificationLedgerSeesBothEntries` — 两 session ship 后第三 ledger 看到 2 entries + chain integrity 通过
+5. `testBothSessionsCarryM298ThroughM305Codes` — 4 always-emitted prefix (frontier / tribunal / abyssal / humanAnchor) 在两 session 都 present
+6. `testAuditLedgerUsesCanonicalFilenameUnderRoot` — `sovereign-audit.sqlite` 在 root 下
+
+### 71.3 测试基线
+
+| 套件 | 70 章末 | 71 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2136 | **2142** | +6 (M306) |
+| Qinao XCTest | 1238 | **1238** | 0（M306 测试落 BAS 侧） |
+| 全栈 | 3374 | **3380** | +6 |
+
+0 failures / 0 flakes (gate-off)。
+
+### 71.4 红线 / 不变量回归
+
+| 不变量 / 红线 | M306 影响 |
+|---|---|
+| #1 先醒再答 | ✓（每 session 各自走 L1 wake） |
+| #2 神经不掌权 | ✓（ledger 仅写 audit；不参与 verdict/permit 决策） |
+| #3 私有经验不进权重 | ✓（demo 全 in-memory + tmp，session 结束删 root） |
+| audit hash chain | ✓ deterministic（chain integrity verifier 通过） |
+| 单提交口（单 session 内） | ✓（cross-session 是 ledger 共享文件，不绕单 session 内的 commit gate） |
+| white paper 红线 7（watcher hint, not verdict） | ✓ |
+| Qinao 4 边界闸 | ✓（BAS imports already allowed in `check_qinao_import_boundaries.sh`） |
+
+### 71.5 chapter 七十.9 A.2 状态更新
+
+| 缺口 | 七十章末 | 七十一章末 |
+|---|---|---|
+| A.1 5 件剩余 Cthulhu schemas（UnknownReserve / AnomalyTrace / NarrativeDistortion / AbyssalBranch / ForbiddenKnowledgeCandidate） | ❌ deferred | ❌ deferred（M308+） |
+| **A.2 M306 multi-session demo** | ❌ deferred | **✓ closed** |
+| A.3 M295.1+ 生产课程内容 | ❌ deferred（需 domain experts） | ❌ deferred |
+
+### 71.6 演示输出
+
+```
+━━━ Step 2/4 — Session A ━━━
+sessionID:       host.primary|task|quarantine
+auditID:         audit.host.primary|task|quarantine.quarantine
+audit codes:     frontier.status:, tribunal.status:, abyssal.magnitude:,
+                 humanAnchor.tone:, seal.count:, lifecycle.tickets:
+signalRefs (#):  47
+
+━━━ Step 3/4 — Session B ━━━
+sessionID:       host.reflective|manipulationRisk|quarantine
+auditID:         audit.host.reflective|manipulationRisk|quarantine.quarantine
+audit codes:     frontier.status:, tribunal.status:, abyssal.magnitude:,
+                 humanAnchor.tone:, seal.count:, lifecycle.tickets:
+signalRefs (#):  52
+
+━━━ Step 4/4 — Continuity proof (verification ledger) ━━━
+entries on disk:        2
+chain integrity:        ✓ verified
+sessionIDs distinct:    ✓
+auditIDs distinct:      ✓
+```
+
+### 71.7 仍剩 surgical 缺口（A 类）
+
+- A.1 5 件剩余 Cthulhu schemas runtime 接入（~1 天，仿 M303-M305）
+- A.3 M295.1+ 生产课程内容（domain experts，仓库永远不能替）
+
+不可 surgical（B 类）继续不变：W1-W5 / L4 训练资产 / M296.1-3。
+
+### 71.8 一句话总结
+
+**M306 用 1 个 surgical PR + 6 个 typed-pin 测试 close A.2 multi-session continuity gap**。`QinaoSampleHost --multi-session-demo` 现在驱动两 BASHostRuntime sessions 共享一个 SQLite-backed audit ledger，第三个 verification ledger 验证 chain integrity；M298-M305 audit codes 在两 session 都 present。doctrine integrity 不动；新发现 doctrine：appending runtime-built audit entries to a sovereign ledger requires clearing `entry.signature` (the runtime's keying ≠ ledger's HMAC keying)。BAS 2136 → 2142 / Qinao 1238 / 全栈 3380 / 0 failures。
