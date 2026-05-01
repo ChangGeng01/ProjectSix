@@ -271,6 +271,19 @@ public struct BASEvolutionLifecycleStructuralFingerprint:
         return BASEvolutionLifecycleStructuralFingerprintHasher
             .sha256Hex(encoding: encoding)
     }
+
+    /// M364 — public passthrough to the M341 SHA-256 hasher.
+    /// Useful for downstream code (sample-host benches,
+    /// integrity verifiers) that wants to hash arbitrary
+    /// strings using the same implementation that produces
+    /// the L13 canonical hash. The hasher itself stays
+    /// internal to keep the public surface narrow.
+    public static func sha256Hex(
+        of string: String
+    ) -> String {
+        BASEvolutionLifecycleStructuralFingerprintHasher
+            .sha256Hex(encoding: string)
+    }
 }
 
 /// Internal SHA-256 helper. Avoids depending on CryptoKit at this
