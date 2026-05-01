@@ -6868,3 +6868,152 @@ LOW / NIT 暂未修（13 项）—— style / 重复代码 / 完整 Codable 一�
 ### 67.8 一句话总结
 
 **Deep test 0 退化 0 flake** + **deep review 修了 4 个真 bug**（2 CRITICAL + 2 HIGH）+ **8 个 fix-pin 测试 typed-asserted**。doctrine 物理 invariant 现在的**强度**比 67 章前严格——以前是「靠测试 + 文档约定」，现在 typed validator + typed cache + typed cancellation 都把 invariant 物理 typed-pinned。
+
+## 六十八、 全面开发 batch — M298-M301 surgical wire + M302 stale sweep
+
+### 68.1 触发动作
+
+用户 `全面开发`。Phase 1 实证 grep 实证后收敛到 5 条 surgical-shippable 缺口：
+
+1. M283 `BASUnifiedStorageLocator` schema 在 (M270 / M91)，但 0 runtime caller
+2. M284 `BASCandidateFrontierSummary.summarize()` 在，但 0 runtime caller
+3. M285 `BASTribunalCoverageCheck.report()` 在，但 0 runtime caller
+4. M293 `QinaoSurfaceShowcaseView` 在，但 `QinaoSampleApp.swift` 不调（27 行 stub）
+5. Honesty-board section 28.6 / 31.3 标"QinaoSampleApp 真演 6 surface ✗"——需 ship 后矫正
+
+每条都是「类型已 ship，宿主路径未消费」——M298-M301 surgical 一日 PR 全闭。
+
+### 68.2 M298 — `BASUnifiedStorageLocator` 接入 sample-host startup chain
+
+**问题**：`BASUnifiedStorageLocator.locate(in:)` 提供 audit-ledger SQLite + lifecycle SQLite 两个 canonical URL 的 root-bundling helper（M283 ship），但 `QinaoSampleHost --full-stack-demo` 用 hardcoded `/tmp/qinao_full_stack_demo_lifecycle.json` 路径，没人示范 locator 的部署惯用法。
+
+**修复** ([QinaoSampleHost/main.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift)):
+
+- Step 2 storage 构建块替换为：
+  ```swift
+  let demoRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("qinao-full-stack-demo-\(UUID().uuidString)")
+  let unifiedLocations = try BASUnifiedStorageLocator.locate(in: demoRoot)
+  let storageURL = unifiedLocations.root.appendingPathComponent("lifecycle.json")
+  ```
+- Step 2 banner 加 unified root + canonical filenames 输出
+- 末尾 cleanup 改为删整个 `unifiedLocations.root`，不留空目录
+
+**Doctrine 锁定**（5 测试 in [QinaoSampleHostUnifiedLocatorTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostUnifiedLocatorTests.swift))：
+- 文件名 byte-equal banner 输出
+- 三 URL 共享 root parent path
+- `ensureRootDirectory` idempotent 跨 demo re-entry
+- `locate(in:)` 一站式 mkdir + 三 URL bundling
+- 独立 root 间无文件冲突
+
+### 68.3 M299 — `BASCandidateFrontierSummary` 接入 audit signalRefs
+
+**问题**：M284 ship 了 `BASCandidateObservationBundle.summarize()` 派生 4 个 status code（dominant-clear / guardian-held / diversity-only / empty）+ candidate count + diversity flag，但 `EBrainRuntimeCoordinator.runTurn` 不调用——L14 audit entry 看不到 frontier 状态。
+
+**修复** ([EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift)):
+
+- `buildSovereignAuditEntry` 加 `candidateObservationBundle: BASCandidateObservationBundle? = nil` 参数（backward-compat optional）
+- 当 bundle 非 nil → call `.summarize()` → append 三条 signal code:
+  - `frontier.status:<code>`
+  - `frontier.candidates:<N>`
+  - `frontier.diversity:emitted` (only when emitted)
+- 在 [EBrainRuntimeCoordinator.swift line 663](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift) 接入 `thoughtArtifacts.candidateObservationBundle`
+
+**Doctrine 锁定**（4 测试 in [M299FrontierSummaryConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M299FrontierSummaryConsumptionTests.swift))：
+- frontier.status code 在 4 canonical 值集合内
+- frontier.candidates 整数 parseable
+- 既有 risk: / permit: / fold: 代码并存（backward-compat）
+- 双 turn determinism
+
+**Hash chain integrity**：signature 仍 deterministic digest of `signalRefs` ASC 排序——只是更长。verdict 不被 escalate（advisory metadata only）。不变量 #2「神经不掌权」未触。
+
+### 68.4 M300 — `BASTribunalCoverageCheck` 接入 audit signalRefs
+
+**问题**：M285 ship 了 `BASTribunalCoverageCheck.report(for:)` 派生 5 个 statusCode（full-body-converged / full-body-dissent / full-body-incomplete / partial-N-voices / empty）+ voicesPresent.count，但 audit entry 不消费——L14 看不到 tribunal coverage 是否 full-body。
+
+**修复**：同 M299，extending the same `buildSovereignAuditEntry` 改动：
+
+- `tribunalObservationBundle: BASTribunalObservationBundle? = nil` 参数
+- 当 bundle 非 nil → call `BASTribunalCoverageCheck.report(for:)` → append 两条 signal code:
+  - `tribunal.status:<code>`
+  - `tribunal.voices:<N>`
+- 接入 `thoughtFrame.tribunalObservationBundle`（已 M55 attached）
+
+**Doctrine 锁定**（5 测试 in [M300TribunalCoverageConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M300TribunalCoverageConsumptionTests.swift))：
+- tribunal.status code 在 5 canonical 值集合内
+- tribunal.voices 整数 ∈ [0, 3]
+- determinism 跨 turn
+- M299 + M300 codes 同 turn 共存
+- 既有代码并存
+
+### 68.5 M301 — `QinaoSampleApp` 6 surface scenario screens
+
+**问题**：6 个 surface SwiftUI views (`QinaoComparePanelView` / `QinaoDraftShellView` / `QinaoDelayPacketView` / `QinaoBoundaryScriptView` / `QinaoSilentStubView` / `QinaoLocalOnlySheetView`) + `QinaoSurfaceShowcaseView` (M293) 都 ship 了，但 `QinaoSampleApp.swift` 的 `ContentView()` 只渲染 prompt/response 面板，hosts 试用 SDK 看不到 6 surface。
+
+**修复** ([ContentView.swift](../QinaoRuntimeSDK/Sources/QinaoSample/ContentView.swift)):
+
+- 加 `DemoTab` enum（2 cases: `.prompt` / `.surfaceShowcase`）
+- body 顶部加 `Picker("Demo", selection: $activeTab).pickerStyle(.segmented)`
+- 根据 `activeTab` switch 到 `promptModeBody`（既有）或 `surfaceShowcaseBody`（新）
+- `surfaceShowcaseBody` 渲染 `QinaoSurfaceShowcaseView(model: .canonicalDemo)`，gated by `if #available(iOS 18, macOS 14, watchOS 11, *)` 与 ShowcaseView 的 availability annotation 对齐
+- Package.swift QinaoSample 加 `QinaoUI` 依赖
+
+**Doctrine 锁定**（5 测试 in [QinaoSampleAppShowcaseWireTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleAppShowcaseWireTests.swift))：
+- DemoTab 严格 2 cases，rawValues stable
+- `ContentView.init(session:..., activeTab:)` 默认 prompt（backward-compat），可显式传 .surfaceShowcase
+- canonicalDemo 6 surface IDs 按 manifest v2 1.1-1.6 顺序
+- canonicalDemo cross-instantiation determinism
+
+### 68.6 测试基线（M298-M301 累积）
+
+| 套件 | 67.x 末 | 68.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2105 | **2114** | +9 (M299 4 + M300 5) |
+| Qinao XCTest | 1221 | **1231** | +10 (M298 5 + M301 5) |
+| 全栈 | 3326 | **3345** | +19 |
+
+0 failures / 0 flakes (gate-off)。AFM gate-on 不触（M298-M301 全 deterministic 纯类型 / SwiftUI 渲染层）。
+
+### 68.7 M302 stale-claim sweep
+
+仿照 56.1 矫正模式，对 M298-M301 ship 后的旧自陈做实证矫正：
+
+| Pre-M302 自陈位置 | 旧 claim | M298-M301 后实证 |
+|---|---|---|
+| 28.6 总结表 "M286-M290 还剩" | "QinaoSampleApp 真演 6 surface ✗（应用层活 next）" | **stale → 矫正** — M301 ship `DemoTab` + showcase tab |
+| 31.3 总账表 "QinaoSampleApp 真演 6 surface ✗" | 同 | **stale → 矫正** — 同 M301 |
+| 五十六.2 真正剩可 typed-ship 项 (推断) | "M283/M284/M285 schema-only" | **stale → 矫正** — M298/M299/M300 三 wire 全 ship |
+| 附录 F (plan 文件) "M287-M291 agent fabric" | 整体 | **stale → STALE 标注**（plan 文件 STALE 已加） |
+
+矫正后 honesty board 没有"M283/M284/M285 unconsumed"或"sample app 不展 6 surface"的活 claim。
+
+### 68.8 红线 / 不变量回归
+
+| 红线 / 不变量 | M298 | M299 | M300 | M301 |
+|---|---|---|---|---|
+| #1 先醒再答 | ✓（不动 L1） | ✓（不动 L1） | ✓（不动 L1） | ✓（不动 L1） |
+| #2 神经不掌权 | ✓（仅路径常量化） | ✓（advisory metadata，不 escalate verdict） | ✓（同 M299） | ✓（仅渲染层） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ | ✓（canonicalDemo 是 illustrative，不 promote） |
+| audit hash chain 不变 | ✓ | ✓（signalRefs 加长，digest 仍 deterministic） | ✓（同 M299） | n/a |
+| 单提交口 | ✓ | ✓ | ✓ | ✓ |
+
+### 68.9 仍剩缺口（不在 M298-M302 范围）
+
+按工程量级分两组：
+
+**A. surgical 一日 PR 但本批未触**：
+- 真模型多轮端到端 demo（host 集成 + AFM 真机多 session）
+- M295.1+ authoritative 生产课程内容（domainExpertReviewed envelope，需 domain experts）
+
+**B. weeks-of-engineering 量级**：
+- L4 真训练资产（基座预训练 / 算力）
+- M296.1 净启 真演（跨进程 + 多设备演练）
+- M296.2 Dual-key commit（cryptography 设计）
+- M296.3 Cross-device sync ledger（CRDT vs 主从 doctrine）
+- W1-W5 真世界（招 expert / 审稿 / 训 adapter / 多设备 / host 集成）
+
+doctrine 层面 v1 / v2 / v3 / v4 全 typed-enforced（55.7 / 67.7 已 pin）；剩余是集成 + 演出 + 内容 + 真世界，不涉及底层 doctrine 翻转。
+
+### 68.10 一句话总结
+
+**M298-M301 用 5 个 surgical-typed PR 关掉 5 条「类型已 ship，运行时未消费」缺口**：locator 进 sample-host / frontier summary 进 audit / tribunal coverage 进 audit / 6 surface 进 sample app / 一份 stale 自陈 sweep。BAS 2114 + Qinao 1231 全绿 0 flake。doctrine integrity 不动；不变量 #1/#2/#3 全保留；hash chain 仍 deterministic（signalRefs 仅 additive metadata）。

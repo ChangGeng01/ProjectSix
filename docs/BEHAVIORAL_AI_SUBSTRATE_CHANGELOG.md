@@ -1,5 +1,13 @@
 # BehavioralAISubstrate Changelog
 
+## 2026-05-01
+
+- **M298 — `BASUnifiedStorageLocator` wired into QinaoSampleHost full-stack-demo**: `runFullStackDemo()` Step 2 now derives audit-ledger + lifecycle storage paths via `BASUnifiedStorageLocator.locate(in:)` instead of hardcoding `/tmp/qinao_full_stack_demo_lifecycle.json`. Banner output prints unified root + canonical SQLite filenames so hosts see the deployment convention. Cleanup tears down the entire root, not just the JSON file. 5 new tests (`QinaoSampleHostUnifiedLocatorTests`).
+- **M299 — `BASCandidateFrontierSummary.summarize()` consumed by L14 audit signalRefs**: `buildSovereignAuditEntry` accepts an optional `candidateObservationBundle` parameter; when supplied (via `thoughtArtifacts.candidateObservationBundle` from `runTurn`), it appends `frontier.status:<code>`, `frontier.candidates:<N>`, and `frontier.diversity:emitted` (when applicable) to `signalRefs`. Additive metadata only — verdict level not escalated, hash chain remains deterministic. 4 new tests (`M299FrontierSummaryConsumptionTests`).
+- **M300 — `BASTribunalCoverageCheck.report()` consumed by L14 audit signalRefs**: same `buildSovereignAuditEntry` extended with optional `tribunalObservationBundle` parameter; when supplied (via `thoughtFrame.tribunalObservationBundle`, already attached at the M55 derive seam), it appends `tribunal.status:<code>` and `tribunal.voices:<N>` to `signalRefs`. 5 new tests (`M300TribunalCoverageConsumptionTests`).
+- **M301 — `QinaoSurfaceShowcaseView` wired into `QinaoSampleApp` ContentView**: ContentView gains a segmented `Picker` toggle between `.prompt` (legacy demo) and `.surfaceShowcase` (six L12 surface families). `QinaoSample` library adds a `QinaoUI` dep so the showcase renders inline, gated by `if #available(iOS 18, macOS 14, watchOS 11, *)`. 5 new tests (`QinaoSampleAppShowcaseWireTests`).
+- **M302 — Honesty-board chapter 六十八**: documented M298-M301 ship + ran a stale-claim sweep correcting four pre-M298 self-claims (M283/M284/M285 unconsumed, QinaoSampleApp 6-surface absent). Plan-file Appendix F flagged as STALE (M287-M291 numbers reused for L9/L10/UI work; agent fabric shipped in M292.1-M294).
+
 ## 2026-04-25
 
 - **M146 — 白皮书 scope 总收官 capstone (M121-M145 · 一次性 solve-through session · 14/14 L1-L14 auto-stream + L14 §5 四动作 quartet + 所有 Swift-only-whitepaper-scope self-critique items closed)**：承前 21 个 milestone (M121 L1 → M145 surfaceDecision non-optional)，本条目为 session 总收官 · 记录里程碑矩阵 + 最终状态 + honesty board 更新。
