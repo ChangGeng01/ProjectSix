@@ -7894,7 +7894,7 @@ A 类全部 close + Cthulhu schemas 全 close + M296.1 净启 production wire �
 
 | 项 | 障碍 | 估算 |
 |---|---|---|
-| 真模型 AFM 多轮 demo（M310/M314 fallback 已 ship） | 见 75.8.1 — runtime 选择决定 | 软件实测 |
+| ~~真模型 AFM 多轮 demo~~ | ~~runtime 选择决定~~ | **✓ closed (75.8.2 实证)** |
 | L4 真训练资产（基座预训练） | 需算力（GPU / TPU 集群） | 软件无法替代算力 |
 | M295.1+ authoritative-tier curriculum 内容 | 需 domain experts 审稿 + 签发 `.domainExpertReviewed` envelope | 软件无法替代专家 |
 | M296.2 Dual-key commit 协议落地 | 密码学设计（Ed25519 多签 + TTL + nonce + key ceremony）— weeks of design+implementation | 仓库可做但 weeks |
@@ -7922,7 +7922,43 @@ QINAO_AFM_MULTI_TURN_DEMO=1 swift run QinaoSampleHost --multi-turn-demo
 
 **结论**：B 类列表里"AFM 多轮 demo"严格说不是"仓库无法 close"，而是"仓库已 close (M314 fallback) + 实测 AFM 接通需用户本机配置"。划入 B 类是因为接通效果取决于环境而不是代码。
 
-M296.2 + M296.3 是真正"代码可做但工程量级 weeks"项；其余 3 项（L4 训练 / authoritative curriculum / W1-W5）需要外部世界协作。
+#### 75.8.2 本机实测验证（2026-05-02）
+
+**用户 `跑` → `QINAO_AFM_MULTI_TURN_DEMO=1 swift run QinaoSampleHost --multi-turn-demo` 在 macOS host 直跑实证**：
+
+```
+provider mode:   apple-foundation
+provider:        apple.foundation-models.v1（跨 3 turn 一致）
+
+Turn 1 — context entries: 0
+  prompt:   Suggest one calming evening habit in one sentence.
+  response: *Meditation*
+
+Turn 2 — context entries: 2
+  prompt:   Why does that habit help in one sentence?
+  response: Meditation is a calming evening habit because it helps reduce
+            stress and anxiety
+
+Turn 3 — context entries: 4
+  prompt:   Suggest one variation of that habit in one sentence.
+  response: Here is a variation of that habit in one sentence:
+            *Taking a warm bath with es...
+
+continuity proof: sessionID stable ✓ / context monotonic ✓ /
+distinct responses 3 of 3 ✓
+```
+
+**实证结论**：
+- `provider mode: apple-foundation`（不是 mock-fallback）— AFM 真接通
+- `apple.foundation-models.v1` 跨 3 turn provider ID 一致 — 同一 model 服务
+- 3 turn 真模型 LLM 输出（不是 mock 编码）
+- M310/M314 driver 在真模型上 monotonic context growth + sessionID isolation 全部 ✓
+
+**doctrine 升级**：M314 不再是"代码 close + AFM 接通环境依赖"——本机 macOS host (macOS 26+ + Apple Silicon + Apple Intelligence enabled) 路径下，**code + runtime end-to-end demonstrably closed**。AFM 多轮 demo 从 75.8 B 类降级，写入 75.8 顶部矫正条。
+
+(Simulator + 真机路径仍 75.8.1 表格，需对应环境实测。)
+
+M296.2 + M296.3 是真正"代码可做但工程量级 weeks"项；剩 3 项（L4 训练 / authoritative curriculum / W1-W5）需要外部世界协作。
 
 ### 75.9 一句话总结
 
