@@ -7492,3 +7492,136 @@ A 类 4 项中 3 项已 ship，A2（M295.1+ 50-starter）实证后是 stale clai
 ### 72.8 一句话总结
 
 **M308-M310 用 3 个 surgical PR close A 类剩 3 项**：9 席一站式 factory + manifesto v4 phase 三阶段 dispatch load-bearing + multi-turn driver pattern (mock 全栈 + AFM gated)。`QinaoAgentConcurrencyPhase` 从纯 typed-vocabulary 推到 runtime-enforced，是本批最大 doctrine-integrity 提升。BAS 2142 / Qinao 1238 → 1257 / 全栈 3399 / 0 failures。
+
+## 七十三、 A 类全面落地 — production-path wiring (M312-M314)
+
+### 73.1 触发动作
+
+用户继续 "需要 a 全面 落地"。Phase 1 实证扫描显示 chapter 七十二 ship 的 M308/M309/M310 三件 API 都 0 production-path caller —— **API 可用但无产品消费**：
+
+| API | 产品路径 caller | 状态 |
+|---|---|---|
+| M308 `allDefaultLoopSeats(loop:)` | 仅 def 处 (`QinaoLoopReaderAdapters.swift`)；`QinaoDefaults.makeStandard` 仍只调 6 席 | 0 |
+| M309 `dispatchByPhase(snapshotID:)` | 仅 def 处 (`QinaoSeatPhaseDispatch.swift`) + 内部 helper 注释 | 0 |
+| M310 `driveMultiTurn(...)` driver | 仅 test 文件；无 sample / Defaults / runtime 路径 | 0 |
+
+同 M283/M284/M285 pre-M298 pattern。本批 production wire 全部 close。
+
+### 73.2 M312 — `QinaoDefaults.makeStandardWithAdapters(endpoint:)` (A4 production wire)
+
+**问题**：`QinaoDefaults.makeStandard(endpoint:)` (M294) 只注 6 席（`standardLoopSeats`）。Hosts 想要全 9 席默认 council 没有一行 convenience。
+
+**修复** ([QinaoDefaults.swift](../QinaoRuntimeSDK/Sources/QinaoDefaults/QinaoDefaults.swift)):
+
+- 加 `QinaoDefaults.makeStandardWithAdapters(endpoint:) async throws -> (loop, registry)` — 调 M308 `allDefaultLoopSeats(loop:)` 直接拿 9 席
+- M294 `makeStandard` 不动（backward-compat for chapter 30.5 / M294 既有合约）
+- doc-comment 互引：hosts 选 6 席用 `makeStandard`，9 席用 `makeStandardWithAdapters`
+
+**Doctrine 锁定**（5 新测试 in [QinaoDefaultsTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoDefaultsTests.swift) extension）：
+- `makeStandardWithAdapters` 返 9 席（`Set == QinaoSeat.allCases`）
+- `makeStandard` 仍返 6 席（pre-M312 shape 严格保留 — backward-compat pin）
+- 9 席 ⊃ 6 席，差集严格 = `{memory, hostAlignment, evolutionShadow}`（disjoint cover pin）
+- vault seeded（同 `makeStandard` 语义，`tmpl-body-hydration` smoke）
+- 二次调用 yield independent (loop, registry) 实例
+
+### 73.3 M313 — `QinaoSampleHost --phase-dispatch-demo` (A3 production wire)
+
+**问题**：M309 `dispatchByPhase` 在 source 树 0 runtime 调用。最少代价 production wire = sample-host 新 mode 演示三阶段 dispatch。
+
+**修复**:
+
+- 新文件 [PhaseDispatchDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/PhaseDispatchDemo.swift)：`PhaseDispatchDemo.run()` 用 M312 `makeStandardWithAdapters` 拿 9 席 → 调 `dispatchByPhase` → 返 `Outcome` (perception/cognition/landing 各一 `PhaseRecord` carrying seat raw values + verdicts/failures count)
+- main.swift 加 `--phase-dispatch-demo` args 分支 + `runPhaseDispatchDemo` 私有静态 func 渲染 banner（Step 1 9 席 assembled / Step 2 三 phase 输出 ASC seats + verdicts/failures）
+- Package.swift 加 `QinaoDefaults / QinaoSeats / QinaoLoopSeats` deps（注释为 M313 + M314 共用）
+
+**实测 demo 输出**（不需真模型）：
+
+```
+total seats:     9
+perception ▸  (verdicts: 0, failures: 2)
+cognition  ▸  (verdicts: 0, failures: 4)
+landing    ▸ evolutionShadow (verdicts: 1, failures: 2)
+```
+
+默认 seat impls (`QinaoScoutDefaultSeat` etc.) 在 inert endpoint + 无候选状态下 throw `session-unknown`，per-phase 失败隔离工作得很 — verdicts 不阻断其他 phase。Demo 证明的是 **shape**（3 phases, 9 seats partitioned, sequential ordering, per-phase failure isolation），不是 verdict content。
+
+**Doctrine 锁定**（4 测试 in [QinaoSampleHostPhaseDispatchTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostPhaseDispatchTests.swift)）：
+- `QinaoAgentConcurrencyPhase` 严格 3 cases
+- `seatsInPhase` partition 并集 = `QinaoSeat.allCases`
+- raw values 字面 `"perception" / "cognition" / "landing"`（demo banner grep keys）
+- partition disjoint（无 seat 跨两 phase）
+
+### 73.4 M314 — `QinaoSampleHost --multi-turn-demo` (A1 production wire)
+
+**问题**：M310 `driveMultiTurn(...)` 仅 test fixture。最少代价 production wire = sample-host 新 mode 跑 3-turn conversation。
+
+**修复**:
+
+- 新文件 [MultiTurnDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/MultiTurnDemo.swift)：
+  - `MockEndpoint` actor — 同 M310 `RecordingMockEndpoint` shape
+  - `AFMEndpoint` struct — wrap `BASOrganRegistry` + `AppleFoundationOrganAdapter`（M178 模式）
+  - `MultiTurnDemo.run(...)` — 默认 mock；`QINAO_AFM_MULTI_TURN_DEMO=1` 切 AFM；AFM 失败 graceful fallback to mock + 标记 `mock-fallback-no-afm`
+  - 内部 `drive(...)` 同 M310 driver math：每 turn 累加 `user: <prompt>` + `assistant: <response.body>` 进 context
+- main.swift 加 `--multi-turn-demo` args 分支 + `runMultiTurnDemo` 私有静态 func 渲染 banner
+
+**实测 demo 输出**（mock mode）：
+
+```
+sessionID:       multi-turn-demo-{uuid}
+provider mode:   mock
+Turn 1 — context entries: 0  →  mock-turn-0:Suggest one
+Turn 2 — context entries: 2  →  mock-turn-1:Why does tha
+Turn 3 — context entries: 4  →  mock-turn-2:Suggest one
+sessionID stable:        ✓
+context grew monotonic:  ✓
+distinct responses:      3 of 3
+```
+
+**Doctrine 锁定**（4 测试 in [QinaoSampleHostMultiTurnDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostMultiTurnDemoTests.swift)）：
+- `produceBody(prompt:context:role:sessionID:)` 接 context array + 返 `OrganResponse`（接口契约）
+- `OrganRole` 含 `.scout` + `.core`
+- 3-turn driver math 模拟产 context counts `[0, 2, 4]`（pin M310 append semantics）
+- 独立 sessionID 通过 driver 不串
+
+### 73.5 测试基线（M312-M314 累积）
+
+| 套件 | M310 末 (ch 七十二) | M314 末 (ch 七十三) | Δ |
+|---|---|---|---|
+| BAS XCTest | 2142 | 2142 | 0（M312-M314 全 Qinao-side） |
+| Qinao XCTest | 1257 | **1270** | +13 (M312 5 + M313 4 + M314 4) |
+| 全栈 | 3399 | **3412** | +13 |
+
+0 failures / 0 flakes。两 demo 模式（`--phase-dispatch-demo` / `--multi-turn-demo`）实测可 invoke + exit code 0。
+
+### 73.6 红线 / 不变量
+
+| 红线 / 不变量 | M312 | M313 | M314 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（仅 factory） | ✓（仅 phase ordering，不 escalate） | ✓（transport-layer driver） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（不触 audit） | ✓（不触 audit） | ✓（不触 audit） |
+| 单提交口 | ✓ | ✓（每 phase 独立 SeatBoard） | ✓ |
+
+### 73.7 现状 — A 类全面落地完成
+
+A 类 4 项 + 3 production wires 全部 closed：
+
+| # | 类型 ship | 产品路径 wire | 总状态 |
+|---|---|---|---|
+| A1 multi-turn driver | M310 | **M314** sample-host `--multi-turn-demo` | ✓ ship + wired |
+| A2 50-starter | M296.x ship（chapter 五十四） | n/a (stale claim 验证后矫正) | ✓ ship |
+| A3 phase dispatch | M309 | **M313** sample-host `--phase-dispatch-demo` | ✓ ship + wired |
+| A4 9-seat factory | M308 | **M312** `QinaoDefaults.makeStandardWithAdapters` | ✓ ship + wired |
+
+**A 类「全面落地」完成**——3 件 0-caller API 都有 ≥1 production-path consumer。
+
+### 73.8 仍剩
+
+不在本批：
+- 5 件 Cthulhu schemas（`UnknownReserve / AnomalyTrace / NarrativeDistortion / AbyssalBranch / ForbiddenKnowledgeCandidate`）— chapter 七十.5 列；3 仍 0-runtime-caller，2 部分接入。下次 phase 1 候选。
+- B 类（W1-W5 真世界 / L4 训练资产 / M295.1+ authoritative-tier 课程 / M296.1-3 主权三件）— 工程 weeks 级别 / 外部资源依赖
+
+### 73.9 一句话总结
+
+**M312-M314 用 3 个 surgical PR + 13 个 typed-pin 测试 close A 类 production wiring**：M308 9 席 factory 进 `QinaoDefaults`、M309 三阶段 dispatch 进 `--phase-dispatch-demo` mode、M310 multi-turn driver 进 `--multi-turn-demo` mode（mock 默认 + AFM env-gated fallback）。两 demo 模式实测可 `swift run` invoke。doctrine integrity 不动；A 类「全面落地」完成 — 0-caller API 全部有 production consumer。BAS 2142 / Qinao 1257 → 1270 / 全栈 3412 / 0 failures。
