@@ -293,6 +293,37 @@ struct QinaoSampleHost {
             await runFullStackBench()
             return
         }
+        if args.contains("--lifecycle-bench") {
+            // M363 — bench L13 lifecycle traversal (sub-µs
+            // floor reference). Default 100K traversals;
+            // QINAO_BENCH_LIFECYCLE_COUNT=N override.
+            runLifecycleBench()
+            return
+        }
+        if args.contains("--sha256-bench") {
+            // M364 — bench M341 pure-Swift SHA-256 hasher
+            // throughput. Default 100K hashes;
+            // QINAO_BENCH_SHA256_COUNT=N override.
+            runSHA256Bench()
+            return
+        }
+        if args.contains("--json-codec-bench") {
+            // M365 — bench BASSovereignAuditEntry JSON
+            // encode/decode round-trip. Default 50K
+            // round-trips; QINAO_BENCH_JSON_COUNT=N override.
+            runJSONCodecBench()
+            return
+        }
+        if args.contains("--bench-suite") {
+            // M366 — run all 8 bench modes sequentially +
+            // emit consolidated BASBenchSuiteReport
+            // (banner + JSON + markdown table). All sample
+            // sizes default to small for fast suite runs;
+            // override individual sizes via the per-bench
+            // env vars.
+            await runBenchSuite()
+            return
+        }
         if args.contains("--lora-curriculum-train-m247") {
             // M247 — re-trains the curriculum LoRA against the
             // EXACT chat-template format Gemma 4 E2B sees at
@@ -4288,6 +4319,9 @@ struct QinaoSampleHost {
             for line in outcome.latency.bannerLines() {
                 print("  " + line)
             }
+            compareToBaselineIfConfigured(
+                benchName: "audit-ledger-bench",
+                stats: outcome.latency)
             print("\n  ━━━ Demo complete — \(outcome.entryCount) entries appended ━━━")
         } catch {
             print("ERROR: --audit-ledger-bench failed: \(error)")
@@ -4394,10 +4428,408 @@ struct QinaoSampleHost {
             for line in stats.bannerLines() {
                 print("  " + line)
             }
+            compareToBaselineIfConfigured(
+                benchName: "full-stack-bench",
+                stats: stats)
         } else {
             print("  no successful sessions to measure")
         }
         print("\n  ━━━ Demo complete — \(outcome.successfulSessions) sessions completed ━━━")
+    }
+
+    // MARK: - M363 lifecycle-bench
+
+    private static func runLifecycleBench() {
+        let count = envInt(
+            "QINAO_BENCH_LIFECYCLE_COUNT",
+            default: 100_000)
+        print("""
+            QinaoSampleHost --lifecycle-bench (M363):
+              \(count) full L13 traversals (5 transitions
+              each: registerCandidate → startShadowTrial →
+              finalizeTrial → promote → retract).
+
+              \(LifecycleBench.scopeStatement)
+            """)
+        let outcome = LifecycleBench.run(
+            traversalCount: count)
+        print("""
+
+            ━━━ M363 lifecycle-bench (\(outcome.traversalCount) traversals) ━━━
+            elapsed wall:  \(String(format: "%.4f", outcome.elapsedSeconds)) sec
+            throughput:    \(String(format: "%.1f", Double(outcome.traversalCount) / outcome.elapsedSeconds)) traversals/sec
+
+            """)
+        for line in outcome.outcome.bannerLines(unit: "ms") {
+            print("  " + line)
+        }
+        compareToBaselineIfConfigured(
+            benchName: "lifecycle-bench",
+            stats: outcome.outcome.warm
+                ?? outcome.outcome.combined)
+        print("\n  ━━━ Demo complete — \(outcome.traversalCount) traversals ━━━")
+    }
+
+    // MARK: - M364 sha256-bench
+
+    private static func runSHA256Bench() {
+        let count = envInt(
+            "QINAO_BENCH_SHA256_COUNT",
+            default: 100_000)
+        print("""
+            QinaoSampleHost --sha256-bench (M364):
+              \(count) SHA-256 hashes over the L13
+              canonical encoding (\(SHA256Bench.canonicalInput.utf8.count) bytes).
+
+              \(SHA256Bench.scopeStatement)
+            """)
+        let outcome = SHA256Bench.run(
+            hashCount: count)
+        let throughputBytesPerSec =
+            Double(outcome.hashCount * outcome.inputBytes)
+            / outcome.elapsedSeconds
+        let throughputMB = throughputBytesPerSec
+            / (1024.0 * 1024.0)
+        print("""
+
+            ━━━ M364 sha256-bench (\(outcome.hashCount) hashes × \(outcome.inputBytes) bytes) ━━━
+            elapsed wall:  \(String(format: "%.4f", outcome.elapsedSeconds)) sec
+            throughput:    \(String(format: "%.1f", Double(outcome.hashCount) / outcome.elapsedSeconds)) hashes/sec
+                           \(String(format: "%.2f", throughputMB)) MB/sec
+
+            """)
+        for line in outcome.outcome.bannerLines(unit: "ms") {
+            print("  " + line)
+        }
+        compareToBaselineIfConfigured(
+            benchName: "sha256-bench",
+            stats: outcome.outcome.warm
+                ?? outcome.outcome.combined)
+        print("\n  ━━━ Demo complete — \(outcome.hashCount) hashes ━━━")
+    }
+
+    // MARK: - M365 json-codec-bench
+
+    private static func runJSONCodecBench() {
+        let count = envInt(
+            "QINAO_BENCH_JSON_COUNT", default: 50_000)
+        print("""
+            QinaoSampleHost --json-codec-bench (M365):
+              \(count) BASSovereignAuditEntry JSON encode +
+              decode round-trips on a representative entry
+              (~5 ruleIDs × ~5 signal refs).
+
+              \(JSONCodecBench.scopeStatement)
+            """)
+        do {
+            let outcome = try JSONCodecBench.run(
+                roundTripCount: count)
+            print("""
+
+                ━━━ M365 json-codec-bench (\(outcome.roundTripCount) round-trips × \(outcome.entrySerializedBytes) bytes/entry) ━━━
+                elapsed wall:  \(String(format: "%.4f", outcome.elapsedSeconds)) sec
+                throughput:    \(String(format: "%.1f", Double(outcome.roundTripCount) / outcome.elapsedSeconds)) round-trips/sec
+
+                """)
+            for line in outcome.outcome.bannerLines(
+                unit: "ms")
+            {
+                print("  " + line)
+            }
+            compareToBaselineIfConfigured(
+                benchName: "json-codec-bench",
+                stats: outcome.outcome.warm
+                    ?? outcome.outcome.combined)
+            print("\n  ━━━ Demo complete — \(outcome.roundTripCount) round-trips ━━━")
+        } catch {
+            print("ERROR: --json-codec-bench failed: \(error)")
+            exit(2)
+        }
+    }
+
+    // MARK: - M366 bench-suite
+
+    private static func runBenchSuite() async {
+        print("""
+            QinaoSampleHost --bench-suite (M366):
+              run all 8 bench modes sequentially with small
+              default sample sizes (override per-bench via
+              env vars). Emits consolidated BASBenchSuiteReport
+              banner + JSON + markdown table.
+            """)
+        let suiteStart = Date()
+        var benches:
+            [BASBenchSuiteReport.BenchResult] = []
+
+        // M333 evolution-loop demo doesn't return latency
+        // stats per se (it pins invariants). Skip in suite.
+
+        // M334 throughput-bench: 100 turns of lease/lung
+        // recordTurn. Convert M334's inline LatencyStats to
+        // M355 BASBenchLatencyStats for suite uniformity.
+        do {
+            let bench = await ThroughputBenchDemo.run(
+                turnCount: 100)
+            let m355Stats = BASBenchLatencyStats(
+                sampleCount: bench.latency.count,
+                min: bench.latency.min,
+                max: bench.latency.max,
+                mean: bench.latency.mean,
+                p50: bench.latency.p50,
+                p95: bench.latency.p95,
+                p99: bench.latency.p99,
+                p999: bench.latency.p99,
+                standardDeviation: 0,
+                outlierCount: 0)
+            let outcome = BASBenchWarmupOutcome(
+                combined: m355Stats,
+                cold: nil, warm: m355Stats,
+                config: .none)
+            benches.append(.init(
+                benchName: "throughput-bench",
+                outcome: outcome,
+                elapsedSeconds:
+                    bench.elapsedSeconds,
+                notes: "100 turns of lease/lung recordTurn"))
+        }
+
+        // M357 audit-ledger-bench: 1000 entries.
+        do {
+            let bench = try await AuditLedgerBench.run(
+                entryCount: 1_000)
+            let outcome = BASBenchWarmupOutcome(
+                combined: bench.latency,
+                cold: nil, warm: bench.latency,
+                config: .none)
+            benches.append(.init(
+                benchName: "audit-ledger-bench",
+                outcome: outcome,
+                elapsedSeconds:
+                    bench.elapsedSeconds,
+                notes: "1000 entries appended to in-memory Ed25519 ledger"))
+        } catch {
+            print("  audit-ledger-bench failed: \(error)")
+        }
+
+        // M358 multi-host-merge-bench: 100 frames per host.
+        do {
+            let bench = MultiHostMergeBench.run(
+                framesPerHost: 100)
+            let lat = BASBenchLatencyStats.compute(
+                samples: [bench.metric.mergeWallClockSeconds * 1000.0])
+                ?? BASBenchLatencyStats(
+                    sampleCount: 1,
+                    min: bench.metric.mergeWallClockSeconds * 1000.0,
+                    max: bench.metric.mergeWallClockSeconds * 1000.0,
+                    mean: bench.metric.mergeWallClockSeconds * 1000.0,
+                    p50: bench.metric.mergeWallClockSeconds * 1000.0,
+                    p95: bench.metric.mergeWallClockSeconds * 1000.0,
+                    p99: bench.metric.mergeWallClockSeconds * 1000.0,
+                    p999: bench.metric.mergeWallClockSeconds * 1000.0,
+                    standardDeviation: 0,
+                    outlierCount: 0)
+            benches.append(.init(
+                benchName: "multi-host-merge-bench",
+                scenarioLabel: "100 frames/host",
+                outcome: BASBenchWarmupOutcome(
+                    combined: lat,
+                    cold: nil, warm: lat,
+                    config: .none),
+                elapsedSeconds:
+                    bench.metric.mergeWallClockSeconds,
+                notes: "1 fwd + 1 rev merge; consensus=\(bench.metric.framesInConsensus)"))
+        }
+
+        // M359 full-stack-bench: 5 sessions × 1 turn.
+        do {
+            let bench = await FullStackBench.run(
+                sessionCount: 5, turnCount: 1)
+            let outcome = BASBenchWarmupOutcome(
+                combined: bench.perSessionLatency
+                    ?? .init(sampleCount: 0, min: 0, max: 0,
+                             mean: 0, p50: 0, p95: 0,
+                             p99: 0, p999: 0,
+                             standardDeviation: 0,
+                             outlierCount: 0),
+                cold: nil,
+                warm: bench.perSessionLatency,
+                config: .none)
+            benches.append(.init(
+                benchName: "full-stack-bench",
+                scenarioLabel: "\(bench.successfulSessions)/\(bench.sessionCount) ok",
+                outcome: outcome,
+                elapsedSeconds: bench.elapsedSeconds,
+                notes: "BASHostRuntime.startSession × N"))
+        }
+
+        // M363 lifecycle-bench: 10K traversals.
+        do {
+            let bench = LifecycleBench.run(
+                traversalCount: 10_000)
+            benches.append(.init(
+                benchName: "lifecycle-bench",
+                outcome: bench.outcome,
+                elapsedSeconds: bench.elapsedSeconds,
+                notes: "10K full L13 traversals (5 transitions each)"))
+        }
+
+        // M364 sha256-bench: 10K hashes.
+        do {
+            let bench = SHA256Bench.run(
+                hashCount: 10_000)
+            benches.append(.init(
+                benchName: "sha256-bench",
+                outcome: bench.outcome,
+                elapsedSeconds: bench.elapsedSeconds,
+                notes: "10K hashes × \(bench.inputBytes) bytes"))
+        }
+
+        // M365 json-codec-bench: 5K round-trips.
+        do {
+            let bench = try JSONCodecBench.run(
+                roundTripCount: 5_000)
+            benches.append(.init(
+                benchName: "json-codec-bench",
+                outcome: bench.outcome,
+                elapsedSeconds: bench.elapsedSeconds,
+                notes: "5K round-trips × \(bench.entrySerializedBytes) bytes"))
+        } catch {
+            print("  json-codec-bench failed: \(error)")
+        }
+
+        let suiteEnd = Date()
+        let report = BASBenchSuiteReport(
+            suiteName: "qinao-sample-host",
+            runStartedAt: suiteStart,
+            runCompletedAt: suiteEnd,
+            totalElapsedSeconds:
+                suiteEnd.timeIntervalSince(suiteStart),
+            benches: benches)
+        print("")
+        for line in report.bannerLines() {
+            print(line)
+        }
+        print("\n══ Markdown table ══\n")
+        print(report.markdownTable(unit: "ms"))
+        // M366 — also dump JSON when env var requests it.
+        if ProcessInfo.processInfo.environment[
+            "QINAO_BENCH_SUITE_JSON_DUMP"] == "1",
+           let json = try? report.encodedJSONString()
+        {
+            print("\n══ JSON (machine-readable) ══\n")
+            print(json)
+        }
+    }
+
+    // MARK: - M363/M364/M365/M366 helper
+
+    private static func envInt(
+        _ key: String, default: Int
+    ) -> Int {
+        if let raw = ProcessInfo.processInfo
+            .environment[key],
+           let n = Int(raw),
+           n > 0
+        {
+            return n
+        }
+        return `default`
+    }
+
+    // MARK: - M367 baseline auto-compare
+
+    /// If `QINAO_BENCH_BASELINE_DIR=/path` env var is set,
+    /// compare `stats` against `<dir>/<benchName>.json`. On
+    /// regression beyond `QINAO_BENCH_TOLERANCE` (default 0.25),
+    /// print regression report and exit non-zero. On
+    /// `.noBaseline`, optionally write a fresh baseline if
+    /// `QINAO_BENCH_WRITE_MISSING_BASELINE=1`. No-op if env
+    /// unset.
+    ///
+    /// Called by each bench runner just before its final banner.
+    /// Returns true if no regression (or no baseline configured)
+    /// — runners may use the bool to decide their own exit
+    /// status.
+    @discardableResult
+    private static func compareToBaselineIfConfigured(
+        benchName: String,
+        stats: BASBenchLatencyStats
+    ) -> Bool {
+        guard let baselineDirPath = ProcessInfo
+            .processInfo.environment[
+                "QINAO_BENCH_BASELINE_DIR"]
+        else { return true }
+        let baselineURL = URL(
+            fileURLWithPath: baselineDirPath)
+            .appendingPathComponent("\(benchName).json")
+        let tolerance: Double = {
+            if let raw = ProcessInfo.processInfo
+                .environment["QINAO_BENCH_TOLERANCE"],
+               let d = Double(raw),
+               d > 0
+            {
+                return d
+            }
+            return BASBenchBaselineStorage
+                .defaultToleranceFraction
+        }()
+        do {
+            let verdict = try BASBenchBaselineStorage
+                .compareToBaseline(
+                    measured: stats,
+                    benchName: benchName,
+                    baselinePath: baselineURL,
+                    toleranceFraction: tolerance)
+            switch verdict {
+            case .withinTolerance:
+                print("\n  [baseline] within tolerance " +
+                      "(\(String(format: "%.0f%%", tolerance * 100))) ✓")
+                return true
+            case .regression(let reports):
+                print("\n  [baseline] REGRESSION " +
+                      "(>\(String(format: "%.0f%%", tolerance * 100))):")
+                for r in reports {
+                    print(
+                        "    \(r.metricName): " +
+                        "baseline \(String(format: "%.4f", r.baselineValue)) → " +
+                        "measured \(String(format: "%.4f", r.measuredValue)) " +
+                        "(\(String(format: "%+.1f%%", r.regressionFraction * 100)))")
+                }
+                exit(3)
+            case .incompatibleBaseline(let reason):
+                print("\n  [baseline] INCOMPATIBLE: \(reason)")
+                exit(4)
+            case .noBaseline:
+                if ProcessInfo.processInfo.environment[
+                    "QINAO_BENCH_WRITE_MISSING_BASELINE"]
+                    == "1"
+                {
+                    let envelope = BASBenchBaselineStorage
+                        .Envelope(
+                            benchName: benchName,
+                            stats: stats)
+                    do {
+                        try FileManager.default
+                            .createDirectory(
+                                at: URL(fileURLWithPath: baselineDirPath),
+                                withIntermediateDirectories: true)
+                        try BASBenchBaselineStorage
+                            .writeBaseline(
+                                envelope: envelope,
+                                to: baselineURL)
+                        print("\n  [baseline] no prior baseline; wrote fresh one to \(baselineURL.path)")
+                    } catch {
+                        print("\n  [baseline] failed to write fresh baseline: \(error)")
+                    }
+                } else {
+                    print("\n  [baseline] no prior baseline (set QINAO_BENCH_WRITE_MISSING_BASELINE=1 to create)")
+                }
+                return true
+            }
+        } catch {
+            print("\n  [baseline] comparison failed: \(error)")
+            return true
+        }
     }
 }
 
