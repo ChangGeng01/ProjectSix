@@ -660,6 +660,66 @@ public struct BASEBrainRuntimeCoordinator {
             runtimeTrace: runtimeTrace,
             thoughtFold: thoughtFold
         )
+        // M303 — derive Cthulhu/Abyssal pressure from existing
+        // turn state right before the audit-entry build so the
+        // projection sees the final risk card + uncertainty
+        // ledger + evidence debts that L11 / L9 already settled.
+        // Pure projection; no verdict escalation; signalRefs
+        // additive only.
+        let abyssalPressureForAudit = BASAbyssalPressureBudget
+            .derive(
+                turnID: runtimeTrace.sessionID,
+                riskLevel: boundRiskCard.riskLevel,
+                uncertaintyLedger:
+                    thoughtFrame.uncertaintyLedger,
+                evidenceDebtCount:
+                    thoughtFrame.evidenceDebts?.count ?? 0)
+        // M304 — derive human-anchor signal from final risk +
+        // permit + candidate count. White-paper §5.3 / red line
+        // 7: hint, not verdict.
+        let humanAnchorSignalForAudit = BASHumanAnchorProtocol
+            .derive(
+                anchorID: "human-anchor-\(runtimeTrace.sessionID)",
+                hostSummaryRef: hostContext.hostID,
+                riskLevel: boundRiskCard.riskLevel,
+                permitMode: boundActionPermit.mode,
+                candidateCount: thoughtFrame.candidates.count)
+        // M304 — synthesize seal envelopes from the turn's
+        // quarantine records. Each quarantine becomes a
+        // sovereign-only seal (the strictest tier short of
+        // forbidden) targeting the quarantine source. Aggregate
+        // returns nil when there are no quarantines this turn,
+        // and the audit-entry builder elides both seal codes.
+        let synthesizedSealsForAudit = quarantineRecords.map { record in
+            BASSealEnvelope(
+                sealID: "seal.\(record.quarantineID)",
+                targetRefs: [record.sourceRef],
+                sealReason: record.reasonCodes
+                    .joined(separator: ","),
+                accessPolicy: .sovereignOnly,
+                revealConditions: [],
+                lineageCutRefs: [],
+                auditRef: record.quarantineID)
+        }
+        let sealAggregateForAudit = BASOldSealSealingProtocol
+            .aggregate(synthesizedSealsForAudit)
+        // M305 — synthesize an L13 lifecycle session per fresh
+        // UpdateTicket on this turn. All start at `.proposed`
+        // (the typed entry point of the 8-stage state machine);
+        // cross-turn promotion / retraction is the L13 actor
+        // primitives' job, not this projection. The aggregate
+        // is nil for turns that produced zero tickets, so the
+        // audit-entry builder elides the lifecycle.* codes.
+        let lifecycleSessionsForAudit = updateTickets.map {
+            ticket in
+            BASEvolutionLifecycleSession(
+                candidateID: ticket.ticketID,
+                currentStage: .proposed,
+                history: [])
+        }
+        let lifecycleAggregateForAudit =
+            BASEvolutionLifecycleSession.aggregate(
+                lifecycleSessionsForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -677,7 +737,20 @@ public struct BASEBrainRuntimeCoordinator {
             // attached to `thoughtFrame` via M55 derive seam) so
             // tribunal coverage codes land in audit signalRefs.
             tribunalObservationBundle: thoughtFrame
-                .tribunalObservationBundle
+                .tribunalObservationBundle,
+            // M303 — feed the Abyssal pressure projection so the
+            // 3 abyssal.* codes land in audit signalRefs.
+            abyssalPressure: abyssalPressureForAudit,
+            // M304 — feed human-anchor signal + seal aggregate
+            // so 2-4 humanAnchor.* / seal.* codes land in audit
+            // signalRefs.
+            humanAnchorSignal: humanAnchorSignalForAudit,
+            sealAggregate: sealAggregateForAudit,
+            // M305 — feed L13 lifecycle aggregate so
+            // lifecycle.tickets / .terminal / .promoted /
+            // .stages codes land in audit signalRefs when the
+            // turn produces UpdateTickets.
+            lifecycleAggregate: lifecycleAggregateForAudit
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

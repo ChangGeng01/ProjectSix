@@ -1,4 +1,5 @@
 import Foundation
+import BASPolicy
 import BASRuntimeCore
 
 /// M287 — Cthulhu-inspiration white paper schema parity (5 of 8 objects).
@@ -563,6 +564,88 @@ public enum BASAbyssalPressureBudget {
         guard !reasons.isEmpty else { return nil }
         return "elevated:" + reasons.joined(separator: ",")
     }
+
+    // MARK: - M303 — runtime projection
+
+    /// M303 — pure projection from per-turn substrate state to a
+    /// `BASAbyssalPressure` reading. Producers (the L14 audit
+    /// path in M303 — see `buildSovereignAuditEntry`) feed in
+    /// already-computed risk/uncertainty/evidence signals; the
+    /// six output dimensions are clamped to [0, 1] by the
+    /// `BASAbyssalPressure` initializer.
+    ///
+    /// Mapping rationale (white paper §5.1):
+    ///   - `unknownLoad`        ← `1 − uncertaintyLedger.confidenceFloor`
+    ///                            (low confidence = high unknown load)
+    ///   - `consequenceRadius`  ← risk-level scalar mapping
+    ///   - `evidenceDebt`       ← evidence-debt count clamped at 10
+    ///   - `ontologyDistortion` ← left at 0 unless a watcher fills it
+    ///   - `manipulationIndex`  ← left at 0 (filled by M305+)
+    ///   - `narrativePollution` ← left at 0 (filled by M305+)
+    ///
+    /// `recommendedModes` are computed via `recommendedModes(for:)`
+    /// after the dimensions are populated; `sovereignEscalationHint`
+    /// likewise. The result is a fully-populated typed pressure
+    /// reading suitable for streaming into L14 audit signalRefs as
+    /// additive metadata (M303 wire) — no verdict escalation, no
+    /// permit mutation. The L11 / L13 runtime hooks land in M305+.
+    public static func derive(
+        turnID: String,
+        riskLevel: BASBrainRiskLevel,
+        uncertaintyLedger: BASUncertaintyLedger?,
+        evidenceDebtCount: Int,
+        triggerThreshold: Double = defaultTriggerThreshold,
+        elevatedThreshold: Double = defaultSovereignEscalationThreshold
+    ) -> BASAbyssalPressure {
+        // Confidence floor [0..1]; default mid-range when absent.
+        let confidence = uncertaintyLedger?.confidenceFloor ?? 0.5
+        let unknownLoad = max(0, min(1, 1 - confidence))
+
+        // Risk-level → consequence-radius scalar. Tuned so the
+        // budget's default 0.6 trigger fires at .high; .extreme
+        // crosses the elevated 0.8 threshold.
+        let consequenceRadius: Double
+        switch riskLevel {
+        case .low:     consequenceRadius = 0.2
+        case .medium:  consequenceRadius = 0.45
+        case .high:    consequenceRadius = 0.7
+        case .extreme: consequenceRadius = 1.0
+        }
+
+        // Evidence-debt count saturates at 10 outstanding debts.
+        let evidenceDebt = max(
+            0, min(1, Double(evidenceDebtCount) / 10.0))
+
+        // Build the un-mode-populated pressure first, then ask the
+        // budget helper for recommended modes + escalation hint
+        // using the pressure's own dimensions. This keeps mode
+        // selection consistent with the other budget helpers.
+        let dimensionsOnly = BASAbyssalPressure(
+            pressureID: "abyssal-pressure-\(turnID)",
+            unknownLoad: unknownLoad,
+            consequenceRadius: consequenceRadius,
+            evidenceDebt: evidenceDebt,
+            ontologyDistortion: 0,
+            manipulationIndex: 0,
+            narrativePollution: 0,
+            recommendedModes: [])
+        let modes = recommendedModes(
+            for: dimensionsOnly,
+            triggerThreshold: triggerThreshold)
+        let escalation = sovereignEscalationHint(
+            for: dimensionsOnly,
+            elevatedThreshold: elevatedThreshold)
+        return BASAbyssalPressure(
+            pressureID: dimensionsOnly.pressureID,
+            unknownLoad: dimensionsOnly.unknownLoad,
+            consequenceRadius: dimensionsOnly.consequenceRadius,
+            evidenceDebt: dimensionsOnly.evidenceDebt,
+            ontologyDistortion: dimensionsOnly.ontologyDistortion,
+            manipulationIndex: dimensionsOnly.manipulationIndex,
+            narrativePollution: dimensionsOnly.narrativePollution,
+            recommendedModes: modes,
+            sovereignEscalationHint: escalation)
+    }
 }
 
 // MARK: - BASHumanAnchorProtocol (cross-cutting protocol helper)
@@ -638,6 +721,80 @@ public enum BASHumanAnchorProtocol {
                 overwhelmRisk: overwhelmRisk),
             requiredAgencyReservation: requiredAgencyReservation
         )
+    }
+
+    // MARK: - M304 — runtime projection
+
+    /// M304 — pure projection from per-turn substrate state to a
+    /// `BASHumanAnchorSignal`. The L14 audit path uses this to
+    /// emit `humanAnchor.tone` / `humanAnchor.maxRisk` codes
+    /// onto `signalRefs` as additive metadata (red line 7:
+    /// watcher hint, never a verdict).
+    ///
+    /// Mapping rationale (white paper §5.3):
+    ///   - `agencyRisk`     ← elevated when permit blocks the
+    ///                        host from acting
+    ///   - `alienationRisk` ← elevated under extreme risk
+    ///                        (cosmic-scale framing without
+    ///                        anchor)
+    ///   - `dignityRisk`    ← elevated when the surface is
+    ///                        forced into block / urgency mode
+    ///   - `overwhelmRisk`  ← scales with candidate count
+    ///                        (≥6 candidates saturates)
+    ///
+    /// All four risks clamp to [0, 1] inside the
+    /// `BASHumanAnchorSignal` initializer. The tone is computed
+    /// via `recommendedTone(...)` so audit consumers see the
+    /// same tone the L12 surface layer would.
+    public static func derive(
+        anchorID: String,
+        hostSummaryRef: String,
+        riskLevel: BASBrainRiskLevel,
+        permitMode: BASActionPermitMode,
+        candidateCount: Int,
+        requiredAgencyReservation: String = "default-agency-reservation"
+    ) -> BASHumanAnchorSignal {
+        // Block-mode permit blocks the host's chosen action →
+        // agency risk elevated; non-blocking modes keep agency
+        // intact. Mid-saturation defaults so the tone helper has
+        // room to differentiate.
+        let agencyRisk: Double = (permitMode == .block) ? 0.75 : 0.25
+
+        // Alienation tracks the "cosmic" tier — extreme risk +
+        // permit blocks raise it.
+        let alienationRisk: Double = {
+            switch (riskLevel, permitMode) {
+            case (.extreme, .block):  return 0.85
+            case (.extreme, _):       return 0.55
+            case (.high, .block):     return 0.55
+            case (.high, _):          return 0.35
+            default:                  return 0.15
+            }
+        }()
+
+        // Dignity erodes under coercive routes (block + extreme
+        // risk simultaneously). Lower for any non-block permit.
+        let dignityRisk: Double = {
+            if permitMode == .block && riskLevel >= .high {
+                return 0.7
+            }
+            if permitMode == .block { return 0.45 }
+            return 0.15
+        }()
+
+        // Overwhelm scales linearly with candidate count, saturates
+        // at 6 candidates.
+        let overwhelmRisk = max(
+            0, min(1, Double(candidateCount) / 6.0))
+
+        return signal(
+            anchorID: anchorID,
+            hostSummaryRef: hostSummaryRef,
+            agencyRisk: agencyRisk,
+            alienationRisk: alienationRisk,
+            dignityRisk: dignityRisk,
+            overwhelmRisk: overwhelmRisk,
+            requiredAgencyReservation: requiredAgencyReservation)
     }
 }
 

@@ -207,4 +207,53 @@ public enum BASOldSealSealingProtocol {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return seals.filter { $0.targetRefs.contains(needle) }
     }
+
+    // MARK: - M304 — runtime aggregation
+
+    /// M304 — typed aggregation of a seal collection. Useful for
+    /// L14 audit walkers that want to grep "did this turn touch
+    /// any seals" + "what was the strictest access policy in
+    /// play" without re-implementing the strictness-ordering
+    /// logic. The L14 audit path emits `seal.count:N` and
+    /// `seal.strictest:<policy>` codes from this aggregate.
+    ///
+    /// `count` is the seal count; `strictestPolicy` reflects
+    /// the strictest policy across ALL targets the seals refer
+    /// to (forbidden ≻ sovereignOnly ≻ hostExplicit ≻
+    /// auditedAccess ≻ passive). Returns `nil` when the seal
+    /// list is empty so consumers can elide both codes when no
+    /// seals are present this turn.
+    public struct Aggregate: Sendable, Equatable {
+        public let count: Int
+        public let strictestPolicy: BASSealAccessPolicy
+        public init(
+            count: Int,
+            strictestPolicy: BASSealAccessPolicy
+        ) {
+            self.count = count
+            self.strictestPolicy = strictestPolicy
+        }
+    }
+
+    /// Returns the typed aggregate for a seal collection, or
+    /// `nil` when the collection is empty.
+    public static func aggregate(
+        _ seals: [BASSealEnvelope]
+    ) -> Aggregate? {
+        guard !seals.isEmpty else { return nil }
+        // Walk strictness order; pick the first level that
+        // appears in any seal's accessPolicy.
+        let order: [BASSealAccessPolicy] = [
+            .forbidden,
+            .sovereignOnly,
+            .hostExplicit,
+            .auditedAccess,
+            .passive
+        ]
+        let strictest = order.first { level in
+            seals.contains { $0.accessPolicy == level }
+        } ?? .passive
+        return Aggregate(
+            count: seals.count, strictestPolicy: strictest)
+    }
 }

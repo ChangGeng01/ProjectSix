@@ -310,7 +310,41 @@ extension BASEBrainRuntimeCoordinator {
         // additive-metadata contract as M299 but for L10 tribunal
         // coverage. Defaults to `thoughtFold`-only behaviour for
         // legacy / test callers that don't yet plumb the bundle.
-        tribunalObservationBundle: BASTribunalObservationBundle? = nil
+        tribunalObservationBundle: BASTribunalObservationBundle? = nil,
+        // M303 — optional Cthulhu/Abyssal pressure reading.
+        // White-paper §5.1 cross-cutting projection of unknown
+        // load + consequence radius + evidence debt. Producer is
+        // `BASAbyssalPressureBudget.derive(...)` from existing
+        // turn state; consumer (here) emits `abyssal.magnitude`
+        // / `abyssal.modes` / `abyssal.escalation` codes into
+        // `signalRefs`. Same additive-metadata contract — no
+        // verdict escalation, no permit mutation. `nil` for
+        // legacy / test callers that don't yet plumb the
+        // projection.
+        abyssalPressure: BASAbyssalPressure? = nil,
+        // M304 — optional human-anchor signal (white paper
+        // §5.3). Producer is `BASHumanAnchorProtocol.derive(...)`
+        // from existing risk + permit + candidate state.
+        // Consumer emits `humanAnchor.tone` + `humanAnchor.maxRisk`
+        // into `signalRefs`. Doctrine red line 7 preserved
+        // (watcher hint, not verdict).
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        // M304 — optional seal-envelope aggregate (white paper
+        // §5.2). Producer is
+        // `BASOldSealSealingProtocol.aggregate(...)` over a
+        // turn's synthesized seals (one per quarantine record
+        // by default). Consumer emits `seal.count` +
+        // `seal.strictest` into `signalRefs` only when there's
+        // at least one seal (nil → both codes elided).
+        sealAggregate: BASOldSealSealingProtocol.Aggregate? = nil,
+        // M305 — optional L13 evolution-lifecycle aggregate.
+        // Producer is
+        // `BASEvolutionLifecycleSession.aggregate(...)` over
+        // freshly-synthesized sessions (one per UpdateTicket).
+        // Consumer emits `lifecycle.tickets` /
+        // `lifecycle.terminal` / `lifecycle.promoted` /
+        // `lifecycle.stages` into `signalRefs` when non-nil.
+        lifecycleAggregate: BASEvolutionLifecycleSession.Aggregate? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -345,6 +379,75 @@ extension BASEBrainRuntimeCoordinator {
                 "tribunal.status:\(report.statusCode)")
             observationStatusCodes.append(
                 "tribunal.voices:\(report.voicesPresent.count)")
+        }
+        // M303 — Cthulhu/Abyssal pressure projection. Aggregate
+        // magnitude is the mean of the six dimensions; modes
+        // count + sovereign-escalation hint are pure derived
+        // products via `BASAbyssalPressureBudget`. All three
+        // codes appear together so audit consumers can grep a
+        // single `abyssal.` prefix.
+        if let pressure = abyssalPressure {
+            // Format magnitude with 3 decimal places for stable
+            // cross-build digests; %.3f rounds half-to-even per
+            // POSIX, matching the existing `risk:`/`permit:`
+            // numeric-stable conventions.
+            let magnitude = String(
+                format: "%.3f", pressure.aggregateMagnitude)
+            observationStatusCodes.append(
+                "abyssal.magnitude:\(magnitude)")
+            observationStatusCodes.append(
+                "abyssal.modes:\(pressure.recommendedModes.count)")
+            if let hint = pressure.sovereignEscalationHint {
+                observationStatusCodes.append(
+                    "abyssal.escalation:\(hint)")
+            }
+        }
+        // M304 — Human-anchor signal. Tone + max-risk give L14
+        // audit walkers a one-line readout of "did the surface
+        // need to slow down for the host this turn?" without
+        // re-running the protocol logic.
+        if let anchor = humanAnchorSignal {
+            let maxRisk = max(
+                anchor.agencyRisk,
+                max(anchor.alienationRisk,
+                    max(anchor.dignityRisk,
+                        anchor.overwhelmRisk)))
+            observationStatusCodes.append(
+                "humanAnchor.tone:" +
+                "\(anchor.recommendedSurfaceTone.rawValue)")
+            observationStatusCodes.append(
+                "humanAnchor.maxRisk:" +
+                "\(String(format: "%.3f", maxRisk))")
+        }
+        // M304 — Old-seal aggregate. Only emit when at least
+        // one seal is present this turn (`nil` aggregate means
+        // no seals → both codes elided).
+        if let seal = sealAggregate {
+            observationStatusCodes.append(
+                "seal.count:\(seal.count)")
+            observationStatusCodes.append(
+                "seal.strictest:" +
+                "\(seal.strictestPolicy.rawValue)")
+        }
+        // M305 — L13 evolution lifecycle aggregate. Always emit
+        // `lifecycle.tickets:N` (with N=0 elided since the
+        // aggregate is nil for empty collections). When N > 0,
+        // also emit terminal / promoted counts and the stable
+        // distinct active-stages list.
+        if let lifecycle = lifecycleAggregate {
+            observationStatusCodes.append(
+                "lifecycle.tickets:\(lifecycle.count)")
+            observationStatusCodes.append(
+                "lifecycle.terminal:\(lifecycle.terminalCount)")
+            observationStatusCodes.append(
+                "lifecycle.promoted:\(lifecycle.promotedCount)")
+            // Active stages joined with `+` so the audit string
+            // grep-pattern stays single-token.
+            let stages = lifecycle.activeStages
+                .map(\.rawValue)
+                .joined(separator: "+")
+            observationStatusCodes.append(
+                "lifecycle.stages:\(stages)")
         }
         let signalRefs = orderedReasonCodes(
             [

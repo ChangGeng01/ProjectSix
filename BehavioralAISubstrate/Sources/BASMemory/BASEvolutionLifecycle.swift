@@ -296,3 +296,76 @@ public struct BASEvolutionLifecycleSession:
         return ordered
     }
 }
+
+// MARK: - M305 — Aggregate
+
+/// M305 — aggregate over a collection of lifecycle sessions for
+/// the L14 audit signalRefs / dashboard surfaces. Used by the
+/// runtime coordinator to summarize per-turn ticket lifecycle
+/// state without importing the actor primitives.
+public extension BASEvolutionLifecycleSession {
+    struct Aggregate: Sendable, Equatable {
+        /// Total session count.
+        public let count: Int
+        /// Number of sessions where `currentStage.isTerminal` is
+        /// true.
+        public let terminalCount: Int
+        /// Number of sessions that have reached `.promoted` (or
+        /// `.retracted`, which implies promotion was achieved).
+        public let promotedCount: Int
+        /// Distinct current-stage values across all sessions, in
+        /// strictness-descending order matching the `Stage` enum
+        /// declaration.
+        public let activeStages: [BASEvolutionLifecycleStage]
+
+        public init(
+            count: Int,
+            terminalCount: Int,
+            promotedCount: Int,
+            activeStages: [BASEvolutionLifecycleStage]
+        ) {
+            self.count = count
+            self.terminalCount = terminalCount
+            self.promotedCount = promotedCount
+            self.activeStages = activeStages
+        }
+    }
+
+    /// Aggregate a collection of lifecycle sessions. Returns
+    /// `nil` for an empty collection so audit consumers can
+    /// elide the `lifecycle.*` codes when no tickets entered the
+    /// pipeline this turn.
+    static func aggregate(
+        _ sessions: [BASEvolutionLifecycleSession]
+    ) -> Aggregate? {
+        guard !sessions.isEmpty else { return nil }
+        var stagesSeen = Set<BASEvolutionLifecycleStage>()
+        var orderedActive: [BASEvolutionLifecycleStage] = []
+        var terminalCount = 0
+        var promotedCount = 0
+        // Walk in declaration order so the active-stages list is
+        // stable across builds.
+        let declarationOrder = BASEvolutionLifecycleStage.allCases
+        for stage in declarationOrder {
+            if sessions.contains(where: {
+                $0.currentStage == stage
+            }) {
+                stagesSeen.insert(stage)
+                orderedActive.append(stage)
+            }
+        }
+        for session in sessions {
+            if session.currentStage.isTerminal {
+                terminalCount += 1
+            }
+            if session.hasReachedPromotion {
+                promotedCount += 1
+            }
+        }
+        return Aggregate(
+            count: sessions.count,
+            terminalCount: terminalCount,
+            promotedCount: promotedCount,
+            activeStages: orderedActive)
+    }
+}
