@@ -159,6 +159,32 @@ public struct BASOrganTrainedWeightProvenance:
     /// Production tier requires a non-nil attestation reference;
     /// non-production tiers must NOT carry one (otherwise it
     /// looks like a forged uplift).
+    ///
+    /// **Relationship to `BASOrganTrainedWeightFilter.rejectionReason`**
+    /// (per chapter 八十一 deep-review note, M353):
+    ///
+    /// `isStructurallyConsistent` and `rejectionReason` check
+    /// overlapping but slightly different concerns. `rejectionReason`
+    /// is the production gate (returns the typed `Rejection`
+    /// case for telemetry/audit); `isStructurallyConsistent` is
+    /// a fast-path diagnostic Boolean. They agree on:
+    ///
+    /// - Hash field length must be exactly 64
+    /// - Production tier requires non-nil attestation ref + issued-at
+    /// - Non-production tier must NOT carry attestation
+    ///
+    /// They diverge on:
+    ///
+    /// - `rejectionReason` ALSO checks hex content (M352) and
+    ///   surfaces `nonProductionTierCarriesAttestation` as the
+    ///   forged-uplift signal taking precedence over plain tier
+    ///   rejection.
+    /// - `isStructurallyConsistent` does NOT check hex content
+    ///   (it's a structural check, not a content-validity check).
+    ///
+    /// Use `rejectionReason` for production gating; use
+    /// `isStructurallyConsistent` for fast-path well-formedness
+    /// diagnostics.
     public var isStructurallyConsistent: Bool {
         let hashesAreCorrectLength =
             trainingCorpusHashHex.count == 64
@@ -210,6 +236,18 @@ public enum BASOrganTrainedWeightFilter {
         /// SHA-256 invariant is part of the typed pin.
         case malformedHash(field: String, length: Int)
 
+        /// Hash field has correct length (64) but contains
+        /// non-hex characters. SHA-256 hex output is exactly
+        /// `[0-9a-f]{64}` (lowercase) or `[0-9A-F]{64}`
+        /// (uppercase); any other character indicates a
+        /// malformed envelope. M352 chapter 八十一 fix — pre-M352
+        /// only length was checked, so `"zzzz...zzzz"` (64 z's)
+        /// would pass the length gate while being invalid hex.
+        /// `firstInvalidChar` is a String (length 1) rather than
+        /// Character so the enum stays `Codable` via synthesis.
+        case malformedHashContent(
+            field: String, firstInvalidChar: String)
+
         /// Non-production tier carries an attestation reference.
         /// This indicates a forged uplift attempt — the envelope
         /// is rejected even though the runtime would never have
@@ -240,6 +278,22 @@ public enum BASOrganTrainedWeightFilter {
             return .malformedHash(
                 field: "trainedWeightsHashHex",
                 length: provenance.trainedWeightsHashHex.count)
+        }
+        // M352 chapter 八十一 fix — hash content must be hex.
+        // Length check alone allowed e.g. 64 z's to pass.
+        if let invalid = firstNonHexCharacter(
+            provenance.trainingCorpusHashHex)
+        {
+            return .malformedHashContent(
+                field: "trainingCorpusHashHex",
+                firstInvalidChar: String(invalid))
+        }
+        if let invalid = firstNonHexCharacter(
+            provenance.trainedWeightsHashHex)
+        {
+            return .malformedHashContent(
+                field: "trainedWeightsHashHex",
+                firstInvalidChar: String(invalid))
         }
         // Tier check.
         if provenance.tier < productionTierFloor {
@@ -274,5 +328,17 @@ public enum BASOrganTrainedWeightFilter {
         _ provenances: [BASOrganTrainedWeightProvenance]
     ) -> [BASOrganTrainedWeightProvenance] {
         provenances.filter { isPermittedForProduction($0) }
+    }
+
+    /// M352 helper — return the first non-hex character if any,
+    /// else nil. Hex = `[0-9a-fA-F]`. Used by `rejectionReason`
+    /// to enforce the SHA-256 content invariant beyond length.
+    internal static func firstNonHexCharacter(
+        _ s: String
+    ) -> Character? {
+        for ch in s where !ch.isHexDigit {
+            return ch
+        }
+        return nil
     }
 }
