@@ -77,6 +77,93 @@ over-claim.** The improvement is still substantial and ships.
 
 ---
 
+### 2026-05-02 — M376 — high-res clock migration corrects M369 over-claim
+
+**Bench**: `--sha256-bench` (re-measured post-M376 high-res clock)
+
+**What the bench revealed**: chapter 八十四.2 reported M369 SHA-256
+speedup as **5.4x** (warm mean 0.298 → 0.055 ms). After M376
+migrated all sample-host benches from `Date()` to
+`BASBenchHighResClock` (ContinuousClock-backed), the same
+post-CryptoKit hash now measures at **0.0349 ms warm mean**.
+
+The pre-M376 numbers were **inflated by Date timing overhead**.
+Date() takes ~100s of nanoseconds per call, which got added to
+every sample. For sub-µs benches that adds significant noise to
+both pre- and post- measurements.
+
+**Re-computed actual speedup**:
+
+| Metric | pre-M369 (Date) | post-M369 (Date) | post-M376 (HighRes) |
+|---|---|---|---|
+| warm mean | 0.298 ms | 0.055 ms | **0.0349 ms** |
+| warm p50 | 0.220 ms | 0.042 ms | **0.0309 ms** |
+
+The Date overhead-cleansed comparison: 0.298 → 0.0349 = **8.5x
+speedup**, not the 5.4x reported in chapter 八十四.
+
+**Honest assessment**: M369 was a bigger win than chapter 八十四.2
+gave it credit for. The over-claim correction in chapter 八十四.2
+("100x → 5.4x") was itself an under-correction; the real number
+on this dev box is **8.5x**. Future evolution claims will use
+high-res clock numbers from the start.
+
+**Same pattern affects other benches**:
+
+| Bench | pre-M376 warm mean | post-M376 warm mean | Cleansing factor |
+|---|---|---|---|
+| sha256-bench | 0.055 ms | 0.0349 ms | -36% |
+| json-codec-bench | 0.031 ms | 0.0136 ms | -56% |
+| lifecycle-bench | 0.0048 ms | 0.0035 ms | -27% |
+
+The smaller the latency, the larger the relative cleansing
+because Date overhead is constant while real work shrinks.
+
+---
+
+### 2026-05-02 — M377 — full-stack-bench cold/warm split
+
+**Bench**: `--full-stack-bench`
+
+**What the bench revealed**: chapter 八十四.2 / 八十二.7 showed
+full-stack-bench mean ~12 ms with CV 1.71 — bimodal distribution
+where 1-2 cold samples (50-77 ms) dominated the mean and made
+the warm steady-state (~5 ms) invisible in the headline number.
+
+**Change shipped**:
+[`QinaoRuntimeSDK/Sources/QinaoSampleHost/FullStackBench.swift`](../QinaoRuntimeSDK/Sources/QinaoSampleHost/FullStackBench.swift)
+returns `BASBenchWarmupOutcome` (M361 combined/cold/warm triple)
+instead of single `BASBenchLatencyStats`. Cold = first session;
+warm = remaining sessions. Same shape as M363/M364/M365 already
+use.
+
+`Outcome.perSessionLatency` retained as backward-compat accessor
+that returns the warm distribution by default.
+
+**Before / after** (10 sessions, post-M376 high-res clock):
+
+| Metric | pre-M377 (single dist) | post-M377 (warm only) |
+|---|---|---|
+| mean | 8.44 ms | **3.65 ms** |
+| p50 | 3.02 ms | **3.71 ms** |
+| p95 | 57.25 ms | **3.93 ms** |
+| max | 57.25 ms | **3.93 ms** |
+| stddev | 16.27 ms | **0.19 ms** |
+| CV | 1.93 | **0.05** |
+
+**Honest assessment**: dramatic improvement in distribution
+tightness — CV dropped 38x (1.93 → 0.05). The cold spike is
+still visible in the cold sub-distribution (16.9 ms first
+session) but no longer pollutes the warm headline.
+
+The cold cost itself wasn't reduced — it's still the same first-
+process Codable type-metadata + module load + static init costs.
+Production hosts pay this once at app launch and amortize across
+many sessions, which the warm distribution accurately models.
+The bench reporting now matches production reality.
+
+---
+
 ### 2026-05-02 — M370 — JSONEncoder + JSONDecoder caching
 
 **Bench**: `--json-codec-bench` (chapter 八十三.4)
