@@ -126,7 +126,14 @@ extension BASEBrainRuntimeCoordinator {
         let actionDigest = sovereignDigestHex(
             actionDigestParts + [sessionID, turnID, scope.rawValue, snapshotRef, policyHash]
         )
-        let tokenID = "token.\(scope.rawValue).\(sessionID).\(abs(actionDigest.hashValue))"
+        // M336 deep review fix: previously
+        // `abs(actionDigest.hashValue)` — Swift's `String.hashValue`
+        // is randomly seeded per process, so token IDs varied
+        // across runs (breaking cross-session ID stability the
+        // M306 multi-session demo claims). Use a deterministic
+        // prefix of the SHA256 digest instead. `actionDigest` is
+        // already a hex string from `sovereignDigestHex(...)`.
+        let tokenID = "token.\(scope.rawValue).\(sessionID).\(actionDigest.prefix(16))"
         let signature = sovereignDigestHex(
             [
                 tokenID,
@@ -165,7 +172,10 @@ extension BASEBrainRuntimeCoordinator {
     ) -> BASSovereignWarrant {
         let jurisdictionRef = "jurisdiction.\(token.scope.rawValue)"
         let timeLockRef = "timelock.\(token.turnID).\(token.scope.rawValue).ttl_\(token.ttlMs)"
-        let warrantID = "warrant.\(token.scope.rawValue).\(runtimeTrace.sessionID).\(abs(token.actionDigest.hashValue))"
+        // M336 deep review fix: same `hashValue` non-determinism
+        // issue as `tokenID` above. Use deterministic SHA256 hex
+        // prefix.
+        let warrantID = "warrant.\(token.scope.rawValue).\(runtimeTrace.sessionID).\(token.actionDigest.prefix(16))"
         let issuedAt = runtimeTrace.recordedAt
         let expiresAt = issuedAt.addingTimeInterval(Double(token.ttlMs) / 1_000)
         let witnessRefs = sovereignWarrantWitnessRefs(
