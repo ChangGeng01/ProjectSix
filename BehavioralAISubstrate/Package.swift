@@ -151,7 +151,13 @@ let package = Package(
                 "BASObservability",
                 "BASEvaluation",
                 "BASAdmin",
-                "BASAppleAdapters"
+                "BASAppleAdapters",
+                // M320 — `buildSovereignAuditEntry` accepts an
+                // optional `BASUnknownReserve` projection (white
+                // paper §5.4). The schema lives in BASWorldPrior;
+                // host kit imports it to type the audit entry's
+                // optional parameter.
+                "BASWorldPrior"
             ]
         ),
         .testTarget(name: "BehavioralAISubstrateTests", dependencies: [

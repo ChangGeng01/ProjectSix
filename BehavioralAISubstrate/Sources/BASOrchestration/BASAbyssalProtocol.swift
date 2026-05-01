@@ -998,6 +998,20 @@ public extension BASAbyssalBranch {
     }
 }
 
+// MARK: - M320 BASUnknownReserve runtime derive
+
+// Note: `BASUnknownReserve` lives in BASWorldPrior; the derive
+// helper that maps from existing turn signals (uncertainty ledger
+// confidence floor) into a typed reserve is added there, not
+// here, to respect the layer ownership convention.
+
+// MARK: - M321 BASForbiddenKnowledgeCandidate runtime derive
+
+// Note: `BASForbiddenKnowledgeCandidate` lives in BASMemory; the
+// derive helper that maps from existing quarantine records into
+// typed forbidden-knowledge candidates is added there, not here,
+// to respect the layer ownership convention.
+
 // MARK: - BASAnomalyWatchProtocol (cross-cutting protocol helper)
 
 /// White paper §5.4 "Anomaly Watch Protocol" — pure-function

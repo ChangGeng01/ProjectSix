@@ -5,6 +5,10 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+// M320 — `BASUnknownReserve` is defined in BASWorldPrior and is
+// referenced by the optional audit-entry parameter introduced in
+// chapter 七十五.
+import BASWorldPrior
 
 // MARK: - M71 split — BASEBrainRuntimeCoordinator — sovereign commit tokens / warrants / lock / quarantine /
 // audit / execution receipt builders.
@@ -368,7 +372,21 @@ extension BASEBrainRuntimeCoordinator {
         // abyssal threshold. Consumer emits
         // `abyssalBranch.count` + `abyssalBranch.maxLoad` +
         // optional closure-condition flag when non-empty.
-        abyssalBranches: [BASAbyssalBranch] = []
+        abyssalBranches: [BASAbyssalBranch] = [],
+        // M320 — optional `BASUnknownReserve` projection (white
+        // paper §5.4). Producer is `BASUnknownReserve.derive(...)`
+        // from the L9 uncertainty ledger's confidence floor.
+        // Consumer emits `unknownReserve.assertionCeiling` +
+        // `unknownReserve.refs:N` when ceiling is below
+        // `.unrestricted` (i.e. unknowns matter on this turn).
+        unknownReserve: BASUnknownReserve? = nil,
+        // M321 — optional aggregate of L13 forbidden-knowledge
+        // candidates (white paper §5.5). Producer is
+        // `BASForbiddenKnowledgeCandidate.aggregate(...)` over
+        // candidates derived from the turn's quarantine records.
+        // Consumer emits `forbidden.count` + `forbidden.policy` +
+        // `forbidden.allHeld` when at least one candidate exists.
+        forbiddenAggregate: BASForbiddenKnowledgeCandidate.Aggregate? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -508,6 +526,37 @@ extension BASEBrainRuntimeCoordinator {
             observationStatusCodes.append(
                 "anomaly.confidence:" +
                 "\(String(format: "%.3f", trace.confidence))")
+        }
+        // M320 — `BASUnknownReserve` projection (white paper
+        // §5.4). Only emit when the assertion ceiling is below
+        // `unrestricted` — unrestricted means no unknown signal
+        // worth reporting and would flood the audit ledger with
+        // useless zero-information codes.
+        if let reserve = unknownReserve,
+           reserve.assertionCeiling != .unrestricted
+        {
+            observationStatusCodes.append(
+                "unknownReserve.assertionCeiling:" +
+                "\(reserve.assertionCeiling.rawValue)")
+            observationStatusCodes.append(
+                "unknownReserve.refs:\(reserve.unknownRefs.count)")
+        }
+        // M321 — `BASForbiddenKnowledgeCandidate` aggregate
+        // (white paper §5.5). nil aggregate (no quarantines this
+        // turn) elides all forbidden codes. When non-nil, emit
+        // count + strictest shadow-trial policy + a single
+        // `allHeld` flag so audit walkers can grep "did this
+        // turn block any high-risk candidate from progression".
+        if let forbidden = forbiddenAggregate {
+            observationStatusCodes.append(
+                "forbidden.count:\(forbidden.count)")
+            observationStatusCodes.append(
+                "forbidden.policy:" +
+                "\(forbidden.strictestPolicy.rawValue)")
+            if forbidden.allHeld {
+                observationStatusCodes.append(
+                    "forbidden.allHeld:true")
+            }
         }
         // M318 — L9 abyssal-branch annotations. Empty array
         // elides all branch codes; non-empty emits count + max

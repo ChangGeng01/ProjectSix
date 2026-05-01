@@ -179,3 +179,90 @@ public struct BASForbiddenKnowledgeCandidate:
         }
     }
 }
+
+// MARK: - M321 — runtime derive + aggregate
+
+public extension BASForbiddenKnowledgeCandidate {
+    /// **M321** — projection from a `BASQuarantineRecord` into a
+    /// typed forbidden-knowledge candidate. Pre-M321 the schema
+    /// (white paper §5.5 / §7) had 0 runtime callers; this helper
+    /// closes the gap by mapping each turn's quarantine records
+    /// into the L13 parking-lot shape.
+    ///
+    /// Doctrine
+    ///
+    /// - **One quarantine → one candidate**, mirroring M304's
+    ///   one-quarantine-one-seal pattern. Audit consumers can
+    ///   correlate the two surfaces by `quarantineID` ↔
+    ///   `sourceRefs`.
+    /// - **Default `.standard` shadow trial** — quarantines are
+    ///   already a held state, so the trial policy follows the
+    ///   typical retry semantics. Hosts may override by mapping
+    ///   to `.escalated` for high-severity zones.
+    /// - **Default `.held` sovereign review state** — until L14
+    ///   explicitly clears the quarantine, the candidate stays
+    ///   blocked from reconsideration.
+    /// - **24-hour cooling period** — gives downstream review a
+    ///   defensible default; may be overridden via the
+    ///   `coolingPeriod:` parameter.
+    static func derive(
+        from quarantine: BASQuarantineRecord,
+        coolingPeriod: TimeInterval = 24 * 60 * 60
+    ) -> BASForbiddenKnowledgeCandidate {
+        BASForbiddenKnowledgeCandidate(
+            candidateID:
+                "forbidden-\(quarantine.quarantineID)",
+            sourceRefs: [quarantine.sourceRef],
+            riskReasons: quarantine.reasonCodes,
+            contaminationRefs: [quarantine.zone.rawValue],
+            coolingPeriod: coolingPeriod,
+            shadowTrialPolicy: .standard,
+            sovereignReviewState: .held,
+            rollbackPlanRef: nil)
+    }
+
+    /// Aggregate of a turn's forbidden-knowledge candidates. Audit
+    /// consumer reads `count` + `strictestPolicy` to emit
+    /// `forbidden.*` codes; nil aggregate = no candidates this
+    /// turn → all codes elided.
+    struct Aggregate: Sendable, Equatable {
+        public let count: Int
+        public let strictestPolicy: BASShadowTrialPolicy
+        public let allHeld: Bool
+
+        public init(
+            count: Int,
+            strictestPolicy: BASShadowTrialPolicy,
+            allHeld: Bool
+        ) {
+            self.count = count
+            self.strictestPolicy = strictestPolicy
+            self.allHeld = allHeld
+        }
+    }
+
+    /// Aggregate factory. Returns nil when the input is empty so
+    /// the audit-entry consumer can short-circuit cleanly.
+    static func aggregate(
+        _ candidates: [BASForbiddenKnowledgeCandidate]
+    ) -> Aggregate? {
+        guard !candidates.isEmpty else { return nil }
+        // Strictest policy = highest severity tier present.
+        // Order from least to most strict:
+        //   none < manualOnly < restricted < standard < escalated
+        let order: [BASShadowTrialPolicy] = [
+            .none, .manualOnly, .restricted,
+            .standard, .escalated,
+        ]
+        let policies = candidates.map(\.shadowTrialPolicy)
+        let strictest = order.last { policies.contains($0) }
+            ?? .none
+        let allHeld = candidates.allSatisfy {
+            $0.sovereignReviewState == .held
+        }
+        return Aggregate(
+            count: candidates.count,
+            strictestPolicy: strictest,
+            allHeld: allHeld)
+    }
+}

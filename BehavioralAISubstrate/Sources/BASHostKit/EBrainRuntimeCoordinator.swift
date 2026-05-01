@@ -5,6 +5,9 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+// M320 — `BASUnknownReserve.derive(...)` lives in BASWorldPrior
+// and is invoked from `runTurn` to project per-turn unknowns.
+import BASWorldPrior
 
 // MARK: - M71 split — BASEBrainRuntimeCoordinator now lives in its own file.
 // Types (BASEBrainTurnRequest / BASEBrainTurnResult), evolution summary/
@@ -750,6 +753,27 @@ public struct BASEBrainRuntimeCoordinator {
             candidateIDs: thoughtFrame.candidates
                 .map(\.candidateID),
             pressure: abyssalPressureForAudit)
+        // M320 — derive `BASUnknownReserve` projection from L9
+        // uncertainty ledger's confidence floor. When the floor
+        // is high (≥0.8) the reserve resolves to `.unrestricted`
+        // and the audit consumer elides the codes; otherwise
+        // emits ceiling tier + ref count.
+        let unknownReserveForAudit = BASUnknownReserve.derive(
+            reserveID:
+                "unknown-reserve-\(runtimeTrace.sessionID)",
+            confidenceFloor: thoughtFrame.uncertaintyLedger?
+                .confidenceFloor ?? 1.0)
+        // M321 — derive `BASForbiddenKnowledgeCandidate`
+        // aggregate from the turn's quarantine records. Empty
+        // collection (no quarantines this turn) yields nil
+        // aggregate → audit consumer elides all `forbidden.*`
+        // codes.
+        let forbiddenCandidatesForAudit = quarantineRecords.map {
+            BASForbiddenKnowledgeCandidate.derive(from: $0)
+        }
+        let forbiddenAggregateForAudit =
+            BASForbiddenKnowledgeCandidate.aggregate(
+                forbiddenCandidatesForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -790,7 +814,13 @@ public struct BASEBrainRuntimeCoordinator {
             anomalyTrace: anomalyTraceForAudit,
             // M318 — feed L9 abyssal-branch annotations (empty
             // when below abyssal threshold; codes elided).
-            abyssalBranches: abyssalBranchesForAudit
+            abyssalBranches: abyssalBranchesForAudit,
+            // M320 — feed L4 unknown-reserve projection (codes
+            // elided when ceiling resolves to `.unrestricted`).
+            unknownReserve: unknownReserveForAudit,
+            // M321 — feed L13 forbidden-knowledge aggregate (nil
+            // when no quarantines this turn; codes elided).
+            forbiddenAggregate: forbiddenAggregateForAudit
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

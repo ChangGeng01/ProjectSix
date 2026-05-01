@@ -130,3 +130,67 @@ public struct BASUnknownReserve:
         !unknownRefs.isEmpty && assertionCeiling != .unrestricted
     }
 }
+
+// MARK: - M320 — runtime derive
+
+public extension BASUnknownReserve {
+    /// **M320** — projection from existing turn state into the
+    /// `BASUnknownReserve` shape. Pre-M320 the schema (white
+    /// paper §5.4 / §7) had 0 runtime callers; this helper closes
+    /// the gap by mapping the L9/L11 confidence floor into an
+    /// assertion ceiling.
+    ///
+    /// Mapping (deliberately conservative — confidence floor
+    /// dominates the projection because higher-fidelity unknown
+    /// detection requires L7 mirror blade signals not yet wired):
+    ///
+    /// - **`assertionCeiling`** — derived from the confidence floor:
+    ///   - `floor ≥ 0.8` → `.unrestricted` (no signal of unknowns)
+    ///   - `0.6 ≤ floor < 0.8` → `.provisional`
+    ///   - `0.4 ≤ floor < 0.6` → `.qualified`
+    ///   - `0.2 ≤ floor < 0.4` → `.metaOnly`
+    ///   - `floor < 0.2` → `.none`
+    /// - **`unknownRefs`** — when ceiling is below `.unrestricted`,
+    ///   carries a single `"confidence-floor:<value>"` reference so
+    ///   audit walkers can trace the projection back to its source.
+    /// - **`whyUnresolved`** — short stable string describing the
+    ///   ceiling tier ("confidence floor below threshold").
+    /// - **`forbiddenInferences`** — empty by default; future
+    ///   milestones may populate from L7 mirror blade.
+    /// - **`evidenceNeeded`** — empty by default; future milestones
+    ///   may populate from L8 hippocampal-well missing-evidence
+    ///   query.
+    static func derive(
+        reserveID: String,
+        confidenceFloor: Double
+    ) -> BASUnknownReserve {
+        let clamped = min(1, max(0, confidenceFloor))
+        let ceiling: BASUnknownAssertionCeiling
+        switch clamped {
+        case 0.8...: ceiling = .unrestricted
+        case 0.6..<0.8: ceiling = .provisional
+        case 0.4..<0.6: ceiling = .qualified
+        case 0.2..<0.4: ceiling = .metaOnly
+        default: ceiling = .none
+        }
+        let refs: [String]
+        let why: String
+        if ceiling == .unrestricted {
+            refs = []
+            why = ""
+        } else {
+            refs = [
+                "confidence-floor:" +
+                String(format: "%.3f", clamped)
+            ]
+            why = "confidence floor below threshold"
+        }
+        return BASUnknownReserve(
+            reserveID: reserveID,
+            unknownRefs: refs,
+            whyUnresolved: why,
+            forbiddenInferences: [],
+            evidenceNeeded: [],
+            assertionCeiling: ceiling)
+    }
+}
