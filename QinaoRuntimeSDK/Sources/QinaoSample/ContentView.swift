@@ -1,12 +1,29 @@
 import SwiftUI
 import QinaoLoop
+import QinaoUI
 
 /// SwiftUI view rendering the Qinao Sample app. Lifted from the
 /// executable target into the QinaoSample library (M228) so it
 /// can be exercised by snapshot + behaviour tests without driving
 /// a real app launch.
+///
+/// **M301** — added a top-of-window `Picker` toggle so hosts can
+/// switch between the prompt-driven loop demo (existing) and the
+/// six L12 surface-family showcase (`QinaoSurfaceShowcaseView`,
+/// M293). Same window, two demos. The showcase tab is purely
+/// declarative (no async work, no provider wiring); the prompt
+/// tab is unchanged.
 @MainActor
 public struct ContentView: View {
+    /// M301 — `View` selector. `prompt` keeps the legacy demo;
+    /// `surfaceShowcase` renders all six surface families via
+    /// `QinaoSurfaceShowcaseView`.
+    public enum DemoTab: String, CaseIterable, Identifiable {
+        case prompt = "Prompt"
+        case surfaceShowcase = "Surface Showcase"
+        public var id: String { rawValue }
+    }
+
     @StateObject private var session: SampleSession
     @State private var prompt: String =
         "Reply with one short sentence about a calming evening habit."
@@ -15,6 +32,9 @@ public struct ContentView: View {
     @State private var traceID: String = "—"
     @State private var latencyMs: Double = 0
     @State private var isRunning: Bool = false
+    /// M301 — currently visible demo. Defaults to `.prompt` so
+    /// existing snapshot tests + first-run UX are unchanged.
+    @State private var activeTab: DemoTab = .prompt
 
     /// Default-init: production sample-app path with the real
     /// QinaoLoop endpoint factories.
@@ -33,7 +53,8 @@ public struct ContentView: View {
         response: String = "",
         provider: SampleProvider = .appleFoundation,
         traceID: String = "—",
-        latencyMs: Double = 0
+        latencyMs: Double = 0,
+        activeTab: DemoTab = .prompt
     ) {
         _session = StateObject(wrappedValue: session)
         _prompt = State(initialValue: prompt)
@@ -41,9 +62,50 @@ public struct ContentView: View {
         _provider = State(initialValue: provider)
         _traceID = State(initialValue: traceID)
         _latencyMs = State(initialValue: latencyMs)
+        _activeTab = State(initialValue: activeTab)
     }
 
     public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            tabSelector
+            Divider()
+            // M301 — switch between the prompt-driven loop demo
+            // and the six-surface showcase. No state cross-talk:
+            // each tab is a self-contained body.
+            switch activeTab {
+            case .prompt:
+                promptModeBody
+            case .surfaceShowcase:
+                surfaceShowcaseBody
+            }
+        }
+        .padding(20)
+    }
+
+    // MARK: - Tab selector
+
+    /// M301 — tab picker shown above the demo body. Segmented
+    /// style so both options are visible without opening a menu.
+    private var tabSelector: some View {
+        HStack {
+            Picker("Demo", selection: $activeTab) {
+                ForEach(DemoTab.allCases) { tab in
+                    Text(tab.rawValue).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 360)
+            Spacer()
+        }
+    }
+
+    // MARK: - Prompt mode body
+
+    /// M301 — the legacy prompt-driven demo, factored out of
+    /// `body` so the tab switcher can dispatch to it cleanly.
+    /// Behaviour identical to pre-M301 (header / provider row /
+    /// loading / prompt / response / status bar).
+    private var promptModeBody: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
             providerRow
@@ -55,7 +117,32 @@ public struct ContentView: View {
             responsePanel
             statusBar
         }
-        .padding(20)
+    }
+
+    // MARK: - Surface showcase mode body
+
+    /// M301 — the six L12 surface families rendered side by
+    /// side via `QinaoSurfaceShowcaseView` (M293). No async
+    /// state, no provider wiring — the showcase is a checklist
+    /// view of canonical demo models so hosts immediately see
+    /// what every Qinao surface looks like.
+    @ViewBuilder
+    private var surfaceShowcaseBody: some View {
+        if #available(iOS 18, macOS 14, watchOS 11, *) {
+            QinaoSurfaceShowcaseView(
+                model: .canonicalDemo)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Surface Showcase")
+                    .font(.headline)
+                Text(
+                    "Requires iOS 18 / macOS 14 / watchOS 11 " +
+                    "or newer.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+        }
     }
 
     // MARK: - Header

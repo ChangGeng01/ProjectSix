@@ -270,7 +270,12 @@ let package = Package(
             dependencies: [
                 "QinaoLoop",
                 "QinaoAppleFoundation",
-                "QinaoMLX"
+                "QinaoMLX",
+                // M301 — wire QinaoSurfaceShowcaseView into the
+                // sample app so hosts trying the SDK see all six
+                // L12 surface families on first run, not just the
+                // prompt/response panel.
+                "QinaoUI"
             ]),
         // M219 — SwiftUI macOS GUI demo executable. M228 thinned to
         // just @main + window scene; UI lives in the QinaoSample
