@@ -3249,9 +3249,30 @@ struct QinaoSampleHost {
             """)
 
         // 2. Lifecycle coordinator with audit + storage
-        let storageURL = URL(
-            fileURLWithPath:
-                "/tmp/qinao_full_stack_demo_lifecycle.json")
+        // M298 — derive co-located paths through
+        // `BASUnifiedStorageLocator` so the audit-ledger SQLite
+        // and lifecycle stores share one deployment root. The
+        // demo only spins up the lifecycle JSON file (existing
+        // M268 form), but the locator pin-prints the canonical
+        // SQLite ledger URL alongside it — proof that hosts can
+        // wire both stores from one root without hardcoding
+        // filenames.
+        let demoRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "qinao-full-stack-demo-\(UUID().uuidString)")
+        let unifiedLocations: BASUnifiedStorageLocator.Locations
+        do {
+            unifiedLocations = try BASUnifiedStorageLocator
+                .locate(in: demoRoot)
+        } catch {
+            stderr("error: locator failed: \(error)\n")
+            exit(2)
+        }
+        // JSON file lives next to where the SQLite ledger would
+        // land — same root, distinct filename so M283's
+        // two-store guarantee remains untouched.
+        let storageURL = unifiedLocations.root
+            .appendingPathComponent("lifecycle.json")
         try? FileManager.default.removeItem(at: storageURL)
         let storage =
             BASUpdateTicketLifecycleJSONFileStorage(
@@ -3264,9 +3285,12 @@ struct QinaoSampleHost {
             storage: storage)
         print("""
 
-            ━━━ Step 2/5 — Lifecycle coordinator built (M259+M265+M268) ━━━
-            audit sink: enabled (in-memory capture)
-            storage:    \(storageURL.lastPathComponent) (JSON)
+            ━━━ Step 2/5 — Lifecycle coordinator built (M259+M265+M268+M298) ━━━
+            unified root:    \(unifiedLocations.root.lastPathComponent)
+            audit ledger:    \(unifiedLocations.auditLedgerURL.lastPathComponent) (canonical, M91)
+            lifecycle store: \(unifiedLocations.lifecycleURL.lastPathComponent) (canonical, M270)
+            demo storage:    \(storageURL.lastPathComponent) (JSON form, M268)
+            audit sink:      enabled (in-memory capture)
             """)
 
         // 3. 3-turn conversation via secondary (M254)
@@ -3403,10 +3427,13 @@ struct QinaoSampleHost {
               terminal events captured: \(auditEntries.count)
               first audit ID:          \(auditEntries.first?.auditID ?? "none")
 
-            ━━━ Demo complete — every M254-M270 seam exercised ━━━
+            ━━━ Demo complete — every M254-M270+M298 seam exercised ━━━
             """)
 
-        try? FileManager.default.removeItem(at: storageURL)
+        // M298 — clean the entire unified root, not just the
+        // lifecycle JSON file, so we don't leak the empty dir.
+        try? FileManager.default.removeItem(
+            at: unifiedLocations.root)
     }
 }
 
