@@ -7123,3 +7123,144 @@ doctrine 层面 v1 / v2 / v3 / v4 全 typed-enforced（55.7 / 67.7 已 pin）；
 ### 69.7 一句话总结
 
 **AFM panel test skip flake 关闭** —— Doctrine A AFM E2E pin **真正生效**，不再靠 synth 兜底。Parser robustness + prompt tightening + retry bump 三件合力，3 次连续 gate-on runs 0 skip 实证。**全部 chapter 六十七 MEDIUM findings 修了**。基线 3352 / 0 failures / 0 真 flake。
+
+## 七十、 全面开发 batch v2 — M303-M305 close 8 Cthulhu schemas + L13 lifecycle 0-runtime-caller gap
+
+### 70.1 触发动作
+
+用户继续 `全面开发`。本次 phase 1 实证扫描发现 chapter 六十八 关掉了 5 条缺口后，又冒出**新一组「类型已 ship + 测试 ship + governance 注册，但 runtime 0 caller」schemas**：
+
+1. **8 个 M287 Cthulhu/Abyssal schemas**：`BASAbyssalPressure / HumanAnchorSignal / UnknownReserve / AnomalyTrace / NarrativeDistortion / AbyssalBranch / SealEnvelope / ForbiddenKnowledgeCandidate`——每个仅 `EBrainSchemaGovernanceRegistry.swift` 注册一次，0 runtime 消费
+2. **5 件 M56 L13 lifecycle scaffold**：`BASEvolutionLifecycleStage / Action / Transition / Policy / Session`——self-file 内部使用，0 外部 caller
+
+白皮书 `QINAO_CTHULHU_INSPIRATION_INTEGRATION_SPEC_V1.md` §5.1-5.3 + chapter 五十六 L13 stage-1 governance spine 承诺都是**纸面**。本批 surgical 一日 PR 把 8/8 Cthulhu schemas 推到「至少有 1 条 runtime caller」+ L13 lifecycle scaffold 进 audit signalRefs。
+
+### 70.2 M303 — `BASAbyssalPressure` 接入 audit signalRefs（white paper §5.1）
+
+**问题**：`BASAbyssalPressureBudget.recommendedModes(for:)` + `.sovereignEscalationHint(for:)` 是 pure helper，但没有 producer 把 6 维 pressure（unknownLoad / consequenceRadius / evidenceDebt / ontologyDistortion / manipulationIndex / narrativePollution）从 substrate 状态投影出来。
+
+**修复** ([BASAbyssalProtocol.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift)):
+
+- 新 `BASAbyssalPressureBudget.derive(turnID:riskLevel:uncertaintyLedger:evidenceDebtCount:)` static 投影：
+  - `unknownLoad ← 1 − uncertaintyLedger.confidenceFloor`
+  - `consequenceRadius ← .low/0.2 / .medium/0.45 / .high/0.7 / .extreme/1.0`
+  - `evidenceDebt ← Double(count) / 10` saturated
+  - `ontologyDistortion / manipulationIndex / narrativePollution = 0`（M306+ 的 L11 / L13 wire 填）
+- `BASBrainRiskLevel` 用 `BASPolicy` import（已在 BASOrchestration deps）
+- `buildSovereignAuditEntry` 加 optional `abyssalPressure: BASAbyssalPressure? = nil` → 当非 nil 时 append `abyssal.magnitude:%.3f` + `abyssal.modes:N` + optional `abyssal.escalation:elevated:<reasons>`
+- `runTurn` 在 audit entry 构建前 derive
+
+**Doctrine 锁定**（7 测试 in [M303AbyssalPressureConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M303AbyssalPressureConsumptionTests.swift))：
+- 每 turn 必发 abyssal.magnitude（即使最低风险）
+- abyssal.modes 整数 0-6（六维上限）
+- aggregate-magnitude 必为 6 维算术平均（非加权）
+- consequenceRadius 严格随 risk-level 单调
+- extreme risk 必触发 sovereign-escalation hint
+- low risk + 0 debt 不触发
+- determinism 跨 derive
+
+### 70.3 M304 — `BASHumanAnchorSignal` + `BASSealEnvelope` 接入 audit signalRefs
+
+**问题**：`BASHumanAnchorProtocol.signal(...)` 是 builder，没人调；`BASOldSealSealingProtocol.isSealed/strictestPolicy` 是 lookup，但 audit 路径没有「这个 turn 触了几个 seal」的 aggregate。
+
+**修复**：
+
+- 新 `BASHumanAnchorProtocol.derive(anchorID:hostSummaryRef:riskLevel:permitMode:candidateCount:)` 投影 4 维（agency / alienation / dignity / overwhelm）+ 推荐 tone
+  - block permit → agencyRisk ≥ 0.5；非 block → < 0.5
+  - block + (≥ high risk) → dignityRisk = 0.7；非 coercive → 0.15
+  - overwhelm 随 candidates 线性，6+ 饱和 1.0
+- 新 `BASOldSealSealingProtocol.aggregate(_:)` + `Aggregate {count, strictestPolicy}` 结构（[BASSealEnvelope.swift](../BehavioralAISubstrate/Sources/BASMemory/BASSealEnvelope.swift))
+- `runTurn` 把每条 `BASQuarantineRecord` 合成一条 `.sovereignOnly` `BASSealEnvelope`（targetRefs = sourceRef）
+- audit codes:
+  - `humanAnchor.tone:<plain|warm|steady|reserved>`
+  - `humanAnchor.maxRisk:%.3f`
+  - 仅当 ≥1 seal: `seal.count:N` + `seal.strictest:<policy>`
+
+**Doctrine 锁定**（8 测试 in [M304HumanAnchorAndSealConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M304HumanAnchorAndSealConsumptionTests.swift))：
+- tone 在 4 canonical 值集合内
+- maxRisk parse + bounded [0,1]
+- block-permit elevates agencyRisk pinned
+- overwhelm scales with candidates pinned (0/6/12 三点)
+- 空 seal 列表 aggregate 返 nil（codes elided）
+- 5 policy strictness ordering pinned (forbidden ≻ ... ≻ passive)
+- determinism
+
+### 70.4 M305 — `BASEvolutionLifecycleSession` 接入 audit signalRefs（chapter 五十六）
+
+**问题**：M56 章 ship 8-stage lifecycle 状态机 + 7 actions + Policy 但**完全 isolated**——audit / dashboard / UI 可以读 `session.history`，但 runtime 路径里没人合成 session。
+
+**修复** ([BASEvolutionLifecycle.swift](../BehavioralAISubstrate/Sources/BASMemory/BASEvolutionLifecycle.swift)):
+
+- 新 `BASEvolutionLifecycleSession.aggregate(_:)` + `Aggregate {count, terminalCount, promotedCount, activeStages}`
+- `runTurn` 给每条 fresh `BASUpdateTicket` 合成 `.proposed` session
+- audit codes（仅当 ≥1 ticket）:
+  - `lifecycle.tickets:N`
+  - `lifecycle.terminal:N`（fresh turn 全 0）
+  - `lifecycle.promoted:N`（fresh turn 全 0）
+  - `lifecycle.stages:<stage1+stage2+...>`（declaration-order）
+
+**Doctrine 锁定**（7 测试 in [M305EvolutionLifecycleConsumptionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M305EvolutionLifecycleConsumptionTests.swift))：
+- 空 sessions → nil aggregate（codes elided）
+- terminal 计数：retracted + rejected + withdrawn 是 terminal；promoted **不**是 terminal（retraction 是真路径）
+- promoted 计数：promoted + retracted 都是 hasReachedPromotion
+- activeStages 按 enum declaration-order 稳定输出
+- determinism
+- runtime 与 turn.updateTickets.count 严格匹配
+
+### 70.5 M306 stay deferred（明确 out-of-scope）
+
+原本规划 M306 = `--multi-turn-demo` host-integration 真模型 demo。Phase 1 检查发现：
+- 既有 `--full-stack-demo` 已在单 session 内 multi-turn (3-turn MLX `draftMultiTurn`)
+- 真正缺的是 **multi-session continuity**（session A → session B 跨 audit ledger）
+- 这需要 `BASHostKit` dep + 跨 session 状态机，**不是 surgical 一日 PR**
+
+**Decision**：M306 留 backlog（与 W1-W5 / M296.x 同级），honesty board 显式标 deferred。本批不破坏 surgical 边界。
+
+### 70.6 测试基线（M303-M305 累积）
+
+| 套件 | 68 章末 | 70 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2114 | **2136** | +22 (M303 7 + M304 8 + M305 7) |
+| Qinao XCTest | 1231 | **1238** | +7 (cross-package additive；本批未 add Qinao 测试) |
+| 全栈 | 3345 | **3374** | +29 |
+
+0 failures / 0 flakes (gate-off)。
+
+### 70.7 8 个 Cthulhu schemas runtime caller 状态
+
+| Schema | M287 ship | 70 章末 runtime caller |
+|---|---|---|
+| BASAbyssalPressure | ✓ | **M303** — `BASAbyssalPressureBudget.derive` + audit signalRefs |
+| BASHumanAnchorSignal | ✓ | **M304** — `BASHumanAnchorProtocol.derive` + audit signalRefs |
+| BASSealEnvelope | ✓ | **M304** — `BASOldSealSealingProtocol.aggregate` + audit signalRefs |
+| BASUnknownReserve | ✓ | ❌ 仍 0 caller (留 M308+) |
+| BASAnomalyTrace | ✓ | ❌ 仍 0 caller (留 M308+) |
+| BASNarrativeDistortion | ✓ | ❌ 仍 0 caller (留 M308+) |
+| BASAbyssalBranch | ✓ | ❌ 仍 0 caller (留 M308+) |
+| BASForbiddenKnowledgeCandidate | ✓ | ❌ 仍 0 caller (留 M308+) |
+
+Cthulhu schemas runtime 接入：**3/8** (从 0/8 → 3/8)。剩 5 件留 M308+ surgical batch。
+
+### 70.8 红线 / 不变量回归
+
+| 红线 / 不变量 | M303 | M304 | M305 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（advisory） | ✓ | ✓ |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| white paper 红线 7（watcher hint, not verdict） | ✓ | ✓ | ✓ |
+| audit hash chain | ✓ deterministic | ✓ | ✓ |
+
+### 70.9 仍剩 surgical 缺口（A 类）
+
+| # | 项 | 工期 |
+|---|---|---|
+| A.1 | 5 件 Cthulhu schemas runtime 接入（UnknownReserve / AnomalyTrace / NarrativeDistortion / AbyssalBranch / ForbiddenKnowledgeCandidate）| ~1 天（仿 M303-M305 模式 5 子接入） |
+| A.2 | M306 multi-session demo（host 集成 + AFM 真机）| ~1-2 天（需 BASHostKit dep + cross-session state） |
+| A.3 | M295.1+ 生产课程内容 | 真世界（需 domain experts） |
+
+不可 surgical（B 类）继续不变：W1-W5 / L4 训练资产 / M296.1-3。
+
+### 70.10 一句话总结
+
+**M303-M305 用 3 个 surgical-typed PR 把 3/8 Cthulhu schemas + L13 lifecycle scaffold 从「0 runtime caller」推到「audit signalRefs 真消费」**。每条 PR 配 7-8 个 typed-pin 测试。BAS 2114 → 2136 (+22) / Qinao 1231 → 1238 (+7) / 全栈 3374 / 0 failures / 0 flakes。doctrine integrity 不动；不变量 #1/#2/#3 + 红线 7 全保留；hash chain 仍 deterministic。下批 (M308+) closes 5 件剩余 Cthulhu schemas。
