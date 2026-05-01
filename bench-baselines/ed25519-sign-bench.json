@@ -1,0 +1,17 @@
+{
+  "benchName" : "ed25519-sign-bench",
+  "schemaVersion" : "bas-bench-baseline.v1",
+  "stats" : {
+    "max" : 0.282583,
+    "mean" : 0.0540071657165715,
+    "min" : 0.046083,
+    "outlierCount" : 178,
+    "p50" : 0.049167,
+    "p95" : 0.077125,
+    "p99" : 0.132125,
+    "p999" : 0.231042,
+    "sampleCount" : 9999,
+    "standardDeviation" : 0.01627794263399648
+  },
+  "storedAt" : "2026-05-01T21:57:16Z"
+}

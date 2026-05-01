@@ -324,6 +324,16 @@ struct QinaoSampleHost {
             await runBenchSuite()
             return
         }
+        if args.contains("--ed25519-sign-bench") {
+            // M380 — diagnostic bench isolating Ed25519 signing
+            // latency from audit-ledger machinery. Used to
+            // diagnose chapter 八十四.6 Open Opportunity C
+            // (audit-ledger 1-3% outlier rate bimodal).
+            // Default 10K signatures;
+            // QINAO_BENCH_ED25519_SIGN_COUNT=N override.
+            runEd25519SignBench()
+            return
+        }
         if args.contains("--lora-curriculum-train-m247") {
             // M247 — re-trains the curriculum LoRA against the
             // EXACT chat-template format Gemma 4 E2B sees at
@@ -4739,6 +4749,45 @@ struct QinaoSampleHost {
         {
             print("\n══ JSON (machine-readable) ══\n")
             print(json)
+        }
+    }
+
+    // MARK: - M380 ed25519-sign-bench
+
+    private static func runEd25519SignBench() {
+        let count = envInt(
+            "QINAO_BENCH_ED25519_SIGN_COUNT",
+            default: 10_000)
+        print("""
+            QinaoSampleHost --ed25519-sign-bench (M380):
+              \(count) Ed25519 signatures over the L13
+              canonical encoding (446 bytes).
+
+              \(Ed25519SignBench.scopeStatement)
+            """)
+        do {
+            let outcome = try Ed25519SignBench.run(
+                signCount: count)
+            print("""
+
+                ━━━ M380 ed25519-sign-bench (\(outcome.signCount) signs × \(outcome.payloadBytes) bytes) ━━━
+                elapsed wall:  \(String(format: "%.4f", outcome.elapsedSeconds)) sec
+                throughput:    \(String(format: "%.1f", Double(outcome.signCount) / outcome.elapsedSeconds)) sigs/sec
+
+                """)
+            for line in outcome.outcome.bannerLines(
+                unit: "ms")
+            {
+                print("  " + line)
+            }
+            compareToBaselineIfConfigured(
+                benchName: "ed25519-sign-bench",
+                stats: outcome.outcome.warm
+                    ?? outcome.outcome.combined)
+            print("\n  ━━━ Demo complete — \(outcome.signCount) signatures ━━━")
+        } catch {
+            print("ERROR: --ed25519-sign-bench failed: \(error)")
+            exit(2)
         }
     }
 
