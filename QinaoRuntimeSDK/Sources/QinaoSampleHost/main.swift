@@ -26,6 +26,12 @@ import QinaoWorldPrior
 // the dual-key demo uses.
 import CryptoKit
 import BASSovereign
+// M333 — `--evolution-loop-demo` mode needs
+// `BASEvolutionLifecycleSession` (chapter 五十六) from BASMemory.
+import BASMemory
+// M334 — `--throughput-bench` mode needs `BASLeaseLifeCoordinator`
+// + `BASThermalTwin.Reading` for thermal/breath quantification.
+import BASLeaseLife
 
 // QinaoSampleHost
 //
@@ -228,6 +234,34 @@ struct QinaoSampleHost {
             // contract end-to-end. In-process simulation; no
             // real network transport.
             runCrossDeviceSyncDemo()
+            return
+        }
+        if args.contains("--evolution-loop-demo") {
+            // M333 — drive
+            // BASEvolutionLifecycleSession (chapter 五十六)
+            // through 3 paths (promote+retract / trial-fail /
+            // early-withdraw) + 4 invariant pins. Pure
+            // value-type lifecycle, no actor / IO.
+            runEvolutionLoopDemo()
+            return
+        }
+        if args.contains("--throughput-bench") {
+            // M334 — drive N turns of representative
+            // substrate work + capture latency stats
+            // (p50/p95/p99/min/max/mean) + thermal/breath
+            // quantification via BASLeaseLifeCoordinator.
+            // Default N=100; QINAO_BENCH_TURN_COUNT=N override.
+            await runThroughputBench()
+            return
+        }
+        if args.contains("--multi-host-demo") {
+            // M335 — drive 2 independent host instances
+            // (host-A walks promotion path, host-B walks
+            // failure path); merge their audit fragments via
+            // M329 FragmentMerger; verify symmetry +
+            // commutativity + isolation invariants. 0 BAS
+            // changes — pure recombination of M329 primitives.
+            runMultiHostDemo()
             return
         }
         if args.contains("--lora-curriculum-train-m247") {
@@ -3973,6 +4007,217 @@ struct QinaoSampleHost {
 
             ━━━ Demo complete — M296.3 跨设备一致性 (vector-clock merge + clock convergence) verified end-to-end ━━━
             """)
+    }
+
+    // MARK: - M333 evolution-loop-demo
+
+    /// Drive `BASEvolutionLifecycleSession` (chapter 五十六)
+    /// through 3 lifecycle paths + 4 invariant pins. Pure
+    /// value-type — no actor, no IO. Banner reports per-path
+    /// stages-visited + transitions + each invariant outcome.
+    private static func runEvolutionLoopDemo() {
+        print("""
+            QinaoSampleHost --evolution-loop-demo (M333):
+              drive BASEvolutionLifecycleSession (chapter 五十六)
+              through 3 paths and 4 invariant pins. Pure
+              value-type lifecycle — no actor, no IO. Doctrine:
+              promoted is NON-terminal (retraction is real path);
+              withdraw is BLOCKED from promoted (only retraction
+              gets you out).
+            """)
+
+        let outcome = EvolutionLoopDemo.run()
+
+        print("""
+
+            ━━━ Step 1/3 — Path 1: promotion + retraction ━━━
+            ticket:           \(outcome.promotedThenRetracted.candidateID)
+            path:             \(outcome.promotedThenRetracted.pathName)
+            final stage:      \(outcome.promotedThenRetracted.finalStage)
+            terminal:         \(outcome.promotedThenRetracted.isTerminal)
+            reached promotion: \(outcome.promotedThenRetracted.hasReachedPromotion)
+            stages visited:   \(outcome.promotedThenRetracted.stagesVisited
+                .joined(separator: " → "))
+            transitions:
+            """)
+        for t in outcome.promotedThenRetracted.transitions {
+            print("              • \(t)")
+        }
+
+        print("""
+
+            ━━━ Step 2/3 — Path 2: trial failure ━━━
+            ticket:           \(outcome.trialFailed.candidateID)
+            path:             \(outcome.trialFailed.pathName)
+            final stage:      \(outcome.trialFailed.finalStage)
+            terminal:         \(outcome.trialFailed.isTerminal)
+            reached promotion: \(outcome.trialFailed.hasReachedPromotion)
+            stages visited:   \(outcome.trialFailed.stagesVisited
+                .joined(separator: " → "))
+            transitions:
+            """)
+        for t in outcome.trialFailed.transitions {
+            print("              • \(t)")
+        }
+
+        print("""
+
+            ━━━ Step 3/3 — Path 3: early withdrawal ━━━
+            ticket:           \(outcome.earlyWithdrawn.candidateID)
+            path:             \(outcome.earlyWithdrawn.pathName)
+            final stage:      \(outcome.earlyWithdrawn.finalStage)
+            terminal:         \(outcome.earlyWithdrawn.isTerminal)
+            reached promotion: \(outcome.earlyWithdrawn.hasReachedPromotion)
+            stages visited:   \(outcome.earlyWithdrawn.stagesVisited
+                .joined(separator: " → "))
+            transitions:
+            """)
+        for t in outcome.earlyWithdrawn.transitions {
+            print("              • \(t)")
+        }
+
+        print("""
+
+            ━━━ Doctrine invariant pins ━━━
+            """)
+        for pin in outcome.invariantPins {
+            let mark = pin.assertionResult ? "✓" : "⚠"
+            print("""
+              \(mark) \(pin.pinName)
+                \(pin.detail)
+            """)
+        }
+        let allOK = outcome.allInvariantsHold
+        print("""
+
+            ━━━ Demo complete — all invariants hold: \(allOK ? "✓" : "⚠ MISMATCH") ━━━
+            """)
+        if !allOK {
+            exit(2)
+        }
+    }
+
+    // MARK: - M334 throughput-bench
+
+    /// Drive N turns of substrate work + capture latency stats +
+    /// thermal/breath quantification. Banner mirrors M179 perf
+    /// shape (p50 / p95 / p99 / min / max / mean) plus thermal
+    /// evolution.
+    private static func runThroughputBench() async {
+        let turnCount: Int = {
+            if let raw = ProcessInfo.processInfo
+                .environment["QINAO_BENCH_TURN_COUNT"],
+               let n = Int(raw),
+               n > 0
+            {
+                return n
+            }
+            return 100
+        }()
+
+        print("""
+            QinaoSampleHost --throughput-bench (M334):
+              drive \(turnCount) turns of substrate work
+              (lifecycle + thermal/breath cycling) + capture
+              latency stats. Default 100 turns; override via
+              QINAO_BENCH_TURN_COUNT=N. No model inference —
+              the bench measures observation pipeline + state-
+              machine throughput, not LLM latency.
+            """)
+
+        let outcome = await ThroughputBenchDemo.run(
+            turnCount: turnCount)
+
+        print("""
+
+            ━━━ Step 1/2 — Latency stats (\(outcome.turnCount) turns) ━━━
+            elapsed wall:  \(String(format: "%.2f", outcome.elapsedSeconds)) sec
+            min:           \(String(format: "%.4f", outcome.latency.min)) ms
+            p50:           \(String(format: "%.4f", outcome.latency.p50)) ms
+            p95:           \(String(format: "%.4f", outcome.latency.p95)) ms
+            p99:           \(String(format: "%.4f", outcome.latency.p99)) ms
+            max:           \(String(format: "%.4f", outcome.latency.max)) ms
+            mean:          \(String(format: "%.4f", outcome.latency.mean)) ms
+
+            ━━━ Step 2/2 — Thermal / breath cycling ━━━
+            first pressure:        \(String(format: "%.4f", outcome.thermal.firstPressure))
+            final pressure:        \(String(format: "%.4f", outcome.thermal.finalPressure))
+            peak pressure:         \(String(format: "%.4f", outcome.thermal.peakPressure))
+            first guardLevel:      \(outcome.thermal.firstGuardLevel)
+            final guardLevel:      \(outcome.thermal.finalGuardLevel)
+            guardLevel escalations: \(outcome.thermal.guardEscalations)
+            cancelled breath total: \(outcome.thermal.cancelledBreathTotal)
+
+            ━━━ Demo complete — \(turnCount) turns benchmarked; thermal twin observed ━━━
+            """)
+    }
+
+    // MARK: - M335 multi-host-demo
+
+    /// Drive 2 independent host instances + merge their audit
+    /// fragment timelines via M329 FragmentMerger. Banner
+    /// reports per-host stages walked + merged consensus +
+    /// invariant outcomes.
+    private static func runMultiHostDemo() {
+        print("""
+            QinaoSampleHost --multi-host-demo (M335):
+              drive 2 independent host instances (host-A walks
+              the promotion path; host-B walks the failure
+              path); merge audit fragments via M329
+              FragmentMerger; verify symmetry + commutativity
+              + isolation invariants. 0 BAS code changes —
+              pure recombination of M329 cross-device
+              primitives with hostID semantics.
+            """)
+
+        let outcome = MultiHostDemo.run()
+
+        print("""
+
+            ━━━ Step 1/3 — Host A (promotion path) ━━━
+            hostID:                \(outcome.hostA.hostID)
+            constitution version:  \(outcome.hostA.constitutionVersion)
+            stages walked:         \(outcome.hostA.stagesWalked
+                .joined(separator: " → "))
+            audit fragments:       \(outcome.hostA.auditFragmentRefs.count)
+              \(outcome.hostA.auditFragmentRefs
+                  .joined(separator: ", "))
+            final clock:           \(outcome.hostA.finalClock
+                .map { "\($0.key)=\($0.value)" }
+                .sorted()
+                .joined(separator: ", "))
+
+            ━━━ Step 2/3 — Host B (failure path) ━━━
+            hostID:                \(outcome.hostB.hostID)
+            constitution version:  \(outcome.hostB.constitutionVersion)
+            stages walked:         \(outcome.hostB.stagesWalked
+                .joined(separator: " → "))
+            audit fragments:       \(outcome.hostB.auditFragmentRefs.count)
+              \(outcome.hostB.auditFragmentRefs
+                  .joined(separator: ", "))
+            final clock:           \(outcome.hostB.finalClock
+                .map { "\($0.key)=\($0.value)" }
+                .sorted()
+                .joined(separator: ", "))
+
+            ━━━ Step 3/3 — Cross-host audit consensus (M329 FragmentMerger) ━━━
+            total frames:                \(outcome.consensus.totalFrames)
+            ordered audit refs:          \(outcome.consensus.orderedAuditRefs
+                .joined(separator: " → "))
+            merge(A,B) == merge(B,A):    \(outcome.consensus.mergeIsSymmetric ? "✓ symmetric" : "⚠ ASYMMETRIC")
+            clock merge commutative:     \(outcome.consensus.clockMergeIsCommutative ? "✓" : "⚠")
+            constitutions isolated:      \(outcome.consensus.constitutionsAreIsolated ? "✓ (hostID-namespaced)" : "⚠ COLLISION")
+            no duplicate frames:         \(outcome.consensus.noDuplicateFrames ? "✓" : "⚠ DUPLICATES")
+            merged clock counters:       \(outcome.consensus.mergedClockCounters
+                .map { "\($0.key)=\($0.value)" }
+                .sorted()
+                .joined(separator: ", "))
+
+            ━━━ Demo complete — multi-host audit consensus invariants all hold: \(outcome.consensus.allInvariantsHold ? "✓" : "⚠ MISMATCH") ━━━
+            """)
+        if !outcome.consensus.allInvariantsHold {
+            exit(2)
+        }
     }
 }
 

@@ -368,7 +368,13 @@ let package = Package(
                 // 50-template starter curriculum via Apple
                 // Foundation Models. Doctrine A: panel
                 // consensus does NOT promote envelope.
-                "QinaoWorldPrior"
+                "QinaoWorldPrior",
+                // M334 — `--throughput-bench` mode drives
+                // BASLeaseLifeCoordinator.recordTurn(...) for
+                // thermal/breath quantification across N turns.
+                .product(
+                    name: "BASLeaseLife",
+                    package: "BehavioralAISubstrate")
             ]),
         .testTarget(
             name: "QinaoRuntimeSDKTests",
@@ -403,7 +409,14 @@ let package = Package(
                 // drives `QinaoLoop.generateCandidates` with the real
                 // on-device LLM. Test-target-only dep so production
                 // QinaoLoop stays decoupled from Apple adapters.
-                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate")
+                .product(name: "BASAppleAdapters", package: "BehavioralAISubstrate"),
+                // M333 + M334 — tests that pin
+                // `BASEvolutionLifecycleSession` (chapter 五十六) +
+                // `BASLeaseLifeCoordinator` substrate contracts
+                // the sample-host evolution-loop / throughput-bench
+                // demos rely on.
+                .product(name: "BASMemory", package: "BehavioralAISubstrate"),
+                .product(name: "BASLeaseLife", package: "BehavioralAISubstrate")
             ])
     ]
 )
