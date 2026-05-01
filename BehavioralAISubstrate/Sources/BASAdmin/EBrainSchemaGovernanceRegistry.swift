@@ -960,6 +960,49 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "FeedbackEvent",
             versionedType: BASFeedbackEvent.self,
             tests: ["schema.feedback.current", "schema.feedback.backward"]
+        ),
+        // M287 — Cthulhu-inspiration white paper schema parity
+        // (8 core objects from
+        // QINAO_ABYSSAL_HUMAN_ANCHOR_PROTOCOL_TARGET_VINF.md §7).
+        entry(
+            "AbyssalPressure",
+            versionedType: BASAbyssalPressure.self,
+            tests: ["schema.abyssal_pressure.current", "schema.abyssal_pressure.backward"]
+        ),
+        entry(
+            "HumanAnchorSignal",
+            versionedType: BASHumanAnchorSignal.self,
+            tests: ["schema.human_anchor_signal.current", "schema.human_anchor_signal.backward"]
+        ),
+        entry(
+            "AnomalyTrace",
+            versionedType: BASAnomalyTrace.self,
+            tests: ["schema.anomaly_trace.current", "schema.anomaly_trace.backward"]
+        ),
+        entry(
+            "NarrativeDistortion",
+            versionedType: BASNarrativeDistortion.self,
+            tests: ["schema.narrative_distortion.current", "schema.narrative_distortion.backward"]
+        ),
+        entry(
+            "AbyssalBranch",
+            versionedType: BASAbyssalBranch.self,
+            tests: ["schema.abyssal_branch.current", "schema.abyssal_branch.backward"]
+        ),
+        entry(
+            "UnknownReserve",
+            versionedType: BASUnknownReserve.self,
+            tests: ["schema.unknown_reserve.current", "schema.unknown_reserve.backward"]
+        ),
+        entry(
+            "SealEnvelope",
+            versionedType: BASSealEnvelope.self,
+            tests: ["schema.seal_envelope.current", "schema.seal_envelope.backward"]
+        ),
+        entry(
+            "ForbiddenKnowledgeCandidate",
+            versionedType: BASForbiddenKnowledgeCandidate.self,
+            tests: ["schema.forbidden_knowledge_candidate.current", "schema.forbidden_knowledge_candidate.backward"]
         )
     ]
 

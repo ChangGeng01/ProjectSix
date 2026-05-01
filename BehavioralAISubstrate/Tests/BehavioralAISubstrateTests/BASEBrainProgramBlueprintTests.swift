@@ -291,7 +291,16 @@ struct BASEBrainProgramBlueprintTests {
             "RuntimeTrace",
             "EvalSample",
             "ModelArtifact",
-            "FeedbackEvent"
+            "FeedbackEvent",
+            // M287 — Cthulhu-inspiration white paper schema parity:
+            "AbyssalPressure",
+            "HumanAnchorSignal",
+            "AnomalyTrace",
+            "NarrativeDistortion",
+            "AbyssalBranch",
+            "UnknownReserve",
+            "SealEnvelope",
+            "ForbiddenKnowledgeCandidate"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

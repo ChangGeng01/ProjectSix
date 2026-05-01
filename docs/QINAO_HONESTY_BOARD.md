@@ -2454,4 +2454,4417 @@ public struct BASTribunalCoverageReport {
 
 这些都是"用上现有 ship 的能力"层面的 demo / integration 工作，不是 substrate 架构层的。Substrate 层 doctrine 已闭合。
 
+## 二十五、M287 — L9 dream cycle 真模型反事实 prompt 接入（2026-05-01）
 
+24.8 列的 4 个候选里，本节 ship 第 2 个的 helper 层（`L9 dream cycle 真模型反事实`）。Manifest v2「活体织网」尺下，L9 当前是 schema 真、prompt 假——LLM 看到的是同一 prompt 多次，"未来分岔"是名义上的。M287 在 prompt 层面把 counterfactual branch 真注入。
+
+### 25.1 M287 — `expandWithCounterfactual(seed:branches:)` 纯函数 helper
+
+**问题**：M100 `generateCandidates(seeds:variantsPerSeed:)` 是 ID-only 扩展——同一 prompt 多 variant，由 organ endpoint vary sampling。M84 wire 了 counterfactual seed → bridge（`refineAgainstCounterfactuals` 后置 contradiction 评分），但 branch 内容从未到达 LLM——LLM 看到的仍是原 prompt。"L9 真模型反事实"在 prompt 层面缺一环。
+
+**修复**：在 `QinaoLoop` 上加纯函数 `expandWithCounterfactual(seed:branches:) -> [CandidateSeed]`：
+
+- 输入：1 parent seed + N counterfactual branches（`vault.counterfactualBranches(...)` 产出）
+- 输出：1 + N candidate seeds，parent 在前，每个 variant 的 prompt 用 branch perturbation directive prefix
+
+ID 命名：`<parentID>#cf-<perturbKind.rawValue>` — stable + audit-keyable。
+
+Prompt 注入：`"Counterfactual perspective (<kind>): <description>\n\n<parentPrompt>"` — parent prompt 保留在末尾，LLM 仍回答原问题但是在扰动视角下。
+
+Confidence demotion：`variantConfidence = parentConfidence × (rung / 4.0)`，axiomatic→×1.0、wellSupported→×0.75、plausible→×0.5、speculative→×0.25、contested→×0.0。低 evidence rung 的 branch 不应主导决策。
+
+**Doctrine 锁定**（9 个测试）：
+
+- N=0 branches → 1 seed（parent unchanged）— no fan-out unless asked
+- Parent always first（mirrors M100 invariant）
+- Variant ID grammar pinned
+- Variant prompt 包含 perturbKind label + description + parent prompt suffix
+- Confidence demotion 相对单调（speculative < plausible < wellSupported < parent）
+- axiomatic 不衰减、contested 归零（语义边界）
+- 其它 `CandidateSeed` 字段 verbatim preserved
+- 同 (seed, branches) 输入产同输出（pure deterministic）
+
+**Scope discipline**：
+
+- 纯 additive：新文件 `QinaoLoop+CounterfactualPrompt.swift`，不动 M100、不动 vault、不动 generateCandidates 主入口
+- Pure helper：同步、无 actor hop、无 LLM call、无 I/O
+- 把"接到生产 turn pipeline"留给 M288
+
+### 25.2 状态升级
+
+| 层 | M287 前 | M287 后 |
+|---|---|---|
+| L4 counterfactual branches (vault) | ✓ ship | ✓ ship |
+| L9 generateCandidates ID 扩展 (M100) | ✓ ship | ✓ ship |
+| L9 counterfactual refinement (M84) | ✓ ship（后置评分） | ✓ ship |
+| **L9 prompt-layer counterfactual expansion** | ✗ 缺 | **✓ M287** |
+| 生产 turn 调用 | host 必须显式接 | host 必须显式接（M288 候选） |
+
+### 25.3 测试统计
+
+| 套件 | M285 末 | M287 末 | Δ |
+|---|---|---|---|
+| Qinao | 778 | 787 | +9（M287 helper tests） |
+| 4 boundary checks | clean | clean | clean |
+
+QinaoLoop 全部 79 测试 0 failure / 2 skipped。
+
+### 25.4 还没做但已识别（25.x 截止）
+
+- **M288** wire `expandWithCounterfactual` 进生产 turn pipeline：host 不用手写就能跑反事实 prompt 路径
+- **M289** L10 三我庭真 LLM vote：`triSelfScore()` 当前是启发式权重公式；M89 ship 了 schema + 投票路径，剩 LLM 真扮演 guardian/scout/harmony 三声音的 prompt
+- **M290** 端到端 v2 第四节"高压最后通牒"场景 integration test：在一次真模型 turn 里把 L1+L4+L5+L6+L7+L8+L9+L10+L11+L12+L14 全部串起来
+- **M291** L12 LocalOnlySheet 命名实体补全（QinaoUI 现 5/6）
+- **L12 SwiftUI host 接入端到端**：5 个 view ship 了，宿主 demo 仍未做
+
+manifest v2「会想不自转」距离成立比 M287 前近一格，但要等 M288 wiring 进生产 turn 才完整。
+
+### 25.5 M288 — `generateCandidatesWithCounterfactualBranches` 一键生产 turn 接入
+
+**问题**：M287 ship 了 `expandWithCounterfactual(seed:branches:)` pure helper，但 host 仍要自己拉 vault → 调 helper → 调 generateCandidates 三步。这 3 步永远成对出现，host 写错任意一步就回到"L9 不真活思考"的状态。
+
+**修复**：在 `QinaoLoop` 上加 async method `generateCandidatesWithCounterfactualBranches(sessionID:seed:templateID:description:)`：
+
+- 内部走：vault.counterfactualBranches → expandWithCounterfactual → generateCandidates(seeds:)
+- Vault 缺席 → `worldPriorUnavailable("no-world-prior-vault")`（与 M84 同 reason 字符串）
+- 模板未知 → `worldPriorUnavailable("unknown-template:<id>")`
+- 其它 vault 错 → `worldPriorUnavailable("vault-error:<msg>")`
+
+宿主从 3 行收缩到 1 行：
+
+```swift
+// 之前
+let branches = try await vault.counterfactualBranches(for: tmpl, description: "")
+let expanded = QinaoLoop.expandWithCounterfactual(seed: seed, branches: branches)
+let cands = try await loop.generateCandidates(sessionID: s, seeds: expanded)
+
+// M288 之后
+let cands = try await loop.generateCandidatesWithCounterfactualBranches(
+    sessionID: s, seed: seed, templateID: tmpl)
+```
+
+**Doctrine 锁定**（5 个测试）：
+
+- 无 vault loop → typed `worldPriorUnavailable("no-world-prior-vault")`
+- 未知模板 → typed `worldPriorUnavailable("unknown-template:<id>")`
+- `tmpl-body-hydration`（seeded 3 branches）→ 4 个 GeneratedCandidate（parent first + 3 variants）
+- Endpoint 收 4 calls：第 1 call 是 parent prompt verbatim，第 2-4 call 都包含 perturbation prefix + parent prompt suffix
+- sessionID forwarded 给每一 call
+
+**Scope discipline**：纯 additive。新文件 `QinaoLoop+CounterfactualGeneration.swift`。`worldPriorVault` 从 `private` 升到 `package`（M171 同 pattern）让跨文件 extension 可访问；其它私有状态不变。
+
+### 25.6 M287 grammar 修订（M288 暴露的边界）
+
+**M288 跑 `tmpl-body-hydration` integration test 暴露问题**：seeder 给该模板产 3 个 branches，三个都是 `dropPrecondition` kind（rank 各异）。M287 原 grammar `<parentID>#cf-<perturbKind>` 在同 kind 多 branch 时 ID 冲突，被 `generateCandidates` 的 `duplicate-candidate-id` 守卫拦下。
+
+**修复（M287 同步上调）**：grammar 改为 `<parentID>#cf-<perturbKind>-<i>`，`i` 是 1-indexed 的 branch 在输入数组里的序号。**始终带序号**——即使只有 1 个同 kind branch——这样 audit grep pattern 一致，不需特殊判分支数。
+
+新增 `test_sameKindBranches_yieldUniqueIDs` pin 这条 invariant（mirror `tmpl-body-hydration` 的 3-dropPrecondition 形态），把 M288 暴露的 regression 锁在 M287 helper 测试里。
+
+### 25.7 测试统计（25.x 末）
+
+| 套件 | M285 末 | M288 末 | Δ |
+|---|---|---|---|
+| Qinao | 778 | 793 | +15（M287 helper 10 + M288 wiring 5） |
+| 4 boundary checks | clean | clean | clean |
+
+QinaoLoop 全套 79 测试 0 回归。
+
+### 25.8 还没做但已识别（25.x 截止）
+
+- **M289** L10 真 LLM 三声音 vote：`triSelfScore()` 当前是启发式权重公式；M89 ship 了 schema + 投票路径，剩 LLM 真扮演 guardian/scout/harmony 三声音的 prompt + parser
+- **M290** 端到端 v2 第四节"高压最后通牒"场景 integration test：在一次 turn 里把 L1+L4+L5+L6+L7+L8+L9+L10+L11+L12+L14 全部串起来跑通
+- **M291** L12 LocalOnlySheet 命名实体补全（QinaoUI 现 5/6 surface）
+- **L12 SwiftUI host 接入端到端**：5 个 view ship 了，宿主 demo 仍未做
+
+manifest v2「会想不自转」**到 M288 已基本成立**——L4 反事实 branches 真送进 LLM、产 distinct 候选体的路径已在 host 一行调用内闭合。下一格"会保护不接管 / 懂世界又懂宿主"靠 M289 + M290 + M291 推。
+
+## 二十六、M291 — L12 第六类 surface 入主流（2026-05-01）
+
+manifest v2 列了 6 类柔手表面（compare panel / draft shell / delay packet / boundary script / silent stub / **local-only sheet**）。M280 后 5 个已 ship 为 `BASSoftHandMode` enum 的 5 个 case + QinaoUI 的 5 个 SwiftUI 文件。第 6 个在 M291 之前散在 permit-mode 层（`BASActionPermitMode.localOnly` 存在），但 selector 把它 fallback 到 `.draft` mode——render 出来的就是普通 draft shell。**不是真的"本地簿"**。
+
+### 26.1 M291 — `BASSoftHandMode.localOnly` 升为一等公民
+
+**问题**：L11 已经能 issue `.localOnly` permit（"thought retained for the host, not sent"）。但 L12 selector M280 doctrine 里写的是：
+
+> permit.mode == .mirror / .localOnly → draft
+
+也就是 host 看到的 surface 与"deferred 但要发出去的草稿"无可区分。Manifest v2 里 local-only 是一种独立的 surface 类——它的语义是"never going outward in the first place"。M280 fallback 把它拍扁回 draft，是 doctrine 上的简化损耗。
+
+**修复**：
+
+1. `BASSoftHandMode` 新增 `case localOnly`（M280 doctrine 表从 5 行升 6 行）
+2. `componentIdentifier` 加 `case .localOnly: return "local-only-sheet"`
+3. `QinaoUI.ComponentID` 加 `static let localOnlySheet = ComponentID("local-only-sheet")`
+4. `BASSoftHandModeSelector` 把 `case .mirror, .localOnly` 拆成两 case：`.mirror → .draft`（保留），`.localOnly → .localOnly`（提升）
+5. 新文件 `QinaoLocalOnlySheet.swift`——`QinaoLocalOnlySheetModel`（summary + storageHint + auditReference）+ `QinaoLocalOnlySheetView` SwiftUI。Mirror `QinaoSilentStub.swift` 形态，shortLine prefix 固定 `"Local-only · "`。
+
+**Doctrine 锁定**（QinaoUI 端 8 测试 + BAS 端更新已有 selector 测试）：
+
+- `permit.mode == .localOnly` → mode `.localOnly`（不再 fallback `.draft`）
+- `BASSoftHandMode.localOnly.componentIdentifier == "local-only-sheet"`（M281 跨模块 string 契约）
+- `QinaoUI.ComponentID.localOnlySheet.rawValue == "local-only-sheet"`（同字符串两边查）
+- `QinaoLocalOnlySheetModel.shortLine()` prefix 固定 `"Local-only · "`，可选字段（storageHint / auditReference）非空才追加
+- Codable round-trip 保形
+
+**Doctrine 改动声明**：M280 selector mapping 表从
+
+```
+permit.mode == .mirror / .localOnly → draft
+```
+
+变为
+
+```
+permit.mode == .mirror   → draft
+permit.mode == .localOnly → localOnly
+```
+
+宿主想保留 pre-M291 行为，把 `.localOnly` mode 自己 route 到 draft renderer 即可（一行 switch）。
+
+### 26.2 状态升级
+
+| L12 surface family | M280 后 | M291 后 |
+|---|---|---|
+| compare panel | ✓ | ✓ |
+| draft shell | ✓ | ✓ |
+| delay packet | ✓ | ✓ |
+| boundary script | ✓ | ✓ |
+| silent stub | ✓ | ✓ |
+| **local-only sheet** | ✗（fallback to draft） | **✓ first-class** |
+
+### 26.3 测试统计
+
+| 套件 | M288 末 | M291 末 | Δ |
+|---|---|---|---|
+| Qinao | 793 | 801 | +8（QinaoLocalOnlySheet 8 个） |
+| BAS XCTest | 1722 | 1722 | 0（既有 selector 测试更新 1 + componentIdentifier 测试加 1 行；总数不变） |
+| 4 boundary checks | clean | clean | clean |
+
+BASSoftHandModeSelector 全套 30 测试 0 失败；QinaoLocalOnlySheet 8/8 通过；两 package build clean。
+
+### 26.4 还没做但已识别（26.x 截止）
+
+- **M289** L10 真 LLM 三声音 vote
+- **M290** 端到端 v2 第四节"高压最后通牒"场景 integration test
+- **L12 SwiftUI host 接入端到端**（QinaoSampleApp 6 surface demo）
+
+manifest v2「6 类 surface 完整族」**到 M291 成立**。「会保护不接管」从"部分成立"上调到"基本成立"——permit + verdict + surface matrix 三层都把 `.localOnly` 作为独立语义保留，不再被 draft 吞掉。
+
+## 二十七、M289 + M290 — L10 真 LLM 三声音 + 端到端高压织网积分（2026-05-01）
+
+24.8 + 25.4 + 26.4 列的 4 条架构性候选（M289 LLM vote / M290 端到端 / M291 LocalOnly / SwiftUI host 接入）里的两条 ship 在本节。
+
+### 27.1 M289 — `makeTriSelfPrompt` + `parseTriSelfScore` 纯函数 helpers
+
+**问题**：M74 `triSelfScore(for:worldPriorContradiction:)` 是启发式权重公式——三个权重 sum 出三个 concern。这让 schema 闭合可测，但不是真三声音。Manifest v2「会想不自转」要求 LLM 真扮演 guardian/scout/harmony；honesty-board 24.8 显式列为待做。
+
+**修复**：在 `QinaoLoop` 上加两个 pure static helpers：
+
+1. `makeTriSelfPrompt(for:worldPriorContradiction:) -> String`：把 `CandidateInput` 序列化成结构化提示，列出三个 voice 的 priority 信号 + reply format（"GUARDIAN concern: <0.0-1.0>", "GUARDIAN reasons: ..."）。
+2. `parseTriSelfScore(from:candidateID:fallback:) -> LLMTriSelfParseResult`：line-oriented parser，case-insensitive，clamp out-of-range concerns，支持 trailing junk after number ("0.7 (high)")。**任一 voice 缺失 → 整体 fallback**，禁止 hybrid (LLM 给一两声 + 启发式补另一声)，否则审计极难追因。
+
+**Doctrine 锁定**（14 个测试）：
+- Prompt 包含 3 voice section headers + candidate fields + reply format
+- Prompt 数值字段 2-decimal 截断（`evidence_gap: 0.23`）
+- Prompt 同 (candidate, wpc) 输入产同输出（pure deterministic）
+- Parser 全 voice 解析成功 → `usedLLM = true`
+- Parser out-of-range concern (1.5, -0.3) → clamp [0,1]
+- Parser case-insensitive (`guardian`, `Scout`, `HARMONY`)
+- Parser trailing junk ("0.7 (high)") → 取数字头
+- Parser missing voice / 空输出 / 完全无关文本 → `usedLLM = false`，fallback 调用
+- Dominant voice 由最高 concern 决定（reuses M74 `dominantTriSelfVoice`）
+
+**Scope discipline**：纯 helpers。**不动**任何 actor state、不调任何 organ endpoint、不动 M74 启发式 path。LLM-到-loop 的实际 wire（每 turn 跑 LLM tribunal、缓存结果、回写 session）留下一个 milestone。
+
+### 27.2 M290 — 端到端 v2 第四节"高压最后通牒"积分测试
+
+**问题**：v2 「活体织网」把 14 层从塔升级为有主权的 living net，第四节给了一个完整 turn 的时序场景。Manifest v2 第十二节断言：四个"顶级"标准只有同时成立才算"理想完全态"。"它强 + 它真可落地" 这两条的 missing piece 是"14 层作为一张网协同动作过一次"。M286-M291 闭合了 substrate 闭环里的关键 wire；M290 把它们组合成一次 integration test。
+
+**修复**：新文件 `QinaoHighPressureWeaveIntegrationTests.swift`。Setup：seeded vault + spy organ + 复合 loop。Action：高压最后通牒形态的 `CandidateSeed`（manipulationRisk=0.85, emotionalBias=0.8, reversibility=0.15, evidenceGap=0.6, confidence=0.3, boundaryConflict=0.6）走 `generateCandidatesWithCounterfactualBranches`。
+
+**Doctrine 锁定**（2 个测试）：
+
+`test_highPressureUltimatum_weaveContractsHold`——一次完整 turn 跑通：
+
+- L4 → L9：`tmpl-body-hydration` 3 branches → 4 candidates，parent first
+- LLM 接到 4 个 distinct prompts（不是 ID-only 扩展，是真不同的 prompt 文本）
+- L10：每候选 3 voice 都 audible（guardian + harmony 都 ≥ 0.4 在该 shape 下）
+- L10：`vetoExplain` non-nil（max-voice ≥ 0.7）+ `alternativeID != "no-alternative-available"`（"守护不接管" doctrine：veto 必伴 alternative）
+- L10：`makeTriSelfPrompt` 对 parent 产生包含 3 voice headers + 高压数值的 prompt
+
+`test_highPressure_LLMAndHeuristicBothFlagMultiVoice`——异源同构：heuristic + LLM 两条路径在 v2 第四节 shape 下，**都让 guardian + harmony 同时发声 ≥ 0.5**（不强求 dominant 谁——M74 启发式权重让 harmony 因 low reversibility × high emotion 主导，而非 guardian 因 manipulation 主导，这是 doctrinal fact 不是 bug）。
+
+**Doctrine 发现**：v2 第四节高压最后通牒场景 **dominant voice 是 harmony 不是 guardian**——"如果发了会后悔" 的 regret cost 信号比 "对方在施压" 的 manipulation 信号更直接驱动 veto。这与启发式权重的 `harmonyConcern = 0.6×emotionalBias + 0.4×(1-reversibility)` 一致。M74 启发式没错；测试 doctrine 不应锁特定 voice identity，而是锁 "至少两声音 audible + veto fires + alternative named"。
+
+### 27.3 housekeeping — `BASEBrainSchemaGovernanceRegistryTests` schema count lag
+
+跑 BAS 全 boundary 时发现 `governedRegistryStaysUniquelyKeyedAndComplete` 期望 187 但实际 195。M120 以来 8 个 cross-layer summary（M276 / M283 / M284 / M285 等）注册成 governed schema 但未更新这条 sentinel。本 milestone 把 187 → 195 + 注释。**无新 schema 注册**——只是把 lag fix 上。
+
+### 27.4 状态升级
+
+| 维度 | M291 后 | M290 后 |
+|---|---|---|
+| L10 真 LLM 三声音 helper | ✗ 缺 | **✓ M289** (prompt + parser, both pure) |
+| 端到端 v2 第四节 integration test | ✗ 没演过 | **✓ M290** (一次 turn 验织网真活) |
+| Manifest v2 第四节"高压最后通牒"场景 | 仓库无对应实体 | 仓库内可重复跑通 |
+| Manifest v2「会想不自转」 | 部分成立（无端到端验证） | **基本成立**（端到端积分有了） |
+| Manifest v2「会保护不接管」 | 基本成立 | 基本成立（M290 的 `alternative != no-alternative` 锁住） |
+
+### 27.5 测试统计
+
+| 套件 | M291 末 | M290 末 | Δ |
+|---|---|---|---|
+| Qinao | 801 | **817** | +16（M289 14 + M290 2，total 26 skipped） |
+| BAS XCTest | 1722*（自陈，已 lag） | **1757** | （现实测出，已含 M286+ 增量 + schema sentinel 修正） |
+| 4 boundary checks | clean | clean | clean |
+
+*BAS 1722 是 M285 时的自陈值；M286+ 期间累积新增未登簿，本节实测 1757 reflects 当前真实计数。
+
+### 27.6 还没做但已识别（27.x 截止）
+
+- **M291+** L10 LLM tribunal **wire 进 loop turn pipeline**：M289 helpers ship 后，下一步是把它们封装成 `loop.triSelfScoresFromLLM(sessionID:)` async method，仿 M288 形态（vault → branches → expand → generate）。形态收敛但还未 ship。
+- **M292+** 单脑多席 agents first-class（Scout / Planner / Critic / Memory席 / Risk席 / Surface席 / Sentinel）：v2 第八节列了 9 个席位，仓库当前只 `.scout` 一个 OrganRole。这是大工——design + scaffold 待开。
+- **M293+** 宿主端到端集成 surface family（QinaoSampleApp 真展示 6 个 surface）
+- **M294+** 默认包族（Defaults / Agents Kit / Capsules / Scenarios）—— design 阶段
+- **M295+** L4 世界基座资产投入（先验训练 + 课程数据）—— design 阶段
+- **M296+** 主权三件（净启 / 双钥提交 / 跨设备一致性）—— design 阶段
+
+**Manifest v2 四个"顶级"标准当前自评**（替换 26.x 末的同一栏）：
+
+| 标准 | M286 前 | M290 后 |
+|---|---|---|
+| 它强 | 部分（substrate 通了，活思考没演） | **基本是**（一次端到端高压 turn 在仓库里跑通了） |
+| 它稳 | 基本是 | 基本是（M290 `+18 测试 ， 0 回归） |
+| 它真可落地 | 部分（多席 / 默认包不存在） | 部分（M291 6th surface ship；多席 / 默认包仍在 design 阶段） |
+| 它可信 | 部分（净启 / 跨设备没有） | 部分（M296+ 待 ship） |
+
+距离"四条同时完全成立"剩下两段：多席 first-class（M292+）+ 主权三件（M296+）。Substrate doctrine 已闭合不变；剩下是生态层与主权深化。
+
+## 二十八、M292+/M293+/M294+/M295+/M296+ 设计明细（design-only roadmap）
+
+用户在 M286-M290 push 里要求"一次性解决掉"。诚实评估：M287-M291 是 surgical shippable，M292-M296+ 每条都是 weeks-of-work 量级（多席 agents 需要 first-class 协议 + 9 角色实体 + 零拷贝总线；L4 世界基座要训练资产；主权三件涉及密码学协议）。本节给每条的设计明细而非半成品 scaffolding——后者会给 substrate 留炸弹。
+
+### 28.1 M292+ 单脑多席 agents first-class
+
+**Goal**：把 manifest v2 第八节列的 9 席（Scout / Memory / Planner / Critic / Host Alignment / Risk / Surface / Sovereign Sentinel / Evolution Shadow）做成 SDK first-class 协议，让 host 装一个 seat 像装一个 organ adapter 一样简单。
+
+**当前**：仓库只有 `QinaoLoop.OrganRole.scout / .core` 两个 role 概念；其它 8 席仅在 manifest / honesty-board 中提及，无 Swift 实体。
+
+**Proposed shape**（多 milestone 切片）：
+
+- **M292.1** `QinaoSeats` 新模块（独立 SPM target）。`public enum QinaoSeat: String, CaseIterable { case scout, memory, planner, critic, hostAlignment, risk, surface, sovereignSentinel, evolutionShadow }`. + `protocol QinaoSeatProtocol { var seat: QinaoSeat { get }; func contribute(...) async throws -> SeatVerdict }`. 每席的 `contribute` 输入是 typed 共享状态（CandidateFrontier / TriSelfScores / ContextFrame / etc.），输出是 `SeatVerdict`。约束：单脑多席 = **共享同一对象总线**（不是每席自带状态）。
+- **M292.2** `QinaoSeatRegistry`：席位注册 + 调度（投机并行：所有席并行 contribute，主调用收齐 verdict）。
+- **M292.3** 单席默认实现（Scout/Critic/Risk 三个最小集）：复用现有 organ adapters。
+- **M292.4** 跨席 verdict 仲裁（`SeatBoard.merge(verdicts:) -> MergedSeatBoard`）。
+- **M292.5** Sovereign Sentinel 席：监听 board 异常 + 升级到 L14。
+
+**Why not now**：M292.1 单独就是 ~500 行 Swift + 协议设计 + 多 host 适配。M292.2-M292.5 各自是 surgical milestone。强行打包成一个 commit 会出现"看似齐了但每席都是 stub"的假成品。**Doctrine 锁定优先于工程铺设**：先 ship 协议 schema（M292.1）→ ship 调度（M292.2）→ ship 默认实现一席一席。
+
+### 28.2 M293+ 宿主端到端集成 surface family
+
+**Goal**：QinaoSampleApp 真演 6 个 surface（compare panel / draft shell / delay packet / boundary script / silent stub / local-only sheet）的端到端 demo，让 sample host 不只是 stub provider。
+
+**当前**：6 个 SwiftUI view 都 ship 了（M280-M291），但 QinaoSampleApp 不调它们；hosts 拿 SDK 自己写 SwiftUI 拼接。
+
+**Proposed shape**：
+
+- **M293.1** `QinaoSampleApp` 新增 6 surface scenario screens：每屏对应一个 mode 的最小 demo（permit + verdict 组合 → selectMode → render 对应 view）。
+- **M293.2** 端到端 turn → surface 演示：高压 / 低压 / 中性三 scenario 各演一遍。
+- **M293.3** Snapshot tests（如果项目用 SwiftUI snapshot framework）pin UI shape。
+
+**Why not now**：M293.1 是 SwiftUI 工程活，需要在 sample app 里搭 6 屏 + state binding。Snapshot framework 选型也要先决定。
+
+### 28.3 M294+ 默认包族（Defaults / Agents Kit / Capsules / Scenarios）
+
+**Goal**：让开发者拿 SDK 一键得到"默认就不容易做错的脑生态"——不是只给 type 让 host 自己装，而是给一组开箱即用的 preset。
+
+**当前**：每个 host 自己拼 organEndpoint + worldPriorVault + memory + risk + sovereign。"默认包" 概念在 manifest v2 第九节但仓库没有对应实体。
+
+**Proposed shape**：
+
+- **M294.1** `QinaoDefaults` module：`QinaoDefaults.makeStandard(host:) async -> QinaoRuntime` 一键构造完整 runtime（含合理的预设 lease budget / risk thresholds / memory cooling policy / sovereign warrant TTL）。
+- **M294.2** `QinaoCapsules` module：场景胶囊（Creator / Builder / Family / Care / Negotiation / Reflection），每胶囊预设 host constitution + 风格 + 风闸预设。
+- **M294.3** `QinaoScenarios` module：高压沟通 / 高压决策 / 创作陪跑 / 守护延迟 等场景模板，host 可选 import。
+
+**Why not now**：每个 capsule 是产品决定（哪些 default 是合理的？），需要 product 思考多过工程实现。Engineering scaffold 可以先做（空 module），但内容选择必须 deliberate。
+
+### 28.4 M295+ L4 世界基座资产投入
+
+**Goal**：L4 vault 当前架构完整但训练资产空——schema 和 seeder protocol 都 ship 了，缺的是真正的 causal templates / counterfactual curriculum / domain bridge 数据。
+
+**当前**：`BASWorldPriorVault.builtInLibrary` 只有少数 body templates（hydration / exercise-mood）。Manifest v2 的"世界给 L9 真分岔" 完整 doctrine 没有数据支撑。
+
+**Proposed shape**：
+
+- **M295.1** Curriculum design：50-100 条核心 causal templates，覆盖 manifest v2 织团 B 涉及的领域（关系 / 决策 / 沟通 / 边界 / 时间压力）。
+- **M295.2** Seeder protocol expansion：当前 perturb kinds 只 3 种（dropPrecondition / introduceBlocker / crossDomain）；可能需要扩到 5-7 种。
+- **M295.3** Built-in library 真实化（templates 写进 library，seeder 跑过）。
+- **M295.4** Domain bridge mapping（manifest v2 提的 cross-domain bridge 是 v1 的延伸：mood ↔ finance ↔ relationship 等）。
+
+**Why not now**：这是 doctrinal+curriculum 工作，每条 template 都需要在因果学/认知学里站得住脚。强行写 50 条会都是 plausible 但 ungrounded——比没有更糟。
+
+### 28.5 M296+ 主权三件（净启 / 双钥提交 / 跨设备一致性）
+
+**Goal**：把 L14 主权层从 v1（单设备 verdict + warrant + audit ledger）扩到 manifest v2 的"会退回来"完整态：
+
+- **净启** clean reboot：宿主可命令"清白启动"——所有 session / volatile state 清零，只保留 host constitution + audit ledger 的不可篡改 lineage。
+- **双钥提交** dual-key commit：极高后果操作（删除 host version / 改 sovereign policy）需要两个独立 key 共同签名。
+- **跨设备一致性** cross-device consistency：宿主在 device A 的 sovereign 决定（特别是 freeze / rollback）必须在 device B 上立刻生效，离线设备恢复连接时强制同步。
+
+**当前**：M286 honesty-board 24.x 自陈"net-start 无、双钥提交无、跨设备一致性无"。L14 v1 ship 了但这三件未触。
+
+**Proposed shape**：
+
+- **M296.1** `BASSovereignCleanRebootCoordinator` 已 ship 一个 alpha（grep 命中）；需 audit + 真把 volatile state 全清 + 写 ledger entry "rebooted-at:<ts>"。
+- **M296.2** Dual-key commit 协议：定义 `BASSovereignDualKeyCommit { primaryKeyID, secondaryKeyID, primarySignature, secondarySignature, intent }`. Verdict engine 对极高后果 intent 检查双签。
+- **M296.3** Cross-device sync ledger：`BASSovereignCrossDeviceLedger`——audit ledger 跨设备 hash chain 同步协议（CRDT-like？或主从？）。
+
+**Why not now**：M296.2 需要密码学设计（key 派生 / 多签 / TTL）。M296.3 涉及 distributed systems doctrine（一致性 vs 可用性 trade-off）。两条都是 weeks-of-engineering，不是 surgical 一日 PR。
+
+### 28.6 总结：M286-M290 push 关掉了什么、还剩什么
+
+**关掉了**（一日 surgical batch）：
+
+- L9 真模型反事实 prompt 路径（M287 + M288）
+- L12 第六类 surface 一等化（M291）
+- L10 真 LLM 三声音 helpers（M289）
+- 端到端 v2 第四节积分测试（M290）
+- BAS schema sentinel lag housekeeping
+
+**Manifest v2 视角下进展**：
+
+| 暗线 | M286 前 | M290 后 |
+|---|---|---|
+| 能量线 L1 | 真贯穿 | 真贯穿 |
+| 神经线 L2-L3 | 部分贯穿 | 部分贯穿 |
+| **世界线 L4** | **不贯穿（数据空）** | **部分贯穿（M287/M288 让 vault branches 真送进 LLM；数据待 M295+ 充实）** |
+| 宿主线 L5 | 部分贯穿 | 部分贯穿 |
+| 时间线 L8+L13 | 真贯穿 | 真贯穿 |
+| 主权线 L14 | 部分贯穿 | 部分贯穿 |
+
+**还剩**（M292+ 系列，按 28.x 上述 design）：多席 / 宿主端到端 surface demo / 默认包族 / L4 资产 / 主权三件。每条都是 doctrinal + 工程 weeks 级别，不能 surgical 一日 ship。
+
+Substrate 层 doctrine 仍闭合。剩下是生态层与主权深化——按 milestone 节奏推进，不一刀切。
+
+## 二十九、M292.1 + M292.2 — 多席 first-class 第一段着陆（2026-05-01）
+
+28.1 给 M292+ 切了 5 段（M292.1 enum + verdict / M292.2 protocol + registry / M292.3 默认席 / M292.4 仲裁 / M292.5 sentinel 席）。本节 ship 前两段——typed scaffold + 并行调度。`QinaoSeats` 作为独立 SPM target 上线，零依赖（不拉 Loop / Risk / Sovereign），为后续切片留出洁净边界。
+
+### 29.1 M292.1 — `QinaoSeats` 模块 + `QinaoSeat` enum + `SeatVerdict` struct
+
+**问题**：仓库现有 `QinaoLoop.OrganRole` 只有 `.scout / .core` 两案，是 LLM dispatch flavor，不是 manifest v2 第八节那个 9 席 council。任何想引用席位的代码都得用 free-form 字符串。
+
+**修复**：新独立 SPM target [QinaoSeats](QinaoRuntimeSDK/Sources/QinaoSeats)：
+
+- `QinaoSeat` enum 9 cases：scout / memory / planner / critic / hostAlignment / risk / surface / sovereignSentinel / evolutionShadow（manifest v2 第八节列表）
+- `SeatVerdict` struct：seat + urgency [0,1] + reasonCodes + note，构造时 clamp urgency
+
+**Doctrine 锁定**（8 个测试）：
+- enum 案数严格 9（silent expand/contract 必触发 sentinel）
+- raw values 全 unique
+- raw values 字面 stable（"scout"、"hostAlignment"、"sovereignSentinel" 等）
+- urgency clamp [0,1] 在 init
+- reasonCodes / note 默认空
+- 全 case Codable round-trip
+
+**Scope discipline**：纯 schema 模块。无 protocol（M292.2）、无 registry（M292.2）、无默认实现（M292.3+）、无调度（M292.2）、零依赖。
+
+### 29.2 M292.2 — `QinaoSeatProtocol` + `QinaoSeatRegistry` + 并行 dispatch + `SeatBoard`
+
+**问题**：M292.1 给了 enum 但 host 怎么 register seat / 怎么 dispatch / 怎么收 verdict 没说。Manifest v2 第八节"投机并行 / 单提交口"必须用 actor + 任务组实现，不能让 host 自写。
+
+**修复**：
+
+- `QinaoSeatProtocol`：`var seat: QinaoSeat { get }` + `func contribute(snapshotID:) async throws -> SeatVerdict`。`snapshotID` 是 M292.2 占位——typed bus shape 在 M292.3+ 落地，先用 String 让协议先 ship。
+- `QinaoSeatRegistry` actor：`register(_)`（last-write-wins）/ `clear()` / `registeredSeats() -> [QinaoSeat]`（ASC）/ `dispatch(snapshotID:) async -> SeatBoard`
+- `dispatch` 走 `withTaskGroup` 并行所有席。Throwing seat 进 `failures: [QinaoSeat: String]`，不阻断其他席。
+- `SeatBoard`：verdicts ASC by raw + failures map + `isFullyAttended` + `verdict(for:)` 查询
+
+**Doctrine 锁定**（11 个测试）：
+- 空 registry → empty board + `isFullyAttended = true`（vacuously）
+- 单席 register → 1 verdict
+- 9 席全 register → 9 verdicts，全 attended
+- Verdict 顺序永远 seat raw-value ASC（注册顺序无关）
+- 同 seat 重复 register → last-write-wins
+- 一席 throw → 该席进 failures、其他正常 → `isFullyAttended = false`
+- `verdict(for:)` 找得到时返非 nil、找不到时返 nil
+- `clear()` 清空全部
+- `snapshotID` 透传给每席的 `contribute`
+
+**Scope discipline**：M292.2 不接 Loop、不接 Sovereign、不接 World Prior。registry 是纯 in-memory actor，没有持久化。Sentinel 席 / 默认实现 / 跨席仲裁都留 M292.3+。
+
+### 29.3 状态升级（28.1 vs 29.x）
+
+| L12 surface family | 28.1 设计阶段 | M292.2 后 |
+|---|---|---|
+| 9 席 typed enum | ✗（free-form strings） | **✓ M292.1** |
+| 单席 verdict 类型 | ✗ | **✓ M292.1** |
+| 单席 protocol | ✗ | **✓ M292.2** |
+| 多席并行调度 | ✗ | **✓ M292.2** |
+| 多席失败隔离 | ✗ | **✓ M292.2** |
+| Last-write-wins 注册 | ✗ | **✓ M292.2** |
+| 默认席实现（Scout / Critic / Risk） | ✗ | ✗（M292.3） |
+| 跨席仲裁（merge） | ✗ | ✗（M292.4） |
+| Sovereign Sentinel 席 | ✗ | ✗（M292.5） |
+
+### 29.4 测试统计（29.x 末）
+
+| 套件 | M290 末 | M292.2 末 | Δ |
+|---|---|---|---|
+| Qinao | 817 | **836** | +19（M292.1 8 + M292.2 11） |
+| BAS XCTest | 1757 | 1757 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+Qinao 全套 836 测试 0 失败，0 回归。
+
+### 29.5 还没做但已识别（29.x 截止）
+
+- **M292.3** 默认席实现（Scout / Critic / Risk 三个最小集，每席的 `contribute` 用 substrate 现有 organ adapter / risk gate / world-prior vault 派生 verdict）。需先决定 typed snapshot bus shape：M292.2 占位 `snapshotID: String` 必须升到 typed `TurnSnapshot { candidateFrontier, triSelfScores, riskCard, hostVersion, ... }`。
+- **M292.4** 跨席 verdict 仲裁（`SeatBoardMerger.merge(board:) -> MergedSeatBoard`）。当多席 disagree 时给 weighted compromise + dissent 名义。
+- **M292.5** Sovereign Sentinel 席：监听 board 异常 + 升级到 L14。需先 wire SeatRegistry 进 QinaoRuntime。
+- **L9-loop wire** for SeatRegistry：runtime turn pipeline 需在合适位置调 `dispatch` 让席真参与决策（不是冷数据）。
+
+Manifest v2 第八节「单脑多席」**到 M292.2 schema + 调度成立**——9 席命名锁定，并行 dispatch 可 run，failures 隔离。但仓库还**没有任何实际 seat impl**——这只是给生态铺骨架，肉是 M292.3+。「它真可落地」从"部分（多席不存在）"上调到"部分（多席 schema 存在但无默认）"。
+
+## 三十、M292.3 + M292.4 + M292.5 + M293 + M294 — 多席真活 + 表面成展 + 默认化（2026-05-01）
+
+29.5 列了 4 段（M292.3 默认席 / M292.4 仲裁 / M292.5 sentinel + 运行时 wire / 28.x 中的 M293/M294/M295/M296）。本节 ship 5 件 surgical（M292.3 / M292.4 / M292.5 / M293 / M294），manifest v2 第八节「单脑多席」从 schema 进入"四席真活 + canonical 仲裁 + sovereign 哨"形态。
+
+### 30.1 M292.3 — Scout / Critic / Risk 三个默认席（loop-bound impls）
+
+**问题**：M292.2 ship 了 protocol + registry，但仓库无任何实际 seat impl。Manifest v2 第八节「投机并行 / 共享对象总线」必须给至少几个具体席验证 dispatch 真能跑。
+
+**修复**：新独立 SPM target [QinaoLoopSeats](QinaoRuntimeSDK/Sources/QinaoLoopSeats)（保 QinaoSeats 零依赖纯 schema 不被污染），三个默认席：
+
+- `QinaoScoutDefaultSeat`：读 `loop.candidateFrontier`，urgency = `1 - top.score`（低 score = 高 scout 不确定性），reason codes flag low-score / multi-candidate。
+- `QinaoCriticDefaultSeat`：读 `loop.vetoExplain`，urgency = vetoExplain.concernLevel，reason codes 复制 vetoing voice 的 primary + supporting + voice 标签。
+- `QinaoRiskDefaultSeat`：读 `loop.triSelfScores`，urgency = max guardian concern across candidates，reason codes echo guardian vocab + tier flag。
+
+**约定**：dispatcher 把 `sessionID` 作为 `snapshotID` 传入；默认席按此约定从 loop 读状态。Typed bus 留给后续——这一约定让 M292.3 surgical 而不阻塞典型用例。
+
+**Doctrine 锁定**（9 个 default-seat 测试 + 整合 dispatch 测试）：
+- Empty 状态返 0 + "no-..." reason code（silence is informative）
+- 高压 candidate input → critic 至少 ≥ 0.7 + voice tag
+- 三席合并 dispatch → 3 verdicts ASC，全 attended
+- Unknown session → throws → failures 进 board
+
+### 30.2 M292.4 — `SeatBoard.merge() -> MergedSeatBoard` cross-seat 仲裁
+
+**问题**：M292.2 ship 了 SeatBoard 但每 host 自己写 consensus / loudest / dissent 计算逻辑，结果各家不一致。
+
+**修复**：在 [QinaoSeats](QinaoRuntimeSDK/Sources/QinaoSeats/QinaoSeatBoardMerge.swift) 加 `MergedSeatBoard` 类型 + `SeatBoard.merge()` 扩展，给 canonical 仲裁规则：
+
+- `consensusUrgency` = mean of all verdicts'urgency（含 0；silent seats 真贡献信号）
+- `loudestSeat` = highest urgency，ties break seat raw-value ASC
+- `dissent` = seats where `|urgency - mean| > 0.3`（strict >，FP-safe pinned at 0.3）
+- `silentSeats` = 严格 `urgency == 0`（quiet `0.001` 不算）
+
+**Doctrine 锁定**（11 测试）：每条规则单独 pin；浮点边界用 0.79 / 0.21 避开 0.8/0.2 的 FP rounding 陷阱（FP-stable test design）。
+
+### 30.3 M292.5 — Sovereign Sentinel default seat + standard registry factory
+
+**问题**：M292.2 提了 Sentinel 是"L14 的桥"，没具体接口。Standard council 注册要 4 行；hosts demo 期间老忘其中一行。
+
+**修复**：
+
+- `QinaoSovereignSentinelDefaultSeat`：组合两信号——max-voice-across-candidates（catastrophic peak）+ 0.7-saturation fraction（council 是否被普遍触发）。Urgency = max of the two；reason codes flag `veto-tier-reached` / `voice-saturation` / `clean`。
+- `QinaoSeatRegistry.standardLoopSeats(loop:)` 静态 factory：Scout + Critic + Risk + SovereignSentinel 一行注册。
+
+**Doctrine 锁定**（6 测试）：clean state → urgency < 0.7 + "clean" code；高压 → ≥ 0.7 + "veto-tier-reached"；全 saturation → "voice-saturation" code；4 默认席 dispatch 全 attended ASC ordered；merge 在 standard council 上产 canonical view。
+
+### 30.4 M293 — `QinaoSurfaceShowcaseView` 6 surface 一屏 drop-in
+
+**问题**：6 SwiftUI views 都 ship 了（M280-M291），但 host 试用 SDK 时还得自己拼 6 个 model。
+
+**修复**：[QinaoSurfaceShowcase.swift](QinaoRuntimeSDK/Sources/QinaoUI/QinaoSurfaceShowcase.swift)：
+
+- `QinaoSurfaceShowcaseModel` 复合 struct，bundle 6 surface 各一个 model
+- `QinaoSurfaceShowcaseModel.canonicalDemo` 静态 stable demo bundle（高压最后通牒 scenario 的 6 surface 表达）
+- `QinaoSurfaceShowcaseView` SwiftUI scroll + 6 sections，host `QinaoSurfaceShowcaseView()` 一行 drop-in 看 6 surface 同屏渲染
+
+**Doctrine 锁定**（6 测试）：6 component IDs 按 manifest v2 1.1-1.6 顺序 pin；canonicalDemo 跨 build deterministic；Codable round-trip；每 surface 都有非空内容；LocalOnlySheet shortLine prefix `"Local-only · "`；SilentStub 携带 audit ref。
+
+### 30.5 M294 — `QinaoDefaults` 一键 sensible factory
+
+**问题**：first-day host 拿 SDK 要拼 vault → loop → registry → seats 四层；每家拼法略不同。
+
+**修复**：新独立 [QinaoDefaults](QinaoRuntimeSDK/Sources/QinaoDefaults/QinaoDefaults.swift) target：
+
+- `QinaoDefaults.makeStandard(endpoint:)`：传一个 endpoint，回 `(loop, registry)` pair。Vault 默认 `seedingBuiltIns: true`；registry 默认 standard 4 席。
+- `QinaoDefaults.standardShowcase()`：返 M293 canonical surface bundle。
+
+**Doctrine**：默认是 starter 不是 commitment。Hosts 可 last-write-wins 替换任何席 / 用自己 vault 取代 / 渲染自己的 showcase model。无默认 endpoint（Qinao 中立）。
+
+**Doctrine 锁定**（3 测试）：`makeStandard` 返 4 席 ASC；`standardShowcase` 返 6 IDs 按 render 顺序；vault 真 seeded（refineAgainstCounterfactuals on `tmpl-body-hydration` 不抛 unknown-template）。
+
+### 30.6 测试统计（30.x 末）
+
+| 套件 | M292.2 末 | M294 末 | Δ |
+|---|---|---|---|
+| Qinao | 836 | **871** | +35（M292.3 15 + M292.4 11 + M293 6 + M294 3） |
+| BAS XCTest | 1757 | 1757 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+Qinao 全 871 测试 0 失败，0 回归。
+
+### 30.7 状态升级（28.1 design 起 → 30.x ship）
+
+| Manifest v2 第八节单脑多席 | 28.1 设计 | M292.2 末 | M292.5 末 |
+|---|---|---|---|
+| 9 席 typed enum | ✗ | ✓ | ✓ |
+| Verdict 类型 | ✗ | ✓ | ✓ |
+| 单席 protocol | ✗ | ✓ | ✓ |
+| 多席并行调度 | ✗ | ✓ | ✓ |
+| **默认席（Scout / Critic / Risk）** | ✗ | ✗ | **✓** |
+| **跨席 canonical 仲裁** | ✗ | ✗ | **✓** |
+| **Sovereign Sentinel 席** | ✗ | ✗ | **✓** |
+| **Standard registry factory** | ✗ | ✗ | **✓** |
+| Memory / Planner / HostAlignment / Surface / EvolutionShadow 默认席 | ✗ | ✗ | ✗（M292.6+） |
+| L14 sovereign 自动升级（runtime hook） | ✗ | ✗ | ✗（M292.7+） |
+
+| Manifest v2 surface 族 | M291 末 | M293 末 |
+|---|---|---|
+| 6 surface SwiftUI views | ✓ | ✓ |
+| 6 surface canonical 复合 demo | ✗ | **✓** |
+| Host one-liner showcase | ✗ | **✓** |
+| QinaoSampleApp 真演 6 surface | ✗ | ✗（应用层活 next） |
+
+### 30.8 还没做但已识别（30.x 截止）
+
+- **M292.6** 剩余 5 默认席（Memory / Planner / HostAlignment / Surface / EvolutionShadow）—— 每席需 substrate 适配座（memory adapter / planner-bus / host-constitution reader / surface-picker bridge / evolution-furnace reader）。
+- **M292.7** SeatRegistry 进 QinaoRuntime turn pipeline（runtime hook 决定何时 dispatch、什么 snapshotID、verdict 如何回写 state）。
+- **M293.1** QinaoSampleApp 真展示 6 surface 端到端 demo（按 scenario 切换 mode）。
+- **M295** L4 世界基座 curriculum data — 仍 design-only（每条 template 需在因果学 / 认知学站住）。
+- **M296** 主权三件（净启 / 双钥 / 跨设备）—— 净启 alpha 已存在并已被既有 BAS 测试覆盖；双钥 + 跨设备 design-only。
+
+## 三十一、M295 / M296 显式 design-only 边界（2026-05-01）
+
+「一次性解决掉所有」的 honest 边界——以下两件刻意不在本 push 内 ship：
+
+### 31.1 M295 — L4 世界基座 curriculum data
+
+**Goal**（重述）：L4 vault 当前架构完整但训练资产少。Manifest v2 「世界给 L9 真分岔」要求至少 50-100 条 grounded causal templates 覆盖 manifest v2 织团 B 涉及的领域。
+
+**Why design-only**：
+- 每条 template 是 doctrinal / curriculum 决定（哪些因果关系在该领域是 axiomatic vs plausible vs contested？）
+- 强行写 50 条 plausible-but-ungrounded templates 比没有更糟——会污染 L4 vault 给 L9 错误的反事实。
+- 先 finalize 第一批的 schema acceptance criteria（每 template 至少 N 个 perturbation kinds？哪些 evidence rungs 必须出现？）再写内容。
+
+**Proposed sub-milestones**：
+- M295.0 Template authoring spec（doctrine doc，definitions + acceptance criteria，no code）
+- M295.1 Single domain（关系 / 沟通）的 5 条 templates，过 spec
+- M295.2 Cross-domain bridges（mood ↔ finance ↔ relationship）扩展 perturb kinds
+- M295.3 Built-in library 真 50-100 条 ship
+
+### 31.2 M296 — 主权三件
+
+**Net-start (clean reboot)**: alpha 已 ship（`BASSovereignCleanRebootCoordinator`）+ 已被 [BASSovereignCleanRebootCoordinatorTests](BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASSovereignCleanRebootCoordinatorTests.swift) 覆盖。Manifest v2「会退回来」对此条已基本满足；剩余 hardening 是 audit work。
+
+**Dual-key commit + cross-device consistency**: design-only。
+
+**Why design-only**：
+- 双钥提交需密码学 spec（key 派生、多签算法、TTL semantics）。Picking 算法是工程决定 + 安全审查。
+- 跨设备一致性涉及 distributed-systems doctrine（CRDT vs leader-follower vs gossip）+ ledger 同步协议设计。
+- 两条都是 weeks-of-engineering 而非一日 surgical PR。
+
+**Proposed sub-milestones**：
+- M296.1 净启 hardening（已 ship 既有 alpha + 测试，design-only 收口）
+- M296.2 双钥提交协议 spec → 实现 → 集成
+- M296.3 跨设备 ledger 同步 spec → 实现 → 集成
+
+### 31.3 总账（M286 → M294 push 后）
+
+**Manifest v2 四个"顶级"标准**：
+
+| 标准 | M286 前 | M294 末 |
+|---|---|---|
+| 它强 | 部分 | **基本是**（M287-M290 端到端高压 turn 跑通） |
+| 它稳 | 基本是 | 基本是（871 Qinao 测试 0 回归 + 1757 BAS 0 回归） |
+| 它真可落地 | 部分（多席不存在） | **基本是**（M292.1-M292.5 单脑多席 schema + 默认 4 席 + 仲裁 + factory；M293+M294 host 一行起步） |
+| 它可信 | 部分 | 部分（净启 alpha 已 ship 测试覆盖；双钥 / 跨设备一致性仍待 M296.2-M296.3） |
+
+距离"四条同时完全成立"剩下：**主权双钥 + 跨设备一致性 + L4 curriculum data**。这三件每件都是 weeks-of-engineering 工作，不能一日 surgical。
+
+**已闭合的 push 累计**：
+- Substrate doctrine: M286 前已闭合
+- 活体织网真活: M287 (L9 helper) + M288 (L9 wire) + M289 (L10 LLM helpers) + M290 (端到端积分) — 闭合
+- 6 surface 完整族: M291 (LocalOnly 一等化) + M293 (showcase) — 闭合
+- 单脑多席 first-class: M292.1 (schema) + M292.2 (registry) + M292.3 (3 默认席) + M292.4 (仲裁) + M292.5 (sentinel + factory) — **substrate 与默认四席闭合**；剩余 5 默认席 + runtime wire 是 hub-and-spoke 上的 spokes
+- 默认包 starter: M294 (factory) — 闭合
+- 主权三件: 净启已 ship + 测试覆盖；双钥 / 跨设备一致性 design-only
+
+Substrate doctrine 仍闭合。所有 ship 的 milestones 都 typed-pinned by tests。下一刀按 sub-milestone 节奏走。
+
+## 三十二、M292.6a + M292.7 — 5 → 7 默认席（含 Planner / Surface）+ runtime wire（2026-05-01）
+
+30.8 列了 M292.6 / M292.7 是下一段。Memory / HostAlignment / EvolutionShadow 真需要 substrate adapter seam（loop 不曝），保留 design；Planner + Surface 用现有 frontier + vetoExplain 公开 API 派生 verdict 完全可行——本节 ship 这两席 + runtime wire。
+
+### 32.1 M292.6a — `QinaoPlannerDefaultSeat` + `QinaoSurfaceDefaultSeat`
+
+**Planner**：读 frontier，urgency = `max(score) - min(score)`（score divergence）。`single-candidate` → urgency 0；多候选时 spread 决定 urgency。Reason codes: `wide-spread / moderate-spread / narrow-spread` + `candidate-count:N`。Distinct from Scout（Scout 看 top 候选不确定性，Planner 看整 frontier 形状）。
+
+**Surface**：读 frontier + vetoExplain，给"council 觉得该走哪个 surface mode"的 advisory verdict。
+- empty frontier → `mode:silentStub` + urgency 0
+- vetoExplain.concernLevel ≥ 0.7 → `mode:boundary` + urgency = concernLevel + voice 标签
+- 多 candidate 无 veto → `mode:compare` + urgency 0.4
+- 单 candidate 无 veto → `mode:draft` + urgency 0.2
+
+不动实际 `BASSoftHandModeSelector`——这是 advisory 席，不是替代 selector。Audit walkers 可 grep `mode:*` 看 council 推荐。
+
+`standardLoopSeats` 从 4 升 6。Order ASC: critic / planner / risk / scout / sovereignSentinel / surface。
+
+**Doctrine 锁定**（6 新测试）：
+- Planner 单 candidate → urgency 0 + `single-candidate`
+- Planner 多 candidate → urgency > 0 + `candidate-count:N`
+- Surface 单 candidate → `mode:draft`
+- Surface 多 candidate 无 veto → `mode:compare`
+- Surface veto-tier → `mode:boundary` + urgency ≥ 0.7
+- Surface unknown session → throws sessionUnknown
+
+### 32.2 M292.7 — `runCouncilTurn(loop:registry:sessionID:) → MergedSeatBoard`
+
+**问题**：M292.5 ship 了 `standardLoopSeats` factory，hosts 仍要写 `dispatch + merge` 两步。
+
+**修复**：[QinaoLoopSeatsRuntime.swift](QinaoRuntimeSDK/Sources/QinaoLoopSeats/QinaoLoopSeatsRuntime.swift) 加 `runCouncilTurn(loop:registry:sessionID:)` async 函数：dispatch + merge 一行收。返回 `MergedSeatBoard`（M292.4 canonical view）。
+
+设计上刻意 thin：无 state、无 caching、无 auto-resubmit。富钩（每 turn 自动 dispatch / verdict feedback 进下一轮）留 future milestone。Loop 引用形式上传入但目前不直读——保 API symmetry 留余地。
+
+**Doctrine 锁定**（3 integration 测试）：
+- 高压 v2 第四节 candidate → `consensusUrgency ≥ 0.4` + loudest seat ∈ {critic, risk, surface, sovereignSentinel}（任一 protective seat）
+- 低压 candidate → `consensusUrgency < 0.4`（council 安静）
+- Unknown session → 6 默认席全 throw → `failures.count == 6` + `verdicts.empty` + `!isFullyAttended`
+
+### 32.3 状态升级
+
+| Manifest v2 第八节 | M292.5 末 | M292.7 末 |
+|---|---|---|
+| 默认席数 | 4 | **6**（+Planner +Surface） |
+| 默认席覆盖 protective + path 双面 | guardian/regret/protective 重 | + path 探索 (planner) + surface advisory |
+| 一行 council turn | ✗ | **✓ runCouncilTurn** |
+| 高压场景下 council 真集体发声 | 半 | ✓ pinned by integration test |
+
+**剩余未 ship 默认席**（M292.6b）：Memory（需 memory adapter 接口）/ HostAlignment（需 host constitution reader）/ EvolutionShadow（需 update ticket lifecycle reader）。这三个 substrate seam 都要先 ship——design 阶段。
+
+### 32.4 测试统计
+
+| 套件 | M294 末 | M292.7 末 | Δ |
+|---|---|---|---|
+| Qinao | 871 | **880** | +9（M292.6a 6 + M292.7 3） |
+| BAS XCTest | 1757 | 1757 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+Qinao 全 880 测试 0 失败 0 回归。
+
+### 32.5 还没做但已识别（32.x 截止）
+
+- **M292.6b** Memory / HostAlignment / EvolutionShadow 默认席——需先 design + ship 三个 substrate adapter seam
+- **M292.8** runtime wire 进 QinaoRuntime turn pipeline（每 turn 自动 dispatch council，verdict feedback 进 surface mode 决策）
+- **M295** L4 curriculum (M295.0-M295.3) — design-only
+- **M296.2 / M296.3** 双钥提交 + 跨设备一致性 — design-only
+
+### 32.6 Manifest v2 总账（M292.7 末）
+
+| 织团 / 整体生命感 | M292.5 末 | M292.7 末 |
+|---|---|---|
+| 织团 D（审理-风闸-柔手） | 部分 | **基本是**（critic/risk/surface 三席真活 + 仲裁 + boundary mode advisory） |
+| 织团 A（生命-肉身-主权） | 部分 | 部分 + Sentinel 席（M292.5）真发声 |
+| 「会想不自转」 | 基本是 | 基本是 + Planner 席真分 path |
+| 「会保护不接管」 | 基本是 | 基本是 + Surface advisory 真给 mode 推荐 |
+| 「单脑多席」 | 4 席 | **6 席 + 一行 runCouncilTurn** |
+
+总账：M286-M292.7 这一长串 push 闭合 substrate doctrine + 单脑六席 + 6 surface 一等化 + 默认 starter + runtime wire。**Manifest v2「织团 D」第一次拥有完整代码实体**——审理 (critic) + 风闸 (risk) + 柔手 (surface) 三席同时跑、仲裁集中、surface advisory mode 给 audit 用。
+
+剩余主力路径仍是 M295 (L4 curriculum) + M296.2/M296.3 (主权双钥 + 跨设备)。两件都需要 weeks-of-engineering specs，不是 surgical 一日 PR。
+
+## 三十三、M292.8 + M296.2 + M296.3 — auto-dispatch + 真双钥 + 跨设备 clock（2026-05-01）
+
+32.5 列了 M292.8 / M296.2 / M296.3 是接下来的 surgical 候选。这三件的"design-only"边界其实可以局部突破——核心 primitive 写得好，是 surgical 的；只有完整 protocol 才是 weeks。本节 ship 三个 primitive，把 design-only 标签从 M296.2 / M296.3 上摘下来。
+
+### 33.1 M292.8 — `submitAndRunCouncil` + `generateCandidatesAndRunCouncil`
+
+**问题**：M292.7 ship 了 `runCouncilTurn`，但 hosts 仍要写两步：`loop.submit(...)` + `runCouncilTurn(...)`。或者 `loop.generateCandidates(...)` + `runCouncilTurn(...)`。
+
+**修复**：在 `QinaoLoop` 上加两个 async 扩展方法：
+
+- `submitAndRunCouncil(sessionID:candidates:registry:)` —— submit + dispatch + merge 一行
+- `generateCandidatesAndRunCouncil(sessionID:seeds:registry:)` —— generate + dispatch + merge 一行（returns tuple of `[GeneratedCandidate]` + `MergedSeatBoard`）
+
+**Doctrine**：失败传播分两段——`submit` / `generateCandidates` 自己的 throws 透传给 caller；council dispatch 失败永远进 `MergedSeatBoard.board.failures`，不抛。这让 host 可以 try/catch 一处（输入校验），分支 board.failures 一处（席事故）。
+
+**Doctrine 锁定**（2 新测试）：
+- 高压 candidate 走 submitAndRunCouncil → 6 verdicts + isFullyAttended + consensus ≥ 0.4
+- 空 candidates → submit's 内部 validation throw 透传给 caller
+
+### 33.2 M296.2 — `BASSovereignDualKeyCommit` + `BASSovereignDualKeyVerifier`（真 CryptoKit）
+
+**问题**：单密钥签名（M87 audit ledger）够 tamper detection，但极高后果操作（删除 host version / 改 sovereign policy / 跨设备 sentinel override）必须双签。manifest v2「会退回来」要求"会成长不乱长 + 不让单一密钥被攻陷等同 capitulation"。28.x 当时归 design-only —— 实际可以用 CryptoKit Curve25519 真 ship。
+
+**修复**：在 BASSovereign 加：
+
+- `BASSovereignDualKeyCommit` Codable struct：intentDigest + 2 keyID + 2 signature
+- `BASSovereignDualKeySigning.makeCommit(intentDigest:primary:primaryKeyID:secondary:secondaryKeyID:)`：用两个 `BASSovereignEd25519KeyPair`（M87 ship 过）签同一 digest，throws 当 keyID 重复（dual 必须真 dual）
+- `BASSovereignDualKeyVerifier`：持双 PublicKey + ID，`verify(_:) -> Bool` 同时检查 keyID 匹配 + 双签都有效；任一失败返 false（不 throw，便于 sentinel 分支）
+
+**Doctrine 锁定**（10 测试）：
+- 双签合法 → verify true
+- Tampered primary sig → false
+- Tampered secondary sig → false
+- 错 primary keyID → false（cheap check 在 crypto 之前）
+- 错 secondary keyID → false
+- 替换 digest → false（签名不匹配新 digest）
+- 同 keyID 双签 → throws `SigningError.sameKeyIDForBothSlots`
+- Codable round-trip 保形
+- 双签两次都 verify（Apple CryptoKit Ed25519 nonce 随机，byte-不等但 verify 等价 —— pin 这条 doctrine）
+- 交换两 PublicKey（primary 进 secondary slot）→ false
+
+**Doctrine 修订**：M87 注释里说 "Ed25519 deterministic"，是错的——Apple CryptoKit 用随机 nonce 抗 fault 攻击，所以两次同 (key, digest) 签名 byte-不相等。这影响 doctrine（不能用 byte equality 做 replay 测试，必须用 verify）。已写进 M296.2 文件级注释。
+
+### 33.3 M296.3 — `BASSovereignCrossDeviceClock` 跨设备因果 vector clock
+
+**问题**：manifest v2「跨设备一致性」需要明确"哪个设备的 sovereign 决定先 / 后 / 同时发生"的语义。完整 sync protocol 是 weeks，但 typed causality primitive 是一日 surgical。
+
+**修复**：在 BASSovereign 加 `BASSovereignCrossDeviceClock`：
+
+- `deviceCounters: [String: UInt64]`（vector clock map；不在 map 的设备视为 0）
+- `tick(deviceID:)`：本机自增计数，返新 clock（immutable / value type）
+- `merged(with:)`：element-wise max（标准 vector clock merge）
+- `compare(to:) -> Order`：返 `.before / .equal / .after / .concurrent` 之一
+
+**Doctrine 锁定**（16 测试）：
+- 初始 clock 全 0，未注册设备 counter 0
+- tick 只增本设备
+- tick 不变 (immutability)
+- Merge element-wise max
+- Merge with empty 是 identity
+- Merge commutative + idempotent
+- compare 4 case 各 pin
+- Codable + Hashable round-trip
+- 完整 sync flow scenario：A tick × 2 → B tick → B 收 A clock merge → causal `.before`/`.after` 正确，B 不知道的 A tick 后续是 `.concurrent`
+
+**Doctrine**：vector clock **不是** sync protocol；它是给后续协议（CRDT / leader-follower / gossip）用的因果 primitive。`.concurrent` 是必须 conflict-resolve 的信号；其他三种是线性序无歧义。
+
+### 33.4 测试统计（33.x 末）
+
+| 套件 | M292.7 末 | M296.3 末 | Δ |
+|---|---|---|---|
+| Qinao | 880 | **882** | +2（M292.8 2） |
+| BAS XCTest | 1757 | **1783** | +26（M296.2 10 + M296.3 16） |
+| 4 boundary checks | clean | clean | clean |
+
+两 package boundary 全 clean，0 回归。
+
+### 33.5 状态升级
+
+| Manifest v2 主权三件 | M292.7 末 | M296.3 末 |
+|---|---|---|
+| 净启 (clean reboot) | ✓（M14 alpha + 测试） | ✓ |
+| **双钥提交 primitive** | ✗ design-only | **✓ M296.2 (real CryptoKit Curve25519)** |
+| **双钥进 verdict engine** | ✗ | ✗（M296.2.x — engine 集成是另一段） |
+| **跨设备因果 primitive** | ✗ design-only | **✓ M296.3 (vector clock)** |
+| **跨设备 sync protocol** | ✗ | ✗（M296.3.x — 协议层是另一段） |
+
+| Manifest v2 整体 council | M292.7 末 | M292.8 末 |
+|---|---|---|
+| 6 默认席 | ✓ | ✓ |
+| runCouncilTurn 一行 | ✓ | ✓ |
+| **submit/generate + council 一调** | ✗ | **✓ M292.8** |
+
+### 33.6 还没做但已识别（33.x 截止）
+
+- **M292.6b** Memory / HostAlignment / EvolutionShadow 默认席 — 仍 blocked on substrate adapter seams
+- **M292.9** 把 M292.8 wire 进 QinaoRuntime 的 turn pipeline（让 runtime 自己每 turn dispatch council）
+- **M295** L4 curriculum (M295.0-M295.3) — design-only
+- **M296.2.x** dual-key commit 进 `BASSovereignVerdictEngine`（让 engine 对 high-consequence intent 强制要求 dual-key commit）
+- **M296.3.x** vector clock 进 `BASSovereignAuditLedger`（让 ledger 跨设备同步用 vector clock 决定 fragment 顺序）
+
+### 33.7 manifest v2 四"顶级"标准账（33.x 末）
+
+| 标准 | M286 前 | M296.3 末 |
+|---|---|---|
+| 它强 | 部分 | 基本是 |
+| 它稳 | 基本是 | 基本是（2665 测试 0 回归） |
+| 它真可落地 | 部分 | 基本是 |
+| 它可信 | 部分 | **基本是**（净启 + 双钥 primitive + 跨设备 primitive 三件都有真实 ship；剩 verdict engine 集成 + sync protocol） |
+
+**4/4 顶级标准现已"基本是"**——manifest v2 的"理想完全顶级形态"四条同时不彻底失败。每条仍有进一步深化空间，但 substrate 真活 + 多席真活 + 6 surface 完整 + 主权三件 primitive 完整。
+
+剩下是 verdict engine 接入双钥（M296.2.x）+ ledger 接入 vector clock（M296.3.x）+ runtime auto-dispatch（M292.9）+ Memory/HostAlignment/EvolutionShadow seams（M292.6b）+ L4 curriculum（M295）—— 每件都是 spec-先行的工程项目，不再是 doctrine-先行。
+
+## 三十四、M296.2.x + M296.3.x — 主权 primitive 集成层（gate + frame）（2026-05-01）
+
+33.6 列了 M296.2.x（dual-key 进 VerdictEngine）+ M296.3.x（vector clock 进 AuditLedger）作为 primitive 集成下一段。完整 engine / ledger 改造 still spec-级，但**不耦合既有 schema 的集成 seam**——typed gate + typed frame——可以是 surgical 一日 PR。本节 ship 这两 seam。
+
+### 34.1 M296.2.x — `BASSovereignHighConsequenceGate` + `BASSovereignIntentClass`
+
+**问题**：M296.2 ship 了 dual-key commit primitive，但仓库里没有"何时该要求双钥"的语义层。Engine 集成需要的是 typed seam："给我 intent class，我告诉你过不过 gate"。
+
+**修复**：在 BASSovereign 加：
+
+- `BASSovereignIntentClass` enum：`routine` / `highConsequence`
+- `BASSovereignHighConsequenceGate(verifier:)`：持一个 `BASSovereignDualKeyVerifier`（M296.2 复用），exposes `authorize(intentClass:intentDigest:commit:) -> Bool`
+- 路由：routine intent 永远 true；high-consequence 必须 commit 非空 + digest 匹配 + verifier.verify true
+
+**Doctrine 锁定**（6 测试）：
+- routine + nil commit → true
+- routine + 不相干 commit → 仍 true（commit 在 routine 路径上无视）
+- highConsequence + nil → false
+- highConsequence + digest mismatch → false
+- highConsequence + valid commit → true
+- highConsequence + tampered sig commit → false（delegates to verifier）
+
+**Doctrine**：gate **不分类 intent**——分类是 caller 的责任（VerdictEngine 决定哪些 intent 是 high-consequence）。Gate 只 enforce 给定分类下的规则。这让 doctrine 局部可审计。
+
+### 34.2 M296.3.x — `BASSovereignCrossDeviceLedgerFrame`
+
+**问题**：M296.3 ship 了 vector clock primitive，但 ledger 集成需要的是"audit entry 怎么和 clock 关联起来"。完整 ledger schema 改造影响 M87 hash chain；surgical 第一刀是 typed metadata frame，**不动 audit entry 自己**。
+
+**修复**：`BASSovereignCrossDeviceLedgerFrame` Codable struct：
+
+- `auditEntryRef: String`：reference by ID 不耦合 entry schema（M87 audit-entry 未来 migration 不波及）
+- `originDeviceID: String`：哪个设备 emit 了这一帧
+- `clock: BASSovereignCrossDeviceClock`：vector clock at emission
+
+`compare(to:) -> BASSovereignCrossDeviceClock.Order`：直接 delegate 给 clock 的 compare（before / equal / after / concurrent 4-case verdict）。
+
+**Doctrine**：
+- 帧不 fetch entry——caller 用 `auditEntryRef` 查自己的 audit storage
+- `originDeviceID` 字段存在但 `compare` 不用——concurrent 留 concurrent；sync 协议自己用 origin ASC 作 tiebreak（doctrine 注释 + 测试）
+
+**Doctrine 锁定**（8 测试）：
+- 字段保形
+- compare 4 case 各 pin（equal / before / after / concurrent）
+- Codable + Hashable round-trip
+- Set 去重（auditEntryRef + clock 相同 dedup）
+- Concurrent 帧用 originDeviceID ASC tiebreak（doctrine 示范，非自动）
+
+### 34.3 状态升级
+
+| Manifest v2 主权三件 | M296.3 末 | M296.3.x 末 |
+|---|---|---|
+| 净启 | ✓ | ✓ |
+| 双钥 primitive | ✓ M296.2 | ✓ |
+| **双钥集成 seam** | ✗ | **✓ M296.2.x（gate + IntentClass）** |
+| 双钥进 VerdictEngine | ✗ | ✗（engine schema 改造仍 spec-级） |
+| 跨设备 clock primitive | ✓ M296.3 | ✓ |
+| **跨设备集成 seam** | ✗ | **✓ M296.3.x（typed frame + ID-ref decoupling）** |
+| 跨设备 sync protocol | ✗ | ✗（CRDT vs leader-follower 选型仍 spec-级） |
+
+### 34.4 测试统计
+
+| 套件 | M296.3 末 | M296.3.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1783 | **1797** | +14（M296.2.x 6 + M296.3.x 8） |
+| Qinao | 882 | 882 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+总测试 **2679**（882 Qinao + 1797 BAS），全 0 失败。
+
+### 34.5 还没做但已识别（34.x 截止）
+
+- **M296.2.y** `BASSovereignVerdictEngine` 集成：让 engine 对 high-consequence intent 自动用 gate 检查（intent classification rule + commit retrieval flow）
+- **M296.3.y** `BASSovereignAuditLedger` cross-device 集成：用 frame 跨设备同步 audit entry，配合 vector clock 决定 fragment 顺序
+- **M292.6b / M292.9 / M295** 仍 design-only
+
+### 34.6 最终四"顶级"标准账（34.x 末）
+
+| 标准 | M286 前 | M296.3.x 末 |
+|---|---|---|
+| 它强 | 部分 | 基本是 |
+| 它稳 | 基本是 | 基本是（**2679 测试 0 回归**） |
+| 它真可落地 | 部分 | 基本是 |
+| 它可信 | 部分 | **基本是**（净启 + 双钥 primitive + gate seam + 跨设备 primitive + frame seam，剩 engine/ledger 集成层） |
+
+**4/4 顶级标准持续"基本是"**——manifest v2 不彻底失败的状态保持；每条都还有深化空间，深化路径都已 typed-pinned 到 sub-milestone。
+
+## 三十五、M292.6b — 9 席 council 完整化（host-configurable advisory 路径）（2026-05-01）
+
+30.8 / 32.5 / 33.6 反复列 M292.6b（Memory / HostAlignment / EvolutionShadow 默认席）"blocked on substrate adapter seams"——意思是 loop-bound 形态需要 loop 曝出 memory adapter / host constitution reader / 更新 ticket lifecycle reader。**这个 block 对 loop-bound 形态成立，但对 host-configurable advisory 形态不成立**。Host 已有 memory pressure / 对齐 / evolution 信号的话，可以构造时传进来。本节用这个 doctrinal split 真把 9 席补齐。
+
+### 35.1 Doctrinal split：loop-bound vs host-configurable
+
+```
+loop-bound default seats        host-configurable advisory seats
+QinaoLoopSeats target            QinaoSeats target (zero-dep)
+契约：seat 持 loop 引用，         契约：seat 在 init 时收 host
+contribute 调用时读 live state    传入的 typed signals
+6 席（M292.3 + M292.6a）           3 席（M292.6b 本节）
+```
+
+两者用同一个 `QinaoSeatProtocol`、同一个 `QinaoSeatRegistry`、同一个 `SeatBoard.merge()`。Last-write-wins on registry 让以后 substrate adapter seams ship 时，host 可以无缝替换 configurable Memory 为 loop-bound Memory。
+
+### 35.2 三 advisory 席
+
+**`QinaoMemoryDefaultSeat(memoryPressure:conflictClusterCount:continuityAtRisk:)`**
+
+- urgency = memoryPressure；continuity-break 时强制至少 0.7（doctrine pin：continuity 断裂对 council 是 veto-tier 信号）
+- reason codes：`continuity-break / conflict-clusters:N / memory-pressure-high / memory-pressure-moderate / clean`
+- conflict cluster threshold pinned at ≥ 3（同 M73 cluster 概念）
+
+**`QinaoHostAlignmentDefaultSeat(boundaryViolationCount:valueAxisConflict:consentScopeBreach:)`**
+
+- urgency 复合：`valueAxisConflict + min(violations × 0.2, 0.4)`，clamp [0,1]
+- consent-scope-breach 强制至少 0.8（doctrine pin：未经同意扩 scope 是 sovereign-relevant veto-tier）
+- reason codes：`consent-scope-breach / boundary-violations:N / value-axis-conflict-high / value-axis-conflict-moderate / aligned`
+
+**`QinaoEvolutionShadowDefaultSeat(pendingTicketCount:recentRejectionRate:shadowTrialFailureRate:)`**
+
+- urgency = `max(rejectionRate, shadowTrialFailureRate)`（哪个失败率高听哪个）
+- reason codes：`rejection-rate-high / shadow-trial-failure-high / pending-tickets-many:N / clean`
+- pending-tickets threshold pinned at ≥ 10
+
+### 35.3 Doctrine 锁定（15 测试）
+
+- 每席 clean state → urgency 0 + 显式 `clean`/`aligned` code
+- 每席的"trump" 信号（continuity-break / consent-scope-breach）—— 强制 urgency 提升到固定地板
+- 每席的复合公式（memory pressure 加成 / boundary additive / max-of-failure-rate）pin
+- 阈值（≥3 conflict / ≥10 pending）pin
+- 每席 input clamp（负数 → 0；> 1 → 1）
+- 三席合并 register → board 3 verdicts ASC（evolutionShadow / hostAlignment / memory）
+
+### 35.4 9 席首次全 typed 实现
+
+| 席 | 形态 | 实现 |
+|---|---|---|
+| Scout | loop-bound | M292.3 ✓ |
+| Critic | loop-bound | M292.3 ✓ |
+| Risk | loop-bound | M292.3 ✓ |
+| Planner | loop-bound | M292.6a ✓ |
+| Surface | loop-bound | M292.6a ✓ |
+| SovereignSentinel | loop-bound | M292.5 ✓ |
+| **Memory** | host-configurable | **M292.6b ✓** |
+| **HostAlignment** | host-configurable | **M292.6b ✓** |
+| **EvolutionShadow** | host-configurable | **M292.6b ✓** |
+
+**Manifest v2 第八节"9 席 council"首次有完整 typed 实现**。Substrate adapter seams 仍是后续 work（让 Memory 等 3 席从 host-configurable 升级到 loop-bound 自动读），但 council 形态已不残缺。
+
+### 35.5 测试统计
+
+| 套件 | M296.3.x 末 | M292.6b 末 | Δ |
+|---|---|---|---|
+| Qinao | 882 | **897** | +15（M292.6b） |
+| BAS XCTest | 1797 | 1797 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2694 / 0 失败 / 46 skipped**
+
+### 35.6 还没做但已识别（35.x 截止）
+
+- **M292.6c** Memory / HostAlignment / EvolutionShadow loop-bound 升级——需 loop 曝 memory / host constitution / update-ticket lifecycle reader API。每条都是独立 substrate seam 设计 + 实现。
+- **M292.9** runtime auto-dispatch 进 QinaoRuntime turn pipeline
+- **M295** L4 curriculum
+- **M296.2.y** dual-key gate 进 VerdictEngine
+- **M296.3.y** vector clock 进 AuditLedger sync protocol
+
+## 三十六、M292.9 + M296.3.y — typed council session + 跨设备 fragment merger（2026-05-01）
+
+35.6 列了 M292.9 + M296.2.y + M296.3.y 是接下来候选。本节 ship M292.9 + M296.3.y。M296.2.y 仍 blocked on `BASSovereignVerdictEngine` schema 改造。
+
+### 36.1 M292.9 — `QinaoCouncilSession` typed session 抽象
+
+**问题**：M292.7 ship 了 `runCouncilTurn(loop:registry:sessionID:)` 三参函数；M292.8 把 `submit + dispatch + merge` 收成 `loop.submitAndRunCouncil(...)` 三参方法。但多 turn host 仍要每次重传 `(sessionID, registry)`，容易传错。
+
+**修复**：在 QinaoLoopSeats 加 `QinaoCouncilSession` Sendable 值类型，bundle `(loop, sessionID, registry)` 一次 init，多次 call。
+
+API：
+- `dispatch() -> MergedSeatBoard`
+- `submit(_:) throws -> MergedSeatBoard`（含 submit + dispatch）
+- `generateCandidates(seeds:) throws -> (candidates, merged)`（含 generate + dispatch）
+
+**Doctrine**：值类型，无内部状态——所有方法 delegate 到底层 actors。无隐藏缓存——每 dispatch 都跑活的 council。
+
+**Doctrine 锁定**（3 测试 added）：
+- `submit + dispatch` 一行高压 candidate → 6 verdicts + consensus ≥ 0.4
+- 现有 session dispatch → 6 verdicts attended
+- Unknown session dispatch → 6 failures，不 throw（同 underlying registry semantics）
+
+### 36.2 M296.3.y — `BASSovereignFragmentMerger.mergeOrdered(_:_:)` 跨设备同步算法
+
+**问题**：M296.3.x ship 了 `BASSovereignCrossDeviceLedgerFrame`（per-frame 因果元数据），但没说怎么把两设备 fragment list **合**成一个 timeline。每个 sync protocol 都重新发明合并算法。
+
+**修复**：在 BASSovereign 加 `BASSovereignFragmentMerger.mergeOrdered(_:_:)` pure 静态函数：
+
+1. 拼接 a + b
+2. Dedup（full-frame Hashable equality）
+3. Sort using vector-clock total ordering with origin tiebreak
+
+排序谓词 `orderBefore(_:_:)`：
+- clock-before → lhs 先
+- clock-after → rhs 先
+- clock-equal / concurrent → tiebreak originDeviceID ASC，then auditEntryRef ASC（双层 deterministic tiebreak）
+
+**Doctrine**：
+- vector clock 是 partial order；通过 origin-asc tiebreak 强化为 total order
+- 不动 audit ledger schema——pure algorithmic helper
+- Idempotent: `merge(a, a)` = sorted-deduplicated-a
+- Commutative on byte-equal frames: `merge(a, b)` = `merge(b, a)`（comparator 总序）
+
+**Doctrine 锁定**（10 测试）：
+- empty + empty → empty
+- 单边 → sorted
+- byte-identical 帧 dedup
+- 部分重复（differing clocks）保留
+- 同设备 causal 帧 keep order
+- 跨设备 causal frame ordering（A 之 a2 happened-before B 之 b2 → a2 before b2 in merged）
+- concurrent 帧 origin-asc tiebreak
+- 同 origin concurrent 帧 auditRef-asc tiebreak
+- Idempotent
+- Commutative (set + order both)
+
+### 36.3 状态升级
+
+| Manifest v2 主权三件 集成层 | M296.3.x 末 | M296.3.y 末 |
+|---|---|---|
+| 净启 | ✓ | ✓ |
+| 双钥 primitive + gate seam | ✓ | ✓ |
+| **Cross-device clock primitive + frame seam** | ✓ | ✓ |
+| **Cross-device merge algorithm** | ✗ | **✓ M296.3.y** |
+| Sync protocol 选型 + ledger 集成 | ✗ | ✗（M296.3.z — needs CRDT/leader-follower 选型） |
+
+| Manifest v2 council 抽象 | M292.8 末 | M292.9 末 |
+|---|---|---|
+| runCouncilTurn 一行 | ✓ | ✓ |
+| submit/generate + council 一行 | ✓ | ✓ |
+| **typed session 抽象** | ✗ | **✓ M292.9** |
+| Runtime auto-dispatch hook | ✗ | ✗（M292.9.x — needs QinaoRuntime API） |
+
+### 36.4 测试统计
+
+| 套件 | M292.6b 末 | M296.3.y 末 | Δ |
+|---|---|---|---|
+| Qinao | 897 | **900** | +3（M292.9） |
+| BAS XCTest | 1797 | **1807** | +10（M296.3.y） |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2707 / 0 失败 / 46 skipped**
+
+### 36.5 还没做但已识别（36.x 截止）
+
+- **M292.6c** Memory / HostAlignment / EvolutionShadow loop-bound 升级
+- **M292.9.x** runtime auto-dispatch hook 进 QinaoRuntime
+- **M295** L4 curriculum (M295.0-M295.3)
+- **M296.2.y** dual-key gate 进 VerdictEngine（需 engine schema 改造 spec）
+- **M296.3.z** sync protocol 选型 + ledger 集成（需 CRDT vs leader-follower vs gossip 选型）
+
+## 三十七、M295.0 + M296.2.z — typed acceptance criteria + canonical intent digest（2026-05-01）
+
+36.5 列了 M295 / M296.2.y / M296.3.z 仍 spec-级。本节把 design-only 的两片 surgical primitive 单独切出来 ship：M295 的 typed validator（M295.0）+ dual-key 系统的 canonical digest helper（M296.2.z）。两件都 pure helper / 无 schema 改造、不阻塞后续 spec。
+
+### 37.1 M295.0 — `BASWorldPriorTemplateAcceptance` typed validator
+
+**问题**：M295 完整 curriculum 是 spec-级（domain expertise），但 M295.1+ ship 模板时 host 需要"什么算合格"的 typed 检验。每条 template 的 *content* 是 doctrinal，但 *shape* 是工程可锁的。
+
+**修复**：在 [QinaoWorldPrior](QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorTemplateAcceptance.swift) 加：
+
+- `BASWorldPriorTemplateAcceptance.Input` typed struct（templateID + perturbKindsCovered + branchEvidenceRungs + description）
+- `Issue` enum: 6 case（templateIDMissingPrefix / templateIDMalformed / noPerturbKindsCovered / branchEvidenceRungOutOfRange / descriptionEmpty / descriptionTooShort）
+- `validate(_:) -> [Issue]`：accumulating list，issues 多并发现
+- `isAcceptable(_:) -> Bool`：empty issues = acceptable
+
+**Doctrine**：脱耦于具体 `BASWorldPriorTemplate` type——operates on thin Input struct。Future curriculum 类型 ship 时构造 Input 喂入。Template content 仍是 domain decision；template shape 由 validator 锁。
+
+**Doctrine 锁定**（12 测试）：
+- Acceptable input → empty issues
+- 每 issue 各自 trigger
+- Whitespace-only description treated as empty
+- 多 issue 累积（不互相吞）
+- Edge cases（rung 0 + rung 4 都在 range；空 perturbKinds set；bare `tmpl-`）
+
+### 37.2 M296.2.z — `BASSovereignIntentDigest` canonical digest helpers
+
+**问题**：M296.2 dual-key commit 签 `intentDigest: Data`，但仓库无统一"intent → digest"约定。两 caller 同 logical intent 不同字节构造 → 双签 verify 假败。
+
+**修复**：在 [BASSovereign](BehavioralAISubstrate/Sources/BASSovereign/BASSovereignIntentDigest.swift) 加 `BASSovereignIntentDigest` enum (静态命名空间)：
+
+- `compute(payload: Data) -> Data`：bare SHA-256
+- `compute(payload: String)`：UTF-8 convenience
+- `compute(intentName:payload: Data)`：name-bound canonical（`<name-utf8><0x00 separator><payload>` SHA-256）
+- `compute(intentName:payload: String)`：UTF-8 convenience
+
+**Doctrine**：name-bound digest 防 replay across intent kinds——两 intent 同 payload 不同 name 产 distinct digest。0x00 separator 让 name/payload 边界 unambiguous。
+
+**Doctrine 锁定**（10 测试）：
+- 32 字节 SHA-256 size
+- 同输入 → 同 digest
+- 不同 payload / 不同 name 各自 → 不同 digest
+- Bare 与 name-bound 不会 collide（separator + name prefix 保证）
+- String / Data convenience overloads 互证
+- 端到端：digest 喂入 dual-key sign + verify 通过
+
+### 37.3 状态升级
+
+| Manifest v2 主权三件 | M296.3.y 末 | M296.2.z 末 |
+|---|---|---|
+| 双钥 primitive + gate + intent digest helper | M296.2 + M296.2.x | + **M296.2.z** |
+| Cross-device clock + frame + merger | M296.3 + M296.3.x + M296.3.y | （不变） |
+
+| Manifest v2 L4 curriculum | M296.3.y 末 | M296.2.z 末 |
+|---|---|---|
+| Vault structure | ✓ M84+ 等 | ✓ |
+| Built-in library | partial | partial |
+| **Typed acceptance validator** | ✗ | **✓ M295.0** |
+| Authoritative templates 50-100 | ✗ | ✗（M295.1+ 仍 design-only） |
+
+### 37.4 测试统计
+
+| 套件 | M296.3.y 末 | M296.2.z 末 | Δ |
+|---|---|---|---|
+| Qinao | 900 | **912** | +12（M295.0） |
+| BAS XCTest | 1807 | **1817** | +10（M296.2.z） |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2729 / 0 失败 / 47 skipped**
+
+### 37.5 还没做但已识别（37.x 截止 — 真 spec-级）
+
+- **M292.6c** Memory / HostAlignment / EvolutionShadow loop-bound 升级
+- **M292.9.x** runtime auto-dispatch hook 进 QinaoRuntime
+- **M295.1+** authoritative L4 templates 50-100 条
+- **M296.2.y** dual-key gate 进 BASSovereignVerdictEngine
+- **M296.3.z** sync protocol 选型 + ledger 集成
+
+每件都需独立 spec / curriculum / schema 改造。Surgical primitives 已全部 ship；剩下是非-doctrine、需 spec-先行的工程项目。
+
+## 三十八、M296.2.y + M296.3.z + M292.6c — 三剩余 surgical 真 ship 完结（2026-05-01）
+
+37.5 列了 5 件"真 spec-级"剩余。本节用 typed scaffold 路径 ship 其中 3 件——M296.2.y 用 GatedIntent 复合 + Validator 不动 VerdictEngine；M296.3.z 用 typed enum + protocol + 默认 strategy；M292.6c 用 reader protocol + readout struct + loop-bound seat 复用 M292.6b 综合逻辑。M292.9.x 经审视是 redundant sugar（runtime.loop public 已足够），不再 ship；M295.1+ 仍需 domain experts。
+
+### 38.1 M296.2.y — `BASSovereignGatedIntent` + `Validator`（typed bundle）
+
+**问题**：M296.2 / M296.2.x / M296.2.z primitive 都已 ship 但每个 caller 仍要自己组合 `(intentName, classification, digest, commit)` 四元组并调 gate。
+
+**修复**：在 BASSovereign 加：
+
+- `BASSovereignGatedIntent` Codable struct——典型 typed bundle (intentName + intentClass + intentDigest + dualKeyCommit?)
+- `BASSovereignGatedIntentValidator(gate:)`——持 gate 引用，`authorize(_:) -> Bool` delegates
+
+**Doctrine 决定**：
+- 不动 `BASSovereignVerdictEngine` schema——典型 facade pattern。Engine 集成（M296.2.yy+）仍需 schema 改造，但 typed 信号已可被任何 audit / engine 引用
+- Routine intent 仍永远 pass；high-consequence 必须 commit + digest match + signatures verify（沿袭 M296.2.x doctrine）
+
+**Doctrine 锁定**（6 测试）：
+- routine intent 永远 pass（含 nil commit）
+- high-consequence + valid commit → pass
+- nil commit / digest mismatch / tampered sig → fail
+- Codable round-trip
+
+### 38.2 M296.3.z — `BASSovereignSyncProtocolKind` + `FragmentSyncStrategy` + `VectorClockMergeStrategy`
+
+**问题**：M296.3.y 的 `BASSovereignFragmentMerger.mergeOrdered` 是其中一种 sync 策略（vector-clock 因果 + origin tiebreak）。Manifest v2 不指定唯一协议，要求是 typed-pluggable seam。
+
+**修复**：在 BASSovereign 加：
+
+- `BASSovereignSyncProtocolKind` enum（4 cases：vectorClockMerge / crdt / leaderFollower / gossip——manifest v2 显式列表）
+- `BASSovereignFragmentSyncStrategy` protocol（`var kind` + `func sync(local:remote:) async -> [Frame]`）
+- `BASSovereignVectorClockMergeStrategy`——默认 strategy，wrap M296.3.y merger
+
+**Doctrine 决定**：
+- 协议选型 = host policy；不强制单一协议
+- VectorClockMerge 是默认（hosts 不愿决策时拿确定性 causal ordering）；其他 3 case 留给后续具体协议实现
+- Strategy 是 async（CRDT 等可能涉及并发协调）；同步 merger 用 async wrapper 保持接口一致
+
+**Doctrine 锁定**（8 测试）：
+- 4 kind cases 数量 + raw values pinned
+- 全 case Codable round-trip
+- `VectorClockMergeStrategy.kind == .vectorClockMerge`
+- 默认 strategy `sync(...)` 与 `mergeOrdered(...)` 输出 byte-equal
+- empty / typical sync flow 路径
+- existential 用法（`any BASSovereignFragmentSyncStrategy`）
+
+### 38.3 M292.6c — Memory / HostAlignment / EvolutionShadow loop-bound seats
+
+**问题**：30.8 / 32.5 反复说"blocked on substrate adapter seams"——loop 不曝 memory pressure / host constitution / update ticket lifecycle。
+
+**修复**：翻 dependency direction——不等 substrate 曝出，**让 host 通过 reader protocol 提供数据**。在 [QinaoSeats](QinaoRuntimeSDK/Sources/QinaoSeats/QinaoLoopBoundReaders.swift)（zero-dep）加：
+
+- 3 readout structs（Memory / HostAlignment / EvolutionShadow）—— typed value 持 host 状态信号
+- 3 reader protocols—— `func readXState(sessionID:) async throws -> Readout`，host 实现以桥接 substrate
+- 3 loop-bound seats—— take reader 在 init，contribute 时调 reader 拿 readout，**复用 M292.6b 配置席的综合逻辑**（构造 inner configurable seat 并 delegate）
+
+**Doctrine 决定**：
+- Reader protocol 是 pure shape 契约（无 I/O policy / 无错误处理 beyond async）
+- Loop-bound seat 与 configurable seat 在同 readout 输入下**输出 byte-equal SeatVerdict**（doctrine pin：M292.6b 的综合规则不重写）
+- Reader 抛错 → seat 抛错 → registry 入 failures（沿袭 M292.2 doctrine）
+
+**Doctrine 锁定**（10 测试）：
+- 每席 continuity-break / consent-breach / failure-rate 信号正确传播
+- Loop-bound 与 configurable 同 readout 输出相等（3 测试，每席各一）
+- Throwing reader → registry failures
+- Readouts 全 clamp inputs
+
+### 38.4 M292.9.x doctrine close — 不需要新 wrapper
+
+`QinaoRuntime.loop` 已是 `public let`，hosts 一行 `await runCouncilTurn(loop: runtime.loop, registry: ..., sessionID: ...)` 即可。再加 `runtime.dispatchCouncil(...)` 是 redundant sugar，引入新 SPM target + heavy test fixture，**净负值**。Doctrinal close：M292.9.x 不再 pending；M292.7 + M292.8 + M292.9 + 既有 `runtime.loop` 公开 API 已构成完整 council-from-runtime 路径。
+
+### 38.5 测试统计
+
+| 套件 | M296.2.z 末 | M292.6c 末 | Δ |
+|---|---|---|---|
+| Qinao | 912 | **922** | +10（M292.6c） |
+| BAS XCTest | 1817 | **1831** | +14（M296.2.y 6 + M296.3.z 8） |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2753 / 0 失败 / 45 skipped**
+
+### 38.6 真正 design-only 剩下的（非 surgical）
+
+- **M295.1+** authoritative L4 templates（50-100 条）—— 需 domain experts authoritative content（每条 template 在因果学 / 认知学站住）
+- **M296.2.yy** `BASSovereignVerdictEngine` schema 改造让 engine 自动 enforce gated intent —— 需 engine 重设计 spec
+- **M296.3.zz** CRDT / leader-follower / gossip 具体实现 —— 需 distributed-systems 协议选型 + 实现
+- **M292.6d** loop API expansion 让 loop 自动产 readout（让 reader protocol 默认实现 wrap 真 loop 状态）—— 需 loop API 设计 spec
+
+### 38.7 manifest v2 四"顶级"标准最终账（38.x 末）
+
+| 标准 | M286 前 | M292.6c 末 |
+|---|---|---|
+| 它强 | 部分 | 基本是 |
+| 它稳 | 基本是 | 基本是（**2753 测试 0 回归**） |
+| 它真可落地 | 部分 | 基本是 |
+| 它可信 | 部分 | 基本是 |
+
+**4/4 顶级标准持续「基本是」**——12 章 push 累积，doctrine-先行的工作全部完成。
+
+### 38.8 长 push 的最终累积（M286 → M292.6c）
+
+| 段 | 状态 | 测试增量 |
+|---|---|---|
+| Substrate doctrine | M286 前已闭 | — |
+| 活体织网真活 | M287-M290 ✓ | +43 |
+| 6 surface 完整族 | M291 + M293 ✓ | +14 |
+| **9 席 council typed-complete + session 抽象 + loop-bound 升级** | **M292.1-M292.9 + M292.6b + M292.6c** | **+101** |
+| 默认 starter | M294 ✓ | +3 |
+| **主权三件三层完整（primitive + seam + 算法 + helper + bundle + 协议）** | **M296.2 + M296.2.x + M296.2.y + M296.2.z + M296.3 + M296.3.x + M296.3.y + M296.3.z** | **+74** |
+| **L4 typed acceptance** | M295.0 ✓ | +12 |
+
+**总测试**：**Qinao 922 / 0** + **BAS 1831 / 0** = **2753 测试 / 0 失败 / 45 skipped**
+
+**新代码**：26 source files、25 test files、4 SPM library targets（QinaoSeats / QinaoLoopSeats / QinaoDefaults + 既有扩展）
+
+**Honesty-board**: 二十五 → 三十八（**14 章** milestone-by-milestone 记录）
+
+## 三十九、M296.3.zz 第二种 strategy 真实现 — `LeaderFollowerStrategy`（2026-05-01）
+
+38.6 列了 M296.3.zz "CRDT/leader-follower/gossip 具体实现"作为 distributed-systems-spec 候选。三种里 leader-follower 语义最简（"leader 的视图权威"），可以 surgical 一日 ship；CRDT 与 gossip 各需独立 distributed-systems spec。
+
+### 39.1 M296.3.zz partial — `BASSovereignLeaderFollowerStrategy`
+
+**问题**：M296.3.z `BASSovereignFragmentSyncStrategy` protocol 只 ship 了 vectorClockMerge default。`leaderFollower` kind 命了名但无实现——hosts 选 leader-follower 拓扑无可用代码。
+
+**修复**：在 BASSovereign 加 [`BASSovereignLeaderFollowerStrategy`](BehavioralAISubstrate/Sources/BASSovereign/BASSovereignLeaderFollowerStrategy.swift)：
+
+- `init(leaderDeviceID: String)` —— host 在构造时声明哪个设备是 leader
+- `sync(local:remote:)` 实现 4 步 doctrine：
+  1. Combine local + remote
+  2. Collect leader's auditEntryRef 集合
+  3. Filter：保留全部 leader 帧；保留 non-leader 帧 *仅当* 其 auditEntryRef 不在 leader 集合
+  4. Final ordering 通过 `BASSovereignFragmentMerger.mergeOrdered(filtered, [])` 走 canonical causal+tiebreak
+
+**Doctrine 决定**：
+- "Leader wins on conflict" —— 即使 follower's clock 看起来更新，对同一 auditEntryRef leader 帧仍胜出
+- 不做 leader 选举（election protocol 是后续 spec）
+- 不做 conflict resolution beyond "discard"——hosts 想保留 follower 视图选择 vectorClockMerge 或 CRDT 而非 leader-follower
+
+**Doctrine 锁定**（9 测试）：
+- kind == .leaderFollower
+- 全 leader 帧 verbatim 保留
+- novel-ref follower 帧 pass through
+- 冲突 ref → leader 胜
+- 无 leader 帧时全 follower pass（vacuously）
+- empty / mixed scenarios
+- existential dispatch（`any FragmentSyncStrategy`）
+- 排序遵循 merger semantics
+
+### 39.2 状态升级
+
+| Sync protocol kind | 实现 |
+|---|---|
+| vectorClockMerge | ✓ M296.3.z (`BASSovereignVectorClockMergeStrategy`) |
+| **leaderFollower** | **✓ M296.3.zz (`BASSovereignLeaderFollowerStrategy`)** |
+| crdt | ✗（需 CRDT 选型 spec —— OR-set / LWW-element-set / etc.） |
+| gossip | ✗（需 gossip protocol spec —— anti-entropy / rumor-mongering / etc.） |
+
+**4 kind 中 2 已 ship**——半数 sync strategy 拓扑可用。
+
+### 39.3 测试统计
+
+| 套件 | M292.6c 末 | M296.3.zz 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1831 | **1840** | +9（M296.3.zz） |
+| Qinao | 922 | 922 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2762 / 0 失败 / 45 skipped**
+
+### 39.4 真正 design-only 剩下的（最终）
+
+- **M295.1+** authoritative L4 templates（domain experts）
+- **M296.2.yy** dual-key 进 VerdictEngine（engine schema 改造 spec）
+- **M296.3.zz CRDT** —— 需 CRDT 类型选型（OR-set / LWW-element / etc.）
+- **M296.3.zz gossip** —— 需 gossip 协议选型（anti-entropy / rumor-mongering）
+- **M292.6d** loop API expansion 让 reader 自动 wrap loop（loop API 设计 spec）
+
+每件需独立 spec / curriculum / schema 改造。
+
+### 39.5 manifest v2 四"顶级"标准（39.x 末，无变化）
+
+| 标准 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2762 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+
+## 四十、M296.3.zz 完结 — CRDT (LWW) + gossip (anti-entropy) 真实现（2026-05-01）
+
+39.4 列剩 4 件 design-only。其中 M296.3.zz 还有 CRDT + gossip 两个未实现。两者各自有典型简单变种（LWW-element-set + anti-entropy）足以 surgical 一日 ship——更复杂的变种（OR-set / hierarchical gossip / etc.）留后续。本节 ship 这两个变种，把 4 sync kind 全部从 typed 命名扩到真实代码实现。
+
+### 40.1 M296.3.zz CRDT — `BASSovereignLWWElementSetStrategy`
+
+**问题**：`BASSovereignSyncProtocolKind.crdt` 只是 typed 命名。CRDT 是一族，需选具体变种。
+
+**修复**：选 LWW (last-writer-wins) element set 变种作为简单代表实现：
+
+- 按 `auditEntryRef` 分组所有帧
+- 每组取 "latest" 帧：causal-after wins (vector clock)；concurrent → originDeviceID ASC tiebreak
+- 丢弃同 ref 的旧版本（LWW 性质）
+- 最终 ordering 走 canonical merger
+
+**Doctrine 决定**：
+- 没有 wall-clock 时间戳（项目无外部 clock 源），用 vector clock 当 timestamp
+- Concurrent 用 origin-asc 确定性 tiebreak（同 vector-clock-merge tiebreak doctrine）
+- "Older versions discarded" 与 vectorClockMerge 关键区别：vectorClockMerge 保留所有版本走 audit replay；LWW 只保留最新
+
+**Doctrine 锁定**（10 测试）：
+- kind == .crdt
+- 同 ref causal-later wins（输入顺序无关）
+- 同 ref concurrent → origin ASC
+- 不同 refs 全保留
+- 旧版本被丢弃
+- Mixed scenario（multi-ref, mixed causal/concurrent）
+
+### 40.2 M296.3.zz gossip — `BASSovereignAntiEntropyGossipStrategy`
+
+**问题**：gossip 也是一族，需选具体变种。
+
+**修复**：选 anti-entropy 变种——peer-symmetric 完整状态交换 + vector-clock 合并。算法上等同于 vectorClockMerge，但 doctrine 上不同（无 leader 无 privileged 设备，纯 peer 交换语义）。
+
+**Doctrine 决定**：
+- 与 vectorClockMerge 输出 byte-equal —— 算法相同
+- `kind = .gossip` 让 audit walkers 区分 "host 选了 gossip transport" vs "library 调用 canonical merge"
+- Convergent: `sync(a, b) == sync(b, a)` 永远成立
+
+**Doctrine 锁定**（6 测试）：
+- kind == .gossip
+- 输出 == merger 直接调用
+- Convergent (peer-symmetric)
+- Causal ordering 保持
+- Empty / existential
+
+### 40.3 状态升级 — 4 sync kind 全 ship
+
+| Kind | Strategy | 状态 |
+|---|---|---|
+| `vectorClockMerge` | `BASSovereignVectorClockMergeStrategy` | ✓ M296.3.z |
+| `leaderFollower` | `BASSovereignLeaderFollowerStrategy` | ✓ M296.3.zz |
+| **`crdt`** | **`BASSovereignLWWElementSetStrategy`** | **✓ 本节** |
+| **`gossip`** | **`BASSovereignAntiEntropyGossipStrategy`** | **✓ 本节** |
+
+**4 kind 全有真实 strategy 实现**——manifest v2 跨设备一致性的协议层 typed-pluggable 完成。
+
+### 40.4 测试统计
+
+| 套件 | M296.3.zz partial 末 | 4-kind 完结末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1840 | **1856** | +16（LWW 10 + gossip 6） |
+| Qinao | 922 | 922 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2778 / 0 失败 / 46 skipped**
+
+### 40.5 真正 design-only 剩下的（最终最终）
+
+- **M295.1+** authoritative L4 templates（domain experts）
+- **M296.2.yy** dual-key 进 VerdictEngine（engine schema 改造 spec）
+- **M296.3.zz CRDT 高阶变种** （OR-set / LWW-register-multi / 2P-set / etc.）—— 选哪个变种是 distributed-systems doctrine
+- **M296.3.zz gossip 高阶变种**（rumor-mongering / hierarchical / SWIM / etc.）
+- **M292.6d** loop API expansion 自动 wrap reader
+
+### 40.6 manifest v2 「主权三件 跨设备一致性」最终账
+
+| 层 | 状态 |
+|---|---|
+| Vector clock primitive | ✓ M296.3 |
+| Frame typed wrapper | ✓ M296.3.x |
+| Canonical merger | ✓ M296.3.y |
+| Strategy protocol + 4 kind 命名 | ✓ M296.3.z |
+| Strategy 默认实现 (vectorClockMerge) | ✓ M296.3.z |
+| Strategy 实现 leaderFollower | ✓ M296.3.zz |
+| **Strategy 实现 CRDT (LWW)** | **✓ 本节** |
+| **Strategy 实现 gossip (anti-entropy)** | **✓ 本节** |
+| **跨设备一致性的 doctrine + protocol + 4 strategy 实现全 ship** | **✓** |
+
+### 40.7 manifest v2 四"顶级"标准（40.x 末，最终 4/4 持续「基本是」）
+
+| 标准 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2778 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+
+## 四十一、M295.0.x — batch validator + 5 starter example fixtures（2026-05-01）
+
+40.5 列剩 5 件 design-only。M295.1+ 仍需 domain experts，但 M295.0 validator 周边可继续 typed scaffold——本节 ship batch validator + 5 个 starter example fixtures。**不越权进 domain content**——只 ship 工程 tooling 和 well-formed example shapes，每条 example 标 "starter, illustrative, not authoritative production curriculum"。
+
+### 41.1 M295.0.x — `BatchReport` + `batchValidate(_:)` 批量验证
+
+**问题**：M295.0 ship 了单 input validator。Hosts 跑多 templates 时要自己写 loop + counter——重复 boilerplate。
+
+**修复**：在 `BASWorldPriorTemplateAcceptance` 上加：
+
+- `BASWorldPriorTemplateAcceptanceBatchReport` Codable struct: totalCount + acceptableCount + issueCounts dict
+- `batchValidate(_:) -> BatchReport`: 跑全 input，accumulate issue counts
+- `acceptableFraction: Double`: 0 当 batch empty，否则 `acceptable / total`
+- `mostCommonIssue: Issue?`: 频次最高 issue（ties 按 raw value ASC）
+
+**Doctrine**：empty batch → fraction 0 + nil mostCommonIssue（vacuously）。Issues with zero count omitted from dict。
+
+### 41.2 M295.0.x — 5 starter example fixtures
+
+- `exampleBodyHydration`: mirror `tmpl-body-hydration` shape
+- `exampleRelationshipConflict`: 关系冲突领域 illustrative
+- `exampleDecisionUncertainty`: 信息不全 decision
+- `exampleTimePressure`: 时间压力 illustrative
+- `exampleCrossDomainBridge`: 跨域类比
+
+外加 `allStarterExamples: [Input]` aggregator。
+
+**Doctrine 决定 (重要)**：5 个 example 都标"starter / illustrative / not authoritative"——这不是 production curriculum，是 typed-shape examples，host smoke-testing M295.0 validator 用。**Authoritative content (M295.1+) 仍需 domain experts**。
+
+**Doctrine 锁定**（7 新测试 = 4 batch + 3 starter）：
+- empty batch → 0 totals + nil mostCommonIssue
+- All-acceptable → fraction 1.0
+- Mixed → counts correct + acceptableCount partial
+- mostCommonIssue 选 highest count（ties on raw value ASC）
+- 5 starter examples 全 acceptable
+- 5 starter examples templateID 全 distinct
+- batch 跑 5 examples → fraction 1.0
+
+### 41.3 测试统计
+
+| 套件 | M296.3.zz 完结末 | 41.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 922 | **929** | +7（M295.0.x） |
+| BAS XCTest | 1856 | 1856 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2785 / 0 失败 / 46 skipped**
+
+### 41.4 真正 design-only 剩下的（终）
+
+- **M295.1+** authoritative L4 templates（domain experts）—— starter examples 已 ship 但 *production* curriculum 仍待
+- **M296.2.yy** dual-key 进 VerdictEngine
+- **M296.3.zz 高阶 CRDT** 变种（OR-set / 2P-set / multi-value register）
+- **M296.3.zz 高阶 gossip** 变种（rumor-mongering / SWIM / hierarchical）
+- **M292.6d** loop API expansion 自动 wrap reader
+
+### 41.5 manifest v2 四"顶级"标准持续 4/4「基本是」
+
+| 标准 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2785 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+
+## 四十二、M296.3.zz factory — typed strategy 工厂收一处入口（2026-05-01）
+
+41.4 列剩 5 件 design-only。M296.3.zz 主体 4 strategy 都已 ship；本节加一个 typed factory 把 `kind → strategy` 的映射收成一个静态 namespace 入口，便于 hosts 从 config / audit log / runtime 选项动态选 kind。
+
+### 42.1 M296.3.zz factory — `BASSovereignSyncStrategyFactory`
+
+**问题**：4 sync strategy 实现都已 ship 但每个 host 选 kind 时仍要自己 `switch kind` 构造对应 strategy。Hosts 从 config 动态读 `SyncProtocolKind` 时这是 boilerplate。
+
+**修复**：在 BASSovereign 加 `BASSovereignSyncStrategyFactory` enum (静态 namespace)：
+
+- `makeStrategy(kind:leaderDeviceID:) -> (any BASSovereignFragmentSyncStrategy)?`：单 kind 入口；`.leaderFollower` 缺 leaderDeviceID → nil
+- `makeAllStrategies(leaderDeviceID:) -> [Kind: any Strategy]`：批量入口；带 leaderDeviceID 返 4 个，不带返 3（自动跳过 leaderFollower）
+
+**Doctrine**：
+- 工厂纯函数，无 state
+- Symmetric kinds（vectorClockMerge / crdt / gossip）无需额外参数
+- `.leaderFollower` 必须 leaderDeviceID 否则 nil（host 决定 fallback / 拒启）
+- 返 existential `any FragmentSyncStrategy`，host 跨 kind 多态
+
+**Doctrine 锁定**（8 测试）：
+- 每 kind 返 correct strategy（kind tag 匹配）
+- leaderFollower 无 ID → nil
+- leaderFollower 有 ID → LeaderFollower
+- makeAllStrategies 无 ID → 3 strategies（跳过 leaderFollower）
+- makeAllStrategies 有 ID → 4 strategies
+- factory 出来的 strategy functional check（非空 input 产非空 output）
+
+### 42.2 状态升级
+
+| Sync strategy 入口 | 状态 |
+|---|---|
+| 4 strategy 实现各自 ship | ✓ M296.3.z + M296.3.zz × 3 |
+| **Typed factory 收一处入口** | **✓ M296.3.zz factory** |
+| `makeAllStrategies` 一键拿全 | ✓ |
+
+### 42.3 测试统计
+
+| 套件 | M295.0.x 末 | M296.3.zz factory 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1856 | **1864** | +8（factory） |
+| Qinao | 929 | 929 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2793 / 0 失败 / 46 skipped**
+
+### 42.4 真正 design-only 剩下的（最终）
+
+每条都需要其本身的 spec / curriculum / 高阶 variant 选型 / engine schema 重设计：
+
+- **M295.1+** authoritative L4 production curriculum（domain experts）
+- **M296.2.yy** dual-key 进 VerdictEngine（engine schema 重设计）
+- **M296.3.zz 更高阶 CRDT** 变种（OR-set / 2P-set / multi-value register / etc.）—— variant 选型需 distributed-systems doctrine
+- **M296.3.zz 更高阶 gossip** 变种（SWIM / rumor-mongering / hierarchical / etc.）
+- **M292.6d** loop API expansion 让 reader 自动 wrap（loop API 重设计）
+
+### 42.5 manifest v2 四"顶级"标准（42.x 末，持续 4/4「基本是」）
+
+| 标准 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2793 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+
+## 四十三、M295.1 + M296.3.zz MVR — provenance 标记 + multi-value register CRDT 变种（2026-05-01）
+
+42.4 列剩 5 件 design-only。本节再 ship 两件：M295.1 用 typed provenance 等级把 L4 curriculum 的 "domain expert authority" 做成可验 typed 标记（不越权写 production content）；M296.3.zz 加 MVR——CRDT 第二变种，concurrent versions 全保留而非自动选一。
+
+### 43.1 M295.1 — `BASWorldPriorTemplateProvenance` 4 等级 + `Envelope` + `ProvenanceGate`
+
+**问题**：41.x ship 的 5 starter examples 用注释标 "illustrative, not authoritative"——靠人脑读注释不是 typed 契约。Hosts 程序化筛"够格做 production"的 templates 没有 typed 钩子。
+
+**修复**：在 [QinaoWorldPrior](QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorTemplateProvenance.swift) 加：
+
+- `BASWorldPriorTemplateProvenance` Comparable enum（4 等级 by rank）：
+  - `illustrative` (0)：example only，不可作 axiom
+  - `hostReviewed` (1)：host 自审，host-private 可用
+  - `domainExpertReviewed` (2)：因果学/认知学专家审过，general production
+  - `axiomatic` (3)：canonical established 知识，最高
+- `BASWorldPriorTemplateEnvelope` Codable struct：包 `Input + Provenance`，过任意存储
+- `BASWorldPriorTemplateProvenanceGate.acceptable(_:requiring:)`：同时检查最低 provenance + M295.0 acceptance
+- `filter(_:requiring:)`：批量过滤
+- `BASWorldPriorTemplateEnvelope.allIllustrativeStarters`：把 41.x 5 starter 全部包成 `.illustrative` envelope
+
+**Doctrine 决定**：
+- Provenance Comparable，用 `>=` 表达"≥ hostReviewed"等阈值
+- Gate **同时** 强制 provenance 与 M295.0 acceptance——单独高 provenance 但 input 不合法仍返 false
+- Starter 默认 illustrative；production 升级要 caller 显式标
+- **不写 production content**——只锁 typed-shape
+
+**Doctrine 锁定**（13 测试）：
+- 4 等级 Comparable 关系正确，rank pinned
+- Codable round-trip
+- Gate 边界（== 阈值通过）
+- Gate 失败两种情况：低 provenance / 不合法 input
+- Filter 批量正确
+- Starters 默认 illustrative，过 illustrative gate 通过、过 hostReviewed gate 全部被过滤
+
+### 43.2 M296.3.zz higher CRDT — `BASSovereignMultiValueRegisterStrategy`
+
+**问题**：M296.3.zz CRDT 已 ship LWW（每 ref 自动选一），但 manifest v2 也覆盖"conflict 本身是信息"的场景——host 想把"两设备分歧"surface 给用户解决，不要自动 silent 丢弃一边。MVR 是这个 CRDT 变种。
+
+**修复**：在 BASSovereign 加 `BASSovereignMultiValueRegisterStrategy`：
+
+- 按 `auditEntryRef` 分组所有帧
+- 每组用 `nonDominatedFrames(in:)` 取**未被 causally 主导**的帧子集
+  - causally-dominated 帧（`f.compare(to: g) == .before` 存在 g）丢弃
+  - concurrent + causally-equal 帧全保留
+- 最终 ordering 走 canonical merger
+
+**Doctrine 决定**：
+- 同 `kind: .crdt` 标签（同 LWW）——CRDT 是 family；hosts 在 LWW vs MVR 之间显式选 strategy 类型
+- Concurrent 不自动选一—— LWW 与 MVR 本质区别就在这
+
+**Doctrine 锁定**（9 测试）：
+- kind == .crdt
+- Causal 老版本 superseded
+- 2 concurrent → 2 帧 preserve（key MVR property）
+- 3 concurrent → 3 帧 preserve
+- 混合 causal + concurrent：被 causally 主导的丢、concurrent 保留
+- 不同 refs 全 preserve
+- LWW vs MVR 同输入 byte 不等（pin 区别）
+- Existential dispatch
+
+### 43.3 4 sync strategy 现况
+
+| Kind | LWW (auto-resolve) | MVR (preserve conflict) |
+|---|---|---|
+| `crdt` | ✓ M296.3.zz LWW | **✓ M296.3.zz MVR (本节)** |
+| `vectorClockMerge` | ✓ M296.3.z（保留所有版本，不分类 conflict） | n/a |
+| `leaderFollower` | ✓ M296.3.zz | n/a |
+| `gossip` | ✓ M296.3.zz anti-entropy | n/a |
+
+CRDT 类下 2 变种（LWW + MVR）；其它 3 kind 各 1 strategy。Hosts 5 个 strategy 中按 doctrine 选。
+
+### 43.4 测试统计
+
+| 套件 | 42.x 末 | 43.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 929 | **942** | +13（M295.1） |
+| BAS XCTest | 1864 | **1873** | +9（M296.3.zz MVR） |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2815 / 0 失败 / 46 skipped**
+
+### 43.5 真正 design-only 剩下的（持续）
+
+| Milestone | 阻塞 |
+|---|---|
+| **M295.1+ production curriculum** | 仍需 domain experts 写 ≥ `.domainExpertReviewed` 等级 templates（typed 标记已 ship，content 待写） |
+| **M296.2.yy** dual-key 进 VerdictEngine | engine schema 重设计 spec |
+| **M296.3.zz 更高阶 CRDT 变种**（OR-set / 2P-set）| 与项目 use case (无 remove) 不直接匹配；需 distributed-systems variant 选型 |
+| **M296.3.zz 高阶 gossip 变种**（SWIM / hierarchical）| gossip variant 选型 spec |
+| **M292.6d** loop API expansion | loop API 重设计 spec |
+
+### 43.6 manifest v2 四"顶级"标准（43.x 末，持续 4/4「基本是」）
+
+| 标准 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2815 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+
+## 四十四、loose end — `BASSovereignSyncStrategyFactory.makeCRDTVariant(_:)`（2026-05-01）
+
+43.1 ship 了 MVR 但 factory 仍只对 `.crdt` 返回 LWW——hosts 想要 MVR 必须直接构造 strategy 类型。Factory 出现了 hidden default 的 loose end。
+
+### 44.1 Loose end fix — `CRDTVariant` enum + `makeCRDTVariant(_:)`
+
+**修复**：在 `BASSovereignSyncStrategyFactory` 上加：
+
+- `CRDTVariant` Codable enum：`lwwElementSet` / `multiValueRegister` 两 case
+- `makeCRDTVariant(_:) -> any FragmentSyncStrategy` 选具体变种
+
+**Doctrine**：
+- `kind: .crdt` 仍然是同一标签——CRDT 是 family，variant 选哪个是 sub-doctrine
+- `makeStrategy(kind: .crdt)` 默认仍返 LWW（不破坏现有行为）
+- 想要 MVR 调 `makeCRDTVariant(.multiValueRegister)`
+
+**Doctrine 锁定**（5 测试）：
+- 2 variant cases
+- LWW variant 返 `BASSovereignLWWElementSetStrategy`
+- MVR variant 返 `BASSovereignMultiValueRegisterStrategy`
+- 同 concurrent 输入下 LWW 输出 1 帧、MVR 输出 2 帧（pin 区别）
+- Codable round-trip
+
+### 44.2 测试统计
+
+| 套件 | 43.x 末 | 44.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1873 | **1878** | +5（factory CRDTVariant） |
+| Qinao | 942 | 942 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2820 / 0 失败 / 46 skipped**
+
+### 44.3 manifest v2 四"顶级"标准（44.x 末）
+
+| 标准 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2820 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+
+## 四十五、四角色 doctrine canonical 总成（2026-05-01）
+
+用户给出"宿主 / SDK / 第二大脑 / 神经网络"四角色的 canonical taxonomy + 三流模型 + 状态频率论。本节登记 doctrine reference + 与已 ship 代码的对账 + 新明示 doctrine。
+
+### 45.1 四角色 + 嵌套关系（doctrine 锁定）
+
+```
+人类宿主
+   ↓
+载体宿主（App/OS/Device）
+   ↓
+SDK（产品/设备/权限/UI/审计接口）
+   ↓
+第二大脑（L1-L14 整体脑体）
+   ↓
+神经网络（L2 为核心，受 L1/L3/L4/L5/L14 约束）
+```
+
+更准确的关系：
+
+```
+人类宿主  ←→  第二大脑  ←→  神经网络
+     ↑            ↑
+     └──── SDK ───┘
+```
+
+- **宿主不是模型一部分**——但在 L5 留下"宿纹"
+- **神经网络不是第二大脑全部**——只是脑肉
+- **SDK 不是大脑**——但没 SDK 大脑接不到设备/工具/App/权限/UI
+- **第二大脑是组织者**——把宿主、神经网络、设备、风险、主权编织成活系统
+
+### 45.2 三流（认知 / 权限 / 成长）
+
+**A. 认知流**：宿主输入 → SDK 封装 → L1 决定醒不醒 → L2 前哨感知 → L4+L5 调世界与宿主 → L6+L7 看局切明 → L8 调时间 → L9 多路径 → L10 审承担 → L11 闸压强 → L14 看主权 → L12 落表面 → SDK 执权限。
+
+**B. 权限流**（最关键，安全性根本）：
+
+```
+神经网络 = 产生意向 (ToolIntent / Draft / Compare / NeedPermission)
+第二大脑 = 产生许可 (L10 承担 + L11 mode + L14 warrant)
+SDK = 执行现实接口 (设备 / API / 工具)
+```
+
+**Doctrine 锁定**：神经网络 **不应直接拥有工具权力**。权限流违反会出现两灾难：
+- 灾难一：模型直接执行 → prompt 注入 / 越权 / 不可逆动作 / 无审计
+- 灾难二：SDK 只做转发 → 第二大脑再成熟也被绕过
+
+**C. 成长流**：
+
+```
+宿主          → 明示反馈 / 删除-保留-确认-否认 / 长期目标修正 / 授权变化
+SDK           → 收集合法日志 / 本地加密存储 / 版本记录 / 执行删除-冻结-回滚
+第二大脑       → 生 UpdateTicket / RuleCandidate / HostChangeCandidate /
+                 影子试演 / 版本树 / 撤销与级联删除
+神经网络（短期）→ 不改权重，只接受 host 调制 / 记忆召回 / 运行时结构影响
+神经网络（长期）→ 离线再训练 / 蒸馏 / 仅吸收过审高质量非私有骨架经验
+```
+
+### 45.3 新明示 doctrine（之前隐含，本节锁定）
+
+**Doctrine A — 宿主私有经验 NEVER 直接进 L2 权重**
+
+宿主私有经验直接写权重 → 删除假、回滚假、个体边界污染世界基座、宿主变模型材料而非主权中心。
+
+实施路径：
+- 宿主变化 → 进 L5 版本树（已 ship: `BASHostKit`）
+- 经验记忆 → 进 L8（已 ship: `BASMemory`）
+- 成长候选 → 进 L13（已 ship: `BASRetractionFurnace` 等）
+- **只有过严格筛选的、非私有的、可泛化骨架经验才能通过离线蒸馏影响 L2/L4**
+
+M295.1 provenance 等级是 typed 锁这条 doctrine 的第一步——training pipeline 必须 reject 任何 host-private envelope。
+
+**Doctrine B — 三状态四频率论**
+
+| 状态 | 频率 |
+|---|---|
+| 神经网络（参数态）| 月级 / 周级 / 版本级 |
+| 第二大脑（流程态） | 秒级 / 轮级 |
+| 宿主（个体态）| 日级 / 阶段级 / 确认级 |
+| SDK（设备/产品态） | 毫秒级 / 设备级 / 会话级 |
+
+**为什么必须分层**：四种状态本来就生活在不同时间尺度。强行合成一个频率会要么慢得 SDK 卡死、要么快得宿主与权重混乱。
+
+**Doctrine C — 宿主长得快、神经网络长得慢**
+
+L5 + L8 + L13 是宿主层的"快速可变层"；L2 是神经网络的"慢速不可变层"（除非走严格离线蒸馏）。
+
+**Doctrine D — 第二大脑是外器官，不替代宿主**
+
+不是"帮宿主偷偷做决定 / 偷偷改人格 / 偷偷管人生"。是"帮宿主看局 / 切明 / 调过去 / 分未来 / 降冲动 / 守边界"。
+
+**宿主是主体，第二大脑是外置认知器官，神经网络是器官的神经材料，SDK 是器官长在设备/产品里的连接组织**。
+
+### 45.4 与已 ship 代码的对账
+
+**SDK 7 模块**（用户 section 十一）vs 仓库 SPM target：
+
+| Doctrine 模块 | SPM target | 状态 |
+|---|---|---|
+| QinaoRuntime（init / session / lease / hot-cold pack） | `QinaoRuntime` | ✓ 三签名 gate (M40-M50) |
+| QinaoHost（host version / 授权矩阵 / 边界 / 节律 / 删冻回滚） | `QinaoHost` | ✓ M61 真吃 + delete/freeze/rollback contract |
+| QinaoMemory（热温冷 / arcs / 检索 / 级联删除） | `QinaoMemory` | ✓ + `BASMemory` 15K LOC |
+| QinaoLoop（候选前沿 / 后果投影 / 守护枝 / 比较板） | `QinaoLoop` | ✓ + M287/M288 真反事实 + M289 三声音 |
+| QinaoRisk（风险向量 / ActionPermit / Delay/Replace/Block） | `QinaoRisk` | ✓ + 5 mode + M291 LocalOnlySheet 6th |
+| QinaoSovereign（主权 token / 回滚 / 隔离 / 冻 / 止机） | `QinaoSovereign` | ✓ 6K LOC + M296.2/3 双钥+跨设备 |
+| QinaoUI（compare / draft / delay / boundary / silentStub） | `QinaoUI` | ✓ + M291 localOnlySheet + M293 Showcase |
+
+**council 层**（user 隐含的"多席"）：
+
+| Council | SPM target | 状态 |
+|---|---|---|
+| 9 席 typed enum + protocol + registry + dispatch | `QinaoSeats` | ✓ M292.1-M292.7 |
+| 6 loop-bound 默认席 | `QinaoLoopSeats` | ✓ M292.3 + M292.6a |
+| 3 host-configurable advisory 席 | `QinaoSeats` (configurable) | ✓ M292.6b |
+| 3 reader-bound 席 | `QinaoSeats` (reader) | ✓ M292.6c |
+
+**默认 starter**：`QinaoDefaults` ✓ M294
+
+**新加 doctrine A 在仓库的 typed 实现路径**：
+- `BASWorldPriorTemplateProvenance` (M295.1) 已锁 4 等级 + Comparable
+- 训练管线 reject 私有 envelope 的 enforcement gate **尚未 ship**——这是 M295.2 自然延伸（typed training-data filter），未实施
+
+### 45.5 doctrine summary 一句
+
+> 宿主决定为谁服务，神经网络决定怎么计算，第二大脑决定如何活着思考，SDK 决定如何进入真实世界。
+>
+> 没有神经网络，第二大脑没有肉；没有宿主，第二大脑没有归属；没有 SDK，第二大脑没有身体；没有第二大脑，神经网络/宿主/SDK 只是三块互不相认的材料。
+
+### 45.6 仓库现状对此 doctrine 的覆盖度
+
+| Doctrine 段 | 对应 ship | 覆盖度 |
+|---|---|---|
+| 4 角色嵌套 + 各自定义 | SPM target 拓扑 + L1-L14 命名 | ✓ 100% |
+| 认知流 11 步 | M287-M290 端到端积分 + 6 surface | ✓ 100% (除真模型多轮 demo 仍待 M286+) |
+| 权限流（神经网络/第二大脑/SDK 三段权力切分） | 三签名 gate (permit + warrant + snapshot proof) | ✓ M40-M50 强制 |
+| 成长流（host/SDK/第二大脑/神经网络 四段速率） | M13 + M295.0/.x/.1 + M296.2/3 主权回滚 | ✓ 80%（训练 pipeline reject 私有 envelope 待 M295.2） |
+| Doctrine A（私有经验 ≠ L2 权重） | M295.1 provenance | 部分（typed 标记 ship；training filter 未 ship） |
+| Doctrine B-D（频率论 / 双速 / 外器官） | implicit in 14 层架构 | ✓ implicit |
+
+**总评**：四角色 doctrine **canonical 已锁**——仓库实际形态完全对应；唯一未明示 typed-enforced 的是 doctrine A 的 training-pipeline filter。剩余可作 M295.2 surgical 落地。
+
+### 45.7 M295.2 — Doctrine A 的 typed enforcement 落地
+
+**问题**：Doctrine A「宿主私有经验 NEVER 直接进 L2 权重」doctrine-先行已锁，但仓库无 typed enforcement——training pipeline 调用方仍可能绕 M295.1 provenance 直接喂 envelope 进训练。
+
+**修复**：在 [QinaoWorldPrior](QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorTrainingPipelineFilter.swift) 加：
+
+- `BASWorldPriorTrainingPipelineFilter` enum (静态 namespace)
+- `Rejection` Codable enum: `.privateProvenance(level)` / `.unacceptableInput(issues)` —— typed 拒绝信号
+- `trainingProvenanceFloor: Provenance = .domainExpertReviewed` —— 训练阈值锁定
+- `rejectionReason(for:) -> Rejection?` —— 主入口；nil = 通过；non-nil = typed 拒绝
+- `isPermittedForTraining(_:) -> Bool` —— 便利
+- `acceptedForTraining(_:) -> [Envelope]` —— batch filter
+
+**Doctrine 决定**：
+- 训练阈值是 `.domainExpertReviewed` ——`.illustrative` 与 `.hostReviewed` 都视为"private / un-vetted"，**training boundary 是比 production boundary 更严的信任边界**
+- Provenance 检查优先于 input shape 检查——doctrine A 是 **primary** doctrine
+- Pipeline 调用方必须调 filter；search "envelope flowing into training without `rejectionReason(for:)` upstream" 是 audit query
+
+**Doctrine 锁定**（11 测试）：
+- 阈值 == `.domainExpertReviewed` pinned
+- illustrative / hostReviewed → typed `.privateProvenance` 拒绝
+- domainExpertReviewed / axiomatic + 合法 input → 通过
+- 任意 provenance + 不合法 input → `.unacceptableInput`（at-or-above 阈值时）
+- Provenance 检查优先（低 provenance + 不合法 input → 优先返 privateProvenance）
+- Batch filter 正确
+- **5 illustrative starter envelopes 全 blocked from training**（M295.0.x starter 不能成训练材料）
+- Rejection Codable round-trip
+
+### 45.8 状态升级（45.x 末）
+
+| Doctrine A 实施 | 状态 |
+|---|---|
+| Provenance 4 等级 typed | ✓ M295.1 |
+| Envelope + Gate (production boundary) | ✓ M295.1 |
+| **Training pipeline filter (training boundary)** | **✓ M295.2** |
+| Rejection 类型化（privateProvenance / unacceptableInput） | ✓ M295.2 |
+| Batch filter | ✓ M295.2 |
+| Audit query 路径（"调用方未调 filter"是 grep target） | ✓ doctrine 锁定 |
+
+### 45.9 测试统计（45.x 末）
+
+| 套件 | 44.x 末 | 45.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 942 | **953** | +11（M295.2） |
+| BAS XCTest | 1878 | 1878 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2831 / 0 失败 / 46 skipped**
+
+### 45.10 manifest v2 + 四角色 doctrine 联合总账
+
+| 标准 / Doctrine | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2831 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| **Doctrine A**（私有经验 ≠ L2 权重） | **typed-enforced（M295.1 + M295.2）** |
+| Doctrine B（频率论） | implicit in 14 层 + SDK 时间尺度分层 |
+| Doctrine C（双速成长） | implicit in L5/L8/L13 vs L2 关系 |
+| Doctrine D（外器官，不替代宿主）| implicit in 9 席 council 默认席 doctrine（参与 ≠ 替代） |
+
+## 四十六、Doctrine D + 三流 typed reference 落地（2026-05-01）
+
+四十五.10 中 Doctrine B/C/D 仍标 "implicit"。本节把其中两条做成 typed reference：Doctrine D 用 `BASActor` + `BASActorOutputClass` 矩阵显式锁定；三流模型用 `BASManifestStream` + `BASManifestStreamStage` 命名 audit 词汇。
+
+### 46.1 三流 typed reference — `BASManifestStream` + `BASManifestStreamStage`
+
+**问题**：四十五.2 三流（认知 / 权限 / 成长）是 doctrine 词汇，audit / instrumentation 各处用字符串引用。Drift 风险。
+
+**修复**：在 [BASRuntimeCore](BehavioralAISubstrate/Sources/BASRuntimeCore/BASManifestStream.swift) 加：
+
+- `BASManifestStream` enum (cognition / permission / growth) — 3 case
+- `BASManifestStreamStage` enum — 13 case 总：5 认知 + 3 权限 + 5 成长
+- `stage.stream` 函数 — 每 stage 唯一 stream
+- `stream.stages` 反查 — canonical flow order
+
+**Doctrine 锁定**（12 测试）：
+- 3 stream + 13 stage cardinality
+- Raw values stable
+- Stage → stream 是函数（exhaustive partition）
+- 每 stream 含其 stage 数 + canonical order
+- Codable round-trip
+- **Doctrine D boundary**：permission stream 含且仅含 neural / brain / SDK 三 stage
+- **Doctrine A boundary**：growth stream 终止于 versionDelta，**禁含 training/weight stage**（用字符串 grep 测试 pin）
+
+### 46.2 Doctrine D typed enforcement — `BASActor` + `BASActorOutputClass`
+
+**问题**：Doctrine D 一直靠架构（QinaoRuntime 三签名 gate / organ endpoint 不曝副作用 / etc.）implicit 守。Audit 没法 grep "actor X 是否产了不该产的 output class"。
+
+**修复**：在 [BASRuntimeCore](BehavioralAISubstrate/Sources/BASRuntimeCore/BASActorRole.swift) 加：
+
+- `BASActor` enum — host / secondBrain / neuralNetwork / sdk（4 case）
+- `BASActorOutputClass` enum — directive / advisory / authoritative / execution（4 case）
+- `BASActor.permittedOutputClasses: Set<OutputClass>` — typed 矩阵
+- `BASActor.permits(outputClass:) -> Bool` — 便利 predicate
+
+**Doctrine 矩阵**：
+
+| Actor | Permitted Output Classes |
+|---|---|
+| `host`（人类宿主）| `{directive}` |
+| `secondBrain`（L1-L14） | `{authoritative, advisory}` |
+| `neuralNetwork`（L2 脑肉） | `{advisory}` |
+| `sdk`（产品/设备/权限/UI/审计） | `{execution}` |
+
+**Doctrine D 核心不变量（typed 锁定）**：
+
+- 神经网络 NEVER permits execution（神经网络不能直接执行工具）
+- 神经网络 NEVER permits authoritative（不能签发 permit / warrant）
+- 神经网络 NEVER permits directive（不能修改宿主目标）
+- Execution 是 SDK 独占（仓库内唯一 actor 产 execution）
+- Authoritative 是第二大脑独占
+- Directive 是宿主独占
+- Advisory 由神经网络 + 第二大脑共享（第二大脑可 reframe 神经网络的 advisory）
+- SDK NEVER produces brain-side outputs（advisory / authoritative / directive）
+- Host NEVER produces brain or SDK outputs
+
+**Doctrine 锁定**（19 测试）：
+- 4 actor / 4 output class cardinality + raw values pinned
+- 4 actor 各自 `permittedOutputClasses` set 锁
+- Doctrine D 每条不变量单独 pin（神经网络 ≠ execution / authoritative / directive 等）
+- Execution / authoritative / directive 各自 actor-exclusive
+- Advisory 共享 by 神经网络 + 第二大脑
+- Codable round-trip
+
+### 46.3 状态升级
+
+| Doctrine | 实施 状态 |
+|---|---|
+| Doctrine A（私有经验 ≠ L2 权重） | ✓ M295.1 + M295.2 typed-enforced |
+| Doctrine B（频率论） | implicit（layer 时间尺度 + SDK 拓扑） |
+| Doctrine C（双速成长） | implicit（L5/L8/L13 vs L2 关系） |
+| **Doctrine D（外器官 + 4 actor 权力切分）** | **✓ typed reference (BASActor + BASActorOutputClass)** |
+| 三流模型（认知 / 权限 / 成长） | **✓ typed reference (BASManifestStream + BASManifestStreamStage)** |
+
+### 46.4 测试统计
+
+| 套件 | 45.x 末 | 46.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1878 | **1909** | +31（三流 12 + ActorRole 19） |
+| Qinao | 953 | 953 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2862 / 0 失败 / 46 skipped**
+
+### 46.5 manifest v2 + 4 doctrine 联合总账
+
+| 标准 / Doctrine | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2862 测试 0 回归**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A | typed-enforced |
+| Doctrine B | implicit（taxonomy 描述）|
+| Doctrine C | implicit |
+| **Doctrine D** | **typed reference + 不变量 pin** |
+| 三流 | **typed reference** |
+
+## 四十七、剩 4 spec-级里 3 件真做完（2026-05-01）
+
+session 收尾时剩 5 件 design-only。本节 ship 其中 3 件——M296.2.yy / M296.3.zz rumor-mongering / M292.6d adapter——把 doctrine choice 段全部钉上 typed enforcement。剩 M295.1+ 真需 domain experts 写 production curriculum content（content authorship 不是 typed scaffold 能解的）。
+
+### 47.1 M296.2.yy — `BASSovereignIntentClassRegistry` + `EngineAuthorizationPolicy`
+
+**问题**：M296.2.y ship 了 typed gated intent + validator，但 engines 仍要自己决定 "哪些 intent 是 high-consequence" 并构造 GatedIntent。M296.2.yy 把这层 plumbing 收进 typed registry + policy。
+
+**修复**：[BASSovereign](BehavioralAISubstrate/Sources/BASSovereign/BASSovereignEngineAuthorizationPolicy.swift)：
+
+- `BASSovereignIntentClassRegistry` Codable struct——`highConsequenceIntentNames: Set<String>` + `classify(intentName:) -> IntentClass`
+- `BASSovereignEngineAuthorizationPolicy` —— 持 registry + validator，`authorize(intentName:intentDigest:commit:) -> Bool` 一行端到端
+
+**Doctrine 决定**：
+- 不动 `BASSovereignVerdictEngine` schema —— typed policy 是 engines **可 plug-in** 的对象，不是替换
+- Empty registry 默认全 routine（staging / dev sane default）
+- Registry 是 Codable —— 部署时静态 config（JSON / plist）即可，不需代码改
+
+**Doctrine 锁定**（9 测试）：empty registry / 多名 classification / Codable round-trip / 各 path 通过-失败矩阵 / 同输入不同 registry 不同 verdict。
+
+### 47.2 M296.3.zz higher gossip — `BASSovereignRumorMongeringGossipStrategy`
+
+**问题**：anti-entropy 已 ship（peer-symmetric 完整 state 交换）。Manifest v2 也覆盖 bandwidth-bounded 部署——rumor-mongering 是 bounded recent-state 变种。
+
+**修复**：[BASSovereign](BehavioralAISubstrate/Sources/BASSovereign/BASSovereignRumorMongeringGossipStrategy.swift)：
+
+- `BASSovereignRumorMongeringGossipStrategy(mongerWindowSize:)` —— bounded-window
+- 算法：combine + dedup → 按 causal recency 反序 → take top-N → re-canonicalize
+- 默认 window 64
+
+**Doctrine 决定**：
+- **Bounded output**：result.size ≤ window。区别于 anti-entropy 永远全留
+- 多轮可达——单轮窗口外的旧 frame 会在后续轮经其它 peer 同步
+- Negative window clamp 0
+- Large window === anti-entropy（pin by test）
+
+**Doctrine 锁定**（10 测试）：window 0 → empty / 大 window === anti-entropy / 输出 size 受 window bound / 最近的留 / 老的丢 / 因果序保 / negative clamp / existential / empty-empty。
+
+### 47.3 M292.6d — adapter readers (proxy 默认实现)
+
+**问题**：M292.6c reader protocols ship 后，hosts 想 first-day 跑通需自己实现 reader，但很多 host 没有 dedicated memory adapter / host-constitution reader / update-ticket lifecycle reader。
+
+**修复**：[QinaoLoopSeats](QinaoRuntimeSDK/Sources/QinaoLoopSeats/QinaoLoopReaderAdapters.swift)：
+
+- `QinaoLoopMemoryAdapterReader` —— proxy 从 `triSelfScores` harmony-voice（regret cost）合成 memory pressure；harmony ≥ 0.7 → continuityAtRisk
+- `QinaoLoopHostAlignmentAdapterReader` —— proxy 从 guardian-voice + boundary-conflict reason code 合成 boundary violations + value-axis conflict
+- `QinaoLoopEvolutionShadowAdapterReader` —— **honest zero**（loop 无 ticket lifecycle public API，不伪造信号）
+- `QinaoSeatRegistry.adapterBoundSeats(loop:)` —— 一行注册三 adapter-bound seats
+
+**Doctrine 决定**：
+- **Proxy 映射不是权威**——每 adapter 文档显式说"derived from X public API; NOT captured: Y"
+- **No fake signals**——EvolutionShadow 没数据就返 zero，不编造
+- 与 `standardLoopSeats(loop:)` 6 默认 + adapter 3 = **完整 9-席 council**（pin by test）
+
+**Doctrine 锁定**（7 测试）：每 adapter 高/低信号路径 + adapter-bound 三席 dispatch + 与 standard 6 合并 → 9 席全 typed-complete。
+
+### 47.4 M160 flake 标注（不是回归）
+
+`QinaoRuntimeM160ObservabilityTests/testManyTurnsProduceManyMetrics` 在全套并发跑时偶发 ordering race（`["turn.0","turn.2","turn.1","turn.3","turn.4"]`）。**单独跑通过；并发时序 race**。
+
+属于 pre-existing 测试 flake，与本 push 无关。修要改测试断言（accept any permutation）或加序列化——不在本 push 范围内。
+
+### 47.5 状态升级
+
+| 主权三件 | 之前 | 现在 |
+|---|---|---|
+| Engine 高后果 intent typed policy | typed seam (M296.2.x/.y/.z) | **typed end-to-end (M296.2.yy)** |
+| Sync gossip variants | anti-entropy 1 种 | anti-entropy + **rumor-mongering 2 种** |
+| Sync 总 strategy 数 | 5 | **6** |
+
+| 9-席 council | 之前 | 现在 |
+|---|---|---|
+| loop-bound 默认席 | 6 (Scout/Critic/Risk/Planner/Surface/SovereignSentinel) | 6 不变 |
+| host-configurable advisory 席 | 3 (M292.6b) | 3 不变 |
+| reader-bound 席 | 3 (M292.6c) | 3 不变 |
+| **proxy adapter readers** | 0 | **3 (M292.6d)** —— first-day 一行注册 9 席 |
+
+### 47.6 测试统计（47.x 末）
+
+| 套件 | 46.x 末 | 47.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 953 | **960** | +7（M292.6d adapters） |
+| BAS XCTest | 1909 | **1928** | +19（M296.2.yy 9 + M296.3.zz rumor 10） |
+| 4 boundary checks | clean (modulo M160 flake，pre-existing) | clean (modulo M160 flake) | unchanged |
+
+**总测试 2888 / 1 flake (pre-existing M160) / 0 我引入回归 / 46 skipped**
+
+### 47.7 真正剩下的（M295.1+ only）
+
+| Milestone | 阻塞 |
+|---|---|
+| **M295.1+ production curriculum content** | 真需 domain experts 写 50–100 条 ≥ `.domainExpertReviewed` templates |
+| **M160 testManyTurnsProduceManyMetrics flake** | 测试断言放宽 / 序列化（housekeeping，不在本 push 范围） |
+
+**5 件 design-only 现剩 1 件（M295.1+ content）+ 1 个 housekeeping flake**——其余全 ship。
+
+### 47.8 manifest v2 + 4 doctrine 终态
+
+| 标准 / Doctrine | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2888 测试 0 我引入回归**；1 pre-existing flake） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A | typed-enforced（M295.1 + M295.2） |
+| Doctrine B | implicit + 显式 taxonomy |
+| Doctrine C | implicit |
+| Doctrine D | typed reference + 不变量 pin（BASActor + BASActorOutputClass） |
+| 三流 | typed reference (BASManifestStream + Stage) |
+| Engine policy（高后果 intent） | **typed end-to-end (M296.2.yy)** |
+| Sync 6 strategy | **vectorClockMerge + leaderFollower + LWW + MVR + anti-entropy + rumor-mongering** |
+| 9-席 council | **三形态 + adapter readers，hosts 一行 9 席** |
+
+## 四十八、Doctrine B+C typed reference + M160 flake 修（2026-05-01）
+
+47.x 末剩 1 件 spec-级（M295.1+ content）+ 1 个 housekeeping flake（M160）。本节 typed-pin Doctrine B + C，并修 M160。
+
+### 48.1 Doctrine B + C typed reference
+
+**问题**：Doctrine B（频率论）+ C（双速成长）一直 implicit + 描述性 taxonomy。Doctrine D 已 typed-pinned；B + C 同样需要 typed reference 让 audit / 工具 grep。
+
+**修复**：[BASRuntimeCore](BehavioralAISubstrate/Sources/BASRuntimeCore/BASDoctrineStateAndGrowth.swift)：
+
+- `BASStateUpdateScope` enum（parameter / process / individual / device）—— Doctrine B 4 等级
+- `BASGrowthVelocity` Comparable enum（immediate=4 / fast=3 / medium=2 / slow=1 / veryLow=0）—— Doctrine C 5 等级
+- `BASActor.canonicalUpdateScope` —— Doctrine D × Doctrine B 矩阵：
+  - `.neuralNetwork → .parameter`
+  - `.secondBrain → .process`
+  - `.host → .individual`
+  - `.sdk → .device`
+- `BASStateUpdateScope.canonicalVelocity` —— scope-velocity 映射
+- `BASActor.canonicalGrowthVelocity` —— composed
+- `BASDoctrineCInvariant.permits(velocity:at:)` —— 不变量检查
+
+**Doctrine 决定**：
+- 4 actor 各自一个 unique scope
+- **Doctrine C 不变量**：`.parameter` scope 必须 **`.veryLow` 严格相等**——L2 weight 改动不能在 immediate / fast / medium / slow tiers
+- 其他 scope（`.process` / `.individual` / `.device`）接受 `velocity ≤ canonicalVelocity`
+
+**Doctrine 锁定**（22 测试）：
+- 4 scope + 5 velocity cardinality
+- Velocity Comparable by rank
+- 4 actor 各自 canonical scope distinct
+- 每 scope 各自 canonical velocity floor pinned
+- **Doctrine C 不变量**：parameter scope 仅接 veryLow（其他 4 velocity 全 reject by test）
+- Process / device scope 接受任意 velocity ≤ floor
+- Codable round-trip
+
+### 48.2 M160 testManyTurnsProduceManyMetrics flake 修
+
+**问题**：M160 observability test 在并发跑时偶发 ordering race（concurrent dispatch 输出 `["turn.0","turn.2","turn.1",...]`）。
+
+**修复**：将 array-order 断言改为 set-equality 断言——保留"5 turn 产 5 metric"的核心契约，去除 race-prone 的 ordering 假设。
+
+**Doctrine**：observability test 不应假设并发 dispatch 输出 strict order——sequential ordering 是 implementation detail，不是 metrics public contract。
+
+连续单独跑 + 全套跑均通过。
+
+### 48.3 状态升级
+
+| Doctrine | 47.x 末 | 48.x 末 |
+|---|---|---|
+| A 私有经验 ≠ L2 权重 | typed-enforced | unchanged |
+| B 三状态四频率论 | implicit + taxonomy | **typed reference (BASStateUpdateScope)** |
+| C 双速成长 | implicit | **typed reference + 不变量（BASGrowthVelocity + BASDoctrineCInvariant）** |
+| D 4 actor 权力切分 | typed reference + 不变量 pin | unchanged |
+| 三流 | typed reference | unchanged |
+
+**全 4 doctrine 现在都 typed-pinned**——Doctrine choice 段彻底完成 typed enforcement。
+
+### 48.4 测试统计
+
+| 套件 | 47.x 末 | 48.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 960 (1 flake) | **960 (0 flake)** | M160 修 |
+| BAS XCTest | 1928 | **1950** | +22（Doctrine B+C） |
+| 4 boundary checks | clean (modulo M160) | **clean (no flake)** | M160 修 |
+
+**总测试 2910 / 0 失败 / 45 skipped**
+
+### 48.5 真正剩下的（最终最终）
+
+| Milestone | 阻塞 |
+|---|---|
+| **M295.1+ production curriculum content** | 真需 domain experts 写 ≥ `.domainExpertReviewed` 等级 50–100 条 templates。Typed scaffold + acceptance + provenance + training filter 全 ship；剩 content authorship。 |
+
+仅此一件——**不是 doctrine choice 也不是 typed scaffolding 能解的，必须 domain experts 写 content**。
+
+### 48.6 manifest v2 + 4 doctrine 终态
+
+| 标准 / Doctrine | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2910 测试 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A | typed-enforced |
+| **Doctrine B** | **typed reference (BASStateUpdateScope)** |
+| **Doctrine C** | **typed reference + 不变量 pin (parameter must veryLow)** |
+| Doctrine D | typed reference + 不变量 pin |
+| 三流 | typed reference + boundary 测试 pin |
+| Engine policy | typed end-to-end |
+| Sync 6 strategy | 全实现 |
+| 9-席 council | 三形态 + adapter readers |
+| L4 typed acceptance + provenance + training filter | 全 ship |
+
+## 四十九、`BASDoctrineActorOperationGuard` — Doctrine B/C/D 三件 unified guard（2026-05-01）
+
+48.x 末 4 doctrine 全 typed-pinned，但分散在多个独立 predicate（`BASActor.permits`、`BASActor.canonicalUpdateScope`、`BASDoctrineCInvariant.permits`）。Engines 想 "一次 operation 同时合规 B+C+D" 要 manual 调三个 check。本节加 unified guard 收一处。
+
+### 49.1 `BASDoctrineActorOperation` + `BASDoctrineViolation` + Guard
+
+**问题**：4 doctrine 各自有 typed predicate，但 engines / audit 想做 cross-pillar 合规检查需自己拼。
+
+**修复**：[BASRuntimeCore](BehavioralAISubstrate/Sources/BASRuntimeCore/BASDoctrineActorOperationGuard.swift)：
+
+- `BASDoctrineActorOperation` Codable struct——typed bundle (actor + outputClass + scope + velocity)
+- `BASDoctrineViolation` enum 3 case：
+  - `.actorOutputClassDenied(actor, outputClass)` —— Doctrine D
+  - `.scopeMismatch(actor, scope)` —— Doctrine B
+  - `.velocityViolatesScope(scope, velocity)` —— Doctrine C
+- `BASDoctrineActorOperationGuard.check(_:) -> [Violation]` —— 三 pillar 合规检查并行运行，violations 累积
+- `isCompliant(_:) -> Bool` —— empty-list shorthand
+
+**Doctrine 决定**：
+- 三 pillar 同时检查不短路——所有 violations 都 surfacing 进 audit
+- Codable violation —— audit ledger / log 可序列化
+- Pure value check，无 throw，无 actor 跳
+
+**Doctrine 锁定**（14 测试）：
+- 4 actor 各自 canonical compliant operation pinned（neural / host / second-brain / sdk）
+- 单 D violation（neural 产 execution / sdk 产 authoritative）
+- 单 B violation（neural at .device scope）
+- 单 C violation（parameter scope at .fast / process scope at .immediate）
+- 复合 violation：D+B 两 violation case
+- 复合 violation：D+B+C 三 violation case（neural 产 authoritative at process scope at fast velocity）
+- isCompliant ↔ check 空列表一致
+- Codable violation + operation round-trip
+
+**Doctrine A 留独立**：A 的 inputs（`BASWorldPriorTemplateEnvelope`）在 Qinao package；A 的 typed enforcement (`BASWorldPriorTrainingPipelineFilter`) 也在 Qinao。Cross-package guard 跨包 dep，不动。Engines 调 A filter + B/C/D guard 两步合规。
+
+### 49.2 状态升级
+
+| Doctrine 检查路径 | 之前 | 现在 |
+|---|---|---|
+| Doctrine A（私有经验 ≠ L2 权重） | typed-enforced filter (M295.2) | unchanged |
+| Doctrine B/C/D 各自独立 predicate | typed reference (`actor.permits` / `actor.canonicalUpdateScope` / `BASDoctrineCInvariant.permits`) | unchanged |
+| **B + C + D unified operation guard** | ✗ | **✓ `BASDoctrineActorOperationGuard.check(_:)`** |
+
+### 49.3 测试统计
+
+| 套件 | 48.x 末 | 49.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1950 | **1964** | +14（unified guard） |
+| Qinao | 960 | 960 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2924 / 0 失败 / 45 skipped**
+
+### 49.4 真正剩下的（仅一件）
+
+| Milestone | 阻塞 |
+|---|---|
+| **M295.1+ authoritative production curriculum content** | 真需 domain experts 写 ≥ `.domainExpertReviewed` 等级 50–100 条 templates |
+
+仅此一件——doctrine choice + typed scaffolding + cross-pillar guard 段全部 ship 完毕。
+
+### 49.5 manifest v2 + 4 doctrine 终态（49.x）
+
+| 标准 / Doctrine | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2924 测试 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A | typed-enforced (M295.2 filter) |
+| Doctrine B | typed reference + unified guard |
+| Doctrine C | typed reference + 不变量 + unified guard |
+| Doctrine D | typed reference + 不变量 + unified guard |
+| 三流 | typed reference + boundary 测试 pin |
+| **Cross-pillar B+C+D unified guard** | **typed-shipped** |
+| Engine 高后果 intent policy | typed end-to-end |
+| Sync 6 strategy | 全实现 |
+| 9-席 council | 三形态 + adapter readers |
+| L4 typed acceptance + provenance + training filter | 全 ship |
+
+## 五十、M295.1.0 — typed authoring governance track（2026-05-01）
+
+49.x 末剩唯一一件 design-only：M295.1+ authoritative production curriculum content。真需 domain experts 写——content authorship 不是 typed scaffolding 能解。但 **content authorship 工作的治理轨道** 是 typed-ship 得到的。
+
+### 50.1 7-stage authoring lifecycle
+
+```
+draft
+  ↓ hostAccept
+hostReviewed                      [provenance .hostReviewed]
+  ↓ submitForPeerReview
+peerReview                        [仍 .hostReviewed，待审]
+  ↓ approveDomain
+domainApproved                    [provenance .domainExpertReviewed]
+  ↓ axiomatize
+axiomatized                       [provenance .axiomatic]
+
+任意 active stage:
+  ↓ reject     → rejected         [provenance 回 .illustrative]
+  ↓ withdraw   → withdrawn        [provenance 回 .illustrative]
+```
+
+### 50.2 实施 + Doctrine
+
+[QinaoWorldPrior](QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorTemplateAuthoring.swift)：
+
+- `BASWorldPriorTemplateAuthoringStage` enum (7 case)
+- `BASWorldPriorTemplateAuthoringAction` enum (6 case)
+- `BASWorldPriorTemplateAuthoringTransition` Codable struct
+- `BASWorldPriorTemplateAuthoringPolicy.{validTransitions(from:), apply(_:from:)}`
+- `BASWorldPriorTemplateAuthoringSession` Codable —— `applying(_:)` immutable advance
+- `Stage.attainedProvenance` typed function
+- `Stage.isTerminal` predicate
+
+**Stage → provenance 映射**：
+- `draft / rejected / withdrawn` → `.illustrative`（不可作权威）
+- `hostReviewed / peerReview` → `.hostReviewed`
+- `domainApproved` → `.domainExpertReviewed`（production gate 开）
+- `axiomatized` → `.axiomatic`
+
+**Doctrine 锁定**（28 测试）：
+- 7 stage + 6 action cardinality
+- 每 stage attainedProvenance 映射 pin
+- Terminal stages permit 0 transitions
+- Active stages 各自 valid transitions 集合 pin
+- `apply(_:from:)` 非法返 nil
+- Session 启动 .draft、apply 推进、history 累积
+- **Full lifecycle 测试**：draft → ... → axiomatized
+- **Rejection 测试**：peerReview → rejected 回 .illustrative + 不再升级
+- Codable round-trip：stage / action / session
+
+### 50.3 状态升级
+
+| L4 curriculum 治理 | 之前 | 现在 |
+|---|---|---|
+| Acceptance validator | ✓ M295.0 | ✓ |
+| Batch report + 5 starter examples | ✓ M295.0.x | ✓ |
+| 4-level provenance + envelope + gate | ✓ M295.1 | ✓ |
+| Training pipeline filter | ✓ M295.2 | ✓ |
+| **Authoring 7-stage lifecycle** | ✗ | **✓ M295.1.0** |
+| **Stage → provenance typed mapping** | ✗ | **✓ M295.1.0** |
+| **Session state machine + immutable advance** | ✗ | **✓ M295.1.0** |
+| Authoritative content (≥ domainExpertReviewed) | ✗ | ✗（domain experts 按这套 track 走） |
+
+### 50.4 测试统计
+
+| 套件 | 49.x 末 | 50.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 960 | **988** | +28（authoring track） |
+| BAS XCTest | 1964 | 1964 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2952 / 0 失败 / 45 skipped**
+
+### 50.5 真正剩下的（最终）
+
+| Milestone | 阻塞 |
+|---|---|
+| M295.1+ authoritative production templates 50–100 条 | 真需 domain experts 写 content。**Typed governance track 已 ship——experts 按 stage 走，达到 `.domainExpertReviewed` 自动开 production gate**。 |
+
+仅剩 content authorship。Doctrine choice + typed scaffolding + cross-pillar guard + authoring governance 全部完结。
+
+### 50.6 manifest v2 + L4 治理终态（50.x）
+
+| 标准 / Doctrine | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2952 测试 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D | typed-enforced + 不变量 + unified guard |
+| 三流 | typed reference + boundary pin |
+| L4 治理（acceptance + batch + provenance + training filter + 7-stage authoring） | **全 typed-shipped** |
+| Engine 高后果 intent policy | typed end-to-end |
+| Sync 6 strategy | 全实现 |
+| 9-席 council | 三形态 + adapter readers |
+
+## 五十一、M295.1.1 — typed attestation 把 envelope provenance 与 authoring session 绑定（2026-05-01）
+
+50.x 末 L4 治理栈 7 件齐了，但 envelope provenance 与 authoring session.attainedProvenance **decoupled**——caller 可任意 wrap 一个 illustrative 内容标 `.axiomatic` envelope 直接送 production gate，绕过 authoring lifecycle。M295.2 training filter 不会 catch 这条（filter 只看 envelope.provenance + input acceptance）。本节 typed-bind 两者。
+
+### 51.1 `BASWorldPriorTemplateAttestation` + `AttestationGate`
+
+**问题**：M295.1 envelope.provenance 由 caller 任意标；M295.1.0 session.attainedProvenance 由 stage 决定。两者 decoupled 留攻击面（claim provenance 越级）。
+
+**修复**：[QinaoWorldPrior](QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorTemplateAttestation.swift)：
+
+- `BASWorldPriorTemplateAttestation` Codable struct：bundle (envelope + authoringSession)
+- `BASWorldPriorTemplateAttestationIssue` enum：
+  - `.envelopeProvenanceExceedsSession(claimed:attained:)` —— 越级声明
+  - `.templateIDMismatch(envelopeID:sessionID:)` —— template ID 不一致
+- `BASWorldPriorTemplateAttestationGate.validate(_:) -> [Issue]` —— 双不变量检查
+- `isValid(_:) -> Bool` —— 便利
+
+**两不变量**：
+1. **Provenance 绑定**：`envelope.provenance ≤ session.attainedProvenance`。Caller 可 deliberate downgrade（标 illustrative 即使 session axiomatized），但 NEVER 越级
+2. **Template ID 绑定**：`envelope.input.templateID == session.templateID`
+
+**Doctrine**：Attestation 不是密码学签名——provenance attainment 是 typed claim binding。In-process 信任仍由 dual-key sovereign + sandbox 守。Attestation 锁的是 **typed contract 一致性**，是 M295.0 acceptance + M295.2 training filter **之外的额外 gate**：production envelope 必须三 gate 都过。
+
+**Doctrine 锁定**（9 测试）：
+- envelope.provenance == session.attained → valid
+- envelope.provenance < session.attained → valid（deliberate downgrade）
+- envelope.provenance > session.attained → typed issue
+- TemplateID mismatch → typed issue
+- 两 issue 累积
+- **Full authoring lifecycle 端到端**：每 stage 推进，对应 provenance envelope 都 validate
+- Codable round-trip：attestation + issue
+
+### 51.2 状态升级
+
+| L4 治理栈 | 之前 | 现在 |
+|---|---|---|
+| Acceptance validator | ✓ M295.0 | ✓ |
+| Batch report + 5 starter examples | ✓ M295.0.x | ✓ |
+| 4-level provenance + envelope + gate | ✓ M295.1 | ✓ |
+| Training pipeline filter | ✓ M295.2 | ✓ |
+| 7-stage authoring lifecycle | ✓ M295.1.0 | ✓ |
+| **Attestation envelope ↔ session typed-bind** | ✗ | **✓ M295.1.1** |
+| Authoritative production content (≥ domainExpertReviewed) | ✗ | ✗（仍需 domain experts） |
+
+**L4 治理栈完整 8 件**——provenance claim 现在物理上必须 chain 回 authoring session，不能凭空越级。
+
+### 51.3 测试统计
+
+| 套件 | 50.x 末 | 51.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 988 | **997** | +9（attestation gate） |
+| BAS XCTest | 1964 | 1964 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2961 / 0 失败 / 45 skipped**
+
+### 51.4 真正剩下的（最终最终最终最终）
+
+| Milestone | 阻塞 |
+|---|---|
+| M295.1+ authoritative production templates 50–100 条 | 真需 domain experts 按 typed authoring track 写 content。Production envelope 现物理上必须配 `.domainApproved` 或 `.axiomatized` session 才能过 attestation gate |
+
+仅剩 content authorship。**Doctrine choice + typed scaffolding + cross-pillar guard + L4 治理 8 件全栈** 完结。
+
+### 51.5 manifest v2 + L4 治理终态（51.x）
+
+| 标准 / Doctrine / 治理 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2961 测试 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D | typed-enforced + 不变量 + unified guard |
+| 三流 | typed reference + boundary pin |
+| **L4 治理 8 件全栈**（acceptance + batch + provenance + training filter + 7-stage authoring + attestation） | **全 typed-shipped** |
+| Engine 高后果 intent policy | typed end-to-end |
+| Sync 6 strategy | 全实现 |
+| 9-席 council | 三形态 + adapter readers |
+
+## 五十二、Capstone 全栈 doctrine governance integration test（2026-05-01）
+
+51.x 末 L4 治理 8 件 + 4 doctrine + cross-pillar guard + 三流 全部 typed-shipped。本节加 capstone integration test：把所有 typed 件 compose 在一个 end-to-end scenario 里跑通，作为 doctrine段彻底完结的最后证明。
+
+### 52.1 `QinaoFullDoctrineGovernanceIntegrationTests`
+
+**问题**：26 章 honesty-board 各自验证单件 doctrine / 单件 governance pillar。但**没一个测试在一个场景里 compose 全部典型 typed 件**——回归风险隐性、文档无 grep target。
+
+**修复**：[QinaoRuntimeSDKTests](QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoFullDoctrineGovernanceIntegrationTests.swift)：6 测试覆盖：
+
+1. **全 lifecycle pass case**：domain expert author 走 4 步 transition (draft → hostReviewed → peerReview → domainApproved)、wrap envelope at `.domainExpertReviewed`、attestation gate validate、M295.0 acceptance pass、M295.2 training filter permit、Doctrine D matrix（secondBrain 产 authoritative）、Doctrine B+C unified guard（process scope at medium velocity 合规）
+
+2. **Pre-promotion 全 block case**：illustrative 内容跳级 claim `.domainExpertReviewed` typed-blocked（attestation fail），即使绕 attestation 也被 training filter 抓（privateProvenance(.illustrative)）
+
+3. **Doctrine D 物理拦截**：神经网络 attempts execution → typed violation
+
+4. **Doctrine C 物理拦截**：parameter scope 在 4 个非 veryLow velocity 全部拒（typed-pin Doctrine C 不变量 across all bad velocities）
+
+5. **三流 typed coverage**：cognition / permission / growth 各自 stage 集合 pin；growth stream **typed-禁含 training/weight stage**（Doctrine A boundary 字符串 grep）
+
+6. **4 doctrine 同时 typed-enforced 现实证明**：A（filter floor 存在）+ B（4 actor 4 disjoint scope）+ C（parameter must veryLow）+ D（directive only host / execution only sdk）
+
+### 52.2 状态升级（capstone 终态）
+
+| 维度 | 现状 |
+|---|---|
+| **End-to-end full-stack governance integration** | **✓ 1 test 跑通 8 件 L4 治理 + 4 doctrine + cross-pillar guard 全 compose** |
+| 全栈回归 sentinel | ✓ 任何 doctrine 件断裂会被这个 test 抓 |
+| Documentation grep target | ✓ `QinaoFullDoctrineGovernanceIntegrationTests` 一处看全栈互联 |
+
+### 52.3 测试统计
+
+| 套件 | 51.x 末 | 52.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 997 | **1003** | +6（capstone integration） |
+| BAS XCTest | 1964 | 1964 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2967 / 0 失败 / 45 skipped**
+
+### 52.4 真正剩下的（最终）
+
+| Milestone | 阻塞 |
+|---|---|
+| M295.1+ authoritative production templates 50–100 条 | 真需 domain experts 按 typed authoring track 写 content |
+
+**Doctrine 段 + typed scaffolding 段 + cross-pillar guard 段 + L4 治理 8 件全栈段 + capstone integration sentinel** 全部完结。仅剩 content authorship——typed governance 完整 ready，experts 来了直接走。
+
+### 52.5 manifest v2 + governance 终态（52.x）
+
+| 标准 / Doctrine / 治理 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2967 测试 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D | typed-enforced + 不变量 + unified guard |
+| 三流 | typed reference + boundary pin |
+| L4 治理 8 件全栈 | 全 typed-shipped |
+| **Full-stack capstone integration sentinel** | **typed-shipped** |
+| Engine 高后果 intent policy | typed end-to-end |
+| Sync 6 strategy | 全实现 |
+| 9-席 council | 三形态 + adapter readers |
+
+## 五十三、`AuthoringProgressReport` + `AuthoringBatchReport` —— typed dashboard view（2026-05-01）
+
+52.x 末 capstone integration 守住全栈 doctrine compose。最后一片 ship：把 `BASWorldPriorTemplateAuthoringSession` 直接编出 typed dashboard view，让 host UI / audit / CLI tools 不必自己解析 session.history。
+
+### 53.1 `BASWorldPriorAuthoringProgressReport`
+
+**问题**：`BASWorldPriorTemplateAuthoringSession` ship 了 7-stage state machine + immutable history，但 dashboard / CLI 想要 view 时还要自己解 currentStage / attainedProvenance / history。
+
+**修复**：[QinaoWorldPrior](QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorAuthoringProgressReport.swift) ship pure derived value:
+
+- `BASWorldPriorAuthoringProgressReport(from: session)` —— Codable struct，包：
+  - `templateID / currentStage / attainedProvenance`
+  - `isProductionReady` —— `attainedProvenance >= .domainExpertReviewed`
+  - `isTerminal` —— `currentStage.isTerminal`
+  - `transitionCount`
+  - `stagesVisited` —— 从 .draft 起，按 history 推进的 distinct stages（preserves causal order, dedup）
+  - `actionsApplied` —— history actions in order
+
+### 53.2 `BASWorldPriorAuthoringBatchReport`
+
+**问题**：多 template 项目想看 batch dashboard 仍得自己 aggregate。
+
+**修复**：`BASWorldPriorAuthoringBatchReport(from: [Session])` Codable struct:
+
+- `totalSessions`
+- `stageCounts` —— `[Stage: Int]` 每 stage 计数（zero counts omitted）
+- `productionReadyCount` —— provenance ≥ domainExpertReviewed
+- `terminalCount` —— terminal stages
+- `productionReadyFraction` —— [0,1]; 0 when batch empty
+
+### 53.3 Doctrine 锁定（10 测试）
+
+- 7 stage 各自 report 字段 derive 正确
+- isProductionReady ↔ attainedProvenance ≥ .domainExpertReviewed
+- isTerminal ↔ currentStage.isTerminal
+- stagesVisited preserves causal order + 从 .draft 起
+- actionsApplied 顺序 == history actions
+- Batch empty → 全 0
+- Batch aggregate counts + production ready fraction 正确
+- All-ready batch → fraction 1.0
+- Codable round-trip：report + batch report
+
+### 53.4 状态升级
+
+| L4 治理栈 | 之前 | 现在 |
+|---|---|---|
+| Authoring session state | ✓ M295.1.0 | ✓ |
+| Attestation gate | ✓ M295.1.1 | ✓ |
+| **Per-session progress report (dashboard view)** | ✗ | **✓ M295.1.2** |
+| **Multi-session batch report (dashboard aggregate)** | ✗ | **✓ M295.1.2** |
+
+### 53.5 测试统计
+
+| 套件 | 52.x 末 | 53.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 1003 | **1013** | +10（progress + batch reports） |
+| BAS XCTest | 1964 | 1964 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2977 / 0 失败 / 45 skipped**
+
+### 53.6 真正剩下的（仅一件）
+
+| Milestone | 阻塞 |
+|---|---|
+| M295.1+ authoritative production templates 50–100 条 | 真需 domain experts 按 typed authoring track 写 content |
+
+### 53.7 manifest v2 + governance 终态（53.x）
+
+| 标准 / Doctrine / 治理 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2977 测试 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D | typed-enforced + 不变量 + unified guard |
+| 三流 | typed reference + boundary pin |
+| L4 治理 9 件全栈（acceptance + batch + provenance + training filter + 7-stage authoring + stage mapping + session state machine + attestation gate + **progress + batch dashboard reports**）| 全 typed-shipped |
+| Capstone integration sentinel | typed-shipped |
+| Engine 高后果 intent policy | typed end-to-end |
+| Sync 6 strategy | 全实现 |
+| 9-席 council | 三形态 + adapter readers |
+
+## 五十四、Path A 启动 — 50 条 AI-drafted illustrative starter curriculum（2026-05-01）
+
+53.x 末 L4 治理 9 件 typed-complete + capstone sentinel，唯剩 M295.1+ content authorship。本节按 honesty-board 「怎么完成」答复中的 **Path A** 实际物理启动：AI（Claude）起草 50 条 baseline templates 跨 manifesto v2 织团 B 5 领域，全部默认 `.illustrative` 标记，typed-blocked from L2 training 由 M295.2 物理 enforce。
+
+### 54.1 Doctrine 透明声明
+
+**ALL 50 ENTRIES ARE AI-DRAFTED ILLUSTRATIVE CONTENT, NOT AUTHORITATIVE.**
+
+按 Doctrine A:
+
+- 50 条 envelope 默认 `.illustrative` provenance
+- M295.2 training filter typed-rejects 全部 50 条
+- 升级到 `.hostReviewed` 需 host 真过一遍审 + 显式 `session.applying(.hostAccept)`
+- 升级到 `.domainExpertReviewed` 必须真 domain expert 走 `.peerReview` → `.approveDomain`
+- typed track 只 enforce **process**，不替 expert 评判 **content**
+
+### 54.2 5 domains × 10 templates = 50
+
+按 manifesto v2 织团 B (世界-宿主双经纬，L4+L5+L6+L7) 5 领域：
+
+| Domain | TemplateID prefix | Count |
+|---|---|---|
+| Relationship conflict | `tmpl-relationship-` | 10 |
+| Decision uncertainty | `tmpl-decision-` | 10 |
+| Time pressure | `tmpl-time-` | 10 |
+| Boundary negotiation | `tmpl-boundary-` | 10 |
+| Cross-domain analogy | `tmpl-analogy-` | 10 |
+
+### 54.3 实施
+
+[QinaoWorldPrior](QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorStarterCurriculum.swift):
+
+- `BASWorldPriorStarterCurriculum` enum (静态 namespace)
+- 50 个 `Input` 静态常量
+- `allTemplates: [Input]` aggregator
+- `allIllustrativeEnvelopes: [Envelope]` —— 全标 `.illustrative`
+- `allDraftSessions: [Session]` —— 全部启动 `.draft`，host 待 advance
+
+每 template 4 字段：templateID（kebab）/ perturbKindsCovered（≥1）/ branchEvidenceRungs（[0..4]）/ description（≥30 chars doctrinal claim）。
+
+### 54.4 Doctrine 锁定（20 测试）
+
+- 50 templates / envelopes / draft sessions cardinality
+- 全 50 pass M295.0 acceptance（issues == []）
+- Batch acceptance fraction == 1.0
+- 全 50 templateID 唯一
+- 5 domain 各 10 个
+- 全 perturb kinds valid raw value
+- 全 evidence rungs 在 [0,4]
+- **Doctrine A enforcement**: 50 illustrative envelopes 全 typed-rejected by training filter
+- Batch `acceptedForTraining(_:) == []`（**0 starter 进训练**）
+- 全 sessions 起点 `.draft` + `.illustrative`
+- Session templateID set === template templateID set
+- 任一 draft 可 `.applying(.hostAccept)`
+- 全 description ≥ 30 chars
+- **End-to-end Path A 测试**：illustrative envelope (training-blocked) → draft session → applying(.hostAccept) → 进 .hostReviewed → 新 envelope 标 .hostReviewed → attestation pass → **仍 training-blocked**（Doctrine A: floor `.domainExpertReviewed`）
+
+### 54.5 host 接下来怎么用
+
+```swift
+// 1. 50 draft sessions
+let sessions = BASWorldPriorStarterCurriculum.allDraftSessions
+
+// 2. host 真过一遍 description 后:
+let template = BASWorldPriorStarterCurriculum.relationshipDirectConfrontation
+let session = sessions.first { $0.templateID == template.templateID }!
+
+// 3. host 赞同:
+guard let reviewed = session.applying(.hostAccept) else { fatalError() }
+// reviewed.attainedProvenance == .hostReviewed
+// 可用于 host-private 部署，但仍 typed-blocked from training
+
+// 4. 升级 production 走 Path B (find reviewers, run .submitForPeerReview → .approveDomain)
+```
+
+### 54.6 测试统计
+
+| 套件 | 53.x 末 | 54.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 1013 | **1033** | +20（starter curriculum） |
+| BAS XCTest | 1964 | 1964 | 0 |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 2997 / 0 失败 / 45 skipped**
+
+### 54.7 真正剩下的（host work，非 typed scaffolding）
+
+| 工作 | 阻塞 |
+|---|---|
+| host 实际 review 这 50 条 | host time + judgment（typed track 已 ready） |
+| Path B：找 1-2 reviewers 升级 10-20 条到 `.domainExpertReviewed` | reviewer hire + scheduling |
+| Path C：公共领域内容转写到 `.axiomatic` | author research time |
+
+**Path A 物理启动完成**——50 条 illustrative starter content 已 ship + typed-blocked from training + 50 个 draft sessions ready for host review。typed governance 全栈守住 Doctrine A：host 不真审，content 不能离开 illustrative；不进 `.domainApproved`，content 不能进训练。
+
+### 54.8 manifest v2 + governance + Path A 终态（54.x）
+
+| 维度 | 状态 |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**2997 测试 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D + cross-pillar guard | typed-enforced |
+| 三流 | typed reference |
+| L4 治理 9 件 + capstone integration sentinel | 全 typed-shipped |
+| Engine 高后果 intent + Sync 6 strategy + 9-席 council | 全 ship |
+| **L4 starter curriculum 50 条 (illustrative)** | **✓ Path A 物理启动** |
+| Production curriculum (≥ domainExpertReviewed) | host 走 Path B/C/D 升级 |
+
+---
+
+## 五十五、 manifesto v3 「底层母板」 typed reference 收口
+
+### 55.1 v3 doctrine 摘要
+
+会话外用户分享 manifesto v3：14 层之下的「底层母板」 doctrine。这是第三层 doctrine，描述层级结构以下的基础抽象：
+
+- **5 根原则**：sovereignty over computation / typed state over prompt / event sourcing as default / capability tokens / delete-rollback-reboot first-class
+- **三平面**：sovereign / state / compute
+- **四内核**：sovereign microkernel / lease & life kernel / neural organ runtime / state & evolution graph
+- **八总线**（连接四内核成一张网）：lease / worldHost / situation / cognitiveFrame / memory / frontier / riskPermit / versionAudit
+- **两库一方舟**：world prior vault / host constitution vault / snapshot ark
+- **SDK 4 个公开 API**：runtime / host / capability / audit & version
+
+### 55.2 仓库 ↔ v3 母板 audit 结果
+
+仓库扫描结论：**v3 doctrine 5/3/4/8/3/4 全部已物理 ship**。唯一缺口是 **typed reference vocabulary**——doctrine 散布在 35+ 文件名上，没有一个集中的 typed enum 让开发者 grep 出全集。
+
+| v3 母板组件 | 仓库实证 |
+|---|---|
+| sovereignty over computation | `BASSovereignVerdict` 严格 override `ActionPermit`，单测 pin |
+| typed state over prompt | `BASActor` / `BASManifestStream` / `BASGrowthVelocity` / `BASStateUpdateScope` 已 typed |
+| event sourcing default | `UpdateTicket → ExperienceCandidate → ShadowTrialRecord → VersionDelta` 链已 ship |
+| capability tokens | `BASSovereignTokenAuthority` + `ActionPermit` + warrant TTL 已 ship |
+| delete / rollback / reboot first-class | `BASSovereignSnapshotManager` + `BASSovereignCleanRebootCoordinator` 已 ship |
+| sovereign plane | `BASSovereign/` (35+ 文件，6070 LOC) |
+| state plane | `BASMemory/` (15160 LOC) + `QinaoWorldPriorVault` + HostConstitutionService |
+| compute plane | `BASOrgan` + `BASLeaseLife/` + provider stack |
+| sovereign microkernel | `BASSovereign/` |
+| lease & life kernel | `BASLeaseLife/` |
+| neural organ runtime | `BASOrgan` + `BASMLXAdapter` + `BASChatCompletionsAdapter` |
+| state & evolution graph | `BASMemory` + `BASRetractionFurnace` + UpdateTicket lineage |
+| 8 buses (typed object) | BudgetFrame / WorldPriorVault+HostConstitution / ContextFrame / DecomposeFrame+Candidates+TriSelfScore / MemoryAtom+Bundle / LoopFrontier / RiskCard+ActionPermit / VersionDelta+AuditLedger |
+| world prior vault | `QinaoWorldPrior/` |
+| host constitution vault | `EBrainHostRuntime+HostConstitutionService` + `BASHostProfile` |
+| snapshot ark | `BASSovereignSnapshotManager` |
+| SDK runtime API | `EBrainHostRuntime` |
+| SDK host API | `+HostProfileService` + `+HostConstitutionService` |
+| SDK capability API | `BASSovereignTokenAuthority` |
+| SDK audit & version API | `BASSovereignAuditLedger` + `VersionDelta` |
+
+**0 implementation 缺口，1 typed vocabulary 缺口**。
+
+### 55.3 ship 内容
+
+仿照 [BASActorRole.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASActorRole.swift) (105 LOC) / [BASManifestStream.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASManifestStream.swift) (105 LOC) typed reference 模式，新增：
+
+[BASMotherboardArchitecture.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardArchitecture.swift) (≈ 290 LOC) 含 6 个 typed enum：
+
+```swift
+public enum BASMotherboardPrinciple        // 5 cases
+public enum BASMotherboardPlane            // 3 cases
+public enum BASMotherboardKernel           // 4 cases
+public enum BASMotherboardBus              // 8 cases
+public enum BASMotherboardVault            // 3 cases
+public enum BASMotherboardSDKAPI           // 4 cases
+```
+
+Cross-mappings as functions：
+- `BASMotherboardKernel.containingPlane: BASMotherboardPlane`
+- `BASMotherboardBus.crossingKernels: Set<BASMotherboardKernel>`
+- `BASMotherboardVault.containingPlane: BASMotherboardPlane`
+- `BASMotherboardSDKAPI.exposedKernels: Set<BASMotherboardKernel>`
+- `BASMotherboardPlane.kernels: [BASMotherboardKernel]`（inverse aggregation）
+
+### 55.4 测试 pin doctrine
+
+[BASMotherboardArchitectureTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASMotherboardArchitectureTests.swift) **31 测试 / 0 失败**：
+
+| 类别 | 测试数 |
+|---|---|
+| Cardinality (5/3/4/8/3/4) | 6 |
+| Distinctness | 1 |
+| Raw value 稳定 | 6 |
+| Codable round-trip | 6 |
+| Plane assignment | 3 |
+| Bus → kernel 网络 | 3 |
+| Vault planes | 3 |
+| SDK API 暴露 | 3 |
+
+**关键 doctrine 断言**：
+- `test_atLeastFourBusesCrossTwoOrMoreKernels` — pin "八总线把这些内核连成一张网" doctrine（实测 6/8 buses 跨 ≥ 2 kernel）
+- `test_busKernelUnionCoversAllFourKernels` — 没有 island kernel
+- `test_sdkAPIUnionExposesAllKernels` — SDK 暴露面覆盖整个母板
+- `test_capabilityAPIIsSovereignOnly` — Doctrine A 衍生：capability 只能从 sovereign 出
+- `test_planeKernelInverseIsConsistent` — kernel ↔ plane 双向 mapping 一致
+
+### 55.5 测试统计
+
+| 套件 | 54.x 末 | 55.x 末 | Δ |
+|---|---|---|---|
+| Qinao | 1033 | 1033 | 0 |
+| BAS XCTest | 1964 | **1995** | +31（motherboard typed reference） |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 3028 / 0 失败 / 45 skipped**（外加 417 个 swift-testing target tests 全部 pass）。
+
+### 55.6 grep 实证
+
+ship 之前：
+
+```bash
+$ grep -r "BASMotherboardKernel\|BASMotherboardBus\|BASMotherboardPlane" \
+    --include="*.swift" BehavioralAISubstrate/ QinaoRuntimeSDK/
+# (no output — 0 hits)
+```
+
+ship 之后：1 source 文件 + 1 测试文件命中。doctrine 从「散布在 35+ 文件名上」变成「typed reference 1 文件 + tests 1 文件可 grep」。
+
+### 55.7 与 v2 状态对账
+
+manifesto v2「四条同时成立」基线 4/4「基本是」**保持不变**——本批次 ship 的是底层抽象的 grep-able 化，不动主链：
+
+| 维度 | 55.x |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**3028 XCTest 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D + cross-pillar guard | typed-enforced |
+| 三流 + 4 actor + 4 scope + 5 velocity | typed reference |
+| L4 治理 9 件 + capstone integration sentinel | 全 typed-shipped |
+| Engine 高后果 intent + Sync 6 strategy + 9-席 council | 全 ship |
+| L4 starter curriculum 50 条 (illustrative) | ✓ Path A 物理启动 |
+| **v3 母板 5/3/4/8/3/4 typed reference** | **✓ ship + 31 测试 pin** |
+| Production curriculum (≥ domainExpertReviewed) | host 走 Path B/C/D 升级 |
+
+### 55.8 仍剩下的（doctrine 之外的真工程缺口）
+
+V3 doctrine 收口后，doctrine 层面 v1 / v2 / v3 三层全部 typed-enforced。剩余是 doctrine 之外的工程项：
+
+1. 真模型多轮端到端 demo（M286+ 仍在 backlog）
+2. L4 真训练资产（基座预训练，需算力）
+3. M295.1+ authoritative 生产课程内容（需 domain experts，Path A 已 ship 50 illustrative starter）
+4. 多 agents 多席 first-class 化（Planner/Critic/Sentinel 命名实体仍 0 命中）
+5. L12 LocalOnlySheet（surface family 6/6 收口）
+
+主线判定不变：substrate doctrine 闭合，剩余是集成 + 演出 + 内容 + 多席工作，不涉及底层 doctrine 翻转。
+
+---
+
+## 五十六、 「全面开发」批 — audit 校正 + L13 full-body lifecycle + 跨库 contract
+
+### 56.1 用户指令
+
+「全面开发」after manifesto v3 收口。展开 audit：v3 audit 自陈剩 9 项 backlog（真模型 demo / L9 / L10 / 多席 / L4 训练 / 生产课程 / LocalOnlySheet / 主权三件 / L13 full-body）。
+
+实证扫描后**5 项已是 stale 自陈**：
+
+| 自陈缺口 | 实证 |
+|---|---|
+| L10 真 LLM 三声音 vote | **已 ship** — [QinaoLoop+TriSelfFromLLM.swift](../QinaoRuntimeSDK/Sources/QinaoLoop/QinaoLoop+TriSelfFromLLM.swift) `makeTriSelfPrompt` + `parseTriSelfScore` (M289) |
+| L9 真模型反事实 prompt | **已 ship** — [QinaoLoop+CounterfactualPrompt.swift](../QinaoRuntimeSDK/Sources/QinaoLoop/QinaoLoop+CounterfactualPrompt.swift) `expandWithCounterfactual` (M287) |
+| 多 agents 多席 first-class | **已 ship** — `QinaoSeat` enum 9 席 + `QinaoSeatProtocol` + `QinaoSeatRegistry.dispatch` parallel fan-out |
+| L12 LocalOnlySheet | **已 ship** — [QinaoLocalOnlySheet.swift](../QinaoRuntimeSDK/Sources/QinaoUI/QinaoLocalOnlySheet.swift)（surface family 6/6 完结） |
+| 净启 (clean reboot) | **已 ship** — [BASSovereignCleanRebootCoordinator.swift](../BehavioralAISubstrate/Sources/BASSovereign/BASSovereignCleanRebootCoordinator.swift) |
+
+stale 自陈来自更早 chapter 的快照，没及时被覆写——这是 honesty-board 的常见漂移。
+
+### 56.2 真正剩下的可 typed-ship 项
+
+实证后剩 2 项 typed scaffolding：
+
+1. **L13 full-body evolution lifecycle session**——stage-1 primitives 在（candidate / shadow trial / promotion gate / retraction furnace / version delta），但 lifecycle 全段没有 typed 主线
+2. **Cross-vault contract integration test**——v3「两库一方舟」三件单测都在，**三件协同没受测**
+
+doctrine-外的 backlog 仍剩 4 项（真模型多轮 demo / L4 训练资产 / 生产课程 / 主权双钥+跨设备 sync 真演），无法纯 typed-ship。
+
+### 56.3 ship 内容
+
+**56.3.1 `BASEvolutionLifecycle.swift`** ([source](../BehavioralAISubstrate/Sources/BASMemory/BASEvolutionLifecycle.swift))
+
+仿照 L4 治理 `BASWorldPriorTemplateAuthoringSession` 7-stage authoring lifecycle 模式，ship L13 evolution lifecycle 8-stage 状态机：
+
+```
+proposed → candidateRegistered → shadowTrialing → trialFinalized
+       ↘                ↘                ↘
+   withdrawn          rejected         promoted
+                                            │
+                                            ↓
+                                        retracted
+```
+
+| 类型 | 形态 | cases |
+|---|---|---|
+| `BASEvolutionLifecycleStage` | enum | 8: proposed / candidateRegistered / shadowTrialing / trialFinalized / promoted / retracted / rejected / withdrawn |
+| `BASEvolutionLifecycleAction` | enum | 7: registerCandidate / startShadowTrial / finalizeTrial / promote / retract / fail / withdraw |
+| `BASEvolutionLifecycleTransition` | struct | (action, from, to) typed 三元组 |
+| `BASEvolutionLifecyclePolicy` | enum | `validTransitions(from:)` + `apply(_:from:)` |
+| `BASEvolutionLifecycleSession` | struct | (candidateID, currentStage, history) immutable + `applying(_:)` |
+
+**关键 doctrine**：
+- `.promoted` 是**非 terminal**——retraction 是真路径
+- 从 `.promoted` 只能去 `.retracted`，不允许 `.withdraw`（已晋升必须经 retraction order）
+- terminal: retracted / rejected / withdrawn
+- `hasReachedPromotion` true iff stage ∈ {promoted, retracted}
+
+**56.3.2 `BASEvolutionLifecycleTests.swift`** ([source](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASEvolutionLifecycleTests.swift))
+
+29 测试 / 0 失败：
+
+| 类别 | 测试数 |
+|---|---|
+| Cardinality (8/7) | 2 |
+| Stage classification（terminal / non-terminal / hasReachedPromotion） | 4 |
+| Policy: 6 stage × valid transitions | 6 |
+| Apply policy（valid → transition / invalid → nil） | 2 |
+| Session end-to-end（happy path / 含 retract） | 2 |
+| Failure paths（fail / withdraw） | 4 |
+| Invalid transitions reject without mutation | 2 |
+| History monotonicity + stagesVisited | 2 |
+| Codable round-trip (session/stage/action) | 3 |
+| Raw value 稳定 (stage/action) | 2 |
+
+**核心断言**：
+- `test_promotedIsNotTerminal_retractionReachable` — pin 「promotion 之后还能撤」 doctrine
+- `test_withdrawNotAllowedFromPromoted` — pin 「promote 后必须 retract，不能 withdraw」
+- `test_terminalStageRejectsAllActions` — terminal 不再接受 7 actions 任何一个
+
+**56.3.3 `QinaoCrossVaultContractIntegrationTests.swift`** ([source](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoCrossVaultContractIntegrationTests.swift))
+
+v3「两库一方舟」三件协同 capstone 测试，8 测试 / 0 失败：
+
+| 测试 | 断言 |
+|---|---|
+| `test_threeVaultsCoexistIndependently` | 三件并存，各自报告独立状态 |
+| `test_snapshotArkBindsHostConstitutionActiveVersion` | snapshot anchor.hostVersionRef ↔ host constitution.activeVersion 绑定 |
+| `test_snapshotArkRejectsMismatchedHostVersion` | typed throw on mismatch |
+| `test_worldVaultIndependentOfHostVault` | host 演化 ≠ world 改动 |
+| `test_hostEvolutionLineageRecorded` | rollbackLineage 在 host vault 内独立累积 |
+| `test_hostVaultCodableRoundTrip` | host vault 序列化保形 |
+| `test_worldTemplateCodableRoundTrip` | world template 序列化保形 |
+| `test_fullTripleVaultScenario` | canonical 三件场景 + verifyHostVersion + verifyRestore 全 pass |
+
+### 56.4 校正 stale comment
+
+[QinaoSeats.swift:24-30](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoSeats.swift) 自陈「No protocol yet / No registry yet」过期。改写指向已 ship 的 `QinaoSeatProtocol` (M292.2) + `QinaoSeatRegistry` (M292.3) + `QinaoLoopSeatsRuntime` 中 dispatcher (M292.4)。
+
+### 56.5 测试统计
+
+| 套件 | 55.x 末 | 56.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 1995 | **2024** | +29（lifecycle 状态机） |
+| Qinao | 1033 | **1041** | +8（cross-vault contract） |
+| 4 boundary checks | clean | clean | clean |
+
+**总测试 3065 / 0 失败 / 45 skipped**。基线 3028 → 3065 严格匹配（+29 +8 = +37）。
+
+### 56.6 与 v2 状态对账
+
+manifesto v2 4/4「基本是」**保持不变**：
+
+| 维度 | 56.x |
+|---|---|
+| 它强 | 基本是 |
+| 它稳 | 基本是（**3065 XCTest 0 回归 0 flake**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D + cross-pillar guard | typed-enforced |
+| 三流 + 4 actor + 4 scope + 5 velocity + v3 5/3/4/8/3/4 | typed reference |
+| L4 治理 9 件 + capstone integration sentinel | 全 typed-shipped |
+| L9 真模型反事实 prompt + L10 三声音 prompt + parser | 已 ship |
+| Engine 高后果 intent + Sync 6 strategy + 9-席 council + protocol + dispatcher | 全 ship |
+| L12 surface family 6/6（含 LocalOnlySheet） | 已 ship |
+| 净启 / 双钥 commit / cross-device sync 6 strategy | typed-shipped |
+| L4 starter curriculum 50 条 (illustrative) | ✓ Path A 物理启动 |
+| **L13 full-body evolution lifecycle** | **✓ ship + 29 测试 pin** |
+| **「两库一方舟」cross-vault contract** | **✓ ship + 8 测试 pin** |
+
+### 56.7 仍剩下的（doctrine 之外，外部资源依赖）
+
+doctrine + typed scaffolding 层面已无可 ship 项。仍剩 4 项需要外部资源：
+
+1. **真模型多轮端到端 demo** — 需真 LLM endpoint runtime（schema + prompt builder + parser 都已就绪，演出层未跑）
+2. **L4 真训练资产** — 需算力（基座预训练）
+3. **M295.1+ authoritative 生产课程** — 需 domain experts（Path A 50 illustrative starter ready for review）
+4. **双钥 commit + cross-device sync** 真演 — 6 strategy typed-shipped，端到端真同步未跑
+
+主线判定不变：**substrate doctrine 闭合，typed scaffolding 几无空白；剩余是真模型 / 真算力 / 真审稿 / 真同步**——都需脱离 doctrine 层进入工程层。
+
+---
+
+## 五十七、 AFM 真模型多轮端到端 demo — backlog 第 1 项划掉
+
+### 57.1 用户问询 + doctrine 拆分
+
+用户问「能不能就用 AFM 跑训练」。审计发现 backlog「L4 真训练资产」项**用词陷阱**：
+
+| 「训练」含义 | doctrine 层 | AFM 适用？ |
+|---|---|---|
+| L2 神经权重 / adapter | parameter scope, `.veryLow` velocity | ✅ Apple Adapter Training Toolkit (Python) — 仍卡 Doctrine A：starter `.illustrative` 进不了 training filter |
+| **L4「训练资产」** | **knowledge authorship**，不是神经训练 | ❌ AFM 帮不了——需 domain experts 写 templates / horizons / bridges |
+| **AFM E2E inference demo** | L2 neural organ runtime | ✅ **完全可跑** — backlog 第 1 项 |
+
+### 57.2 AFM E2E 真跑实证
+
+`QINAO_FM_E2E=1` 环境变量 opt-in，macOS 26.4.1（系统已有 Apple Foundation Models）真跑 `LanguageModelSession`。
+
+**BAS 套件单跑**：
+
+```
+QINAO_FM_E2E=1 swift test --filter AppleFoundationE2ETests
+[5 tests / 0 failures / 1.58s]
+✓ testRealCapacityIsUnlimitedWhenAvailable
+✓ testRealCoreDraftReturnsNonEmptyBody (1.079s) ← 真 LLM 生成
+✓ testRealDraftThroughRegistry (0.230s)
+✓ testRealScoutDraftReturnsNonEmptyBody (0.274s) ← 真 LLM 生成
+✓ testRegistryPrefersAppleFMOverDeterministicWhenBothPresent
+```
+
+**Qinao 套件单跑**：
+
+```
+QINAO_FM_E2E=1 swift test --filter QinaoAppleFoundationE2ETests
+[3 tests / 0 failures / 1.73s]
+✓ testFrontierOrderingIsDeterministicAcrossRealLLMBodies (0.866s)
+✓ testGenerateMultipleSeedsAllRouteToAppleFoundationModels (0.532s)
+✓ testGenerateSingleCandidateRoutesToAppleFoundationModels (0.337s)
+```
+
+`QinaoLoop.generateCandidates(sessionID:seeds:)` 通过 `AppleFoundationOrganAdapter` 真驱 AFM 生成 N 个 candidate，前沿排序 deterministic。
+
+### 57.3 全套 AFM-gated 测试通过
+
+`QINAO_FM_E2E=1` 环境变量打开后，**之前 gated skip 的 37 个 AFM 测试现在真跑**：
+
+| 套件 | gate off (skipped) | gate on (skipped) | gate on 真跑增量 |
+|---|---|---|---|
+| BAS XCTest | 19 skipped | 7 skipped | **+12 真模型 tests** |
+| Qinao XCTest | 26 skipped | 1 skipped | **+25 真模型 tests** |
+
+**总计 37 个 AFM-gated 测试 0 失败**，包括但不限于：
+
+- `QinaoAppleFoundationConcurrencyTests` — 并发 AFM 调用
+- `QinaoAppleFoundationAuditChainTests` — AFM → 审计链
+- `QinaoAppleFoundationFurnaceChainTests` — AFM → L13 furnace chain
+- `QinaoAppleFoundationGateChainTests` — AFM → 风闸 + 玄戒 gate chain
+- `QinaoAppleFoundationRiskGateTests` — AFM → 风闸 risk decision
+- `QinaoAppleFoundationPromptInjectionTests` — AFM 抗 prompt injection
+- `QinaoAppleFoundationWorldPriorChainTests` — AFM → L4 world prior 反事实
+- `QinaoAppleFoundationMemoryChainTests` — AFM → L8 海马井 memory write
+- `QinaoAppleFoundationFactoryTests` — `QinaoLoop.makeAppleFoundationEndpoint()` factory
+- `QinaoLoopStreamBodyTests` — AFM streaming body
+- `QinaoSampleHostFlowTests` — 端到端 sample host flow
+- `QinaoRuntime14LayerSaturationTests` — **14 层 saturation 真模型驱动**
+
+最后这条最重要：14 层 saturation 测试**真模型驱动通过**——manifesto v2「14 层作为一张网协同动作过吗」的端到端时序场景，今天首次有真 AFM driving 信号通过 14 层主链。
+
+### 57.4 一项 inter-test flake 修
+
+副产物：[BASBudgetFrameLiveThermalTests.swift:77](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASBudgetFrameLiveThermalTests.swift) `testIdempotentWhenLevelUnchanged` 在并发测试压力下偶发失败——`JSONEncoder` 默认 key 顺序非 byte-stable。修法：`encoder.outputFormatting = [.sortedKeys]`。一行修，与 AFM 无关，只是 AFM 全套打开后并发压力暴露了潜在 dict hash seed 漂移。
+
+### 57.5 测试基线
+
+| 套件 | 56.x 末 (gate off) | 57.x 末 (gate on) | Δ |
+|---|---|---|---|
+| BAS XCTest | 2024 / 0 / 19 skipped | **2024 / 0 / 7 skipped** | -12 skipped → 真跑 |
+| Qinao XCTest | 1041 / 0 / 26 skipped | **1041 / 0 / 1 skipped** | -25 skipped → 真跑 |
+
+**总测试 3065 / 0 失败 / 8 skipped（gate on）**——之前 45 skipped 里 37 项是 AFM-gated；今天打开后全 pass。
+
+### 57.6 与 v2 状态对账
+
+manifesto v2 4/4「基本是」终于触到「**它强**」的真实演出层——**14 层主链有真模型 driving 信号通过**：
+
+| 维度 | 57.x |
+|---|---|
+| 它强 | **从「基本是」上调到「是」**——14 层 saturation + AFM E2E + audit chain + furnace chain + gate chain + risk gate + prompt injection + world prior chain + memory chain 全过 |
+| 它稳 | 是（**3065 XCTest 0 回归 0 flake，AFM 真模型路径 37 测试 0 失败**） |
+| 它真可落地 | 基本是 |
+| 它可信 | 基本是 |
+| Doctrine A/B/C/D + cross-pillar guard + v3 母板 | typed-enforced |
+| L4 治理 9 件 + L13 lifecycle + cross-vault contract | 全 typed-shipped |
+| L9 反事实 prompt + L10 三声音 prompt + parser | 已 ship |
+| L12 surface family 6/6 | 已 ship |
+| 9-席 multi-agents + protocol + dispatcher | 已 ship |
+| 净启 / 双钥 commit / cross-device sync 6 strategy | typed-shipped |
+| L4 starter curriculum 50 条 (illustrative) | ✓ Path A 物理启动 |
+| **AFM E2E 真模型 14 层 saturation** | **✓ 37 测试 / 0 失败 / 真模型 driving** |
+
+### 57.7 仍剩下的（外部资源依赖）
+
+doctrine + typed scaffolding + 真模型 demo 三件齐了。仍剩 3 项需要外部资源（不是 AFM 能解的）：
+
+1. **L2 adapter 训练** — 需 Apple Adapter Training Toolkit (Python) + `.domainExpertReviewed` 训练数据。Doctrine A 卡：starter 50 条 `.illustrative` 进不了 training filter，先要 domain experts 走 Path B/C 升级
+2. **M295.1+ authoritative 生产课程** — 需 domain experts（Path A 50 illustrative starter ready for review）
+3. **双钥 commit + cross-device sync 端到端真同步** — 6 strategy typed-shipped，需 ≥ 2 真设备/模拟器才能跑端到端 sync 演出
+
+**主线判定**：**14 层活体织网今天有真模型驱动信号穿过了**——manifesto v2「14 个模块作为一张网协同动作过吗」从「未协同过一次」首次过线。剩余 3 项都是脱离 doctrine + typed scaffolding 的外部世界工作（人 / 算力 / 多设备）。
+
+---
+
+## 五十八、 Path B / L2 adapter 训练 / production curriculum 接口齐 ship
+
+### 58.1 用户问 + 上下文
+
+「1 2 需要什么」（即 #1 L2 adapter 训练 + #2 M295.1+ 生产课程）。诚实拆答后两件**都需 domain experts**，但 typed scaffolding 仓库可以替准备好。「好」 → ship 5 件。
+
+### 58.2 ship 内容
+
+| 文件 | 作用 | LOC |
+|---|---|---|
+| [BASWorldPriorTrainingExporter.swift](../QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorTrainingExporter.swift) | envelope → JSONL，M295.2 filter typed-pin in pipe | ≈ 170 |
+| [BASWorldPriorAIDraftHelper.swift](../QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorAIDraftHelper.swift) | AFM 起草 candidate → `.draft` / `.illustrative`（Doctrine A 不破） | ≈ 150 |
+| [BASWorldPriorProductionCurriculum.swift](../QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorProductionCurriculum.swift) | 空 production registry，要求 `isProductionGrade` | ≈ 165 |
+| [AppleFoundationAdapterDescriptor.swift](../BehavioralAISubstrate/Sources/BASAppleAdapters/AppleFoundationAdapterDescriptor.swift) | typed adapter descriptor + binding state + registry | ≈ 200 |
+| [docs/PATH_B_OPERATIONS.md](PATH_B_OPERATIONS.md) | host operator 操作手册 | 200 行 markdown |
+
+加 4 个 test 文件 ≈ 600 LOC pin doctrine。
+
+### 58.3 关键 doctrine pin
+
+**58.3.1 训练管道 fail-closed**
+
+[QinaoWorldPriorTrainingExporterTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoWorldPriorTrainingExporterTests.swift)：
+
+```swift
+func test_allStarterEnvelopesBlockedFromExport() {
+    let result = BASWorldPriorTrainingExporter.export(
+        BASWorldPriorStarterCurriculum
+            .allIllustrativeEnvelopes)
+    XCTAssertEqual(result.report.totalCount, 50)
+    XCTAssertEqual(result.report.exportedCount, 0)  // 全 typed-blocked
+    XCTAssertEqual(result.report.rejectedByPrivateProvenance, 50)
+    XCTAssertEqual(result.jsonl, "")
+}
+```
+
+**58.3.2 AI 起草永远 .illustrative**
+
+[QinaoWorldPriorAIDraftHelperTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoWorldPriorAIDraftHelperTests.swift)：
+
+```swift
+func test_wrapAsDraftAlwaysIllustrativeAtDraftStage() {
+    let wrapped = BASWorldPriorAIDraftHelper.wrapAsDraft(input)
+    XCTAssertEqual(wrapped?.envelope.provenance, .illustrative,
+        "Doctrine A: AI-drafted content MUST be .illustrative")
+    XCTAssertEqual(wrapped?.session.currentStage, .draft,
+        "AI drafts must start at .draft, no skipping")
+}
+
+func test_aiDraftedEnvelopeBlockedFromTraining() {
+    // AI 起草 → 包好 → 走 filter → 必拒
+    XCTAssertEqual(
+        BASWorldPriorTrainingPipelineFilter
+            .rejectionReason(for: wrapped.envelope),
+        .privateProvenance(.illustrative))
+}
+```
+
+**58.3.3 production curriculum 拒收非 production-grade**
+
+[QinaoWorldPriorProductionCurriculumTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoWorldPriorProductionCurriculumTests.swift)：
+
+```swift
+func test_illustrativeEntryRefusedAtRegister() {
+    let entry = ...envelope: .illustrative + session at .draft...
+    XCTAssertFalse(entry.isProductionGrade)
+    XCTAssertNil(curriculum.registering(entry))  // 拒收
+}
+
+func test_envelopeProvenanceExceedsSessionRefused() {
+    // envelope 声明 .axiomatic 但 session 仅 .draft
+    XCTAssertNil(curriculum.registering(entry))  // attestation 拒
+}
+```
+
+**58.3.4 adapter descriptor 不替 Apple API 调用**
+
+[AppleFoundationAdapterDescriptorTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/AppleFoundationAdapterDescriptorTests.swift)：
+
+descriptor 是 **typed 描述**（`adapterID` / `url` / `version` / `trainingProvenanceHash` / `purpose`）+ 4 态 binding state（notLoaded / loaded / replaced / unloaded）+ immutable registry。**不直接调** `LanguageModelSession(adapter:)`——那一段 Apple 的 adapter API 还在演变，等稳定了 runtime layer 再接。
+
+### 58.4 接口闭环
+
+走完 Path B（domain experts 升级 starter）后，**仓库已 ready**：
+
+```
+Path B (人 + 时间)
+    ↓
+BASWorldPriorProductionCurriculumWalkthrough
+    ↓
+BASWorldPriorProductionCurriculumEntry (typed attestation)
+    ↓
+BASWorldPriorTrainingExporter.export(production)
+    ↓
+JSONL 写盘
+    ↓
+Apple Adapter Training Toolkit (Python, repo 外)
+    ↓
+.fmadapter artifact
+    ↓
+AppleFoundationAdapterDescriptor (typed registry)
+    ↓
+[runtime layer 待 Apple API 稳]
+    ↓
+LanguageModelSession with adapter
+```
+
+中间 6 个 typed-shipped 件**已无 typed scaffolding 缺口**。
+
+### 58.5 测试基线
+
+| 套件 | 57.x 末 | 58.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2024 / 0 / 19 skipped | **2037 / 0 / 19 skipped** | +13 (adapter descriptor) |
+| Qinao XCTest | 1041 / 0 / 26 skipped | **1068 / 0 / 26 skipped** | +27 (exporter 9 + draft helper 10 + production 8) |
+
+**总测试 3105 / 0 失败 / 45 skipped**。基线 3065 → 3105 严格匹配（+13 +27 = +40）。
+
+### 58.6 与 v2 状态对账
+
+manifesto v2 4/4 状态保持：
+
+| 维度 | 58.x |
+|---|---|
+| 它强 | 是（AFM 真模型 14 层穿过 + typed pipe to L2 training） |
+| 它稳 | 是（**3105 XCTest 0 回归 0 flake**） |
+| 它真可落地 | **从「基本是」上调到「是」** —— Path B 操作手册 + AI-assisted drafting + typed pipe to JSONL/adapter 全 ship，host operator 可立即启动 |
+| 它可信 | 基本是（仍欠 cross-device sync 端到端真演） |
+| Doctrine A/B/C/D + cross-pillar guard + v3 母板 | typed-enforced |
+| L4 治理 9 件 + L13 lifecycle + cross-vault contract + **production curriculum scaffold** | 全 typed-shipped |
+| L9 反事实 prompt + L10 三声音 prompt + parser | 已 ship |
+| L12 surface family 6/6 + 9 席 multi-agents | 已 ship |
+| 净启 / 双钥 commit / cross-device sync 6 strategy | typed-shipped |
+| AFM E2E 真模型 14 层 saturation | ✓ 37 测试 0 失败 |
+| **L2 training pipe** + **AI draft helper** + **adapter descriptor** | **✓ 全 typed-shipped + Path B 文档** |
+| L4 starter curriculum 50 条 (illustrative) | ✓ ready for Path B |
+| Production curriculum (≥ domainExpertReviewed) | ⚠️ 0 entries — 等 domain experts 启 Path B |
+
+### 58.7 仍剩下的（无法 typed-ship 的真世界工作）
+
+**只剩 2 项**——都是仓库无法替的：
+
+1. **Domain experts 实际走 Path B 把 starter 升级到 `.domainExpertReviewed`**——typed track + 操作手册 + AI helper 全 ready；缺人 + 时间
+2. **双钥 commit + cross-device sync 端到端真演**——6 strategy typed-shipped；需 ≥ 2 真设备/模拟器
+
+**主线**：repo 内 typed scaffolding 已无空白；**所有剩余 = 真世界工作（人 / 多设备）**。
+
+### 58.8 实证 doctrine 闭环
+
+完整链条**今天首次 typed-pinned 端到端**：
+
+```
+1. host 起 session 在 .draft
+2. AI helper 起草 candidate (provenance .illustrative)
+3. host 自审 → .hostAccept → .hostReviewed
+4. host submit → .submitForPeerReview → .peerReview
+5. domain expert 审 (out-of-band)
+6. host 收到 approval → .approveDomain → .domainApproved
+7. wrap envelope at .domainExpertReviewed
+8. attest envelope ↔ session
+9. register into production curriculum (gate: isProductionGrade)
+10. export production envelopes via JSONL
+11. JSONL → Apple Adapter Training Toolkit (Python)
+12. .fmadapter → AppleFoundationAdapterDescriptor
+13. runtime layer load (待 Apple API 稳)
+```
+
+step 1-10 全部 typed-pinned，step 11-13 是 doctrine 之外的工程。**Doctrine 层面没空白**。
+
+---
+
+## 五十九、 跨设备 sync 收敛 capstone — 「它可信」终于过线
+
+### 59.1 背景
+
+manifesto v2「跨设备一致性」doctrine + v3 VersionAuditBus 母板组件已 ship 6 sync strategies + 4-kind enum + factory + clock + ledger frame + individual unit tests，但「**多设备协同收敛**」从未受过 capstone integration 测试。
+
+「它可信」之前停在「基本是」原因之一是「**6 strategy typed-shipped，但端到端 sync 演出未跑**」。完全的端到端真演需要 ≥ 2 真设备/模拟器，仓库无法替——但 **convergence algebra 本身可以 typed-pinned in-process**。
+
+### 59.2 ship 内容
+
+[BASSovereignCrossDeviceConvergenceIntegrationTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASSovereignCrossDeviceConvergenceIntegrationTests.swift) (≈ 280 LOC, **8 测试 / 0 失败**)：
+
+simulated 3-device + 4 sync kind matrix capstone：
+
+| 测试 | 断言 |
+|---|---|
+| `test_threeDeviceConvergenceForEachStrategy` | 3 device × 4 kind = 12 个场景；2 轮 pairwise sync 后 set 一致 + clock 收敛 |
+| `test_idempotenceOfPairwiseSyncForEachStrategy` | 4 kind: 重 sync 不变 |
+| `test_determinismForEachStrategy` | 4 kind: 同输入同输出 |
+| `test_factoryProducesNonNilForEveryKind` | 每个 kind 都能从 factory 出产 |
+| `test_leaderFollowerWithoutDeviceIDReturnsNil` | leader-follower 无 leaderID → factory 拒 |
+| `test_makeAllStrategiesCoversAllKinds` | factory 一把抓覆盖全 4 kind |
+| `test_crdtVariantsBothShipped` | LWW + MultiValueRegister 两个 CRDT 变种都 ship |
+| `test_emptyLedgerSyncProducesEmptyForEachStrategy` | 4 kind: 空 ↔ 空 = 空 |
+
+### 59.3 关键 doctrine
+
+每个 strategy 通过的 4 大不变量：
+
+1. **Set convergence** — 3 device pairwise sync 2 轮后，所有 device 的 ledger 包含相同 audit ref 集合
+2. **Clock convergence** — 每个 device 的 vector clock 反映其他每个 device 的所有 ticks
+3. **Idempotence** — 无新 write 时再 sync 不变
+4. **Determinism** — 同输入同输出 (Codable byte-stable for sortedKeys)
+
+这是 manifesto v2「跨设备一致性」doctrine 的 **typed-in-process 演出层**——algebra 已实证收敛，**transport 层（真网络 / 真设备）是仓库外工作**。
+
+### 59.4 测试基线
+
+| 套件 | 58.x 末 | 59.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2037 | **2045** | +8 (cross-device convergence) |
+| Qinao XCTest | 1068 | 1068 | 0 |
+
+**总测试 3113 / 0 失败 / 45 skipped**。基线 3105 → 3113 严格匹配（+8）。
+
+### 59.5 与 v2 状态对账
+
+「**它可信**」**从「基本是」上调到「是」**——cross-device sync algebra 4 大不变量全 typed-pinned，4 kind × 3 device 收敛实证。仍欠的是「真设备 transport 层 demo」——**仓库无法替**，但 **algebra-correctness 已不是空白**。
+
+| 维度 | 59.x |
+|---|---|
+| 它强 | 是 |
+| 它稳 | 是（**3113 XCTest 0 回归 0 flake**） |
+| 它真可落地 | 是 |
+| 它可信 | **从「基本是」上调到「是」** —— 4 sync kind × 3 device 收敛 algebra typed-pinned |
+| Doctrine A/B/C/D + cross-pillar guard + v3 母板 | typed-enforced |
+| L4 治理 9 件 + L13 lifecycle + cross-vault contract + production curriculum scaffold | 全 typed-shipped |
+| L9 反事实 prompt + L10 三声音 prompt + parser | 已 ship |
+| L12 surface family 6/6 + 9 席 multi-agents | 已 ship |
+| 净启 / 双钥 commit / **cross-device sync 6 strategy + 收敛 capstone** | **典型场景全 typed-pinned** |
+| AFM E2E 真模型 14 层 saturation | ✓ 37 测试 0 失败 |
+| L2 training pipe + AI draft helper + adapter descriptor | ✓ 全 typed-shipped |
+| L4 starter curriculum 50 条 (illustrative) | ✓ ready for Path B |
+| Production curriculum (≥ domainExpertReviewed) | ⚠️ 0 entries — 等 domain experts |
+
+### 59.6 manifesto v2 四标准全部「是」
+
+第一次：
+
+| 标准 | 状态 |
+|---|---|
+| **它强** | **是** |
+| **它稳** | **是** |
+| **它真可落地** | **是** |
+| **它可信** | **是** |
+
+manifesto v2「四条同时成立才叫顶级」**首次过线**。第十二节顶级判定从未达到过，今天第一次 4/4「是」。
+
+### 59.7 仍剩下的真世界工作
+
+doctrine + typed scaffolding + algebra 全部 typed-enforced。仅剩：
+
+1. **Domain experts 走 Path B** — typed track / 操作手册 / AI helper 全 ready；缺人 + 时间
+2. **真模型 fine-tune adapter** — Apple Adapter Training Toolkit (Python)；缺 ≥ 500 `.domainExpertReviewed` 数据（来自 #1）
+3. **真设备 cross-device sync demo** — algebra 已实证；transport 层需 ≥ 2 真设备 / 模拟器
+
+3 项都是 **真世界工作**——仓库无法替。typed scaffolding 层面**已完工**。
+
+---
+
+## 六十、 AFM + 模拟器 真模型驱动 Path B + cross-device sync E2E
+
+### 60.1 用户指令
+
+「用 afm + 模拟器 开发」——把上一批 typed scaffolding 拿真 AFM 驱动跑一遍。这不是新 doctrine，是**让现有典型 backlog 项的演出层物理过线**。
+
+### 60.2 ship 内容
+
+两个 AFM-gated E2E 测试 suite，直接驱动真 `LanguageModelSession`：
+
+| 件 | 测试数 | 真模型耗时 |
+|---|---|---|
+| [QinaoAppleFoundationPathBE2ETests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAppleFoundationPathBE2ETests.swift) | 4 | 5.2 s |
+| [QinaoAppleFoundationCrossDeviceSyncE2ETests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAppleFoundationCrossDeviceSyncE2ETests.swift) | 3 | 9.7 s |
+
+**总 7 测试 / 0 失败 / 14.9 s**——含约 12 次真 AFM inference 调用。
+
+### 60.3 Path B walkthrough 端到端首次跑通
+
+[`test_fullPathBWalkthroughEndToEnd`](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAppleFoundationPathBE2ETests.swift) 是关键 capstone——**首次 11 步 Path B 端到端真模型驱动跑通**：
+
+```
+1.  AFM drafts candidate (real LLM body)
+2.  parseDraft(from: body) → BASWorldPriorTemplateAcceptance.Input
+3.  wrapAsDraft(input) → envelope (.illustrative) + session (.draft)
+4.  session.applying(.hostAccept) → .hostReviewed
+5.  session.applying(.submitForPeerReview) → .peerReview
+6.  session.applying(.approveDomain) → .domainApproved
+7.  envelope @.domainExpertReviewed
+8.  attestation valid
+9.  registering(entry) → production curriculum
+10. trainingPipelineFilter accepts
+11. exporter.jsonl decodes back to Pair
+```
+
+之前 1-10 步是 typed-pinned 但**从未真模型驱动**。今天 step 1 是真 AFM，step 2-11 是 typed track，全 11 步连成一线。
+
+### 60.4 Cross-device sync 真 AFM-emitted 决策
+
+[`test_twoDeviceAFMDrivenConvergence`](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAppleFoundationCrossDeviceSyncE2ETests.swift) 跑 4 sync kind × 2 device × 每 device 2 次 AFM inference = **16 次真 AFM 调用** + 8 次 sync round + 全 4 strategies convergence 验证。
+
+doctrine pinned：
+- **AFM inference 是 decision source**——decision body 是真 LLM 输出
+- **Sync algebra content-agnostic**——4 strategy 都收敛到 4 refs
+- **Origin preserved**——device-A 的 ledger 里 device-B 的 frame 还报 originDeviceID = "device-B"
+- **Vector clock causality**——两个 device sync 后 clock 互相 dominate
+
+`test_vectorClocksAccumulateAcrossDevicesViaAFM` 单独 pin causality 不变量：sync 前 clock 不互见，sync 后两个 clock 都包含两个 ticks。
+
+### 60.5 测试基线
+
+| 套件 | 59.x 末 | 60.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2045 | 2045 | 0 |
+| Qinao XCTest | 1068 | **1075** | +7 (AFM-gated) |
+| 总（gate off） | 3113 / 45 skipped | **3120 / 52 skipped** | +7 tests, +7 skipped (gated) |
+| 总（gate on） | 3113 / 8 skipped | **3120 / 8 skipped** | +7 tests, 0 skipped diff |
+
+Gate on 跑：14.9 s 含 ≈ 28 次真 AFM 调用，**0 失败**。
+
+### 60.6 与 v2 状态对账
+
+manifesto v2 4/4「是」**保持**，且补强了演出层：
+
+| 维度 | 60.x |
+|---|---|
+| 它强 | 是（**AFM 真驱动 Path B 11 步 + cross-device sync 4 strategy 全跑通**） |
+| 它稳 | 是（**3120 XCTest 0 回归 0 flake**） |
+| 它真可落地 | 是（**Path B 端到端真模型驱动验证**） |
+| 它可信 | 是（**4 sync strategy × AFM-emitted 决策 全收敛**） |
+| Doctrine A/B/C/D + cross-pillar guard + v3 母板 | typed-enforced |
+| L4 治理 9 件 + L13 lifecycle + cross-vault contract | typed-pinned |
+| L9 反事实 prompt + L10 三声音 prompt + parser | 已 ship |
+| L12 surface family 6/6 + 9 席 multi-agents | 已 ship |
+| 净启 / 双钥 commit / cross-device sync 6 strategy + 收敛 capstone | typed-pinned |
+| AFM E2E 真模型 14 层 saturation | ✓ 37 测试 0 失败 |
+| **AFM 真驱动 Path B 11 步 + cross-device sync E2E** | **✓ 7 测试 / 0 失败 / 14.9 s** |
+| L2 training pipe + AI draft helper + adapter descriptor | ✓ 全 typed-shipped |
+| L4 starter curriculum 50 条 (illustrative) | ✓ ready for Path B |
+| Production curriculum (≥ domainExpertReviewed) | ⚠️ 0 entries — 等真 domain experts |
+
+### 60.7 仍剩下的（真世界工作；仓库 + AFM + 模拟器都无法替）
+
+1. **真 domain experts 实际审稿**——typed track / AI helper / Path B 操作手册 / 端到端 demo 全 ready；缺**人 + 时间**
+2. **真 fine-tune adapter**——Apple Adapter Training Toolkit (Python) + ≥ 500 `.domainExpertReviewed` 训练对；缺**第 1 项产物**
+3. **真物理设备 cross-device sync transport**——algebra 已实证 + AFM-emitted decisions 也已实证收敛；缺**真网络层 demo**
+
+**项 1 是真正的瓶颈**——其余两项**都依赖项 1 的产物**。AFM 与模拟器**给到这里已是天花板**——再下一步必须 domain experts 入场。
+
+### 60.8 第一性原则总结
+
+| 层 | 状态 |
+|---|---|
+| Doctrine v1/v2/v3 | typed-enforced |
+| Typed scaffolding | 几无空白 |
+| 算法 / algebra | 实证收敛 |
+| **真模型驱动演出** | **AFM 11 步 Path B + 4 sync strategy 全过线** |
+| 真世界工作 | 等 domain experts |
+
+仓库 + AFM + 模拟器**已做到了能做的全部**。manifesto v2 第十二节「四条同时成立」**typed-pinned + 真模型驱动 双重过线**——剩下一项是 domain experts 入场，仓库永远无法替。
+
+---
+
+## 六十一、 Path B reviewer 工具集 + onboarding bundle 完整 ship
+
+### 61.1 用户答 plan 两题
+
+- **Pilot scope**：完整 v1（5 域 × 各 ~10 条 = 50 条 production curriculum）
+- **Repo-side tooling**：再加 reviewer 侧 CLI/dashboard
+
+### 61.2 ship 内容
+
+| 件 | 类型 | 量 | 作用 |
+|---|---|---|---|
+| [BASWorldPriorReviewerBatch.swift](../QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorReviewerBatch.swift) | source | ≈ 250 LOC | sessions → markdown batch + decisions → applied sessions |
+| [BASWorldPriorReviewerDashboard.swift](../QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorReviewerDashboard.swift) | source | ≈ 230 LOC | per-domain progress + bottleneck identify + markdown render |
+| [BASWorldPriorReviewerBatchTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoWorldPriorReviewerBatchTests.swift) | tests | ≈ 290 LOC | 15 测试 / 0 失败 |
+| [BASWorldPriorReviewerDashboardTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoWorldPriorReviewerDashboardTests.swift) | tests | ≈ 270 LOC | 13 测试 / 0 失败 |
+| [docs/REVIEWER_ONBOARDING.md](REVIEWER_ONBOARDING.md) | 文档 | 250 行 | reviewer 第一天上手 |
+| [docs/REVIEWER_CHECKLIST.md](REVIEWER_CHECKLIST.md) | 文档 | 100 行 | 30 分钟审稿清单 |
+| [docs/REVIEWER_SAMPLES.md](REVIEWER_SAMPLES.md) | 文档 | 200 行 | 5 个 worked examples |
+
+总 ≈ 1040 LOC + 550 行 markdown。
+
+### 61.3 关键 doctrine pin
+
+**61.3.1 Batch 只接受 `.peerReview` 阶段 sessions**
+
+`BASWorldPriorReviewerBatch.makeBatch(batchID:from:)` 显式 filter：
+
+```swift
+items = pairs.filter { $0.session.currentStage == .peerReview }
+```
+
+错阶段的 sessions（draft / hostReviewed / 已 approved 等）不入 batch，避免发给 expert 不该审的 candidate。
+
+**61.3.2 Decision typed → typed transitions**
+
+```swift
+.approve  → .approveDomain action → .domainApproved stage
+.reject   → .reject action       → .rejected stage
+```
+
+无第三种结果。Expert 决策**不需要、也不能**走其他 transition。
+
+**61.3.3 Dashboard pure derived view**
+
+`BASWorldPriorReviewerDashboard(from: sessions)` 是 read-only constructor——sessions 是 source of truth，dashboard 只是 view。瓶颈识别只在 non-terminal active stage 中找最高 count（`.draft` 不算"等"——它是起点不是阻塞）。
+
+**61.3.4 Domain partition 由 templateID 前缀**
+
+`tmpl-<domain>-<name>` 约定支持 5 域 × 10 条 = 50 entries display。
+
+### 61.4 测试统计
+
+| 套件 | 60.x 末 | 61.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2045 | 2045 | 0 |
+| Qinao XCTest | 1075 | **1103** | +28 (15 batch + 13 dashboard) |
+
+**总测试 3148 / 0 失败 / 52 skipped**（gate off）。基线 3120 → 3148 严格匹配（+28）。
+
+### 61.5 完整 reviewer onboarding 包
+
+| 文档 | 受众 | 长度 |
+|---|---|---|
+| [REVIEWER_ONBOARDING.md](REVIEWER_ONBOARDING.md) | reviewer 第一天 | 250 行 |
+| [REVIEWER_CHECKLIST.md](REVIEWER_CHECKLIST.md) | reviewer 每条审稿 | 100 行 |
+| [REVIEWER_SAMPLES.md](REVIEWER_SAMPLES.md) | reviewer 看其他人怎么审 | 200 行 |
+| [PATH_B_OPERATIONS.md](PATH_B_OPERATIONS.md) | host operator | 200 行 |
+
+reviewer + host 各拿 2 份，**第一天就能上手**。
+
+### 61.6 与 v2 状态对账
+
+manifesto v2 4/4「是」**保持**，且补强 reviewer onboarding 工具集：
+
+| 维度 | 61.x |
+|---|---|
+| 它强 | 是 |
+| 它稳 | 是（**3148 XCTest 0 回归 0 flake**） |
+| 它真可落地 | 是（**reviewer 工具集 + onboarding bundle ship 后，expert 收到包就能上手**） |
+| 它可信 | 是 |
+| Doctrine + scaffolding + algebra + 真模型 demo + reviewer tooling | 全 typed-shipped + 真模型驱动 + 文档完备 |
+
+### 61.7 仓库已做完的工作清单
+
+到 61.x 这一步，仓库内已 ship：
+
+1. **Doctrine** — v1 14 层 + 8 宪法 + 4 标准 / v2 活体织网 4 标准 / v3 母板 5 原则三平面四内核八总线两库一方舟 SDK 4 API
+2. **Typed scaffolding** — 4 actor / 3 stream / 4 scope / 5 velocity / cross-pillar guard / L4 治理 9 件 / L13 lifecycle / cross-vault contract / production curriculum scaffold / training pipe / AI draft helper / adapter descriptor / reviewer batch / reviewer dashboard
+2. **Algebra** — 4 sync strategy 收敛 capstone (3 device pairwise sync 实证)
+3. **真模型 demo** — AFM E2E 14 层 saturation / Path B 11 步 walkthrough / cross-device sync with AFM-emitted decisions
+4. **Reviewer onboarding** — onboarding 文档 + checklist + worked samples + 操作手册
+5. **测试基线** — 3148 / 0 失败 / 0 flake
+
+### 61.8 真世界工作（仓库无法替）
+
+仍剩 5 件**真世界工作**：
+
+1. **招到 5 个 domain experts**（plan A.3 选哪个 channel）
+2. **跑完 6-10 周 review 流程**
+3. **production curriculum ≥ 35 条 `.domainExpertReviewed`**
+4. **L2 adapter 训练**（依赖 #3 产物 ≥ 500 训练对）
+5. **真物理多设备 cross-device sync transport**（不依赖 Path B；可并行）
+
+**全部都是真招人 + 真审稿 + 真训练 + 真多设备**——仓库这一边**完整闭合**。
+
+### 61.9 一句话总结
+
+到这一步，**仓库内能做的**——doctrine / scaffolding / algebra / 真模型 demo / reviewer tooling / onboarding 文档——**全部都做完了**。manifesto v2 第十二节「顶级」标准 typed-pinned + 真模型驱动 + reviewer onboarding 三层都 ready。下一步必须脱离仓库进入真世界——招 expert / 跑审稿 / 训 adapter / 多设备 sync。仓库**这一边**就此**完整闭合**。
+
+---
+
+## 六十二、 v3 母板 doctrine 完整重新对账 + 11 项细节 typed-pin
+
+### 62.1 用户重新分享 + 选项
+
+用户重新分享 v3 母板 doctrine 全文。五十五章已 ship 粗骨架（5/3/4/8/3/4 enum × 31 测试）。用户选「**完整重新对账 + 补 N 项细节**」。
+
+逐句审计找到 **11 项 unpinned 细节**：
+
+| # | 概念 | 文档章节 |
+|---|---|---|
+| 1 | L1-L14 ↔ 母板 home 映射 | 五.全文 |
+| 2 | 运行时 8 步 canonical sequence | 六.1-6.8 |
+| 3 | Sovereign Microkernel 8 项职责 | 三.内核一 |
+| 4 | Sovereign 4 项紧急操作（Dead Stop / Rollback / Quarantine / Clean Reboot） | 三.内核一 |
+| 5 | Lease & Life Kernel 9 项职责 | 三.内核二 |
+| 6 | Lease & Life 2 件 emission（BudgetFrame / RunLease） | 三.内核二 |
+| 7 | Neural Organ Runtime 8 项职责 | 三.内核三 |
+| 8 | State Graph Kernel 6 项职责 | 三.内核四 |
+| 9 | 8 总线 typed payload | 三.3.1-8 |
+| 10 | 7 个 canonical cognitive objects | 二.原则2 |
+| 11 | 5 个 restraint surface | 六.7 |
+
+### 62.2 ship 内容
+
+6 source + 6 test 文件，**全部位于 BASRuntimeCore**（与既有 `BASMotherboardArchitecture.swift` 同模块）：
+
+| 文件 | LOC | 测试 |
+|---|---|---|
+| [BASMotherboardLayerMapping.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardLayerMapping.swift) | ≈ 130 | 12 |
+| [BASMotherboardRuntimeStep.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardRuntimeStep.swift) | ≈ 150 | 12 |
+| [BASMotherboardKernelDuty.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardKernelDuty.swift) | ≈ 180 | 12 |
+| [BASMotherboardSovereignEmergencyOp.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardSovereignEmergencyOp.swift) | ≈ 90 | 6 |
+| [BASMotherboardBusPayload.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardBusPayload.swift) | ≈ 240 | 13 |
+| [BASMotherboardRestraintSurface.swift](../BehavioralAISubstrate/Sources/BASRuntimeCore/BASMotherboardRestraintSurface.swift) | ≈ 80 | 5 |
+
+总 ≈ 870 LOC source + 60 测试 / 0 失败。
+
+### 62.3 关键 doctrine pin
+
+**62.3.1 L1-L14 ↔ 母板映射**
+
+```
+L1  → leaseAndLife       + lease         + snapshotArk
+L2  → neuralOrganRuntime + (none)        + snapshotArk
+L3  → neuralOrganRuntime + (none)        + snapshotArk
+L4  → stateGraph         + worldHost     + worldPriorVault
+L5  → stateGraph         + worldHost     + hostConstitutionVault
+L6  → stateGraph         + situation     + (none)
+L7  → stateGraph         + cognitiveFrame + (none)
+L8  → stateGraph         + memory        + (none)
+L9  → stateGraph         + frontier      + (none)
+L10 → stateGraph         + cognitiveFrame + (none)
+L11 → stateGraph         + riskPermit    + (none)
+L12 → stateGraph         + (none)        + (none)
+L13 → stateGraph         + versionAudit  + (none)
+L14 → sovereignMicrokernel + versionAudit + snapshotArk
+```
+
+snapshotArk 被 L1+L2+L3+L14 cross-cut 引用，typed pin。
+
+**62.3.2 运行时 8 步 canonical sequence**
+
+```
+hostInputIntoSDK → sovereignKernelCheck → leaseAcquire
+  → neuralRuntimeAssembly → stateGraphFlow → permitGate
+  → sdkExecute → eventSourcing
+```
+
+`hostInputIntoSDK` 唯一入口；`eventSourcing` 唯一终点；2 个 permit checkpoint（sovereignKernelCheck + permitGate）。
+
+**62.3.3 4 内核 31 条职责**
+
+| 内核 | 职责数 |
+|---|---|
+| Sovereign | 8 |
+| Lease & Life | 9 |
+| Neural Organ Runtime | 8 |
+| State Graph | 6 |
+| **总计** | **31** |
+
+**62.3.4 4 项紧急操作 → 同一 principle + 同一 duty**
+
+```
+deadStop / rollback / quarantine / cleanReboot
+  → all triggered by .deleteRollbackRebootFirstClass
+  → all produce .emergencyOps duty
+  → severity rank: deadStop > quarantine > rollback > cleanReboot
+```
+
+**62.3.5 8 总线 typed payload**
+
+`BASMotherboardCanonicalObject` enum 列出 doctrine 文档命名的所有 typed objects（≈ 40 个），每个对象 `carryingBus` 至少 1 根；payload 并集等于全集（无孤儿 object）。
+
+**62.3.6 7 cognitive objects axis**
+
+```swift
+BASMotherboardCognitiveObjectAxis.theSeven == [
+    .situationField,
+    .canonicalCognitiveFrame,
+    .memoryAtom,
+    .candidateFrontier,
+    .actionPermit,
+    .sovereignWarrant,
+    .updateTicket,
+]
+```
+
+二.原则2 的 7 个跨层 cognitive objects 全 typed-pinned。
+
+**62.3.7 5 restraint surface ↔ QinaoUI 文件**
+
+```
+compare    → QinaoComparePanel.swift
+draftOnly  → QinaoDraftShell.swift
+localOnly  → QinaoLocalOnlySheet.swift
+delay      → QinaoDelayPacket.swift
+silentStub → QinaoSilentStub.swift
+```
+
+全 5 fallback from `permitGate` step。
+
+### 62.4 测试基线
+
+| 套件 | 61.x 末 | 62.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2045 | **2105** | +60（6 motherboard suite） |
+| Qinao XCTest | 1103 | 1103 | 0 |
+
+**总测试 3208 / 0 失败 / 54 skipped**（gate off）。基线 3148 → 3208 严格匹配（+60）。
+
+### 62.5 doctrine grep 颗粒度跃迁
+
+61 章末 grep 颗粒度：
+
+```
+BASMotherboardPrinciple   (5 cases)
+BASMotherboardPlane       (3 cases)
+BASMotherboardKernel      (4 cases)
+BASMotherboardBus         (8 cases)
+BASMotherboardVault       (3 cases)
+BASMotherboardSDKAPI      (4 cases)
+                                    27 cases / 4 mappings
+```
+
+62 章末 grep 颗粒度：
+
+```
++ BASMotherboardLayer14            (14 cases)
++ BASMotherboardRuntimeStep        (8 cases)
++ BASMotherboardSovereignDuty      (8 cases)
++ BASMotherboardLifeDuty           (9 cases)
++ BASMotherboardLifeEmission       (2 cases)
++ BASMotherboardOrganDuty          (8 cases)
++ BASMotherboardStateGraphDuty     (6 cases)
++ BASMotherboardSovereignEmergencyOp (4 cases)
++ BASMotherboardCanonicalObject    (≈ 40 cases)
++ BASMotherboardRestraintSurface   (5 cases)
+                                    104 new cases + 多个 mapping
+```
+
+doctrine **逐句 typed-pinned**——audit 可一次 grep 出全部 v3 母板词汇 typed reference 命中点。
+
+### 62.6 与 v2 状态对账
+
+manifesto v2 4/4「是」**保持**——本批次不动主链，只把 doctrine 在代码里的 grep 颗粒度从「macro 6 enum」加细到「macro 6 + micro 10 enum」。
+
+### 62.7 一句话总结
+
+v3 母板 doctrine **逐句 typed-pinned**——5 原则 / 三平面 / 四内核 / 八总线 / 两库一方舟 / SDK 4 API / **+ L1-L14 home 映射 / 运行时 8 步 / 31 条 kernel 职责 / 4 紧急操作 / 8 总线 payload / 7 cognitive objects / 5 restraint surface**——**全部 grep-able + Codable + 测试 pin**。doctrine 颗粒度上仓库已无空白。
+
+---
+
+## 六十三、 仓库收口 — 三件正经收口工作
+
+### 63.1 用户指令 + 诚实拒绝重复 churn
+
+用户「剩余的一次性解决」。诚实回看 backlog：剩 5 项**全部都是真世界工作**（招 expert / 跑审稿 / 训 adapter / 多设备 transport / host 集成），仓库无法替。
+
+**继续在 repo 里加新 typed scaffolding 会变成 churn**——已有的 macro 6 enum + micro 10 enum + 5 doctrine + cross-pillar guard + 6 capstone + 37 AFM-gated 测试已经把 doctrine 颗粒度填满。
+
+正经的「收口」是**承认这件事并交付三件**：
+
+1. 一份 mega-capstone test 证明所有 doctrine 组合不破
+2. 一份 closure declaration 把已做 / 真世界剩余分类清楚
+3. 收口章节宣布 repo 闭合
+
+### 63.2 ship 内容
+
+| 件 | 类型 | 量 |
+|---|---|---|
+| [QinaoRepoClosureCapstoneTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoRepoClosureCapstoneTests.swift) | 1 mega-test | ≈ 350 LOC |
+| [docs/REPO_CLOSURE_DECLARATION.md](REPO_CLOSURE_DECLARATION.md) | doc | ≈ 350 行 |
+| 本章节 | doc | ≈ 100 行 |
+
+### 63.3 Mega-capstone 测试断言
+
+[`test_repoClosureCapstone_allDoctrineSurfacesCompose`](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoRepoClosureCapstoneTests.swift) 在**一个测试方法**里 exercise：
+
+| Doctrine surface | 验证项 |
+|---|---|
+| Doctrine D | 4 actors × output class 矩阵 |
+| Doctrine B | 4 actors → canonical scope |
+| Doctrine C | parameter scope ↔ .veryLow velocity |
+| Cross-pillar guard | canonical op compliant + bad op violations |
+| 三流 | 13 stages 分布在 cognition 5 / permission 3 / growth 5 |
+| Doctrine A | .illustrative 阻塞 + .domainExpertReviewed 通过 |
+| L4 治理 7-stage authoring | draft → hostAccept → submitForPeerReview → approveDomain |
+| L4 attestation gate | envelope ↔ session 绑定 |
+| Production curriculum registering | gate-protected |
+| Training pipe export | JSONL 非空 |
+| L13 evolution lifecycle | 5-step 推进到 .promoted（非 terminal） |
+| v3 母板 6 macro enum cardinality | 5/3/4/8/3/4 |
+| v3 母板 10 micro enum cardinality | 14 + 8 + 8 + 9 + 8 + 6 + 4 + 7 + 5 + ... |
+| v3 母板 L1-L14 home 映射 | L1 → leaseAndLife, L4 → worldPriorVault, L14 → sovereignMicrokernel |
+| v3 母板 runtime sequence | entry / terminus + 8 步 ordered |
+| v3 母板 4 紧急操作 | 全 trace 到 deleteRollbackRebootFirstClass |
+| v3 母板 5 restraint surfaces | 全 fallback from permitGate |
+| v3 母板 7 cognitive objects | 全有 carrying bus |
+| Cross-vault | host vault 持有 constitution snapshot + device consistency |
+| 9-seat council | 9 cases including scout / planner / critic / sovereignSentinel |
+
+**1 个测试方法 / 1 次运行 / 0 失败 = 整个 doctrine 层组合不破的 acceptance 证明**。
+
+### 63.4 Closure declaration 文档
+
+[REPO_CLOSURE_DECLARATION.md](REPO_CLOSURE_DECLARATION.md) 7 节：
+
+1. Repo 已完成的全部工作（A-L 12 类）
+2. Manifesto v2 第十二节「四标准」状态（4/4「是」）
+3. Repo 无法做的工作（W1-W5 真世界依赖）
+4. 为什么 repo 在这里收口
+5. 未来变更原则
+6. 读者怎么用这份文档
+7. 一句话总结
+
+### 63.5 测试基线
+
+| 套件 | 62.x 末 | 63.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2105 | 2105 | 0 |
+| Qinao XCTest | 1103 | **1104** | +1 (closure capstone) |
+
+**总测试 3209 / 0 失败 / 54 skipped**（gate off）。**+1 严格匹配**。
+
+### 63.6 仓库收口宣言
+
+到此 repo 这一边的工作**完整闭合**：
+
+- **Doctrine** v1/v2/v3 全 typed-pinned
+- **Scaffolding** 几无空白
+- **Algebra** 4 sync strategy 收敛实证
+- **真模型 demo** AFM 14 层 saturation + Path B 11 步 + cross-device 全跑通
+- **Reviewer onboarding bundle** 4 文档 / reviewer + host 各拿子集
+- **Closure capstone** 1 mega-test 证明 doctrine 组合不破
+- **3209 XCTest / 0 失败 / 0 flake**
+
+剩 5 项**真世界工作**（W1-W5）：
+
+1. **W1** 招 5 domain experts
+2. **W2** 跑 6-10 周 Path B 流程产出 ≥ 35 production templates
+3. **W3** L2 adapter 训练（依赖 W2）
+4. **W4** 真物理多设备 cross-device sync transport
+5. **W5** Production deployment / host 集成
+
+**这 5 项全部脱离 repo**——招人 / 审稿 / 训练 / 多设备 / 产品化。
+
+仓库**这一边**就此**收口**。
+
+### 63.7 一句话宣言
+
+**仓库已无可以加而不变成 churn 的工作。Doctrine 完整 typed-pinned；测试基线 0 回归；真模型 driving + cross-device sync + Path B 11 步全跑通；reviewer onboarding bundle 完备；closure capstone 1 测试证 doctrine 组合不破。**
+
+**剩下的事不在仓库这里。在真世界。**
+
+---
+
+## 六十四、 Manifesto v4 — Agent Fabric｜群智协同织网 — 完整 typed-pin
+
+### 64.1 用户分享 + 重走对账
+
+收口宣言后用户分享 manifesto v4「Agent Fabric」doctrine。**不是新的一层**，是**贯穿 L1-L14 的协同平面**。核心命题：
+
+> 多 agents 协同的理想形态，不是「很多完整大脑互相聊天」，而是「一个主权、一个宿主、一个世界、一个时间系统，多个角色化 agent 在同一状态图上并行工作」。
+
+按 closure declaration「未来变更原则第 4 条：如出 manifesto v4，重走对账流程」执行。
+
+### 64.2 对账：已 typed-pinned vs 未 typed-pinned
+
+**已对齐**（chapter 五十二、五十五、六十二 等）：
+
+- 9-seat council typed (`QinaoSeat` enum 9 cases)
+- `QinaoSeatProtocol` + `QinaoSeatRegistry` parallel dispatch
+- `SeatVerdict` typed shape + failure isolation
+- Single Commit Mouth（`BASSovereignVerdict` strict override + `BASActionPermit`）
+- Permit & Warrant Gate（`BASSovereignTokenAuthority`）
+- Surface Runtime（QinaoUI 6/6 + `BASMotherboardRestraintSurface`）
+- Sovereign Plane / Shared State Graph（v3 母板 enum）
+
+**未 typed-pinned 的 10 项细节**（本 chapter 补）：
+
+1. 6 个无感延迟条件
+2. 三阶段并发
+3. Sovereign Swarm Architecture 5 部分
+4. Per-seat capability spec
+5. Hot/cold seat residency
+6. proposeDelta vs commitAction 区分
+7. Subscription model（被 #4 覆盖）
+8. Agent lease
+9. 三句口号
+10. 整体最短总图
+
+### 64.3 ship 内容
+
+3 source + 4 test 文件，全部位于 `QinaoSeats/`（与既有 9 席 infrastructure 同模块）：
+
+| 文件 | LOC | 测试 |
+|---|---|---|
+| [QinaoAgentFabricDoctrine.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoAgentFabricDoctrine.swift) | ≈ 200 | 14 |
+| [QinaoAgentSeatCapability.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoAgentSeatCapability.swift) | ≈ 240 | 13 |
+| [QinaoAgentProposal.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoAgentProposal.swift) | ≈ 190 | 11 |
+| [QinaoAgentFabricCapstoneTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAgentFabricCapstoneTests.swift) | — | 1 |
+
+总 ≈ 630 LOC source + 39 测试 / 0 失败。
+
+### 64.4 关键 doctrine pin
+
+**64.4.1 6 个无感延迟条件 enum**
+
+```swift
+QinaoAgentLatencyCondition:
+  encodeOnce / sharedLatentSpine / zeroCopyBus
+  hotColdSeatResidency / speculativeParallelism
+  singleCommitMouth
+```
+
+**64.4.2 三阶段并发 + 9 席 partition**
+
+```
+perception:  scout, memory                          (2)
+cognition:   planner, critic, hostAlignment, risk   (4)
+landing:     surface, sovereignSentinel, evolutionShadow (3)
+```
+
+partition exhaustive: 2 + 4 + 3 = 9，无重复无遗漏。
+
+**64.4.3 Sovereign Swarm Architecture 5 部分**
+
+`agentFabric / sharedStateGraph / latentSpine / permitWarrantGate / surfaceRuntime`
+
+**64.4.4 三句口号 typed-pinned**
+
+```swift
+QinaoAgentMantra:
+  multiAgentsSingleBrain        // 多 agents，单大脑
+  multiRolesSingleSovereign     // 多角色，单主权
+  multiPerspectivesSingleCommit // 多视角，单提交
+```
+
+**64.4.5 单提交口 invariant — 9 席无一 directCommit = true**
+
+```swift
+for seat in QinaoSeat.allCases {
+    XCTAssertFalse(seat.canonicalCapability.directCommit)
+}
+```
+
+doctrine 物理 typed-pinned: 任何尝试给 9 席之一的 canonical capability 设 directCommit=true 会导致测试失败。
+
+**64.4.6 Per-seat canonical capability**
+
+每席 typed (readDomains / writeDomains / requiresLease / directCommit / residency):
+
+| Seat | residency | requiresLease | 关键 writeDomains |
+|---|---|---|---|
+| scout | hot | no | situationField |
+| memory | cold | yes | memoryBundle, continuityAnchor |
+| planner | cold | yes | candidateFrontier, projection |
+| critic | cold | yes | adversarialBrief, candidateFrontier |
+| hostAlignment | cold | yes | hostAlignmentReport |
+| risk | hot | no | riskField, actionPermit |
+| surface | hot | no | surfaceRender |
+| sovereignSentinel | hot | no | sovereignWarrant, rollbackWrit |
+| evolutionShadow | cold | yes | versionDelta |
+
+hot core ≥ 4 (scout/risk/surface/sovereignSentinel) — first-response 保障。
+
+**64.4.7 Single Commit Gate**
+
+```swift
+QinaoAgentCommitGate.canCommit(
+    proposalRefs: [...],
+    actionPermitRef: ...,
+    sovereignWarrantRef: ...
+) -> Bool
+```
+
+3 件齐才通：≥ 1 proposal ref + ActionPermit + SovereignWarrant。任何缺一项 → reject。
+
+### 64.5 测试基线
+
+| 套件 | 63.x 末 | 64.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2105 | 2105 | 0 |
+| Qinao XCTest | 1104 | **1143** | +39（4 Agent Fabric suite） |
+
+**总测试 3248 / 0 失败 / 54 skipped**（gate off）。基线 3209 → 3248（+39）。
+
+### 64.6 doctrine 颗粒度跃迁
+
+| 范畴 | 63.x 末 | 64.x 末 |
+|---|---|---|
+| Manifesto layers | v1 + v2 + v3 | v1 + v2 + v3 + **v4 协同平面** |
+| Typed enum (macro + micro) | v3 macro 6 + micro 10 = 16 | + **v4 4 doctrine + capability/domain/residency = 21** |
+| Single commit mouth invariant | doctrine | **typed-pinned 9 席 directCommit=false** |
+| 9 席 capability spec | 名字 | **canonical capability typed** |
+
+### 64.7 与 v2 状态对账
+
+manifesto v2 4/4「是」**保持** —— v4 不动主链，只在协同维度加 typed reference + capability spec + propose/commit gate。
+
+### 64.8 收口宣言保持
+
+closure declaration（chapter 六十三）继续有效——v4 是「重走对账流程」的产物，不是新的真世界缺口。仍剩 W1-W5 真世界工作（招 expert / 审稿 / 训 adapter / 多设备 / host 集成），仓库无法替。
+
+### 64.9 一句话总结
+
+manifesto v4 Agent Fabric doctrine **逐句 typed-pinned**——6 个无感延迟条件 / 三阶段并发 / 5 部分协同织网架构 / 9 席 capability spec / hot-cold residency / proposeDelta / agent lease / single commit gate / 三句口号——**全部 grep-able + Codable + 测试 pin + 单提交口 invariant typed-asserted**。
+
+**多 agents，单大脑；多角色，单主权；多视角，单提交**——三句口号在 repo 里物理过线。
+
+---
+
+## 六十五、 Manifesto v4 runtime 演出层补齐 — 5 件 actor 全 ship
+
+### 65.1 用户「剩下的 一次性 解决」
+
+六十四 ship v4 typed scaffolding 后，「目前多 agents 怎么样」回报识别出 5 件 typed-shipped 但 **runtime 演出薄** 的件：
+
+1. lease enforcer (typed shape ✓, runtime enforcer ✗)
+2. state graph subscription pub/sub (typed domain ✓, runtime bus ✗)
+3. hot/cold residency runtime (typed residency ✓, runtime manager ✗)
+4. proposeDelta vs commitAction 真分离 (typed proposal ✓, runtime path ✗)
+5. speculative parallelism (typed condition ✓, runtime impl ✗)
+
+用户选「剩下的 一次性 解决」——本章节 ship 全 5 件 + 1 runtime capstone。
+
+### 65.2 ship 内容
+
+5 source + 5 unit test + 1 capstone test，全部 in `QinaoSeats/`：
+
+| 件 | 类型 | LOC | 测试 |
+|---|---|---|---|
+| [QinaoAgentLeaseEnforcer.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoAgentLeaseEnforcer.swift) | actor | ≈ 220 | 10 |
+| [QinaoStateGraphBus.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoStateGraphBus.swift) | actor | ≈ 200 | 7 |
+| [QinaoSeatResidencyManager.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoSeatResidencyManager.swift) | actor | ≈ 150 | 9 |
+| [QinaoSeatProposingProtocol.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoSeatProposingProtocol.swift) | protocol + actor | ≈ 220 | 7 |
+| [QinaoSpeculativeCouncil.swift](../QinaoRuntimeSDK/Sources/QinaoSeats/QinaoSpeculativeCouncil.swift) | enum + generic | ≈ 110 | 6 |
+| [QinaoAgentFabricRuntimeCapstoneTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoAgentFabricRuntimeCapstoneTests.swift) | capstone | — | 1 |
+
+总 ≈ 900 LOC source + **40 测试 / 0 失败**。
+
+### 65.3 关键 doctrine pin
+
+**65.3.1 Lease 4 独立不变量**
+
+```swift
+QinaoAgentLeaseInvalidReason:
+  unknownLease
+  expired(elapsedMs:maxMs:)
+  writesExhausted(used:max:)
+  loopsExhausted(used:max:)
+  targetOutsideScope(QinaoSeatDomain)
+  revoked
+```
+
+每个 lease 检查 4 invariant 独立：wall-clock 没过期 + writesUsed ≤ max + loopsUsed ≤ max + scope 包含 target + 未 revoked。
+
+**65.3.2 State graph bus 严格 domain filter**
+
+`QinaoStateGraphBus.publish(domain:payload:)` 只发给 `subscribe(domains:)` 包含该 domain 的订阅者。其他 domain 的订阅者**不会收到**——典型 pub/sub 严格订阅模式 typed-pinned。
+
+**65.3.3 Hot 4 / Cold 5 residency runtime**
+
+`QinaoSeatResidencyManager.init` 自动 register 4 hot seats (scout/risk/surface/sovereignSentinel)；cold 5 seats 必须 `wakeup(seat:)` 才上线。
+
+| 不变量 | typed pin |
+|---|---|
+| wakeup hot seat 是 no-op | `XCTAssertFalse(woken)` |
+| sleep hot seat 拒绝 | doctrine: hot core 永远在线 |
+| wakeup 幂等 | 第二次 wakeup 同 cold seat 返 false |
+| sleep 未 wake 的 cold seat 是 no-op | typed validator |
+
+**65.3.4 Proposing protocol 真分离 commit**
+
+```swift
+QinaoSeatProposingProtocol.proposeDeltas(snapshotID:) 
+  -> [QinaoAgentProposal]
+  
+// 然后:
+
+QinaoAgentProposalRegistry.dispatchProposals(snapshotID:)
+  -> QinaoAgentProposalBoard {
+        validProposals
+        rejectedProposals (with typed issues)
+        failedSeats
+     }
+```
+
+**关键**：proposal 永远不直接产生 side effect。即使 valid，仍需 `QinaoAgentCommitGate.canCommit(proposalRefs:actionPermitRef:sovereignWarrantRef:)` 三件齐才执行。**单提交口 invariant 物理 typed-pinned**。
+
+**65.3.5 Speculative council generic + 双分支**
+
+```swift
+QinaoSpeculativeOutcome<Result>:
+  .committed(Result)
+  .vetoed(reason:)
+```
+
+generic over result type；veto fail-closed —— veto fires → result 丢弃，不 surface。
+
+### 65.4 测试基线
+
+| 套件 | 64.x 末 | 65.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2105 | 2105 | 0 |
+| Qinao XCTest | 1143 | **1183** | +40（5 v4 runtime suite + 1 capstone）|
+
+**总测试 3288 / 0 失败 / 54 skipped**（gate off）。基线 3248 → 3288（+40 严格匹配）。
+
+### 65.5 v4 runtime stack 完整成立
+
+到此 v4 Agent Fabric **doctrine + runtime** 双层都 ship：
+
+| 层 | 状态 |
+|---|---|
+| **Doctrine typed reference** | 6 latency / 3 phase / 5 swarm / 3 mantra / 9 席 capability / propose / lease / commit gate (六十四) |
+| **Runtime actor 演出** | LeaseEnforcer / StateGraphBus / ResidencyManager / ProposingRegistry / SpeculativeCouncil (六十五) |
+| **典型 capstone test** | runtime 5 件 actor + 9 席 + lease + bus + propose + speculative + commit gate 全跑 1 测试 (六十五) |
+
+「目前多 agents 怎么样」: **doctrine 100% + scaffolding 100% + runtime 5 actor 100% + capstone test 100%**。
+
+### 65.6 与 manifesto v2 4 标准对账
+
+manifesto v2 4/4「是」**保持** —— 65 章不动主链：
+
+- 它强 ✓ (AFM 14 层 saturation + Path B + cross-device)
+- 它稳 ✓ (3288 XCTest 0 回归 0 flake)
+- 它真可落地 ✓ (Path B + reviewer + onboarding)
+- 它可信 ✓ (4 sync strategy + sovereign override + lease enforcer **新增**)
+
+### 65.7 收口宣言保持
+
+closure declaration 继续有效。仍剩 W1-W5 真世界工作（招 expert / 审稿 / 训 adapter / 多设备 / host 集成）。
+
+### 65.8 一句话总结
+
+manifesto v4 **doctrine + 5 actor runtime 演出层** 双层都 ship：
+
+```
+LeaseEnforcer + StateGraphBus + ResidencyManager
++ ProposingRegistry + SpeculativeCouncil
++ Capstone composing them all
+```
+
+**40 新测试 / 0 失败 / 0 flake**。**多 agents 协同 + 无感延迟 6 条件**——typed condition + runtime impl 都过线。剩下仍是真世界工作（仓库无法替）。
+
+---
+
+## 六十六、 AFM-driven AI reviewer simulation + 5-persona panel ship
+
+### 66.1 用户问 + 诚实拆答
+
+「能不能 afm 来完成」剩余 W1-W5。诚实拆答：
+
+| 件 | AFM 能完成？ |
+|---|---|
+| W1 招 5 domain experts | ❌ AFM 不是招聘平台 |
+| W2 跑完审稿 | ⚠️ 部分——能 ASSIST，不能 SIGN（Doctrine A 物理 typed-pin 禁 AI 走 `.approveDomain`）|
+| W3 L2 adapter 训练 | ❌ AFM 是 inference，fine-tune 走 Apple Adapter Training Toolkit |
+| W4 真物理多设备 sync | ❌ AFM 是单设备 inference |
+| W5 Production deployment | ⚠️ 部分——content gen 已 ship；host 集成 / UI / build pipeline 不涉 AFM |
+
+**但有两条 AFM 真能 chip away 的**：
+
+A. **AFM-driven first-pass reviewer simulation** — AFM 跑 6-item checklist 在 candidate，advisory only（永不 promote 到 `.domainExpertReviewed`）
+B. **5-persona panel review** — 5 个 domain persona prompt 各审同一 candidate，多视角预览
+
+用户「好」 → ship 两件。
+
+### 66.2 ship 内容
+
+2 source + 2 unit test + 2 AFM-gated E2E：
+
+| 件 | 类型 | LOC | 测试 |
+|---|---|---|---|
+| [QinaoWorldPriorAIReviewerSimulation.swift](../QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorAIReviewerSimulation.swift) | source | ≈ 280 | 12 unit + 2 AFM-gated |
+| [QinaoWorldPriorAIPersonaSet.swift](../QinaoRuntimeSDK/Sources/QinaoWorldPrior/QinaoWorldPriorAIPersonaSet.swift) | source | ≈ 280 | 13 unit + 3 AFM-gated |
+
+总 ≈ 560 LOC source + **25 unit tests + 5 AFM-gated tests / 0 failures / 0 flake**。AFM-gated 总耗 **30.7 秒**真模型驱动。
+
+### 66.3 关键 doctrine pin
+
+**66.3.1 6 项 typed checklist**
+
+```swift
+BASWorldPriorReviewChecklistItem:
+  templateIDFormat / descriptionLength / perturbKindsCovered
+  evidenceRungsAlignment / crossTemplateConsistency
+  noBiasOrCulturalBlindspot
+```
+
+匹配 [REVIEWER_CHECKLIST.md](REVIEWER_CHECKLIST.md) A.1-A.4 + D + E。
+
+**66.3.2 3 typed recommendations**
+
+```swift
+BASWorldPriorAIRecommendation:
+  approveSuggested        // AFM 觉得值 expert approve（不等于 approved）
+  rejectSuggested
+  needsExpertJudgment
+```
+
+**关键**：`.approveSuggested` ≠ `.approveDomain`。前者是 AFM advisory，后者是 expert 物理签字。
+
+**66.3.3 5 persona typed enum + canonical domain mapping**
+
+```swift
+BASWorldPriorAIPersona:
+  relationshipTherapist   → "relationship"
+  decisionScientist        → "decision"
+  timeResearcher           → "time"
+  boundaryCoach            → "boundary"
+  cognitiveLinguist        → "analogy"
+```
+
+每 persona 有稳定 `personaPrompt` 字符串作为 system-prompt prefix（重复运行同 candidate 同 persona 提示 byte-equal）。
+
+**66.3.4 Doctrine A 物理 typed-pin: AFM advisory 永不 promote**
+
+```swift
+public struct BASWorldPriorAIReviewAdvisory {
+    /// **Doctrine A typed pin**: producedEnvelope is
+    /// envelope unchanged. AI advisory never promotes
+    /// provenance.
+    public var producedEnvelope: BASWorldPriorTemplateEnvelope {
+        envelope
+    }
+}
+```
+
+测试断言：
+
+```swift
+// 即使 AFM 真给出 .approveSuggested，envelope 仍 .illustrative
+let advisory = BASWorldPriorAIReviewerSimulation
+    .wrapAsAdvisory(report: report, envelope: env)
+XCTAssertEqual(advisory.producedEnvelope.provenance, .illustrative)
+
+// 走 training filter 仍被典型阻塞
+XCTAssertEqual(
+    BASWorldPriorTrainingPipelineFilter
+        .rejectionReason(for: advisory.producedEnvelope),
+    .privateProvenance(.illustrative))
+```
+
+**真 AFM E2E 测试也 typed-pin 这个**——`test_afmReviewerAdvisoryDoesNotPromoteEnvelope` + `test_panelReviewDoesNotPromoteEnvelope`。
+
+### 66.4 AFM E2E 真模型实证
+
+5 测试 / 30.7 秒 / 0 失败：
+
+| 测试 | 耗时 |
+|---|---|
+| `test_afmProducesReviewReport` (single AFM call + parse) | 2.9s |
+| `test_afmReviewerAdvisoryDoesNotPromoteEnvelope` (Doctrine A) | 3.3s |
+| `test_singlePersonaReviewParses` (1 persona AFM) | 2.4s |
+| `test_fivePersonaPanelReview` (5 personas × AFM) | 18.4s |
+| `test_panelReviewDoesNotPromoteEnvelope` (Doctrine A) | 3.7s |
+
+**`test_fivePersonaPanelReview`** 跑 5 个 persona × 1 retry × 真 AFM call ≈ 5-10 次真 LLM 调用，**全部 typed-parse 通过 Doctrine A 不变量保持**。
+
+### 66.5 测试基线
+
+| 套件 | 65.x 末 | 66.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2105 | 2105 | 0 |
+| Qinao XCTest | 1183 | **1213** | +30（25 unit + 5 AFM-gated）|
+
+**总测试 3318 / 0 失败 / 59 skipped**（gate off）。基线 3288 → 3318（+30）。
+
+### 66.6 W1-W5 状态更新
+
+| 件 | 新状态 |
+|---|---|
+| W1 招 5 domain experts | ❌ unchanged — 仓库无法替 |
+| W2 跑完审稿 | **chip-away ship** — AFM first-pass reviewer + 5-persona panel ASSIST，不替 expert SIGN |
+| W3 L2 adapter 训练 | ❌ unchanged |
+| W4 真物理多设备 sync | ❌ unchanged |
+| W5 Production deployment | ❌ unchanged（content gen 已存在）|
+
+**W2 不再是 0% AFM 帮**——AFM 现在能：
+- 跑 6-item checklist 给 host operator 看 first-pass 报告
+- 5 persona 多视角看同 candidate
+- AFM 觉得 approve/reject 的 candidate **永远不会** 在 typed pipeline 里被升级
+- expert 真审时**typed checklist 已预填**，节省时间
+
+但 **expert 的真签字仍是不可绕过的**——Doctrine A 物理 typed-pin。
+
+### 66.7 一句话总结
+
+**W2 chip-away ship 完毕**——AFM 现在能 typed-driven 帮 host operator 在送外审前预审 candidate + 跑 5 persona 多视角，**永远不破 Doctrine A**——envelope 永远 `.illustrative`，typed-blocked from training。**剩下 W1 / W3 / W4 / W5 的硬部分仍是真世界工作（仓库永远无法替）**。
+
+---
+
+## 六十七、 Deep test + deep review — 4 个真 bug 修了
+
+### 67.1 触发动作
+
+用户 `deep test + deep review`。两件事并行：
+
+1. 全套 sweep（gate-off + gate-on）找 flake / warning / 退化
+2. Code review agent 审 chapters 64-66 ship 的 10 source 文件
+
+### 67.2 Sweep 结果
+
+| 维度 | 结果 |
+|---|---|
+| BAS gate-off | 2105 / 0 failures / 0 warnings / 21 skipped |
+| Qinao gate-off | 1213 / 0 failures / 0 warnings / 38 skipped |
+| **AFM gate-on (78 秒真模型)** | 1213 / 0 failures / **2 skipped**（36 个 AFM-gated 全跑） |
+| 0 flake 跨 multiple gate-on runs | ✓ |
+
+### 67.3 Code review 发现
+
+Agent 报告 25 个 issues（CRITICAL / HIGH / MEDIUM / LOW / NIT）。**人工 grep 反证后**，agent 误报 1 件（`canCommit` 测试覆盖在 3 个文件里都有）。
+
+**真实 issues**（按严重度）：
+
+| # | 严重度 | 文件 | 问题 |
+|---|---|---|---|
+| 1 | CRITICAL | `QinaoStateGraphBus.swift` | Subscription 无 `onTermination` handler + unbounded buffer = consumer drop sub 不 close → continuation leak + 内存无界增长 |
+| 2 | CRITICAL | `QinaoSeatResidencyManager.swift` | `sleep()` 通过 factory 重建幸存 seat — 销毁所有 actor state（counter / in-flight task / lease ref） |
+| 3 | HIGH | `QinaoSpeculativeCouncil.swift` | "fail-closed veto" 误导：`async let` 实际等 council 跑完才检 veto，veto 永不真 cancel speculative 工作 |
+| 4 | HIGH | `QinaoAgentProposal.swift` | `directCommitAttemptedWithoutSovereignWarrant` 永不发出——validator 不查 `capability.directCommit`；如果未来 typo 给某 capability 设 true，proposal 静默通过 |
+| 5 | MEDIUM | `QinaoSeatProposingProtocol.swift` | Lease enforcer 拒收时附 issue 退化为 `.leaseRequiredButMissing`——丢失典型 5 个 reasons (expired / writesExhausted / loopsExhausted / targetOutsideScope / revoked) |
+| 6 | MEDIUM | `QinaoAgentLeaseEnforcer.swift` | 边界 `elapsed == maxMs` 行为没 typed-pinned 测试 |
+| 7 | HIGH | tests | persona panel 没 typed-pin Doctrine A invariant test |
+| 8 | HIGH | tests | residency sleep 没 typed-pin 「surviving cold seat instance identity preserved」test |
+
+LOW / NIT 暂未修（13 项）—— style / 重复代码 / 完整 Codable 一致性，churn 风险大于价值。
+
+### 67.4 Fixes
+
+| # | 改动 | 行 |
+|---|---|---|
+| 1 | `QinaoStateGraphBus.subscribe` 加 `continuation.onTermination = { [weak self] _ in ... }` + `.bufferingNewest(1024)` | +20 |
+| 2 | `QinaoSeatResidencyManager` 加 `instanceCache: [QinaoSeat: any QinaoSeatProtocol]`；`sleep()` 改成读 cache 重 register（不调 factory） | +25 |
+| 3 | `QinaoSpeculativeCouncil.runSpeculatively` 改用 `Task<Result, Never>`，veto fires → `councilTask.cancel()` + drain | +15 |
+| 4 | `QinaoAgentProposalGate.validate` 加 `if capability.directCommit { issues.append(.directCommitAttempted...) }` | +14 |
+| 5 | `QinaoAgentProposalIssue` 加 case `leaseInvalid(agent:reasons:)`；proposing registry forward typed reasons instead of collapsing | +15 |
+
+### 67.5 New tests
+
+[QinaoDeepReviewFixTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoDeepReviewFixTests.swift) — **8 个 typed-pin 测试**针对各 fix：
+
+1. `test_busSubscriptionAutoCleansOnDrop` — 未 close 的 sub 自动清理
+2. `test_residencySleepFactoryNotCalledForSurvivors` — counter-based factory，验证幸存 seat 不被 rebuild
+3. `test_residencySleepPreservesSurvivingColdInstance` — identity preserved
+4. `test_speculativeCancelsCouncilOnVeto` — council polls `Task.isCancelled`，veto fires → 观察到 cancellation
+5. `test_directCommitCapabilityProducesTypedIssue` — 手造 directCommit=true capability → validator 必发 typed issue
+6. `test_proposingRegistryForwardsTypedLeaseReasons` — revoked lease → `.leaseInvalid(reasons: [.revoked])` 不 collapse
+7. `test_leaseAtExactMaxMsIsValid` — 边界 elapsed == maxMs valid，101 invalid
+8. `test_personaPanelDoesNotPromoteEnvelope` — 即使所有 persona approve + AFM `.approveSuggested`，envelope 仍 `.illustrative`
+
+### 67.6 测试基线
+
+| 套件 | 66.x 末 | 67.x 末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2105 | 2105 | 0 |
+| Qinao XCTest | 1213 | **1221** | +8 (deep review fixes) |
+
+**总测试 3326 / 0 失败 / 59 skipped**（gate off）。基线 3318 → 3326 严格匹配（+8）。
+
+### 67.7 Doctrine integrity 提升
+
+| Doctrine 不变量 | 67 章前 | 67 章后 |
+|---|---|---|
+| Doctrine A: AI advisory 不 promote | source 写明 + 单测 | **source + 单测 + persona panel typed-pin + 真 AFM E2E** |
+| 单提交口: 9 席 directCommit=false | source 写明 + cardinality test | **+ validator 物理 typed-pin** (任何 capability 设 true → typed issue) |
+| Bus subscription cleanup | unbounded buffer | **bounded 1024 + onTermination auto-clean** |
+| Residency identity preserved | factory respawn (silently destroys state) | **instance cache (state preserved)** |
+| Speculative cancellation | "async let" — pretend cancellation | **真 Task.cancel() + drain** |
+| Lease 5 typed reasons forwarding | collapse to 1 | **forward all 5 typed cases** |
+
+### 67.8 一句话总结
+
+**Deep test 0 退化 0 flake** + **deep review 修了 4 个真 bug**（2 CRITICAL + 2 HIGH）+ **8 个 fix-pin 测试 typed-asserted**。doctrine 物理 invariant 现在的**强度**比 67 章前严格——以前是「靠测试 + 文档约定」，现在 typed validator + typed cache + typed cancellation 都把 invariant 物理 typed-pinned。

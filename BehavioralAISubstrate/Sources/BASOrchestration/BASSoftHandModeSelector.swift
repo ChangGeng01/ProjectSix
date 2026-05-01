@@ -35,7 +35,8 @@ import BASRuntimeCore
 /// | permit.mode == .delay                      | delay       |
 /// | permit.mode == .draftOnly / .compare       | compare     |
 /// | permit.mode == .escalate                   | boundary    |
-/// | permit.mode == .mirror / .localOnly        | draft       |
+/// | permit.mode == .mirror                     | draft       |
+/// | permit.mode == .localOnly                  | localOnly   |
 /// | permit.mode == .answer + verdict.pass      | draft       |
 /// | (no permit, verdict.pass)                  | silentStub  |
 ///
@@ -168,10 +169,18 @@ public enum BASSoftHandModeSelector {
                 return SelectionResult(
                     mode: .boundary,
                     reasonCodes: ["permit:escalate"])
-            case .mirror, .localOnly:
+            case .mirror:
                 return SelectionResult(
                     mode: .draft,
-                    reasonCodes: ["permit:\(p.mode.rawValue)"])
+                    reasonCodes: ["permit:mirror"])
+            case .localOnly:
+                // M291 — promoted from `.draft` fallback to its own
+                // first-class soft-hand mode. Hosts wanting the
+                // pre-M291 behavior can map `.localOnly` mode to
+                // their existing draft renderer themselves.
+                return SelectionResult(
+                    mode: .localOnly,
+                    reasonCodes: ["permit:localOnly"])
             case .answer:
                 // Multi-candidate even in answer mode → compare
                 // instead of single draft.

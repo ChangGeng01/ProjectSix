@@ -40,7 +40,7 @@ import BASRuntimeCore
 //   5. Auditable — append-only ring actor ledger keyed by turn
 //      and session.
 
-/// The five UI render modes L12 can emit.
+/// The six UI render modes L12 can emit (M291 added `.localOnly`).
 public enum BASSoftHandMode:
     String, Sendable, Codable, CaseIterable
 {
@@ -55,6 +55,13 @@ public enum BASSoftHandMode:
     /// 静默桩 — minimal safe placeholder; renders nothing
     /// actionable.
     case silentStub
+    /// 本地簿 — host-private surface that **does not transmit**.
+    /// Resulting artifact is captured into the host's local-only
+    /// store (journal / private notes / ephemeral scratch) so the
+    /// reasoning persists for the host but no external recipient
+    /// is involved. M291 lifts manifest v2's 6th surface from
+    /// permit-mode-only to a first-class soft-hand mode.
+    case localOnly
 
     /// M281 — stable component identifier matching the
     /// `QinaoUI.ComponentID` namespace. Hosts call
@@ -63,13 +70,14 @@ public enum BASSoftHandMode:
     /// `QinaoUI`. Bridge stays a stable string so neither side
     /// has to import the other's module.
     ///
-    /// | mode       | identifier        |
-    /// |------------|-------------------|
-    /// | compare    | "compare-panel"   |
-    /// | draft      | "draft-shell"     |
-    /// | delay      | "delay-packet"    |
-    /// | boundary   | "boundary-script" |
-    /// | silentStub | "silent-stub"     |
+    /// | mode       | identifier         |
+    /// |------------|--------------------|
+    /// | compare    | "compare-panel"    |
+    /// | draft      | "draft-shell"      |
+    /// | delay      | "delay-packet"     |
+    /// | boundary   | "boundary-script"  |
+    /// | silentStub | "silent-stub"      |
+    /// | localOnly  | "local-only-sheet" |
     public var componentIdentifier: String {
         switch self {
         case .compare: return "compare-panel"
@@ -77,6 +85,7 @@ public enum BASSoftHandMode:
         case .delay: return "delay-packet"
         case .boundary: return "boundary-script"
         case .silentStub: return "silent-stub"
+        case .localOnly: return "local-only-sheet"
         }
     }
 }

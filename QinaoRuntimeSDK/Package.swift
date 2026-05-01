@@ -33,6 +33,19 @@ let package = Package(
         .library(name: "QinaoSovereign", targets: ["QinaoSovereign"]),
         .library(name: "QinaoWorldPrior", targets: ["QinaoWorldPrior"]),
         .library(name: "QinaoUI", targets: ["QinaoUI"]),
+        // M292.1 — typed seat scaffold (single-brain-multi-seat).
+        // First slice: enum + verdict struct only; no protocol,
+        // no registry yet.
+        .library(name: "QinaoSeats", targets: ["QinaoSeats"]),
+        // M292.3 — default seat implementations that read from a
+        // QinaoLoop. Separate target so QinaoSeats stays
+        // dependency-free (abstract scaffold) and QinaoLoopSeats
+        // carries the concrete-with-loop layer.
+        .library(name: "QinaoLoopSeats", targets: ["QinaoLoopSeats"]),
+        // M294 — convenience factory layer. Wires "standard"
+        // seeded vault + standard seats with one call so hosts
+        // doing demos don't have to re-derive sensible defaults.
+        .library(name: "QinaoDefaults", targets: ["QinaoDefaults"]),
         // M180 — opt-in Apple FoundationModels endpoint factory.
         // Hosts wanting Apple LLM `import QinaoAppleFoundation`;
         // hosts that don't keep a substrate-only QinaoLoop graph.
@@ -196,6 +209,36 @@ let package = Package(
         .target(
             name: "QinaoUI",
             dependencies: []),
+        // M292.1 — typed seat scaffold. Zero deps: just the
+        // QinaoSeat enum + SeatVerdict struct so any module can
+        // reference seats by Swift type without pulling Loop /
+        // Risk / Sovereign. Registry / dispatch / default seat
+        // implementations land in M292.2+.
+        .target(
+            name: "QinaoSeats",
+            dependencies: []),
+        // M292.3 — default seat implementations bound to a
+        // QinaoLoop. Each seat takes a loop reference at init
+        // and reads the loop's typed state inside `contribute`.
+        // Convention: dispatcher passes `sessionID` as `snapshotID`.
+        .target(
+            name: "QinaoLoopSeats",
+            dependencies: [
+                "QinaoSeats",
+                "QinaoLoop"
+            ]),
+        // M294 — one-call sensible-default factories for hosts
+        // doing first-day integration. Wires seeded vault + loop
+        // + standard seats together.
+        .target(
+            name: "QinaoDefaults",
+            dependencies: [
+                "QinaoLoop",
+                "QinaoLoopSeats",
+                "QinaoSeats",
+                "QinaoWorldPrior",
+                "QinaoUI"
+            ]),
         // M180 — public factory wiring Apple FoundationModels
         // behind QinaoOrganEndpoint. Optional library: hosts that
         // don't want Apple-specific code (or BASAppleAdapters'
@@ -292,6 +335,12 @@ let package = Package(
                 "QinaoSovereign",
                 "QinaoWorldPrior",
                 "QinaoUI",
+                // M292.1 — exercise QinaoSeats typed scaffold.
+                "QinaoSeats",
+                // M292.3 — exercise default seat implementations.
+                "QinaoLoopSeats",
+                // M294 — exercise convenience defaults.
+                "QinaoDefaults",
                 // M180 — exercise the public factory directly so the
                 // host pattern is covered end-to-end.
                 "QinaoAppleFoundation",

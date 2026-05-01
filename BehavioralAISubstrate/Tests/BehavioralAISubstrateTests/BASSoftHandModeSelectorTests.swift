@@ -128,11 +128,15 @@ final class BASSoftHandModeSelectorTests: XCTestCase {
         XCTAssertEqual(mode, .draft)
     }
 
-    func testLocalOnlyPermitRendersDraft() {
+    func testLocalOnlyPermitRendersLocalOnly() {
+        // M291 — `.localOnly` permit now resolves to its own
+        // first-class soft-hand mode, no longer falling back to
+        // `.draft`. Host-private surface (journal / notes / scratch)
+        // is doctrinally distinct from a deferred draft.
         let mode = BASSoftHandModeSelector.selectMode(
             permit: makePermit(.localOnly),
             verdict: nil)
-        XCTAssertEqual(mode, .draft)
+        XCTAssertEqual(mode, .localOnly)
     }
 
     // MARK: - Multi-candidate hint
@@ -301,6 +305,9 @@ final class BASSoftHandModeSelectorTests: XCTestCase {
         XCTAssertEqual(
             BASSoftHandMode.silentStub.componentIdentifier,
             "silent-stub")
+        XCTAssertEqual(
+            BASSoftHandMode.localOnly.componentIdentifier,
+            "local-only-sheet")
     }
 
     func testM281IdentifiersAreUnique() {

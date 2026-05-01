@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 187)  // +M120 8 parity-lint backfills
+        #expect(governedObjects.count == 195)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -387,7 +387,24 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "RuntimeTrace": BASRuntimeTrace.currentSchemaVersion,
             "EvalSample": BASEvalSample.currentSchemaVersion,
             "ModelArtifact": BASModelArtifact.currentSchemaVersion,
-            "FeedbackEvent": BASFeedbackEvent.currentSchemaVersion
+            "FeedbackEvent": BASFeedbackEvent.currentSchemaVersion,
+            // M287 — Cthulhu-inspiration white paper schema parity:
+            "AbyssalPressure":
+                BASAbyssalPressure.currentSchemaVersion,
+            "HumanAnchorSignal":
+                BASHumanAnchorSignal.currentSchemaVersion,
+            "AnomalyTrace":
+                BASAnomalyTrace.currentSchemaVersion,
+            "NarrativeDistortion":
+                BASNarrativeDistortion.currentSchemaVersion,
+            "AbyssalBranch":
+                BASAbyssalBranch.currentSchemaVersion,
+            "UnknownReserve":
+                BASUnknownReserve.currentSchemaVersion,
+            "SealEnvelope":
+                BASSealEnvelope.currentSchemaVersion,
+            "ForbiddenKnowledgeCandidate":
+                BASForbiddenKnowledgeCandidate.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

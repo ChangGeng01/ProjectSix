@@ -78,8 +78,15 @@ final class BASBudgetFrameLiveThermalTests: XCTestCase {
         let source = budget(thermalGuardLevel: .watch)
         let routed = source.withLiveThermalGuardLevel(.watch)
         // Value type; encoding should be byte-for-byte stable.
-        let a = try? JSONEncoder().encode(source)
-        let b = try? JSONEncoder().encode(routed)
+        // `.sortedKeys` is required: JSONEncoder default key
+        // ordering is dictionary-internal-state dependent and
+        // can drift across runs when concurrent test pressure
+        // changes hash seeds, even though both inputs are
+        // structurally identical.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let a = try? encoder.encode(source)
+        let b = try? encoder.encode(routed)
         XCTAssertEqual(a, b)
     }
 

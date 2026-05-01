@@ -283,7 +283,11 @@ public actor QinaoLoop {
 
     private var sessions: [String: SessionState] = [:]
     private let organEndpoint: (any QinaoOrganEndpoint)?
-    private let worldPriorVault: QinaoWorldPriorVault?
+    /// `package` (M288) so cross-file extensions in this SPM package
+    /// can read the wired vault — see
+    /// `QinaoLoop+CounterfactualGeneration.swift`. Still nil when no
+    /// vault was supplied at init.
+    package let worldPriorVault: QinaoWorldPriorVault?
 
     public init() {
         self.organEndpoint = nil

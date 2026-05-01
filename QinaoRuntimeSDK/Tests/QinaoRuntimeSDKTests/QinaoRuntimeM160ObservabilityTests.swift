@@ -164,10 +164,16 @@ final class QinaoRuntimeM160ObservabilityTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         let metrics = await collector.collected
         XCTAssertEqual(metrics.count, 5)
-        // Order should match insertion (recorder is sequential)
+        // Content-only assertion: all 5 turnIDs are present.
+        // Order is async-race-prone (concurrent recorder/
+        // collector dispatch can interleave), so we assert the
+        // set rather than the array order.
         XCTAssertEqual(
-            metrics.map(\.turnID),
-            ["turn.0", "turn.1", "turn.2", "turn.3", "turn.4"])
+            Set(metrics.map(\.turnID)),
+            Set([
+                "turn.0", "turn.1", "turn.2",
+                "turn.3", "turn.4",
+            ]))
     }
 
     // MARK: - 6. Metric value-type is Equatable + Sendable
