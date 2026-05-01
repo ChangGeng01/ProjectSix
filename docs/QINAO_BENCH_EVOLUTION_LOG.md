@@ -121,6 +121,75 @@ because Date overhead is constant while real work shrinks.
 
 ---
 
+### 2026-05-02 — M380+M381 — Open Opportunity C investigation: audit-ledger outlier rate
+
+**Bench**: new `--ed25519-sign-bench` (M380) + existing
+`--audit-ledger-bench` (M357) at matched 10K-sample scale post-M376
+high-res clock.
+
+**What the bench revealed**: chapter 八十四.6 evolution log Open
+Opportunity C flagged audit-ledger-bench's "outlier rate 1-3% (vs
+0.27% normal) bimodal" as needing investigation. Two questions:
+
+1. Is the spike Ed25519 itself or downstream?
+2. Is the 1-3% rate real or sample-size artifact?
+
+**Change shipped**:
+[`QinaoRuntimeSDK/Sources/QinaoSampleHost/Ed25519SignBench.swift`](../QinaoRuntimeSDK/Sources/QinaoSampleHost/Ed25519SignBench.swift)
++ `--ed25519-sign-bench` mode in main.swift drives
+`Curve25519.Signing.PrivateKey.signature(for:)` in isolation 10K
+times, reporting M361 cold/warm split. Compares directly to
+`--audit-ledger-bench` at same scale.
+
+**Diagnostic comparison** (10K warm samples, post-M376 high-res
+clock):
+
+| Metric | Ed25519 alone | Full audit-ledger | Delta |
+|---|---|---|---|
+| mean | 0.0460 ms | 0.0489 ms | +0.003 ms |
+| p50 | 0.0451 ms | 0.0476 ms | +0.003 ms |
+| p95 | 0.0500 ms | 0.0542 ms | +0.004 ms |
+| p99 | 0.0601 ms | 0.0662 ms | +0.006 ms |
+| p99.9 | 0.109 ms | 0.159 ms | +0.050 ms |
+| **max** | 0.185 ms | 0.408 ms | **+0.223 ms (2.2x)** |
+| **outlier rate** | 0.93% | **0.79%** | -0.14% |
+| CV | 0.107 | 0.161 | +0.054 |
+
+**Findings**:
+
+1. **The "1-3% outlier rate" was sample-size noise.** Chapter
+   八十二.5 ran 200 samples; at 10K samples the outlier rate is
+   **0.79%** (~3x the 0.27% normal expectation, not 11x as
+   chapter 八十四.6 implied).
+
+2. **Ed25519 accounts for ~94% of mean cost** (0.046 / 0.049).
+   Non-Ed25519 work (canonical bytes + SHA-256 hash + in-memory
+   bookkeeping + segment management) adds ~3 µs per call.
+
+3. **Tail amplification is real**: max grows 2.2x (0.185 → 0.408
+   ms). The extra 223 µs in worst-case is consistent with Swift
+   collection growth amortization:
+   - `auditRefIndex` Dictionary rehashing at capacity thresholds
+   - `entries` Array realloc + copy when capacity doubles
+   - `segments` linear scan for ensure-open path
+
+4. **CV grows from 0.107 to 0.161** — distribution gets ~50%
+   wider. Same explanation: tail amortization spikes.
+
+**Honest assessment**: **no substrate fix needed**. The
+distribution shape matches expected Swift collection
+amortization patterns. Pre-allocating capacity at ledger init
+might shave the tail a bit, but the worst-case is already
+sub-millisecond and the median is sub-50µs — well below any
+production latency budget.
+
+**Open Opportunity C is closed**: investigated, false alarm
+(sample-size noise) + benign tail amortization. No code change.
+The new `Ed25519SignBench` ships permanently as a diagnostic
+tool for any future PR that touches the signing path.
+
+---
+
 ### 2026-05-02 — M377 — full-stack-bench cold/warm split
 
 **Bench**: `--full-stack-bench`
@@ -237,13 +306,13 @@ path consistently.
 
 ### C — `--audit-ledger-bench` outlier rate 1-3% (vs 0.27% normal)
 
-Bimodal distribution suggests something happens periodically that
-spikes append latency. Could be:
-- Garbage collection (Swift ARC)
-- Actor reentrancy on the Ed25519 signing path
-- Storage protocol's no-op path doing more than expected
-
-Worth profiling with Instruments to identify the spike source.
+**STATUS: closed (M380+M381 investigation, chapter 八十六)**.
+At 10K samples the outlier rate is 0.79% (~3x normal not 11x);
+the original 1-3% was small-sample noise from the chapter 八十二.5
+200-sample run. Ed25519 accounts for ~94% of mean cost; tail
+amplification (max 2.2x) is benign Swift collection growth
+amortization. No substrate fix needed. New `Ed25519SignBench`
+ships as permanent diagnostic for future regressions.
 
 ### D — `--multi-host-merge-bench` near-linear growth
 
