@@ -8241,3 +8241,153 @@ BAS substrate residual scan passed.
 ### 77.8 一句话总结
 
 **M331 用 1 个 surgical script PR close chronic boundary FAILED state（自 pre-M298 起）**：新 `FORBIDDEN_TOKEN_ALLOWLIST` per-symbol 机制处理 M292.x 故意 token reuse；42 个 M295.x 类型加 whitelist。**4 闸首次全绿**。chapter 七十六.4 "surgical scope 全 close" stale claim 至此真正实证落地。BAS 2171 / Qinao 1287 / 全栈 3458 / 0 failures / **4/4 boundary checks ✓**。仓库代码层 surgical scope **真正全 close**——剩 3 项需外部资源不变。
+
+## 七十八、 全面进化 — A+B+C+D+E 五方向闭合（M333-M337）
+
+### 78.1 触发动作
+
+用户 `全面进化` 选 `abcde` —— 全 5 方向同推：
+- **A** manifesto v5 doctrine（综合 B+E 经验后 author）
+- **B** L13 self-evolution loop demo（8-stage 状态机端到端走通）
+- **C** deep test + deep review pass（M298-M335 全 sweep + agent review）
+- **D** performance / quantization bench（throughput + thermal/breath 量化）
+- **E** cross-instance / multi-host demo（2 host 实例协同，复用 M329 fragment merger）
+
+用户随后追加 `你先全面研究一下` —— Phase 1 三路并行 Explore agents 实证扫描后产 plan，按"由易至难、由内至外"排成 M333-M337 sequence。每条独立 commit + 每条都过 4 边界闸。
+
+### 78.2 M333 — B：L13 self-evolution loop demo
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/EvolutionLoopDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/EvolutionLoopDemo.swift)（~250 LOC，pure value-type lifecycle demo + 3 paths：promotion+retraction / trial-failure / early-withdrawal）+ `--evolution-loop-demo` mode in main.swift + `QinaoSampleHostEvolutionLoopDemoTests.swift`（9 测试）。
+
+**关键 doctrine pin**：
+- **`.promoted` ≠ terminal** — 演示 promoted → retracted 路径
+- **`.retracted` 仍 retains `hasReachedPromotion`** —— 历史不可消除
+- **`withdraw` 从 `.promoted` 被 policy 拒绝** —— retracted 是唯一退出口
+- **terminal stages `validTransitions == []`** —— `.fullyDistilled` / `.retracted` / `.aborted` 无逃生口
+
+**Banner verified**: "all invariants hold: ✓"
+
+### 78.3 M334 — D：throughput + thermal quantization bench
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/ThroughputBenchDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/ThroughputBenchDemo.swift)（~300 LOC，仿 M179 模式 LatencyStats nearest-rank percentile + ThermalCycleStats）+ `--throughput-bench` mode + `QinaoSampleHostThroughputBenchDemoTests.swift`（5 测试）。
+
+**关键设计选择**：
+- **同时 quantify** turn latency (p50/p95/p99/min/max/mean) + thermal cycles (pressure trajectory + guardLevel escalations + cancelled breath count) —— 一条 demo 出两份报告
+- **`Swift.min` / `Swift.max` 显式限定** —— struct 自身有 `min` / `max` 属性，编译器歧义需 Swift 命名空间消歧
+- **default 100 turns**，`QINAO_BENCH_TURN_COUNT=N` 可覆盖
+- **regression alarm 不 perf goal** —— 仿 M179 宽松 ceiling
+
+**smoke test result**: p50=0.0013ms, p95=0.0015ms, p99=0.0041ms, max=0.0066ms, mean=0.0014ms（100 turns，BASLeaseLifeCoordinator + BASLungStateAccumulator 调用）
+
+### 78.4 M335 — E：multi-host instance demo（**0 BAS 改动**）
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/MultiHostDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/MultiHostDemo.swift)（~350 LOC，纯 M306+M329 primitive recombination）+ `--multi-host-demo` mode + `QinaoSampleHostMultiHostDemoTests.swift`（6 测试）。
+
+**关键发现 — Phase 1 deep research**：multi-host demo **不需要任何 BAS 代码改动**。`BASSovereignCrossDeviceLedgerFrame.originDeviceID` 字段语义直接对等 `hostID`，`BASSovereignFragmentMerger.mergeOrdered(_:_:)` + `BASSovereignCrossDeviceClock.merged(with:)` 元素 max 都已 ship。**工期从原估 0.7 day 压到 0.4 day**。
+
+**Demo 演示**：
+- 2 host instances（host-A 走 promotion path 5 stage / host-B 走 failure path 4 stage）
+- merger symmetric: `merge(A, B) == merge(B, A)` ✓
+- clock 元素 max commutative: `mergedClockAB == mergedClockBA` ✓
+- constitutions isolated: `hostAID != hostBID` ✓
+- no duplicate frames in merged output ✓
+
+**Banner verified**: "all invariants hold: ✓"
+
+### 78.5 M336 — C：deep test + agent review
+
+**实装**：[docs/QINAO_M298_TO_M335_DEEP_REVIEW_2026-05-02.md](QINAO_M298_TO_M335_DEEP_REVIEW_2026-05-02.md)（完整 review 报告）+ `BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift` 第 129/168 行 fix + `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M336SovereignTokenIDDeterminismTests.swift`（2 fix-pin 测试）。
+
+**Test sweep**：3 次 gate-off run + 1 次 AFM gate-on（QINAO_AFM_E2E=1 / QINAO_FM_E2E=1）—— 0 flakes / 0 failures / 36 AFM tests succeed。
+
+**Agent review on top-10 bug-prone files** —— 9 findings (4 HIGH + 5 MEDIUM)：
+- 1 真 bug (HIGH 2): `abs(actionDigest.hashValue)` 在 sovereign commit token suffix —— `String.hashValue` 随机种子每进程不同 + `abs(Int.min)` traps
+- 8 false positives (89% rate vs chapter 67's baseline 76%)
+
+**HIGH 2 fix**：line 129 `tokenID` + line 168 `warrantID` 把 `abs(actionDigest.hashValue)` 替换为 `actionDigest.prefix(16)` —— SHA256 hex 16 char 是确定性 64-bit entropy，跨进程稳定。Fix 不破坏既有 BAS 2173 / Qinao 1307 测试。
+
+**Doctrine 强化**：M306 multi-session continuity 现在真兑现 —— 同 audit intent 跨 session 真产同 tokenID。这条 latent bug 是 M335 multi-host work 揭开的，在它造成 production 审计链不一致前修掉。
+
+### 78.6 M337 — A：manifesto v5 doctrine spec
+
+**实装**：[docs/QINAO_MANIFESTO_V5_DOCTRINE.md](QINAO_MANIFESTO_V5_DOCTRINE.md)（~830 词 / §1-§7 + appendix）。
+
+**v5 单 axis: "Performance is Doctrine"** —— 综合 B/D/E 实证后选定（不是 evolution / 不是 distribution）。立论：
+
+> Every doctrine claim must be typed, measurable, and regression-gated.
+> A doctrine without a measurement primitive is not enforceable.
+
+**v5 doctrine triple**：
+```
+typed pin → measurement → regression gate
+```
+
+**4 working examples**（v5 立论由这 4 件 demonstrate）：
+1. L13 lifecycle state transition < 100µs（M333 demo）
+2. AFM E2E latency < 2s（M179 baseline + M334 bench）
+3. Multi-host fragment merger symmetric / commutative（M335 demo）
+4. Training pipeline block rate 100% on illustrative content（M67.4 typed-pin）
+
+**v5 不破 v1-v4** —— 是 additive doctrine + 重新 frame 它们。每个 prior axis 现在都被强制配 measurement primitive 与 regression gate。
+
+**v6/v7 candidates parked**（缺 triple 中至少一条腿）：L13 self-evolution doctrine / Multi-instance distribution doctrine / Adapter-trained L2 doctrine。
+
+### 78.7 测试基线
+
+| 套件 | 七十七章末 | 七十八章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2171 | **2173** | +2（M336 fix-pin 测试） |
+| Qinao XCTest | 1287 | **1307** | +20（M333 9 + M334 5 + M335 6） |
+| 全栈 | 3458 | **3480** | +22 |
+
+0 failures / 0 flakes / 4 boundary checks 全绿。AFM gate-on 路径健康（36 AFM 测试 success）。
+
+### 78.8 红线 / 不变量回归
+
+| 不变量 / 红线 | M333 | M334 | M335 | M336 | M337 |
+|---|---|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ | ✓（fix 不动 wake path） | ✓（doctrine 不破） |
+| #2 神经不掌权 | ✓（lifecycle 走 typed gate） | ✓（bench 不动 verdict） | ✓（merger 仅 audit 层不动 verdict） | ✓（fix 不改 verdict 引擎） | ✓（v5 不变 v1-v4） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| audit hash chain | ✓ | ✓ | ✓ | **✓ 强化**（fix 让 tokenID 真确定性） | ✓ |
+| 单提交口 | ✓ | ✓ | ✓（每 host 单提交 / merger 仅 audit 层） | ✓ | ✓ |
+| 4 boundary checks | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### 78.9 chapter 七十七.7 stale-claim 矫正
+
+七十七.7 列"仓库代码层 surgical scope 真正全 close"。本 chapter ship 后矫正：
+
+| 残项 | 七十七章末 | 七十八章末 |
+|---|---|---|
+| Cthulhu schemas runtime 接入 | 9/9 ✓ | 9/9 ✓ |
+| M296.1 净启 production wire | ✓ | ✓ |
+| M296.2 dual-key | ✓ demo + primitives | ✓ demo + primitives |
+| M296.3 cross-device sync | ✓ demo + primitives | ✓ demo + primitives |
+| AFM 多轮 demo | ✓ | ✓ |
+| 8 demo modes | ✓ | **11 demo modes**（+ evolution-loop / throughput-bench / multi-host） |
+| 4 boundary 闸 | ✓ | ✓ |
+| **L13 lifecycle e2e demo** | 散落 in --full-stack-demo | **✓ M333 standalone demo** |
+| **performance bench** | M179 100-turn observation | **✓ M334 full-turn bench + thermal** |
+| **multi-host instance demo** | 缺 | **✓ M335 0-BAS-change demo** |
+| **manifesto v5 doctrine** | 缺 | **✓ M337 "Performance is Doctrine"** |
+| **deep review pass** | chapter 67（pre-M298） | **✓ M336 covers M298-M335** |
+| L4 训练 / curriculum / W1-W5 | 外部资源 | 外部资源（不变） |
+
+### 78.10 仓库 surgical scope 真实状态（七十八章末）
+
+**全 close**。剩 3 项需外部资源（仓库永远无法替代）：
+
+| 项 | 障碍 |
+|---|---|
+| L4 训练资产 | GPU/TPU 算力 |
+| M295.1+ authoritative curriculum | domain experts 真签字 |
+| W1-W5 真世界 | 真世界协调 |
+
+**v6/v7 候选 backlog**（M337 v5 manifesto 列）：
+- L13 self-evolution doctrine（缺 production regression gate）
+- Multi-instance distribution doctrine（缺 cross-host convergence measurement plane）
+- Adapter-trained L2 doctrine（缺 trained-weight 的 substrate-level audit primitive）
+
+### 78.11 一句话总结
+
+**M333-M337 五方向同步 ship close A+B+C+D+E 全面进化 batch**：M333 L13 self-evolution e2e demo（pure value-type，3 paths，4 invariants pinned）+ M334 throughput + thermal bench（仿 M179，100-turn LatencyStats + ThermalCycleStats）+ M335 multi-host demo（**0 BAS 改动** —— Phase 1 实证发现 M306+M329 primitives 直接 recombine）+ M336 deep test + agent review（3 gate-off + 1 AFM gate-on / 0 flake / 9 findings → 1 真 bug `hashValue` non-determinism → fix + 2 pin tests）+ M337 manifesto v5 "Performance is Doctrine"（typed pin → measurement → regression gate triple）。BAS 2173 (+2) / Qinao 1307 (+20) / 全栈 3480 (+22) / 0 failures / 4/4 boundary 全绿 / 11 demo modes (+3)。仓库 surgical scope 真正完成；剩 L4 训练 + curriculum + W1-W5 仅需外部资源不变。

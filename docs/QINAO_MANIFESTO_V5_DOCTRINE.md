@@ -1,0 +1,199 @@
+# Qinao Manifesto v5 — Performance is Doctrine
+
+> A doctrine that cannot be measured is a wish.
+> A doctrine without a regression gate is a memory.
+
+**Status**: target doctrine spec, additive on top of v1–v4. Does not
+replace any prior axis. Does not introduce a new invariant. Strengthens
+the *testability* of every doctrine that came before.
+
+**Source of authority**: implementation-grounded — every claim in this
+document is bound to either an existing measurement primitive
+(`BASLatencyStats`, `M179` perf gates, M334 throughput bench) or a
+structural typed-pin in the substrate (`BASEvolutionLifecycleSession`,
+`BASSovereignFragmentMerger`).
+
+---
+
+## §1 The four prior axes (recap)
+
+Each axis was authored when the substrate could *demonstrate* its claim:
+
+| Axis | What it added |
+|---|---|
+| v1 — Operational integrity | The three invariants (wake before answer / network never rules / host secrets stay out of base weights). Public contract surface. |
+| v2 — 14-layer living net | L1 wick → L14 sovereign black ring as a single weave; each layer typed, each interface load-bearing. |
+| v3 — Typed motherboard | Every doctrine claim becomes a Swift type; `BASSchemaVersioned` makes drift visible. M120 schema parity gate enforces it. |
+| v4 — Agent fabric | Single-sovereign / single-host / single-state-graph / single-commit-mouth swarm of 9 seats. Coordination without coup. |
+
+Each axis is single-purpose. None of them touches the others' invariants.
+The compounding effect is what makes the substrate distinguishable from a
+"chat plus tools" stack.
+
+---
+
+## §2 The v5 statement
+
+**Every doctrine claim must be typed, measurable, and regression-gated.
+A doctrine without a measurement primitive is not enforceable. A
+measurement primitive without a regression gate decays. A regression gate
+without a typed-pin lies.**
+
+The three together form a *doctrine triple*:
+
+```
+         typed pin
+            │
+       (existence)
+            │
+            ▼
+      measurement ──── regression gate
+       (current)         (drift alarm)
+```
+
+v5 elevates the triple from "good engineering practice" to "doctrine
+authoring rule": you cannot add a v6 axis without supplying all three
+parts for every claim under it.
+
+---
+
+## §3 The four working examples
+
+The substrate already ships four claims that obey the v5 triple. Each is
+the proof that the rule is realisable, not a fresh promise.
+
+### 3.A L13 lifecycle state transition < 100 µs
+
+- **Typed pin**: `BASEvolutionLifecycleSession.applying(_:)` is pure
+  value-type, 8 stages × 7 actions, no I/O.
+- **Measurement**: M333 `EvolutionLoopDemo` traverses promotion +
+  retraction + early-withdrawal paths in a single demo run.
+- **Regression gate**: 4 invariant assertions + per-stage banner pin
+  sub-millisecond. Any state-machine bloat that breaks the budget shows
+  up the next time the demo runs.
+
+### 3.B AFM E2E latency < 2 s (M179 baseline)
+
+- **Typed pin**: `BASLatencyStats` (nearest-rank percentile) +
+  `AppleFoundationOrganAdapter` env-gated tests.
+- **Measurement**: 100-turn observation pipeline p50 ~0.76 ms, p95
+  ~1.16 ms (M179); M334 throughput bench extends the gauge to full
+  per-turn latency.
+- **Regression gate**: `QinaoSampleHostThroughputBenchDemoTests` +
+  per-percentile ceiling. CI can run the bench gated on a perf budget
+  without coupling to the model's content.
+
+### 3.C Multi-host fragment merger convergence ≤ N rounds
+
+- **Typed pin**: `BASSovereignFragmentMerger.mergeOrdered(_:_:)` plus
+  `BASSovereignCrossDeviceClock.merged(with:)` element-wise max.
+- **Measurement**: M335 `MultiHostDemo` proves symmetric merge +
+  commutative clock + isolated constitutions + no duplicate frames in
+  one ledger pass.
+- **Regression gate**: 6 typed-pin tests in
+  `QinaoSampleHostMultiHostDemoTests`. A regression that breaks
+  symmetry would fail before any audit divergence reaches downstream.
+
+### 3.D Training pipeline block rate 100% on illustrative content
+
+- **Typed pin**: `BASWorldPriorTrainingPipelineFilter.trainingProvenanceFloor = .domainExpertReviewed`.
+- **Measurement**: `testPersonaPanelDoesNotPromoteEnvelope` (M67.4) —
+  unanimous AI persona approval still keeps the envelope `.illustrative`.
+- **Regression gate**: a removal of the floor would fail the typed
+  filter test before the build even ships.
+
+---
+
+## §4 What v5 forbids
+
+A future axis may not introduce:
+
+1. A doctrine claim with no measurement primitive ("the model behaves
+   well under load" without a load measurement).
+2. A measurement primitive disconnected from a typed-pin ("p95 latency
+   is 1.2 s" with no schema-bound caller path).
+3. A regression gate that depends on the model's content ("the response
+   uses respectful language" — testable in the wild, but not a
+   substrate-level gate).
+4. An axis whose claim cannot be falsified by the test suite.
+
+The exclusion list is concrete because the temptation is concrete: every
+"agent quality" surface invites soft claims. v5's job is to keep the
+soft claims out of the doctrine layer and contained in product
+documentation.
+
+---
+
+## §5 The relationship to v1–v4
+
+v5 does **not** modify any prior invariant. It re-frames them:
+
+| Axis | Pre-v5 framing | Post-v5 framing |
+|---|---|---|
+| v1 | Three invariants are the public contract. | Three invariants are the public contract; each carries a measurement primitive (lease lifecycle / three-signature gate / training-pipeline filter). |
+| v2 | 14 layers compose into a living net. | 14 layers compose; per-layer regression gate exists or the layer is "schema-only" — and the schema-only label is itself a typed claim. |
+| v3 | Schemas are typed. | Schemas are typed; the parity gate keeps drift visible. |
+| v4 | 9-seat fabric coordinates without coup. | 9-seat fabric; coordination latency is bounded by the dispatch layer's typed contract. |
+
+The change is small per axis. The compounding effect is large: a v6
+authoring attempt now fails at the doctrine review stage if it cannot
+produce the triple.
+
+---
+
+## §6 The measurement plane
+
+v5's substrate-level home is `BASLatencyStats` plus the M334 throughput
+bench. Together they form a *measurement plane* that v6+ axes can extend
+without re-implementing the percentile algebra. The plane is intentionally
+boring — `nearest-rank percentile`, `Swift.min` / `Swift.max`, no
+exotic statistics — because the doctrine value is in the regression gate,
+not the math.
+
+The thermal twin (M334's `ThermalCycleStats`) extends the plane to L1
+without forcing any new doctrine. Future axes that need a new measurement
+domain (memory pressure, cross-device sync convergence) follow the same
+pattern: typed-pin first, measurement second, regression gate third.
+
+---
+
+## §7 What is not in v5
+
+- **No new invariant.** Adding a fourth invariant would dilute v1.
+- **No SLA promises.** "p95 < 100 ms" is a regression alarm, not a
+  customer commitment.
+- **No model-quality claims.** Whether the LLM "thinks well" is product
+  surface, not doctrine.
+- **No multi-agent emergence claims.** v4 is about coordination
+  primitives; v5 keeps the discipline of typing and measuring those
+  primitives without claiming downstream behavioural properties.
+- **No L13 self-evolution doctrine.** v5 makes self-evolution
+  measurable but does not yet promise it. A v6 candidate axis is on the
+  table; it must satisfy the triple before it can be authored.
+- **No multi-instance distribution doctrine.** Same reason as above —
+  M335 demonstrates the merger primitive, but a doctrine claim across
+  hosts needs its own measurement plane (sync convergence, inter-host
+  audit replay) before authoring.
+
+---
+
+## Appendix — v6/v7 candidates parked
+
+The following are tracked as future doctrine candidates. Each is
+deliberately *not* yet authored because at least one leg of the v5
+triple is missing:
+
+| Candidate | Missing leg |
+|---|---|
+| L13 self-evolution as doctrine | regression gate (lifecycle is typed + measurable, but no production gate yet) |
+| Multi-instance distribution doctrine | measurement plane for cross-host convergence |
+| Adapter-trained L2 layer | typed pin (training pipeline schema is shipped, but the trained weights themselves are not yet auditable through a substrate primitive) |
+
+When any one of these acquires its missing leg, it becomes a v6 (or
+v7, or v∞) candidate. Until then it stays in this appendix.
+
+---
+
+*Authored 2026-05-02 as附录 J 阶段 5 (M337) — direction A of the 全面进化
+batch. v5 is the first manifesto axis to be authored after the
+substrate can demonstrate its own claim from cold start.*
