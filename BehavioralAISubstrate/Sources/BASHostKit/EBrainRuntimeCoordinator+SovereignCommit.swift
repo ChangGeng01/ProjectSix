@@ -298,7 +298,19 @@ extension BASEBrainRuntimeCoordinator {
         runtimeTrace: BASRuntimeTrace,
         thoughtFold: BASThoughtFold,
         riskCard: BASRiskCard,
-        actionPermit: BASActionPermit
+        actionPermit: BASActionPermit,
+        // M299 — optional candidate-frontier observation bundle.
+        // When supplied (post-materialization), the L9 frontier
+        // status code lands in `signalRefs` as additive metadata
+        // — purely advisory, never escalates the verdict, never
+        // changes hash chain semantics (signature simply digests
+        // the longer signalRefs list deterministically).
+        candidateObservationBundle: BASCandidateObservationBundle? = nil,
+        // M300 — optional tribunal observation bundle. Same
+        // additive-metadata contract as M299 but for L10 tribunal
+        // coverage. Defaults to `thoughtFold`-only behaviour for
+        // legacy / test callers that don't yet plumb the bundle.
+        tribunalObservationBundle: BASTribunalObservationBundle? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -307,6 +319,33 @@ extension BASEBrainRuntimeCoordinator {
             sovereignCommitTokens.map(\.tokenID)
             + sovereignWarrants.map(\.warrantID)
             + quarantineRecords.map(\.quarantineID)
+        // M299 — derive frontier summary from the candidate
+        // observation bundle. `summarize()` is a pure value-type
+        // transform; emits at most three status codes per turn
+        // (status, candidates count, diversity flag).
+        var observationStatusCodes: [String] = []
+        if let bundle = candidateObservationBundle {
+            let summary = bundle.summarize()
+            observationStatusCodes.append(
+                "frontier.status:\(summary.statusCode)")
+            observationStatusCodes.append(
+                "frontier.candidates:\(summary.candidateCount)")
+            if summary.emittedDiversitySignal {
+                observationStatusCodes.append(
+                    "frontier.diversity:emitted")
+            }
+        }
+        // M300 — tribunal coverage status. Same additive code
+        // shape; load-bearing for "did all three voices speak"
+        // audits.
+        if let tribunal = tribunalObservationBundle {
+            let report = BASTribunalCoverageCheck.report(
+                for: tribunal)
+            observationStatusCodes.append(
+                "tribunal.status:\(report.statusCode)")
+            observationStatusCodes.append(
+                "tribunal.voices:\(report.voicesPresent.count)")
+        }
         let signalRefs = orderedReasonCodes(
             [
                 "risk:\(riskCard.riskLevel.rawValue)",
@@ -317,6 +356,7 @@ extension BASEBrainRuntimeCoordinator {
             ].compactMap { $0 }
                 + sovereignVerdict.reasonCodes
                 + sovereignWarrants.flatMap(\.witnessRefs)
+                + observationStatusCodes
         )
         let ruleIDs = sovereignRuleIDs(for: sovereignVerdict)
         let signature = sovereignDigestHex(

@@ -668,7 +668,16 @@ public struct BASEBrainRuntimeCoordinator {
             runtimeTrace: runtimeTrace,
             thoughtFold: thoughtFold,
             riskCard: boundRiskCard,
-            actionPermit: boundActionPermit
+            actionPermit: boundActionPermit,
+            // M299 — feed the materialization's candidate bundle
+            // so frontier status codes land in audit signalRefs.
+            candidateObservationBundle: thoughtArtifacts
+                .candidateObservationBundle,
+            // M300 — feed tribunal observation bundle (already
+            // attached to `thoughtFrame` via M55 derive seam) so
+            // tribunal coverage codes land in audit signalRefs.
+            tribunalObservationBundle: thoughtFrame
+                .tribunalObservationBundle
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict
