@@ -182,6 +182,13 @@ struct QinaoSampleHost {
             await runMultiTurnDemo()
             return
         }
+        if args.contains("--clean-reboot-demo") {
+            // M322 — drive `BASSovereignCleanRebootCoordinator`
+            // through rollback + deadStop scenarios so hosts
+            // see the M296.1 净启 plan shape end-to-end.
+            await runCleanRebootDemo()
+            return
+        }
         if args.contains("--lora-curriculum-train-m247") {
             // M247 — re-trains the curriculum LoRA against the
             // EXACT chat-template format Gemma 4 E2B sees at
@@ -3655,6 +3662,60 @@ struct QinaoSampleHost {
             distinct responses:      \(outcome.distinctResponseCount) of \(outcome.turns.count)
 
             ━━━ Demo complete — M310 driveMultiTurn driver verified end-to-end ━━━
+            """)
+    }
+
+    // MARK: - M322 clean-reboot demo
+
+    /// Drive `BASSovereignCleanRebootCoordinator` through a
+    /// pre-built version tree (v0 good, v1 tainted) and produce
+    /// rollback + deadStop plans. Banner renders the typed plan
+    /// shape so hosts see the M296.1 净启 contract end-to-end.
+    private static func runCleanRebootDemo() async {
+        print("""
+            QinaoSampleHost --clean-reboot-demo (M322):
+              drive BASSovereignCleanRebootCoordinator through
+              rollback (v1 tainted → v0 good + bootstrap) and
+              deadStop (v0 → halt & await host) scenarios.
+              Coordinator produces typed RebootPlans; demo
+              prints actions sequence + bootstrap flag + audit
+              ref so hosts see the M296.1 净启 contract.
+            """)
+
+        let outcome: CleanRebootDemo.Outcome
+        do {
+            outcome = try await CleanRebootDemo.run()
+        } catch {
+            stderr("error: clean-reboot demo failed: \(error)\n")
+            exit(2)
+        }
+
+        print("""
+
+            ━━━ Step 1/2 — Rollback scenario (tainted lineage) ━━━
+            verdict level:      \(outcome.rollback.verdictLevel)
+            source version:     \(outcome.rollback.sourceVersionID)
+            target version:     \(outcome.rollback.targetVersionID)
+            target anchor:      \(outcome.rollback.targetAnchorID)
+            actions:            \(outcome.rollback.actions
+                .joined(separator: " → "))
+            bootstrap next:     \(outcome.rollback.bootstrapNextSession ? "✓" : "⚠ FALSE")
+            audit ref:          \(outcome.rollback.auditRef)
+
+            ━━━ Step 2/2 — DeadStop scenario (halt & await host) ━━━
+            verdict level:      \(outcome.deadStop.verdictLevel)
+            source version:     \(outcome.deadStop.sourceVersionID)
+            target version:     \(outcome.deadStop.targetVersionID)
+            target anchor:      \(outcome.deadStop.targetAnchorID)
+            actions:            \(outcome.deadStop.actions
+                .joined(separator: " → "))
+            bootstrap next:     \(outcome.deadStop.bootstrapNextSession ? "⚠ TRUE" : "✓ FALSE (halt expected)")
+            audit ref:          \(outcome.deadStop.auditRef)
+
+            ━━━ Audit ledger trail ━━━
+            entries appended:   \(outcome.auditEntryCount)
+
+            ━━━ Demo complete — M296.1 净启 (clean reboot) plan generation verified end-to-end ━━━
             """)
     }
 }
