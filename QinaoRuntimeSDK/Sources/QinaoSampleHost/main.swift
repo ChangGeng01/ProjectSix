@@ -18,6 +18,14 @@ import QinaoLoopSeats
 // BASWorldPriorAIPersonaReviewer + AIRecommendation enum
 // (M295.1 AI advisory pre-review path).
 import QinaoWorldPrior
+// M328 + M329 — `--dual-key-demo` and `--cross-device-sync-demo`
+// modes need BASSovereign primitives (DualKeyCommit / Verifier /
+// HighConsequenceGate / FragmentMerger / CrossDeviceClock /
+// CrossDeviceLedgerFrame). BASSovereign is already imported via
+// M306; CryptoKit comes in transitively for the SHA256 digest
+// the dual-key demo uses.
+import CryptoKit
+import BASSovereign
 
 // QinaoSampleHost
 //
@@ -200,6 +208,26 @@ struct QinaoSampleHost {
             // Foundation Models. Doctrine A pin: panel
             // consensus does NOT promote envelope.
             await runPersonaPanelReview()
+            return
+        }
+        if args.contains("--dual-key-demo") {
+            // M328 — drive
+            // BASSovereignHighConsequenceGate +
+            // BASSovereignDualKeyCommit through 5 canonical
+            // scenarios (routine / nil / valid / wrong-digest /
+            // tampered) so hosts see M296.2 双钥提交 contract
+            // end-to-end. Real CryptoKit Ed25519, no mock.
+            runDualKeyDemo()
+            return
+        }
+        if args.contains("--cross-device-sync-demo") {
+            // M329 — drive
+            // BASSovereignFragmentMerger +
+            // BASSovereignCrossDeviceClock through a 2-device
+            // sync scenario so hosts see M296.3 跨设备一致性
+            // contract end-to-end. In-process simulation; no
+            // real network transport.
+            runCrossDeviceSyncDemo()
             return
         }
         if args.contains("--lora-curriculum-train-m247") {
@@ -3836,6 +3864,115 @@ struct QinaoSampleHost {
             stderr(
                 "warning: failed to write JSON output: \(error)\n")
         }
+    }
+
+    // MARK: - M328 dual-key-demo
+
+    /// Drive `BASSovereignHighConsequenceGate` +
+    /// `BASSovereignDualKeyCommit` through 5 canonical
+    /// scenarios. Banner reports per-scenario outcome
+    /// (authorized vs expected) so hosts see M296.2 双钥提交
+    /// contract end-to-end.
+    private static func runDualKeyDemo() {
+        print("""
+            QinaoSampleHost --dual-key-demo (M328):
+              drive BASSovereignHighConsequenceGate +
+              BASSovereignDualKeyCommit through 5 scenarios:
+                1. routine + nil commit       (expect: pass)
+                2. high-conseq + nil commit   (expect: fail)
+                3. high-conseq + valid commit (expect: pass)
+                4. high-conseq + wrong digest (expect: fail)
+                5. high-conseq + tampered sig (expect: fail)
+              All cryptography is real Ed25519 via CryptoKit.
+            """)
+
+        let outcome: DualKeyCommitDemo.Outcome
+        do {
+            outcome = try DualKeyCommitDemo.run()
+        } catch {
+            stderr("error: dual-key demo failed: \(error)\n")
+            exit(2)
+        }
+
+        print("""
+
+            ━━━ Step 1/2 — Key registry ━━━
+            primary key ID:    \(outcome.primaryKeyID)
+            secondary key ID:  \(outcome.secondaryKeyID)
+
+            ━━━ Step 2/2 — Scenario results ━━━
+            """)
+        for (idx, s) in outcome.scenarios.enumerated() {
+            let mark = s.outcomeMatches ? "✓" : "⚠"
+            print("""
+
+              \(idx + 1). \(s.scenarioName)
+                 intent class:        \(s.intentClass)
+                 commit provided:     \(s.commitProvided)
+                 authorized:          \(s.authorized) (expected \(s.expectedAuthorized))  \(mark)
+                 \(s.note)
+            """)
+        }
+        let allOK = outcome.allOutcomesMatchExpected
+        print("""
+
+            ━━━ Demo complete — all 5 outcomes match expected: \(allOK ? "✓" : "⚠ MISMATCH") ━━━
+            """)
+        if !allOK {
+            exit(2)
+        }
+    }
+
+    // MARK: - M329 cross-device-sync-demo
+
+    /// Drive `BASSovereignFragmentMerger` +
+    /// `BASSovereignCrossDeviceClock` through a 2-device sync
+    /// scenario. Banner reports per-device timelines, merged
+    /// total-order, and clock convergence so hosts see M296.3
+    /// 跨设备一致性 contract end-to-end.
+    private static func runCrossDeviceSyncDemo() {
+        print("""
+            QinaoSampleHost --cross-device-sync-demo (M329):
+              simulate 2 devices each emitting audit-fragment
+              frames with vector clocks, then merge through
+              BASSovereignFragmentMerger.mergeOrdered. In-
+              process simulation — no real network transport.
+              Vector-clock causal ordering is the M296.3
+              default strategy (chapter 38.2); CRDT / leader-
+              follower / gossip strategies also shipped.
+            """)
+
+        let outcome = CrossDeviceSyncDemo.run()
+
+        print("""
+
+            ━━━ Step 1/3 — Per-device timelines ━━━
+            \(outcome.deviceA.deviceID):
+              frame count: \(outcome.deviceA.frameCount)
+              frame refs:  \(outcome.deviceA.frameRefs
+                  .joined(separator: " → "))
+            \(outcome.deviceB.deviceID):
+              frame count: \(outcome.deviceB.frameCount)
+              frame refs:  \(outcome.deviceB.frameRefs
+                  .joined(separator: " → "))
+
+            ━━━ Step 2/3 — Merged total-order timeline ━━━
+            merged frame count:        \(outcome.merged.frameCount)
+            ordered refs:              \(outcome.merged.orderedRefs
+                .joined(separator: " → "))
+            merge(A, B) == merge(B, A): \(outcome.merged.symmetricUnderReverse ? "✓ symmetric" : "⚠ ASYMMETRIC")
+
+            ━━━ Step 3/3 — Clock convergence ━━━
+            device A's final counter:  \(outcome.convergence.deviceA_finalCounter)
+            device B's final counter:  \(outcome.convergence.deviceB_finalCounter)
+            merged counters:           \(outcome.convergence.mergedCounters
+                .map { "\($0.key)=\($0.value)" }
+                .sorted()
+                .joined(separator: ", "))
+            merge(A,B) == merge(B,A):  \(outcome.convergence.convergenceMatches ? "✓ commutative" : "⚠ NOT COMMUTATIVE")
+
+            ━━━ Demo complete — M296.3 跨设备一致性 (vector-clock merge + clock convergence) verified end-to-end ━━━
+            """)
     }
 }
 
