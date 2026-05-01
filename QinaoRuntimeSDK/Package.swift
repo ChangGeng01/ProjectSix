@@ -352,7 +352,17 @@ let package = Package(
                     package: "BehavioralAISubstrate"),
                 .product(
                     name: "BASAdmin",
-                    package: "BehavioralAISubstrate")
+                    package: "BehavioralAISubstrate"),
+                // M313 — `--phase-dispatch-demo` mode + M314
+                // `--multi-turn-demo` mode wire QinaoDefaults
+                // (M312) and QinaoSeats / QinaoLoopSeats so the
+                // sample-host can build a 9-seat council and
+                // dispatch by phase, plus drive the multi-turn
+                // driver pattern from M310 against a real
+                // endpoint.
+                "QinaoDefaults",
+                "QinaoSeats",
+                "QinaoLoopSeats"
             ]),
         .testTarget(
             name: "QinaoRuntimeSDKTests",

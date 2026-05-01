@@ -8,6 +8,12 @@ import BASRuntimeCore
 import QinaoLoop
 import QinaoAppleFoundation
 import QinaoMLX
+// M313 + M314 — phase-dispatch + multi-turn demo modes need
+// QinaoDefaults (M312 9-seat factory) + QinaoSeats /
+// QinaoLoopSeats (M308/M309 dispatch surface).
+import QinaoDefaults
+import QinaoSeats
+import QinaoLoopSeats
 
 // QinaoSampleHost
 //
@@ -155,6 +161,25 @@ struct QinaoSampleHost {
             // M298-M305 audit-signal codes are observable per
             // session.
             await runMultiSessionDemo()
+            return
+        }
+        if args.contains("--phase-dispatch-demo") {
+            // M313 — drive M309's three-phase dispatch
+            // (perception → cognition → landing) against a
+            // 9-seat council built via M312
+            // `QinaoDefaults.makeStandardWithAdapters(...)`.
+            // Pre-M313 both M309 and M312 had 0 production-path
+            // callers; this demo proves they compose end-to-end.
+            await runPhaseDispatchDemo()
+            return
+        }
+        if args.contains("--multi-turn-demo") {
+            // M314 — drive M310's multi-turn driver pattern
+            // through `QinaoOrganEndpoint.context:` accumulation
+            // across N turns. Default mock provider always
+            // available; AFM gated under
+            // `QINAO_AFM_MULTI_TURN_DEMO=1` env var.
+            await runMultiTurnDemo()
             return
         }
         if args.contains("--lora-curriculum-train-m247") {
@@ -3529,6 +3554,107 @@ struct QinaoSampleHost {
             auditIDs distinct:      \(outcome.sessionA.auditID != outcome.sessionB.auditID ? "✓" : "⚠ SAME")
 
             ━━━ Demo complete — M298 locator + M91 SQLite ledger + M298-M305 audit codes verified across two sessions ━━━
+            """)
+    }
+
+    // MARK: - M313 phase-dispatch demo
+
+    /// Drive M309's three-phase seat dispatch against a 9-seat
+    /// council built via M312 `QinaoDefaults.makeStandard
+    /// WithAdapters`. Prints per-phase shape (verdicts / failures
+    /// / seat raw values) plus a doctrine reminder that
+    /// perception completes before cognition starts before
+    /// landing starts.
+    private static func runPhaseDispatchDemo() async {
+        print("""
+            QinaoSampleHost --phase-dispatch-demo (M313):
+              build a 9-seat council via M312 + dispatch through
+              M309's perception → cognition → landing ordering.
+              Default seats use M292.6d proxy readers (no real
+              model needed); demo prints per-phase shape so
+              hosts see the manifesto v4 三阶段并发 contract on
+              one screen.
+            """)
+
+        let outcome: PhaseDispatchDemo.Outcome
+        do {
+            outcome = try await PhaseDispatchDemo.run()
+        } catch {
+            stderr("error: phase-dispatch demo failed: \(error)\n")
+            exit(2)
+        }
+
+        print("""
+
+            ━━━ Step 1/2 — 9-seat council assembled (M312) ━━━
+            snapshot:        \(outcome.snapshotID)
+            total seats:     \(outcome.totalSeats)
+
+            ━━━ Step 2/2 — Three-phase dispatch (M309) ━━━
+            perception ▸ \(outcome.perceptionPhase
+                .seatRawValuesASC.joined(separator: ", "))
+              verdicts: \(outcome.perceptionPhase.verdictsCount), failures: \(outcome.perceptionPhase.failuresCount)
+            cognition  ▸ \(outcome.cognitionPhase
+                .seatRawValuesASC.joined(separator: ", "))
+              verdicts: \(outcome.cognitionPhase.verdictsCount), failures: \(outcome.cognitionPhase.failuresCount)
+            landing    ▸ \(outcome.landingPhase
+                .seatRawValuesASC.joined(separator: ", "))
+              verdicts: \(outcome.landingPhase.verdictsCount), failures: \(outcome.landingPhase.failuresCount)
+
+            ━━━ Demo complete — manifesto v4 三阶段并发 dispatch shape verified end-to-end ━━━
+            """)
+    }
+
+    // MARK: - M314 multi-turn demo
+
+    /// Drive M310's multi-turn driver pattern across 3 turns.
+    /// Default mock provider always available (deterministic
+    /// outcome); AFM real provider activated when
+    /// `QINAO_AFM_MULTI_TURN_DEMO=1` env var is set, mirroring
+    /// the M178 + M310 gating pattern.
+    private static func runMultiTurnDemo() async {
+        print("""
+            QinaoSampleHost --multi-turn-demo (M314):
+              drive 3-turn conversation through M310's
+              `driveMultiTurn(...)` driver. Default uses a
+              deterministic mock provider so the demo runs in
+              CI without external dependencies; set
+              QINAO_AFM_MULTI_TURN_DEMO=1 to drive Apple
+              Foundation Models on macOS 26+ devices with Apple
+              Intelligence enabled.
+            """)
+
+        let outcome: MultiTurnDemo.Outcome
+        do {
+            outcome = try await MultiTurnDemo.run()
+        } catch {
+            stderr("error: multi-turn demo failed: \(error)\n")
+            exit(2)
+        }
+
+        print("""
+
+            ━━━ Step 1/2 — 3-turn conversation (M310) ━━━
+            sessionID:       \(outcome.sessionID)
+            provider mode:   \(outcome.providerMode)
+            """)
+        for turn in outcome.turns {
+            print("""
+
+              Turn \(turn.turnIndex + 1) — context entries: \(turn.contextEntryCountBefore)
+                prompt:    \(turn.prompt)
+                provider:  \(turn.providerID)
+                response:  \(turn.responseHead)
+            """)
+        }
+        print("""
+
+            ━━━ Step 2/2 — Continuity proof ━━━
+            sessionID stable:        \(outcome.sessionIDStable ? "✓" : "⚠")
+            context grew monotonic:  \(outcome.contextGrewMonotonically ? "✓" : "⚠")
+            distinct responses:      \(outcome.distinctResponseCount) of \(outcome.turns.count)
+
+            ━━━ Demo complete — M310 driveMultiTurn driver verified end-to-end ━━━
             """)
     }
 }
