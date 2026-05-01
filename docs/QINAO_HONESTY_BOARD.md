@@ -8986,3 +8986,135 @@ CV:            1.7129     ← very high variance
 ### 82.12 一句话总结
 
 **M355-M360 把 bench infrastructure 从 "1 mode + 5 stats" 升级为 "4 modes + 10 stats + baseline tracking + regression detection + 4 latency tiers covered"**：M355 ship `BASBenchLatencyStats` typed primitive (p50/p95/p99/p99.9/max/min/mean/stddev/outliers/CV + nearest-rank percentile + population variance) + M356 ship `BASBenchBaselineStorage` JSON I/O + 4-verdict regression detection (25% default tolerance) + M357 ship `--audit-ledger-bench` 测 audit ledger append (10K entries default, smoke ~9k entries/sec, p50 0.1ms, CV 0.36 reveals bimodal distribution) + M358 ship `--multi-host-merge-bench` 测 FragmentMerger growth across 4 sizes (smoke shows near-linear growth 10→10K frames) + M359 ship `--full-stack-bench` 测 BASHostRuntime.startSession 真实成本 (smoke shows 5-77ms vs M334's 0.001ms, **5000-77000x higher** — chapter 78.7 self-critique 第 3 项的真 antidote)。BAS 2233 → 2258 (+25) / Qinao 1311 → 1323 (+12) / 全栈 3581 (+37) / 0 failures / 4/4 boundary 全绿。Bench suite 现在有 4 个 latency tier 从 sub-microsecond 到 sub-second 全覆盖；任何 audit ledger / FragmentMerger / BASHostRuntime 的成本变化都会在对应 bench fire alarm。仓库 bench infrastructure 从 "single-tier regression alarm" 升级为 "multi-tier regression alarm with baseline tracking"。
+
+## 八十三、 benchmark 全面化 高质量 — warmup + suite + 3 new benches + auto-baseline (M361-M368)
+
+### 83.1 触发动作
+
+用户：`benchmark 全面化 高质量`。
+
+接 chapter 八十二 大幅提高 benchmark 后，bench infrastructure 还有 4 个空白：(1) warmup/cold-warm 不分（cold-spike 污染整体 stats）(2) 多 bench 间无聚合 (3) L13/SHA256/JSON-codec 几个 sub-µs 层 floor 不测 (4) baselines 写了但要手动 grep / diff。
+
+按 8 milestone 全 ship。
+
+### 83.2 M361 — `BASBenchWarmupConfig` + `BASBenchWarmupOutcome` cold/warm split
+
+**实装**：[BehavioralAISubstrate/Sources/BASObservability/BASBenchWarmupConfig.swift](../BehavioralAISubstrate/Sources/BASObservability/BASBenchWarmupConfig.swift)（~150 LOC）。
+
+**问题**：chapter 八十二.5 audit-ledger smoke 里 outlier rate 3.000% (11x normal expectation) + CV 0.36，chapter 八十二.7 full-stack smoke 里 p95 76.7ms (cold) vs p50 5.3ms (warm) + CV 1.71 —— 两个都是"cold spike + warm steady-state 混在一个 distribution"的红旗，但 pre-M361 没办法分。
+
+**Fix**：
+- `BASBenchWarmupConfig`：`coldSampleCount` (default 1) + `includeColdInWarm` (default false)
+- `.none` / `.strictFirstSample` / `.extended` 3 个 convenience constants
+- `BASBenchWarmupOutcome`：carries `combined` + `cold` + `warm` BASBenchLatencyStats triple
+- `bannerLines(unit:)` outputs all three sections
+
+**11 测试** in `M361BenchWarmupTests` 含 negative-clamp / empty / cold count exceeds samples / includeColdInWarm / convenience shapes / real-world cold-spike isolation。
+
+### 83.3 M362 — `BASBenchSuiteReport` aggregator (JSON + markdown table)
+
+**实装**：[BehavioralAISubstrate/Sources/BASObservability/BASBenchSuiteReport.swift](../BehavioralAISubstrate/Sources/BASObservability/BASBenchSuiteReport.swift)（~170 LOC）。
+
+**Components**：
+- `BenchResult` struct：benchName / scenarioLabel? / outcome / elapsedSeconds / notes?
+- Top-level：schemaVersion / suiteName / runStartedAt / runCompletedAt / totalElapsedSeconds / benches[]
+- `encodedJSON()` / `encodedJSONString()` — pretty-printed + ISO8601 dates
+- `decodeJSON(from:)` — symmetric round-trip helper (default JSONDecoder fails on ISO8601 string dates)
+- `markdownTable(unit:)` — 9 columns (bench / scenario / samples / p50 / p95 / p99 / mean / max / wall sec)，使用 warm 优先 fallback combined
+- `bannerLines(unit:)` — 完整 multi-bench banner
+
+**6 测试** in `M362BenchSuiteReportTests` 含 empty list / Codable round-trip via decodeJSON / markdown column count / banner sections / schema version。
+
+### 83.4 M363/M364/M365 — 3 new bench modes covering sub-µs floor
+
+| Bench | 测的 | Smoke (10K samples warm) | 揭示 |
+|---|---|---|---|
+| **M363 `--lifecycle-bench`** | L13 5-transition full cycle | mean 4.6 µs / p99.9 72 µs | 纯 value-type lifecycle 是 sub-10µs, cold 比 warm 慢 30x |
+| **M364 `--sha256-bench`** | M341 pure-Swift SHA256 over L13 canonical (446 bytes) | mean 298 µs / ~1.5 MB/sec | 自实现 SHA256 比 CryptoKit 慢 100x — 是 known tradeoff (no SIMD) |
+| **M365 `--json-codec-bench`** | BASSovereignAuditEntry encode+decode round-trip | mean 21 µs / p50 20 µs / p95 22 µs | 紧密 distribution post-warmup，cold 第一次 encoder 初始化 343 µs |
+
+**3 helper structs** + **main.swift** 加 3 args branch + **3 test files** (M363/M364/M365 4 测试 each pin substrate contracts)。
+
+**M364 副产品**：M341 的 internal `BASEvolutionLifecycleStructuralFingerprintHasher.sha256Hex` 加了 public passthrough `BASEvolutionLifecycleStructuralFingerprint.sha256Hex(of:)`，让 downstream 直接 hash 任意 string 而无需 internal symbol。
+
+### 83.5 M366 — `--bench-suite` aggregator mode
+
+**实装**：main.swift `runBenchSuite()` async function + adapters from each bench's outcome to `BenchResult`。
+
+**Suite 跑 7 benches** (skip M333 evolution-loop because it pins invariants not latencies)：
+- throughput-bench (100 turns)
+- audit-ledger-bench (1000 entries)
+- multi-host-merge-bench (100 frames/host)
+- full-stack-bench (5 sessions × 1 turn)
+- lifecycle-bench (10K traversals)
+- sha256-bench (10K hashes)
+- json-codec-bench (5K round-trips)
+
+**Output**：3 sections — banner (per-bench warmup-aware stats) + markdown table (one row per bench, warm-prioritized) + JSON (env-gated `QINAO_BENCH_SUITE_JSON_DUMP=1`)。
+
+**Smoke result**: 7 benches in single command + consolidated table — useful for PR descriptions / release notes / regression tracking。
+
+### 83.6 M367 — auto-baseline-compare wired into bench modes
+
+**实装**：main.swift `compareToBaselineIfConfigured(benchName:stats:)` helper + 5 bench runners (M357 / M359 / M363 / M364 / M365) call it before final banner。
+
+**Env-driven**：
+- `QINAO_BENCH_BASELINE_DIR=/path` — root dir for baselines (one file per bench: `<benchName>.json`)
+- `QINAO_BENCH_TOLERANCE=0.10` — override default 25%
+- `QINAO_BENCH_WRITE_MISSING_BASELINE=1` — auto-write baseline if missing (CI bootstrap)
+
+**4 verdict paths**：
+- `.withinTolerance` — print "[baseline] within tolerance (25%) ✓"; bench exits 0
+- `.regression(reports:)` — print per-metric details with %; bench exits 3
+- `.incompatibleBaseline(reason:)` — print mismatch reason; bench exits 4
+- `.noBaseline` — write fresh if env requests, else print "(set QINAO_BENCH_WRITE_MISSING_BASELINE=1 to create)"
+
+**Smoke verified end-to-end**: first run writes baseline; second run compares + reports "within tolerance (25%) ✓"。
+
+### 83.7 测试基线
+
+| 套件 | 八十二章末 | 八十三章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2258 | **2275** | +17 (M361 11 + M362 6) |
+| Qinao XCTest | 1323 | **1335** | +12 (M363 4 + M364 4 + M365 4) |
+| 全栈 | 3581 | **3610** | +29 |
+
+0 failures / 4/4 boundary checks 全绿。
+
+### 83.8 红线 / 不变量回归
+
+| 不变量 / 红线 | M361 | M362 | M363 | M364 | M365 | M366 | M367 |
+|---|---|---|---|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓（aggregator 不动 verdict） | ✓（compare 不动 verdict） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| audit hash chain | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 4 boundary checks | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### 83.9 chapter 八十二.5 / 八十二.7 stale-claim 矫正
+
+| 残项 | 八十二章末 | 八十三章末 |
+|---|---|---|
+| audit-ledger smoke 的 CV 0.36 + outlier 11x normal | 当时只能假设是 bimodal | **M361 cold/warm split 现在能直接验证**（cold 是 first-sample，warm 是 rest） |
+| full-stack smoke 的 CV 1.71 | 当时只能假设 cold-spike 主导 | M361 split 让 warm-only stats 与 cold-only stats 分开报告 |
+| Bench modes | 4 (throughput / audit-ledger / multi-host-merge / full-stack) | **7** (+ lifecycle / sha256 / json-codec) — 八十三新加 3 个 sub-µs 层 floor |
+| Latency tiers | 4 (sub-µs / sub-ms / sub-100ms / sub-second) | **同 4，但 sub-µs 层现在有 3 个 separate measurements** |
+| Stats fields | 10 + 3 derived | **同 10**，加 cold/warm/combined triple via M361 |
+| Suite-level aggregation | 无 | **`--bench-suite` mode** (banner + markdown + optional JSON) |
+| Baseline tracking | 写了但手动 diff | **auto-compare** via `QINAO_BENCH_BASELINE_DIR` env，regression exits 3 |
+
+### 83.10 仓库 bench infrastructure 真实状态（八十三章末）
+
+| 维度 | pre-八十三 | post-八十三 |
+|---|---|---|
+| Bench modes | 4 | **8** (+ lifecycle / sha256 / json-codec / bench-suite) |
+| Latency tiers covered | 4 (一 measurement each) | **4 (sub-µs 层加 3 个 separate measurements)** |
+| Stats fields | 10 + 3 derived | **10 + 3 derived + cold/warm/combined triple** via M361 |
+| Suite aggregation | 无 | M366 `--bench-suite` (banner / markdown / JSON) |
+| Baseline tracking | 手动 grep / diff | **auto-compare** via env (M367) |
+| Tests covering bench primitives | 30 (chapter 八十二.11 末) | **47** (+ M361 11 + M362 6) |
+
+### 83.11 一句话总结
+
+**M361-M368 把 bench infrastructure 从 "4 modes + manual baseline" 升级为 "8 modes + warmup-aware split + suite aggregator + JSON/markdown reports + auto-baseline-compare"**：M361 ship `BASBenchWarmupConfig` + `BASBenchWarmupOutcome` 解决 cold-spike 污染整体 stats 的问题（split into combined / cold / warm triple；3 convenience configs `.none` / `.strictFirstSample` / `.extended`）+ M362 ship `BASBenchSuiteReport` aggregator (9-column markdown table + pretty-printed JSON + ISO8601 dates + symmetric decode helper) + M363 ship `--lifecycle-bench` (L13 5-transition full cycle, smoke warm mean 4.6 µs / p99.9 72 µs) + M364 ship `--sha256-bench` (M341 hasher over 446-byte canonical input, smoke ~1.5 MB/sec — 自实现 SHA256 比 CryptoKit 慢 100x as known tradeoff) + M365 ship `--json-codec-bench` (audit entry encode+decode round-trip, smoke warm 21 µs / p95 22 µs) + M366 ship `--bench-suite` mode running all 7 latency-producing benches sequentially with consolidated banner + markdown table + optional JSON dump + M367 wire auto-baseline-compare into 5 bench modes via `QINAO_BENCH_BASELINE_DIR` env (4 verdict paths: withinTolerance / regression exits 3 / incompatibleBaseline exits 4 / noBaseline writes fresh if `QINAO_BENCH_WRITE_MISSING_BASELINE=1`)。BAS 2258 → 2275 (+17) / Qinao 1323 → 1335 (+12) / 全栈 3610 (+29) / 0 failures / 4/4 boundary 全绿。Bench infrastructure 从 "single-tier regression alarm + manual baseline" 升级为 "multi-tier regression alarm + warmup-aware split + suite aggregator + machine-readable reports + automatic regression detection with exit codes"。任何 PR 改动 audit ledger / FragmentMerger / BASHostRuntime / L13 lifecycle / SHA256 hasher / JSON codec 的成本都会在对应 bench fire alarm；CI 集成只需 set 1 env var。
