@@ -67,13 +67,19 @@ public struct AuditLedgerBench {
         var samplesMs = [Double]()
         samplesMs.reserveCapacity(entryCount)
 
+        // M376 — high-res clock for nanosecond-precision per-append
+        // latency. Pre-M376 outlier rate was 1-3% (vs 0.27%
+        // normal); chapter 八十四.6 Open Opportunity C flagged
+        // this as bimodal distribution. Higher precision should
+        // reveal the spike source more clearly.
+        let clock = BASBenchHighResClock()
         let startWall = Date()
         for i in 0..<entryCount {
             let entry = makeEntry(index: i)
-            let t0 = Date()
-            _ = try await ledger.append(entry)
-            let elapsedMs = Date()
-                .timeIntervalSince(t0) * 1000.0
+            let elapsedMs =
+                try await clock.measureMillisecondsAsync {
+                    _ = try await ledger.append(entry)
+                }
             samplesMs.append(Swift.max(0, elapsedMs))
         }
         let elapsedSeconds = Date()

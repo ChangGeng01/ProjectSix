@@ -71,13 +71,15 @@ public struct SHA256Bench {
         var samplesMs: [Double] = []
         samplesMs.reserveCapacity(hashCount)
         let input = canonicalInput
+        // M376 — high-res clock; nanosecond precision exposes
+        // the post-M369 CryptoKit speedup precisely.
+        let clock = BASBenchHighResClock()
         let startWall = Date()
         for _ in 0..<hashCount {
-            let t0 = Date()
-            _ = BASEvolutionLifecycleStructuralFingerprint
-                .sha256Hex(of: input)
-            let elapsedMs = Date()
-                .timeIntervalSince(t0) * 1_000.0
+            let elapsedMs = clock.measureMilliseconds {
+                _ = BASEvolutionLifecycleStructuralFingerprint
+                    .sha256Hex(of: input)
+            }
             samplesMs.append(Swift.max(0, elapsedMs))
         }
         let elapsedSeconds = Date()

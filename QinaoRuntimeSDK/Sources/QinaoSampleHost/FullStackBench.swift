@@ -41,19 +41,39 @@ public struct FullStackBench {
         public let turnsPerSession: Int
         public let successfulSessions: Int
         public let elapsedSeconds: Double
-        public let perSessionLatency: BASBenchLatencyStats?
+
+        /// M377 chapter 八十五 — full warmup-aware outcome
+        /// (combined / cold / warm triple) replacing the
+        /// pre-M377 single `perSessionLatency` field. Aligns
+        /// FullStackBench with M363/M364/M365 reporting shape.
+        /// First session in this bench is dominated by Swift
+        /// module load / Codable type-metadata caching / static
+        /// initializers — those are one-time process costs that
+        /// production hosts pay once at app startup and reuse
+        /// thereafter. The cold/warm split makes the steady-state
+        /// number visible separately from the cold cost.
+        public let perSessionOutcome: BASBenchWarmupOutcome?
+
+        /// Backward-compat accessor — returns the warm distribution
+        /// when present, else combined. Use `perSessionOutcome` for
+        /// full triple.
+        public var perSessionLatency: BASBenchLatencyStats? {
+            perSessionOutcome?.warm
+                ?? perSessionOutcome?.combined
+        }
+
         public init(
             sessionCount: Int,
             turnsPerSession: Int,
             successfulSessions: Int,
             elapsedSeconds: Double,
-            perSessionLatency: BASBenchLatencyStats?
+            perSessionOutcome: BASBenchWarmupOutcome?
         ) {
             self.sessionCount = sessionCount
             self.turnsPerSession = turnsPerSession
             self.successfulSessions = successfulSessions
             self.elapsedSeconds = elapsedSeconds
-            self.perSessionLatency = perSessionLatency
+            self.perSessionOutcome = perSessionOutcome
         }
     }
 
@@ -76,6 +96,11 @@ public struct FullStackBench {
         latenciesMs.reserveCapacity(
             sessionCount * turnCount)
         var successCount = 0
+        // M376 — high-res clock for nanosecond-precision
+        // per-session latency. The cold spike (~77 ms first
+        // session) is unaffected (it's real config-construction
+        // cost), but warm samples are now more precise.
+        let clock = BASBenchHighResClock()
         let startWall = Date()
 
         for sessionIndex in 0..<sessionCount {
@@ -89,11 +114,12 @@ public struct FullStackBench {
                     "bench-session-\(sessionIndex)",
                 title: "M359-bench",
                 riskLevel: .medium)
-            let t0 = Date()
             do {
-                _ = try runtime.startSession(request)
-                let elapsedMs = Date()
-                    .timeIntervalSince(t0) * 1000.0
+                let elapsedMs = try clock
+                    .measureMilliseconds {
+                        _ = try runtime
+                            .startSession(request)
+                    }
                 latenciesMs.append(
                     Swift.max(0, elapsedMs))
                 successCount += 1
@@ -105,14 +131,18 @@ public struct FullStackBench {
         let elapsedSeconds = Date()
             .timeIntervalSince(startWall)
 
-        let stats = BASBenchLatencyStats.compute(
-            samples: latenciesMs)
+        // M377 — wrap as warmup-aware outcome so first-session
+        // cold cost (module load + Codable metadata + static
+        // init) doesn't pollute reported steady-state stats.
+        let outcome = BASBenchWarmupOutcome.compute(
+            samples: latenciesMs,
+            config: .strictFirstSample)
         return Outcome(
             sessionCount: sessionCount,
             turnsPerSession: turnCount,
             successfulSessions: successCount,
             elapsedSeconds: elapsedSeconds,
-            perSessionLatency: stats)
+            perSessionOutcome: outcome)
     }
 
     // MARK: - Internal helpers

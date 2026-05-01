@@ -76,15 +76,17 @@ public struct JSONCodecBench {
 
         var samplesMs: [Double] = []
         samplesMs.reserveCapacity(roundTripCount)
+        // M376 — high-res clock; nanosecond precision needed to
+        // see encode/decode below the Date floor.
+        let clock = BASBenchHighResClock()
         let startWall = Date()
         for _ in 0..<roundTripCount {
-            let t0 = Date()
-            let data = try encoder.encode(entry)
-            _ = try decoder.decode(
-                BASSovereignAuditEntry.self,
-                from: data)
-            let elapsedMs = Date()
-                .timeIntervalSince(t0) * 1_000.0
+            let elapsedMs = try clock.measureMilliseconds {
+                let data = try encoder.encode(entry)
+                _ = try decoder.decode(
+                    BASSovereignAuditEntry.self,
+                    from: data)
+            }
             samplesMs.append(Swift.max(0, elapsedMs))
         }
         let elapsedSeconds = Date()

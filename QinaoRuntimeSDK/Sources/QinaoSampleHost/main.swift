@@ -4424,10 +4424,17 @@ struct QinaoSampleHost {
             sessions ok:   \(outcome.successfulSessions) / \(outcome.sessionCount)
 
             """)
-        if let stats = outcome.perSessionLatency {
-            for line in stats.bannerLines() {
+        if let warmupOutcome = outcome.perSessionOutcome {
+            // M377 — emit cold/warm split bannerLines.
+            for line in warmupOutcome.bannerLines(
+                unit: "ms")
+            {
                 print("  " + line)
             }
+            // Compare warm distribution (or combined fallback)
+            // to baseline. Cold spike doesn't pollute baseline.
+            let stats = warmupOutcome.warm
+                ?? warmupOutcome.combined
             compareToBaselineIfConfigured(
                 benchName: "full-stack-bench",
                 stats: stats)
@@ -4641,19 +4648,19 @@ struct QinaoSampleHost {
         }
 
         // M359 full-stack-bench: 5 sessions × 1 turn.
+        // M377 — uses native warmup-aware outcome now.
         do {
             let bench = await FullStackBench.run(
                 sessionCount: 5, turnCount: 1)
-            let outcome = BASBenchWarmupOutcome(
-                combined: bench.perSessionLatency
-                    ?? .init(sampleCount: 0, min: 0, max: 0,
-                             mean: 0, p50: 0, p95: 0,
-                             p99: 0, p999: 0,
-                             standardDeviation: 0,
-                             outlierCount: 0),
-                cold: nil,
-                warm: bench.perSessionLatency,
-                config: .none)
+            let outcome = bench.perSessionOutcome
+                ?? BASBenchWarmupOutcome(
+                    combined: BASBenchLatencyStats(
+                        sampleCount: 0, min: 0, max: 0,
+                        mean: 0, p50: 0, p95: 0, p99: 0,
+                        p999: 0, standardDeviation: 0,
+                        outlierCount: 0),
+                    cold: nil, warm: nil,
+                    config: .none)
             benches.append(.init(
                 benchName: "full-stack-bench",
                 scenarioLabel: "\(bench.successfulSessions)/\(bench.sessionCount) ok",

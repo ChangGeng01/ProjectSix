@@ -59,13 +59,18 @@ public struct LifecycleBench {
     ) -> Outcome {
         var samplesMs: [Double] = []
         samplesMs.reserveCapacity(traversalCount)
+        // M376 — migrate from Date() to BASBenchHighResClock
+        // (ContinuousClock-backed) for nanosecond-precision
+        // measurements. Pre-M376 most warm samples clustered at
+        // the Date 1µs floor; post-M376 actual lifecycle
+        // traversal cost is visible.
+        let clock = BASBenchHighResClock()
         let startWall = Date()
         for index in 0..<traversalCount {
-            let t0 = Date()
-            traverseFullCycle(
-                candidateID: "bench-\(index)")
-            let elapsedMs = Date()
-                .timeIntervalSince(t0) * 1_000.0
+            let elapsedMs = clock.measureMilliseconds {
+                traverseFullCycle(
+                    candidateID: "bench-\(index)")
+            }
             samplesMs.append(Swift.max(0, elapsedMs))
         }
         let elapsedSeconds = Date()
