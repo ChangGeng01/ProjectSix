@@ -167,4 +167,65 @@ public extension QinaoSeatRegistry {
                         loop: loop)))
         return registry
     }
+
+    /// **M308** — One-call convenience factory wiring **all 9**
+    /// default seats bound to a loop. Equivalent to calling
+    /// `standardLoopSeats(loop:)` (6 seats: Scout / Critic / Risk
+    /// / Planner / Surface / SovereignSentinel) + `adapterBound
+    /// Seats(loop:)` (3 seats: Memory / HostAlignment /
+    /// EvolutionShadow), but folded into one registry so hosts
+    /// don't have to merge two registries by hand.
+    ///
+    /// Doctrine
+    ///
+    /// - **Same proxy semantics as `adapterBoundSeats`** —
+    ///   Memory / HostAlignment / EvolutionShadow seats use M292.6d
+    ///   proxy readers (synthesised from existing public loop
+    ///   API). Hosts running production should still ship dedicated
+    ///   readers against real substrate adapters and override via
+    ///   `register(_:)` last-write-wins.
+    /// - **Order matches the manifest v2 第八节 9-seat list**: the
+    ///   six standard seats register first (Scout → Sovereign
+    ///   Sentinel), then the three adapter-bound seats (Memory →
+    ///   EvolutionShadow). Order does not affect behaviour
+    ///   (`SeatBoard` always orders verdicts by seat raw-value
+    ///   ASC) but makes audit reads of register sequence
+    ///   deterministic.
+    /// - **Idempotent if called twice**: registers are
+    ///   last-write-wins, so a second call simply replaces all 9
+    ///   seats with fresh instances bound to the same loop.
+    static func allDefaultLoopSeats(
+        loop: QinaoLoop
+    ) async -> QinaoSeatRegistry {
+        let registry = QinaoSeatRegistry()
+        // 6 standard seats (mirrors `standardLoopSeats`).
+        await registry.register(
+            QinaoScoutDefaultSeat(loop: loop))
+        await registry.register(
+            QinaoCriticDefaultSeat(loop: loop))
+        await registry.register(
+            QinaoRiskDefaultSeat(loop: loop))
+        await registry.register(
+            QinaoPlannerDefaultSeat(loop: loop))
+        await registry.register(
+            QinaoSurfaceDefaultSeat(loop: loop))
+        await registry.register(
+            QinaoSovereignSentinelDefaultSeat(loop: loop))
+        // 3 adapter-bound seats (mirrors `adapterBoundSeats`).
+        await registry.register(
+            QinaoMemoryLoopBoundSeat(
+                reader: QinaoLoopMemoryAdapterReader(
+                    loop: loop)))
+        await registry.register(
+            QinaoHostAlignmentLoopBoundSeat(
+                reader:
+                    QinaoLoopHostAlignmentAdapterReader(
+                        loop: loop)))
+        await registry.register(
+            QinaoEvolutionShadowLoopBoundSeat(
+                reader:
+                    QinaoLoopEvolutionShadowAdapterReader(
+                        loop: loop)))
+        return registry
+    }
 }
