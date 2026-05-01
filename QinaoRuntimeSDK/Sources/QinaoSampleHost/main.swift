@@ -264,6 +264,35 @@ struct QinaoSampleHost {
             runMultiHostDemo()
             return
         }
+        if args.contains("--audit-ledger-bench") {
+            // M357 — bench `BASSovereignAuditLedger.append`
+            // per-entry latency × N. Default N=10000;
+            // QINAO_BENCH_LEDGER_ENTRY_COUNT=N override.
+            // Output uses M355 BASBenchLatencyStats
+            // (p50/p95/p99/p99.9/max/min/mean/stddev/outliers);
+            // M356 baseline-compare optional via
+            // QINAO_BENCH_BASELINE_DIR=/path env var.
+            await runAuditLedgerBench()
+            return
+        }
+        if args.contains("--multi-host-merge-bench") {
+            // M358 — bench `BASSovereignFragmentMerger
+            // .mergeOrdered` over varying frame counts
+            // (10/100/1000/10000) verifying O(n log n)
+            // growth shape via M342
+            // BASMultiHostConvergenceMetric.
+            await runMultiHostMergeBench()
+            return
+        }
+        if args.contains("--full-stack-bench") {
+            // M359 — bench end-to-end
+            // BASHostRuntime.startSession over N sequential
+            // sessions × M turns each. Default N=20 M=5;
+            // QINAO_BENCH_FULL_STACK_SESSIONS / _TURNS env
+            // override.
+            await runFullStackBench()
+            return
+        }
         if args.contains("--lora-curriculum-train-m247") {
             // M247 — re-trains the curriculum LoRA against the
             // EXACT chat-template format Gemma 4 E2B sees at
@@ -4218,6 +4247,157 @@ struct QinaoSampleHost {
         if !outcome.consensus.allInvariantsHold {
             exit(2)
         }
+    }
+
+    // MARK: - M357 audit-ledger-bench
+
+    /// Drive `BASSovereignAuditLedger.append` × N entries +
+    /// emit M355 latency stats banner. Default N=10000;
+    /// `QINAO_BENCH_LEDGER_ENTRY_COUNT=N` override.
+    private static func runAuditLedgerBench() async {
+        let entryCount: Int = {
+            if let raw = ProcessInfo.processInfo
+                .environment[
+                    "QINAO_BENCH_LEDGER_ENTRY_COUNT"],
+               let n = Int(raw),
+               n > 0
+            {
+                return n
+            }
+            return 10_000
+        }()
+
+        print("""
+            QinaoSampleHost --audit-ledger-bench (M357):
+              append \(entryCount) entries to a fresh
+              Ed25519-signed BASSovereignAuditLedger.
+
+              \(AuditLedgerBench.scopeStatement)
+            """)
+
+        do {
+            let outcome = try await AuditLedgerBench.run(
+                entryCount: entryCount)
+            print("""
+
+                ━━━ M357 audit-ledger-bench (\(outcome.entryCount) entries) ━━━
+                elapsed wall:  \(String(format: "%.2f", outcome.elapsedSeconds)) sec
+                throughput:    \(String(format: "%.1f", Double(outcome.entryCount) / outcome.elapsedSeconds)) entries/sec
+
+                """)
+            for line in outcome.latency.bannerLines() {
+                print("  " + line)
+            }
+            print("\n  ━━━ Demo complete — \(outcome.entryCount) entries appended ━━━")
+        } catch {
+            print("ERROR: --audit-ledger-bench failed: \(error)")
+            exit(2)
+        }
+    }
+
+    // MARK: - M358 multi-host-merge-bench
+
+    /// Drive `BASMultiHostConvergenceMetric.measure` over
+    /// varying frame counts (10 / 100 / 1000 / 10000) to
+    /// quantify FragmentMerger growth shape.
+    private static func runMultiHostMergeBench() async {
+        let frameCounts: [Int] = [10, 100, 1_000, 10_000]
+        print("""
+            QinaoSampleHost --multi-host-merge-bench (M358):
+              measure BASSovereignFragmentMerger.mergeOrdered
+              latency over varying frame counts. Each row
+              measures forward + reverse merge for symmetry
+              verification (so wall-time = ~2× single merge).
+
+              [scope] regression alarm, not an SLA. measures
+              in-process FragmentMerger only — no network, no
+              ledger I/O, no actor hops across runtime layers.
+              do not quote these numbers as customer-facing
+              latency.
+
+            """)
+        for n in frameCounts {
+            let outcome = MultiHostMergeBench.run(
+                framesPerHost: n)
+            print("""
+                ━━━ M358 multi-host-merge-bench: \(n) frames per host ━━━
+                """)
+            print("""
+                  consensus frames:    \(outcome.metric.framesInConsensus)
+                  duplicates:          \(outcome.metric.duplicateFramesInConsensus)
+                  symmetric:           \(outcome.metric.mergeIsSymmetric ? "✓" : "✗")
+                  wall (sec):          \(String(format: "%.6f", outcome.metric.mergeWallClockSeconds))
+                  throughput (frames/sec): \(String(format: "%.0f", Double(2 * n) / outcome.metric.mergeWallClockSeconds))
+                  invariants hold:     \(outcome.metric.allInvariantsHold ? "✓" : "✗")
+                """)
+            if !outcome.metric.failingInvariants.isEmpty {
+                print("  failing: \(outcome.metric.failingInvariants)")
+            }
+            print("")
+        }
+        print("  ━━━ Demo complete — merge growth shape captured across 4 sizes ━━━")
+    }
+
+    // MARK: - M359 full-stack-bench
+
+    /// Drive `BASHostRuntime.startSession` × N sessions × M
+    /// turns each, measuring per-session latency.
+    private static func runFullStackBench() async {
+        let sessionCount: Int = {
+            if let raw = ProcessInfo.processInfo
+                .environment[
+                    "QINAO_BENCH_FULL_STACK_SESSIONS"],
+               let n = Int(raw),
+               n > 0
+            {
+                return n
+            }
+            return 20
+        }()
+        let turnCount: Int = {
+            if let raw = ProcessInfo.processInfo
+                .environment[
+                    "QINAO_BENCH_FULL_STACK_TURNS"],
+               let n = Int(raw),
+               n > 0
+            {
+                return n
+            }
+            return 5
+        }()
+
+        print("""
+            QinaoSampleHost --full-stack-bench (M359):
+              drive BASHostRuntime.startSession × \(sessionCount)
+              sessions × \(turnCount) turns each.
+
+              [scope] regression alarm, not an SLA. measures
+              in-process BASHostRuntime startSession only —
+              no Apple Foundation Models inference, no
+              persistent SQLite I/O, no real network. do not
+              quote these numbers as customer-facing latency.
+
+            """)
+
+        let outcome = await FullStackBench.run(
+            sessionCount: sessionCount,
+            turnCount: turnCount)
+
+        print("""
+
+            ━━━ M359 full-stack-bench (\(outcome.sessionCount) sessions × \(outcome.turnsPerSession) turns) ━━━
+            elapsed wall:  \(String(format: "%.2f", outcome.elapsedSeconds)) sec
+            sessions ok:   \(outcome.successfulSessions) / \(outcome.sessionCount)
+
+            """)
+        if let stats = outcome.perSessionLatency {
+            for line in stats.bannerLines() {
+                print("  " + line)
+            }
+        } else {
+            print("  no successful sessions to measure")
+        }
+        print("\n  ━━━ Demo complete — \(outcome.successfulSessions) sessions completed ━━━")
     }
 }
 

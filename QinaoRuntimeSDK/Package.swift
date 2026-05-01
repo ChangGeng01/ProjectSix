@@ -416,7 +416,19 @@ let package = Package(
                 // the sample-host evolution-loop / throughput-bench
                 // demos rely on.
                 .product(name: "BASMemory", package: "BehavioralAISubstrate"),
-                .product(name: "BASLeaseLife", package: "BehavioralAISubstrate")
+                .product(name: "BASLeaseLife", package: "BehavioralAISubstrate"),
+                // M357 + M358 + M359 — tests that pin
+                // `BASSovereignAuditLedger` /
+                // `BASSovereignFragmentMerger` /
+                // `BASMultiHostConvergenceMetric` /
+                // `BASHostRuntime` / `BASBenchLatencyStats`
+                // substrate contracts the sample-host
+                // audit-ledger-bench / multi-host-merge-bench /
+                // full-stack-bench modes rely on.
+                .product(name: "BASSovereign", package: "BehavioralAISubstrate"),
+                .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
+                .product(name: "BASHostKit", package: "BehavioralAISubstrate"),
+                .product(name: "BASObservability", package: "BehavioralAISubstrate")
             ])
     ]
 )
