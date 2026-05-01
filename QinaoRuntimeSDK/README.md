@@ -59,6 +59,24 @@ Host experience has three legal landing zones:
 The neural network's base weights are never updated from inside a
 session. Deletion is real deletion; rollback is real rollback.
 
+The invariant has two mirrored gates:
+
+- **Inbound** — the training pipeline filter rejects any curriculum
+  template below the `domainExpertReviewed` provenance tier from
+  entering the L2 training corpus. Curriculum content cannot reach
+  training unless a real domain expert has signed it.
+- **Outbound** — the trained-weight filter rejects any trained
+  adapter from entering the production organ registry unless its
+  provenance envelope carries the `domainExpertReviewed` tier with
+  a non-nil expert attestation signature reference and issued-at
+  timestamp. Trained weights cannot reach production unless their
+  training provenance is signed too.
+
+Both gates use the same 4-tier ladder
+(`illustrative` < `aiAdvisory` < `peerReviewed` < `domainExpertReviewed`)
+so the doctrine composes: only signed-curriculum-trained signed-weights
+serve runtime requests.
+
 ---
 
 ## Five integrity properties
