@@ -344,7 +344,31 @@ extension BASEBrainRuntimeCoordinator {
         // Consumer emits `lifecycle.tickets` /
         // `lifecycle.terminal` / `lifecycle.promoted` /
         // `lifecycle.stages` into `signalRefs` when non-nil.
-        lifecycleAggregate: BASEvolutionLifecycleSession.Aggregate? = nil
+        lifecycleAggregate: BASEvolutionLifecycleSession.Aggregate? = nil,
+        // M316 — optional narrative-distortion projection (white
+        // paper §7). Producer is
+        // `BASNarrativeDistortion.derive(...)` from final risk +
+        // permit. Consumer emits `narrative.maxAxis` +
+        // `narrative.forcedClosure` + `narrative.urgencyMask`
+        // into `signalRefs` only when at least one axis is
+        // non-trivial. Doctrine red line 7 preserved (watcher
+        // hint, not verdict).
+        narrativeDistortion: BASNarrativeDistortion? = nil,
+        // M317 — optional anomaly-trace projection (white paper
+        // §7). Producer is `BASAnomalyTrace.deriveOrNil(...)`
+        // (nil when distortion has no axis above the emit
+        // threshold). Consumer emits `anomaly.types:N` +
+        // `anomaly.confidence` + a sorted concatenation of
+        // anomaly type raw-values when present.
+        anomalyTrace: BASAnomalyTrace? = nil,
+        // M318 — optional list of L9 abyssal-branch annotations
+        // (white paper §7). Producer is
+        // `BASAbyssalBranch.deriveAll(...)` from candidate IDs +
+        // an `BASAbyssalPressure` reading; empty when below
+        // abyssal threshold. Consumer emits
+        // `abyssalBranch.count` + `abyssalBranch.maxLoad` +
+        // optional closure-condition flag when non-empty.
+        abyssalBranches: [BASAbyssalBranch] = []
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -448,6 +472,64 @@ extension BASEBrainRuntimeCoordinator {
                 .joined(separator: "+")
             observationStatusCodes.append(
                 "lifecycle.stages:\(stages)")
+        }
+        // M316 — Narrative-distortion projection. Only emit when
+        // at least one of the 5 distortion axes is non-trivial;
+        // otherwise the audit signal would flood with zero-axis
+        // hints. `narrative.forcedClosure` + `.urgencyMask` are
+        // the two axes M316.derive populates; `.maxAxis` gives
+        // audit walkers a one-line readout of "did this turn
+        // show any distortion shape at all?".
+        if let distortion = narrativeDistortion,
+           distortion.isNonTrivial
+        {
+            observationStatusCodes.append(
+                "narrative.maxAxis:" +
+                "\(String(format: "%.3f", distortion.maxAxis))")
+            observationStatusCodes.append(
+                "narrative.forcedClosure:" +
+                "\(String(format: "%.3f", distortion.forcedClosure))")
+            observationStatusCodes.append(
+                "narrative.urgencyMask:" +
+                "\(String(format: "%.3f", distortion.urgencyMask))")
+        }
+        // M317 — Anomaly-trace projection. Always elide when
+        // `nil` (no anomaly types crossed the emit threshold).
+        // When present, emit a deterministic types-list so audit
+        // walkers can grep for specific anomaly classes (e.g.
+        // `anomaly.types:false-urgency` for urgency-mask audits).
+        if let trace = anomalyTrace {
+            let typesJoined = trace.anomalyTypes
+                .map(\.rawValue)
+                .sorted()
+                .joined(separator: "+")
+            observationStatusCodes.append(
+                "anomaly.types:\(typesJoined)")
+            observationStatusCodes.append(
+                "anomaly.confidence:" +
+                "\(String(format: "%.3f", trace.confidence))")
+        }
+        // M318 — L9 abyssal-branch annotations. Empty array
+        // elides all branch codes; non-empty emits count + max
+        // unknown-load + escalation-flag if any branch carries a
+        // sovereign-review-passed closure condition.
+        if !abyssalBranches.isEmpty {
+            observationStatusCodes.append(
+                "abyssalBranch.count:\(abyssalBranches.count)")
+            let maxLoad = abyssalBranches
+                .map(\.unknownLoad)
+                .max() ?? 0
+            observationStatusCodes.append(
+                "abyssalBranch.maxLoad:" +
+                "\(String(format: "%.3f", maxLoad))")
+            let escalating = abyssalBranches.contains {
+                $0.requiredClosureConditions
+                    .contains("sovereign-review-passed")
+            }
+            if escalating {
+                observationStatusCodes.append(
+                    "abyssalBranch.escalation:sovereign-review")
+            }
         }
         let signalRefs = orderedReasonCodes(
             [

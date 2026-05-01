@@ -720,6 +720,36 @@ public struct BASEBrainRuntimeCoordinator {
         let lifecycleAggregateForAudit =
             BASEvolutionLifecycleSession.aggregate(
                 lifecycleSessionsForAudit)
+        // M316 — derive narrative distortion projection from
+        // final risk + permit. Stays at zero on most axes
+        // (M316.derive only populates forcedClosure +
+        // urgencyMask) so the audit-entry consumer elides the
+        // narrative codes unless the turn shows real
+        // distortion shape.
+        let narrativeDistortionForAudit = BASNarrativeDistortion
+            .derive(
+                distortionID:
+                    "narrative-\(runtimeTrace.sessionID)",
+                riskLevel: boundRiskCard.riskLevel,
+                permitMode: boundActionPermit.mode)
+        // M317 — derive anomaly trace from the M316 distortion.
+        // Returns nil when no axis crosses the emit threshold;
+        // audit-entry consumer elides the codes when nil.
+        let anomalyTraceForAudit = BASAnomalyTrace.deriveOrNil(
+            traceID: "anomaly-\(runtimeTrace.sessionID)",
+            distortion: narrativeDistortionForAudit,
+            relationShift: "",
+            sourceRefs: [runtimeTrace.sessionID],
+            pressureVector: abyssalPressureForAudit)
+        // M318 — derive L9 abyssal-branch annotations from
+        // candidate IDs + the M303 abyssal pressure reading.
+        // Returns empty array when below the abyssal threshold;
+        // audit-entry consumer elides all branch codes when
+        // empty.
+        let abyssalBranchesForAudit = BASAbyssalBranch.deriveAll(
+            candidateIDs: thoughtFrame.candidates
+                .map(\.candidateID),
+            pressure: abyssalPressureForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -750,7 +780,17 @@ public struct BASEBrainRuntimeCoordinator {
             // lifecycle.tickets / .terminal / .promoted /
             // .stages codes land in audit signalRefs when the
             // turn produces UpdateTickets.
-            lifecycleAggregate: lifecycleAggregateForAudit
+            lifecycleAggregate: lifecycleAggregateForAudit,
+            // M316 — feed narrative-distortion projection so
+            // narrative.* codes land in audit signalRefs when
+            // any of the 5 axes is non-trivial.
+            narrativeDistortion: narrativeDistortionForAudit,
+            // M317 — feed anomaly-trace (nil when distortion
+            // has no axis above the threshold; codes elided).
+            anomalyTrace: anomalyTraceForAudit,
+            // M318 — feed L9 abyssal-branch annotations (empty
+            // when below abyssal threshold; codes elided).
+            abyssalBranches: abyssalBranchesForAudit
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

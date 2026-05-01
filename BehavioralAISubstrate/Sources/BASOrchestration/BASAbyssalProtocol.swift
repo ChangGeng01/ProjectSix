@@ -798,6 +798,206 @@ public enum BASHumanAnchorProtocol {
     }
 }
 
+// MARK: - M316 / M317 / M318 — derive helpers from runtime state
+
+public extension BASNarrativeDistortion {
+    /// **M316** — projection from existing turn state into the
+    /// 5-axis narrative-distortion shape.
+    ///
+    /// Pre-M316 the `BASNarrativeDistortion` schema (white paper
+    /// §7) was load-bearing in tests + governance only; no
+    /// runtime path produced one. M316 closes the gap by
+    /// projecting from L11 risk + L12 permit + L9 candidate state
+    /// — same pattern as M303 `BASAbyssalPressureBudget.derive`.
+    ///
+    /// Mappings (deliberately conservative — placeholders use 0
+    /// rather than over-claim signal):
+    ///
+    /// - **`realityDenial`**: stays 0 until L7 mirror blade wires
+    ///   real signal. The substrate has no audit on whether the
+    ///   host is denying observable reality; this would require
+    ///   the host_constitution + L8 memory to disagree, which
+    ///   M316 doesn't yet wire.
+    /// - **`historyRewrite`**: same — stays 0 until L7 / L8 wires.
+    /// - **`forcedClosure`**: scales with permit mode tightness.
+    ///   `.block` → 0.7 (decision shut down), `.delay` → 0.4,
+    ///   `.compare` → 0.2, `.answer` → 0.0. Mirrors the
+    ///   white-paper "decide right now" framing reading.
+    /// - **`roleInversion`**: stays 0 — needs L10 tribunal voice
+    ///   shift detection (future milestone).
+    /// - **`urgencyMask`**: scales with risk-level paired with
+    ///   permissive permit. `.extreme` + `.answer` → 0.9
+    ///   (genuine deliberation disguised as decisive action),
+    ///   `.high` + `.answer` → 0.6, `.medium` + `.answer` → 0.3,
+    ///   else 0.
+    ///
+    /// `confidence` is fixed at 0.5 — projection is structural,
+    /// not introspective; downstream watchers can override with
+    /// higher confidence after deeper inspection.
+    static func derive(
+        distortionID: String,
+        riskLevel: BASBrainRiskLevel,
+        permitMode: BASActionPermitMode
+    ) -> BASNarrativeDistortion {
+        let forcedClosure: Double
+        switch permitMode {
+        case .block: forcedClosure = 0.7
+        case .delay: forcedClosure = 0.4
+        case .compare: forcedClosure = 0.2
+        case .answer: forcedClosure = 0.0
+        // M316 — newer permit modes (added by L12 surface
+        // expansion) all signal less forced-closure than block
+        // but more than answer; default to 0.2 (parity with
+        // compare) until L7 mirror blade wires more nuance.
+        case .mirror, .draftOnly, .localOnly,
+             .replace, .escalate:
+            forcedClosure = 0.2
+        }
+        let urgencyMask: Double
+        switch (riskLevel, permitMode) {
+        case (.extreme, .answer): urgencyMask = 0.9
+        case (.high, .answer): urgencyMask = 0.6
+        case (.medium, .answer): urgencyMask = 0.3
+        default: urgencyMask = 0.0
+        }
+        return BASNarrativeDistortion(
+            distortionID: distortionID,
+            realityDenial: 0,
+            historyRewrite: 0,
+            forcedClosure: forcedClosure,
+            roleInversion: 0,
+            urgencyMask: urgencyMask,
+            confidence: 0.5)
+    }
+
+    /// True when at least one distortion field exceeds 0.0 — the
+    /// audit-entry consumer uses this to decide whether to emit
+    /// `narrative.*` codes for the turn.
+    var isNonTrivial: Bool {
+        realityDenial > 0
+            || historyRewrite > 0
+            || forcedClosure > 0
+            || roleInversion > 0
+            || urgencyMask > 0
+    }
+
+    /// Maximum across the 5 distortion axes. The audit signal
+    /// surface uses this as a one-line readout.
+    var maxAxis: Double {
+        max(
+            realityDenial,
+            max(
+                historyRewrite,
+                max(
+                    forcedClosure,
+                    max(roleInversion, urgencyMask))))
+    }
+}
+
+public extension BASAnomalyTrace {
+    /// **M317** — projection from a derived
+    /// `BASNarrativeDistortion` plus existing turn refs into a
+    /// runtime-built `BASAnomalyTrace`. Reuses
+    /// `BASAnomalyWatchProtocol.trace(...)` so the trace shape
+    /// stays identical to the watcher-protocol output.
+    ///
+    /// The audit-entry consumer treats `nil` as "no anomaly to
+    /// report" — i.e., when the distortion has no axis above
+    /// the emit threshold. Consumer never escalates the verdict
+    /// (red line 7); it only emits additive `anomaly.*`
+    /// signalRefs codes.
+    static func deriveOrNil(
+        traceID: String,
+        distortion: BASNarrativeDistortion,
+        relationShift: String,
+        sourceRefs: [String],
+        pressureVector: BASAbyssalPressure? = nil,
+        emitThreshold: Double =
+            BASAnomalyWatchProtocol.defaultEmitThreshold
+    ) -> BASAnomalyTrace? {
+        let trace = BASAnomalyWatchProtocol.trace(
+            traceID: traceID,
+            distortion: distortion,
+            relationShift: relationShift,
+            sourceRefs: sourceRefs,
+            pressureVector: pressureVector,
+            emitThreshold: emitThreshold)
+        return trace.anomalyTypes.isEmpty ? nil : trace
+    }
+}
+
+public extension BASAbyssalBranch {
+    /// **M318** — projection from L9 dream-loop counterfactual
+    /// bundles + an `BASAbyssalPressure` reading into 0-or-N
+    /// branches.
+    ///
+    /// A branch is emitted for each counterfactual bundle whose
+    /// abyssal-pressure threshold is exceeded — meaning the
+    /// branch carries non-trivial unknown-load + manipulation +
+    /// ontology distortion. White paper §7 says these are L9's
+    /// hint to L14: "this counterfactual ventured into abyssal
+    /// territory and needs sovereign review before the host can
+    /// commit to it."
+    ///
+    /// Mappings:
+    /// - `branchID` ← `"abyssal-branch-{candidateID}"`
+    /// - `sourceCandidateRef` ← `bundle.candidateID`
+    /// - `unknownLoad` ← `pressure.unknownLoad`
+    /// - `manipulationLoad` ← `pressure.manipulationIndex`
+    /// - `ontologyDistortion` ← `pressure.ontologyDistortion`
+    /// - `triggerReasons` ← reason codes drawn from each non-zero
+    ///   axis above the abyssal threshold
+    /// - `protectivePathRefs` ← empty (real protective paths come
+    ///   from L9 alternative-counterfactual generation in a
+    ///   future milestone; M318 ships the projection shape)
+    /// - `requiredClosureConditions` ← `["sovereign-review-passed"]`
+    ///   when escalation threshold met, else empty
+    static func deriveAll(
+        candidateIDs: [String],
+        pressure: BASAbyssalPressure,
+        abyssalThreshold: Double = 0.5
+    ) -> [BASAbyssalBranch] {
+        // Below abyssal threshold → no branches; the abyssal
+        // signal isn't strong enough to warrant L14 review.
+        guard pressure.aggregateMagnitude >= abyssalThreshold
+        else {
+            return []
+        }
+        var triggerReasons: [String] = []
+        if pressure.unknownLoad >= abyssalThreshold {
+            triggerReasons.append(
+                "unknown-load>=\(abyssalThreshold)")
+        }
+        if pressure.manipulationIndex >= abyssalThreshold {
+            triggerReasons.append(
+                "manipulation-index>=\(abyssalThreshold)")
+        }
+        if pressure.ontologyDistortion >= abyssalThreshold {
+            triggerReasons.append(
+                "ontology-distortion>=\(abyssalThreshold)")
+        }
+        if triggerReasons.isEmpty {
+            triggerReasons.append("aggregate-magnitude-elevated")
+        }
+        let closureConditions: [String] =
+            pressure.aggregateMagnitude >= 0.7
+                ? ["sovereign-review-passed"]
+                : []
+        return candidateIDs.map { candidateID in
+            BASAbyssalBranch(
+                branchID: "abyssal-branch-\(candidateID)",
+                sourceCandidateRef: candidateID,
+                triggerReasons: triggerReasons,
+                unknownLoad: pressure.unknownLoad,
+                manipulationLoad: pressure.manipulationIndex,
+                ontologyDistortion:
+                    pressure.ontologyDistortion,
+                protectivePathRefs: [],
+                requiredClosureConditions: closureConditions)
+        }
+    }
+}
+
 // MARK: - BASAnomalyWatchProtocol (cross-cutting protocol helper)
 
 /// White paper §5.4 "Anomaly Watch Protocol" — pure-function
