@@ -264,6 +264,16 @@ struct QinaoSampleHost {
             runMultiHostDemo()
             return
         }
+        if args.contains("--cthulhu-doctrine-demo") {
+            // M393 — exercise every M384-M389 typed primitive
+            // in isolation against fixture inputs designed to
+            // trigger each wire's non-trivial path. Pure
+            // function — no actor / no IO. Banner reports
+            // per-wire summary + reason codes + final
+            // invariant pin.
+            runCthulhuDoctrineDemo()
+            return
+        }
         if args.contains("--audit-ledger-bench") {
             // M357 — bench `BASSovereignAuditLedger.append`
             // per-entry latency × N. Default N=10000;
@@ -4286,6 +4296,71 @@ struct QinaoSampleHost {
             ━━━ Demo complete — multi-host audit consensus invariants all hold: \(outcome.consensus.allInvariantsHold ? "✓" : "⚠ MISMATCH") ━━━
             """)
         if !outcome.consensus.allInvariantsHold {
+            exit(2)
+        }
+    }
+
+    // MARK: - M393 cthulhu-doctrine-demo
+
+    /// Drive every M384-M389 typed primitive once against
+    /// fixture inputs that trigger each wire's non-trivial
+    /// path. Pure function — no actor, no IO. Banner reports
+    /// per-wire summary + reason codes + final invariant pin.
+    private static func runCthulhuDoctrineDemo() {
+        print("""
+            QinaoSampleHost --cthulhu-doctrine-demo (M393):
+              exercise M384-M389 Cthulhu doctrine wires in
+              isolation. Pure-function — no actor / no IO. Each
+              step shows the gate / cap / histogram / dominant-
+              axis output the helpers produce when the input
+              crosses the wire's trigger threshold. The audit
+              codes printed below are exactly the strings the
+              substrate writes into `BASSovereignAuditEntry
+              .signalRefs` for each turn that activates the
+              wire.
+            """)
+
+        let outcome = CthulhuDoctrineDemo.run()
+
+        func renderStep(
+            _ step: CthulhuDoctrineWireOutcome
+        ) -> String {
+            var lines = "  \(step.summary)"
+            if !step.reasonCodes.isEmpty {
+                lines += "\n  reason codes:\n"
+                lines += step.reasonCodes
+                    .map { "    • \($0)" }
+                    .joined(separator: "\n")
+            }
+            return lines
+        }
+
+        print("""
+
+            ━━━ Step 1/7 — \(outcome.m384HighPressureWarmAnchor.stepName) ━━━
+            \(renderStep(outcome.m384HighPressureWarmAnchor))
+
+            ━━━ Step 2/7 — \(outcome.m384RedLine8ReservedAnchor.stepName) ━━━
+            \(renderStep(outcome.m384RedLine8ReservedAnchor))
+
+            ━━━ Step 3/7 — \(outcome.m385ActiveReserveCap.stepName) ━━━
+            \(renderStep(outcome.m385ActiveReserveCap))
+
+            ━━━ Step 4/7 — \(outcome.m386ForbiddenGateRefusal.stepName) ━━━
+            \(renderStep(outcome.m386ForbiddenGateRefusal))
+
+            ━━━ Step 5/7 — \(outcome.m387SealHistogramShape.stepName) ━━━
+            \(renderStep(outcome.m387SealHistogramShape))
+
+            ━━━ Step 6/7 — \(outcome.m388NarrativeDominantAxis.stepName) ━━━
+            \(renderStep(outcome.m388NarrativeDominantAxis))
+
+            ━━━ Step 7/7 — \(outcome.m389DoctrineRedLineCardinality.stepName) ━━━
+            \(renderStep(outcome.m389DoctrineRedLineCardinality))
+
+            ━━━ Demo complete — Cthulhu doctrine invariants all hold: \(outcome.allInvariantsHold ? "✓" : "⚠ MISMATCH") ━━━
+            """)
+        if !outcome.allInvariantsHold {
             exit(2)
         }
     }

@@ -374,6 +374,17 @@ let package = Package(
                 // thermal/breath quantification across N turns.
                 .product(
                     name: "BASLeaseLife",
+                    package: "BehavioralAISubstrate"),
+                // M393 — `--cthulhu-doctrine-demo` mode exercises
+                // M384-M389 typed primitives directly. Needs
+                // BASOrchestration (escalation, ceiling gate,
+                // abyssal/anchor schemas, doctrine red-line enum)
+                // + BASWorldPrior (BASUnknownReserve schema).
+                .product(
+                    name: "BASOrchestration",
+                    package: "BehavioralAISubstrate"),
+                .product(
+                    name: "BASWorldPrior",
                     package: "BehavioralAISubstrate")
             ]),
         .testTarget(
@@ -428,7 +439,18 @@ let package = Package(
                 .product(name: "BASSovereign", package: "BehavioralAISubstrate"),
                 .product(name: "BASRuntimeCore", package: "BehavioralAISubstrate"),
                 .product(name: "BASHostKit", package: "BehavioralAISubstrate"),
-                .product(name: "BASObservability", package: "BehavioralAISubstrate")
+                .product(name: "BASObservability", package: "BehavioralAISubstrate"),
+                // M393 — tests that pin Cthulhu doctrine substrate
+                // contracts the sample-host
+                // `--cthulhu-doctrine-demo` mode relies on
+                // (BASAbyssalPermitEscalation +
+                // BASAssertionCeilingGate + BASNarrativeDistortion +
+                // BASAbyssalDoctrineRedLine in BASOrchestration;
+                // BASUnknownReserve in BASWorldPrior;
+                // BASActionPermit in BASPolicy).
+                .product(name: "BASOrchestration", package: "BehavioralAISubstrate"),
+                .product(name: "BASWorldPrior", package: "BehavioralAISubstrate"),
+                .product(name: "BASPolicy", package: "BehavioralAISubstrate")
             ])
     ]
 )
