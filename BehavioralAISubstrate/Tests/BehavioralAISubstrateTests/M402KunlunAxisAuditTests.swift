@@ -142,11 +142,12 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         }
         XCTAssertFalse(kunlunCodes.isEmpty,
                        "at least one kunlun.* code expected")
-        // M402+M404+M405 — Kunlun codes can carry any of the
-        // four segments: axis (M402), jade (M404), river (M405),
-        // or future segments. All must be `kunlun.<segment>.*`.
+        // M402+M404+M405+M408+M409+M410 — Kunlun codes can carry
+        // any of the five segments: axis (M402), jade (M404),
+        // river (M405), yaochi (M408), tianmen (M409+M410). All
+        // must be `kunlun.<segment>.*`.
         let allowedSegments: Set<String> = [
-            "axis", "jade", "river",
+            "axis", "jade", "river", "yaochi", "tianmen",
         ]
         for code in kunlunCodes {
             let parts = code.components(separatedBy: ".")
@@ -155,27 +156,27 @@ final class M402KunlunAxisAuditTests: XCTestCase {
             let segment = parts.count >= 2 ? parts[1] : ""
             XCTAssertTrue(
                 allowedSegments.contains(segment),
-                "kunlun code segment \(segment) not in {axis, jade, river}; got \(code)")
+                "kunlun code segment \(segment) not in {axis,jade,river,yaochi,tianmen}; got \(code)")
         }
     }
 
     // MARK: - 4. Code count includes all kunlun segments
-    //          (axis M402 + jade M404 + river M405)
+    //          (axis M402 + jade M404 + river M405 +
+    //           yaochi M408 + tianmen M409+M410)
 
     func testKunlunCodeCountInValidRange() throws {
-        // M402+M404+M405 — every turn emits an axis center code,
-        // a jade seal status code, and three river codes
-        // (lineage / upward / downward). Plus optional axis
-        // deviation/requires-gate, optional jade missing/defects,
-        // optional river warnings/cut. Pin the invariants:
-        //
-        //   - Always exactly 1 `kunlun.axis.center:` (M402)
-        //   - Always exactly 1 `kunlun.jade.seal:`        (M404)
-        //   - Always exactly 1 `kunlun.river.lineage:`    (M405)
-        //   - Always exactly 1 `kunlun.river.upward:`     (M405)
-        //   - Always exactly 1 `kunlun.river.downward:`   (M405)
-        //   - Total kunlun.* codes ∈ [5, 11] depending on
-        //     deviation / missing / warnings flags.
+        // M402+M404+M405+M408+M409+M410 — every turn emits:
+        //   - axis center (M402, always 1)
+        //   - jade seal (M404, always 1)
+        //   - river lineage / upward / downward (M405, always 3)
+        //   - yaochi access (M408, always 1)
+        //   - tianmen gate / ready / axis-bound (M409+M410,
+        //     always 3 when readiness present)
+        // Total guaranteed: 9 codes per turn.
+        // Optional codes: axis deviation/requires-gate,
+        // jade missing/defects, river warnings/cut, yaochi
+        // reasons, tianmen reasons + warrant-bind/missing.
+        // Total range: [9, 17] depending on which flags fire.
         let runtime = makeRuntime(profile: "m402-range")
         let result = try runtime.startSession(
             BASHostSessionRequest(
@@ -191,10 +192,11 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         let kunlunCodes = signalRefs.filter {
             $0.hasPrefix("kunlun.")
         }
-        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 5,
-            "Kunlun emits at least 5 codes (axis.center + jade.seal + river.{lineage,upward,downward})")
-        XCTAssertLessThanOrEqual(kunlunCodes.count, 11,
-            "Kunlun emits at most 11 codes when all optional segments fire")
+        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 9,
+            "Kunlun emits at least 9 codes (axis.center + jade.seal + river.{lineage,upward,downward} + yaochi.access + tianmen.{gate,ready,axis-bound})")
+        XCTAssertLessThanOrEqual(kunlunCodes.count, 17,
+            "Kunlun emits at most 17 codes when all optional segments fire")
+        // Pin the always-fire codes (one each).
         let centerCount = kunlunCodes.filter {
             $0.hasPrefix("kunlun.axis.center:")
         }.count
@@ -218,6 +220,26 @@ final class M402KunlunAxisAuditTests: XCTestCase {
             $0.hasPrefix("kunlun.river.downward:")
         }.count
         XCTAssertEqual(riverDownwardCount, 1)
+        let yaochiAccessCount = kunlunCodes.filter {
+            $0.hasPrefix("kunlun.yaochi.access:")
+        }.count
+        XCTAssertEqual(yaochiAccessCount, 1,
+                       "exactly 1 kunlun.yaochi.access always emits")
+        let tianmenGateCount = kunlunCodes.filter {
+            $0.hasPrefix("kunlun.tianmen.gate:")
+        }.count
+        XCTAssertEqual(tianmenGateCount, 1,
+                       "exactly 1 kunlun.tianmen.gate always emits")
+        let tianmenReadyCount = kunlunCodes.filter {
+            $0.hasPrefix("kunlun.tianmen.ready:")
+        }.count
+        XCTAssertEqual(tianmenReadyCount, 1,
+                       "exactly 1 kunlun.tianmen.ready always emits")
+        let tianmenAxisBoundCount = kunlunCodes.filter {
+            $0.hasPrefix("kunlun.tianmen.axis-bound:")
+        }.count
+        XCTAssertEqual(tianmenAxisBoundCount, 1,
+                       "exactly 1 kunlun.tianmen.axis-bound always emits")
     }
 
     // MARK: - 4b. Elision semantics — buildSovereignAuditEntry

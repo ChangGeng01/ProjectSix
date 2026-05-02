@@ -1072,6 +1072,117 @@ public struct BASEBrainRuntimeCoordinator {
         let kunlunRiverLineageForAudit =
             BASKunlunRiverOriginProtocol.analyze(
                 kunlunRiverTraceForAudit)
+        // M408 — Yaochi Sanctum access audit projection. Doctrine
+        // §4.4 (line 556-560): 可以存在但默认不参与普通检索 / 可以
+        // 被保护但不能被系统操控 / 可以被召回但必须有上下文授权与
+        // 承接表面. Synthesize a per-turn sample sanctum entry
+        // representing the highest-sensitivity memory class touched
+        // by this turn (when quarantine records exist, treat them
+        // as `.sensitive` proxy; otherwise mint a `.boundary` proxy
+        // representing the host's general protective posture).
+        // Run `BASKunlunYaochiProtocol.evaluateAccess` against
+        // current request context (host anchor present iff
+        // humanAnchorSignal is .reserved tone signaling distance;
+        // otherwise present); audit-only emission — actual L8
+        // hippocampal gating is M413+ work (chapter 九十五).
+        let kunlunYaochiSanctumForAudit: BASYaochiSanctumEntry = {
+            let sanctumClass: BASYaochiSanctumClass =
+                quarantineRecords.isEmpty
+                    ? .boundary
+                    : .sensitive
+            return BASYaochiSanctumEntry(
+                entryID:
+                    "yaochi-\(runtimeTrace.sessionID)",
+                memoryRef: thoughtFrame.candidates.first?
+                    .candidateID ?? "no-memory",
+                hostRef: hostContext.hostID,
+                sanctumClass: sanctumClass,
+                accessPolicy: .conditional,
+                revealConditions: [
+                    "host-explicit-recall",
+                    "anchor-tone-warm",
+                ],
+                coolingPeriod: 60,
+                humanAnchorRequired: true,
+                lastRevealedAt: "")
+        }()
+        let kunlunYaochiAccessForAudit = BASKunlunYaochiProtocol
+            .evaluateAccess(
+                entry: kunlunYaochiSanctumForAudit,
+                hostAnchorPresent:
+                    humanAnchorSignalForAudit
+                        .recommendedSurfaceTone != .reserved,
+                matchedRevealConditions: {
+                    // Match a single reveal condition
+                    // representing whether the bound permit's
+                    // mode allows recall (not in delay/block).
+                    switch boundActionPermit.mode {
+                    case .answer, .mirror, .compare:
+                        return ["host-explicit-recall"]
+                    default:
+                        return []
+                    }
+                }(),
+                secondsSinceLastReveal: 86400)
+        // M409 — Heaven Gate Permit readiness audit projection.
+        // Doctrine §4.3: 不是有路径就能进现实 / 不是有候选就能进
+        // 宿主层 / 不是有经验就能进成长层 / 不是有工具意图就能工具
+        // 写. Synthesize a per-turn permit representing the
+        // highest gate class implied by the turn's bound permit
+        // mode (`.tool` for tool-emitting permits, `.public` for
+        // answer/mirror, `.cognitive` otherwise). Required seals:
+        // synthesize one per warrant. Sovereign warrant ref
+        // sourced from the first sovereign warrant when present.
+        // Pass state derived from verdict level (passed when
+        // verdict is `.advisory`/`.unrestricted`, otherwise
+        // pending/remanded). Audit-only emission — actual gate
+        // enforcement is M410 follow-up.
+        let kunlunHeavenGateForAudit: BASHeavenGatePermit = {
+            let gateClass: BASKunlunGateClass = {
+                switch boundActionPermit.mode {
+                case .answer, .mirror:
+                    return .public
+                case .compare, .draftOnly:
+                    return .cognitive
+                case .delay, .replace, .localOnly:
+                    return .cognitive
+                case .escalate, .block:
+                    return .host
+                }
+            }()
+            let passState: BASKunlunGateState
+            switch sovereignVerdict.verdictLevel {
+            case .pass:
+                passState = .passed
+            case .throttle, .shadowLock:
+                passState = .pending
+            case .toolCut, .memoryFreeze, .quarantine:
+                passState = .remanded
+            case .rollback, .deadStop:
+                passState = .denied
+            }
+            return BASHeavenGatePermit(
+                gateID: "tianmen-\(runtimeTrace.sessionID)",
+                sourceRef: thoughtFrame.candidates.first?
+                    .candidateID ?? "no-candidate",
+                targetDomain:
+                    "domain-\(boundActionPermit.mode.rawValue)",
+                gateClass: gateClass,
+                requiredSeals: sovereignWarrants
+                    .map { "seal-\($0.warrantID)" },
+                actionPermitRef:
+                    "permit-\(boundActionPermit.mode.rawValue)",
+                sovereignWarrantRef: sovereignWarrants.first?
+                    .warrantID ?? "",
+                secondCheckRequired:
+                    boundActionPermit.requireSecondCheck,
+                passState: passState,
+                returnPathRef:
+                    "rollback-\(runtimeTrace.sessionID)")
+        }()
+        let kunlunHeavenGateReadinessForAudit =
+            BASKunlunHeavenGateProtocol.evaluateReadiness(
+                kunlunHeavenGateForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -1134,7 +1245,24 @@ public struct BASEBrainRuntimeCoordinator {
             // kunlun.river.lineage / .upward / .downward /
             // .warnings codes land in audit signalRefs. Doctrine
             // §4.5 (没有源流就没有可信成长).
-            riverOriginLineage: kunlunRiverLineageForAudit
+            riverOriginLineage: kunlunRiverLineageForAudit,
+            // M408 — feed Yaochi sanctum access decision so
+            // kunlun.yaochi.access:<class>:<decision> + reason
+            // codes land in audit signalRefs. Doctrine §4.4
+            // (默认不参与普通检索) + 红线 #3 (sanctum 不能被系统占
+            // 有). Audit-only emission at this milestone.
+            yaochiAccess: kunlunYaochiAccessForAudit,
+            yaochiSanctumClass:
+                kunlunYaochiSanctumForAudit.sanctumClass,
+            // M409 — feed Heaven Gate readiness so
+            // kunlun.tianmen.gate:<domain>:<state> + readiness
+            // reason codes land in audit signalRefs. Doctrine
+            // §4.3 (七 transition gates).
+            tianmenReadiness: kunlunHeavenGateReadinessForAudit,
+            tianmenGateClass:
+                kunlunHeavenGateForAudit.gateClass,
+            tianmenPassState:
+                kunlunHeavenGateForAudit.passState
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

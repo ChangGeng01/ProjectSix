@@ -11067,3 +11067,131 @@ After this chapter ships:
 ### 93.10 一句话总结
 
 **M404-M407 close 昆仑 doctrine Phase β (chapter 九十三)**：M404 wire `BASJadeCanonSeal` derive over `boundActionPermit` + `BASKunlunJadeCanonProtocol.verifySeal` at L4 audit-projection seam emit `kunlun.jade.seal:<class>:<status>` + `.missing:<N>` + `.defects:<sorted>` (红线 #4 玉律不能成黑箱 typed-pinned) + M405 wire `BASRiverOriginTrace` derive + `BASKunlunRiverOriginProtocol.analyze` emit `kunlun.river.lineage:<status>` + `.upward:N` + `.downward:N` + `.warnings:<sorted>` + `.cut:true` (红线 #6 源流不隐性监控 typed-pinned) + M406 ship pure-function `BASKunlunPermitEscalation.escalate(permit:alignment:humanAnchor:)` translating `BASAxisAlignment.requiresGate == true` into typed permit `stackedModes` extensions (`.compare` always; `.escalate` for centerScore < 0.3 deep deviation; suppressed when humanAnchor.tone == .reserved) + composability with M384 abyssal escalation pinned via `testCompositionPreservesExistingStackedModes` (red line #2 单提交口 pinned by 9-mode all-cases test; red line #5 天门不绕过 pinned by `.compare`-only escalation; red line #8 不绕人性锚点 cross-doctrine pinned by reserved-tone suppression test) + 6 audit-emission + 9 escalation tests + 2 fix-pin updates to existing tests reflecting additive doctrine. BAS 2391 → 2406 (+15) / Qinao 1361 unchanged / 全栈 3752 → 3784 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase β done; Phase γ (Yaochi + Tianmen + L14) 待 chapter 九十四**.
+
+---
+
+## 九十四、 Kunlun Phase γ — Yaochi + Tianmen + L14 cross-protocol bind（M408-M411 / 2026-05-03）
+
+### 94.1 触发与起点
+
+继 chapter 九十三 ship Phase β (M404 JadeCanon + M405 RiverOrigin + M406 L11 axis escalation)，本章节按 plan 附录 L §L.5 (Phase γ) 推进 4 milestones：M408 Yaochi 沙坛接入闸 / M409 Tianmen heaven-gate 准备就绪 wire / M410 L14 sovereign-warrant 跨协议绑定 / M411 wrap doc。
+
+**起点状态**（chapter 九十三 末）:
+- 6 typed schemas + 5 helpers + L4 axis derive + L11 axis escalation shipped
+- M404 + M405 audit-only emission shipped
+- M406 permit-synthesis hook live with composability with M384 abyssal escalation
+- BAS 2406 / Qinao 1361 / 全栈 3784 / 0 failures / 4/4 boundary green
+
+### 94.2 M408 — YaochiSanctum access gate (audit-only emission)
+
+**修改** [EBrainRuntimeCoordinator.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift):
+- New `kunlunYaochiSanctumForAudit` derive at audit-projection seam (after `kunlunRiverLineageForAudit`)
+- Synthesizes `BASYaochiSanctumEntry` representing the highest-sensitivity memory class touched by the turn (when quarantine records non-empty → `.sensitive` proxy; otherwise → `.boundary` proxy reflecting host's general protective posture)
+- Calls `BASKunlunYaochiProtocol.evaluateAccess(...)` against current request context:
+  - `hostAnchorPresent: humanAnchorSignalForAudit.recommendedSurfaceTone != .reserved` (reserved tone = host needs distance)
+  - `matchedRevealConditions: ["host-explicit-recall"]` when permit mode ∈ {.answer, .mirror, .compare}; `[]` otherwise (delay/block modes block recall)
+  - `secondsSinceLastReveal: 86400` (synthetic value representing "long enough since last reveal")
+
+**修改** [EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift):
+- New optional params: `yaochiAccess: BASKunlunYaochiProtocol.AccessDecision? = nil` + `yaochiSanctumClass: BASYaochiSanctumClass? = nil`
+- Audit emission: when non-nil, append:
+  - `kunlun.yaochi.access:<class>:<decision>` (class is sanctum class raw value e.g. `sensitive` / `boundary`; decision is `granted` | `denied`)
+  - `kunlun.yaochi.reasons:<sorted+joined>` (only when denied; emits stripped per-reason kebab-case list — `cooling-period-active` / `human-anchor-required` / `sealed-policy` / `no-matched-conditions`)
+
+**Doctrine pin**: §4.4 + 红线 #3 (sanctum 不能被系统占有) — audit-only emission documenting what WOULD be gated; actual L8 hippocampal gating is M413+ work (chapter 九十五).
+
+### 94.3 M409 — Heaven Gate (Tianmen) readiness wire
+
+**修改** [EBrainRuntimeCoordinator.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift):
+- New `kunlunHeavenGateForAudit` derive after `kunlunYaochiAccessForAudit`
+- Synthesizes `BASHeavenGatePermit` representing the highest-stakes gate class implied by the turn:
+  - `boundActionPermit.mode ∈ {.answer, .mirror}` → `.public` (output to host surface)
+  - `boundActionPermit.mode ∈ {.compare, .draftOnly, .delay, .replace, .localOnly}` → `.cognitive` (within-cognition transition)
+  - `boundActionPermit.mode ∈ {.escalate, .block}` → `.host` (high-stakes domain)
+- Pass state derived from sovereign verdict level: `.pass` → `.passed`; `.throttle/.shadowLock` → `.pending`; `.toolCut/.memoryFreeze/.quarantine` → `.remanded`; `.rollback/.deadStop` → `.denied`
+- Calls `BASKunlunHeavenGateProtocol.evaluateReadiness(...)` to get readiness verdict
+
+**修改** [EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift):
+- New optional params: `tianmenReadiness: BASKunlunHeavenGateProtocol.Readiness? = nil` + `tianmenGateClass: BASKunlunGateClass? = nil` + `tianmenPassState: BASKunlunGateState? = nil`
+- Audit emission: when non-nil, append:
+  - `kunlun.tianmen.gate:<domain>:<state>` (domain = gate class raw value; state ∈ `passed` | `denied` | `pending` | `remanded`)
+  - `kunlun.tianmen.ready:<bool>` (readiness verdict)
+  - `kunlun.tianmen.reasons:<sorted+joined>` (only when not ready; emits stripped per-reason kebab-case list)
+
+**Doctrine pin**: §4.3 (七 transition gates) + 红线 #5 (天门不绕过宿主授权; reinforced by M410 below).
+
+### 94.4 M410 — L14 sovereign-warrant Tianmen cross-protocol bind
+
+**修改** [EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift):
+- Within M409 emission block (no new params), additionally emit cross-protocol bind codes:
+  - `kunlun.tianmen.warrant-bind:<warrantID>` — when sovereign warrant is present
+  - `kunlun.tianmen.warrant-missing:high-stakes` — when high-stakes gate class (`.host` / `.evolution` / `.public`) has no warrant present (red line #5 violation marker)
+  - `kunlun.tianmen.axis-bound:session-<sessionID>` — always emits (cross-link to the M402 axis-keyed session); audit walkers join M402 + M409 emissions by sessionID
+
+**Doctrine pin** (红线 #5 — 天门不绕过宿主授权):
+- High-stakes gate (`.host`/`.evolution`/`.public`) MUST have sovereign warrant; absence is an audit-emitted violation marker
+- Cross-link to the active session axis ensures every Tianmen gate is anchored to the same session-scoped Kunlun axis (no orphaned gates)
+
+### 94.5 测试
+
+**新建** [M408M409M410KunlunYaochiTianmenAuditTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M408M409M410KunlunYaochiTianmenAuditTests.swift)（8 tests）:
+1. `testRuntimeTurnEmitsYaochiAccessCode` — real BASHostRuntime turn produces exactly 1 `kunlun.yaochi.access:<class>:<decision>` code with class ∈ valid 6 + decision ∈ {granted, denied}
+2. `testRuntimeTurnEmitsTianmenGateAndReadinessCodes` — real turn produces exactly 1 `kunlun.tianmen.gate:<domain>:<state>` (domain ∈ valid 6 + state ∈ {passed, denied, pending, remanded}) + 1 `.ready:<bool>`
+3. `testRuntimeTurnEmitsTianmenAxisBoundCrossLink` — real turn produces exactly 1 `kunlun.tianmen.axis-bound:session-<id>` + verifies warrant-bind and warrant-missing are mutually exclusive
+4. `testSealedSanctumEntryDeniesAccess` — direct unit test on helper: sealed policy → denied with `sealed-policy` reason
+5. `testHighStakesGateWithoutWarrantNotReady` — direct unit test on helper: `.host` gate with no warrant → not ready with both `high-stakes-needs-sovereign-warrant` + `high-stakes-needs-jade-seal` reasons
+6. `testCodesUseStableKebabCasePrefix` — all `kunlun.yaochi.*` / `kunlun.tianmen.*` codes follow `kunlun.<segment>.<key>:<value>` shape
+7. `testNilDecisionElidesYaochiCodes` — direct test on helper: granted decision on conditional policy with matched conditions emits no reason codes
+8. `testReadyPermitElidesTianmenReasons` — direct test on helper: ready permit emits no reason codes
+
+**修正** [M402KunlunAxisAuditTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M402KunlunAxisAuditTests.swift):
+- `testKunlunCodesUseStableKebabCasePrefix` allowedSegments expanded from `{axis, jade, river}` to `{axis, jade, river, yaochi, tianmen}` reflecting Phase γ additions
+- `testKunlunCodeCountInValidRange` lower bound raised from 5 to 9 (axis.center + jade.seal + river.{lineage,upward,downward} + yaochi.access + tianmen.{gate,ready,axis-bound}) and upper bound from 11 to 17. Pin tests for each "always exactly 1" code added (8 always-fire codes per turn).
+
+### 94.6 测试基线
+
+| 套件 | 九十三 章末 | 九十四 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2406 | **2414** | **+8** (M408+M409+M410) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1361 | **1361** | unchanged (no Qinao changes) |
+| 全栈 | 3784 | **3792** | **+8** |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿.
+
+### 94.7 红线 / 不变量
+
+| 红线 / 不变量 | M408 | M409 | M410 |
+|---|---|---|---|
+| #1 先醒再答 | ✓（audit-only） | ✓（audit-only） | ✓（audit-only） |
+| #2 神经不掌权 | ✓（audit-only; no decision） | ✓（audit-only; no decision） | ✓（audit-only; no decision） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（yaochi codes additive） | ✓（tianmen codes additive） | ✓（bind codes additive） |
+| 单提交口 | ✓ | ✓ | ✓ |
+| Kunlun 红线 #3 (sanctum 不能被系统占有) | **✓ pinned** by `humanAnchorRequired: true` derive + sealed-policy denies test | n/a | n/a |
+| Kunlun 红线 #5 (天门不绕过宿主授权) | n/a | n/a (high-stakes detection) | **✓ pinned** by `kunlun.tianmen.warrant-missing:high-stakes` audit emission marker + 5-test verifies no-warrant high-stakes path |
+| Cthulhu 红线 (10 cases) | unchanged | unchanged | unchanged |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 94.8 Phase γ 完成判据
+
+| 判据 | 状态 |
+|---|---|
+| YaochiSanctum access decision derive at L4 audit projection | ✓ M408 |
+| HeavenGate readiness derive at L4 audit projection | ✓ M409 |
+| L14 cross-protocol bind audit emission | ✓ M410 |
+| Red lines #3 / #5 typed-pinned | ✓ |
+| BAS + Qinao test suites green | ✓ |
+| 4 boundary checks clean | ✓ |
+| 8 new wire tests added | ✓ |
+
+### 94.9 Phase δ 后续 (chapter 九十五 — M412-M414)
+
+After this chapter ships:
+- M412 — `BASKunlunDoctrineRedLine` 8-case typed enum + lint test (parity with M389 BASAbyssalDoctrineRedLine)
+- M413 — Kunlun + Cthulhu composability snapshot tests (6 fixtures pinning byte-equal cross-doctrine emission shapes)
+- M414 — `KunlunDoctrineDemo.swift` sample-host pure demo (parity with `CthulhuDoctrineDemo.swift`)
+
+### 94.10 一句话总结
+
+**M408-M411 close 昆仑 doctrine Phase γ (chapter 九十四)**：M408 wire `BASYaochiSanctumEntry` derive + `BASKunlunYaochiProtocol.evaluateAccess` at L4 audit-projection seam emit `kunlun.yaochi.access:<class>:<decision>` + `.reasons:<sorted>` (红线 #3 sanctum 不能被系统占有 typed-pinned via humanAnchorRequired derive + sealed-policy denial test) + M409 wire `BASHeavenGatePermit` derive + `BASKunlunHeavenGateProtocol.evaluateReadiness` emit `kunlun.tianmen.gate:<domain>:<state>` + `.ready:<bool>` + `.reasons:<sorted>` (mapping verdict level → pass state) + M410 cross-protocol bind emit `kunlun.tianmen.warrant-bind:<id>` (when warrant present) | `kunlun.tianmen.warrant-missing:high-stakes` (when high-stakes gate has no warrant — red line #5 violation marker) + `kunlun.tianmen.axis-bound:session-<id>` (always emits; cross-link to M402 axis-keyed session for audit join) + 8 new audit-emission tests + 2 fix-pin updates to existing M402 test (segment whitelist expanded; code-count range raised). BAS 2406 → 2414 (+8) / Qinao 1361 unchanged / 全栈 3784 → 3792 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase γ done; Phase δ (red-lines + composability + demo) 待 chapter 九十五**.

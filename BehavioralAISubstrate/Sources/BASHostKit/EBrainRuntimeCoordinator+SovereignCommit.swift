@@ -445,7 +445,50 @@ extension BASEBrainRuntimeCoordinator {
         //     lineage-cut is recorded (Cthulhu 斩谱 cross-link).
         // Doctrine red line 6 (源流追踪不变成隐性监控) — every
         // emission is over typed schema; no raw payload leaked.
-        riverOriginLineage: BASKunlunRiverOriginProtocol.LineageReport? = nil
+        riverOriginLineage: BASKunlunRiverOriginProtocol.LineageReport? = nil,
+        // M408 — optional Yaochi sanctum access decision. Producer
+        // is `BASKunlunYaochiProtocol.evaluateAccess(...)` run over
+        // a per-turn `BASYaochiSanctumEntry`. Consumer emits:
+        //   `kunlun.yaochi.access:<class>:<decision>` — class is
+        //     the sanctum class raw value; decision is `granted`
+        //     when access permitted else `denied`.
+        //   `kunlun.yaochi.reasons:<sorted+joined>` — only when
+        //     denied; emits the per-reason kebab-case list
+        //     (`cooling-period-active` / `human-anchor-required` /
+        //     `sealed-policy` / `no-matched-conditions`).
+        // Doctrine §4.4 + 红线 #3 (sanctum 不能被系统占有) —
+        // audit-only emission, actual L8 gating is M413+ work.
+        yaochiAccess: BASKunlunYaochiProtocol.AccessDecision? = nil,
+        // M408 — class context for the access decision, used to
+        // disambiguate which sanctum class was being evaluated.
+        // Required when `yaochiAccess` is non-nil.
+        yaochiSanctumClass: BASYaochiSanctumClass? = nil,
+        // M409 — optional Heaven Gate readiness readout. Producer
+        // is `BASKunlunHeavenGateProtocol.evaluateReadiness(...)`
+        // run over a per-turn `BASHeavenGatePermit`. Consumer
+        // emits:
+        //   `kunlun.tianmen.gate:<domain>:<state>` — domain is the
+        //     gate class raw value; state is one of
+        //     `passed | denied | pending | remanded` per the
+        //     synthesized passState.
+        //   `kunlun.tianmen.ready:<bool>` — readiness verdict
+        //     surfaces directly so audit walkers don't have to
+        //     re-derive it.
+        //   `kunlun.tianmen.reasons:<sorted+joined>` — only when
+        //     readiness is false; emits per-reason kebab-case
+        //     list (`missing-action-permit` / `high-stakes-needs-
+        //     sovereign-warrant` / etc.).
+        // Doctrine §4.3 (七 transition gates) — audit-only at this
+        // milestone (M410 enriches the warrant via reason codes).
+        tianmenReadiness: BASKunlunHeavenGateProtocol.Readiness? = nil,
+        // M409 — class context for the gate, used to disambiguate
+        // which gate class the readiness applied to. Required
+        // when `tianmenReadiness` is non-nil.
+        tianmenGateClass: BASKunlunGateClass? = nil,
+        // M409 — pass state context for the gate (passed |
+        // denied | pending | remanded). Required when
+        // `tianmenReadiness` is non-nil.
+        tianmenPassState: BASKunlunGateState? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -720,6 +763,107 @@ extension BASEBrainRuntimeCoordinator {
             if lineage.hasLineageCut {
                 observationStatusCodes.append(
                     "kunlun.river.cut:true")
+            }
+        }
+        // M408 — Yaochi sanctum access audit emission. Doctrine
+        // §4.4 + 红线 #3 (sanctum 不能被系统占有). nil decision
+        // → all codes elided.
+        if let yaochi = yaochiAccess {
+            let className = yaochiSanctumClass?.rawValue
+                ?? "unknown"
+            let decision = yaochi.granted ? "granted" : "denied"
+            observationStatusCodes.append(
+                "kunlun.yaochi.access:\(className):\(decision)")
+            if !yaochi.granted && !yaochi.reasonCodes.isEmpty {
+                // Reason codes are already prefixed with
+                // `kunlun.yaochi.` by the protocol helper; here
+                // we strip that prefix to keep emission compact
+                // (consumer concatenates again at the
+                // `kunlun.yaochi.reasons:` outer key).
+                let stripped = yaochi.reasonCodes
+                    .map { code -> String in
+                        let prefix = "kunlun.yaochi."
+                        if code.hasPrefix(prefix) {
+                            return String(code.dropFirst(
+                                prefix.count))
+                        }
+                        return code
+                    }
+                let joined = stripped
+                    .sorted()
+                    .joined(separator: "+")
+                observationStatusCodes.append(
+                    "kunlun.yaochi.reasons:\(joined)")
+            }
+        }
+        // M409 — Heaven Gate (Tianmen) readiness audit emission.
+        // Doctrine §4.3 (七 transition gates) — emit gate domain
+        // + pass state + readiness flag + per-reason codes when
+        // not ready. nil readiness → all codes elided.
+        if let tianmen = tianmenReadiness {
+            let domain = tianmenGateClass?.rawValue
+                ?? "unknown"
+            let state = tianmenPassState?.rawValue
+                ?? "unknown"
+            observationStatusCodes.append(
+                "kunlun.tianmen.gate:\(domain):\(state)")
+            observationStatusCodes.append(
+                "kunlun.tianmen.ready:\(tianmen.isReady)")
+            if !tianmen.isReady && !tianmen.reasonCodes.isEmpty {
+                // Same prefix-stripping approach as Yaochi; helper
+                // emits already-prefixed `kunlun.gate.<reason>`
+                // codes.
+                let stripped = tianmen.reasonCodes
+                    .map { code -> String in
+                        let prefix = "kunlun.gate."
+                        if code.hasPrefix(prefix) {
+                            return String(code.dropFirst(
+                                prefix.count))
+                        }
+                        return code
+                    }
+                let joined = stripped
+                    .sorted()
+                    .joined(separator: "+")
+                observationStatusCodes.append(
+                    "kunlun.tianmen.reasons:\(joined)")
+            }
+            // M410 — L14 sovereign-warrant Tianmen integration.
+            // Doctrine 红线 #5 (天门不绕过宿主授权): the gate must
+            // refer to an existing sovereign warrant; it never
+            // replaces one. Emit typed cross-protocol bind codes
+            // so audit walkers can grep `kunlun.tianmen.bind:`
+            // to verify host authorization is upstream of every
+            // high-stakes gate.
+            //
+            // High-stakes gate classes (host / evolution /
+            // public) MUST have a warrant present; absence emits
+            // `kunlun.tianmen.warrant-missing:high-stakes` so the
+            // red line #5 violation is visible in the ledger.
+            if let gateClass = tianmenGateClass {
+                let highStakes: Set<BASKunlunGateClass> = [
+                    .host, .evolution, .public,
+                ]
+                let isHighStakes = highStakes.contains(gateClass)
+                let firstWarrantID =
+                    sovereignWarrants.first?.warrantID ?? ""
+                if isHighStakes && firstWarrantID.isEmpty {
+                    observationStatusCodes.append(
+                        "kunlun.tianmen.warrant-missing:high-stakes")
+                } else if !firstWarrantID.isEmpty {
+                    observationStatusCodes.append(
+                        "kunlun.tianmen.warrant-bind:" +
+                        "\(firstWarrantID)")
+                }
+                // Stable reference-only marker that the gate was
+                // evaluated against the active session axis. The
+                // axis-ID derive is host-side (sessionID-keyed),
+                // mirrored in the M402 emission's
+                // `kunlun.axis.center` row. Audit walkers can
+                // join the two by sessionID.
+                observationStatusCodes.append(
+                    "kunlun.tianmen.axis-bound:" +
+                    "session-\(runtimeTrace.sessionID)")
             }
         }
         // M318 — L9 abyssal-branch annotations. Empty array
