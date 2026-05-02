@@ -9860,3 +9860,134 @@ Chapter 八十四.6 列了 4 个 open opportunities (A/B/C/D)；chapter 八十�
 ### 89.9 一句话总结
 
 **M395-M397 close "拉高 benchmark 在跑测试" 用户指令** —— ship `QINAO_BENCH_REWRITE_BASELINE=1` env var + `--rewrite-baselines` script flag 让 sample-count uplift 不被 25% tolerance regression alarm 误识为 substrate regression（M395）+ 6/6 baselines uplifted（lifecycle/sha256/json-codec 5× / audit-ledger 10× / ed25519 5× / full-stack 5×）+ 6/6 round-trip verify within tolerance（M396）+ chapter 八十九 + bench evolution log entry + changelog 更新（M397）。p99 全 6 个 bench 降 11.8%-68.3% — **不是** substrate 优化（0 production code change），是 measurement quality 提升（rare tail outliers 不再主导 sparse data 的 percentile estimator）。新 baselines 在 25% tolerance 下 stable + meaningful。BAS 2337 / Qinao 1346 / 全栈 3683 不变 / 0 failures / 4/4 boundary 全绿 / 4 commits + push。仓库内 surgical scope 第七次确认 = 空 — 剩 EB-1/EB-2/EB-3 三项需外部资源不变。
+
+## 九十、 一次性 解决 不满意 — close chapter 八十九.5 unsatisfied items (M398-M400)
+
+### 90.1 触发动作
+
+用户 `一次性 解决 不满意` —— close chapter 八十九.5 列的 5 个 self-assessment unsatisfied items 在 one batch。Phase 1 audit:
+
+| Item | Status | Disposition |
+|---|---|---|
+| #1 M384/M385 "load-bearing" 是部分的（tool execution 不见 escalation） | **INVALID** | M392 已置 gate hooks 在 `applySovereignNeuralContract` (line 461) / `materializeToolIntent` (line 470) / `actionService.render` (line 433+) / `projectedRenderedOutput` (line 439) **之前**。M399 empirical run 进一步证明：runtime turn 实跑出 `permit.mode=.delay + stackedModes=[.draftOnly] + assertionCeiling=meta-only`，全是 post-escalation/post-cap 值。Self-assessment 当时是 misread。 |
+| #2 M386 actor wire opt-in / 0 caller | **REAL** | M399 closes via `--cthulhu-end-to-end-demo` (first in-repo caller of `ingestTicketsWithForbiddenGate`) |
+| #3 M393 demo pure-function not end-to-end | **REAL** | M399 closes (drives real `BASHostRuntime.startSession`, inspects post-runTurn audit signalRefs) |
+| #4 v5 regression gate is vocabulary lint not behavioral | **REAL** | M398 closes via 7 byte-equal behavioral snapshots |
+| #5 external bottlenecks (EB-1/EB-2/EB-3) | **EXTERNAL** | Genuinely external — can't fix in repo by definition. M400 manifesto v5 wording precision distinguishes "repo-scope landing" from "full real-world landing" |
+
+3 real items + 1 invalid + 1 external = M398/M399/M400 全 close。
+
+### 90.2 M398 — behavioral regression snapshot tests (closes #4)
+
+**实装**：[BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M398CthulhuBehavioralSnapshotTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M398CthulhuBehavioralSnapshotTests.swift) — 7 byte-equal JSON snapshots covering every wire's full output shape against fixed deterministic input.
+
+**关键设计 — 互补 M389 lint**：
+- M389 静态 lint 抓 audit-emission 词表 drift（`watcher.permit:` 等 forbidden tokens 漏出）
+- M398 行为 snapshot 抓 decision-result drift（escalation 表 flip / strictness ranking 重排 / gate 翻 refusal/allow / tie-break 重排）
+
+两件合起来 = v5 doctrine triple regression-gate leg 现在 cover substrate-vocabulary 层 + decision-result 层。
+
+**M386 gate 175-cell matrix snapshot**：5 sovereign states × 5 shadow-trial policies × 7 lifecycle actions 全枚举 + pin refusal counts (33 refusals / 132 clean / 10 with-reason-codes) 作为 structural fingerprint，避免直接序列化 175 cell JSON 太大但保 cell-flip detection。
+
+### 90.3 M399 — `--cthulhu-end-to-end-demo` (closes #2 + #3)
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/CthulhuEndToEndDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/CthulhuEndToEndDemo.swift) + main.swift `--cthulhu-end-to-end-demo` args 分支 + `runCthulhuEndToEndDemo()` async banner + [QinaoSampleHostCthulhuEndToEndDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostCthulhuEndToEndDemoTests.swift)（4 tests pin BAS substrate contracts demo composes）。
+
+**Empirical run 2026-05-02**:
+
+```
+━━━ Step 1/2 — runtime turn shape ━━━
+sessionID:               host.primary|task|quarantine
+auditID:                 audit.host.primary|task|quarantine.quarantine
+signalRefs count:        60
+permit.mode:             delay
+permit.stackedModes:     draft_only
+permit.assertionCeiling: meta-only
+permit.reasonCodes count: 26
+updateTickets count:     1
+
+━━━ Step 2/2 — per-wire audit-prefix presence ━━━
+✓ M303 abyssal pressure [abyssal.magnitude:]: abyssal.magnitude:0.228
+✓ M304 human anchor [humanAnchor.tone:]: humanAnchor.tone:steady
+✓ M304/M387 seal scope [seal.count:]: seal.count:2
+✓ M305 lifecycle [lifecycle.tickets:]: lifecycle.tickets:1
+✓ M316/M388 narrative [narrative.]: narrative.maxAxis:0.400, narrative.dominantAxis:forced-closure
+✓ M317 anomaly [anomaly.]: anomaly.types:forced-closure
+· M318 abyssal branch [abyssalBranch.]: (non-trivial path did not fire on this turn)
+✓ M320 unknown reserve [unknownReserve.]: unknownReserve.assertionCeiling:meta-only
+✓ M321 forbidden [forbidden.]: forbidden.count:2, forbidden.policy:standard
+
+━━━ Step 3/3 — M391 forbidden-gate production call ━━━
+first ticket: ticket.5247f173-...
+  state after gate: rejected (expected: rejected) ✓
+  refusal reason codes: lifecycle.gated:forbidden:sovereign-rejected
+
+━━━ Demo complete — Cthulhu wires ran through BASHostRuntime: ✓
+    forbidden-gate production caller invoked: ✓ ━━━
+```
+
+**关键 empirical findings**:
+1. **M384 fired in production** — `permit.mode = .delay`（不是 default `.answer`）+ `stackedModes = [.draftOnly]`（escalation 翻译表真翻译完毕）。这条不仅 reaches surface render，**reaches L11 wind-gate output** —— `permit.mode` 字段被 escalation 翻新了。
+2. **M385 fired in production** — `permit.assertionCeiling = "meta-only"`（capped from L11 default by active reserve 在 confidence floor < 0.4）— 反过来反证 M392 hook 顺序对（M385 cap 前 surface 没 sealed）。
+3. **M391 fired in production** — `submitWithForbiddenGate` 真被一个**非测试 caller** 调到，first ticket 真过 actor 的 `markRejected` state-machine 路径，typed reason code 真进 history。
+4. **8/9 wires emit audit codes** — 仅 M318 abyssal-branch 这一 turn 没 cross threshold（pressure aggregateMagnitude 0.228 < default branch threshold）。其他 8 wires 全 fire。
+
+### 90.4 M400 — stale comment cleanup + manifesto v5 wording precision
+
+**Stale comment fix**：`EBrainRuntimeCoordinator.swift` line 370-378 旧 comment 写"all upstream consumers (organ map, tool intent) ran above and saw the pre-escalation permit, which is doctrine-correct for this surgical scope (M384 closes 附录 K.2.1 — escalation metadata becomes audit-visible; gating wider runtime behavior is deferred to subsequent milestones if needed)"。M392 后该 comment **完全 stale** —— 顺序已变，consumers DO see post-escalation。M400 替换为 M392 + M399 doctrine cite。
+
+**Manifesto v5 precision**：原 wording 说 "Cthulhu doctrine v5 triple complete + Full production landing"，对外读起来像 doctrine 整个 close 了。M400 重写区分两层：
+- "Repository-scope production landing as of M391-M393" — 仓库内可 ship 的全 ship
+- "Full end-to-end verification as of M398-M399" — repo-scope 验证完整
+- "What's still external (not in repo scope)" — EB-1 / EB-2 / EB-3 explicitly listed as the genuine doctrine gap that can't be closed by writing more Swift
+
+读者不会再以为 "完整 doctrine" = "repo done"。
+
+### 90.5 测试基线
+
+| 套件 | 八十九章末 | 九十章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2337 | **2344** | +7（M398 snapshot tests） |
+| Qinao XCTest | 1346 | **1350** | +4（M399 demo tests） |
+| 全栈 | 3683 | **3694** | +11 |
+
+0 failures / 0 flakes / 4 boundary checks 全绿。
+
+### 90.6 红线 / 不变量回归矩阵
+
+| 红线 / 不变量 | M398 | M399 | M400 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（snapshot tests 仅断言 typed primitives output） | ✓（demo 仅 read post-runTurn observable） | ✓ |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（不动 audit emission） | ✓（read-only inspection） | ✓ |
+| 单提交口 | ✓ | ✓（`submitWithForbiddenGate` 走 actor 的 `markRejected` 主入口，非绕路） | ✓ |
+| 红线 7（watcher 只 hint） | n/a | ✓（demo 仅 emit observability，不 gate） | ✓ |
+| 红线 8（不绕人性锚点） | ✓（M398 step 2 pin 红线 8 lock 完整 reason codes） | ✓ | ✓ |
+| 红线 9（封印不伪删除） | ✓（M398 step 5 pin seal histogram） | ✓ | ✓ |
+| 红线 10（主品牌不默认恐怖） | ✓ | ✓（demo CLI banner 不动 SDK public surface） | ✓ |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 90.7 chapter 八十九.5 stale-claim 矫正完整表
+
+| 残项 | 八十九章末 | 九十章末 |
+|---|---|---|
+| #1 M384/M385 audit-visible only | ⚠️ self-claim | **INVALID** — M392 已置 hooks above all consumers; M399 empirical 反证 |
+| #2 M386 opt-in / 0 caller | ⚠️ real | **✓ M399** — `--cthulhu-end-to-end-demo` 是 first in-repo caller |
+| #3 M393 demo pure-function | ⚠️ real | **✓ M399** — drives real `BASHostRuntime.startSession` |
+| #4 v5 regression gate vocabulary lint | ⚠️ real | **✓ M398** — 7 byte-equal behavioral snapshots |
+| #5 EB-1/EB-2/EB-3 external | ⚠️ real | **EXTERNAL** — manifesto v5 wording 重写区分 repo-scope vs real-world |
+
+### 90.8 仓库 surgical scope 真实状态（九十章末）
+
+**全 close**。剩 3 项需外部资源（manifesto v5 现在 explicitly 列）：
+
+| 项 | 障碍 |
+|---|---|
+| L4 训练资产（EB-1） | GPU/TPU 算力 |
+| M295.1+ authoritative curriculum（EB-2） | domain experts 真签字 |
+| W1-W5 真世界（EB-3） | 真世界协调 |
+
+### 90.9 一句话总结
+
+**M398-M400 一次性 close chapter 八十九.5 自陈不满意 5 件**：phase-1 audit 反证 #1（M392 hooks 实在 organ/tool/render 之前；M399 empirical 真跑出 post-escalation `.delay+.draftOnly+meta-only` permit）+ M398 close #4（7 byte-equal behavioral snapshots 抓 decision-result drift / 互补 M389 vocabulary lint 抓 substrate-vocab drift）+ M399 close #2 + #3（`--cthulhu-end-to-end-demo` drives real `BASHostRuntime.startSession`；scans audit signalRefs for 9 wire prefixes; invokes `ingestTicketsWithForbiddenGate` as first in-repo M391 production caller; first ticket 真 `proposed → rejected` via actor `markRejected` 主入口 with typed gate reason code）+ M400 close #5 framing（manifesto v5 wording 重写区分 "repository-scope production landing" vs "full real-world landing gated on EB-1/EB-2/EB-3"）+ M400 stale comment cleanup（line 370-378 pre-M392 stale text 替换 M392 + M399 doctrine cite）。BAS 2337 → 2344 (+7) / Qinao 1346 → 1350 (+4) / 全栈 3683 → 3694 (+11) / 0 failures / 4/4 boundary 全绿 / 3 commits + push。**Cthulhu doctrine 现 truly load-bearing in production**: M384 escalation reaches L11 wind-gate `mode` field; M385 cap reaches surface render; M386 gate has real production caller; M398 byte-equal behavioral regression-gate; M399 end-to-end empirical pin. 仓库内 surgical scope 第八次确认 = 空 — 剩 EB-1/EB-2/EB-3 三项需真世界外部资源不变（manifesto v5 现在 explicit framing）。

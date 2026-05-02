@@ -200,17 +200,35 @@ pattern: typed-pin first, measurement second, regression gate third.
   that pins the substrate's audit-emission vocabulary clean against
   every red line. The doctrine itself was already authored
   (CTHULHU_SPEC_V1 + ABYSSAL_VINF predate v5), so the only
-  outstanding work was the v5 triple — now closed. **Full
-  production landing as of M391–M393** (chapter 八十八):
-  `BASForbiddenLifecycleGate` is now load-bearing in the
-  `BASUpdateTicketLifecycleCoordinator` actor path via three
+  outstanding work was the v5 triple — now closed in repository
+  scope. **Repository-scope production landing as of M391–M393**
+  (chapter 八十八): `BASForbiddenLifecycleGate` is now load-bearing
+  in the `BASUpdateTicketLifecycleCoordinator` actor path via three
   opt-in extension methods (`submitWithForbiddenGate` /
   `startTrialWithForbiddenGate` /
   `ingestTicketsWithForbiddenGate`); the M384/M385 escalation +
   cap hooks now run BEFORE `renderedOutput` projection so the
   rendered surface stays consistent with the persisted permit;
   and `QinaoSampleHost --cthulhu-doctrine-demo` exercises every
-  wire in a 7-step banner with all invariants pinned.
+  wire in a 7-step banner with all invariants pinned. **Full
+  end-to-end verification as of M398–M399** (chapter 九十):
+  `M398CthulhuBehavioralSnapshotTests` adds 7 byte-equal
+  behavioral snapshots (the regression-gate leg now covers
+  decision-result drift in addition to M389's
+  audit-vocabulary lint); `--cthulhu-end-to-end-demo` (M399)
+  drives a real `BASHostRuntime` session and inspects the
+  resulting `BASEBrainTurnResult` for evidence each wire ran in
+  production (empirical run 2026-05-02: 8/9 wires emit audit
+  codes, M384 escalates `.answer → .delay + [.draftOnly]`,
+  M385 caps assertion ceiling to `meta-only`, M391 forbidden
+  gate refuses the resulting ticket via `markRejected`).
+  **What's still external (not in repo scope):** L4 training
+  assets (EB-1: GPU/TPU compute), authoritative curriculum
+  (EB-2: domain-expert sign-off), and W1-W5 real-world
+  coordination (EB-3). These are the genuine doctrine gaps —
+  they can't be closed by writing more Swift. The
+  repository-scope claims above stop at substrate behaviour
+  + sample-host verification.
 
 ---
 

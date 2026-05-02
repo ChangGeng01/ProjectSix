@@ -367,15 +367,19 @@ public struct BASEBrainRuntimeCoordinator {
             thoughtFrame: thoughtFrame
         )
         let boundRiskCard = primaryBinding?.riskCard ?? riskCard
-        // M384 — boundActionPermit is rebound below by the abyssal
-        // permit escalation seam (after M303 pressure + M304 anchor
-        // derive). Mutable here so the escalation result becomes the
-        // canonical permit for audit emission and persistence; all
-        // upstream consumers (organ map, tool intent) ran above and
-        // saw the pre-escalation permit, which is doctrine-correct
-        // for this surgical scope (M384 closes附录 K.2.1 — escalation
-        // metadata becomes audit-visible; gating wider runtime
-        // behavior is deferred to subsequent milestones if needed).
+        // M392 — `boundActionPermit` is rebound by the Cthulhu
+        // doctrine gate block below (M303/M304/M384/M320/M385).
+        // The block runs BEFORE `applySovereignNeuralContract`,
+        // `materializeToolIntent`, `actionService.render`, and
+        // `projectedRenderedOutput`, so the escalation /
+        // assertion-ceiling cap is visible to every downstream
+        // consumer (not just audit emission). M399's
+        // `--cthulhu-end-to-end-demo` empirically verifies the
+        // post-gate permit reaches surface render (e.g. the demo
+        // run on 2026-05-02 produced `permit.mode = .delay,
+        // stackedModes = [.draftOnly], assertionCeiling =
+        // "meta-only"` after the gate fired, all reflected
+        // verbatim in `result.actionPermit`).
         var boundActionPermit = primaryBinding?.actionPermit ?? actionPermit
         normalizedRiskDecisionPackage = projectedRiskDecisionPackage(
             from: normalizedRiskDecisionPackage,
