@@ -9991,3 +9991,202 @@ first ticket: ticket.5247f173-...
 ### 90.9 一句话总结
 
 **M398-M400 一次性 close chapter 八十九.5 自陈不满意 5 件**：phase-1 audit 反证 #1（M392 hooks 实在 organ/tool/render 之前；M399 empirical 真跑出 post-escalation `.delay+.draftOnly+meta-only` permit）+ M398 close #4（7 byte-equal behavioral snapshots 抓 decision-result drift / 互补 M389 vocabulary lint 抓 substrate-vocab drift）+ M399 close #2 + #3（`--cthulhu-end-to-end-demo` drives real `BASHostRuntime.startSession`；scans audit signalRefs for 9 wire prefixes; invokes `ingestTicketsWithForbiddenGate` as first in-repo M391 production caller; first ticket 真 `proposed → rejected` via actor `markRejected` 主入口 with typed gate reason code）+ M400 close #5 framing（manifesto v5 wording 重写区分 "repository-scope production landing" vs "full real-world landing gated on EB-1/EB-2/EB-3"）+ M400 stale comment cleanup（line 370-378 pre-M392 stale text 替换 M392 + M399 doctrine cite）。BAS 2337 → 2344 (+7) / Qinao 1346 → 1350 (+4) / 全栈 3683 → 3694 (+11) / 0 failures / 4/4 boundary 全绿 / 3 commits + push。**Cthulhu doctrine 现 truly load-bearing in production**: M384 escalation reaches L11 wind-gate `mode` field; M385 cap reaches surface render; M386 gate has real production caller; M398 byte-equal behavioral regression-gate; M399 end-to-end empirical pin. 仓库内 surgical scope 第八次确认 = 空 — 剩 EB-1/EB-2/EB-3 三项需真世界外部资源不变（manifesto v5 现在 explicit framing）。
+
+## 九十一、 Deep test + deep review pass on M384-M400 surface (M398.1-M398.3 fixes)
+
+### 91.1 触发动作
+
+用户 `deep review + deep test` —— chapter 67 / chapter 八十一 风格 deep-review pass on the M384-M400 batch (17 commits / ~25 files since 附录 K start). Standard sequence: 3-run gate-off sweep + AFM gate-on + bench-suite regression + agent code review on top-N bug-prone files + human-grep verification + fix verified bugs + fix-pin tests + report + chapter.
+
+### 91.2 Sweep 结果
+
+| Sweep | BAS | Qinao | Failures | Notes |
+|---|---:|---:|---:|---|
+| Gate-off run 1 | 2344 | 1350 | 0 | clean |
+| Gate-off run 2 | 2344 | 1350 | 0 | clean — no flake |
+| Gate-off run 3 | 2344 | 1350 | 0 | clean — no flake |
+| AFM gate-on | (n/a) | 1350 | **38+1** | **environmental** — `ModelManagerError 1026` 系统 Apple Intelligence service 退化；非 M384-M400 引入；suite earlier in conversation passed when service healthy |
+| Bench vs M395 baselines | (n/a) | (n/a) | 0 | 5/5 within tolerance ✓ |
+
+3 次 gate-off 0 flake → substrate stable。AFM gate-on 38 个 failures 全部相同根因 (`ModelManagerError Code=1026` from local Apple Intelligence daemon refusing connections + 8-attempt CoreData XPC retry exhaustion)。同一 suite 在本对话早些时候是 green 的（chapter 八十六.7 / 八十七 / 八十八 self-claims）。Treat as transient environmental flake，不是 M384-M400 regression。
+
+Bench 5/5 baselines within tolerance ✓ — M395 baselines stable across multiple runs，substrate changes 没引入 perf regression。
+
+### 91.3 Agent review on top-9 bug-prone files
+
+针对 M384-M400 surface 的 9 个最 bug-prone files（按 LOC × concurrency × novel logic 排序）：
+
+1. `EBrainRuntimeCoordinator.swift` (M392 var rebind mid-flow)
+2. `BASUpdateTicketLifecycleForbiddenGate.swift` (M391 actor extension async)
+3. `BASAbyssalPermitEscalation.swift` (M384 translation table)
+4. `BASAssertionCeilingGate.swift` (M385 cross-vocab ranking)
+5. `BASForbiddenLifecycleGate.swift` (M386 switch-on-state)
+6. `BASSealEnvelope.swift` (M387 Aggregate field add)
+7. `EBrainRuntimeCoordinator+SovereignCommit.swift` (M387/M388 emission)
+8. `CthulhuEndToEndDemo.swift` (M399 real-runtime driver)
+9. `main.swift` (M395 rewrite path)
+
+Agent returned 10 findings (1 CRITICAL + 2 HIGH + 5 MEDIUM + 2 LOW)。
+
+### 91.4 Human-grep verification — 2 real bugs + 1 testable nit + 7 false positives
+
+| # | Severity | Verdict | Fix |
+|---|---|---|---|
+| 1 | CRITICAL | FALSE POSITIVE — `seen` set seeding `permit.mode` is design-correct (single-commit-mouth red line) | none |
+| 2 | HIGH | **REAL BUG** — `.retract` is the only exit from `.promoted`; refusing it strands promoted candidates when sovereign rejects retroactively | **M398.1 fix** |
+| 3 | HIGH | **REAL BUG** — `markRejected` throws `illegalTransition(from: .rejected, _)` on already-rejected; breaks re-presented turns + concurrent callers | **M398.2 fix** |
+| 4 | MEDIUM | FALSE POSITIVE — unrecognised permit string rank -1 is intentional safety semantics | none |
+| 5 | MEDIUM | FALSE POSITIVE — sovereign-held vs policy-none ordering effect identical for all realistic combos | none |
+| 6 | MEDIUM | FALSE POSITIVE — M392 hooks ARE before all consumers; M399 empirical run reproduces post-cap permit | none |
+| 7 | MEDIUM | FALSE POSITIVE — `Aggregate` consumed by field-read not encode | none |
+| 8 | MEDIUM | TESTABLE NIT — `>=` boundary documented but untested | **M398.3 fix-pin test** |
+| 9 | LOW | FALSE POSITIVE — null-path code is correct, style only | none |
+| 10 | LOW | FALSE POSITIVE/STYLE — silent rewrite-failure intentional separation of regression-alarm vs infrastructure-error | none |
+
+**78% false-positive rate** (chapter 67 baseline 76% / chapter 八十一 baseline 75%). Pattern stable across deep-reviews.
+
+### 91.5 M398.1 fix — `.retract` allowed when sovereign-rejected
+
+Pre-fix `BASForbiddenLifecycleGate.swift:100-101`:
+```swift
+case .registerCandidate, .startShadowTrial,
+    .finalizeTrial, .promote, .retract:    // <- bug
+    return BASForbiddenLifecycleGateDecision(
+        action: nil,
+        reasonCodes: ["lifecycle.gated:forbidden:sovereign-rejected"],
+        refused: true)
+```
+
+Post-fix:
+```swift
+case .withdraw, .fail, .retract:    // <- fix: .retract is terminal
+    return BASForbiddenLifecycleGateDecision(
+        action: action,
+        reasonCodes: [
+            "lifecycle.gated:forbidden:sovereign-rejected:terminal-action-allowed"
+        ],
+        refused: false)
+case .registerCandidate, .startShadowTrial,
+    .finalizeTrial, .promote:
+    return BASForbiddenLifecycleGateDecision(
+        action: nil,
+        reasonCodes: ["lifecycle.gated:forbidden:sovereign-rejected"],
+        refused: true)
+```
+
+**Doctrine cite**: `BASEvolutionLifecyclePolicy.validTransitions(from: .promoted) = [.retract: .retracted]` — `.retract` is the ONLY path out of `.promoted`. `.withdraw` does NOT work from `.promoted`. Refusing `.retract` when sovereign-rejected was a doctrine inconsistency: gate prevented the only available cleanup of a promoted candidate.
+
+**Tests** (3 changes):
+- New `testRejectedSovereignAllowsRetractAsTerminalExit` (fix-pin)
+- `testRejectedSovereignBlocksAdvanceActions` blocked list shrinks 5→4
+- `testRejectedSovereignAllowsTerminalActions` allowed list grows 2→3
+- M398 snapshot 175-cell matrix expected counts updated (refusals 33→28, pass-with-codes 10→15, clean unchanged at 132)
+
+### 91.6 M398.2 fix — M391 `markRejected` idempotent on already-rejected
+
+Pre-fix `BASUpdateTicketLifecycleForbiddenGate.swift:101-104`:
+```swift
+if decision.refused {
+    try await markRejected(
+        ticketID: ticket.ticketID,
+        reasonCodes: decision.reasonCodes)    // <- can throw
+    return .rejected
+}
+```
+
+The actor's `mutate(...)` throws `LifecycleError.illegalTransition` for any (from, to) not in `legalTransitions`. `.rejected` is terminal (`legalTransitions[.rejected] = [:]`), so any second `markRejected` on an already-rejected entry throws.
+
+**Realistic scenarios**:
+- Re-presented turn: same ticket re-submitted across two `submitWithForbiddenGate` calls
+- Concurrent gate callers: two callers paired with the same ticket via different paths
+
+Post-fix narrow catch:
+```swift
+do {
+    try await markRejected(
+        ticketID: ticket.ticketID,
+        reasonCodes: decision.reasonCodes)
+} catch let err as LifecycleError {
+    let alreadyRejected: Bool = {
+        if case let .illegalTransition(from, _) = err,
+           from == .rejected
+        {
+            return true
+        }
+        return false
+    }()
+    guard alreadyRejected else { throw err }
+    // already in `.rejected` — gate's goal achieved.
+}
+return .rejected
+```
+
+Other `illegalTransition` errors still propagate so callers see real bugs.
+
+**Tests**: 1 new fix-pin `testReRejectingAlreadyRejectedTicketIsIdempotent` asserts no throw + entry stays `.rejected` + exactly 1 rejection-transition in history (no duplicate audit trail).
+
+### 91.7 M398.3 fix — M384 trigger-floor boundary pin
+
+Not a bug — just missing test coverage. Pre-fix the docstring at line 158-160 explicitly says `>=` semantics, but no test pinned the exact boundary. Future `>=`→`>` refactor would silently change behavior.
+
+New `testTriggerFloorBoundarySemantics` pins:
+- `magnitude = 0.5999999` → `triggered = false`
+- `magnitude = 0.6` (== default floor) → `triggered = true`
+- `magnitude = 0.6000001` → `triggered = true`
+
+### 91.8 测试基线
+
+| 套件 | 九十章末 | 九十一章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2344 | **2347** | +3（M398.1 retract + M398.2 idempotent + M398.3 boundary） |
+| Qinao XCTest | 1350 | 1350 | 0 |
+| 全栈 | 3694 | **3697** | +3 |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿 / 5/5 bench within tolerance。AFM gate-on: 38+1 environmental failures all `Code 1026` (pre-existing, not M384-M400 regression).
+
+### 91.9 红线 / 不变量回归
+
+| 红线 / 不变量 | M398.1 | M398.2 | M398.3 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（gate doctrine fix preserves typed enforcement） | ✓（idempotent error absorption narrows scope） | ✓（test only） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（不动 audit emission） | ✓（仅 catch error path） | ✓ |
+| 单提交口 | ✓（actor `markRejected` 仍是 mutation 主入口） | ✓（catch narrows allowed errors not bypasses commit mouth） | ✓ |
+| 红线 7（watcher 只 hint） | n/a | n/a | n/a |
+| 红线 8（不绕人性锚点） | n/a | n/a | n/a |
+| 红线 9（封印不伪删除） | n/a | n/a | n/a |
+| 红线 10（主品牌不默认恐怖） | ✓ | ✓ | ✓ |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 91.10 chapter 九十.7 stale-claim 矫正完整表
+
+| 残项 | 九十章末 | 九十一章末 |
+|---|---|---|
+| #1 M384/M385 audit-visible only | INVALID（M392 + M399 empirical 反证） | INVALID（不变） |
+| #2 M386 opt-in / 0 caller | ✓ M399 closed | ✓（不变） |
+| #3 M393 demo pure-function | ✓ M399 closed | ✓（不变） |
+| #4 v5 regression gate vocabulary lint | ✓ M398 closed | ✓（不变） |
+| #5 EB-1/EB-2/EB-3 external | EXTERNAL | EXTERNAL（不变） |
+| **NEW M386 `.retract` doctrine bug** | undetected | **✓ M398.1 fixed** |
+| **NEW M391 `markRejected` non-idempotent** | undetected | **✓ M398.2 fixed** |
+| **NEW M384 trigger-floor untested** | undetected | **✓ M398.3 pinned** |
+| **AFM environmental fragility** | not surfaced | **✓ surfaced** — 38+1 failures all `Code 1026`，pre-existing；offline-fallback test could harden defensive try/catch（separate scope） |
+
+### 91.11 仓库 surgical scope 真实状态（九十一章末）
+
+**全 close**。剩 3 项需外部资源（manifesto v5 现 explicit）：
+
+| 项 | 障碍 |
+|---|---|
+| L4 训练资产（EB-1） | GPU/TPU 算力 |
+| M295.1+ authoritative curriculum（EB-2） | domain experts 真签字 |
+| W1-W5 真世界（EB-3） | 真世界协调 |
+
+**Pre-existing fragilities** flagged but not in M384-M400 scope:
+- `testFactoryWithFallbackProducesUsableEndpointOffline` defensive try/catch around AFM probe
+- AFM service degradation handling (system-level Apple Intelligence dependency)
+
+### 91.12 一句话总结
+
+**M398.1+M398.2+M398.3 close 3 deep-review findings on M384-M400 surface**：3-run gate-off sweep 0 flake + AFM gate-on 38+1 failures all `ModelManagerError Code=1026` 环境问题不是 regression + bench 5/5 within tolerance + agent review on top-9 bug-prone files yielded 10 findings, human-grep verified: 2 real bugs + 1 testable nit + 7 false positives (78% false-positive rate vs chapter 67 baseline 76%) + M398.1 fixes M386 `.retract` doctrine bug（`.retract` 是 `.promoted` 的唯一 exit；pre-fix gate refused 它阻止 sovereign-rejected 后清理路径）+ M398.2 fixes M391 `markRejected` 非幂等（pre-fix re-presented turn / concurrent callers throws `illegalTransition(from: .rejected, _)`，narrowly catch + treat as idempotent）+ M398.3 pin M384 `>=` 边界（`magnitude == triggerFloor → triggers`）+ deep-review report at `docs/QINAO_M384_TO_M400_DEEP_REVIEW_2026-05-02.md`。BAS 2344 → 2347 (+3 fix-pin tests) / Qinao 1350 / 全栈 3694 → 3697 (+3) / 0 failures (gate-off) / 4/4 boundary 全绿 / 1 commit + push + chapter docs commit。仓库内 surgical scope 第九次确认 = 空 — 剩 EB-1/EB-2/EB-3 三项需真世界外部资源 + AFM service degradation 是 platform-level dependency 非 substrate 问题。
