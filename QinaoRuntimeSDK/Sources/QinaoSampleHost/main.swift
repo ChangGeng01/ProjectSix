@@ -5047,7 +5047,18 @@ struct QinaoSampleHost {
                               "QINAO_BENCH_REWRITE_BASELINE=1 — " +
                               "refreshed baseline at \(baselineURL.path)")
                     } catch {
-                        print("  [baseline] failed to refresh: \(error)")
+                        // Chapter 九十一.5 honesty correction:
+                        // baseline-write failures go to stderr
+                        // (not stdout) so CI / wrapper scripts
+                        // can grep them as a signal even when
+                        // the regression-alarm verdict is
+                        // unchanged. The function still returns
+                        // true (preserving regression-alarm vs
+                        // infrastructure-error separation) but
+                        // the failure is loud.
+                        let msg = "  [baseline] failed to refresh: \(error)\n"
+                        FileHandle.standardError.write(
+                            Data(msg.utf8))
                     }
                 }
                 return true
@@ -5085,7 +5096,16 @@ struct QinaoSampleHost {
                               "overwrote prior baseline at \(baselineURL.path)")
                         return true
                     } catch {
-                        print("\n  [baseline] failed to rewrite: \(error)")
+                        // Chapter 九十一.5 honesty correction:
+                        // baseline-rewrite failures go to stderr
+                        // (see same fix in the withinTolerance
+                        // path above). The exit(3) below still
+                        // fires so the regression-alarm semantics
+                        // are preserved — but the user sees the
+                        // rewrite-failure separately.
+                        let msg = "\n  [baseline] failed to rewrite: \(error)\n"
+                        FileHandle.standardError.write(
+                            Data(msg.utf8))
                     }
                 }
                 exit(3)
@@ -5112,7 +5132,13 @@ struct QinaoSampleHost {
                                 to: baselineURL)
                         print("\n  [baseline] no prior baseline; wrote fresh one to \(baselineURL.path)")
                     } catch {
-                        print("\n  [baseline] failed to write fresh baseline: \(error)")
+                        // Chapter 九十一.5 honesty correction:
+                        // baseline-write failures go to stderr
+                        // (see same fix in the regression /
+                        // withinTolerance paths above).
+                        let msg = "\n  [baseline] failed to write fresh baseline: \(error)\n"
+                        FileHandle.standardError.write(
+                            Data(msg.utf8))
                     }
                 } else {
                     print("\n  [baseline] no prior baseline (set QINAO_BENCH_WRITE_MISSING_BASELINE=1 to create)")

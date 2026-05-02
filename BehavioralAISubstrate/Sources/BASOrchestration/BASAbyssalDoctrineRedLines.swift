@@ -144,9 +144,26 @@ public enum BASAbyssalDoctrineRedLine:
             // would only appear if this red line were broken.
             return ["qinao.horror", "qinao.cthulhu-default"]
         case .watcherHintsNeverDecides:
-            // A watcher schema MUST NOT emit a `permit.*` or
-            // `verdict.*` reason code (that is the gate's job).
-            return ["watcher.permit:", "watcher.verdict:"]
+            // A watcher schema MUST NOT emit a permit or verdict
+            // assertion. Watcher prefixes (`narrative.*` / `anomaly.*`
+            // / `abyssalBranch.*`) emit only observation metadata —
+            // never `<watcher>.permit:<mode>` or `<watcher>.verdict:
+            // <level>` style codes which would be the gate's job.
+            //
+            // Chapter 九十一.5 honesty correction: pre-correction the
+            // patterns were `["watcher.permit:", "watcher.verdict:"]`
+            // — the literal prefix `watcher.` does not appear in any
+            // substrate emission, so the lint passed vacuously. The
+            // patterns now match the dot-permit-colon / dot-verdict-
+            // colon shape that would only appear if a watcher prefix
+            // emitted permit/verdict info as a sub-key (e.g.
+            // `narrative.permit:answer` would be RL7-violating). The
+            // M384 `permit.escalated:abyssal:*` codes start with
+            // `permit.` (no leading dot before `permit`) so they do
+            // NOT match — the patterns are sharp enough to catch RL7
+            // violations without false-positiving on gating-emitter
+            // codes.
+            return [".permit:", ".verdict:"]
         case .humanAnchorOverridesPressure:
             // No emission may claim that pressure overrode the
             // anchor. The actual emission is the inverse —

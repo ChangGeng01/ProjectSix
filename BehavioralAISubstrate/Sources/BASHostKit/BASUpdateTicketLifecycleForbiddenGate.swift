@@ -99,35 +99,14 @@ public extension BASUpdateTicketLifecycleCoordinator {
         }
 
         if decision.refused {
-            // Chapter 九十一 deep-review fix #3: absorb
-            // `illegalTransition` from `markRejected` when the
-            // entry is already in `.rejected` (e.g. a concurrent
-            // caller transitioned it before us, or the existing
-            // entry from a re-presented turn was already
-            // rejected on a prior pass). Any-state →
-            // `.rejected` is legal *except* from `.rejected`
-            // itself; treating that single illegal-transition
-            // case as idempotent matches the gate's intent
-            // ("end up rejected") without double-rejecting.
-            // Other illegal-transition errors (terminal states
-            // .distilled / theoretical edge cases) still
-            // propagate so callers see real bugs.
-            do {
-                try await markRejected(
-                    ticketID: ticket.ticketID,
-                    reasonCodes: decision.reasonCodes)
-            } catch let err as LifecycleError {
-                let alreadyRejected: Bool = {
-                    if case let .illegalTransition(from, _) = err,
-                       from == .rejected
-                    {
-                        return true
-                    }
-                    return false
-                }()
-                guard alreadyRejected else { throw err }
-                // already in `.rejected` — gate's goal achieved.
-            }
+            // Chapter 九十一 deep-review fix #3 + chapter
+            // 九十一.5 honesty correction: absorb the single
+            // already-rejected case via the shared helper so
+            // both `submitWithForbiddenGate` and
+            // `startTrialWithForbiddenGate` reject idempotently.
+            try await idempotentMarkRejected(
+                ticketID: ticket.ticketID,
+                reasonCodes: decision.reasonCodes)
             return .rejected
         }
         return .proposed
@@ -153,7 +132,14 @@ public extension BASUpdateTicketLifecycleCoordinator {
         if decision.refused {
             var codes = decision.reasonCodes
             codes.append("trial-record-ref:\(trialRecordRef)")
-            try await markRejected(
+            // Chapter 九十一.5 honesty correction: same
+            // idempotent guard as `submitWithForbiddenGate`.
+            // Pre-correction `markRejected` here threw
+            // `illegalTransition(from: .rejected, _)` when the
+            // ticket had already been rejected (concurrent
+            // caller / re-presented turn). The shared helper
+            // absorbs that single case.
+            try await idempotentMarkRejected(
                 ticketID: ticketID,
                 reasonCodes: codes)
             return
@@ -161,6 +147,38 @@ public extension BASUpdateTicketLifecycleCoordinator {
         try await startTrial(
             ticketID: ticketID,
             trialRecordRef: trialRecordRef)
+    }
+
+    /// **Chapter 九十一.5 helper** — apply `markRejected` and
+    /// absorb the single idempotent-already-rejected error case.
+    /// Other illegal-transition errors (terminal `.distilled`
+    /// etc.) still propagate so callers see real bugs.
+    ///
+    /// Doctrine: any-state → `.rejected` is legal *except* from
+    /// `.rejected` itself; treating that single transition as
+    /// idempotent matches the gate's intent ("end up rejected")
+    /// without double-rejecting or surfacing a stale-state error
+    /// to the host.
+    private func idempotentMarkRejected(
+        ticketID: String,
+        reasonCodes: [String]
+    ) async throws {
+        do {
+            try await markRejected(
+                ticketID: ticketID,
+                reasonCodes: reasonCodes)
+        } catch let err as LifecycleError {
+            let alreadyRejected: Bool = {
+                if case let .illegalTransition(from, _) = err,
+                   from == .rejected
+                {
+                    return true
+                }
+                return false
+            }()
+            guard alreadyRejected else { throw err }
+            // already in `.rejected` — gate's goal achieved.
+        }
     }
 
     /// **M391** — forbidden-gate-aware variant of

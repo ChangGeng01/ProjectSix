@@ -164,6 +164,46 @@ final class M391ForbiddenGateLifecycleIntegrationTests: XCTestCase {
         XCTAssertEqual(entry?.state, .trialing)
     }
 
+    // MARK: - 5b. Chapter 九十一.5 fix-pin — startTrial idempotent
+    //          on already-rejected
+
+    /// Pin chapter 九十一.5 honesty correction:
+    /// `startTrialWithForbiddenGate` shares the idempotent-
+    /// reject contract with `submitWithForbiddenGate`. When a
+    /// ticket is already rejected and the gate refuses
+    /// `.startShadowTrial`, calling `startTrialWithForbiddenGate`
+    /// must NOT throw `illegalTransition(from: .rejected, _)`.
+    /// Pre-correction this threw.
+    func testStartTrialWithForbiddenGateIsIdempotentOnAlreadyRejected()
+    async throws {
+        let coord = makeCoordinator()
+        // Get the ticket into .rejected via the submit path.
+        let firstState = try await coord.submitWithForbiddenGate(
+            ticket(),
+            forbidden: candidate(reviewState: .rejected))
+        XCTAssertEqual(firstState, .rejected)
+        // Now call startTrialWithForbiddenGate against the SAME
+        // ticket with a held-sovereign candidate (gate refuses
+        // .startShadowTrial). Pre-correction this threw because
+        // the underlying markRejected hits already-rejected.
+        try await coord.startTrialWithForbiddenGate(
+            ticketID: "tk-1",
+            trialRecordRef: "trial-x",
+            forbidden: candidate(reviewState: .held))
+        // Entry stays .rejected; trial-record-ref code is NOT
+        // appended a second time because the underlying
+        // markRejected was idempotent (no new history
+        // transition).
+        let entry = await coord.entry(ticketID: "tk-1")
+        XCTAssertEqual(entry?.state, .rejected)
+        let rejectionTransitions = entry?.history
+            .filter { $0.to == .rejected }
+            .count ?? 0
+        XCTAssertEqual(
+            rejectionTransitions, 1,
+            "idempotent rejection must not duplicate history")
+    }
+
     // MARK: - 6. Held sovereign refuses startTrial
 
     func testStartTrialWithHeldSovereignRejects() async throws {
