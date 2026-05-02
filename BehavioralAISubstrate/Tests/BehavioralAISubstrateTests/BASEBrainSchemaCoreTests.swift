@@ -3271,7 +3271,21 @@ struct BASEBrainSchemaCoreTests {
 
             let package = try! #require(result.riskDecisionPackage)
             #expect(result.actionPermit.mode == scenario.package.actionPermit.mode)
-            #expect(result.actionPermit.stackedModes == scenario.package.actionPermit.stackedModes)
+            // M406 — Kunlun axis-deviation escalation is additive
+            // (`.compare` may be appended to stackedModes when the
+            // turn's axis-alignment requires a gate). The L11
+            // contract is "every L11-decided mode flows through to
+            // the result" — express that as subset containment so
+            // that M406's additive doctrine and any future additive
+            // escalation wires don't break the regression test.
+            // The pre-escalation snapshot is still strictly equal
+            // to the L11 lattice via `riskBindings.first.stackedModes`
+            // below (line +5).
+            for expectedMode in scenario.package.actionPermit.stackedModes {
+                #expect(
+                    result.actionPermit.stackedModes.contains(expectedMode),
+                    "L11 stackedMode \(expectedMode) must flow through to result")
+            }
             #expect(result.renderedOutput.mode == scenario.package.actionPermit.mode)
             #expect(result.thoughtFrame.riskDecisionPackage?.actionPermit.mode == scenario.package.actionPermit.mode)
             #expect(package.actionModeDecision.primaryMode == scenario.package.actionModeDecision.primaryMode)

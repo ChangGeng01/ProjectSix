@@ -443,6 +443,73 @@ public struct BASEBrainRuntimeCoordinator {
                 permit: boundActionPermit,
                 reserve: unknownReserveForGate)
         boundActionPermit = assertionCeilingDecisionForGate.permit
+        // M406 — Kunlun axis-alignment escalation. Run AFTER the
+        // M384 abyssal escalation + M385 assertion-ceiling cap so
+        // axis deviations compose with Cthulhu pressure on the
+        // same `boundActionPermit`. Doctrine: when both fire on
+        // the same turn, both reason codes accumulate; mode
+        // (single commit mouth) stays at L11.
+        //
+        // The "for-gate" alignment derive mirrors the audit-side
+        // derive in the audit-projection seam below (line ~960).
+        // Same inputs (host context + risk level + permit mode +
+        // candidate count) → same output by construction. The
+        // separation of locals follows the M392 pattern: upstream
+        // values feed the gate; downstream values feed audit
+        // emission.
+        let kunlunAxisForGate = BASKunlunAxis(
+            axisID: "axis-\(derivedSessionID)",
+            hostRef: hostContext.hostID,
+            sovereignRef: "sovereign-\(derivedSessionID)",
+            worldAnchorRef:
+                "world-anchor-\(derivedSessionID)",
+            activeLayerRefs: [
+                "L1", "L2", "L3", "L4", "L5", "L6",
+                "L7", "L8", "L9", "L10", "L11", "L12",
+                "L13", "L14",
+            ],
+            agentSeatRefs: [],
+            centerlineRules: [
+                "respects-host-boundary",
+                "honors-world-anchor",
+                "permit-mode-\(boundActionPermit.mode.rawValue)",
+            ],
+            deviationThreshold: 0.7,
+            lastAlignmentCheck: "")
+        let kunlunMatchedForGate: Int = {
+            switch boundRiskCard.riskLevel {
+            case .low: return 3
+            case .medium: return 2
+            case .high: return 1
+            case .extreme: return 0
+            }
+        }()
+        let kunlunDeviationCodesForGate: [String] = {
+            switch boundRiskCard.riskLevel {
+            case .low: return []
+            case .medium: return ["risk-medium-needs-attention"]
+            case .high: return ["risk-high-narrows-axis"]
+            case .extreme: return [
+                "risk-extreme-axis-overreach",
+            ]
+            }
+        }()
+        let kunlunAxisAlignmentForGate = BASKunlunAxisProtocol
+            .computeAlignment(
+                alignmentID:
+                    "axis-align-\(derivedSessionID)",
+                axis: kunlunAxisForGate,
+                targetRef: thoughtFrame.candidates.first?
+                    .candidateID ?? "no-candidate",
+                matchedRules: kunlunMatchedForGate,
+                deviationCodes: kunlunDeviationCodesForGate,
+                correctionHint: "")
+        let kunlunEscalation = BASKunlunPermitEscalation
+            .escalate(
+                permit: boundActionPermit,
+                alignment: kunlunAxisAlignmentForGate,
+                humanAnchor: humanAnchorSignalForGate)
+        boundActionPermit = kunlunEscalation.permit
         thoughtFrame.actionPermit = boundActionPermit
         // M56 — L11 risk climate now surfaces per-dimension
         // observations on the main-chain thought frame. Reuses M53's
@@ -916,6 +983,95 @@ public struct BASEBrainRuntimeCoordinator {
                 matchedRules: kunlunMatched,
                 deviationCodes: kunlunDeviationCodes,
                 correctionHint: "")
+        // M404 — Jade Canon seal verification audit projection.
+        // Doctrine §4.2: 无来源不成玉 / 无签名不进门 / 无回放不
+        // 升格 / 无撤销路径不得长期生效. Synthesize a per-turn
+        // seal for the bound action permit (always class
+        // `.actionPermit` since the permit IS the high-integrity
+        // object being sealed at L11). Source provenance comes
+        // from the verdict + sovereign warrants; signature ref
+        // from verdict ID; integrity hash from thoughtFold
+        // checksum; revocation path from session-keyed rollback
+        // anchor ref. Audit-only emission — actual seal-driven
+        // gating is M413+ composability work (chapter 九十五).
+        let kunlunJadeSealForAudit = BASJadeCanonSeal(
+            sealID: "jade-permit-\(runtimeTrace.sessionID)",
+            targetRef:
+                "permit-\(boundActionPermit.mode.rawValue)",
+            objectClass: .actionPermit,
+            targetSchemaVersion:
+                BASActionPermit.currentSchemaVersion,
+            provenanceRefs: {
+                var refs: [String] = []
+                refs.append(
+                    "verdict-\(sovereignVerdict.verdictID)")
+                refs.append(contentsOf:
+                    sovereignWarrants.map(\.warrantID))
+                if !thoughtFold.foldID.isEmpty {
+                    refs.append("fold-\(thoughtFold.foldID)")
+                }
+                return refs
+            }(),
+            integrityHash: thoughtFold.checksum,
+            signatureRef: sovereignVerdict.verdictID,
+            replayRequired: boundActionPermit.requireMirror
+                || boundActionPermit.requireCompare
+                || boundActionPermit.requireSecondCheck,
+            revocationPath:
+                "rollback-\(runtimeTrace.sessionID)",
+            sourceRiverRef:
+                "river-\(runtimeTrace.sessionID)")
+        let kunlunJadeVerificationForAudit =
+            BASKunlunJadeCanonProtocol.verifySeal(
+                kunlunJadeSealForAudit)
+        // M405 — River-Origin lineage audit projection. Doctrine
+        // §4.5: 没有源流就没有可信成长. Synthesize a per-turn
+        // trace from existing turn metadata: roots from session
+        // ref + verdict ref; tributaries from candidate IDs;
+        // derived objects from the bound permit + warrants;
+        // transformations from the pipeline stages we observably
+        // ran; consents from quarantine + warrant witnesses;
+        // permits from the bound permit; audit refs from the
+        // about-to-be-emitted audit entry's stable prefix.
+        // Audit-only emission — analyze produces orphan / cascade
+        // warnings that surface in signalRefs.
+        let kunlunRiverTraceForAudit = BASRiverOriginTrace(
+            traceID: "river-\(runtimeTrace.sessionID)",
+            rootSourceRefs: [
+                "session-\(runtimeTrace.sessionID)",
+                "verdict-\(sovereignVerdict.verdictID)",
+            ],
+            tributaryRefs: thoughtFrame.candidates
+                .map(\.candidateID),
+            derivedObjectRefs: {
+                var refs: [String] = []
+                refs.append(
+                    "permit-\(boundActionPermit.mode.rawValue)")
+                refs.append(contentsOf:
+                    sovereignWarrants.map(\.warrantID))
+                return refs
+            }(),
+            transformationSteps: [
+                "risk.bind",
+                "permit.synthesize",
+                "neural.materialize",
+                "tribunal.merge",
+                "audit.emit",
+            ],
+            consentRefs: quarantineRecords
+                .map(\.quarantineID),
+            permitRefs: [
+                "permit-\(boundActionPermit.mode.rawValue)",
+            ],
+            auditRefs: [
+                "audit.\(runtimeTrace.sessionID)." +
+                "\(sovereignVerdict.verdictLevel.rawValue)",
+            ],
+            deletionDependents: [],
+            lineageCutRefs: [])
+        let kunlunRiverLineageForAudit =
+            BASKunlunRiverOriginProtocol.analyze(
+                kunlunRiverTraceForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -966,9 +1122,19 @@ public struct BASEBrainRuntimeCoordinator {
             // M402 — feed Kunlun axis-alignment projection so
             // kunlun.axis.center / kunlun.axis.deviation /
             // kunlun.axis.requires-gate codes land in audit
-            // signalRefs. Audit-only at this milestone (M406
-            // wires permit hook).
-            kunlunAxisAlignment: kunlunAxisAlignmentForAudit
+            // signalRefs.
+            kunlunAxisAlignment: kunlunAxisAlignmentForAudit,
+            // M404 — feed Jade Canon seal verification readout so
+            // kunlun.jade.seal:<class>:<status> +
+            // kunlun.jade.missing:<count> codes land in audit
+            // signalRefs. Doctrine §4.2 (玉律不能成黑箱).
+            jadeCanonVerification: kunlunJadeVerificationForAudit,
+            jadeCanonObjectClass: .actionPermit,
+            // M405 — feed River-Origin lineage analysis so
+            // kunlun.river.lineage / .upward / .downward /
+            // .warnings codes land in audit signalRefs. Doctrine
+            // §4.5 (没有源流就没有可信成长).
+            riverOriginLineage: kunlunRiverLineageForAudit
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

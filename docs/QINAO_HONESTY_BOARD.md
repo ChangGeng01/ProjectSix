@@ -10909,3 +10909,161 @@ After this chapter ships:
 ### 92.9 一句话总结
 
 **M401-M403 close 昆仑 doctrine Phase α (chapter 九十二)**：M401 ship `BASKunlunProtocol.swift` 6 typed schemas (KunlunAxis / AxisAlignment / JadeCanonSeal / HeavenGatePermit / YaochiSanctumEntry / RiverOriginTrace per whitepaper §4.1-§4.5) + 4 helper enums + 5 protocol-helper namespaces (computeAlignment / verifySeal / evaluateReadiness / evaluateAccess / analyze) all pure-function + co-locates with BASAbyssalProtocol parallel doctrine pair + 37 schema-parity tests + M402 wire L4 audit-projection seam to derive `BASKunlunAxis` + `BASAxisAlignment` from sessionID/host/permit/risk-level inputs and emit 1-3 `kunlun.axis.*` audit signalRefs codes + 6 audit tests + M403 sample-host `--kunlun-schema-demo` schema-introspection banner + 3 substrate-pin tests. Audit-only emission at this milestone (M406 wires permit hook in chapter 九十三). BAS 2348 → 2391 (+43) / Qinao 1358 → 1361 (+3) / 全栈 3706 → 3752 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase α done; Phase β (JadeCanon + RiverOrigin) 待 chapter 九十三**.
+
+---
+
+## 九十三、 Kunlun Phase β — JadeCanon + RiverOrigin + L11 axis escalation（M404-M407 / 2026-05-03）
+
+### 93.1 触发与起点
+
+继 chapter 九十二 ship Phase α (M401 schemas + M402 audit-only axis derive + M403 sample-host introspection demo)，本章节按 plan 附录 L §L.4 (Phase β) 推进 4 milestones：M404 JadeCanon 验签 wire / M405 RiverOrigin 源流 wire / M406 L11 permit-synthesis 轴向逃生闸 / M407 wrap doc。
+
+**起点状态**（chapter 九十二 末）:
+- 6 typed schemas + 5 pure-function helpers shipped at BASOrchestration/BASKunlunProtocol.swift
+- L4 audit-projection seam emits `kunlun.axis.center / .deviation / .requires-gate` (1-3 codes per turn)
+- M406 explicitly deferred to this chapter
+- BAS 2391 / Qinao 1361 / 全栈 3752 / 0 failures / 4/4 boundary green
+
+### 93.2 M404 — JadeCanon seal verification wire
+
+**修改** [EBrainRuntimeCoordinator.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift):
+- New `kunlunJadeSealForAudit` derive at audit-projection seam (after `kunlunAxisAlignmentForAudit`)
+- Synthesizes `BASJadeCanonSeal` for `boundActionPermit` (always `objectClass: .actionPermit` since the L11 permit IS the sealed object at audit time)
+- `provenanceRefs`: verdict ID + warrant IDs + foldID
+- `integrityHash`: `thoughtFold.checksum`
+- `signatureRef`: `sovereignVerdict.verdictID`
+- `replayRequired`: true when `requireMirror || requireCompare || requireSecondCheck`
+- `revocationPath`: `rollback-<sessionID>` (session-keyed reference)
+- Calls `BASKunlunJadeCanonProtocol.verifySeal(...)` to get `Verification` (isCanonical + missingRequirements list)
+- Passes verification + class to `buildSovereignAuditEntry` via 2 new optional params
+
+**修改** [EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift):
+- New optional params: `jadeCanonVerification: BASKunlunJadeCanonProtocol.Verification? = nil` + `jadeCanonObjectClass: BASJadeCanonObjectClass? = nil`
+- Audit emission: when non-nil, append:
+  - `kunlun.jade.seal:<class>:<status>` (class is canonical class raw value e.g. `action-permit`; status is `canonical` | `defective`)
+  - `kunlun.jade.missing:<count>` (only when defective)
+  - `kunlun.jade.defects:<sorted+joined>` (only when defective; emits per-defect sorted reason codes)
+
+**Doctrine pin**: 红线 #4 (玉律不能成黑箱) — every defect surfaces as typed reason code. Audit-only emission; no permit mutation, no verdict escalation at this milestone.
+
+### 93.3 M405 — RiverOrigin trace integrity wire
+
+**修改** [EBrainRuntimeCoordinator.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift):
+- New `kunlunRiverTraceForAudit` derive after `kunlunJadeSealForAudit`
+- Synthesizes `BASRiverOriginTrace` with `traceID: river-<sessionID>`, root sources from session + verdict, tributaries from candidate IDs, derived objects from permit + warrants, transformations from 5 typed pipeline stages (risk.bind / permit.synthesize / neural.materialize / tribunal.merge / audit.emit), consents from quarantines, permits + audit ref from current turn
+- Calls `BASKunlunRiverOriginProtocol.analyze(...)` to get `LineageReport` (isWellFormed + upward/downward counts + warnings + lineage-cut flag)
+- Passes report to `buildSovereignAuditEntry` via new optional param
+
+**修改** [EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift):
+- New optional param: `riverOriginLineage: BASKunlunRiverOriginProtocol.LineageReport? = nil`
+- Audit emission: when non-nil, append:
+  - `kunlun.river.lineage:<status>` (`wellformed` | `partial`)
+  - `kunlun.river.upward:N`
+  - `kunlun.river.downward:N`
+  - `kunlun.river.warnings:<sorted+joined>` (only when warnings non-empty)
+  - `kunlun.river.cut:true` (only when at least one lineage-cut recorded)
+
+**Doctrine pin**: §4.5 line 612 (没有源流就没有可信成长) + 红线 #6 (源流追踪不变成隐性监控) — every emission is over typed schema; no raw payload leaked.
+
+### 93.4 M406 — L11 permit-synthesis hook for axis-aware gating
+
+**新建** [BASKunlunPermitEscalation.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASKunlunPermitEscalation.swift)（~200 LOC）:
+- New `BASKunlunPermitEscalationDecision` value type carrying escalated permit + reasonCodes + suppressedByHumanAnchor + triggered flags
+- New `BASKunlunPermitEscalation.escalate(permit:alignment:humanAnchor:)` static func — pure function (no actor / no IO) translating `BASAxisAlignment.requiresGate == true` into typed permit `stackedModes` + `reasonCodes` extensions:
+  - When `alignment.requiresGate` AND human-anchor tone is NOT reserved: append `.compare` to stackedModes + per-deviation reason codes (sorted)
+  - When `centerScore < 0.3` (deep deviation ceiling): also append `.escalate`
+  - When `humanAnchor.recommendedSurfaceTone == .reserved`: suppress escalation; emit `permit.escalation-skipped:kunlun-axis-anchor-reserved` + per-deviation `permit.escalation-suppressed:kunlun:<code>` reason codes
+  - When `alignment == nil` OR `requiresGate == false`: no-op
+
+**修改** [EBrainRuntimeCoordinator.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift):
+- New `kunlunAxisForGate` + `kunlunAxisAlignmentForGate` upstream derive (after `assertionCeilingDecisionForGate.permit` rebind, mirrors M392 pattern of separate "for-gate" / "for-audit" locals)
+- New `kunlunEscalation = BASKunlunPermitEscalation.escalate(permit:alignment:humanAnchor:)` invocation; `boundActionPermit = kunlunEscalation.permit` rebinds
+- Composability with M384 abyssal escalation + M385 assertion-ceiling cap preserved: M406 fires AFTER both, so axis deviations and Cthulhu pressure both compose on the same `boundActionPermit`.
+
+**Doctrine pins**:
+- 单提交口 (red line v1-#2 + v4 single-mouth): `permit.mode` is NEVER mutated — only `stackedModes` extended. Pinned by `testSingleCommitMouthInvariantAcrossAllModes` running across all 9 BASActionPermitMode cases.
+- 红线 #5 (天门不绕过宿主授权): escalation issues `.compare` (review surface), never bypasses host authorization.
+- 红线 #8 (cross-doctrine, originally Cthulhu RL #8 — applies symmetrically): when `humanAnchor.recommendedSurfaceTone == .reserved`, escalation is intentionally suppressed; reason codes still emitted for audit traceability. Pinned by `testReservedHumanAnchorSuppressesEscalation`.
+- Composability with M384: M406 reasonCodes are additive; existing `.compare` stack mode is not duplicated. Pinned by `testCompositionPreservesExistingStackedModes` + `testExistingCompareNotDuplicated`.
+
+### 93.5 测试
+
+**新建** [M404M405KunlunJadeRiverAuditTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M404M405KunlunJadeRiverAuditTests.swift)（6 tests）:
+1. `testRuntimeTurnEmitsJadeCanonSealCode` — real BASHostRuntime turn produces exactly 1 `kunlun.jade.seal:action-permit:<status>` code with `canonical | defective` status
+2. `testRuntimeTurnEmitsRiverOriginLineageCodes` — real turn produces exactly 1 `kunlun.river.lineage:` + 1 `.upward:N` + 1 `.downward:N`
+3. `testDefectiveSealEmitsMissingAndDefectsCodes` — defective seal yields 4 missing requirements; verifies helper output shape
+4. `testPartialTraceEmitsWarningsViaAnalyzer` — partial trace yields ≥2 warnings via analyzer (no-root-source + no-audit-trail)
+5. `testCodesUseStableKebabCasePrefix` — all kunlun.jade.* / kunlun.river.* codes follow `kunlun.<segment>.<key>:<value>` shape with segment ∈ {jade, river}
+6. `testNilJadeAndRiverElidesAllCodes` — direct unit test: canonical seal + wellformed trace → no warnings; nil parameters → no codes (default-nil parameter behavior)
+
+**新建** [M406KunlunPermitEscalationTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M406KunlunPermitEscalationTests.swift)（9 tests）:
+1. `testNilAlignmentNoEscalation` — nil alignment → permit unchanged
+2. `testCenteredAlignmentNoEscalation` — `requiresGate == false` → permit unchanged
+3. `testOffAxisAlignmentAppendsCompare` — off-axis with deviation codes → `.compare` appended + per-deviation reason codes
+4. `testDeeplyOffAxisAppendsBoth` — `centerScore < 0.3` → both `.compare` AND `.escalate` appended
+5. `testReservedHumanAnchorSuppressesEscalation` — red line 8 — reserved tone suppresses escalation; permit unchanged; suppression reason codes emitted
+6. `testSingleCommitMouthInvariantAcrossAllModes` — all 9 BASActionPermitMode cases preserve `permit.mode` through escalation
+7. `testCompositionPreservesExistingStackedModes` — pre-existing M384 abyssal `.delay` + reason codes preserved when M406 escalation fires
+8. `testExistingCompareNotDuplicated` — pre-existing `.compare` (e.g. from upstream escalation) is not duplicated
+9. `testDeviationCodesEmittedInSortedOrder` — deviation codes emit in sorted order for cross-build digest stability
+
+**修正** [BASEBrainSchemaCoreTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASEBrainSchemaCoreTests.swift) line 3274:
+- `runtimeCoordinatorCarriesExpandedL11ModeLattice` test originally asserted strict equality `result.actionPermit.stackedModes == scenario.package.actionPermit.stackedModes`; this is now a doctrine-incorrect strict equality given M406's additive escalation contract.
+- Updated to subset containment loop: every L11 stackedMode is asserted to be present in result, allowing M406's `.compare` addition to flow through cleanly. The pre-escalation snapshot is still strictly equal via line 3279 `result.thoughtFrame.riskBindings?.first?.stackedModes == scenario.package.actionPermit.stackedModes` (riskBindings is captured pre-Cthulhu/Kunlun escalation block).
+
+**修正** [M402KunlunAxisAuditTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M402KunlunAxisAuditTests.swift):
+- `testKunlunCodesUseStableKebabCasePrefix` updated from "only `kunlun.axis.*`" to "any of `kunlun.{axis,jade,river}.*`" (M404 + M405 now also emit under kunlun.* prefix)
+- `testKunlunCodeCountInValidRange` updated from `[1, 3]` to `[5, 11]` reflecting M404 + M405 baseline emissions (axis center + jade seal + river lineage/upward/downward)
+
+### 93.6 测试基线
+
+| 套件 | 九十二 章末 | 九十三 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2391 | **2406** | **+15** (M404+M405 6 tests + M406 9 tests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1361 | **1361** | unchanged (no Qinao changes) |
+| 全栈 | 3752 | **3784** | **+32** (BAS 2406+417=2823 + Qinao 1361, plus 2 fix-pin tests in BASEBrainSchemaCoreTests) |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿 (qinao import / sovereign redaction / SDK / substrate residuals).
+
+### 93.7 红线 / 不变量
+
+| 红线 / 不变量 | M404 | M405 | M406 |
+|---|---|---|---|
+| #1 先醒再答 | ✓（audit-only） | ✓（audit-only） | ✓（permit hook only; L1 unchanged） |
+| #2 神经不掌权 | ✓（audit-only） | ✓（audit-only） | ✓（permit by L11 single mouth; M406 only extends stackedModes） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（jade codes additive） | ✓（river codes additive） | ✓（reason codes additive） |
+| 单提交口 | ✓ | ✓ | ✓ pinned by 9-case all-mode test |
+| Kunlun 红线 #4 (玉律不能成黑箱) | **✓ pinned** by `testDefectiveSealEmitsMissingAndDefectsCodes` (per-defect typed reason codes) | n/a | n/a |
+| Kunlun 红线 #5 (天门不绕过宿主授权) | n/a | n/a | **✓ pinned** — M406 only escalates to `.compare` (review surface), never replaces verdict |
+| Kunlun 红线 #6 (源流追踪不隐性监控) | n/a | **✓ pinned** by typed schema emission (no raw payload) | n/a |
+| Kunlun 红线 #8 (cross-doctrine; analogous to Cthulhu RL #8) | n/a | n/a | **✓ pinned** by `testReservedHumanAnchorSuppressesEscalation` |
+| Cthulhu 红线 (10 cases) | unchanged | unchanged | unchanged + composes via M384 |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 93.8 Phase β 完成判据
+
+| 判据 | 状态 |
+|---|---|
+| JadeCanon seal derive + verification at L4 audit projection | ✓ M404 |
+| RiverOrigin trace derive + analyze at L4 audit projection | ✓ M405 |
+| L11 permit-synthesis hook for axis-aware gating | ✓ M406 |
+| Composability with M384 abyssal pressure | ✓ pinned by `testCompositionPreservesExistingStackedModes` |
+| Single commit mouth preserved | ✓ pinned by `testSingleCommitMouthInvariantAcrossAllModes` |
+| Red lines 4 / 5 / 6 / 8 typed-pinned | ✓ |
+| BAS + Qinao test suites green | ✓ |
+| 4 boundary checks clean | ✓ |
+| 15 new wire tests added | ✓ |
+
+### 93.9 Phase γ 后续 (chapter 九十四 — M408-M411)
+
+After this chapter ships:
+- M408 — YaochiSanctumEntry L8 access gate (sealed memory reveal protocol)
+- M409 — HeavenGatePermit L11→L14 escalation gate (high-stakes domain transitions)
+- M410 — L14 sovereign-warrant Tianmen integration (warrant carries tianmen_gate_ref + kunlun_axis_ref)
+- M411 — Yaochi audit emission (`kunlun.yaochi.access:<class>:<decision>` + `kunlun.tianmen.gate:<domain>:<state>`)
+
+### 93.10 一句话总结
+
+**M404-M407 close 昆仑 doctrine Phase β (chapter 九十三)**：M404 wire `BASJadeCanonSeal` derive over `boundActionPermit` + `BASKunlunJadeCanonProtocol.verifySeal` at L4 audit-projection seam emit `kunlun.jade.seal:<class>:<status>` + `.missing:<N>` + `.defects:<sorted>` (红线 #4 玉律不能成黑箱 typed-pinned) + M405 wire `BASRiverOriginTrace` derive + `BASKunlunRiverOriginProtocol.analyze` emit `kunlun.river.lineage:<status>` + `.upward:N` + `.downward:N` + `.warnings:<sorted>` + `.cut:true` (红线 #6 源流不隐性监控 typed-pinned) + M406 ship pure-function `BASKunlunPermitEscalation.escalate(permit:alignment:humanAnchor:)` translating `BASAxisAlignment.requiresGate == true` into typed permit `stackedModes` extensions (`.compare` always; `.escalate` for centerScore < 0.3 deep deviation; suppressed when humanAnchor.tone == .reserved) + composability with M384 abyssal escalation pinned via `testCompositionPreservesExistingStackedModes` (red line #2 单提交口 pinned by 9-mode all-cases test; red line #5 天门不绕过 pinned by `.compare`-only escalation; red line #8 不绕人性锚点 cross-doctrine pinned by reserved-tone suppression test) + 6 audit-emission + 9 escalation tests + 2 fix-pin updates to existing tests reflecting additive doctrine. BAS 2391 → 2406 (+15) / Qinao 1361 unchanged / 全栈 3752 → 3784 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase β done; Phase γ (Yaochi + Tianmen + L14) 待 chapter 九十四**.

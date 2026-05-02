@@ -406,10 +406,46 @@ extension BASEBrainRuntimeCoordinator {
         //     code list (omitted when no deviations)
         //   `kunlun.axis.requires-gate:true` — only when
         //     requiresGate is true (omitted when false)
-        // Audit-only at this milestone; M406 wires the alignment
-        // into L11 permit synthesis. Doctrine: kunlun.axis.* codes
-        // are observability metadata, not decision input (yet).
-        kunlunAxisAlignment: BASAxisAlignment? = nil
+        // Audit-only emission seam; M406 (chapter 九十三) wires the
+        // same alignment value into L11 permit synthesis upstream.
+        kunlunAxisAlignment: BASAxisAlignment? = nil,
+        // M404 — optional Jade Canon seal verification readout.
+        // Producer is `BASKunlunJadeCanonProtocol.verifySeal(_:)`
+        // run over a per-turn seal derived for the bound action
+        // permit (object class `.actionPermit`). Consumer emits:
+        //   `kunlun.jade.seal:<class>:<status>` — class is the
+        //     seal's object class raw value; status is
+        //     `canonical` when verification passes else
+        //     `defective`.
+        //   `kunlun.jade.missing:<count>` — only when defective,
+        //     sized by the count of failed canonical requirements
+        //     (无来源 / 无签名 / 无哈希 / 无撤销路径). Per-reason
+        //     codes are joined deterministic.
+        // Doctrine red line 4 (玉律不能成黑箱) — every defect is
+        // emitted as a stable typed reason code, never elided.
+        // Audit-only emission; no permit mutation, no verdict
+        // escalation at this milestone.
+        jadeCanonVerification: BASKunlunJadeCanonProtocol.Verification? = nil,
+        // M404 — class context for the verification, used to
+        // disambiguate which canonical class was being verified.
+        // Required when `jadeCanonVerification` is non-nil.
+        jadeCanonObjectClass: BASJadeCanonObjectClass? = nil,
+        // M405 — optional River-Origin lineage analysis. Producer
+        // is `BASKunlunRiverOriginProtocol.analyze(_:)` run over a
+        // per-turn `BASRiverOriginTrace`. Consumer emits:
+        //   `kunlun.river.lineage:<status>` — `wellformed` when
+        //     trace has at least one root + audit ref; else
+        //     `partial`.
+        //   `kunlun.river.upward:N` — root + tributary count
+        //   `kunlun.river.downward:N` — derived object count
+        //   `kunlun.river.warnings:<sorted+joined>` — only when
+        //     analyzer surfaced warnings (orphan / cascade-without-
+        //     consent / derived-without-permit).
+        //   `kunlun.river.cut:true` — only when at least one
+        //     lineage-cut is recorded (Cthulhu 斩谱 cross-link).
+        // Doctrine red line 6 (源流追踪不变成隐性监控) — every
+        // emission is over typed schema; no raw payload leaked.
+        riverOriginLineage: BASKunlunRiverOriginProtocol.LineageReport? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -630,6 +666,60 @@ extension BASEBrainRuntimeCoordinator {
             if kunlun.requiresGate {
                 observationStatusCodes.append(
                     "kunlun.axis.requires-gate:true")
+            }
+        }
+        // M404 — Kunlun Jade Canon seal verification audit
+        // emission. Doctrine red line 4 (玉律不能成黑箱) — every
+        // defect surfaces as a typed reason code so audit walkers
+        // can grep `kunlun.jade.missing:` to identify ungated
+        // promotions. nil verification → all codes elided.
+        if let jadeVerification = jadeCanonVerification {
+            let className = jadeCanonObjectClass?.rawValue
+                ?? "unknown"
+            let status = jadeVerification.isCanonical
+                ? "canonical"
+                : "defective"
+            observationStatusCodes.append(
+                "kunlun.jade.seal:\(className):\(status)")
+            if !jadeVerification.isCanonical {
+                let missingCount = jadeVerification
+                    .missingRequirements.count
+                observationStatusCodes.append(
+                    "kunlun.jade.missing:\(missingCount)")
+                // Stable per-defect trace. Sorted to keep cross-
+                // build digests deterministic.
+                let joined = jadeVerification.missingRequirements
+                    .sorted()
+                    .joined(separator: "+")
+                observationStatusCodes.append(
+                    "kunlun.jade.defects:\(joined)")
+            }
+        }
+        // M405 — Kunlun River-Origin lineage audit emission.
+        // Doctrine: 没有源流就没有可信成长 (§4.5 line 612). Codes
+        // surface trace shape so audit consumers can detect
+        // orphans (no root / no audit) without re-running the
+        // analyzer. nil report → all codes elided.
+        if let lineage = riverOriginLineage {
+            let status = lineage.isWellFormed
+                ? "wellformed"
+                : "partial"
+            observationStatusCodes.append(
+                "kunlun.river.lineage:\(status)")
+            observationStatusCodes.append(
+                "kunlun.river.upward:\(lineage.upwardCount)")
+            observationStatusCodes.append(
+                "kunlun.river.downward:\(lineage.downwardCount)")
+            if !lineage.warningCodes.isEmpty {
+                let joined = lineage.warningCodes
+                    .sorted()
+                    .joined(separator: "+")
+                observationStatusCodes.append(
+                    "kunlun.river.warnings:\(joined)")
+            }
+            if lineage.hasLineageCut {
+                observationStatusCodes.append(
+                    "kunlun.river.cut:true")
             }
         }
         // M318 — L9 abyssal-branch annotations. Empty array
