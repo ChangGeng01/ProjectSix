@@ -200,7 +200,17 @@ pattern: typed-pin first, measurement second, regression gate third.
   that pins the substrate's audit-emission vocabulary clean against
   every red line. The doctrine itself was already authored
   (CTHULHU_SPEC_V1 + ABYSSAL_VINF predate v5), so the only
-  outstanding work was the v5 triple — now closed.
+  outstanding work was the v5 triple — now closed. **Full
+  production landing as of M391–M393** (chapter 八十八):
+  `BASForbiddenLifecycleGate` is now load-bearing in the
+  `BASUpdateTicketLifecycleCoordinator` actor path via three
+  opt-in extension methods (`submitWithForbiddenGate` /
+  `startTrialWithForbiddenGate` /
+  `ingestTicketsWithForbiddenGate`); the M384/M385 escalation +
+  cap hooks now run BEFORE `renderedOutput` projection so the
+  rendered surface stays consistent with the persisted permit;
+  and `QinaoSampleHost --cthulhu-doctrine-demo` exercises every
+  wire in a 7-step banner with all invariants pinned.
 
 ---
 

@@ -9646,3 +9646,121 @@ Evolution log §"Open Opportunities" 现在为**空**。下一轮 bench-driven e
 ### 87.12 一句话总结
 
 **M384-M389 close 附录 K Cthulhu schema → runtime decision integration batch — 全部 6 milestones surgical 一-batch shippable**：M384 abyssal pressure → permit stackedModes escalation（红线 8 lock 显式 anchor-tone-reserved suppression） + M385 unknown reserve → permit ceiling cap（cross-vocabulary strictness ranking 保 BAS "guarded" ≡ ".qualified" 既有契约 zero churn） + M386 forbidden candidate → lifecycle action gate（pure 类型 helper / coordinator-side wire deferred） + M387 seal envelope per-policy histogram audit emission（红线 9 audit-trail 完整 / backward-compat 两-arg init 保） + M388 watcher narrative dominant-axis name + 红线 7 regression pin（watcher 触发不改 verdict / permit shape） + M389 Cthulhu doctrine 10-case typed pin + static lint test over 37 substrate reason-code prefixes（v5 doctrine triple capstone）。**chapter 七十八.9 "Cthulhu schemas runtime接入 9/9" stale claim 实证矫正** —— "接入"=audit emit ≠ decision-influencing，本 chapter 真做 decision integration。BAS 2281 → 2330 (+49) / Qinao 1339 不变 / 全栈 3620 → 3669 (+49) / 0 failures / 4/4 boundary 全绿 / 6 commits / **v5 doctrine triple now closed on Cthulhu doctrine**。仓库内 surgical scope 第五次确认 = 空 — 剩 3 项需外部资源（EB-1/EB-2/EB-3）不变。
+
+## 八十八、 全面落地 — Cthulhu 6 wires production-path 接入（M391-M393）
+
+### 88.1 触发动作
+
+用户 `全面落地` —— 把 chapter 八十七 ship 的 M384-M389 typed primitives 从"shipped types"推到"load-bearing in production paths"。Phase 1 audit 找到 3 个 "shipped but not load-bearing" 缺口：
+
+1. **M386 actor-side wire deferred** — chapter 八十七.4 显式列 "coordinator-side actor wire deferred"。`BASForbiddenLifecycleGate` 是 pure helper / 0 production callers
+2. **M384 / M385 surface lag** — escalation/cap 在 audit-projection seam (line ~681+) 后跑，已经过了 `renderedOutput` projection (line ~439)。surface 持的 permit 是 pre-escalation 版本，actionPermit 持的是 post-escalation 版本。L11 contract test 仅因 cross-vocab ranking 让 "guarded" ≡ ".qualified" rank-2 silent 才没爆 — 高 reserve 场景会暴露
+3. **demo absent** — 没有 sample-host mode 显示所有 6 wires 同时 fire
+
+### 88.2 M391 — `BASForbiddenLifecycleGate` 在 `BASUpdateTicketLifecycleCoordinator` 真接线
+
+**实装**：[BehavioralAISubstrate/Sources/BASHostKit/BASUpdateTicketLifecycleForbiddenGate.swift](../BehavioralAISubstrate/Sources/BASHostKit/BASUpdateTicketLifecycleForbiddenGate.swift)（actor extension in BASHostKit so it can see both BASMemory gate + BASObservability actor）+ [M391ForbiddenGateLifecycleIntegrationTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M391ForbiddenGateLifecycleIntegrationTests.swift)（7 测试）。
+
+**Vocabulary bridge 关键** — M386 gate 走 `BASEvolutionLifecycleAction`（在 BASMemory），coordinator actor 走 `BASUpdateTicketLifecycleState`（在 BASObservability）。两者不同 vocabulary，不能直接对接。M391 三个 opt-in extension methods 是 bridge：
+
+| 方法 | 包装 | 当 gate refuses |
+|---|---|---|
+| `submitWithForbiddenGate(_:forbidden:)` | `submit` | 立即 `markRejected` with `lifecycle.gated:forbidden:sovereign-rejected` reason code |
+| `startTrialWithForbiddenGate(ticketID:trialRecordRef:forbidden:)` | `startTrial` | `markRejected` 含 gate reason code + `trial-record-ref:<ref>` 保 audit traceability |
+| `ingestTicketsWithForbiddenGate(_:forbiddenByTicketID:)` | `ingestTurn` | 按 ticket-by-ticket 调 submit-gate variant，返回 accepted count |
+
+**Default-safe**：hosts 不调 `*WithForbiddenGate` 继续 pre-M391 plain primitives。M391 是 opt-in。
+
+**单提交口红线**：gate 永不直接改 lifecycle state — refusals 全转成真 `markRejected` 调用，actor 的 state machine 仍是唯一 mutation 入口。
+
+### 88.3 M392 — M384/M385 hooks moved upstream of `renderedOutput` projection
+
+**实装**：[BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift) M384/M385 hooks 从 line 681+/799+ 移到 line 380（即 `thoughtFrame.actionPermit = boundActionPermit` 之后立即跑）。下游 hooks 删除（避 double-apply）。
+
+**架构修正**：pre-M392 顺序：
+1. line 379: `thoughtFrame.actionPermit = boundActionPermit`
+2. line 433-439: `actionService.render` + `projectedRenderedOutput` — surface sealed
+3. line 681-720: M303/M304 derive + M384 escalate
+4. line 791-810: M320 derive + M385 cap
+
+surface 在 step 2 sealed 时持 pre-escalation permit；audit-emission 在 step 3-4 后才看到 post-escalation permit。
+
+post-M392 顺序：
+1. line 379: `thoughtFrame.actionPermit = boundActionPermit`
+2. line 380-440 (NEW): M303 + M304 + M384 + M320 + M385 全跑 → boundActionPermit 是 post-cap
+3. line 433-439: `actionService.render` + `projectedRenderedOutput` 现持 post-cap permit
+4. line 681+: audit-emission 也 derive 自己的 audit-side locals（identical 输出，pure function）
+
+**Identical-output guarantee**：upstream 与 downstream 的 derives 都是 pure functions of same inputs。"separate locals for separation of concerns" — 一个用于 gating，一个用于 audit emission。无 behavioral 差异。
+
+**Regression gate**：existing test `runtimeCoordinatorProjectsL11PackageControlsIntoRenderedSurfaceMetadata` 锁 `surface.disclosure.assertionCeiling == result.actionPermit.assertionCeiling` 等三组 surface↔permit 字段相等。M392 之前低 reserve 场景偶然过；M392 之后在所有 reserve scenarios 下都过。
+
+### 88.4 M393 — `--cthulhu-doctrine-demo` 显示 6 wires 全 fire
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/CthulhuDoctrineDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/CthulhuDoctrineDemo.swift)（pure-function demo + value-typed `CthulhuDoctrineDemoOutcome`）+ main.swift `--cthulhu-doctrine-demo` args branch + `runCthulhuDoctrineDemo()` banner renderer + Package.swift 加 BASOrchestration / BASWorldPrior deps + [QinaoSampleHostCthulhuDoctrineDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostCthulhuDoctrineDemoTests.swift)（7 测试，仿 M333/M334/M335 pattern：tests pin BAS substrate contracts demo composes）。
+
+**7 步 banner 实跑结果**：
+
+| Step | Wire | 输出 |
+|---|---|---|
+| 1 | M384 high-pressure + warm-anchor | stackedModes=[compare, delay, escalate], 3 escalated reason codes |
+| 2 | M384 red-line-8 reserved-anchor | suppressed=true, stackedModes=(empty), 4 suppressed reason codes |
+| 3 | M385 reserve cap default→qualified | capped=true, 1 ceiling reason code |
+| 4 | M386 held-sovereign refuses startShadowTrial | refused=true, 1 forbidden reason code |
+| 5 | M387 4-seal histogram | count=4, 3 scope reason codes |
+| 6 | M388 role-inversion dominant axis | dominantAxis=role-inversion, 2 narrative reason codes |
+| 7 | M389 10 doctrine red-lines | redLineCount=10, allWellFormed=true |
+
+**所有 7 步 invariants hold ✓**。Demo 退出码 2 on mismatch。
+
+### 88.5 测试基线
+
+| 套件 | 八十七章末 | 八十八章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2330 | **2337** | +7（M391） |
+| Qinao XCTest | 1339 | **1346** | +7（M393） |
+| 全栈 | 3669 | **3683** | +14 |
+
+0 failures / 0 flakes / 4 boundary checks 全绿。Sample-host `--cthulhu-doctrine-demo` mode 实跑通过（all invariants hold ✓）。
+
+### 88.6 红线 / 不变量回归矩阵
+
+| 红线 / 不变量 | M391 | M392 | M393 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（gate refusals 走 typed actor methods） | ✓（escalation/cap 仍 typed gate） | ✓（demo 仅 pure helpers） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（reasonCodes additive） | ✓（不动 audit emission） | ✓（demo 不写 ledger） |
+| 单提交口 | ✓（refusals 通过 actor 的 markRejected） | ✓（permit.mode 仍未被覆盖） | ✓ |
+| 红线 7（watcher 只 hint） | n/a | ✓（M388 emission 仍 hint-only） | ✓ |
+| 红线 8（不绕人性锚点） | n/a | **✓ pin 加强**（escalation 现在 surface-sealed before render） | ✓ |
+| 红线 9（封印不伪删除） | n/a | n/a | n/a |
+| 红线 10（主品牌不默认恐怖） | ✓ | ✓ | ✓（demo 仅 sample-host CLI 不动 SDK） |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+| **UI 不改** | ✓ | ✓ | ✓ |
+
+### 88.7 chapter 八十七.4 stale-claim 矫正
+
+七十七.4 列 "Coordinator-side actor wire deferred"。本章节 ship 后矫正：
+
+| 残项 | 八十七章末 | 八十八章末 |
+|---|---|---|
+| M386 BASForbiddenLifecycleGate pure helper | ✓ shipped | ✓（不变） |
+| **M386 actor-side production wire** | ⚠️ **deferred** | **✓ M391（3 extension methods + 7 tests）** |
+| M384/M385 audit-visible only | ⚠️ **surface lag** | **✓ M392（hooks moved upstream of render）** |
+| Sample-host demo for 6 wires | ✗ absent | **✓ M393（`--cthulhu-doctrine-demo`，7-step banner，7 tests）** |
+| L4 训练 / curriculum / W1-W5 | 外部资源（不变） | 外部资源（不变） |
+
+### 88.8 仓库 surgical scope 真实状态（八十八章末）
+
+**全 close**。剩 3 项需外部资源（仓库永远无法替代）：
+
+| 项 | 障碍 |
+|---|---|
+| L4 训练资产（EB-1） | GPU/TPU 算力 |
+| M295.1+ authoritative curriculum（EB-2） | domain experts 真签字 |
+| W1-W5 真世界（EB-3） | 真世界协调 |
+
+### 88.9 一句话总结
+
+**M391-M393 close 附录 K full-landing batch — 把 chapter 八十七 列的"deferred actor-wire" + "audit-visible-only surface lag" + "absent sample-host demo" 三件全 ship**：M391 `BASForbiddenLifecycleGate` 真接线进 `BASUpdateTicketLifecycleCoordinator`（3 opt-in extension methods bridging vocabulary gap between `BASEvolutionLifecycleAction` 和 `BASUpdateTicketLifecycleState` / 7 fix-pin tests / 单提交口红线 actor 的 markRejected 仍唯一 mutation 入口） + M392 hooks 上移到 `renderedOutput` projection 之前（M303 + M304 + M384 + M320 + M385 现 line 380 跑 / surface 现 sealed against post-cap permit / existing L11 contract test 自动变为 regression gate / 双 hook 删 避 double-apply / audit-side derives identical-output guarantee） + M393 `--cthulhu-doctrine-demo` 7-step banner 显示 6 wires + 1 doctrine cardinality（实跑 banner all invariants hold ✓ / 7 fix-pin tests 仿 M333/M334/M335 pattern pin BAS substrate contracts demo composes / Package.swift 加 BASOrchestration + BASWorldPrior deps）。BAS 2330 → 2337 (+7) / Qinao 1339 → 1346 (+7) / 全栈 3669 → 3683 (+14) / 0 failures / 4/4 boundary 全绿 / 3 commits / **Cthulhu doctrine 现 fully load-bearing**：6 schemas runtime-influencing decisions + 1 doctrine static lint pinning audit vocabulary clean + sample-host CLI demo making all wires visible in one run。仓库内 surgical scope 第六次确认 = 空 — 剩 3 项需外部资源（EB-1/EB-2/EB-3）不变。
