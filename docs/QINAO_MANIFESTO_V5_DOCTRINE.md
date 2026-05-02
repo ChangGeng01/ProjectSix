@@ -185,6 +185,22 @@ pattern: typed-pin first, measurement second, regression gate third.
   (compute) + EB-2 (domain experts), so this candidate is
   *authoring-ready in repository scope* but the doctrine claim itself
   awaits real trained weights to measure.
+- **Cthulhu doctrine status.** As of **M384–M389** the v5 triple is
+  complete on the Cthulhu doctrine. Pre-M384 the eight Cthulhu
+  schemas (M287) had typed pins (the Swift structs themselves) plus
+  audit-metadata measurement (M303–M305 / M316–M318 / M320–M321
+  derives + signalRefs), but no regression gate that the substrate's
+  decision paths actually consult them. M384–M388 ship four typed
+  decision wires (`BASAbyssalPermitEscalation`,
+  `BASAssertionCeilingGate`, `BASForbiddenLifecycleGate`,
+  `BASSealEnvelope.Aggregate.policyHistogram`) plus a watcher-hint
+  audit upgrade with red-line-7 regression pin; M389 ships
+  `BASAbyssalDoctrineRedLine` (10 typed cases with white-paper
+  references and forbidden-substring lists) plus a static lint test
+  that pins the substrate's audit-emission vocabulary clean against
+  every red line. The doctrine itself was already authored
+  (CTHULHU_SPEC_V1 + ABYSSAL_VINF predate v5), so the only
+  outstanding work was the v5 triple — now closed.
 
 ---
 

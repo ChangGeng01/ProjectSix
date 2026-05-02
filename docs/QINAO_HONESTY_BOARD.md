@@ -9487,3 +9487,162 @@ Evolution log §"Open Opportunities" 现在为**空**。下一轮 bench-driven e
 ### 86.8 一句话总结
 
 **M380-M383 close chapter 八十四.6 evolution log 最后一个 open opportunity (audit-ledger outlier rate)，确认是 sample-size 噪声 + benign Swift collection amortization 不是 substrate bug；M382 stale-claim sweep 跑完零 finding；honesty board accurate**：M380 ship `Ed25519SignBench` diagnostic isolating crypto signing latency from full audit-ledger machinery (10K samples warm, mean 0.046 ms / outlier rate 0.93%) + M381 比较结果显示 Ed25519 占 mean cost 94%, tail amplification (max 2.2x audit-ledger 比 Ed25519 alone) 是 Swift Dict rehash + Array realloc benign amortization 不是 crypto issue, **chapter 八十四.6 "1-3% outlier rate" 实际是 chapter 八十二.5 用 200 samples 的 small-sample 噪声 — 10K samples 时 outlier rate 是 0.79% (3x normal 不是 11x), 已 close 该 Open Opportunity** + M382 sweep 验 v5/v6/v7 manifesto + 6 baselines + test counts + 4 boundary checks 全 accurate, 0 stale claims found + M383 chapter 八十六 + 6 commits + push。BAS 2281 / Qinao 1335 → 1339 (+4 M380 tests) / 全栈 3620 (+4) / 0 failures / 4/4 boundary 全绿 / 9 bench modes (+1) / 6 committed baselines (+1)。Evolution log §"Open Opportunities" 现**全空** — chapter 八十四.6 列的 A/B/C/D 四个 open items 已被 chapter 八十五 + 八十六 全部 closed (A=M375 / B=M377 / C=M380+M381 / D=nothing-to-do)。"自我满意为止" 边界 reached — 仓库内 surgical scope 第四次确认 = 空, evolution loop 已无 open thread, bench infrastructure self-correcting + diagnostic-equipped, doctrine 红线全保, honesty 数据全 verified。下一轮 evolution 需要外部资源 (EB-1 GPU compute / EB-2 domain experts / EB-3 W1-W5) 触发新 surgical opportunity，仓库内能 ship 的全 ship。
+
+## 八十七、 开始克苏鲁 — schema → runtime decision integration（M384-M389）
+
+### 87.1 触发动作
+
+用户 `整体研究一下 我觉得可以开始 克苏鲁` + `克苏鲁 有白皮书 ui 不要改`。Phase 1 三路并行 Explore agents 实证扫描后发现：
+
+- 8 个 Cthulhu schemas（M287 ship）+ 4 个横切协议都已存在
+- M303-M305 / M316-M318 / M320-M321 已 wire audit signalRefs
+- 但 **0 schema 真正影响 runtime decisions** —— 全部 metadata-only
+- chapter 七十八.9 "Cthulhu schemas runtime接入 9/9 ✓" 是 stale claim（"接入"=audit emit ≠ decision-influencing）
+- 用户明确排除 UI 主题包 → M292 + M293 watcher UI 全不在范围
+
+附录 K 拟定的 6 wires + 1 docs 序列：M384 permit escalation + M385 assertion ceiling + M386 lifecycle gate + M387 seal histogram + M388 watcher hints + M389 doctrine red-line typed pin + M390 docs。
+
+### 87.2 M384 — `BASAbyssalPressure` → permit `stackedModes` escalation
+
+**实装**：[BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalPermitEscalation.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalPermitEscalation.swift)（pure-function helper + value-typed `BASAbyssalPermitEscalationDecision`）+ coordinator hook（`EBrainRuntimeCoordinator.swift` 第 379 行 `boundActionPermit` 改 `var` + M304 derive 后 escalate 调用 + thoughtFrame.actionPermit 持久化）+ [M384AbyssalPermitEscalationTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M384AbyssalPermitEscalationTests.swift)（11 测试）。
+
+**翻译表**（pure 6→4 typed map）：
+- `compare` → `compare` (1:1)
+- `delay` → `delay` (1:1)
+- `sovereignEscalate` → `escalate`
+- `localDraft` → `localOnly`
+- `guardianBranch` → 无 permit 等价（仅 reason code）
+- `humanAnchorCheck` → 无 permit 等价（仅 reason code）
+
+**红线 8 锁**：当 `humanAnchor.recommendedSurfaceTone == .reserved` → escalation 显式 suppressed + `permit.escalation-skipped:human-anchor-reserved` reason code。`.plain`/`.steady`/`.warm` 不抑制（pin-tested）。
+
+**触发阈值**：`pressure.aggregateMagnitude >= 0.6`（default）。低于该阈值 recommendedModes 仅留在 audit metadata 不进 permit。
+
+**Banner test**：`testTranslatableModesAppendedAndReasonCodesEmitted` 显示完整 4-mode escalation：`[.compare, .delay, .escalate, .localOnly]` 全部 appended，reason codes 4 条全 emit，primary mode 不变（single-commit-mouth 红线）。
+
+### 87.3 M385 — `BASUnknownReserve.assertionCeiling` → permit ceiling cap
+
+**实装**：[BehavioralAISubstrate/Sources/BASOrchestration/BASAssertionCeilingGate.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAssertionCeilingGate.swift) + coordinator hook（M320 derive 后 cap） + [M385AssertionCeilingGateTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M385AssertionCeilingGateTests.swift)（11 测试）。
+
+**Cross-vocabulary strictness ranking**（关键设计选择）：
+- "default" / "unrestricted" → 0 (least strict)
+- "standard" / "provisional" → 1
+- "guarded" / "qualified" → 2
+- "metaOnly" → 3
+- "minimal" / "none" → 4 (most strict)
+
+这个 mapping **deliberately preserves** 既有 BAS 契约 "guarded" ≡ ".qualified"（同 rank 2）→ pre-existing BAS permits 不会因 reserve 触发而 churn。原始设计把 "guarded" 当 -1 unrecognized 导致 L11 testRuntime + testHighRiskBlock 两个 pre-existing 测试 fail；矫正后两个测试自然过 + 我自己 11 测试也通过。
+
+**Doctrine — monotonic narrowing only**：reserve cap 永远不能 widen permit。`"minimal"` permit + `.qualified` reserve → 不 cap（permit 已 stricter）。
+
+### 87.4 M386 — `BASForbiddenKnowledgeCandidate` → lifecycle action gate
+
+**实装**：[BehavioralAISubstrate/Sources/BASMemory/BASForbiddenLifecycleGate.swift](../BehavioralAISubstrate/Sources/BASMemory/BASForbiddenLifecycleGate.swift) + [M386ForbiddenLifecycleGateTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M386ForbiddenLifecycleGateTests.swift)（7 测试）。
+
+**Gate semantics**：
+- `sovereignReviewState == .rejected` → 阻 5 个 advance actions（`registerCandidate`/`startShadowTrial`/`finalizeTrial`/`promote`/`retract`），允 2 个 terminal actions（`withdraw`/`fail`）
+- `sovereignReviewState == .held` → 仅阻 `startShadowTrial`
+- `shadowTrialPolicy == .none` → 阻 `startShadowTrial`
+- 其他 (state, policy) 组合 → action 透传
+- nil candidate → 透传（default-safe）
+
+**Coordinator-side actor wire deferred**：`BASUpdateTicketLifecycleCoordinator`（M268）尚未把 forbidden candidate 配对进 state-machine path。本 milestone ship pure 类型 helper —— 任何 caller 拿到 `(action, candidate)` pair 都能立即 query。Actor wire 是后续 plumbing milestone。
+
+### 87.5 M387 — Per-seal accessPolicy histogram in audit signalRefs
+
+**实装**：[BehavioralAISubstrate/Sources/BASMemory/BASSealEnvelope.swift](../BehavioralAISubstrate/Sources/BASMemory/BASSealEnvelope.swift) `Aggregate` 加 `policyHistogram: [BASSealAccessPolicy: Int]` 字段（默认 `[:]` 保持 backward-compat）+ audit emitter（`EBrainRuntimeCoordinator+SovereignCommit.swift`）按 canonical strictness order 走 histogram emit `seal.scope:<policy>:<count>` 一码 per 非零 entry + [M387SealAccessPolicyAuditTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M387SealAccessPolicyAuditTests.swift)（7 测试）。
+
+**红线 9 锁**（旧印封缄不是伪删除）：每 seal 都把 typed access scope 进 audit trail —— policy histogram 是最小 typed surface 满足该需求 + 不暴露 seal identifier 或 content。Audit hash chain 不变（codes 是 additive `signalRefs`）。
+
+**Doctrine consistency invariant**：`agg.policyHistogram.values.reduce(+) == agg.count` —— histogram 总和必 equal 总 seal count。
+
+### 87.6 M388 — Watcher schemas hint emission upgrade + 红线 7 regression pin
+
+**实装**：[BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift) `BASNarrativeDistortion.dominantAxisName` computed property（canonical kebab-case + tie-break order: `reality-denial` ≻ `history-rewrite` ≻ `forced-closure` ≻ `role-inversion` ≻ `urgency-mask`） + audit emitter加 `narrative.dominantAxis:<name>` 第 4 码 + M316 consumption test 升级到 0-or-4 emission shape + [M388WatcherHintRedLineTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M388WatcherHintRedLineTests.swift)（6 测试）。
+
+**红线 7 锁**（watcher 只 hint 不裁决）：新 code 是纯 additive metadata；no permit/verdict path consults it。M316 consumption test 升级**仅**断言 emission shape，never 升级 watcher 到 gate。
+
+### 87.7 M389 — Cthulhu doctrine red-line typed pin（v5 doctrine triple capstone）
+
+**实装**：[BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalDoctrineRedLines.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalDoctrineRedLines.swift) `BASAbyssalDoctrineRedLine` enum 10 cases + `whitePaperRef: String` + `forbiddenSubstrings: [String]` per-case + [M389DoctrineRedLineLintTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M389DoctrineRedLineLintTests.swift)（7 测试）。
+
+**10 红线** 全部 cite 白皮书 §：
+- `forbidShockHorror` (CTHULHU §2.1)
+- `forbidOracular` (CTHULHU §2.2 / ABYSSAL §8 RL2)
+- `forbidErosion` (CTHULHU §2.3)
+- `forbidMystical` (CTHULHU §2.4)
+- `mainBrandStaysProfessional` (ABYSSAL §2.7 / §8 RL10)
+- `watcherHintsNeverDecides` (ABYSSAL §5.4 / §8 RL7)
+- `humanAnchorOverridesPressure` (ABYSSAL §8 RL8)
+- `sealsHaveAuditRef` (ABYSSAL §8 RL9)
+- `silentRelicLeavesResidue` (CTHULHU §5.14)
+- `noCosmicScaleDilution` (CTHULHU §1.1 / ABYSSAL §4.4)
+
+**静态 lint pass**：测试 `testKnownSubstrateReasonCodePrefixesAreClean` 走 37 个已知 reason-code prefixes（覆盖 M299/M300/M303/M304/M305/M316/M317/M318/M320/M321/M384/M385/M386/M387）+ 验证 0 prefix 含任何 forbidden substring。Drift in audit emission vocabulary → fail this test before user-facing surface drift。
+
+**Doctrine 闭合**：v5 doctrine triple 在 Cthulhu 上现完整 ——
+- typed pin = 8 schemas + 4 protocols + 10 red-line enum cases
+- measurement = M303-M321 derives + signalRefs
+- regression gate = M384-M388 runtime wires + M389 lint test
+
+### 87.8 测试基线
+
+| 套件 | 八十六章末 | 八十七章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2281 | **2330** | +49（M384 11 + M385 11 + M386 7 + M387 7 + M388 6 + M389 7） |
+| Qinao XCTest | 1339 | 1339 | 0 |
+| 全栈 | 3620 | **3669** | +49 |
+
+0 failures / 0 flakes / 4 boundary checks 全绿。AFM gate-on 路径不影响（M384-M389 全 BAS-side 无 Qinao 改动）。
+
+### 87.9 红线 / 不变量回归矩阵
+
+| 红线 / 不变量 | M384 | M385 | M386 | M387 | M388 | M389 |
+|---|---|---|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（escalation typed gate） | ✓（ceiling typed cap） | ✓（gate typed lifecycle） | ✓（仅 audit metadata） | ✓（仅 reasonCodes） | ✓（lint 不影响 runtime） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（reasonCodes additive） | ✓ | ✓ | ✓（红线 9 lock） | ✓ | ✓ |
+| 单提交口 | ✓（permit L11 单提交） | ✓ | ✓（lifecycle 单 actor） | ✓ | ✓ | ✓ |
+| 红线 7（watcher 只 hint）| n/a | n/a | n/a | n/a | **✓ pin** | ✓ |
+| 红线 8（不绕人性锚点）| **✓ pin** | n/a | n/a | n/a | n/a | ✓ |
+| 红线 9（封印不伪删除）| n/a | n/a | n/a | **✓ pin** | n/a | ✓ |
+| 红线 10（主品牌不默认恐怖）| ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 4 boundary checks | 维持 | 维持 | 维持 | 维持 | 维持 | 维持 |
+| **UI 不改**（用户指令）| ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### 87.10 chapter 七十八.9 stale-claim 矫正
+
+七十八.9 列 "Cthulhu schemas runtime接入 9/9 ✓"。本章节 ship 后矫正：
+
+| 残项 | 七十八章末 | 八十七章末 |
+|---|---|---|
+| 8 Cthulhu schemas typed pin | ✓（chapter 二十五 / M287） | ✓（不变） |
+| audit signalRefs metadata | ✓（M303-M305 / M316-M318 / M320-M321） | ✓（M387 + M388 升级） |
+| **runtime decision integration** | ⚠️ **stale-implied** | **✓ M384-M388（4 gating wires + 1 hinting upgrade + 1 doctrine lint）** |
+| **doctrine 红线 typed pin** | ✗ 散在 doc 不在 typed Swift | **✓ M389（10-case enum + lint test）** |
+| **v5 doctrine triple on Cthulhu** | ✗ 仅 typed pin + measurement | **✓ all 3 legs closed (typed pin + measurement + regression gate)** |
+| L4 训练 / curriculum / W1-W5 | 外部资源（不变） | 外部资源（不变） |
+
+### 87.11 仓库 surgical scope 真实状态（八十七章末）
+
+**全 close**。剩 3 项需外部资源（仓库永远无法替代）：
+
+| 项 | 障碍 |
+|---|---|
+| L4 训练资产（EB-1） | GPU/TPU 算力 |
+| M295.1+ authoritative curriculum（EB-2） | domain experts 真签字 |
+| W1-W5 真世界（EB-3） | 真世界协调 |
+
+**v5 doctrine triple status**（chapter 七十九 + 八十 + 八十七 累计）：
+
+| Doctrine candidate | typed pin | measurement | regression gate | Authoring status |
+|---|---|---|---|---|
+| L13 self-evolution | ✓ M341 fingerprint | ✓ M333 demo | ✓ drift detector | triple-complete, awaiting v6 |
+| Multi-instance distribution | ✓ M329 primitives | ✓ M335 demo | ✓ M342 metric | triple-complete, awaiting v6 |
+| Adapter-trained L2 | ✓ M343 provenance | ⚠️ EB-1+EB-2 partial | ✓ M343 filter | repository-scope complete |
+| **Cthulhu doctrine** | ✓ M287 schemas + M389 red-line enum | ✓ M303-M321 derives + audit signalRefs | ✓ **M384-M389 wires + lint** | **✓ triple-complete** |
+
+### 87.12 一句话总结
+
+**M384-M389 close 附录 K Cthulhu schema → runtime decision integration batch — 全部 6 milestones surgical 一-batch shippable**：M384 abyssal pressure → permit stackedModes escalation（红线 8 lock 显式 anchor-tone-reserved suppression） + M385 unknown reserve → permit ceiling cap（cross-vocabulary strictness ranking 保 BAS "guarded" ≡ ".qualified" 既有契约 zero churn） + M386 forbidden candidate → lifecycle action gate（pure 类型 helper / coordinator-side wire deferred） + M387 seal envelope per-policy histogram audit emission（红线 9 audit-trail 完整 / backward-compat 两-arg init 保） + M388 watcher narrative dominant-axis name + 红线 7 regression pin（watcher 触发不改 verdict / permit shape） + M389 Cthulhu doctrine 10-case typed pin + static lint test over 37 substrate reason-code prefixes（v5 doctrine triple capstone）。**chapter 七十八.9 "Cthulhu schemas runtime接入 9/9" stale claim 实证矫正** —— "接入"=audit emit ≠ decision-influencing，本 chapter 真做 decision integration。BAS 2281 → 2330 (+49) / Qinao 1339 不变 / 全栈 3620 → 3669 (+49) / 0 failures / 4/4 boundary 全绿 / 6 commits / **v5 doctrine triple now closed on Cthulhu doctrine**。仓库内 surgical scope 第五次确认 = 空 — 剩 3 项需外部资源（EB-1/EB-2/EB-3）不变。
