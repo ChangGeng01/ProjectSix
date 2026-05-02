@@ -1,6 +1,6 @@
 # Deep-Review Doctrine
 
-> Chapter 67 → 八十一 → 九十一 → 九十一.5 → 九十一.6 condensed pattern.
+> Chapter 67 → 八十一 → 九十一 → 九十一.5 → 九十一.6 → 九十一.9 condensed pattern.
 
 This document codifies the deep-review process learned across four
 honesty-board chapters. It is the answer to chapter 九十一.5's pattern
@@ -183,6 +183,50 @@ is comfortable. Don't let it become a hiding place.
 
 ---
 
+## 3.5 The "empirical evidence vs logically sound" rule (chapter 九十一.9 lesson)
+
+**Logically-sound claims are still over-claims if they don't have
+empirical fire-trace.** Chapter 九十一.8 wrap claimed "14/14 AFM
+files defensive-XCTSkip" with bulk-test green, but several of the
+new code paths had never actually fired in real conditions — the
+test was passing because AFM was cache-warm at the time. User
+pushed back; chapter 九十一.9 ran a skip-counter breakdown that
+empirically counted **22 platform-degraded XCTSkips fired across
+11 of 16 files** including the structurally-tricky Concurrency
+`Error?` capture pattern firing 2 times.
+
+For every claim in a deep-review wrap, decide which category:
+
+1. **Empirical evidence**: an actual test run produced the
+   expected behavior (skip fired / assertion held / bug
+   reproduced before fix and resolved after). Cite the run +
+   line of evidence.
+2. **Static evidence**: a grep / type-check / structural
+   analysis confirms the property without running. Cite the
+   grep pattern + count.
+3. **Unit-test evidence**: a synthetic input was constructed
+   to exercise the path (e.g. M400.5's helper unit tests with
+   synthetic AFM error strings). Cite the test name.
+4. **Logically sound**: the code path is structurally correct
+   by inspection. **NOT sufficient** for a "close" claim.
+   Either upgrade to one of (1)-(3) or mark as "deferred,
+   pending fire-trace".
+
+When the only available category is (4), the wrap text MUST say
+"logically sound but empirically unverified" rather than
+"verified" or "tested". This prevents the over-claim pattern
+that needs a "你别骗我" pushback to surface.
+
+Calibration: chapter 九十一.9's M400.4 skip-counter is the
+canonical example. It broke down 40 skips into 4 categories
+(platform-degraded 22 / env-gated 1 / defensive coverage 1 /
+OS-version + adapter-specific 16) and explicitly noted "5 files
+didn't fire today because their AFM calls succeeded — wraps in
+place but untriggered". That's empirical evidence + explicit
+limitation, both sides of §1's category line.
+
+---
+
 ## 4. AFM gate-on test handling (chapter 九十一.6 lesson)
 
 When tests fail with `ModelManagerError Code=1026` or
@@ -253,6 +297,14 @@ preferred shape — they pushed for it explicitly and validated it twice.
 - Chapter 九十一.5 — honesty correction admitting chapter 九十一 wrap
   was premature; 4 additional gaps closed
 - Chapter 九十一.6 — chapter that ships this doctrine doc
+- Chapter 九十一.7 — `仓库外 gap 先不管 一次性 解决掉 仓内 gap`
+  batch (M400.1 AFM helper + 5 patches; M400.2 manifesto v8)
+- Chapter 九十一.8 — `continue` batch (M400.3 14/14 AFM
+  defensive XCTSkip 真完成; 38 → 0 failures empirically)
+- Chapter 九十一.9 — `一次性 解决 所有 不满意` empirical close
+  (M400.4 skip-counter breakdown / M400.5 helper unit tests +
+  static grep / M400.6 v9 candidate audit). Codified the
+  empirical-evidence-vs-logically-sound rule §3.5 above.
 - `docs/QINAO_AFM_PLATFORM_POLICY_2026-05-02.md` — AFM cold-cache
   investigation
 - `docs/QINAO_M298_TO_M335_DEEP_REVIEW_2026-05-02.md` — chapter 67's
