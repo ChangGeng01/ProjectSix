@@ -167,8 +167,15 @@ final class QinaoSampleHostFlowTests: XCTestCase {
             expectedCost: 0.2,
             reversibility: 0.9,
             confidence: 0.8)
-        let drafts = try await loop.generateCandidates(
-            sessionID: "sess.demo.1", seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let drafts: [QinaoLoop.GeneratedCandidate]
+        do {
+            drafts = try await loop.generateCandidates(
+                sessionID: "sess.demo.1", seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertEqual(drafts.count, 1)
         let draft = drafts[0]
         XCTAssertEqual(

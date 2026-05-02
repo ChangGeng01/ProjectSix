@@ -244,9 +244,16 @@ final class QinaoAppleFoundationE2ETests: XCTestCase {
             reversibility: 0.3,
             confidence: 0.3)
 
-        let result = try await loop.generateCandidates(
-            sessionID: "qinao-e2e-frontier",
-            seeds: [strong, weak])
+        // M400.3 — Code 1026 → XCTSkip
+        let result: [QinaoLoop.GeneratedCandidate]
+        do {
+            result = try await loop.generateCandidates(
+                sessionID: "qinao-e2e-frontier",
+                seeds: [strong, weak])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
 
         XCTAssertEqual(result.count, 2)
         XCTAssertEqual(

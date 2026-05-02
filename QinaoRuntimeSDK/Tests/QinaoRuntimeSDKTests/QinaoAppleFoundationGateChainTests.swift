@@ -193,8 +193,15 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
             expectedCost: 0.2,
             reversibility: 0.9,
             confidence: 0.8)
-        let drafts = try await llmLoop.generateCandidates(
-            sessionID: "sess.gate.real.1", seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let drafts: [QinaoLoop.GeneratedCandidate]
+        do {
+            drafts = try await llmLoop.generateCandidates(
+                sessionID: "sess.gate.real.1", seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertEqual(drafts.count, 1)
         let draft = drafts[0]
         XCTAssertEqual(
@@ -296,8 +303,15 @@ final class QinaoAppleFoundationGateChainTests: XCTestCase {
             expectedCost: 0.2,
             reversibility: 0.9,
             confidence: 0.8)
-        let drafts = try await llmLoop.generateCandidates(
-            sessionID: "sess.gate.real.2", seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let drafts: [QinaoLoop.GeneratedCandidate]
+        do {
+            drafts = try await llmLoop.generateCandidates(
+                sessionID: "sess.gate.real.2", seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         let draft = drafts[0]
 
         let toolName = "calendar.add_event"

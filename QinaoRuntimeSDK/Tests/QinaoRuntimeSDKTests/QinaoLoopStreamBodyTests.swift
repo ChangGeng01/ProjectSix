@@ -126,7 +126,14 @@ final class QinaoLoopStreamBodyTests: XCTestCase {
                 "List five short single-word colors, one per line.",
             role: .scout)
 
-        let chunks = try await collectChunks(from: stream)
+        // M400.3 — Code 1026 → XCTSkip
+        let chunks: [QinaoLoop.OrganResponseChunk]
+        do {
+            chunks = try await collectChunks(from: stream)
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertGreaterThan(
             chunks.count, 1,
             "real Apple FM streaming through QinaoLoop must " +
@@ -152,7 +159,14 @@ final class QinaoLoopStreamBodyTests: XCTestCase {
             prompt: "Reply with three short adjectives.",
             role: .scout)
 
-        let chunks = try await collectChunks(from: stream)
+        // M400.3 — Code 1026 → XCTSkip
+        let chunks: [QinaoLoop.OrganResponseChunk]
+        do {
+            chunks = try await collectChunks(from: stream)
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertGreaterThan(chunks.count, 0)
 
         // Monotonic non-decreasing cumulative.

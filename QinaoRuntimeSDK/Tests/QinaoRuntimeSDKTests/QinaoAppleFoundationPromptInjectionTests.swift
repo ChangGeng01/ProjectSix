@@ -69,9 +69,16 @@ final class QinaoAppleFoundationPromptInjectionTests: XCTestCase {
             expectedCost: 0.2,
             reversibility: 0.9,
             confidence: 0.5)
-        let drafts = try await loop.generateCandidates(
-            sessionID: "pi.real.\(UUID().uuidString.prefix(6))",
-            seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let drafts: [QinaoLoop.GeneratedCandidate]
+        do {
+            drafts = try await loop.generateCandidates(
+                sessionID: "pi.real.\(UUID().uuidString.prefix(6))",
+                seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertEqual(drafts.count, 1)
         return drafts[0].body
             .trimmingCharacters(in: .whitespacesAndNewlines)

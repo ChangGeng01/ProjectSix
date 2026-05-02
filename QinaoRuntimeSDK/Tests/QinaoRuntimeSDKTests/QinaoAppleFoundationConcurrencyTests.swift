@@ -82,7 +82,15 @@ final class QinaoAppleFoundationConcurrencyTests: XCTestCase {
         async let resultB = loopB.generateCandidates(
             sessionID: "concurrent.B", seeds: [seedB])
 
-        let (a, b) = try await (resultA, resultB)
+        // M400.3 — Code 1026 → XCTSkip
+        let a: [QinaoLoop.GeneratedCandidate]
+        let b: [QinaoLoop.GeneratedCandidate]
+        do {
+            (a, b) = try await (resultA, resultB)
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
 
         XCTAssertEqual(a.count, 1)
         XCTAssertEqual(b.count, 1)
@@ -113,9 +121,17 @@ final class QinaoAppleFoundationConcurrencyTests: XCTestCase {
 
         let adapter = AppleFoundationOrganAdapter()
 
-        await withThrowingTaskGroup(
+        // M400.3 — `withThrowingTaskGroup` body's catch can't
+        // propagate `XCTSkip` to the test runner directly. Use
+        // `Error?` capture pattern: stash the first thrown
+        // error inside the closure, return early, then re-raise
+        // outside the closure where the outer test method's
+        // `async throws` can carry the throw + `skipIfAFMDegraded`
+        // can pivot it to `XCTSkip`.
+        var capturedError: Error? = nil
+        let collected = await withThrowingTaskGroup(
             of: BASOrganDraft.self
-        ) { group in
+        ) { group -> [BASOrganDraft] in
             for i in 0..<5 {
                 let request = BASOrganRequest(
                     requestID: "concurrent-\(i)",
@@ -127,36 +143,40 @@ final class QinaoAppleFoundationConcurrencyTests: XCTestCase {
                 }
             }
 
-            var collected: [BASOrganDraft] = []
+            var inner: [BASOrganDraft] = []
             do {
                 for try await draft in group {
-                    collected.append(draft)
+                    inner.append(draft)
                 }
             } catch {
-                XCTFail(
-                    "concurrent adapter call threw: \(error)")
-                return
+                capturedError = error
             }
-
-            XCTAssertEqual(collected.count, 5)
-            for draft in collected {
-                XCTAssertEqual(
-                    draft.providerID,
-                    "apple.foundation-models.v1")
-                XCTAssertFalse(
-                    draft.body
-                        .trimmingCharacters(
-                            in: .whitespacesAndNewlines)
-                        .isEmpty)
-            }
-
-            // Each request should have its own requestID echoed
-            // back — proves no cross-contamination.
-            let returnedIDs = Set(collected.map(\.requestID))
-            XCTAssertEqual(
-                returnedIDs.count, 5,
-                "each concurrent call must round-trip its " +
-                "requestID; got \(returnedIDs)")
+            return inner
         }
+
+        if let err = capturedError {
+            try skipIfAFMDegraded(err)
+            throw err
+        }
+
+        XCTAssertEqual(collected.count, 5)
+        for draft in collected {
+            XCTAssertEqual(
+                draft.providerID,
+                "apple.foundation-models.v1")
+            XCTAssertFalse(
+                draft.body
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines)
+                    .isEmpty)
+        }
+
+        // Each request should have its own requestID echoed
+        // back — proves no cross-contamination.
+        let returnedIDs = Set(collected.map(\.requestID))
+        XCTAssertEqual(
+            returnedIDs.count, 5,
+            "each concurrent call must round-trip its " +
+            "requestID; got \(returnedIDs)")
     }
 }

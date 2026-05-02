@@ -175,9 +175,16 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
             reversibility: 0.9,
             confidence: 0.8)
 
-        let result = try await loop.generateCandidates(
-            sessionID: "factory-real-1",
-            seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let result: [QinaoLoop.GeneratedCandidate]
+        do {
+            result = try await loop.generateCandidates(
+                sessionID: "factory-real-1",
+                seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
 
         XCTAssertEqual(result.count, 1)
         let candidate = result[0]
@@ -213,9 +220,16 @@ final class QinaoAppleFoundationFactoryTests: XCTestCase {
             reversibility: 0.9,
             confidence: 0.8)
 
-        let result = try await loop.generateCandidates(
-            sessionID: "factory-both-real-1",
-            seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let result: [QinaoLoop.GeneratedCandidate]
+        do {
+            result = try await loop.generateCandidates(
+                sessionID: "factory-both-real-1",
+                seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
 
         XCTAssertEqual(
             result.first?.providerID,

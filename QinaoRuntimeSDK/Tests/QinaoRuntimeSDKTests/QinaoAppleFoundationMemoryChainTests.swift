@@ -56,8 +56,15 @@ final class QinaoAppleFoundationMemoryChainTests: XCTestCase {
             role: .scout,
             expectedBenefit: 0.7, expectedCost: 0.2,
             reversibility: 0.9, confidence: 0.8)
-        let drafts = try await loop.generateCandidates(
-            sessionID: "mem.real.1", seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let drafts: [QinaoLoop.GeneratedCandidate]
+        do {
+            drafts = try await loop.generateCandidates(
+                sessionID: "mem.real.1", seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertEqual(drafts.count, 1)
         return drafts[0].body
             .trimmingCharacters(in: .whitespacesAndNewlines)

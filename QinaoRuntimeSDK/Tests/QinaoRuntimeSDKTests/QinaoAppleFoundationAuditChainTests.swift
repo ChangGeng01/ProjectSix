@@ -78,9 +78,16 @@ final class QinaoAppleFoundationAuditChainTests: XCTestCase {
             expectedCost: 0.2,
             reversibility: 0.9,
             confidence: 0.8)
-        let drafts = try await llmLoop.generateCandidates(
-            sessionID: "audit-llm.1",
-            seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let drafts: [QinaoLoop.GeneratedCandidate]
+        do {
+            drafts = try await llmLoop.generateCandidates(
+                sessionID: "audit-llm.1",
+                seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertEqual(drafts.count, 1)
         let draft = drafts[0]
         XCTAssertEqual(
@@ -179,8 +186,15 @@ final class QinaoAppleFoundationAuditChainTests: XCTestCase {
             reversibility: 0.9,
             confidence: 0.5)
 
-        let result = try await loop.generateCandidates(
-            sessionID: "trace.1", seeds: [seed])
+        // M400.3 — Code 1026 → XCTSkip
+        let result: [QinaoLoop.GeneratedCandidate]
+        do {
+            result = try await loop.generateCandidates(
+                sessionID: "trace.1", seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         XCTAssertEqual(result.count, 1)
         let candidate = result[0]
         XCTAssertFalse(

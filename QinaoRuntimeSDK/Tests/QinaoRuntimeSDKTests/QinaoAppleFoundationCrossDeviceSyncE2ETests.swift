@@ -105,7 +105,14 @@ final class QinaoAppleFoundationCrossDeviceSyncE2ETests:
             preset: .core,
             instruction: prompt,
             context: [])
-        let draft = try await adapter.draft(request)
+        // M400.3 — Code 1026 → XCTSkip
+        let draft: BASOrganDraft
+        do {
+            draft = try await adapter.draft(request)
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         let ref = auditRef(
             for: draft.body,
             deviceID: device.id,
