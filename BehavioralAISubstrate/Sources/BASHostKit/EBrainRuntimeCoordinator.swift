@@ -793,6 +793,21 @@ public struct BASEBrainRuntimeCoordinator {
                 "unknown-reserve-\(runtimeTrace.sessionID)",
             confidenceFloor: thoughtFrame.uncertaintyLedger?
                 .confidenceFloor ?? 1.0)
+        // M385 — assertion ceiling gate. When the reserve is
+        // active (`isOpen == true`), the typed reserve ceiling caps
+        // the permit's free-form `assertionCeiling` field per
+        // strictness ranking. Monotonic narrowing only — already-
+        // stricter permit ceilings are preserved. The pure helper
+        // returns the input permit unchanged when no cap fires; we
+        // overwrite the local `boundActionPermit` with the result
+        // so the audit emission and downstream tone / template
+        // enforcement see the capped value. Reason codes propagate
+        // through `permit.reasonCodes` (audit ledger consumer).
+        let assertionCeilingDecision = BASAssertionCeilingGate.cap(
+            permit: boundActionPermit,
+            reserve: unknownReserveForAudit)
+        boundActionPermit = assertionCeilingDecision.permit
+        thoughtFrame.actionPermit = boundActionPermit
         // M321 — derive `BASForbiddenKnowledgeCandidate`
         // aggregate from the turn's quarantine records. Empty
         // collection (no quarantines this turn) yields nil
