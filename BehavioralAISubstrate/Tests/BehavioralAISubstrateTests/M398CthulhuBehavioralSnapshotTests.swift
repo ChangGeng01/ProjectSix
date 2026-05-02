@@ -243,23 +243,27 @@ final class M398CthulhuBehavioralSnapshotTests: XCTestCase {
         // 5 states × 5 policies × 7 actions = 175 cells. Pin a
         // structural fingerprint instead of the full string —
         // 175-cell JSON is too large for a single literal but the
-        // refusal/allow count must stay invariant. Refusal cell
-        // counts:
-        //   - rejected sovereign × every policy × 5 advance
-        //     actions = 25 refusals (registerCandidate/
-        //     startShadowTrial/finalizeTrial/promote/retract)
-        //   - rejected sovereign × every policy × 2 terminal
-        //     actions = 10 allowed-with-reason
+        // refusal/allow count must stay invariant.
+        //
+        // Chapter 九十一 deep-review fix #2 changed `.retract` from
+        // refused to allowed when sovereign-rejected. Updated cell
+        // counts (post-M398.1 fix):
+        //
+        //   - rejected sovereign × every policy × 4 advance
+        //     actions = 20 refusals (registerCandidate /
+        //     startShadowTrial / finalizeTrial / promote;
+        //     `.retract` removed)
+        //   - rejected sovereign × every policy × 3 terminal
+        //     actions = 15 allowed-with-reason (added `.retract`
+        //     to the 10 prior `.withdraw` + `.fail` cells)
         //   - held sovereign × every policy × 1 action
         //     (startShadowTrial) = 5 refusals
         //   - other states × policy=.none × 1 action
-        //     (startShadowTrial) = 4 refusals (notReferred/
-        //     pending/cleared — 3 states × 1 action; one of these
-        //     is already covered by held above? no — held has its
-        //     own bucket; pending/cleared/notReferred each fire
-        //     once with policy=.none → 3 refusals)
-        // Total refusals = 25 + 5 + 3 = 33; pass-through = 175 - 33
-        //                                         - 10 = 132
+        //     (startShadowTrial) = 3 refusals (notReferred /
+        //     pending / cleared — 3 states × 1 action; held has
+        //     its own bucket; rejected has its own bucket)
+        // Total refusals = 20 + 5 + 3 = 28; pass-through-with-
+        // codes = 15; clean = 175 - 28 - 15 = 132.
         let refusals = cells.filter(\.refused).count
         let passThroughClean = cells.filter {
             !$0.refused && $0.reasonCodes.isEmpty
@@ -268,14 +272,14 @@ final class M398CthulhuBehavioralSnapshotTests: XCTestCase {
             !$0.refused && !$0.reasonCodes.isEmpty
         }.count
         XCTAssertEqual(
-            refusals, 33,
-            "M386 gate refusal count drift: expected 33, got \(refusals)")
+            refusals, 28,
+            "M386 gate refusal count drift: expected 28, got \(refusals)")
         XCTAssertEqual(
             passThroughClean, 132,
             "M386 gate clean-pass count drift: expected 132, got \(passThroughClean)")
         XCTAssertEqual(
-            passThroughWithCodes, 10,
-            "M386 gate pass-with-codes count drift: expected 10, got \(passThroughWithCodes)")
+            passThroughWithCodes, 15,
+            "M386 gate pass-with-codes count drift: expected 15, got \(passThroughWithCodes)")
         // Also pin a sample full snapshot to catch reason-code
         // wording drift on a representative cell.
         let sample = cells.first {

@@ -116,6 +116,41 @@ final class M391ForbiddenGateLifecycleIntegrationTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    // MARK: - 4b. Chapter 九十一 fix-pin — re-rejecting an
+    //          already-rejected ticket is idempotent
+
+    /// Pin chapter 九十一 deep-review fix #3: when a ticket has
+    /// already been rejected (by a prior gate call or a
+    /// concurrent caller), re-applying `submitWithForbiddenGate`
+    /// with a refusing-gate candidate must NOT throw
+    /// `LifecycleError.illegalTransition(from: .rejected, …)`.
+    /// Pre-fix this would have thrown.
+    func testReRejectingAlreadyRejectedTicketIsIdempotent()
+    async throws {
+        let coord = makeCoordinator()
+        // First call: gate refuses → ticket .rejected.
+        let firstState = try await coord.submitWithForbiddenGate(
+            ticket(),
+            forbidden: candidate(reviewState: .rejected))
+        XCTAssertEqual(firstState, .rejected)
+        // Second call with same (rejecting) candidate: must not
+        // throw, must report .rejected, must leave the entry
+        // unchanged.
+        let secondState = try await coord
+            .submitWithForbiddenGate(
+                ticket(),
+                forbidden: candidate(reviewState: .rejected))
+        XCTAssertEqual(secondState, .rejected)
+        let entry = await coord.entry(ticketID: "tk-1")
+        XCTAssertEqual(entry?.state, .rejected)
+        // Entry has exactly one rejection-transition in history
+        // (no duplicate).
+        let rejectionTransitions = entry?.history
+            .filter { $0.to == .rejected }
+            .count ?? 0
+        XCTAssertEqual(rejectionTransitions, 1)
+    }
+
     // MARK: - 5. Permissive candidate startTrial accepts
 
     func testStartTrialWithPermissiveCandidate() async throws {

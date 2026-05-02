@@ -303,4 +303,47 @@ final class M384AbyssalPermitEscalationTests: XCTestCase {
         XCTAssertTrue(decision.triggered)
         XCTAssertEqual(decision.permit.stackedModes, [.compare])
     }
+
+    // MARK: - 12. Chapter 九十一 fix-pin — boundary semantics
+
+    /// Pin chapter 九十一 deep-review note #8: the threshold
+    /// comparison is `>=`, not `>`. Producers measuring exactly
+    /// at the floor must trigger; producers a hair below must
+    /// not. This pins the inequality direction so a future
+    /// refactor that switches `>=` to `>` (or re-introduces a
+    /// tolerance band) fails fast.
+    func testTriggerFloorBoundarySemantics() {
+        let permit = basePermit()
+        // Just below floor → no escalation.
+        let pBelow = pressure(
+            magnitude: 0.5999999,
+            recommendedModes: [.compare])
+        let belowDecision = BASAbyssalPermitEscalation.escalate(
+            permit: permit,
+            pressure: pBelow,
+            humanAnchor: nil)
+        XCTAssertFalse(belowDecision.triggered,
+                       "magnitude 0.5999999 < default floor 0.6 " +
+                       "must NOT trigger")
+        // Exactly at floor → triggers (>= semantics).
+        let pAt = pressure(
+            magnitude: 0.6,
+            recommendedModes: [.compare])
+        let atDecision = BASAbyssalPermitEscalation.escalate(
+            permit: permit,
+            pressure: pAt,
+            humanAnchor: nil)
+        XCTAssertTrue(atDecision.triggered,
+                      "magnitude 0.6 == default floor 0.6 must " +
+                      "trigger (>= semantics, not strict >)")
+        // Just above floor → triggers.
+        let pAbove = pressure(
+            magnitude: 0.6000001,
+            recommendedModes: [.compare])
+        let aboveDecision = BASAbyssalPermitEscalation.escalate(
+            permit: permit,
+            pressure: pAbove,
+            humanAnchor: nil)
+        XCTAssertTrue(aboveDecision.triggered)
+    }
 }

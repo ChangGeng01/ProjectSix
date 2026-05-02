@@ -99,9 +99,35 @@ public extension BASUpdateTicketLifecycleCoordinator {
         }
 
         if decision.refused {
-            try await markRejected(
-                ticketID: ticket.ticketID,
-                reasonCodes: decision.reasonCodes)
+            // Chapter 九十一 deep-review fix #3: absorb
+            // `illegalTransition` from `markRejected` when the
+            // entry is already in `.rejected` (e.g. a concurrent
+            // caller transitioned it before us, or the existing
+            // entry from a re-presented turn was already
+            // rejected on a prior pass). Any-state →
+            // `.rejected` is legal *except* from `.rejected`
+            // itself; treating that single illegal-transition
+            // case as idempotent matches the gate's intent
+            // ("end up rejected") without double-rejecting.
+            // Other illegal-transition errors (terminal states
+            // .distilled / theoretical edge cases) still
+            // propagate so callers see real bugs.
+            do {
+                try await markRejected(
+                    ticketID: ticket.ticketID,
+                    reasonCodes: decision.reasonCodes)
+            } catch let err as LifecycleError {
+                let alreadyRejected: Bool = {
+                    if case let .illegalTransition(from, _) = err,
+                       from == .rejected
+                    {
+                        return true
+                    }
+                    return false
+                }()
+                guard alreadyRejected else { throw err }
+                // already in `.rejected` — gate's goal achieved.
+            }
             return .rejected
         }
         return .proposed

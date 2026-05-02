@@ -52,13 +52,15 @@ final class M386ForbiddenLifecycleGateTests: XCTestCase {
     // MARK: - 2. Rejected sovereign — advance actions blocked
 
     func testRejectedSovereignBlocksAdvanceActions() {
+        // Chapter 九十一 deep-review fix #2: `.retract` is no
+        // longer in the blocked set — see
+        // `testRejectedSovereignAllowsRetractTooFromPromoted`.
         let c = candidate(reviewState: .rejected)
         let blocked: [BASEvolutionLifecycleAction] = [
             .registerCandidate,
             .startShadowTrial,
             .finalizeTrial,
             .promote,
-            .retract,
         ]
         for action in blocked {
             let decision = BASForbiddenLifecycleGate.gate(
@@ -78,9 +80,18 @@ final class M386ForbiddenLifecycleGateTests: XCTestCase {
 
     func testRejectedSovereignAllowsTerminalActions() {
         let c = candidate(reviewState: .rejected)
+        // Chapter 九十一 deep-review fix #2: `.retract` joins
+        // `.withdraw` and `.fail` as exit-bound terminal
+        // actions. `.retract` is the only path out of
+        // `.promoted` per
+        // `BASEvolutionLifecyclePolicy.validTransitions(from:
+        // .promoted) = [.retract: .retracted]`. Refusing it
+        // would strand a `.promoted` candidate with no exit
+        // when sovereign rejects retroactively.
         let terminal: [BASEvolutionLifecycleAction] = [
             .withdraw,
             .fail,
+            .retract,
         ]
         for action in terminal {
             let decision = BASForbiddenLifecycleGate.gate(
@@ -94,6 +105,25 @@ final class M386ForbiddenLifecycleGateTests: XCTestCase {
                 "lifecycle.gated:forbidden:sovereign-rejected:terminal-action-allowed"
             ])
         }
+    }
+
+    // MARK: - 3b. Chapter 九十一 fix-pin — .retract specifically
+
+    /// Pin the chapter 九十一 deep-review fix #2: `.retract`
+    /// must be allowed when sovereign-rejected so a `.promoted`
+    /// candidate can always reach `.retracted` (its only exit).
+    /// Pre-fix this test would have failed (gate refused
+    /// `.retract`).
+    func testRejectedSovereignAllowsRetractAsTerminalExit() {
+        let c = candidate(reviewState: .rejected)
+        let decision = BASForbiddenLifecycleGate.gate(
+            action: .retract,
+            candidate: c)
+        XCTAssertFalse(decision.refused)
+        XCTAssertEqual(decision.action, .retract)
+        XCTAssertEqual(decision.reasonCodes, [
+            "lifecycle.gated:forbidden:sovereign-rejected:terminal-action-allowed"
+        ])
     }
 
     // MARK: - 4. Held sovereign blocks startShadowTrial only

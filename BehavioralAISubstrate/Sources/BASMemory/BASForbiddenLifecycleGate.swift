@@ -84,13 +84,28 @@ public enum BASForbiddenLifecycleGate {
         // Sovereign review states.
         switch candidate.sovereignReviewState {
         case .rejected:
-            // Sovereign permanently bars — every action that would
-            // advance the candidate is refused. `withdraw` and
-            // `fail` (terminal moves to `.withdrawn` / `.rejected`)
-            // are still allowed because they take the candidate
-            // out of the active path.
+            // Sovereign permanently bars — every action that
+            // would *advance* the candidate is refused. Three
+            // exit-bound actions are still allowed because they
+            // take the candidate OUT of the active path:
+            //
+            //   - `.withdraw` (any active → `.withdrawn`)
+            //   - `.fail`     (pre-promotion → `.rejected`)
+            //   - `.retract`  (`.promoted` → `.retracted`)
+            //
+            // `.retract` is the only path out of `.promoted` per
+            // `BASEvolutionLifecyclePolicy.validTransitions(from:
+            // .promoted) = [.retract: .retracted]`. If sovereign
+            // rejects a candidate that has somehow reached
+            // `.promoted` (e.g. via a different path that pre-
+            // dated the gate), refusing `.retract` would strand
+            // the candidate in `.promoted` with no exit. Doctrine
+            // fix from chapter 九十一 deep review #2: allow
+            // `.retract` alongside `.withdraw`/`.fail` so the
+            // sovereign-rejected verdict can always reach a
+            // terminal stage.
             switch action {
-            case .withdraw, .fail:
+            case .withdraw, .fail, .retract:
                 return BASForbiddenLifecycleGateDecision(
                     action: action,
                     reasonCodes: [
@@ -98,7 +113,7 @@ public enum BASForbiddenLifecycleGate {
                     ],
                     refused: false)
             case .registerCandidate, .startShadowTrial,
-                .finalizeTrial, .promote, .retract:
+                .finalizeTrial, .promote:
                 return BASForbiddenLifecycleGateDecision(
                     action: nil,
                     reasonCodes: [
