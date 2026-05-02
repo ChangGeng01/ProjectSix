@@ -474,12 +474,34 @@ extension BASEBrainRuntimeCoordinator {
         // M304 — Old-seal aggregate. Only emit when at least
         // one seal is present this turn (`nil` aggregate means
         // no seals → both codes elided).
+        // M387 — per-policy histogram codes. Doctrine red line
+        // 9 (旧印封缄不是伪删除): every seal carries typed
+        // access scope into the audit trail. We emit one
+        // `seal.scope:<policy>:<count>` code per non-zero entry
+        // in the histogram; consumers walking the audit ledger
+        // can filter sealed entries by policy without touching
+        // the seal collection itself. Output is sorted by the
+        // canonical strictness order so the audit trail is
+        // deterministic across runs.
         if let seal = sealAggregate {
             observationStatusCodes.append(
                 "seal.count:\(seal.count)")
             observationStatusCodes.append(
                 "seal.strictest:" +
                 "\(seal.strictestPolicy.rawValue)")
+            let canonicalOrder: [BASSealAccessPolicy] = [
+                .forbidden,
+                .sovereignOnly,
+                .hostExplicit,
+                .auditedAccess,
+                .passive,
+            ]
+            for policy in canonicalOrder {
+                if let n = seal.policyHistogram[policy], n > 0 {
+                    observationStatusCodes.append(
+                        "seal.scope:\(policy.rawValue):\(n)")
+                }
+            }
         }
         // M305 — L13 evolution lifecycle aggregate. Always emit
         // `lifecycle.tickets:N` (with N=0 elided since the

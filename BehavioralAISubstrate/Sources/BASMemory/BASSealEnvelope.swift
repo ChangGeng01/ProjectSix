@@ -226,12 +226,27 @@ public enum BASOldSealSealingProtocol {
     public struct Aggregate: Sendable, Equatable {
         public let count: Int
         public let strictestPolicy: BASSealAccessPolicy
+        /// **M387** — per-policy histogram of the seals in this
+        /// aggregate. Keys are the five canonical
+        /// `BASSealAccessPolicy` cases; values are the number of
+        /// seals carrying that exact policy. The full
+        /// distribution is stable and audit-emittable so the
+        /// ledger can record `seal.scope:<policy>:<count>` for
+        /// each non-zero entry without exposing the seal
+        /// collection itself. Doctrine red line 9 (旧印封缄不
+        /// 是伪删除) requires that seals carry typed access
+        /// scope into the audit trail; the per-policy histogram
+        /// is the smallest typed surface that satisfies that
+        /// requirement without leaking seal identifiers.
+        public let policyHistogram: [BASSealAccessPolicy: Int]
         public init(
             count: Int,
-            strictestPolicy: BASSealAccessPolicy
+            strictestPolicy: BASSealAccessPolicy,
+            policyHistogram: [BASSealAccessPolicy: Int] = [:]
         ) {
             self.count = count
             self.strictestPolicy = strictestPolicy
+            self.policyHistogram = policyHistogram
         }
     }
 
@@ -253,7 +268,16 @@ public enum BASOldSealSealingProtocol {
         let strictest = order.first { level in
             seals.contains { $0.accessPolicy == level }
         } ?? .passive
+        // M387 — build per-policy histogram. Only include
+        // policies with non-zero counts; downstream emitters
+        // walk the dictionary directly.
+        var histogram: [BASSealAccessPolicy: Int] = [:]
+        for seal in seals {
+            histogram[seal.accessPolicy, default: 0] += 1
+        }
         return Aggregate(
-            count: seals.count, strictestPolicy: strictest)
+            count: seals.count,
+            strictestPolicy: strictest,
+            policyHistogram: histogram)
     }
 }
