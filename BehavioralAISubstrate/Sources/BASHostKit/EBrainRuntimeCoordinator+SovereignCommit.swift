@@ -536,6 +536,13 @@ extension BASEBrainRuntimeCoordinator {
             observationStatusCodes.append(
                 "narrative.maxAxis:" +
                 "\(String(format: "%.3f", distortion.maxAxis))")
+            // M388 — emit the dominant-axis name so audit walkers
+            // can grep by specific distortion shape (e.g.
+            // `narrative.dominantAxis:role-inversion`). White-paper
+            // red line 7 preserved: this is a hint, never a gate.
+            observationStatusCodes.append(
+                "narrative.dominantAxis:" +
+                "\(distortion.dominantAxisName)")
             observationStatusCodes.append(
                 "narrative.forcedClosure:" +
                 "\(String(format: "%.3f", distortion.forcedClosure))")

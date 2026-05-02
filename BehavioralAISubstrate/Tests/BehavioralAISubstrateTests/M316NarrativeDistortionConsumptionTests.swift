@@ -179,20 +179,41 @@ final class M316NarrativeDistortionConsumptionTests: XCTestCase {
         let narrativeCodes = auditEntry.signalRefs.filter {
             $0.hasPrefix("narrative.")
         }
-        // When non-trivial → exactly 3 codes:
-        //   narrative.maxAxis / .forcedClosure / .urgencyMask
+        // When non-trivial → exactly 4 codes:
+        //   narrative.maxAxis (Double)
+        //   narrative.dominantAxis (name, M388)
+        //   narrative.forcedClosure (Double)
+        //   narrative.urgencyMask (Double)
         // When trivial → 0 codes. Both shapes valid per the
-        // M316 emit contract.
+        // M316 + M388 emit contract.
         XCTAssertTrue(
             narrativeCodes.isEmpty
-                || narrativeCodes.count == 3,
-            "narrative codes must be 0 or 3, got " +
+                || narrativeCodes.count == 4,
+            "narrative codes must be 0 or 4 (M388), got " +
             "\(narrativeCodes.count): \(narrativeCodes)")
         // If present, validate each code's parseable shape.
+        // Three codes (`maxAxis` / `forcedClosure` / `urgencyMask`)
+        // must parse as Double; one (`dominantAxis`) carries a
+        // canonical kebab-case name and is asserted separately.
+        let canonicalAxisNames: Set<String> = [
+            "reality-denial",
+            "history-rewrite",
+            "forced-closure",
+            "role-inversion",
+            "urgency-mask",
+            "none",
+        ]
         for code in narrativeCodes {
             let suffix = code
                 .components(separatedBy: ":")
                 .last ?? ""
+            if code.hasPrefix("narrative.dominantAxis:") {
+                XCTAssertTrue(
+                    canonicalAxisNames.contains(suffix),
+                    "narrative.dominantAxis suffix must be " +
+                    "canonical: \(code)")
+                continue
+            }
             guard let value = Double(suffix) else {
                 XCTFail(
                     "narrative code suffix must parse as " +

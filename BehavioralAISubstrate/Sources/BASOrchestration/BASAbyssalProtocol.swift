@@ -892,6 +892,26 @@ public extension BASNarrativeDistortion {
                     forcedClosure,
                     max(roleInversion, urgencyMask))))
     }
+
+    /// **M388** — name of the dominant distortion axis (the one
+    /// whose value equals `maxAxis`). When more than one axis ties
+    /// for the max, the canonical white-paper order
+    /// (`reality-denial` ≻ `history-rewrite` ≻ `forced-closure`
+    /// ≻ `role-inversion` ≻ `urgency-mask`) decides. Returns
+    /// `"none"` when every axis is `0` (caller should also check
+    /// `isNonTrivial`).
+    ///
+    /// Stable raw values match the white-paper kebab-case names so
+    /// audit walkers can grep by axis without importing the enum.
+    var dominantAxisName: String {
+        if !isNonTrivial { return "none" }
+        let m = maxAxis
+        if realityDenial >= m { return "reality-denial" }
+        if historyRewrite >= m { return "history-rewrite" }
+        if forcedClosure >= m { return "forced-closure" }
+        if roleInversion >= m { return "role-inversion" }
+        return "urgency-mask"
+    }
 }
 
 public extension BASAnomalyTrace {
