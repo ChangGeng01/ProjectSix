@@ -9,7 +9,8 @@
 #   bash scripts/run_bench_suite.sh                    # full suite, fail on regression
 #   bash scripts/run_bench_suite.sh --tolerance 0.10   # tighter 10% tolerance
 #   bash scripts/run_bench_suite.sh --no-regression-fail  # report-only mode
-#   bash scripts/run_bench_suite.sh --update-baselines  # rewrite baselines (CI bootstrap)
+#   bash scripts/run_bench_suite.sh --update-baselines  # write baselines if missing (CI bootstrap)
+#   bash scripts/run_bench_suite.sh --rewrite-baselines  # M395 — overwrite even if regression (sample-count uplift)
 #
 # Outputs:
 #   - per-bench banner with cold/warm split
@@ -28,6 +29,7 @@ TOLERANCE="${QINAO_BENCH_TOLERANCE:-0.25}"
 WRITE_MISSING=""
 NO_FAIL=""
 UPDATE_BASELINES=""
+REWRITE_BASELINES=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -43,8 +45,15 @@ while [[ $# -gt 0 ]]; do
             UPDATE_BASELINES="1"
             shift
             ;;
+        --rewrite-baselines)
+            # M395 — overwrite existing baselines even on
+            # regression. Use case: deliberately raising sample
+            # counts where p99/max naturally grow.
+            REWRITE_BASELINES="1"
+            shift
+            ;;
         --help|-h)
-            sed -n '2,17p' "${BASH_SOURCE[0]}"
+            sed -n '2,18p' "${BASH_SOURCE[0]}"
             exit 0
             ;;
         *)
@@ -57,6 +66,12 @@ done
 if [[ "${UPDATE_BASELINES}" == "1" ]]; then
     echo "[bench-suite] update-baselines mode: writing fresh baselines"
     export QINAO_BENCH_WRITE_MISSING_BASELINE=1
+fi
+
+if [[ "${REWRITE_BASELINES}" == "1" ]]; then
+    echo "[bench-suite] rewrite-baselines mode: overwriting existing baselines"
+    export QINAO_BENCH_WRITE_MISSING_BASELINE=1
+    export QINAO_BENCH_REWRITE_BASELINE=1
 fi
 
 export QINAO_BENCH_BASELINE_DIR="${BASELINE_DIR}"

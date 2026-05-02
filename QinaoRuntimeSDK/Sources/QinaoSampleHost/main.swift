@@ -4929,6 +4929,30 @@ struct QinaoSampleHost {
             case .withinTolerance:
                 print("\n  [baseline] within tolerance " +
                       "(\(String(format: "%.0f%%", tolerance * 100))) ✓")
+                // M395 — even within tolerance, rewrite when
+                // explicitly requested (sample-count uplift may
+                // tighten p50 + extend p99.9 simultaneously, all
+                // within tolerance, but the new numbers are
+                // meaningfully higher-quality).
+                if ProcessInfo.processInfo.environment[
+                    "QINAO_BENCH_REWRITE_BASELINE"] == "1"
+                {
+                    let envelope = BASBenchBaselineStorage
+                        .Envelope(
+                            benchName: benchName,
+                            stats: stats)
+                    do {
+                        try BASBenchBaselineStorage
+                            .writeBaseline(
+                                envelope: envelope,
+                                to: baselineURL)
+                        print("  [baseline] " +
+                              "QINAO_BENCH_REWRITE_BASELINE=1 — " +
+                              "refreshed baseline at \(baselineURL.path)")
+                    } catch {
+                        print("  [baseline] failed to refresh: \(error)")
+                    }
+                }
                 return true
             case .regression(let reports):
                 print("\n  [baseline] REGRESSION " +
@@ -4939,6 +4963,33 @@ struct QinaoSampleHost {
                         "baseline \(String(format: "%.4f", r.baselineValue)) → " +
                         "measured \(String(format: "%.4f", r.measuredValue)) " +
                         "(\(String(format: "%+.1f%%", r.regressionFraction * 100)))")
+                }
+                // M395 — `QINAO_BENCH_REWRITE_BASELINE=1` opts
+                // into "I deliberately want to overwrite this
+                // baseline with the new measurement, regression
+                // notwithstanding". Use case: raising sample
+                // counts (sharper percentile tails make p99/max
+                // grow naturally; this is a measurement-quality
+                // change, not a substrate regression).
+                if ProcessInfo.processInfo.environment[
+                    "QINAO_BENCH_REWRITE_BASELINE"] == "1"
+                {
+                    let envelope = BASBenchBaselineStorage
+                        .Envelope(
+                            benchName: benchName,
+                            stats: stats)
+                    do {
+                        try BASBenchBaselineStorage
+                            .writeBaseline(
+                                envelope: envelope,
+                                to: baselineURL)
+                        print("\n  [baseline] " +
+                              "QINAO_BENCH_REWRITE_BASELINE=1 — " +
+                              "overwrote prior baseline at \(baselineURL.path)")
+                        return true
+                    } catch {
+                        print("\n  [baseline] failed to rewrite: \(error)")
+                    }
                 }
                 exit(3)
             case .incompatibleBaseline(let reason):

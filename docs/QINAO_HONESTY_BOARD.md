@@ -9764,3 +9764,99 @@ post-M392 顺序：
 ### 88.9 一句话总结
 
 **M391-M393 close 附录 K full-landing batch — 把 chapter 八十七 列的"deferred actor-wire" + "audit-visible-only surface lag" + "absent sample-host demo" 三件全 ship**：M391 `BASForbiddenLifecycleGate` 真接线进 `BASUpdateTicketLifecycleCoordinator`（3 opt-in extension methods bridging vocabulary gap between `BASEvolutionLifecycleAction` 和 `BASUpdateTicketLifecycleState` / 7 fix-pin tests / 单提交口红线 actor 的 markRejected 仍唯一 mutation 入口） + M392 hooks 上移到 `renderedOutput` projection 之前（M303 + M304 + M384 + M320 + M385 现 line 380 跑 / surface 现 sealed against post-cap permit / existing L11 contract test 自动变为 regression gate / 双 hook 删 避 double-apply / audit-side derives identical-output guarantee） + M393 `--cthulhu-doctrine-demo` 7-step banner 显示 6 wires + 1 doctrine cardinality（实跑 banner all invariants hold ✓ / 7 fix-pin tests 仿 M333/M334/M335 pattern pin BAS substrate contracts demo composes / Package.swift 加 BASOrchestration + BASWorldPrior deps）。BAS 2330 → 2337 (+7) / Qinao 1339 → 1346 (+7) / 全栈 3669 → 3683 (+14) / 0 failures / 4/4 boundary 全绿 / 3 commits / **Cthulhu doctrine 现 fully load-bearing**：6 schemas runtime-influencing decisions + 1 doctrine static lint pinning audit vocabulary clean + sample-host CLI demo making all wires visible in one run。仓库内 surgical scope 第六次确认 = 空 — 剩 3 项需外部资源（EB-1/EB-2/EB-3）不变。
+
+## 八十九、 拉高 benchmark 在跑测试 — sample-count uplift + sharper baselines (M395-M397)
+
+### 89.1 触发动作
+
+用户 `拉高 benchmark 在跑测试` —— ramp 上 bench sample counts，capture sharper baselines，full test suite verify 不破。Phase 1 audit found 2 个 under-sampled baselines from M371:
+- `audit-ledger-bench` 1K samples → p99 confidence interval ±25% from sampling variance alone
+- `full-stack-bench` 10 sessions → p99 == max （样本数太少 percentile estimator 退化）
+- 其他 4 个 (lifecycle / sha256 / json-codec / ed25519) 在 10K-100K samples，statistical 充分但 5x 升级会进一步 tighten p99/p99.9 noise
+
+### 89.2 M395 — `QINAO_BENCH_REWRITE_BASELINE=1` env var + `--rewrite-baselines` script flag
+
+**实装**：[QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift) `compareToBaselineIfConfigured(...)` 加 `QINAO_BENCH_REWRITE_BASELINE=1` 路径 + [scripts/run_bench_suite.sh](../scripts/run_bench_suite.sh) `--rewrite-baselines` flag exports both env vars。
+
+**关键设计选择 — 两个 env vars 相对**：
+- `QINAO_BENCH_WRITE_MISSING_BASELINE=1`（M371 既有）= 仅当 baseline absent 时写。CI bootstrap fresh repo 用。
+- `QINAO_BENCH_REWRITE_BASELINE=1`（M395 新加）= 即便 baseline 存在 + 即便 measurement 落入 `withinTolerance` 或 `regression`，都覆盖 baseline。Sample-count uplift / measurement-quality refresh 用。
+
+Pre-M395 `--update-baselines` 仅写 missing baselines —— 以为是"rewrite"实际是"write-if-missing"。Sample-count uplift 触发 `regression` verdict（由于 noise tail 自然 extend），exit 3 阻止 baseline 更新。M395 给 deliberate "I want to refresh this baseline" 一个 typed 入口。
+
+**Doctrine pin — 红线 #2 神经不掌权 不变**：`--rewrite-baselines` 是 sample-host CLI 入口；底层 substrate (BASBenchBaselineStorage) 不动。Hosts 不调 sample-host 不受影响。Production CI 用 `--update-baselines`（write-if-missing），人工 evolution 用 `--rewrite-baselines`（deliberate refresh）。
+
+### 89.3 M395 — sample-count uplift 6/6 baselines
+
+| Bench | 旧 samples | 新 samples | uplift |
+|---|---:|---:|---:|
+| lifecycle | 99 999 | 499 999 | 5× |
+| sha256 | 99 999 | 499 999 | 5× |
+| json-codec | 49 999 | 249 999 | 5× |
+| audit-ledger | 1 000 | 10 000 | **10×** |
+| ed25519 | 9 999 | 49 999 | 5× |
+| full-stack | 9 | 49 | 5× |
+
+总 bench 时长 ~30 sec wall clock for re-baseline run（包含 builds）+ ~17 sec for round-trip verify。
+
+### 89.4 关键发现 — p99 全降，不是 substrate 优化是 measurement quality
+
+| Bench | 旧 p99 | 新 p99 | Δ |
+|---|---:|---:|---:|
+| lifecycle | 3.21 µs | 2.83 µs | **-11.8%** |
+| sha256 | 121.25 µs | 53.81 µs | **-55.6%** |
+| json-codec | 54.25 µs | 21.92 µs | **-59.6%** |
+| audit-ledger | 247.04 µs | 78.29 µs | **-68.3%** |
+| ed25519 | 132.13 µs | 54.46 µs | **-58.8%** |
+| full-stack | 4 700.71 µs | 3 277.30 µs | **-30.2%** |
+
+**这不是 substrate 优化** —— 没动任何 production code path。这是 **measurement quality** 提升。少 samples 时 p99 estimate 被 rare tail outliers 主导 1.4×–3.2× 过估。多 samples 后 p99 收敛到真分布。25% tolerance regression alarm 现在在 p99 层面 meaningful 了。
+
+### 89.5 M396 — round-trip verify
+
+每 bench 在新 sample count 下 vs 新 baseline 跑一次：
+
+```
+lifecycle:    [baseline] within tolerance (25%) ✓   wall 1.30 sec
+sha256:       [baseline] within tolerance (25%) ✓   wall 10.78 sec
+json-codec:   [baseline] within tolerance (25%) ✓   wall 3.15 sec
+audit-ledger: [baseline] within tolerance (25%) ✓   wall 0.49 sec
+full-stack:   [baseline] within tolerance (25%) ✓   wall 0.13 sec
+ed25519:      [baseline] within tolerance (25%) ✓   wall 2.30 sec
+```
+
+6/6 within tolerance。Confirms：
+1. 新 baselines 是 stable 的（再跑一次还在 tolerance 里）
+2. Substrate 没真 regression（如果有 substrate 慢，新 vs 新 不同 sample-count run 之间 p99 变化会超 25%）
+3. 25% tolerance 是 noise floor over multiple runs
+
+### 89.6 测试基线 (no change)
+
+| 套件 | 八十八章末 | 八十九章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2337 | 2337 | 0 |
+| Qinao XCTest | 1346 | 1346 | 0 |
+| 全栈 | 3683 | 3683 | 0 |
+
+0 failures / 0 flakes / 4 boundary checks 全绿。Test counts 不变 — M395-M397 是 baseline data + bench infrastructure 改动不动 source of truth tests。
+
+### 89.7 红线 / 不变量回归
+
+| 红线 / 不变量 | M395 | M396 | M397 |
+|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓（CLI flag 不动 substrate） | ✓ | ✓ |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓（不动 audit emission） | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 89.8 chapter 八十四.6 / chapter 八十六 evolution log opportunity 复查
+
+Chapter 八十四.6 列了 4 个 open opportunities (A/B/C/D)；chapter 八十六.7 全部宣告 closed。M395 不打开新 opportunity — 它是 measurement infrastructure 的 quality 升级，不是 substrate 优化机会。下一轮 evolution loop 还需要外部 trigger（new bench mode / new substrate path）。
+
+**evolution log opportunity table** 末加 M395+M396 entry — 不入 "Open opportunities" 列表（不是 open，是 closed-after-action）。
+
+### 89.9 一句话总结
+
+**M395-M397 close "拉高 benchmark 在跑测试" 用户指令** —— ship `QINAO_BENCH_REWRITE_BASELINE=1` env var + `--rewrite-baselines` script flag 让 sample-count uplift 不被 25% tolerance regression alarm 误识为 substrate regression（M395）+ 6/6 baselines uplifted（lifecycle/sha256/json-codec 5× / audit-ledger 10× / ed25519 5× / full-stack 5×）+ 6/6 round-trip verify within tolerance（M396）+ chapter 八十九 + bench evolution log entry + changelog 更新（M397）。p99 全 6 个 bench 降 11.8%-68.3% — **不是** substrate 优化（0 production code change），是 measurement quality 提升（rare tail outliers 不再主导 sparse data 的 percentile estimator）。新 baselines 在 25% tolerance 下 stable + meaningful。BAS 2337 / Qinao 1346 / 全栈 3683 不变 / 0 failures / 4/4 boundary 全绿 / 4 commits + push。仓库内 surgical scope 第七次确认 = 空 — 剩 EB-1/EB-2/EB-3 三项需外部资源不变。

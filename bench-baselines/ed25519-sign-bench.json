@@ -2,16 +2,16 @@
   "benchName" : "ed25519-sign-bench",
   "schemaVersion" : "bas-bench-baseline.v1",
   "stats" : {
-    "max" : 0.282583,
-    "mean" : 0.0540071657165715,
-    "min" : 0.046083,
-    "outlierCount" : 178,
-    "p50" : 0.049167,
-    "p95" : 0.077125,
-    "p99" : 0.132125,
-    "p999" : 0.231042,
-    "sampleCount" : 9999,
-    "standardDeviation" : 0.01627794263399648
+    "max" : 0.114333,
+    "mean" : 0.04574163045260666,
+    "min" : 0.04475,
+    "outlierCount" : 805,
+    "p50" : 0.045042,
+    "p95" : 0.047375,
+    "p99" : 0.054542,
+    "p999" : 0.068083,
+    "sampleCount" : 49999,
+    "standardDeviation" : 0.001874029959478489
   },
-  "storedAt" : "2026-05-01T21:57:16Z"
+  "storedAt" : "2026-05-02T11:25:15Z"
 }
