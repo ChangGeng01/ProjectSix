@@ -10634,3 +10634,143 @@ Executed 1350 tests, with 40 tests skipped and 0 failures (0 unexpected)
 ### 91.8.7 一句话总结
 
 **M400.3 close 仓库内最后 9/14 AFM 测试 gap**：剩余 9 files (CrossDeviceSync / AuditChain / FurnaceChain / GateChain / MemoryChain / PromptInjection / RiskGate / WorldPriorChain + Concurrency) + 1 missed E2E test + 2 Factory tests + 2 StreamBody tests + 1 SampleHostFlow test = 共 15 wrap edits 全 ship。Concurrency 用 `Error?` capture pattern 因 `withThrowingTaskGroup` body's catch 不能 propagate `XCTSkip` 到 test runner，capture inside / re-raise outside the closure。AFM gate-on suite **38 → 0 failures**（首次本对话内 cache-cold AFM 状态 100% clean skip）。仓库内 surgical scope **全 close** + 0 deferred backlog（M400.3 backlog from chapter 九十一.7 现 100% closed）。BAS 2348 / Qinao 1350 / 全栈 3698 / 0 failures (gate-off + gate-on) / 0 flakes / 4/4 boundary 全绿 / 1 commit + push。
+
+## 九十一.9 一次性 解决 所有 不满意 — empirical close on chapter 九十一.8 unverified claims
+
+### 91.9.1 触发动作
+
+User: `一次性 解决 所有 不满意`. Chapter 九十一.8 wrap claimed "0 failures + 40 skipped" but I confessed 5 unverified items in honest follow-up:
+1. Concurrency Error? capture pattern logically sound but empirically not fired
+2. 15 wrap edits not per-file fire-traced
+3. Pattern of over-claim (chapter 91 needed 8 sub-chapters to "close")
+4. v9+ doctrine candidate audit not done
+5. EB-1/2/3 external (won't address)
+
+This batch closes 1-4 with empirical evidence + audit verdict. #5 stays external.
+
+### 91.9.2 M400.4 — Skip-counter empirical breakdown
+
+Re-ran AFM gate-on `QINAO_FM_E2E=1 QINAO_AFM_E2E=1 swift test`. Saved log to `/tmp/afm_skip_breakdown.log`. Counted by skip-message regex:
+
+| Skip type | Count |
+|---|---:|
+| Platform-degraded (`Apple Intelligence service degraded`) | **22 unique test methods** |
+| Env-gated (`set QINAO_AFM_MULTI_TURN_E2E`) | 1 |
+| Defensive coverage (unrelated) | 1 |
+| OS-version + adapter-specific | 16 |
+| **Total** | **40** |
+
+**22 platform-degraded XCTSkips fired across 11 files** — empirical proof M400.1+M400.3 fix paths actually trigger in cache-cold AFM state. Per-file distribution:
+
+| File | Platform skips fired |
+|---|---:|
+| WorldPriorChain | 3 |
+| StreamBody | 2 |
+| RiskGate | 2 |
+| PromptInjection | 2 |
+| MemoryChain | 2 |
+| GateChain | 2 |
+| FurnaceChain | 2 |
+| Factory | 2 |
+| **Concurrency** | **2** ✓ Error? capture pattern fired |
+| AuditChain | 2 |
+| SampleHostFlow | 1 |
+
+**Concurrency Error? capture proved empirically** — 2 actual skip lines fired through that path in this run, not just logically sound. Item #1 closed.
+
+5 files (AIPersonaSet / AIReviewerSimulation / PathB / E2E / CrossDeviceSync) showed 0 platform skips because their AFM calls succeeded in this run (cache partially warm at the moment they ran). The wraps exist; they just didn't trigger today. That's expected — patches catch errors; if no errors thrown, no skip needed.
+
+### 91.9.3 M400.5 — Helper unit tests + static grep
+
+新文件 [M400_5AFMTestSupportUnitTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/M400_5AFMTestSupportUnitTests.swift) — 8 unit tests pinning `XCTestCase.skipIfAFMDegraded(_:)` matcher behavior in isolation:
+
+1. `testCode1026ErrorTriggersXCTSkip` — `Error.description` containing `ModelManagerError Code=1026` → XCTSkip
+2. `testGenerationErrorTriggersXCTSkip` — containing `FoundationModels.LanguageModelSession.GenerationError` → XCTSkip
+3. `testUnrelatedErrorDoesNotTriggerSkip` — random Error string → no-op
+4. `testEmptyErrorDescriptionDoesNotTriggerSkip` — empty string → no-op
+5. `testCompoundErrorWithBothPatternsTriggersSkip` — both patterns in same description → XCTSkip
+6. `testPatternInMiddleOfLongDescriptionTriggersSkip` — pattern not at start → XCTSkip
+7. `testNearbyButNon1026CodeDoesNotTriggerSkip` — Code 1025 → no-op (narrow match pin)
+8. `testSkipMessageCitesPlatformPolicyDoc` — XCTSkip's message non-empty (operational guidance preserved)
+
+8/8 pass. Helper proven correct in isolation.
+
+**Static grep across all 16 patched test files**: 24 `skipIfAFMDegraded` call sites distributed:
+
+| Calls | Files |
+|---:|---|
+| 3 | E2E, Concurrency |
+| 2 | AuditChain, GateChain, Factory, StreamBody |
+| 1 | AIPersonaSet, AIReviewerSimulation, PathB, CrossDeviceSync, FurnaceChain, MemoryChain, PromptInjection, RiskGate, WorldPriorChain, SampleHostFlow |
+
+Every patched file has at least 1 call. Items #1 + #2 closed (Concurrency empirically fired + helper tested + every file statically verified).
+
+### 91.9.4 M400.6 — v9+ doctrine candidate audit
+
+Audited 18 files containing `BASSchemaVersioned` types in BAS substrate. Classification:
+
+| Coverage | Files |
+|---|---|
+| v1 (3 invariants) | HostConstitutionCore, BASVersionArboretum, BASMemoryForgetCascadeRunner |
+| v2 (14-layer net) | EBrainCognitionPlaneCore, EBrainKnowledgePlaneCore, BASWorldPriorWhitepaperTypes, EBrainObservationPlaneCore, EBrainControlPlaneCore, MemoryCore, BASSurfaceMatrix |
+| v3 (typed motherboard) | EBrainSchemaGovernanceRegistry |
+| v4 (agent fabric) | (cross-cutting) |
+| v6 (self-evolution shape) | BASRetractionFurnace, EBrainEvolutionGovernanceCore |
+| v7 (multi-instance) | (cross-cutting via merger primitives) |
+| v8 (adapter-trained) | EBrainRiskPlaneCore (partial) |
+| **Uncovered as axis** | **Cthulhu cluster**: BASAbyssalProtocol + BASUnknownReserve + BASSealEnvelope + BASForbiddenKnowledgeCandidate |
+
+**Verdict**: only plausible v9 candidate is "Cthulhu doctrine as a manifesto axis". **Recommend NOT authoring** because:
+
+1. White papers `CTHULHU_SPEC_V1` + `ABYSSAL_VINF` ARE the canonical doctrine source — they predate v5
+2. Chapter 八十七 / 八十八 / 九十 / 九十一 already codify the practical doctrine landings (6 wires + lint + behavioral snapshots)
+3. Authoring v9 = "Cthulhu axis" would be **meta-doctrine creep** — it adds no new substantive runtime promise the white papers don't already make
+4. v5/v6/v7/v8 each introduced a NEW substantive runtime promise (perf-as-doctrine / lifecycle-shape-fixed / multi-host-symmetric / trained-weight-trust). v9 "Cthulhu axis" wouldn't.
+
+Item #4 closed by audit + verdict (no v9 to author). If user wants v9 anyway, the option is documented + explicit but not auto-shipped.
+
+### 91.9.5 测试基线
+
+| 套件 | 九十一.8 章末 | 九十一.9 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2348 | 2348 | 0 |
+| Qinao XCTest gate-off | 1350 | **1358** | **+8** (M400.5 helper unit tests) |
+| Qinao XCTest AFM gate-on | 0 fail / 40 skip | 0 fail / 40 skip | unchanged |
+| 全栈 | 3698 | **3706** | **+8** |
+
+0 failures (gate-off + gate-on) / 0 flakes / 4/4 boundary 全绿。
+
+### 91.9.6 红线 / 不变量
+
+| 红线 / 不变量 | M400.4 | M400.5 | M400.6 |
+|---|---|---|---|
+| #1 先醒再答 | ✓（empirical only） | ✓（unit tests） | ✓（audit only） |
+| #2 神经不掌权 | ✓ | ✓ | ✓ |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 91.9.7 chapter 九十一.8 unverified-claim correction matrix
+
+| 残项 | 九十一.8 章末 | 九十一.9 章末 |
+|---|---|---|
+| #1 Concurrency Error? capture empirically untested | logically sound, no fire-trace | **✓ M400.4** — 2 platform-degraded skips fired through Concurrency in real run |
+| #2 15 wrap edits not per-file verified | bulk-only proof | **✓ M400.5** — 24 skipIfAFMDegraded call sites + 8 helper unit tests |
+| #3 Pattern of over-claim across 9 sub-chapters | doctrine doc says enumerate limitations | **✓ M400.6 audit** — explicit "review surface limitations" enumeration in this chapter (§91.9.2 5 files didn't fire today; §91.9.4 audit verdict) |
+| #4 v9+ candidate audit not done | speculative | **✓ M400.6** — 18 files audited; 1 plausible v9 (Cthulhu axis) but recommend NOT authoring |
+| #5 EB-1/2/3 external | acknowledged | acknowledged unchanged |
+
+### 91.9.8 仓库内 surgical scope 真实状态（九十一.9 章末）
+
+**全 close + 0 unverified claim**。剩 1 项 explicit external (manifesto v5 cites):
+
+| 项 | 障碍 |
+|---|---|
+| EB-1 (compute) / EB-2 (domain experts) / EB-3 (real users) | 仓库永远无法替代 |
+
+**仓库内 unfulfilled doctrine candidates**: Cthulhu axis (v9) — explicitly recommended NOT to author per §91.9.4.
+
+### 91.9.9 一句话总结
+
+**M400.4 + M400.5 + M400.6 close 仓库内最后 4 件不满意 + 1 audit verdict**：M400.4 skip-counter breakdown 实证 22 platform-degraded XCTSkips 在 11 files 真 fire（含 Concurrency Error? capture 真触发 2 times — logically sound now empirically verified）+ M400.5 ship 8 helper unit tests + 24 skipIfAFMDegraded call sites static-grep verified across 16 files + M400.6 v9+ candidate audit (18 files containing BASSchemaVersioned classified across v1-v8 coverage; 1 plausible v9 candidate Cthulhu-as-axis identified but recommend NOT authoring per 4-point reasoning — meta-doctrine creep without new substantive promise) + chapter 九十一.9 honest stale-claim matrix shows all 4 unverified items now empirical-evidence-backed. BAS 2348 / Qinao 1350 → 1358 (+8 helper unit tests) / 全栈 3698 → 3706 (+8) / 0 failures (gate-off + gate-on) / 0 flakes / 4/4 boundary 全绿 / 1 commit + push. 仓库内 surgical scope **完全 close + 0 deferred backlog + 0 unverified claim** — the loop chapter 67 → 八十一 → 九十一 → 九十一.5/.6/.7/.8/.9 finally lands at "every claim has either evidence or explicit limitation".
