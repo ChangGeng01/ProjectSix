@@ -10774,3 +10774,138 @@ Item #4 closed by audit + verdict (no v9 to author). If user wants v9 anyway, th
 ### 91.9.9 一句话总结
 
 **M400.4 + M400.5 + M400.6 close 仓库内最后 4 件不满意 + 1 audit verdict**：M400.4 skip-counter breakdown 实证 22 platform-degraded XCTSkips 在 11 files 真 fire（含 Concurrency Error? capture 真触发 2 times — logically sound now empirically verified）+ M400.5 ship 8 helper unit tests + 24 skipIfAFMDegraded call sites static-grep verified across 16 files + M400.6 v9+ candidate audit (18 files containing BASSchemaVersioned classified across v1-v8 coverage; 1 plausible v9 candidate Cthulhu-as-axis identified but recommend NOT authoring per 4-point reasoning — meta-doctrine creep without new substantive promise) + chapter 九十一.9 honest stale-claim matrix shows all 4 unverified items now empirical-evidence-backed. BAS 2348 / Qinao 1350 → 1358 (+8 helper unit tests) / 全栈 3698 → 3706 (+8) / 0 failures (gate-off + gate-on) / 0 flakes / 4/4 boundary 全绿 / 1 commit + push. 仓库内 surgical scope **完全 close + 0 deferred backlog + 0 unverified claim** — the loop chapter 67 → 八十一 → 九十一 → 九十一.5/.6/.7/.8/.9 finally lands at "every claim has either evidence or explicit limitation".
+
+## 九十二、 开始 昆仑 — Phase α (Observatory + Axis) schema parity (M401-M403)
+
+### 92.1 触发动作
+
+User 2026-05-03 指令"开始 昆仑". Plan 附录 L (master roadmap) approved with scope = "全部 (中兴多批)" + manifesto v9 = "按需 author". 本章 ship Phase α (Observatory + Axis) per whitepaper §14 推荐 phasing — first of 6 chapters (九十二 → 九十七).
+
+### 92.2 M401 — `BASKunlunProtocol.swift` schema parity
+
+**新文件** [BehavioralAISubstrate/Sources/BASOrchestration/BASKunlunProtocol.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASKunlunProtocol.swift)（~750 LOC）:
+
+**6 typed schemas** (white paper §4.1-§4.5):
+- `BASKunlunAxis` (§4.1) — host-sovereignty centerline definition; 9 fields including axisID / hostRef / sovereignRef / worldAnchorRef / activeLayerRefs / agentSeatRefs / centerlineRules / deviationThreshold ∈ [0,1] / lastAlignmentCheck
+- `BASAxisAlignment` (§4.1) — per-target alignment readout; centerScore ∈ [0,1] / deviationCodes / correctionHint / requiresGate
+- `BASJadeCanonSeal` (§4.2) — high-integrity object seal; provenanceRefs + integrityHash + signatureRef + replayRequired + revocationPath all required for `isCanonicallySealed = true`
+- `BASHeavenGatePermit` (§4.3) — domain-transition gate (cognitive / memory / tool / host / evolution / public); links L11 actionPermitRef + L14 sovereignWarrantRef + required jade seals
+- `BASYaochiSanctumEntry` (§4.4) — sanctum memory parking record (sensitive / precious / grief / boundary / vow / high-weight-relation); accessPolicy ∈ {sealed / conditional / audited-open}
+- `BASRiverOriginTrace` (§4.5) — system-level provenance graph; supports backwards-find / downwards-find / pollution-locate / cascade-delete-verify / rule-replay-chain
+
+**4 typed enums** (stable kebab-case raw values):
+- `BASJadeCanonObjectClass` (8 cases: action-permit / sovereign-warrant / host-version / rule-candidate / rollback-writ / update-ticket / memory-atom / forget-cascade)
+- `BASKunlunGateClass` (6 cases: cognitive / memory / tool / host / evolution / public)
+- `BASKunlunGateState` (4 cases: pending / passed / denied / remanded)
+- `BASYaochiSanctumClass` (6 cases: sensitive / precious / grief / boundary / vow / high-weight-relation)
+- `BASYaochiAccessPolicy` (3 cases: sealed / conditional / audited-open)
+
+**5 protocol helper enums** (pure-function namespaces):
+- `BASKunlunAxisProtocol.computeAlignment(...)` → `BASAxisAlignment` (4 inputs + score derivation + threshold-aware requiresGate computation)
+- `BASKunlunJadeCanonProtocol.verifySeal(_:)` → `Verification {isCanonical, missingRequirements[]}` (typed 4-rule check: 无来源 / 无签名 / 无哈希 / 无撤销路径)
+- `BASKunlunHeavenGateProtocol.evaluateReadiness(_:)` → `Readiness {isReady, reasonCodes[]}` (high-stakes gate classes require warrant + jade seal)
+- `BASKunlunYaochiProtocol.evaluateAccess(...)` → `AccessDecision {granted, reasonCodes[]}` (sealed always denies; conditional needs matched conditions; audited-open free; cooling + human-anchor gates apply)
+- `BASKunlunRiverOriginProtocol.analyze(_:)` → `LineageReport {isWellFormed, upwardCount, downwardCount, hasLineageCut, warningCodes[]}` (orphan / derived-without-permit / cascade-without-consent warnings)
+
+**Doctrine pins**:
+- All schemas `BASSchemaVersioned` v1.0.0 + `Sendable` + `Equatable` + `Hashable` + `Codable`
+- Stable kebab-case raw values across all enums
+- Pure-function helpers — no actor / no IO / no upstream substrate-runtime dependency
+- Co-locates with `BASAbyssalProtocol.swift` (parallel file structure, parallel doctrine pair)
+
+**测试**: [BASKunlunProtocolTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASKunlunProtocolTests.swift)（37 tests, 10 sections）:
+1. Enum cardinality + raw values (5 tests across 4 enums + access policy)
+2. Schema Codable round-trips (6 tests, 1 per schema)
+3. Schema field clamping (3 tests: deviationThreshold / centerScore / coolingPeriod)
+4. JadeCanonSeal canonical-sealed predicate (2 tests)
+5. RiverOriginTrace well-formedness (3 tests)
+6. Protocol helper Axis Alignment (3 tests: full / threshold / red-tier deviation)
+7. Protocol helper Jade Canon (2 tests: canonical pass + 4-missing fail)
+8. Protocol helper Heaven Gate (4 tests: low-stakes pass / high-stakes fail / missing-permit / denied+remanded)
+9. Protocol helper Yaochi (4 tests: sealed-always-denies / conditional / cooling / red-line-3 anchor)
+10. Protocol helper River-Origin (5 tests: well-formed / orphan / derived-without-permit / cascade-without-consent / lineage-cut detected)
+
+### 92.3 M402 — L4 axis derive + audit signalRefs
+
+**修改** [EBrainRuntimeCoordinator.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift):
+- New `kunlunAxisForAudit` derive at audit-projection seam (after M321 forbidden aggregate, before `buildSovereignAuditEntry`)
+- Synthesizes `BASKunlunAxis` from `runtimeTrace.sessionID` + `hostContext.hostID` + permit mode + 14 active layer refs + 3 centerline rules
+- Maps `boundRiskCard.riskLevel` to typed `matchedRules` count + `deviationCodes` array (low: 3/3 + []; medium: 2/3 + ["risk-medium-needs-attention"]; high: 1/3 + ["risk-high-narrows-axis"]; extreme: 0/3 + ["risk-extreme-axis-overreach"])
+- Calls `BASKunlunAxisProtocol.computeAlignment(...)` to derive `BASAxisAlignment` for the turn's primary candidate (or "no-candidate" sentinel)
+- Passes alignment to `buildSovereignAuditEntry(...)` via new optional `kunlunAxisAlignment` parameter
+
+**修改** [EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift):
+- New optional parameter `kunlunAxisAlignment: BASAxisAlignment? = nil`
+- Audit emission: when non-nil, append `kunlun.axis.center:%.3f` (always); `kunlun.axis.deviation:<sorted+joined>` (when deviationCodes non-empty); `kunlun.axis.requires-gate:true` (when requiresGate true)
+- Code prefix `kunlun.axis.*` stable + observability-only at this milestone (M406 in chapter 九十三 will hook alignment into L11 permit synthesis)
+
+**Doctrine pin**: audit-only emission, no decision influence (parity with M303 / M304 audit-only pre-M384 phase for Cthulhu).
+
+**测试**: [M402KunlunAxisAuditTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M402KunlunAxisAuditTests.swift)（6 tests）:
+1. `testRuntimeTurnEmitsKunlunAxisCenterCode` — real BASHostRuntime turn produces `kunlun.axis.center:<score>` with parseable [0,1] Double
+2. `testMediumRiskTurnEmitsDeviationAndRequiresGate` — medium-risk fixture fires both deviation + requires-gate codes
+3. `testKunlunCodesUseStableKebabCasePrefix` — all kunlun codes are `kunlun.axis.*`
+4. `testKunlunCodeCountInValidRange` — code count ∈ [1, 3]; exactly 1 `.center` always
+5. `testNilAlignmentDefaultElidesKunlunCodes` — direct unit test on helper output shape (when deviationCodes empty + requiresGate false, only `.center` would emit)
+6. `testSameSessionProducesSameAxisIDPattern` — per-session axis ID derivation stable
+
+### 92.4 M403 — sample-host `--kunlun-schema-demo`
+
+**修改** [QinaoSampleHost/main.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift):
+- New `--kunlun-schema-demo` args branch
+- New `runKunlunSchemaDemo()` static func — 100-line banner introspecting all 5 schemas + 5 protocol helpers + audit signalRefs codes + doctrine pair invariant + pointer to chapters 九十三 / 九十四 for subsequent phases
+
+**Banner output**: schema-only introspection (no runtime, no actor, no IO). Cites white paper §4.1-§4.5 verbatim. Banner verified by manual `swift run QinaoSampleHost --kunlun-schema-demo` execution.
+
+**测试**: [QinaoSampleHostKunlunSchemaDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostKunlunSchemaDemoTests.swift)（3 tests）:
+1. All 5 protocol helpers callable in isolation (parity with M333/M334/M335 substrate-pin pattern; doesn't import executable target)
+2. White-paper-faithful kebab-case raw values pinned
+3. All 6 schemas at v1.0.0 schemaVersion
+
+### 92.5 测试基线
+
+| 套件 | 九十一.9 章末 | 九十二 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2348 | **2391** | **+43** (M401 37 + M402 6) |
+| Qinao XCTest gate-off | 1358 | **1361** | **+3** (M403) |
+| Qinao XCTest AFM gate-on | 0 fail / 40 skip | (not tested this batch) | - |
+| 全栈 | 3706 | **3752** | **+46** |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿 (qinao import / sovereign redaction / SDK / substrate residuals).
+
+### 92.6 红线 / 不变量
+
+| 红线 / 不变量 | M401 | M402 | M403 |
+|---|---|---|---|
+| #1 先醒再答 | ✓（schema only） | ✓（audit-only emission） | ✓（demo banner only） |
+| #2 神经不掌权 | ✓（permit untouched） | ✓（audit-only; no decision） | ✓（demo only） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | n/a | ✓（kunlun codes additive metadata） | n/a |
+| 单提交口 | ✓（permit by L11; warrant by L14） | ✓ | ✓ |
+| Kunlun 红线 #1-8 (target spec §13.7) | n/a (schemas only) | n/a (audit only) | n/a |
+| Cthulhu 红线 (10 cases) | unchanged | unchanged | unchanged |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 92.7 Phase α 完成判据
+
+| 判据 | 状态 |
+|---|---|
+| Whitepaper §4.1-§4.5 全 6 schemas typed in BAS | ✓ M401 |
+| 5 protocol helpers pure-function callable | ✓ M401 |
+| L4 audit projection emit `kunlun.axis.*` codes | ✓ M402 |
+| Sample-host introspection demo runs | ✓ M403 |
+| BAS + Qinao test suites green | ✓ |
+| 4 boundary checks clean | ✓ |
+| Schema parity tests pin every field + enum + helper | ✓ 37 tests |
+
+### 92.8 Phase β 后续 (chapter 九十三 — M404-M407)
+
+After this chapter ships:
+- M404 — JadeCanon seal verification wire (high-integrity object audit emission)
+- M405 — RiverOrigin trace integrity wire (provenance graph audit)
+- M406 — L11 permit-synthesis hook for axis-aware gating (`requiresGate == true` → escalate `BASActionPermit.stackedModes`; composability with M384 abyssal pressure)
+- M407 — Phase β audit signalRefs aggregation
+
+### 92.9 一句话总结
+
+**M401-M403 close 昆仑 doctrine Phase α (chapter 九十二)**：M401 ship `BASKunlunProtocol.swift` 6 typed schemas (KunlunAxis / AxisAlignment / JadeCanonSeal / HeavenGatePermit / YaochiSanctumEntry / RiverOriginTrace per whitepaper §4.1-§4.5) + 4 helper enums + 5 protocol-helper namespaces (computeAlignment / verifySeal / evaluateReadiness / evaluateAccess / analyze) all pure-function + co-locates with BASAbyssalProtocol parallel doctrine pair + 37 schema-parity tests + M402 wire L4 audit-projection seam to derive `BASKunlunAxis` + `BASAxisAlignment` from sessionID/host/permit/risk-level inputs and emit 1-3 `kunlun.axis.*` audit signalRefs codes + 6 audit tests + M403 sample-host `--kunlun-schema-demo` schema-introspection banner + 3 substrate-pin tests. Audit-only emission at this milestone (M406 wires permit hook in chapter 九十三). BAS 2348 → 2391 (+43) / Qinao 1358 → 1361 (+3) / 全栈 3706 → 3752 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase α done; Phase β (JadeCanon + RiverOrigin) 待 chapter 九十三**.

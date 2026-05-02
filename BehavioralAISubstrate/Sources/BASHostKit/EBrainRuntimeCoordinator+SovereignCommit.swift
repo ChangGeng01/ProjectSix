@@ -396,7 +396,20 @@ extension BASEBrainRuntimeCoordinator {
         // candidates derived from the turn's quarantine records.
         // Consumer emits `forbidden.count` + `forbidden.policy` +
         // `forbidden.allHeld` when at least one candidate exists.
-        forbiddenAggregate: BASForbiddenKnowledgeCandidate.Aggregate? = nil
+        forbiddenAggregate: BASForbiddenKnowledgeCandidate.Aggregate? = nil,
+        // M402 — optional Kunlun axis-alignment projection.
+        // Producer is `BASKunlunAxisProtocol.computeAlignment(...)`
+        // from the L4 audit-projection seam. Consumer emits 3 codes
+        // when non-nil:
+        //   `kunlun.axis.center:%.3f` — alignment center score
+        //   `kunlun.axis.deviation:<sorted+joined>` — deviation
+        //     code list (omitted when no deviations)
+        //   `kunlun.axis.requires-gate:true` — only when
+        //     requiresGate is true (omitted when false)
+        // Audit-only at this milestone; M406 wires the alignment
+        // into L11 permit synthesis. Doctrine: kunlun.axis.* codes
+        // are observability metadata, not decision input (yet).
+        kunlunAxisAlignment: BASAxisAlignment? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -595,6 +608,28 @@ extension BASEBrainRuntimeCoordinator {
             if forbidden.allHeld {
                 observationStatusCodes.append(
                     "forbidden.allHeld:true")
+            }
+        }
+        // M402 — Kunlun axis alignment audit emission. Always
+        // emit `kunlun.axis.center:<score>`; emit
+        // `kunlun.axis.deviation:<codes>` only when deviation
+        // codes are present; emit `kunlun.axis.requires-gate:
+        // true` only when requiresGate is true. nil alignment →
+        // all codes elided.
+        if let kunlun = kunlunAxisAlignment {
+            observationStatusCodes.append(
+                "kunlun.axis.center:" +
+                "\(String(format: "%.3f", kunlun.centerScore))")
+            if !kunlun.deviationCodes.isEmpty {
+                let joined = kunlun.deviationCodes
+                    .sorted()
+                    .joined(separator: "+")
+                observationStatusCodes.append(
+                    "kunlun.axis.deviation:\(joined)")
+            }
+            if kunlun.requiresGate {
+                observationStatusCodes.append(
+                    "kunlun.axis.requires-gate:true")
             }
         }
         // M318 — L9 abyssal-branch annotations. Empty array

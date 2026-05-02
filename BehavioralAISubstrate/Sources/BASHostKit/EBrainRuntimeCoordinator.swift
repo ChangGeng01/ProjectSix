@@ -855,6 +855,67 @@ public struct BASEBrainRuntimeCoordinator {
         let forbiddenAggregateForAudit =
             BASForbiddenKnowledgeCandidate.aggregate(
                 forbiddenCandidatesForAudit)
+        // M402 — Kunlun axis + alignment audit projection.
+        // Builds a synthetic axis from the host context + permit
+        // mode + risk level, computes alignment for the turn's
+        // primary candidate. This is audit-only emission; M406
+        // (chapter 九十三) will hook the alignment into L11 permit
+        // synthesis. Doctrine: kunlun.axis.* codes are
+        // observability-only at this milestone — no decision
+        // influence yet (parity with M303 / M304 audit-only
+        // pre-M384 phase for Cthulhu).
+        let kunlunAxisForAudit = BASKunlunAxis(
+            axisID: "axis-\(runtimeTrace.sessionID)",
+            hostRef: hostContext.hostID,
+            sovereignRef: "sovereign-\(runtimeTrace.sessionID)",
+            worldAnchorRef:
+                "world-anchor-\(runtimeTrace.sessionID)",
+            activeLayerRefs: [
+                "L1", "L2", "L3", "L4", "L5", "L6",
+                "L7", "L8", "L9", "L10", "L11", "L12",
+                "L13", "L14",
+            ],
+            agentSeatRefs: [],
+            centerlineRules: [
+                "respects-host-boundary",
+                "honors-world-anchor",
+                "permit-mode-\(boundActionPermit.mode.rawValue)",
+            ],
+            deviationThreshold: 0.7,
+            lastAlignmentCheck: "")
+        // Synthesize a deviation count from the risk level —
+        // higher risk = more rule-mismatches signaled. This is
+        // a placeholder projection until M406 wires real L4
+        // rule evaluation.
+        let kunlunMatched: Int = {
+            switch boundRiskCard.riskLevel {
+            case .low: return 3
+            case .medium: return 2
+            case .high: return 1
+            case .extreme: return 0
+            }
+        }()
+        let kunlunDeviationCodes: [String] = {
+            switch boundRiskCard.riskLevel {
+            case .low: return []
+            case .medium: return ["risk-medium-needs-attention"]
+            case .high: return ["risk-high-narrows-axis"]
+            case .extreme: return [
+                "risk-extreme-axis-overreach",
+            ]
+            }
+        }()
+        let kunlunAxisAlignmentForAudit = BASKunlunAxisProtocol
+            .computeAlignment(
+                alignmentID:
+                    "axis-align-\(runtimeTrace.sessionID)",
+                axis: kunlunAxisForAudit,
+                targetRef:
+                    thoughtFrame.candidates.first?.candidateID
+                    ?? "no-candidate",
+                matchedRules: kunlunMatched,
+                deviationCodes: kunlunDeviationCodes,
+                correctionHint: "")
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -901,7 +962,13 @@ public struct BASEBrainRuntimeCoordinator {
             unknownReserve: unknownReserveForAudit,
             // M321 — feed L13 forbidden-knowledge aggregate (nil
             // when no quarantines this turn; codes elided).
-            forbiddenAggregate: forbiddenAggregateForAudit
+            forbiddenAggregate: forbiddenAggregateForAudit,
+            // M402 — feed Kunlun axis-alignment projection so
+            // kunlun.axis.center / kunlun.axis.deviation /
+            // kunlun.axis.requires-gate codes land in audit
+            // signalRefs. Audit-only at this milestone (M406
+            // wires permit hook).
+            kunlunAxisAlignment: kunlunAxisAlignmentForAudit
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

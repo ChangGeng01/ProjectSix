@@ -284,6 +284,15 @@ struct QinaoSampleHost {
             await runCthulhuEndToEndDemo()
             return
         }
+        if args.contains("--kunlun-schema-demo") {
+            // M403 (chapter 九十二) — print the 5 Kunlun schema
+            // shapes + 5 protocol helper signatures. Schema-only
+            // introspection demo for the Phase α landing of the
+            // Kunlun Axis Doctrine. No runtime / no actor / no
+            // IO. Cite white paper §4.x for each schema.
+            runKunlunSchemaDemo()
+            return
+        }
         if args.contains("--audit-ledger-bench") {
             // M357 — bench `BASSovereignAuditLedger.append`
             // per-entry latency × N. Default N=10000;
@@ -4373,6 +4382,120 @@ struct QinaoSampleHost {
         if !outcome.allInvariantsHold {
             exit(2)
         }
+    }
+
+    // MARK: - M403 kunlun-schema-demo (chapter 九十二 Phase α)
+
+    /// Print the 5 Kunlun schema shapes + 5 protocol helper
+    /// signatures for the Phase α landing of the Kunlun Axis
+    /// Doctrine. Schema-only introspection — no runtime, no
+    /// actor, no IO. Each schema cites the white paper section
+    /// that defines its fields.
+    private static func runKunlunSchemaDemo() {
+        print("""
+            QinaoSampleHost --kunlun-schema-demo (M403, chapter 九十二 Phase α):
+              Print the Kunlun Axis Doctrine schema shapes
+              shipped in M401 (`BASKunlunProtocol.swift`). This
+              is schema-only introspection — no runtime, no
+              decision wires yet. Wires hook into L11 / L8 /
+              L14 in chapters 九十三 (β) / 九十四 (γ).
+
+              Cite: docs/QINAO_KUNLUN_AXIS_DOCTRINE_TARGET_VINF.md §4.
+
+            ━━━ Schema 1 — BASKunlunAxis (white paper §4.1) ━━━
+              Host-sovereignty centerline definition.
+              Fields: axisID / hostRef / sovereignRef /
+              worldAnchorRef / activeLayerRefs[] / agentSeatRefs[] /
+              centerlineRules[] / deviationThreshold ∈ [0,1] /
+              lastAlignmentCheck.
+              Doctrine: 多角色可以并行，但必须共轴.
+
+            ━━━ Schema 2 — BASAxisAlignment (white paper §4.1) ━━━
+              Per-target alignment readout (centered / deviating /
+              overreaching). Fields: alignmentID / targetRef /
+              axisRef / centerScore ∈ [0,1] / deviationCodes[] /
+              correctionHint / requiresGate.
+              Doctrine: 中轴一动，全脑随之调向.
+
+            ━━━ Schema 3 — BASJadeCanonSeal (white paper §4.2) ━━━
+              High-integrity object seal. Fields: sealID /
+              targetRef / objectClass (8 canonical) /
+              targetSchemaVersion / provenanceRefs[] /
+              integrityHash / signatureRef / replayRequired /
+              revocationPath / sourceRiverRef.
+              Doctrine: 无来源不成玉 / 无签名不进门 /
+              无回放不升格 / 无撤销路径不得长期生效.
+
+            ━━━ Schema 4 — BASHeavenGatePermit (white paper §4.3) ━━━
+              Domain-transition gate (cognitive / memory / tool /
+              host / evolution / public). Fields: gateID /
+              sourceRef / targetDomain / gateClass /
+              requiredSeals[] / actionPermitRef /
+              sovereignWarrantRef / secondCheckRequired /
+              passState / returnPathRef.
+              Doctrine: 高处有门，过门有证.
+
+            ━━━ Schema 5 — BASYaochiSanctumEntry (white paper §4.4) ━━━
+              Sanctum memory parking record (sensitive / precious /
+              grief / boundary / vow / high-weight-relation).
+              Fields: entryID / memoryRef / hostRef / sanctumClass /
+              accessPolicy (sealed / conditional / audited-open) /
+              revealConditions[] / coolingPeriod (sec) /
+              humanAnchorRequired / lastRevealedAt.
+              Doctrine: 瑶池不是炫耀珍藏，
+                       而是安置不该被频繁触碰的深物.
+
+            ━━━ Schema 6 — BASRiverOriginTrace (white paper §4.5) ━━━
+              System-level provenance graph. Fields: traceID /
+              rootSourceRefs[] / tributaryRefs[] /
+              derivedObjectRefs[] / transformationSteps[] /
+              consentRefs[] / permitRefs[] / auditRefs[] /
+              deletionDependents[] / lineageCutRefs[].
+              Doctrine: 没有源流，就没有可信成长.
+
+            ━━━ Protocol helpers (5 pure-function families) ━━━
+              1. BASKunlunAxisProtocol.computeAlignment(
+                   alignmentID:axis:targetRef:matchedRules:
+                   deviationCodes:correctionHint:)
+                 → BASAxisAlignment
+
+              2. BASKunlunJadeCanonProtocol.verifySeal(_:)
+                 → Verification {isCanonical, missingRequirements[]}
+
+              3. BASKunlunHeavenGateProtocol.evaluateReadiness(_:)
+                 → Readiness {isReady, reasonCodes[]}
+
+              4. BASKunlunYaochiProtocol.evaluateAccess(
+                   entry:hostAnchorPresent:
+                   matchedRevealConditions:secondsSinceLastReveal:)
+                 → AccessDecision {granted, reasonCodes[]}
+
+              5. BASKunlunRiverOriginProtocol.analyze(_:)
+                 → LineageReport {isWellFormed, upwardCount,
+                   downwardCount, hasLineageCut, warningCodes[]}
+
+            ━━━ Audit signalRefs (M402, chapter 九十二) ━━━
+              Per-turn audit emission codes:
+                kunlun.axis.center:%.3f (always when alignment
+                                         fed into audit)
+                kunlun.axis.deviation:<sorted+joined>
+                                         (when codes non-empty)
+                kunlun.axis.requires-gate:true
+                                         (when gate needed)
+
+            ━━━ Doctrine pair invariant (Kunlun + Cthulhu) ━━━
+              昆仑给方向。深渊给边界。
+              昆仑给秩序。深渊给警惕。
+              昆仑负责立中。深渊负责止损。
+
+            ━━━ Demo complete — Phase α (chapter 九十二) ━━━
+              Phase β (chapter 九十三): JadeCanon + RiverOrigin
+                wires hook into L11 permit synthesis.
+              Phase γ (chapter 九十四): Yaochi + Tianmen wires
+                hook into L8 query gate + L14 sovereign warrant.
+              See docs/QINAO_KUNLUN_AXIS_DOCTRINE_TARGET_VINF.md
+                + plan附录 L for full roadmap.
+            """)
     }
 
     // MARK: - M399 cthulhu-end-to-end-demo
