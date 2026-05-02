@@ -116,9 +116,16 @@ final class QinaoAppleFoundationE2ETests: XCTestCase {
             reversibility: 0.9,
             confidence: 0.8)
 
-        let result = try await loop.generateCandidates(
-            sessionID: "qinao-e2e-single",
-            seeds: [seed])
+        // M400.1 — Code 1026 → XCTSkip (macOS 26 foreground policy)
+        let result: [QinaoLoop.GeneratedCandidate]
+        do {
+            result = try await loop.generateCandidates(
+                sessionID: "qinao-e2e-single",
+                seeds: [seed])
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
 
         XCTAssertEqual(result.count, 1)
         let candidate = result[0]
@@ -176,9 +183,16 @@ final class QinaoAppleFoundationE2ETests: XCTestCase {
                 confidence: 0.85),
         ]
 
-        let result = try await loop.generateCandidates(
-            sessionID: "qinao-e2e-multi",
-            seeds: seeds)
+        // M400.1 — Code 1026 → XCTSkip
+        let result: [QinaoLoop.GeneratedCandidate]
+        do {
+            result = try await loop.generateCandidates(
+                sessionID: "qinao-e2e-multi",
+                seeds: seeds)
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
 
         XCTAssertEqual(result.count, 2)
         let providerIDs = Set(result.map(\.providerID))

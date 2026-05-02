@@ -84,7 +84,14 @@ final class QinaoAppleFoundationPathBE2ETests: XCTestCase {
             preset: .core,
             instruction: prompt,
             context: [])
-        let draft = try await adapter.draft(request)
+        // M400.1 — Code 1026 → XCTSkip.
+        let draft: BASOrganDraft
+        do {
+            draft = try await adapter.draft(request)
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         return draft.body
     }
 

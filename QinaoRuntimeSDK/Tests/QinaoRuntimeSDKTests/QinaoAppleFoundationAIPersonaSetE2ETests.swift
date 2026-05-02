@@ -47,7 +47,17 @@ final class QinaoAppleFoundationAIPersonaSetE2ETests:
             preset: .core,
             instruction: prompt,
             context: [])
-        let draft = try await adapter.draft(request)
+        // M400.1 — convert macOS 26 foreground-only-policy
+        // failures (`Code 1026`) into a clean XCTSkip rather
+        // than substrate-mismatch test failure. See
+        // `docs/QINAO_AFM_PLATFORM_POLICY_2026-05-02.md`.
+        let draft: BASOrganDraft
+        do {
+            draft = try await adapter.draft(request)
+        } catch {
+            try skipIfAFMDegraded(error)
+            throw error
+        }
         return draft.body
     }
 
