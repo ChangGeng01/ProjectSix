@@ -186,7 +186,18 @@ pattern: typed-pin first, measurement second, regression gate third.
   *authoring-ready in repository scope* but the doctrine claim itself
   awaits real trained weights to measure.
 - **Cthulhu doctrine status.** As of **M384–M389** the v5 triple is
-  complete on the Cthulhu doctrine. Pre-M384 the eight Cthulhu
+  **triple-leg-complete** on the Cthulhu doctrine — meaning all
+  three legs of the triple (typed pin / measurement / regression
+  gate) are in place. This is distinct from "all wires firing on
+  every turn", which is an empirical-coverage claim that depends
+  on per-input substrate state. The 2026-05-02 empirical
+  end-to-end run showed **8 of 9 wires** emit audit codes (M318
+  abyssal-branch's `aggregateMagnitude` threshold was not crossed
+  by the demo's medium-risk-level input — the wire is wired and
+  testable, but its non-trivial path simply wasn't activated by
+  that particular input). Triple-leg-complete + all-wires-firing-
+  on-every-turn are different claims; the former holds, the
+  latter is input-dependent and not a doctrine requirement. Pre-M384 the eight Cthulhu
   schemas (M287) had typed pins (the Swift structs themselves) plus
   audit-metadata measurement (M303–M305 / M316–M318 / M320–M321
   derives + signalRefs), but no regression gate that the substrate's

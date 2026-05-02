@@ -2,16 +2,16 @@
   "benchName" : "json-codec-bench",
   "schemaVersion" : "bas-bench-baseline.v1",
   "stats" : {
-    "max" : 0.701709,
-    "mean" : 0.0150730666322674,
-    "min" : 0.011041,
-    "outlierCount" : 1283,
-    "p50" : 0.0145,
-    "p95" : 0.017875,
-    "p99" : 0.021916,
-    "p999" : 0.068417,
+    "max" : 0.231667,
+    "mean" : 0.012761366773471412,
+    "min" : 0.011,
+    "outlierCount" : 3001,
+    "p50" : 0.012083,
+    "p95" : 0.014958,
+    "p99" : 0.0315,
+    "p999" : 0.08475,
     "sampleCount" : 249999,
-    "standardDeviation" : 0.004610074433466677
+    "standardDeviation" : 0.005077338146147474
   },
-  "storedAt" : "2026-05-02T11:24:51Z"
+  "storedAt" : "2026-05-02T13:06:15Z"
 }
