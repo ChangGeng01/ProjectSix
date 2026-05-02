@@ -387,6 +387,59 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame.riskCard = boundRiskCard
         thoughtFrame.actionPermit = boundActionPermit
         thoughtFrame.riskDecisionPackage = normalizedRiskDecisionPackage
+
+        // M392 — Cthulhu doctrine pressure / anchor / unknown-reserve
+        // derives + permit gating wires moved UP to here (was at the
+        // audit-projection seam, line 681+). The wires now fire
+        // BEFORE `actionService.render(...)` and
+        // `projectedRenderedOutput(...)`, so the rendered surface
+        // reflects the escalated stackedModes (M384) and the capped
+        // assertionCeiling (M385). Pre-M392 the wires were
+        // audit-visible only because the surface had already been
+        // sealed against the un-escalated permit; post-M392 the
+        // surface stays consistent with the persisted permit.
+        //
+        // The audit-projection block at line 681+ continues to
+        // derive its own copies of `abyssalPressureForAudit`,
+        // `humanAnchorSignalForAudit`, and `unknownReserveForAudit`
+        // — those derives are pure functions of the same inputs and
+        // produce identical outputs for audit emission. This is
+        // intentional: the upstream derives feed the gating wires;
+        // the downstream derives feed audit emission. Same values
+        // by construction; separate locals for separation of
+        // concerns.
+        let abyssalPressureForGate = BASAbyssalPressureBudget
+            .derive(
+                turnID: derivedSessionID,
+                riskLevel: boundRiskCard.riskLevel,
+                uncertaintyLedger:
+                    thoughtFrame.uncertaintyLedger,
+                evidenceDebtCount:
+                    thoughtFrame.evidenceDebts?.count ?? 0)
+        let humanAnchorSignalForGate = BASHumanAnchorProtocol
+            .derive(
+                anchorID: "human-anchor-\(derivedSessionID)",
+                hostSummaryRef: hostContext.hostID,
+                riskLevel: boundRiskCard.riskLevel,
+                permitMode: boundActionPermit.mode,
+                candidateCount: thoughtFrame.candidates.count)
+        let abyssalEscalation = BASAbyssalPermitEscalation
+            .escalate(
+                permit: boundActionPermit,
+                pressure: abyssalPressureForGate,
+                humanAnchor: humanAnchorSignalForGate)
+        boundActionPermit = abyssalEscalation.permit
+        let unknownReserveForGate = BASUnknownReserve.derive(
+            reserveID:
+                "unknown-reserve-\(derivedSessionID)",
+            confidenceFloor: thoughtFrame.uncertaintyLedger?
+                .confidenceFloor ?? 1.0)
+        let assertionCeilingDecisionForGate = BASAssertionCeilingGate
+            .cap(
+                permit: boundActionPermit,
+                reserve: unknownReserveForGate)
+        boundActionPermit = assertionCeilingDecisionForGate.permit
+        thoughtFrame.actionPermit = boundActionPermit
         // M56 — L11 risk climate now surfaces per-dimension
         // observations on the main-chain thought frame. Reuses M53's
         // derived (sessionID, turnID) so L6 / L7 / L10 / L11 bundles
@@ -696,27 +749,15 @@ public struct BASEBrainRuntimeCoordinator {
                 riskLevel: boundRiskCard.riskLevel,
                 permitMode: boundActionPermit.mode,
                 candidateCount: thoughtFrame.candidates.count)
-        // M384 — abyssal permit escalation seam. Pure helper reads
-        // M303 pressure + M304 anchor and returns an escalated
-        // permit (or the input permit unchanged when the trigger
-        // floor is not crossed or red line 8 fires). All escalation
-        // is additive: stackedModes never lose entries and `mode`
-        // (the single commit mouth) is never overwritten. The
-        // resulting reason codes propagate into the audit entry via
-        // the permit's `reasonCodes` array; signalRefs already
-        // carry the abyssal magnitude / mode summary from M303 so
-        // there is no double-emit risk. Red line 8 (深渊压强不绕
-        // 过人性锚点) is enforced by the helper itself: when
-        // anchor.recommendedSurfaceTone == .reserved the escalation
-        // is suppressed and a `permit.escalation-skipped:human-
-        // anchor-reserved` reason code is appended instead.
-        let abyssalPermitDecision = BASAbyssalPermitEscalation
-            .escalate(
-                permit: boundActionPermit,
-                pressure: abyssalPressureForAudit,
-                humanAnchor: humanAnchorSignalForAudit)
-        boundActionPermit = abyssalPermitDecision.permit
-        thoughtFrame.actionPermit = boundActionPermit
+        // M384 escalation now fires upstream (M392 — see the
+        // gating block right after `thoughtFrame.actionPermit =
+        // boundActionPermit` at line ~380). The audit emission
+        // below reads the escalated permit via `boundActionPermit`,
+        // and the per-turn audit-projection derives below
+        // (`abyssalPressureForAudit` / `humanAnchorSignalForAudit`)
+        // produce identical values to the upstream gate-side
+        // derives — they exist as separate locals for separation
+        // of concerns (gate-side vs audit-side reads).
         // M304 — synthesize seal envelopes from the turn's
         // quarantine records. Each quarantine becomes a
         // sovereign-only seal (the strictest tier short of
@@ -793,21 +834,12 @@ public struct BASEBrainRuntimeCoordinator {
                 "unknown-reserve-\(runtimeTrace.sessionID)",
             confidenceFloor: thoughtFrame.uncertaintyLedger?
                 .confidenceFloor ?? 1.0)
-        // M385 — assertion ceiling gate. When the reserve is
-        // active (`isOpen == true`), the typed reserve ceiling caps
-        // the permit's free-form `assertionCeiling` field per
-        // strictness ranking. Monotonic narrowing only — already-
-        // stricter permit ceilings are preserved. The pure helper
-        // returns the input permit unchanged when no cap fires; we
-        // overwrite the local `boundActionPermit` with the result
-        // so the audit emission and downstream tone / template
-        // enforcement see the capped value. Reason codes propagate
-        // through `permit.reasonCodes` (audit ledger consumer).
-        let assertionCeilingDecision = BASAssertionCeilingGate.cap(
-            permit: boundActionPermit,
-            reserve: unknownReserveForAudit)
-        boundActionPermit = assertionCeilingDecision.permit
-        thoughtFrame.actionPermit = boundActionPermit
+        // M385 cap now fires upstream (M392 — see the gating block
+        // right after `thoughtFrame.actionPermit = boundActionPermit`
+        // at line ~380). `unknownReserveForAudit` here is the
+        // audit-emission-side derive; the gate-side derive
+        // (`unknownReserveForGate`) lives upstream. They produce
+        // identical values from identical inputs.
         // M321 — derive `BASForbiddenKnowledgeCandidate`
         // aggregate from the turn's quarantine records. Empty
         // collection (no quarantines this turn) yields nil
