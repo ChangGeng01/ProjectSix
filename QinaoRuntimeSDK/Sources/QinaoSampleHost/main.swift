@@ -274,6 +274,16 @@ struct QinaoSampleHost {
             runCthulhuDoctrineDemo()
             return
         }
+        if args.contains("--cthulhu-end-to-end-demo") {
+            // M399 — drive a real `BASHostRuntime` session and
+            // verify each M384-M388 wire ran through the
+            // production audit pipeline; then invoke the M391
+            // `submitWithForbiddenGate` extension as a real
+            // production caller. Closes chapter 八十九.5 #2 + #3
+            // (no production caller / pure-function demo).
+            await runCthulhuEndToEndDemo()
+            return
+        }
         if args.contains("--audit-ledger-bench") {
             // M357 — bench `BASSovereignAuditLedger.append`
             // per-entry latency × N. Default N=10000;
@@ -4363,6 +4373,93 @@ struct QinaoSampleHost {
         if !outcome.allInvariantsHold {
             exit(2)
         }
+    }
+
+    // MARK: - M399 cthulhu-end-to-end-demo
+
+    /// Drive a real `BASHostRuntime` session through every
+    /// M384-M388 wire AND invoke the M391
+    /// `submitWithForbiddenGate` extension against the resulting
+    /// update tickets. Banner reports per-wire audit-prefix
+    /// presence in the runtime's `BASSovereignAuditEntry.signalRefs`
+    /// PLUS the gate's effect on the first vs second ticket.
+    private static func runCthulhuEndToEndDemo() async {
+        print("""
+            QinaoSampleHost --cthulhu-end-to-end-demo (M399):
+              drive `BASHostRuntime.startSession(...)` and verify
+              every M384-M388 wire ran through the production
+              audit pipeline (audit signalRefs presence per
+              wire); then invoke M391
+              `submitWithForbiddenGate(_:forbidden:)` against the
+              runtime's actual update tickets. The first ticket
+              is paired with a synthesized sovereign-rejected
+              forbidden candidate so the gate refuses it; the
+              second ticket (if present) is unpaired so the gate
+              passes through. Closes chapter 八十九.5 #2 (no
+              production caller) and #3 (pure-function demo).
+            """)
+
+        let outcome: CthulhuEndToEndOutcome
+        do {
+            outcome = try await CthulhuEndToEndDemo.run()
+        } catch {
+            print("""
+
+                ━━━ Demo failed: \(error) ━━━
+                """)
+            exit(2)
+        }
+
+        print("""
+
+            ━━━ Step 1/2 — runtime turn shape ━━━
+            sessionID:               \(outcome.sessionID)
+            auditID:                 \(outcome.auditID)
+            signalRefs count:        \(outcome.signalRefCount)
+            permit.mode:             \(outcome.permitMode)
+            permit.stackedModes:     \(outcome.permitStackedModes
+                .joined(separator: "+"))
+            permit.assertionCeiling: \(outcome.permitAssertionCeiling)
+            permit.reasonCodes count: \(outcome.permitReasonCodeCount)
+            updateTickets count:     \(outcome.updateTicketCount)
+            """)
+
+        print("""
+
+            ━━━ Step 2/2 — per-wire audit-prefix presence ━━━
+            """)
+        for r in outcome.wireReadouts {
+            let mark = r.present ? "✓" : "·"
+            let sample = r.sampleCodes.isEmpty
+                ? "(non-trivial path did not fire on this turn)"
+                : r.sampleCodes.joined(separator: ", ")
+            print("  \(mark) \(r.wireName) [\(r.auditCodePrefix)]: \(sample)")
+        }
+
+        if let g = outcome.forbiddenGateRecord {
+            print("""
+
+                ━━━ Step 3/3 — M391 forbidden-gate production call ━━━
+                first ticket:               \(g.firstTicketID)
+                  state after gate:         \(g.firstTicketStateAfterGate) (expected: rejected)
+                  refusal reason codes:     \(g.gateRefusalReasonCodes
+                    .joined(separator: ", "))
+                second ticket:              \(g.secondTicketID ?? "(none)")
+                  state after gate:         \(g.secondTicketStateAfterGate ?? "(n/a)") (expected: proposed)
+                """)
+        } else {
+            print("""
+
+                ━━━ Step 3/3 — M391 forbidden-gate production call ━━━
+                runtime produced 0 update tickets — gate not invoked.
+                """)
+        }
+
+        print("""
+
+            ━━━ Demo complete — Cthulhu wires ran through BASHostRuntime: \(outcome.allWiresRegistered ? "✓" : "⚠")
+                forbidden-gate production caller invoked: \(outcome.forbiddenGateInvoked ? "✓" : "⚠ no tickets") ━━━
+            """)
     }
 
     // MARK: - M357 audit-ledger-bench
