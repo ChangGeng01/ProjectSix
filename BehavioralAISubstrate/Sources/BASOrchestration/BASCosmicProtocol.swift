@@ -1,5 +1,6 @@
 import Foundation
 import BASRuntimeCore
+import BASWorldPrior
 
 /// M439 (chapter 一百十四) — schema parity for 7 Cthulhu/Abyssal
 /// objects at L4/L7/L9/L10 that the user's 2026-05-04 audit
@@ -461,6 +462,146 @@ public struct BASNonEuclideanCandidate:
     }
 }
 
+// MARK: - M453 (chapter 一百十九) — non-Euclidean derive helper
+
+public extension BASNonEuclideanCandidate {
+
+    /// Confidence threshold below which a candidate is
+    /// considered for non-Euclidean classification. Per Abyssal
+    /// VINF §4.9 — high-confidence candidates do not carry
+    /// "consistent only under partial view" risk.
+    static let nonEuclideanConfidenceThreshold: Double = 0.4
+
+    /// Reversibility threshold below which a low-confidence
+    /// candidate is classified as `.collapsedOnGrasp` —
+    /// committing to it has high consequence, so it must not
+    /// be presented as a confident verdict.
+    static let collapsedOnGraspReversibilityThreshold: Double = 0.3
+
+    /// Required-evidence count above which a low-confidence
+    /// candidate is classified as `.topologyDistortion` — the
+    /// candidate depends on too many partial-view facts to be
+    /// flattened into a single coherent answer.
+    static let topologyDistortionEvidenceCountThreshold: Int = 5
+
+    /// Expected-benefit threshold above which (combined with
+    /// low reversibility) a candidate is classified as
+    /// `.boundaryViolation` — high upside × high commitment
+    /// suggests the candidate would cross a host-constitution
+    /// boundary.
+    static let boundaryViolationBenefitThreshold: Double = 0.7
+
+    /// Reversibility threshold for boundary-violation
+    /// classification (must be very low + high benefit).
+    static let boundaryViolationReversibilityThreshold: Double = 0.2
+
+    /// Partial-view consistency threshold — candidates above
+    /// this confidence are still internally consistent at
+    /// partial view (i.e. partial-view state is preserved).
+    static let partialViewConsistencyThreshold: Double = 0.2
+
+    /// **M453** (chapter 一百十九) — derive `[BASNonEuclidean
+    /// Candidate]` from `[BASCandidatePath]` per Abyssal VINF
+    /// §4.9. Pure function; deterministic per input.
+    ///
+    /// Heuristic axes:
+    ///
+    ///  - `confidence < nonEuclideanConfidenceThreshold` is the
+    ///    gate; only low-confidence candidates considered.
+    ///  - `reversibility < collapsedOnGraspReversibilityThreshold`
+    ///    AND benefit ≤ boundaryViolation threshold →
+    ///    `.collapsedOnGrasp`
+    ///  - `expectedBenefit > boundaryViolationBenefitThreshold`
+    ///    AND `reversibility < boundaryViolationReversibility`
+    ///    → `.boundaryViolation`
+    ///  - `requiredEvidence.count >
+    ///    topologyDistortionEvidenceCountThreshold` →
+    ///    `.topologyDistortion`
+    ///  - else → `.consistencyLoss` (default for low-confidence
+    ///    candidates)
+    ///
+    /// `consistentUnderPartialView` = (confidence >=
+    /// `partialViewConsistencyThreshold`) — candidates with
+    /// non-trivial partial-view state are still internally
+    /// consistent; only deeply uncertain ones are not.
+    static func deriveAll(
+        from candidates: [BASCandidatePath],
+        turnID: String
+    ) -> [BASNonEuclideanCandidate] {
+        candidates.compactMap { candidate in
+            // Gate: only low-confidence candidates considered.
+            guard candidate.confidence
+                < nonEuclideanConfidenceThreshold
+            else { return nil }
+            let failureMode = classifyFailureMode(for: candidate)
+            let topology = topologyLabel(for: failureMode)
+            return BASNonEuclideanCandidate(
+                candidateID: candidate.candidateID,
+                nonStandardTopology: topology,
+                consistentUnderPartialView:
+                    candidate.confidence
+                    >= partialViewConsistencyThreshold,
+                failureModeWhenGrasped: failureMode,
+                supportingAnchors: candidate.requiredEvidence)
+        }
+    }
+
+    /// Classify failure mode for a low-confidence candidate.
+    /// Pure switch over the 4-axis heuristic.
+    static func classifyFailureMode(
+        for candidate: BASCandidatePath
+    ) -> BASNonEuclideanFailureMode {
+        // Highest priority: boundary violation (high upside ×
+        // very low reversibility).
+        if candidate.expectedBenefit
+            > boundaryViolationBenefitThreshold
+            && candidate.reversibility
+                < boundaryViolationReversibilityThreshold
+        {
+            return .boundaryViolation
+        }
+        // Second priority: collapsed-on-grasp (low reversibility
+        // alone, regardless of benefit).
+        if candidate.reversibility
+            < collapsedOnGraspReversibilityThreshold
+        {
+            return .collapsedOnGrasp
+        }
+        // Third priority: topology distortion (heavy evidence
+        // dependency).
+        if candidate.requiredEvidence.count
+            > topologyDistortionEvidenceCountThreshold
+        {
+            return .topologyDistortion
+        }
+        // Default: consistency loss.
+        return .consistencyLoss
+    }
+
+    /// Stable kebab-case topology label per failure mode.
+    /// Anti-magic-string doctrine — every label is a static
+    /// constant.
+    static let topologyLabelCollapsedOnGrasp: String = "high-stakes-irreversible"
+    static let topologyLabelBoundaryViolation: String = "host-boundary-crossing"
+    static let topologyLabelTopologyDistortion: String = "evidence-heavy-partial-view"
+    static let topologyLabelConsistencyLoss: String = "low-confidence-pattern"
+
+    static func topologyLabel(
+        for mode: BASNonEuclideanFailureMode
+    ) -> String {
+        switch mode {
+        case .collapsedOnGrasp:
+            return topologyLabelCollapsedOnGrasp
+        case .boundaryViolation:
+            return topologyLabelBoundaryViolation
+        case .topologyDistortion:
+            return topologyLabelTopologyDistortion
+        case .consistencyLoss:
+            return topologyLabelConsistencyLoss
+        }
+    }
+}
+
 // MARK: - BASUnknownRetentionLoop (L9 unknown-retention loop)
 
 /// White paper §4.9 (Abyssal VINF) `UnknownRetentionLoop` —
@@ -515,6 +656,77 @@ public struct BASUnknownRetentionLoop:
         self.reExamineTriggers = reExamineTriggers
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+}
+
+// MARK: - M452 (chapter 一百十九) — derive helper
+
+public extension BASUnknownRetentionLoop {
+
+    /// Mapping table from `BASUnknownAssertionCeiling` enum tier
+    /// to cooling-period seconds. Anti-magic-number doctrine —
+    /// each tier has a named static constant.
+    ///
+    /// Doctrine: stricter ceilings need longer cooling periods
+    /// because the substrate has explicitly admitted "we don't
+    /// know yet". The cooling period gives upstream evidence
+    /// gathering time before the substrate re-asserts.
+    static let coolingSecondsForNoneCeiling: Int = 600   // 10 min
+    static let coolingSecondsForMetaOnlyCeiling: Int = 300  // 5 min
+    static let coolingSecondsForQualifiedCeiling: Int = 60  // 1 min
+    static let coolingSecondsForProvisionalCeiling: Int = 0
+    static let coolingSecondsForUnrestrictedCeiling: Int = 0
+
+    /// Mapping table from typed enum ceiling to numeric `[0, 1]`
+    /// safe assertion ceiling (the field BASUnknownRetentionLoop
+    /// itself carries as a Double).
+    static let safeCeilingForNone: Double = 0.1
+    static let safeCeilingForMetaOnly: Double = 0.3
+    static let safeCeilingForQualified: Double = 0.5
+    static let safeCeilingForProvisional: Double = 0.75
+    static let safeCeilingForUnrestricted: Double = 1.0
+
+    /// **M452** (chapter 一百十九) — projection from existing
+    /// `BASUnknownReserve` into a `BASUnknownRetentionLoop` per
+    /// Cthulhu Spec V1 §5.9. Returns `nil` when the reserve is
+    /// unrestricted (no retention needed).
+    ///
+    /// Doctrine pin: the helper is total over all enum cases of
+    /// `BASUnknownAssertionCeiling`; tests walk `.allCases` to
+    /// catch future drift.
+    static func derive(
+        from reserve: BASUnknownReserve,
+        turnID: String
+    ) -> BASUnknownRetentionLoop? {
+        // Don't synthesize a loop when the reserve is wide open.
+        if reserve.assertionCeiling == .unrestricted {
+            return nil
+        }
+        let cooling: Int
+        let safeCeiling: Double
+        switch reserve.assertionCeiling {
+        case .unrestricted:
+            // Already filtered above; safety branch.
+            return nil
+        case .provisional:
+            cooling = coolingSecondsForProvisionalCeiling
+            safeCeiling = safeCeilingForProvisional
+        case .qualified:
+            cooling = coolingSecondsForQualifiedCeiling
+            safeCeiling = safeCeilingForQualified
+        case .metaOnly:
+            cooling = coolingSecondsForMetaOnlyCeiling
+            safeCeiling = safeCeilingForMetaOnly
+        case .none:
+            cooling = coolingSecondsForNoneCeiling
+            safeCeiling = safeCeilingForNone
+        }
+        return BASUnknownRetentionLoop(
+            loopID: "retention-loop:\(turnID)",
+            preservedUnknownRefs: reserve.unknownRefs,
+            coolingPeriodSeconds: cooling,
+            safeAssertionCeiling: safeCeiling,
+            reExamineTriggers: reserve.evidenceNeeded)
     }
 }
 

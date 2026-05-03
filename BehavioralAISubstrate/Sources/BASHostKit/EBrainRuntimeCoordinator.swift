@@ -1144,12 +1144,23 @@ public struct BASEBrainRuntimeCoordinator {
                 assertionCeilingRawValue: unknownReserveForGate
                     .assertionCeiling.rawValue,
                 turnID: derivedTurnID)
+        // M452 (chapter 一百十九) — derive L9 retention loop from
+        // unknown reserve. Closes the chapter 一百十八 nil
+        // placeholder for `retentionLoop:` in M449. Returns nil
+        // when reserve.assertionCeiling == .unrestricted (no
+        // retention needed for wide-open trust).
+        let unknownRetentionLoopForGate = BASUnknownRetentionLoop
+            .derive(
+                from: unknownReserveForGate,
+                turnID: derivedTurnID)
         // M449 — fog assertion-ceiling cap (composes with M385).
+        // Chapter 一百十九 M454: retention loop now non-nil when
+        // unknown reserve is below `.unrestricted` ceiling.
         let cthulhuAssertionDecision = BASCthulhuAssertionCeilingGate
             .cap(
                 permit: boundActionPermit,
                 ontologyFog: ontologyFogForAudit,
-                retentionLoop: nil)
+                retentionLoop: unknownRetentionLoopForGate)
         boundActionPermit = cthulhuAssertionDecision.permit
         thoughtFrame.actionPermit = boundActionPermit
         // M450 — derive cosmic-cold counterweight from risk
@@ -1175,10 +1186,20 @@ public struct BASEBrainRuntimeCoordinator {
             antiPaternalism: Self
                 .antiPaternalismFromPermit(
                     boundActionPermit.mode))
+        // M453 (chapter 一百十九) — derive [BASNonEuclideanCandidate]
+        // from low-confidence candidates. Closes the chapter 一百十八
+        // empty-array placeholder for `nonEuclideanCandidates:` in
+        // M450. Returns empty array when no candidate has
+        // confidence below `nonEuclideanConfidenceThreshold`.
+        let nonEuclideanCandidatesForGate = BASNonEuclideanCandidate
+            .deriveAll(
+                from: thoughtFrame.candidates,
+                turnID: derivedTurnID)
         let cthulhuEscalation = BASCthulhuPermitEscalation
             .escalate(
                 permit: boundActionPermit,
-                nonEuclideanCandidates: [],
+                nonEuclideanCandidates:
+                    nonEuclideanCandidatesForGate,
                 cosmicColdCounterweight: counterweightForGate)
         boundActionPermit = cthulhuEscalation.permit
         thoughtFrame.actionPermit = boundActionPermit
