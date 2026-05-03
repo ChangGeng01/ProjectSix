@@ -534,15 +534,23 @@ extension BASEBrainRuntimeCoordinator {
             BASObservationReconciliationVerdict? = nil,
         layerReconciliationReport:
             BASObservationReconciliationReport? = nil,
-        // M436 — silent-bundle audit emission. Pre-fix only
-        // candidate (M299) + tribunal (M300) bundles emitted
-        // `signalRefs` codes; the other 7 cognitive bundles
-        // (L1 / L2 / L3 / L5 / L6 / L7 / L12) were derived per
-        // turn but produced ZERO audit-walker visibility. Each
-        // optional bundle below now contributes a one-line
-        // coverage status code so audit walkers can grep
-        // `<layer>.coverage:<full|partial|missing>` per turn.
-        // Default `nil` keeps backward-compat for legacy callers.
+        // M436 + M436.1 — silent-bundle audit emission. Pre-
+        // M436 only candidate (M299) + tribunal (M300) bundles
+        // emitted `signalRefs` codes; the other 11 cognitive
+        // bundles (L1 leaseLife / L2 neuralOrgan / L3
+        // thoughtFold / L4 worldPrior / L5 hostConstitution /
+        // L6 presence / L7 decomposition / L8 hippocampal / L11
+        // risk / L12 softHand / L13 updateTicket) were derived
+        // per turn but produced ZERO audit-walker visibility.
+        // M436 closed 8 of these (L1/L2/L3/L5/L6/L7/L8/L12);
+        // chapter 一百五's M436.1 honest-correction added the
+        // remaining 3 (L4 worldPrior / L11 risk / L13
+        // updateTicket) closing the asymmetric-coverage HIGH
+        // gap. Each optional bundle below now contributes a
+        // one-line coverage status code so audit walkers can
+        // grep `<layer>.coverage:<full|partial|empty>` per
+        // turn. Default `nil` keeps backward-compat for legacy
+        // callers.
         presenceObservationBundle:
             BASPresenceObservationBundle? = nil,
         decompositionObservationBundle:
@@ -1035,24 +1043,35 @@ extension BASEBrainRuntimeCoordinator {
                     "abyssalBranch.escalation:sovereign-review")
             }
         }
-        // M436 — silent-bundle audit emission. Each per-layer
-        // bundle gets one `<layer>.coverage:<status>` code so
-        // audit walkers can grep "did this layer participate
-        // this turn." Status is `full` when the bundle's
-        // `hasCoreSignalCoverage` predicate is true, `partial`
-        // when observations exist but core coverage is missing,
-        // `empty` when the bundle has zero observations. Each
-        // emission is conditional on the bundle being non-nil
-        // (legacy / test callers that don't plumb the bundle
-        // simply elide the code). Doctrine pin: audit-only
-        // emission, no decision influence — this purely closes
-        // the "silent bundle" audit-walker gap identified by the
-        // chapter 一百四 deep architecture audit (HIGH defect
-        // #2: 7 of 12 cognitive bundles emit ZERO signalRefs
-        // codes pre-M436).
-        func coverageStatus(observations: Int, core: Bool) -> String {
-            if observations == 0 { return "empty" }
-            return core ? "full" : "partial"
+        // M436 + M436.1 — silent-bundle audit emission. Each
+        // per-layer bundle gets one `<layer>.coverage:<status>`
+        // code so audit walkers can grep "did this layer
+        // participate this turn." Status is `full` when the
+        // bundle's `hasCoreSignalCoverage` predicate is true,
+        // `partial` when observations exist but core coverage
+        // is missing, `empty` when the bundle has zero
+        // observations. Each emission is conditional on the
+        // bundle being non-nil (legacy / test callers that
+        // don't plumb the bundle simply elide the code).
+        // Doctrine pin: audit-only emission, no decision
+        // influence — purely closes the "silent bundle" audit-
+        // walker gap identified by the chapter 一百四 deep
+        // architecture audit (HIGH defect #2). Pre-M436: 11
+        // cognitive bundles (L1/L2/L3/L4/L5/L6/L7/L8/L11/L12/
+        // L13-ticket) emitted ZERO signalRefs codes despite
+        // being derived per turn. M436 closed 8; M436.1's
+        // chapter 一百五 honest-correction closed the remaining
+        // 3 (L4 worldPrior / L11 risk / L13 updateTicket).
+        // Helper extracted to a `static func` (M436.2) for
+        // direct unit-test access closing the chapter 一百六
+        // deep-review M-1/M-2 test-coverage gap. Local closure
+        // retains the named-parameter call shape used by all
+        // 11 in-function emission sites below.
+        func coverageStatus(
+            observations: Int, core: Bool
+        ) -> String {
+            Self.coverageStatus(
+                observations: observations, core: core)
         }
         if let b = presenceObservationBundle {
             observationStatusCodes.append(

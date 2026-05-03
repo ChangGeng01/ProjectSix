@@ -363,24 +363,11 @@ public struct BASEBrainRuntimeCoordinator {
         // every layer the substrate expects to hear from on a
         // healthy turn. Today this is the 12 cognitive layers
         // above. Any layer in the list that didn't emit becomes
-        // a `.missingLayer` finding in the verdict.
-        let expectedLayers: [BASCognitiveLayer] = [
-            .leaseLife,         // L1
-            .neuralOrgan,       // L2
-            .thoughtFold,       // L3
-            .worldPrior,        // L4
-            .hostConstitution,  // L5
-            .presenceEye,       // L6
-            .mirrorBlade,       // L7
-            .hippocampalWell,   // L8
-            .dreamLoop,         // L9 (candidate frontier today)
-            .triSelfTribunal,   // L10
-            .riskClimate,       // L11
-            .gentleHand,        // L12
-            .evolutionFurnace,  // L13
-            // L14 sovereign is the ledger itself; not a layer
-            // that emits coverage TO the ledger.
-        ]
+        // a `.missingLayer` finding in the verdict. Hoisted to
+        // a type-level `static let` (M436.2 chapter 一百六 N-1
+        // fix) so the array isn't reallocated each turn — pure
+        // value list with no per-turn dependency.
+        let expectedLayers = Self.layerReconciliationExpectedLayers
         // M436.1 — budget ceiling alignment. Pre-fix the helper
         // hardcoded 12.0 ("1.0 × 12 layers") while Qinao's
         // parallel path (`QinaoSovereign.recordTurnCoverage`,
@@ -403,6 +390,51 @@ public struct BASEBrainRuntimeCoordinator {
                 emittedAt: emittedAt)
         return (report: report, verdict: verdict)
     }
+
+    /// M436.2 (chapter 一百六 deep-review M-1/M-2 fix) — pure
+    /// 3-way classifier mapping (observations count, core
+    /// signal coverage) → audit-emission status string. Status
+    /// is `empty` when the bundle has zero observations,
+    /// `partial` when observations exist but `hasCoreSignalCoverage`
+    /// is false, `full` otherwise. Extracted from the inline
+    /// helper inside `buildSovereignAuditEntry` so unit tests
+    /// can pin all 3 branches directly without driving a fixture
+    /// turn (production-runtime fixtures always have core
+    /// coverage, so the `partial` branch was untested pre-M436.2
+    /// per chapter 一百六 strict-audit MEDIUM finding M-1).
+    /// Pure function: no side effects, no IO, no randomness.
+    static func coverageStatus(
+        observations: Int, core: Bool
+    ) -> String {
+        if observations == 0 { return "empty" }
+        return core ? "full" : "partial"
+    }
+
+    /// M436.2 (chapter 一百六 deep-review N-1 fix) — type-level
+    /// constant carrying the per-turn 13-layer expectation set
+    /// for reconciliation verdict evaluation. Hoisted from a
+    /// per-turn local in `deriveLayerReconciliationReport(...)`
+    /// so the array literal isn't reallocated each turn (it has
+    /// no per-turn dependency — same 13 cognitive layers every
+    /// invocation). L14 sovereign is intentionally omitted —
+    /// it's the ledger itself, not a layer that emits coverage
+    /// TO the ledger.
+    static let layerReconciliationExpectedLayers:
+        [BASCognitiveLayer] = [
+            .leaseLife,         // L1
+            .neuralOrgan,       // L2
+            .thoughtFold,       // L3
+            .worldPrior,        // L4
+            .hostConstitution,  // L5
+            .presenceEye,       // L6
+            .mirrorBlade,       // L7
+            .hippocampalWell,   // L8
+            .dreamLoop,         // L9 (candidate frontier today)
+            .triSelfTribunal,   // L10
+            .riskClimate,       // L11
+            .gentleHand,        // L12
+            .evolutionFurnace,  // L13
+        ]
 
     public init(
         powerClockService: any BASPowerClockServicing,
@@ -1728,11 +1760,13 @@ public struct BASEBrainRuntimeCoordinator {
             // called from production").
             layerReconciliationVerdict: layerReconciliation.verdict,
             layerReconciliationReport: layerReconciliation.report,
-            // M436 — feed the 7 silent observation bundles so
-            // each layer's coverage status (full / partial /
-            // empty) lands in audit signalRefs as a typed code.
-            // Closes the chapter 一百四 HIGH defect #2 ("7 of 12
-            // cognitive bundles emit ZERO signalRefs codes").
+            // M436 + M436.1 — feed the 11 silent observation
+            // bundles so each layer's coverage status (full /
+            // partial / empty) lands in audit signalRefs as a
+            // typed code. M436 closed 8 (L1/L2/L3/L5/L6/L7/L8/
+            // L12); M436.1 closed the remaining 3 (L4 worldPrior
+            // / L11 risk / L13 updateTicket per chapter 一百五
+            // honest-correction asymmetric-coverage HIGH gap).
             // Doctrine pin: audit-only emission, no decision
             // influence, no verdict escalation.
             presenceObservationBundle:

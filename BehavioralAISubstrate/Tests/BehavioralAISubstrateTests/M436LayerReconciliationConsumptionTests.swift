@@ -581,6 +581,113 @@ final class M436LayerReconciliationConsumptionTests: XCTestCase {
         }
     }
 
+    // MARK: - 10. M436.2 — coverageStatus pure-function unit
+    //          tests (chapter 一百六 deep-review M-1 fix).
+    //
+    // Pre-M436.2 the `coverageStatus(observations:core:)`
+    // helper was an inline closure inside `buildSovereignAuditEntry`.
+    // Production fixtures always populated `hasCoreSignalCoverage = true`,
+    // so the `partial` and `empty` branches of the 3-way
+    // classifier were never exercised through any test
+    // assertion against actual audit signalRefs strings. A
+    // future refactor that flipped `core ? "full" : "partial"`
+    // to `core ? "full" : "degraded"` (or any other rename)
+    // would have shipped green. M436.2 extracted the helper to
+    // `BASEBrainRuntimeCoordinator.coverageStatus(...)` static,
+    // unblocking these direct unit tests.
+
+    /// Empty branch: zero observations → "empty".
+    func testCoverageStatusEmptyBranch() {
+        let status = BASEBrainRuntimeCoordinator.coverageStatus(
+            observations: 0, core: false)
+        XCTAssertEqual(status, "empty")
+        // Edge: even if core==true, zero observations → empty.
+        let status2 = BASEBrainRuntimeCoordinator.coverageStatus(
+            observations: 0, core: true)
+        XCTAssertEqual(status2, "empty",
+            "zero observations always returns 'empty' " +
+            "regardless of core flag")
+    }
+
+    /// Partial branch: observations > 0 AND core == false →
+    /// "partial".
+    func testCoverageStatusPartialBranch() {
+        let status = BASEBrainRuntimeCoordinator.coverageStatus(
+            observations: 3, core: false)
+        XCTAssertEqual(status, "partial")
+    }
+
+    /// Full branch: observations > 0 AND core == true →
+    /// "full".
+    func testCoverageStatusFullBranch() {
+        let status = BASEBrainRuntimeCoordinator.coverageStatus(
+            observations: 5, core: true)
+        XCTAssertEqual(status, "full")
+        // Edge: 1 observation + core == "full" too.
+        let status2 = BASEBrainRuntimeCoordinator.coverageStatus(
+            observations: 1, core: true)
+        XCTAssertEqual(status2, "full")
+    }
+
+    /// Pin: the canonical status set is exactly {empty, full,
+    /// partial} — no other strings can be returned. Pin via
+    /// exhaustive enumeration on a small input grid.
+    func testCoverageStatusOnlyEmitsCanonicalSet() {
+        var observed: Set<String> = []
+        for obs in [0, 1, 5, 100] {
+            for core in [false, true] {
+                observed.insert(
+                    BASEBrainRuntimeCoordinator.coverageStatus(
+                        observations: obs, core: core))
+            }
+        }
+        XCTAssertEqual(
+            observed,
+            ["empty", "full", "partial"],
+            "coverageStatus must only emit the 3 canonical " +
+            "status strings (any drift would change audit-" +
+            "walker contract)")
+    }
+
+    // MARK: - 11. layerReconciliationExpectedLayers static
+    //          constant invariance (chapter 一百六 N-1 fix).
+    //
+    // M436.2 hoisted the per-turn local `expectedLayers` array
+    // to a type-level `static let`. Pin the cardinality + order
+    // so a future PR that drops or reorders a layer (which
+    // could cause a verdict-shape divergence between BAS-direct
+    // and Qinao-streamed paths) fails loudly.
+
+    func testExpectedLayersStaticConstantHas13Layers() {
+        XCTAssertEqual(
+            BASEBrainRuntimeCoordinator
+                .layerReconciliationExpectedLayers.count,
+            13,
+            "13 cognitive layers (L1..L13); L14 sovereign is " +
+            "the ledger itself, not a layer that emits coverage")
+    }
+
+    func testExpectedLayersStaticConstantOrderIsStable() {
+        // Pin exact order — chapter 一百四 / 一百五 emission
+        // contract relies on `reconciliation.observed:` being
+        // sorted lex (L1+L10+L11+...+L9), but the expected-
+        // layers list itself is in numeric order so any
+        // missing-layer findings emit in a stable sequence.
+        let expected: [BASCognitiveLayer] = [
+            .leaseLife, .neuralOrgan, .thoughtFold,
+            .worldPrior, .hostConstitution, .presenceEye,
+            .mirrorBlade, .hippocampalWell, .dreamLoop,
+            .triSelfTribunal, .riskClimate, .gentleHand,
+            .evolutionFurnace
+        ]
+        XCTAssertEqual(
+            BASEBrainRuntimeCoordinator
+                .layerReconciliationExpectedLayers,
+            expected,
+            "expected-layers list order must be stable; " +
+            "a reorder would change finding-emission ordering")
+    }
+
     /// Pin "every layer in `reconciliation.observed:` has a
     /// matching `<layer>.coverage:` per-layer code." This is
     /// the structural symmetry doctrine — the report and the

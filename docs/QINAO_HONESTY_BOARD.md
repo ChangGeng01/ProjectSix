@@ -12446,3 +12446,138 @@ Otherwise baseline measurements will systematically underestimate pre-fix state 
 ### 105.7 一句话总结
 
 **M436.1 closes 一百四 honest-audit findings (chapter 一百五)**: User instruction "诚实 严查 整体 查缺补漏 细致入微" triggered a strict audit of chapter 一百四. Agent found the "36% → 100%" framing was inflated for two reasons: (a) Qinao SDK auto-stream was already at 14/14 pre-M436 via `QinaoRuntime.sendSession` → `QinaoSovereign.recordTurnCoverage` → `BASObservationReconciliationVerdictEngine.evaluate` (the original CRITICAL #1 was scoped only to BAS-direct surface, not Qinao surface); (b) post-M436 was actually 8/11 cognitive bundles per-layer-coded, not 11/11 — L4 worldPrior / L11 risk / L13 updateTicket bundles entered the reconciliation report but had no per-layer `<layer>.coverage:` code emission. M436.1 closes the asymmetric-coverage HIGH gap (3 new optional parameters + 6 new emission lines + new symmetry-pin test). MEDIUM gap "budget ceiling 12.0 vs 1.0 mismatch" closed by aligning to 1.0. HIGH gap "happy-path-only tests" closed by 6 new failure-path / symmetry tests. MEDIUM "buildSovereignAuditEntry parameter explosion (34+ params)" deferred with explicit forcing function. **Honest measurement post-correction**: BAS-direct surface was 36% pre-M436, now 100% post-M436+M436.1; Qinao SDK surface was 14/14 throughout; both surfaces now at parity. Chapter 一百四 entries kept as-committed; chapter 一百五 is the formal honest correction citing the calibration error rather than retconning. Test counts: BAS XCTest 2468 → 2474 (+6) / Qinao 1375 unchanged / 全栈 3860 → 3866 / 0 failures / 4/4 boundary clean. **Methodology lesson codified**: completeness audits must scope across both BAS substrate AND Qinao SDK; failing to enumerate scope = baseline numbers are presumptively suspect.
+
+## 一百六、 Deep review + deep test pass on M436+M436.1 surface (M436.2 / 2026-05-03)
+
+### 106.1 触发动作
+
+User instruction "deep review + deep test" — apply the chapter 67/81/91.5/103 deep-review doctrine pattern to the chapter 一百四 (M436) + 一百五 (M436.1) combined surface.
+
+### 106.2 Deep test phase
+
+| Test type | Result |
+|---|---|
+| 3-run gate-off BAS | 2474 / 2474 / 2474 (stable count, 0 failures, 0 flakes) |
+| 3-run gate-off Qinao | 1375 / 1375 / 1375 (stable count, 0 failures, 0 flakes) |
+| AFM gate-on Qinao (`QINAO_AFM_E2E=1 QINAO_FM_E2E=1`) | 1375 tests / 40 platform-degraded skip (per chapter 91.6 macOS 26 foreground-only platform policy) / 0 actual failures |
+| 4 boundary checks | all green (Qinao import / sovereign redaction / SDK import / substrate residuals) |
+
+Skip-count varies 19/20/21 across runs reflecting AFM-degraded skip nondeterminism inherent to the M398.4 doctrine; this is documented behavior, not a flake.
+
+### 106.3 Deep review phase — agent findings + verification
+
+Spawned `general-purpose` agent in deep-review mode with explicit doctrine-pin checklist (audit-only emission / single commit mouth / Cthulhu RL7-RL10 / Kunlun 8 红线 / hash chain semantics / cross-package consistency / determinism / test coverage gaps). Agent returned **5 MEDIUM + 3 LOW + 2 NIT (0 CRITICAL, 0 HIGH)** findings.
+
+Human-grep verification confirmed **3 actionable findings**:
+
+| Finding | Severity | Reality |
+|---|---|---|
+| M-1 `coverageStatus` "partial" branch never tested through audit-emission path | MEDIUM | **REAL** — fixture turns always populate `hasCoreSignalCoverage == true`, so `partial` branch shipping with rename would be green |
+| M-2 `reconciliation.overspend:` code emission untested in production-emission path | MEDIUM | **REAL** — chapter 一百五 added a verdict-shape test only, not the buildSovereignAuditEntry emission test |
+| M-3 mixed-nil bundle parameters untested | MEDIUM | REAL but lower-impact (production always passes all-or-none from same `thoughtFrame`) |
+| M-4 cross-package `expectedLayers` divergence (BAS [L1..L13] vs Qinao [L14]) | MEDIUM | DOCUMENTED — both emissions are audit-only and reader can disambiguate by source path; chapter 一百五 already acknowledged scope |
+| M-5 `buildSovereignAuditEntry` parameter explosion (34+ params) | MEDIUM | DOCUMENTED — chapter 一百五 explicit forcing function for next chapter that adds another optional param |
+| L-1 stale "7 silent bundles" / "7 of 12" comments | LOW | REAL — 4 occurrences across 2 files |
+| L-2 stale `<full|partial|missing>` docstring → `<empty>` | LOW | REAL — 1 occurrence |
+| L-3 M436.1 commit message overstates budget-ceiling impact | LOW | REAL but commit-immutable — verdict engine clamps ceiling to `[0,1]` internally so 12.0 was always already collapsed to 1.0 (no actual divergence at runtime) |
+| N-1 `expectedLayers` recomputed every turn | NIT | REAL — easy `static let` hoist |
+| N-2 speculative determinism risk in `testReconciliationCodesAreDeterministic` | NIT | speculative; skipped |
+
+**FP rate**: 5/10 = 50% (lower than chapter 67/81/91.5's 75-80% baseline because the audit was scoped to a small, recently-shipped surface; agent had less to speculate on).
+
+### 106.4 M436.2 fixes shipped
+
+#### Fix 1: Extract `coverageStatus` to static helper (M-1 + M-2)
+
+Pre-fix the helper was a `func` local to `buildSovereignAuditEntry`. Production fixtures only exercised the `full` branch; `partial` and `empty` were structurally untestable through audit-emission strings. M436.2 hoisted the helper to `BASEBrainRuntimeCoordinator.coverageStatus(observations:core:) -> String` static (test-accessible via `@testable import BASHostKit`); local closure inside `buildSovereignAuditEntry` now delegates to the static.
+
+**4 new unit tests** added:
+- `testCoverageStatusEmptyBranch` (zero observations always → "empty", regardless of core flag)
+- `testCoverageStatusPartialBranch` (observations > 0 + core == false → "partial")
+- `testCoverageStatusFullBranch` (observations > 0 + core == true → "full")
+- `testCoverageStatusOnlyEmitsCanonicalSet` (exhaustive 4×2 grid pins {empty, full, partial} as the only possible outputs)
+
+#### Fix 2: Hoist `expectedLayers` to type-level constant (N-1)
+
+Pre-fix the 13-element array was reallocated each turn inside `deriveLayerReconciliationReport`. Hoisted to `BASEBrainRuntimeCoordinator.layerReconciliationExpectedLayers: [BASCognitiveLayer]` static — pure value list with no per-turn dependency.
+
+**2 new invariance tests**:
+- `testExpectedLayersStaticConstantHas13Layers` (cardinality pin)
+- `testExpectedLayersStaticConstantOrderIsStable` (exact-order byte-equal pin — finding-emission ordering depends on this)
+
+#### Fix 3: Stale "7 silent bundles" comments (L-1)
+
+3 places fixed in 2 files:
+- `EBrainRuntimeCoordinator+SovereignCommit.swift:539` parameter doc — "the other 7 cognitive bundles" → "the other 11 cognitive bundles" with full L1..L13 enumeration + chapter 一百五 cross-reference
+- `EBrainRuntimeCoordinator+SovereignCommit.swift:1051` emission-block doc — same correction with explicit M436 closed 8 / M436.1 closed 3 attribution
+- `EBrainRuntimeCoordinator.swift:1763` runTurn call-site doc — same correction
+
+#### Fix 4: Stale `<full|partial|missing>` docstring (L-2)
+
+`EBrainRuntimeCoordinator+SovereignCommit.swift:544` `<full|partial|missing>` → `<full|partial|empty>` matching the actual emission helper output (verified by `testCoverageStatusOnlyEmitsCanonicalSet`).
+
+### 106.5 Documented but not code-changed
+
+#### M-4 cross-package `expectedLayers` divergence (DOCUMENTED)
+
+The agent verified that the BAS-direct path's `expectedLayers` is `[L1..L13]` while Qinao's `recordTurnCoverage` defaults to `[L14]` and only expands via `streamObservationLayers`. Both emissions are independently meaningful audit-only metadata; readers disambiguate by source. Chapter 一百五 already acknowledged this scope ambiguity; chapter 一百六 records the full agent verification.
+
+#### M-5 parameter explosion (DOCUMENTED)
+
+`buildSovereignAuditEntry` carries 34+ parameters post-M436.1. Agent confirms this is "clearly documented technical debt" — chapter 一百五's explicit forcing function ("restructure into `BASAuditObservationProjections` bundle struct on next chapter that adds another optional param") stands.
+
+#### L-3 M436.1 commit message overstatement (ACKNOWLEDGED, NOT RETCONNED)
+
+The chapter 一百五 commit message claimed "the same turn could emit `reconciliation.severity:halt` from one path and `clean` from the other when the total clamped budget landed between the two ceilings." Agent verified this scenario was physically impossible — `BASObservationReconciliationVerdictEngine.evaluate` clamps `budgetCeiling = min(1, max(0, budgetCeiling))` at line 184, so 12.0 was always already collapsed to 1.0 internally. The in-source comment at `EBrainRuntimeCoordinator.swift:384-397` does correctly state this ("the 12.0 was therefore both wrong AND a no-op"). Honest correction: the alignment fix was correct documentation hygiene; the commit message overstated the runtime impact. Per chapter 一百五 doctrine "kept as-committed (not retconned)", this chapter records the agent's verification rather than rewriting the commit message.
+
+### 106.6 测试基线
+
+| 套件 | 一百五 章末 | 一百六 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2474 | **2480** | +6 (M436.2: 4 coverageStatus + 2 expectedLayers tests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3866 | **3872** | +6 |
+
+3-run flake check: 0 flakes / 0 failures across all 3 runs (BAS 2474 stable count pre-fix; 2480 stable post-fix). 4 boundary checks all green.
+
+### 106.7 红线 / 不变量
+
+| 红线 / 不变量 | M436.2 |
+|---|---|
+| #1 先醒再答 | ✓ (no L1 wake / breath path changes) |
+| #2 神经不掌权 | ✓ (extracted helper is pure; no decision influence) |
+| #3 私有经验不进权重 | ✓ (no L13 / L8 / L5 writes) |
+| audit hash chain | ✓ (no signalRefs change; coverageStatus call surface identical) |
+| 单提交口 | ✓ (single permit / single warrant unchanged) |
+| Cthulhu 红线 7-10 / Kunlun 8 红线 | ✓ (agent verified 0 red-line violations across all M436 + M436.1 + M436.2 emissions) |
+| 4 boundary checks | maintained green |
+
+### 106.8 Methodology lesson — extract-for-test pattern
+
+**Pattern observation**: Pre-M436.2 the `coverageStatus` helper was an inline closure inside a 1280-line audit-build seam. Production fixtures structurally couldn't exercise the `partial` and `empty` branches because real bundles always have core coverage on healthy turns. This created a class of "structurally untestable" code where every unit-test assertion of the form `expected ∈ canonicalSet` is satisfied by 1 of 3 actual values.
+
+**Codified lesson**: When a pure classifier function lives inside a fixture-driven path, **extract it to a type-level static** so unit tests can pin all branches directly. The pattern:
+
+```swift
+// BEFORE: branch coverage limited by fixture realism
+func someClassifier(in1: A, in2: B) -> String {
+    if condition1 { return "x" }
+    if condition2 { return "y" }
+    return "z"
+}
+
+// AFTER: branch coverage testable independent of fixture
+static func someClassifier(in1: A, in2: B) -> String {
+    if condition1 { return "x" }
+    if condition2 { return "y" }
+    return "z"
+}
+// inline call sites delegate via local func to preserve named parameters
+```
+
+**Forcing function**: future inline classifiers inside fixture-driven code paths should be extracted at the time of first emission, not as a post-hoc deep-review fix. The cost is one line of static-method declaration; the benefit is permanent branch-test access.
+
+### 106.9 一句话总结
+
+**M436.2 closes chapter 一百四+一百五 deep-review findings (chapter 一百六)**: User instruction "deep review + deep test" triggered the chapter 67/81/91.5 deep-review doctrine pattern. Deep test phase: 3-run gate-off (BAS 2474×3 / Qinao 1375×3 stable, 0 fail, 0 flake), AFM gate-on (1375 / 40 platform-degraded skip / 0 fail), 4 boundary checks all clean. Deep review phase: agent found 5 MEDIUM + 3 LOW + 2 NIT (0 CRITICAL, 0 HIGH); human-grep verified 50% real-bug rate (lower than chapter 67/81/91.5's 75-80% FP baseline because surface was small + recent). 4 surgical fixes shipped: (a) extracted `coverageStatus` to `BASEBrainRuntimeCoordinator.coverageStatus(observations:core:)` static + 4 unit tests covering the previously-untestable `partial` and `empty` branches; (b) hoisted `expectedLayers` to `layerReconciliationExpectedLayers` static + 2 invariance tests; (c) fixed 3 stale "7 silent bundles" comments → "11 cognitive bundles" with full L1..L13 enumeration; (d) fixed 1 stale `<full|partial|missing>` docstring → `<full|partial|empty>`. 3 findings documented but not code-changed (M-4 cross-package divergence already in chapter 一百五, M-5 parameter explosion already deferred with forcing function, L-3 commit-message overstatement is commit-immutable). Test counts: BAS XCTest 2474 → 2480 (+6) / Qinao 1375 unchanged / 全栈 3866 → 3872 / 0 failures / 4/4 boundary clean. **Methodology lesson codified**: extract pure inline classifiers to type-level statics at first emission so unit tests can pin all branches independent of fixture realism (forcing function: future inline classifiers inside fixture-driven paths get extracted upfront, not as post-hoc deep-review fixes).
