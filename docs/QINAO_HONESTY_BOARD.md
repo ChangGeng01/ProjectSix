@@ -11195,3 +11195,140 @@ After this chapter ships:
 ### 94.10 一句话总结
 
 **M408-M411 close 昆仑 doctrine Phase γ (chapter 九十四)**：M408 wire `BASYaochiSanctumEntry` derive + `BASKunlunYaochiProtocol.evaluateAccess` at L4 audit-projection seam emit `kunlun.yaochi.access:<class>:<decision>` + `.reasons:<sorted>` (红线 #3 sanctum 不能被系统占有 typed-pinned via humanAnchorRequired derive + sealed-policy denial test) + M409 wire `BASHeavenGatePermit` derive + `BASKunlunHeavenGateProtocol.evaluateReadiness` emit `kunlun.tianmen.gate:<domain>:<state>` + `.ready:<bool>` + `.reasons:<sorted>` (mapping verdict level → pass state) + M410 cross-protocol bind emit `kunlun.tianmen.warrant-bind:<id>` (when warrant present) | `kunlun.tianmen.warrant-missing:high-stakes` (when high-stakes gate has no warrant — red line #5 violation marker) + `kunlun.tianmen.axis-bound:session-<id>` (always emits; cross-link to M402 axis-keyed session for audit join) + 8 new audit-emission tests + 2 fix-pin updates to existing M402 test (segment whitelist expanded; code-count range raised). BAS 2406 → 2414 (+8) / Qinao 1361 unchanged / 全栈 3784 → 3792 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase γ done; Phase δ (red-lines + composability + demo) 待 chapter 九十五**.
+
+---
+
+## 九十五、 Kunlun Phase δ — doctrine red lines + composability + sample-host demo（M412-M414 / 2026-05-03）
+
+### 95.1 触发与起点
+
+继 chapter 九十四 ship Phase γ (M408 Yaochi access + M409 Tianmen readiness + M410 cross-protocol bind)，本章节按 plan 附录 L §L.6 (Phase δ) 推进 3 milestones：M412 Kunlun 红线 typed-pin / M413 Kunlun + Cthulhu 跨 doctrine composability snapshot tests / M414 sample-host pure-function 演示。
+
+**起点状态**（chapter 九十四 末）:
+- 6 typed schemas + 5 helpers + L4 axis derive + L11 axis escalation + Yaochi access + Tianmen readiness + L14 cross-protocol bind shipped
+- All wires audit-only emission (M406 is the only runtime decision wire so far)
+- BAS 2414 / Qinao 1361 / 全栈 3792 / 0 failures / 4/4 boundary green
+
+### 95.2 M412 — `BASKunlunDoctrineRedLine` 8-case typed pin + lint
+
+**新建** [BASKunlunDoctrineRedLines.swift](../BehavioralAISubstrate/Sources/BASOrchestration/BASKunlunDoctrineRedLines.swift)（~190 LOC）:
+- New `public enum BASKunlunDoctrineRedLine: String, Sendable, Equatable, Hashable, Codable, CaseIterable` with 8 stable kebab-case raw values per QINAO_KUNLUN_AXIS_DOCTRINE_TARGET_VINF §13.7
+- Cases:
+  1. `forbidSystemAuthorityViaKunlun` — RL1
+  2. `forbidAscentShamingHost` — RL2
+  3. `forbidPermanentSanctumOccupation` — RL3
+  4. `forbidJadeCanonBlackBox` — RL4
+  5. `forbidTianmenBypassesHost` — RL5
+  6. `forbidRiverOriginHiddenSurveillance` — RL6
+  7. `forbidSingleCultureExclusivity` — RL7
+  8. `forbidWelcomeBecomesTakeover` — RL8
+- Each case carries `whitePaperRef: String` (citing §13.7 RL N) + `forbiddenSubstrings: [String]` (substrate-vocabulary patterns that MUST NOT appear in audit emission)
+- Pattern parallel to M389 `BASAbyssalDoctrineRedLine` (10 Cthulhu cases)
+
+**新建** [M412KunlunDoctrineRedLineLintTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M412KunlunDoctrineRedLineLintTests.swift)（7 tests）:
+1. `testAllEightCasesEnumerated` — exactly 8 cases per §13.7
+2. `testAllRawValuesAreStableKebabCase` — kebab-case + lowercase + no underscores
+3. `testRawValuesAreUnique` — 8 distinct raw values
+4. `testWhitePaperReferenceNonEmptyForEach` — every case cites §13.7
+5. `testForbiddenSubstringsNonEmptyForEach` — every case has at least one substrate-vocabulary pattern
+6. `testSubstrateEmissionVocabularyHonorsAllRedLines` — **the critical lint test** — walks 28 known Kunlun emission codes (axis / jade / river / yaochi / tianmen / permit-escalation prefixes from M402/M404/M405/M406/M408/M409/M410) and asserts none contain any forbidden substring from any red line
+7. `testCrossDoctrineSemanticAlignmentDocumented` — pin Kunlun (8) + Cthulhu (10) = 18 doctrine red lines total
+
+### 95.3 M413 — Kunlun + Cthulhu composability snapshot tests
+
+**新建** [M413KunlunCthulhuComposabilityTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M413KunlunCthulhuComposabilityTests.swift)（6 tests, ~330 LOC）:
+
+6 fixtures pinning the cross-doctrine composability contract:
+
+1. `testLowPressureCenteredAxisNoEscalation` — pressure LOW + axis CENTERED → permit unchanged (no escalation from either doctrine)
+2. `testHighPressureCenteredAxisCthulhuOnly` — pressure HIGH + axis CENTERED → only Cthulhu escalation fires; Kunlun reason codes absent; `:abyssal:` codes ≥ 2 (one per recommended mode)
+3. `testLowPressureOverreachingAxisKunlunOnly` — pressure LOW + axis OVERREACHING → only Kunlun escalation fires; `:abyssal:` codes absent; `:kunlun:` codes ≥ 2 (requires-gate + compare + per-deviation)
+4. `testHighPressureOverreachingAxisBothFire` — both fire → both stack modes (compare + delay) present + both reason code sets accumulate; `Set(stackedModes)` is order-independent under composition
+5. `testReservedAnchorSuppressesBothEscalations` — red line 8 fires symmetrically for both doctrines; both `decision.suppressedByHumanAnchor == true`; suppression reason codes present in respective decisions; composed permit unchanged (mode + stackedModes)
+6. `testDeepDeviationAxisAddsKunlunEscalateMode` — axis `centerScore < 0.3` → Kunlun appends `.escalate` in addition to `.compare`; `permit.escalated:kunlun:escalate-deep-deviation` reason code emitted
+
+Doctrine pins:
+- Single commit mouth: `permit.mode == .answer` across all 6 fixtures
+- Composability is additive (no doctrine cancels another)
+- Red line 8 is symmetric (one bug-pinning test catches drift in either doctrine)
+
+### 95.4 M414 — `KunlunDoctrineDemo.swift` sample-host pure demo + `--kunlun-doctrine-demo` arg
+
+**新建** [KunlunDoctrineDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/KunlunDoctrineDemo.swift)（~370 LOC）:
+
+Pure-function demo exercising 13 wires across the 7 milestones (parity with `CthulhuDoctrineDemo.swift` M393):
+
+| # | Step | Milestone | Expected Output |
+|---|---|---|---|
+| 1 | M402 axis centered | M402 | `centerScore=1.0; requiresGate=false` |
+| 2 | M402 axis overreaching | M402 | `centerScore<0.7; requiresGate=true; deviations=risk-high-narrows-axis` |
+| 3 | M404 canonical seal | M404 | `isCanonical=true; missing=[]` |
+| 4 | M404 defective seal | M404 | `isCanonical=false; missing=4` |
+| 5 | M405 wellformed lineage | M405 | `isWellFormed=true; warnings=[]` |
+| 6 | M405 partial lineage | M405 | `isWellFormed=false; warnings≥2` |
+| 7 | M406 permit escalation overreaching | M406 | `triggered=true; suppressed=false; stackedModes=compare` |
+| 8 | M406 red-line-8 reserved suppression | M406 | `triggered=true; suppressed=true; stackedModes=[]` |
+| 9 | M408 sealed sanctum denied | M408 | `granted=false; reason=sealed-policy` |
+| 10 | M408 conditional sanctum granted | M408 | `granted=true; reasons=[]` |
+| 11 | M409 high-stakes gate not ready | M409 | `isReady=false; reason=high-stakes-needs-sovereign-warrant` |
+| 12 | M409 low-stakes gate ready | M409 | `isReady=true` |
+| 13 | M412 doctrine red-line cardinality | M412 | `redLineCount=8; allWellFormed=true` |
+
+`KunlunDoctrineDemoOutcome.allInvariantsHold` flag aggregates expected shapes — verified `true` end-to-end via manual `swift run QinaoSampleHost --kunlun-doctrine-demo` execution.
+
+**修改** [QinaoSampleHost/main.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift):
+- New `--kunlun-doctrine-demo` args branch + `runKunlunDoctrineDemo()` static func — banner introspecting all 13 wires + final invariant pin
+
+**新建** [QinaoSampleHostKunlunDoctrineDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostKunlunDoctrineDemoTests.swift)（8 tests, parity with M403 substrate-pin pattern):
+- 7 helper-pin tests (M402/M404/M405/M406/M408/M409/M412 each callable in isolation with happy-path output)
+- 1 cross-doctrine cardinality test (8 + 10 = 18)
+
+### 95.5 测试基线
+
+| 套件 | 九十四 章末 | 九十五 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2414 | **2427** | **+13** (M412 7 + M413 6) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1361 | **1369** | **+8** (M414 demo pin tests) |
+| 全栈 | 3792 | **3813** | **+21** |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿. Manual demo run verified `allInvariantsHold = true`.
+
+### 95.6 红线 / 不变量
+
+| 红线 / 不变量 | M412 | M413 | M414 |
+|---|---|---|---|
+| #1 先醒再答 | ✓（schema only） | ✓（pure-function tests） | ✓（pure demo） |
+| #2 神经不掌权 | ✓（schema only） | ✓（permit not mutated） | ✓（pure demo） |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ |
+| audit hash chain | n/a | n/a | n/a |
+| 单提交口 | n/a | **✓ pinned across 6 fixtures** | ✓ pinned in demo invariants |
+| Kunlun 8 红线 (§13.7) | **✓ typed enumerated + lint test pins substrate vocabulary** | n/a | ✓ pinned via cardinality test |
+| Cthulhu 10 红线 | unchanged | n/a | ✓ pinned via cross-doctrine cardinality test |
+| Cross-doctrine composability | n/a | **✓ 6 fixtures pinning additive accumulation + symmetric RL8** | ✓ exercised in demo |
+| 4 boundary checks | 维持 | 维持 | 维持 |
+
+### 95.7 Phase δ 完成判据
+
+| 判据 | 状态 |
+|---|---|
+| 8 Kunlun doctrine red lines typed-enumerated | ✓ M412 |
+| Static lint over substrate emission vocabulary | ✓ M412 (28 codes vs 8 red lines = 224 negative checks) |
+| Cross-doctrine composability fixtures | ✓ M413 (6 fixtures) |
+| Symmetric RL8 (anchor wins for both doctrines) | ✓ M413 fixture 5 |
+| Sample-host pure-function demo | ✓ M414 (13 wires) |
+| `swift run QinaoSampleHost --kunlun-doctrine-demo` runs | ✓ verified `allInvariantsHold = true` |
+| Helper-pin tests for demo primitives | ✓ M414 (8 tests) |
+| BAS + Qinao test suites green | ✓ |
+| 4 boundary checks clean | ✓ |
+| 21 new tests added | ✓ (M412: 7, M413: 6, M414: 8) |
+
+### 95.8 Phase ε 后续 (chapter 九十六 — M415-M416)
+
+After this chapter ships:
+- M415 — Kunlun behavioral regression snapshot tests (~7 byte-equal snapshots; parity with M398)
+- M416 — End-to-end demo through `BASHostRuntime` (parity with M399 `--cthulhu-end-to-end-demo`); empirical verification that ≥X/13 wires emit audit codes through real runTurn path
+
+### 95.9 一句话总结
+
+**M412-M414 close 昆仑 doctrine Phase δ (chapter 九十五)**：M412 ship `BASKunlunDoctrineRedLines.swift` 8-case typed enum (forbidSystemAuthorityViaKunlun / forbidAscentShamingHost / forbidPermanentSanctumOccupation / forbidJadeCanonBlackBox / forbidTianmenBypassesHost / forbidRiverOriginHiddenSurveillance / forbidSingleCultureExclusivity / forbidWelcomeBecomesTakeover per §13.7 RL1-RL8) each carrying whitePaperRef + forbiddenSubstrings; 7 lint tests pinning cardinality + raw-value stability + cross-doctrine cardinality (8 Kunlun + 10 Cthulhu = 18 total) + the critical static lint test walking 28 known Kunlun emission codes vs 8 red lines (224 negative checks) ensuring substrate vocabulary honors all red lines + M413 ship 6 cross-doctrine composability fixtures pinning Kunlun + Cthulhu additive composition (low/centered → no escalation; high/centered → Cthulhu only; low/overreach → Kunlun only; high/overreach → both fire + reason codes accumulate; reserved anchor → both suppressed symmetrically RL8; deep deviation → Kunlun .escalate added) + M414 ship `KunlunDoctrineDemo.swift` pure-function demo + `--kunlun-doctrine-demo` sample-host arg + 13-wire banner (2 axis + 2 jade + 2 river + 2 escalation + 2 yaochi + 2 tianmen + 1 red-line) with `allInvariantsHold` flag aggregating expected shapes; manual `swift run` verified `allInvariantsHold = true` end-to-end + 8 substrate-pin tests on demo primitives. Single commit mouth pinned across 6 composability fixtures. BAS 2414 → 2427 (+13) / Qinao 1361 → 1369 (+8) / 全栈 3792 → 3813 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase δ done; Phase ε (behavioral snapshots + e2e through BASHostRuntime) 待 chapter 九十六**.

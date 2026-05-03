@@ -293,6 +293,16 @@ struct QinaoSampleHost {
             runKunlunSchemaDemo()
             return
         }
+        if args.contains("--kunlun-doctrine-demo") {
+            // M414 (chapter 九十五) — exercise every Kunlun
+            // doctrine wire shipped in M402 / M404 / M405 /
+            // M406 / M408 / M409 / M412 in pure-function
+            // isolation. Pattern parallel to
+            // `--cthulhu-doctrine-demo`. No runtime / no actor /
+            // no IO. Banner verifies all invariants hold.
+            runKunlunDoctrineDemo()
+            return
+        }
         if args.contains("--audit-ledger-bench") {
             // M357 — bench `BASSovereignAuditLedger.append`
             // per-entry latency × N. Default N=10000;
@@ -4495,6 +4505,69 @@ struct QinaoSampleHost {
                 hook into L8 query gate + L14 sovereign warrant.
               See docs/QINAO_KUNLUN_AXIS_DOCTRINE_TARGET_VINF.md
                 + plan附录 L for full roadmap.
+            """)
+    }
+
+    // MARK: - M414 kunlun-doctrine-demo (chapter 九十五 Phase δ)
+
+    /// Exercise every Kunlun doctrine wire shipped in M402 +
+    /// M404 + M405 + M406 + M408 + M409 + M412 in pure-function
+    /// isolation. Pattern parallel to `runCthulhuDoctrineDemo`.
+    /// No runtime / no actor / no IO. Banner verifies all
+    /// invariants hold via the helper's `allInvariantsHold`
+    /// final flag.
+    private static func runKunlunDoctrineDemo() {
+        print("""
+
+            QinaoSampleHost --kunlun-doctrine-demo (M414):
+
+              Exercises every Kunlun doctrine wire shipped in
+              chapter 九十二 / 九十三 / 九十四 / 九十五 in
+              pure-function isolation. No runtime / no actor /
+              no IO. Each step prints the helper's typed input
+              shape, the typed output, and the audit-emittable
+              reason codes the wire produced.
+
+            """)
+        let outcome = KunlunDoctrineDemo.run()
+        let steps: [KunlunDoctrineWireOutcome] = [
+            outcome.m402AxisAlignmentCentered,
+            outcome.m402AxisAlignmentOverreaching,
+            outcome.m404JadeCanonCanonicalSeal,
+            outcome.m404JadeCanonDefectiveSeal,
+            outcome.m405RiverOriginWellformed,
+            outcome.m405RiverOriginPartial,
+            outcome.m406PermitEscalationOverreaching,
+            outcome.m406PermitEscalationReserved,
+            outcome.m408YaochiSealedDenied,
+            outcome.m408YaochiConditionalGranted,
+            outcome.m409TianmenHighStakesNotReady,
+            outcome.m409TianmenLowStakesReady,
+            outcome.m412DoctrineRedLineCardinality,
+        ]
+        for (idx, step) in steps.enumerated() {
+            print("""
+
+              [\(idx + 1)/\(steps.count)] \(step.stepName)
+                summary: \(step.summary)
+                reasonCodes (\(step.reasonCodes.count)):
+                \(step.reasonCodes.map { "  - \($0)" }
+                    .joined(separator: "\n                "))
+            """)
+        }
+        print("""
+
+            ━━━ Demo complete — chapter 九十五 Phase δ ━━━
+              allInvariantsHold = \(outcome.allInvariantsHold)
+              13 wires exercised: 2 axis (M402) + 2 jade (M404)
+              + 2 river (M405) + 2 escalation (M406) + 2 yaochi
+              (M408) + 2 tianmen (M409) + 1 red-line (M412).
+              See docs/QINAO_KUNLUN_AXIS_DOCTRINE_TARGET_VINF.md
+                + plan 附录 L for full roadmap.
+              Phase ε (chapter 九十六): behavioral snapshots +
+                e2e through real BASHostRuntime.
+              Phase ζ (chapter 九十七): deep review pass +
+                manifesto v9 按需 author decision.
             """)
     }
 
