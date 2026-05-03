@@ -223,6 +223,48 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     /// `kunlun.refinement.ticketCount:<int>` when non-empty.
     public var jadeRefinementTickets: [BASJadeRefinementTicket]
 
+    // MARK: - M491-M494 (chapter 一百二十七) — final Kunlun
+    // host + integrity production wires.
+
+    /// L2 jade-fidelity map (M491). When non-nil, emits
+    /// `kunlun.jade.fidelity:<level>` + `kunlun.jade.audit-required`
+    /// reason codes.
+    public var jadeFidelityMap: BASJadeFidelityMap?
+
+    /// L5 host-jade register (M492). When non-nil, emits
+    /// `kunlun.host.register:<provenance-status>` reason code.
+    public var hostJadeRegister: BASHostJadeRegister?
+
+    /// L7 jade-mirror draft (M493). When non-nil, emits
+    /// `kunlun.jade.mirror:<no-inducement-status>` reason code.
+    public var jadeMirrorDraft: BASJadeMirrorDraft?
+
+    /// L7 Kunlun unnamable set (M494). When non-nil, emits
+    /// `kunlun.unnamable.refCount:<int>` reason code.
+    public var kunlunUnnamableSet: BASKunlunUnnamableSet?
+
+    // MARK: - M495-M498 (chapter 一百二十七) — chapter 一百
+    // 二十一 Cthulhu leftover production wires.
+
+    /// L7 narrative-distortion map (M495). When non-nil, emits
+    /// `cthulhu.distortionMap.subjects:<int>` +
+    /// `cthulhu.distortionMap.dominant:<bool>` reason codes.
+    public var narrativeDistortionMap: BASNarrativeDistortionMap?
+
+    /// L8 sealed-memory binding (M496). When non-nil, emits
+    /// `cthulhu.sealed.class:<rawValue>` +
+    /// `cthulhu.sealed.disclosure:<rawValue>` reason codes.
+    public var sealedMemory: BASSealedMemory?
+
+    /// L5 host-anchor profile (M497). When non-nil, emits
+    /// `cthulhu.anchor.dignity:<count>` +
+    /// `cthulhu.anchor.guards:<count>` reason codes.
+    public var humanAnchorProfile: BASHumanAnchorProfile?
+
+    /// L2 abyssal organ alias (M498). When non-nil, emits
+    /// `cthulhu.organ.alias:<rawValue>` reason code.
+    public var abyssalOrganAlias: BASAbyssalOrganAlias?
+
     // MARK: - Construction
 
     /// All-fields-default constructor. Most callers use the
@@ -306,7 +348,15 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         restSteps: [BASRestStep] = [],
         returnPaths: [BASReturnPath] = [],
         jadeCasket: BASJadeCasketSnapshot? = nil,
-        jadeRefinementTickets: [BASJadeRefinementTicket] = []
+        jadeRefinementTickets: [BASJadeRefinementTicket] = [],
+        jadeFidelityMap: BASJadeFidelityMap? = nil,
+        hostJadeRegister: BASHostJadeRegister? = nil,
+        jadeMirrorDraft: BASJadeMirrorDraft? = nil,
+        kunlunUnnamableSet: BASKunlunUnnamableSet? = nil,
+        narrativeDistortionMap: BASNarrativeDistortionMap? = nil,
+        sealedMemory: BASSealedMemory? = nil,
+        humanAnchorProfile: BASHumanAnchorProfile? = nil,
+        abyssalOrganAlias: BASAbyssalOrganAlias? = nil
     ) {
         self.candidateObservationBundle =
             candidateObservationBundle
@@ -381,6 +431,14 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         self.returnPaths = returnPaths
         self.jadeCasket = jadeCasket
         self.jadeRefinementTickets = jadeRefinementTickets
+        self.jadeFidelityMap = jadeFidelityMap
+        self.hostJadeRegister = hostJadeRegister
+        self.jadeMirrorDraft = jadeMirrorDraft
+        self.kunlunUnnamableSet = kunlunUnnamableSet
+        self.narrativeDistortionMap = narrativeDistortionMap
+        self.sealedMemory = sealedMemory
+        self.humanAnchorProfile = humanAnchorProfile
+        self.abyssalOrganAlias = abyssalOrganAlias
     }
 
     /// All-default singleton. Used by callers that emit a
@@ -494,6 +552,18 @@ extension BASEBrainRuntimeCoordinator {
             returnPaths: projections.returnPaths,
             jadeCasket: projections.jadeCasket,
             jadeRefinementTickets:
-                projections.jadeRefinementTickets)
+                projections.jadeRefinementTickets,
+            jadeFidelityMap: projections.jadeFidelityMap,
+            hostJadeRegister: projections.hostJadeRegister,
+            jadeMirrorDraft: projections.jadeMirrorDraft,
+            kunlunUnnamableSet:
+                projections.kunlunUnnamableSet,
+            narrativeDistortionMap:
+                projections.narrativeDistortionMap,
+            sealedMemory: projections.sealedMemory,
+            humanAnchorProfile:
+                projections.humanAnchorProfile,
+            abyssalOrganAlias:
+                projections.abyssalOrganAlias)
     }
 }

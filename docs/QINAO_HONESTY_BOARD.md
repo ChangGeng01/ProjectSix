@@ -14796,3 +14796,71 @@ Remaining 4 schema wires (chapter 一百二十七): L2 JadeFidelityMap + L5 Host
 ### 126.6 一句话总结
 
 **Chapter 一百二十六 / M486-M490**: continue Kunlun production-wire batch — 5 of 13 remaining schemas wired into runTurn audit emission. **M486** L9 BASAscentBranch derived per-candidate (always non-empty returnPathRef per §5.9 dignity invariant — synthesized "return-path:<candidateID>" by construction). **M487** L9 BASRestStep derived only for low-confidence candidates with required evidence (nil when not stalled). **M488** L9 BASReturnPath derived always per-candidate (dignityPreserved=true; rollbackPossible from reversibility ≥ 0.5 threshold). **M489** L3 BASJadeCasketSnapshot synthesized once per turn with all 4 jade-canon ref fields populated (always canonical per §4.2). **M490** L13 BASJadeRefinementTicket derived only for impure candidates (low confidence OR high cost) with fracturePath synthesized per §5.13 不留幽灵. **9 new named static constants** (cumulative 20 across chapters 一百二十五/一百二十六). **7 new tests** in M486KunlunDreamLoopWiringTests pinning: jade.casket always canonical / ascent dignity invariant never violated / return path dignity honored when emitted / parseable counts / single commit mouth / determinism. **M402 test update** in same chapter: allowedSegments +3 ({rest, return, refinement}); count range [17,30] → [17,40]. **Plan progress**: Stream A schemas wired 6/15 → **11/15** (73%); plan total 21/31 → **26/31** (84%). Test counts: BAS XCTest 2794 → **2801** (+7), Qinao 1375 unchanged, 全栈 4186 → **4193** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (241 registered, 0 drift). Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean.
+
+## 一百二十七、 Kunlun production wires γ — final 4 host+integrity schemas + chapter 一百二十一 Cthulhu leftover (M491-M499 / 2026-05-04)
+
+### 127.1 触发动作
+
+User priority "packages 先不做 补齐 14层 缺口 优先" + "continue" auto mode → close out Stream A schemas at 15/15. Chapter 一百二十六 closed 11/15; this chapter wires the remaining 4 Kunlun schemas (L2 BASJadeFidelityMap / L5 BASHostJadeRegister / L7 BASJadeMirrorDraft / L7 BASKunlunUnnamableSet) + 4 chapter 一百二十一 Cthulhu leftover schemas (L2 BASAbyssalOrganAlias / L5 BASHumanAnchorProfile / L7 BASNarrativeDistortionMap / L8 BASSealedMemory) + hostFragility actual computation.
+
+### 127.2 Production wires shipped
+
+| M | Schema | Layer | Derive cadence | Audit codes |
+|---|---|---|---|---|
+| M491 | BASJadeFidelityMap | L2 | per turn (always) | `kunlun.jade.fidelity:<level>` + `kunlun.jade.audit-required:honored\|violated` (only on `.contaminated`) |
+| M492 | BASHostJadeRegister | L5 | per turn (always) | `kunlun.host.register:honored\|violated` |
+| M493 | BASJadeMirrorDraft | L7 | per turn (always) | `kunlun.jade.mirror:honored\|violated` |
+| M494 | BASKunlunUnnamableSet | L7 | conditional (when unknownRefs non-empty) | `kunlun.unnamable.refCount:<int>` |
+| M495 | BASNarrativeDistortionMap | L7 | conditional (when distortion ≥ threshold + non-empty candidates) | `cthulhu.distortionMap.subjects:<int>` + `cthulhu.distortionMap.dominant:<bool>` |
+| M496 | BASSealedMemory | L8 | conditional (when thermal layer ≠ tide-surface) | `cthulhu.sealed.class:<rawValue>` + `cthulhu.sealed.disclosure:<rawValue>` |
+| M497 | BASHumanAnchorProfile | L5 | per turn (always) | `cthulhu.anchor.dignity:<count>` + `cthulhu.anchor.guards:<count>` |
+| M498 | BASAbyssalOrganAlias | L2 | per turn (always) | `cthulhu.organ.alias:<rawValue>` |
+| M499 | hostFragility computation | (cross-cutting) | per turn (always; default 0 when no anchor) | folds into `cthulhu.budget.aggregateAvailability` via 7-field aggregate |
+
+### 127.3 Doctrine pins applied
+
+Anti-magic-number — 4 new Kunlun named static constants:
+- `jadeFidelityToleranceLow = 0.7`
+- `jadeFidelityToleranceMedium = 0.5`
+- `jadeFidelityToleranceHigh = 0.3`
+- `jadeFidelityToleranceExtreme = 0.1`
+
+Plus 2 Cthulhu-leftover named statics:
+- `distortionMapAxisThreshold = 0.5`
+- `sealRevealRiskFloor = 0.5`
+
+(Total cumulative chapter 一百二十五 + 一百二十六 + 一百二十七: 11 + 9 + 6 = 26 named statics for combined Kunlun + Cthulhu-leftover production wires)
+
+Doctrine invariants typed-pinned via test:
+- **§3.2 contamination invariant** (`testContaminatedFidelityHonorsAuditInvariant`): `.contaminated` fidelity → `auditRequired == true` (carried through audit emission as `kunlun.jade.audit-required:honored`)
+- **§5.5 provenance invariant** (`testHostJadeRegisterAlwaysAppears`): `riverOriginRef` always non-empty (synthesized as `"river-origin:<sessionID>"` by construction)
+- **§5.7 noInducement invariant** (`testJadeMirrorDraftAlwaysAppears`): `noInducementFlag == true` set by derive helper by construction
+- **§5.7 preservation invariant** (M494 derive helper): vacuous unnamable sets returned nil (only emit when unknownRefs non-empty)
+- **Single commit mouth** (`testPermitModeNotMutatedByChapter127Wires`): permit.mode unchanged by all 8 new wires
+- **§5.11 hostFragility folding** (`testChapter127CodesAreDeterministic` indirectly via abyssal aggregate): hostFragility computed from anchor's max(alienation, dignity, overwhelm) and folded back into pressure via `HostFragilityProjection.apply(...)` so `aggregateMagnitudeWithFragility` reflects the spec-canonical 7-field mean
+
+Anti-drift M402 test update — `allowedSegments` extended +2: `{host, unnamable}`. Count range raised `[17,30]` → `[20,45]` accounting for 3 always-fire + 1 conditional Kunlun chapter-一百二十七 codes.
+
+### 127.4 测试基线
+
+| 套件 | 一百二十六 章末 | 一百二十七 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2801 | **2812** | +11 (1 new test file: M491KunlunIntegrityCthulhuLeftoverWiringTests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4193 | **4204** | +11 |
+
+5 gates clean: 4 boundary + whitepaper parity (241 registered, 0 drift).
+
+### 127.5 Plan progress
+
+| 项 | Pre-chapter | Post-chapter |
+|---|---|---|
+| Stream A schemas production-wired into runTurn | 11/15 | **15/15 ✓** (100%) |
+| Chapter 一百二十一 Cthulhu leftover wired | 0/4 | **4/4 ✓** (100%) |
+| hostFragility computation | hard-coded 0 | **derived from anchor signal** ✓ |
+| Plan total | 26/31 (84%) | **31/31** (100% — Stream A complete) |
+
+### 127.6 一句话总结
+
+**Chapter 一百二十七 / M491-M499**: close out Stream A schemas production-wiring at 15/15 — 4 final Kunlun host+integrity wires + 4 chapter 一百二十一 Cthulhu leftover wires + hostFragility actual computation. **M491** L2 BASJadeFidelityMap derived from runMode + risk → 4-tier fidelity; `.contaminated` honors §3.2 audit invariant by construction. **M492** L5 BASHostJadeRegister synthesized once per turn with non-empty riverOriginRef (§5.5 provenance invariant honored by construction via sessionID anchor). **M493** L7 BASJadeMirrorDraft per turn with `noInducementFlag = true` (§5.7 玉鉴 invariant honored by construction). **M494** L7 BASKunlunUnnamableSet conditional emission (only when unknownRefs non-empty per §5.7 preservation invariant). **M495** L7 BASNarrativeDistortionMap derived from M316 distortion when material axis ≥ 0.5 threshold; per-candidate aggregate map. **M496** L8 BASSealedMemory bridges from BASMemoryTemperatureLayer (returns nil for tide-surface, otherwise typed seal class + disclosure mode + reentry conditions per §5.8). **M497** L5 BASHumanAnchorProfile per turn with default 3 dignity invariants + 2 exploitation guards + risk-derived sensitivity windows. **M498** L2 BASAbyssalOrganAlias per turn (run mode → 6 stable kebab-case aliases per Cthulhu Spec V1 §5.2). **M499** hostFragility computation: max(alienation, dignity, overwhelm) from anchor signal → folded back into pressure via `HostFragilityProjection.apply(...)` → `aggregateMagnitudeWithFragility` reflects spec-canonical 7-field mean. **6 new named static constants** (cumulative 26 across chapters 一百二十五/六/七). **11 new tests** in M491KunlunIntegrityCthulhuLeftoverWiringTests pinning: jade fidelity always emitted with valid level / contamination invariant honored / host register provenance honored / jade mirror noInducement honored / unnamable refCount parseable / distortion map paired emission / sealed memory paired emission / anchor profile default counts / organ alias one of 6 stable values / single commit mouth held / determinism. **M402 test update** in same chapter: allowedSegments +2 ({host, unnamable}); count range [17,30] → [20,45]. **Plan progress**: Stream A schemas wired **15/15 ✓** (100%); chapter 一百二十一 Cthulhu leftover wired **4/4 ✓** (100%); hostFragility derived from anchor signal ✓; plan total **31/31** (100% — Stream A complete). Test counts: BAS XCTest 2801 → **2812** (+11), Qinao 1375 unchanged, 全栈 4193 → **4204** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (241 registered, 0 drift). Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean.

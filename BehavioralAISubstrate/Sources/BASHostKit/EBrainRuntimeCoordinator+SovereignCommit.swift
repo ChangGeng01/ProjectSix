@@ -618,7 +618,19 @@ extension BASEBrainRuntimeCoordinator {
         restSteps: [BASRestStep] = [],
         returnPaths: [BASReturnPath] = [],
         jadeCasket: BASJadeCasketSnapshot? = nil,
-        jadeRefinementTickets: [BASJadeRefinementTicket] = []
+        jadeRefinementTickets: [BASJadeRefinementTicket] = [],
+        // M491-M494 (chapter 一百二十七) — final Kunlun
+        // host + integrity production wires.
+        jadeFidelityMap: BASJadeFidelityMap? = nil,
+        hostJadeRegister: BASHostJadeRegister? = nil,
+        jadeMirrorDraft: BASJadeMirrorDraft? = nil,
+        kunlunUnnamableSet: BASKunlunUnnamableSet? = nil,
+        // M495-M498 (chapter 一百二十七) — chapter 一百二十一
+        // Cthulhu leftover production wires.
+        narrativeDistortionMap: BASNarrativeDistortionMap? = nil,
+        sealedMemory: BASSealedMemory? = nil,
+        humanAnchorProfile: BASHumanAnchorProfile? = nil,
+        abyssalOrganAlias: BASAbyssalOrganAlias? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -1430,6 +1442,76 @@ extension BASEBrainRuntimeCoordinator {
             observationStatusCodes.append(
                 "kunlun.refinement.noGhost:" +
                 "\(noGhostTickets)")
+        }
+        // M491-M494 (chapter 一百二十七) — final Kunlun
+        // host + integrity production wires.
+        if let jadeFidelityMap = jadeFidelityMap {
+            observationStatusCodes.append(
+                "kunlun.jade.fidelity:" +
+                "\(jadeFidelityMap.fidelityLevel.rawValue)")
+            // §3.2 contamination invariant pin: contaminated
+            // fidelity → auditRequired must be true.
+            if jadeFidelityMap.fidelityLevel == .contaminated {
+                let invariantHonored = jadeFidelityMap
+                    .honorsContaminationInvariant
+                observationStatusCodes.append(
+                    "kunlun.jade.audit-required:" +
+                    "\(invariantHonored ? "honored" : "violated")")
+            }
+        }
+        if let hostJadeRegister = hostJadeRegister {
+            // §5.5 provenance invariant pin: riverOriginRef
+            // must be non-empty.
+            let invariantHonored = hostJadeRegister
+                .honorsProvenanceInvariant
+            observationStatusCodes.append(
+                "kunlun.host.register:" +
+                "\(invariantHonored ? "honored" : "violated")")
+        }
+        if let jadeMirrorDraft = jadeMirrorDraft {
+            // §5.7 玉鉴 invariant pin: noInducementFlag must
+            // be true.
+            let invariantHonored = jadeMirrorDraft
+                .honorsNoInducementInvariant
+            observationStatusCodes.append(
+                "kunlun.jade.mirror:" +
+                "\(invariantHonored ? "honored" : "violated")")
+        }
+        if let kunlunUnnamableSet = kunlunUnnamableSet {
+            observationStatusCodes.append(
+                "kunlun.unnamable.refCount:" +
+                "\(kunlunUnnamableSet.unknownRefs.count)")
+        }
+        // M495-M498 (chapter 一百二十七) — chapter 一百二十一
+        // Cthulhu leftover production wires.
+        if let distortionMap = narrativeDistortionMap {
+            observationStatusCodes.append(
+                "cthulhu.distortionMap.subjects:" +
+                "\(distortionMap.subjectRefs.count)")
+            observationStatusCodes.append(
+                "cthulhu.distortionMap.dominant:" +
+                "\(distortionMap.dominantSubjectRef != nil)")
+        }
+        if let sealedMemory = sealedMemory {
+            observationStatusCodes.append(
+                "cthulhu.sealed.class:" +
+                "\(sealedMemory.sealClass.rawValue)")
+            observationStatusCodes.append(
+                "cthulhu.sealed.disclosure:" +
+                "\(sealedMemory.disclosureMode.rawValue)")
+        }
+        if let humanAnchorProfile = humanAnchorProfile {
+            observationStatusCodes.append(
+                "cthulhu.anchor.dignity:" +
+                "\(humanAnchorProfile.dignityInvariants.count)")
+            observationStatusCodes.append(
+                "cthulhu.anchor.guards:" +
+                "\(humanAnchorProfile.noExploitationGuards.count)")
+        }
+        if let abyssalOrganAlias = abyssalOrganAlias {
+            observationStatusCodes.append(
+                "cthulhu.organ.alias:" +
+                "\(abyssalOrganAlias.rawValue)")
         }
         if let ontologyShiftMark = ontologyShiftMark,
            !ontologyShiftMark.observedShiftAxes.isEmpty

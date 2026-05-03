@@ -1206,6 +1206,46 @@ public struct BASEBrainRuntimeCoordinator {
                         from: candidate,
                         turnID: derivedTurnID)
             }
+        // M491-M494 (chapter 一百二十七) — final Kunlun host +
+        // integrity production wires.
+        let jadeFidelityMapForAudit = BASKunlunLayerProjections
+            .JadeFidelityMap.derive(
+                from: routedBudget.runMode,
+                riskLevel: boundRiskCard.riskLevel,
+                organRef: "neural-organ:" +
+                    "\(thoughtFrame.organMap?.morph.rawValue ?? "unknown")",
+                turnID: derivedTurnID)
+        let hostJadeRegisterForAudit = BASKunlunLayerProjections
+            .HostJadeRegister.derive(
+                hostID: hostContext.hostID,
+                sessionID: derivedSessionID,
+                turnID: derivedTurnID)
+        let jadeMirrorDraftForAudit = BASKunlunLayerProjections
+            .JadeMirrorDraft.derive(
+                unknownRefs: unknownReserveForGate.unknownRefs,
+                anchorRef:
+                    "human-anchor-\(derivedSessionID)",
+                turnID: derivedTurnID)
+        let kunlunUnnamableSetForAudit = BASKunlunLayerProjections
+            .KunlunUnnamableSet.derive(
+                unknownRefs: unknownReserveForGate.unknownRefs,
+                preservationPolicy: "await-evidence",
+                turnID: derivedTurnID)
+        // M495-M498 (chapter 一百二十七) — chapter 一百二十一
+        // Cthulhu leftover production wires.
+        let abyssalOrganAliasForAudit =
+            BASCthulhuLeftoverProjections.AbyssalOrganAlias
+                .derive(from: routedBudget.runMode)
+        let humanAnchorProfileForAudit =
+            BASCthulhuLeftoverProjections.HumanAnchorProfile
+                .derive(
+                    hostID: hostContext.hostID,
+                    riskLevel: boundRiskCard.riskLevel,
+                    turnID: derivedTurnID)
+        let sealedMemoryForAudit =
+            BASCthulhuLeftoverProjections.SealedMemory.derive(
+                from: memoryTemperatureLayerForAudit,
+                turnID: derivedTurnID)
         let cosmicScaleViewForAudit = BASCthulhuLayerProjections
             .CosmicScaleView.derive(
                 from: routedBudget,
@@ -1677,6 +1717,29 @@ public struct BASEBrainRuntimeCoordinator {
                 turnID: derivedTurnID,
                 targetSubjectRef: thoughtFrame.candidates
                     .first?.candidateID ?? "no-candidate")
+        // M495 (chapter 一百二十七) — derive L7 narrative-
+        // distortion map from the M316 distortion + candidate
+        // IDs. Watcher-hint only.
+        let narrativeDistortionMapForAudit =
+            BASCthulhuLeftoverProjections.NarrativeDistortionMap
+                .derive(
+                    from: narrativeDistortionForAudit,
+                    candidateIDs: thoughtFrame.candidates
+                        .map(\.candidateID),
+                    turnID: derivedTurnID)
+        // M499 (chapter 一百二十七) — compute hostFragility from
+        // the human-anchor signal and re-build pressure with
+        // fragility folded in. Pre-M499 the field was hard-coded
+        // to 0 (chapter 一百二十一 schema-only ship); chapter
+        // 一百二十七 closes the computation gap.
+        let hostFragilityForAudit =
+            BASCthulhuLeftoverProjections.HostFragilityProjection
+                .derive(from: humanAnchorSignalForAudit)
+        let abyssalPressureWithFragility =
+            BASCthulhuLeftoverProjections.HostFragilityProjection
+                .apply(
+                    fragility: hostFragilityForAudit,
+                    to: abyssalPressureForAudit)
         // M320 — derive `BASUnknownReserve` projection from L9
         // uncertainty ledger's confidence floor. When the floor
         // is high (≥0.8) the reserve resolves to `.unrestricted`
@@ -2032,7 +2095,11 @@ public struct BASEBrainRuntimeCoordinator {
                 .candidateObservationBundle,
             tribunalObservationBundle: thoughtFrame
                 .tribunalObservationBundle,
-            abyssalPressure: abyssalPressureForAudit,
+            // M499 (chapter 一百二十七) — thread the
+            // fragility-folded pressure into projections so the
+            // audit emission reflects the spec-canonical
+            // 7-field aggregate.
+            abyssalPressure: abyssalPressureWithFragility,
             humanAnchorSignal: humanAnchorSignalForAudit,
             sealAggregate: sealAggregateForAudit,
             lifecycleAggregate: lifecycleAggregateForAudit,
@@ -2114,7 +2181,22 @@ public struct BASEBrainRuntimeCoordinator {
             returnPaths: returnPathsForAudit,
             jadeCasket: jadeCasketForAudit,
             jadeRefinementTickets:
-                jadeRefinementTicketsForAudit)
+                jadeRefinementTicketsForAudit,
+            // M491-M494 (chapter 一百二十七) — final Kunlun
+            // host + integrity production-wire projections.
+            jadeFidelityMap: jadeFidelityMapForAudit,
+            hostJadeRegister: hostJadeRegisterForAudit,
+            jadeMirrorDraft: jadeMirrorDraftForAudit,
+            kunlunUnnamableSet: kunlunUnnamableSetForAudit,
+            // M495-M498 (chapter 一百二十七) — chapter 一百
+            // 二十一 Cthulhu leftover production-wire
+            // projections.
+            narrativeDistortionMap:
+                narrativeDistortionMapForAudit,
+            sealedMemory: sealedMemoryForAudit,
+            humanAnchorProfile:
+                humanAnchorProfileForAudit,
+            abyssalOrganAlias: abyssalOrganAliasForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,

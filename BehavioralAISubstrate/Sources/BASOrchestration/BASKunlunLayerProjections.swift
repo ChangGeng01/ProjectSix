@@ -706,3 +706,176 @@ public extension BASKunlunLayerProjections {
     /// impurity is added.
     static let refinementHighCostThreshold: Double = 0.7
 }
+
+// MARK: - M491-M494 (chapter 一百二十七) — final Kunlun
+// host + integrity production wires. Closes the schema-only
+// trap for chapter 一百二十四 schemas (BASJadeFidelityMap /
+// BASHostJadeRegister / BASJadeMirrorDraft /
+// BASKunlunUnnamableSet) per chapter 一百十八 ship-with-
+// production-wire doctrine.
+
+public extension BASKunlunLayerProjections {
+
+    // MARK: - M491 BASJadeFidelityMap derivation (L2)
+
+    /// Project an L2 jade-fidelity map per turn from the bound
+    /// run mode + risk level. Mirrors §3.2 contamination doctrine:
+    /// `.contaminated` MUST have `auditRequired == true` (init-
+    /// enforced via `honorsContaminationInvariant`).
+    ///
+    /// Mapping doctrine:
+    ///   - run mode `.quarantine` / `.lockdown` → `.contaminated`
+    ///     with auditRequired=true (per §3.2 invariant)
+    ///   - run mode `.recovery` / `.guard` → `.partial`
+    ///   - risk `.extreme` → `.partial`
+    ///   - risk `.high` + non-quarantine → `.standard`
+    ///   - everything else → `.high` (clean fidelity)
+    ///
+    /// `contaminationTolerance` derived from inverse risk: low
+    /// risk = high tolerance (organ can absorb noise); high risk
+    /// = low tolerance (organ must halt-on-contamination).
+    enum JadeFidelityMap {
+        public static func derive(
+            from runMode: BASEBrainRunMode,
+            riskLevel: BASBrainRiskLevel,
+            organRef: String,
+            turnID: String
+        ) -> BASJadeFidelityMap {
+            let level = fidelityLevel(
+                runMode: runMode, riskLevel: riskLevel)
+            let policy = degradationPolicy(for: level)
+            let tolerance = contaminationTolerance(
+                for: riskLevel)
+            let auditRequired = (level == .contaminated)
+            return BASJadeFidelityMap(
+                mapID: "jade-fidelity:\(turnID)",
+                organRef: organRef,
+                fidelityLevel: level,
+                degradationPolicy: policy,
+                contaminationTolerance: tolerance,
+                auditRequired: auditRequired)
+        }
+
+        private static func fidelityLevel(
+            runMode: BASEBrainRunMode,
+            riskLevel: BASBrainRiskLevel
+        ) -> BASJadeFidelityLevel {
+            switch runMode {
+            case .quarantine, .lockdown:
+                return .contaminated
+            case .`guard`, .recovery:
+                return .partial
+            case .dormant, .pulse, .sentinel,
+                 .engage, .reflect, .deepLoop:
+                switch riskLevel {
+                case .extreme: return .partial
+                case .high: return .standard
+                case .medium, .low: return .high
+                }
+            }
+        }
+
+        private static func degradationPolicy(
+            for level: BASJadeFidelityLevel
+        ) -> String {
+            switch level {
+            case .high: return "degrade-gracefully"
+            case .standard: return "degrade-gracefully"
+            case .partial: return "degrade-with-audit"
+            case .contaminated: return "halt-on-contamination"
+            }
+        }
+
+        private static func contaminationTolerance(
+            for riskLevel: BASBrainRiskLevel
+        ) -> Double {
+            switch riskLevel {
+            case .low: return jadeFidelityToleranceLow
+            case .medium: return jadeFidelityToleranceMedium
+            case .high: return jadeFidelityToleranceHigh
+            case .extreme: return jadeFidelityToleranceExtreme
+            }
+        }
+    }
+
+    /// Contamination tolerance baselines (anti-magic-number).
+    /// Higher = organ can absorb more noise before halt.
+    static let jadeFidelityToleranceLow: Double = 0.7
+    static let jadeFidelityToleranceMedium: Double = 0.5
+    static let jadeFidelityToleranceHigh: Double = 0.3
+    static let jadeFidelityToleranceExtreme: Double = 0.1
+
+    // MARK: - M492 BASHostJadeRegister derivation (L5)
+
+    /// Project an L5 host-jade register per turn from the bound
+    /// host context. Doctrine invariant per §5.5: `riverOriginRef`
+    /// MUST be non-empty (every host change has provenance).
+    /// The derive helper uses sessionID as the river-origin
+    /// anchor so the invariant always holds by construction.
+    enum HostJadeRegister {
+        public static func derive(
+            hostID: String,
+            sessionID: String,
+            turnID: String
+        ) -> BASHostJadeRegister {
+            BASHostJadeRegister(
+                registerID: "host-jade-register:\(turnID)",
+                hostVersionRef: "host-version:\(hostID)",
+                boundaryContractRefs: [],
+                authorizationScrollRefs: [],
+                relationRegisterRefs: [],
+                rollbackRefs: [],
+                riverOriginRef:
+                    "river-origin:\(sessionID)")
+        }
+    }
+
+    // MARK: - M493 BASJadeMirrorDraft derivation (L7)
+
+    /// Project an L7 jade-mirror draft per turn. Doctrine
+    /// invariant per §5.7: `noInducementFlag` MUST be `true`
+    /// (drafts that induce confidence violate jade mirror).
+    /// The derive helper sets the flag to `true` by construction.
+    ///
+    /// `unknownPreserved` populated from the unknown-reserve
+    /// refs (chapter 一百十八 wire) so unknowns aren't auto-
+    /// filled.
+    enum JadeMirrorDraft {
+        public static func derive(
+            unknownRefs: [String],
+            anchorRef: String,
+            turnID: String
+        ) -> BASJadeMirrorDraft {
+            BASJadeMirrorDraft(
+                draftID: "jade-mirror-draft:\(turnID)",
+                sourceFrameRef: "fold:\(turnID)",
+                cleanReflection: "",
+                unknownPreserved: unknownRefs,
+                inferenceDisclosures: [],
+                hostAnchorRef: anchorRef,
+                noInducementFlag: true)
+        }
+    }
+
+    // MARK: - M494 BASKunlunUnnamableSet derivation (L7)
+
+    /// Project an L7 Kunlun unnamable set when the unknown
+    /// reserve has at least one preserved unknown. Returns nil
+    /// for empty reserves (per §5.7 doctrine: vacuous sets
+    /// violate "未知必须留" — preservation requires non-empty).
+    enum KunlunUnnamableSet {
+        public static func derive(
+            unknownRefs: [String],
+            preservationPolicy: String,
+            turnID: String
+        ) -> BASKunlunUnnamableSet? {
+            guard !unknownRefs.isEmpty else { return nil }
+            return BASKunlunUnnamableSet(
+                setID: "unnamable-set:\(turnID)",
+                unknownRefs: unknownRefs,
+                preservationPolicy: preservationPolicy,
+                partialStructures: [],
+                safeLabels: [])
+        }
+    }
+}

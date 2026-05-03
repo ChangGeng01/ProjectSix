@@ -153,10 +153,14 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         // Chapter 一百二十六 / M486-M490 added: rest (L9
         // RestStep), return (L9 ReturnPath), refinement (L13
         // JadeRefinementTicket). ascent/jade segments reused.
+        // Chapter 一百二十七 / M491-M494 added: host (L5
+        // HostJadeRegister), unnamable (L7 KunlunUnnamableSet).
+        // M491 + M493 reuse jade segment.
         let allowedSegments: Set<String> = [
             "axis", "jade", "river", "yaochi", "tianmen",
             "ascent", "gate", "tianheng", "permit",
             "rest", "return", "refinement",
+            "host", "unnamable",
         ]
         for code in kunlunCodes {
             let parts = code.components(separatedBy: ".")
@@ -165,7 +169,7 @@ final class M402KunlunAxisAuditTests: XCTestCase {
             let segment = parts.count >= 2 ? parts[1] : ""
             XCTAssertTrue(
                 allowedSegments.contains(segment),
-                "kunlun code segment \(segment) not in {axis,jade,river,yaochi,tianmen}; got \(code)")
+                "kunlun code segment \(segment) not in allowed set; got \(code)")
         }
     }
 
@@ -215,10 +219,17 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         // pathCount,dignityHonored} + jade.casket = 4 codes
         // when ≥1 candidate. rest.stepCount, refinement.{
         // ticketCount,noGhost} = optional based on candidate state.
-        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 17,
-            "Kunlun emits at least 17 codes (chapter 九十二 9 + chapter 一百二十五 8)")
-        XCTAssertLessThanOrEqual(kunlunCodes.count, 40,
-            "Kunlun emits at most 40 codes when all optional segments fire across chapters 九十二/一百二十五/一百二十六")
+        // Chapter 一百二十七 / M491-M494 added always-fire:
+        //   - jade.fidelity (M491, always 1)
+        //   - host.register (M492, always 1)
+        //   - jade.mirror (M493, always 1)
+        //   - unnamable.refCount (M494, optional based on
+        //     unknown reserve)
+        // Total chapter-一百二十七 always-fire: 3 codes.
+        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 20,
+            "Kunlun emits at least 20 codes (chapter 九十二 9 + chapter 一百二十五 8 + chapter 一百二十七 3)")
+        XCTAssertLessThanOrEqual(kunlunCodes.count, 45,
+            "Kunlun emits at most 45 codes when all optional segments fire across chapters 九十二/一百二十五/一百二十六/一百二十七")
         // Pin the always-fire codes (one each).
         let centerCount = kunlunCodes.filter {
             $0.hasPrefix("kunlun.axis.center:")
