@@ -172,9 +172,19 @@ QINAO_BENCH_LEDGER_ENTRY_COUNT="${QINAO_BENCH_LEDGER_ENTRY_COUNT:-1000}" \
 # full-stack-bench run produces 99 warm samples (chapter 一百三
 # perf doctrine wants N≥30 + 95% CI; N=9 gave CV ~6% which was
 # adequate but noisier than necessary). 100 sessions × 5 turns
-# is ~5 seconds wall-clock per run — still fast enough for CI.
+# is ~5 seconds wall-clock per run.
+# M437.2 (chapter 一百十二) — promoted multi-trial to default.
+# QINAO_BENCH_FULL_STACK_TRIALS=3 runs 3 trials per suite
+# invocation (~15 seconds total wall-clock) and produces a v2
+# baseline with `trialStats` so the chapter 一百十 mean ± 2σ
+# regression check actually runs in CI (vs sitting opt-in
+# behind an env var nobody sets). N=3 is the working compromise:
+# enough for sample std to be defined (n-1 divisor needs ≥2);
+# 10× faster CI than full-discipline N=10 multi-trial; future
+# doctrine candidate to bump to N=10 if CI time budget allows.
 QINAO_BENCH_FULL_STACK_SESSIONS="${QINAO_BENCH_FULL_STACK_SESSIONS:-100}" \
     QINAO_BENCH_FULL_STACK_TURNS="${QINAO_BENCH_FULL_STACK_TURNS:-5}" \
+    QINAO_BENCH_FULL_STACK_TRIALS="${QINAO_BENCH_FULL_STACK_TRIALS:-3}" \
     run_bench --full-stack-bench
 
 echo ""

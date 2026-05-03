@@ -1,17 +1,17 @@
 {
   "benchName" : "lifecycle-bench",
-  "schemaVersion" : "bas-bench-baseline.v1",
+  "schemaVersion" : "bas-bench-baseline.v2",
   "stats" : {
-    "max" : 0.442708,
-    "mean" : 0.0011368020280199762,
+    "max" : 0.412958,
+    "mean" : 0.001093173531735507,
     "min" : 0.000875,
-    "outlierCount" : 352,
-    "p50" : 0.000958,
-    "p95" : 0.001125,
-    "p99" : 0.001458,
-    "p999" : 0.0375,
+    "outlierCount" : 150,
+    "p50" : 0.001042,
+    "p95" : 0.001166,
+    "p99" : 0.00125,
+    "p999" : 0.010833,
     "sampleCount" : 99999,
-    "standardDeviation" : 0.003720539165327297
+    "standardDeviation" : 0.0019638712831550878
   },
-  "storedAt" : "2026-05-03T15:09:03Z"
+  "storedAt" : "2026-05-03T16:06:47Z"
 }

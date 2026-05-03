@@ -1,17 +1,17 @@
 {
   "benchName" : "sha256-bench",
-  "schemaVersion" : "bas-bench-baseline.v1",
+  "schemaVersion" : "bas-bench-baseline.v2",
   "stats" : {
-    "max" : 5.237334,
-    "mean" : 0.039480320693210384,
-    "min" : 0.024666,
-    "outlierCount" : 1083,
-    "p50" : 0.02675,
-    "p95" : 0.08275,
-    "p99" : 0.294291,
-    "p999" : 1.043834,
+    "max" : 4.677042,
+    "mean" : 0.031241076820765025,
+    "min" : 0.024667,
+    "outlierCount" : 503,
+    "p50" : 0.028958,
+    "p95" : 0.046083,
+    "p99" : 0.07825,
+    "p999" : 0.236833,
     "sampleCount" : 99999,
-    "standardDeviation" : 0.08004076629638876
+    "standardDeviation" : 0.024473229290781783
   },
-  "storedAt" : "2026-05-03T15:09:07Z"
+  "storedAt" : "2026-05-03T16:06:50Z"
 }
