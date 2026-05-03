@@ -11661,3 +11661,115 @@ If user later says "author v9", the verdict + deep-review report provide the fou
 ### 97.13 一句话总结
 
 **M417 closes 昆仑 doctrine Phase ζ + entire 昆仑 roadmap (chapter 九十七)**：3-run gate-off + AFM gate-on stability verified (BAS 2435 / 0 fail / 0 flakes; Qinao 1375 / 40 platform-degraded skip per chapter 91.6 policy) + agent code review returned 11 findings (1 HIGH + 5 MEDIUM + 5 LOW) + human-grep verification confirmed 18% real-bug rate (matches baseline ~75-80% FP rate) + 2 real bugs fixed: **H1** harvest-suppression-reason-codes (`escalationSuppressionCodes` parameter on `buildSovereignAuditEntry` captures M384/M406 decision-side reason codes when red line 8 fires; audit walker can now distinguish "no deviation" from "deviation suppressed by reserved-anchor") + **M1** kunlun:compare-attribution-always-emit (separate stack-mode append from reason-code emission so cross-doctrine composability traceability preserved when M384 already added `.compare`/`.escalate`) + 3 fix-pin tests + deep review report doc + manifesto v9 audit verdict recording **Kunlun-axis-as-doctrine v5 triple-complete** with authoring **deferred** per user preference "按需 author" + chapter 九十一.9 precedent (sibling 一轴一渊 doctrine asymmetry). BAS 2435 → 2438 (+3) / Qinao 1375 unchanged / 全栈 3827 → 3830 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase ζ done; plan 附录 L Kunlun roadmap (M401-M417) fully closed across 6 phases**.
+
+---
+
+## 九十八、 Kunlun deep-review pass 2 — H418-1 placement bug fix（M418 / 2026-05-03）
+
+### 98.1 触发与起点
+
+User instruction: "deep test + deep review". Chapter 九十七 (M417) had just shipped the first deep-review pass; this is the second pass with broader scope (the M417 changes themselves + M417.7 polish + adjacent surfaces).
+
+**起点状态**（chapter 九十七.7 末）:
+- Plan 附录 L Kunlun roadmap fully closed (Phase α-ζ + polish)
+- BAS 2441 / Qinao 1375 / 全栈 3833 / 0 failures / 4/4 boundary green
+
+### 98.2 M418.1 — Deep test phase
+
+| Run | Result |
+|---|---|
+| Gate-off run 1/2/3 | BAS 2441 / Qinao 1375 / 0 fail / 0 flake (all 3) |
+| AFM gate-on | 0 fail + 40 platform-degraded skip (per chapter 91.6 policy) |
+| Bench suite (5 benches) | all within 25% tolerance ✓ |
+
+Bench first-iteration showed `audit-ledger-bench` p95 +75% / `lifecycle-bench` p99 +163% but consolidated re-run was clean — cold-spike inflation per chapter 91.6 doctrine (concurrent macOS background CPU during xctest startup), not real regression.
+
+### 98.3 M418.2 — Deep review pass 2 (broader scope)
+
+Spawned `general-purpose` agent with focused scope:
+- M417 fixes themselves (H1 + M1)
+- M417.7 polish (prefix contract tests)
+- BASAbyssalPermitEscalation side-by-side with BASKunlunPermitEscalation (symmetry / asymmetry check)
+- Cyclomatic complexity (`runTurn` size)
+- Test coverage gaps M417 left open
+- Stale claims in honesty board chapters 九十二-九十七 + manifesto v9 verdict
+
+Agent returned **7 findings**: 0 CRITICAL, **1 HIGH** (H418-1), 3 MEDIUM, 3 LOW.
+
+### 98.4 M418.3 — Real bugs fixed
+
+#### Fix 1 — H418-1 (M418.3a): M417 H1 fix had a placement bug
+
+**Problem**: M417's H1 fix added `escalationSuppressionCodes` emission INSIDE the `if let tianmen = tianmenReadiness` block in [EBrainRuntimeCoordinator+SovereignCommit.swift](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator+SovereignCommit.swift). Function signature defaults `tianmenReadiness: nil`. Today's runTurn always feeds non-nil tianmen so the bug was masked, but contract was wrong:
+
+1. Future caller passing `tianmenReadiness: nil` would silently lose all suppression observability — defeating H1's purpose
+2. Two concerns are semantically orthogonal — red-line-8 anchor suppression (M384/M406) is independent of Heaven Gate readiness (M409)
+
+The pre-fix comment even acknowledged "Block placed inside the `if let tianmen` scope so tests that don't drive the gate path don't see these codes" — actively contradicting H1's purpose.
+
+**Fix**: Hoisted the loop OUT of `if let tianmen` scope into its own top-level emission block (after closing brace at line ~881).
+
+#### Fix 2 — M418-1 (M418.3b): No e2e test for suppression-code emission
+
+**Problem**: M417's helper-level test (`testReservedAnchorSuppressionCodesAreHarvestable`) only pinned the helper output, not the audit-emission contract. `grep -rn "escalationSuppressionCodes" Tests/` returned zero hits.
+
+**Fix**: New [M418EscalationSuppressionAuditEmissionTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M418EscalationSuppressionAuditEmissionTests.swift) (4 tests):
+1. `testRuntimeWithReservedAnchorEmitsSuppressionCodes` — drives real runTurn; pins suppression-code emission contract conditional on reserved-tone firing
+2. `testSuppressionCodesEmitIndependentlyOfTianmenPath` — structural independence claim
+3. `testNonReservedTurnDoesNotEmitSuppressionCodes` — non-reserved → no pollution
+4. `testTianmenCodesStillFireWhenSuppressionEmpty` — **regression check on hoist direction** (tianmen still fires after the fix; verifies the hoist didn't break Tianmen path)
+
+### 98.5 Deferred findings
+
+| # | Severity | Description | Rationale |
+|---|---|---|---|
+| M418-2 | MEDIUM | M413 fixture #4 not byte-equal pinned (uses set-equivalence) | Would need new M415 fixture; flag for future expansion |
+| M418-3 | MEDIUM | `runTurn` ~1338 lines (function-too-large per coding-style.md) | Refactor invasive; extract candidates noted (`derivedKunlunAxisAlignment`, `escalateBoundActionPermitForKunlun`, `buildKunlunAuditProjections`) |
+| L418-1 | LOW | M384 vs M406 helper internal var ordering asymmetry | Cosmetic — both functionally identical |
+| L418-2 | LOW | Dead-code in audit gate-class mapping (`.localOnly`, `.replace` unreachable) | Cosmetic |
+| L418-3 | LOW | Manifesto v9 verdict claim needed footnote | **Closed via M418-1 fix** — e2e tests now provide the load-bearing regression gate the verdict claimed |
+
+### 98.6 测试基线
+
+| 套件 | 九十七.7 章末 | 九十八 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2441 | **2445** | **+4** (M418 4 e2e tests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3833 | **3837** | **+4** |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿. Bench suite: all 5 within 25% tolerance.
+
+### 98.7 红线 / 不变量
+
+| 红线 / 不变量 | M418 |
+|---|---|
+| #1 先醒再答 | ✓ |
+| #2 神经不掌权 | ✓ |
+| #3 私有经验不进权重 | ✓ |
+| audit hash chain | ✓（hoist is structural; emission still appended to `observationStatusCodes`) |
+| 单提交口 | ✓ |
+| Kunlun 8 红线 | unchanged |
+| Cthulhu 10 红线 | unchanged |
+| 4 boundary checks | 维持 |
+| **Cross-doctrine RL8 (anchor wins)** | **STRENGTHENED** — H418-1 fix makes red-line-8 honoring observable independent of orthogonal code paths; M418.3b tests pin the contract |
+
+### 98.8 Two-pass review meta-doctrine
+
+This pass empirically validates a meta-doctrine pattern: **agent reviews of one's own fixes catch placement bugs that surface only after independent re-evaluation**.
+
+M417 (first pass, scope M401-M416):
+- 11 findings, 2 real bugs, 18% real-bug rate
+- Found H1 (the bug) but FIX placement was wrong
+
+M418 (second pass, scope M417 changes + adjacent):
+- 7 findings, 2 real bugs, 29% real-bug rate
+- Found H418-1 (the M417 fix's own placement bug) + M418-1 (M417's coverage gap)
+
+**Higher real-bug rate (29% vs 18%) on second pass with focused scope on the first pass's deliverables** is the signal that "deep review on top of fixes" is a worthwhile pattern, not redundant work. Codified for future use:
+
+When fixing real bugs surfaced by deep review, schedule a SECOND deep-review pass with focused scope on the fix changes themselves before declaring the work closed. The reviewer agent should be told explicitly that this is a second pass on previously-fixed bugs, focused on regressions and placement.
+
+### 98.9 一句话总结
+
+**M418 closes second deep-review pass on chapter 九十二 → 九十七 (chapter 九十八)**：3-run gate-off (BAS 2441 / Qinao 1375 / 0 fail / 0 flake) + AFM gate-on (40 platform-degraded skips per chapter 91.6 policy, 0 actual failures) + bench suite (5/5 within 25% tolerance after consolidated re-run; cold-spike inflation on first iteration per chapter 91.6 doctrine) + agent code review pass 2 with broader scope (M417 fixes + M417.7 polish + adjacent surfaces) returned 7 findings: 1 HIGH + 3 MEDIUM + 3 LOW + human-grep verification confirmed 29% real-bug rate (HIGHER than chapter 九十七's 18% — focused-scope second pass catches what first pass missed). **2 real bugs fixed**: **H418-1** M417's H1 fix had placement bug — `escalationSuppressionCodes` emission inside `if let tianmen = tianmenReadiness` block. Today masked because runTurn always feeds non-nil tianmen, but contract was wrong (red-line-8 observability orthogonal to Tianmen). Hoisted loop OUT of scope into top-level block (line ~881) + **M418-1** No e2e test for suppression-code emission. New `M418EscalationSuppressionAuditEmissionTests.swift` (4 tests) covers: real-runTurn reserved-tone emission contract / structural independence from tianmen / non-reserved → no pollution / **regression check on hoist direction (tianmen still fires after fix)**. Empirically validates two-pass review meta-doctrine: agent reviews of one's own fixes catch placement bugs that surface only after independent re-evaluation. New `docs/QINAO_M418_DEEP_REVIEW_2026-05-03.md` records full process + findings + fix detail. BAS 2441 → 2445 (+4) / Qinao 1375 unchanged / 全栈 3833 → 3837 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Kunlun-axis-as-doctrine v5 triple is genuinely load-bearing now (post-M418 fixes); manifesto v9 verdict claim is now empirically substantiated by the regression gate it promised**.

@@ -841,27 +841,6 @@ extension BASEBrainRuntimeCoordinator {
                 observationStatusCodes.append(
                     "kunlun.tianmen.reasons:\(joined)")
             }
-            // M417 — escalation suppression reason codes (red
-            // line 8 cross-doctrine). Emitted as-is so audit
-            // walkers can grep `permit.escalation-skipped:`
-            // and see exactly which doctrine suppressed
-            // (kunlun-axis-anchor-reserved / human-anchor-
-            // reserved). Empty array elides emission entirely.
-            //
-            // (Block placed inside the `if let tianmen` scope so
-            // tests that don't drive the gate path don't see
-            // these codes. Hosts that drive the gate AND
-            // experience suppression will see them appended
-            // here; Hosts that drive only the gate without
-            // suppression will see no extra codes.)
-            //
-            // Note: emission appends raw codes — they already
-            // carry typed prefixes (`permit.escalation-skipped:`
-            // / `permit.escalation-suppressed:`) from the
-            // M384/M406 helpers.
-            for code in escalationSuppressionCodes {
-                observationStatusCodes.append(code)
-            }
             // M410 — L14 sovereign-warrant Tianmen integration.
             // Doctrine 红线 #5 (天门不绕过宿主授权): the gate must
             // refer to an existing sovereign warrant; it never
@@ -899,6 +878,32 @@ extension BASEBrainRuntimeCoordinator {
                     "kunlun.tianmen.axis-bound:" +
                     "session-\(runtimeTrace.sessionID)")
             }
+        }
+        // M418 — escalation suppression reason codes (red line 8
+        // cross-doctrine). Emitted as-is so audit walkers can
+        // grep `permit.escalation-skipped:` / `permit.escalation-
+        // suppressed:` and see exactly which doctrine suppressed
+        // (kunlun-axis-anchor-reserved / human-anchor-reserved).
+        // Empty array elides emission entirely.
+        //
+        // M418 fix-pin (chapter 九十八 deep-review H418-1): hoisted
+        // OUT of the `if let tianmen = tianmenReadiness` scope.
+        // Pre-fix the loop sat inside that scope, conditionally
+        // gating the suppression-code emission on the orthogonal
+        // Tianmen-readiness path being active. Today every
+        // runTurn invocation feeds non-nil tianmenReadiness so
+        // the bug was masked, but the contract was wrong: red-
+        // line-8 anchor suppression observability is independent
+        // of Heaven Gate readiness, and any future caller passing
+        // `tianmenReadiness: nil` (the parameter's default) would
+        // silently lose all suppression observability.
+        //
+        // Note: emission appends raw codes — they already carry
+        // typed prefixes (`permit.escalation-skipped:` /
+        // `permit.escalation-suppressed:`) from the M384/M406
+        // helpers.
+        for code in escalationSuppressionCodes {
+            observationStatusCodes.append(code)
         }
         // M318 — L9 abyssal-branch annotations. Empty array
         // elides all branch codes; non-empty emits count + max
