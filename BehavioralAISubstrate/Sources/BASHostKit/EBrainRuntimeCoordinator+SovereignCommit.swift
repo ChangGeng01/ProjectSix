@@ -602,7 +602,16 @@ extension BASEBrainRuntimeCoordinator {
         // production wire. Closes chapter 一百十七 / 一百十九
         // honest-deferred item. Emits `cthulhu.memory.thermal:
         // <rawValue>` reason code when non-nil.
-        memoryTemperatureLayer: BASMemoryTemperatureLayer? = nil
+        memoryTemperatureLayer: BASMemoryTemperatureLayer? = nil,
+        // M480-M485 (chapter 一百二十五) — Kunlun production
+        // wires for chapter-一百二十二/三 schemas. Each emits
+        // typed `kunlun.<layer>.*` reason codes when non-nil.
+        ascentLease: BASAscentLease? = nil,
+        axisDeviation: BASAxisDeviation? = nil,
+        gatePressure: BASGatePressure? = nil,
+        yaochiMemoryLayer: BASYaochiMemoryLayer? = nil,
+        tianhengProfile: BASTianhengProfile? = nil,
+        jadePermitGrade: BASJadePermitGrade? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -1292,6 +1301,79 @@ extension BASEBrainRuntimeCoordinator {
             observationStatusCodes.append(
                 "cthulhu.memory.thermal:" +
                 memoryTemperatureLayer.rawValue)
+        }
+        // M480-M485 (chapter 一百二十五) — Kunlun production
+        // wires. Doctrine pin: audit-only emission, no permit
+        // / verdict mutation. Each block elides cleanly when
+        // the projection is nil.
+        if let ascentLease = ascentLease {
+            observationStatusCodes.append(
+                "kunlun.ascent.mode:" +
+                ascentLease.ascentMode.rawValue)
+            observationStatusCodes.append(
+                "kunlun.ascent.budget:" +
+                "\(ascentLease.gateBudget)")
+            if ascentLease.returnRequired {
+                observationStatusCodes.append(
+                    "kunlun.ascent.return-required")
+            }
+        }
+        if let axisDeviation = axisDeviation {
+            observationStatusCodes.append(
+                "kunlun.axis.deviationScore:" +
+                String(format: "%.3f",
+                       axisDeviation.deviationScore))
+            if !axisDeviation.reasonCodes.isEmpty {
+                observationStatusCodes.append(
+                    "kunlun.axis.deviationCodes:" +
+                    axisDeviation.reasonCodes
+                        .sorted()
+                        .joined(separator: ","))
+            }
+        }
+        if let gatePressure = gatePressure {
+            observationStatusCodes.append(
+                "kunlun.gate.urgency:" +
+                String(format: "%.3f", gatePressure.urgency))
+            if gatePressure.gateRequired {
+                observationStatusCodes.append(
+                    "kunlun.gate.required")
+            }
+        }
+        if let yaochiMemoryLayer = yaochiMemoryLayer,
+           !yaochiMemoryLayer.sanctumPolicy.isEmpty
+        {
+            observationStatusCodes.append(
+                "kunlun.yaochi.policy:" +
+                yaochiMemoryLayer.sanctumPolicy)
+        }
+        if let tianhengProfile = tianhengProfile {
+            observationStatusCodes.append(
+                "kunlun.tianheng.center:" +
+                String(format: "%.3f",
+                       tianhengProfile.centerBias))
+            observationStatusCodes.append(
+                "kunlun.tianheng.dignity:" +
+                String(format: "%.3f",
+                       tianhengProfile.dignityFloor))
+            if !tianhengProfile.imbalanceCodes.isEmpty {
+                observationStatusCodes.append(
+                    "kunlun.tianheng.imbalance:" +
+                    tianhengProfile.imbalanceCodes
+                        .sorted()
+                        .joined(separator: ","))
+            }
+        }
+        if let jadePermitGrade = jadePermitGrade {
+            observationStatusCodes.append(
+                "kunlun.permit.grade:" +
+                "\(String(format: "%.3f", jadePermitGrade.clarityScore))" +
+                ":\(String(format: "%.3f", jadePermitGrade.reversibilityScore))" +
+                ":\(String(format: "%.3f", jadePermitGrade.provenanceScore))")
+            if !jadePermitGrade.gateRequirements.isEmpty {
+                observationStatusCodes.append(
+                    "kunlun.permit.gates-required")
+            }
         }
         if let ontologyShiftMark = ontologyShiftMark,
            !ontologyShiftMark.observedShiftAxes.isEmpty

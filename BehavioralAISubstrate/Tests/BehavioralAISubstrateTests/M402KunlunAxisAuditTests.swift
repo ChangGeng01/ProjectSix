@@ -142,12 +142,17 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         }
         XCTAssertFalse(kunlunCodes.isEmpty,
                        "at least one kunlun.* code expected")
-        // M402+M404+M405+M408+M409+M410 — Kunlun codes can carry
-        // any of the five segments: axis (M402), jade (M404),
-        // river (M405), yaochi (M408), tianmen (M409+M410). All
-        // must be `kunlun.<segment>.*`.
+        // M402+M404+M405+M408+M409+M410 — Kunlun codes carry
+        // segments: axis (M402), jade (M404), river (M405),
+        // yaochi (M408), tianmen (M409+M410).
+        //
+        // Chapter 一百二十五 / M480-M485 extended allowed
+        // segments with: ascent (L1 AscentLease), gate (L6
+        // GatePressure), tianheng (L10 TianhengProfile),
+        // permit (L11 JadePermitGrade).
         let allowedSegments: Set<String> = [
             "axis", "jade", "river", "yaochi", "tianmen",
+            "ascent", "gate", "tianheng", "permit",
         ]
         for code in kunlunCodes {
             let parts = code.components(separatedBy: ".")
@@ -172,11 +177,20 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         //   - yaochi access (M408, always 1)
         //   - tianmen gate / ready / axis-bound (M409+M410,
         //     always 3 when readiness present)
-        // Total guaranteed: 9 codes per turn.
-        // Optional codes: axis deviation/requires-gate,
-        // jade missing/defects, river warnings/cut, yaochi
-        // reasons, tianmen reasons + warrant-bind/missing.
-        // Total range: [9, 17] depending on which flags fire.
+        //
+        // Chapter 一百二十五 / M480-M485 added always-fire:
+        //   - ascent.mode + ascent.budget + ascent.return-required (3)
+        //   - axis.deviationScore (1)
+        //   - gate.urgency (1)
+        //   - tianheng.center + tianheng.dignity (2)
+        //   - permit.grade (1)
+        // Total chapter-一百二十五 always-fire: 8 codes.
+        //
+        // Total guaranteed: 9 + 8 = 17 codes per turn.
+        // Optional: axis.deviationCodes, gate.required,
+        // yaochi.policy, tianheng.imbalance, permit.gates-required,
+        // plus pre-existing optional jade/river/yaochi/tianmen.
+        // Total range: [17, 30] depending on which flags fire.
         let runtime = makeRuntime(profile: "m402-range")
         let result = try runtime.startSession(
             BASHostSessionRequest(
@@ -192,10 +206,10 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         let kunlunCodes = signalRefs.filter {
             $0.hasPrefix("kunlun.")
         }
-        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 9,
-            "Kunlun emits at least 9 codes (axis.center + jade.seal + river.{lineage,upward,downward} + yaochi.access + tianmen.{gate,ready,axis-bound})")
-        XCTAssertLessThanOrEqual(kunlunCodes.count, 17,
-            "Kunlun emits at most 17 codes when all optional segments fire")
+        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 17,
+            "Kunlun emits at least 17 codes (chapter 九十二 9 + chapter 一百二十五 8)")
+        XCTAssertLessThanOrEqual(kunlunCodes.count, 30,
+            "Kunlun emits at most 30 codes when all optional segments fire (chapter 九十二 17 + chapter 一百二十五 13)")
         // Pin the always-fire codes (one each).
         let centerCount = kunlunCodes.filter {
             $0.hasPrefix("kunlun.axis.center:")

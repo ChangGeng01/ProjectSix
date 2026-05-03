@@ -168,6 +168,37 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     /// `cthulhu.memory.thermal:<rawValue>` reason code.
     public var memoryTemperatureLayer: BASMemoryTemperatureLayer?
 
+    // MARK: - M480-M485 (chapter 一百二十五) — Kunlun production
+    // wires for chapter-一百二十二/三 schemas.
+
+    /// L1 ascent-lease readout (M480). When non-nil, emits
+    /// `kunlun.ascent.mode:<mode>` + `kunlun.ascent.budget:<int>`.
+    public var ascentLease: BASAscentLease?
+
+    /// L6 axis-deviation readout (M481). When non-nil, emits
+    /// `kunlun.axis.deviation:<3-decimal>` reason code.
+    public var axisDeviation: BASAxisDeviation?
+
+    /// L6 gate-pressure readout (M482). When non-nil, emits
+    /// `kunlun.gate.urgency:<3-decimal>` + `kunlun.gate.required:
+    /// <bool>` reason codes.
+    public var gatePressure: BASGatePressure?
+
+    /// L8 yaochi-memory-layer (M483). When non-nil + non-empty
+    /// sanctumPolicy, emits `kunlun.yaochi.policy:<policy>`
+    /// reason code.
+    public var yaochiMemoryLayer: BASYaochiMemoryLayer?
+
+    /// L10 Tianheng equilibrium (M484). When non-nil, emits
+    /// `kunlun.tianheng.center:<3-decimal>` +
+    /// `kunlun.tianheng.dignity:<3-decimal>` reason codes.
+    public var tianhengProfile: BASTianhengProfile?
+
+    /// L11 jade-permit-grade (M485). When non-nil, emits
+    /// `kunlun.permit.grade:<clarity>:<reversibility>:<provenance>`
+    /// reason code.
+    public var jadePermitGrade: BASJadePermitGrade?
+
     // MARK: - Construction
 
     /// All-fields-default constructor. Most callers use the
@@ -240,7 +271,13 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         abyssBudget: BASAbyssBudget? = nil,
         cthulhuAssertionCeilingReasonCodes: [String] = [],
         cthulhuPermitEscalationReasonCodes: [String] = [],
-        memoryTemperatureLayer: BASMemoryTemperatureLayer? = nil
+        memoryTemperatureLayer: BASMemoryTemperatureLayer? = nil,
+        ascentLease: BASAscentLease? = nil,
+        axisDeviation: BASAxisDeviation? = nil,
+        gatePressure: BASGatePressure? = nil,
+        yaochiMemoryLayer: BASYaochiMemoryLayer? = nil,
+        tianhengProfile: BASTianhengProfile? = nil,
+        jadePermitGrade: BASJadePermitGrade? = nil
     ) {
         self.candidateObservationBundle =
             candidateObservationBundle
@@ -304,6 +341,12 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         self.cthulhuPermitEscalationReasonCodes =
             cthulhuPermitEscalationReasonCodes
         self.memoryTemperatureLayer = memoryTemperatureLayer
+        self.ascentLease = ascentLease
+        self.axisDeviation = axisDeviation
+        self.gatePressure = gatePressure
+        self.yaochiMemoryLayer = yaochiMemoryLayer
+        self.tianhengProfile = tianhengProfile
+        self.jadePermitGrade = jadePermitGrade
     }
 
     /// All-default singleton. Used by callers that emit a
@@ -404,6 +447,13 @@ extension BASEBrainRuntimeCoordinator {
             cthulhuPermitEscalationReasonCodes:
                 projections.cthulhuPermitEscalationReasonCodes,
             memoryTemperatureLayer:
-                projections.memoryTemperatureLayer)
+                projections.memoryTemperatureLayer,
+            ascentLease: projections.ascentLease,
+            axisDeviation: projections.axisDeviation,
+            gatePressure: projections.gatePressure,
+            yaochiMemoryLayer:
+                projections.yaochiMemoryLayer,
+            tianhengProfile: projections.tianhengProfile,
+            jadePermitGrade: projections.jadePermitGrade)
     }
 }

@@ -14639,3 +14639,93 @@ Anti-drift 3-site cross-update:
 ### 124.6 一句话总结
 
 **Chapter 一百二十四 / Stream A γ / M476-M479**: user "全面开发" → ship 4 Kunlun host + integrity schemas in new `BASKunlunHostIntegrity.swift` (~280 LoC). **M476** `BASJadeFidelityMap` (L2) — 玉律精度图 with 4-tier `BASJadeFidelityLevel` enum (high/standard/partial/contaminated); honorsContaminationInvariant pin (contaminated → auditRequired=true). **M477** `BASHostJadeRegister` (L5) — 宿主玉牒 with hostVersionRef + boundary contracts (玉契) + authorization scrolls (玉券) + relation register (玉谱) + rollback refs + riverOriginRef; honorsProvenanceInvariant pin (riverOriginRef non-empty). **M478** `BASJadeMirrorDraft` (L7) — 玉鉴草稿 with cleanReflection text + unknownPreserved + inferenceDisclosures + hostAnchorRef + noInducementFlag; honorsNoInducementInvariant pin per §5.7 玉鉴 doctrine. **M479** `BASKunlunUnnamableSet` (L7) — 不可名状保留 (Kunlun complement to Cthulhu BASUnknownSet); honorsPreservationInvariant pin (unknownRefs non-empty). **4 governance entries** + 3-site cross-update (count 237→241). **19 new tests** in `BASKunlunHostIntegrityTests.swift` covering: enum cardinality + raw-value pins / round-trip Codable / clamping / 4 doctrine invariant pins / cross-schema schema-version pin. **Stream A COMPLETE**: 15/15 BAS substrate Kunlun schemas now shipped (chapters 一百二十二 + 一百二十三 + 一百二十四). Plan progress 15/31 = ~48%. Test counts: BAS XCTest 2765 → **2784** (+19), Qinao 1375 unchanged, 全栈 4157 → **4176** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (241 registered, 0 drift). Doctrine pin held: pure schemas + helper enum; no permit.mode mutation; all red lines / invariants regressed clean (Kunlun §3.2 contamination + §5.5 provenance + §5.7 玉鉴 + §5.7 preservation 4 newly typed-pinned).
+
+---
+
+## 一百二十五、 Kunlun production wires (chapter 一百二十二/三 schemas → runTurn audit) (M480-M485 / 2026-05-04)
+
+### 125.1 触发动作
+
+User said "packages 先不做 补齐 14层 缺口 优先". Phase 1 grep confirmed: 15 chapter 一百二十二/三/四 Kunlun schemas + 4 chapter 一百二十一 strict-audit Cthulhu schemas = **19 schemas with 0 production callers**. Same recursive trap chapter 一百十八 codified ("schema-only ship trap is recursive — schemas exist but aren't called from runTurn").
+
+This chapter fixes **6 of 19** by wiring chapter 一百二十二/三 schemas into the L14 audit emission seam. Stream B (SDK packages) remains paused per user instruction; orphan SDK files cleaned (chapter 一百二十五 task list item 1).
+
+### 125.2 What shipped — M480-M485 production wires + 1 governance test fix
+
+New file `BehavioralAISubstrate/Sources/BASOrchestration/BASKunlunLayerProjections.swift` (~480 LoC) — Kunlun mirror of chapter 一百十七 `BASCthulhuLayerProjections`:
+
+| M | Schema | Layer | Derive source | Audit reason codes |
+|---|---|---|---|---|
+| M480 | BASAscentLease | L1 | BASBudgetFrame | `kunlun.ascent.mode:<rawValue>` + `kunlun.ascent.budget:<int>` + `kunlun.ascent.return-required` |
+| M481 | BASAxisDeviation | L6 | BASBrainRiskLevel | `kunlun.axis.deviationScore:<3-decimal>` + `kunlun.axis.deviationCodes:<sorted-joined>` (when not low risk) |
+| M482 | BASGatePressure | L6 | BASBrainRiskLevel + BASActionPermit | `kunlun.gate.urgency:<3-decimal>` + `kunlun.gate.required` (when threshold crossed) |
+| M483 | BASYaochiMemoryLayer | L8 | BASEBrainRunMode | `kunlun.yaochi.policy:<policy>` (when sanctumPolicy non-empty) |
+| M484 | BASTianhengProfile | L10 | BASBrainRiskLevel + permitMode | `kunlun.tianheng.center:<3-decimal>` + `kunlun.tianheng.dignity:<3-decimal>` + `kunlun.tianheng.imbalance:<sorted>` |
+| M485 | BASJadePermitGrade | L11 | BASActionPermit | `kunlun.permit.grade:<clarity>:<reversibility>:<provenance>` + `kunlun.permit.gates-required` (when score below threshold) |
+
+Wiring sites:
+- `BASAuditObservationProjections` extended with 6 optional fields
+- `buildSovereignAuditEntry` accepts 6 new params + emission block
+- `EBrainRuntimeCoordinator.runTurn` derives all 6 at audit-projection seam (after chapter 一百十八/二十 Cthulhu derives)
+- `projections=` construction threads the 6 new fields
+
+### 125.3 Doctrine pins applied
+
+Chapter 一百十三 anti-magic-number — 11 named static constants in `BASKunlunLayerProjections`:
+- `maxLoopsGateBudgetCeiling = 12` / `deviationRiskFloor = 0.4` / `pressureUrgencyGateThreshold = 0.7`
+- `centerBiasOnAnswerMode = 0.85` / `dignityFloorBaseline = 0.5` / `dignityFloorHighRisk = 0.75` / `dignityFloorExtremeRisk = 0.9`
+- `clarityScoreCleanMode = 0.85` / `clarityScoreNarrowedMode = 0.5`
+- `reversibilityScoreDelayed = 0.85` / `reversibilityScoreImmediate = 0.5`
+
+Chapter 一百十八 ship-with-production-wire — 6 schemas now flow from `runTurn` body → audit signalRefs (no more schema-only).
+
+Chapter 一百十四 anti-drift — `M402KunlunAxisAuditTests.allowedSegments` extended from `{axis, jade, river, yaochi, tianmen}` to `{..., ascent, gate, tianheng, permit}` + count range raised from `[9, 17]` to `[17, 30]`. Same chapter as the new emissions.
+
+Doctrine invariants (typed pins via test):
+- **Single commit mouth** (`testPermitModeNotMutatedByKunlunWires`) — chapter 一百二十五 wires never touch permit.mode
+- **回峰条件** (Kunlun §5.1) — `BASAscentLease.returnRequired` always true; pinned via `testKunlunAscentReturnRequiredAlwaysFires`
+- **Determinism** — `kunlun.*` codes byte-equal across same-input turns
+
+### 125.4 测试基线
+
+| 套件 | 一百二十四 章末 | 一百二十五 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2784 | **2794** | +10 (1 new test file: 10 production wiring tests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4176 | **4186** | +10 |
+
+5 gates clean: 4 boundary + whitepaper parity (241 registered, 0 drift).
+
+### 125.5 红线 / 不变量
+
+| 红线 / 不变量 | M480-M485 |
+|---|---|
+| #1 先醒再答 | ✓ (audit emission only) |
+| #2 神经不掌权 | ✓ (watcher-hint emission, no permit/verdict mutation) |
+| #3 私有经验不进权重 | ✓ (additive metadata only) |
+| audit hash chain | ✓ (additive signalRefs codes) |
+| 单提交口 | ✓ pin (testPermitModeNotMutatedByKunlunWires) |
+| Kunlun §5.1 回峰条件 | ✓ pin (testKunlunAscentReturnRequiredAlwaysFires) |
+| 4 boundary checks | clean |
+| **whitepaper schema parity gate** | clean (241 registered, 0 drift) |
+| **Magic-number doctrine** | enforced — 11 named statics added |
+
+### 125.6 Plan progress update
+
+| 项 | Pre-chapter | Post-chapter |
+|---|---|---|
+| Stream A (15 BAS schemas shipped) | 15/15 ✓ | 15/15 ✓ (no change) |
+| **Stream A schemas production-wired into runTurn** | **0/15** | **6/15** (40%) |
+| Stream B (SDK packages, paused per user) | 0/5 | 0/5 (paused) |
+| Stream C (bench metrics) | 0/7 | 0/7 |
+| Stream D (共轴 primitives) | 0/4 | 0/4 |
+| Plan total | 15/31 (48%) | 21/31 (68%) |
+
+Remaining production wires (13 schemas across 2 chapters):
+- chapter 一百二十六 (planned): L9 dream-loop schemas (AscentBranch/RestStep/ReturnPath) + L3 JadeCasketSnapshot + L13 JadeRefinementTicket + chapter 一百二十一 leftover (BASAbyssalOrganAlias / BASNarrativeDistortionMap)
+- chapter 一百二十七 (planned): L2 JadeFidelityMap + L5 HostJadeRegister + L7 JadeMirrorDraft / KunlunUnnamableSet + chapter 一百二十一 leftover (BASHumanAnchorProfile / BASSealedMemory) + hostFragility field actual computation
+
+### 125.7 一句话总结
+
+**Chapter 一百二十五 / M480-M485**: user "packages 先不做 补齐 14层 缺口 优先" → Stream B paused, orphan SDK files cleaned; production-wire 6 chapter-一百二十二/三 Kunlun schemas into `EBrainRuntimeCoordinator.runTurn` audit-projection seam. **M480** L1 `BASAscentLease` derived from `BASBudgetFrame` (mirror of chapter 一百十七 BASAbyssBudget pattern); always fires `kunlun.ascent.mode/budget/return-required`. **M481** L6 `BASAxisDeviation` derived from risk level — 4-tier mapping (.low=0.2 / .medium=0.5 / .high=0.7 / .extreme=0.9); emits deviationScore + (when non-low) deviationCodes. **M482** L6 `BASGatePressure` derived from risk + permit; gateRequired fires when urgency ≥ 0.7 OR permit.requireSecondCheck. **M483** L8 `BASYaochiMemoryLayer` derived from runMode — emits sanctumPolicy only for guard/recovery/quarantine/lockdown modes. **M484** L10 `BASTianhengProfile` derived from risk + permit mode; emits centerBias + dignityFloor (and imbalanceCodes when narrowed); 11 named static constants pin clamping doctrine. **M485** L11 `BASJadePermitGrade` derived from action permit; clarity/reversibility/provenance scores from permit shape; emits gates-required when any score < 0.5. **Anti-drift M402 test update** in same chapter — `allowedSegments` extended {axis, jade, river, yaochi, tianmen} → {..., ascent, gate, tianheng, permit}; count range [9,17] → [17,30]. **10 new production-wiring tests** in `M480KunlunProductionWiringTests` (mirror M448 chapter 一百十八 pattern): every kunlun.* always emits / parseable / bounded; permit.mode preserved (single commit mouth pin); 回峰条件 always fires; determinism. Test counts: BAS XCTest 2784 → **2794** (+10), Qinao 1375 unchanged, 全栈 4176 → **4186** / 0 failures / 5 gates clean. Stream A schemas production-wired: 0/15 → **6/15** (40%); plan total progress 15/31 → **21/31** (68%). Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean.

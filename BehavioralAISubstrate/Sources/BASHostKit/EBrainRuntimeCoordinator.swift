@@ -1142,6 +1142,39 @@ public struct BASEBrainRuntimeCoordinator {
         let memoryTemperatureLayerForAudit =
             BASCthulhuLayerProjections.MemoryTemperatureLayer
                 .derive(from: routedBudget.runMode)
+        // M480-M485 (chapter 一百二十五) — Kunlun production
+        // wires for chapter-一百二十二/三 schemas. Each derive
+        // is a pure function from existing turn state; never
+        // mutates permit / verdict / lifecycle state.
+        let ascentLeaseForAudit = BASKunlunLayerProjections
+            .AscentLease.derive(
+                from: routedBudget,
+                turnID: derivedTurnID)
+        let axisDeviationForAudit = BASKunlunLayerProjections
+            .AxisDeviation.derive(
+                from: boundRiskCard.riskLevel,
+                turnID: derivedTurnID,
+                situationRef: derivedSessionID,
+                centerlineRef: kunlunAxisForGate.axisID)
+        let gatePressureForAudit = BASKunlunLayerProjections
+            .GatePressure.derive(
+                from: boundRiskCard.riskLevel,
+                permit: boundActionPermit,
+                turnID: derivedTurnID,
+                situationRef: derivedSessionID)
+        let yaochiMemoryLayerForAudit = BASKunlunLayerProjections
+            .YaochiMemoryLayer.derive(
+                from: routedBudget.runMode,
+                turnID: derivedTurnID)
+        let tianhengProfileForAudit = BASKunlunLayerProjections
+            .TianhengProfile.derive(
+                from: boundRiskCard.riskLevel,
+                permitMode: boundActionPermit.mode,
+                turnID: derivedTurnID)
+        let jadePermitGradeForAudit = BASKunlunLayerProjections
+            .JadePermitGrade.derive(
+                from: boundActionPermit,
+                turnID: derivedTurnID)
         let cosmicScaleViewForAudit = BASCthulhuLayerProjections
             .CosmicScaleView.derive(
                 from: routedBudget,
@@ -2036,7 +2069,15 @@ public struct BASEBrainRuntimeCoordinator {
             cthulhuPermitEscalationReasonCodes:
                 cthulhuEscalation.reasonCodes,
             memoryTemperatureLayer:
-                memoryTemperatureLayerForAudit)
+                memoryTemperatureLayerForAudit,
+            // M480-M485 (chapter 一百二十五) — Kunlun production
+            // wire projections.
+            ascentLease: ascentLeaseForAudit,
+            axisDeviation: axisDeviationForAudit,
+            gatePressure: gatePressureForAudit,
+            yaochiMemoryLayer: yaochiMemoryLayerForAudit,
+            tianhengProfile: tianhengProfileForAudit,
+            jadePermitGrade: jadePermitGradeForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
