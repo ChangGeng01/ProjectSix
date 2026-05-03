@@ -4820,6 +4820,23 @@ struct QinaoSampleHost {
 
     /// Drive `BASHostRuntime.startSession` × N sessions × M
     /// turns each, measuring per-session latency.
+    /// M438 (chapter 一百十三 anti-magic-number sweep) — named
+    /// defaults for `runFullStackBench`. Pre-M438 these were
+    /// `return 20` and `return 5` literals inside the env-
+    /// fallback closures, with no explanation of why those
+    /// numbers. The defaults are chosen for "fast smoke test"
+    /// shape (~1 sec wall-clock at 20 sessions × 5 turns); the
+    /// production bench-suite invocation overrides via env
+    /// `QINAO_BENCH_FULL_STACK_SESSIONS=100` (chapter 一百九).
+    /// Naming the constants also lets future tests pin them.
+    static let runFullStackBenchDefaultSessionCount: Int = 20
+    static let runFullStackBenchDefaultTurnCount: Int = 5
+    /// M438 — when no `QINAO_BENCH_FULL_STACK_TRIALS` env var
+    /// set, fall back to single-trial path (chapter 一百十一
+    /// backward-compat). Production bench-suite (chapter 一百十二)
+    /// overrides to 3 via env.
+    static let runFullStackBenchDefaultTrialCount: Int = 1
+
     private static func runFullStackBench() async {
         let sessionCount: Int = {
             if let raw = ProcessInfo.processInfo
@@ -4830,7 +4847,7 @@ struct QinaoSampleHost {
             {
                 return n
             }
-            return 20
+            return Self.runFullStackBenchDefaultSessionCount
         }()
         let turnCount: Int = {
             if let raw = ProcessInfo.processInfo
@@ -4841,7 +4858,7 @@ struct QinaoSampleHost {
             {
                 return n
             }
-            return 5
+            return Self.runFullStackBenchDefaultTurnCount
         }()
         // M437.1 (chapter 一百十一) — multi-trial capture mode.
         // When `QINAO_BENCH_FULL_STACK_TRIALS=N` (N≥2) is set,
@@ -4859,7 +4876,7 @@ struct QinaoSampleHost {
             {
                 return n
             }
-            return 1
+            return Self.runFullStackBenchDefaultTrialCount
         }()
 
         print("""

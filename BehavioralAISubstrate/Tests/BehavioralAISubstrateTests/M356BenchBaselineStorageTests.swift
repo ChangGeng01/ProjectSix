@@ -316,6 +316,37 @@ final class M356BenchBaselineStorageTests: XCTestCase {
             "bas-bench-baseline.v2")
     }
 
+    // MARK: - M438 — anti-magic-number sweep pins
+
+    /// Pin: `defaultSubMicrosecondFloorMs == 0.005` (5µs).
+    /// Regression detector — if a future change drifts this
+    /// value, the lifecycle/throughput sub-µs benches start
+    /// firing false-positive regressions every other run
+    /// (chapter 一百九 empirical observation).
+    func testDefaultSubMicrosecondFloorMsIsFiveMicroseconds() {
+        XCTAssertEqual(
+            BASBenchBaselineStorage
+                .defaultSubMicrosecondFloorMs,
+            0.005, accuracy: 0.0001,
+            "5µs floor is the chapter 一百九 / chapter 一百十三 " +
+            "doctrine value — drifting it changes the threshold " +
+            "below which sub-µs benches skip regression check")
+    }
+
+    /// Pin: `defaultStandardDeviationMultiplier == 2.0`.
+    /// Regression detector — corresponds to ~95% confidence
+    /// under approximately-normal trial-to-trial variation
+    /// (chapter 一百十 schema-bump doctrine).
+    func testDefaultStandardDeviationMultiplierIsTwoSigma() {
+        XCTAssertEqual(
+            BASBenchBaselineStorage
+                .defaultStandardDeviationMultiplier,
+            2.0, accuracy: 0.0001,
+            "2σ multiplier is the chapter 一百十 / chapter 一百十三 " +
+            "doctrine value — tightening to 1.96 (exact 95%) or " +
+            "loosening to 2.5 (~99%) is a future doctrine-review")
+    }
+
     func testSupportedSchemaVersionsIncludesBothV1AndV2() {
         // Backward + forward compat pin: this binary must
         // accept both v1 (legacy) and v2 (M437) baselines

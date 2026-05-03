@@ -199,6 +199,40 @@ public struct BASBenchBaselineStorage: Sendable {
     /// this fraction count as no-regression.
     public static let defaultToleranceFraction: Double = 0.25
 
+    /// **M438 (chapter 一百十三 anti-magic-number sweep)** — sub-µs
+    /// absolute floor below which percent-tolerance regression
+    /// checks are skipped. At sub-5µs scales (lifecycle ~0.6µs,
+    /// throughput ~1.2µs) timer jitter dominates: a 1µs jump
+    /// from baseline 0.7µs to measured 1.7µs is +143% but is
+    /// pure jitter, not a regression. ContinuousClock single-
+    /// trial measurements are not stat-rigorous below this
+    /// floor. 5µs is empirical — above it OS scheduler jitter
+    /// becomes a small fraction; below it dominates.
+    ///
+    /// Pre-M438 this value was hardcoded as `0.005` literal at
+    /// two call sites in `compareToBaseline` (the %-tolerance
+    /// branch + the multi-trial 2σ branch). M438 promotes to
+    /// named static constant so a future change drops in one
+    /// place instead of drifting between two.
+    public static let defaultSubMicrosecondFloorMs: Double = 0.005
+
+    /// **M438 (chapter 一百十三 anti-magic-number sweep)** —
+    /// standard-deviation multiplier for the multi-trial
+    /// regression check. Default `2.0` corresponds to ~95%
+    /// confidence under approximately-normal trial-to-trial
+    /// variation. Pre-M438 this value was hardcoded as `2.0`
+    /// literal at two call sites in the multi-trial branch
+    /// (upper bound check + reported tolerance fraction). M438
+    /// promotes to named static constant.
+    ///
+    /// Doctrine pin: this is the chapter 一百十 schema-bump
+    /// "stat-rigorous regression" doctrine constant. Tightening
+    /// to `1.96` (exact 95%) or loosening to `2.5` (~99%) are
+    /// future doctrine-review candidates; the current `2.0` is
+    /// the easy-to-explain integer compromise.
+    public static let defaultStandardDeviationMultiplier:
+        Double = 2.0
+
     /// Default schema version for new baselines.
     /// **M437 (chapter 一百十)**: bumped v1 → v2 to carry
     /// optional `MultiTrialStats`. v1 baselines still readable
@@ -321,7 +355,12 @@ public struct BASBenchBaselineStorage: Sendable {
                 ("mean", trial.meanMean,
                     trial.meanStdDev, measured.mean),
             ]
-            let absoluteFloorMs: Double = 0.005
+            // M438 — replaced 0.005 literal + 2.0 literal with
+            // named static constants (anti-magic-number sweep).
+            let absoluteFloorMs = Self
+                .defaultSubMicrosecondFloorMs
+            let sigmaMultiplier = Self
+                .defaultStandardDeviationMultiplier
             for (name, mean, std, measuredValue)
                 in twoSigma
             {
@@ -329,9 +368,9 @@ public struct BASBenchBaselineStorage: Sendable {
                 if mean < absoluteFloorMs
                     && measuredValue < absoluteFloorMs
                 {
-                    continue  // sub-µs floor (M436.6)
+                    continue  // sub-µs floor (M436.6 / M438)
                 }
-                let upper = mean + 2.0 * std
+                let upper = mean + sigmaMultiplier * std
                 if measuredValue > upper {
                     let regressionFraction =
                         (measuredValue - mean) / mean
@@ -340,7 +379,7 @@ public struct BASBenchBaselineStorage: Sendable {
                         baselineValue: mean,
                         measuredValue: measuredValue,
                         toleranceFraction:
-                            (2.0 * std) / mean,
+                            (sigmaMultiplier * std) / mean,
                         regressionFraction:
                             regressionFraction))
                 }
@@ -365,17 +404,11 @@ public struct BASBenchBaselineStorage: Sendable {
             ("mean", baseline.mean, measured.mean),
         ]
         // M436.6 (chapter 一百九) — absolute-µs floor for sub-µs
-        // benches. At sub-5µs scales (lifecycle / throughput
-        // benches) timer jitter dominates: a 1µs jump from
-        // baseline 0.7µs to measured 1.7µs is +143% but is
-        // pure jitter, not a regression. Without this floor
-        // every other run of the suite fires false-positive
-        // alarms on sub-µs benches no matter what % tolerance.
-        // 5µs floor is empirical: above 5µs the OS scheduler
-        // jitter becomes a small fraction; below 5µs it's the
-        // dominant signal. ContinuousClock sub-µs measurements
-        // are not stat-rigorous in single-trial.
-        let absoluteFloorMs: Double = 0.005  // 5µs
+        // benches. M438 (chapter 一百十三): replaced 0.005
+        // literal with `defaultSubMicrosecondFloorMs` static
+        // constant. See doc-comment on the static for full
+        // doctrine rationale.
+        let absoluteFloorMs = Self.defaultSubMicrosecondFloorMs
         for (name, baselineValue, measuredValue) in metrics {
             // Skip metrics where baseline is 0 (we can't compute
             // a meaningful percentage regression from 0).

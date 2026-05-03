@@ -13162,3 +13162,101 @@ I initially read the +70% p50 jump (1.16 → 1.95 ms) as a regression. Investiga
 ### 112.8 一句话总结
 
 **M437.2 promotes multi-trial to bench-suite default (chapter 一百十二)**: User "continue" → natural follow-up to chapter 一百十一. Chapter 一百十一 added multi-trial capture mode but kept opt-in via env var; without setting `QINAO_BENCH_FULL_STACK_TRIALS=N`, the bench-suite still ran single-trial and 2σ check sat dormant. **Fix**: `scripts/run_bench_suite.sh` now sets `QINAO_BENCH_FULL_STACK_TRIALS=3` by default. Recaptured `bench-baselines/full-stack-bench.json` as schema v2 with `trialStats` populated (p50 CV 2.2%, p95 CV 5.3%, trialCount 3) — significantly tighter than single-trial CV ~10%. **Empirical observation during capture**: full-stack p50 jumped from 1.16 ms (fresh release-binary, isolated run) to 2.15 ms (after running 6 prior benches in same suite — thermal-throttled state). Same code, same machine, +70% from thermal state alone. **Honest interpretation codified**: bench-suite baselines reflect thermal-throttled-after-prior-benches state, NOT cold-start; subsequent comparisons hit same state → regression alarm semantics still valid (chapter 一百三 doctrine "regression alarm not SLA"). Absolute baseline numbers should NOT be cited as customer-facing latency. **Trade-off**: N=3 trials adds ~15 sec to suite wall-clock (~20 sec → ~35 sec); future doctrine candidate to bump N=10 if multi-trial reliably catches <10% regressions in practice. **Methodology lesson codified**: bench measurements depend on machine warmth-state — treat suite-context baselines as suite-context-comparable; mixing cold-start and suite-context comparisons produces false-positive alarms. Test counts unchanged: BAS 2495 / Qinao 1375 / 全栈 3887 / 0 failures / 4/4 boundary clean / 5/5 stable runs. Honest satisfaction post-chapter: ~98.5% (was ~98%; +0.5% from making chapter 一百十 schema operationally active in default CI; remaining 1.5% = production deployment / customers / SLA — external).
+
+## 一百十三、 严查 hard coding 与 magic numbers (M438 / 2026-05-04)
+
+### 113.1 触发动作
+
+User instruction "我不喜欢 hard coding 和 魔法数字 严查" — strict scan of recent (chapter 一百四 → chapter 一百十二) surface for hardcoded numeric literals + magic numbers that should be named static constants.
+
+### 113.2 5 verified findings
+
+| # | File | Issue | Severity |
+|---|---|---|---|
+| 1 | `BASBenchBaselineStorage.swift` | `0.005` (5µs floor) hardcoded **2×** at lines 324 + 378 | HIGH (drift risk) |
+| 2 | `BASBenchBaselineStorage.swift` | `2.0` (2σ multiplier) hardcoded **2×** at lines 334 + 343 | HIGH (drift risk) |
+| 3 | `EBrainRuntimeCoordinator.swift` | `summaries.reserveCapacity(13)` hardcoded — must mirror `layerReconciliationExpectedLayers.count` but doesn't reference it | MEDIUM (silent mismatch risk) |
+| 4 | `EBrainRuntimeCoordinator.swift` | `budgetCeiling: 1.0` literal in `deriveLayerReconciliationReport` | MEDIUM (cross-package alignment value) |
+| 5 | `main.swift` `runFullStackBench` | `return 20` (sessions) / `return 5` (turns) / `return 1` (trials) literal env-fallback defaults | LOW (env-overridable but unnamed) |
+
+The 2× duplications (#1 + #2) are the worst — exactly the drift pattern that creates "fix in one place, miss the other" bugs.
+
+### 113.3 Fixes
+
+#### Fix #1: `defaultSubMicrosecondFloorMs: Double = 0.005`
+
+```swift
+public static let defaultSubMicrosecondFloorMs: Double = 0.005
+```
+
+Replaced both literal occurrences with `Self.defaultSubMicrosecondFloorMs`. Doctrine doc-comment cites chapter 一百九 empirical observation (timer jitter dominates below 5µs).
+
+#### Fix #2: `defaultStandardDeviationMultiplier: Double = 2.0`
+
+```swift
+public static let defaultStandardDeviationMultiplier: Double = 2.0
+```
+
+Replaced both literal occurrences with `Self.defaultStandardDeviationMultiplier`. Doctrine doc-comment cites chapter 一百十 schema-bump (~95% confidence under approximately-normal trial-to-trial variation; tightening to 1.96 / loosening to 2.5 are future doctrine-review candidates).
+
+#### Fix #3: `reserveCapacity(Self.layerReconciliationExpectedLayers.count)`
+
+Routes the capacity hint through the existing static. Future drift adding/removing a layer (or adding L14 sovereign opt-in) updates one place instead of silently mismatching.
+
+#### Fix #4: `layerReconciliationBudgetCeiling: Double = 1.0`
+
+```swift
+public static let layerReconciliationBudgetCeiling: Double = 1.0
+```
+
+Replaced literal `1.0` in `deriveLayerReconciliationReport` with `Self.layerReconciliationBudgetCeiling`. Doctrine doc-comment cites chapter 一百九 cross-package alignment with Qinao path's default + chapter 一百十三 anti-magic-number promotion.
+
+#### Fix #5: `runFullStackBenchDefault{SessionCount,TurnCount,TrialCount}`
+
+```swift
+static let runFullStackBenchDefaultSessionCount: Int = 20
+static let runFullStackBenchDefaultTurnCount: Int = 5
+static let runFullStackBenchDefaultTrialCount: Int = 1
+```
+
+Replaced literal returns in env-fallback closures. Doctrine doc-comment notes the env-override path (chapter 一百九 `QINAO_BENCH_FULL_STACK_SESSIONS=100` + chapter 一百十二 `QINAO_BENCH_FULL_STACK_TRIALS=3`).
+
+### 113.4 Fix-pin tests (3 new)
+
+| Test | Constant pinned | Future-drift signal |
+|---|---|---|
+| `testDefaultSubMicrosecondFloorMsIsFiveMicroseconds` | 5µs floor | sub-µs benches start firing false-positives if drifted |
+| `testDefaultStandardDeviationMultiplierIsTwoSigma` | 2σ multiplier | regression confidence semantics changes if drifted |
+| `testLayerReconciliationBudgetCeilingIsOne` | budget ceiling 1.0 | cross-package alignment with Qinao breaks if drifted |
+
+### 113.5 测试基线
+
+| 套件 | 一百十二 章末 | 一百十三 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2495 | **2498** | +3 (M438 pins) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3887 | **3890** | +3 |
+
+3/3 stable bench-suite runs / 0 failures / 4/4 boundary checks clean.
+
+### 113.6 红线 / 不变量
+
+| 红线 / 不变量 | M438 |
+|---|---|
+| #1 / #2 / #3 | ✓ (no runtime path changes; constants extracted, semantics identical) |
+| audit hash chain | ✓ |
+| 单提交口 | ✓ |
+| Cthulhu / Kunlun 红线 | ✓ |
+| 4 boundary checks | maintained green |
+| **Magic-number doctrine** | **NEW pin** — duplicated literals are now named statics + fix-pin tests catch future drift |
+
+### 113.7 Methodology lesson — duplicated literals are bugs waiting
+
+Both #1 (5µs floor) and #2 (2σ multiplier) appeared **twice** in `compareToBaseline`. Pre-fix this is a future-bug breeding ground: someone fixes one site, misses the other → the two paths drift → mysterious test failures or silent misbehavior. **Codified rule**: any numeric literal that appears more than once in the same function (or in the same file's logical section) MUST be promoted to a named constant. Single-use literals are tolerable IF the value is self-explanatory; duplicates are NOT tolerable regardless of self-explanatoriness.
+
+This is closely related to chapter 一百三's hot-path-cohesion doctrine and chapter 一百八's convergence doctrine, but specifically targets the "shotgun surgery" anti-pattern (Refactoring: Improving the Design of Existing Code, §3 Bad Smells in Code).
+
+### 113.8 一句话总结
+
+**M438 closes 5 hardcoded literals + 3 fix-pin tests (chapter 一百十三)**: User "我不喜欢 hard coding 和 魔法数字 严查" → strict scan caught 5 hardcoded values across `BASBenchBaselineStorage.swift` + `EBrainRuntimeCoordinator.swift` + `main.swift`'s `runFullStackBench`. **Worst offenders**: `0.005` (5µs floor) and `2.0` (2σ multiplier) each duplicated 2× in `compareToBaseline` — exactly the shotgun-surgery breeding ground. **Fixes**: promoted to 5 named static constants — `defaultSubMicrosecondFloorMs`, `defaultStandardDeviationMultiplier`, `layerReconciliationBudgetCeiling`, `runFullStackBenchDefault{SessionCount,TurnCount,TrialCount}` — each with doctrine doc-comment citing the chapter that established the value. Replaced literal #3 (`reserveCapacity(13)`) with `Self.layerReconciliationExpectedLayers.count` so capacity hint mirrors the static array size. **Methodology lesson codified**: duplicated literals are bugs waiting — any numeric literal appearing >1× in same function/section MUST be a named constant; single-use literals tolerable when self-explanatory, duplicates never. **3 fix-pin tests** detect future drift on the doctrine-critical constants (5µs floor, 2σ multiplier, 1.0 budget ceiling). Test counts: BAS 2495 → **2498** (+3), Qinao 1375 unchanged, 全栈 3887 → **3890** / 0 failures / 4/4 boundary clean / 3/3 stable bench. Doctrine pin held: no runtime path changes (constants extracted, semantics identical); all red lines / invariants regressed clean. Honest satisfaction post-chapter: ~99% (was ~98.5%; +0.5% from closing the duplicated-literals shotgun-surgery risk; remaining 1% = production deployment / customers / SLA — external).

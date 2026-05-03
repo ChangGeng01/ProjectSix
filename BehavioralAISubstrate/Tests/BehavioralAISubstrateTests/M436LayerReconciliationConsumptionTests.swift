@@ -658,6 +658,26 @@ final class M436LayerReconciliationConsumptionTests: XCTestCase {
     // could cause a verdict-shape divergence between BAS-direct
     // and Qinao-streamed paths) fails loudly.
 
+    // MARK: - M438 — anti-magic-number sweep pins
+
+    /// Pin: `layerReconciliationBudgetCeiling == 1.0`.
+    /// Regression detector for chapter 一百十三 anti-magic-number
+    /// sweep. The verdict engine clamps `[0, 1]` internally so
+    /// values >= 1.0 collapse, but the literal value still
+    /// matters for cross-package alignment with Qinao's path
+    /// (`QinaoSovereign.recordTurnCoverage(...,
+    /// budgetCeiling: 1.0)`). Drift here would silently break
+    /// the chapter 一百七 cross-package alignment doctrine.
+    func testLayerReconciliationBudgetCeilingIsOne() {
+        XCTAssertEqual(
+            BASEBrainRuntimeCoordinator
+                .layerReconciliationBudgetCeiling,
+            1.0, accuracy: 0.0001,
+            "budget ceiling 1.0 aligns BAS-direct path with " +
+            "Qinao default (chapter 一百九 alignment + chapter " +
+            "一百十三 anti-magic-number promotion)")
+    }
+
     func testExpectedLayersStaticConstantHas13Layers() {
         XCTAssertEqual(
             BASEBrainRuntimeCoordinator

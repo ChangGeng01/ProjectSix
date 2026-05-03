@@ -299,8 +299,17 @@ public struct BASEBrainRuntimeCoordinator {
         // equivalent — `BASObservationReconciliationReport.init`
         // (line 160) runs the same dedup+filter pass that
         // `.appending` would have applied iteratively.
+        // M438 (chapter 一百十三 anti-magic-number sweep) —
+        // route the capacity hint through the static expected-
+        // layers list so a future drift adding/removing a
+        // layer (or the L14 sovereign opt-in) updates one
+        // place instead of two. Pre-M438 this was hardcoded
+        // `13` literal which would silently mismatch
+        // `Self.layerReconciliationExpectedLayers.count` if
+        // the static array changed.
         var summaries: [BASObservationCoverageSummary] = []
-        summaries.reserveCapacity(13)
+        summaries.reserveCapacity(
+            Self.layerReconciliationExpectedLayers.count)
         // L1-L13 cognitive bundles. Order matches
         // `layerReconciliationExpectedLayers` for stable
         // `reconciliation.observed:<L1+L2+...+L13>` emission;
@@ -375,25 +384,20 @@ public struct BASEBrainRuntimeCoordinator {
         // fix) so the array isn't reallocated each turn — pure
         // value list with no per-turn dependency.
         let expectedLayers = Self.layerReconciliationExpectedLayers
-        // M436.1 — budget ceiling alignment. Pre-fix the helper
-        // hardcoded 12.0 ("1.0 × 12 layers") while Qinao's
-        // parallel path (`QinaoSovereign.recordTurnCoverage`,
-        // line 1216 default `budgetCeiling: 1.0`) used 1.0.
-        // The chapter 一百四 honest audit flagged this as a
-        // numeric-divergence MEDIUM: the same turn could emit
-        // `reconciliation.severity:halt` from one path and
-        // `clean` from the other when the total clamped budget
-        // landed between the two ceilings. Aligning to 1.0
-        // matches Qinao's contract; the verdict engine clamps
-        // ceiling to [0, 1] internally anyway, so any value
-        // >= 1.0 was already collapsed to 1.0 in the strict
-        // comparison — the 12.0 was therefore both wrong AND
-        // a no-op (hardcoded comment misled readers).
+        // M436.1 — budget ceiling alignment with Qinao path
+        // (default 1.0). M438 (chapter 一百十三) replaced 1.0
+        // literal with `layerReconciliationBudgetCeiling`
+        // static constant so future adjustments drop in one
+        // place. The verdict engine clamps to [0, 1]
+        // internally; pre-M436.1 the helper hardcoded 12.0
+        // which collapsed to 1.0 in strict comparison (both
+        // wrong AND a no-op).
         let verdict = BASObservationReconciliationVerdictEngine
             .evaluate(
                 report: report,
                 expectedLayers: expectedLayers,
-                budgetCeiling: 1.0,
+                budgetCeiling: Self
+                    .layerReconciliationBudgetCeiling,
                 emittedAt: emittedAt)
         return (report: report, verdict: verdict)
     }
@@ -486,6 +490,24 @@ public struct BASEBrainRuntimeCoordinator {
     public static let fullCoverageExpectedLayerIDs: [String] =
         layerReconciliationExpectedLayerIDs
             + [BASCognitiveLayer.sovereign.rawValue]
+
+    /// M438 (chapter 一百十三 anti-magic-number sweep) — budget
+    /// ceiling for the per-turn 14-layer reconciliation
+    /// verdict evaluation. `1.0` aligns with Qinao path's
+    /// default (`QinaoSovereign.recordTurnCoverage(...,
+    /// budgetCeiling: 1.0)`) so both paths agree on the same
+    /// threshold. The verdict engine clamps `[0, 1]`
+    /// internally; values >= 1.0 collapse to 1.0 in the strict
+    /// `>` comparison anyway.
+    ///
+    /// Pre-M438 this value was hardcoded `1.0` literal in
+    /// `deriveLayerReconciliationReport`. M436.1 fixed an
+    /// earlier hardcoded `12.0` (which collapsed to 1.0 due
+    /// to clamping — wrong AND a no-op). M438 promotes to
+    /// named static constant so future changes drop in one
+    /// place + align via cross-package reference.
+    public static let layerReconciliationBudgetCeiling:
+        Double = 1.0
 
     public init(
         powerClockService: any BASPowerClockServicing,
