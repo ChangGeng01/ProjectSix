@@ -12055,3 +12055,129 @@ These all share the structure: **claim was made on partial evidence**; **subsequ
 ### 101.11 一句话总结
 
 **M421-M427 close 全面改造 dissatisfaction sweep (chapter 一百一)**: User asked "你 满意吗" → I confessed 7 specific dissatisfactions → user instructed "全面改造不满意至满意" → 7 milestones surgically address each. **M421 stat-rigorous re-measurement of M420** revealed the "-8.6% perf" claim was N=1 statistical noise; CI at N=10 straddles zero; claim retracted (M420 code kept as cleanup, perf claim withdrawn). **M422 two-pass review** found 8 findings; 2 real fixes applied (silent `?? []` fallback → `kunlunCenterlineRules(for:)` helper with assertionFailure; byte-equal claim citations expanded with explicit test names). **M423 profile** of full-stack-bench (10000 sessions, sample profiler) revealed `fingerprint(for:)` + `String.init(format:)` calls are real hot paths (~5% combined); M402-M410 string allocations (M420's target) do NOT appear in top paths, confirming M421's verdict. **M424 wired chapter 九十九 schemas into runtime**: BASKunlunAxisView + BASKunlunTianmenWarrant + BASKunlunGateDenialWrit now emit audit codes (kunlun.axis.view / kunlun.tianmen.warrant-authorized / kunlun.tianmen.denial-well-formed); 2 remaining schemas (AscentView + FarWestReserve) deferred with explicit forcing function (wire when substrate seams ship). **M425 runTurn refactor down-payment**: extracted Yaochi + HeavenGate derive blocks into pure-function helpers (~85 LOC moved); runTurn 1400 → 1359 lines; full close requires 5-7 future chapters at ~80 LOC reduction each. **M426 deferred-items audit** of 18 items revealed 33% were never real bugs; refined meta-doctrine to 4 explicit categories (CLOSED-NOT-BUG / FORCING-FUNCTION / HONEST-DEFER / TIMED-DEFER) instead of generic "deferred with criteria". **M427 codified premature-verdict mitigation pattern**: every quantitative claim must be supported by measurement (≥N=10 + 95% CI) / multiple-pass review / profile data / explicit deferred-categorization. BAS 2461 / Qinao 1375 unchanged / 全栈 3853 / 0 failures / 4/4 boundary 全绿 / 5 doc files added (M421/M423/M426/M427 reports + 1 inline edit to M420 comment) + 2 source files modified (EBrainRuntimeCoordinator.swift + EBrainRuntimeCoordinator+SovereignCommit.swift) + 1 commit ready. **All 7 dissatisfactions addressed**: M420 perf retracted (1) / typed-surface-only schemas wired (2) / runTurn refactor down-paid (3) / two-pass review applied (4) / deferred items audited (5) / profile done (6) / premature-verdict pattern codified (7).
+
+---
+
+## 一百二、 诚实模式 改造续 — 失败的 refactor + 新 bench discipline + 进一步 audit（M428-M434 / 2026-05-03）
+
+### 102.1 触发与起点
+
+User 命令 "诚实模式 开启 全面 开发 满意为止" → I had listed 12% remaining dissatisfaction in chapter 一百一. This chapter addresses 3 of the 4 actionable items (runTurn refactor / N=10 sensitivity / re-examine indefinitely-deferred). Outcome: 1 success, 1 failed-and-reverted, 1 partial.
+
+**起点**：BAS 2461 / Qinao 1375 / runTurn 1359 lines (post-chapter 一百一 with M425 yaochi+heavengate already extracted)
+
+### 102.2 M428-M431 — Attempted runTurn extraction (FAILED, REVERTED)
+
+**Plan**: extract 4 Kunlun derive blocks (M402 axis / M404 jade / M405 river / M424 chapter-99-schemas-wire) into private static helpers. Target: runTurn 1359 → ~1247 lines.
+
+**Implementation**: 4 helpers added at top of `BASEBrainRuntimeCoordinator` struct (`deriveKunlunAxisAlignment` / `deriveKunlunJadeCanonSeal` / `deriveKunlunRiverOriginTrace` / `deriveKunlunChapter九十九Schemas`); 4 inline blocks in runTurn replaced with helper calls.
+
+**Verification**: BAS 2461 tests still pass after extraction. runTurn at 1247 lines (-112).
+
+**Then M432 measurement (see below) revealed +3.35% regression at 95% CI N=30 release build.**
+
+**Mitigation attempt**: Added `@inline(__always)` to all 6 helpers (M425 + M428-M431). Re-measured at N=30 release. Result: **regression PERSISTED** (+3.35% with @inline; was +2.90% without — actually slightly worse with @inline).
+
+**Decision**: REVERT. `git checkout HEAD -- file` restored the file to chapter 一百一 state. M425 helpers (already in HEAD) retained. M428-M431 + @inline annotations discarded. Tests verified 2461 still pass.
+
+**runTurn line count**: back to 1359.
+
+**Honest lesson recorded**: a code-cleanup refactor with measurable perf regression is NOT a win. Future runTurn extraction must use a perf-friendly approach (e.g. struct-typed returns instead of tuples; carefully-placed `@inlinable` with `@usableFromInline` plumbing; or single-shot combined helper that does all 4 derives at once instead of 4 sequential helpers).
+
+### 102.3 M432 — High-N release-build bench discipline
+
+**Critical finding**: Release-build bench has **20× tighter variance than debug build**:
+- Debug build (M421 measurement): CV ~18%, minimum detectable Δ ≈ 28% at N=10
+- Release build (M432 measurement): **CV 0.63-1.20%, minimum detectable Δ ≈ 0.64% at N=30**
+
+The earlier M421 "+14% noise" verdict from chapter 一百一 was using debug build, which has noise floor too high to detect M420's actual effect. Release-build measurement is the proper tool.
+
+**Method**: `swift build --package-path QinaoRuntimeSDK -c release`; run binary directly (`.build/arm64-apple-macosx/release/QinaoSampleHost --full-stack-bench`); 30 runs × 200 sessions per side = 6000 samples per side.
+
+**Three-way release-build comparison (N=30 each)**:
+| State | mean p50 | std | 95% CI |
+|---|---|---|---|
+| Pre-M428 (chapter 一百一 + M425 only) | 1.0029 ms | 0.0063 | ± 0.0022 |
+| M428-M431 no @inline | 1.0320 ms (+2.90%) | 0.0091 | ± 0.0033 |
+| M428-M431 + @inline(__always) | 1.0365 ms (+3.35%) | 0.0124 | ± 0.0044 |
+
+Both M428-M431 variants show statistically significant regression (95% CI lower bound > 0).
+
+**Doctrine codification update**: bench measurements MUST use release build + direct binary (no `swift run` wrapper). The 18% CV from debug build measurements is misleading — actually the substrate is far more consistent than chapter 91.6 platform-policy doc suggested. The "cold-spike inflation" attributed to macOS background processes is partially real but mostly a debug-build artifact.
+
+This finding RETROACTIVELY adjusts the chapter 一百一 M421 verdict on M420:
+- **M421 said "M420 -8.6% claim retracted as N=1 noise"** — that was correct
+- **M421 measured "+14% post higher than pre at N=10 debug"** — was DEBUG-BUILD NOISE; the release-build comparison was needed
+- A proper release-build comparison of M420 is left as a M-future deferred-with-criteria item (low priority; the M420 code is already in HEAD as cleanup-only)
+
+### 102.4 M433 — Re-examined 4+1 indefinitely-deferred items
+
+Honest re-examination of M426's "deferred indefinitely" list:
+
+| Item | Pre-M433 | Post-M433 |
+|---|---|---|
+| M4 (audit-projection humanAnchorRequired hardcoded) | DEFER | KEEP DEFER (forcing function reaffirmed) |
+| M5 (format string round-trip stability) | DEFER | **CLOSED AS NOT-A-BUG** (no real platform risk) |
+| DI-2 (Axis Plane architecture) | DEFER | KEEP DEFER (forcing function: explicit user authorization) |
+| DI-4 (SDK packs) | DEFER | KEEP DEFER (forcing function reaffirmed) |
+| L418-1 (M384 vs M406 var ordering cosmetic) | (cosmetic-defer) | **CLOSED AS NOT-A-BUG** |
+
+**Net change**: 2 of 5 re-classified from "honest defer indefinitely" → "closed as not-a-bug". 3 confirmed honest-defer with sharper forcing functions.
+
+Updated M426 ledger:
+- CLOSED-NOT-A-BUG: 6 + 2 = **8 (44%)**
+- CLOSED via earlier work: 3 (17%)
+- PARTIALLY CLOSED: 1 (5%)
+- FORCING FUNCTION SET: 4 (22%)
+- HONEST DEFERRED INDEFINITELY: 4 → **3 (17%)**
+
+**The user's pushback "deferred 用得太顺手" was correct**: ~44% of "deferred" items were never real gaps.
+
+Full re-exam in [QINAO_M433_INDEFINITELY_DEFERRED_RE_EXAM_2026-05-03.md](./QINAO_M433_INDEFINITELY_DEFERRED_RE_EXAM_2026-05-03.md).
+
+### 102.5 测试基线
+
+| 套件 | 一百一 章末 | 一百二 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2461 | **2461** | unchanged |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3853 | **3853** | unchanged |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿. M428-M431 attempted but reverted; M433 is doc-only re-classification; net code change: zero (this chapter is doctrine + measurement work).
+
+### 102.6 红线 / 不变量
+
+| 红线 / 不变量 | M428-M434 |
+|---|---|
+| #1 先醒再答 | ✓ |
+| #2 神经不掌权 | ✓ |
+| #3 私有经验不进权重 | ✓ |
+| audit hash chain | ✓ (no changes) |
+| 单提交口 | ✓ |
+| 4 boundary checks | 维持 |
+| **Honest mode**: don't ship known regressions | **✓ ENFORCED** by M428-M431 revert |
+| **Honest mode**: don't accept defer-as-noise | **✓ ENFORCED** by M433 re-classification of 2 items |
+
+### 102.7 What this chapter actually accomplished
+
+**Real wins**:
+1. Discovered release-build vs debug-build bench has 20× different variance — codified release-build measurement as required for perf claims
+2. Closed 2 over-classified deferred items (M5 / L418-1) → ledger now ~44% closed-not-a-bug instead of 33%
+3. Demonstrated honest-mode discipline: attempted refactor → measured rigorously → found regression → REVERTED rather than ship
+4. Caught a methodological gap in M421's debug-build noise verdict (release-build measurement was the right tool)
+
+**Real losses (honest)**:
+1. runTurn remains at 1359 lines (above 800 guideline)
+2. The 4 helper extractions were textbook-clean code-quality work but caused +3.35% perf regression — refactor pattern needs different approach
+3. The "5-7 chapters of compounding extractions" plan from M425 is now blocked: the obvious extraction approach measurably regresses
+
+**What "satisfied" means now (post-chapter 一百二)**:
+- All claims supported by rigorous measurement (release build, N≥30) ✓
+- All deferred items in 4 explicit categories with forcing functions ✓
+- All known regressions are reverted (not silently shipped) ✓
+- runTurn refactor is honestly acknowledged as harder than expected ✓ (not just "deferred with criteria")
+
+### 102.8 一句话总结
+
+**M428-M434 close 诚实模式 改造续 (chapter 一百二)**: User instructed "诚实模式 开启 全面 开发 满意为止" → addressed 3 of 4 remaining dissatisfactions. **M428-M431 attempted runTurn refactor**: extracted 4 Kunlun derive blocks (axis/jade/river/chapter-99-schemas) into private static helpers; runTurn 1359 → 1247 (-112 lines); BAS 2461 tests still green. **M432 high-N release-build bench (CRITICAL FINDING)**: release-build bench has CV 0.63-1.20% (vs debug-build 18%); minimum detectable Δ at N=30 release ≈ 0.64% (vs N=10 debug ≈ 28%); release-build measurement is the proper tool for perf claims. Three-way comparison (N=30 each) of pre-M428 vs M428-M431 vs M428-M431+@inline showed M428-M431 caused **+2.90% regression** without inline, **+3.35% regression** with @inline (slightly worse). Both ranges 95% CI lower bound > 0 (statistically significant). **Honest decision**: REVERT M428-M431 (and the @inline annotations); restored to chapter 一百一 state; runTurn back to 1359 lines. Per honest mode: don't ship known perf regressions; future runTurn extraction needs different approach (struct returns vs tuples / @inlinable plumbing / single-shot combined helper). **M433 deferred-items re-exam**: M5 (format string platform stability) closed as not-a-bug; L418-1 (var ordering cosmetic) closed as not-a-bug; M4 / DI-2 / DI-4 confirmed honest-defer with sharper forcing functions. M426 ledger: 8/19 closed-not-a-bug (44% — vs M426's claim of 33%); user's pushback "deferred 用得太顺手" was correct. **Doctrine codification**: release build mandatory for perf measurements; honest mode = don't ship known regressions even when surrounding work is clean. Chapter 一百二 is doctrine + measurement work, not new feature work; tests / boundary checks unchanged. **Net runTurn line count**: 1359 (unchanged from chapter 一百一; failed extraction reverted). **Outstanding satisfaction gap**: runTurn refactor still needed to hit 800 LOC guideline; current obvious extraction approach blocked; needs different structural approach.
