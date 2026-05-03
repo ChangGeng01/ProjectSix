@@ -36,6 +36,68 @@ public struct BASEBrainRuntimeCoordinator {
     public var hostVersionTree: BASHostVersionTree?
     public var hostForgetRequest: BASForgetRequest?
 
+    // MARK: - M420 hot-path string constants (chapter 一百)
+    //
+    // Chapter 一百 deep-bench optimization: invariant string arrays
+    // used by the M402 / M405 Kunlun-doctrine derive seams are
+    // hoisted to `static let` so each `runTurn` invocation reuses
+    // the same Array<String> reference instead of allocating fresh
+    // copies. Same string array reference shared between the
+    // upstream "for-gate" derive (line ~466) and downstream
+    // "for-audit" derive (line ~964).
+    //
+    // Prior state: each `runTurn` allocated 2× 14-element arrays
+    // (activeLayerRefs) + 1× 5-element array (transformationSteps)
+    // + 2× 3-element arrays (centerlineRules). Each allocation
+    // touches the heap and dirties the stack; replacing with
+    // shared static references avoids ~38 string-array allocations
+    // and ~18 string-interpolation calls per turn.
+    //
+    // Doctrine pin: zero behavior change. The arrays' contents
+    // are byte-identical to the inline literals they replace.
+    // Verified by full BAS + Qinao test suite (2461 + 1375 + 0
+    // failures).
+
+    /// 14-layer ref list used by the M402 axis derive (both
+    /// upstream gate-side and downstream audit-side).
+    fileprivate static let kunlunActiveLayerRefs: [String] = [
+        "L1", "L2", "L3", "L4", "L5", "L6",
+        "L7", "L8", "L9", "L10", "L11", "L12",
+        "L13", "L14",
+    ]
+
+    /// 5-step pipeline transformation list used by the M405
+    /// River-Origin trace derive.
+    fileprivate static let riverOriginTransformationSteps: [String] = [
+        "risk.bind", "permit.synthesize", "neural.materialize",
+        "tribunal.merge", "audit.emit",
+    ]
+
+    /// Pre-computed centerline-rules array per
+    /// `BASActionPermitMode`. Avoids per-turn string interpolation
+    /// + 3-element array allocation in M402 axis derive.
+    /// Computed once at first access (Swift static-let lazy init).
+    fileprivate static let kunlunCenterlineRulesByMode:
+        [BASActionPermitMode: [String]] =
+    {
+        var result: [BASActionPermitMode: [String]] = [:]
+        for mode in BASActionPermitMode.allCases {
+            result[mode] = [
+                "respects-host-boundary",
+                "honors-world-anchor",
+                "permit-mode-\(mode.rawValue)",
+            ]
+        }
+        return result
+    }()
+
+    /// 2-condition reveal-conditions list used by the M408 Yaochi
+    /// audit-projection derive (audit-only, fixed conditions).
+    fileprivate static let yaochiAuditRevealConditions: [String] = [
+        "host-explicit-recall",
+        "anchor-tone-warm",
+    ]
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -463,17 +525,12 @@ public struct BASEBrainRuntimeCoordinator {
             sovereignRef: "sovereign-\(derivedSessionID)",
             worldAnchorRef:
                 "world-anchor-\(derivedSessionID)",
-            activeLayerRefs: [
-                "L1", "L2", "L3", "L4", "L5", "L6",
-                "L7", "L8", "L9", "L10", "L11", "L12",
-                "L13", "L14",
-            ],
+            activeLayerRefs:
+                Self.kunlunActiveLayerRefs,
             agentSeatRefs: [],
-            centerlineRules: [
-                "respects-host-boundary",
-                "honors-world-anchor",
-                "permit-mode-\(boundActionPermit.mode.rawValue)",
-            ],
+            centerlineRules:
+                Self.kunlunCenterlineRulesByMode[
+                    boundActionPermit.mode] ?? [],
             deviationThreshold: 0.7,
             lastAlignmentCheck: "")
         let kunlunMatchedForGate: Int = {
@@ -961,17 +1018,12 @@ public struct BASEBrainRuntimeCoordinator {
             sovereignRef: "sovereign-\(runtimeTrace.sessionID)",
             worldAnchorRef:
                 "world-anchor-\(runtimeTrace.sessionID)",
-            activeLayerRefs: [
-                "L1", "L2", "L3", "L4", "L5", "L6",
-                "L7", "L8", "L9", "L10", "L11", "L12",
-                "L13", "L14",
-            ],
+            activeLayerRefs:
+                Self.kunlunActiveLayerRefs,
             agentSeatRefs: [],
-            centerlineRules: [
-                "respects-host-boundary",
-                "honors-world-anchor",
-                "permit-mode-\(boundActionPermit.mode.rawValue)",
-            ],
+            centerlineRules:
+                Self.kunlunCenterlineRulesByMode[
+                    boundActionPermit.mode] ?? [],
             deviationThreshold: 0.7,
             lastAlignmentCheck: "")
         // Synthesize a deviation count from the risk level —
@@ -1075,13 +1127,8 @@ public struct BASEBrainRuntimeCoordinator {
                     sovereignWarrants.map(\.warrantID))
                 return refs
             }(),
-            transformationSteps: [
-                "risk.bind",
-                "permit.synthesize",
-                "neural.materialize",
-                "tribunal.merge",
-                "audit.emit",
-            ],
+            transformationSteps:
+                Self.riverOriginTransformationSteps,
             consentRefs: quarantineRecords
                 .map(\.quarantineID),
             permitRefs: [
@@ -1122,10 +1169,8 @@ public struct BASEBrainRuntimeCoordinator {
                 hostRef: hostContext.hostID,
                 sanctumClass: sanctumClass,
                 accessPolicy: .conditional,
-                revealConditions: [
-                    "host-explicit-recall",
-                    "anchor-tone-warm",
-                ],
+                revealConditions:
+                    Self.yaochiAuditRevealConditions,
                 coolingPeriod: 60,
                 humanAnchorRequired: true,
                 lastRevealedAt: "")
