@@ -334,7 +334,18 @@ struct BASEBrainProgramBlueprintTests {
             // M440 (chapter 一百十五) — 2 layer-naming schemas
             // closing audit Section B remainder:
             "AbyssBudget",
-            "ForbiddenCandidateZone"
+            "ForbiddenCandidateZone",
+            // M441-M443 (chapter 一百十六) — 8 top-level
+            // architecture wrappers closing audit Section A
+            // ("3 planes / 4 kernels / Snapshot Ark"):
+            "SovereignPlane",
+            "StatePlane",
+            "ComputePlane",
+            "LeaseLifeKernel",
+            "NeuralOrganRuntime",
+            "StateEvolutionGraphKernel",
+            "SovereignMicrokernel",
+            "SnapshotArk"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

@@ -5,6 +5,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASSovereign
 import BASWorldPrior
 
 @Suite("BASEBrain schema governance registry")
@@ -30,7 +31,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 215)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五)
+        #expect(governedObjects.count == 223)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五) + M441-M443 8 top-level wrappers (chapter 一百十六)
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -449,7 +450,24 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "AbyssBudget":
                 BASAbyssBudget.currentSchemaVersion,
             "ForbiddenCandidateZone":
-                BASForbiddenCandidateZone.currentSchemaVersion
+                BASForbiddenCandidateZone.currentSchemaVersion,
+            // M441-M443 (chapter 一百十六) — top-level wrappers:
+            "SovereignPlane":
+                BASSovereignPlane.currentSchemaVersion,
+            "StatePlane":
+                BASStatePlane.currentSchemaVersion,
+            "ComputePlane":
+                BASComputePlane.currentSchemaVersion,
+            "LeaseLifeKernel":
+                BASLeaseLifeKernel.currentSchemaVersion,
+            "NeuralOrganRuntime":
+                BASNeuralOrganRuntime.currentSchemaVersion,
+            "StateEvolutionGraphKernel":
+                BASStateEvolutionGraphKernel.currentSchemaVersion,
+            "SovereignMicrokernel":
+                BASSovereignMicrokernel.currentSchemaVersion,
+            "SnapshotArk":
+                BASSnapshotArk.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

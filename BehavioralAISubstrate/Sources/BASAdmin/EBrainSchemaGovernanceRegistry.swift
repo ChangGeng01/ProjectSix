@@ -4,6 +4,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASSovereign
 import BASWorldPrior
 
 public enum BASEBrainSchemaGovernanceRegistry {
@@ -1122,6 +1123,53 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "ForbiddenCandidateZone",
             versionedType: BASForbiddenCandidateZone.self,
             tests: ["schema.forbidden_candidate_zone.current", "schema.forbidden_candidate_zone.backward"]
+        ),
+        // M441 + M442 + M443 (chapter 一百十六) — top-level
+        // architecture wrappers closing user 2026-05-04 audit
+        // Section A. Three planes (Sovereign / State / Compute)
+        // + four kernels (Lease & Life / Neural Organ Runtime /
+        // State & Evolution Graph / Sovereign Microkernel) +
+        // Snapshot Ark. White-paper anchor: §3.2-§3.9 of
+        // QINAO_SOVEREIGN_SECOND_BRAIN_PLATFORM_RND_TECH_OUTLINE_V1.md.
+        entry(
+            "SovereignPlane",
+            versionedType: BASSovereignPlane.self,
+            tests: ["schema.sovereign_plane.current", "schema.sovereign_plane.backward"]
+        ),
+        entry(
+            "StatePlane",
+            versionedType: BASStatePlane.self,
+            tests: ["schema.state_plane.current", "schema.state_plane.backward"]
+        ),
+        entry(
+            "ComputePlane",
+            versionedType: BASComputePlane.self,
+            tests: ["schema.compute_plane.current", "schema.compute_plane.backward"]
+        ),
+        entry(
+            "LeaseLifeKernel",
+            versionedType: BASLeaseLifeKernel.self,
+            tests: ["schema.lease_life_kernel.current", "schema.lease_life_kernel.backward"]
+        ),
+        entry(
+            "NeuralOrganRuntime",
+            versionedType: BASNeuralOrganRuntime.self,
+            tests: ["schema.neural_organ_runtime.current", "schema.neural_organ_runtime.backward"]
+        ),
+        entry(
+            "StateEvolutionGraphKernel",
+            versionedType: BASStateEvolutionGraphKernel.self,
+            tests: ["schema.state_evolution_graph_kernel.current", "schema.state_evolution_graph_kernel.backward"]
+        ),
+        entry(
+            "SovereignMicrokernel",
+            versionedType: BASSovereignMicrokernel.self,
+            tests: ["schema.sovereign_microkernel.current", "schema.sovereign_microkernel.backward"]
+        ),
+        entry(
+            "SnapshotArk",
+            versionedType: BASSnapshotArk.self,
+            tests: ["schema.snapshot_ark.current", "schema.snapshot_ark.backward"]
         )
     ]
 
