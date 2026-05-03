@@ -410,7 +410,8 @@ public struct BASEBrainRuntimeCoordinator {
         return core ? "full" : "partial"
     }
 
-    /// M436.2 (chapter 一百六 deep-review N-1 fix) — type-level
+    /// M436.2 (chapter 一百六 deep-review N-1 fix) + M436.3
+    /// (chapter 一百七 cross-package alignment) — type-level
     /// constant carrying the per-turn 13-layer expectation set
     /// for reconciliation verdict evaluation. Hoisted from a
     /// per-turn local in `deriveLayerReconciliationReport(...)`
@@ -419,7 +420,23 @@ public struct BASEBrainRuntimeCoordinator {
     /// invocation). L14 sovereign is intentionally omitted —
     /// it's the ledger itself, not a layer that emits coverage
     /// TO the ledger.
-    static let layerReconciliationExpectedLayers:
+    ///
+    /// **M436.3 (chapter 一百七)**: promoted from `internal` to
+    /// `public` so cross-package callers (specifically
+    /// `QinaoSovereign.recordTurnCoverage(...)` callers that
+    /// want full-cognitive-coverage expectations rather than
+    /// the L14-only default) can reference this single source
+    /// of truth. Pre-M436.3 the BAS-direct path used
+    /// `[L1..L13]` and the Qinao path defaulted to `[L14]`,
+    /// producing two divergent reconciliation contracts that
+    /// audit walkers reading both ledgers would see as
+    /// contradictory. M436.3 alignment: BAS still uses
+    /// `[L1..L13]` (sovereign emits the verdict, not coverage);
+    /// Qinao callers can opt in via
+    /// `BASEBrainRuntimeCoordinator.layerReconciliationExpectedLayerIDs`
+    /// (string-typed view below) when they want the same
+    /// 13-layer expectation set without coupling to BASHostKit.
+    public static let layerReconciliationExpectedLayers:
         [BASCognitiveLayer] = [
             .leaseLife,         // L1
             .neuralOrgan,       // L2
@@ -435,6 +452,33 @@ public struct BASEBrainRuntimeCoordinator {
             .gentleHand,        // L12
             .evolutionFurnace,  // L13
         ]
+
+    /// M436.3 (chapter 一百七 cross-package alignment) — string-
+    /// typed view of `layerReconciliationExpectedLayers`. Used
+    /// by Qinao SDK callers (e.g. hosts streaming all 13
+    /// cognitive layers via
+    /// `QinaoSovereign.recordTurnCoverage(...,
+    /// expectedLayerIDs:)`) so that BAS-direct and Qinao paths
+    /// agree on the same expectation set when both opt in.
+    /// Sorted to match `BASCognitiveLayer.rawValue` ordering
+    /// (L1, L2, ... L13) so audit walkers can rely on stable
+    /// finding-emission ordering across both paths.
+    public static let layerReconciliationExpectedLayerIDs:
+        [String] = layerReconciliationExpectedLayers
+            .map { $0.rawValue }
+
+    /// M436.3 (chapter 一百七) — full-cognitive-coverage
+    /// expectation set: every cognitive layer (L1..L13) PLUS
+    /// L14 sovereign. Use this when reconciliation should
+    /// expect the L14 layer as well (which Qinao's
+    /// `recordTurnCoverage` does by default since the L14
+    /// summary is computed from the audit ledger itself).
+    /// Aligns Qinao's `[L14]` default with BAS's `[L1..L13]`
+    /// expectation by giving callers a single 14-element list
+    /// that covers both contracts.
+    public static let fullCoverageExpectedLayerIDs: [String] =
+        layerReconciliationExpectedLayerIDs
+            + [BASCognitiveLayer.sovereign.rawValue]
 
     public init(
         powerClockService: any BASPowerClockServicing,
@@ -1655,120 +1699,53 @@ public struct BASEBrainRuntimeCoordinator {
                 turnID: derivedTurnID,
                 sessionID: derivedSessionID,
                 emittedAt: runtimeTrace.recordedAt)
-        let sovereignAuditEntry = buildSovereignAuditEntry(
-            sovereignVerdict: sovereignVerdict,
-            sovereignCommitTokens: sovereignCommitTokens,
-            sovereignWarrants: sovereignWarrants,
-            quarantineRecords: quarantineRecords,
-            runtimeTrace: runtimeTrace,
-            thoughtFold: thoughtFold,
-            riskCard: boundRiskCard,
-            actionPermit: boundActionPermit,
-            // M299 — feed the materialization's candidate bundle
-            // so frontier status codes land in audit signalRefs.
+        // M436.4 (chapter 一百七 parameter-bundle refactor) —
+        // populate the typed audit-observation bundle once and
+        // pass to the bundle-form `buildSovereignAuditEntry`.
+        // Pre-M436.4 the call site spelled 24+ named parameters
+        // inline (130+ lines of named-arg list); now we name
+        // each projection field once on the bundle and pass
+        // the bundle as a single `projections:` argument. Each
+        // chapter that adds a new audit emission grows the
+        // bundle struct rather than the function signature.
+        let projections = BASAuditObservationProjections(
             candidateObservationBundle: thoughtArtifacts
                 .candidateObservationBundle,
-            // M300 — feed tribunal observation bundle (already
-            // attached to `thoughtFrame` via M55 derive seam) so
-            // tribunal coverage codes land in audit signalRefs.
             tribunalObservationBundle: thoughtFrame
                 .tribunalObservationBundle,
-            // M303 — feed the Abyssal pressure projection so the
-            // 3 abyssal.* codes land in audit signalRefs.
             abyssalPressure: abyssalPressureForAudit,
-            // M304 — feed human-anchor signal + seal aggregate
-            // so 2-4 humanAnchor.* / seal.* codes land in audit
-            // signalRefs.
             humanAnchorSignal: humanAnchorSignalForAudit,
             sealAggregate: sealAggregateForAudit,
-            // M305 — feed L13 lifecycle aggregate so
-            // lifecycle.tickets / .terminal / .promoted /
-            // .stages codes land in audit signalRefs when the
-            // turn produces UpdateTickets.
             lifecycleAggregate: lifecycleAggregateForAudit,
-            // M316 — feed narrative-distortion projection so
-            // narrative.* codes land in audit signalRefs when
-            // any of the 5 axes is non-trivial.
             narrativeDistortion: narrativeDistortionForAudit,
-            // M317 — feed anomaly-trace (nil when distortion
-            // has no axis above the threshold; codes elided).
             anomalyTrace: anomalyTraceForAudit,
-            // M318 — feed L9 abyssal-branch annotations (empty
-            // when below abyssal threshold; codes elided).
             abyssalBranches: abyssalBranchesForAudit,
-            // M320 — feed L4 unknown-reserve projection (codes
-            // elided when ceiling resolves to `.unrestricted`).
             unknownReserve: unknownReserveForAudit,
-            // M321 — feed L13 forbidden-knowledge aggregate (nil
-            // when no quarantines this turn; codes elided).
             forbiddenAggregate: forbiddenAggregateForAudit,
-            // M402 — feed Kunlun axis-alignment projection so
-            // kunlun.axis.center / kunlun.axis.deviation /
-            // kunlun.axis.requires-gate codes land in audit
-            // signalRefs.
             kunlunAxisAlignment: kunlunAxisAlignmentForAudit,
-            // M404 — feed Jade Canon seal verification readout so
-            // kunlun.jade.seal:<class>:<status> +
-            // kunlun.jade.missing:<count> codes land in audit
-            // signalRefs. Doctrine §4.2 (玉律不能成黑箱).
-            jadeCanonVerification: kunlunJadeVerificationForAudit,
+            jadeCanonVerification:
+                kunlunJadeVerificationForAudit,
             jadeCanonObjectClass: .actionPermit,
-            // M405 — feed River-Origin lineage analysis so
-            // kunlun.river.lineage / .upward / .downward /
-            // .warnings codes land in audit signalRefs. Doctrine
-            // §4.5 (没有源流就没有可信成长).
             riverOriginLineage: kunlunRiverLineageForAudit,
-            // M408 — feed Yaochi sanctum access decision so
-            // kunlun.yaochi.access:<class>:<decision> + reason
-            // codes land in audit signalRefs. Doctrine §4.4
-            // (默认不参与普通检索) + 红线 #3 (sanctum 不能被系统占
-            // 有). Audit-only emission at this milestone.
             yaochiAccess: kunlunYaochiAccessForAudit,
             yaochiSanctumClass:
                 kunlunYaochiSanctumForAudit.sanctumClass,
-            // M409 — feed Heaven Gate readiness so
-            // kunlun.tianmen.gate:<domain>:<state> + readiness
-            // reason codes land in audit signalRefs. Doctrine
-            // §4.3 (七 transition gates).
-            tianmenReadiness: kunlunHeavenGateReadinessForAudit,
+            tianmenReadiness:
+                kunlunHeavenGateReadinessForAudit,
             tianmenGateClass:
                 kunlunHeavenGateForAudit.gateClass,
             tianmenPassState:
                 kunlunHeavenGateForAudit.passState,
-            // M417 — feed escalation suppression reason codes
-            // (M384 + M406) so red-line #8 (cross-doctrine
-            // anchor-wins) honoring is observable in the audit
-            // ledger. Empty array elides codes when no
-            // suppression fired this turn.
-            escalationSuppressionCodes: escalationSuppressionCodes,
-            // M424 (chapter 一百一) — feed chapter 九十九 schemas
-            // so they exit "typed-surface-only" status. Each
-            // schema emits a status code into signalRefs.
+            escalationSuppressionCodes:
+                escalationSuppressionCodes,
             kunlunAxisView: kunlunAxisViewForAudit,
             kunlunTianmenWarrant: kunlunTianmenWarrantForAudit,
-            kunlunGateDenialWrit: kunlunGateDenialWritForAudit,
-            // M436 (chapter 一百四) — feed the per-turn
-            // reconciliation report + verdict so the
-            // `reconciliation.severity` /
-            // `reconciliation.findings` /
-            // `reconciliation.observed` /
-            // `reconciliation.missing:<layer>` codes land in
-            // audit signalRefs. Production code now invokes the
-            // verdict engine that pre-M436 was test-only. Closes
-            // the chapter 一百四 deep architecture audit's
-            // CRITICAL defect #1 ("reconciliation engine never
-            // called from production").
-            layerReconciliationVerdict: layerReconciliation.verdict,
-            layerReconciliationReport: layerReconciliation.report,
-            // M436 + M436.1 — feed the 11 silent observation
-            // bundles so each layer's coverage status (full /
-            // partial / empty) lands in audit signalRefs as a
-            // typed code. M436 closed 8 (L1/L2/L3/L5/L6/L7/L8/
-            // L12); M436.1 closed the remaining 3 (L4 worldPrior
-            // / L11 risk / L13 updateTicket per chapter 一百五
-            // honest-correction asymmetric-coverage HIGH gap).
-            // Doctrine pin: audit-only emission, no decision
-            // influence, no verdict escalation.
+            kunlunGateDenialWrit:
+                kunlunGateDenialWritForAudit,
+            layerReconciliationVerdict:
+                layerReconciliation.verdict,
+            layerReconciliationReport:
+                layerReconciliation.report,
             presenceObservationBundle:
                 contextFrame.presenceObservationBundle,
             decompositionObservationBundle:
@@ -1785,18 +1762,22 @@ public struct BASEBrainRuntimeCoordinator {
                 .neuralOrganObservationBundle,
             hippocampalMemoryObservationBundle: thoughtFrame
                 .hippocampalMemoryObservationBundle,
-            // M436.1 — close asymmetric coverage. L4 / L11 /
-            // L13-updateTicket bundles enter the reconciliation
-            // report and appear in `reconciliation.observed:`
-            // but lacked their own `<layer>.coverage:` codes
-            // pre-fix.
             worldPriorObservationBundle: thoughtFrame
                 .worldPriorObservationBundle,
             riskObservationBundle: thoughtFrame
                 .riskObservationBundle,
             updateTicketObservationBundle: thoughtFrame
-                .updateTicketObservationBundle
-        )
+                .updateTicketObservationBundle)
+        let sovereignAuditEntry = buildSovereignAuditEntry(
+            sovereignVerdict: sovereignVerdict,
+            sovereignCommitTokens: sovereignCommitTokens,
+            sovereignWarrants: sovereignWarrants,
+            quarantineRecords: quarantineRecords,
+            runtimeTrace: runtimeTrace,
+            thoughtFold: thoughtFold,
+            riskCard: boundRiskCard,
+            actionPermit: boundActionPermit,
+            projections: projections)
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict
             verdict.auditRef = sovereignAuditEntry.auditID

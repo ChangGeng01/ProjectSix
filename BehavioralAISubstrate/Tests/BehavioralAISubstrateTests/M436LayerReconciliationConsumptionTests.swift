@@ -667,6 +667,74 @@ final class M436LayerReconciliationConsumptionTests: XCTestCase {
             "the ledger itself, not a layer that emits coverage")
     }
 
+    // MARK: - 12. M436.3 — cross-package alignment static
+    //          views (chapter 一百七 fix M-4).
+    //
+    // Pre-M436.3 the BAS-direct path used `[L1..L13]` for
+    // `expectedLayers` and the Qinao path defaulted to
+    // `[L14]`, producing two divergent reconciliation
+    // contracts that audit walkers reading both ledgers would
+    // see as contradictory. M436.3 promoted the BAS static
+    // constant from `internal` to `public` and added two
+    // string-typed views (`layerReconciliationExpectedLayerIDs`
+    // = L1..L13 and `fullCoverageExpectedLayerIDs` = L1..L14)
+    // so cross-package callers can opt into a shared
+    // expectation set.
+
+    /// String-typed view must mirror the typed array exactly
+    /// (same cardinality, same ordering, same raw values).
+    func testLayerReconciliationExpectedLayerIDsMirrorsTypedArray()
+    {
+        let typed = BASEBrainRuntimeCoordinator
+            .layerReconciliationExpectedLayers
+            .map { $0.rawValue }
+        XCTAssertEqual(
+            BASEBrainRuntimeCoordinator
+                .layerReconciliationExpectedLayerIDs,
+            typed,
+            "string-typed view must mirror typed array — drift " +
+            "would re-introduce the cross-package divergence " +
+            "M436.3 fixes")
+    }
+
+    /// `fullCoverageExpectedLayerIDs` must be `[L1..L13, L14]`
+    /// — exactly the 13 cognitive layers plus L14 sovereign.
+    /// Pin both cardinality (14) and that L14 is the LAST
+    /// element (ordering matters for stable finding emission).
+    func testFullCoverageExpectedLayerIDsHas14LayersWithSovereignLast()
+    {
+        let full = BASEBrainRuntimeCoordinator
+            .fullCoverageExpectedLayerIDs
+        XCTAssertEqual(full.count, 14)
+        XCTAssertEqual(
+            full.last,
+            BASCognitiveLayer.sovereign.rawValue,
+            "L14 sovereign must be the last element so " +
+            "cognitive-then-sovereign ordering is stable for " +
+            "audit-walker finding emission")
+        // Pin: dropping the last == L1..L13.
+        XCTAssertEqual(
+            Array(full.dropLast()),
+            BASEBrainRuntimeCoordinator
+                .layerReconciliationExpectedLayerIDs,
+            "fullCoverage = layerReconciliation + L14 must hold")
+    }
+
+    /// Pin: `layerReconciliationExpectedLayerIDs` does NOT
+    /// contain L14 (sovereign is the ledger itself, not a
+    /// layer that emits coverage TO the ledger). A future
+    /// drift that adds L14 here would silently change the
+    /// reconciliation contract.
+    func testLayerReconciliationExpectedLayerIDsExcludesSovereign()
+    {
+        let ids = BASEBrainRuntimeCoordinator
+            .layerReconciliationExpectedLayerIDs
+        XCTAssertFalse(
+            ids.contains(BASCognitiveLayer.sovereign.rawValue),
+            "L14 sovereign must NOT be in the cognitive-layer " +
+            "expectation set — it's a separate audit surface")
+    }
+
     func testExpectedLayersStaticConstantOrderIsStable() {
         // Pin exact order — chapter 一百四 / 一百五 emission
         // contract relies on `reconciliation.observed:` being

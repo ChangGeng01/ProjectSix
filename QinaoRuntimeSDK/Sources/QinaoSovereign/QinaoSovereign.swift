@@ -1201,7 +1201,17 @@ public actor QinaoSovereignControlPlane {
     ///     the turn. Strict `>` comparison — at-ceiling is clean.
     ///     Clamped to `[0, 1]` before use.
     ///   - expectedLayerIDs: layer raw IDs (`"L1"`..`"L14"`) that
-    ///     should have reported. Defaults to `["L14"]`.
+    ///     should have reported. Defaults to `["L14"]`. **M436.3
+    ///     cross-package alignment (chapter 一百七)**: callers
+    ///     wanting the same 13-cognitive-layer expectation set as
+    ///     BAS-direct's `BASEBrainRuntimeCoordinator.runTurn`
+    ///     audit-build seam can pass
+    ///     `BASEBrainRuntimeCoordinator.layerReconciliationExpectedLayerIDs`
+    ///     (= `["L1", "L2", ..., "L13"]`); callers wanting full
+    ///     L1..L14 coverage (cognitive + sovereign) can pass
+    ///     `BASEBrainRuntimeCoordinator.fullCoverageExpectedLayerIDs`.
+    ///     Default `["L14"]` preserves pre-M90 host contract for
+    ///     callers that don't auto-stream L1–L13.
     ///   - additionalSummaries: optional L1–L13 per-layer coverage
     ///     summaries the host streams into the ledger in addition to
     ///     the L14 summary. Nil (default) preserves pre-M90 behaviour.
