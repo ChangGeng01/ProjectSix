@@ -258,3 +258,41 @@ extension BASUpdateTicketObservationBundle {
             emittedAt: emittedAt)
     }
 }
+
+// MARK: - L3 thought fold (M436)
+//
+// Closes the last gap in the 14-layer projection matrix. Pre-M436
+// the L3 `BASThoughtFoldObservationBundle` was the only cognitive
+// observation bundle without a `.coverageSummary` projection — so
+// the reconciliation report could never see L3, which made
+// `BASObservationReconciliationVerdictEngine.evaluate(...)`
+// systematically emit a spurious `.missingLayer(.thoughtFold)`
+// finding even on healthy turns. M436 lands the projection so the
+// chapter 一百四 helper `deriveLayerReconciliationReport(...)`
+// can feed L3 into the report alongside L1/L2/L5/L6/L7/L8/L9/L10/
+// L11/L12/L13. With this in place, the substrate's runTurn path
+// can run a real-time 14-layer reconciliation verdict each turn
+// (where L4 is appended via `BASWorldPriorObservationBundle`'s
+// own projection in BASWorldPrior).
+
+extension BASThoughtFoldObservationBundle {
+    /// Neutral coverage summary for L3. `distinctSubjectCount`
+    /// maps to the number of distinct fold-subject IDs (atom /
+    /// snapshot / rollback / resume / integrity-weave / organ-
+    /// package / degradation refs) the bundle touched this turn.
+    /// `hasCoreSignalCoverage` surfaces the existing `hasFoldSeal`
+    /// predicate — L3 is "healthy" when the fold-sealed baseline
+    /// fired (which matches the L14 surface's "fold exists" floor).
+    public var coverageSummary: BASObservationCoverageSummary {
+        BASObservationCoverageSummary(
+            layer: .thoughtFold,
+            turnID: turnID,
+            sessionID: sessionID,
+            totalObservations: observations.count,
+            distinctSubjectCount: subjectIDs.count,
+            hasCoreSignalCoverage: hasCoreSignalCoverage,
+            budgetTotalCost:
+                BASThoughtFoldSignalBudget.totalCost(for: self),
+            emittedAt: emittedAt)
+    }
+}

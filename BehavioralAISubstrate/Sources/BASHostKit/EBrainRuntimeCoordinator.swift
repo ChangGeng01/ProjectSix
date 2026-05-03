@@ -256,6 +256,146 @@ public struct BASEBrainRuntimeCoordinator {
         "anchor-tone-warm",
     ]
 
+    /// M436 (chapter 一百四) — close the 14-layer reconciliation
+    /// loop. Pre-fix the substrate had ALL 12 observation bundles
+    /// derived per turn (L1/L2/L3/L5/L6/L7/L8/L10/L11/L12/L13 +
+    /// L4 worldPrior) but the
+    /// `BASObservationReconciliationVerdictEngine.evaluate(...)`
+    /// library was NEVER called from production code — only from
+    /// tests. Per chapter 一百四 deep architecture audit
+    /// (`docs/QINAO_M436_DEEP_ARCHITECTURE_AUDIT_2026-05-03.md`):
+    /// 36% of layers were "极致" (load-bearing); 57% were "运转
+    /// not maxed" (derived but unread). This helper composes the
+    /// per-turn `BASObservationReconciliationReport` from the 12
+    /// bundles + a candidate-bundle adapter, runs the verdict
+    /// engine, and returns both. The verdict + report go into
+    /// audit signalRefs so audit walkers can grep
+    /// `reconciliation.severity:halt` etc.
+    ///
+    /// Pure function: no actor / no IO. The bundles' `.coverageSummary`
+    /// projections are stable.
+    fileprivate static func deriveLayerReconciliationReport(
+        thoughtFrame: BASThoughtFrame,
+        presenceBundle: BASPresenceObservationBundle?,
+        decompositionBundle: BASDecompositionObservationBundle?,
+        candidateBundle: BASCandidateObservationBundle?,
+        turnID: String,
+        sessionID: String,
+        emittedAt: Date
+    ) -> (report: BASObservationReconciliationReport,
+          verdict: BASObservationReconciliationVerdict)
+    {
+        var report = BASObservationReconciliationReport(
+            turnID: turnID,
+            sessionID: sessionID)
+        // Append per-layer summaries from the 13 cognitive bundles
+        // (L1-L13). Each `coverageSummary` is a pure projection
+        // from the bundle to the neutral coverage type. The
+        // presence (L6) and decomposition (L7) bundles live on
+        // `BASContextFrame` / `BASDecomposeFrame` and arrive as
+        // explicit parameters; the rest live on `BASThoughtFrame`.
+        // `BASCandidateObservationBundle` (L9) is derived
+        // post-materialization on the frontier itself, not on the
+        // frame — also passed explicitly. `BASWorldPriorObservationBundle`
+        // (L4) is a field on the thought frame.
+        if let b = presenceBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = decompositionBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = candidateBundle {
+            // The candidate bundle is constructed by
+            // `BASNeuralMaterializationCompiler.buildCandidateObservationBundle`
+            // with `turnID = "l9.turn.step-N"` and
+            // `sessionID = decomposeRef` — different from the
+            // canonical `derivedTurnID` / `derivedSessionID`
+            // pair the rest of the substrate uses. Without
+            // normalization, `appending(_:)` is a no-op
+            // (`turnID/sessionID` mismatch is a guard in
+            // `BASObservationReconciliationReport.appending`).
+            // M436 normalizes the candidate summary's keys so
+            // L9 (dreamLoop) participates in the reconciliation
+            // report. Pure value-type rewrite — no I/O.
+            let raw = b.coverageSummary
+            let normalized = BASObservationCoverageSummary(
+                layer: raw.layer,
+                turnID: turnID,
+                sessionID: sessionID,
+                totalObservations: raw.totalObservations,
+                distinctSubjectCount: raw.distinctSubjectCount,
+                hasCoreSignalCoverage: raw.hasCoreSignalCoverage,
+                budgetTotalCost: raw.budgetTotalCost,
+                emittedAt: raw.emittedAt)
+            report = report.appending(normalized)
+        }
+        if let b = thoughtFrame.tribunalObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.riskObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.softHandObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.updateTicketObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.worldPriorObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.leaseLifeObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.hostConstitutionObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.thoughtFoldObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.hippocampalMemoryObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        if let b = thoughtFrame.neuralOrganObservationBundle {
+            report = report.appending(b.coverageSummary)
+        }
+        // Run verdict against the report. ExpectedLayers list:
+        // every layer the substrate expects to hear from on a
+        // healthy turn. Today this is the 12 cognitive layers
+        // above. Any layer in the list that didn't emit becomes
+        // a `.missingLayer` finding in the verdict.
+        let expectedLayers: [BASCognitiveLayer] = [
+            .leaseLife,         // L1
+            .neuralOrgan,       // L2
+            .thoughtFold,       // L3
+            .worldPrior,        // L4
+            .hostConstitution,  // L5
+            .presenceEye,       // L6
+            .mirrorBlade,       // L7
+            .hippocampalWell,   // L8
+            .dreamLoop,         // L9 (candidate frontier today)
+            .triSelfTribunal,   // L10
+            .riskClimate,       // L11
+            .gentleHand,        // L12
+            .evolutionFurnace,  // L13
+            // L14 sovereign is the ledger itself; not a layer
+            // that emits coverage TO the ledger.
+        ]
+        // Budget ceiling: 1.0 (any individual layer's clamped
+        // budget cost is ≤ 1.0 by construction; sum across 12
+        // layers can exceed if all spike, hence ceiling at sum
+        // upper bound). Use 1.0 as the per-layer ceiling
+        // baseline; the verdict engine emits halt when
+        // total > ceiling.
+        let verdict = BASObservationReconciliationVerdictEngine
+            .evaluate(
+                report: report,
+                expectedLayers: expectedLayers,
+                budgetCeiling: 12.0,
+                emittedAt: emittedAt)
+        return (report: report, verdict: verdict)
+    }
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -1442,6 +1582,39 @@ public struct BASEBrainRuntimeCoordinator {
                     "rollback-\(runtimeTrace.sessionID)",
                 humanExplanationStub: "")
         }()
+        // M436 (chapter 一百四) — derive the per-turn 14-layer
+        // reconciliation report + verdict from all 13 cognitive
+        // bundles in scope (L1..L13). Pre-fix this engine
+        // existed as a library but was never invoked from
+        // production; the audit ledger therefore had ZERO
+        // visibility into "did all expected layers participate
+        // this turn." Now the verdict's findings (missing layer
+        // / partial coverage / budget overspend) emit
+        // `reconciliation.*` codes into `signalRefs` below, and
+        // the report's `summaries` give audit walkers the full
+        // observed-layer list. Doctrine pin: pure derive, no
+        // verdict escalation, no permit mutation, no decision
+        // influence — purely additive metadata.
+        let layerReconciliation = Self
+            .deriveLayerReconciliationReport(
+                thoughtFrame: thoughtFrame,
+                presenceBundle:
+                    contextFrame.presenceObservationBundle,
+                decompositionBundle:
+                    decomposeFrame.decompositionObservationBundle,
+                candidateBundle: thoughtArtifacts
+                    .candidateObservationBundle,
+                // Canonical key formula matching the rest of
+                // the substrate: derivedTurnID + derivedSessionID
+                // are what the M53 / M54 / M55 / M62 / M63 /
+                // M64 derive helpers feed into every per-layer
+                // bundle. Using the same pair here lets
+                // `BASObservationReconciliationReport.appending`
+                // accept every bundle's summary instead of
+                // dropping ones whose keys don't match.
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID,
+                emittedAt: runtimeTrace.recordedAt)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -1533,7 +1706,43 @@ public struct BASEBrainRuntimeCoordinator {
             // schema emits a status code into signalRefs.
             kunlunAxisView: kunlunAxisViewForAudit,
             kunlunTianmenWarrant: kunlunTianmenWarrantForAudit,
-            kunlunGateDenialWrit: kunlunGateDenialWritForAudit
+            kunlunGateDenialWrit: kunlunGateDenialWritForAudit,
+            // M436 (chapter 一百四) — feed the per-turn
+            // reconciliation report + verdict so the
+            // `reconciliation.severity` /
+            // `reconciliation.findings` /
+            // `reconciliation.observed` /
+            // `reconciliation.missing:<layer>` codes land in
+            // audit signalRefs. Production code now invokes the
+            // verdict engine that pre-M436 was test-only. Closes
+            // the chapter 一百四 deep architecture audit's
+            // CRITICAL defect #1 ("reconciliation engine never
+            // called from production").
+            layerReconciliationVerdict: layerReconciliation.verdict,
+            layerReconciliationReport: layerReconciliation.report,
+            // M436 — feed the 7 silent observation bundles so
+            // each layer's coverage status (full / partial /
+            // empty) lands in audit signalRefs as a typed code.
+            // Closes the chapter 一百四 HIGH defect #2 ("7 of 12
+            // cognitive bundles emit ZERO signalRefs codes").
+            // Doctrine pin: audit-only emission, no decision
+            // influence, no verdict escalation.
+            presenceObservationBundle:
+                contextFrame.presenceObservationBundle,
+            decompositionObservationBundle:
+                decomposeFrame.decompositionObservationBundle,
+            softHandObservationBundle: thoughtFrame
+                .softHandObservationBundle,
+            leaseLifeObservationBundle: thoughtFrame
+                .leaseLifeObservationBundle,
+            hostConstitutionObservationBundle: thoughtFrame
+                .hostConstitutionObservationBundle,
+            thoughtFoldObservationBundle: thoughtFrame
+                .thoughtFoldObservationBundle,
+            neuralOrganObservationBundle: thoughtFrame
+                .neuralOrganObservationBundle,
+            hippocampalMemoryObservationBundle: thoughtFrame
+                .hippocampalMemoryObservationBundle
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

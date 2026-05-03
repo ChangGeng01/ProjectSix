@@ -12255,3 +12255,96 @@ Forcing function: if a future deep-bench finds M425 has measurable cost (release
 ### 103.8 一句话总结
 
 **M435 closes 诚实模式 收尾 (chapter 一百三)**: User instructed "诚实模式 ... 满意为止". Chapter 一百二 reverted M428-M431 (failed extraction at +3.35% regression). Remaining 8% dissatisfaction was "runTurn at 1359 lines exceeds 800 LoC guideline". **Re-examined per honest mode**: the 1359-line function is correct, well-tested, hot-path orchestrator with sequentially-coupled state; M428-M431 evidence proves extraction has measurable perf cost (+3.35% at 95% CI N=30 release build, even with @inline). **Verdict**: runTurn size is a recognized hot-path-cohesion exception, NOT a doctrine violation. **New `docs/QINAO_M435_HOT_PATH_COHESION_DOCTRINE_2026-05-03.md`** codifies the doctrine: orchestrator methods on hot paths MAY exceed function-size guidelines when sequentially coupled + extraction has measurable cost + stages are well-MARK'd + each stage pinned by independent tests. The substrate's runTurn satisfies all 4. The "5-7 chapters of compounding extractions" plan from M425 is invalidated. **M425 stays in HEAD** (forcing function: revert if future bench shows cost). Honest satisfaction: pre-M435 92% → post-M435 ~95-100%. **The honest move was to question my own dissatisfaction calibration rather than invent more refactor attempts**. No code changes; doc-only chapter. Tests unchanged: BAS 2461 / Qinao 1375 / 全栈 3853 / 0 failures / 4/4 boundary clean.
+
+## 一百四、 Deep review 底层架构 — 14 层 reconciliation 闭环（M436 / 2026-05-03）
+
+### 104.1 触发动作
+
+User instruction "deep review 底层 架构 缺陷 bug 打通闭环 14层 全 运转 极致" — strict architectural audit + close-the-loop on every layer + drive each layer to "极致" (load-bearing through audit ledger).
+
+A general-purpose code-review agent surveyed the substrate and quantified the actual per-layer audit-walker visibility:
+
+- **5/14 = 36% load-bearing** (only L9 dreamLoop / L10 tribunal / L11 risk / L13 lifecycle / L14 sovereign emit typed audit reasonCodes pre-fix)
+- **8/14 = 57% running but unread** (L1/L2/L3/L5/L6/L7/L8/L12 derive observation bundles every turn but never feed signalRefs)
+- **CRITICAL defect**: `BASObservationReconciliationVerdictEngine.evaluate(...)` is a public library function called **only from tests** — production `runTurn` never invokes it; the audit ledger has zero visibility into "did all expected layers participate."
+
+### 104.2 实施
+
+3 surgical patches lift "极致" 36% → 100%:
+
+**Patch A** — `BASObservationCoverageProjections.swift` adds the missing L3 `BASThoughtFoldObservationBundle.coverageSummary` projection (the only cognitive bundle without one pre-fix; verdict engine systematically emitted spurious `.missingLayer(.thoughtFold)` even on healthy turns).
+
+**Patch B** — `EBrainRuntimeCoordinator.swift` adds:
+- New static helper `deriveLayerReconciliationReport(thoughtFrame:presenceBundle:decompositionBundle:candidateBundle:turnID:sessionID:emittedAt:)` composing a 13-layer reconciliation report + verdict (pure value-type derive, no I/O).
+- Wires the helper into `runTurn` at the audit-build seam, just before `buildSovereignAuditEntry`.
+- Normalizes the L9 candidate-bundle's non-canonical `turnID = "l9.turn.step-N"` / `sessionID = decomposeRef` keys to the canonical pair so `BASObservationReconciliationReport.appending` accepts the L9 summary (otherwise silently no-ops, and L9 disappears from the observed list).
+
+**Patch C** — `EBrainRuntimeCoordinator+SovereignCommit.swift` extends `buildSovereignAuditEntry` with 9 new optional parameters and emits 6 new code prefixes:
+
+| Parameter | New code prefixes |
+|---|---|
+| `layerReconciliationVerdict` + `layerReconciliationReport` | `reconciliation.severity:<clean\|advisory\|halt>` / `reconciliation.findings:<count>` / `reconciliation.observed:<L1+L2+...>` / `reconciliation.missing:<layer>` / `reconciliation.partial:<layer>` / `reconciliation.overspend:<observed>:<ceiling>` |
+| `presenceObservationBundle` | `presence.coverage:<status>` + `presence.observations:<N>` |
+| `decompositionObservationBundle` | `decomposition.coverage:` + `decomposition.observations:` |
+| `softHandObservationBundle` | `softHand.coverage:` + `softHand.observations:` |
+| `leaseLifeObservationBundle` | `leaseLife.coverage:` + `leaseLife.observations:` |
+| `hostConstitutionObservationBundle` | `hostConstitution.coverage:` + `hostConstitution.observations:` |
+| `thoughtFoldObservationBundle` | `thoughtFold.coverage:` + `thoughtFold.observations:` |
+| `neuralOrganObservationBundle` | `neuralOrgan.coverage:` + `neuralOrgan.observations:` |
+| `hippocampalMemoryObservationBundle` | `hippocampal.coverage:` + `hippocampal.observations:` |
+
+Doctrine pin: every emission is **audit-only metadata**. Zero verdict escalation, zero permit mutation, zero hash-chain semantic change (signature digests a longer ordered list deterministically).
+
+### 104.3 测试
+
+新增 `M436LayerReconciliationConsumptionTests.swift` (7 tests, 全 pass):
+
+1. `testReconciliationSeverityIsEmitted` — pin one severity code per turn, value ∈ {clean, advisory, halt}
+2. `testReconciliationFindingsCountIsEmitted` — pin parseable integer count
+3. `testReconciliationObservedListsCognitiveLayers` — **pin all 13 cognitive layers (L1-L13) observed on a healthy fixture turn** (the "极致" gauge)
+4. `testSevenSilentBundlesNowEmitCoverageCodes` — pin 8 layers (L1/L2/L3/L5/L6/L7/L8/L12) all emit one `<layer>.coverage:<status>` + one `<layer>.observations:<N>` code each
+5. `testLegacyCodesStillPresentAlongsideM436Codes` — pin backward-compat: M298 risk/permit/fold + M299 frontier + M300 tribunal codes all still appear
+6. `testReconciliationIsAuditOnlyNoVerdictEscalation` — doctrine pin: reconciliation never escalates verdict to `.rollback` / `.deadStop`
+7. `testReconciliationCodesAreDeterministic` — pin determinism across two identical fixture runs
+
+### 104.4 测试基线
+
+| 套件 | 一百三 章末 | 一百四 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2461 | **2468** | +7 (M436 test file) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3853 | **3860** | +7 |
+
+0 failures / 0 flakes / 4/4 boundary 全绿.
+
+### 104.5 "极致" rate measurement
+
+| 维度 | 一百三 | 一百四 |
+|---|---|---|
+| Load-bearing layers (audit-walker visibility) | 5/14 = 36% | **14/14 = 100%** |
+| Running-but-unread layers | 8/14 = 57% | **0/14 = 0%** |
+| Reconciliation verdict in production | NO (test-only library) | **YES (every turn)** |
+| L3 coverage projection matrix | 11/12 cognitive bundles | **12/12** |
+| L9 candidate bundle key-normalization | mismatched (silent no-op) | **canonical (observed)** |
+
+### 104.6 红线 / 不变量
+
+| 红线 / 不变量 | M436 |
+|---|---|
+| #1 先醒再答 | ✓ (no L1 wake / breath path changes) |
+| #2 神经不掌权 | ✓ (verdict / permit synthesis unchanged) |
+| #3 私有经验不进权重 | ✓ (no L13 / L8 / L5 writes) |
+| audit hash chain | ✓ (signalRefs additive, signature digests longer list deterministically) |
+| 单提交口 | ✓ (single permit / single warrant unchanged) |
+| Cthulhu 红线 7 (watcher hint) / 8 (anchor wins) / 9 (seals have audit ref) / 10 (主品牌不默认恐怖) | ✓ |
+| Kunlun 8 红线 | ✓ (no Kunlun decision-path mutation) |
+| 4 boundary checks | maintained green |
+
+### 104.7 文档
+
+新建 `docs/QINAO_M436_DEEP_ARCHITECTURE_AUDIT_2026-05-03.md` — formal audit record with patch shape, before/after measurements, doctrine pins, test mapping.
+
+### 104.8 一句话总结
+
+**M436 closes 14-layer reconciliation 闭环 (chapter 一百四)**: Deep architecture audit found 36% load-bearing / 57% running-but-unread + a CRITICAL defect (`BASObservationReconciliationVerdictEngine` was a test-only library; production `runTurn` never invoked it) + a HIGH defect (7 cognitive bundles emit zero `signalRefs` codes) + an L3 gap (the only cognitive bundle without a `.coverageSummary` projection). 3 surgical patches close all three: new L3 projection, new `deriveLayerReconciliationReport` helper wired into runTurn, 9 new optional parameters on `buildSovereignAuditEntry` emitting 6 new code prefixes (`reconciliation.severity` / `.findings` / `.observed` / `.missing` / `.partial` / `.overspend` plus 8 per-layer `<layer>.coverage:<status>` / `<layer>.observations:<N>` pairs). The candidate-bundle key normalization fix is the subtle one — pre-M436 the L9 summary's keys were `"l9.turn.step-N"` / `decomposeRef`, mismatched with the canonical `derivedTurnID` / `derivedSessionID` pair, so `BASObservationReconciliationReport.appending` silently no-op'd and L9 was never observed; post-fix all 13 cognitive layers participate. Doctrine pin: every new code is audit-only metadata, zero decision influence, zero hash-chain semantic change. 7 new tests + 4 boundary checks + 2468/417/1375/全栈 3860 all green. "极致" rate: 36% → 100%.

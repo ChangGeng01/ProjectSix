@@ -510,7 +510,55 @@ extension BASEBrainRuntimeCoordinator {
         // decision influence.
         kunlunAxisView: BASKunlunAxisView? = nil,
         kunlunTianmenWarrant: BASKunlunTianmenWarrant? = nil,
-        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil
+        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil,
+        // M436 (chapter 一百四) — close the 14-layer reconciliation
+        // gap. Pre-fix, `BASObservationReconciliationVerdictEngine`
+        // was a library that production code never invoked (only
+        // tests called it), so the substrate had ALL 12 cognitive
+        // observation bundles deriving per turn but ZERO of them
+        // feeding a per-turn coverage verdict into the audit
+        // ledger. Per chapter 一百四 deep architecture audit:
+        // 36% of layers were "极致" load-bearing; 57% were
+        // "运转 not maxed" (derived but unread). M436 wires
+        // `deriveLayerReconciliationReport(...)` (in
+        // `EBrainRuntimeCoordinator.swift`) into the audit-build
+        // seam, and this parameter carries the verdict so its
+        // findings emit `reconciliation.severity` /
+        // `reconciliation.findings` / `reconciliation.observed`
+        // / `reconciliation.missing:<layer>` codes into
+        // `signalRefs`. Doctrine pin: audit-only emission, no
+        // verdict escalation, no permit mutation. Default `nil`
+        // for legacy / test callers that haven't plumbed the
+        // helper yet.
+        layerReconciliationVerdict:
+            BASObservationReconciliationVerdict? = nil,
+        layerReconciliationReport:
+            BASObservationReconciliationReport? = nil,
+        // M436 — silent-bundle audit emission. Pre-fix only
+        // candidate (M299) + tribunal (M300) bundles emitted
+        // `signalRefs` codes; the other 7 cognitive bundles
+        // (L1 / L2 / L3 / L5 / L6 / L7 / L12) were derived per
+        // turn but produced ZERO audit-walker visibility. Each
+        // optional bundle below now contributes a one-line
+        // coverage status code so audit walkers can grep
+        // `<layer>.coverage:<full|partial|missing>` per turn.
+        // Default `nil` keeps backward-compat for legacy callers.
+        presenceObservationBundle:
+            BASPresenceObservationBundle? = nil,
+        decompositionObservationBundle:
+            BASDecompositionObservationBundle? = nil,
+        softHandObservationBundle:
+            BASSoftHandObservationBundle? = nil,
+        leaseLifeObservationBundle:
+            BASLeaseLifeObservationBundle? = nil,
+        hostConstitutionObservationBundle:
+            BASHostConstitutionObservationBundle? = nil,
+        thoughtFoldObservationBundle:
+            BASThoughtFoldObservationBundle? = nil,
+        neuralOrganObservationBundle:
+            BASNeuralOrganObservationBundle? = nil,
+        hippocampalMemoryObservationBundle:
+            BASHippocampalMemoryObservationBundle? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -967,6 +1015,156 @@ extension BASEBrainRuntimeCoordinator {
             if escalating {
                 observationStatusCodes.append(
                     "abyssalBranch.escalation:sovereign-review")
+            }
+        }
+        // M436 — silent-bundle audit emission. Each per-layer
+        // bundle gets one `<layer>.coverage:<status>` code so
+        // audit walkers can grep "did this layer participate
+        // this turn." Status is `full` when the bundle's
+        // `hasCoreSignalCoverage` predicate is true, `partial`
+        // when observations exist but core coverage is missing,
+        // `empty` when the bundle has zero observations. Each
+        // emission is conditional on the bundle being non-nil
+        // (legacy / test callers that don't plumb the bundle
+        // simply elide the code). Doctrine pin: audit-only
+        // emission, no decision influence — this purely closes
+        // the "silent bundle" audit-walker gap identified by the
+        // chapter 一百四 deep architecture audit (HIGH defect
+        // #2: 7 of 12 cognitive bundles emit ZERO signalRefs
+        // codes pre-M436).
+        func coverageStatus(observations: Int, core: Bool) -> String {
+            if observations == 0 { return "empty" }
+            return core ? "full" : "partial"
+        }
+        if let b = presenceObservationBundle {
+            observationStatusCodes.append(
+                "presence.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreChannelCoverage))
+            observationStatusCodes.append(
+                "presence.observations:\(b.observations.count)")
+        }
+        if let b = decompositionObservationBundle {
+            observationStatusCodes.append(
+                "decomposition.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "decomposition.observations:" +
+                "\(b.observations.count)")
+        }
+        if let b = softHandObservationBundle {
+            observationStatusCodes.append(
+                "softHand.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "softHand.observations:\(b.observations.count)")
+        }
+        if let b = leaseLifeObservationBundle {
+            observationStatusCodes.append(
+                "leaseLife.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "leaseLife.observations:\(b.observations.count)")
+        }
+        if let b = hostConstitutionObservationBundle {
+            observationStatusCodes.append(
+                "hostConstitution.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "hostConstitution.observations:" +
+                "\(b.observations.count)")
+        }
+        if let b = thoughtFoldObservationBundle {
+            observationStatusCodes.append(
+                "thoughtFold.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "thoughtFold.observations:\(b.observations.count)")
+        }
+        if let b = neuralOrganObservationBundle {
+            observationStatusCodes.append(
+                "neuralOrgan.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "neuralOrgan.observations:\(b.observations.count)")
+        }
+        if let b = hippocampalMemoryObservationBundle {
+            observationStatusCodes.append(
+                "hippocampal.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "hippocampal.observations:" +
+                "\(b.observations.count)")
+        }
+        // M436 — reconciliation verdict emission. The verdict's
+        // findings encode the substrate's per-turn answer to
+        // "did all 13 expected layers participate, and did total
+        // budget stay under ceiling?" — pre-fix this answer
+        // existed as a library output but was never written to
+        // the ledger. Now it lands as four code prefixes:
+        //   reconciliation.severity:<halt|advisory|nominal>
+        //   reconciliation.findings:<count>
+        //   reconciliation.observed:<L1+L2+...>  (sorted)
+        //   reconciliation.missing:<layer>      (one per missing)
+        if let verdict = layerReconciliationVerdict,
+            let report = layerReconciliationReport
+        {
+            // Severity is the verdict's structural answer:
+            // clean / advisory / halt. The engine guarantees
+            // `severity == .clean` iff `findings.isEmpty`.
+            observationStatusCodes.append(
+                "reconciliation.severity:" +
+                "\(verdict.severity.rawValue)")
+            observationStatusCodes.append(
+                "reconciliation.findings:" +
+                "\(verdict.findings.count)")
+            // Observed layers — sorted raw values joined with
+            // '+' so audit walkers can grep "did L9 participate
+            // this turn" in O(log n) without re-parsing.
+            let observed = report.summaries
+                .map { $0.layer.rawValue }
+                .sorted()
+                .joined(separator: "+")
+            if !observed.isEmpty {
+                observationStatusCodes.append(
+                    "reconciliation.observed:\(observed)")
+            }
+            // Per-finding emission. Missing-layer findings
+            // surface as `reconciliation.missing:<layer>`;
+            // missing-core-coverage as
+            // `reconciliation.partial:<layer>`; budget overspend
+            // as `reconciliation.overspend:<observed>:<ceiling>`.
+            for finding in verdict.findings {
+                switch finding {
+                case .missingLayer(let layer):
+                    observationStatusCodes.append(
+                        "reconciliation.missing:" +
+                        "\(layer.rawValue)")
+                case .layerMissingCoreCoverage(let layer):
+                    observationStatusCodes.append(
+                        "reconciliation.partial:" +
+                        "\(layer.rawValue)")
+                case .budgetOverspend(let observed, let ceiling):
+                    observationStatusCodes.append(
+                        "reconciliation.overspend:" +
+                        "\(String(format: "%.3f", observed))" +
+                        ":\(String(format: "%.3f", ceiling))")
+                }
             }
         }
         let signalRefs = orderedReasonCodes(
