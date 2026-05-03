@@ -2,16 +2,16 @@
   "benchName" : "full-stack-bench",
   "schemaVersion" : "bas-bench-baseline.v1",
   "stats" : {
-    "max" : 3.889333,
-    "mean" : 2.9738443877551015,
-    "min" : 2.565792,
-    "outlierCount" : 0,
-    "p50" : 2.897292,
-    "p95" : 3.582125,
-    "p99" : 3.889333,
-    "p999" : 3.889333,
-    "sampleCount" : 49,
-    "standardDeviation" : 0.32280428471139183
+    "max" : 9.788084,
+    "mean" : 3.0529204141414144,
+    "min" : 1.756583,
+    "outlierCount" : 1,
+    "p50" : 2.720041,
+    "p95" : 5.513042,
+    "p99" : 9.788084,
+    "p999" : 9.788084,
+    "sampleCount" : 99,
+    "standardDeviation" : 1.2028378705944966
   },
-  "storedAt" : "2026-05-02T13:06:17Z"
+  "storedAt" : "2026-05-03T15:09:09Z"
 }

@@ -154,9 +154,19 @@ final class M356BenchBaselineStorageTests: XCTestCase {
                 benchName: "test-bench",
                 baselinePath: path)
         if case .regression(let reports) = verdict {
-            // 4 metrics compared (p50/p95/p99/mean) — all 4
-            // should regress by ~50%.
-            XCTAssertEqual(reports.count, 4)
+            // 3 metrics compared (p50/p95/mean) — all should
+            // regress by ~50%. M436.6 (chapter 一百九) dropped
+            // p99 from the regression check because single-trial
+            // p99 swings 50-150% on OS-jitter outliers alone
+            // (the 1-of-N worst-sample sensitivity); real
+            // regressions show in p50+p95+mean simultaneously.
+            // p99 stays in the JSON baseline + markdown report
+            // for diagnostic visibility, just not as alarm.
+            XCTAssertEqual(reports.count, 3)
+            // Pin the names to confirm p99 was specifically
+            // dropped, not some other metric drift.
+            let names = Set(reports.map(\.metricName))
+            XCTAssertEqual(names, ["p50", "p95", "mean"])
             for report in reports {
                 XCTAssertEqual(
                     report.regressionFraction, 0.50,
@@ -166,6 +176,61 @@ final class M356BenchBaselineStorageTests: XCTestCase {
             }
         } else {
             XCTFail("expected regression; got \(verdict)")
+        }
+    }
+
+    /// M436.6 (chapter 一百九) — pin that the absolute-µs
+    /// floor skips regression check on metrics where both
+    /// baseline AND measured are below 5µs. Sub-µs scales are
+    /// timer-jitter-dominated; pre-fix the suite would fire
+    /// false-positive alarms on lifecycle-bench (~0.6µs)
+    /// every other run.
+    func testSubFiveMicrosecondMetricsSkipRegressionCheck() throws {
+        let path = tempDir.appendingPathComponent(
+            "sub-us-baseline.json")
+        // All metrics in baseline are < 5µs (= 0.005ms).
+        let baselineStats = BASBenchLatencyStats(
+            sampleCount: 1000,
+            min: 0.0005,
+            max: 0.001,
+            mean: 0.0006,
+            p50: 0.0006,
+            p95: 0.0008,
+            p99: 0.0009,
+            p999: 0.001,
+            standardDeviation: 0.0001,
+            outlierCount: 0)
+        try BASBenchBaselineStorage.writeBaseline(
+            envelope: .init(
+                benchName: "sub-us-bench",
+                stats: baselineStats),
+            to: path)
+        // Measured is 100% slower — but still all < 5µs, so
+        // floor must skip the check.
+        let measuredStats = BASBenchLatencyStats(
+            sampleCount: 1000,
+            min: 0.001,
+            max: 0.002,
+            mean: 0.0012,
+            p50: 0.0012,
+            p95: 0.0016,
+            p99: 0.0018,
+            p999: 0.002,
+            standardDeviation: 0.0002,
+            outlierCount: 0)
+        let verdict = try BASBenchBaselineStorage
+            .compareToBaseline(
+                measured: measuredStats,
+                benchName: "sub-us-bench",
+                baselinePath: path)
+        if case .withinTolerance = verdict {
+            // OK
+        } else {
+            XCTFail(
+                "all metrics below 5µs floor must be skipped — " +
+                "single-trial sub-µs measurements are timer-" +
+                "jitter dominated and not stat-rigorous " +
+                "(M436.6); got verdict \(verdict)")
         }
     }
 

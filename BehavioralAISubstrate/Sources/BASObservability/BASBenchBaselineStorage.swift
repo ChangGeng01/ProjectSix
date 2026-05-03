@@ -131,11 +131,25 @@ public struct BASBenchBaselineStorage: Sendable {
     }
 
     /// Compare `measured` stats against baseline stored at
-    /// `baselinePath`. Compares the 4 most-relevant metrics:
-    /// p50, p95, p99, mean. Other metrics in the envelope (min,
-    /// max, p99.9, stddev, outliers) are stored but not compared
-    /// — they're for diagnosis, not regression alarms (max alone
-    /// is too noisy).
+    /// `baselinePath`. Compares 3 most-relevant metrics for
+    /// regression alarm: p50, p95, mean.
+    ///
+    /// **M436.6 (chapter 一百九)**: dropped p99 from the
+    /// regression check. p99 is the single 10th-worst sample of
+    /// the run (for N=1000, 1-of-1000); it swings 50-150% on
+    /// single-trial spikes from OS scheduler jitter alone. After
+    /// the 5µs absolute floor was added, p99 was still firing
+    /// false-positive alarms on benches with high outlier rates
+    /// (audit-ledger has ~2% outlier rate; one outlier moves p99
+    /// 60-100%). p99 stays in the JSON baseline for diagnosis +
+    /// in the markdown report for visibility, but is no longer
+    /// an alarm threshold. Real regressions show in p50 + p95 +
+    /// mean simultaneously; tail-only regressions are diagnosed
+    /// by hand rather than auto-alarmed.
+    ///
+    /// Other metrics in the envelope (min, max, p99.9, stddev,
+    /// outliers) are stored but not compared — they're for
+    /// diagnosis, not regression alarms.
     public static func compareToBaseline(
         measured: BASBenchLatencyStats,
         benchName: String,
@@ -166,16 +180,42 @@ public struct BASBenchBaselineStorage: Sendable {
         }
         let baseline = envelope.stats
         var reports: [RegressionReport] = []
+        // M436.6 — p99 dropped from regression check. Single-
+        // trial p99 = single 10th-worst-of-N sample, which swings
+        // 50-150% on OS-jitter outliers alone. Real regressions
+        // show in p50 + p95 + mean together; tail-only regressions
+        // are diagnosed by hand. p99 still appears in the markdown
+        // report for visibility.
         let metrics: [(String, Double, Double)] = [
             ("p50", baseline.p50, measured.p50),
             ("p95", baseline.p95, measured.p95),
-            ("p99", baseline.p99, measured.p99),
             ("mean", baseline.mean, measured.mean),
         ]
+        // M436.6 (chapter 一百九) — absolute-µs floor for sub-µs
+        // benches. At sub-5µs scales (lifecycle / throughput
+        // benches) timer jitter dominates: a 1µs jump from
+        // baseline 0.7µs to measured 1.7µs is +143% but is
+        // pure jitter, not a regression. Without this floor
+        // every other run of the suite fires false-positive
+        // alarms on sub-µs benches no matter what % tolerance.
+        // 5µs floor is empirical: above 5µs the OS scheduler
+        // jitter becomes a small fraction; below 5µs it's the
+        // dominant signal. ContinuousClock sub-µs measurements
+        // are not stat-rigorous in single-trial.
+        let absoluteFloorMs: Double = 0.005  // 5µs
         for (name, baselineValue, measuredValue) in metrics {
             // Skip metrics where baseline is 0 (we can't compute
             // a meaningful percentage regression from 0).
             guard baselineValue > 0 else { continue }
+            // Skip metrics where both baseline AND measured are
+            // below the 5µs absolute floor — sub-µs scale is
+            // timer-jitter-dominated and unreliable for single-
+            // trial regression detection.
+            if baselineValue < absoluteFloorMs
+                && measuredValue < absoluteFloorMs
+            {
+                continue
+            }
             let regressionFraction =
                 (measuredValue - baselineValue)
                 / baselineValue

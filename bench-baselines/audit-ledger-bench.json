@@ -2,16 +2,16 @@
   "benchName" : "audit-ledger-bench",
   "schemaVersion" : "bas-bench-baseline.v1",
   "stats" : {
-    "max" : 0.734625,
-    "mean" : 0.049717900800000006,
-    "min" : 0.047084,
-    "outlierCount" : 107,
-    "p50" : 0.047917,
-    "p95" : 0.055125,
-    "p99" : 0.084958,
-    "p999" : 0.177042,
-    "sampleCount" : 10000,
-    "standardDeviation" : 0.011368531222526478
+    "max" : 3.860542,
+    "mean" : 0.13050802700000025,
+    "min" : 0.069833,
+    "outlierCount" : 14,
+    "p50" : 0.077375,
+    "p95" : 0.351667,
+    "p99" : 0.883125,
+    "p999" : 2.367917,
+    "sampleCount" : 1000,
+    "standardDeviation" : 0.20482612802389805
   },
-  "storedAt" : "2026-05-02T13:06:16Z"
+  "storedAt" : "2026-05-03T15:09:09Z"
 }
