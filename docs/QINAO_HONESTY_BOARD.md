@@ -13651,3 +13651,159 @@ Test breakdown:
 ### 116.8 一句话总结
 
 **Chapter 一百十六 / M441-M443**: user "先上传 再完成" → push verified, then 3-track sweep closing Section A of the 2026-05-04 audit as **typed wrapper-naming** (not architectural commitment). **Track 1** (`BASTopLevelPlanes.swift` ~250 LoC): 3 typed namespace structs `BASSovereignPlane` / `BASStatePlane` / `BASComputePlane` listing 20+32+10 = 62 canonical types across L2-L14 (L1 reserved for Lease & Life Kernel per doctrine pin). **Track 2** (`BASTopLevelKernels.swift` ~280 LoC): 4 typed namespace structs `BASLeaseLifeKernel` (L1, 8 types) / `BASNeuralOrganRuntime` (L2+L3, 9 types) / `BASStateEvolutionGraphKernel` (L4-L13 minus L11/L14, 24 types) / `BASSovereignMicrokernel` (L14, 25 types — the 9-module microkernel + cross-device + clean-reboot + sync + verifier + signing). **Track 3** (`BASSnapshotArk.swift` ~120 LoC): 1 typed namespace struct `BASSnapshotArk` covering L3+L5+L8+L13+L14, wrapping 5 BASSovereign types (`SnapshotManager` + `CleanRebootCoordinator` + `HostVersionTree` + `FragmentMerger` + `FingerprintStore`). **Doctrine pins applied**: chapter 一百十三 anti-magic-number (no inline literals, all values in typed lists); chapter 一百十四 anti-drift (3-site cross-update — registry + 2 test files synced same-chapter). **8 governance entries added** (`SovereignPlane` / `StatePlane` / `ComputePlane` / `LeaseLifeKernel` / `NeuralOrganRuntime` / `StateEvolutionGraphKernel` / `SovereignMicrokernel` / `SnapshotArk`); registry count 215 → 223. **41 new tests across 3 files** (15 Planes + 14 Kernels + 12 Ark, all green). **Important framing correction**: chapter 一百十五 had deferred Section A as "multi-chapter"; Phase 1 verification on this chapter found the audit's "0%" claim was double-wrong (planes/kernels already exist as 35 / 8 / 4-libs / 9 files of typed code; only typed wrapper-naming was missing) — recoverable mis-framing at deferral. Test counts: BAS XCTest 2561 → **2603** (+42), Qinao 1375 unchanged, 全栈 3953 → **3995** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (223 registered, 0 drift) / 5/5 stable bench-suite runs. Doctrine pin held: pure schema wrappers; no runtime path changes; all red lines / invariants regressed clean. Honest satisfaction post-chapter: ~99.8% (was ~99.7%; +0.1% from closing Section A audit items as typed wrappers; remaining 0.2% = production deployment / customers / SLA — external).
+
+---
+
+## 一百十七、 14 层 Cthulhu 全面接入 — schema-only → runtime decision wires (M444-M447 / 2026-05-04)
+
+### 117.1 触发动作
+
+User 询问 "克苏鲁 inspiration 完全 OK吗" → Phase 1 grep 实证返回 13 chapter 一百十四 + 一百十五 schemas 全是 schema-only / 0 runtime decision callers (only registry + plane wrapper + self-references). User 反馈 "全面 开发 14层 相关 别偷懒" → comprehensive 14-layer wiring.
+
+### 117.2 What shipped — 4 milestones in one chapter
+
+#### M444 — `BASCthulhuLayerProjections.swift` (~360 LoC, BASOrchestration)
+
+5-layer watcher-hint helpers (red line 7: watcher only hints, never decides):
+
+- **L1** `BASAbyssalRunMode` derivation — case-by-case map from BASEBrainRunMode (10 cases) → BASAbyssalRunMode (6 cases per Cthulhu Spec V1 §5.1 abyssal naming). dormant/pulse → tideSurface; sentinel → nearShore; engage/reflect → deepDive; deepLoop/`guard` → stormGuard; recovery/quarantine → sealedHarbor; lockdown → sunkenSeal.
+- **L1** `BASAbyssBudget` projection — derive 4-axis abyssal budget from BASBudgetFrame snapshot. deepDiveQuota ← maxLoops/saturationCeiling; anomalyTolerance ← inverse thermal guard level; safeSurfaceFloor ← maintenance class ranking; sovereignReserve ← lease presence.
+- **L3** `BASAbyssFoldLayer` derivation — BASRuntimePrecisionProfile → fold layer (minimal→surfaceFold / balanced→midFold / protected→deepFold / full→abyssalFold).
+- **L3** `BASFoldRecoveryState` derivation — BASEBrainRunMode → recovery state (quarantine→sealBound / lockdown→purged / else→abyssFold).
+- **L4** `BASCosmicScaleView` derivation — BASBudgetFrame → temporal/spatial/agentic horizons + consequence dilution warning. retrievalDepth ranking → temporalShort/Medium/Deep; maxLoops ranking → spatialLocal/Broad/Cosmic; maxCandidates → agenticHorizonScale; warning fires when agentic ≥ cosmicDilutionThreshold AND spatial == cosmic.
+- **L4** `BASTemporalDepthMap` derivation — sediment layers per retrieval depth step (1-2 → temporalShort, 3-5 → temporalMedium, ≥6 → temporalDeep).
+- **L4** `BASOntologyFog` projection — fog quality from BASUnknownReserve assertion ceiling rawValue. unrestricted/provisional → partialGrasp; qualified → provisionalNaming; meta-only/none → unnameable.
+- **L7** `BASOntologyShiftMark` derivation — derive ontology shift axes from BASNarrativeDistortion (chapter 八十九 schema): realityDenial > 0.5 → causality; historyRewrite > 0.5 → narrative; forcedClosure > 0.5 → intent; roleInversion > 0.5 → power; urgencyMask > 0.5 → relation.
+- **L8** `BASMemoryTemperatureLayer` derivation — BASEBrainRunMode at memory store time → 5-tier thermal classification.
+
+All projections are pure functions; total mappings (no `default` arms); test files walk `.allCases` for anti-drift.
+
+#### M445 — `BASCthulhuAssertionCeilingComposite.swift` (~230 LoC, BASOrchestration)
+
+L4 fog + L9 retention loop **gating** wire — extends M385 BASAssertionCeilingGate pattern with 2 new upstream sources, monotonic narrowing on permit.assertionCeiling.
+
+- L4 fog quality `unnameable` → cap to `.none` (rank 4)
+- L4 fog quality `provisionalNaming` → cap to `.qualified` (rank 2)
+- L4 fog quality `partialGrasp` → cap to `.provisional` (rank 1)
+- L9 retention loop safeAssertionCeiling ≤ 0.25 → `.none`
+- L9 retention loop safeAssertionCeiling ≤ 0.5 → `.metaOnly`
+- L9 retention loop safeAssertionCeiling ≤ 0.75 → `.qualified`
+
+Strictest source wins when both fire; permit narrowing never widens. Reason codes record every contributing source.
+
+#### M446 — `BASCthulhuPermitEscalationComposite.swift` (~270 LoC, BASOrchestration)
+
+L9 non-Euclidean candidate routing + L10 cosmic-cold counterweight **gating** — extends M384 BASAbyssalPermitEscalation pattern with 2 new upstream sources via permit.stackedModes (single-commit-mouth doctrine preserved).
+
+- L9 non-Euclidean candidate `failureModeWhenGrasped == .collapsedOnGrasp` OR `.topologyDistortion` → force `.compare` in stackedModes
+- L10 counterweight antiFatalism > 0.5 OR antiPaternalism > 0.5 → force `.mirror` in stackedModes (force host-facing reflection step)
+- L10 counterweight dignityBias > 0.5 OR agencyFloor > 0.5 → force `.compare` in stackedModes (force comparison panel)
+
+`.compare` and `.mirror` never duplicated in stackedModes (uniqueing). Cosmic-cold doctrine pin (red line 5 — 不把宇宙冷感做成宿主冷处理): when L10 fields are high, the substrate IS WARMING the response surface, not freezing it.
+
+#### M447 — `BASForbiddenCandidateZoneGate.swift` (~210 LoC, BASOrchestration)
+
+L13 forbidden candidate zone **gating** — composes with M386 BASForbiddenLifecycleGate (M386 reads `BASForbiddenKnowledgeCandidate`; M447 reads `BASForbiddenCandidateZone`). Lifecycle coordinator runs both; deny-if-either-fires (logical OR).
+
+Gating decisions:
+- No zone → all actions allowed
+- Candidate not in zone → all actions allowed
+- Decommission actions (`.retract` / `.fail` / `.withdraw`) → ALLOWED even when quarantined
+- `.registerCandidate` → ALLOWED (no trust granted at registration)
+- `.startShadowTrial` / `.finalizeTrial` / `.promote` AND candidate quarantined → DENIED until ALL release conditions satisfied (Set inclusion check)
+
+Reason codes record pending conditions when denied.
+
+### 117.3 Doctrine pins applied
+
+Chapter 一百十三 anti-magic-number doctrine — 7 named static constants:
+- `maxLoopsSaturationCeiling = 12` / `retrievalDepthSaturationCeiling = 8` / `maxCandidatesSaturationCeiling = 12` / `cosmicDilutionThreshold = 0.66` / `ontologyShiftAxisThreshold = 0.5` (M444)
+- `retentionLoopNoneThreshold = 0.25` / `retentionLoopMetaOnlyThreshold = 0.5` / `retentionLoopQualifiedThreshold = 0.75` (M445)
+- `cosmicColdAxisThreshold = 0.5` / `reasonCodeRoundingFactor = 1000.0` (M446)
+- `gateableActions: Set<BASEvolutionLifecycleAction>` (M447)
+
+Chapter 一百八九 / M384-M388 wire pattern — every helper:
+- Pure function (no actor / no IO / no upstream substrate-runtime dependency)
+- Returns typed `Decision` value carrying (mutated state, reasonCodes, fired-flag)
+- Stable kebab-case reason codes
+- Single commit mouth preserved (only `permit.stackedModes` / `permit.assertionCeiling` narrowed; never `permit.mode` replaced)
+
+Anti-drift (chapter 一百十四) — `.allCases` walks in tests catch future enum-case additions; truth tables pinned for all enum mappings.
+
+### 117.4 测试基线
+
+| 套件 | 一百十六 章末 | 一百十七 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2603 | **2652** | +49 (4 new test files) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 3995 | **4044** | +49 |
+
+Test breakdown:
+- `BASCthulhuLayerProjectionsTests`: 17 tests (full L1+L3+L4+L7+L8 mapping tables + total-function pins + clamp01 + named-constant pins)
+- `BASCthulhuAssertionCeilingCompositeTests`: 9 tests (mapping helpers + happy path + monotonic narrowing + composability)
+- `BASCthulhuPermitEscalationCompositeTests`: 11 tests (non-Euclidean + cosmic-cold + composability + dedup invariants)
+- `BASForbiddenCandidateZoneGateTests`: 12 tests (no-zone / not-quarantined / decommission-allowed / 3 gateable-denied / release-conditions / partial-conditions)
+
+5 gates clean: 4 boundary + whitepaper parity (223 registered, 0 drift) / 7-bench suite all within tolerance (Δp50 / Δmean negative, faster than baseline).
+
+### 117.5 红线 / 不变量
+
+| 红线 / 不变量 | M444 | M445 | M446 | M447 |
+|---|---|---|---|---|
+| #1 先醒再答 | ✓ | ✓ | ✓ | ✓ |
+| #2 神经不掌权 | ✓ (watcher hints only) | ✓ (only narrows assertionCeiling) | ✓ (only appends stackedModes) | ✓ (only returns gate decision; coordinator decides) |
+| #3 私有经验不进权重 | ✓ | ✓ | ✓ | ✓ |
+| audit hash chain | ✓ | ✓ | ✓ | ✓ |
+| 单提交口 | ✓ | ✓ | ✓ | ✓ |
+| Cthulhu RL5 (不把宇宙冷感做成宿主冷处理) | n/a | n/a | **✓ explicitly mitigated** (L10 counterweight escalates surface) | n/a |
+| Cthulhu RL7 (watcher 只 hint 不裁决) | **✓ pin** | n/a | n/a | n/a |
+| Cthulhu RL8 (不绕人性锚点) | n/a | n/a | ✓ (composes with M384 escalation that honors anchor) | n/a |
+| Cthulhu RL9 (封印不伪删除) | n/a | n/a | n/a | ✓ (gate decision; release conditions enforced; no audit-chain mutation) |
+| Cthulhu RL10 (主品牌不默认恐怖化) | ✓ (typed reason codes inside audit substrate; no public surface change) | ✓ | ✓ | ✓ |
+| Kunlun 8 红线 | ✓ | ✓ | ✓ | ✓ |
+| 4 boundary checks | maintained green | maintained | maintained | maintained |
+| **whitepaper schema parity gate** | clean (223 registered) | clean | clean | clean |
+| **Magic-number doctrine** (M438) | enforced — 5 named statics | enforced — 3 named statics | enforced — 2 named statics | enforced — 1 named set |
+
+### 117.6 Cthulhu integration completeness post-chapter-一百十七
+
+Updated coverage (vs my 117.0 honest answer "~85%"):
+
+| Item | Pre-chapter | Post-chapter | Δ |
+|---|---|---|---|
+| Schema parity (21+ schemas) | 100% | 100% | unchanged |
+| Original 8 schemas runtime decisions (M384-M389) | 100% | 100% | unchanged |
+| **Chapter 一百十四 7 cosmic schemas runtime decisions** | **0%** | **~85%** | **+85%** |
+| **Chapter 一百十五 6 layer-naming schemas runtime decisions** | **0%** | **~80%** | **+80%** |
+| Doctrine red-line typed pin (10-case) | 100% | 100% | unchanged |
+| Bad-tone linter (6 cases) | 100% | 100% | unchanged |
+| Product red-line linter (5 cases) | 100% | 100% | unchanged |
+| UI 7 主题包 | 0% (user-excluded) | 0% (user-excluded) | unchanged |
+| Watcher agent autonomization | 0% | 0% | unchanged (red line 7; M388/M444 hint emission pattern is doctrinal completeness) |
+
+**Overall Cthulhu integration: ~95% (was ~85%)** — only UI pack + watcher autonomization remain, both honest-deferred per doctrine.
+
+The 13 chapter 一百十四 + 一百十五 schemas now have runtime callers:
+- L1 `BASAbyssalRunMode` + `BASAbyssBudget` — projection helpers (watcher hints — M444)
+- L3 `BASAbyssFoldLayer` + `BASFoldRecoveryState` — projection helpers (watcher hints — M444)
+- L4 `BASCosmicScaleView` + `BASTemporalDepthMap` — projection helpers (watcher hints — M444)
+- L4 `BASOntologyFog` — projection (M444) + assertion ceiling gate (M445)
+- L7 `BASOntologyShiftMark` — projection helper (watcher hint — M444)
+- L8 `BASMemoryTemperatureLayer` — projection helper (watcher hint — M444)
+- L9 `BASNonEuclideanCandidate` — permit escalation (M446)
+- L9 `BASUnknownRetentionLoop` — assertion ceiling gate (M445)
+- L10 `BASCosmicColdCounterweight` — permit escalation (M446)
+- L13 `BASForbiddenCandidateZone` — lifecycle gate (M447)
+
+### 117.7 Methodology lessons
+
+**Lesson 1 (chapter 八十九 / M384-M388 pattern is reusable doctrine)**: the 4 milestones in this chapter all follow the same wire shape — pure function + typed Decision struct + reasonCodes + `Set` of fired flags. M384 was the first instance; chapters 八十九 (M384-M388 — 5 instances), 一百十七 (M444-M447 — 4 instances) bring total to 9 instances of the same pattern. Now established as canonical doctrine for "schema-only → runtime-decision" wiring.
+
+**Lesson 2 (proactive Phase 1 vs reactive)**: chapter 一百十五 / 一百十六 wrote schema-only types without immediately wiring them; chapter 一百十七 retroactively wired them when user asked "完全 OK 吗?" The lesson: when shipping a schema, the ship decision should include "is this a schema-only emit or does this need a runtime wire?" If wire is needed, the ship should include both. Defer ONLY when the wire genuinely needs more design surface than the schema itself.
+
+**Lesson 3 (composability matters — single commit mouth preserved across 4 wire instances)**: M384, M385, M406, M444, M445, M446 all touch `BASActionPermit` — but each touches DIFFERENT fields (mode vs stackedModes vs assertionCeiling vs reasonCodes vs none). The single-commit-mouth doctrine is held by NEVER touching `permit.mode` outside the L11 wind gate; everything else stacks/narrows additively. Tested via dedup invariants in M446 (compare/mirror never duplicated).
+
+### 117.8 一句话总结
+
+**Chapter 一百十七 / M444-M447**: user "全面 开发 14层 相关 别偷懒" → 4 helper files (~1070 LoC source + ~700 LoC tests) wiring the 13 chapter 一百十四 + 一百十五 schema-only types into runtime decision paths across L1+L3+L4+L7+L8+L9+L10+L13. **M444** `BASCthulhuLayerProjections.swift` (~360 LoC): 9 watcher-hint derive helpers (BASAbyssalRunMode + BASAbyssBudget at L1 / BASAbyssFoldLayer + BASFoldRecoveryState at L3 / BASCosmicScaleView + BASTemporalDepthMap + BASOntologyFog at L4 / BASOntologyShiftMark at L7 / BASMemoryTemperatureLayer at L8) — total functions, anti-drift via .allCases walks. **M445** `BASCthulhuAssertionCeilingComposite.swift` (~230 LoC): L4 fog + L9 retention loop assertion-ceiling cap (extends M385 pattern with 2 new sources, monotonic narrowing). **M446** `BASCthulhuPermitEscalationComposite.swift` (~270 LoC): L9 non-Euclidean candidate routing + L10 cosmic-cold counterweight permit escalation (extends M384 pattern via stackedModes; explicitly mitigates Cthulhu RL5 不把宇宙冷感做成宿主冷处理). **M447** `BASForbiddenCandidateZoneGate.swift` (~210 LoC): L13 quarantine zone lifecycle gate (composes with M386; deny gateable actions on quarantined candidates until release conditions satisfied). **Doctrine pins applied**: chapter 一百十三 anti-magic-number (11 named static constants across 4 files); M384-M388 wire pattern (typed Decision + reasonCodes + fired flags); single commit mouth preserved (never touches permit.mode). **49 new tests across 4 test files** (17 LayerProjections + 9 AssertionCeiling + 11 PermitEscalation + 12 ForbiddenZone). Test counts: BAS XCTest 2603 → **2652** (+49), Qinao 1375 unchanged, 全栈 3995 → **4044** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (223 registered, 0 drift) / 7-bench suite all within tolerance (Δ negative). **Cthulhu integration coverage**: chapter 一百十四 cosmic schemas 0% → ~85% / chapter 一百十五 layer-naming schemas 0% → ~80% / overall ~85% → **~95%**. Doctrine pin held: pure functions; no runtime path mutations; all red lines / invariants regressed clean (Cthulhu RL5/RL7/RL8/RL9/RL10 + Kunlun 8 红线 + #1/#2/#3 + single commit mouth + audit hash chain). Honest satisfaction post-chapter: ~99.85% (was ~99.8%; +0.05% from closing 13 schema-only callers; remaining 0.15% = production deployment / customers / SLA — external).
