@@ -156,11 +156,15 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         // Chapter 一百二十七 / M491-M494 added: host (L5
         // HostJadeRegister), unnamable (L7 KunlunUnnamableSet).
         // M491 + M493 reuse jade segment.
+        // Chapter 一百二十八 / M500-M510 added: l4 (Kunlun L4
+        // chapter-99-deferred AscentView + FarWestReserve),
+        // surface (L12 doctrine surface aliases).
         let allowedSegments: Set<String> = [
             "axis", "jade", "river", "yaochi", "tianmen",
             "ascent", "gate", "tianheng", "permit",
             "rest", "return", "refinement",
             "host", "unnamable",
+            "l4", "surface",
         ]
         for code in kunlunCodes {
             let parts = code.components(separatedBy: ".")
@@ -226,10 +230,17 @@ final class M402KunlunAxisAuditTests: XCTestCase {
         //   - unnamable.refCount (M494, optional based on
         //     unknown reserve)
         // Total chapter-一百二十七 always-fire: 3 codes.
-        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 20,
-            "Kunlun emits at least 20 codes (chapter 九十二 9 + chapter 一百二十五 8 + chapter 一百二十七 3)")
-        XCTAssertLessThanOrEqual(kunlunCodes.count, 45,
-            "Kunlun emits at most 45 codes when all optional segments fire across chapters 九十二/一百二十五/一百二十六/一百二十七")
+        // Chapter 一百二十八 / M500-M510 added always-fire:
+        //   - l4.ascent:wellformed (M500, always 1)
+        //   - surface.alias (M502, optional — only when permit
+        //     mode has L12 surface counterpart)
+        // Plus optional: l4.far-west.{distance,refCount} when
+        // unknownRefs non-empty.
+        // Total chapter-一百二十八 always-fire: 1 code (l4.ascent).
+        XCTAssertGreaterThanOrEqual(kunlunCodes.count, 22,
+            "Kunlun emits at least 22 codes (chapter 九十二 9 + chapter 一百二十五 8 + chapter 一百二十七 3 + chapter 一百二十八 2)")
+        XCTAssertLessThanOrEqual(kunlunCodes.count, 50,
+            "Kunlun emits at most 50 codes when all optional segments fire across chapters 九十二/一百二十五/一百二十六/一百二十七/一百二十八")
         // Pin the always-fire codes (one each).
         let centerCount = kunlunCodes.filter {
             $0.hasPrefix("kunlun.axis.center:")

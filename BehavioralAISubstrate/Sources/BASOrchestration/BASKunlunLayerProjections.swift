@@ -44,6 +44,7 @@
 import Foundation
 import BASPolicy
 import BASRuntimeCore
+import BASWorldPrior
 
 // MARK: - BASKunlunLayerProjections
 
@@ -876,6 +877,154 @@ public extension BASKunlunLayerProjections {
                 preservationPolicy: preservationPolicy,
                 partialStructures: [],
                 safeLabels: [])
+        }
+    }
+
+    // MARK: - M500-M501 (chapter 一百二十八) — Kunlun L4
+    // chapter-99-deferred wires. AscentView + FarWestReserve
+    // schemas have lived as schema-only since chapter 九十九
+    // ("need synthetic ascent context or unknown-distance
+    // projection that the substrate doesn't yet expose"). The
+    // chapter 一百二十一+ BASUnknownReserve derive + chapter
+    // 一百二十六+ per-candidate ascent state make the data
+    // sources available, so the deferred criteria are met.
+
+    // MARK: - M500 BASKunlunAscentView derivation (L4)
+
+    /// Project an L4 Kunlun ascent view per turn from candidate
+    /// state. Mirrors chapter 99 `BASKunlunAxisView` audit-
+    /// emission pattern. `isWellFormed` invariant per §5.4
+    /// 不急着登顶 doctrine: the view MUST declare both
+    /// preconditions (`ascentConditions`) AND a way back
+    /// (`returnPaths`). The derive helper synthesizes both by
+    /// construction.
+    enum AscentView {
+        public static func derive(
+            candidateID: String?,
+            confidence: Double,
+            reversibility: Double,
+            riskLevel: BASBrainRiskLevel,
+            returnPathRefs: [String],
+            turnID: String
+        ) -> BASKunlunAscentView {
+            let conditions = ascentConditions(
+                confidence: confidence,
+                riskLevel: riskLevel)
+            let stops = stopPoints(
+                reversibility: reversibility)
+            return BASKunlunAscentView(
+                questionRef:
+                    candidateID ?? "no-candidate",
+                ascentConditions: conditions,
+                gateSequence: ["heaven-gate-1"],
+                stopPoints: stops,
+                returnPaths: returnPathRefs.isEmpty
+                    ? ["return-path:default"]
+                    : returnPathRefs)
+        }
+
+        private static func ascentConditions(
+            confidence: Double,
+            riskLevel: BASBrainRiskLevel
+        ) -> [String] {
+            var conditions: [String] = []
+            if confidence
+                >= ascentConfidenceCleanThreshold
+            {
+                conditions.append("axis-aligned")
+            }
+            if confidence
+                >= ascentConfidenceWithEvidenceThreshold
+            {
+                conditions.append("evidence-floor-met")
+            }
+            if riskLevel == .extreme {
+                conditions.append("host-explicit-consent")
+            }
+            // Always include at least one condition so
+            // isWellFormed is honored.
+            if conditions.isEmpty {
+                conditions.append("preconditions-pending")
+            }
+            return conditions
+        }
+
+        private static func stopPoints(
+            reversibility: Double
+        ) -> [String] {
+            reversibility
+                < ascentReversibilityStopThreshold
+                ? ["pre-commit", "pre-execute"]
+                : []
+        }
+    }
+
+    // MARK: - M501 BASKunlunFarWestReserve derivation (L4)
+
+    /// Project an L4 Kunlun far-west reserve per turn from the
+    /// unknown-reserve assertion ceiling. Returns nil when
+    /// `unknownRefs` is empty (mirrors M494
+    /// BASKunlunUnnamableSet preservation invariant — vacuous
+    /// reserves violate "用远方保留区承接未知").
+    enum FarWestReserve {
+        public static func derive(
+            unknownRefs: [String],
+            assertionCeiling: BASUnknownAssertionCeiling,
+            riskLevel: BASBrainRiskLevel,
+            turnID: String
+        ) -> BASKunlunFarWestReserve? {
+            guard !unknownRefs.isEmpty else { return nil }
+            let distance = distanceBand(
+                for: assertionCeiling)
+            let naming = namingStatus(for: assertionCeiling)
+            let safeRules = safeApproachRules(
+                for: riskLevel)
+            return BASKunlunFarWestReserve(
+                unknownRefs: unknownRefs,
+                distanceBand: distance,
+                namingStatus: naming,
+                safeApproachRules: safeRules)
+        }
+
+        private static func distanceBand(
+            for ceiling: BASUnknownAssertionCeiling
+        ) -> BASKunlunFarWestDistance {
+            switch ceiling {
+            case .unrestricted: return .adjacent
+            case .provisional: return .visible
+            case .qualified: return .farReach
+            case .metaOnly: return .beyondHorizon
+            case .none: return .sealedUnknown
+            }
+        }
+
+        private static func namingStatus(
+            for ceiling: BASUnknownAssertionCeiling
+        ) -> BASKunlunNamingStatus {
+            switch ceiling {
+            case .unrestricted, .provisional:
+                return .unattempted
+            case .qualified:
+                return .provisional
+            case .metaOnly, .none:
+                return .refused
+            }
+        }
+
+        private static func safeApproachRules(
+            for riskLevel: BASBrainRiskLevel
+        ) -> [String] {
+            switch riskLevel {
+            case .low, .medium:
+                return []
+            case .high:
+                return ["host-explicit-permission"]
+            case .extreme:
+                return [
+                    "host-explicit-permission",
+                    "no-time-pressure",
+                ]
+            }
         }
     }
 }

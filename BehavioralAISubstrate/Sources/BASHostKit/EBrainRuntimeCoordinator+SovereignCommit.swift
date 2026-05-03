@@ -630,7 +630,15 @@ extension BASEBrainRuntimeCoordinator {
         narrativeDistortionMap: BASNarrativeDistortionMap? = nil,
         sealedMemory: BASSealedMemory? = nil,
         humanAnchorProfile: BASHumanAnchorProfile? = nil,
-        abyssalOrganAlias: BASAbyssalOrganAlias? = nil
+        abyssalOrganAlias: BASAbyssalOrganAlias? = nil,
+        // M500-M501 (chapter 一百二十八) — Kunlun L4 chapter-99-
+        // deferred wires.
+        kunlunAscentView: BASKunlunAscentView? = nil,
+        kunlunFarWestReserve: BASKunlunFarWestReserve? = nil,
+        // M502-M510 (chapter 一百二十八) — L12 doctrine surface
+        // aliases.
+        cthulhuSurfaceAlias: BASCthulhuSurfaceAlias? = nil,
+        kunlunSurfaceAlias: BASKunlunSurfaceAlias? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -1512,6 +1520,36 @@ extension BASEBrainRuntimeCoordinator {
             observationStatusCodes.append(
                 "cthulhu.organ.alias:" +
                 "\(abyssalOrganAlias.rawValue)")
+        }
+        // M500-M501 (chapter 一百二十八) — Kunlun L4 chapter-99-
+        // deferred wires.
+        if let kunlunAscentView = kunlunAscentView {
+            // §5.4 不急着登顶 invariant pin: view must declare
+            // both preconditions AND a way back.
+            observationStatusCodes.append(
+                "kunlun.l4.ascent:" +
+                "\(kunlunAscentView.isWellFormed ? "wellformed" : "partial")")
+        }
+        if let kunlunFarWestReserve = kunlunFarWestReserve {
+            observationStatusCodes.append(
+                "kunlun.l4.far-west.distance:" +
+                "\(kunlunFarWestReserve.distanceBand.rawValue)")
+            observationStatusCodes.append(
+                "kunlun.l4.far-west.refCount:" +
+                "\(kunlunFarWestReserve.unknownRefs.count)")
+        }
+        // M502-M510 (chapter 一百二十八) — L12 doctrine surface
+        // aliases. Internal-only audit-walker vocabulary (red
+        // line 10 — public Qinao surface unchanged).
+        if let cthulhuSurfaceAlias = cthulhuSurfaceAlias {
+            observationStatusCodes.append(
+                "cthulhu.surface.alias:" +
+                "\(cthulhuSurfaceAlias.rawValue)")
+        }
+        if let kunlunSurfaceAlias = kunlunSurfaceAlias {
+            observationStatusCodes.append(
+                "kunlun.surface.alias:" +
+                "\(kunlunSurfaceAlias.rawValue)")
         }
         if let ontologyShiftMark = ontologyShiftMark,
            !ontologyShiftMark.observedShiftAxes.isEmpty

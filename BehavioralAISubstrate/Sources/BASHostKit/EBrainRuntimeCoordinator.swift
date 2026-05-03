@@ -1231,6 +1231,29 @@ public struct BASEBrainRuntimeCoordinator {
                 unknownRefs: unknownReserveForGate.unknownRefs,
                 preservationPolicy: "await-evidence",
                 turnID: derivedTurnID)
+        // M500-M501 (chapter 一百二十八) — Kunlun L4 chapter-99-
+        // deferred wires. Data sources now exist via chapter
+        // 一百二十一+ BASUnknownReserve + chapter 一百二十六+
+        // candidate state.
+        let firstCandidate = thoughtFrame.candidates.first
+        let returnPathRefsForAudit = thoughtFrame.candidates
+            .map { "return-path:\($0.candidateID)" }
+        let kunlunAscentViewForAudit = BASKunlunLayerProjections
+            .AscentView.derive(
+                candidateID: firstCandidate?.candidateID,
+                confidence: firstCandidate?.confidence ?? 0,
+                reversibility:
+                    firstCandidate?.reversibility ?? 1,
+                riskLevel: boundRiskCard.riskLevel,
+                returnPathRefs: returnPathRefsForAudit,
+                turnID: derivedTurnID)
+        let kunlunFarWestReserveForAudit =
+            BASKunlunLayerProjections.FarWestReserve.derive(
+                unknownRefs: unknownReserveForGate.unknownRefs,
+                assertionCeiling: unknownReserveForGate
+                    .assertionCeiling,
+                riskLevel: boundRiskCard.riskLevel,
+                turnID: derivedTurnID)
         // M495-M498 (chapter 一百二十七) — chapter 一百二十一
         // Cthulhu leftover production wires.
         let abyssalOrganAliasForAudit =
@@ -2081,6 +2104,21 @@ public struct BASEBrainRuntimeCoordinator {
                 turnID: derivedTurnID,
                 sessionID: derivedSessionID,
                 emittedAt: runtimeTrace.recordedAt)
+        // M502-M510 (chapter 一百二十八) — L12 doctrine surface
+        // aliases. Pure translation tables from final permit
+        // mode → BASSurfaceMode → doctrine-specific aliases.
+        // nil when permit mode has no L12 surface (e.g. .answer
+        // / .escalate proceed without surface rendering).
+        let surfaceModeForAudit = BASSurfaceModeFromPermit
+            .derive(from: boundActionPermit.mode)
+        let cthulhuSurfaceAliasForAudit =
+            surfaceModeForAudit.flatMap {
+                BASCthulhuSurfaceAlias.derive(from: $0)
+            }
+        let kunlunSurfaceAliasForAudit =
+            surfaceModeForAudit.map {
+                BASKunlunSurfaceAlias.derive(from: $0)
+            }
         // M436.4 (chapter 一百七 parameter-bundle refactor) —
         // populate the typed audit-observation bundle once and
         // pass to the bundle-form `buildSovereignAuditEntry`.
@@ -2196,7 +2234,18 @@ public struct BASEBrainRuntimeCoordinator {
             sealedMemory: sealedMemoryForAudit,
             humanAnchorProfile:
                 humanAnchorProfileForAudit,
-            abyssalOrganAlias: abyssalOrganAliasForAudit)
+            abyssalOrganAlias: abyssalOrganAliasForAudit,
+            // M500-M501 (chapter 一百二十八) — Kunlun L4
+            // chapter-99-deferred wires.
+            kunlunAscentView: kunlunAscentViewForAudit,
+            kunlunFarWestReserve:
+                kunlunFarWestReserveForAudit,
+            // M502-M510 (chapter 一百二十八) — L12 doctrine
+            // surface aliases.
+            cthulhuSurfaceAlias:
+                cthulhuSurfaceAliasForAudit,
+            kunlunSurfaceAlias:
+                kunlunSurfaceAliasForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,

@@ -265,6 +265,38 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     /// `cthulhu.organ.alias:<rawValue>` reason code.
     public var abyssalOrganAlias: BASAbyssalOrganAlias?
 
+    // MARK: - M500-M501 (chapter 一百二十八) — Kunlun L4
+    // chapter-99-deferred wires. Closes 2 schema-only Kunlun
+    // L4 schemas (BASKunlunAscentView + BASKunlunFarWestReserve)
+    // now that data sources are available (chapter 一百二十一+
+    // BASUnknownReserve + chapter 一百二十六+ candidate state).
+
+    /// L4 Kunlun ascent view (M500). When non-nil, emits
+    /// `kunlun.l4.ascent:wellformed|partial` reason code.
+    public var kunlunAscentView: BASKunlunAscentView?
+
+    /// L4 Kunlun far-west reserve (M501). When non-nil, emits
+    /// `kunlun.l4.far-west.{distance,refCount}` reason codes.
+    public var kunlunFarWestReserve: BASKunlunFarWestReserve?
+
+    // MARK: - M502-M510 (chapter 一百二十八) — L12 doctrine
+    // surface aliases. Typed translation tables (mirror M498
+    // BASAbyssalOrganAlias pattern) for Cthulhu + Kunlun
+    // doctrine-specific L12 surface naming.
+
+    /// L12 Cthulhu surface alias (M502). When non-nil, emits
+    /// `cthulhu.surface.alias:<rawValue>` reason code. nil when
+    /// permit mode has no L12 surface (e.g. .answer / .escalate)
+    /// OR when surface mode is .draftShell (Cthulhu has no
+    /// draftShell alias per §5.12).
+    public var cthulhuSurfaceAlias: BASCthulhuSurfaceAlias?
+
+    /// L12 Kunlun surface alias (M502). When non-nil, emits
+    /// `kunlun.surface.alias:<rawValue>` reason code. nil when
+    /// permit mode has no L12 surface (e.g. .answer / .escalate);
+    /// 1-to-1 mapping otherwise.
+    public var kunlunSurfaceAlias: BASKunlunSurfaceAlias?
+
     // MARK: - Construction
 
     /// All-fields-default constructor. Most callers use the
@@ -356,7 +388,11 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         narrativeDistortionMap: BASNarrativeDistortionMap? = nil,
         sealedMemory: BASSealedMemory? = nil,
         humanAnchorProfile: BASHumanAnchorProfile? = nil,
-        abyssalOrganAlias: BASAbyssalOrganAlias? = nil
+        abyssalOrganAlias: BASAbyssalOrganAlias? = nil,
+        kunlunAscentView: BASKunlunAscentView? = nil,
+        kunlunFarWestReserve: BASKunlunFarWestReserve? = nil,
+        cthulhuSurfaceAlias: BASCthulhuSurfaceAlias? = nil,
+        kunlunSurfaceAlias: BASKunlunSurfaceAlias? = nil
     ) {
         self.candidateObservationBundle =
             candidateObservationBundle
@@ -439,6 +475,10 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         self.sealedMemory = sealedMemory
         self.humanAnchorProfile = humanAnchorProfile
         self.abyssalOrganAlias = abyssalOrganAlias
+        self.kunlunAscentView = kunlunAscentView
+        self.kunlunFarWestReserve = kunlunFarWestReserve
+        self.cthulhuSurfaceAlias = cthulhuSurfaceAlias
+        self.kunlunSurfaceAlias = kunlunSurfaceAlias
     }
 
     /// All-default singleton. Used by callers that emit a
@@ -564,6 +604,14 @@ extension BASEBrainRuntimeCoordinator {
             humanAnchorProfile:
                 projections.humanAnchorProfile,
             abyssalOrganAlias:
-                projections.abyssalOrganAlias)
+                projections.abyssalOrganAlias,
+            kunlunAscentView:
+                projections.kunlunAscentView,
+            kunlunFarWestReserve:
+                projections.kunlunFarWestReserve,
+            cthulhuSurfaceAlias:
+                projections.cthulhuSurfaceAlias,
+            kunlunSurfaceAlias:
+                projections.kunlunSurfaceAlias)
     }
 }

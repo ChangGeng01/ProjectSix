@@ -14864,3 +14864,79 @@ Anti-drift M402 test update — `allowedSegments` extended +2: `{host, unnamable
 ### 127.6 一句话总结
 
 **Chapter 一百二十七 / M491-M499**: close out Stream A schemas production-wiring at 15/15 — 4 final Kunlun host+integrity wires + 4 chapter 一百二十一 Cthulhu leftover wires + hostFragility actual computation. **M491** L2 BASJadeFidelityMap derived from runMode + risk → 4-tier fidelity; `.contaminated` honors §3.2 audit invariant by construction. **M492** L5 BASHostJadeRegister synthesized once per turn with non-empty riverOriginRef (§5.5 provenance invariant honored by construction via sessionID anchor). **M493** L7 BASJadeMirrorDraft per turn with `noInducementFlag = true` (§5.7 玉鉴 invariant honored by construction). **M494** L7 BASKunlunUnnamableSet conditional emission (only when unknownRefs non-empty per §5.7 preservation invariant). **M495** L7 BASNarrativeDistortionMap derived from M316 distortion when material axis ≥ 0.5 threshold; per-candidate aggregate map. **M496** L8 BASSealedMemory bridges from BASMemoryTemperatureLayer (returns nil for tide-surface, otherwise typed seal class + disclosure mode + reentry conditions per §5.8). **M497** L5 BASHumanAnchorProfile per turn with default 3 dignity invariants + 2 exploitation guards + risk-derived sensitivity windows. **M498** L2 BASAbyssalOrganAlias per turn (run mode → 6 stable kebab-case aliases per Cthulhu Spec V1 §5.2). **M499** hostFragility computation: max(alienation, dignity, overwhelm) from anchor signal → folded back into pressure via `HostFragilityProjection.apply(...)` → `aggregateMagnitudeWithFragility` reflects spec-canonical 7-field mean. **6 new named static constants** (cumulative 26 across chapters 一百二十五/六/七). **11 new tests** in M491KunlunIntegrityCthulhuLeftoverWiringTests pinning: jade fidelity always emitted with valid level / contamination invariant honored / host register provenance honored / jade mirror noInducement honored / unnamable refCount parseable / distortion map paired emission / sealed memory paired emission / anchor profile default counts / organ alias one of 6 stable values / single commit mouth held / determinism. **M402 test update** in same chapter: allowedSegments +2 ({host, unnamable}); count range [17,30] → [20,45]. **Plan progress**: Stream A schemas wired **15/15 ✓** (100%); chapter 一百二十一 Cthulhu leftover wired **4/4 ✓** (100%); hostFragility derived from anchor signal ✓; plan total **31/31** (100% — Stream A complete). Test counts: BAS XCTest 2801 → **2812** (+11), Qinao 1375 unchanged, 全栈 4193 → **4204** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (241 registered, 0 drift). Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean.
+
+## 一百二十八、 14 层双极 doctrine 末端缺口收尾 — Kunlun L4 deferred + L12 doctrine surface aliases (M500-M510 / 2026-05-04)
+
+### 128.1 触发动作
+
+User asked "目前 default 14层 克苏鲁 昆仑 怎么样了"。My layer × doctrine matrix claimed Cthulhu 12/14 (missing L6, L12; partial L10) + Kunlun 12/14 (missing L4, L12). User said "plan" → entered plan mode.
+
+Phase 1 verification (2 parallel Explore agents) revised gap analysis:
+
+| Gap I claimed | Verified state |
+|---|---|
+| Cthulhu L6 missing | **Already wired** — `BASAnomalyTrace` (chapter 八十九 M317) is L6 临境 schema per whitepaper §5.6; emits `anomaly.*` codes |
+| Cthulhu L10 partial | **Fully wired** — `BASCosmicColdCounterweight` schema + `BASCthulhuPermitEscalation` emits `permit.escalated:cthulhu-cosmic-cold:*` codes |
+| Kunlun L4 missing | **Partial** — `BASKunlunAxisView` already wired (chapter 99); `BASKunlunAscentView` + `BASKunlunFarWestReserve` schema-only, deferred per chapter 99 ("need synthetic ascent context or unknown-distance projection") |
+| L12 doctrine surfaces | **Real gap** — `BASSurfaceMatrix` exists (chapter 八十八) doctrine-neutral; whitepaper §5.12 Kunlun specifies 5 doctrine-specific aliases + Cthulhu specifies 4 |
+
+Real remaining gaps post-verification: 2 items closed by chapter 一百二十八 — Kunlun L4 deferred wires (data sources now exist via chapter 一百二十一+ BASUnknownReserve + chapter 一百二十六+ candidate state) + L12 doctrine-specific surface aliases.
+
+### 128.2 Production wires shipped
+
+| M | Schema / Helper | Layer | Derive cadence | Audit codes |
+|---|---|---|---|---|
+| M500 | BASKunlunAscentView | L4 | per turn (always) | `kunlun.l4.ascent:wellformed\|partial` |
+| M501 | BASKunlunFarWestReserve | L4 | conditional (when unknownRefs non-empty) | `kunlun.l4.far-west.distance:<rawValue>` + `kunlun.l4.far-west.refCount:<int>` |
+| M502 | BASCthulhuSurfaceAlias enum | L12 | conditional (when permit mode has L12 surface AND mode != .draftShell) | `cthulhu.surface.alias:<rawValue>` (4 stable kebab-case values) |
+| M503-M510 | BASKunlunSurfaceAlias enum | L12 | conditional (when permit mode has L12 surface) | `kunlun.surface.alias:<rawValue>` (5 stable kebab-case values) |
+
+Plus 1 cross-cutting helper: `BASSurfaceModeFromPermit.derive(from: BASActionPermitMode) -> BASSurfaceMode?` — returns nil when permit mode has no L12 surface (.answer / .escalate / .localOnly).
+
+### 128.3 Doctrine pins applied
+
+Doctrine invariants typed-pinned via test:
+- **§5.4 不急着登顶 invariant** (`testKunlunL4AscentIsWellFormedByConstruction`): derive helper synthesizes both ascentConditions AND returnPaths so isWellFormed honored by construction
+- **§5.4 用远方保留区承接未知 invariant** (M501 derive returns nil for empty unknownRefs)
+- **§5.12 Cthulhu surface naming** (`testCthulhuSurfaceAliasCardinality` + `testCthulhuSurfaceAliasDeriveTable`): exactly 4 aliases per whitepaper; `.draftShell` returns nil (Cthulhu has no draftShell alias)
+- **§5.12 Kunlun surface naming** (`testKunlunSurfaceAliasCardinality` + `testKunlunSurfaceAliasDeriveTable`): exactly 5 aliases per whitepaper; 1-to-1 mapping with BASSurfaceMode
+- **Single commit mouth** (`testPermitModeNotMutatedByChapter128Wires`): permit.mode unchanged
+- **Red line 10 internal-only** (no public Qinao surface changes — aliases live in audit substrate vocabulary only)
+
+Anti-drift M402 test update — `allowedSegments` extended +2: `{l4, surface}`. Count range raised `[20,45]` → `[22,50]`.
+
+### 128.4 测试基线
+
+| 套件 | 一百二十七 章末 | 一百二十八 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2812 | **2823** | +11 (1 new test file: M500KunlunL4LeftoverSurfaceAliasWiringTests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4204 | **4215** | +11 |
+
+5 gates clean: 4 boundary + whitepaper parity (241 registered, 0 drift).
+
+### 128.5 14 层双极 doctrine 覆盖率（chapter 一百二十八 末态）
+
+| 层 | Cthulhu (向下) | Kunlun (向上) |
+|---|---|---|
+| L1 灯芯 | ✓ AbyssalRunMode + AbyssBudget | ✓ AscentLease |
+| L2 神经 | ✓ AbyssalOrganAlias | ✓ JadeFidelityMap |
+| L3 思考折页 | ✓ AbyssFoldLayer + FoldRecoveryState | ✓ JadeCasketSnapshot |
+| L4 世界先验 | ✓ CosmicScaleView + TemporalDepthMap + OntologyFog | **✓ AxisView + AscentView + FarWestReserve (chapter 一百二十八 closure)** |
+| L5 宿主宪法 | ✓ HumanAnchorSignal + HumanAnchorProfile | ✓ HostJadeRegister + KunlunAxis |
+| L6 临境 | ✓ AnomalyTrace (per §5.6) | ✓ AxisDeviation + GatePressure |
+| L7 镜刃 | ✓ NarrativeDistortion + AnomalyTrace + OntologyShiftMark + DistortionMap + UnknownSet | ✓ JadeMirrorDraft + KunlunUnnamableSet |
+| L8 海马井 | ✓ SealEnvelope + SealedMemory + MemoryTemperatureLayer | ✓ YaochiMemoryLayer + YaochiSanctumEntry |
+| L9 梦环 | ✓ AbyssalBranch + NonEuclideanCandidate + UnknownRetentionLoop | ✓ AscentBranch + RestStep + ReturnPath |
+| L10 三我庭 | ✓ CosmicColdCounterweight + escalation | ✓ TianhengProfile |
+| L11 风闸 | ✓ AbyssalPressure + PermitEscalation + hostFragility | ✓ JadePermitGrade + HeavenGatePermit |
+| **L12 柔手** | **✓ CthulhuSurfaceAlias (chapter 一百二十八 closure)** | **✓ KunlunSurfaceAlias (chapter 一百二十八 closure)** |
+| L13 进化炉 | ✓ ForbiddenKnowledgeCandidate + ForbiddenCandidateZone | ✓ JadeRefinementTicket |
+| L14 主权 | ✓ AuditLedger + AbyssalPermitEscalation | ✓ TianmenWarrant + GateDenialWrit + AxisView |
+
+**14/14 layers covered for both doctrines** ✓ (post-chapter-一百二十八)
+
+### 128.6 一句话总结
+
+**Chapter 一百二十八 / M500-M510**: close 14-layer doctrine coverage at 100% for both Cthulhu + Kunlun by wiring 2 chapter-99-deferred Kunlun L4 schemas (BASKunlunAscentView always-fire wellformed by construction per §5.4 不急着登顶 — synthesizes both ascentConditions AND returnPaths; BASKunlunFarWestReserve conditional emission with 5-tier distanceBand + 3-tier namingStatus mapped from BASUnknownAssertionCeiling) + adding 9 typed L12 doctrine-specific surface aliases (4 Cthulhu lighthouse-compare/tide-delay-packet/seal-notice/lantern-boundary-script per §5.12 + 5 Kunlun axis-compare-panel/jade-draft-shell/tianmen-second-check/yaochi-seal-notice/return-path-card per §5.12) via new file `BehavioralAISubstrate/Sources/BASOrchestration/BASSurfaceDoctrineAlias.swift` + `BASSurfaceModeFromPermit` permit-mode-to-surface-mode helper. **4 audit codes added**: kunlun.l4.ascent + kunlun.l4.far-west.{distance,refCount} + cthulhu.surface.alias + kunlun.surface.alias. **Wire integration**: BASAuditObservationProjections +4 fields + buildSovereignAuditEntry +4 params + 4 emission blocks; runTurn body +4 derive calls + projections= construction +4 fields. **Anti-drift M402 test update**: allowedSegments +2 ({l4, surface}); count range [20,45] → [22,50]. **11 new tests** in M500KunlunL4LeftoverSurfaceAliasWiringTests pinning all 4 wires + 2 enum cardinality + 2 derive tables + 1 permit mode helper + paired emission + permit.mode preservation + determinism. **14/14 layer coverage achieved** for both Cthulhu + Kunlun doctrines (post-chapter-一百二十八 末态). Test counts: BAS XCTest 2812 → **2823** (+11), Qinao 1375 unchanged, 全栈 4204 → **4215** / 0 failures / 5/5 gates clean. Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean (Kunlun §5.4 不急着登顶 + §5.4 用远方保留区承接未知 newly typed-pinned + §5.12 doctrine-specific surface naming for both doctrines + red line 10 internal-only audit-walker vocabulary preserved).
