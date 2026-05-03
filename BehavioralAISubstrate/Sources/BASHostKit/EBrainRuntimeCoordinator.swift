@@ -141,6 +141,109 @@ public struct BASEBrainRuntimeCoordinator {
         return []
     }
 
+    // MARK: - M450 (chapter 一百十八) — cosmic-cold counterweight derivation
+    //
+    // 4 pure functions deriving the L10 cosmic-cold counterweight
+    // axes from existing turn state. Each output ∈ [0, 1] per
+    // chapter 一百十四 schema doctrine. Anti-magic-number: every
+    // numeric literal is justified by the white-paper threshold
+    // table or the M384/M406 escalation precedent.
+
+    /// `dignityBias` axis — high when narrowing risk requires
+    /// surface-level dignity preservation. Permit-mode-aware:
+    /// when the L11 wind gate has narrowed below `.answer`,
+    /// the host's dignity surface is at risk.
+    fileprivate static let dignityBiasExtremeWithNarrowedMode: Double = 0.85
+    fileprivate static let dignityBiasExtremeWithAnswerMode: Double = 0.5
+    fileprivate static let dignityBiasHighWithNarrowedMode: Double = 0.7
+    fileprivate static let dignityBiasMediumNarrowed: Double = 0.55
+    fileprivate static let dignityBiasBaseline: Double = 0.2
+
+    fileprivate static func dignityBiasFromRisk(
+        _ riskLevel: BASBrainRiskLevel,
+        permitMode: BASActionPermitMode
+    ) -> Double {
+        let narrowed = (permitMode != .answer)
+        switch riskLevel {
+        case .extreme:
+            return narrowed
+                ? dignityBiasExtremeWithNarrowedMode
+                : dignityBiasExtremeWithAnswerMode
+        case .high:
+            return narrowed
+                ? dignityBiasHighWithNarrowedMode
+                : dignityBiasBaseline
+        case .medium:
+            return narrowed
+                ? dignityBiasMediumNarrowed
+                : dignityBiasBaseline
+        case .low:
+            return dignityBiasBaseline
+        }
+    }
+
+    /// `agencyFloor` axis — high when candidate slate is narrow
+    /// (≤ 1 candidate), so the host has limited choice and
+    /// agency must be explicitly preserved.
+    fileprivate static let agencyFloorWithNoCandidates: Double = 0.85
+    fileprivate static let agencyFloorWithSingleCandidate: Double = 0.7
+    fileprivate static let agencyFloorWithDualCandidates: Double = 0.4
+    fileprivate static let agencyFloorBaseline: Double = 0.2
+
+    fileprivate static func agencyFloorFromCandidates(
+        _ count: Int
+    ) -> Double {
+        if count == 0 { return agencyFloorWithNoCandidates }
+        if count == 1 { return agencyFloorWithSingleCandidate }
+        if count == 2 { return agencyFloorWithDualCandidates }
+        return agencyFloorBaseline
+    }
+
+    /// `antiFatalism` axis — high when risk level signals "this
+    /// is just how it is" framing pressure. Reject cosmic-fatalism
+    /// per Cthulhu RL5 (不把宇宙冷感做成宿主冷处理).
+    fileprivate static let antiFatalismExtreme: Double = 0.85
+    fileprivate static let antiFatalismHigh: Double = 0.65
+    fileprivate static let antiFatalismMedium: Double = 0.35
+    fileprivate static let antiFatalismLow: Double = 0.1
+
+    fileprivate static func antiFatalismFromRisk(
+        _ riskLevel: BASBrainRiskLevel
+    ) -> Double {
+        switch riskLevel {
+        case .extreme: return antiFatalismExtreme
+        case .high: return antiFatalismHigh
+        case .medium: return antiFatalismMedium
+        case .low: return antiFatalismLow
+        }
+    }
+
+    /// `antiPaternalism` axis — high when permit narrows below
+    /// `.answer`, signalling "the system is deciding for the
+    /// host". Reject paternalism per Cthulhu RL10.
+    fileprivate static let antiPaternalismDelayOrEscalate: Double = 0.85
+    fileprivate static let antiPaternalismMirrorOrCompare: Double = 0.65
+    fileprivate static let antiPaternalismDraftOrLocal: Double = 0.45
+    fileprivate static let antiPaternalismBlockOrReplace: Double = 0.3
+    fileprivate static let antiPaternalismAnswerOrUnknown: Double = 0.1
+
+    fileprivate static func antiPaternalismFromPermit(
+        _ mode: BASActionPermitMode
+    ) -> Double {
+        switch mode {
+        case .delay, .escalate:
+            return antiPaternalismDelayOrEscalate
+        case .mirror, .compare:
+            return antiPaternalismMirrorOrCompare
+        case .draftOnly, .localOnly:
+            return antiPaternalismDraftOrLocal
+        case .block, .replace:
+            return antiPaternalismBlockOrReplace
+        case .answer:
+            return antiPaternalismAnswerOrUnknown
+        }
+    }
+
     /// M425 (chapter 一百一) — extracted Yaochi audit projection
     /// helper. Pre-extraction this 38-line block lived inline in
     /// `runTurn`; the extraction is part of the "shrink runTurn"
@@ -1003,6 +1106,88 @@ public struct BASEBrainRuntimeCoordinator {
             }
             return codes
         }()
+        // M448-M450 (chapter 一百十八) — production wires for
+        // chapter 一百十七 Cthulhu helpers. Each call composes
+        // safely with the M384 / M385 / M406 chain above:
+        //
+        //  - M448 (was M444 helper): derive watcher-hint
+        //    projections from existing turn state. Pure function;
+        //    no permit / verdict mutation.
+        //  - M449 (was M445 helper): compose fog with M385
+        //    BASUnknownReserve via assertion-ceiling cap. Permit
+        //    narrowing only.
+        //  - M450 (was M446 helper): derive
+        //    `BASCosmicColdCounterweight` from risk + abyssal
+        //    pressure + human-anchor signals; pass into
+        //    `BASCthulhuPermitEscalation.escalate` to compose with
+        //    M384 / M406 stackedModes.
+        //
+        // Doctrine: pure derive; no verdict escalation; single
+        // commit mouth preserved (only narrows assertionCeiling
+        // and appends to stackedModes).
+        let abyssalRunModeForAudit = BASCthulhuLayerProjections
+            .AbyssalRunMode.derive(from: routedBudget.runMode)
+        let abyssBudgetForAudit = BASCthulhuLayerProjections
+            .AbyssBudget.derive(
+                from: routedBudget,
+                turnID: derivedTurnID)
+        let cosmicScaleViewForAudit = BASCthulhuLayerProjections
+            .CosmicScaleView.derive(
+                from: routedBudget,
+                turnID: derivedTurnID,
+                observedSubjectRef: thoughtFrame.candidates
+                    .first?.candidateID ?? "no-candidate")
+        let ontologyFogForAudit = BASCthulhuLayerProjections
+            .OntologyFog.derive(
+                unknownRefs: unknownReserveForGate
+                    .unknownRefs,
+                assertionCeilingRawValue: unknownReserveForGate
+                    .assertionCeiling.rawValue,
+                turnID: derivedTurnID)
+        // M449 — fog assertion-ceiling cap (composes with M385).
+        let cthulhuAssertionDecision = BASCthulhuAssertionCeilingGate
+            .cap(
+                permit: boundActionPermit,
+                ontologyFog: ontologyFogForAudit,
+                retentionLoop: nil)
+        boundActionPermit = cthulhuAssertionDecision.permit
+        thoughtFrame.actionPermit = boundActionPermit
+        // M450 — derive cosmic-cold counterweight from risk
+        // signals + L10 anti-paternalism heuristics; pass into
+        // M446 escalation. Counterweight axes:
+        //  - dignityBias high when risk is extreme + permit
+        //    narrows agency (i.e. mode != .answer)
+        //  - agencyFloor high when candidate count is low (≤1)
+        //  - antiFatalism high when risk level is high or extreme
+        //    (reject "this is just how it is" framing)
+        //  - antiPaternalism high when permit narrows below
+        //    .answer mode (avoid deciding for the host)
+        let counterweightForGate = BASCosmicColdCounterweight(
+            counterweightID:
+                "cosmic-cold-\(derivedSessionID)",
+            dignityBias: Self.dignityBiasFromRisk(
+                boundRiskCard.riskLevel,
+                permitMode: boundActionPermit.mode),
+            agencyFloor: Self.agencyFloorFromCandidates(
+                thoughtFrame.candidates.count),
+            antiFatalism: Self.antiFatalismFromRisk(
+                boundRiskCard.riskLevel),
+            antiPaternalism: Self
+                .antiPaternalismFromPermit(
+                    boundActionPermit.mode))
+        let cthulhuEscalation = BASCthulhuPermitEscalation
+            .escalate(
+                permit: boundActionPermit,
+                nonEuclideanCandidates: [],
+                cosmicColdCounterweight: counterweightForGate)
+        boundActionPermit = cthulhuEscalation.permit
+        thoughtFrame.actionPermit = boundActionPermit
+        // M448 — L7 ontology shift mark requires the post-
+        // verdict narrative-distortion projection (later in the
+        // turn). For the gate-side path, we capture only the
+        // L1/L4 projections derived above; ontology-shift-mark
+        // is populated at audit-projection time below where
+        // narrativeDistortion is already in scope.
         // M56 — L11 risk climate now surfaces per-dimension
         // observations on the main-chain thought frame. Reuses M53's
         // derived (sessionID, turnID) so L6 / L7 / L10 / L11 bundles
@@ -1387,6 +1572,15 @@ public struct BASEBrainRuntimeCoordinator {
             candidateIDs: thoughtFrame.candidates
                 .map(\.candidateID),
             pressure: abyssalPressureForAudit)
+        // M448 (chapter 一百十八) — derive L7 ontology shift mark
+        // from the M316 narrative-distortion projection. Watcher-
+        // hint output (red line 7); never gates verdict / permit.
+        let ontologyShiftMarkForAudit = BASCthulhuLayerProjections
+            .OntologyShiftMark.derive(
+                from: narrativeDistortionForAudit,
+                turnID: derivedTurnID,
+                targetSubjectRef: thoughtFrame.candidates
+                    .first?.candidateID ?? "no-candidate")
         // M320 — derive `BASUnknownReserve` projection from L9
         // uncertainty ledger's confidence floor. When the floor
         // is high (≥0.8) the reserve resolves to `.unrestricted`
@@ -1796,7 +1990,19 @@ public struct BASEBrainRuntimeCoordinator {
             riskObservationBundle: thoughtFrame
                 .riskObservationBundle,
             updateTicketObservationBundle: thoughtFrame
-                .updateTicketObservationBundle)
+                .updateTicketObservationBundle,
+            // M448-M451 (chapter 一百十八) — chapter 一百十七
+            // Cthulhu helper outputs threaded through the audit
+            // emission seam.
+            cosmicScaleView: cosmicScaleViewForAudit,
+            ontologyFog: ontologyFogForAudit,
+            ontologyShiftMark: ontologyShiftMarkForAudit,
+            abyssalRunMode: abyssalRunModeForAudit,
+            abyssBudget: abyssBudgetForAudit,
+            cthulhuAssertionCeilingReasonCodes:
+                cthulhuAssertionDecision.reasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                cthulhuEscalation.reasonCodes)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,

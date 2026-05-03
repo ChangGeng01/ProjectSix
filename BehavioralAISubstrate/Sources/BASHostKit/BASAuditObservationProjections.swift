@@ -126,6 +126,43 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     public var updateTicketObservationBundle:
         BASUpdateTicketObservationBundle?
 
+    // MARK: - M448-M451 — chapter 一百十八 Cthulhu 14-layer
+    // production wires (M444-M447 helpers driven from EBrainRuntime
+    // Coordinator.runTurn).
+
+    /// L4 cosmic-scale view derived from BASBudgetFrame (M444).
+    /// When non-nil, audit emission adds
+    /// `cthulhu.cosmic.scale:<temporal>:<spatial>` and
+    /// `cthulhu.cosmic.dilution:<bool>` reason codes.
+    public var cosmicScaleView: BASCosmicScaleView?
+
+    /// L4 ontology fog projection (M444). When non-nil, audit
+    /// emission adds `cthulhu.fog.quality:<rawValue>` reason code.
+    public var ontologyFog: BASOntologyFog?
+
+    /// L7 ontology shift mark derived from BASNarrativeDistortion
+    /// (M444). When non-nil + has axes, audit emission adds
+    /// `cthulhu.shift.axes:<sortedJoined>` and
+    /// `cthulhu.shift.confidence:<rounded>` reason codes.
+    public var ontologyShiftMark: BASOntologyShiftMark?
+
+    /// L1 abyssal run mode label (M444). When non-nil, audit
+    /// emission adds `cthulhu.runMode:<rawValue>` reason code.
+    public var abyssalRunMode: BASAbyssalRunMode?
+
+    /// L1 abyss budget readout (M444). When non-nil, audit
+    /// emission adds `cthulhu.budget.aggregateAvailability:<rounded>`
+    /// reason code.
+    public var abyssBudget: BASAbyssBudget?
+
+    /// Reason codes from the M445 `BASCthulhuAssertionCeilingGate
+    /// .cap(...)` decision. Empty when the gate did not fire.
+    public var cthulhuAssertionCeilingReasonCodes: [String]
+
+    /// Reason codes from the M446 `BASCthulhuPermitEscalation
+    /// .escalate(...)` decision. Empty when no escalation fired.
+    public var cthulhuPermitEscalationReasonCodes: [String]
+
     // MARK: - Construction
 
     /// All-fields-default constructor. Most callers use the
@@ -190,7 +227,14 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         riskObservationBundle:
             BASRiskObservationBundle? = nil,
         updateTicketObservationBundle:
-            BASUpdateTicketObservationBundle? = nil
+            BASUpdateTicketObservationBundle? = nil,
+        cosmicScaleView: BASCosmicScaleView? = nil,
+        ontologyFog: BASOntologyFog? = nil,
+        ontologyShiftMark: BASOntologyShiftMark? = nil,
+        abyssalRunMode: BASAbyssalRunMode? = nil,
+        abyssBudget: BASAbyssBudget? = nil,
+        cthulhuAssertionCeilingReasonCodes: [String] = [],
+        cthulhuPermitEscalationReasonCodes: [String] = []
     ) {
         self.candidateObservationBundle =
             candidateObservationBundle
@@ -244,6 +288,15 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         self.riskObservationBundle = riskObservationBundle
         self.updateTicketObservationBundle =
             updateTicketObservationBundle
+        self.cosmicScaleView = cosmicScaleView
+        self.ontologyFog = ontologyFog
+        self.ontologyShiftMark = ontologyShiftMark
+        self.abyssalRunMode = abyssalRunMode
+        self.abyssBudget = abyssBudget
+        self.cthulhuAssertionCeilingReasonCodes =
+            cthulhuAssertionCeilingReasonCodes
+        self.cthulhuPermitEscalationReasonCodes =
+            cthulhuPermitEscalationReasonCodes
     }
 
     /// All-default singleton. Used by callers that emit a
@@ -333,6 +386,15 @@ extension BASEBrainRuntimeCoordinator {
             riskObservationBundle:
                 projections.riskObservationBundle,
             updateTicketObservationBundle:
-                projections.updateTicketObservationBundle)
+                projections.updateTicketObservationBundle,
+            cosmicScaleView: projections.cosmicScaleView,
+            ontologyFog: projections.ontologyFog,
+            ontologyShiftMark: projections.ontologyShiftMark,
+            abyssalRunMode: projections.abyssalRunMode,
+            abyssBudget: projections.abyssBudget,
+            cthulhuAssertionCeilingReasonCodes:
+                projections.cthulhuAssertionCeilingReasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                projections.cthulhuPermitEscalationReasonCodes)
     }
 }

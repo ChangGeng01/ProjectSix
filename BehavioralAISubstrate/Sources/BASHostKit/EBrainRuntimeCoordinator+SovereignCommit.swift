@@ -584,7 +584,20 @@ extension BASEBrainRuntimeCoordinator {
         riskObservationBundle:
             BASRiskObservationBundle? = nil,
         updateTicketObservationBundle:
-            BASUpdateTicketObservationBundle? = nil
+            BASUpdateTicketObservationBundle? = nil,
+        // M448-M451 (chapter 一百十八) — production wires for
+        // chapter 一百十七 helpers (M444 BASCthulhuLayerProjections
+        // / M445 BASCthulhuAssertionCeilingGate / M446
+        // BASCthulhuPermitEscalation). Each optional projection
+        // adds typed `cthulhu.*` reason codes to `signalRefs`.
+        // Default `nil` keeps backward-compat for legacy callers.
+        cosmicScaleView: BASCosmicScaleView? = nil,
+        ontologyFog: BASOntologyFog? = nil,
+        ontologyShiftMark: BASOntologyShiftMark? = nil,
+        abyssalRunMode: BASAbyssalRunMode? = nil,
+        abyssBudget: BASAbyssBudget? = nil,
+        cthulhuAssertionCeilingReasonCodes: [String] = [],
+        cthulhuPermitEscalationReasonCodes: [String] = []
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -1240,6 +1253,54 @@ extension BASEBrainRuntimeCoordinator {
                 }
             }
         }
+        // M448-M451 (chapter 一百十八) — emit chapter 一百十七
+        // helper outputs as typed `cthulhu.*` reason codes.
+        // Doctrine pin: audit-only emission, no verdict
+        // escalation. Each block elides cleanly when the
+        // projection is `nil` / empty.
+        if let abyssalRunMode = abyssalRunMode {
+            observationStatusCodes.append(
+                "cthulhu.runMode:\(abyssalRunMode.rawValue)")
+        }
+        if let abyssBudget = abyssBudget {
+            observationStatusCodes.append(
+                "cthulhu.budget.aggregateAvailability:" +
+                String(format: "%.3f",
+                       abyssBudget.aggregateAvailability))
+        }
+        if let cosmicScaleView = cosmicScaleView {
+            observationStatusCodes.append(
+                "cthulhu.cosmic.scale:" +
+                "\(cosmicScaleView.temporalHorizon.rawValue):" +
+                "\(cosmicScaleView.spatialHorizon.rawValue)")
+            if cosmicScaleView.consequenceDilutionWarning {
+                observationStatusCodes.append(
+                    "cthulhu.cosmic.dilution:warning")
+            }
+        }
+        if let ontologyFog = ontologyFog {
+            observationStatusCodes.append(
+                "cthulhu.fog.quality:" +
+                ontologyFog.partialGraspQuality.rawValue)
+        }
+        if let ontologyShiftMark = ontologyShiftMark,
+           !ontologyShiftMark.observedShiftAxes.isEmpty
+        {
+            let axesJoined = ontologyShiftMark.observedShiftAxes
+                .map(\.rawValue)
+                .sorted()
+                .joined(separator: ",")
+            observationStatusCodes.append(
+                "cthulhu.shift.axes:\(axesJoined)")
+            observationStatusCodes.append(
+                "cthulhu.shift.confidence:" +
+                String(format: "%.3f",
+                       ontologyShiftMark.shiftConfidence))
+        }
+        observationStatusCodes.append(
+            contentsOf: cthulhuAssertionCeilingReasonCodes)
+        observationStatusCodes.append(
+            contentsOf: cthulhuPermitEscalationReasonCodes)
         let signalRefs = orderedReasonCodes(
             [
                 "risk:\(riskCard.riskLevel.rawValue)",
