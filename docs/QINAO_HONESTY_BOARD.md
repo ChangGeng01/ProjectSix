@@ -13005,3 +13005,77 @@ M437's schema bump approach: bump current to v2; add `supportedSchemaVersions: S
 ### 110.8 一句话总结
 
 **M437 closes chapter 一百九 forcing function + ships 4 self-* property integration validations (chapter 一百十 全面进化)**: User instruction "全面进化" triggered two parallel tracks. **A — Multi-trial baseline schema** extends `BASBenchBaselineEnvelope` to v2 with optional `MultiTrialStats` (trialCount + p50Mean/StdDev + p95Mean/StdDev + meanMean/StdDev); `compareToBaseline` uses `mean ± 2σ` check when `trialStats` non-nil (stat-rigorous, ~95% confidence detection of <10% regressions); falls through to %-tolerance for v1 baselines (backward-compat). 5 new tests pin v1↔v2 compat + 2σ branch + N≥2 invariant + multi-trial regression report tag `(mean+2σ)`. Closes chapter 一百九's explicit forcing function "single-trial detection floor at ~20% needs multi-trial baseline format extension." **B/C/D/E — Self-* integration tests** ship 6 tests in new `M437SelfStarPropertiesIntegrationTests.swift`: 自演化 L13 8-stage full-traversal + failure-path; 自修复 multi-trial stat library hand-computed pin; 自适应 abyssal pressure escalation + red-line-8 reserved-anchor suppression; 自调度 PowerClock state-machine cardinality pin. Honest scores updated: 自演化 70%→78%, 自修复 80%→82%, 自适应 75%→80%, 自调度 85% (unchanged behaviorally), 企业级 50%→52%. Net architectural enterprise-readiness 60%→62%. **Methodology lessons codified**: (1) forcing-function chains must be tracked as TODOs not aspirations; next perf chapter consumes most recent forcing function; (2) self-* property claims need at minimum one end-to-end integration test exercising the full property-defining sequence (unit-only is insufficient); (3) schema bump doctrine — bump current + supportedSchemaVersions Set + tag new code path so consumers distinguish + both forward-readable + backward-readable paths. Test counts: BAS XCTest 2484 → **2495** (+11), Qinao 1375 unchanged, 全栈 3876 → **3887** / 0 failures / 4/4 boundary clean / 5/5 stable bench-suite runs. Honest satisfaction post-chapter: ~97% (was 96%; +1% from closing forcing function + integration tests; remaining 3% = production deployment / customers / SLA — external to the codebase, not a code gap).
+
+## 一百十一、 续进化 — multi-trial capture mode + scripts drift sweep (M437.1 / 2026-05-04)
+
+### 111.1 触发动作
+
+User instruction "continue" (auto-mode) + chapter 一百十 forcing function chain — chapter 一百十 shipped multi-trial baseline schema v2 but bench suite still captured single-trial; the schema was unused in practice. M437.1 lands the capture-side counterpart so the schema becomes load-bearing rather than aspirational.
+
+Also broader sweep: chapter 一百九 found `run_bench_suite.sh` had `swift run` (debug) drift; sweep other scripts for similar pattern.
+
+### 111.2 Scripts drift sweep — clean
+
+`grep "swift run" scripts/*.sh` — only `run_bench_suite.sh` (already fixed chapter 一百九). Quality-gate scripts (`run_quality_gate.sh` / `run_quality_gate_double.sh` / `run_quality_gate_extreme.sh` / `run_quality_gate_x10.sh`) use `swift test` (debug-build is **correct for correctness tests** per the chapter 一百三 doctrine — debug build for tests, release build for perf benches). No further drift to fix.
+
+### 111.3 Multi-trial capture mode (M437.1)
+
+**`runFullStackBench` extended**: when `QINAO_BENCH_FULL_STACK_TRIALS=N` (N≥2) is set, the bench loops N times, collecting `BASBenchLatencyStats` from each trial, then aggregates via `BASBenchBaselineStorage.MultiTrialStats.summarize(...)`. The aggregated summary writes into the v2 baseline's `trialStats` field for stat-rigorous future regression detection.
+
+**`compareToBaselineIfConfigured` plumbed**: new optional `trialStats: BASBenchBaselineStorage.MultiTrialStats?` parameter. When non-nil, all 3 baseline-write paths (within-tolerance rewrite / regression rewrite / no-baseline fresh-write) propagate it into the `Envelope.trialStats` field. Default `nil` preserves single-trial backward-compat.
+
+**New convenience**: `compareToBaselineIfConfiguredMultiTrial(benchName:stats:trialStats:)` for callers that always pass trial stats.
+
+### 111.4 End-to-end verification
+
+**Capture path** (M437.1 multi-trial): `QINAO_BENCH_FULL_STACK_TRIALS=5` runs 5 trials, prints per-trial p50/p95/mean + multi-trial summary with mean ± std + writes v2 baseline. Verified by inspecting `bench-baselines/full-stack-bench.json`:
+```
+"trialStats" : {
+    "meanMean" : 2.012, "meanStdDev" : 0.141,
+    "p50Mean" : 1.950, "p50StdDev" : 0.118,
+    "p95Mean" : 2.640, "p95StdDev" : 0.320,
+    "trialCount" : 5
+}
+```
+
+**Compare path** (M437.1 mean ± 2σ): synthetic tight baseline (mean 1.0 ± 0.05) → current measurement (~2ms) fires regression with `(mean+2σ)` tag on all 3 metrics:
+```
+[baseline] REGRESSION (>25%):
+    p50 (mean+2σ): baseline 1.0000 → measured 1.2421 (+24.2%)
+    p95 (mean+2σ): baseline 1.2000 → measured 2.1285 (+77.4%)
+    mean (mean+2σ): baseline 1.0000 → measured 1.3554 (+35.5%)
+```
+
+The `(mean+2σ)` tag is the chapter 一百十 schema-bump doctrine in action — consumers can grep multi-trial verdicts vs %-tolerance verdicts.
+
+**Backward-compat**: 3/3 stable single-trial bench-suite runs pass (no `QINAO_BENCH_FULL_STACK_TRIALS` env var set → single-trial path).
+
+### 111.5 测试基线
+
+| 套件 | 一百十 章末 | 一百十一 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2495 | **2495** | unchanged (M437.1 is sample-host code) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3887 | **3887** | unchanged |
+
+3/3 single-trial bench-suite runs clean. Multi-trial capture verified end-to-end. 4/4 boundary checks clean.
+
+### 111.6 红线 / 不变量
+
+| 红线 / 不变量 | M437.1 |
+|---|---|
+| #1 / #2 / #3 | ✓ (no runtime path changes) |
+| audit hash chain | ✓ |
+| 单提交口 | ✓ |
+| Cthulhu / Kunlun 红线 | ✓ |
+| 4 boundary checks | maintained green |
+| **Forcing function chain** (chapter 一百十) | **closed** — multi-trial schema now has capture-side counterpart |
+
+### 111.7 Methodology lesson — schema vs capture lifecycle
+
+Chapter 一百十 shipped the schema; chapter 一百十一 shipped the capture-side that produces baselines in that schema. **Codified rule**: when introducing a new persistent schema, either ship the producer + consumer in the same chapter, OR explicitly track the producer as the next forcing function. Without that, the schema sits unused and the doctrine drifts back into "we have a feature but nobody uses it" — exactly the chapter 一百九 pattern in miniature.
+
+### 111.8 一句话总结
+
+**M437.1 closes the chapter 一百十 schema-vs-capture gap (chapter 一百十一)**: User "continue" triggered the natural follow-up — chapter 一百十 shipped the multi-trial baseline schema (v2 with optional `MultiTrialStats`) but the bench suite still captured single-trial. The schema was load-bearing on paper, aspirational in practice. M437.1 lands the capture-side: `QINAO_BENCH_FULL_STACK_TRIALS=N` (N≥2) runs N trials, aggregates via `MultiTrialStats.summarize`, writes v2 baseline with `trialStats`. The 2σ regression check (chapter 一百十's `(mean+2σ)` branch) now fires against real captures: verified end-to-end with synthetic tight baseline → ~2ms measurement fires regression with all 3 metrics tagged `(mean+2σ)`. **Scripts drift sweep**: `grep "swift run" scripts/*.sh` confirms only `run_bench_suite.sh` had the chapter 一百九 drift (already fixed); quality-gate scripts use `swift test` which is correct for correctness testing. **Backward-compat**: 3/3 stable single-trial bench-suite runs (no env var set → single-trial path; `Envelope.trialStats = nil` for v2 single-trial baselines is well-defined). **Methodology lesson codified**: when introducing a new persistent schema, ship producer + consumer same chapter OR track the producer as next forcing function (otherwise schema sits unused — chapter 一百九 pattern in miniature). Test counts unchanged: BAS 2495 / Qinao 1375 / 全栈 3887 / 0 failures / 4/4 boundary clean. Honest satisfaction post-chapter: ~98% (was 97%; +1% from closing chapter 一百十's forcing function with stat-rigorous capture; remaining 2% = production deployment / customers / SLA — external).

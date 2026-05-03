@@ -4843,11 +4843,30 @@ struct QinaoSampleHost {
             }
             return 5
         }()
+        // M437.1 (chapter 一百十一) — multi-trial capture mode.
+        // When `QINAO_BENCH_FULL_STACK_TRIALS=N` (N≥2) is set,
+        // run the bench N times and aggregate trial-level
+        // stats into a v2 baseline (chapter 一百十 schema). This
+        // consumes the M437 multi-trial baseline schema for
+        // stat-rigorous regression detection at <10% (vs the
+        // ~20% single-trial floor).
+        let trialCount: Int = {
+            if let raw = ProcessInfo.processInfo
+                .environment[
+                    "QINAO_BENCH_FULL_STACK_TRIALS"],
+               let n = Int(raw),
+               n >= 1
+            {
+                return n
+            }
+            return 1
+        }()
 
         print("""
             QinaoSampleHost --full-stack-bench (M359):
               drive BASHostRuntime.startSession × \(sessionCount)
-              sessions × \(turnCount) turns each.
+              sessions × \(turnCount) turns each \
+              \(trialCount > 1 ? "× \(trialCount) trials (M437.1)" : "").
 
               [scope] regression alarm, not an SLA. measures
               in-process BASHostRuntime startSession only —
@@ -4857,10 +4876,73 @@ struct QinaoSampleHost {
 
             """)
 
-        let outcome = await FullStackBench.run(
-            sessionCount: sessionCount,
-            turnCount: turnCount)
+        // Single-trial path (backward-compat): no aggregation,
+        // emit single-trial stats.
+        if trialCount == 1 {
+            let outcome = await FullStackBench.run(
+                sessionCount: sessionCount,
+                turnCount: turnCount)
+            emitFullStackBanner(outcome: outcome)
+            if let warmupOutcome = outcome.perSessionOutcome {
+                let stats = warmupOutcome.warm
+                    ?? warmupOutcome.combined
+                compareToBaselineIfConfigured(
+                    benchName: "full-stack-bench",
+                    stats: stats)
+            }
+            print(
+                "\n  ━━━ Demo complete — "
+                + "\(outcome.successfulSessions) sessions "
+                + "completed ━━━")
+            return
+        }
 
+        // Multi-trial path: run N trials, aggregate stats.
+        var trialStats: [BASBenchLatencyStats] = []
+        var lastSingleTrialStats: BASBenchLatencyStats?
+        for trial in 1 ... trialCount {
+            print("\n  ── trial \(trial)/\(trialCount) ──")
+            let outcome = await FullStackBench.run(
+                sessionCount: sessionCount,
+                turnCount: turnCount)
+            if let warmupOutcome = outcome.perSessionOutcome {
+                let stats = warmupOutcome.warm
+                    ?? warmupOutcome.combined
+                trialStats.append(stats)
+                lastSingleTrialStats = stats
+                print(
+                    "    p50=\(String(format: "%.4f", stats.p50)) ms "
+                    + "p95=\(String(format: "%.4f", stats.p95)) ms "
+                    + "mean=\(String(format: "%.4f", stats.mean)) ms")
+            }
+        }
+        guard
+            let summary = BASBenchBaselineStorage
+                .MultiTrialStats.summarize(trials: trialStats),
+            let lastStats = lastSingleTrialStats
+        else {
+            print("  multi-trial: no successful trials")
+            return
+        }
+        print("""
+
+              ── multi-trial summary (N=\(summary.trialCount), M437.1) ──
+                p50:  mean \(String(format: "%.4f", summary.p50Mean)) ± \(String(format: "%.4f", summary.p50StdDev)) ms
+                p95:  mean \(String(format: "%.4f", summary.p95Mean)) ± \(String(format: "%.4f", summary.p95StdDev)) ms
+                mean: mean \(String(format: "%.4f", summary.meanMean)) ± \(String(format: "%.4f", summary.meanStdDev)) ms
+            """)
+        compareToBaselineIfConfiguredMultiTrial(
+            benchName: "full-stack-bench",
+            stats: lastStats,
+            trialStats: summary)
+        print(
+            "\n  ━━━ Multi-trial complete — "
+            + "\(trialCount) trials aggregated ━━━")
+    }
+
+    private static func emitFullStackBanner(
+        outcome: FullStackBench.Outcome
+    ) {
         print("""
 
             ━━━ M359 full-stack-bench (\(outcome.sessionCount) sessions × \(outcome.turnsPerSession) turns) ━━━
@@ -4875,17 +4957,9 @@ struct QinaoSampleHost {
             {
                 print("  " + line)
             }
-            // Compare warm distribution (or combined fallback)
-            // to baseline. Cold spike doesn't pollute baseline.
-            let stats = warmupOutcome.warm
-                ?? warmupOutcome.combined
-            compareToBaselineIfConfigured(
-                benchName: "full-stack-bench",
-                stats: stats)
         } else {
             print("  no successful sessions to measure")
         }
-        print("\n  ━━━ Demo complete — \(outcome.successfulSessions) sessions completed ━━━")
     }
 
     // MARK: - M363 lifecycle-bench
@@ -5254,10 +5328,31 @@ struct QinaoSampleHost {
     /// Returns true if no regression (or no baseline configured)
     /// — runners may use the bool to decide their own exit
     /// status.
+    /// M437.1 (chapter 一百十一) — multi-trial variant of
+    /// `compareToBaselineIfConfigured`. When the bench was
+    /// captured across N≥2 trials, this function passes the
+    /// aggregated `MultiTrialStats` summary into the baseline
+    /// write/compare path so the v2 schema's
+    /// `mean ± 2σ` regression check can fire on <10%
+    /// regressions (vs the ~20% single-trial floor).
+    @discardableResult
+    private static func compareToBaselineIfConfiguredMultiTrial(
+        benchName: String,
+        stats: BASBenchLatencyStats,
+        trialStats: BASBenchBaselineStorage.MultiTrialStats
+    ) -> Bool {
+        compareToBaselineIfConfigured(
+            benchName: benchName,
+            stats: stats,
+            trialStats: trialStats)
+    }
+
     @discardableResult
     private static func compareToBaselineIfConfigured(
         benchName: String,
-        stats: BASBenchLatencyStats
+        stats: BASBenchLatencyStats,
+        trialStats: BASBenchBaselineStorage.MultiTrialStats?
+            = nil
     ) -> Bool {
         guard let baselineDirPath = ProcessInfo
             .processInfo.environment[
@@ -5296,28 +5391,29 @@ struct QinaoSampleHost {
                 if ProcessInfo.processInfo.environment[
                     "QINAO_BENCH_REWRITE_BASELINE"] == "1"
                 {
+                    // M437.1 — write v2 envelope with optional
+                    // trialStats. When trialStats is non-nil,
+                    // the v2 baseline carries multi-trial mean
+                    // ± std for stat-rigorous future regression
+                    // checks.
                     let envelope = BASBenchBaselineStorage
                         .Envelope(
                             benchName: benchName,
-                            stats: stats)
+                            stats: stats,
+                            trialStats: trialStats)
                     do {
                         try BASBenchBaselineStorage
                             .writeBaseline(
                                 envelope: envelope,
                                 to: baselineURL)
+                        let trialNote = trialStats != nil
+                            ? " (multi-trial v2)"
+                            : ""
                         print("  [baseline] " +
                               "QINAO_BENCH_REWRITE_BASELINE=1 — " +
-                              "refreshed baseline at \(baselineURL.path)")
+                              "refreshed baseline at \(baselineURL.path)" +
+                              trialNote)
                     } catch {
-                        // Chapter 九十一.5 honesty correction:
-                        // baseline-write failures go to stderr
-                        // (not stdout) so CI / wrapper scripts
-                        // can grep them as a signal even when
-                        // the regression-alarm verdict is
-                        // unchanged. The function still returns
-                        // true (preserving regression-alarm vs
-                        // infrastructure-error separation) but
-                        // the failure is loud.
                         let msg = "  [baseline] failed to refresh: \(error)\n"
                         FileHandle.standardError.write(
                             Data(msg.utf8))
@@ -5347,15 +5443,20 @@ struct QinaoSampleHost {
                     let envelope = BASBenchBaselineStorage
                         .Envelope(
                             benchName: benchName,
-                            stats: stats)
+                            stats: stats,
+                            trialStats: trialStats)
                     do {
                         try BASBenchBaselineStorage
                             .writeBaseline(
                                 envelope: envelope,
                                 to: baselineURL)
+                        let trialNote = trialStats != nil
+                            ? " (multi-trial v2)"
+                            : ""
                         print("\n  [baseline] " +
                               "QINAO_BENCH_REWRITE_BASELINE=1 — " +
-                              "overwrote prior baseline at \(baselineURL.path)")
+                              "overwrote prior baseline at \(baselineURL.path)" +
+                              trialNote)
                         return true
                     } catch {
                         // Chapter 九十一.5 honesty correction:
@@ -5382,7 +5483,8 @@ struct QinaoSampleHost {
                     let envelope = BASBenchBaselineStorage
                         .Envelope(
                             benchName: benchName,
-                            stats: stats)
+                            stats: stats,
+                            trialStats: trialStats)
                     do {
                         try FileManager.default
                             .createDirectory(
@@ -5392,7 +5494,10 @@ struct QinaoSampleHost {
                             .writeBaseline(
                                 envelope: envelope,
                                 to: baselineURL)
-                        print("\n  [baseline] no prior baseline; wrote fresh one to \(baselineURL.path)")
+                        let trialNote = trialStats != nil
+                            ? " (multi-trial v2)"
+                            : ""
+                        print("\n  [baseline] no prior baseline; wrote fresh one to \(baselineURL.path)\(trialNote)")
                     } catch {
                         // Chapter 九十一.5 honesty correction:
                         // baseline-write failures go to stderr
