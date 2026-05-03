@@ -14940,3 +14940,57 @@ Anti-drift M402 test update — `allowedSegments` extended +2: `{l4, surface}`. 
 ### 128.6 一句话总结
 
 **Chapter 一百二十八 / M500-M510**: close 14-layer doctrine coverage at 100% for both Cthulhu + Kunlun by wiring 2 chapter-99-deferred Kunlun L4 schemas (BASKunlunAscentView always-fire wellformed by construction per §5.4 不急着登顶 — synthesizes both ascentConditions AND returnPaths; BASKunlunFarWestReserve conditional emission with 5-tier distanceBand + 3-tier namingStatus mapped from BASUnknownAssertionCeiling) + adding 9 typed L12 doctrine-specific surface aliases (4 Cthulhu lighthouse-compare/tide-delay-packet/seal-notice/lantern-boundary-script per §5.12 + 5 Kunlun axis-compare-panel/jade-draft-shell/tianmen-second-check/yaochi-seal-notice/return-path-card per §5.12) via new file `BehavioralAISubstrate/Sources/BASOrchestration/BASSurfaceDoctrineAlias.swift` + `BASSurfaceModeFromPermit` permit-mode-to-surface-mode helper. **4 audit codes added**: kunlun.l4.ascent + kunlun.l4.far-west.{distance,refCount} + cthulhu.surface.alias + kunlun.surface.alias. **Wire integration**: BASAuditObservationProjections +4 fields + buildSovereignAuditEntry +4 params + 4 emission blocks; runTurn body +4 derive calls + projections= construction +4 fields. **Anti-drift M402 test update**: allowedSegments +2 ({l4, surface}); count range [20,45] → [22,50]. **11 new tests** in M500KunlunL4LeftoverSurfaceAliasWiringTests pinning all 4 wires + 2 enum cardinality + 2 derive tables + 1 permit mode helper + paired emission + permit.mode preservation + determinism. **14/14 layer coverage achieved** for both Cthulhu + Kunlun doctrines (post-chapter-一百二十八 末态). Test counts: BAS XCTest 2812 → **2823** (+11), Qinao 1375 unchanged, 全栈 4204 → **4215** / 0 failures / 5/5 gates clean. Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean (Kunlun §5.4 不急着登顶 + §5.4 用远方保留区承接未知 newly typed-pinned + §5.12 doctrine-specific surface naming for both doctrines + red line 10 internal-only audit-walker vocabulary preserved).
+
+## 一百二十九、 chapter 一百二十八 deep review — 1 real bug fixed (M511 doctrine invariant) + 1 fix-pin (M512) (2026-05-04)
+
+### 129.1 触发动作
+
+User requested "deep test" / "deep review" after chapter 一百二十八 ship. Applied chapter 67 / 81 / 91.5 / 103 deep-review pattern: multi-run sweep + agent code review + human-grep verify + fix verified bugs + report doc.
+
+### 129.2 Deep review pipeline results
+
+**Multi-run BAS sweep**: 3/3 stable × 2823 tests / 0 failures / no flakes.
+
+**Agent code review** (general-purpose agent on 6 chapter-128 source/test files): 0 CRITICAL / 0 HIGH / 2 MEDIUM / 4 LOW findings.
+
+**Human-grep verification** (~83% FP rate, consistent with chapter 67/81 baseline):
+
+| # | Severity | Verdict | Action |
+|---|---|---|---|
+| 1 | MEDIUM | **REAL** — `BASKunlunFarWestReserve.derive` produces doctrine-violating reserve when ceiling=`.qualified` (`namingStatus=.provisional` violates `isHonoringDoctrine` invariant) | M511 fix |
+| 2 | MEDIUM | FP — reversibility default 1.0 is internal-only, no AscentView leak | document |
+| 3 | LOW | FP — agent self-confirmed `permit.mode` is doctrine-correct (single commit mouth) | none |
+| 4 | LOW | FP — NaN compares fail-safe to "preconditions-pending" | document |
+| 5 | LOW | VALID — asymmetric `.draftShell` test gap | M512 fix-pin |
+| 6 | LOW | FP — determinism filter loose but currently safe | none |
+
+### 129.3 Fixes shipped
+
+**M511 — `BASKunlunFarWestReserve.derive` namingStatus mapping fix**:
+
+`BehavioralAISubstrate/Sources/BASOrchestration/BASKunlunLayerProjections.swift` — change `.qualified → .provisional` to `.qualified → .unattempted`. `.provisional` namingStatus violated `isHonoringDoctrine` invariant which requires `namingStatus ∈ {.unattempted, .refused}` OR `distanceBand == .sealedUnknown`. Per §5.4 "用远方保留区承接未知，不急着命名" doctrine, `.qualified` ceiling means "we have caveats but haven't given up on naming" — doctrinally closer to `.unattempted` (held without commitment) than `.provisional` (actively naming). The `distanceBand=.farReach` already encodes the qualification.
+
+**M511 fix-pin test** (`testFarWestReserveAlwaysHonorsDoctrine`): walks all 5 BASUnknownAssertionCeiling cases + asserts `isHonoringDoctrine` holds for every emitted reserve. Catches future regressions where ceilings get `.provisional` namingStatus.
+
+**M512 fix-pin test** (`testCthulhuDraftShellAsymmetricEmission`): positive-asymmetry pin per finding #5 — when Kunlun emits `jadeDraftShell`, Cthulhu MUST emit nil (per §5.12 4-vs-5 doctrine). Catches drift in inverse direction.
+
+### 129.4 Methodology lessons codified
+
+1. **Schema invariants need derive-helper coverage** — chapter 一百二十四 BASKunlunHostIntegrityTests checked `isHonoringDoctrine` for direct construction but not derive-helper output. Chapter 一百二十八 inherited this gap. M511 fix-pin closes it.
+2. **Asymmetric mapping tables need bidirectional pins** — testing one direction (Kunlun emits → Cthulhu may not) doesn't catch reverse drift (Cthulhu adding `.draftShell` arm but Kunlun forgetting). M512 adds inverse-direction pin.
+3. **Agent FP rate consistent** — ~83% FP, within chapter 67/81/91.5/103 baseline ~75-80%. Methodology proven: never trust agent finding without grep-verification + doctrine cross-check.
+
+### 129.5 测试基线
+
+| 套件 | 一百二十八 章末 | 一百二十九 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2823 | **2825** | +2 (M511 + M512 fix-pin tests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4215 | **4217** | +2 |
+
+5 gates clean: 4 boundary + whitepaper parity (241 registered, 0 drift).
+
+### 129.6 一句话总结
+
+**Chapter 一百二十九**: deep review of chapter 一百二十八 (M500-M510). Multi-run sweep clean (3/3 × 2823 tests). Agent code review surfaced 6 findings (0 CRITICAL / 0 HIGH / 2 MEDIUM / 4 LOW) with ~83% FP rate consistent with chapter 67/81/91.5/103 baseline. **1 REAL bug fixed (M511)**: `BASKunlunFarWestReserve.derive` for ceiling=`.qualified` mapped namingStatus to `.provisional` which violated `isHonoringDoctrine` invariant — fix maps `.qualified → .unattempted` per §5.4 "不急着命名" doctrine. **2 fix-pin tests added**: `testFarWestReserveAlwaysHonorsDoctrine` (M511 — walks all 5 BASUnknownAssertionCeiling cases asserting isHonoringDoctrine), `testCthulhuDraftShellAsymmetricEmission` (M512 — positive-asymmetry pin per §5.12 4-vs-5 alias doctrine). Deep review report: `docs/QINAO_M500_TO_M510_DEEP_REVIEW_2026-05-04.md`. Test counts: BAS XCTest 2823 → **2825** (+2 fix-pins), Qinao 1375 unchanged, 全栈 4215 → **4217** / 0 failures / 5/5 gates clean. Doctrine pin held: M511 fix doesn't change runtime behavior for non-`.qualified` paths (backward-compat preserved); §5.4 reserve-doctrine + §5.12 surface-asymmetry doctrine newly typed-pinned via fix-pins. Methodology lessons codified in deep review report (§Methodology) — schema invariants need derive-helper coverage, asymmetric mappings need bidirectional pins, agent FP rate stays ~80%.

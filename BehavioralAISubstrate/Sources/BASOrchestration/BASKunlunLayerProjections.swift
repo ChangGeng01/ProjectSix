@@ -1001,11 +1001,21 @@ public extension BASKunlunLayerProjections {
         private static func namingStatus(
             for ceiling: BASUnknownAssertionCeiling
         ) -> BASKunlunNamingStatus {
+            // Doctrine pin per §5.4 "不急着命名" + chapter 一百
+            // 二十八 deep-review finding #1 (M511 fix): `.qualified`
+            // ceiling MUST map to `.unattempted` (not `.provisional`)
+            // because `BASKunlunFarWestReserve.isHonoringDoctrine`
+            // requires namingStatus ∈ {.unattempted, .refused} OR
+            // distanceBand == .sealedUnknown. Mapping `.qualified` to
+            // `.provisional` produced doctrine-violating reserves.
+            // The `.qualified` ceiling means "we have caveats but
+            // haven't given up on naming" — this is doctrinally
+            // closer to "not yet attempted" than "in-progress
+            // naming", so .unattempted is the correct mapping per
+            // §5.4 reserve-doctrine.
             switch ceiling {
-            case .unrestricted, .provisional:
+            case .unrestricted, .provisional, .qualified:
                 return .unattempted
-            case .qualified:
-                return .provisional
             case .metaOnly, .none:
                 return .refused
             }

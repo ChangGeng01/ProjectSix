@@ -4,6 +4,7 @@ import XCTest
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASWorldPrior
 
 /// M500-M510 (chapter 一百二十八) — pin the chapter 99 deferred
 /// Kunlun L4 wires (BASKunlunAscentView + BASKunlunFarWestReserve)
@@ -288,7 +289,59 @@ final class M500KunlunL4LeftoverSurfaceAliasWiringTests:
             "single commit mouth — chapter 一百二十八 wires don't replace permit.mode")
     }
 
-    // MARK: - 10. Determinism
+    // MARK: - 10. M511 fix-pin (deep-review finding #1)
+
+    /// **Doctrine pin** — `BASKunlunFarWestReserve.isHonoring
+    /// Doctrine` MUST hold for every emitted reserve. Pre-M511 the
+    /// `.qualified` ceiling mapped `namingStatus` to `.provisional`
+    /// which violated the schema invariant
+    /// (`namingStatus ∈ {.unattempted, .refused}` OR
+    /// `distanceBand == .sealedUnknown`). M511 fixes the mapping
+    /// to `.unattempted`. This test pins the invariant by directly
+    /// invoking the derive helper for every BASUnknownAssertion
+    /// Ceiling case + asserting isHonoringDoctrine.
+    func testFarWestReserveAlwaysHonorsDoctrine() throws {
+        let allCeilings: [BASUnknownAssertionCeiling] = [
+            .unrestricted, .provisional, .qualified,
+            .metaOnly, .none,
+        ]
+        for ceiling in allCeilings {
+            let reserve = try XCTUnwrap(
+                BASKunlunLayerProjections
+                    .FarWestReserve.derive(
+                        unknownRefs: ["unknown-1"],
+                        assertionCeiling: ceiling,
+                        riskLevel: .medium,
+                        turnID: "test-\(ceiling.rawValue)"),
+                "reserve must be non-nil with non-empty unknownRefs (ceiling=\(ceiling.rawValue))")
+            XCTAssertTrue(
+                reserve.isHonoringDoctrine,
+                "FarWestReserve must honor §5.4 doctrine for ceiling=\(ceiling.rawValue) (chapter 一百二十八 M511 fix)")
+        }
+    }
+
+    // MARK: - 11. M511 fix-pin (deep-review finding #5)
+
+    /// **§5.12 asymmetric pin** — when Kunlun emits
+    /// `jadeDraftShell`, Cthulhu MUST emit nothing (Cthulhu
+    /// doctrine has no draftShell alias per whitepaper §5.12).
+    /// This pin catches drift in the inverse direction (someone
+    /// adding a draftShell case to Cthulhu but forgetting Kunlun
+    /// would still pass the existing pair-together test).
+    func testCthulhuDraftShellAsymmetricEmission() {
+        let kunlunForDraftShell = BASKunlunSurfaceAlias.derive(
+            from: .draftShell)
+        XCTAssertEqual(
+            kunlunForDraftShell, .jadeDraftShell,
+            "Kunlun must alias .draftShell → .jadeDraftShell")
+        let cthulhuForDraftShell = BASCthulhuSurfaceAlias.derive(
+            from: .draftShell)
+        XCTAssertNil(
+            cthulhuForDraftShell,
+            "Cthulhu doctrine has no draftShell alias per §5.12 — \\(cthulhu.draftShell) MUST be nil")
+    }
+
+    // MARK: - 12. Determinism
 
     func testChapter128CodesAreDeterministic() throws {
         let turn1 = try runTurn()
