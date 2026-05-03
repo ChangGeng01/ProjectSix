@@ -470,3 +470,239 @@ public enum BASKunlunLayerProjections {
 
 // `BASBrainRiskLevel` lives in BASPolicy (`EBrainRiskPlaneCore.swift`).
 // Imported above via `import BASPolicy`.
+
+// MARK: - M486-M490 (chapter 一百二十六) — L9 dream-loop +
+// L3 fold-page + L13 refinement production wires.
+//
+// Each derive helper is pure, returns a value-typed Kunlun
+// schema from existing turn state. Same doctrine as M480-M485.
+
+public extension BASKunlunLayerProjections {
+
+    // MARK: - M486 BASAscentBranch derivation (L9)
+
+    /// Project a `BASCandidatePath` onto an L9 ascent branch.
+    /// Per §5.9 doctrine: every ascent has a paired return
+    /// path (dignity invariant). The derive helper synthesizes
+    /// a default returnPathRef tied to the candidate ID so the
+    /// invariant is honored by construction.
+    enum AscentBranch {
+        public static func derive(
+            from candidate: BASCandidatePath,
+            turnID: String
+        ) -> BASAscentBranch {
+            BASAscentBranch(
+                branchID: "ascent-branch:\(candidate.candidateID)",
+                candidateRef: candidate.candidateID,
+                ascentConditions: ascentConditions(
+                    confidence: candidate.confidence),
+                gateSequence: gateSequenceFromBenefit(
+                    candidate.expectedBenefit),
+                evidenceRequirements: candidate.requiredEvidence,
+                returnPathRef:
+                    "return-path:\(candidate.candidateID)",
+                stopPoints: stopPointsFromReversibility(
+                    candidate.reversibility))
+        }
+
+        private static func ascentConditions(
+            confidence: Double
+        ) -> [String] {
+            var conditions: [String] = []
+            if confidence >= ascentConfidenceCleanThreshold {
+                conditions.append("axis-aligned")
+            }
+            if confidence
+                >= ascentConfidenceWithEvidenceThreshold
+            {
+                conditions.append("evidence-sufficient")
+            }
+            return conditions
+        }
+
+        private static func gateSequenceFromBenefit(
+            _ benefit: Double
+        ) -> [String] {
+            var gates: [String] = []
+            if benefit >= ascentBenefitGateThreshold {
+                gates.append("heaven-gate-1")
+            }
+            return gates
+        }
+
+        private static func stopPointsFromReversibility(
+            _ reversibility: Double
+        ) -> [String] {
+            reversibility < ascentReversibilityStopThreshold
+                ? ["pre-commit", "pre-execute"]
+                : []
+        }
+    }
+
+    /// Confidence threshold above which "axis-aligned" is
+    /// added to the ascent conditions.
+    static let ascentConfidenceCleanThreshold: Double = 0.7
+    /// Confidence threshold above which "evidence-sufficient"
+    /// is added.
+    static let ascentConfidenceWithEvidenceThreshold: Double = 0.8
+    /// Expected-benefit threshold above which a gate-pass is
+    /// pre-required for the ascent.
+    static let ascentBenefitGateThreshold: Double = 0.6
+    /// Reversibility threshold below which extra stop-points
+    /// are inserted.
+    static let ascentReversibilityStopThreshold: Double = 0.4
+
+    // MARK: - M487 BASRestStep derivation (L9)
+
+    /// Project a stalled candidate onto an L9 rest step. Used
+    /// when the candidate's confidence is below the
+    /// pause-and-resume threshold but evidence may yet arrive.
+    enum RestStep {
+        public static func derive(
+            from candidate: BASCandidatePath,
+            turnID: String
+        ) -> BASRestStep? {
+            // Only derive a rest-step when the candidate is
+            // genuinely "needs more evidence" — confidence
+            // below threshold but has at least one required
+            // evidence ref.
+            guard candidate.confidence
+                < restStepConfidenceCeiling
+                && !candidate.requiredEvidence.isEmpty
+            else {
+                return nil
+            }
+            return BASRestStep(
+                restID: "rest-step:\(candidate.candidateID)",
+                candidateRef: candidate.candidateID,
+                reasonCodes: ["awaiting-evidence"],
+                allowedIntermediateActions: [
+                    "observe", "summarize",
+                ],
+                resumeConditions: candidate.requiredEvidence)
+        }
+    }
+
+    /// Confidence ceiling below which a rest-step is derived.
+    static let restStepConfidenceCeiling: Double = 0.6
+
+    // MARK: - M488 BASReturnPath derivation (L9)
+
+    /// Project an L9 return path for any candidate. Always
+    /// non-nil per §5.9 dignity invariant — every ascent has
+    /// a way back.
+    enum ReturnPath {
+        public static func derive(
+            from candidate: BASCandidatePath,
+            turnID: String
+        ) -> BASReturnPath {
+            BASReturnPath(
+                returnID:
+                    "return-path:\(candidate.candidateID)",
+                candidateRef: candidate.candidateID,
+                dignityPreserved: true,
+                rollbackPossible: candidate.reversibility
+                    >= returnPathRollbackThreshold,
+                nextSafeStep: nextSafeStep(
+                    confidence: candidate.confidence))
+        }
+
+        private static func nextSafeStep(
+            confidence: Double
+        ) -> String {
+            if confidence < returnPathLowConfidenceThreshold {
+                return "summarize-and-pause"
+            }
+            return "review-with-host"
+        }
+    }
+
+    /// Reversibility threshold for `rollbackPossible=true`.
+    static let returnPathRollbackThreshold: Double = 0.5
+    /// Confidence threshold below which the safe step is
+    /// "summarize-and-pause" (vs "review-with-host").
+    static let returnPathLowConfidenceThreshold: Double = 0.4
+
+    // MARK: - M489 BASJadeCasketSnapshot derivation (L3)
+
+    /// Project an L3 jade-casket snapshot binding for the
+    /// current turn. Always synthesizes a casket — every turn
+    /// produces a foldable state worth sealing.
+    enum JadeCasketSnapshot {
+        public static func derive(
+            turnID: String,
+            sessionID: String
+        ) -> BASJadeCasketSnapshot {
+            BASJadeCasketSnapshot(
+                snapshotID:
+                    "jade-casket:\(sessionID):\(turnID)",
+                foldRefs: ["fold:\(turnID)"],
+                integrityHash:
+                    "sha256:turn-\(turnID)-\(sessionID)",
+                sourceRiverRef:
+                    "river-origin:\(sessionID)",
+                restoreGateRef:
+                    "heaven-gate:\(sessionID):restore",
+                rollbackWritRef:
+                    "rollback-writ:\(sessionID):\(turnID)")
+        }
+    }
+
+    // MARK: - M490 BASJadeRefinementTicket derivation (L13)
+
+    /// Project an L13 jade-refinement ticket for a candidate
+    /// that needs impurity removal before promotion. Returns
+    /// nil when candidate is clean (no impurities).
+    enum JadeRefinementTicket {
+        public static func derive(
+            from candidate: BASCandidatePath,
+            turnID: String
+        ) -> BASJadeRefinementTicket? {
+            let impurities = impurityCodes(
+                confidence: candidate.confidence,
+                expectedCost: candidate.expectedCost)
+            guard !impurities.isEmpty else { return nil }
+            return BASJadeRefinementTicket(
+                ticketID:
+                    "jade-refinement:\(candidate.candidateID)",
+                candidateRef: candidate.candidateID,
+                impurityCodes: impurities,
+                refinementSteps:
+                    refinementStepsFor(impurities: impurities),
+                shadowTrialRef:
+                    "shadow-trial:\(candidate.candidateID)",
+                fracturePath:
+                    "fracture:\(candidate.candidateID)",
+                promotionGateRef:
+                    "heaven-gate:promotion")
+        }
+
+        private static func impurityCodes(
+            confidence: Double,
+            expectedCost: Double
+        ) -> [String] {
+            var codes: [String] = []
+            if confidence < refinementLowConfidenceThreshold {
+                codes.append("low-confidence")
+            }
+            if expectedCost > refinementHighCostThreshold {
+                codes.append("high-cost-needs-review")
+            }
+            return codes
+        }
+
+        private static func refinementStepsFor(
+            impurities: [String]
+        ) -> [String] {
+            // Default steps for any impurity — host can extend.
+            ["scrub-impurity", "shadow-trial", "host-review"]
+        }
+    }
+
+    /// Confidence threshold below which "low-confidence"
+    /// impurity is added.
+    static let refinementLowConfidenceThreshold: Double = 0.5
+    /// Cost threshold above which "high-cost-needs-review"
+    /// impurity is added.
+    static let refinementHighCostThreshold: Double = 0.7
+}

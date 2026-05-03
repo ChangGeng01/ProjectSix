@@ -14729,3 +14729,70 @@ Remaining production wires (13 schemas across 2 chapters):
 ### 125.7 一句话总结
 
 **Chapter 一百二十五 / M480-M485**: user "packages 先不做 补齐 14层 缺口 优先" → Stream B paused, orphan SDK files cleaned; production-wire 6 chapter-一百二十二/三 Kunlun schemas into `EBrainRuntimeCoordinator.runTurn` audit-projection seam. **M480** L1 `BASAscentLease` derived from `BASBudgetFrame` (mirror of chapter 一百十七 BASAbyssBudget pattern); always fires `kunlun.ascent.mode/budget/return-required`. **M481** L6 `BASAxisDeviation` derived from risk level — 4-tier mapping (.low=0.2 / .medium=0.5 / .high=0.7 / .extreme=0.9); emits deviationScore + (when non-low) deviationCodes. **M482** L6 `BASGatePressure` derived from risk + permit; gateRequired fires when urgency ≥ 0.7 OR permit.requireSecondCheck. **M483** L8 `BASYaochiMemoryLayer` derived from runMode — emits sanctumPolicy only for guard/recovery/quarantine/lockdown modes. **M484** L10 `BASTianhengProfile` derived from risk + permit mode; emits centerBias + dignityFloor (and imbalanceCodes when narrowed); 11 named static constants pin clamping doctrine. **M485** L11 `BASJadePermitGrade` derived from action permit; clarity/reversibility/provenance scores from permit shape; emits gates-required when any score < 0.5. **Anti-drift M402 test update** in same chapter — `allowedSegments` extended {axis, jade, river, yaochi, tianmen} → {..., ascent, gate, tianheng, permit}; count range [9,17] → [17,30]. **10 new production-wiring tests** in `M480KunlunProductionWiringTests` (mirror M448 chapter 一百十八 pattern): every kunlun.* always emits / parseable / bounded; permit.mode preserved (single commit mouth pin); 回峰条件 always fires; determinism. Test counts: BAS XCTest 2784 → **2794** (+10), Qinao 1375 unchanged, 全栈 4176 → **4186** / 0 failures / 5 gates clean. Stream A schemas production-wired: 0/15 → **6/15** (40%); plan total progress 15/31 → **21/31** (68%). Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean.
+
+---
+
+## 一百二十六、 Kunlun production wires β — L9 dream-loop + L3 jade-casket + L13 refinement (M486-M490 / 2026-05-04)
+
+### 126.1 触发动作
+
+User "continue" auto mode after chapter 一百二十五. Per plan: ship next 5 production wires for chapter 一百二十二/三 schemas. Continues "补齐 14层 缺口 优先" priority.
+
+### 126.2 What shipped — 5 production wires
+
+Extension to `BASKunlunLayerProjections.swift` (~210 LoC added):
+
+| M | Schema | Layer | Derive source | Audit reason codes |
+|---|---|---|---|---|
+| M486 | BASAscentBranch | L9 | per BASCandidatePath | `kunlun.ascent.branchCount:<int>` + `kunlun.ascent.dignity-violation:<count>` (0 expected per derive doctrine) |
+| M487 | BASRestStep | L9 | per low-confidence candidate with required-evidence | `kunlun.rest.stepCount:<int>` (only when emitted) |
+| M488 | BASReturnPath | L9 | per BASCandidatePath (always) | `kunlun.return.pathCount:<int>` + `kunlun.return.dignityHonored:<int>` |
+| M489 | BASJadeCasketSnapshot | L3 | per turn (always) | `kunlun.jade.casket:canonical|defective` |
+| M490 | BASJadeRefinementTicket | L13 | per impure candidate (low confidence OR high cost) | `kunlun.refinement.ticketCount:<int>` + `kunlun.refinement.noGhost:<int>` |
+
+### 126.3 Doctrine pins applied
+
+Anti-magic-number — 6 new named static constants:
+- `ascentConfidenceCleanThreshold = 0.7`
+- `ascentConfidenceWithEvidenceThreshold = 0.8`
+- `ascentBenefitGateThreshold = 0.6`
+- `ascentReversibilityStopThreshold = 0.4`
+- `restStepConfidenceCeiling = 0.6`
+- `returnPathRollbackThreshold = 0.5`
+- `returnPathLowConfidenceThreshold = 0.4`
+- `refinementLowConfidenceThreshold = 0.5`
+- `refinementHighCostThreshold = 0.7`
+
+(Total cumulative chapter 一百二十五 + 一百二十六: 11 + 9 = 20 named statics for Kunlun production wires)
+
+Doctrine invariants typed-pinned via test:
+- **§5.9 dignity invariant** (`testAscentDignityInvariantNeverViolated`): every derived AscentBranch carries non-empty returnPathRef
+- **§5.13 不留幽灵** (implicit via M490 derive — every refinement ticket has fracturePath synthesized)
+- **§4.2 jade-canon 4-rule** (`testJadeCasketIsCanonicalByConstruction`): derive helper synthesizes all 4 ref fields
+- **Single commit mouth** (`testPermitModeNotMutatedByDreamLoopWires`)
+
+Anti-drift M402 test update — `allowedSegments` extended +3: `{rest, return, refinement}`. Count range raised `[17,30]` → `[17,40]`.
+
+### 126.4 测试基线
+
+| 套件 | 一百二十五 章末 | 一百二十六 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2794 | **2801** | +7 (1 new test file: M486KunlunDreamLoopWiringTests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4186 | **4193** | +7 |
+
+5 gates clean: 4 boundary + whitepaper parity (241 registered, 0 drift).
+
+### 126.5 Plan progress
+
+| 项 | Pre-chapter | Post-chapter |
+|---|---|---|
+| Stream A schemas production-wired into runTurn | 6/15 | **11/15** (~73%) |
+| Plan total | 21/31 (68%) | **26/31** (~84%) |
+
+Remaining 4 schema wires (chapter 一百二十七): L2 JadeFidelityMap + L5 HostJadeRegister + L7 JadeMirrorDraft + L7 KunlunUnnamableSet + 4 chapter 一百二十一 Cthulhu leftover (BASAbyssalOrganAlias / BASHumanAnchorProfile / BASNarrativeDistortionMap / BASSealedMemory) + hostFragility actual computation.
+
+### 126.6 一句话总结
+
+**Chapter 一百二十六 / M486-M490**: continue Kunlun production-wire batch — 5 of 13 remaining schemas wired into runTurn audit emission. **M486** L9 BASAscentBranch derived per-candidate (always non-empty returnPathRef per §5.9 dignity invariant — synthesized "return-path:<candidateID>" by construction). **M487** L9 BASRestStep derived only for low-confidence candidates with required evidence (nil when not stalled). **M488** L9 BASReturnPath derived always per-candidate (dignityPreserved=true; rollbackPossible from reversibility ≥ 0.5 threshold). **M489** L3 BASJadeCasketSnapshot synthesized once per turn with all 4 jade-canon ref fields populated (always canonical per §4.2). **M490** L13 BASJadeRefinementTicket derived only for impure candidates (low confidence OR high cost) with fracturePath synthesized per §5.13 不留幽灵. **9 new named static constants** (cumulative 20 across chapters 一百二十五/一百二十六). **7 new tests** in M486KunlunDreamLoopWiringTests pinning: jade.casket always canonical / ascent dignity invariant never violated / return path dignity honored when emitted / parseable counts / single commit mouth / determinism. **M402 test update** in same chapter: allowedSegments +3 ({rest, return, refinement}); count range [17,30] → [17,40]. **Plan progress**: Stream A schemas wired 6/15 → **11/15** (73%); plan total 21/31 → **26/31** (84%). Test counts: BAS XCTest 2794 → **2801** (+7), Qinao 1375 unchanged, 全栈 4186 → **4193** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (241 registered, 0 drift). Doctrine pin held: pure derives + additive metadata; no permit.mode mutation; all red lines / invariants regressed clean.

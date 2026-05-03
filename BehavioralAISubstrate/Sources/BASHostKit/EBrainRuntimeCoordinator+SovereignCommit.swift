@@ -611,7 +611,14 @@ extension BASEBrainRuntimeCoordinator {
         gatePressure: BASGatePressure? = nil,
         yaochiMemoryLayer: BASYaochiMemoryLayer? = nil,
         tianhengProfile: BASTianhengProfile? = nil,
-        jadePermitGrade: BASJadePermitGrade? = nil
+        jadePermitGrade: BASJadePermitGrade? = nil,
+        // M486-M490 (chapter 一百二十六) — L9 dream-loop +
+        // L3 fold-page + L13 refinement production wires.
+        ascentBranches: [BASAscentBranch] = [],
+        restSteps: [BASRestStep] = [],
+        returnPaths: [BASReturnPath] = [],
+        jadeCasket: BASJadeCasketSnapshot? = nil,
+        jadeRefinementTickets: [BASJadeRefinementTicket] = []
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -1374,6 +1381,55 @@ extension BASEBrainRuntimeCoordinator {
                 observationStatusCodes.append(
                     "kunlun.permit.gates-required")
             }
+        }
+        // M486-M490 (chapter 一百二十六) — L9 dream-loop + L3
+        // fold-page + L13 refinement production wires.
+        if !ascentBranches.isEmpty {
+            observationStatusCodes.append(
+                "kunlun.ascent.branchCount:" +
+                "\(ascentBranches.count)")
+            // §5.9 dignity invariant pin: every branch carries
+            // non-empty returnPathRef.
+            let dignityViolations = ascentBranches.filter {
+                !$0.honorsDignityInvariant
+            }.count
+            if dignityViolations > 0 {
+                observationStatusCodes.append(
+                    "kunlun.ascent.dignity-violation:" +
+                    "\(dignityViolations)")
+            }
+        }
+        if !restSteps.isEmpty {
+            observationStatusCodes.append(
+                "kunlun.rest.stepCount:\(restSteps.count)")
+        }
+        if !returnPaths.isEmpty {
+            observationStatusCodes.append(
+                "kunlun.return.pathCount:\(returnPaths.count)")
+            let dignityHonored = returnPaths.filter {
+                $0.dignityPreserved
+            }.count
+            observationStatusCodes.append(
+                "kunlun.return.dignityHonored:" +
+                "\(dignityHonored)")
+        }
+        if let jadeCasket = jadeCasket {
+            let verdict = jadeCasket.honorsJadeCanonInvariants
+                ? "canonical"
+                : "defective"
+            observationStatusCodes.append(
+                "kunlun.jade.casket:\(verdict)")
+        }
+        if !jadeRefinementTickets.isEmpty {
+            observationStatusCodes.append(
+                "kunlun.refinement.ticketCount:" +
+                "\(jadeRefinementTickets.count)")
+            let noGhostTickets = jadeRefinementTickets.filter {
+                $0.honorsNoGhostInvariant
+            }.count
+            observationStatusCodes.append(
+                "kunlun.refinement.noGhost:" +
+                "\(noGhostTickets)")
         }
         if let ontologyShiftMark = ontologyShiftMark,
            !ontologyShiftMark.observedShiftAxes.isEmpty

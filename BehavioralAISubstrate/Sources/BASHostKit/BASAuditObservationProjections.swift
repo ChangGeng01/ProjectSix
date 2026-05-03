@@ -199,6 +199,30 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     /// reason code.
     public var jadePermitGrade: BASJadePermitGrade?
 
+    // MARK: - M486-M490 (chapter 一百二十六) — L9 dream-loop +
+    // L3 fold-page + L13 refinement production wires.
+
+    /// L9 ascent-branch readouts (M486). Emits
+    /// `kunlun.ascent.branchCount:<int>` + per-branch dignity
+    /// pin.
+    public var ascentBranches: [BASAscentBranch]
+
+    /// L9 rest-step readouts (M487). Emits
+    /// `kunlun.rest.stepCount:<int>` when non-empty.
+    public var restSteps: [BASRestStep]
+
+    /// L9 return-path readouts (M488). Emits
+    /// `kunlun.return.pathCount:<int>` + dignity-honor invariant.
+    public var returnPaths: [BASReturnPath]
+
+    /// L3 jade-casket snapshot (M489). Emits
+    /// `kunlun.jade.casket:<verdict>` (canonical/defective).
+    public var jadeCasket: BASJadeCasketSnapshot?
+
+    /// L13 jade-refinement tickets (M490). Emits
+    /// `kunlun.refinement.ticketCount:<int>` when non-empty.
+    public var jadeRefinementTickets: [BASJadeRefinementTicket]
+
     // MARK: - Construction
 
     /// All-fields-default constructor. Most callers use the
@@ -277,7 +301,12 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         gatePressure: BASGatePressure? = nil,
         yaochiMemoryLayer: BASYaochiMemoryLayer? = nil,
         tianhengProfile: BASTianhengProfile? = nil,
-        jadePermitGrade: BASJadePermitGrade? = nil
+        jadePermitGrade: BASJadePermitGrade? = nil,
+        ascentBranches: [BASAscentBranch] = [],
+        restSteps: [BASRestStep] = [],
+        returnPaths: [BASReturnPath] = [],
+        jadeCasket: BASJadeCasketSnapshot? = nil,
+        jadeRefinementTickets: [BASJadeRefinementTicket] = []
     ) {
         self.candidateObservationBundle =
             candidateObservationBundle
@@ -347,6 +376,11 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         self.yaochiMemoryLayer = yaochiMemoryLayer
         self.tianhengProfile = tianhengProfile
         self.jadePermitGrade = jadePermitGrade
+        self.ascentBranches = ascentBranches
+        self.restSteps = restSteps
+        self.returnPaths = returnPaths
+        self.jadeCasket = jadeCasket
+        self.jadeRefinementTickets = jadeRefinementTickets
     }
 
     /// All-default singleton. Used by callers that emit a
@@ -454,6 +488,12 @@ extension BASEBrainRuntimeCoordinator {
             yaochiMemoryLayer:
                 projections.yaochiMemoryLayer,
             tianhengProfile: projections.tianhengProfile,
-            jadePermitGrade: projections.jadePermitGrade)
+            jadePermitGrade: projections.jadePermitGrade,
+            ascentBranches: projections.ascentBranches,
+            restSteps: projections.restSteps,
+            returnPaths: projections.returnPaths,
+            jadeCasket: projections.jadeCasket,
+            jadeRefinementTickets:
+                projections.jadeRefinementTickets)
     }
 }

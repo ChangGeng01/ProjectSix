@@ -1175,6 +1175,37 @@ public struct BASEBrainRuntimeCoordinator {
             .JadePermitGrade.derive(
                 from: boundActionPermit,
                 turnID: derivedTurnID)
+        // M486-M490 (chapter 一百二十六) — L9 dream-loop + L3
+        // fold-page + L13 refinement production wires. Derive
+        // per-candidate ascent + rest + return + refinement
+        // schemas; one casket per turn.
+        let ascentBranchesForAudit = thoughtFrame.candidates
+            .map { candidate in
+                BASKunlunLayerProjections.AscentBranch.derive(
+                    from: candidate, turnID: derivedTurnID)
+            }
+        let restStepsForAudit = thoughtFrame.candidates
+            .compactMap { candidate in
+                BASKunlunLayerProjections.RestStep.derive(
+                    from: candidate, turnID: derivedTurnID)
+            }
+        let returnPathsForAudit = thoughtFrame.candidates
+            .map { candidate in
+                BASKunlunLayerProjections.ReturnPath.derive(
+                    from: candidate, turnID: derivedTurnID)
+            }
+        let jadeCasketForAudit = BASKunlunLayerProjections
+            .JadeCasketSnapshot.derive(
+                turnID: derivedTurnID,
+                sessionID: derivedSessionID)
+        let jadeRefinementTicketsForAudit = thoughtFrame
+            .candidates
+            .compactMap { candidate in
+                BASKunlunLayerProjections.JadeRefinementTicket
+                    .derive(
+                        from: candidate,
+                        turnID: derivedTurnID)
+            }
         let cosmicScaleViewForAudit = BASCthulhuLayerProjections
             .CosmicScaleView.derive(
                 from: routedBudget,
@@ -2077,7 +2108,13 @@ public struct BASEBrainRuntimeCoordinator {
             gatePressure: gatePressureForAudit,
             yaochiMemoryLayer: yaochiMemoryLayerForAudit,
             tianhengProfile: tianhengProfileForAudit,
-            jadePermitGrade: jadePermitGradeForAudit)
+            jadePermitGrade: jadePermitGradeForAudit,
+            ascentBranches: ascentBranchesForAudit,
+            restSteps: restStepsForAudit,
+            returnPaths: returnPathsForAudit,
+            jadeCasket: jadeCasketForAudit,
+            jadeRefinementTickets:
+                jadeRefinementTicketsForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
