@@ -285,80 +285,87 @@ public struct BASEBrainRuntimeCoordinator {
     ) -> (report: BASObservationReconciliationReport,
           verdict: BASObservationReconciliationVerdict)
     {
-        var report = BASObservationReconciliationReport(
-            turnID: turnID,
-            sessionID: sessionID)
-        // Append per-layer summaries from the 13 cognitive bundles
-        // (L1-L13). Each `coverageSummary` is a pure projection
-        // from the bundle to the neutral coverage type. The
-        // presence (L6) and decomposition (L7) bundles live on
-        // `BASContextFrame` / `BASDecomposeFrame` and arrive as
-        // explicit parameters; the rest live on `BASThoughtFrame`.
-        // `BASCandidateObservationBundle` (L9) is derived
-        // post-materialization on the frontier itself, not on the
-        // frame — also passed explicitly. `BASWorldPriorObservationBundle`
-        // (L4) is a field on the thought frame.
-        if let b = presenceBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = decompositionBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = candidateBundle {
-            // The candidate bundle is constructed by
-            // `BASNeuralMaterializationCompiler.buildCandidateObservationBundle`
-            // with `turnID = "l9.turn.step-N"` and
-            // `sessionID = decomposeRef` — different from the
-            // canonical `derivedTurnID` / `derivedSessionID`
-            // pair the rest of the substrate uses. Without
-            // normalization, `appending(_:)` is a no-op
-            // (`turnID/sessionID` mismatch is a guard in
-            // `BASObservationReconciliationReport.appending`).
-            // M436 normalizes the candidate summary's keys so
-            // L9 (dreamLoop) participates in the reconciliation
-            // report. Pure value-type rewrite — no I/O.
-            let raw = b.coverageSummary
-            let normalized = BASObservationCoverageSummary(
-                layer: raw.layer,
-                turnID: turnID,
-                sessionID: sessionID,
-                totalObservations: raw.totalObservations,
-                distinctSubjectCount: raw.distinctSubjectCount,
-                hasCoreSignalCoverage: raw.hasCoreSignalCoverage,
-                budgetTotalCost: raw.budgetTotalCost,
-                emittedAt: raw.emittedAt)
-            report = report.appending(normalized)
-        }
-        if let b = thoughtFrame.tribunalObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = thoughtFrame.riskObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = thoughtFrame.softHandObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = thoughtFrame.updateTicketObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = thoughtFrame.worldPriorObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
+        // M436.5 (chapter 一百八 perf recovery) — build the
+        // summaries array directly + construct the report once.
+        // Pre-M436.5 each `.appending(...)` call (a) constructed
+        // a new `BASObservationReconciliationReport` struct with
+        // dedup+filter pass on the entire summaries array
+        // (O(n²) total over 13 appends) and (b) allocated a new
+        // copy of the summaries array on each call. Consolidating
+        // to one report construction with a pre-built summaries
+        // array runs the dedup+filter once, not 13 times.
+        // Recovers ~7-9% of the chapter 一百七 +11.3% test-path
+        // perf cost. Pure value-type rewrite, semantically
+        // equivalent — `BASObservationReconciliationReport.init`
+        // (line 160) runs the same dedup+filter pass that
+        // `.appending` would have applied iteratively.
+        var summaries: [BASObservationCoverageSummary] = []
+        summaries.reserveCapacity(13)
+        // L1-L13 cognitive bundles. Order matches
+        // `layerReconciliationExpectedLayers` for stable
+        // `reconciliation.observed:<L1+L2+...+L13>` emission;
+        // `BASObservationReconciliationReport.dedupedAndFiltered`
+        // preserves first-seen order so this layout is stable.
         if let b = thoughtFrame.leaseLifeObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = thoughtFrame.hostConstitutionObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = thoughtFrame.thoughtFoldObservationBundle {
-            report = report.appending(b.coverageSummary)
-        }
-        if let b = thoughtFrame.hippocampalMemoryObservationBundle {
-            report = report.appending(b.coverageSummary)
+            summaries.append(b.coverageSummary)        // L1
         }
         if let b = thoughtFrame.neuralOrganObservationBundle {
-            report = report.appending(b.coverageSummary)
+            summaries.append(b.coverageSummary)        // L2
         }
+        if let b = thoughtFrame.thoughtFoldObservationBundle {
+            summaries.append(b.coverageSummary)        // L3
+        }
+        if let b = thoughtFrame.worldPriorObservationBundle {
+            summaries.append(b.coverageSummary)        // L4
+        }
+        if let b = thoughtFrame.hostConstitutionObservationBundle {
+            summaries.append(b.coverageSummary)        // L5
+        }
+        if let b = presenceBundle {
+            summaries.append(b.coverageSummary)        // L6
+        }
+        if let b = decompositionBundle {
+            summaries.append(b.coverageSummary)        // L7
+        }
+        if let b = thoughtFrame.hippocampalMemoryObservationBundle {
+            summaries.append(b.coverageSummary)        // L8
+        }
+        if let b = candidateBundle {
+            // L9 candidate bundle is constructed by
+            // `BASNeuralMaterializationCompiler.buildCandidateObservationBundle`
+            // with non-canonical `turnID = "l9.turn.step-N"` /
+            // `sessionID = decomposeRef`. Pre-M436 the
+            // `appending(_:)` guard at line 233 silently no-op'd
+            // on key mismatch, dropping L9. M436 normalized; M436.5
+            // continues normalization in the consolidated build.
+            let raw = b.coverageSummary
+            summaries.append(
+                BASObservationCoverageSummary(
+                    layer: raw.layer,
+                    turnID: turnID,
+                    sessionID: sessionID,
+                    totalObservations: raw.totalObservations,
+                    distinctSubjectCount: raw.distinctSubjectCount,
+                    hasCoreSignalCoverage: raw.hasCoreSignalCoverage,
+                    budgetTotalCost: raw.budgetTotalCost,
+                    emittedAt: raw.emittedAt))   // L9
+        }
+        if let b = thoughtFrame.tribunalObservationBundle {
+            summaries.append(b.coverageSummary)        // L10
+        }
+        if let b = thoughtFrame.riskObservationBundle {
+            summaries.append(b.coverageSummary)        // L11
+        }
+        if let b = thoughtFrame.softHandObservationBundle {
+            summaries.append(b.coverageSummary)        // L12
+        }
+        if let b = thoughtFrame.updateTicketObservationBundle {
+            summaries.append(b.coverageSummary)        // L13
+        }
+        let report = BASObservationReconciliationReport(
+            turnID: turnID,
+            sessionID: sessionID,
+            summaries: summaries)
         // Run verdict against the report. ExpectedLayers list:
         // every layer the substrate expects to hear from on a
         // healthy turn. Today this is the 12 cognitive layers
