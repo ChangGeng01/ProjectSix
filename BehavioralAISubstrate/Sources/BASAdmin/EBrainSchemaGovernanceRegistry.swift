@@ -1107,6 +1107,21 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "KunlunGateDenialWrit",
             versionedType: BASKunlunGateDenialWrit.self,
             tests: ["schema.kunlun_gate_denial_writ.current", "schema.kunlun_gate_denial_writ.backward"]
+        ),
+        // M440 (chapter 一百十五) — 2 new layer-naming schemas
+        // closing user 2026-05-04 audit Section B remainder.
+        // L1 AbyssBudget per Cthulhu Spec V1 §5.1; L13
+        // ForbiddenCandidateZone per Cthulhu Spec V1 §5.13 +
+        // Abyssal VINF §7.
+        entry(
+            "AbyssBudget",
+            versionedType: BASAbyssBudget.self,
+            tests: ["schema.abyss_budget.current", "schema.abyss_budget.backward"]
+        ),
+        entry(
+            "ForbiddenCandidateZone",
+            versionedType: BASForbiddenCandidateZone.self,
+            tests: ["schema.forbidden_candidate_zone.current", "schema.forbidden_candidate_zone.backward"]
         )
     ]
 

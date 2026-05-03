@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 213)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills (chapter 一百十四)
+        #expect(governedObjects.count == 215)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五)
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -444,7 +444,12 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "KunlunTianmenWarrant":
                 BASKunlunTianmenWarrant.currentSchemaVersion,
             "KunlunGateDenialWrit":
-                BASKunlunGateDenialWrit.currentSchemaVersion
+                BASKunlunGateDenialWrit.currentSchemaVersion,
+            // M440 (chapter 一百十五) — 2 layer-naming schemas:
+            "AbyssBudget":
+                BASAbyssBudget.currentSchemaVersion,
+            "ForbiddenCandidateZone":
+                BASForbiddenCandidateZone.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

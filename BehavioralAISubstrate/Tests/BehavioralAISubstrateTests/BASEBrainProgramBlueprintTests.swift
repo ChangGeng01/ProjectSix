@@ -330,7 +330,11 @@ struct BASEBrainProgramBlueprintTests {
             "KunlunAscentView",
             "KunlunFarWestReserve",
             "KunlunTianmenWarrant",
-            "KunlunGateDenialWrit"
+            "KunlunGateDenialWrit",
+            // M440 (chapter 一百十五) — 2 layer-naming schemas
+            // closing audit Section B remainder:
+            "AbyssBudget",
+            "ForbiddenCandidateZone"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)
