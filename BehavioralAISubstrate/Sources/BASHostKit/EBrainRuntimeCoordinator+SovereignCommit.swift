@@ -597,7 +597,12 @@ extension BASEBrainRuntimeCoordinator {
         abyssalRunMode: BASAbyssalRunMode? = nil,
         abyssBudget: BASAbyssBudget? = nil,
         cthulhuAssertionCeilingReasonCodes: [String] = [],
-        cthulhuPermitEscalationReasonCodes: [String] = []
+        cthulhuPermitEscalationReasonCodes: [String] = [],
+        // M456 (chapter 一百二十) — L8 memory thermal layer
+        // production wire. Closes chapter 一百十七 / 一百十九
+        // honest-deferred item. Emits `cthulhu.memory.thermal:
+        // <rawValue>` reason code when non-nil.
+        memoryTemperatureLayer: BASMemoryTemperatureLayer? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -1282,6 +1287,11 @@ extension BASEBrainRuntimeCoordinator {
             observationStatusCodes.append(
                 "cthulhu.fog.quality:" +
                 ontologyFog.partialGraspQuality.rawValue)
+        }
+        if let memoryTemperatureLayer = memoryTemperatureLayer {
+            observationStatusCodes.append(
+                "cthulhu.memory.thermal:" +
+                memoryTemperatureLayer.rawValue)
         }
         if let ontologyShiftMark = ontologyShiftMark,
            !ontologyShiftMark.observedShiftAxes.isEmpty

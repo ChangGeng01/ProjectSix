@@ -163,6 +163,11 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     /// .escalate(...)` decision. Empty when no escalation fired.
     public var cthulhuPermitEscalationReasonCodes: [String]
 
+    /// L8 memory thermal layer (M456 chapter 一百二十). When
+    /// non-nil, audit emission adds
+    /// `cthulhu.memory.thermal:<rawValue>` reason code.
+    public var memoryTemperatureLayer: BASMemoryTemperatureLayer?
+
     // MARK: - Construction
 
     /// All-fields-default constructor. Most callers use the
@@ -234,7 +239,8 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
         abyssalRunMode: BASAbyssalRunMode? = nil,
         abyssBudget: BASAbyssBudget? = nil,
         cthulhuAssertionCeilingReasonCodes: [String] = [],
-        cthulhuPermitEscalationReasonCodes: [String] = []
+        cthulhuPermitEscalationReasonCodes: [String] = [],
+        memoryTemperatureLayer: BASMemoryTemperatureLayer? = nil
     ) {
         self.candidateObservationBundle =
             candidateObservationBundle
@@ -297,6 +303,7 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
             cthulhuAssertionCeilingReasonCodes
         self.cthulhuPermitEscalationReasonCodes =
             cthulhuPermitEscalationReasonCodes
+        self.memoryTemperatureLayer = memoryTemperatureLayer
     }
 
     /// All-default singleton. Used by callers that emit a
@@ -395,6 +402,8 @@ extension BASEBrainRuntimeCoordinator {
             cthulhuAssertionCeilingReasonCodes:
                 projections.cthulhuAssertionCeilingReasonCodes,
             cthulhuPermitEscalationReasonCodes:
-                projections.cthulhuPermitEscalationReasonCodes)
+                projections.cthulhuPermitEscalationReasonCodes,
+            memoryTemperatureLayer:
+                projections.memoryTemperatureLayer)
     }
 }

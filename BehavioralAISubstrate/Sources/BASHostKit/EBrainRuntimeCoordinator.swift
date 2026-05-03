@@ -1131,6 +1131,17 @@ public struct BASEBrainRuntimeCoordinator {
             .AbyssBudget.derive(
                 from: routedBudget,
                 turnID: derivedTurnID)
+        // M456 (chapter 一百二十) — L8 memory thermal layer
+        // projection from runMode at audit-projection time. Per
+        // chapter 一百十七 doctrine BASMemoryTemperatureLayer
+        // classifies hippocampal-well memory along 5 thermal
+        // tiers; the projection here labels "what thermal class
+        // would a memory atom stored at this turn's runMode
+        // belong to?" — additive audit metadata, no L8 query
+        // mutation.
+        let memoryTemperatureLayerForAudit =
+            BASCthulhuLayerProjections.MemoryTemperatureLayer
+                .derive(from: routedBudget.runMode)
         let cosmicScaleViewForAudit = BASCthulhuLayerProjections
             .CosmicScaleView.derive(
                 from: routedBudget,
@@ -2023,7 +2034,9 @@ public struct BASEBrainRuntimeCoordinator {
             cthulhuAssertionCeilingReasonCodes:
                 cthulhuAssertionDecision.reasonCodes,
             cthulhuPermitEscalationReasonCodes:
-                cthulhuEscalation.reasonCodes)
+                cthulhuEscalation.reasonCodes,
+            memoryTemperatureLayer:
+                memoryTemperatureLayerForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
