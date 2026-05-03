@@ -306,9 +306,187 @@ final class M356BenchBaselineStorageTests: XCTestCase {
                 .defaultToleranceFraction, 0.25)
     }
 
-    func testCurrentSchemaVersionIsV1() {
+    func testCurrentSchemaVersionIsV2() {
+        // M437 (chapter 一百十) — schema bumped v1 → v2 to
+        // carry optional MultiTrialStats. v1 still readable
+        // (supportedSchemaVersions); v2 is the new default
+        // for fresh baselines.
         XCTAssertEqual(
             BASBenchBaselineStorage.currentSchemaVersion,
-            "bas-bench-baseline.v1")
+            "bas-bench-baseline.v2")
+    }
+
+    func testSupportedSchemaVersionsIncludesBothV1AndV2() {
+        // Backward + forward compat pin: this binary must
+        // accept both v1 (legacy) and v2 (M437) baselines
+        // when comparing.
+        XCTAssertTrue(
+            BASBenchBaselineStorage.supportedSchemaVersions
+                .contains("bas-bench-baseline.v1"),
+            "must read v1 baselines for backward compat")
+        XCTAssertTrue(
+            BASBenchBaselineStorage.supportedSchemaVersions
+                .contains("bas-bench-baseline.v2"),
+            "must read v2 baselines (current default)")
+    }
+
+    // MARK: - M437 — multi-trial 2σ regression check
+
+    private func makeMultiTrialStats(
+        p50Mean: Double = 1.0,
+        p50StdDev: Double = 0.05,
+        p95Mean: Double = 1.5,
+        p95StdDev: Double = 0.10,
+        meanMean: Double = 1.1,
+        meanStdDev: Double = 0.06,
+        trialCount: Int = 10
+    ) -> BASBenchBaselineStorage.MultiTrialStats {
+        BASBenchBaselineStorage.MultiTrialStats(
+            trialCount: trialCount,
+            p50Mean: p50Mean, p50StdDev: p50StdDev,
+            p95Mean: p95Mean, p95StdDev: p95StdDev,
+            meanMean: meanMean, meanStdDev: meanStdDev)
+    }
+
+    /// Pin: when baseline carries multi-trial summary, the
+    /// comparison uses mean ± 2σ instead of %-tolerance. A
+    /// measurement within 2σ of the trial mean is
+    /// `.withinTolerance`.
+    func testMultiTrialBaselineWithinTwoSigmaIsClean() throws {
+        let path = tempDir.appendingPathComponent(
+            "multi-trial-baseline.json")
+        // Baseline mean 1.0ms ± 0.05ms → 2σ band is [0.9, 1.1]
+        let baselineStats = sampleStats(meanMultiplier: 1.0)
+        let trialStats = makeMultiTrialStats(
+            p50Mean: 1.0, p50StdDev: 0.05,
+            p95Mean: 1.5, p95StdDev: 0.10,
+            meanMean: 1.1, meanStdDev: 0.06)
+        try BASBenchBaselineStorage.writeBaseline(
+            envelope: .init(
+                schemaVersion: "bas-bench-baseline.v2",
+                benchName: "test-bench",
+                stats: baselineStats,
+                trialStats: trialStats),
+            to: path)
+        // Measured: p50 1.05 (within 2σ = 0.9..1.1)
+        let measured = sampleStats(meanMultiplier: 1.05)
+        let verdict = try BASBenchBaselineStorage
+            .compareToBaseline(
+                measured: measured,
+                benchName: "test-bench",
+                baselinePath: path)
+        if case .withinTolerance = verdict {
+            // OK — within 2σ
+        } else {
+            XCTFail("expected withinTolerance for 1.05 vs " +
+                "mean 1.0 ± 0.05 (2σ band), got \(verdict)")
+        }
+    }
+
+    /// Pin: when measured exceeds mean + 2σ, multi-trial
+    /// check fires regression with `(mean+2σ)` metric label.
+    /// This is the chapter 一百十 ability to detect <10%
+    /// regressions that single-trial 25% tolerance would miss.
+    func testMultiTrialBaselineBeyondTwoSigmaFiresRegression()
+        throws
+    {
+        let path = tempDir.appendingPathComponent(
+            "multi-trial-regression.json")
+        // Baseline mean 1.0ms ± 0.05ms → 2σ upper = 1.10
+        let baselineStats = sampleStats(meanMultiplier: 1.0)
+        let trialStats = makeMultiTrialStats(
+            p50Mean: 1.0, p50StdDev: 0.05,
+            p95Mean: 1.5, p95StdDev: 0.10,
+            meanMean: 1.1, meanStdDev: 0.06)
+        try BASBenchBaselineStorage.writeBaseline(
+            envelope: .init(
+                schemaVersion: "bas-bench-baseline.v2",
+                benchName: "test-bench",
+                stats: baselineStats,
+                trialStats: trialStats),
+            to: path)
+        // Measured: p50 1.20 (beyond 2σ upper of 1.10) — this
+        // is a stat-rigorous regression signal that would NOT
+        // fire under 25% %-tolerance (1.20 / 1.0 = +20% which
+        // is below 25% band, but is +4σ above trial mean).
+        let measured = sampleStats(meanMultiplier: 1.20)
+        let verdict = try BASBenchBaselineStorage
+            .compareToBaseline(
+                measured: measured,
+                benchName: "test-bench",
+                baselinePath: path)
+        if case .regression(let reports) = verdict {
+            // Pin: at least p50 fires (it's most central)
+            XCTAssertTrue(
+                reports.contains {
+                    $0.metricName.starts(with: "p50")
+                },
+                "p50 must fire when 1.20 > mean 1.0 + 2σ 0.10 = 1.10 " +
+                "(was reports: \(reports.map(\.metricName)))")
+            // Pin: regression labels carry the mean+2σ tag so
+            // consumers can distinguish multi-trial from %-
+            // tolerance verdicts.
+            for r in reports {
+                XCTAssertTrue(
+                    r.metricName.contains("(mean+2σ)"),
+                    "multi-trial reports must carry (mean+2σ) " +
+                    "tag — was \(r.metricName)")
+            }
+        } else {
+            XCTFail("expected regression; got \(verdict)")
+        }
+    }
+
+    /// Pin: v1 baseline (no trialStats) falls through to the
+    /// %-tolerance path even when read by v2 binary.
+    /// Backward-compat invariant.
+    func testV1BaselineFallsThroughToPercentageTolerance()
+        throws
+    {
+        let path = tempDir.appendingPathComponent(
+            "v1-baseline.json")
+        // Manually write v1 envelope (no trialStats field) by
+        // using the v1 schema version + nil trialStats.
+        let envelope = BASBenchBaselineStorage.Envelope(
+            schemaVersion: "bas-bench-baseline.v1",
+            benchName: "test-bench",
+            stats: sampleStats(meanMultiplier: 1.0),
+            trialStats: nil)
+        try BASBenchBaselineStorage.writeBaseline(
+            envelope: envelope, to: path)
+        // Measured 1.10 → +10% which is below 25% tolerance →
+        // .withinTolerance
+        let measured = sampleStats(meanMultiplier: 1.10)
+        let verdict = try BASBenchBaselineStorage
+            .compareToBaseline(
+                measured: measured,
+                benchName: "test-bench",
+                baselinePath: path)
+        if case .withinTolerance = verdict {
+            // OK
+        } else {
+            XCTFail("v1 baseline should fall through to " +
+                "%-tolerance; +10% is within 25% — got " +
+                "\(verdict)")
+        }
+    }
+
+    /// Pin: MultiTrialStats.summarize requires N≥2.
+    /// Single-trial input returns nil (caller falls back to
+    /// %-tolerance path).
+    func testMultiTrialSummarizeRequiresAtLeastTwoTrials() {
+        let single = [sampleStats(meanMultiplier: 1.0)]
+        XCTAssertNil(
+            BASBenchBaselineStorage.MultiTrialStats
+                .summarize(trials: single),
+            "N=1 cannot produce meaningful std")
+        let pair = [
+            sampleStats(meanMultiplier: 1.0),
+            sampleStats(meanMultiplier: 1.1),
+        ]
+        XCTAssertNotNil(
+            BASBenchBaselineStorage.MultiTrialStats
+                .summarize(trials: pair),
+            "N=2 is the minimum for sample std (n-1 divisor)")
     }
 }

@@ -71,24 +71,127 @@ public struct BASBenchBaselineStorage: Sendable {
         }
     }
 
+    /// M437 (chapter 一百十) — multi-trial summary capturing
+    /// mean ± std across N≥2 release-build trials. Optional
+    /// extension to the baseline envelope.
+    ///
+    /// Pre-M437 the baseline stored a single `BASBenchLatencyStats`
+    /// snapshot (one trial's p50/p95/p99/mean). Single-trial
+    /// regression detection has a structural floor at ~20%
+    /// (chapter 一百九 codification: single-trial release-build
+    /// CV is ~10-15% on outlier-heavy benches; tolerance must
+    /// stay above that).
+    ///
+    /// M437 adds optional `trialStats` so callers running
+    /// multi-trial captures can store the trial-to-trial mean +
+    /// std for each compared metric. When `trialStats` is non-
+    /// nil, `compareToBaseline` uses the **mean ± 2σ** check
+    /// instead of percentage tolerance, enabling stat-rigorous
+    /// detection of <10% regressions.
+    ///
+    /// Backward-compat: legacy v1 baselines (no `trialStats`)
+    /// continue to work via percentage tolerance fallback.
+    /// Forward-compat: new v2 baselines store both `stats`
+    /// (single-trial last-snapshot) AND `trialStats` (multi-
+    /// trial summary) so old readers can still parse them.
+    public struct MultiTrialStats: Sendable, Equatable, Codable {
+        /// Number of trials in this summary (N≥2 to be
+        /// stat-meaningful; N=1 should not produce a
+        /// MultiTrialStats — use single-trial path instead).
+        public let trialCount: Int
+
+        /// Mean p50 across trials.
+        public let p50Mean: Double
+        /// Sample standard deviation of p50 across trials.
+        public let p50StdDev: Double
+
+        /// Mean p95 across trials.
+        public let p95Mean: Double
+        /// Sample standard deviation of p95 across trials.
+        public let p95StdDev: Double
+
+        /// Mean of mean-latencies across trials.
+        public let meanMean: Double
+        /// Sample standard deviation of mean-latencies across
+        /// trials.
+        public let meanStdDev: Double
+
+        public init(
+            trialCount: Int,
+            p50Mean: Double, p50StdDev: Double,
+            p95Mean: Double, p95StdDev: Double,
+            meanMean: Double, meanStdDev: Double
+        ) {
+            self.trialCount = trialCount
+            self.p50Mean = p50Mean
+            self.p50StdDev = p50StdDev
+            self.p95Mean = p95Mean
+            self.p95StdDev = p95StdDev
+            self.meanMean = meanMean
+            self.meanStdDev = meanStdDev
+        }
+
+        /// Build from an array of N single-trial stats.
+        /// Returns nil for N < 2 (mean ± std from N=1 is
+        /// undefined).
+        public static func summarize(
+            trials: [BASBenchLatencyStats]
+        ) -> MultiTrialStats? {
+            guard trials.count >= 2 else { return nil }
+            func meanStd(_ vs: [Double]) -> (Double, Double) {
+                let n = Double(vs.count)
+                let m = vs.reduce(0, +) / n
+                let sumSq = vs.reduce(0) {
+                    $0 + ($1 - m) * ($1 - m)
+                }
+                // Sample std (n-1 divisor). For n=2, divisor=1;
+                // for n=10, divisor=9. Use n-1 because we're
+                // estimating population std from samples.
+                let variance = sumSq / (n - 1)
+                return (m, variance.squareRoot())
+            }
+            let (p50M, p50S) = meanStd(trials.map(\.p50))
+            let (p95M, p95S) = meanStd(trials.map(\.p95))
+            let (meanM, meanS) = meanStd(trials.map(\.mean))
+            return MultiTrialStats(
+                trialCount: trials.count,
+                p50Mean: p50M, p50StdDev: p50S,
+                p95Mean: p95M, p95StdDev: p95S,
+                meanMean: meanM, meanStdDev: meanS)
+        }
+    }
+
     /// Schema-versioned envelope for a stored baseline.
+    ///
+    /// **M437 (chapter 一百十)**: schema bumped to v2 to carry
+    /// optional `trialStats`. v1 baselines are still readable
+    /// (decode treats missing `trialStats` as nil); v2 readers
+    /// see both `stats` (single-trial snapshot) and `trialStats`
+    /// (multi-trial summary) when both are populated.
     public struct Envelope: Sendable, Equatable, Codable {
         public let schemaVersion: String
         public let benchName: String
         public let storedAt: Date
         public let stats: BASBenchLatencyStats
+        /// M437 — optional multi-trial summary. Non-nil only
+        /// when capture path ran N≥2 trials. Enables stat-
+        /// rigorous mean ± 2σ regression check in
+        /// `compareToBaseline`.
+        public let trialStats: MultiTrialStats?
 
         public init(
             schemaVersion: String =
-                "bas-bench-baseline.v1",
+                BASBenchBaselineStorage.currentSchemaVersion,
             benchName: String,
             storedAt: Date = Date(),
-            stats: BASBenchLatencyStats
+            stats: BASBenchLatencyStats,
+            trialStats: MultiTrialStats? = nil
         ) {
             self.schemaVersion = schemaVersion
             self.benchName = benchName
             self.storedAt = storedAt
             self.stats = stats
+            self.trialStats = trialStats
         }
     }
 
@@ -97,8 +200,23 @@ public struct BASBenchBaselineStorage: Sendable {
     public static let defaultToleranceFraction: Double = 0.25
 
     /// Default schema version for new baselines.
+    /// **M437 (chapter 一百十)**: bumped v1 → v2 to carry
+    /// optional `MultiTrialStats`. v1 baselines still readable
+    /// (treated as no-trialStats); v2 baselines emit both stats
+    /// snapshot + trialStats summary when multi-trial capture
+    /// ran. The `compareToBaseline` schema-mismatch guard now
+    /// accepts both v1 and v2 (forward + backward compat).
     public static let currentSchemaVersion: String =
-        "bas-bench-baseline.v1"
+        "bas-bench-baseline.v2"
+
+    /// **M437**: list of all schema versions this binary can
+    /// read. v1 (pre-M437) and v2 (M437) are both accepted.
+    /// Used by `compareToBaseline` to decide whether the stored
+    /// baseline is compatible.
+    public static let supportedSchemaVersions: Set<String> = [
+        "bas-bench-baseline.v1",
+        "bas-bench-baseline.v2",
+    ]
 
     /// Write the envelope to `path` as pretty-printed JSON. The
     /// caller owns directory creation.
@@ -170,16 +288,71 @@ public struct BASBenchBaselineStorage: Sendable {
                 "'\(benchName)' got " +
                 "'\(envelope.benchName)'")
         }
-        if envelope.schemaVersion
-            != currentSchemaVersion
+        // M437 — accept both v1 and v2 (chapter 一百十 schema
+        // bump for multi-trial support). v1 baselines work
+        // through the percentage-tolerance fallback path below.
+        if !supportedSchemaVersions.contains(
+            envelope.schemaVersion)
         {
             return .incompatibleBaseline(
-                reason: "expected schemaVersion " +
-                "'\(currentSchemaVersion)' got " +
+                reason: "expected schemaVersion in " +
+                "\(supportedSchemaVersions.sorted()) got " +
                 "'\(envelope.schemaVersion)'")
         }
         let baseline = envelope.stats
         var reports: [RegressionReport] = []
+
+        // M437 (chapter 一百十) — multi-trial mean ± 2σ check
+        // when baseline carries trial summary. Stat-rigorous
+        // detection of <10% regressions; fires when measured >
+        // (baseline-mean + 2σ). Falls through to %-tolerance
+        // path below when trialStats is nil (v1 baselines or
+        // single-trial captures). The 2σ threshold gives ~95%
+        // confidence the regression is real (not noise) under
+        // assumption of approximately-normal trial-to-trial
+        // variation. Same metric set as %-tolerance path
+        // (p50/p95/mean; p99 still excluded per M436.6).
+        if let trial = envelope.trialStats, trial.trialCount >= 2 {
+            let twoSigma: [(String, Double, Double, Double)] = [
+                ("p50", trial.p50Mean,
+                    trial.p50StdDev, measured.p50),
+                ("p95", trial.p95Mean,
+                    trial.p95StdDev, measured.p95),
+                ("mean", trial.meanMean,
+                    trial.meanStdDev, measured.mean),
+            ]
+            let absoluteFloorMs: Double = 0.005
+            for (name, mean, std, measuredValue)
+                in twoSigma
+            {
+                guard mean > 0 else { continue }
+                if mean < absoluteFloorMs
+                    && measuredValue < absoluteFloorMs
+                {
+                    continue  // sub-µs floor (M436.6)
+                }
+                let upper = mean + 2.0 * std
+                if measuredValue > upper {
+                    let regressionFraction =
+                        (measuredValue - mean) / mean
+                    reports.append(RegressionReport(
+                        metricName: "\(name) (mean+2σ)",
+                        baselineValue: mean,
+                        measuredValue: measuredValue,
+                        toleranceFraction:
+                            (2.0 * std) / mean,
+                        regressionFraction:
+                            regressionFraction))
+                }
+            }
+            if reports.isEmpty {
+                return .withinTolerance
+            }
+            return .regression(reports: reports)
+        }
+
+        // %-tolerance fallback path (v1 baselines or v2
+        // baselines without multi-trial capture).
         // M436.6 — p99 dropped from regression check. Single-
         // trial p99 = single 10th-worst-of-N sample, which swings
         // 50-150% on OS-jitter outliers alone. Real regressions
