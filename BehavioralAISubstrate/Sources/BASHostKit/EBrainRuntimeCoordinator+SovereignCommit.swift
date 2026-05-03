@@ -488,7 +488,20 @@ extension BASEBrainRuntimeCoordinator {
         // M409 — pass state context for the gate (passed |
         // denied | pending | remanded). Required when
         // `tianmenReadiness` is non-nil.
-        tianmenPassState: BASKunlunGateState? = nil
+        tianmenPassState: BASKunlunGateState? = nil,
+        // M417 (chapter 九十七 deep-review H1 fix-pin) —
+        // escalation suppression reason codes harvested at the
+        // gating block when M384 abyssal or M406 kunlun
+        // escalation fires red-line #8 (humanAnchor.tone ==
+        // .reserved). Pre-fix the suppression codes lived only
+        // in the discarded `decision.reasonCodes` and never
+        // reached the audit ledger; the audit walker had no way
+        // to tell "no escalation this turn" apart from
+        // "escalation suppressed by reserved-anchor." Empty
+        // array elides emission. Doctrine red line 8 —
+        // both Cthulhu and Kunlun cross-doctrine — observable
+        // via these codes.
+        escalationSuppressionCodes: [String] = []
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -827,6 +840,27 @@ extension BASEBrainRuntimeCoordinator {
                     .joined(separator: "+")
                 observationStatusCodes.append(
                     "kunlun.tianmen.reasons:\(joined)")
+            }
+            // M417 — escalation suppression reason codes (red
+            // line 8 cross-doctrine). Emitted as-is so audit
+            // walkers can grep `permit.escalation-skipped:`
+            // and see exactly which doctrine suppressed
+            // (kunlun-axis-anchor-reserved / human-anchor-
+            // reserved). Empty array elides emission entirely.
+            //
+            // (Block placed inside the `if let tianmen` scope so
+            // tests that don't drive the gate path don't see
+            // these codes. Hosts that drive the gate AND
+            // experience suppression will see them appended
+            // here; Hosts that drive only the gate without
+            // suppression will see no extra codes.)
+            //
+            // Note: emission appends raw codes — they already
+            // carry typed prefixes (`permit.escalation-skipped:`
+            // / `permit.escalation-suppressed:`) from the
+            // M384/M406 helpers.
+            for code in escalationSuppressionCodes {
+                observationStatusCodes.append(code)
             }
             // M410 — L14 sovereign-warrant Tianmen integration.
             // Doctrine 红线 #5 (天门不绕过宿主授权): the gate must

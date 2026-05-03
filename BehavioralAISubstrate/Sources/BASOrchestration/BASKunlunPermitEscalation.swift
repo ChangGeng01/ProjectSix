@@ -159,10 +159,19 @@ public enum BASKunlunPermitEscalation {
         // Standard escalation: append `.compare` so the surface
         // shows a side-by-side review. Doctrine: 中轴偏离时 host
         // 必须再看一眼 (axis deviation surfaces a comparison).
+        //
+        // M417 fix-pin (chapter 九十七 deep-review M1): always emit
+        // the `permit.escalated:kunlun:compare` attribution code,
+        // even when `.compare` is already in `stackedModes` (e.g.
+        // because the upstream M384 abyssal escalation already
+        // appended it). The attribution code documents that the
+        // KUNLUN escalation independently requested compare;
+        // dropping it when M384 also wanted compare loses cross-
+        // doctrine composability traceability.
+        addedCodes.append("permit.escalated:kunlun:compare")
         if !seen.contains(.compare) {
             stackedModes.append(.compare)
             seen.insert(.compare)
-            addedCodes.append("permit.escalated:kunlun:compare")
         }
 
         // Stable per-deviation trace. Sort to keep output
@@ -177,13 +186,16 @@ public enum BASKunlunPermitEscalation {
         // append `.escalate` so L14 sovereign warrant path is
         // signaled. Doctrine: 严重偏离时升 L14 — single commit
         // mouth still preserved, just one more stack mode.
-        if alignment.centerScore < deepDeviationCeiling
-            && !seen.contains(.escalate)
-        {
-            stackedModes.append(.escalate)
-            seen.insert(.escalate)
+        //
+        // M417 fix-pin (chapter 九十七 deep-review M1): same
+        // attribution-always-emit pattern as `.compare` above.
+        if alignment.centerScore < deepDeviationCeiling {
             addedCodes.append(
                 "permit.escalated:kunlun:escalate-deep-deviation")
+            if !seen.contains(.escalate) {
+                stackedModes.append(.escalate)
+                seen.insert(.escalate)
+            }
         }
 
         let escalatedPermit = BASActionPermit(

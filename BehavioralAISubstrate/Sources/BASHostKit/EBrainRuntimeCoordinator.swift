@@ -511,6 +511,30 @@ public struct BASEBrainRuntimeCoordinator {
                 humanAnchor: humanAnchorSignalForGate)
         boundActionPermit = kunlunEscalation.permit
         thoughtFrame.actionPermit = boundActionPermit
+        // M417 fix-pin (chapter 九十七 deep-review H1): capture
+        // escalation-decision reason codes for audit emission.
+        // When red line #8 fires (humanAnchor.tone == .reserved),
+        // both M384 abyssal and M406 kunlun escalations return
+        // the original permit unchanged with suppression codes
+        // attached to the *decision*, not the permit. Pre-fix
+        // these codes were discarded; the audit walker had no
+        // way to tell "no axis deviation this turn" apart from
+        // "axis deviation suppressed by anchor-reserved." We
+        // now harvest both decisions' reason codes and feed them
+        // into the audit entry's signalRefs so red line #8
+        // honoring is observable.
+        let escalationSuppressionCodes: [String] = {
+            var codes: [String] = []
+            if abyssalEscalation.suppressedByHumanAnchor {
+                codes.append(contentsOf:
+                    abyssalEscalation.reasonCodes)
+            }
+            if kunlunEscalation.suppressedByHumanAnchor {
+                codes.append(contentsOf:
+                    kunlunEscalation.reasonCodes)
+            }
+            return codes
+        }()
         // M56 — L11 risk climate now surfaces per-dimension
         // observations on the main-chain thought frame. Reuses M53's
         // derived (sessionID, turnID) so L6 / L7 / L10 / L11 bundles
@@ -1262,7 +1286,13 @@ public struct BASEBrainRuntimeCoordinator {
             tianmenGateClass:
                 kunlunHeavenGateForAudit.gateClass,
             tianmenPassState:
-                kunlunHeavenGateForAudit.passState
+                kunlunHeavenGateForAudit.passState,
+            // M417 — feed escalation suppression reason codes
+            // (M384 + M406) so red-line #8 (cross-doctrine
+            // anchor-wins) honoring is observable in the audit
+            // ledger. Empty array elides codes when no
+            // suppression fired this turn.
+            escalationSuppressionCodes: escalationSuppressionCodes
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

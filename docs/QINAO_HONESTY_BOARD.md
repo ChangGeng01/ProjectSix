@@ -11471,3 +11471,193 @@ After this chapter ships:
 ### 96.8 一句话总结
 
 **M415-M416 close 昆仑 doctrine Phase ε (chapter 九十六)**：M415 ship 8 byte-equal behavioral snapshot tests (per-wire output JSON-serialized + pinned against expected strings) covering all 7 Kunlun milestones (M402 axis / M404 canonical+defective seal / M405 partial trace / M406 deep-deviation escalation / M408 sealed denial / M409 high-stakes-no-warrant / M412 red-line cardinality) — each test pins a specific drift detector (centerScore math / verifier emission order / sort order / etc.) — all 8 passed on first run with manually-pinned strings + M416 ship `KunlunEndToEndDemo.swift` real-BASHostRuntime e2e demo (~210 LOC) + `--kunlun-end-to-end-demo` sample-host arg + 13-wire prefix scanner + per-wire ✓/· readout banner with sample codes + 6 e2e test pin tests. **Empirical verification**: `12/13 Kunlun wires fire` through real `BASHostRuntime.startSession(...)` audit pipeline (only `kunlun.jade.missing:` is silent — doctrine-correct since canonical seals elide the missing-codes surface). Cross-doctrine composability verified empirically: `permit.stackedModes = ["draft_only", "compare"]` showing both Cthulhu's `.draft_only` (from M384 abyssal) AND Kunlun's `.compare` (from M406) compose on the same bound permit; `permit.mode = "delay"` unchanged (single commit mouth preserved). BAS 2427 → 2435 (+8) / Qinao 1369 → 1375 (+6) / 全栈 3813 → 3827 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase ε done; Phase ζ (deep review pass + manifesto v9 按需 author decision) 待 chapter 九十七**.
+
+---
+
+## 九十七、 Kunlun Phase ζ — deep review pass + manifesto v9 audit verdict（M417 / 2026-05-03）
+
+### 97.1 触发与起点
+
+继 chapter 九十六 ship Phase ε (M415 行为快照 + M416 e2e demo)，本章节按 plan 附录 L §L.8 (Phase ζ) 推进 1 final milestone：M417 deep review pass + manifesto v9 按需 author decision。
+
+**起点状态**（chapter 九十六 末）:
+- Phase α (M401-M403) Observatory + Axis schema parity
+- Phase β (M404-M407) JadeCanon + RiverOrigin + L11 axis escalation
+- Phase γ (M408-M411) Yaochi + Tianmen + L14 cross-protocol bind
+- Phase δ (M412-M414) doctrine red lines + composability + sample-host demo
+- Phase ε (M415-M416) behavioral snapshots + e2e through BASHostRuntime
+- BAS 2435 / Qinao 1375 / 全栈 3827 / 0 failures / 4/4 boundary green
+
+### 97.2 M417.1 — 3-run gate-off + AFM gate-on stability
+
+| Run | BAS XCTest | BAS swift-testing | Qinao XCTest |
+|---|---|---|---|
+| Gate-off run 1 | 2435 / 0 fail | 417 / 0 fail | 1375 / 0 fail |
+| Gate-off run 2 | 2435 / 0 fail | 417 / 0 fail | 1375 / 0 fail |
+| Gate-off run 3 | 2435 / 0 fail | 417 / 0 fail | 1375 / 0 fail |
+| AFM gate-on (`QINAO_AFM_E2E=1 QINAO_FM_E2E=1`) | (BAS unchanged) | unchanged | 1375 / 0 fail / 40 platform-degraded skip |
+
+**Result**: 0 flakes / 0 regressions. AFM gate-on degrades 40 tests per chapter 91.6 macOS 26 foreground-only platform policy (not a substrate bug).
+
+### 97.3 M417.2 — Agent code review
+
+Spawned `general-purpose` agent with explicit doctrine-pin checklist covering single commit mouth, cross-doctrine RL8, Kunlun §13.7 RL3-RL6, composability with M384, audit hash chain, race conditions, edge cases, cross-build determinism.
+
+Agent returned **11 findings**: 1 HIGH, 5 MEDIUM, 5 LOW.
+
+### 97.4 M417.3 — Human-grep verification + fixes
+
+Verified each finding against source. Real bugs vs latent edge cases vs cosmetic:
+
+| # | Severity | Action |
+|---|---|---|
+| **H1** | HIGH | **REAL — FIXED**: suppressed-escalation reason codes never reach audit ledger |
+| **M1** | MEDIUM | **REAL — FIXED**: duplicate-attribution loss when M384+M406 both want `.compare` |
+| M2 | MEDIUM | DEFERRED: `centerScore == threshold` boundary (latent edge case, not reachable today) |
+| M3 | MEDIUM | DEFERRED: NaN handling defensive gap (no production caller produces NaN) |
+| M4 | MEDIUM | DEFERRED: audit-projection synthesis convention (documented; not load-bearing) |
+| M5 | MEDIUM | DEFERRED: format string round-trip stability (cross-platform IEEE 754 default; flag for L4 wire-in) |
+| L1-L5 | LOW | DEFERRED: documentation / cosmetic |
+
+**Calibration**: real-bug rate **18% (2/11)**, matching chapter 67 / 81 / 91.5 baseline of ~75-80% non-actionable agent findings.
+
+### 97.5 Fix 1 — M1 (kunlun:compare attribution always emitted)
+
+**Problem** ([BASKunlunPermitEscalation.swift:162-166](../BehavioralAISubstrate/Sources/BASOrchestration/BASKunlunPermitEscalation.swift)):
+The `permit.escalated:kunlun:compare` reason code was inside the `if !seen.contains(.compare)` guard. When upstream M384 abyssal escalation already added `.compare` to stackedModes, the entire block was skipped — dropping the kunlun-attribution.
+
+**Fix**: separate stack-mode append from attribution emission:
+```swift
+addedCodes.append("permit.escalated:kunlun:compare")  // always
+if !seen.contains(.compare) {
+    stackedModes.append(.compare)
+    seen.insert(.compare)
+}
+```
+
+Same change applied to `.escalate` deep-deviation ladder (line 180-187).
+
+**Test pin** (2 new tests in [M406KunlunPermitEscalationTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M406KunlunPermitEscalationTests.swift)):
+- `testKunlunCompareAttributionAlwaysEmitted` — pre-existing M384 `.compare` + M406 fires → both attribution codes (`abyssal:compare` + `kunlun:compare`) preserved
+- `testKunlunEscalateAttributionAlwaysEmittedOnDeepDeviation` — pre-existing `.escalate` + deep deviation → `kunlun:escalate-deep-deviation` attribution still emitted
+
+### 97.6 Fix 2 — H1 (suppression reason codes harvested into audit)
+
+**Problem** ([EBrainRuntimeCoordinator.swift:435,512](../BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift)):
+Coordinator only consumed `decision.permit` from M384/M406 escalations. When red line 8 fires (anchor `.reserved`), the helpers return permit unchanged with suppression codes attached to the **decision**, not the permit. Pre-fix the `decision.reasonCodes` (`permit.escalation-skipped:kunlun-axis-anchor-reserved` + per-deviation `permit.escalation-suppressed:kunlun:<code>`) were discarded — audit walker had no way to distinguish "no axis deviation" from "deviation suppressed by reserved-anchor."
+
+**Fix**: harvest both escalations' reason codes when suppression fires:
+```swift
+let escalationSuppressionCodes: [String] = {
+    var codes: [String] = []
+    if abyssalEscalation.suppressedByHumanAnchor {
+        codes.append(contentsOf: abyssalEscalation.reasonCodes)
+    }
+    if kunlunEscalation.suppressedByHumanAnchor {
+        codes.append(contentsOf: kunlunEscalation.reasonCodes)
+    }
+    return codes
+}()
+```
+
+Pass to `buildSovereignAuditEntry(... escalationSuppressionCodes: ...)`. Audit emission appends them as-is (they already carry typed `permit.escalation-skipped:` / `permit.escalation-suppressed:` prefixes).
+
+**Test pin** (1 new test in `M406KunlunPermitEscalationTests.swift`):
+- `testReservedAnchorSuppressionCodesAreHarvestable` — when reserved-anchor fires, decision must carry `permit.escalation-skipped:kunlun-axis-anchor-reserved` + per-deviation `permit.escalation-suppressed:kunlun:<code>` markers (so coordinator's harvest step can capture them)
+
+### 97.7 M417.4 — Deep review report doc
+
+新建 [QINAO_M401_TO_M416_DEEP_REVIEW_2026-05-03.md](./QINAO_M401_TO_M416_DEEP_REVIEW_2026-05-03.md)（comprehensive review report）:
+- 11-finding verification matrix (real / deferred / cosmetic)
+- Fix 1 + Fix 2 detailed before/after
+- Doctrine triple status table (8/8 wires complete)
+- Calibration statistics (18% real-bug rate, matches baseline)
+- Test impact (BAS 2435 → 2438)
+
+### 97.8 M417.5 — Manifesto v9 audit verdict
+
+新建 [QINAO_MANIFESTO_V9_DOCTRINE_AUDIT_VERDICT.md](./QINAO_MANIFESTO_V9_DOCTRINE_AUDIT_VERDICT.md):
+
+**Audit verdict matrix**:
+| Doctrine layer | Status |
+|---|---|
+| 8 wires × v5 triple (typed pin + measurement + regression gate) | ✅ all 8 complete |
+| Cross-doctrine compatibility (single mouth + RL8 + composability + hash chain + boundary checks + 18 red lines) | ✅ all verified |
+| Production-path coverage | ✅ 12/13 (92%) per M416 e2e demo |
+| Deep-review pass | ✅ 2 real bugs fixed, 9 deferred-with-criteria |
+
+**Verdict**: **Kunlun-axis-as-doctrine v5 triple-complete**.
+
+**Authoring decision**: **deferred** per user preference "按需 author" + chapter 九十一.9 precedent. Rationale recorded:
+1. User preference verbatim
+2. Cthulhu sibling doctrine also deferred (chapter 九十一.9 precedent)
+3. 一轴一渊 sibling parity (asymmetric authoring would need to be resolved)
+4. Audit verdict provides reproducible empirical foundation; manifesto can be authored later citing this doc
+
+If user later says "author v9", the verdict + deep-review report provide the foundation.
+
+### 97.9 测试基线
+
+| 套件 | 九十六 章末 | 九十七 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2435 | **2438** | **+3** (M1 fix-pin 2 + H1 fix-pin 1) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3827 | **3830** | **+3** |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿. Manual e2e demo run still produces 12/13 wires fired (post-fix unchanged from chapter 九十六 baseline).
+
+### 97.10 红线 / 不变量
+
+| 红线 / 不变量 | M417 fixes |
+|---|---|
+| #1 先醒再答 | ✓（fixes are in escalation seam, not L1） |
+| #2 神经不掌权 | ✓（permit.mode never modified by fixes） |
+| #3 私有经验不进权重 | ✓ |
+| audit hash chain | ✓（fix is additive — appends to signalRefs） |
+| 单提交口 | ✓ |
+| Kunlun 8 红线 (§13.7) | unchanged |
+| Cthulhu 10 红线 | unchanged |
+| 4 boundary checks | 维持 |
+| **Cross-doctrine RL8 (anchor wins)** | **STRENGTHENED** by H1 fix — suppression now empirically observable in audit ledger |
+| **Composability M384 + M406** | **STRENGTHENED** by M1 fix — kunlun-attribution preserved when M384 already added `.compare`/`.escalate` |
+
+### 97.11 Phase ζ 完成判据
+
+| 判据 | 状态 |
+|---|---|
+| 3-run gate-off stable | ✓ |
+| AFM gate-on stable (modulo platform-degraded skips) | ✓ |
+| Agent code review run | ✓ |
+| Human-grep verification of every finding | ✓ |
+| Real bugs fixed with fix-pin tests | ✓ (H1 + M1 fixed; 3 new tests) |
+| Deep review report doc written | ✓ |
+| Manifesto v9 audit verdict recorded | ✓ |
+| BAS + Qinao test suites green | ✓ |
+| 4 boundary checks clean | ✓ |
+
+### 97.12 Kunlun roadmap status (plan 附录 L overall)
+
+| Phase | Chapter | Milestones | Status |
+|---|---|---|---|
+| α | 九十二 | M401-M403 | ✅ done |
+| β | 九十三 | M404-M407 | ✅ done |
+| γ | 九十四 | M408-M411 | ✅ done |
+| δ | 九十五 | M412-M414 | ✅ done |
+| ε | 九十六 | M415-M416 | ✅ done |
+| ζ | 九十七 | M417 | ✅ done — **Kunlun roadmap complete** |
+
+**Plan 附录 L** (Kunlun Axis Doctrine integration, M401-M417) is **fully closed**. The doctrine has:
+- 6 typed schemas + 5 protocol helpers (M401)
+- L4 audit-projection seams for axis / jade / river / yaochi / tianmen / cross-protocol bind (M402, M404, M405, M408, M409, M410)
+- L11 permit-synthesis hook with M384 composability (M406)
+- 8 typed doctrine red lines (M412)
+- 6 cross-doctrine composability fixtures (M413)
+- Pure-function 13-wire demo (M414)
+- 8 byte-equal behavioral snapshots (M415)
+- Real-BASHostRuntime e2e demo with 12/13 production-path coverage (M416)
+- Deep review pass with 2 real bugs fixed + audit verdict recorded (M417)
+
+### 97.13 一句话总结
+
+**M417 closes 昆仑 doctrine Phase ζ + entire 昆仑 roadmap (chapter 九十七)**：3-run gate-off + AFM gate-on stability verified (BAS 2435 / 0 fail / 0 flakes; Qinao 1375 / 40 platform-degraded skip per chapter 91.6 policy) + agent code review returned 11 findings (1 HIGH + 5 MEDIUM + 5 LOW) + human-grep verification confirmed 18% real-bug rate (matches baseline ~75-80% FP rate) + 2 real bugs fixed: **H1** harvest-suppression-reason-codes (`escalationSuppressionCodes` parameter on `buildSovereignAuditEntry` captures M384/M406 decision-side reason codes when red line 8 fires; audit walker can now distinguish "no deviation" from "deviation suppressed by reserved-anchor") + **M1** kunlun:compare-attribution-always-emit (separate stack-mode append from reason-code emission so cross-doctrine composability traceability preserved when M384 already added `.compare`/`.escalate`) + 3 fix-pin tests + deep review report doc + manifesto v9 audit verdict recording **Kunlun-axis-as-doctrine v5 triple-complete** with authoring **deferred** per user preference "按需 author" + chapter 九十一.9 precedent (sibling 一轴一渊 doctrine asymmetry). BAS 2435 → 2438 (+3) / Qinao 1375 unchanged / 全栈 3827 → 3830 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase ζ done; plan 附录 L Kunlun roadmap (M401-M417) fully closed across 6 phases**.

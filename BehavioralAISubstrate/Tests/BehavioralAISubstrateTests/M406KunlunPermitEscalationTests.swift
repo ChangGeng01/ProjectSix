@@ -256,6 +256,76 @@ final class M406KunlunPermitEscalationTests: XCTestCase {
             ".compare must not be duplicated")
     }
 
+    // MARK: - 9. M417 fix-pin: kunlun:compare attribution always
+    //          emitted even when .compare was upstream-added
+
+    /// M417 chapter 九十七 deep-review M1 fix: when an upstream
+    /// escalation (e.g. M384 abyssal) already added `.compare` to
+    /// stackedModes, M406 MUST still emit
+    /// `permit.escalated:kunlun:compare` so the kunlun-attribution
+    /// of the compare-mode request is not lost. Pre-fix the
+    /// attribution code was gated on the same `!seen.contains(.compare)`
+    /// guard as the stack-mode append, dropping cross-doctrine
+    /// composability traceability.
+    func testKunlunCompareAttributionAlwaysEmitted() {
+        // Permit already has .compare (e.g. from upstream M384).
+        let permit = makePermit(
+            stackedModes: [.compare],
+            reasonCodes: ["permit.escalated:abyssal:compare"])
+        let alignment = makeAlignment(
+            centerScore: 0.5,
+            deviationCodes: [],
+            requiresGate: true)
+        let decision = BASKunlunPermitEscalation.escalate(
+            permit: permit,
+            alignment: alignment)
+        // Stack mode count remains 1 (no duplication).
+        let compareCount = decision.permit.stackedModes
+            .filter { $0 == .compare }
+            .count
+        XCTAssertEqual(compareCount, 1,
+            ".compare must not be duplicated in stackedModes")
+        // BUT the kunlun-attribution code MUST be emitted.
+        XCTAssertTrue(
+            decision.reasonCodes.contains(
+                "permit.escalated:kunlun:compare"),
+            "kunlun:compare attribution must be emitted even when M384 already added .compare")
+        // The abyssal-attribution from M384 is preserved in the
+        // permit's reasonCodes.
+        XCTAssertTrue(
+            decision.permit.reasonCodes.contains(
+                "permit.escalated:abyssal:compare"),
+            "M384 abyssal:compare attribution preserved")
+        XCTAssertTrue(
+            decision.permit.reasonCodes.contains(
+                "permit.escalated:kunlun:compare"),
+            "M406 kunlun:compare attribution appended to permit reasonCodes")
+    }
+
+    /// M417 fix-pin extension: same attribution-always-emit logic
+    /// applies to `.escalate` deep-deviation ladder.
+    func testKunlunEscalateAttributionAlwaysEmittedOnDeepDeviation() {
+        // Permit already has .escalate (e.g. from upstream).
+        let permit = makePermit(
+            stackedModes: [.escalate])
+        let alignment = makeAlignment(
+            centerScore: 0.1,  // deep deviation
+            deviationCodes: ["x"],
+            requiresGate: true)
+        let decision = BASKunlunPermitEscalation.escalate(
+            permit: permit,
+            alignment: alignment)
+        let escalateCount = decision.permit.stackedModes
+            .filter { $0 == .escalate }
+            .count
+        XCTAssertEqual(escalateCount, 1,
+            ".escalate must not be duplicated")
+        XCTAssertTrue(
+            decision.reasonCodes.contains(
+                "permit.escalated:kunlun:escalate-deep-deviation"),
+            "kunlun:escalate-deep-deviation attribution must be emitted even when .escalate already in stackedModes")
+    }
+
     // MARK: - 8. Deviation code ordering deterministic
 
     func testDeviationCodesEmittedInSortedOrder() {
@@ -287,5 +357,63 @@ final class M406KunlunPermitEscalationTests: XCTestCase {
             XCTAssertLessThan(m, z,
                 "deviation codes must be sorted: mango < zebra")
         }
+    }
+
+    // MARK: - 10. M417 H1 fix-pin: suppression codes harvestable
+
+    /// M417 chapter 九十七 deep-review H1 fix-pin: when red line
+    /// 8 fires (humanAnchor.tone == .reserved), the M406
+    /// escalation-decision's reasonCodes carry the suppression
+    /// codes (`permit.escalation-skipped:kunlun-axis-anchor-reserved`
+    /// + per-deviation `permit.escalation-suppressed:kunlun:<code>`).
+    /// Pre-fix these were discarded at the coordinator's gating
+    /// block; post-fix they are harvested via the new
+    /// `escalationSuppressionCodes` parameter on
+    /// `buildSovereignAuditEntry` and emitted to signalRefs.
+    ///
+    /// This test pins the helper's contract: the decision MUST
+    /// carry the suppression codes when reserved-anchor fires, so
+    /// the coordinator's harvest step can capture them.
+    func testReservedAnchorSuppressionCodesAreHarvestable() {
+        let permit = makePermit()
+        let alignment = makeAlignment(
+            centerScore: 0.5,
+            deviationCodes: ["risk-medium", "axis-shift"],
+            requiresGate: true)
+        let reservedAnchor = BASHumanAnchorSignal(
+            anchorID: "test-reserved",
+            hostSummaryRef: "host-1",
+            agencyRisk: 0.5,
+            alienationRisk: 0.5,
+            dignityRisk: 0.5,
+            overwhelmRisk: 0.5,
+            recommendedSurfaceTone: .reserved,
+            requiredAgencyReservation: "preserve-distance")
+        let decision = BASKunlunPermitEscalation.escalate(
+            permit: permit,
+            alignment: alignment,
+            humanAnchor: reservedAnchor)
+        XCTAssertTrue(decision.suppressedByHumanAnchor,
+            "decision must report suppression for red line 8")
+        XCTAssertTrue(decision.triggered,
+            "decision must report triggered=true (gate would have fired)")
+        // The decision's reasonCodes (NOT the permit's!) carry
+        // the suppression markers. The coordinator's H1 fix-pin
+        // harvests these.
+        XCTAssertTrue(
+            decision.reasonCodes.contains(
+                "permit.escalation-skipped:kunlun-axis-anchor-reserved"),
+            "decision must carry the typed suppression marker")
+        XCTAssertTrue(
+            decision.reasonCodes.contains(
+                "permit.escalation-suppressed:kunlun:risk-medium"),
+            "per-deviation suppression marker present")
+        XCTAssertTrue(
+            decision.reasonCodes.contains(
+                "permit.escalation-suppressed:kunlun:axis-shift"),
+            "all per-deviation suppression markers present")
+        // The permit itself is unchanged — single commit mouth.
+        XCTAssertEqual(decision.permit, permit,
+            "permit unchanged when suppression fires")
     }
 }
