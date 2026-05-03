@@ -1173,6 +1173,12 @@ ForbiddenKnowledgeCandidate
 
 ## 11. 当前仓库口径与缺口
 
+> **2026-05-03 chapter 九十九 (M419) 更新**：本节先前列出的"还没有"列表
+> 已经过时；M287/M303/M304/M321/M384/M385 + Cthulhu Phase α-ε
+> (chapters 八十七 → 九十一) 已 ship 全部七项典型对象与三项横切协议。
+> 下面给出准确口径。详见
+> `docs/QINAO_M419_WHITEPAPER_GAP_REPORT_2026-05-03.md`。
+
 当前仓库已经有适合承接这套协议的基础：
 
 * `L4` 已有地平线目标态，可承接宇宙尺度、不可知与深时间模板。
@@ -1181,18 +1187,59 @@ ForbiddenKnowledgeCandidate
 * `L14` 已有主权目标态与现实骨架，可承接旧印封缄、谱系斩断、净启与最小残响。
 * 平台总纲已明确宿主主权优先，不适合把克苏鲁 inspiration 做成默认侵蚀叙事。
 
-但距离本文目标态仍有缺口：
+### 11.1 已实装的对象与协议（chapter 八十七 → 九十一 ship）
 
-* 还没有正式 `HumanAnchorSignal / AbyssalPressure / SealEnvelope / ForbiddenKnowledgeCandidate` 对象。
-* 还没有 `Human Anchor Protocol` 作为横切协议进入 `L5 / L10 / L11 / L12 / L14`。
-* 还没有 `Abyssal Pressure Budget` 进入 `L1 / L9 / L11 / L14`。
-* 还没有 `Old Seal Sealing Protocol` 覆盖 `L8 / L13 / L14`。
-* 还没有以主题包形式产品化 `Abyss / Old Seal / Observatory / Deep Tide`。
-* UI 仍需明确避免惊吓化、凝视化与精神侵蚀式语言。
+§7 八个核心对象 — 全部 typed-implemented:
 
-所以当前最准确的口径是：
+| §7 名 | 实装位置 | Milestone |
+|---|---|---|
+| `HumanAnchorSignal` | [BASOrchestration/BASAbyssalProtocol.swift:232](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift) | M287/M304 |
+| `AbyssalPressure` | [BASAbyssalProtocol.swift:121](../BehavioralAISubstrate/Sources/BASOrchestration/BASAbyssalProtocol.swift) | M287/M303 |
+| `UnknownReserve` | [BASWorldPrior/BASUnknownReserve.swift](../BehavioralAISubstrate/Sources/BASWorldPrior/BASUnknownReserve.swift) | M287/M320 |
+| `AnomalyTrace` | `BASAbyssalProtocol.swift` (M317 derive) | M287/M317 |
+| `NarrativeDistortion` | `BASAbyssalProtocol.swift` (M316 derive) | M287/M316 |
+| `AbyssalBranch` | `BASAbyssalProtocol.swift` (M318 derive) | M287/M318 |
+| `SealEnvelope` | [BASMemory/BASSealEnvelope.swift:81](../BehavioralAISubstrate/Sources/BASMemory/BASSealEnvelope.swift) | M287 |
+| `ForbiddenKnowledgeCandidate` | [BASMemory/BASForbiddenKnowledgeCandidate.swift:104](../BehavioralAISubstrate/Sources/BASMemory/BASForbiddenKnowledgeCandidate.swift) | M287/M321 |
 
-仓库已经有适合承接深渊锚点协议的主权与层级基础，但还没有实现这套可选主题哲学与横切治理协议。
+横切协议 — 全部 typed-protocol-helper-implemented:
+
+* `BASHumanAnchorProtocol` (M304) → 横切 L5 / L10 / L11 / L12 / L14
+  via `BASAbyssalProtocol.swift:668`
+* `BASAbyssalPressureBudget` (M303) → 横切 L1 / L9 / L11 / L14 via
+  `BASAbyssalProtocol.swift:500`
+* `BASOldSealSealingProtocol` (M287) → 覆盖 L8 / L13 / L14 via
+  `BASMemory/BASSealEnvelope.swift:153`
+
+### 11.2 仍 deferred 的项（明确不在 chapter 九十九 范围）
+
+* 以主题包形式产品化 `Abyss / Old Seal / Observatory / Deep Tide`
+  (UI surface — 产品层决策；待 explicit user request)
+* §5.10 `CosmicColdCounterweight` (Cthulhu integration spec §5.10 of
+  L10 specifies a counterweight schema; currently not implemented as
+  no clear contract spec; defer until contract is well-defined)
+* `Abyss / Old Seal / Observatory / Deep Tide` SDK packs as Swift
+  packages (would be 1-day surgical each but requires UI commitment)
+
+### 11.3 与 Cthulhu integration spec §3.3 的命名漂移（informational）
+
+Cthulhu integration spec V1 §3.3 `OldSeal` (line 280-287) lists the
+fields as `seal_id / target_refs / seal_class / disclosure_mode /
+release_conditions / sovereign_required`. The shipped
+`BASSealEnvelope` follows this whitepaper's §7 spec instead:
+`seal_id / target_refs / seal_reason / access_policy /
+reveal_conditions / lineage_cut_refs / audit_ref`. Both are valid
+field naming conventions for the same conceptual object; the
+implementation treats `accessPolicy.sovereignOnly` as the typed
+equivalent of `sovereign_required`. See
+`docs/QINAO_M419_WHITEPAPER_GAP_REPORT_2026-05-03.md` §SD-1 for the
+full spec-drift registry entry.
+
+所以当前最准确的口径是（post-chapter 九十一 + chapter 九十九 update）：
+
+仓库已经实装了深渊锚点协议的全部 8 个 §7 typed objects + 3 个横切协议；
+剩余 deferred 的是 UI 主题包 + 产品层 SDK 包 + 一些低优先级
+counter-weight schemas。**§7 typed-object-parity is COMPLETE**。
 
 ⸻
 
