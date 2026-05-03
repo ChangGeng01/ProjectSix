@@ -303,6 +303,15 @@ struct QinaoSampleHost {
             runKunlunDoctrineDemo()
             return
         }
+        if args.contains("--kunlun-end-to-end-demo") {
+            // M416 (chapter 九十六) — drive a real BASHostRuntime
+            // session through every Kunlun wire shipped in
+            // M402-M410 and verify the audit signalRefs ledger
+            // reflects each wire's prefix. Pattern parallel to
+            // `--cthulhu-end-to-end-demo`.
+            await runKunlunEndToEndDemo()
+            return
+        }
         if args.contains("--audit-ledger-bench") {
             // M357 — bench `BASSovereignAuditLedger.append`
             // per-entry latency × N. Default N=10000;
@@ -4656,6 +4665,63 @@ struct QinaoSampleHost {
             ━━━ Demo complete — Cthulhu wires ran through BASHostRuntime: \(outcome.allWiresRegistered ? "✓" : "⚠")
                 forbidden-gate production caller invoked: \(outcome.forbiddenGateInvoked ? "✓" : "⚠ no tickets") ━━━
             """)
+    }
+
+    // MARK: - M416 kunlun-end-to-end-demo (chapter 九十六 Phase ε)
+
+    /// Drive a real `BASHostRuntime` session through every
+    /// M402-M410 wire and verify each wire's audit signalRefs
+    /// prefix is present. Pattern parallel to
+    /// `runCthulhuEndToEndDemo`.
+    private static func runKunlunEndToEndDemo() async {
+        print("""
+
+            QinaoSampleHost --kunlun-end-to-end-demo (M416):
+
+              Drives a real BASHostRuntime session through every
+              Kunlun doctrine wire shipped in chapter 九十二 /
+              九十三 / 九十四 / 九十五 (M402 axis, M404 jade,
+              M405 river, M406 escalation, M408 yaochi, M409
+              tianmen, M410 cross-protocol bind). For each wire,
+              scan the resulting audit signalRefs for the wire's
+              expected emission prefix, and report whether the
+              wire's non-trivial path fired with the demo's
+              inputs.
+
+            """)
+        do {
+            let outcome = try await KunlunEndToEndDemo.run()
+            print("""
+              Session: \(outcome.sessionID)
+              Audit ID: \(outcome.auditID)
+              SignalRefs: \(outcome.signalRefCount)
+              Permit: mode=\(outcome.permitMode) stackedModes=\(outcome.permitStackedModes.joined(separator: "+"))
+              Permit reason codes: \(outcome.permitReasonCodeCount)
+
+              Wire readouts (\(outcome.wiresFiredCount)/\(outcome.wiresRegisteredCount) fired):
+            """)
+            for readout in outcome.wireReadouts {
+                let mark = readout.present ? "✓" : "·"
+                let samples = readout.sampleCodes
+                    .joined(separator: ", ")
+                print("""
+                    [\(mark)] \(readout.wireName) — prefix: \(readout.auditCodePrefix)
+                        samples: \(samples)
+                """)
+            }
+            print("""
+
+              ━━━ Demo complete — Kunlun wires ran through BASHostRuntime: \(outcome.allWiresRegistered ? "✓" : "⚠")
+                  fired \(outcome.wiresFiredCount)/\(outcome.wiresRegisteredCount) on this turn's inputs.
+                  Phase ζ (chapter 九十七): deep review pass +
+                    manifesto v9 按需 author decision.
+              ━━━
+            """)
+        } catch {
+            print("""
+              ⚠ Kunlun end-to-end demo failed: \(error)
+            """)
+        }
     }
 
     // MARK: - M357 audit-ledger-bench

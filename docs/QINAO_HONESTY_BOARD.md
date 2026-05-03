@@ -11332,3 +11332,142 @@ After this chapter ships:
 ### 95.9 一句话总结
 
 **M412-M414 close 昆仑 doctrine Phase δ (chapter 九十五)**：M412 ship `BASKunlunDoctrineRedLines.swift` 8-case typed enum (forbidSystemAuthorityViaKunlun / forbidAscentShamingHost / forbidPermanentSanctumOccupation / forbidJadeCanonBlackBox / forbidTianmenBypassesHost / forbidRiverOriginHiddenSurveillance / forbidSingleCultureExclusivity / forbidWelcomeBecomesTakeover per §13.7 RL1-RL8) each carrying whitePaperRef + forbiddenSubstrings; 7 lint tests pinning cardinality + raw-value stability + cross-doctrine cardinality (8 Kunlun + 10 Cthulhu = 18 total) + the critical static lint test walking 28 known Kunlun emission codes vs 8 red lines (224 negative checks) ensuring substrate vocabulary honors all red lines + M413 ship 6 cross-doctrine composability fixtures pinning Kunlun + Cthulhu additive composition (low/centered → no escalation; high/centered → Cthulhu only; low/overreach → Kunlun only; high/overreach → both fire + reason codes accumulate; reserved anchor → both suppressed symmetrically RL8; deep deviation → Kunlun .escalate added) + M414 ship `KunlunDoctrineDemo.swift` pure-function demo + `--kunlun-doctrine-demo` sample-host arg + 13-wire banner (2 axis + 2 jade + 2 river + 2 escalation + 2 yaochi + 2 tianmen + 1 red-line) with `allInvariantsHold` flag aggregating expected shapes; manual `swift run` verified `allInvariantsHold = true` end-to-end + 8 substrate-pin tests on demo primitives. Single commit mouth pinned across 6 composability fixtures. BAS 2414 → 2427 (+13) / Qinao 1361 → 1369 (+8) / 全栈 3792 → 3813 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase δ done; Phase ε (behavioral snapshots + e2e through BASHostRuntime) 待 chapter 九十六**.
+
+---
+
+## 九十六、 Kunlun Phase ε — behavioral snapshots + e2e through BASHostRuntime（M415-M416 / 2026-05-03）
+
+### 96.1 触发与起点
+
+继 chapter 九十五 ship Phase δ (M412 红线 typed pin + M413 composability + M414 demo)，本章节按 plan 附录 L §L.7 (Phase ε) 推进 2 milestones：M415 Kunlun 行为回归 byte-equal 快照 / M416 真 BASHostRuntime end-to-end demo。
+
+**起点状态**（chapter 九十五 末）:
+- 8 doctrine red lines typed-enumerated + 224 negative lint checks
+- 6 cross-doctrine composability fixtures pinning Kunlun + Cthulhu additive composition
+- 13-wire pure-function demo (`--kunlun-doctrine-demo`)
+- BAS 2427 / Qinao 1369 / 全栈 3813 / 0 failures / 4/4 boundary green
+
+### 96.2 M415 — 行为回归 byte-equal 快照测试（8 fixtures）
+
+**新建** [M415KunlunBehavioralSnapshotTests.swift](../BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M415KunlunBehavioralSnapshotTests.swift)（~280 LOC, 8 byte-equal snapshot tests）:
+
+每个 test:
+1. Fixed deterministic input
+2. Run wire's helper
+3. Snapshot every observable output field as JSON-serialized string (`.sortedKeys` for cross-build stability)
+4. Assert byte-equal against pinned expected string
+
+8 snapshots cover the 7 milestones:
+
+| # | Wire | Snapshot fixture | Drift this catches |
+|---|---|---|---|
+| 1 | M402 axis alignment | overreaching axis (1/3 matched, 2 deviation codes, threshold 0.7) | centerScore math, deviation shape, threshold logic |
+| 2 | M404 canonical seal | full canonical seal | verifier logic |
+| 3 | M404 defective seal | all 4 canonical reqs missing | verifier emission order or wording |
+| 4 | M405 partial trace | orphan trace, no audit, lineage cut | analyzer warning order or wording |
+| 5 | M406 escalation | deep deviation (centerScore 0.1) + 3 unsorted codes (zebra, alpha, mango) | translation, deep-deviation ladder, sort order |
+| 6 | M408 sealed sanctum | sealed policy entry | sealed-policy code |
+| 7 | M409 high-stakes-no-warrant | host gate no warrant | gate readiness logic |
+| 8 | M412 red-line cardinality | all 8 cases | case order, raw value, cardinality |
+
+**All 8 snapshots passed on first run** — pinned strings exactly match substrate's emission. Pattern parallel to M398 Cthulhu behavioral snapshots.
+
+### 96.3 M416 — 真 BASHostRuntime end-to-end demo
+
+**新建** [KunlunEndToEndDemo.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/KunlunEndToEndDemo.swift)（~210 LOC）:
+- `KunlunEndToEndWireReadout` value type carrying wire name + audit code prefix + present flag + sample codes (parity with `CthulhuEndToEndWireReadout`)
+- `KunlunEndToEndOutcome` value type carrying session ID + audit ID + signalRef count + permit shape + wire readouts + fired count / registered count
+- `KunlunEndToEndDemo.run() async throws -> KunlunEndToEndOutcome` — drives a real `BASHostRuntime.startSession(...)` with the canonical demo prompt + medium risk + scans the audit entry's signalRefs for each of 13 Kunlun wire prefixes
+- 13 wire prefixes registered (M402: 3; M404: 2; M405: 3; M406: 1; M408: 1; M409: 2; M410: 1)
+
+**修改** [main.swift](../QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift):
+- New `--kunlun-end-to-end-demo` args branch + `runKunlunEndToEndDemo()` async static func — banner showing per-wire readout ✓/· marker + sample codes + final ratio (X/13 fired)
+
+**Empirical evidence** (manual `swift run QinaoSampleHost --kunlun-end-to-end-demo`):
+```
+Session: host.primary|task|quarantine
+Audit ID: audit.host.primary|task|quarantine.quarantine
+SignalRefs: 76
+Permit: mode=delay stackedModes=draft_only+compare
+Permit reason codes: 29
+
+Wire readouts (12/13 fired):
+  [✓] M402 axis center           — kunlun.axis.center:0.667
+  [✓] M402 axis deviation        — kunlun.axis.deviation:risk-medium-needs-attention
+  [✓] M402 axis requires-gate    — kunlun.axis.requires-gate:true
+  [✓] M404 jade seal             — kunlun.jade.seal:action-permit:canonical
+  [·] M404 jade missing          — (canonical seal correctly elides this)
+  [✓] M405 river lineage         — kunlun.river.lineage:wellformed
+  [✓] M405 river upward          — kunlun.river.upward:5
+  [✓] M405 river downward        — kunlun.river.downward:1
+  [✓] M406 permit escalation     — permit.escalated:kunlun:requires-gate
+  [✓] M408 yaochi access         — kunlun.yaochi.access:sensitive:denied
+  [✓] M409 tianmen gate          — kunlun.tianmen.gate:cognitive:remanded
+  [✓] M409 tianmen ready         — kunlun.tianmen.ready:false
+  [✓] M410 tianmen axis-bound    — kunlun.tianmen.axis-bound:session-...
+```
+
+**12/13 wires fire** through the production audit pipeline. The single silent wire is `kunlun.jade.missing:` — only emits when seal is defective; canonical seals correctly elide it (this is doctrine-correct, not a gap).
+
+**Composability with M384 verified empirically**: `permit.stackedModes = ["draft_only", "compare"]` shows both Cthulhu (`.draft_only` from M384) AND Kunlun (`.compare` from M406) escalations composed on the same bound permit.
+
+**新建** [QinaoSampleHostKunlunEndToEndDemoTests.swift](../QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/QinaoSampleHostKunlunEndToEndDemoTests.swift)（6 tests, parity with M399 e2e test pattern):
+1. `testDemoSessionProducesAuditEntry` — smoke test
+2. `testAllAlwaysFiringKunlunWiresFire` — 11 always-firing wire prefixes (M402 axis, M404 jade seal, M405 river ×3, M408 yaochi, M409 tianmen ×2, M410 axis-bound)
+3. `testHighProductionPathCoverage` — empirical claim: ≥ 12/13 wires fire on canonical demo input
+4. `testM406EscalationReflectedInBoundPermit` — `permit.stackedModes` contains `.compare` from M406
+5. `testM410AxisBoundReferencesSessionID` — cross-protocol bind code references session ID
+6. `testKunlunWireFireCountIsDeterministic` — `Set` of fired wire prefixes is identical across 2 runs
+
+### 96.4 测试基线
+
+| 套件 | 九十五 章末 | 九十六 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2427 | **2435** | **+8** (M415 8 byte-equal snapshots) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1369 | **1375** | **+6** (M416 e2e demo tests) |
+| 全栈 | 3813 | **3827** | **+14** |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿. Manual e2e demo run verified `12/13 wires fired = 92% coverage`.
+
+### 96.5 红线 / 不变量
+
+| 红线 / 不变量 | M415 | M416 |
+|---|---|---|
+| #1 先醒再答 | ✓（pure-function snapshots） | ✓（real BASHostRuntime turn） |
+| #2 神经不掌权 | ✓（permit not mutated by snapshots） | ✓（permit by L11; M406 only extends stackedModes, demo verifies） |
+| #3 私有经验不进权重 | ✓ | ✓ |
+| audit hash chain | ✓（snapshots are pure helper outputs） | ✓（demo reads ledger; doesn't mutate） |
+| 单提交口 | ✓ | **✓ pinned via `permit.mode == "delay"` from L11 not changed by Kunlun escalation** |
+| Kunlun 8 红线 | ✓ M415 fixture 8 byte-equal pins all 8 cases | ✓ |
+| Cross-doctrine composability | ✓ M413 already pins; M415 indirectly pins via M406 fixture | **✓ verified empirically — Cthulhu .draft_only + Kunlun .compare both in stackedModes** |
+| 4 boundary checks | 维持 | 维持 |
+
+### 96.6 Phase ε 完成判据
+
+| 判据 | 状态 |
+|---|---|
+| Per-wire byte-equal output snapshots | ✓ M415 (8 fixtures) |
+| Each snapshot pins a meaningful drift detector | ✓ M415 (each test has explanation of what kind of drift it catches) |
+| All 8 snapshots pass on first run with pinned strings | ✓ M415 |
+| End-to-end demo through real BASHostRuntime | ✓ M416 |
+| Empirical wire-firing claim verified | ✓ M416 (12/13 fired = 92% coverage) |
+| Cross-doctrine composability empirically verified | ✓ M416 (Cthulhu + Kunlun stack modes both in permit) |
+| BAS + Qinao test suites green | ✓ |
+| 4 boundary checks clean | ✓ |
+| 14 new tests added | ✓ (M415: 8 byte-equal snapshots, M416: 6 e2e tests) |
+
+### 96.7 Phase ζ 后续 (chapter 九十七 — M417)
+
+After this chapter ships:
+- M417 — Deep review pass + manifesto v9 按需 author decision (audit verdict)
+  - 3-run gate-off + 1 AFM gate-on + bench-suite verify
+  - Agent code review on top-N Kunlun source files
+  - Human-grep verify each finding (expect ~75-80% FP rate)
+  - Fix verified bugs + add fix-pin tests
+  - Write `docs/QINAO_M401_TO_M416_DEEP_REVIEW_<date>.md`
+  - Manifesto v9 (Kunlun-as-axis) audit verdict — typed-pin + measurement + regression-gate triple complete; decision deferred to user choice per chapter 九十一.9 precedent
+
+### 96.8 一句话总结
+
+**M415-M416 close 昆仑 doctrine Phase ε (chapter 九十六)**：M415 ship 8 byte-equal behavioral snapshot tests (per-wire output JSON-serialized + pinned against expected strings) covering all 7 Kunlun milestones (M402 axis / M404 canonical+defective seal / M405 partial trace / M406 deep-deviation escalation / M408 sealed denial / M409 high-stakes-no-warrant / M412 red-line cardinality) — each test pins a specific drift detector (centerScore math / verifier emission order / sort order / etc.) — all 8 passed on first run with manually-pinned strings + M416 ship `KunlunEndToEndDemo.swift` real-BASHostRuntime e2e demo (~210 LOC) + `--kunlun-end-to-end-demo` sample-host arg + 13-wire prefix scanner + per-wire ✓/· readout banner with sample codes + 6 e2e test pin tests. **Empirical verification**: `12/13 Kunlun wires fire` through real `BASHostRuntime.startSession(...)` audit pipeline (only `kunlun.jade.missing:` is silent — doctrine-correct since canonical seals elide the missing-codes surface). Cross-doctrine composability verified empirically: `permit.stackedModes = ["draft_only", "compare"]` showing both Cthulhu's `.draft_only` (from M384 abyssal) AND Kunlun's `.compare` (from M406) compose on the same bound permit; `permit.mode = "delay"` unchanged (single commit mouth preserved). BAS 2427 → 2435 (+8) / Qinao 1369 → 1375 (+6) / 全栈 3813 → 3827 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Phase ε done; Phase ζ (deep review pass + manifesto v9 按需 author decision) 待 chapter 九十七**.
