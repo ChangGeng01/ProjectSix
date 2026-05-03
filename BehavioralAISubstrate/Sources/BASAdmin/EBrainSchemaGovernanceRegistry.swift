@@ -1003,6 +1003,110 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "ForbiddenKnowledgeCandidate",
             versionedType: BASForbiddenKnowledgeCandidate.self,
             tests: ["schema.forbidden_knowledge_candidate.current", "schema.forbidden_knowledge_candidate.backward"]
+        ),
+        // M439 (chapter 一百十四) — 7 missing L4/L7/L9/L10
+        // schemas from Cthulhu/Abyssal whitepapers
+        // (Cthulhu Spec V1 §5.4 + §5.9, Abyssal VINF §4.4 +
+        // §4.7 + §4.9 + §4.10). Closes 7 of the 11 user-flagged
+        // structural blanks in the 2026-05-04 audit.
+        entry(
+            "CosmicScaleView",
+            versionedType: BASCosmicScaleView.self,
+            tests: ["schema.cosmic_scale_view.current", "schema.cosmic_scale_view.backward"]
+        ),
+        entry(
+            "TemporalDepthMap",
+            versionedType: BASTemporalDepthMap.self,
+            tests: ["schema.temporal_depth_map.current", "schema.temporal_depth_map.backward"]
+        ),
+        entry(
+            "OntologyFog",
+            versionedType: BASOntologyFog.self,
+            tests: ["schema.ontology_fog.current", "schema.ontology_fog.backward"]
+        ),
+        entry(
+            "OntologyShiftMark",
+            versionedType: BASOntologyShiftMark.self,
+            tests: ["schema.ontology_shift_mark.current", "schema.ontology_shift_mark.backward"]
+        ),
+        entry(
+            "NonEuclideanCandidate",
+            versionedType: BASNonEuclideanCandidate.self,
+            tests: ["schema.non_euclidean_candidate.current", "schema.non_euclidean_candidate.backward"]
+        ),
+        entry(
+            "UnknownRetentionLoop",
+            versionedType: BASUnknownRetentionLoop.self,
+            tests: ["schema.unknown_retention_loop.current", "schema.unknown_retention_loop.backward"]
+        ),
+        entry(
+            "CosmicColdCounterweight",
+            versionedType: BASCosmicColdCounterweight.self,
+            tests: ["schema.cosmic_cold_counterweight.current", "schema.cosmic_cold_counterweight.backward"]
+        ),
+        // M439 (chapter 一百十四 anti-drift sweep) — 11 Kunlun
+        // schemas (chapters 九十二-九十七 / M401-M417) that
+        // landed as `BASSchemaVersioned` types but were never
+        // registered in governance. Pre-existing drift caught
+        // by `scripts/check_whitepaper_schema_parity.sh` while
+        // chapter 一百十四 was running its parity gate. Per
+        // chapter 一百十三 "严查 hard coding + magic numbers"
+        // doctrine, drift is drift — closing all 11 in this
+        // chapter rather than leaving them for a follow-up.
+        entry(
+            "KunlunAxis",
+            versionedType: BASKunlunAxis.self,
+            tests: ["schema.kunlun_axis.current", "schema.kunlun_axis.backward"]
+        ),
+        entry(
+            "AxisAlignment",
+            versionedType: BASAxisAlignment.self,
+            tests: ["schema.axis_alignment.current", "schema.axis_alignment.backward"]
+        ),
+        entry(
+            "JadeCanonSeal",
+            versionedType: BASJadeCanonSeal.self,
+            tests: ["schema.jade_canon_seal.current", "schema.jade_canon_seal.backward"]
+        ),
+        entry(
+            "HeavenGatePermit",
+            versionedType: BASHeavenGatePermit.self,
+            tests: ["schema.heaven_gate_permit.current", "schema.heaven_gate_permit.backward"]
+        ),
+        entry(
+            "RiverOriginTrace",
+            versionedType: BASRiverOriginTrace.self,
+            tests: ["schema.river_origin_trace.current", "schema.river_origin_trace.backward"]
+        ),
+        entry(
+            "YaochiSanctumEntry",
+            versionedType: BASYaochiSanctumEntry.self,
+            tests: ["schema.yaochi_sanctum_entry.current", "schema.yaochi_sanctum_entry.backward"]
+        ),
+        entry(
+            "KunlunAxisView",
+            versionedType: BASKunlunAxisView.self,
+            tests: ["schema.kunlun_axis_view.current", "schema.kunlun_axis_view.backward"]
+        ),
+        entry(
+            "KunlunAscentView",
+            versionedType: BASKunlunAscentView.self,
+            tests: ["schema.kunlun_ascent_view.current", "schema.kunlun_ascent_view.backward"]
+        ),
+        entry(
+            "KunlunFarWestReserve",
+            versionedType: BASKunlunFarWestReserve.self,
+            tests: ["schema.kunlun_far_west_reserve.current", "schema.kunlun_far_west_reserve.backward"]
+        ),
+        entry(
+            "KunlunTianmenWarrant",
+            versionedType: BASKunlunTianmenWarrant.self,
+            tests: ["schema.kunlun_tianmen_warrant.current", "schema.kunlun_tianmen_warrant.backward"]
+        ),
+        entry(
+            "KunlunGateDenialWrit",
+            versionedType: BASKunlunGateDenialWrit.self,
+            tests: ["schema.kunlun_gate_denial_writ.current", "schema.kunlun_gate_denial_writ.backward"]
         )
     ]
 

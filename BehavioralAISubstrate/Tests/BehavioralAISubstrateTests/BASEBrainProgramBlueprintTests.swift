@@ -300,7 +300,37 @@ struct BASEBrainProgramBlueprintTests {
             "AbyssalBranch",
             "UnknownReserve",
             "SealEnvelope",
-            "ForbiddenKnowledgeCandidate"
+            "ForbiddenKnowledgeCandidate",
+            // M439 (chapter 一百十四) — 7 missing L4/L7/L9/L10
+            // schemas closing user's 2026-05-04 audit Section B
+            // structural blanks (CosmicScaleView / TemporalDepthMap
+            // / OntologyFog at L4; OntologyShiftMark at L7;
+            // NonEuclideanCandidate / UnknownRetentionLoop at L9;
+            // CosmicColdCounterweight at L10):
+            "CosmicScaleView",
+            "TemporalDepthMap",
+            "OntologyFog",
+            "OntologyShiftMark",
+            "NonEuclideanCandidate",
+            "UnknownRetentionLoop",
+            "CosmicColdCounterweight",
+            // M439 (chapter 一百十四 anti-drift sweep) — 11
+            // Kunlun schemas (chapters 九十二-九十七 / M401-M417)
+            // that shipped as BASSchemaVersioned types but were
+            // never registered in governance. Caught by parity
+            // gate while running M439 ship; closed in same
+            // chapter per chapter 一百十三 "严查" doctrine.
+            "KunlunAxis",
+            "AxisAlignment",
+            "JadeCanonSeal",
+            "HeavenGatePermit",
+            "RiverOriginTrace",
+            "YaochiSanctumEntry",
+            "KunlunAxisView",
+            "KunlunAscentView",
+            "KunlunFarWestReserve",
+            "KunlunTianmenWarrant",
+            "KunlunGateDenialWrit"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

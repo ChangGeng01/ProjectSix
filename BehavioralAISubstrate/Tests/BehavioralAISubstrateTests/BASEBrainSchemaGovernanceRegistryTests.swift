@@ -30,7 +30,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 195)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries
+        #expect(governedObjects.count == 213)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills (chapter 一百十四)
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -404,7 +404,47 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "SealEnvelope":
                 BASSealEnvelope.currentSchemaVersion,
             "ForbiddenKnowledgeCandidate":
-                BASForbiddenKnowledgeCandidate.currentSchemaVersion
+                BASForbiddenKnowledgeCandidate.currentSchemaVersion,
+            // M439 (chapter 一百十四) — 7 missing L4/L7/L9/L10
+            // schemas closing 2026-05-04 audit Section B blanks:
+            "CosmicScaleView":
+                BASCosmicScaleView.currentSchemaVersion,
+            "TemporalDepthMap":
+                BASTemporalDepthMap.currentSchemaVersion,
+            "OntologyFog":
+                BASOntologyFog.currentSchemaVersion,
+            "OntologyShiftMark":
+                BASOntologyShiftMark.currentSchemaVersion,
+            "NonEuclideanCandidate":
+                BASNonEuclideanCandidate.currentSchemaVersion,
+            "UnknownRetentionLoop":
+                BASUnknownRetentionLoop.currentSchemaVersion,
+            "CosmicColdCounterweight":
+                BASCosmicColdCounterweight.currentSchemaVersion,
+            // M439 (chapter 一百十四 anti-drift sweep) — 11
+            // Kunlun schemas backfilled into governance:
+            "KunlunAxis":
+                BASKunlunAxis.currentSchemaVersion,
+            "AxisAlignment":
+                BASAxisAlignment.currentSchemaVersion,
+            "JadeCanonSeal":
+                BASJadeCanonSeal.currentSchemaVersion,
+            "HeavenGatePermit":
+                BASHeavenGatePermit.currentSchemaVersion,
+            "RiverOriginTrace":
+                BASRiverOriginTrace.currentSchemaVersion,
+            "YaochiSanctumEntry":
+                BASYaochiSanctumEntry.currentSchemaVersion,
+            "KunlunAxisView":
+                BASKunlunAxisView.currentSchemaVersion,
+            "KunlunAscentView":
+                BASKunlunAscentView.currentSchemaVersion,
+            "KunlunFarWestReserve":
+                BASKunlunFarWestReserve.currentSchemaVersion,
+            "KunlunTianmenWarrant":
+                BASKunlunTianmenWarrant.currentSchemaVersion,
+            "KunlunGateDenialWrit":
+                BASKunlunGateDenialWrit.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)
