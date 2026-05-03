@@ -350,7 +350,15 @@ struct BASEBrainProgramBlueprintTests {
             // Cthulhu whitepaper coverage closures:
             "HumanAnchorProfile",
             "NarrativeDistortionMap",
-            "SealedMemory"
+            "SealedMemory",
+            // M465-M470 (chapter 一百二十二) — 6 Kunlun control-
+            // flow schemas (Stream A α):
+            "AscentLease",
+            "AxisDeviation",
+            "GatePressure",
+            "AscentBranch",
+            "RestStep",
+            "ReturnPath"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

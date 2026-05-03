@@ -31,7 +31,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 226)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五) + M441-M443 8 top-level wrappers (chapter 一百十六) + M460-M462 3 strict-audit Cthulhu schemas (chapter 一百二十一)
+        #expect(governedObjects.count == 232)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五) + M441-M443 8 top-level wrappers (chapter 一百十六) + M460-M462 3 strict-audit Cthulhu schemas (chapter 一百二十一) + M465-M470 6 Kunlun control-flow schemas (chapter 一百二十二)
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -475,7 +475,21 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "NarrativeDistortionMap":
                 BASNarrativeDistortionMap.currentSchemaVersion,
             "SealedMemory":
-                BASSealedMemory.currentSchemaVersion
+                BASSealedMemory.currentSchemaVersion,
+            // M465-M470 (chapter 一百二十二) — Kunlun control-flow
+            // schemas (Stream A α):
+            "AscentLease":
+                BASAscentLease.currentSchemaVersion,
+            "AxisDeviation":
+                BASAxisDeviation.currentSchemaVersion,
+            "GatePressure":
+                BASGatePressure.currentSchemaVersion,
+            "AscentBranch":
+                BASAscentBranch.currentSchemaVersion,
+            "RestStep":
+                BASRestStep.currentSchemaVersion,
+            "ReturnPath":
+                BASReturnPath.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

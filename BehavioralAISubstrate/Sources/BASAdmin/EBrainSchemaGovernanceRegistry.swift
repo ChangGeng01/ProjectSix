@@ -1195,6 +1195,41 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "SealedMemory",
             versionedType: BASSealedMemory.self,
             tests: ["schema.sealed_memory.current", "schema.sealed_memory.backward"]
+        ),
+        // M465-M470 (chapter 一百二十二 / Stream A α) — Kunlun
+        // control-flow schemas across L1 / L6 / L9 per Kunlun
+        // TARGET_VINF §5.1, §5.6, §5.9. Priority-1 schemas
+        // unlocking 登临 (ascent) + 守中 (centerline-guard)
+        // runtime patterns.
+        entry(
+            "AscentLease",
+            versionedType: BASAscentLease.self,
+            tests: ["schema.ascent_lease.current", "schema.ascent_lease.backward"]
+        ),
+        entry(
+            "AxisDeviation",
+            versionedType: BASAxisDeviation.self,
+            tests: ["schema.axis_deviation.current", "schema.axis_deviation.backward"]
+        ),
+        entry(
+            "GatePressure",
+            versionedType: BASGatePressure.self,
+            tests: ["schema.gate_pressure.current", "schema.gate_pressure.backward"]
+        ),
+        entry(
+            "AscentBranch",
+            versionedType: BASAscentBranch.self,
+            tests: ["schema.ascent_branch.current", "schema.ascent_branch.backward"]
+        ),
+        entry(
+            "RestStep",
+            versionedType: BASRestStep.self,
+            tests: ["schema.rest_step.current", "schema.rest_step.backward"]
+        ),
+        entry(
+            "ReturnPath",
+            versionedType: BASReturnPath.self,
+            tests: ["schema.return_path.current", "schema.return_path.backward"]
         )
     ]
 
