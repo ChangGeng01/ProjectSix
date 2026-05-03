@@ -1170,6 +1170,31 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "SnapshotArk",
             versionedType: BASSnapshotArk.self,
             tests: ["schema.snapshot_ark.current", "schema.snapshot_ark.backward"]
+        ),
+        // M460-M462 (chapter 一百二十一) — strict 14-layer
+        // Cthulhu whitepaper coverage closures:
+        //  - L5 HumanAnchorProfile per Cthulhu Spec V1 §5.5
+        //  - L7 NarrativeDistortionMap per Cthulhu Spec V1 §5.7
+        //  - L8 SealedMemory per Cthulhu Spec V1 §5.8
+        // M459 BASAbyssalOrganAlias is a helper enum (no
+        // BASSchemaVersioned conformance required).
+        // M463 BASAbyssalPressure schema bump v1.0.0 → v1.1.0
+        // adds hostFragility per §5.11; existing registry entry
+        // auto-tracks via `versionedType.currentSchemaVersion`.
+        entry(
+            "HumanAnchorProfile",
+            versionedType: BASHumanAnchorProfile.self,
+            tests: ["schema.human_anchor_profile.current", "schema.human_anchor_profile.backward"]
+        ),
+        entry(
+            "NarrativeDistortionMap",
+            versionedType: BASNarrativeDistortionMap.self,
+            tests: ["schema.narrative_distortion_map.current", "schema.narrative_distortion_map.backward"]
+        ),
+        entry(
+            "SealedMemory",
+            versionedType: BASSealedMemory.self,
+            tests: ["schema.sealed_memory.current", "schema.sealed_memory.backward"]
         )
     ]
 

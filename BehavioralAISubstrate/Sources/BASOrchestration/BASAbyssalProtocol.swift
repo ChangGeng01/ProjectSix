@@ -119,9 +119,24 @@ public enum BASAbyssalPressureMode:
 /// MUST treat values outside `[0, 1]` as a producer bug rather
 /// than silently rescale.
 public struct BASAbyssalPressure:
-    BASSchemaVersioned, Hashable, Sendable
+    BASSchemaVersioned, Hashable, Sendable, Codable
 {
-    public static let currentSchemaVersion = "1.0.0"
+    /// **M463 (chapter 一百二十一)** — schema bump v1.0.0 → v1.1.0
+    /// adding optional `hostFragility` field per Cthulhu Spec V1
+    /// §5.11 (verbatim 7th field of `AbyssPressure`). Pre-bump,
+    /// host fragility was missing despite spec listing it as a
+    /// core dimension. Backward-compat preserved via
+    /// `supportedSchemaVersions` Set + `decodeIfPresent` with
+    /// default-zero fallback.
+    public static let currentSchemaVersion = "1.1.0"
+
+    /// Schema versions this struct can decode (v1.0.0 + v1.1.0
+    /// per chapter 一百三 / 一百十 schema-bump doctrine). The v1
+    /// reader sees hostFragility as 0; the v1.1 reader sees the
+    /// field if present, defaults to 0 when absent.
+    public static let supportedSchemaVersions: Set<String> = [
+        "1.0.0", "1.1.0",
+    ]
 
     public var schemaVersion: String
     /// Stable identifier for this pressure record (e.g.
@@ -144,6 +159,15 @@ public struct BASAbyssalPressure:
     /// Estimated pollution of the surrounding narrative frame
     /// (denial, rewrite, forced closure...).
     public var narrativePollution: Double
+    /// **M463** — host fragility per Cthulhu Spec V1 §5.11.
+    /// `[0, 1]` — higher when the host is currently more
+    /// vulnerable (post-incident window / grief window /
+    /// declared sensitivity period). Producers may derive from
+    /// `BASHumanAnchorProfile.sensitivityWindows`; consumers
+    /// (L11 / L12 / L14) raise compare/delay/local-only mode
+    /// counts when fragility is high. Default 0 for backward-
+    /// compat with v1.0.0 baselines.
+    public var hostFragility: Double
     /// L11 modes the wind gate may want to surface. Order is
     /// preserved (most-preferred first).
     public var recommendedModes: [BASAbyssalPressureMode]
@@ -161,7 +185,8 @@ public struct BASAbyssalPressure:
         manipulationIndex: Double,
         narrativePollution: Double,
         recommendedModes: [BASAbyssalPressureMode],
-        sovereignEscalationHint: String? = nil
+        sovereignEscalationHint: String? = nil,
+        hostFragility: Double = 0
     ) {
         self.schemaVersion = schemaVersion
         self.pressureID = pressureID
@@ -175,13 +200,73 @@ public struct BASAbyssalPressure:
         self.recommendedModes = recommendedModes
         self.sovereignEscalationHint = sovereignEscalationHint
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        self.hostFragility = min(1, max(0, hostFragility))
+    }
+
+    // MARK: - M463 backward-compat Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case pressureID
+        case unknownLoad
+        case consequenceRadius
+        case evidenceDebt
+        case ontologyDistortion
+        case manipulationIndex
+        case narrativePollution
+        case recommendedModes
+        case sovereignEscalationHint
+        case hostFragility
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let version = try container.decodeIfPresent(
+            String.self, forKey: .schemaVersion)
+            ?? "1.0.0"
+        guard Self.supportedSchemaVersions.contains(version) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .schemaVersion,
+                in: container,
+                debugDescription:
+                    "BASAbyssalPressure unsupported schema version " +
+                    "\(version); supported: \(Self.supportedSchemaVersions)")
+        }
+        self.schemaVersion = version
+        self.pressureID = try container
+            .decode(String.self, forKey: .pressureID)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.unknownLoad = min(1, max(0,
+            try container.decode(Double.self, forKey: .unknownLoad)))
+        self.consequenceRadius = min(1, max(0,
+            try container.decode(Double.self, forKey: .consequenceRadius)))
+        self.evidenceDebt = min(1, max(0,
+            try container.decode(Double.self, forKey: .evidenceDebt)))
+        self.ontologyDistortion = min(1, max(0,
+            try container.decode(Double.self, forKey: .ontologyDistortion)))
+        self.manipulationIndex = min(1, max(0,
+            try container.decode(Double.self, forKey: .manipulationIndex)))
+        self.narrativePollution = min(1, max(0,
+            try container.decode(Double.self, forKey: .narrativePollution)))
+        self.recommendedModes = try container.decode(
+            [BASAbyssalPressureMode].self, forKey: .recommendedModes)
+        self.sovereignEscalationHint = try container
+            .decodeIfPresent(String.self, forKey: .sovereignEscalationHint)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // M463: hostFragility decode-with-default for v1.0.0
+        // baselines that don't carry the field.
+        let fragility = try container.decodeIfPresent(
+            Double.self, forKey: .hostFragility) ?? 0
+        self.hostFragility = min(1, max(0, fragility))
     }
 
     /// Convenience: a scalar magnitude estimate combining the six
-    /// continuous dimensions. Producers / consumers can use this
-    /// for ordering / threshold checks without recomputing the
-    /// formula. Pure mean of the six fields, not a weighted score
-    /// — weighting belongs to the policy layer.
+    /// **original** continuous dimensions. Pure mean of 6 fields,
+    /// not 7 — `hostFragility` is intentionally NOT folded in,
+    /// preserving the M303 / M318 / M384 / M398 backward-compat
+    /// contract for trigger thresholds. Future M-chapter may
+    /// expose a separate 7-field `aggregateMagnitudeWithFragility`
+    /// when downstream consumers want the spec-canonical mean.
     public var aggregateMagnitude: Double {
         let total = unknownLoad
             + consequenceRadius
@@ -190,6 +275,15 @@ public struct BASAbyssalPressure:
             + manipulationIndex
             + narrativePollution
         return total / 6.0
+    }
+
+    /// **M463 (chapter 一百二十一)** — 7-field aggregate including
+    /// `hostFragility` per Cthulhu Spec V1 §5.11 verbatim. Use
+    /// this when the spec-canonical mean is needed; `aggregateMagnitude`
+    /// (above) preserves the 6-field backward-compat contract.
+    public var aggregateMagnitudeWithFragility: Double {
+        let total = aggregateMagnitude * 6.0 + hostFragility
+        return total / 7.0
     }
 }
 

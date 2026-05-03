@@ -345,7 +345,12 @@ struct BASEBrainProgramBlueprintTests {
             "NeuralOrganRuntime",
             "StateEvolutionGraphKernel",
             "SovereignMicrokernel",
-            "SnapshotArk"
+            "SnapshotArk",
+            // M460-M462 (chapter 一百二十一) — 3 strict 14-layer
+            // Cthulhu whitepaper coverage closures:
+            "HumanAnchorProfile",
+            "NarrativeDistortionMap",
+            "SealedMemory"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

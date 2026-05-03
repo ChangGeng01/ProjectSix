@@ -31,7 +31,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 223)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五) + M441-M443 8 top-level wrappers (chapter 一百十六)
+        #expect(governedObjects.count == 226)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五) + M441-M443 8 top-level wrappers (chapter 一百十六) + M460-M462 3 strict-audit Cthulhu schemas (chapter 一百二十一)
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -467,7 +467,15 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "SovereignMicrokernel":
                 BASSovereignMicrokernel.currentSchemaVersion,
             "SnapshotArk":
-                BASSnapshotArk.currentSchemaVersion
+                BASSnapshotArk.currentSchemaVersion,
+            // M460-M462 (chapter 一百二十一) — strict 14-layer
+            // Cthulhu whitepaper coverage closures:
+            "HumanAnchorProfile":
+                BASHumanAnchorProfile.currentSchemaVersion,
+            "NarrativeDistortionMap":
+                BASNarrativeDistortionMap.currentSchemaVersion,
+            "SealedMemory":
+                BASSealedMemory.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

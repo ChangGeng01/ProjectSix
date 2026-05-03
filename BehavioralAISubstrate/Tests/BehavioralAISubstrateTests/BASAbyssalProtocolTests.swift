@@ -59,7 +59,16 @@ final class BASAbyssalProtocolTests: XCTestCase {
     }
 
     func testAbyssalPressureSchemaVersionPinned() {
-        XCTAssertEqual(BASAbyssalPressure.currentSchemaVersion, "1.0.0")
+        // Chapter 一百二十一 / M463: schema bump v1.0.0 → v1.1.0
+        // adding optional `hostFragility` field per Cthulhu Spec
+        // V1 §5.11. Backward-compat preserved via
+        // supportedSchemaVersions Set + decodeIfPresent default-0.
+        XCTAssertEqual(BASAbyssalPressure.currentSchemaVersion, "1.1.0")
+        XCTAssertTrue(BASAbyssalPressure.supportedSchemaVersions
+            .contains("1.0.0"),
+            "M463 backward-compat: v1.0.0 still readable")
+        XCTAssertTrue(BASAbyssalPressure.supportedSchemaVersions
+            .contains("1.1.0"))
         let p = BASAbyssalPressure(
             pressureID: "p",
             unknownLoad: 0,
