@@ -358,7 +358,15 @@ struct BASEBrainProgramBlueprintTests {
             "GatePressure",
             "AscentBranch",
             "RestStep",
-            "ReturnPath"
+            "ReturnPath",
+            // M471-M475 (chapter 一百二十三) — 5 Kunlun memory +
+            // equilibrium + permit-grade + refinement schemas
+            // (Stream A β):
+            "JadeCasketSnapshot",
+            "YaochiMemoryLayer",
+            "TianhengProfile",
+            "JadePermitGrade",
+            "JadeRefinementTicket"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

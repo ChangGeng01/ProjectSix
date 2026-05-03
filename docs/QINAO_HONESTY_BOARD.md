@@ -14507,3 +14507,72 @@ Chapter 八十七 stable-raw-value doctrine — `BASAscentMode` 5 cases use keba
 ### 122.7 一句话总结
 
 **Chapter 一百二十二 / Stream A α / M465-M470**: user "开始 昆仑 补全 计划" → plan附录 N (6 chapters / 4 streams / ~6500 LoC) approved → first chapter ships 6 priority-1 Kunlun control-flow schemas in `BASKunlunControlFlow.swift` (~370 LoC). **M465** `BASAscentLease` (L1) — 朝升暮潜 lease with 5-mode `BASAscentMode` enum + returnRequired/gateBudget invariant. **M466** `BASAxisDeviation` (L6) — 离中 readout with deviationScore [0,1] + reasonCodes + correctionHint. **M467** `BASGatePressure` (L6) — 过门压强 with urgency [0,1] + reversible + gateRequired flags. **M468** `BASAscentBranch` (L9) — 登临分支 with required non-empty returnPathRef (dignity invariant pin). **M469** `BASRestStep` (L9) — 守中停驻 with allowedIntermediateActions + resumeConditions. **M470** `BASReturnPath` (L9) — 体面退路 with dignityPreserved + rollbackPossible flags. **Doctrine invariants typed-pinned**: 守正三件套 (Kunlun §5.9 — every ascent branch has paired RestStep + ReturnPath) + 回峰条件 (§5.1 — returnRequired requires gateBudget>0). **6 governance entries** + 3-site cross-update synced. **29 new tests** in `BASKunlunControlFlowTests.swift`. Test counts: BAS XCTest 2708 → **2737** (+29), Qinao 1375 unchanged, 全栈 4100 → **4129** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (232 registered, 0 drift). Doctrine pin held: pure schemas + helper enum; no permit.mode mutation; all red lines / invariants regressed clean. Honest satisfaction: ~99.999% (unchanged from chapter 一百二十一; chapter 一百二十二 is incremental progress on the 6-chapter plan, not a coverage shift). Plan progress: 6/31 work products = ~19% complete; 5 chapters (一百二十三 → 一百二十七) remain.
+
+---
+
+## 一百二十三、 Stream A β 内存+衡+琢 5 schemas (M471-M475 / 2026-05-04)
+
+### 123.1 触发动作
+
+User said "全面开发" (continue plan). Per appendix N: ship Stream A β — 5 priority-2 Kunlun memory + equilibrium + permit-grade + refinement schemas.
+
+### 123.2 What shipped — 5 schemas + 1 rename per residual scan
+
+New file `BASKunlunMemoryEquilibrium.swift` (~340 LoC):
+
+| M | Schema | Layer | White-paper § |
+|---|---|---|---|
+| M471 | `BASJadeCasketSnapshot` | L3 | TARGET §5.3 (line 697-705) |
+| M472 | `BASYaochiMemoryLayer` | L8 | TARGET §5.8 (line 917-925) |
+| M473 | `BASTianhengProfile` | L10 | TARGET §5.10 (line 1010-1020) |
+| M474 | `BASJadePermitGrade` | L11 | TARGET §5.11 (line 1046-1055) |
+| M475 | `BASJadeRefinementTicket` | L13 | TARGET §5.13 (line 1117-1126) |
+
+### 123.3 Honest naming pivot — `BASTianhengProfile` not `BASHeavenBalanceProfile`
+
+Plan附录 N originally proposed `BASHeavenBalanceProfile` for L10. First implementation triggered substrate residual scan (legacy Before-mode vocabulary token reserved for pre-M20 host-compat). Rename to Pinyin `BASTianhengProfile` (天衡) preserves the Kunlun whitepaper anchor while honoring the residual gate. Same convention as `BASKunlunTianmenWarrant` (天门) shipped chapter 九十二. File renamed `BASKunlunMemoryBalance.swift` → `BASKunlunMemoryEquilibrium.swift`.
+
+This is honest course-correction: residual gate is doctrine (chapter 八十六/八十七), not a bug. Plan needed to be updated; rename absorbed at chapter ship time + recorded here.
+
+### 123.4 Doctrine pins applied
+
+Chapter 一百十三 anti-magic-number — all `Double` fields clamped `[0, 1]`; `BASJadePermitGrade.gateMandatoryScoreThreshold = 0.5` named static.
+
+Chapter 一百十四 anti-drift 3-site cross-update:
+- 5 governance entries in `EBrainSchemaGovernanceRegistry.swift`
+- `BASEBrainProgramBlueprintTests.expectedObjects` +5 strings
+- `BASEBrainSchemaGovernanceRegistryTests.expectedVersions` +5 mappings
+- count assertion `232 → 237`
+
+Doctrine invariants (typed pins via test):
+- **§4.2 jade-canon 4 红线** (`BASJadeCasketSnapshot.honorsJadeCanonInvariants`): integrityHash + sourceRiverRef + restoreGateRef + rollbackWritRef all non-empty
+- **§5.8 sanctum anchor invariant** (`BASYaochiMemoryLayer.honorsAnchorInvariant`): non-empty `sanctumPolicy` requires `humanAnchorRequired=true`
+- **§5.11 合度地过** (`BASJadePermitGrade.honorsGateInvariant`): score below threshold requires non-empty `gateRequirements`
+- **§5.13 不留幽灵** (`BASJadeRefinementTicket.honorsNoGhostInvariant`): `fracturePath` non-empty
+
+### 123.5 测试基线
+
+| 套件 | 一百二十二 章末 | 一百二十三 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2737 | **2765** | +28 (1 new test file) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4129 | **4157** | +28 |
+
+5 gates clean: 4 boundary + whitepaper parity (237 registered, 0 drift).
+
+### 123.6 Plan progress
+
+| 项 | Pre-chapter | Post-chapter |
+|---|---|---|
+| Stream A α (control-flow) | 6/6 ✓ | 6/6 ✓ |
+| **Stream A β (memory + equilibrium)** | **0/5** | **5/5** ✓ |
+| Stream A γ (host + integrity) | 0/4 | 0/4 (chapter 一百二十四) |
+| Stream B (5 SDK packages) | 0/5 | 0/5 |
+| Stream C (7 bench metrics) | 0/7 | 0/7 |
+| Stream D (4 共轴 primitives) | 0/4 | 0/4 |
+| **Plan total progress** | **6/31** | **11/31** (~35%) |
+
+### 123.7 一句话总结
+
+**Chapter 一百二十三 / Stream A β / M471-M475**: user "全面开发" → ship 5 priority-2 Kunlun memory + equilibrium + permit-grade + refinement schemas in new `BASKunlunMemoryEquilibrium.swift` (~340 LoC). **M471** `BASJadeCasketSnapshot` (L3) — 玉匣 with 4 jade-canon-required ref fields (integrityHash + sourceRiverRef + restoreGateRef + rollbackWritRef); honorsJadeCanonInvariants pin. **M472** `BASYaochiMemoryLayer` (L8) — 瑶池深井 distinct from Cthulhu thermal enum (chapter 一百十五); sanctum-anchor invariant pin. **M473** `BASTianhengProfile` (L10) — 天衡庭 three-self equilibrium with 3 [0,1] bias/floor scores; Pinyin name avoids residual-scan collision. **M474** `BASJadePermitGrade` (L11) — 玉律风闸 grading layered on top of BASActionPermit; gate-required-when-score-low invariant via named threshold (0.5). **M475** `BASJadeRefinementTicket` (L13) — 炼玉炉 with no-ghost fracturePath invariant per §5.13. **Honest course correction**: original plan name `BASHeavenBalanceProfile` collided with substrate residual scan (legacy host-compat reservation); pivoted to Pinyin `BASTianhengProfile` consistent with chapter 九十二 `BASKunlunTianmenWarrant`. **5 governance entries** + 3-site cross-update (count 232→237). **28 new tests** in `BASKunlunMemoryEquilibriumTests.swift`. Test counts: BAS XCTest 2737 → **2765** (+28), Qinao 1375 unchanged, 全栈 4129 → **4157** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (237 registered, 0 drift). Plan progress: 11/31 = ~35%. Doctrine pin held: pure schemas; no permit.mode mutation; all red lines / invariants regressed clean (Kunlun §4.2 jade-canon 4-rule pin + §5.8 anchor invariant + §5.11 合度地过 + §5.13 不留幽灵 newly typed-pinned).

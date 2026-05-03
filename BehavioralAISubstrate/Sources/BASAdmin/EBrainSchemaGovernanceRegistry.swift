@@ -1230,6 +1230,35 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "ReturnPath",
             versionedType: BASReturnPath.self,
             tests: ["schema.return_path.current", "schema.return_path.backward"]
+        ),
+        // M471-M475 (chapter 一百二十三 / Stream A β) — Kunlun
+        // memory + equilibrium + permit-grade + refinement
+        // schemas across L3 / L8 / L10 / L11 / L13 per Kunlun
+        // TARGET §5.3, §5.8, §5.10, §5.11, §5.13.
+        entry(
+            "JadeCasketSnapshot",
+            versionedType: BASJadeCasketSnapshot.self,
+            tests: ["schema.jade_casket_snapshot.current", "schema.jade_casket_snapshot.backward"]
+        ),
+        entry(
+            "YaochiMemoryLayer",
+            versionedType: BASYaochiMemoryLayer.self,
+            tests: ["schema.yaochi_memory_layer.current", "schema.yaochi_memory_layer.backward"]
+        ),
+        entry(
+            "TianhengProfile",
+            versionedType: BASTianhengProfile.self,
+            tests: ["schema.tianheng_profile.current", "schema.tianheng_profile.backward"]
+        ),
+        entry(
+            "JadePermitGrade",
+            versionedType: BASJadePermitGrade.self,
+            tests: ["schema.jade_permit_grade.current", "schema.jade_permit_grade.backward"]
+        ),
+        entry(
+            "JadeRefinementTicket",
+            versionedType: BASJadeRefinementTicket.self,
+            tests: ["schema.jade_refinement_ticket.current", "schema.jade_refinement_ticket.backward"]
         )
     ]
 
