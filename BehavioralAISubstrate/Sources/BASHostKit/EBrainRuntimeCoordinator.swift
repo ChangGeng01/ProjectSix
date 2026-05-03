@@ -55,8 +55,31 @@ public struct BASEBrainRuntimeCoordinator {
     //
     // Doctrine pin: zero behavior change. The arrays' contents
     // are byte-identical to the inline literals they replace.
-    // Verified by full BAS + Qinao test suite (2461 + 1375 + 0
-    // failures).
+    // Specifically verified by:
+    //   - `BASKunlunProtocolTests` (M401, 37 schema-parity tests)
+    //     pinning the field round-trip Codable behavior of
+    //     BASKunlunAxis (which holds activeLayerRefs +
+    //     centerlineRules).
+    //   - `M402KunlunAxisAuditTests` pinning the runtime emission
+    //     of `kunlun.axis.center` / `.deviation` /
+    //     `.requires-gate` codes from the axis derive.
+    //   - `M404M405KunlunJadeRiverAuditTests` pinning emission
+    //     of `kunlun.river.transformations` (uses
+    //     riverOriginTransformationSteps) + `kunlun.jade.seal`.
+    //   - `M408M409M410KunlunYaochiTianmenAuditTests` pinning
+    //     emission of `kunlun.yaochi.access` (uses
+    //     yaochiAuditRevealConditions).
+    //   - `M415KunlunBehavioralSnapshotTests` byte-equal snapshots
+    //     of every derive seam — these would fail loudly if the
+    //     static-let arrays diverged in any byte from the inline
+    //     literals.
+    //
+    // M421 update: the original M420 perf claim of "-8.6%" was
+    // statistical noise (N=1 measurement). Re-measurement at N=10
+    // × 200 sessions found the effect indistinguishable from noise
+    // at 95% CI. M420 is kept as code-quality / structural
+    // cleanup (zero behavior change verified above), not as a
+    // perf win. See `docs/QINAO_M421_M420_STAT_RIGOROUS_ANALYSIS_2026-05-03.md`.
 
     /// 14-layer ref list used by the M402 axis derive (both
     /// upstream gate-side and downstream audit-side).
@@ -90,6 +113,141 @@ public struct BASEBrainRuntimeCoordinator {
         }
         return result
     }()
+
+    /// M422 fix-pin (chapter 一百一 deep-review): explicit lookup
+    /// helper for `kunlunCenterlineRulesByMode` that fails fast in
+    /// debug builds when a permit mode is missing from the dict.
+    /// Pre-fix the call sites used `?? []` silent fallback, which
+    /// would have masked any future drift (e.g. a new
+    /// `BASActionPermitMode` case added without updating the dict)
+    /// by silently emitting an empty `centerlineRules` array —
+    /// changing the M402 axis-emission byte-stream silently and
+    /// breaking M415 byte-equal snapshot tests downstream rather
+    /// than at the lookup site. The `assertionFailure` makes the
+    /// developer error surface immediately in debug + tests; the
+    /// `return []` graceful-degradation path stays for release
+    /// builds (per substrate doctrine of graceful degradation).
+    fileprivate static func kunlunCenterlineRules(
+        for mode: BASActionPermitMode
+    ) -> [String] {
+        if let rules = kunlunCenterlineRulesByMode[mode] {
+            return rules
+        }
+        assertionFailure(
+            "BASActionPermitMode \(mode) missing from " +
+            "kunlunCenterlineRulesByMode. Did you add a new " +
+            "permit-mode case without updating the dict's " +
+            "static-let initializer?")
+        return []
+    }
+
+    /// M425 (chapter 一百一) — extracted Yaochi audit projection
+    /// helper. Pre-extraction this 38-line block lived inline in
+    /// `runTurn`; the extraction is part of the "shrink runTurn"
+    /// refactor down-payment per chapter 九十八 deep-review M418-3.
+    /// Pure function: same inputs always produce same outputs;
+    /// no side effects. M408 doctrine pin (Yaochi sanctum 默认
+    /// 不参与普通检索) still holds — the derive synthesizes an
+    /// audit-only projection.
+    fileprivate static func deriveYaochiAuditProjection(
+        sessionID: String,
+        candidateID: String,
+        hostID: String,
+        hasQuarantines: Bool,
+        humanAnchorTone: BASHumanAnchorTone,
+        permitMode: BASActionPermitMode
+    ) -> (entry: BASYaochiSanctumEntry,
+          access: BASKunlunYaochiProtocol.AccessDecision)
+    {
+        let sanctumClass: BASYaochiSanctumClass =
+            hasQuarantines ? .sensitive : .boundary
+        let entry = BASYaochiSanctumEntry(
+            entryID: "yaochi-\(sessionID)",
+            memoryRef: candidateID,
+            hostRef: hostID,
+            sanctumClass: sanctumClass,
+            accessPolicy: .conditional,
+            revealConditions: yaochiAuditRevealConditions,
+            coolingPeriod: 60,
+            humanAnchorRequired: true,
+            lastRevealedAt: "")
+        let matchedConditions: [String] = {
+            switch permitMode {
+            case .answer, .mirror, .compare:
+                return ["host-explicit-recall"]
+            default:
+                return []
+            }
+        }()
+        let access = BASKunlunYaochiProtocol
+            .evaluateAccess(
+                entry: entry,
+                hostAnchorPresent:
+                    humanAnchorTone != .reserved,
+                matchedRevealConditions: matchedConditions,
+                secondsSinceLastReveal: 86400)
+        return (entry: entry, access: access)
+    }
+
+    /// M425 (chapter 一百一) — extracted Heaven Gate audit
+    /// projection helper. Pre-extraction this ~50-line block
+    /// lived inline in `runTurn`. Pure function: same inputs
+    /// always produce same outputs; no side effects. M409
+    /// doctrine pin (七 transition gates) still holds — the
+    /// derive synthesizes an audit-only projection of the
+    /// Heaven Gate protocol's readiness check.
+    fileprivate static func deriveHeavenGateAuditProjection(
+        sessionID: String,
+        candidateID: String,
+        permitMode: BASActionPermitMode,
+        warrantIDs: [String],
+        verdictLevel: BASSovereignVerdictLevel,
+        requireSecondCheck: Bool
+    ) -> (permit: BASHeavenGatePermit,
+          readiness: BASKunlunHeavenGateProtocol.Readiness)
+    {
+        let gateClass: BASKunlunGateClass = {
+            switch permitMode {
+            case .answer, .mirror:
+                return .public
+            case .compare, .draftOnly:
+                return .cognitive
+            case .delay, .replace, .localOnly:
+                return .cognitive
+            case .escalate, .block:
+                return .host
+            }
+        }()
+        let passState: BASKunlunGateState
+        switch verdictLevel {
+        case .pass:
+            passState = .passed
+        case .throttle, .shadowLock:
+            passState = .pending
+        case .toolCut, .memoryFreeze, .quarantine:
+            passState = .remanded
+        case .rollback, .deadStop:
+            passState = .denied
+        }
+        let permit = BASHeavenGatePermit(
+            gateID: "tianmen-\(sessionID)",
+            sourceRef: candidateID,
+            targetDomain:
+                "domain-\(permitMode.rawValue)",
+            gateClass: gateClass,
+            requiredSeals:
+                warrantIDs.map { "seal-\($0)" },
+            actionPermitRef:
+                "permit-\(permitMode.rawValue)",
+            sovereignWarrantRef: warrantIDs.first ?? "",
+            secondCheckRequired: requireSecondCheck,
+            passState: passState,
+            returnPathRef:
+                "rollback-\(sessionID)")
+        let readiness = BASKunlunHeavenGateProtocol
+            .evaluateReadiness(permit)
+        return (permit: permit, readiness: readiness)
+    }
 
     /// 2-condition reveal-conditions list used by the M408 Yaochi
     /// audit-projection derive (audit-only, fixed conditions).
@@ -529,8 +687,8 @@ public struct BASEBrainRuntimeCoordinator {
                 Self.kunlunActiveLayerRefs,
             agentSeatRefs: [],
             centerlineRules:
-                Self.kunlunCenterlineRulesByMode[
-                    boundActionPermit.mode] ?? [],
+                Self.kunlunCenterlineRules(
+                    for: boundActionPermit.mode),
             deviationThreshold: 0.7,
             lastAlignmentCheck: "")
         let kunlunMatchedForGate: Int = {
@@ -1022,8 +1180,8 @@ public struct BASEBrainRuntimeCoordinator {
                 Self.kunlunActiveLayerRefs,
             agentSeatRefs: [],
             centerlineRules:
-                Self.kunlunCenterlineRulesByMode[
-                    boundActionPermit.mode] ?? [],
+                Self.kunlunCenterlineRules(
+                    for: boundActionPermit.mode),
             deviationThreshold: 0.7,
             lastAlignmentCheck: "")
         // Synthesize a deviation count from the risk level —
@@ -1156,43 +1314,24 @@ public struct BASEBrainRuntimeCoordinator {
         // humanAnchorSignal is .reserved tone signaling distance;
         // otherwise present); audit-only emission — actual L8
         // hippocampal gating is M413+ work (chapter 九十五).
-        let kunlunYaochiSanctumForAudit: BASYaochiSanctumEntry = {
-            let sanctumClass: BASYaochiSanctumClass =
-                quarantineRecords.isEmpty
-                    ? .boundary
-                    : .sensitive
-            return BASYaochiSanctumEntry(
-                entryID:
-                    "yaochi-\(runtimeTrace.sessionID)",
-                memoryRef: thoughtFrame.candidates.first?
+        // M425 (chapter 一百一) — extracted to
+        // `deriveYaochiAuditProjection`; see file top.
+        let yaochiProjection =
+            Self.deriveYaochiAuditProjection(
+                sessionID: runtimeTrace.sessionID,
+                candidateID: thoughtFrame.candidates.first?
                     .candidateID ?? "no-memory",
-                hostRef: hostContext.hostID,
-                sanctumClass: sanctumClass,
-                accessPolicy: .conditional,
-                revealConditions:
-                    Self.yaochiAuditRevealConditions,
-                coolingPeriod: 60,
-                humanAnchorRequired: true,
-                lastRevealedAt: "")
-        }()
-        let kunlunYaochiAccessForAudit = BASKunlunYaochiProtocol
-            .evaluateAccess(
-                entry: kunlunYaochiSanctumForAudit,
-                hostAnchorPresent:
+                hostID: hostContext.hostID,
+                hasQuarantines:
+                    !quarantineRecords.isEmpty,
+                humanAnchorTone:
                     humanAnchorSignalForAudit
-                        .recommendedSurfaceTone != .reserved,
-                matchedRevealConditions: {
-                    // Match a single reveal condition
-                    // representing whether the bound permit's
-                    // mode allows recall (not in delay/block).
-                    switch boundActionPermit.mode {
-                    case .answer, .mirror, .compare:
-                        return ["host-explicit-recall"]
-                    default:
-                        return []
-                    }
-                }(),
-                secondsSinceLastReveal: 86400)
+                        .recommendedSurfaceTone,
+                permitMode: boundActionPermit.mode)
+        let kunlunYaochiSanctumForAudit =
+            yaochiProjection.entry
+        let kunlunYaochiAccessForAudit =
+            yaochiProjection.access
         // M409 — Heaven Gate Permit readiness audit projection.
         // Doctrine §4.3: 不是有路径就能进现实 / 不是有候选就能进
         // 宿主层 / 不是有经验就能进成长层 / 不是有工具意图就能工具
@@ -1206,52 +1345,103 @@ public struct BASEBrainRuntimeCoordinator {
         // verdict is `.advisory`/`.unrestricted`, otherwise
         // pending/remanded). Audit-only emission — actual gate
         // enforcement is M410 follow-up.
-        let kunlunHeavenGateForAudit: BASHeavenGatePermit = {
-            let gateClass: BASKunlunGateClass = {
-                switch boundActionPermit.mode {
-                case .answer, .mirror:
-                    return .public
-                case .compare, .draftOnly:
-                    return .cognitive
-                case .delay, .replace, .localOnly:
-                    return .cognitive
-                case .escalate, .block:
-                    return .host
-                }
-            }()
-            let passState: BASKunlunGateState
-            switch sovereignVerdict.verdictLevel {
-            case .pass:
-                passState = .passed
-            case .throttle, .shadowLock:
-                passState = .pending
-            case .toolCut, .memoryFreeze, .quarantine:
-                passState = .remanded
-            case .rollback, .deadStop:
-                passState = .denied
-            }
-            return BASHeavenGatePermit(
-                gateID: "tianmen-\(runtimeTrace.sessionID)",
+        // M425 (chapter 一百一) — extracted to
+        // `deriveHeavenGateAuditProjection`; see file top.
+        let heavenGateProjection =
+            Self.deriveHeavenGateAuditProjection(
+                sessionID: runtimeTrace.sessionID,
+                candidateID: thoughtFrame.candidates.first?
+                    .candidateID ?? "no-candidate",
+                permitMode: boundActionPermit.mode,
+                warrantIDs: sovereignWarrants
+                    .map(\.warrantID),
+                verdictLevel: sovereignVerdict.verdictLevel,
+                requireSecondCheck:
+                    boundActionPermit.requireSecondCheck)
+        let kunlunHeavenGateForAudit =
+            heavenGateProjection.permit
+        let kunlunHeavenGateReadinessForAudit =
+            heavenGateProjection.readiness
+        // M424 (chapter 一百一) — wire chapter 九十九 typed schemas
+        // into runtime so they're not just "typed-surface-only".
+        // Each schema is derived from existing audit-projection
+        // state (zero new substrate dependencies) and emits a
+        // status code into signalRefs so audit walkers can verify
+        // the schema fired on each turn.
+        //
+        // Three schemas wired here:
+        //
+        // 1. BASKunlunAxisView (§5.4) — derived from existing
+        //    kunlunAxisForAudit + deviation codes; emits
+        //    `kunlun.axis.view:wellformed|partial`.
+        // 2. BASKunlunTianmenWarrant (§5.14) — derived from
+        //    existing kunlunHeavenGateForAudit + verdict ref +
+        //    seal ref; emits `kunlun.warrant.authorized:true|false`.
+        // 3. BASKunlunGateDenialWrit (§5.14) — derived from
+        //    readiness when not ready; emits `kunlun.denial.well-
+        //    formed:true` when present (denial is doctrine-
+        //    correct per 该断时断 — denials must always carry
+        //    typed reason codes + return path + denied domain).
+        //
+        // Two schemas (BASKunlunAscentView, BASKunlunFarWestReserve)
+        // are intentionally NOT wired here — they need synthetic
+        // ascent/distance data that the substrate doesn't yet
+        // expose. Wiring them without real data would emit
+        // misleading audit codes. Deferred with criteria: wire
+        // when a per-turn ascent context or unknown-distance
+        // projection is added upstream.
+        let kunlunAxisViewForAudit = BASKunlunAxisView(
+            worldRef: kunlunAxisForAudit.worldAnchorRef,
+            centerlinePriors: kunlunAxisForAudit.centerlineRules,
+            deviationPatterns: kunlunDeviationCodes,
+            scaleLadders: ["personal", "civilizational"],
+            orderConstraints: kunlunAxisForAudit.centerlineRules)
+        let kunlunTianmenWarrantForAudit:
+            BASKunlunTianmenWarrant? =
+        {
+            // Only mint the warrant when readiness is true AND a
+            // sovereign warrant exists (the L14 substrate produced
+            // the actual authorization). Otherwise a warrant
+            // synthesized here would be doctrinally misleading.
+            guard kunlunHeavenGateReadinessForAudit.isReady,
+                let firstWarrant = sovereignWarrants.first
+            else { return nil }
+            return BASKunlunTianmenWarrant(
+                warrantID:
+                    "tianmen-warrant-\(firstWarrant.warrantID)",
+                actionRef:
+                    "permit-\(boundActionPermit.mode.rawValue)",
+                gateRef: kunlunHeavenGateForAudit.gateID,
+                sovereignBasis: firstWarrant.warrantID,
+                jadeCanonSealRef: kunlunJadeSealForAudit.sealID,
+                riverOriginRef: kunlunRiverTraceForAudit.traceID,
+                passScope: .scoped,
+                expiry: "")
+        }()
+        let kunlunGateDenialWritForAudit:
+            BASKunlunGateDenialWrit? =
+        {
+            // Only mint the denial when readiness is FALSE. A
+            // denial absent reason codes is doctrinally
+            // forbidden (该断时断), which the helper's
+            // `evaluateReadiness` enforces by emitting reason
+            // codes whenever isReady is false.
+            guard !kunlunHeavenGateReadinessForAudit.isReady,
+                !kunlunHeavenGateReadinessForAudit
+                    .reasonCodes.isEmpty
+            else { return nil }
+            return BASKunlunGateDenialWrit(
+                writID: "tianmen-writ-\(runtimeTrace.sessionID)",
                 sourceRef: thoughtFrame.candidates.first?
                     .candidateID ?? "no-candidate",
-                targetDomain:
+                deniedDomain:
                     "domain-\(boundActionPermit.mode.rawValue)",
-                gateClass: gateClass,
-                requiredSeals: sovereignWarrants
-                    .map { "seal-\($0.warrantID)" },
-                actionPermitRef:
-                    "permit-\(boundActionPermit.mode.rawValue)",
-                sovereignWarrantRef: sovereignWarrants.first?
-                    .warrantID ?? "",
-                secondCheckRequired:
-                    boundActionPermit.requireSecondCheck,
-                passState: passState,
+                reasonCodes:
+                    kunlunHeavenGateReadinessForAudit.reasonCodes,
                 returnPathRef:
-                    "rollback-\(runtimeTrace.sessionID)")
+                    "rollback-\(runtimeTrace.sessionID)",
+                humanExplanationStub: "")
         }()
-        let kunlunHeavenGateReadinessForAudit =
-            BASKunlunHeavenGateProtocol.evaluateReadiness(
-                kunlunHeavenGateForAudit)
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
@@ -1337,7 +1527,13 @@ public struct BASEBrainRuntimeCoordinator {
             // anchor-wins) honoring is observable in the audit
             // ledger. Empty array elides codes when no
             // suppression fired this turn.
-            escalationSuppressionCodes: escalationSuppressionCodes
+            escalationSuppressionCodes: escalationSuppressionCodes,
+            // M424 (chapter 一百一) — feed chapter 九十九 schemas
+            // so they exit "typed-surface-only" status. Each
+            // schema emits a status code into signalRefs.
+            kunlunAxisView: kunlunAxisViewForAudit,
+            kunlunTianmenWarrant: kunlunTianmenWarrantForAudit,
+            kunlunGateDenialWrit: kunlunGateDenialWritForAudit
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

@@ -501,7 +501,16 @@ extension BASEBrainRuntimeCoordinator {
         // array elides emission. Doctrine red line 8 —
         // both Cthulhu and Kunlun cross-doctrine — observable
         // via these codes.
-        escalationSuppressionCodes: [String] = []
+        escalationSuppressionCodes: [String] = [],
+        // M424 (chapter 一百一) — chapter 九十九 schemas wired
+        // into runtime audit emission. Each closes a "typed-
+        // surface-only" gap by emitting a status code into
+        // signalRefs whenever the schema is non-nil and well-
+        // formed. Doctrine pin: audit-only emission, no
+        // decision influence.
+        kunlunAxisView: BASKunlunAxisView? = nil,
+        kunlunTianmenWarrant: BASKunlunTianmenWarrant? = nil,
+        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -878,6 +887,39 @@ extension BASEBrainRuntimeCoordinator {
                     "kunlun.tianmen.axis-bound:" +
                     "session-\(runtimeTrace.sessionID)")
             }
+        }
+        // M424 (chapter 一百一) — chapter 九十九 schemas runtime
+        // emission. Each schema, when non-nil and well-formed,
+        // emits a single status code into signalRefs. This
+        // demonstrates the schemas are reachable + correctly-
+        // populated at runtime (no longer "typed-surface-only").
+        if let axisView = kunlunAxisView {
+            let status = axisView.isWellFormed
+                ? "wellformed"
+                : "partial"
+            observationStatusCodes.append(
+                "kunlun.axis.view:\(status)")
+        }
+        if let warrant = kunlunTianmenWarrant {
+            let auth = warrant.isFullyAuthorized
+                ? "true"
+                : "false"
+            // §5.14 sovereign-tianmen warrant: emit under the
+            // `tianmen` segment to fit the M402 segment whitelist.
+            observationStatusCodes.append(
+                "kunlun.tianmen.warrant-authorized:\(auth)")
+        }
+        if let denial = kunlunGateDenialWrit {
+            // Doctrine 该断时断: denial well-formedness is the
+            // pin. If a denial is present at all, it MUST be
+            // well-formed (reason codes + return path + denied
+            // domain non-empty); the helper enforces this on
+            // every emit. Emitted under the `tianmen` segment
+            // since GateDenialWrit is the §5.14 sovereign-
+            // tianmen denial counterpart of TianmenWarrant.
+            observationStatusCodes.append(
+                "kunlun.tianmen.denial-well-formed:" +
+                "\(denial.isWellFormed)")
         }
         // M418 — escalation suppression reason codes (red line 8
         // cross-doctrine). Emitted as-is so audit walkers can

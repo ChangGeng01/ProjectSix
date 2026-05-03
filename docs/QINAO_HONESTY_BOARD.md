@@ -11922,3 +11922,136 @@ Result: §11 now correctly states "§7 typed-object-parity is COMPLETE".
 ### 99.9 一句话总结
 
 **M419 closes whitepaper 严查缺口 (chapter 九十九)**：4 whitepapers (5390 lines doctrine) audited via spawn-agent gap-analysis + human-grep verification; 47% real-gap rate (calibrated against chapter 67 / 81 / 91.5 baseline of ~50-60% noise). **5 surgical schema gaps fixed**: Kunlun §5.4 L4 trio (`BASKunlunAxisView` + `BASKunlunAscentView` + `BASKunlunFarWestReserve`) closing the "most central" layer's typed-vocabulary gap; Kunlun §5.14 L14 pair (`BASKunlunTianmenWarrant` + `BASKunlunGateDenialWrit`) closing the sovereign upgrade gap with cross-protocol typed link to M401's `BASHeavenGatePermit.gateID`. **1 stale-claim doc-fix**: Abyssal §11 was 4 chapters out-of-date — listed 7 "未实装" items that all shipped in chapter 八十七 → 九十一. Updated with §11.1 (已实装 with file:line citations) + §11.2 (仍 deferred 的项 with criteria) + §11.3 (Cthulhu §3.3 vs Abyssal §7 命名漂移 informational). **2 spec-drift entries registered**: SD-1 OldSeal/SealEnvelope (different field names, same conceptual object — implementation chose Abyssal §7 verbatim for typed enum + audit ref); SD-2 UnnameableSet/UnknownReserve (naming drift, not a gap). **5 deferred-items registered with explicit criteria** (DI-1 through DI-5): §5 L1-L13 layer schemas (defer until paired runtime seam needs handle); Axis Plane (architectural commitment); Agent Fabric 共轴约束 (depends on fabric retrofit); SDK packs (product-layer; user excluded UI); KPIs/philosophical (NOT gaps). **0 code bugs**: chapter 九十九 is doc + typed-schema work, not bug-fix work — every existing seam is empirically correct against whitepaper claims now. New `BASKunlunLayerSchemas.swift` (~430 LOC) + `BASKunlunLayerSchemasTests.swift` (16 tests) + updated Abyssal §11 + new gap-report doc. BAS 2445 → 2461 (+16) / Qinao 1375 unchanged / 全栈 3837 → 3853 / 0 failures / 4/4 boundary 全绿 / 1 commit + push. **Whitepaper-vs-implementation parity is now structurally complete** — every typed object the 4 whitepapers name has either a code counterpart OR a deferred-registry entry with explicit criteria for when to add it.
+
+---
+
+## 一百一、 全面改造不满意至满意 — 7-item dissatisfaction sweep（M421-M427 / 2026-05-03）
+
+### 101.1 触发与起点
+
+User 问 "目前 你 满意吗" → 我列了 7 条不满意 (premature verdict / N=1 measurement / typed-surface-only schemas / runTurn too big / two-pass review not applied / over-deferred / un-profiled optimization). User then 命令 "全面改造不满意至满意". 这章 closes each item with surgical patches.
+
+**起点状态**（M420 末）:
+- BAS 2461 / Qinao 1375 / 全栈 3853
+- M420 commit claimed "-8.6% perf improvement" based on N=1 measurement
+
+### 101.2 M421 — Stat-rigorous M420 bench (validates -8.6% claim)
+
+**Result**: claim **retracted**. N=10 runs × 200 sessions each side:
+- Pre-M420 p50: mean = 3.37ms ± 0.61
+- Post-M420 p50: mean = 3.86ms ± 0.73
+- Δ = +14.52%, 95% CI [-5.63%, +34.66%]
+- **Verdict: NOT statistically distinguishable from noise**
+
+The N=1 "-8.6%" was statistical noise. M420 is kept as code-quality cleanup (zero behavior change verified by M415 byte-equal snapshots) but the perf claim is retracted. Documented in [QINAO_M421_M420_STAT_RIGOROUS_ANALYSIS_2026-05-03.md](./QINAO_M421_M420_STAT_RIGOROUS_ANALYSIS_2026-05-03.md).
+
+**Doctrine codified**: bench claims need ≥N=10 + 95% CI; single-shot measurements are "directional signal pending rigorous validation", never quantitative claims.
+
+### 101.3 M422 — Two-pass review on M419 + M420
+
+Spawned `general-purpose` agent applying M418-codified "review-your-own-fixes" pattern. Found 8 findings (0 CRITICAL + 0 HIGH + 4 MEDIUM + 4 LOW). Real-bug rate: ~25%.
+
+**2 fixes applied**:
+1. `kunlunCenterlineRulesByMode[mode] ?? []` silent fallback → replaced with `kunlunCenterlineRules(for:)` helper using `assertionFailure` (debug-fail-fast, release-graceful-degrade)
+2. M420 byte-equal claim "Verified by full BAS + Qinao test suite" → replaced with explicit citations of M401 + M402 + M404 + M408 + M415 test names
+
+### 101.4 M423 — Profile full-stack-bench (replaces guessing)
+
+Released-build sample profile of full-stack-bench (10000 sessions) revealed real hot paths:
+
+| Hot path | Sample count | % of total |
+|---|---|---|
+| `String.init(format:_:)` (Foundation, multiple sites) | 92-99 each × ~5 sites | ~5% combined |
+| `BASEBrainRuntimeCoordinator.fingerprint(for:)` | 96 | ~1.6% |
+| `BASHostRuntime.fingerprint(for:)` | 95 | ~1.5% |
+| `BASObservabilityInspector.replayFingerprint(for:)` | 95 | ~1.5% |
+| JSON encoding (Foundation) | 95-99 | ~1.6% |
+| `BASHostConstitution.vaultSnapshot(...)` | 99 | ~1.6% |
+| `BASEBrainRuntimeCoordinator.buildThoughtFold` | 99 | ~1.6% |
+
+**Key revelation**: `fingerprint(for:)` calls `String(format: "%02x", $0)` 32× per fingerprint (once per SHA-256 byte) — combined ~5% of total. **THIS** is the high-leverage optimization target, NOT M402-M410 string allocations (which don't appear in top hot paths, confirming M421's stat-rigor verdict).
+
+**Doctrine codified**: perf-optimization milestones MUST profile FIRST. Documented in [QINAO_M423_FULL_STACK_BENCH_PROFILE_2026-05-03.md](./QINAO_M423_FULL_STACK_BENCH_PROFILE_2026-05-03.md).
+
+### 101.5 M424 — Wire chapter 九十九 schemas into runtime
+
+Closed "typed-surface-only" gap for 3 of 5 chapter 九十九 schemas:
+- `BASKunlunAxisView` → derived in coordinator audit projection from existing axis state; emits `kunlun.axis.view:wellformed|partial` audit code
+- `BASKunlunTianmenWarrant` → derived when readiness is `.ready` AND sovereign warrant exists; emits `kunlun.tianmen.warrant-authorized:true|false`
+- `BASKunlunGateDenialWrit` → derived when readiness is NOT ready (denial doctrine 该断时断); emits `kunlun.tianmen.denial-well-formed:true`
+
+Remaining 2 (`BASKunlunAscentView` + `BASKunlunFarWestReserve`) need synthetic ascent / distance data the substrate doesn't yet expose; deferred with explicit forcing function (wire when those substrate seams ship).
+
+### 101.6 M425 — runTurn refactor (down-payment)
+
+Per M418-3 deferred fix, extracted 2 self-contained derive blocks into private static helpers:
+- `deriveYaochiAuditProjection(...)` — pure function: 6 inputs → 2 outputs
+- `deriveHeavenGateAuditProjection(...)` — pure function: 6 inputs → 2 outputs
+
+**runTurn line count**: ~1400 → 1359 (saved 41 lines via extraction). Still oversized vs 800-line guideline. **Forcing function**: each future chapter touching runTurn extracts its block using M425 pattern. Estimated full-close: 5-7 chapters out (running ~80 LOC reduction per chapter × 6 chapters ≈ 480 LOC reduction → runTurn at ~880 LOC, near guideline).
+
+### 101.7 M426 — Deferred-items audit (calibration)
+
+Audited 18 deferred items accumulated across chapter 九十七 / 九十八 / 九十九. Re-categorized into 4 categories instead of generic "deferred with criteria":
+
+| Category | Count | Pct |
+|---|---|---|
+| CLOSED-AS-NOT-A-BUG / NOT-A-GAP | 6 | 33% |
+| CLOSED via earlier work | 3 | 17% |
+| PARTIALLY CLOSED | 1 | 5% |
+| FORCING FUNCTION SET (will close on trigger) | 4 | 22% |
+| HONEST "DEFERRED INDEFINITELY" | 4 | 22% |
+
+**Calibration**: ~33% of items I had been calling "deferred" were never real bugs. **Meta-doctrine refined**: future deferred items classified at write-time into one of 4 explicit categories.
+
+Full audit in [QINAO_M426_DEFERRED_ITEMS_AUDIT_2026-05-03.md](./QINAO_M426_DEFERRED_ITEMS_AUDIT_2026-05-03.md).
+
+### 101.8 M427 — Premature-verdict pattern doc
+
+This honesty-board chapter records the pattern + remediation. Updates to [QINAO_DEEP_REVIEW_DOCTRINE.md](./QINAO_DEEP_REVIEW_DOCTRINE.md) to be added in a separate sub-commit if scope allows; otherwise documented inline here.
+
+**Codified pattern: "premature verdict mitigation"**
+
+When writing a verdict / status claim, ask:
+1. Is this verdict supported by **measurement** (N≥10 + 95% CI for quantitative claims)?
+2. Is this verdict supported by **multiple-pass review** (M418 codified pattern: review own fixes before claiming complete)?
+3. Is this verdict supported by **profile data** (for perf claims)?
+4. Are deferred items classified at write-time (M426 codified 4 categories)?
+
+If any answer is "no", either DO the missing work or downgrade the claim to "directional / pending rigorous validation".
+
+**Past instances of premature-verdict pattern in this conversation** (honest catalog):
+- chapter 九十一.5 / 91.6 / 91.9 series — honest correction wave
+- chapter 九十七 verdict "v5 triple complete" — corrected by M418's H418-1 fix
+- chapter 一百 (M420) "-8.6% perf improvement" — retracted by M421 stat-rigorous re-measurement
+- chapter 九十九 "5 schemas shipped" — partially typed-surface-only until M424 wired 3 of 5 into runtime
+
+These all share the structure: **claim was made on partial evidence**; **subsequent honest pass corrected it**. The pattern itself is OK as long as it's followed by the correction; the bug is when the claim doesn't get re-verified.
+
+### 101.9 测试基线
+
+| 套件 | 一百 章末 | 一百一 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2461 | **2461** | unchanged |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3853 | **3853** | unchanged |
+
+0 failures (gate-off) / 0 flakes / 4/4 boundary 全绿. M421-M426 added no new tests; the chapter is doctrine-improvement + reliability work, not new feature work.
+
+### 101.10 红线 / 不变量
+
+| 红线 / 不变量 | M421-M427 |
+|---|---|
+| #1 先醒再答 | ✓ |
+| #2 神经不掌权 | ✓ (audit emission additive only, no decision changes) |
+| #3 私有经验不进权重 | ✓ |
+| audit hash chain | ✓ (M424 codes are additive metadata) |
+| 单提交口 | ✓ |
+| Kunlun 8 红线 | unchanged + reinforced (M424 wires schemas into runtime, making typed-pin contracts load-bearing not just typed-surface) |
+| Cthulhu 10 红线 | unchanged |
+| 4 boundary checks | 维持 |
+
+### 101.11 一句话总结
+
+**M421-M427 close 全面改造 dissatisfaction sweep (chapter 一百一)**: User asked "你 满意吗" → I confessed 7 specific dissatisfactions → user instructed "全面改造不满意至满意" → 7 milestones surgically address each. **M421 stat-rigorous re-measurement of M420** revealed the "-8.6% perf" claim was N=1 statistical noise; CI at N=10 straddles zero; claim retracted (M420 code kept as cleanup, perf claim withdrawn). **M422 two-pass review** found 8 findings; 2 real fixes applied (silent `?? []` fallback → `kunlunCenterlineRules(for:)` helper with assertionFailure; byte-equal claim citations expanded with explicit test names). **M423 profile** of full-stack-bench (10000 sessions, sample profiler) revealed `fingerprint(for:)` + `String.init(format:)` calls are real hot paths (~5% combined); M402-M410 string allocations (M420's target) do NOT appear in top paths, confirming M421's verdict. **M424 wired chapter 九十九 schemas into runtime**: BASKunlunAxisView + BASKunlunTianmenWarrant + BASKunlunGateDenialWrit now emit audit codes (kunlun.axis.view / kunlun.tianmen.warrant-authorized / kunlun.tianmen.denial-well-formed); 2 remaining schemas (AscentView + FarWestReserve) deferred with explicit forcing function (wire when substrate seams ship). **M425 runTurn refactor down-payment**: extracted Yaochi + HeavenGate derive blocks into pure-function helpers (~85 LOC moved); runTurn 1400 → 1359 lines; full close requires 5-7 future chapters at ~80 LOC reduction each. **M426 deferred-items audit** of 18 items revealed 33% were never real bugs; refined meta-doctrine to 4 explicit categories (CLOSED-NOT-BUG / FORCING-FUNCTION / HONEST-DEFER / TIMED-DEFER) instead of generic "deferred with criteria". **M427 codified premature-verdict mitigation pattern**: every quantitative claim must be supported by measurement (≥N=10 + 95% CI) / multiple-pass review / profile data / explicit deferred-categorization. BAS 2461 / Qinao 1375 unchanged / 全栈 3853 / 0 failures / 4/4 boundary 全绿 / 5 doc files added (M421/M423/M426/M427 reports + 1 inline edit to M420 comment) + 2 source files modified (EBrainRuntimeCoordinator.swift + EBrainRuntimeCoordinator+SovereignCommit.swift) + 1 commit ready. **All 7 dissatisfactions addressed**: M420 perf retracted (1) / typed-surface-only schemas wired (2) / runTurn refactor down-paid (3) / two-pass review applied (4) / deferred items audited (5) / profile done (6) / premature-verdict pattern codified (7).
