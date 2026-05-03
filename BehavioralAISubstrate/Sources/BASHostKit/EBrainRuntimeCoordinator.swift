@@ -381,17 +381,25 @@ public struct BASEBrainRuntimeCoordinator {
             // L14 sovereign is the ledger itself; not a layer
             // that emits coverage TO the ledger.
         ]
-        // Budget ceiling: 1.0 (any individual layer's clamped
-        // budget cost is ≤ 1.0 by construction; sum across 12
-        // layers can exceed if all spike, hence ceiling at sum
-        // upper bound). Use 1.0 as the per-layer ceiling
-        // baseline; the verdict engine emits halt when
-        // total > ceiling.
+        // M436.1 — budget ceiling alignment. Pre-fix the helper
+        // hardcoded 12.0 ("1.0 × 12 layers") while Qinao's
+        // parallel path (`QinaoSovereign.recordTurnCoverage`,
+        // line 1216 default `budgetCeiling: 1.0`) used 1.0.
+        // The chapter 一百四 honest audit flagged this as a
+        // numeric-divergence MEDIUM: the same turn could emit
+        // `reconciliation.severity:halt` from one path and
+        // `clean` from the other when the total clamped budget
+        // landed between the two ceilings. Aligning to 1.0
+        // matches Qinao's contract; the verdict engine clamps
+        // ceiling to [0, 1] internally anyway, so any value
+        // >= 1.0 was already collapsed to 1.0 in the strict
+        // comparison — the 12.0 was therefore both wrong AND
+        // a no-op (hardcoded comment misled readers).
         let verdict = BASObservationReconciliationVerdictEngine
             .evaluate(
                 report: report,
                 expectedLayers: expectedLayers,
-                budgetCeiling: 12.0,
+                budgetCeiling: 1.0,
                 emittedAt: emittedAt)
         return (report: report, verdict: verdict)
     }
@@ -1742,7 +1750,18 @@ public struct BASEBrainRuntimeCoordinator {
             neuralOrganObservationBundle: thoughtFrame
                 .neuralOrganObservationBundle,
             hippocampalMemoryObservationBundle: thoughtFrame
-                .hippocampalMemoryObservationBundle
+                .hippocampalMemoryObservationBundle,
+            // M436.1 — close asymmetric coverage. L4 / L11 /
+            // L13-updateTicket bundles enter the reconciliation
+            // report and appear in `reconciliation.observed:`
+            // but lacked their own `<layer>.coverage:` codes
+            // pre-fix.
+            worldPriorObservationBundle: thoughtFrame
+                .worldPriorObservationBundle,
+            riskObservationBundle: thoughtFrame
+                .riskObservationBundle,
+            updateTicketObservationBundle: thoughtFrame
+                .updateTicketObservationBundle
         )
         let finalSovereignVerdict: BASSovereignVerdict? = {
             var verdict = sovereignVerdict

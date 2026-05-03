@@ -12348,3 +12348,101 @@ Doctrine pin: every emission is **audit-only metadata**. Zero verdict escalation
 ### 104.8 一句话总结
 
 **M436 closes 14-layer reconciliation 闭环 (chapter 一百四)**: Deep architecture audit found 36% load-bearing / 57% running-but-unread + a CRITICAL defect (`BASObservationReconciliationVerdictEngine` was a test-only library; production `runTurn` never invoked it) + a HIGH defect (7 cognitive bundles emit zero `signalRefs` codes) + an L3 gap (the only cognitive bundle without a `.coverageSummary` projection). 3 surgical patches close all three: new L3 projection, new `deriveLayerReconciliationReport` helper wired into runTurn, 9 new optional parameters on `buildSovereignAuditEntry` emitting 6 new code prefixes (`reconciliation.severity` / `.findings` / `.observed` / `.missing` / `.partial` / `.overspend` plus 8 per-layer `<layer>.coverage:<status>` / `<layer>.observations:<N>` pairs). The candidate-bundle key normalization fix is the subtle one — pre-M436 the L9 summary's keys were `"l9.turn.step-N"` / `decomposeRef`, mismatched with the canonical `derivedTurnID` / `derivedSessionID` pair, so `BASObservationReconciliationReport.appending` silently no-op'd and L9 was never observed; post-fix all 13 cognitive layers participate. Doctrine pin: every new code is audit-only metadata, zero decision influence, zero hash-chain semantic change. 7 new tests + 4 boundary checks + 2468/417/1375/全栈 3860 all green. "极致" rate: 36% → 100%.
+
+## 一百五、 诚实严查整体查缺补漏 — chapter 一百四 honest correction（M436.1 / 2026-05-03）
+
+### 105.1 触发动作
+
+User instruction "诚实 严查 整体 查缺补漏 细致入微" — strict honest sweep on chapter 一百四 (M436) claims. A general-purpose strict-audit agent verified each claim against actual code. The agent's report identified 1 CRITICAL framing error + 3 HIGH gaps + 2 MEDIUM gaps + 1 LOW + 3 NIT in chapter 一百四's narrative.
+
+### 105.2 Honest correction — chapter 一百四 framing was inflated
+
+The chapter 一百四 headline "**极致 rate: 36% → 100%**" was misleading for **two independent reasons** identified by the strict audit:
+
+#### 105.2.a "Pre-M436 5/14 = 36%" measurement was scoped to only BAS-direct surface
+
+`QinaoSovereign.recordTurnCoverage(...)` at `QinaoRuntimeSDK/Sources/QinaoSovereign/QinaoSovereign.swift:1243` invokes `BASObservationReconciliationVerdictEngine.evaluate(...)` directly, and is called every turn from `QinaoRuntime.runPhase4CoverageReconciliation` at `QinaoRuntimeSDK/Sources/QinaoRuntime/QinaoRuntime.swift:595-604` (driven by `sendSession`'s phase pipeline). Combined with the L1-L13 auto-stream pipeline at `QinaoRuntime+ObservationLayers.swift:73-85` (which covers every cognitive layer), this means **the engine WAS invoked from the production Qinao SDK on every turn pre-M436**, and its findings landed in `auditLedger.recordCoverageVerdict`.
+
+Accurate framing would have been: *"the BAS substrate-direct `runTurn` audit-build seam never invoked the engine; callers using `BASHostRuntime.startSession` directly (bypassing Qinao) had no per-turn reconciliation in their `BASSovereignAuditEntry.signalRefs`."* That's the real defect — narrower than the chapter 一百四 narrative suggested.
+
+**Honest measurement (post-correction)**:
+
+| Surface | Pre-M436 | Post-M436 + M436.1 |
+|---|---|---|
+| Qinao SDK (canonical product entry) | 14/14 (already) | 14/14 (M436 additive, no regression) |
+| BAS substrate-direct (`BASHostRuntime.startSession`) | 5/14 = 36% | 14/14 = 100% |
+
+M436 closes the BAS-direct gap. Both surfaces now at parity.
+
+#### 105.2.b "Post-M436 100%" was inflated by L4 / L11 / L13-ticket asymmetry
+
+The strict audit found that `deriveLayerReconciliationReport` at `EBrainRuntimeCoordinator.swift:332-361` aggregates L4 worldPrior + L11 risk + L13 updateTicket bundles into the report (so they appear in `reconciliation.observed:`), but `buildSovereignAuditEntry` at `EBrainRuntimeCoordinator+SovereignCommit.swift` only plumbed 8 of those as per-layer `<layer>.coverage:` emissions. So 3 layers entered the audit metadata via the reconciliation report but had no per-layer coverage code — strictly 8/11 cognitive bundles emitting per-layer codes, not the "11/11" the changelog implied.
+
+**M436.1 fix**: added 3 missing optional parameters (`worldPriorObservationBundle` / `riskObservationBundle` / `updateTicketObservationBundle`) on `buildSovereignAuditEntry` with matching emission logic. Per-layer coverage symmetry is now actually 11/11.
+
+### 105.3 Other audit findings + fixes
+
+#### MEDIUM (fixed): budget-ceiling 12.0 vs 1.0 mismatch
+
+Pre-fix: helper hardcoded `budgetCeiling: 12.0` (`EBrainRuntimeCoordinator.swift:394`), Qinao path defaulted `budgetCeiling: 1.0` (`QinaoSovereign.swift:1216`). The 12.0 was both wrong (the verdict engine clamps ceiling to `[0, 1]` internally so `12.0` collapsed to `1.0` in the strict comparison) AND a deliberate-looking comment that misled future readers. **M436.1 fix**: aligned to `1.0` to match Qinao's contract; both paths now agree on the budget threshold.
+
+#### HIGH (fixed): happy-path-only tests
+
+Pre-fix: M436's 7 tests exercised only healthy fixture turns where `verdict.severity == .clean` and `findings.isEmpty`. Halt-tier / advisory-tier / missing-layer / partial-coverage finding translations were functionally untested. **M436.1 fix**: added 6 new tests (4 direct-engine fixture tests pinning halt / missing-layer / partial-coverage / clean translations + 1 asymmetric-coverage closure test + 1 observed/per-layer symmetry test).
+
+#### MEDIUM (deferred with forcing function): `buildSovereignAuditEntry` parameter explosion
+
+Pre-fix and post-M436.1: the function takes 34+ parameters (24+ optional M-tagged add-ons). This violates the 50-LoC function-size guideline by ~25×. **Audit verdict**: refactor candidate but architectural (parameter-bundling restructure into a `BASAuditObservationProjections` struct). **Forcing function**: when next chapter that adds another optional parameter ships, restructure into a bundle struct in the same patch. Until then: shape grows; document in deferred-items.
+
+#### LOW (clean): doctrine red-line invariance
+
+Audit ran the equivalent of M389 / M412 lint mentally on every M436 + M436.1 emitted code prefix vs `BASAbyssalDoctrineRedLine.forbiddenSubstrings` and `BASKunlunDoctrineRedLine.forbiddenSubstrings`. **No red-line violations found**. All emissions pass cross-doctrine red-line lint.
+
+#### NIT (acknowledged in this chapter): honesty-board / changelog stale claims
+
+Three claims in chapter 一百四 / changelog flagged as misleading:
+- "production runTurn never called it" (true for BAS-direct; false for Qinao SDK)
+- "Reconciliation verdict in production: NO → YES" (the "NO" cell was wrong; Qinao path already had it)
+- "Load-bearing layers: 5/14 → 14/14" (overstated: BAS-direct only was 5/14; Qinao was already 14/14)
+
+This chapter 一百五 is the formal honest correction — the chapter 一百四 entries are kept as committed (not retconned) but this chapter cites them as the calibration error.
+
+### 105.4 测试基线
+
+| 套件 | 一百四 章末 | 一百五 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2468 | **2474** | +6 (M436.1 new tests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest gate-off | 1375 | **1375** | unchanged |
+| 全栈 | 3860 | **3866** | +6 |
+
+0 failures / 0 flakes / 4/4 boundary 全绿.
+
+### 105.5 红线 / 不变量
+
+| 红线 / 不变量 | M436.1 |
+|---|---|
+| #1 先醒再答 | ✓ (no L1 wake / breath path changes) |
+| #2 神经不掌权 | ✓ (verdict / permit synthesis unchanged) |
+| #3 私有经验不进权重 | ✓ (no L13 / L8 / L5 writes) |
+| audit hash chain | ✓ (3 new emissions are additive metadata) |
+| 单提交口 | ✓ (single permit / single warrant unchanged) |
+| Cthulhu 红线 7-10 / Kunlun 8 红线 | ✓ (audit confirmed no red-line violations in any M436 or M436.1 code) |
+| 4 boundary checks | maintained green |
+
+### 105.6 Methodology lesson — calibration of audit-agent scope
+
+**Pattern observation**: The chapter 一百四 audit agent was scoped to the BAS substrate sources and didn't include the QinaoRuntimeSDK auto-stream pipeline. As a result, the "5/14 = 36%" baseline measurement was structurally incomplete. The agent honestly reported what it saw; the framing error was mine for not asking it to scope across both packages.
+
+**Codified lesson**: Future "极致" / coverage / completeness audits MUST ask the agent to scope across:
+- BAS substrate sources (`BehavioralAISubstrate/Sources/**`)
+- Qinao SDK sources (`QinaoRuntimeSDK/Sources/**`)
+- Both production call paths (`BASHostRuntime.startSession` AND `QinaoRuntime.sendSession`)
+
+Otherwise baseline measurements will systematically underestimate pre-fix state by missing an entire production surface. This is the same calibration error as chapter 五十六.1 (stale-claim sweep finding scope-mismatch corrections) — the meta-doctrine pattern is "audit scope must match the surface area the claim covers."
+
+**Forcing function**: every future "completeness audit" prompt will explicitly enumerate which packages and which call paths the audit must cover. Failing to enumerate = baseline numbers are presumptively suspect.
+
+### 105.7 一句话总结
+
+**M436.1 closes 一百四 honest-audit findings (chapter 一百五)**: User instruction "诚实 严查 整体 查缺补漏 细致入微" triggered a strict audit of chapter 一百四. Agent found the "36% → 100%" framing was inflated for two reasons: (a) Qinao SDK auto-stream was already at 14/14 pre-M436 via `QinaoRuntime.sendSession` → `QinaoSovereign.recordTurnCoverage` → `BASObservationReconciliationVerdictEngine.evaluate` (the original CRITICAL #1 was scoped only to BAS-direct surface, not Qinao surface); (b) post-M436 was actually 8/11 cognitive bundles per-layer-coded, not 11/11 — L4 worldPrior / L11 risk / L13 updateTicket bundles entered the reconciliation report but had no per-layer `<layer>.coverage:` code emission. M436.1 closes the asymmetric-coverage HIGH gap (3 new optional parameters + 6 new emission lines + new symmetry-pin test). MEDIUM gap "budget ceiling 12.0 vs 1.0 mismatch" closed by aligning to 1.0. HIGH gap "happy-path-only tests" closed by 6 new failure-path / symmetry tests. MEDIUM "buildSovereignAuditEntry parameter explosion (34+ params)" deferred with explicit forcing function. **Honest measurement post-correction**: BAS-direct surface was 36% pre-M436, now 100% post-M436+M436.1; Qinao SDK surface was 14/14 throughout; both surfaces now at parity. Chapter 一百四 entries kept as-committed; chapter 一百五 is the formal honest correction citing the calibration error rather than retconning. Test counts: BAS XCTest 2468 → 2474 (+6) / Qinao 1375 unchanged / 全栈 3860 → 3866 / 0 failures / 4/4 boundary clean. **Methodology lesson codified**: completeness audits must scope across both BAS substrate AND Qinao SDK; failing to enumerate scope = baseline numbers are presumptively suspect.

@@ -216,6 +216,11 @@ final class M436LayerReconciliationConsumptionTests: XCTestCase {
         let auditEntry = try XCTUnwrap(turn.sovereignAuditEntry)
         let signal = auditEntry.signalRefs
 
+        // M436.1 expanded the list to 11 cognitive bundle
+        // prefixes (closing the chapter 一百四 honest-audit
+        // HIGH finding that L4 / L11 / L13-ticket were entered
+        // into the reconciliation report but had no per-layer
+        // `<layer>.coverage:` code emission).
         let layerPrefixes = [
             "presence",
             "decomposition",
@@ -224,7 +229,11 @@ final class M436LayerReconciliationConsumptionTests: XCTestCase {
             "hostConstitution",
             "thoughtFold",
             "neuralOrgan",
-            "hippocampal"
+            "hippocampal",
+            // M436.1 additions:
+            "worldPrior",
+            "risk",
+            "updateTicket"
         ]
         let canonicalCoverage: Set<String> = [
             "full", "partial", "empty"
@@ -376,5 +385,272 @@ final class M436LayerReconciliationConsumptionTests: XCTestCase {
             reconciliationCodes(from: entry2),
             "reconciliation.* codes must be deterministic " +
             "across identical fixture turns")
+    }
+
+    // MARK: - 8. Failure-path verdict translations
+    //          (M436.1 — closes chapter 一百四 honest-audit
+    //          HIGH "happy-path-only tests" finding).
+    //
+    // Pre-M436.1 the M436 audit emission was tested only on
+    // healthy fixture turns where verdict.severity == .clean
+    // and findings.isEmpty. The audit emission's translation
+    // of halt-tier / advisory-tier / missing-layer findings
+    // into reason codes was therefore functionally untested.
+    // The following 4 tests exercise the verdict engine
+    // directly with synthetic input and pin the same string-
+    // shape contract that buildSovereignAuditEntry uses, so
+    // any future change that drops or renames a finding-to-
+    // code mapping is caught.
+
+    /// Halt-tier verdict (budget overspend) should map to
+    /// `reconciliation.severity:halt` + `reconciliation.findings:1`
+    /// + `reconciliation.overspend:<observed>:<ceiling>`.
+    func testHaltVerdictMapsToOverspendAndHaltSeverity() throws {
+        let report = BASObservationReconciliationReport(
+            turnID: "halt-test-turn",
+            sessionID: "halt-test-session",
+            summaries: [
+                BASObservationCoverageSummary(
+                    layer: .dreamLoop,
+                    turnID: "halt-test-turn",
+                    sessionID: "halt-test-session",
+                    totalObservations: 5,
+                    distinctSubjectCount: 5,
+                    hasCoreSignalCoverage: true,
+                    budgetTotalCost: 1.0,
+                    emittedAt: Date(timeIntervalSince1970: 0))
+            ])
+        let verdict = BASObservationReconciliationVerdictEngine
+            .evaluate(
+                report: report,
+                expectedLayers: [.dreamLoop],
+                budgetCeiling: 0.5,
+                emittedAt: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(verdict.severity, .halt,
+            "budget 1.0 > ceiling 0.5 must produce halt-tier")
+        XCTAssertEqual(verdict.findings.count, 1)
+        // Pin the finding shape — this is what M436's emission
+        // logic in buildSovereignAuditEntry will translate.
+        if case .budgetOverspend(let obs, let ceil) = verdict
+            .findings[0]
+        {
+            XCTAssertEqual(obs, 1.0, accuracy: 0.001)
+            XCTAssertEqual(ceil, 0.5, accuracy: 0.001)
+        } else {
+            XCTFail("expected .budgetOverspend, got " +
+                "\(verdict.findings[0])")
+        }
+    }
+
+    /// Missing-layer verdict (advisory-tier) should map to
+    /// `reconciliation.severity:advisory` +
+    /// `reconciliation.missing:<layer>` per missing layer.
+    func testMissingLayerVerdictProducesAdvisoryWithMissingCode()
+        throws
+    {
+        let report = BASObservationReconciliationReport(
+            turnID: "missing-test-turn",
+            sessionID: "missing-test-session",
+            summaries: [
+                BASObservationCoverageSummary(
+                    layer: .dreamLoop,
+                    turnID: "missing-test-turn",
+                    sessionID: "missing-test-session",
+                    totalObservations: 1,
+                    distinctSubjectCount: 1,
+                    hasCoreSignalCoverage: true,
+                    budgetTotalCost: 0.1,
+                    emittedAt: Date(timeIntervalSince1970: 0))
+            ])
+        // Expected layers includes one that's not in the
+        // report — the engine should emit a missing-layer
+        // finding for it.
+        let verdict = BASObservationReconciliationVerdictEngine
+            .evaluate(
+                report: report,
+                expectedLayers: [.dreamLoop, .gentleHand],
+                budgetCeiling: 1.0,
+                emittedAt: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(verdict.severity, .advisory)
+        XCTAssertTrue(
+            verdict.findings.contains { finding in
+                if case .missingLayer(let layer) = finding,
+                    layer == .gentleHand { return true }
+                return false
+            },
+            "expected .missingLayer(.gentleHand), got " +
+            "\(verdict.findings)")
+    }
+
+    /// Missing-core-coverage verdict should map to
+    /// `reconciliation.partial:<layer>` per layer that
+    /// reported but lacked core signal.
+    func testMissingCoreCoverageMapsToPartialCode() throws {
+        let report = BASObservationReconciliationReport(
+            turnID: "partial-test-turn",
+            sessionID: "partial-test-session",
+            summaries: [
+                // Layer reports but has hasCoreSignalCoverage = false
+                BASObservationCoverageSummary(
+                    layer: .dreamLoop,
+                    turnID: "partial-test-turn",
+                    sessionID: "partial-test-session",
+                    totalObservations: 3,
+                    distinctSubjectCount: 3,
+                    hasCoreSignalCoverage: false,
+                    budgetTotalCost: 0.2,
+                    emittedAt: Date(timeIntervalSince1970: 0))
+            ])
+        let verdict = BASObservationReconciliationVerdictEngine
+            .evaluate(
+                report: report,
+                expectedLayers: [.dreamLoop],
+                budgetCeiling: 1.0,
+                emittedAt: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(verdict.severity, .advisory)
+        XCTAssertTrue(
+            verdict.findings.contains { finding in
+                if case .layerMissingCoreCoverage(let layer)
+                    = finding,
+                   layer == .dreamLoop { return true }
+                return false
+            },
+            "expected .layerMissingCoreCoverage(.dreamLoop), " +
+            "got \(verdict.findings)")
+    }
+
+    /// Clean verdict should produce zero findings and
+    /// `reconciliation.severity:clean`.
+    func testCleanVerdictHasNoFindings() throws {
+        let report = BASObservationReconciliationReport(
+            turnID: "clean-test-turn",
+            sessionID: "clean-test-session",
+            summaries: [
+                BASObservationCoverageSummary(
+                    layer: .dreamLoop,
+                    turnID: "clean-test-turn",
+                    sessionID: "clean-test-session",
+                    totalObservations: 1,
+                    distinctSubjectCount: 1,
+                    hasCoreSignalCoverage: true,
+                    budgetTotalCost: 0.1,
+                    emittedAt: Date(timeIntervalSince1970: 0))
+            ])
+        let verdict = BASObservationReconciliationVerdictEngine
+            .evaluate(
+                report: report,
+                expectedLayers: [.dreamLoop],
+                budgetCeiling: 1.0,
+                emittedAt: Date(timeIntervalSince1970: 0))
+        XCTAssertEqual(verdict.severity, .clean)
+        XCTAssertTrue(verdict.findings.isEmpty,
+            "clean severity must have zero findings")
+    }
+
+    // MARK: - 9. Asymmetric-coverage gap closure (M436.1)
+
+    /// Pre-M436.1 the L4 worldPrior / L11 risk / L13
+    /// updateTicket bundles entered the reconciliation report
+    /// (so they appeared in `reconciliation.observed:`) but
+    /// had no per-layer `<layer>.coverage:<status>` code
+    /// emission. M436.1 closes that gap. Pin all 11 cognitive
+    /// per-layer prefixes are present on a healthy turn.
+    func testM436_1AsymmetricCoverageClosed() throws {
+        let turn = try runTurn()
+        let auditEntry = try XCTUnwrap(turn.sovereignAuditEntry)
+        let signal = auditEntry.signalRefs
+
+        // M436.1 requires these 3 prefixes to appear on every
+        // healthy turn (closing the asymmetric-coverage HIGH
+        // finding from chapter 一百四 honest audit).
+        for prefix in ["worldPrior", "risk", "updateTicket"] {
+            let coverageCount = signal.filter {
+                $0.hasPrefix("\(prefix).coverage:")
+            }.count
+            XCTAssertEqual(
+                coverageCount, 1,
+                "M436.1: \(prefix).coverage code missing — " +
+                "honest-audit asymmetric-coverage gap not closed")
+            let obsCount = signal.filter {
+                $0.hasPrefix("\(prefix).observations:")
+            }.count
+            XCTAssertEqual(
+                obsCount, 1,
+                "M436.1: \(prefix).observations code missing — " +
+                "honest-audit asymmetric-coverage gap not closed")
+        }
+    }
+
+    /// Pin "every layer in `reconciliation.observed:` has a
+    /// matching `<layer>.coverage:` per-layer code." This is
+    /// the structural symmetry doctrine — the report and the
+    /// per-layer emission must never disagree on which layers
+    /// participated this turn.
+    func testReconciliationObservedAndPerLayerCoverageAreSymmetric()
+        throws
+    {
+        let turn = try runTurn()
+        let auditEntry = try XCTUnwrap(turn.sovereignAuditEntry)
+        let signal = auditEntry.signalRefs
+
+        // Observed list (e.g. "L1+L2+...+L13") → set of
+        // BASCognitiveLayer raw values
+        guard let observedCode = signal.first(where: {
+            $0.hasPrefix("reconciliation.observed:")
+        }) else {
+            XCTFail("reconciliation.observed: must be present")
+            return
+        }
+        let observedLayers = Set(
+            observedCode
+                .replacingOccurrences(
+                    of: "reconciliation.observed:", with: "")
+                .split(separator: "+")
+                .map(String.init))
+
+        // Map raw values to the per-layer code prefix used by
+        // M436 emission (mostly identity, but a few diverge:
+        // L6 presenceEye → "presence", L7 mirrorBlade →
+        // "decomposition", L8 hippocampalWell → "hippocampal",
+        // L9 dreamLoop → no per-layer code (uses M299
+        // "frontier.*" instead), L10 triSelfTribunal → no
+        // per-layer code (uses M300 "tribunal.*"),
+        // L11 riskClimate → "risk", L12 gentleHand → "softHand",
+        // L13 evolutionFurnace → "updateTicket").
+        let layerToPrefix: [String: String?] = [
+            "L1": "leaseLife",
+            "L2": "neuralOrgan",
+            "L3": "thoughtFold",
+            "L4": "worldPrior",
+            "L5": "hostConstitution",
+            "L6": "presence",
+            "L7": "decomposition",
+            "L8": "hippocampal",
+            "L9": nil,  // M299 uses frontier.*
+            "L10": nil, // M300 uses tribunal.*
+            "L11": "risk",
+            "L12": "softHand",
+            "L13": "updateTicket"
+        ]
+        for layer in observedLayers {
+            guard let mapping = layerToPrefix[layer],
+                  let prefix = mapping else {
+                // Layer either unmapped or uses a different
+                // pre-existing emission (M299 frontier / M300
+                // tribunal). Skip — they're already pinned by
+                // the legacy-codes test.
+                continue
+            }
+            let matches = signal.filter {
+                $0.hasPrefix("\(prefix).coverage:")
+            }
+            XCTAssertEqual(
+                matches.count, 1,
+                "Symmetry violation: layer \(layer) appears " +
+                "in reconciliation.observed: but " +
+                "\(prefix).coverage: is " +
+                "\(matches.isEmpty ? "missing" : "duplicated") " +
+                "(was \(matches))")
+        }
     }
 }

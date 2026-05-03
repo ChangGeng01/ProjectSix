@@ -558,7 +558,25 @@ extension BASEBrainRuntimeCoordinator {
         neuralOrganObservationBundle:
             BASNeuralOrganObservationBundle? = nil,
         hippocampalMemoryObservationBundle:
-            BASHippocampalMemoryObservationBundle? = nil
+            BASHippocampalMemoryObservationBundle? = nil,
+        // M436.1 (chapter 一百五 honest correction) — close the
+        // asymmetric-coverage gap surfaced by the chapter 一百四
+        // self-audit. Pre-fix L4 worldPrior / L11 risk / L13
+        // updateTicket bundles entered `deriveLayerReconciliationReport`
+        // (so they appeared in `reconciliation.observed:`) but never
+        // got their own `<layer>.coverage:<status>` emission.
+        // The chapter 一百四 changelog claimed "100% coverage"
+        // which was inflated; honest tally pre-M436.1 was 8/11
+        // cognitive bundles emitting per-layer codes, not 11/11.
+        // M436.1 lands the missing 3 bundles to make per-layer
+        // coverage actually symmetric. Defaults `nil` for legacy
+        // / test callers.
+        worldPriorObservationBundle:
+            BASWorldPriorObservationBundle? = nil,
+        riskObservationBundle:
+            BASRiskObservationBundle? = nil,
+        updateTicketObservationBundle:
+            BASUpdateTicketObservationBundle? = nil
     ) -> BASSovereignAuditEntry {
         let turnID = "\(runtimeTrace.sessionID)#\(runtimeTrace.recordedAt.timeIntervalSinceReferenceDate)"
         let snapshotRef = sovereignSnapshotRef(for: thoughtFold, sessionID: runtimeTrace.sessionID)
@@ -1109,6 +1127,42 @@ extension BASEBrainRuntimeCoordinator {
                     core: b.hasCoreSignalCoverage))
             observationStatusCodes.append(
                 "hippocampal.observations:" +
+                "\(b.observations.count)")
+        }
+        // M436.1 — close the asymmetric-coverage gap. L4
+        // worldPrior / L11 risk / L13 updateTicket bundles
+        // entered `deriveLayerReconciliationReport` (so they
+        // appeared in `reconciliation.observed:`) but never
+        // had their own `<layer>.coverage:<status>` per-layer
+        // emission pre-fix. Closes the chapter 一百四 honest-
+        // audit HIGH finding.
+        if let b = worldPriorObservationBundle {
+            observationStatusCodes.append(
+                "worldPrior.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "worldPrior.observations:" +
+                "\(b.observations.count)")
+        }
+        if let b = riskObservationBundle {
+            observationStatusCodes.append(
+                "risk.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "risk.observations:\(b.observations.count)")
+        }
+        if let b = updateTicketObservationBundle {
+            observationStatusCodes.append(
+                "updateTicket.coverage:" +
+                coverageStatus(
+                    observations: b.observations.count,
+                    core: b.hasCoreSignalCoverage))
+            observationStatusCodes.append(
+                "updateTicket.observations:" +
                 "\(b.observations.count)")
         }
         // M436 — reconciliation verdict emission. The verdict's
