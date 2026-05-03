@@ -366,7 +366,13 @@ struct BASEBrainProgramBlueprintTests {
             "YaochiMemoryLayer",
             "TianhengProfile",
             "JadePermitGrade",
-            "JadeRefinementTicket"
+            "JadeRefinementTicket",
+            // M476-M479 (chapter 一百二十四) — 4 Kunlun host +
+            // integrity schemas (Stream A γ):
+            "JadeFidelityMap",
+            "HostJadeRegister",
+            "JadeMirrorDraft",
+            "KunlunUnnamableSet"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

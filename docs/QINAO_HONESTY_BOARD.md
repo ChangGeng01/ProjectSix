@@ -14576,3 +14576,66 @@ Doctrine invariants (typed pins via test):
 ### 123.7 一句话总结
 
 **Chapter 一百二十三 / Stream A β / M471-M475**: user "全面开发" → ship 5 priority-2 Kunlun memory + equilibrium + permit-grade + refinement schemas in new `BASKunlunMemoryEquilibrium.swift` (~340 LoC). **M471** `BASJadeCasketSnapshot` (L3) — 玉匣 with 4 jade-canon-required ref fields (integrityHash + sourceRiverRef + restoreGateRef + rollbackWritRef); honorsJadeCanonInvariants pin. **M472** `BASYaochiMemoryLayer` (L8) — 瑶池深井 distinct from Cthulhu thermal enum (chapter 一百十五); sanctum-anchor invariant pin. **M473** `BASTianhengProfile` (L10) — 天衡庭 three-self equilibrium with 3 [0,1] bias/floor scores; Pinyin name avoids residual-scan collision. **M474** `BASJadePermitGrade` (L11) — 玉律风闸 grading layered on top of BASActionPermit; gate-required-when-score-low invariant via named threshold (0.5). **M475** `BASJadeRefinementTicket` (L13) — 炼玉炉 with no-ghost fracturePath invariant per §5.13. **Honest course correction**: original plan name `BASHeavenBalanceProfile` collided with substrate residual scan (legacy host-compat reservation); pivoted to Pinyin `BASTianhengProfile` consistent with chapter 九十二 `BASKunlunTianmenWarrant`. **5 governance entries** + 3-site cross-update (count 232→237). **28 new tests** in `BASKunlunMemoryEquilibriumTests.swift`. Test counts: BAS XCTest 2737 → **2765** (+28), Qinao 1375 unchanged, 全栈 4129 → **4157** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (237 registered, 0 drift). Plan progress: 11/31 = ~35%. Doctrine pin held: pure schemas; no permit.mode mutation; all red lines / invariants regressed clean (Kunlun §4.2 jade-canon 4-rule pin + §5.8 anchor invariant + §5.11 合度地过 + §5.13 不留幽灵 newly typed-pinned).
+
+---
+
+## 一百二十四、 Stream A γ 宿主+完整性 4 schemas (M476-M479 / 2026-05-04)
+
+### 124.1 触发动作
+
+User said "全面开发". Per appendix N: ship Stream A γ — 4 priority-3 Kunlun host + integrity schemas. Completes Stream A (15/15 schemas total across α + β + γ).
+
+### 124.2 What shipped — 4 schemas + 1 helper enum
+
+New file `BASKunlunHostIntegrity.swift` (~280 LoC):
+
+| M | Schema | Layer | White-paper § |
+|---|---|---|---|
+| M476 | `BASJadeFidelityMap` | L2 | RND §3.2 (line 504-513) |
+| M477 | `BASHostJadeRegister` | L5 | TARGET §5.5 (line 780-786) + RND §3.5 |
+| M478 | `BASJadeMirrorDraft` | L7 | TARGET §5.7 (line 872-880) |
+| M479 | `BASKunlunUnnamableSet` | L7 | RND §3.7 (line 676) |
+
+Plus 1 helper enum: `BASJadeFidelityLevel` (4 cases: high / standard / partial / contaminated).
+
+### 124.3 Doctrine pins applied
+
+Doctrine invariants (typed pins via test):
+- **§3.2 contamination invariant** (`BASJadeFidelityMap.honorsContaminationInvariant`): `.contaminated` fidelity → `auditRequired=true`
+- **§5.5 provenance invariant** (`BASHostJadeRegister.honorsProvenanceInvariant`): `riverOriginRef` MUST be non-empty
+- **§5.7 玉鉴 doctrine** (`BASJadeMirrorDraft.honorsNoInducementInvariant`): `noInducementFlag` MUST be `true` ("不把推断伪装成事实, 不把未知强行补完")
+- **§5.7 preservation invariant** (`BASKunlunUnnamableSet.honorsPreservationInvariant`): `unknownRefs` non-empty when set is alive (sets without refs are vacuous)
+
+Anti-drift 3-site cross-update:
+- 4 governance entries (count `237 → 241`)
+- expectedObjects + expectedVersions +4 each
+
+### 124.4 测试基线
+
+| 套件 | 一百二十三 章末 | 一百二十四 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2765 | **2784** | +19 (1 new test file) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4157 | **4176** | +19 |
+
+5 gates clean: 4 boundary + whitepaper parity (241 registered, 0 drift).
+
+### 124.5 Plan progress — Stream A complete
+
+| 项 | Pre-chapter | Post-chapter |
+|---|---|---|
+| Stream A α (control-flow) | 6/6 ✓ | 6/6 ✓ |
+| Stream A β (memory + equilibrium) | 5/5 ✓ | 5/5 ✓ |
+| **Stream A γ (host + integrity)** | **0/4** | **4/4** ✓ |
+| **Stream A TOTAL** | **11/15** | **15/15** ✓ |
+| Stream B (5 SDK packages) | 0/5 | 0/5 (chapter 一百二十五) |
+| Stream C (7 bench metrics) | 0/7 | 0/7 |
+| Stream D (4 共轴 primitives) | 0/4 | 0/4 |
+| **Plan total progress** | **11/31** | **15/31** (~48%) |
+
+**Stream A complete**: all 15 BAS substrate Kunlun schemas now shipped. The L2/L3/L5/L7/L8/L10/L11/L13 schema-name gaps from the user's status table are closed. Remaining: Stream B (Qinao SDK packages), Stream C (bench metrics), Stream D (多-agents 共轴).
+
+### 124.6 一句话总结
+
+**Chapter 一百二十四 / Stream A γ / M476-M479**: user "全面开发" → ship 4 Kunlun host + integrity schemas in new `BASKunlunHostIntegrity.swift` (~280 LoC). **M476** `BASJadeFidelityMap` (L2) — 玉律精度图 with 4-tier `BASJadeFidelityLevel` enum (high/standard/partial/contaminated); honorsContaminationInvariant pin (contaminated → auditRequired=true). **M477** `BASHostJadeRegister` (L5) — 宿主玉牒 with hostVersionRef + boundary contracts (玉契) + authorization scrolls (玉券) + relation register (玉谱) + rollback refs + riverOriginRef; honorsProvenanceInvariant pin (riverOriginRef non-empty). **M478** `BASJadeMirrorDraft` (L7) — 玉鉴草稿 with cleanReflection text + unknownPreserved + inferenceDisclosures + hostAnchorRef + noInducementFlag; honorsNoInducementInvariant pin per §5.7 玉鉴 doctrine. **M479** `BASKunlunUnnamableSet` (L7) — 不可名状保留 (Kunlun complement to Cthulhu BASUnknownSet); honorsPreservationInvariant pin (unknownRefs non-empty). **4 governance entries** + 3-site cross-update (count 237→241). **19 new tests** in `BASKunlunHostIntegrityTests.swift` covering: enum cardinality + raw-value pins / round-trip Codable / clamping / 4 doctrine invariant pins / cross-schema schema-version pin. **Stream A COMPLETE**: 15/15 BAS substrate Kunlun schemas now shipped (chapters 一百二十二 + 一百二十三 + 一百二十四). Plan progress 15/31 = ~48%. Test counts: BAS XCTest 2765 → **2784** (+19), Qinao 1375 unchanged, 全栈 4157 → **4176** / 0 failures / 4/4 boundary clean / whitepaper parity gate clean (241 registered, 0 drift). Doctrine pin held: pure schemas + helper enum; no permit.mode mutation; all red lines / invariants regressed clean (Kunlun §3.2 contamination + §5.5 provenance + §5.7 玉鉴 + §5.7 preservation 4 newly typed-pinned).

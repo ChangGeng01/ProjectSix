@@ -1259,6 +1259,29 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "JadeRefinementTicket",
             versionedType: BASJadeRefinementTicket.self,
             tests: ["schema.jade_refinement_ticket.current", "schema.jade_refinement_ticket.backward"]
+        ),
+        // M476-M479 (chapter 一百二十四 / Stream A γ) — Kunlun
+        // host + integrity schemas across L2 / L5 / L7 per
+        // Kunlun RND §3.2, TARGET §5.5, §5.7.
+        entry(
+            "JadeFidelityMap",
+            versionedType: BASJadeFidelityMap.self,
+            tests: ["schema.jade_fidelity_map.current", "schema.jade_fidelity_map.backward"]
+        ),
+        entry(
+            "HostJadeRegister",
+            versionedType: BASHostJadeRegister.self,
+            tests: ["schema.host_jade_register.current", "schema.host_jade_register.backward"]
+        ),
+        entry(
+            "JadeMirrorDraft",
+            versionedType: BASJadeMirrorDraft.self,
+            tests: ["schema.jade_mirror_draft.current", "schema.jade_mirror_draft.backward"]
+        ),
+        entry(
+            "KunlunUnnamableSet",
+            versionedType: BASKunlunUnnamableSet.self,
+            tests: ["schema.kunlun_unnamable_set.current", "schema.kunlun_unnamable_set.backward"]
         )
     ]
 
