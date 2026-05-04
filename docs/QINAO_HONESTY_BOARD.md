@@ -15425,3 +15425,91 @@ ENGINEERING_HEALTH_DEBT.md 章节 Section A.4 (14-layer 叙事膨胀) + C.5 (mut
 ### 133.8 一句话总结
 
 **Chapter 一百三十三 / M520-M523**: respond to user "先把 缺陷 修了 section1" — verify Critical 1-3 already addressed (chapter 91/91.5/119 历史修复), correct Major 7 over-statement (most Servicing protocols load-bearing for test polymorphism, not abstraction redundancy — only 1 of 11 truly single-impl + that one still serves DI), partial-fix Major 8 mutation gap with 7 layer-integrity sensitivity tests in `M520LayerIntegritySensitivityTests.swift` covering L1/L4/L11/L13/L14 + cross-layer + determinism (input-sensitivity 而非 code-deletion mutation, 5 of 14 layers integrity-covered). **Honest correction**: chapter 一百三十二 debt log Section A.3 verbatim recorded user "11 single-impl protocols" claim 不做 grep 验证 — second-order blind spot, now corrected. Major 4/5/6/9 留 multi-chapter scope (god files + BASHostKit god module + M395 edge cases). Test counts: BAS XCTest 2862 → **2869** (+7), Qinao 1375 unchanged, 全栈 4254 → **4261** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. Doctrine pin held: pure value-type sensitivity tests; no production code change; no permit.mode mutation; 14-layer integrity now has 5/14 sensitivity-test coverage (was 0/14)。
+
+## 一百三十四、 Section 1 全面闭口 — Major 8 14/14 layer coverage + Major 9/Minor 11/Minor 12 verified historical-closed (M524-M532 / 2026-05-04)
+
+### 134.1 触发动作
+
+User: "section 1 全面闭口"。Chapter 一百三十三 closed Critical 1-3 (verified historical) + Major 7 (over-stated correction) + Major 8 partial (5/14 layers)。Chapter 一百三十四 完成全面闭口:
+- **Major 8 full closure** — 9 more sensitivity tests covering remaining L2/L3/L5/L6/L7/L8/L9/L10/L12 → **14/14 layer coverage**
+- **Major 9 verified historical-closed** — M398.8 chapter 91.5 已 ship stderr surfacing for baseline-write failures
+- **Minor 11 verified historical-closed** — M398.7 chapter 91.5 已 sharpen yaochi/watcher patterns (`watcher.permit:` vacuous → `.permit:` meaningful)
+- **Minor 12 verified historical-closed** — M400 chapter 90.4 已 ship stale comment cleanup
+- **Major 4-6 honest-deferred** — multi-chapter scope, NOT closable in single batch
+
+### 134.2 Major 8 full layer integrity coverage
+
+`M520LayerIntegritySensitivityTests.swift` extended to **16 sensitivity tests**:
+
+| 层 | Test | What's verified |
+|---|---|---|
+| L1 | testL1AbyssBudgetSensitivityToBudgetFrame | L1 derive 响应 BudgetFrame 变化 |
+| **L2** | testL2OrganAliasSensitivityToRunMode | L2 alias `.engage → counterfactualForge` ≠ `.lockdown → minimalResonanceCore` |
+| **L3** | testL3JadeCasketSensitivityToTurnID | L3 jade-casket snapshotID per-turn distinct + always honors §4.2 invariant |
+| L4 | testL4OntologyFogSensitivityToCeiling | 3 ceiling raw values → ≥2 distinct fog qualities |
+| **L5** | testL5HumanAnchorSensitivityToRiskAndPermit | tone differs between low-risk + answer mode AND extreme-risk + block mode |
+| **L6** | testL6AxisDeviationSensitivityToRisk | low-risk score < extreme-risk score (strict monotonic) |
+| **L7** | testL7NarrativeDistortionSensitivityToRisk | narrative distortion differs between low-risk + answer and extreme-risk + block |
+| **L8** | testL8YaochiMemoryLayerSensitivityToRunMode | sanctum policy `.engage (open) ≠ .lockdown (old-seal)` |
+| **L9** | testL9AscentBranchSensitivityToCandidate | ascent conditions + stop points differ between high-conf/low-cost vs low-conf/high-cost candidates |
+| **L10** | testL10TianhengProfileSensitivityToRiskAndPermit | dignity floor strictly higher under extreme risk than low risk |
+| L11 | testL11AbyssalPressureSensitivityToRisk | low-risk → 0 modes / extreme-risk → non-empty modes;magnitude monotonic |
+| **L12** | testL12SurfaceAliasSensitivityToPermitMode | compare permit → comparePanel surface;answer permit → nil;Cthulhu/Kunlun aliases for same mode differ |
+| L13 | testL13CounterHostCheckSensitivityToRiskScore | low score → genuineHostPattern;high score → systemInducedDrift |
+| L14 | testL14SovereignDomainScopeLinterSensitivity | clean code passes lint;power-creep code fails lint |
+| 跨层 | testCrossLayerL4L11Coherence | L4 + L11 compose coherently across risk levels |
+| 全部 | testDeterminism | same input → byte-equal output (audit-replay invariant) |
+
+**14/14 layer sensitivity coverage achieved**(was 0/14 chapter 一百三十二 / 5/14 chapter 一百三十三)。新加 layers in chapter 一百三十四: **bold**。
+
+**这仍不是 full mutation tests** (无 code-deletion + expected-failure)。**是 input-sensitivity tests**: 变 input,assert output 有意义变化。No-op layer 会失败这些测试,可以捕获 silent dead-code regression。
+
+### 134.3 Major 9 / Minor 11 / Minor 12 — verified historical-closed
+
+历史 grep 验证(audit reports stale state):
+
+| Item | Historical fix | grep 验证 |
+|---|---|---|
+| **Major 9** M395 baseline rewrite 失败静默 | **M398.8** chapter 91.5 — `BASBenchBaselineStorage.writeBaseline` failures route to stderr;function-return semantics unchanged | source confirms stderr routing in BAS bench infrastructure |
+| **Minor 11** M398.7 yaochi vacuous lint | **M398.7** chapter 91.5 — `BASAbyssalDoctrineRedLines.watcherHintsNeverDecides.forbiddenSubstrings` from `["watcher.permit:", "watcher.verdict:"]` (vacuous,no substrate prefix matches) → `[".permit:", ".verdict:"]` (sharp,catches RL7 violations like hypothetical `narrative.permit:answer`) | verified;chapter 91.5 §91.5.4 |
+| **Minor 12** stale comment | **M400** chapter 90.4 — line 370-378 pre-M392 stale text replaced with M392 + M399 doctrine cite | verified;chapter 90.4 |
+
+3 项全部 historical-closed。User audit reports were stale state.
+
+### 134.4 Major 4-6 honest-deferred (multi-chapter scope)
+
+| # | Item | Why multi-chapter |
+|---|---|---|
+| Major 4 | god files 5K+ lines (5 files) | 不能在单 chapter decompose 5,347-line file 不破 tests;needs test-harness build first |
+| Major 5 | 51 source files >800 lines | same scope as Major 4 |
+| Major 6 | BASHostKit 123 inbound imports god module | needs解构 BASHostKit 内部边界先 |
+
+These 3 items continue tracked in `docs/ENGINEERING_HEALTH_DEBT.md` Sections A.1, A.2. **NOT honestly closable in single chapter**;flagged for separate multi-chapter plan when test-harness improvements are scoped.
+
+### 134.5 Section 1 honest 闭口 总览
+
+**9 of 12 items in-repo CLOSED**:
+- 3 Critical historical fixes(verified chapter 一百三十三)
+- Major 7 over-stated honesty correction(chapter 一百三十三)
+- Major 8 fully closed(chapter 一百三十四 — 14/14 layer sensitivity)
+- Major 9 / Minor 11 / Minor 12 historical-closed(chapter 91.5 / 90.4)
+
+**3 of 12 items multi-chapter scope deferred**:
+- Major 4 / 5 / 6 god files(test-harness needed first)
+
+**Section 1 honest 闭口 = 75% in-chapter + 25% multi-chapter scope flagged**。
+
+### 134.6 测试基线
+
+| 套件 | 一百三十三 章末 | 一百三十四 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2869 | **2878** | +9 (M524-M532 9 more sensitivity tests covering L2/L3/L5/L6/L7/L8/L9/L10/L12) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4261 | **4270** | +9 |
+
+5 gates clean: 4 boundary + whitepaper parity (242 registered, 0 drift)。
+
+### 134.7 一句话总结
+
+**Chapter 一百三十四 / M524-M532**: respond to user "section 1 全面闭口" by extending `M520LayerIntegritySensitivityTests.swift` from 7 → 16 tests covering all 14 layers — **14/14 layer sensitivity coverage achieved** (was 0/14 chapter 一百三十二, 5/14 chapter 一百三十三). New 9 tests cover L2 organ alias / L3 jade-casket / L5 human-anchor protocol / L6 axis-deviation / L7 narrative-distortion / L8 yaochi-memory-layer / L9 ascent-branch / L10 tianheng-profile / L12 surface-aliases (Cthulhu vs Kunlun naming asymmetry). **Major 9 + Minor 11 + Minor 12 verified historical-closed** via grep — Major 9 M398.8 stderr surfacing chapter 91.5 / Minor 11 M398.7 watcher pattern sharpening chapter 91.5 / Minor 12 M400 stale comment cleanup chapter 90.4. **Major 4-6 honest-deferred** as multi-chapter scope (god files 5K+ lines + 51 source files >800 line + BASHostKit 123 imports god module — NOT closable in single chapter without test-harness build first). **Section 1 honest 闭口: 9/12 in-chapter (75%) + 3/12 multi-chapter scope flagged (25%)**. `ENGINEERING_HEALTH_DEBT.md` Section C.5 marked **CLOSED** (14/14 sensitivity coverage, full mutation infrastructure still deferred). Test counts: BAS XCTest 2869 → **2878** (+9), Qinao 1375 unchanged, 全栈 4261 → **4270** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. Doctrine pin held: pure value-type sensitivity tests; no production code change; no permit.mode mutation.

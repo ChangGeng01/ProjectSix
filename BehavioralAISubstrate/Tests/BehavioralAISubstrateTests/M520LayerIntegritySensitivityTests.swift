@@ -226,4 +226,209 @@ final class M520LayerIntegritySensitivityTests: XCTestCase {
             budget1, budget2,
             "same inputs MUST yield byte-equal AbyssBudget — non-determinism would break audit replay")
     }
+
+    // MARK: - M524-M532 (chapter 一百三十四) — fill remaining
+    // L2/L3/L5/L6/L7/L8/L9/L10/L12 sensitivity coverage to
+    // close Major 8 audit gap fully. Layer integrity now
+    // 14/14 coverage post-M532.
+
+    // MARK: - L2 BASAbyssalOrganAlias responds to runMode
+
+    func testL2OrganAliasSensitivityToRunMode() {
+        let engageAlias =
+            BASCthulhuLeftoverProjections.AbyssalOrganAlias
+                .derive(from: .engage)
+        let lockdownAlias =
+            BASCthulhuLeftoverProjections.AbyssalOrganAlias
+                .derive(from: .lockdown)
+        XCTAssertNotEqual(
+            engageAlias, lockdownAlias,
+            "L2 organ alias MUST differ between .engage (counterfactual-forge) and .lockdown (minimal-resonance) — if invariant, L2 derive is dead code")
+    }
+
+    // MARK: - L3 BASJadeCasketSnapshot responds to session/turn
+
+    func testL3JadeCasketSensitivityToTurnID() {
+        let casket1 = BASKunlunLayerProjections
+            .JadeCasketSnapshot.derive(
+                turnID: "t1", sessionID: "s1")
+        let casket2 = BASKunlunLayerProjections
+            .JadeCasketSnapshot.derive(
+                turnID: "t2", sessionID: "s1")
+        XCTAssertNotEqual(
+            casket1.snapshotID, casket2.snapshotID,
+            "L3 jade-casket snapshotID MUST differ between turns — if invariant, L3 derive is dead code")
+        // Both MUST honor §4.2 jade-canon invariant.
+        XCTAssertTrue(
+            casket1.honorsJadeCanonInvariants,
+            "L3 jade-casket MUST be canonical by construction (§4.2)")
+        XCTAssertTrue(
+            casket2.honorsJadeCanonInvariants)
+    }
+
+    // MARK: - L5 BASHumanAnchorProtocol responds to risk + permit
+
+    func testL5HumanAnchorSensitivityToRiskAndPermit() {
+        let lowRiskAnchor = BASHumanAnchorProtocol.derive(
+            anchorID: "a1",
+            hostSummaryRef: "host:v1",
+            riskLevel: .low,
+            permitMode: .answer,
+            candidateCount: 3)
+        let extremeRiskAnchor = BASHumanAnchorProtocol.derive(
+            anchorID: "a2",
+            hostSummaryRef: "host:v1",
+            riskLevel: .extreme,
+            permitMode: .block,
+            candidateCount: 0)
+        XCTAssertNotEqual(
+            lowRiskAnchor.recommendedSurfaceTone,
+            extremeRiskAnchor.recommendedSurfaceTone,
+            "L5 human-anchor tone MUST differ between low-risk + answer mode and extreme-risk + block mode — if invariant, L5 derive is dead code")
+    }
+
+    // MARK: - L6 BASAxisDeviation + BASGatePressure respond to risk
+
+    func testL6AxisDeviationSensitivityToRisk() {
+        let lowDeviation = BASKunlunLayerProjections
+            .AxisDeviation.derive(
+                from: .low,
+                turnID: "t1",
+                situationRef: "sit:1",
+                centerlineRef: "axis:1")
+        let extremeDeviation = BASKunlunLayerProjections
+            .AxisDeviation.derive(
+                from: .extreme,
+                turnID: "t2",
+                situationRef: "sit:1",
+                centerlineRef: "axis:1")
+        XCTAssertNotEqual(
+            lowDeviation.deviationScore,
+            extremeDeviation.deviationScore,
+            "L6 axis-deviation score MUST differ between low + extreme risk — if invariant, L6 derive is dead code")
+        XCTAssertGreaterThan(
+            extremeDeviation.deviationScore,
+            lowDeviation.deviationScore,
+            "extreme risk MUST yield higher deviation score than low risk")
+    }
+
+    // MARK: - L7 BASNarrativeDistortion responds to risk
+
+    func testL7NarrativeDistortionSensitivityToRisk() {
+        let lowDistortion = BASNarrativeDistortion.derive(
+            distortionID: "d1",
+            riskLevel: .low,
+            permitMode: .answer)
+        let highDistortion = BASNarrativeDistortion.derive(
+            distortionID: "d2",
+            riskLevel: .extreme,
+            permitMode: .block)
+        XCTAssertNotEqual(
+            lowDistortion, highDistortion,
+            "L7 narrative-distortion MUST differ between low-risk + answer and extreme-risk + block — if invariant, L7 derive is dead code")
+    }
+
+    // MARK: - L8 BASYaochiMemoryLayer responds to runMode
+
+    func testL8YaochiMemoryLayerSensitivityToRunMode() {
+        let engageLayer = BASKunlunLayerProjections
+            .YaochiMemoryLayer.derive(
+                from: .engage, turnID: "t1")
+        let lockdownLayer = BASKunlunLayerProjections
+            .YaochiMemoryLayer.derive(
+                from: .lockdown, turnID: "t2")
+        // Engage → no sanctum policy; lockdown → "old-seal".
+        XCTAssertNotEqual(
+            engageLayer.sanctumPolicy,
+            lockdownLayer.sanctumPolicy,
+            "L8 yaochi sanctum policy MUST differ between .engage (open) and .lockdown (old-seal) — if invariant, L8 derive is dead code")
+    }
+
+    // MARK: - L9 BASAscentBranch responds to candidate state
+
+    func testL9AscentBranchSensitivityToCandidate() {
+        let cleanCandidate = BASCandidatePath(
+            candidateID: "c1",
+            title: "clean",
+            actionSummary: "answer",
+            requiredEvidence: [],
+            expectedBenefit: 0.8,
+            expectedCost: 0.2,
+            reversibility: 0.9,
+            confidence: 0.9)
+        let reversedCandidate = BASCandidatePath(
+            candidateID: "c2",
+            title: "reversed",
+            actionSummary: "block",
+            requiredEvidence: ["evidence:1"],
+            expectedBenefit: 0.2,
+            expectedCost: 0.8,
+            reversibility: 0.2,
+            confidence: 0.3)
+        let cleanBranch = BASKunlunLayerProjections
+            .AscentBranch.derive(
+                from: cleanCandidate, turnID: "t1")
+        let reversedBranch = BASKunlunLayerProjections
+            .AscentBranch.derive(
+                from: reversedCandidate, turnID: "t1")
+        XCTAssertNotEqual(
+            cleanBranch.ascentConditions,
+            reversedBranch.ascentConditions,
+            "L9 ascent-branch conditions MUST differ between high-confidence + low-cost candidate and low-confidence + high-cost candidate — if invariant, L9 derive is dead code")
+        XCTAssertNotEqual(
+            cleanBranch.stopPoints,
+            reversedBranch.stopPoints,
+            "L9 ascent-branch stop points MUST differ between high-reversibility (≥0.4) and low-reversibility (<0.4)")
+    }
+
+    // MARK: - L10 BASTianhengProfile responds to risk + permit
+
+    func testL10TianhengProfileSensitivityToRiskAndPermit() {
+        let lowRisk = BASKunlunLayerProjections
+            .TianhengProfile.derive(
+                from: .low,
+                permitMode: .answer,
+                turnID: "t1")
+        let extremeRisk = BASKunlunLayerProjections
+            .TianhengProfile.derive(
+                from: .extreme,
+                permitMode: .block,
+                turnID: "t2")
+        XCTAssertNotEqual(
+            lowRisk.dignityFloor,
+            extremeRisk.dignityFloor,
+            "L10 tianheng dignity floor MUST differ between low-risk and extreme-risk — if invariant, L10 derive is dead code")
+        XCTAssertGreaterThan(
+            extremeRisk.dignityFloor,
+            lowRisk.dignityFloor,
+            "extreme risk MUST raise dignity floor (host-protection elevates when system narrows agency)")
+    }
+
+    // MARK: - L12 surface aliases respond to permit mode
+
+    func testL12SurfaceAliasSensitivityToPermitMode() {
+        let compareMode = BASSurfaceModeFromPermit.derive(
+            from: .compare)
+        let answerMode = BASSurfaceModeFromPermit.derive(
+            from: .answer)
+        XCTAssertNotNil(compareMode,
+            "compare permit MUST resolve to comparePanel surface")
+        XCTAssertNil(answerMode,
+            "answer permit MUST resolve to nil (no L12 surface)")
+        // Cthulhu vs Kunlun aliases for the same surface MUST differ.
+        if let mode = compareMode {
+            let cthulhuAlias = BASCthulhuSurfaceAlias.derive(
+                from: mode)
+            let kunlunAlias = BASKunlunSurfaceAlias.derive(
+                from: mode)
+            XCTAssertEqual(
+                cthulhuAlias, .lighthouseCompare)
+            XCTAssertEqual(
+                kunlunAlias, .axisComparePanel)
+            XCTAssertNotEqual(
+                cthulhuAlias?.rawValue,
+                kunlunAlias.rawValue,
+                "L12 doctrine-specific aliases MUST differ between Cthulhu and Kunlun for same surface mode — if invariant, doctrine-specific naming is dead doctrine")
+        }
+    }
 }
