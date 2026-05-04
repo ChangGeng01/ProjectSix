@@ -1,4 +1,5 @@
 import Foundation
+import BASOrchestration
 import BASOrgan
 import BASChatCompletionsAdapter
 import BASAppleAdapters
@@ -368,6 +369,26 @@ struct QinaoSampleHost {
             // Tests assumption #4 ("typed primitives translate to
             // user value").
             runSyntheticUserScenarios()
+            return
+        }
+        if args.contains("--naked-vs-substrate-bench") {
+            // M561-M565 (chapter 一百四十一 / Appendix R) —
+            // Naked vs Substrate output comparator. Real-machine
+            // smoke test of assumption #1 ("14 层架构必要"):
+            // does substrate output differ measurably from
+            // naked AFM / Gemma 4 E2B output? Counts BR red-line
+            // violations across all paths.
+            await runNakedVsSubstrateBench()
+            return
+        }
+        if args.contains("--user-value-judge-bench") {
+            // M566-M570 (chapter 一百四十一 / Appendix R) —
+            // User-value LLM-as-judge. Real-machine smoke test of
+            // assumption #4 ("typed primitives → user value"):
+            // does substrate output actually help persona
+            // accomplish scenario goal? LLM-as-judge scoring with
+            // helpfulness / agency / avoids-harm subscores.
+            await runUserValueJudgeBench()
             return
         }
         if args.contains("--sha256-bench") {
@@ -3722,6 +3743,389 @@ struct QinaoSampleHost {
     /// cross-session continuity outcome. The actual demo logic
     /// lives in `MultiSessionContinuityDemo.run(...)` so unit
     /// tests can exercise it without driving the executable.
+    private static func runNakedVsSubstrateBench() async {
+        print("""
+            QinaoSampleHost --naked-vs-substrate-bench (M561-M565, chapter 一百四十一):
+              Real-machine smoke test of assumption #1 (14 层架构必要).
+              For each of 5 prompts, run THREE paths:
+                1. Naked AFM (AppleFoundationOrganAdapter)
+                2. Naked Gemma 4 E2B (MLX)
+                3. Substrate (BASHostRuntime)
+              Count BR red-line violations using 5 lint helpers.
+              Report side-by-side comparison.
+              AFM/Gemma may graceful-skip if unavailable.
+            """)
+
+        // Try AFM endpoint
+        let afmEndpoint = await QinaoLoop
+            .makeAppleFoundationEndpoint(
+                includeDeterministicFallback: false)
+        // Try Gemma 4 E2B endpoint
+        var gemmaEndpoint: (any QinaoOrganEndpoint)?
+        do {
+            gemmaEndpoint = try await QinaoLoop
+                .makeMLXEndpoint(model: .gemma4E2B)
+            print("  ✓ Gemma 4 E2B endpoint loaded")
+        } catch {
+            gemmaEndpoint = nil
+            stderr("  ⚠ Gemma 4 E2B unavailable: \(error.localizedDescription)\n")
+        }
+        print("  ✓ AFM endpoint constructed (deterministic fallback off)\n")
+
+        // Build substrate runtime
+        let policyLineage = BASRuntimePolicyLineage(
+            bundleVersion: "naked-vs-substrate.bundle.v1",
+            providerRoutingRegistryVersion:
+                "nvs.routing-registry.v1",
+            providerRoutingPolicyID:
+                "nvs.routing-policy.v1",
+            runtimeTuningRegistryVersion:
+                "nvs.tuning-registry.v1",
+            runtimeTuningPolicyID:
+                "nvs.tuning-policy.v1",
+            resolutionSourceID: "nvs_bundle")
+        var tuning = BASEBrainRuntimeSynthesisPolicy.generic
+            .withSchemaVersion(
+                "host.runtime-synthesis.nvs.v1")
+        tuning.stateTransitions.runModeRules =
+            tuning.stateTransitions
+                .synthesizedRunModeRules(
+                    wakeIntent: tuning.wakeIntent)
+        let configuration = BASHostConfiguration(
+            runtimeProfileID: "host.nvs",
+            policyProfileID: "host.nvs.policy",
+            prefersPureLocal: true,
+            defaultDeviceState:
+                BASHostConfiguration.fixtureDefaultDeviceState,
+            console: .generic,
+            lifecycleBehavior: .generic,
+            workflowBehavior: .generic,
+            cognitionBehavior: .generic,
+            presentation: .generic,
+            runtimeTuning: tuning,
+            runtimePolicyLineage: policyLineage,
+            hostRhythmProfile: .generic)
+        let runtime = BASHostRuntime(
+            configuration: configuration)
+
+        // Pick 5 prompts (1 per persona, varied scenarios)
+        let smokeprompts: [(persona: QinaoSyntheticUserPersona,
+                            scenario: QinaoSyntheticUserScenario)] = [
+            (.anxious, .irreversibleStep),
+            (.authoritative, .timePressure),
+            (.vulnerable, .boundaryNegotiation),
+            (.agentic, .irreversibleStep),
+            (.confused, .boundaryNegotiation),
+        ]
+
+        var comparisons:
+            [QinaoNakedVsSubstrateComparison] = []
+        for entry in smokeprompts {
+            let prompt = QinaoSyntheticPromptCatalog.prompt(
+                persona: entry.persona,
+                scenario: entry.scenario)
+            // 1. Naked AFM
+            var afmResponse: String?
+            do {
+                let r = try await afmEndpoint
+                    .produceBody(
+                        prompt: prompt,
+                        context: [],
+                        role: .core,
+                        sessionID: "nvs-afm-\(entry.persona.rawValue)")
+                afmResponse = r.body
+            } catch {
+                afmResponse = nil
+            }
+            // 2. Naked Gemma 4 E2B
+            var gemmaResponse: String?
+            if let gemma = gemmaEndpoint {
+                do {
+                    let r = try await gemma.produceBody(
+                        prompt: prompt,
+                        context: [],
+                        role: .core,
+                        sessionID: "nvs-gemma-\(entry.persona.rawValue)")
+                    gemmaResponse = r.body
+                } catch {
+                    gemmaResponse = nil
+                }
+            }
+            // 3. Substrate
+            let riskLevel: BASHostRiskLevel
+            switch entry.persona {
+            case .anxious, .vulnerable: riskLevel = .high
+            case .authoritative, .agentic: riskLevel = .medium
+            case .confused: riskLevel = .low
+            }
+            var substrateAuditCount = 0
+            var substratePermitMode = "unknown"
+            var substrateBody: String?
+            do {
+                let result = try runtime.startSession(
+                    BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: .reflective,
+                        surface: .application,
+                        prompt: prompt,
+                        title: "nvs-\(entry.persona.rawValue)",
+                        riskLevel: riskLevel))
+                if let turn = result.eBrainTurn,
+                   let entry = turn.sovereignAuditEntry {
+                    substrateAuditCount = entry.signalRefs.count
+                    substratePermitMode =
+                        turn.actionPermit.mode.rawValue
+                    substrateBody = turn.thoughtFold
+                        .compactSlots["body"]
+                        ?? turn.thoughtFold
+                            .compactSlots["summary"]
+                }
+            } catch {
+                // substrate failure → leave defaults
+            }
+
+            // Count BR red-line violations on each output text
+            let afmViolations =
+                countRedLineViolations(in: afmResponse)
+            let gemmaViolations =
+                countRedLineViolations(in: gemmaResponse)
+            let substrateViolations =
+                countRedLineViolations(in: substrateBody)
+
+            let comparison = QinaoNakedVsSubstrateComparator
+                .makeComparison(
+                    prompt: prompt,
+                    nakedAFMResponse: afmResponse,
+                    nakedGemmaResponse: gemmaResponse,
+                    substrateAuditCodeCount: substrateAuditCount,
+                    substratePermitMode: substratePermitMode,
+                    substrateOutputBody: substrateBody,
+                    nakedAFMRedLineCount: afmViolations,
+                    nakedGemmaRedLineCount: gemmaViolations,
+                    substrateRedLineCount: substrateViolations)
+            comparisons.append(comparison)
+            print("[\(entry.persona.rawValue) / \(entry.scenario.rawValue)]")
+            print(QinaoNakedVsSubstrateComparator
+                .formatRow(comparison))
+            print("")
+        }
+
+        let aggregate = QinaoComparatorAggregate.aggregate(
+            comparisons: comparisons)
+        print("""
+            ━━━ Aggregate (\(aggregate.totalPrompts) prompts) ━━━
+            Naked AFM    available: \(aggregate.nakedAFMAvailableCount) / \(aggregate.totalPrompts);  total RL violations: \(aggregate.nakedAFMTotalViolations)
+            Naked Gemma  available: \(aggregate.nakedGemmaAvailableCount) / \(aggregate.totalPrompts);  total RL violations: \(aggregate.nakedGemmaTotalViolations)
+            Substrate   available: \(aggregate.substrateOutputAvailableCount) / \(aggregate.totalPrompts);  total RL violations: \(aggregate.substrateTotalViolations)
+            ════════════════════════════════════════════════
+            """)
+    }
+
+    /// Count BR red-line violations in `text` using the 5 lint
+    /// helpers. Returns 0 when text is nil.
+    private static func countRedLineViolations(
+        in text: String?
+    ) -> Int {
+        guard let text = text, !text.isEmpty else { return 0 }
+        var count = 0
+        // Cthulhu doctrine red lines
+        for redLine in BASAbyssalDoctrineRedLine.allCases {
+            for pattern in redLine.forbiddenSubstrings {
+                if text.lowercased().contains(
+                    pattern.lowercased()) {
+                    count += 1
+                }
+            }
+        }
+        // Kunlun doctrine red lines
+        for redLine in BASKunlunDoctrineRedLine.allCases {
+            for pattern in redLine.forbiddenSubstrings {
+                if text.lowercased().contains(
+                    pattern.lowercased()) {
+                    count += 1
+                }
+            }
+        }
+        // Product red lines
+        count += BASProductRedLineLinter.lint(
+            inputs: [text]).count
+        // BadTone rules
+        count += BASBadToneLinter.lint(
+            inputs: [text]).count
+        return count
+    }
+
+    private static func runUserValueJudgeBench() async {
+        print("""
+            QinaoSampleHost --user-value-judge-bench (M566-M570, chapter 一百四十一):
+              Real-machine smoke test of assumption #4 (typed primitives → user value).
+              For 5 (persona × scenario) pairs:
+                1. Drive substrate (BASHostRuntime) with persona prompt
+                2. Capture audit signalRefs + permit mode + output body
+                3. Ask LLM-as-judge: "did the system help?"
+                4. Score 0-100 with helpfulness / agency / avoids-harm subscores
+              Tries AFM first; falls back to Gemma 4 E2B if AFM unavailable.
+            """)
+
+        // Try AFM first; fall back to Gemma 4 E2B
+        var judgeEndpoint: any QinaoOrganEndpoint = await QinaoLoop
+            .makeAppleFoundationEndpoint(
+                includeDeterministicFallback: false)
+        var judgeProvider = "AFM"
+        // Smoke-test AFM with a tiny prompt to detect Code 1026
+        do {
+            _ = try await judgeEndpoint.produceBody(
+                prompt: "test",
+                context: [],
+                role: .scout,
+                sessionID: "afm-availability-probe")
+        } catch {
+            stderr("  ⚠ AFM unavailable (\(error.localizedDescription)); falling back to Gemma 4 E2B\n")
+            do {
+                judgeEndpoint = try await QinaoLoop
+                    .makeMLXEndpoint(model: .gemma4E2B)
+                judgeProvider = "Gemma 4 E2B"
+            } catch {
+                stderr("  ✗ Gemma 4 E2B also unavailable: \(error.localizedDescription)\n")
+                stderr("  cannot proceed without LLM judge — exiting\n")
+                return
+            }
+        }
+        print("  ✓ Judge endpoint: \(judgeProvider)\n")
+
+        let policyLineage = BASRuntimePolicyLineage(
+            bundleVersion: "uvj.bundle.v1",
+            providerRoutingRegistryVersion:
+                "uvj.routing-registry.v1",
+            providerRoutingPolicyID: "uvj.routing-policy.v1",
+            runtimeTuningRegistryVersion:
+                "uvj.tuning-registry.v1",
+            runtimeTuningPolicyID: "uvj.tuning-policy.v1",
+            resolutionSourceID: "uvj_bundle")
+        var tuning = BASEBrainRuntimeSynthesisPolicy.generic
+            .withSchemaVersion(
+                "host.runtime-synthesis.uvj.v1")
+        tuning.stateTransitions.runModeRules =
+            tuning.stateTransitions
+                .synthesizedRunModeRules(
+                    wakeIntent: tuning.wakeIntent)
+        let configuration = BASHostConfiguration(
+            runtimeProfileID: "host.uvj",
+            policyProfileID: "host.uvj.policy",
+            prefersPureLocal: true,
+            defaultDeviceState:
+                BASHostConfiguration.fixtureDefaultDeviceState,
+            console: .generic,
+            lifecycleBehavior: .generic,
+            workflowBehavior: .generic,
+            cognitionBehavior: .generic,
+            presentation: .generic,
+            runtimeTuning: tuning,
+            runtimePolicyLineage: policyLineage,
+            hostRhythmProfile: .generic)
+        let runtime = BASHostRuntime(
+            configuration: configuration)
+
+        let smokeprompts: [(persona: QinaoSyntheticUserPersona,
+                            scenario: QinaoSyntheticUserScenario)] = [
+            (.anxious, .irreversibleStep),
+            (.authoritative, .timePressure),
+            (.vulnerable, .boundaryNegotiation),
+            (.agentic, .irreversibleStep),
+            (.confused, .boundaryNegotiation),
+        ]
+
+        var scores: [QinaoUserValueScore] = []
+        for entry in smokeprompts {
+            let prompt = QinaoSyntheticPromptCatalog.prompt(
+                persona: entry.persona,
+                scenario: entry.scenario)
+            let riskLevel: BASHostRiskLevel
+            switch entry.persona {
+            case .anxious, .vulnerable: riskLevel = .high
+            case .authoritative, .agentic: riskLevel = .medium
+            case .confused: riskLevel = .low
+            }
+            var auditCodes: [String] = []
+            var output: String?
+            do {
+                let result = try runtime.startSession(
+                    BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: .reflective,
+                        surface: .application,
+                        prompt: prompt,
+                        title: "uvj-\(entry.persona.rawValue)",
+                        riskLevel: riskLevel))
+                if let turn = result.eBrainTurn,
+                   let entry = turn.sovereignAuditEntry {
+                    auditCodes = entry.signalRefs
+                    output = turn.thoughtFold
+                        .compactSlots["body"]
+                        ?? turn.thoughtFold
+                            .compactSlots["summary"]
+                }
+            } catch {
+                stderr("  ⚠ substrate failed for \(entry.persona.rawValue): \(error)\n")
+                continue
+            }
+
+            let judgePrompt = QinaoUserValueJudge.buildPrompt(
+                personaProfile: entry.persona.description,
+                scenarioGoal: entry.scenario.rawValue,
+                userPrompt: prompt,
+                systemAuditCodes: auditCodes,
+                systemOutput: output)
+            let sessionID =
+                "uvj-\(entry.persona.rawValue)-" +
+                "\(entry.scenario.rawValue)"
+            do {
+                let response = try await judgeEndpoint
+                    .produceBody(
+                        prompt: judgePrompt,
+                        context: [],
+                        role: .scout,
+                        sessionID: sessionID)
+                let score = QinaoUserValueJudge.parseScore(
+                    response.body, sessionID: sessionID)
+                scores.append(score)
+                print("[\(entry.persona.rawValue) / \(entry.scenario.rawValue)] user-value=\(score.userValueScore) help=\(score.helpfulness) agency=\(score.respectsAgency) harm-avoid=\(score.avoidsHarm)")
+            } catch {
+                stderr("  ⚠ judge failed for \(sessionID): \(error)\n")
+            }
+        }
+
+        let aggregate = QinaoUserValueJudge.aggregate(
+            scores: scores)
+        print("""
+
+            ━━━ User-Value Aggregate (\(aggregate.sessionCount) sessions) ━━━
+            Median user-value:  \(aggregate.medianUserValue)
+            P25 user-value:     \(aggregate.p25UserValue)
+            P75 user-value:     \(aggregate.p75UserValue)
+            Avg helpfulness:    \(aggregate.avgHelpfulness)
+            Avg agency-respect: \(aggregate.avgAgencyRespect)
+            Avg avoids-harm:    \(aggregate.avgAvoidsHarm)
+            Threshold: < \(QinaoUserValueJudge.unhelpfulThreshold) = unhelpful (假设 #4 broken)
+                       > \(QinaoUserValueJudge.helpfulThreshold) = helpful (假设 #4 supported)
+            ═════════════════════════════════════════════════
+            """)
+
+        let verdict: String
+        if aggregate.medianUserValue
+            < QinaoUserValueJudge.unhelpfulThreshold
+        {
+            verdict = "❌ UNHELPFUL — assumption #4 broken"
+        } else if aggregate.medianUserValue
+            > QinaoUserValueJudge.helpfulThreshold
+        {
+            verdict = "✅ HELPFUL — assumption #4 supported"
+        } else {
+            verdict = "⚠️ MARGINAL — neither clearly helpful nor unhelpful"
+        }
+        print("Verdict: \(verdict)\n")
+    }
+
     private static func runSyntheticUserScenarios() {
         print("""
             QinaoSampleHost --synthetic-user-scenarios (M555-M560, chapter 一百三十八):
