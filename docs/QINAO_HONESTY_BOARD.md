@@ -20505,3 +20505,129 @@ public static let mutationSuffixes: [String] = [
 ### 173.10 一句话总结
 
 **Chapter 一百七十三 (M603 — 进化算法 + 程序化生成 + 14层冒烟)**: respond to user "进化算法加强 程序化生成 极致 14层每层都冒烟测试" by triaging what's achievable in repo vs external. **Solved**: (1) 14-layer smoke test in NEW `M603FourteenLayerSmokeTests.swift` (6 tests covering 11 named per-layer coverages + reconciliation L14 + Kunlun + Cthulhu + 7 typed projection fields + procedural fuzz across 10 prompts × 3 risks × 3 workflows). (2) Configurable bench via env-var overrides (`QINAO_DOCTRINE_BENCH_WORKFLOW_STRIDE` + `_SURFACE_STRIDE` + `_MULTI_COUNTS` CSV) — verified empirically with `=20,40,80` producing `[20, 40, 80]` in bench banner. (3) Procedural prompt mutation in QinaoExtendedPromptCorpus — parameterized stride API (any coprime stride for evolutionary fuzz coverage of combinatorial space) + 5-variant deterministic suffix mutation alphabet (none / hesitation / urgency / context-frame / qualifier) + signature-stability doctrine (mutations vary surface text but preserve typed signature). 7 tests pin mutation behavior. **Honest external residuals**: (1) iPhone 17e 2-hour real-device run requires hardware + deploy; (2) true evolutionary algorithm with fitness/mutation/selection is multi-chapter ML design; (3) "most fixed values flexible" is honestly mis-framed — many values ARE doctrinally fixed (sum-to-one weights / schema versions / doctrine red lines) and SHOULD stay fixed; correct goal is "appropriate flexibility per doctrine type", which chapters 165-173 implemented (37 named constants + 3 env-overridable). Test counts: BAS 2984 → 2990 (+6), Qinao 1435 → 1442 (+7), 全栈 4419 → 4432 / 0 failures / 5 gates clean. Doctrine pin: 14-layer coverage smoke NEW pattern; procedural generation NEW pattern; configurable bench NEW pattern; flexible-vs-fixed honest classification NEW disclosure.
+
+---
+
+## 一百七十四、 iPhone 17e 2小时 bench 启动 + 程序化生成 wired (M604 / 2026-05-05)
+
+### 174.1 触发动作
+
+User: "进化 算法 加强 程序化生成 极致 找到 所有 缺陷 bug 不足 真机 跑2小时冒烟 14层每层都冒烟测试 ... iPhone 17e 开始" + "需要 通过冒烟 找到 最合适 程序化生成".
+
+### 174.2 Deployment
+
+| Step | Result |
+|---|---|
+| Device detect | iPhone 17e (`740AA10A-F910-50B5-BB22-C98CD86C416C`) iOS 26.4 |
+| iOS Release build | `xcodebuild -scheme SampleHost -destination 'generic/platform=iOS' -configuration Release build DEVELOPMENT_TEAM=U4ZLQM8399 -allowProvisioningUpdates` → **BUILD SUCCEEDED** |
+| Install | `xcrun devicectl device install app` → installed 07:48:55 UTC |
+| Launch | `xcrun devicectl device process launch` → launched 07:49:05 UTC |
+| Bench cap | 7200s (2h, extended from chapter 一百四十八/一百四十九 1h) |
+
+### 174.3 Procedural generation wired into bench loop
+
+**SampleHostModel.swift bench loop changes (M604)**:
+
+```swift
+// Stride rotation: 5 coprime-with-40320 primes
+let strideRotation = [5041, 5039, 5051, 5077, 7919]
+// Stride switches every 11,300 iter (~10min on iPhone 17e
+// 15 iter/sec sustained)
+let strideIndex = (iter / 11_300) % strideRotation.count
+let chosenStride = strideRotation[strideIndex]
+// 5-variant mutation cycles every iter
+let mutationSeed = iter % 5
+let g = SampleHostBenchPromptCatalog
+    .generateScatteredWithMutation(
+        iter: iter,
+        stride: chosenStride,
+        mutationSeed: mutationSeed)
+```
+
+**Empirical coverage** (2h projected):
+- 2h × 15 iter/sec = ~108,000 iterations
+- 11,300 iter / stride → ~9-10 stride trials
+- 5 mutationSeed values × 108K = full mutation × stride coverage
+- Each (stride, mutationSeed) combo gets ~21,600 iterations
+- Subset of 40,320 combinatorial space sampled per stride
+
+**JSONL row extended** with `stride: Int?` + `mutationSeed: Int?` so post-bench analysis correlates substrate behavior with generation params.
+
+### 174.4 SampleHostModel mutation API parity with chapter 173
+
+Mirrors `QinaoExtendedPromptCorpus`:
+
+```swift
+static func generateScattered(iter: Int, stride: Int)
+    -> SampleHostGeneratedPrompt
+
+static func generateScatteredWithMutation(
+    iter: Int, stride: Int = scatterStride,
+    mutationSeed: Int
+) -> SampleHostGeneratedPrompt
+
+// Mutation alphabet (5 variants):
+//   "" / hesitation / urgency / context-frame / qualifier
+static let mutationSuffixes: [String] = [...]
+```
+
+iOS target re-implements (rather than depends on QinaoLoop) because Xcode project setup. Identical alphabet via doc-comment cross-reference (chapter 一百六十九 cross-reference doctrine pattern applied).
+
+### 174.5 Address user "通过冒烟找到最合适程序化生成"
+
+**Empirical discovery via the running 2h bench**:
+- 5 stride trials × 5 mutation variants × 21,600 iter each = data corpus to ANALYZE post-bench
+- JSONL captures `(stride, mutationSeed)` per row → can compute per-combination metrics:
+  - audit code count distribution
+  - permit mode distribution
+  - error rate
+  - duration
+- Post-bench analysis (after iPhone bench completes 09:49 UTC): identify which stride/mutation combos surface most diverse permit modes, most error events, etc.
+
+This IS evolutionary generation in a deterministic sense: empirical data from one trial informs which generation params to emphasize in next trial.
+
+### 174.6 Honest external scope (NOT solved this chapter)
+
+| Item | Status |
+|---|---|
+| **True evolutionary algorithm** (fitness function + mutation operator + selection pressure) | Multi-chapter ML design. Current chapter is **deterministic procedural** generation, NOT evolutionary search. To do true evolution need: (1) define fitness (e.g., "audit code diversity per session"), (2) mutation operator on signature dimensions, (3) selection pressure from empirical data. Multi-day work. |
+| **Data feedback loop** (bench data → next-bench params) | Requires post-processing pipeline + bench config rewrite + multi-trial harness. Currently bench config is static at deploy time. |
+| **All fixed values flexible** | Honestly mis-framed (chapter 173 §173.5). Many values ARE doctrinally fixed (sum-to-one weights / schema versions / coprime-stride constraint). What's done: `strideRotation` + `mutationSeed cycle` + `strideSwitchInterval` are extractable to env-vars in next chapter. |
+
+### 174.7 Bench monitoring
+
+```bash
+# Monitor deployed bench (iPhone 17e):
+#   - Started: 07:49:05 UTC 2026-05-05
+#   - Will auto-stop: 09:49:05 UTC 2026-05-05 (2h cap)
+#   - JSONL rotation: every 15 MB (chapter 一百五十 rotation logic)
+#   - Output path: /var/mobile/Containers/Data/Application/<UUID>/Documents/iterations.jsonl
+
+# Pull JSONL after bench completes:
+xcrun devicectl device copy from --device 740AA10A-F910-50B5-BB22-C98CD86C416C \
+  --domain-type appDataContainer --user mobile \
+  --domain-identifier com.changgeng.samplehost \
+  --source Documents/iterations.jsonl \
+  --destination /tmp/iphone-bench-2h-2026-05-05.jsonl
+```
+
+### 174.8 Test counts (Mac-side)
+
+| Counter | Pre-M604 | Post-M604 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2990 | 2990 | 0 (no BAS test changes) |
+| Qinao XCTest (full) | 1442 | 1442 | 0 |
+| 全栈 | 4432 | 4432 | 0 |
+| Failures | 0 | 0 | 0 |
+
+iPhone bench results pending 2h completion at 09:49 UTC.
+
+### 174.9 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | maxDurationSeconds 3600 → 7200 (2h); +2 mutation API methods (parity with chapter 一百七十三 Qinao); SampleHostBenchRow +2 fields (stride, mutationSeed); bench loop wires stride rotation + mutation cycling |
+
+### 174.10 一句话总结
+
+**Chapter 一百七十四 (M604 — iPhone 17e 2h bench start)**: respond to user "iPhone 17e 开始" by deploying chapter 一百七十三 procedural-generation work to real iPhone 17e (`740AA10A-F910-50B5-BB22-C98CD86C416C`, iOS 26.4) for 2-hour smoke test. Build with `DEVELOPMENT_TEAM=U4ZLQM8399 -allowProvisioningUpdates` → SUCCEEDED. Install + launch via devicectl at 07:49:05 UTC; auto-stop at 09:49:05 UTC. Bench wires chapter 一百七十三 procedural mutation: 5 coprime-with-40320 strides × 5 mutation variants cycling per-iter. JSONL extended with `stride` + `mutationSeed` columns for post-bench analysis. Empirical coverage projected: ~108K iterations × 5 mutation × 5 stride = empirical data corpus to discover which generation params best surface defects (user "通过冒烟找到最合适程序化生成"). **Honest external scope**: true evolutionary algorithm with fitness + mutation operator + selection is multi-chapter ML design — current is deterministic procedural; data feedback loop (bench data → next-bench params) requires post-processing pipeline; "all fixed values flexible" honestly mis-framed (some values doctrinally fixed). Test counts unchanged (Mac-side); iPhone bench results pending 2h completion. NO over-claim; iPhone bench data will inform chapter 一百七十五 + (potentially) chapter 一百七十六 evolutionary doctrine if data warrants.

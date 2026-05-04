@@ -19,6 +19,13 @@ struct SampleHostBenchRow: Codable, Sendable, Equatable {
     let durationSeconds: Double
     let status: String
     let errorMessage: String?
+    /// **M604 chapter 一百七十四 — procedural generation params**.
+    /// Captured per-iter so post-bench analysis can correlate
+    /// substrate behavior with stride × mutation combinations.
+    /// Goal (user "通过冒烟找到最合适程序化生成"): discover which
+    /// stride / mutation combos surface defects.
+    let stride: Int?
+    let mutationSeed: Int?
 }
 
 // MARK: - M574 (chapter 一百四十九) — Combinatorial prompt generator
@@ -96,11 +103,55 @@ enum SampleHostBenchPromptCatalog {
     /// Scatter walk: same prompt space coverage as `generate(seed:)`
     /// but adjacent iter values produce distant signatures.
     static func generateScattered(iter: Int) -> SampleHostGeneratedPrompt {
+        return generateScattered(
+            iter: iter, stride: scatterStride)
+    }
+
+    /// **M604 chapter 一百七十四 — parameterized stride** (mirrors
+    /// chapter 一百七十三 M603 QinaoExtendedPromptCorpus API).
+    /// Allows multi-trial fuzz with different coprime strides
+    /// to sample different subsets of combinatorial space.
+    static func generateScattered(
+        iter: Int,
+        stride: Int
+    ) -> SampleHostGeneratedPrompt {
         let cap = totalCapacity
-        let raw = iter * scatterStride
+        let raw = iter * stride
         let seed = ((raw % cap) + cap) % cap
         return generate(seed: seed)
     }
+
+    /// **M604 chapter 一百七十四 — procedural prompt mutation**
+    /// (mirrors chapter 一百七十三 M603). 5-variant deterministic
+    /// suffix alphabet exercises substrate response to surface-
+    /// level variations without changing typed signature.
+    static func generateScatteredWithMutation(
+        iter: Int,
+        stride: Int = scatterStride,
+        mutationSeed: Int
+    ) -> SampleHostGeneratedPrompt {
+        let base = generateScattered(
+            iter: iter, stride: stride)
+        let suffix = mutationSuffixes[
+            ((mutationSeed % mutationSuffixes.count)
+                + mutationSuffixes.count)
+                % mutationSuffixes.count]
+        guard !suffix.isEmpty else { return base }
+        return SampleHostGeneratedPrompt(
+            signature: base.signature,
+            prompt: base.prompt + suffix,
+            seed: base.seed)
+    }
+
+    /// Mutation alphabet — parity with chapter 一百七十三
+    /// QinaoExtendedPromptCorpus.mutationSuffixes.
+    static let mutationSuffixes: [String] = [
+        "",
+        " — but I'm not certain.",
+        " I need to decide quickly.",
+        " Given my situation last year, please advise.",
+        " What would you say if I were a stranger?",
+    ]
 
     static func generate(seed: Int) -> SampleHostGeneratedPrompt {
         let cap = totalCapacity
@@ -838,11 +889,15 @@ final class SampleHostModel: ObservableObject {
         UIApplication.shared.isIdleTimerDisabled = true
         #endif
 
-        // M574 (chapter 一百四十九) — 1-hour maximum duration cap
-        // for "find bugs/defects via diverse prompts" goal. User
-        // wants real-iPhone-17e 1-hour smoke surfacing edge cases
-        // in substrate behavior under combinatorial prompt input.
-        let maxDurationSeconds: TimeInterval = 3600
+        // M574 (chapter 一百四十九) — 1-hour bench cap.
+        // **M604 chapter 一百七十四**: extended to 2h cap per user
+        // "真机 跑2小时冒烟 ... 极大提高benchmark". Doubles
+        // combinatorial prompt coverage from chapter 一百四十九's
+        // 56,585 iterations / 100% coverage to ~113K iter
+        // exercising substrate's 14 observation bundles + 7 typed
+        // projection fields + 11 named per-layer coverage codes
+        // (chapter 一百七十三 smoke pattern) ~113K times each.
+        let maxDurationSeconds: TimeInterval = 7200
 
         let runtime = self.runtime
         let runner = self.benchRunner
@@ -863,8 +918,29 @@ final class SampleHostModel: ObservableObject {
                 // unique prompt across 40,320-slot space, but adjacent
                 // iter values produce distant signatures (all 8 tones
                 // visited in first 8 iter vs only 1 with linear walk).
+                //
+                // **M604 chapter 一百七十四**: cycle 5 mutation variants
+                // every iter via `mutationSeed = iter % 5`. Each
+                // base prompt runs through all 5 surface perturbations
+                // (none / hesitation / urgency / context-frame /
+                // qualifier) over a 5-iter window. Empirical goal
+                // (user "通过冒烟找到最合适程序化生成"): discover
+                // which stride×mutation combos surface defects via
+                // 2h bench observation. Stride doctrine: stride
+                // changes every 11,300 iter (≈ 10min on iPhone 17e
+                // 15 iter/sec sustained) cycling through 5 coprime
+                // primes [5041, 5039, 5051, 5077, 7919] for full
+                // multi-trial coverage of combinatorial subspaces.
+                let strideRotation = [5041, 5039, 5051, 5077, 7919]
+                let strideIndex = (iter / 11_300)
+                    % strideRotation.count
+                let chosenStride = strideRotation[strideIndex]
+                let mutationSeed = iter % 5
                 let g = SampleHostBenchPromptCatalog
-                    .generateScattered(iter: iter)
+                    .generateScatteredWithMutation(
+                        iter: iter,
+                        stride: chosenStride,
+                        mutationSeed: mutationSeed)
                 let prompt = g.prompt
                 let signature = g.signature
                 let t0 = Date()
@@ -925,7 +1001,9 @@ final class SampleHostModel: ObservableObject {
                     bodyLength: bodyLength,
                     durationSeconds: dur,
                     status: status,
-                    errorMessage: errorMessage)
+                    errorMessage: errorMessage,
+                    stride: chosenStride,
+                    mutationSeed: mutationSeed)
                 do {
                     try await runner.appendRow(row)
                 } catch {
