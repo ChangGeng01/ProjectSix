@@ -1306,6 +1306,43 @@ public enum BASEBrainSchemaGovernanceRegistry {
             versionedType: BASCounterHostCheck.self,
             tests: ["schema.counter_host_check.current", "schema.counter_host_check.backward"],
             learnability: .nonLearnable
+        ),
+        // M576 (chapter 一百五十一) — 6 doctrine metric schemas per
+        // master plan v1.0 §13.2. Pure value-type metrics computed
+        // from existing source types (BASAxisAlignment /
+        // BASHeavenGatePermit / BASRiverOriginTrace / BASYaochiSanctumEntry
+        // / BASHumanAnchorSignal / red-line enums). All
+        // observability-class — semi-learnable (statistical aggregates,
+        // not L14 sovereign artifacts).
+        entry(
+            "AxisStabilityScore",
+            versionedType: BASAxisStabilityScore.self,
+            tests: ["schema.axis_stability.current", "schema.axis_stability.backward"]
+        ),
+        entry(
+            "GateFidelityScore",
+            versionedType: BASGateFidelityScore.self,
+            tests: ["schema.gate_fidelity.current", "schema.gate_fidelity.backward"]
+        ),
+        entry(
+            "OriginTraceCompleteness",
+            versionedType: BASOriginTraceCompleteness.self,
+            tests: ["schema.origin_trace_completeness.current", "schema.origin_trace_completeness.backward"]
+        ),
+        entry(
+            "SanctumLeakRate",
+            versionedType: BASSanctumLeakRate.self,
+            tests: ["schema.sanctum_leak_rate.current", "schema.sanctum_leak_rate.backward"]
+        ),
+        entry(
+            "DoctrineHarmonyScore",
+            versionedType: BASDoctrineHarmonyScore.self,
+            tests: ["schema.doctrine_harmony.current", "schema.doctrine_harmony.backward"]
+        ),
+        entry(
+            "HumanAnchorRetention",
+            versionedType: BASHumanAnchorRetention.self,
+            tests: ["schema.human_anchor_retention.current", "schema.human_anchor_retention.backward"]
         )
     ]
 

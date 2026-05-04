@@ -31,7 +31,7 @@ struct BASEBrainSchemaGovernanceRegistryTests {
     func governedRegistryStaysUniquelyKeyedAndComplete() {
         let governedObjects = BASEBrainSchemaGovernanceRegistry.governedSchemas.map(\.objectID)
 
-        #expect(governedObjects.count == 242)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五) + M441-M443 8 top-level wrappers (chapter 一百十六) + M460-M462 3 strict-audit Cthulhu schemas (chapter 一百二十一) + M465-M470 6 Kunlun control-flow schemas (chapter 一百二十二) + M471-M475 5 Kunlun memory+equilibrium schemas (chapter 一百二十三) + M476-M479 4 Kunlun host+integrity schemas (chapter 一百二十四) + M513 1 CounterHostCheck schema (chapter 一百三十)
+        #expect(governedObjects.count == 248)  // +M120 8 parity-lint backfills + M286+ 8 cross-layer summaries + M439 7 L4/L7/L9/L10 schemas + M439 11 Kunlun anti-drift backfills + M440 2 layer-naming schemas (chapter 一百十五) + M441-M443 8 top-level wrappers (chapter 一百十六) + M460-M462 3 strict-audit Cthulhu schemas (chapter 一百二十一) + M465-M470 6 Kunlun control-flow schemas (chapter 一百二十二) + M471-M475 5 Kunlun memory+equilibrium schemas (chapter 一百二十三) + M476-M479 4 Kunlun host+integrity schemas (chapter 一百二十四) + M513 1 CounterHostCheck schema (chapter 一百三十) + M576 6 doctrine metric schemas per plan v1.0 §13.2 (chapter 一百五十一)
         #expect(Set(governedObjects).count == governedObjects.count)
         #expect(governedObjects.contains("DeviceState"))
         #expect(governedObjects.contains("BudgetFrame"))
@@ -514,7 +514,19 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "KunlunUnnamableSet":
                 BASKunlunUnnamableSet.currentSchemaVersion,
             "CounterHostCheck":
-                BASCounterHostCheck.currentSchemaVersion
+                BASCounterHostCheck.currentSchemaVersion,
+            "AxisStabilityScore":
+                BASAxisStabilityScore.currentSchemaVersion,
+            "GateFidelityScore":
+                BASGateFidelityScore.currentSchemaVersion,
+            "OriginTraceCompleteness":
+                BASOriginTraceCompleteness.currentSchemaVersion,
+            "SanctumLeakRate":
+                BASSanctumLeakRate.currentSchemaVersion,
+            "DoctrineHarmonyScore":
+                BASDoctrineHarmonyScore.currentSchemaVersion,
+            "HumanAnchorRetention":
+                BASHumanAnchorRetention.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

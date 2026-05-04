@@ -377,7 +377,15 @@ struct BASEBrainProgramBlueprintTests {
             // Counter-Host Check (Point 7 BASLearnabilityClass +
             // Point 5 BASSovereignDomainScope are enums not
             // BASSchemaVersioned).
-            "CounterHostCheck"
+            "CounterHostCheck",
+            // M576 (chapter 一百五十一) — 6 doctrine metric schemas
+            // per master plan v1.0 §13.2.
+            "AxisStabilityScore",
+            "GateFidelityScore",
+            "OriginTraceCompleteness",
+            "SanctumLeakRate",
+            "DoctrineHarmonyScore",
+            "HumanAnchorRetention"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

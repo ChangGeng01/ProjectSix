@@ -17442,3 +17442,123 @@ Unique tones in first 8 iter: 8 / 8
 ### 150.9 一句话总结
 
 **Chapter 一百五十 (消灭 缺陷 bug 全面进化)**: respond to user "消灭 缺陷 bug 全面进化" after chapter 149's 11-defect catalog. Triaged: 4 defects already corrected in chapter 149 docs (over-claim corrections), 3 are not bugs (substrate doctrine evidence, e.g. past-unresolved/angry triggers), 3 are Apple-tool/iOS bugs we can't fix (defect #1 iOS lock + #6/#8 devicectl active-write issues), leaving **defect #2 (linear seed walk)** + **#8 (mitigatable)** + **#7 (investigatable)** as code work. **Defect #2 真消灭** via coprime stride 5041 = 71² (gcd to 40320 = 1, +1 from 5040 bucket size guarantees all 8 tones in first 8 iter); BAS-side `QinaoExtendedPromptCorpus.generateScattered(iter:)` + 4 new tests; mirrored to iPhone `SampleHostBenchPromptCatalog`; verified on real iPhone 17e — first 8 iter visits all 8 tones (vs linear walk's 1/8). **Defect #8 mitigated** via JSONL rotation at 15MB threshold — Apple's devicectl 20MB cap during active write affects only the latest <15MB file; rotated-out files pull cleanly. **Defect #7 investigated** — BAS has 9 typed permit modes (answer/mirror/compare/delay/draft_only/local_only/block/replace/escalate); only 2 used because synthetic prompts use single workflowProfile + decision-question template + no tool intents. Coverage limitation by prompt template, not bug; future expansion would add Q&A / trade-off / tool-intent / privacy / crisis / reflection prompt families. Test counts: BAS 2891 unchanged, Qinao 1431 → 1435 (+4 scatter tests), 全栈 4326 / 0 failures / 5 gates clean.
+
+---
+
+## 一百五十一、 Plan v1.0 master 审计 + 6 doctrine metrics ship (M576 / 2026-05-05)
+
+### 151.1 触发动作
+
+User pasted the 16-section "宿基双生·主权第二大脑平台 最理想·顶级项目大纲 v1.0" master plan + said "plan". Followed plan-mode workflow → audit existing repo against plan claims → identify true gaps → ship Gap 1.
+
+### 151.2 Audit summary: plan v1.0 §11.1 vs current repo
+
+| Plan §11.1 "must immediately fix" | Reality (verified via grep) |
+|---|---|
+| "收缩 P0 闭环" | ✅ DONE — chapters 一百四十六-一百五十 ran 1h iPhone bench across full L1-L14 substrate path |
+| "层间硬边界" | 🟡 PARTIAL — typed via BAS module structure + import boundary scripts; per-layer write/read/proposal/veto domains NOT explicitly typed |
+| "先做 lineage graph" | ✅ DONE — `BASRiverOriginTrace` + `BASContaminationLineage` + `BASSovereignLineageCutRequest/Outcome/Depth` + `BASSovereignAuditLedger.applyLineageCut()` + `traverseLineage()` BFS already in code |
+| "doctrine 对象化" | ✅ DONE — Cthulhu (chapter 八十七, 8 schemas + 4 protocols) + Kunlun (chapter 九十二+, 6 schemas + 5 protocols) — 14+ typed schemas |
+
+L1-L14 source coverage: **all 14 layers have schema + runtime presence** (verified via grep across `BehavioralAISubstrate/Sources/`).
+
+**Net audit verdict**: plan v1.0 is a solid north star but its specific gap claims are **out of date** relative to chapters 八十七 → 一百五十. The repo is much further along than plan v1.0 perceives.
+
+### 151.3 5 truly remaining gaps
+
+| Gap | Description | Scope |
+|---|---|---|
+| **1** | **§13.2 6 doctrine metrics** (Axis Stability / Gate Fidelity / Origin Trace Completeness / Sanctum Leak Rate / Doctrine Harmony / Human Anchor Retention) — grep finds 0 hits | **Surgical 1-chapter** ← **chosen for chapter 一百五十一** |
+| 2 | §11.1 #2 per-layer typed write/read/proposal/veto domains | Invasive multi-chapter |
+| 3 | §8.3 multi-agent shared latent spine + zero-copy bus | System-level / ML infra |
+| 4 | §6.4 full Snapshot Ark (currently part of BASSovereignAuditLedger) | Doctrine clarification needed |
+| 5 | §8.4 multi-agent coordination overhead metric | Medium scope |
+
+### 151.4 Why Gap 1 first
+
+1. Surgically shippable in 1 chapter (~4 hrs) — same shape as chapter 八十七 Cthulhu schema parity
+2. Plan-aligned (§13.2 explicit)
+3. All source types already exist (BASKunlunAxisAlignment / BASHeavenGatePermit / BASRiverOriginTrace / BASYaochiSanctumEntry / BASHumanAnchorSignal / BASAbyssalDoctrineRedLines / BASKunlunDoctrineRedLines)
+4. Closes 6 named gap items in one stroke
+5. Pure value-type schemas + pure-function compute helpers — zero substrate runtime change
+
+### 151.5 Shipped: `BehavioralAISubstrate/Sources/BASOrchestration/BASDoctrineMetrics.swift`
+
+~570 LoC:
+
+**6 typed `BASSchemaVersioned` value types** (all `Sendable` + `Equatable` + `Codable` + ratio fields clamped `[0, 1]` per anti-magic-number doctrine):
+
+| Schema | Plan §13.2 # | Source type consumed | Computed field |
+|---|---|---|---|
+| `BASAxisStabilityScore` | #1 | `[BASAxisAlignment]` | `stabilityIndex = 1 - (p75 - p25)` |
+| `BASGateFidelityScore` | #2 | `[BASHeavenGatePermit]` | `fidelityRatio = (passed + denied) / total` |
+| `BASOriginTraceCompleteness` | #3 | `[BASRiverOriginTrace]` | `completenessRatio = full provenance / total` |
+| `BASSanctumLeakRate` | #4 | `[BASYaochiSanctumEntry]` + attempts/blocked | `leakRate = leaked / attempts` |
+| `BASDoctrineHarmonyScore` | #5 | red-line hit counts | `harmonyScore = 1 - (hits + conflicts) / sample` |
+| `BASHumanAnchorRetention` | #6 | `[BASHumanAnchorSignal]` | `retentionRatio = preserved / observed` |
+
+**6 pure-function compute helpers** (`BASDoctrineMetricsCompute` enum) — anti-recursion doctrine: all iterative arithmetic. Empty input → 0.0 (named constant `BASDoctrineMetricsThreshold.emptyInputScore`).
+
+**Anti-magic-number named constants**:
+- `BASDoctrineMetricsThreshold.schemaVersion = "1.0.0"`
+- `BASDoctrineMetricsThreshold.emptyInputScore = 0.0`
+- `BASDoctrineMetricsCompute.humanAnchorErosionThreshold = 1.0` (sum of 4 risk axes above which anchor is considered eroded)
+
+### 151.6 Tests: `BASDoctrineMetricsTests.swift` (24 tests, ~440 LoC)
+
+Coverage: schema versions pinned / Codable round-trip per type / clamping invariants (negative → 0, > 1 → 1, empty refs filtered) / compute happy-path per metric / compute empty-input → 0.0 / boundary edge cases (blocked > attempts → clamped, harmony saturation → 0) / threshold constant accessibility.
+
+All 24 pass: `swift test --package-path BehavioralAISubstrate --filter BASDoctrineMetricsTests` → 24/24 / 0 failures / 0.003s.
+
+### 151.7 Anti-drift 3-site sync (chapter 一百十四 doctrine)
+
+Per chapter 一百十四 anti-drift principle: schema additions require synchronized updates across registry + 2 test files in same chapter to prevent silent drift.
+
+**Site 1**: `BehavioralAISubstrate/Sources/BASAdmin/EBrainSchemaGovernanceRegistry.swift` — added 6 `entry()` registrations (none use `learnability:` argument, so all default to `.semiLearnable` per chapter 一百三十 BR-013 — observability-class metrics ARE semi-learnable since they're statistical aggregates, not L14 sovereign artifacts).
+
+**Site 2**: `BASEBrainSchemaGovernanceRegistryTests.swift` count `242 → 248` + 6 entries in `expectedVersions` map.
+
+**Site 3**: `BASEBrainProgramBlueprintTests.swift` `expectedObjects` Set +6 entries.
+
+All 3 sites synced same chapter; `BASEBrainProgramBlueprintTests.governedRegistryStaysUniquelyKeyedAndComplete` passes; whitepaper schema parity gate stays clean.
+
+### 151.8 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| #1 / #2 / #3 invariants | ✓ pure value-type schemas + pure functions; no permit.mode mutation; no audit hash chain change |
+| Anti-magic-number (chapter 一百十三) | ✓ all numeric thresholds named static constants; ratios computed not hardcoded; clamping at init |
+| Anti-drift 3-site (chapter 一百十四) | ✓ governance + 2 test files synced same chapter (242 → 248) |
+| Anti-recursion (chapter 一百三十一) | ✓ pure-function helpers, iterative not recursive |
+| Honest-correction (chapter 一百三十一/144/145/148/149/150) | ✓ §151.2 explicitly notes plan v1.0 perceptions out of date |
+| Cthulhu RL7 watcher only hint | ✓ metrics are observability not gating |
+| Kunlun 8 红线 / Cthulhu 10 红线 | ✓ no doctrine red lines crossed (metrics are observability) |
+| Schema parity gate (M120) | ✓ +6 schemas with governance entries; 247 declared / 248 registered (allowlist diff = 1 maintained) |
+
+### 151.9 测试基线
+
+| 套件 | 一百五十 章末 | 一百五十一 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2915** | +24 (BASDoctrineMetricsTests) |
+| Qinao XCTest | 1435 | **1435** | unchanged |
+| 全栈 | 4326 | **4350** | +24 |
+| 5 gates | clean | **clean** | unchanged |
+| Schema governance count | 242 | **248** | +6 (anti-drift 3-site synced) |
+| Whitepaper parity gate | 241 declared / 242 registered | **247 declared / 248 registered** | +6 / +6 |
+
+### 151.10 Out of scope (deferred)
+
+| Gap | Reason for defer |
+|---|---|
+| 2 (per-layer typed domains) | Multi-chapter invasive; touches every layer's API |
+| 3 (multi-agent shared latent spine) | Requires ML infra changes; system-level |
+| 4 (full Snapshot Ark) | Doctrine clarification needed (separate construct vs L14 sub-system?) |
+| 5 (multi-agent overhead metric) | Separate chapter; requires QinaoSeatRegistry instrumentation |
+| Plan §9 SDK product family | Product-layer work, not substrate |
+| Plan §12 training pipeline | External resources (GPU + corpus) |
+| Plan §13.3 端侧 / §13.4 主权 metrics | Already partially measured via existing benches; no new schemas needed |
+| Plan §15 red lines | Already typed via BASAbyssalDoctrineRedLines + BASKunlunDoctrineRedLines |
+
+### 151.11 一句话总结
+
+**Chapter 一百五十一 (M576 — Plan v1.0 master 审计 + 6 doctrine metrics ship)**: respond to user paste of plan v1.0 master document + "plan" with audit-against-current-state finding plan §11.1 claims (P0 closure / lineage graph / doctrine objectified) are **out of date** — chapters 八十七-一百五十 already shipped most of plan §11.1's "must immediately fix" items. Identify 5 truly remaining gaps; choose Gap 1 (plan §13.2 6 doctrine metrics) for surgical 1-chapter ship — all 6 source types already exist, only consumer schemas + compute helpers missing. Ship `BehavioralAISubstrate/Sources/BASOrchestration/BASDoctrineMetrics.swift` (~570 LoC, 6 typed `BASSchemaVersioned` value types: AxisStabilityScore / GateFidelityScore / OriginTraceCompleteness / SanctumLeakRate / DoctrineHarmonyScore / HumanAnchorRetention + 6 pure compute helpers in `BASDoctrineMetricsCompute` enum + named threshold constants) + 24 unit tests covering schema versions / Codable round-trip / clamping invariants / compute empty-input edge / compute happy-path / boundary saturation. Anti-drift 3-site sync: governance registry (242 → 248) + 2 test files updated same chapter. **Test counts**: BAS 2891 → 2915 (+24), Qinao 1435 unchanged, 全栈 4326 → 4350 / 5 gates clean / whitepaper schema parity 247 declared / 248 registered. Doctrine pin: pure value-type + pure-function (anti-recursion ✓), all numeric thresholds named (anti-magic-number ✓), clamping `[0, 1]` at init, 3-site sync (anti-drift ✓), zero substrate runtime change. Plan v1.0 §13.2 doctrine metrics gap closed in 1 chapter.
