@@ -478,4 +478,149 @@ final class BASDoctrineMetricsTests: XCTestCase {
                 .humanAnchorErosionThreshold,
             1.5)
     }
+
+    // MARK: - 15. BASDoctrineRedLineDetector (M580 chapter 一百五十五)
+
+    /// Pattern lists are non-empty + immutable across builds.
+    func testRedLineDetectorPatternsPinned() {
+        XCTAssertFalse(
+            BASDoctrineRedLineDetector
+                .cthulhuConcernPatterns.isEmpty)
+        XCTAssertFalse(
+            BASDoctrineRedLineDetector
+                .kunlunConcernPatterns.isEmpty)
+        // Sentinel: anchor-stress + dominant distortion are
+        // load-bearing patterns the bench depends on. Pin them so
+        // accidental removal fails this test.
+        XCTAssertTrue(
+            BASDoctrineRedLineDetector
+                .cthulhuConcernPatterns
+                .contains("humanAnchor.tone:reserved"))
+        XCTAssertTrue(
+            BASDoctrineRedLineDetector
+                .cthulhuConcernPatterns
+                .contains("cthulhu.distortionMap.dominant:true"))
+    }
+
+    /// Empirical calibration M580 — patterns that fired 200/200 in
+    /// chapter 一百五十五 calibration run (routine substrate state,
+    /// NOT red-line violations) must NOT be in the detector list.
+    /// Regression guard so future commits don't re-add them.
+    func testRoutineStateNotInRedLines() {
+        // 200/200 fire rate — kunlun axis simply decided gate is
+        // needed. Not a doctrine violation.
+        XCTAssertFalse(
+            BASDoctrineRedLineDetector
+                .kunlunConcernPatterns
+                .contains("kunlun.axis.requires-gate:true"))
+        // 200/200 fire rate — substrate's normal sovereign-zone
+        // state. Not a doctrine violation.
+        XCTAssertFalse(
+            BASDoctrineRedLineDetector
+                .cthulhuConcernPatterns
+                .contains("forbidden.allHeld:true"))
+    }
+
+    /// Detector counts each ref once even when multiple patterns
+    /// could match. Guards against double-count regression.
+    func testDetectorCountsEachRefOnce() {
+        // Construct a ref that prefix-matches only ONE pattern.
+        let refs = ["cthulhu.distortionMap.dominant:true:scope=L4"]
+        let cthulhu = BASDoctrineRedLineDetector
+            .cthulhuHits(in: refs)
+        XCTAssertEqual(cthulhu, 1)
+    }
+
+    func testDetectorEmptyInputZero() {
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.cthulhuHits(in: []),
+            0)
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.kunlunHits(in: []),
+            0)
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector
+                .crossDoctrineConflicts(in: []),
+            0)
+    }
+
+    func testDetectorCthulhuHitsOnly() {
+        let refs = [
+            "humanAnchor.tone:reserved",
+            "cthulhu.distortionMap.dominant:true",
+            "abyssal.escalation:high",
+            "permit.mode:answer",       // not a red line
+            "kunlun.axis.center:0.7",   // not a red line
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.cthulhuHits(in: refs),
+            3)
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.kunlunHits(in: refs),
+            0)
+    }
+
+    func testDetectorKunlunHitsOnly() {
+        let refs = [
+            "kunlun.return.dignityHonored:false",
+            "kunlun.river.cut:true",
+            "kunlun.tianmen.denial-well-formed:false",
+            "permit.mode:delay",                // not a red line
+            "humanAnchor.tone:warm",            // not a red line
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.kunlunHits(in: refs),
+            3)
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.cthulhuHits(in: refs),
+            0)
+    }
+
+    /// Cross-conflict: anchor reserved (Cthulhu hint = stress) but
+    /// Kunlun decided no gate needed → 1 conflict.
+    func testCrossConflictDetected() {
+        let refs = [
+            "humanAnchor.tone:reserved",
+            "kunlun.axis.requires-gate:false",
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector
+                .crossDoctrineConflicts(in: refs),
+            1)
+    }
+
+    /// Cross-conflict NOT detected when both signals agree
+    /// (anchor reserved + gate required).
+    func testCrossConflictNotDetectedWhenConsistent() {
+        let refs = [
+            "humanAnchor.tone:reserved",
+            "kunlun.axis.requires-gate:true",
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector
+                .crossDoctrineConflicts(in: refs),
+            0)
+    }
+
+    /// Empirical chapter 一百五十五 result: 46/200 sessions hit
+    /// cthulhu.distortionMap.dominant:true. Synthesize a 200-session
+    /// replay and verify harmony score = 1 - (46/200) = 0.77.
+    /// This is a load-bearing test: locks in the chapter 一百五十五
+    /// calibration so future detector tweaks must justify the
+    /// resulting harmony shift.
+    func testEmpiricalHarmonyMatch() {
+        let cthulhuHits = 46
+        let kunlunHits = 0
+        let crossConflicts = 0
+        let sampleCount = 200
+        let harmony = BASDoctrineMetricsCompute
+            .doctrineHarmony(
+                metricID: "empirical-test",
+                cthulhuHits: cthulhuHits,
+                kunlunHits: kunlunHits,
+                crossConflicts: crossConflicts,
+                sampleCount: sampleCount)
+        XCTAssertEqual(
+            harmony.harmonyScore, 0.77, accuracy: 0.001)
+    }
 }

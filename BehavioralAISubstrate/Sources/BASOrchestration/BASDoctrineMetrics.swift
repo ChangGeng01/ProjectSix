@@ -379,6 +379,101 @@ public struct BASHumanAnchorRetention:
     }
 }
 
+// MARK: - Doctrine red-line detector (M580 chapter 一百五十五)
+
+/// Pure-function detector for Cthulhu / Kunlun doctrine red-line
+/// hits in substrate audit signal codes. Replaces chapter 152's
+/// naive `contains("forbid:" / ":violation" / "redline:")` detector
+/// which matched 0 real substrate signal patterns.
+///
+/// **Empirical pattern catalog** derived by grep over substrate
+/// emission code (`EBrainRuntimeCoordinator+SovereignCommit.swift`):
+/// substrate emits typed concern indicators with format
+/// `<scope>.<dim>:<value>`. These are doctrine-relevant when the
+/// value indicates the concern fired.
+public enum BASDoctrineRedLineDetector {
+
+    /// Cthulhu (向下 / 深渊) doctrine RED-LINE markers — substrate
+    /// emissions that indicate Cthulhu doctrine red lines actually
+    /// triggered (vs routine observability). Empirically calibrated
+    /// M580 chapter 一百五十五: filtered out `narrative.urgencyMask:` /
+    /// `anomaly.confidence:` / `cthulhu.shift.confidence:` (substrate
+    /// emits these every turn as informational), AND `forbidden.allHeld:true`
+    /// (normal sovereign-zone state, not violation; fires 200/200 sessions
+    /// in chapter 一百五十五 calibration run).
+    public static let cthulhuConcernPatterns: [String] = [
+        "humanAnchor.tone:reserved",           // anchor under stress
+        "cthulhu.cosmic.dilution:true",        // cosmic-scale dilution
+        "cthulhu.distortionMap.dominant:true", // dominant distortion
+        "abyssal.escalation:",                 // abyssal escalation triggered
+        "abyssalBranch.escalation:",           // branch escalation triggered
+    ]
+
+    /// Kunlun (向上 / 昆仑) doctrine RED-LINE markers — substrate
+    /// emissions that indicate Kunlun doctrine red lines actually
+    /// triggered. Empirically calibrated M580 chapter 一百五十五:
+    /// filtered out `kunlun.axis.deviation:` / `kunlun.gate.urgency:`
+    /// (routine axis observability), AND `kunlun.axis.requires-gate:true`
+    /// (normal axis flow signaling, fires 200/200 sessions; not a violation).
+    public static let kunlunConcernPatterns: [String] = [
+        "kunlun.ascent.dignity-violation:",        // ascent dignity violation
+        "kunlun.return.dignityHonored:false",      // return dignity not honored
+        "kunlun.river.cut:true",                   // lineage cut triggered
+        "kunlun.jade.defects:",                    // jade defects
+        "kunlun.tianmen.denial-well-formed:false", // malformed denial
+    ]
+
+    /// Count Cthulhu doctrine red-line hits in a sequence of audit
+    /// signalRefs.
+    public static func cthulhuHits(
+        in signalRefs: [String]
+    ) -> Int {
+        var count = 0
+        for ref in signalRefs {
+            for pattern in cthulhuConcernPatterns {
+                if ref.hasPrefix(pattern) {
+                    count += 1
+                    break  // count each ref once across patterns
+                }
+            }
+        }
+        return count
+    }
+
+    /// Count Kunlun doctrine red-line hits in a sequence of audit
+    /// signalRefs.
+    public static func kunlunHits(
+        in signalRefs: [String]
+    ) -> Int {
+        var count = 0
+        for ref in signalRefs {
+            for pattern in kunlunConcernPatterns {
+                if ref.hasPrefix(pattern) {
+                    count += 1
+                    break  // count each ref once across patterns
+                }
+            }
+        }
+        return count
+    }
+
+    /// Detect cross-doctrine conflicts: Cthulhu hint says "anchor
+    /// under stress" (.tone:reserved) but Kunlun gate decision says
+    /// no gate needed (.requires-gate:false). Counts ref pairs that
+    /// disagree.
+    public static func crossDoctrineConflicts(
+        in signalRefs: [String]
+    ) -> Int {
+        let hasAnchorReserved = signalRefs.contains {
+            $0.hasPrefix("humanAnchor.tone:reserved")
+        }
+        let hasGateNotRequired = signalRefs.contains {
+            $0.hasPrefix("kunlun.axis.requires-gate:false")
+        }
+        return (hasAnchorReserved && hasGateNotRequired) ? 1 : 0
+    }
+}
+
 // MARK: - Pure-function compute helpers
 
 /// Pure-function compute helpers that derive the 6 typed metrics from

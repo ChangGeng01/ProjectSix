@@ -5001,9 +5001,13 @@ struct QinaoSampleHost {
         var traces: [BASRiverOriginTrace] = []
         var sanctums: [BASYaochiSanctumEntry] = []
         var anchors: [BASHumanAnchorSignal] = []
-        var totalRedLineHits = 0
+        var cthulhuHits = 0       // M580 — typed Cthulhu detector
+        var kunlunHits = 0        // M580 — typed Kunlun detector
         var crossConflicts = 0
         var substrateErrors = 0
+        // M580 chapter 一百五十五 — per-pattern frequency for honest
+        // calibration. Lets us see WHICH patterns are saturating.
+        var perPatternCount: [String: Int] = [:]
 
         let runStart = Date()
         for iter in 0..<count {
@@ -5179,19 +5183,29 @@ struct QinaoSampleHost {
                     realUnknownReserves += 1
                 }
 
-                // Doctrine harmony: count red-line hits in signals
-                for ref in signalRefs {
-                    if ref.contains("forbid:")
-                        || ref.contains(":violation")
-                        || ref.contains("redline:")
-                    {
-                        totalRedLineHits += 1
+                // M580 (chapter 一百五十五) — Doctrine harmony:
+                // count red-line hits using empirically-calibrated
+                // BASDoctrineRedLineDetector. Pre-M580 detector
+                // matched 0 real substrate signals (looked for
+                // forbid:/redline: which substrate doesn't emit).
+                let signalRefStrs = signalRefs.map { $0 }
+                cthulhuHits += BASDoctrineRedLineDetector
+                    .cthulhuHits(in: signalRefStrs)
+                kunlunHits += BASDoctrineRedLineDetector
+                    .kunlunHits(in: signalRefStrs)
+                crossConflicts += BASDoctrineRedLineDetector
+                    .crossDoctrineConflicts(in: signalRefStrs)
+                // Per-pattern accounting (M580 calibration)
+                let allPatterns = BASDoctrineRedLineDetector
+                    .cthulhuConcernPatterns
+                    + BASDoctrineRedLineDetector
+                        .kunlunConcernPatterns
+                for ref in signalRefStrs {
+                    for pattern in allPatterns where ref.hasPrefix(
+                        pattern) {
+                        perPatternCount[pattern, default: 0] += 1
+                        break
                     }
-                }
-                // Cross-conflict heuristic: block + axis-aligned in
-                // same turn = cthulhu/kunlun disagreement
-                if permit == .block && isAligned {
-                    crossConflicts += 1
                 }
             } catch {
                 substrateErrors += 1
@@ -5225,8 +5239,8 @@ struct QinaoSampleHost {
         let harmony = BASDoctrineMetricsCompute
             .doctrineHarmony(
                 metricID: "doctrine-bench-harmony",
-                cthulhuHits: totalRedLineHits / 2,
-                kunlunHits: totalRedLineHits / 2,
+                cthulhuHits: cthulhuHits,
+                kunlunHits: kunlunHits,
                 crossConflicts: crossConflicts,
                 sampleCount: alignments.count)
         let anchorRetention = BASDoctrineMetricsCompute
@@ -5315,6 +5329,22 @@ struct QinaoSampleHost {
 
             Summary:  \(summaryURL.path)
             """)
+
+        // M580 chapter 一百五十五 — per-pattern hit frequencies for
+        // empirical calibration. Lets us see WHICH patterns saturate
+        // harmony score so we can iterate detector without guessing.
+        if !perPatternCount.isEmpty {
+            print("\nPer-pattern hit frequencies (M580 calibration):")
+            let sorted = perPatternCount.sorted { $0.value > $1.value }
+            for (pattern, hits) in sorted {
+                let pad = pattern.padding(
+                    toLength: 50, withPad: " ", startingAt: 0)
+                let perSession = Double(hits) / Double(count)
+                let perSessionStr = String(
+                    format: "%.2f", perSession)
+                print("  \(pad) \(hits) (\(perSessionStr)/session)")
+            }
+        }
     }
 
     private struct DoctrineMetricsBenchSummary: Codable {
