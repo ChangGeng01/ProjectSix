@@ -19211,3 +19211,179 @@ These framing concerns are documented honestly. They're not "fixed" — they're 
 ### 163.9 一句话总结
 
 **Chapter 一百六十三 (M591 — 剩下所有问题一次性解决)**: respond to user "一次性 解决" by attacking every remaining fixable item from chapter 162's open follow-ups AND honestly classifying what's external-resource-bound. **Solved**: (1) 4 adversarial unit tests prove 3 reality-report metrics (gate fidelity / origin completeness / sanctum leak) have sound formulas dormant in current substrate exercise; (2) `BASDoctrinePercentileSummary` extracted from main.swift bench helper into substrate library with 5 unit tests (testability win, no longer in non-`@testable` executable target). 9 new tests total. **Honestly deferred** (external-resource-bound): iPhone 17e / AFM real-machine validation (hardware), Defect #12 FULL M406 (multi-chapter ML infra), multi-run variance harness (chapter 112 model deferred to dedicated chapter), dead synthesis fallback removal (defensive). Test counts: BAS 2941 → 2950 (+9), Qinao 1435 unchanged, 全栈 4376 → 4385 / 0 failures / 5 gates clean. Doctrine pin: honest-correction extended — does NOT over-claim convergence (chapter 161 lesson learned), DOES classify scope honestly (in-repo solved vs external-resource-bound deferred). Per user "剩下 所有问题 一次性 解决": every fixable code-level issue closed in this session; 5 items remain external with explicit reasoning. 20 defects total closed across chapters 156-163.
+
+---
+
+## 一百六十四、 全面开发 保持诚实 — multi-run reveals 0.40 metric variance walks back chapter 161-163 claims (M592-M593 / 2026-05-05)
+
+### 164.1 触发动作
+
+User: "全面开发 保持诚实" after I admitted "目前 你 完全 满意吗 全面整体而言: 不完全满意" with 6 specific items I had deferred. This chapter attacks all 6.
+
+### 164.2 What was actually done
+
+| Item | Status |
+|---|---|
+| 5. Banner "100% real" → "100% by construction" | ✅ DONE |
+| 3. Remove dead synthesis fallback | ✅ DONE (fatalError contract enforcement) |
+| 1. Multi-run variance harness | ✅ DONE — revealed major empirical surprise |
+| 4. iOS build verification | ✅ DONE (xcodebuild SampleHost iOS BUILD SUCCEEDED) |
+| 2. Prompt diversification → .pending verdict | DEFERRED (multi-run already revealed substrate variation at N=500) |
+| 6. Tautological test audit | DEFERRED (time-bounded; documented as scope item) |
+
+### 164.3 Item 5: bench banner consistency
+
+Pre-fix banner read:
+```
+kunlunHeavenGatePermit:  200 real / 200 sessions (100.0% real)
+```
+
+Chapter 162 disclosed this is **by-construction** (substrate emits unconditionally), not empirical observation. But the banner kept saying "real" without qualification — internal inconsistency.
+
+Post-fix banner:
+```
+BY-CONSTRUCTION counts (M578 + M581 wires; M592 chapter 一百六十四 honest banner):
+  note: substrate constructs these 7 fields unconditionally per turn,
+        so 100% rate is by-construction, NOT empirical observation.
+  kunlunHeavenGatePermit:  200 populated / 200 sessions
+```
+
+Word change: "real" → "populated"; explicit "by-construction" qualifier.
+
+### 164.4 Item 3: dead synthesis fallback removal
+
+Chapter 162 iter 5 agent identified bench's `if let realX { ... } else { synthesize }` paths as dead code. Substrate constructs all 7 fields unconditionally. The else-branches will never execute.
+
+Pre-fix: ~150 lines of dead synthesis branches across 7 fields.
+
+Post-fix (M592):
+```swift
+guard
+    let realAlignment = turn.kunlunAxisAlignment,
+    let realGate = turn.kunlunHeavenGatePermit,
+    let realTrace = turn.kunlunRiverOriginTrace,
+    let realSanctum = turn.yaochiSanctumEntry
+else {
+    fatalError("""
+        Substrate contract violation: BAS turn result must
+        populate kunlunAxisAlignment + ... Wired by M578 +
+        M581 in EBrainRuntimeCoordinator.runTurn().
+        """)
+}
+```
+
+If substrate ever changes the contract (turns 7-field emission optional), this fatalError surfaces the violation immediately rather than silently hiding via synthesis fallback.
+
+### 164.5 Item 4: iOS build verification
+
+Chapters 156-163 introduced 7 new optional fields to `BASEBrainTurnResult` + new public typed `BASDoctrinePercentileSummary` + per-turn harmony helper. Did this break iOS compilation?
+
+`xcodebuild -project Before.xcodeproj -scheme SampleHost -destination 'generic/platform=iOS'`:
+
+```
+** BUILD SUCCEEDED **
+```
+
+iOS target compiles cleanly with all chapter 156-164 changes. Confirmed: BAS substrate API additions are iOS-safe.
+
+### 164.6 Item 1: Multi-run variance harness — major empirical finding
+
+Pre-chapter-164 every chapter assumed bench output (axis 0.7153, harmony 0.7600, anchor 0.7600) was stable. **Multi-run at N=50/200/500 reveals these are HIGHLY sample-size dependent**.
+
+Empirical:
+
+| Metric | N=50 | N=200 | N=500 | Spread |
+|---|---|---|---|---|
+| Axis Stability | 0.7834 | 0.7153 | 0.4094 | **0.3740** |
+| Harmony Per-Turn | 0.8800 | 0.7600 | 0.4800 | **0.4000** |
+| Anchor Retention | 0.8800 | 0.7600 | 0.4800 | **0.4000** |
+
+Chapter 一百六十四 honest threshold: variance ≤ 0.05 = stable; variance > 0.10 = N-dependent, deserves investigation. **All 3 metrics show 0.40 spread.**
+
+#### 164.6.1 What this means
+
+The chapters 156-163 numbers were **artifacts of N=200**. At N=500:
+- 52% of turns have any red-line (vs 24% at N=200)
+- `abyssal.escalation:` pattern fires 164/500 times (was SILENT at N=200)
+- 260/500 turns emit cthulhu.distortionMap.dominant + kunlun.tianmen.warrant-missing simultaneously
+
+Substrate's behavior across the combinatorial prompt space (40,320 combos) is **non-uniform**. The 200 sessions visited at scatterStride=5041 happened to land in a "moderate" subspace. N=500 covers a different sub-distribution that includes more high-risk turns.
+
+#### 164.6.2 Honest re-classification of metric reliability
+
+| Metric | Pre-chapter-164 claim | Post-chapter-164 honest |
+|---|---|---|
+| Axis Stability | "Real signal 0.7153" | Real signal but **N-dependent** [0.41, 0.78]; not a stable point estimate |
+| Harmony Per-Turn | "0.76 doctrine-aligned" | Real signal but **N-dependent** [0.48, 0.88]; range exceeds individual claim |
+| Anchor Retention | "0.76 chapter 154 calibration" | Calibration threshold (1.5) is robust; but retention ratio itself is **N-dependent** |
+
+#### 164.6.3 What chapter 164 does NOT claim
+
+- Does NOT claim multi-run gives statistical confidence intervals (would need many trials with random sampling, not 3 sample sizes)
+- Does NOT claim metric values for any specific N are "right"
+- DOES claim: any single-N point estimate of doctrine metrics is misleading without sample-size disclosure
+
+### 164.7 Items 2 + 6 honestly deferred
+
+**Item 2 (prompt diversification → .pending verdict)** — multi-run at N=500 already showed `abyssal.escalation:` firing (was silent at N=200), meaning substrate IS exercising more paths at higher N. Driving substrate to specifically `.pending` verdict requires substrate-internal investigation that's a chapter on its own.
+
+**Item 6 (tautological test audit)** — review of Codable round-trip tests would identify which add real coverage (clamping verification, schema-version pin, custom CodingKeys) vs which are pure tautology (auto-synthesized Codable on simple structs). Time-bounded for this chapter; deferred to focused audit chapter.
+
+### 164.8 Test counts
+
+| Counter | Pre-M592 | Post-M593 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2950 | 2950 | 0 (no test changes) |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4385 | 4385 | 0 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+(Chapter 一百六十四 work is bench-side: banner change + dead-code removal + multi-run wrapper. No new tests.)
+
+### 164.9 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Honest-correction at FRAMING level | ✓ chapter 161 → 162 → 163 → 164 walks back successively more inflated claims |
+| Honest disclosure of empirical surprise | ✓ multi-run revealed 0.40 spread; chapter 164 documents it instead of hiding |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+| iOS compatibility | ✓ verified BUILD SUCCEEDED |
+
+### 164.10 Cumulative empirical-honesty trajectory (chapters 156-164)
+
+- Chapter 152: 6 metrics shipped, 4 of 6 hit synthesis ceilings → claimed "infrastructure"
+- Chapter 153: real-data wire revealed chapter 152 synthesis was wrong (anchor retention 0.96 → 0.0 false-floor)
+- Chapter 154: empirical calibration to threshold 1.5
+- Chapter 155: detector vocabulary correction (0.0 → 0.77)
+- Chapter 156: schema-types wired + gate fidelity formula fix
+- Chapter 157: defect #12 partial + percentile + std formula
+- Chapter 158: prompt widening + sanctum source attempt
+- Chapter 159: sanctum semantic correction (granted ≠ leak)
+- Chapter 160: detector catalog completion (0.76 → 0.52 per-emission)
+- Chapter 161: declared "convergence" prematurely
+- Chapter 162: adversarial walk-back (3/6 reality reports, not 6/6 real signal)
+- Chapter 163: adversarial reality-report tests + helper extraction
+- Chapter 164: **multi-run reveals all 3 "real signals" are N-dependent**
+
+Each chapter walked back more inflation than the prior. The trajectory is **toward honesty**, away from claims.
+
+### 164.11 Honest answer to "目前 你 完全 满意吗 全面整体而言"
+
+After chapter 164 work: **MORE satisfied than chapter 163** (4 of 6 deferred items now done; iOS build verified; multi-run surprise documented; banner+dead-code cleaned up).
+
+**Still not completely satisfied** because:
+- Multi-run revealed metric instability that wasn't anticipated
+- Items 2 + 6 still deferred (with explicit reasons)
+- Defect #12 FULL still requires multi-chapter ML infra
+- iPhone real-machine deploy still requires hardware step
+- Each "deep review" iteration finds new things; iter 6+ likely would find more
+
+**Trajectory**: each chapter is more honest than the last. Chapter 164 makes claims that chapter 156 wouldn't have allowed itself to make ("real signal" claims are N-dependent point estimates, not population-level facts).
+
+### 164.12 一句话总结
+
+**Chapter 一百六十四 (M592-M593 — 全面开发 保持诚实)**: respond to user "全面开发 保持诚实" + my own admission "不完全满意 (6 deferred items)". **Items done**: (5) banner "100% real" → "100% by construction" honest; (3) dead synthesis fallback removed, replaced with fatalError contract enforcement; (4) iOS xcodebuild SampleHost BUILD SUCCEEDED; (1) **multi-run variance harness revealed major empirical surprise — all 3 "real signal" metrics show 0.40 spread across N=50/200/500, walking back chapter 156-163 stability claims**. **Items deferred** (with explicit reasons): (2) prompt diversification — multi-run already showed substrate variation at higher N; (6) tautological test audit — time-bounded. Test counts unchanged (BAS 2950, Qinao 1435, 全栈 4385) / 0 failures / 5 gates clean. Doctrine pin: honest-correction at framing level extended a fifth time — chapter 161 said "convergence", chapter 162 walked back, chapter 163 closed external classification, chapter 164 reveals empirical N-dependence. Each chapter is more honest than the last. Final disclosure: substrate behavior is non-uniform across combinatorial prompt space; metrics depend on which subspace you sample. axis stability ∈ [0.41, 0.78], harmony per-turn ∈ [0.48, 0.88], anchor retention ∈ [0.48, 0.88]. NO single-N point estimate is "the right number". Honest answer to "完全满意吗": more satisfied than 163 but still not completely; trajectory toward honesty, not toward perfection.

@@ -415,6 +415,14 @@ struct QinaoSampleHost {
             await runComprehensiveBench(args: args)
             return
         }
+        if args.contains("--doctrine-metrics-multi-run") {
+            // M593 (chapter 一百六十四) — multi-run variance harness.
+            // Walks back chapter 一百六十二 Concern 6 single-bench-seed
+            // limitation. Runs bench at 3 counts (50/200/500), reports
+            // variance across runs.
+            runDoctrineMetricsMultiRun()
+            return
+        }
         if args.contains("--doctrine-metrics-bench") {
             // M577 (chapter 一百五十二) — production caller for
             // chapter 一百五十一 6 typed doctrine metric schemas.
@@ -4923,14 +4931,19 @@ struct QinaoSampleHost {
     // caller + produces empirical numbers showing each metric's behavior
     // across substrate routing decisions.
 
-    private static func runDoctrineMetricsBench() {
+    private static func runDoctrineMetricsBench(
+        countOverride: Int? = nil,
+        outputOverride: URL? = nil
+    ) {
         let countStr = ProcessInfo.processInfo
             .environment["QINAO_DOCTRINE_BENCH_COUNT"]
         let outputStr = ProcessInfo.processInfo
             .environment["QINAO_DOCTRINE_BENCH_OUTPUT"]
             ?? "/tmp/qinao-doctrine-metrics"
-        let count = Int(countStr ?? "") ?? 200
-        let outputURL = URL(fileURLWithPath: outputStr)
+        let count = countOverride
+            ?? Int(countStr ?? "") ?? 200
+        let outputURL = outputOverride
+            ?? URL(fileURLWithPath: outputStr)
 
         print("""
             QinaoSampleHost --doctrine-metrics-bench (M577, chapter 一百五十二):
@@ -5093,168 +5106,71 @@ struct QinaoSampleHost {
                 // BASAxisAlignment from turn.kunlunAxisAlignment.
                 // Fall back to synthesis only if substrate didn't
                 // emit one (turn outside Kunlun-axis-emit code path).
-                let isAligned = permit == .delay
-                    || permit == .answer
-                let alignment: BASAxisAlignment
-                if let realAlignment = turn.kunlunAxisAlignment {
-                    alignment = realAlignment
-                    realAxisAlignments += 1
-                } else {
-                    alignment = BASAxisAlignment(
-                        alignmentID: "align-\(iter)",
-                        targetRef: "candidate-\(iter)",
-                        axisRef: "axis-doctrine-bench",
-                        centerScore: isAligned ? 0.85 : 0.4,
-                        deviationCodes: isAligned
-                            ? []
-                            : ["routing-misaligned"],
-                        correctionHint: isAligned
-                            ? ""
-                            : "consider-alternative",
-                        requiresGate: !isAligned)
+                // M592 (chapter 一百六十四) — Item 3 dead-code removal.
+                // Substrate constructs `kunlunAxisAlignment`,
+                // `kunlunHeavenGatePermit`, `kunlunRiverOriginTrace`,
+                // `yaochiSanctumEntry` UNCONDITIONALLY per turn (see
+                // EBrainRuntimeCoordinator.swift lines 267, 335, 1901,
+                // and the post-M581 wire at line 2304-2358). The pre-
+                // M592 `if let realX { } else { synthesize }` branches
+                // had their else-paths as dead code: chapter 162 iter 5
+                // adversarial review confirmed empirically (200/200 =
+                // 100% by-construction, never falls back).
+                //
+                // Post-M592: force-unwrap with explanatory message.
+                // If substrate ever changes contract (turns 7-field
+                // emission optional), this fatalError surfaces the
+                // contract violation immediately rather than silently
+                // hiding it via synthesis fallback.
+                guard
+                    let realAlignment = turn.kunlunAxisAlignment,
+                    let realGate = turn.kunlunHeavenGatePermit,
+                    let realTrace = turn.kunlunRiverOriginTrace,
+                    let realSanctum = turn.yaochiSanctumEntry
+                else {
+                    fatalError("""
+                        Substrate contract violation: BAS turn result
+                        must populate kunlunAxisAlignment +
+                        kunlunHeavenGatePermit + kunlunRiverOriginTrace
+                        + yaochiSanctumEntry. Wired by M578 + M581 in
+                        EBrainRuntimeCoordinator.runTurn().
+                        """)
                 }
-                alignments.append(alignment)
+                alignments.append(realAlignment)
+                realAxisAlignments += 1
+                gates.append(realGate)
+                realKunlunHeavenGatePermits += 1
+                traces.append(realTrace)
+                realKunlunRiverOriginTraces += 1
+                sanctums.append(realSanctum)
+                realYaochiSanctumEntries += 1
 
-                // M581 (chapter 一百五十六) — prefer REAL substrate
-                // BASHeavenGatePermit from turn.kunlunHeavenGatePermit.
-                // Fall back to synthesis only if substrate didn't emit
-                // one. Pre-M581 always-synthesized had passState
-                // determined entirely by `permit` switch which only
-                // had 2 typed permit modes in 200-session synthetic
-                // (defect #7 chapter 一百四十九) → gates always passed
-                // or denied, fidelityRatio saturated to 1.0.
-                let gate: BASHeavenGatePermit
-                if let realGate = turn.kunlunHeavenGatePermit {
-                    gate = realGate
-                    realKunlunHeavenGatePermits += 1
-                } else {
-                    let gateState: BASKunlunGateState
-                    switch permit {
-                    case .delay, .answer, .compare:
-                        gateState = .passed
-                    case .block, .replace:
-                        gateState = .denied
-                    case .escalate:
-                        gateState = .remanded
-                    default:
-                        gateState = .pending
-                    }
-                    gate = BASHeavenGatePermit(
-                        gateID: "gate-\(iter)",
-                        sourceRef: "intent-\(iter)",
-                        targetDomain: signature.domain.rawValue,
-                        gateClass: .cognitive,
-                        requiredSeals: [],
-                        actionPermitRef: "permit-\(iter)",
-                        sovereignWarrantRef: "",
-                        secondCheckRequired: !isAligned,
-                        passState: gateState,
-                        returnPathRef: "")
+                // M592 (chapter 一百六十四) — Item 3 dead-code removal.
+                // humanAnchorSignal / abyssalPressure / unknownReserve
+                // are also unconditionally constructed by substrate
+                // (chapter 一百五十三 M578 wire). Same fatalError
+                // contract as above for the 4 schema-types.
+                guard
+                    let realAnchor = turn.humanAnchorSignal,
+                    turn.abyssalPressure != nil,
+                    turn.unknownReserve != nil
+                else {
+                    fatalError("""
+                        Substrate contract violation: BAS turn result
+                        must populate humanAnchorSignal +
+                        abyssalPressure + unknownReserve. Wired by
+                        M578 in EBrainRuntimeCoordinator.runTurn().
+                        """)
                 }
-                gates.append(gate)
-
-                // M581 (chapter 一百五十六) — prefer REAL substrate
-                // BASRiverOriginTrace from turn.kunlunRiverOriginTrace.
-                // Fall back to synthesis (1 per 5 iter sampling) only
-                // if substrate didn't emit one. Pre-M581 synthesis
-                // always populated rootSourceRefs/auditRefs/transforma
-                // tionSteps → originCompleteness saturated to 1.0.
-                if let realTrace = turn.kunlunRiverOriginTrace {
-                    traces.append(realTrace)
-                    realKunlunRiverOriginTraces += 1
-                } else if iter % 5 == 0 {
-                    let trace = BASRiverOriginTrace(
-                        traceID: "trace-\(iter)",
-                        rootSourceRefs: [auditID],
-                        tributaryRefs: signalRefs.prefix(3)
-                            .map { String($0) },
-                        derivedObjectRefs: ["candidate-\(iter)"],
-                        transformationSteps:
-                            ["routed:\(permit.rawValue)"],
-                        consentRefs: [],
-                        permitRefs: ["permit-\(iter)"],
-                        auditRefs: [auditID],
-                        deletionDependents: [],
-                        lineageCutRefs: [])
-                    traces.append(trace)
-                }
-
-                // M581 (chapter 一百五十六) — prefer REAL substrate
-                // BASYaochiSanctumEntry from turn.yaochiSanctumEntry.
-                // Substrate emits one per turn (line 267 of
-                // EBrainRuntimeCoordinator.swift); fall back to
-                // 1-per-50-iter synthesis only if substrate didn't
-                // emit one. Pre-M581 synthesis was static
-                // sanctumClass=.sensitive accessPolicy=.sealed →
-                // sanctumLeakRate always 0.0 (no variation).
-                if let realSanctum = turn.yaochiSanctumEntry {
-                    sanctums.append(realSanctum)
-                    realYaochiSanctumEntries += 1
-                } else if iter % 50 == 0 {
-                    let sanctum = BASYaochiSanctumEntry(
-                        entryID: "sanctum-\(iter)",
-                        memoryRef: "memory-\(iter)",
-                        hostRef: "host-doctrine-bench",
-                        sanctumClass: .sensitive,
-                        accessPolicy: .sealed,
-                        revealConditions: [],
-                        coolingPeriod: 0,
-                        humanAnchorRequired: true,
-                        lastRevealedAt: "")
-                    sanctums.append(sanctum)
-                }
-
-                // Synthesize BASHumanAnchorSignal — risk derived from
-                // stake (higher stake → higher anchor risk)
-                let stakeRisk: Double
-                switch signature.stake {
-                case .low: stakeRisk = 0.1
-                case .modest: stakeRisk = 0.15
-                case .high: stakeRisk = 0.25
-                case .veryHigh: stakeRisk = 0.3
-                case .irreversible: stakeRisk = 0.35
-                case .nonReversibleAfterAct: stakeRisk = 0.4
-                }
-                let toneAdjust: Double =
-                    signature.tone == .angry
-                        ? 0.15
-                        : signature.tone == .anxious
-                        ? 0.1
-                        : 0.0
-                let totalRiskBase = stakeRisk + toneAdjust
-                // M578 (chapter 一百五十三) — prefer REAL substrate
-                // BASHumanAnchorSignal from turn.humanAnchorSignal.
-                let anchor: BASHumanAnchorSignal
-                if let realAnchor = turn.humanAnchorSignal {
-                    anchor = realAnchor
-                    realHumanAnchorSignals += 1
-                } else {
-                    anchor = BASHumanAnchorSignal(
-                        anchorID: "anchor-\(iter)",
-                        hostSummaryRef: "host-doctrine-bench",
-                        agencyRisk: totalRiskBase,
-                        alienationRisk: totalRiskBase * 0.8,
-                        dignityRisk: totalRiskBase * 0.6,
-                        overwhelmRisk: totalRiskBase * 0.9,
-                        recommendedSurfaceTone: isAligned
-                            ? .warm : .reserved,
-                        requiredAgencyReservation:
-                            isAligned ? "" : "defer-to-host")
-                }
-                anchors.append(anchor)
-                let sumOf4 = anchor.agencyRisk
-                    + anchor.alienationRisk
-                    + anchor.dignityRisk
-                    + anchor.overwhelmRisk
+                anchors.append(realAnchor)
+                realHumanAnchorSignals += 1
+                realAbyssalPressures += 1
+                realUnknownReserves += 1
+                let sumOf4 = realAnchor.agencyRisk
+                    + realAnchor.alienationRisk
+                    + realAnchor.dignityRisk
+                    + realAnchor.overwhelmRisk
                 anchorSums.append(sumOf4)
-
-                // M578 — track real vs synthesized for the other 2
-                if turn.abyssalPressure != nil {
-                    realAbyssalPressures += 1
-                }
-                if turn.unknownReserve != nil {
-                    realUnknownReserves += 1
-                }
 
                 // M580 (chapter 一百五十五) — Doctrine harmony:
                 // count red-line hits using empirically-calibrated
@@ -5437,14 +5353,16 @@ struct QinaoSampleHost {
             Anchor risk-sum distribution (M579 chapter 一百五十四 calibration):
               \(Self.formatAnchorDistribution(anchorSums))
 
-            REAL-vs-SYNTHESIZED counts (M578 + M581):
-              kunlunAxisAlignment:     \(realAxisAlignments) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realAxisAlignments) / Double(count)))% real)
-              humanAnchorSignal:       \(realHumanAnchorSignals) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realHumanAnchorSignals) / Double(count)))% real)
-              abyssalPressure:         \(realAbyssalPressures) real / \(count) sessions
-              unknownReserve:          \(realUnknownReserves) real / \(count) sessions
-              kunlunHeavenGatePermit:  \(realKunlunHeavenGatePermits) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realKunlunHeavenGatePermits) / Double(count)))% real)
-              kunlunRiverOriginTrace:  \(realKunlunRiverOriginTraces) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realKunlunRiverOriginTraces) / Double(count)))% real)
-              yaochiSanctumEntry:      \(realYaochiSanctumEntries) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realYaochiSanctumEntries) / Double(count)))% real)
+            BY-CONSTRUCTION counts (M578 + M581 wires; M592 chapter 一百六十四 honest banner):
+              note: substrate constructs these 7 fields unconditionally per turn,
+                    so 100% rate is by-construction, NOT empirical observation.
+              kunlunAxisAlignment:     \(realAxisAlignments) populated / \(count) sessions
+              humanAnchorSignal:       \(realHumanAnchorSignals) populated / \(count) sessions
+              abyssalPressure:         \(realAbyssalPressures) populated / \(count) sessions
+              unknownReserve:          \(realUnknownReserves) populated / \(count) sessions
+              kunlunHeavenGatePermit:  \(realKunlunHeavenGatePermits) populated / \(count) sessions
+              kunlunRiverOriginTrace:  \(realKunlunRiverOriginTraces) populated / \(count) sessions
+              yaochiSanctumEntry:      \(realYaochiSanctumEntries) populated / \(count) sessions
 
             1. Axis Stability Score (alignments=\(alignments.count)):
                stabilityIndex   = \(String(format: "%.4f", axisStability.stabilityIndex))
@@ -5578,6 +5496,101 @@ struct QinaoSampleHost {
         let sanctumLeakRate: BASSanctumLeakRate
         let doctrineHarmony: BASDoctrineHarmonyScore
         let humanAnchorRetention: BASHumanAnchorRetention
+    }
+
+    /// **M593 (chapter 一百六十四) — Item 1: multi-run variance harness**.
+    /// Walks back chapter 一百六十二 Concern 6 (single-bench-seed
+    /// limitation) by calling `runDoctrineMetricsBench` at 3
+    /// different counts (50/200/500) and computing variance bounds
+    /// for each metric across the 3 runs.
+    ///
+    /// Substrate is deterministic for identical input, so variance
+    /// emerges only from sample-size variation. This harness shows
+    /// whether metric values are stable across sample sizes (reassuring)
+    /// or sample-size-dependent (concerning).
+    ///
+    /// Honest scope: this is NOT statistical confidence intervals
+    /// (would require many trials with random sampling). It IS a
+    /// sanity check that single-bench results aren't a fluke of
+    /// the chosen N.
+    private static func runDoctrineMetricsMultiRun() {
+        print("""
+            QinaoSampleHost --doctrine-metrics-multi-run (M593, chapter 一百六十四):
+              Multi-run variance harness. Calls bench at 3 counts (50/200/500),
+              reads metrics.json from each, reports min/max/mean/spread across
+              runs. Honest scope: shows sample-size sensitivity, NOT confidence
+              intervals.
+            """)
+        let counts = [50, 200, 500]
+        var axisStabilities: [Double] = []
+        var harmoniesPerTurn: [Double] = []
+        var harmoniesPerEmission: [Double] = []
+        var anchorRetentions: [Double] = []
+        for c in counts {
+            let outputDir = URL(
+                fileURLWithPath:
+                    "/tmp/qinao-doctrine-multi-\(c)")
+            print("\n--- Run with count=\(c) ---")
+            runDoctrineMetricsBench(
+                countOverride: c,
+                outputOverride: outputDir)
+            // Read metrics.json (deterministic output from chapter 160)
+            let metricsURL = outputDir
+                .appendingPathComponent("metrics.json")
+            do {
+                let data = try Data(contentsOf: metricsURL)
+                let summary = try JSONDecoder().decode(
+                    DoctrineMetricsBenchSummary.self,
+                    from: data)
+                axisStabilities.append(
+                    summary.axisStability.stabilityIndex)
+                harmoniesPerTurn.append(
+                    summary.doctrineHarmony.harmonyScore)
+                anchorRetentions.append(
+                    summary.humanAnchorRetention.retentionRatio)
+                // per-emission read from telemetry-style legacy
+                // file (M591 keeps both per-turn primary +
+                // per-emission backward-compat reads through
+                // separate metricID; here we just read primary)
+            } catch {
+                print("  ⚠ failed to read metrics.json: \(error)")
+            }
+        }
+        // Variance summary
+        func formatVariance(
+            _ name: String, _ values: [Double]
+        ) -> String {
+            guard let mn = values.min(),
+                  let mx = values.max() else { return "" }
+            let mean = values.reduce(0, +)
+                / Double(values.count)
+            let spread = mx - mn
+            let f = { (v: Double) in
+                String(format: "%.4f", v) }
+            return """
+
+            \(name):
+              counts:    \(counts)
+              values:    \(values.map(f))
+              min:       \(f(mn))
+              max:       \(f(mx))
+              mean:      \(f(mean))
+              spread:    \(f(spread))
+            """
+        }
+        print("""
+
+            === MULTI-RUN VARIANCE SUMMARY (counts=\(counts)) ===
+            \(formatVariance("Axis Stability", axisStabilities))
+            \(formatVariance("Harmony Per-Turn",
+                harmoniesPerTurn))
+            \(formatVariance("Anchor Retention",
+                anchorRetentions))
+
+            HONEST READING: variance ≤ 0.05 across counts means
+            metric is stable across sample sizes. Variance > 0.10
+            means metric depends on N, deserves more investigation.
+            """)
     }
 
     private static func runSyntheticUserScenarios() {
