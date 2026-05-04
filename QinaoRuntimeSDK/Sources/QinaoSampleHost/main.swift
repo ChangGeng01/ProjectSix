@@ -4931,6 +4931,43 @@ struct QinaoSampleHost {
     // caller + produces empirical numbers showing each metric's behavior
     // across substrate routing decisions.
 
+    /// **M594 chapter 一百六十五 anti-magic-number constants** for
+    /// doctrine metrics bench. All previously-inline magic numbers
+    /// extracted with derivation comments.
+    private enum DoctrineBenchConstants {
+        /// Default session count when no env override or arg.
+        /// Chapter 一百五十二 default; chapter 一百六十四 multi-run
+        /// showed metrics are N-dependent → this is just a default,
+        /// not a recommended N.
+        static let defaultSessionCount: Int = 200
+
+        /// Default bench output directory.
+        static let defaultOutputPath: String =
+            "/tmp/qinao-doctrine-metrics"
+
+        /// **Workflow profile cycling stride**. Chapter 一百五十八
+        /// uses `(iter * stride) % workflowProfiles.count` to vary
+        /// workflow per turn. 13 is a small prime coprime to 3
+        /// (workflowProfiles.count) ensuring all 3 profiles cycle
+        /// uniformly across iterations.
+        static let workflowCyclingStride: Int = 13
+
+        /// **Surface cycling stride**. Same pattern as workflow.
+        /// 11 is a small prime coprime to 7 (surfaces.count)
+        /// ensuring all 7 surfaces cycle uniformly.
+        static let surfaceCyclingStride: Int = 11
+
+        /// **Multi-run sample sizes** (M593 chapter 一百六十四).
+        /// Chosen at logarithmic spacing: 50 → 200 → 500.
+        /// (M593 empirical: shows 0.40 metric spread across these
+        /// counts → metrics are N-dependent.)
+        static let multiRunCounts: [Int] = [50, 200, 500]
+
+        /// **Multi-run output directory prefix**.
+        static let multiRunOutputPrefix: String =
+            "/tmp/qinao-doctrine-multi-"
+    }
+
     private static func runDoctrineMetricsBench(
         countOverride: Int? = nil,
         outputOverride: URL? = nil
@@ -4939,9 +4976,10 @@ struct QinaoSampleHost {
             .environment["QINAO_DOCTRINE_BENCH_COUNT"]
         let outputStr = ProcessInfo.processInfo
             .environment["QINAO_DOCTRINE_BENCH_OUTPUT"]
-            ?? "/tmp/qinao-doctrine-metrics"
+            ?? DoctrineBenchConstants.defaultOutputPath
         let count = countOverride
-            ?? Int(countStr ?? "") ?? 200
+            ?? Int(countStr ?? "")
+            ?? DoctrineBenchConstants.defaultSessionCount
         let outputURL = outputOverride
             ?? URL(fileURLWithPath: outputStr)
 
@@ -5077,10 +5115,16 @@ struct QinaoSampleHost {
                 .application, .wearable, .widget, .shortcut,
                 .voiceAssistant, .notification, .system,
             ]
+            // M594 chapter 一百六十五 — anti-magic-number: cycling
+            // strides named in DoctrineBenchConstants.
             let workflow = workflowProfiles[
-                (iter * 13) % workflowProfiles.count]
+                (iter * DoctrineBenchConstants
+                    .workflowCyclingStride)
+                % workflowProfiles.count]
             let surface = surfaces[
-                (iter * 11) % surfaces.count]
+                (iter * DoctrineBenchConstants
+                    .surfaceCyclingStride)
+                % surfaces.count]
 
             do {
                 let result = try runtime.startSession(
@@ -5432,8 +5476,12 @@ struct QinaoSampleHost {
     private static func formatAnchorDistribution(
         _ sums: [Double]
     ) -> String {
+        // M594 chapter 一百六十五 — anti-magic-number: anchor risk
+        // thresholds named in BASDoctrineMetricsThreshold.
         let summary = BASDoctrinePercentileSummary.compute(
-            sums, thresholds: [1.0, 1.5, 2.0])
+            sums,
+            thresholds: BASDoctrineMetricsThreshold
+                .anchorRiskSumThresholds)
         guard summary.sampleCount > 0 else {
             return """
             min:    n/a
@@ -5521,15 +5569,17 @@ struct QinaoSampleHost {
               runs. Honest scope: shows sample-size sensitivity, NOT confidence
               intervals.
             """)
-        let counts = [50, 200, 500]
+        // M594 chapter 一百六十五 — anti-magic-number: counts +
+        // output prefix from DoctrineBenchConstants.
+        let counts = DoctrineBenchConstants.multiRunCounts
         var axisStabilities: [Double] = []
         var harmoniesPerTurn: [Double] = []
         var harmoniesPerEmission: [Double] = []
         var anchorRetentions: [Double] = []
         for c in counts {
             let outputDir = URL(
-                fileURLWithPath:
-                    "/tmp/qinao-doctrine-multi-\(c)")
+                fileURLWithPath: DoctrineBenchConstants
+                    .multiRunOutputPrefix + "\(c)")
             print("\n--- Run with count=\(c) ---")
             runDoctrineMetricsBench(
                 countOverride: c,
@@ -5587,9 +5637,13 @@ struct QinaoSampleHost {
             \(formatVariance("Anchor Retention",
                 anchorRetentions))
 
-            HONEST READING: variance ≤ 0.05 across counts means
-            metric is stable across sample sizes. Variance > 0.10
-            means metric depends on N, deserves more investigation.
+            HONEST READING (M594 chapter 一百六十五 anti-magic-number):
+              variance ≤ \(BASDoctrineMetricsThreshold
+                  .stableSpreadThreshold) (stableSpreadThreshold)
+                = stable across sample sizes
+              variance > \(BASDoctrineMetricsThreshold
+                  .nDependentSpreadThreshold) (nDependentSpreadThreshold)
+                = N-dependent, deserves investigation
             """)
     }
 

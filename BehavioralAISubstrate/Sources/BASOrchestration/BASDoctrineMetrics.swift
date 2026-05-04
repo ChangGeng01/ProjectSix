@@ -58,6 +58,51 @@ public enum BASDoctrineMetricsThreshold {
 
     /// Schema version pinned across all 6 metric types.
     public static let schemaVersion: String = "1.0.0"
+
+    // MARK: - M594 chapter 一百六十五 — Anti-magic-number sweep
+
+    /// **Percentile fractions** for `BASDoctrinePercentileSummary`
+    /// + `axisStability` IQR computation. Standard nearest-rank
+    /// percentile points pinned for cross-callsite consistency.
+    public static let percentileP25Fraction: Double = 0.25
+    public static let percentileP50Fraction: Double = 0.50
+    public static let percentileP75Fraction: Double = 0.75
+    public static let percentileP99Fraction: Double = 0.99
+
+    /// **Std-formula multiplier** in `axisStability` formula
+    /// `stability = 1 - stdFormulaMultiplier * std`.
+    /// Derivation: for a [0, 1]-bounded random variable, the
+    /// theoretical maximum standard deviation is **0.5** (achieved
+    /// by Bernoulli at p=0.5: std = sqrt(0.5 × 0.5) = 0.5). To map
+    /// std ∈ [0, 0.5] linearly onto stability ∈ [0, 1] we use
+    /// `2 × std`. Hence multiplier = 2.0 = 1 / theoreticalMaxStd.
+    /// (M584 chapter 一百五十七 introduced this; chapter 一百六十五
+    /// names the constant.)
+    public static let stdFormulaMultiplier: Double = 2.0
+
+    /// **Anchor risk-sum thresholds** for percentile-summary
+    /// banner (chapter 一百五十四 calibration empirical evidence).
+    /// Substrate emits anchor risk sums in two clusters:
+    /// - delay path ~1.05 (substrate cools, host agency intact)
+    /// - block path ~1.85 (substrate intervenes hard)
+    /// Threshold 1.5 (= `humanAnchorErosionThreshold`) cleanly
+    /// discriminates between them. 1.0 + 2.0 are sentinel
+    /// boundaries for distribution sanity-check.
+    public static let anchorRiskSumThresholds: [Double] = [
+        1.0,
+        1.5,  // = humanAnchorErosionThreshold (chapter 154)
+        2.0,
+    ]
+
+    /// **Multi-run variance interpretation thresholds**
+    /// (M593 chapter 一百六十四). For metric values across N runs:
+    /// - spread ≤ stableSpreadThreshold (0.05) = stable
+    /// - spread > nDependentSpreadThreshold (0.10) = N-dependent,
+    ///   needs investigation
+    /// Empirical chapter 一百六十四 reading: all 3 metrics show
+    /// spread ≈ 0.40 across N=[50, 200, 500] → far above threshold.
+    public static let stableSpreadThreshold: Double = 0.05
+    public static let nDependentSpreadThreshold: Double = 0.10
 }
 
 // MARK: - 1. Axis Stability Score
@@ -539,10 +584,13 @@ public enum BASDoctrineMetricsCompute {
         // sample of 200 is at index Int((n-1) * 0.25) = 49 by the
         // standard nearest-rank percentile formula. Off-by-one.
         // Post-fix: use `Int((n-1) * fraction)` rounding-down which
-        // matches the percentile-by-floor convention (also
-        // chapter 一百七十九 M179 perf stats convention).
-        let p25Index = Int(Double(n - 1) * 0.25)
-        let p75Index = Int(Double(n - 1) * 0.75)
+        // matches the percentile-by-floor convention.
+        // M594 chapter 一百六十五 — anti-magic-number: percentile
+        // fractions named in BASDoctrineMetricsThreshold.
+        let p25Index = Int(Double(n - 1)
+            * BASDoctrineMetricsThreshold.percentileP25Fraction)
+        let p75Index = Int(Double(n - 1)
+            * BASDoctrineMetricsThreshold.percentileP75Fraction)
         let p25 = scores[max(0, p25Index)]
         let p75 = scores[min(n - 1, p75Index)]
         // M584 (chapter 一百五十七) — defect #21 fix: pre-fix
@@ -559,7 +607,13 @@ public enum BASDoctrineMetricsCompute {
             pow($0 - mean, 2)
         }.reduce(0, +) / Double(n)
         let std = variance.squareRoot()
-        let stability = max(0, min(1, 1 - 2 * std))
+        // M594 chapter 一百六十五 — anti-magic-number: stdFormulaMultiplier
+        // = 2.0 (= 1 / theoreticalMaxStd for [0,1]-bounded var, where
+        // max std = 0.5 at Bernoulli p=0.5). Named in
+        // BASDoctrineMetricsThreshold with derivation doc-comment.
+        let stability = max(0, min(1, 1
+            - BASDoctrineMetricsThreshold.stdFormulaMultiplier
+            * std))
         let deviationCount = alignments
             .filter { !$0.deviationCodes.isEmpty }
             .count
@@ -915,9 +969,13 @@ public struct BASDoctrinePercentileSummary:
     /// nearest-rank percentile via `Int((n-1) * fraction)` (parity
     /// with M590 chapter 一百六十二 axisStability formula fix).
     /// Empty input → all-zero summary (safe; no crash).
+    /// M594 chapter 一百六十五 — anti-magic-number: default thresholds
+    /// reference `anchorRiskSumThresholds` ([1.0, 1.5, 2.0] from
+    /// chapter 一百五十四 calibration where 1.5 = humanAnchorErosionThreshold).
     public static func compute(
         _ samples: [Double],
-        thresholds: [Double] = [1.0, 1.5, 2.0]
+        thresholds: [Double] = BASDoctrineMetricsThreshold
+            .anchorRiskSumThresholds
     ) -> BASDoctrinePercentileSummary {
         guard !samples.isEmpty else {
             return BASDoctrinePercentileSummary(
@@ -936,13 +994,23 @@ public struct BASDoctrinePercentileSummary:
         let counts = thresholds.map { t in
             samples.filter { $0 >= t }.count
         }
+        // M594 chapter 一百六十五 — anti-magic-number: percentile
+        // fractions sourced from BASDoctrineMetricsThreshold.
         return BASDoctrinePercentileSummary(
             sampleCount: n,
             min: sorted[0],
-            p25: sorted[safeIdx(0.25)],
-            median: sorted[safeIdx(0.50)],
-            p75: sorted[safeIdx(0.75)],
-            p99: sorted[safeIdx(0.99)],
+            p25: sorted[safeIdx(
+                BASDoctrineMetricsThreshold
+                    .percentileP25Fraction)],
+            median: sorted[safeIdx(
+                BASDoctrineMetricsThreshold
+                    .percentileP50Fraction)],
+            p75: sorted[safeIdx(
+                BASDoctrineMetricsThreshold
+                    .percentileP75Fraction)],
+            p99: sorted[safeIdx(
+                BASDoctrineMetricsThreshold
+                    .percentileP99Fraction)],
             max: sorted[n - 1],
             thresholdCounts: counts)
     }

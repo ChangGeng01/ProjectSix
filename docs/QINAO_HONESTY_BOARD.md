@@ -19387,3 +19387,135 @@ After chapter 164 work: **MORE satisfied than chapter 163** (4 of 6 deferred ite
 ### 164.12 一句话总结
 
 **Chapter 一百六十四 (M592-M593 — 全面开发 保持诚实)**: respond to user "全面开发 保持诚实" + my own admission "不完全满意 (6 deferred items)". **Items done**: (5) banner "100% real" → "100% by construction" honest; (3) dead synthesis fallback removed, replaced with fatalError contract enforcement; (4) iOS xcodebuild SampleHost BUILD SUCCEEDED; (1) **multi-run variance harness revealed major empirical surprise — all 3 "real signal" metrics show 0.40 spread across N=50/200/500, walking back chapter 156-163 stability claims**. **Items deferred** (with explicit reasons): (2) prompt diversification — multi-run already showed substrate variation at higher N; (6) tautological test audit — time-bounded. Test counts unchanged (BAS 2950, Qinao 1435, 全栈 4385) / 0 failures / 5 gates clean. Doctrine pin: honest-correction at framing level extended a fifth time — chapter 161 said "convergence", chapter 162 walked back, chapter 163 closed external classification, chapter 164 reveals empirical N-dependence. Each chapter is more honest than the last. Final disclosure: substrate behavior is non-uniform across combinatorial prompt space; metrics depend on which subspace you sample. axis stability ∈ [0.41, 0.78], harmony per-turn ∈ [0.48, 0.88], anchor retention ∈ [0.48, 0.88]. NO single-N point estimate is "the right number". Honest answer to "完全满意吗": more satisfied than 163 but still not completely; trajectory toward honesty, not toward perfection.
+
+---
+
+## 一百六十五、 我不喜欢 hard coding 和 魔法数字 全面整改 — anti-magic-number sweep across chapters 156-164 additions (M594 / 2026-05-05)
+
+### 165.1 触发动作
+
+User: "我不喜欢 hard coding 和 魔法数字 全面整改". This invokes chapter 一百十三 anti-magic-number doctrine and applies it comprehensively to all magic numbers introduced across chapters 156-164.
+
+### 165.2 Magic numbers found (audit)
+
+`grep` across `BASDoctrineMetrics.swift` and `main.swift` for chapter 156-164 additions surfaced 8 magic-number categories:
+
+| # | Magic literal | Location | Used as |
+|---|---|---|---|
+| 1 | `0.25 / 0.50 / 0.75 / 0.99` | BASDoctrineMetrics.swift:544/942-945 | Percentile fractions for axisStability + percentileSummary |
+| 2 | `2` (in `1 - 2 * std`) | BASDoctrineMetrics.swift:562 | Std-formula multiplier |
+| 3 | `[1.0, 1.5, 2.0]` | BASDoctrineMetrics.swift:920 + main.swift:5436 | Anchor risk-sum thresholds |
+| 4 | `200` (count default) | main.swift:4944 | Bench default session count |
+| 5 | `13 / 11` (cycling strides) | main.swift:5081/5083 | Workflow + surface stride |
+| 6 | `[50, 200, 500]` | main.swift:5524 | Multi-run sample sizes |
+| 7 | `0.05 / 0.10` | main.swift:5590-5591 | Variance interpretation thresholds |
+| 8 | `"/tmp/qinao-doctrine-multi-"` | main.swift:5527 | Output directory prefix |
+
+### 165.3 Named constants extracted
+
+#### In `BASDoctrineMetricsThreshold` (BAS substrate library)
+
+```swift
+// Percentile fractions (#1)
+public static let percentileP25Fraction: Double = 0.25
+public static let percentileP50Fraction: Double = 0.50
+public static let percentileP75Fraction: Double = 0.75
+public static let percentileP99Fraction: Double = 0.99
+
+// Std-formula multiplier with derivation (#2)
+/// = 1 / theoreticalMaxStd for [0,1]-bounded var (Bernoulli p=0.5
+/// gives std = 0.5; 2 × max-std = 1.0 maps to stability=0.0).
+public static let stdFormulaMultiplier: Double = 2.0
+
+// Anchor risk-sum thresholds (#3)
+/// Empirically calibrated chapter 154: substrate emits sums in two
+/// clusters at ~1.05 (delay) and ~1.85 (block); 1.5 = humanAnchorErosionThreshold.
+public static let anchorRiskSumThresholds: [Double] = [1.0, 1.5, 2.0]
+
+// Multi-run variance interpretation (#7)
+/// ≤ 0.05 = stable across sample sizes; > 0.10 = N-dependent.
+public static let stableSpreadThreshold: Double = 0.05
+public static let nDependentSpreadThreshold: Double = 0.10
+```
+
+#### In `DoctrineBenchConstants` (Qinao bench-side)
+
+```swift
+// Default session count (#4)
+static let defaultSessionCount: Int = 200
+
+// Output paths (#8)
+static let defaultOutputPath: String = "/tmp/qinao-doctrine-metrics"
+static let multiRunOutputPrefix: String = "/tmp/qinao-doctrine-multi-"
+
+// Cycling strides (#5)
+/// 13 = small prime coprime to 3 (workflowProfiles.count)
+static let workflowCyclingStride: Int = 13
+/// 11 = small prime coprime to 7 (surfaces.count)
+static let surfaceCyclingStride: Int = 11
+
+// Multi-run sample sizes (#6)
+/// Logarithmic spacing 50 → 200 → 500.
+static let multiRunCounts: [Int] = [50, 200, 500]
+```
+
+### 165.4 Tests added (5 new pinning tests)
+
+- `testPercentileFractionConstants` — pins 0.25/0.50/0.75/0.99
+- `testStdFormulaMultiplierPinned` — pins 2.0 + verifies derivation (Bernoulli {0,1} → std 0.5 → stability 0.0)
+- `testAnchorRiskSumThresholdsPinned` — pins [1.0, 1.5, 2.0] + cross-references middle threshold equals `humanAnchorErosionThreshold`
+- `testVarianceInterpretationThresholdsPinned` — pins 0.05/0.10 + sanity (stable < N-dependent)
+- `testHarmonyPerTurnFormulaSimple` — pins formula uses count/sample directly (no magic multipliers)
+
+### 165.5 Doctrine-pin tests added
+
+The `testStdFormulaMultiplierPinned` test is doctrine-pin: it not only checks the value 2.0, but also computes Bernoulli-distribution std manually and verifies the resulting stability formula gives 0.0 (max variation). This locks the **derivation reasoning** as well as the value.
+
+The `testAnchorRiskSumThresholdsPinned` cross-references humanAnchorErosionThreshold (chapter 154 calibration) — if either constant drifts, the cross-reference fails.
+
+### 165.6 Build + test verification
+
+- Both BAS substrate + Qinao SampleHost build clean
+- 64 doctrine metrics tests pass (was 59 → +5 from chapter 165)
+- BAS 2950 → 2955 (+5)
+- Multi-run still works; banner now shows named constants:
+  ```
+  HONEST READING (M594 chapter 一百六十五 anti-magic-number):
+    variance ≤ 0.05 (stableSpreadThreshold)
+    variance > 0.1 (nDependentSpreadThreshold)
+  ```
+- 5 boundary gates clean
+
+### 165.7 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Sources/BASOrchestration/BASDoctrineMetrics.swift` | +6 named constants in BASDoctrineMetricsThreshold; axisStability formula uses named percentile fractions + stdFormulaMultiplier; BASDoctrinePercentileSummary default thresholds reference anchorRiskSumThresholds |
+| `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASDoctrineMetricsTests.swift` | +5 anti-magic-number pinning tests |
+| `QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift` | New `DoctrineBenchConstants` enum with 6 bench-side named constants; runDoctrineMetricsBench + runDoctrineMetricsMultiRun reference the named constants instead of inline literals |
+
+### 165.8 Test counts
+
+| Counter | Pre-M594 | Post-M594 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2950 | 2955 | **+5** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4385 | 4390 | +5 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+### 165.9 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Anti-magic-number (chapter 一百十三) | ✓ EXTENDED to all chapter 156-164 additions; 8 categories, ~14 individual literals named |
+| Anti-drift 3-site cross-update | ✓ tests cross-reference humanAnchorErosionThreshold |
+| Honest-correction | ✓ chapter 165 walks back not framing claims but inline literals; same doctrine extension |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 165.10 一句话总结
+
+**Chapter 一百六十五 (M594 — 我不喜欢 hard coding 和 魔法数字 全面整改)**: respond to user invocation of chapter 一百十三 anti-magic-number doctrine. Comprehensive `grep` audit of chapters 156-164 surfaced 8 magic-number categories (percentile fractions / std multiplier / anchor thresholds / count default / cycling strides / multi-run counts / variance thresholds / output paths). All 8 extracted to named constants — 6 in `BASDoctrineMetricsThreshold` (substrate library, with cross-callsite consistency for percentile fractions + stdFormulaMultiplier with derivation doc-comment + anchorRiskSumThresholds cross-referencing humanAnchorErosionThreshold) + 6 in new `DoctrineBenchConstants` enum (bench-side: defaultSessionCount, defaultOutputPath, workflowCyclingStride/surfaceCyclingStride with coprime-explanation comments, multiRunCounts, multiRunOutputPrefix). 5 new tests: testPercentileFractionConstants, testStdFormulaMultiplierPinned (verifies derivation via Bernoulli compute), testAnchorRiskSumThresholdsPinned (cross-references humanAnchorErosionThreshold), testVarianceInterpretationThresholdsPinned, testHarmonyPerTurnFormulaSimple. Test counts: BAS 2950 → 2955 (+5), Qinao 1435 unchanged, 全栈 4385 → 4390 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number doctrine (chapter 一百十三) extended retroactively to chapters 156-164 work; every numeric literal now sourced from named constant with doc-comment derivation. Multi-run banner now displays named constants in output (`stableSpreadThreshold` / `nDependentSpreadThreshold`).

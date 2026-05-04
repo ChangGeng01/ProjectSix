@@ -1099,4 +1099,91 @@ final class BASDoctrineMetricsTests: XCTestCase {
             thresholds: [0.5, 0.9])
         XCTAssertEqual(s.thresholdCounts, [3, 1])
     }
+
+    // MARK: - 18. M594 chapter 一百六十五 — Anti-magic-number constant pinning
+
+    /// Pin percentile fraction constants to standard 25/50/75/99
+    /// values. Regression guard against accidental drift.
+    func testPercentileFractionConstants() {
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.percentileP25Fraction,
+            0.25)
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.percentileP50Fraction,
+            0.50)
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.percentileP75Fraction,
+            0.75)
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.percentileP99Fraction,
+            0.99)
+    }
+
+    /// Pin std-formula multiplier to 2.0.
+    /// Derivation: max std for [0,1]-bounded var = 0.5
+    /// (Bernoulli p=0.5). 2 × max std = 1.0 maps to stability=0.0.
+    /// So multiplier = 1 / theoreticalMaxStd = 2.0.
+    func testStdFormulaMultiplierPinned() {
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.stdFormulaMultiplier,
+            2.0)
+        // Derivation check: Bernoulli at p=0.5 produces std = 0.5
+        // → stability = 1 - 2 * 0.5 = 0.0 (matches max-variation
+        // semantic).
+        let bernoulli: [Double] = [0.0, 1.0]
+        let mean = 0.5
+        let variance = bernoulli.map {
+            pow($0 - mean, 2)
+        }.reduce(0, +) / Double(bernoulli.count)
+        let std = variance.squareRoot()
+        XCTAssertEqual(std, 0.5, accuracy: 0.001)
+        let stability = max(0, min(1, 1
+            - BASDoctrineMetricsThreshold.stdFormulaMultiplier
+            * std))
+        XCTAssertEqual(stability, 0.0, accuracy: 0.001)
+    }
+
+    /// Pin anchor risk-sum thresholds.
+    /// Chapter 一百五十四 calibration: substrate emits anchor risk
+    /// sums in two clusters at ~1.05 and ~1.85; threshold 1.5
+    /// (= humanAnchorErosionThreshold) cleanly discriminates.
+    func testAnchorRiskSumThresholdsPinned() {
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.anchorRiskSumThresholds,
+            [1.0, 1.5, 2.0])
+        // Cross-reference: middle threshold matches
+        // humanAnchorErosionThreshold (chapter 154 calibration).
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.anchorRiskSumThresholds[1],
+            BASDoctrineMetricsCompute.humanAnchorErosionThreshold)
+    }
+
+    /// Pin multi-run variance interpretation thresholds.
+    /// Chapter 一百六十四 empirical reading: ≤ 0.05 = stable;
+    /// > 0.10 = N-dependent.
+    func testVarianceInterpretationThresholdsPinned() {
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.stableSpreadThreshold,
+            0.05)
+        XCTAssertEqual(
+            BASDoctrineMetricsThreshold.nDependentSpreadThreshold,
+            0.10)
+        // Sanity: stable threshold < N-dependent threshold.
+        XCTAssertLessThan(
+            BASDoctrineMetricsThreshold.stableSpreadThreshold,
+            BASDoctrineMetricsThreshold
+                .nDependentSpreadThreshold)
+    }
+
+    /// Pin: doctrineHarmonyPerTurn formula uses count/sample
+    /// directly (no magic multipliers).
+    func testHarmonyPerTurnFormulaSimple() {
+        // 50/100 sample → 0.5 harmony (1 - 50/100)
+        let h = BASDoctrineMetricsCompute
+            .doctrineHarmonyPerTurn(
+                metricID: "formula-pin",
+                turnsWithAnyRedLine: 50,
+                sampleCount: 100)
+        XCTAssertEqual(h.harmonyScore, 0.5, accuracy: 0.001)
+    }
 }
