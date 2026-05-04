@@ -159,7 +159,12 @@ public extension BASUpdateTicketLifecycleCoordinator {
     /// idempotent matches the gate's intent ("end up rejected")
     /// without double-rejecting or surfacing a stale-state error
     /// to the host.
-    private func idempotentMarkRejected(
+    /// **Chapter 一百三十一 M514**: visibility lifted from
+    /// `private` to `internal` so chapter-一百三十一 Counter-Host
+    /// Gate extension (`BASUpdateTicketLifecycleCounterHostGate
+    /// .swift`) can reuse the same idempotent-rejection helper.
+    /// Doctrine unchanged.
+    internal func idempotentMarkRejected(
         ticketID: String,
         reasonCodes: [String]
     ) async throws {

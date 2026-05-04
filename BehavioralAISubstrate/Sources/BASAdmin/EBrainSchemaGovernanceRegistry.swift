@@ -62,17 +62,20 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "SovereignVerdict",
             versionedType: BASSovereignVerdict.self,
-            tests: ["schema.sovereign_verdict.current", "schema.sovereign_verdict.backward"]
+            tests: ["schema.sovereign_verdict.current", "schema.sovereign_verdict.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "SovereignCommitToken",
             versionedType: BASSovereignCommitToken.self,
-            tests: ["schema.sovereign_commit_token.current", "schema.sovereign_commit_token.backward"]
+            tests: ["schema.sovereign_commit_token.current", "schema.sovereign_commit_token.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "SovereignWarrant",
             versionedType: BASSovereignWarrant.self,
-            tests: ["schema.sovereign_warrant.current", "schema.sovereign_warrant.backward"]
+            tests: ["schema.sovereign_warrant.current", "schema.sovereign_warrant.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "SovereignLock",
@@ -82,12 +85,14 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "QuarantineRecord",
             versionedType: BASQuarantineRecord.self,
-            tests: ["schema.quarantine_record.current", "schema.quarantine_record.backward"]
+            tests: ["schema.quarantine_record.current", "schema.quarantine_record.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "SovereignAuditEntry",
             versionedType: BASSovereignAuditEntry.self,
-            tests: ["schema.sovereign_audit_entry.current", "schema.sovereign_audit_entry.backward"]
+            tests: ["schema.sovereign_audit_entry.current", "schema.sovereign_audit_entry.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "HostRhythmProfile",
@@ -207,7 +212,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "HostVersion",
             versionedType: BASHostVersion.self,
-            tests: ["schema.host_version.current", "schema.host_version.backward"]
+            tests: ["schema.host_version.current", "schema.host_version.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "TemporalMemoryField",
@@ -252,7 +258,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "MemoryQuarantineRecord",
             versionedType: BASMemoryQuarantineRecord.self,
-            tests: ["schema.memory_quarantine_record.current", "schema.memory_quarantine_record.backward"]
+            tests: ["schema.memory_quarantine_record.current", "schema.memory_quarantine_record.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "MemorySanctumEntry",
@@ -945,7 +952,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "RuntimeTrace",
             versionedType: BASRuntimeTrace.self,
-            tests: ["schema.trace.current", "schema.trace.backward"]
+            tests: ["schema.trace.current", "schema.trace.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "EvalSample",
@@ -998,12 +1006,14 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "SealEnvelope",
             versionedType: BASSealEnvelope.self,
-            tests: ["schema.seal_envelope.current", "schema.seal_envelope.backward"]
+            tests: ["schema.seal_envelope.current", "schema.seal_envelope.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "ForbiddenKnowledgeCandidate",
             versionedType: BASForbiddenKnowledgeCandidate.self,
-            tests: ["schema.forbidden_knowledge_candidate.current", "schema.forbidden_knowledge_candidate.backward"]
+            tests: ["schema.forbidden_knowledge_candidate.current", "schema.forbidden_knowledge_candidate.backward"],
+            learnability: .nonLearnable
         ),
         // M439 (chapter 一百十四) — 7 missing L4/L7/L9/L10
         // schemas from Cthulhu/Abyssal whitepapers
@@ -1067,7 +1077,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "JadeCanonSeal",
             versionedType: BASJadeCanonSeal.self,
-            tests: ["schema.jade_canon_seal.current", "schema.jade_canon_seal.backward"]
+            tests: ["schema.jade_canon_seal.current", "schema.jade_canon_seal.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "HeavenGatePermit",
@@ -1102,12 +1113,14 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "KunlunTianmenWarrant",
             versionedType: BASKunlunTianmenWarrant.self,
-            tests: ["schema.kunlun_tianmen_warrant.current", "schema.kunlun_tianmen_warrant.backward"]
+            tests: ["schema.kunlun_tianmen_warrant.current", "schema.kunlun_tianmen_warrant.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "KunlunGateDenialWrit",
             versionedType: BASKunlunGateDenialWrit.self,
-            tests: ["schema.kunlun_gate_denial_writ.current", "schema.kunlun_gate_denial_writ.backward"]
+            tests: ["schema.kunlun_gate_denial_writ.current", "schema.kunlun_gate_denial_writ.backward"],
+            learnability: .nonLearnable
         ),
         // M440 (chapter 一百十五) — 2 new layer-naming schemas
         // closing user 2026-05-04 audit Section B remainder.
@@ -1271,7 +1284,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "HostJadeRegister",
             versionedType: BASHostJadeRegister.self,
-            tests: ["schema.host_jade_register.current", "schema.host_jade_register.backward"]
+            tests: ["schema.host_jade_register.current", "schema.host_jade_register.backward"],
+            learnability: .nonLearnable
         ),
         entry(
             "JadeMirrorDraft",
@@ -1290,7 +1304,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
         entry(
             "CounterHostCheck",
             versionedType: BASCounterHostCheck.self,
-            tests: ["schema.counter_host_check.current", "schema.counter_host_check.backward"]
+            tests: ["schema.counter_host_check.current", "schema.counter_host_check.backward"],
+            learnability: .nonLearnable
         )
     ]
 
@@ -1303,7 +1318,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
     private static func entry<T: BASSchemaVersioned>(
         _ objectID: String,
         versionedType: T.Type,
-        tests migrationTests: [String]
+        tests migrationTests: [String],
+        learnability: BASLearnabilityClass = .semiLearnable
     ) -> BASSchemaGovernanceEntry {
         BASSchemaGovernanceEntry(
             objectID: objectID,
@@ -1311,7 +1327,8 @@ public enum BASEBrainSchemaGovernanceRegistry {
             compatibilityWindow: "2 minor versions",
             deprecationPolicy: "Mark deprecated for one milestone before removal.",
             migrationTestIDs: migrationTests,
-            rollbackPolicy: "Rehydrate the previous schema snapshot and preserve replay fidelity."
+            rollbackPolicy: "Rehydrate the previous schema snapshot and preserve replay fidelity.",
+            learnabilityClass: learnability
         )
     }
 }

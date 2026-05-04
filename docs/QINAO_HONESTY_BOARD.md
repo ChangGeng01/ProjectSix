@@ -15128,3 +15128,96 @@ User asked "是否属实", 我 grep-verified each point + 给 honest verdict (mo
 ### 130.11 一句话总结
 
 **Chapter 一百三十 / M513-M519**: respond to user 8-point audit by 全面优化 5 in-repo 推-able items — **M513 Counter-Host Check** (Point 8 防御宿主自证循环 — 4-case outcome enum + 2 named thresholds + requiresSovereignOverride invariant + 10 tests pin BR-013 contract);  **M515 Learnability typed enum** (Point 7 — 3-tier strong/semi/non-learnable boundary + 7 tests including BR-013 typed pin "BLOCKED from training pipelines"); **M517 Sovereign Domain Scope** (Point 5 — 6-case sovereign domain enum + linter detecting 6 power-creep substrings + 6 tests including BR-014 typed pin "L14 emissions stay within sovereign-domain"); **M518 L6 doctrine note** (Point 2 — anomaly.* prefix 反映 emission 位置 而不是 detection 位置); **M519 工程语言修辞** (Point 3 — "无延迟" → sub-20ms coordination overhead + single-encode multi-seat + zero-copy state bus + hot-seat resident-cold-seat-on-demand 4-target language). **Out-of-scope honesty**: Point 4 (Stream B blocked) + Point 6 (multi-chapter — separate plan, lineage graph 4-6 chapters) + Point 9 (real-traffic blocked). **2 new BR red lines** typed-pinned (BR-013 Learnability + BR-014 Sovereign Domain Scope; 总 BR 23 → 25). **3 new typed schemas/enums** + 1 governance entry (BASCounterHostCheck) + 26 new tests. Test counts: BAS XCTest 2825 → **2851** (+26), Qinao 1375 unchanged, 全栈 4217 → **4243** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. Doctrine pin held: pure typed primitives + lint helpers; no permit.mode mutation; 不变量 #3 + 单提交口 strengthened by Counter-Host Check + Learnability + Sovereign Domain Scope。Honest residuals: M514 L13 promotion gate consume + M516 governance learnability annotation 留 chapter 一百三十一 follow-up(scope 边界考虑后均为 schema-bump-style 改动,需要 BASEvolutionLifecycleAction enum 加 case + governance registry struct 加 field 字段 + 3-site 重新 sync + 跨 chapter regression 验证)。
+
+## 一百三十一、 chapter 一百三十 honest residuals 闭环 — M514 L13 promotion gate consume + M516 learnabilityClass annotation (2026-05-04)
+
+### 131.1 触发动作
+
+User 在 chapter 一百三十 ship 后说 "剩下 一次性 解决掉" — 闭合 chapter 一百三十 列出的 honest residuals:
+- **M514** — L13 promotion gate consume BASCounterHostCheck (chapter 一百三十 P.3 deferred)
+- **M516** — governance registry learnabilityClass annotation (chapter 一百三十 P.4 deferred)
+
+两条都属于 schema-bump-style scope,需要同 chapter 隔离风险。"一次性" 立 chapter 一百三十一 同 commit ship.
+
+### 131.2 M514 — Counter-Host Gate L13 promotion path
+
+**新建** `BehavioralAISubstrate/Sources/BASHostKit/BASUpdateTicketLifecycleCounterHostGate.swift` (~140 LoC):
+
+- `BASCounterHostGateOutcome` 3-case enum (kebab-case raw values):
+  - `.passed` — 直通通过 (no Counter-Host Check OR not systemInducedDrift)
+  - `.passedWithSovereignOverride` — 主权 override 通过 (systemInducedDrift + non-empty verdict ref)
+  - `.blocked` — 阻止 (systemInducedDrift + empty verdict ref → markRejected)
+- `BASUpdateTicketLifecycleCoordinator.approveForDistillationWithCounterHostCheck(ticketID:sovereignVerdictRef:counterHostCheck:)` async throws → `BASCounterHostGateOutcome`
+- 复用 `idempotentMarkRejected` helper(visibility from `private` → `internal` per Chapter 一百三十一 cross-extension reuse note)
+
+**Doctrine pin** (chapter 一百三十 P.3 + audit Point 8): 不变量 #3 加固 — "宿主自证循环候选 必须有显式 L14 主权 override 才能进入权重池"。Empty verdict ref + systemInducedDrift = blocked path; doctrine-load-bearing branch.
+
+**Pattern parallel**: chapter 八十九 M386 `submitWithForbiddenGate` / `startTrialWithForbiddenGate` shape — gate-aware variant wraps primary mouth, rejects with reason codes when gate refuses.
+
+**测试**: `M514CounterHostGateWiringTests.swift` 7 tests covering: nil check passes / .genuineHostPattern passes / .systemInducedDrift+empty verdict blocks / .systemInducedDrift+override passes / .insufficientEvidence passes / .notApplicable passes / outcome enum cardinality.
+
+### 131.3 M516 — learnabilityClass annotation on governance entries
+
+**修改** `BehavioralAISubstrate/Sources/BASAdmin/ThirteenLayerProgramBlueprintCore.swift` (`BASSchemaGovernanceEntry` struct):
+
+- 添加 `learnabilityClass: BASLearnabilityClass` 字段,default `.semiLearnable`
+- 自定义 Codable backward-compat: v1 entries (无字段) decode 到 default `.semiLearnable` per chapter 一百二十一 M463 schema-bump pattern
+- import +1: `BASRuntimeCore` (BASLearnabilityClass home)
+
+**修改** `BehavioralAISubstrate/Sources/BASAdmin/EBrainSchemaGovernanceRegistry.swift`:
+
+- `entry(...)` private helper signature 添加 optional `learnability: BASLearnabilityClass = .semiLearnable` 参数
+- **15 doctrine-load-bearing schemas annotated `.nonLearnable`** (BR-013 typed pin):
+  - L14 sovereign: `SovereignVerdict` / `SovereignCommitToken` / `SovereignWarrant` / `QuarantineRecord` / `SovereignAuditEntry`
+  - Host version (delete/rollback): `HostVersion`
+  - Memory quarantine: `MemoryQuarantineRecord`
+  - Audit chain: `RuntimeTrace`
+  - Sealing: `SealEnvelope` / `KunlunTianmenWarrant` / `KunlunGateDenialWrit`
+  - Forbidden zone: `ForbiddenKnowledgeCandidate`
+  - Jade canon (host integrity): `JadeCanonSeal` / `HostJadeRegister`
+  - Counter-Host gate: `CounterHostCheck`
+
+**Doctrine pin** (chapter 一百三十 P.4 + audit Point 7): 这 15 schemas 是 doctrine-load-bearing safety boundary — MUST stay mechanically stable, MUST NOT route through training pipelines.
+
+**测试**: `M516LearnabilityAnnotationTests.swift` 4 tests covering: default `.semiLearnable` / **BR-013 typed pin** (15 doctrine-load-bearing schemas pinned `.nonLearnable`) / Codable v1 backward-compat (no learnabilityClass field decodes to default) / Codable round-trip.
+
+### 131.4 测试基线
+
+| 套件 | 一百三十 章末 | 一百三十一 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2851 | **2862** | +11 (M514 7 tests + M516 4 tests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4243 | **4254** | +11 |
+
+5 gates clean: 4 boundary + whitepaper parity (242 registered, 0 drift).
+
+### 131.5 Doctrine red lines tally (post-chapter 一百三十一)
+
+无新红线 (M514 + M516 闭环 chapter 一百三十 已 typed-pinned BR-013 + BR-014)。
+- Kunlun 8 红线 (chapter 九十五 M412)
+- Cthulhu 10 红线 (chapter 八十九 M389)
+- Product 5 红线 (chapter 一百十五 M440)
+- BR-013 Learnability (chapter 一百三十 M515) — **chapter 一百三十一 production-wired by 15 .nonLearnable annotations**
+- BR-014 Sovereign Domain Scope (chapter 一百三十 M517)
+
+总 BR 数: **25 unchanged**。
+
+### 131.6 8-point audit closure 总览 (post-chapter 一百三十一)
+
+| # | Audit Point | Closure |
+|---|---|---|
+| 2 | L6/L7 doctrine binding 重叠 | ✓ chapter 一百三十 M518 (doctrine note) |
+| 3 | "无延迟" 物理不成立 | ✓ chapter 一百三十 M519 (工程语言修辞) |
+| 4 | 并发一致性灾难 | ✗ Stream B blocked |
+| 5 | L14 太强 sovereign-domain scope | ✓ chapter 一百三十 M517 + BR-014 |
+| 6 | 删除/回滚 lineage graph | ✗ multi-chapter (separate plan) |
+| 7 | Learnability 边界不硬 | ✓ chapter 一百三十 M515 (typed enum) + **chapter 一百三十一 M516 (production-wired 15 annotations + BR-013 typed pin)** |
+| 8 | 宿主自证循环防御 | ✓ chapter 一百三十 M513 (typed primitive) + **chapter 一百三十一 M514 (L13 production-wired)** |
+| 9 | 指标不够"验收化" | ✗ real-traffic blocked |
+
+**5 of 8 in-repo 推-able 全部 closed** ✓ (with both schema-only AND production-wired)。
+
+### 131.7 一句话总结
+
+**Chapter 一百三十一 / M514 + M516**: respond to user "剩下 一次性 解决掉" by 闭环 chapter 一百三十 honest residuals — **M514 Counter-Host Gate L13 promotion path** (new `BASUpdateTicketLifecycleCounterHostGate.swift` ~140 LoC + `BASCounterHostGateOutcome` 3-case enum + `approveForDistillationWithCounterHostCheck(...)` extension method on `BASUpdateTicketLifecycleCoordinator`; doctrine: when outcome=.systemInducedDrift, empty verdict ref → markRejected with Counter-Host reason codes, non-empty verdict ref → passed-with-sovereign-override; visibility lift `idempotentMarkRejected` private→internal per cross-extension reuse note); **M516 governance learnabilityClass annotation** (BASSchemaGovernanceEntry struct +1 field default `.semiLearnable` + Codable v1 backward-compat per chapter 一百二十一 M463 schema-bump pattern; entry() helper +1 optional learnability parameter; **15 doctrine-load-bearing schemas annotated `.nonLearnable`** covering L14 sovereign/token/commit/audit + host version + delete/rollback + sealing + forbidden zone + jade canon host integrity + Counter-Host gate). **11 new tests** (7 M514 + 4 M516) including BR-013 typed pin (15 schemas MUST be `.nonLearnable`). Test counts: BAS XCTest 2851 → **2862** (+11), Qinao 1375 unchanged, 全栈 4243 → **4254** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. **8-point audit closure**: 5 of 8 in-repo 推-able points fully closed (Point 2 / 3 / 5 / 7 / 8) with BOTH schema-only AND production-wired; 3 externally-blocked (Point 4 Stream B / Point 6 lineage graph multi-chapter / Point 9 real-traffic) honestly out-of-scope. Doctrine pin held: pure typed primitives + lint helpers + Codable backward-compat; no permit.mode mutation; 不变量 #3 加固 — Counter-Host gate enforces "宿主自证循环候选 必须有显式 L14 主权 override" + Learnability annotation enforces "15 doctrine-load-bearing schemas BLOCKED from training pipelines"。

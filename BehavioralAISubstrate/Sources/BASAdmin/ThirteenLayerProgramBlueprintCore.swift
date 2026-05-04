@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 public enum BASEBrainTrackKind: String, Codable, Sendable, CaseIterable, Identifiable {
     case physiology
@@ -212,6 +213,22 @@ public struct BASSchemaGovernanceEntry: Codable, Equatable, Sendable, Identifiab
     public var deprecationPolicy: String
     public var migrationTestIDs: [String]
     public var rollbackPolicy: String
+    /// **M516 (chapter 一百三十一)** — learnability classification
+    /// per audit Point 7 + chapter 一百三十 Appendix P.4 doctrine.
+    /// Defaults to `.semiLearnable` (rules+learning hybrid) for
+    /// most schemas; doctrine-load-bearing schemas (L14 / sovereign
+    /// / token / commit / permission / host授权) MUST override
+    /// to `.nonLearnable`. Strong-learnable derive helpers
+    /// (L6/L7/L9/L12 watcher/distortion/candidate/surface) override
+    /// to `.strongLearnable`.
+    ///
+    /// Backward-compat: chapter 一百三十一 ships with default
+    /// `.semiLearnable` so existing schemas don't need annotations
+    /// in this chapter; doctrine-specific overrides apply only
+    /// where the load-bearing distinction matters. BR-013 lint
+    /// test enforces non-learnable on the explicitly-overridden
+    /// list.
+    public var learnabilityClass: BASLearnabilityClass
 
     public init(
         objectID: String,
@@ -219,7 +236,8 @@ public struct BASSchemaGovernanceEntry: Codable, Equatable, Sendable, Identifiab
         compatibilityWindow: String,
         deprecationPolicy: String,
         migrationTestIDs: [String],
-        rollbackPolicy: String
+        rollbackPolicy: String,
+        learnabilityClass: BASLearnabilityClass = .semiLearnable
     ) {
         self.objectID = objectID
         self.currentVersion = currentVersion
@@ -227,6 +245,43 @@ public struct BASSchemaGovernanceEntry: Codable, Equatable, Sendable, Identifiab
         self.deprecationPolicy = deprecationPolicy
         self.migrationTestIDs = migrationTestIDs
         self.rollbackPolicy = rollbackPolicy
+        self.learnabilityClass = learnabilityClass
+    }
+
+    // MARK: - Codable backward-compat
+
+    /// Custom Codable to absorb the v1 entries that don't carry
+    /// the `learnabilityClass` field (defaults to `.semiLearnable`
+    /// when absent). Same pattern as M463 BASAbyssalPressure
+    /// schema-bump from chapter 一百二十一.
+    private enum CodingKeys: String, CodingKey {
+        case objectID
+        case currentVersion
+        case compatibilityWindow
+        case deprecationPolicy
+        case migrationTestIDs
+        case rollbackPolicy
+        case learnabilityClass
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(
+            keyedBy: CodingKeys.self)
+        self.objectID = try container.decode(
+            String.self, forKey: .objectID)
+        self.currentVersion = try container.decode(
+            String.self, forKey: .currentVersion)
+        self.compatibilityWindow = try container.decode(
+            String.self, forKey: .compatibilityWindow)
+        self.deprecationPolicy = try container.decode(
+            String.self, forKey: .deprecationPolicy)
+        self.migrationTestIDs = try container.decode(
+            [String].self, forKey: .migrationTestIDs)
+        self.rollbackPolicy = try container.decode(
+            String.self, forKey: .rollbackPolicy)
+        self.learnabilityClass = try container.decodeIfPresent(
+            BASLearnabilityClass.self,
+            forKey: .learnabilityClass) ?? .semiLearnable
     }
 }
 
