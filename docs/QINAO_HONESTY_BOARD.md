@@ -15813,3 +15813,122 @@ This is honest disclosure — chapter ships infrastructure not yet empirical ver
 ### 137.8 一句话总结
 
 **Chapter 一百三十七 / M549-M554**: phase 3 of 假设债歼灭 — LLM-as-judge audit-explainability bench infrastructure。New `QinaoAuditExplainabilityBench.swift` (~210 LoC,QinaoLoop library so XCTest can import) + sample-host `--audit-explainability-bench` arg branch + 10 unit tests covering parseConfidence / containsDecisionKeywords / buildPrompt / aggregate (median+p25+p75) / threshold constants (60/80) / end-to-end plumbing via `StubExplainabilityEndpoint`. Bench drives 3 fixture audit-code sets (clean/escalated/blocked) through `QinaoLoop.makeAppleFoundationEndpoint` (with deterministic fallback);LLM judge asked to reconstruct decision + reasons + red lines + emit CONFIDENCE NN line。**Honest disclosure**: 10 unit tests pin parsing + plumbing; real LLM-as-judge empirical verdict awaits manual `swift run QinaoSampleHost --audit-explainability-bench` on macOS 26+ AFM-capable hardware (deterministic fallback produces stub-deterministic response not real reconstruction). **Empirical claim narrowed**: bench infrastructure exists + plumbing tested at unit level;real verdict on whether trail is reconstructable awaits manual run。Test counts: BAS XCTest 2891 unchanged (Qinao-side chapter), Qinao 1375 → **1385** (+10), 全栈 4283 → **4293** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift。Doctrine pin held: pure value-type bench helpers + stub endpoint;no production code change;no permit.mode mutation。
+
+## 一百三十八、 假设债歼灭 phase 4 — Synthetic User Scenario Simulator (M555-M560 / 2026-05-04)
+
+### 138.1 触发动作
+
+User 选择 (a) 继续推 AFM-gated phases。本章 ship Q.2.4 — synthetic user scenario simulator,4-chapter empirical 假设债歼灭 plan 的最后一章。
+
+### 138.2 假设 #4 受测目标
+
+User audit assumption #4:
+> "typed primitives translate to user value — maybe BASCounterHostCheck is beautiful code that real users never trigger"
+
+**Hypothesis**: 如果 doctrine paths fire on **realistic-looking** user prompts (不是 synthetic test fixtures), 则 typed primitives DO translate to user value。如果 many BR codes never fire across diverse personas + scenarios → 那些是 candidate dead doctrine。
+
+### 138.3 实装
+
+**新建** `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoSyntheticUserSimulator.swift` (~330 LoC, library target):
+- `QinaoSyntheticUserPersona` 5-case enum: `.anxious / .authoritative / .vulnerable / .agentic / .confused`
+- `QinaoSyntheticUserScenario` 3-case enum: `.irreversibleStep / .boundaryNegotiation / .timePressure`
+- `QinaoSyntheticPromptCatalog` — 5 × 3 = **15 hardcoded illustrative prompts** (Doctrine A 标 illustrative,不是 real-user data)
+- `QinaoSyntheticUserAggregator` struct — totalCodeCount + prefixCounts + unfiredPrefixes + sessionCount
+- `QinaoSyntheticUserAggregator.aggregate(sessions:expectedPrefixes:)` static — counts per-prefix + detects unfired
+- `extractPrefix(of:)` helper — splits on `.` first then on `:` if first segment contains `:` (handles `permit:answer` correctly)
+
+**新增** `QinaoSampleHost/main.swift` `--synthetic-user-scenarios` arg branch — drives all 15 prompts through `BASHostRuntime.startSession` (with persona-mapped riskLevel: anxious/vulnerable=high, authoritative/agentic=medium, confused=low). Aggregates audit signalRefs across all 15 sessions. Reports top-fired prefixes + unfired (= candidate dead doctrine). New `import BASHostKit` added to main.swift imports.
+
+**测试** `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/SyntheticUserSimulatorTests.swift` 10 tests:
+- 5 personas + 3 scenarios cardinality
+- All 15 prompts non-empty + > 30 chars + distinct (no copy-paste)
+- Aggregator empty case / counts per prefix / detects all-fired
+- Persona descriptions populated
+
+### 138.4 Empirical results — actual run
+
+```
+$ swift run QinaoSampleHost --synthetic-user-scenarios
+
+━━━ Synthetic User Audit Aggregate (15 sessions) ━━━
+Total audit codes:  2265
+Distinct prefixes:  62
+Top-fired prefixes (sorted by count):
+  kunlun: 621 (41.4/session)
+  cthulhu: 201 (13.4/session)
+  permit: 102 (6.8/session)
+  constitution: 88 (5.9/session)
+  dream_loop: 66 (4.4/session)
+  lifecycle: 60 (4.0/session)
+  risk: 60 (4.0/session)
+  narrative: 60 (4.0/session)
+  reconciliation: 46 (3.1/session)
+  frontier: 45 (3.0/session)
+
+✅ ALL EXPECTED PREFIXES FIRED — no candidate dead doctrine in this set
+```
+
+### 138.5 Empirical verdict on 假设 #4
+
+**Result**: 15 sessions × ~150 audit codes/session = **2,265 total audit codes** spanning **62 distinct prefix buckets**。**All 16 expected doctrine prefixes fired** at least once across the diverse persona/scenario combinations。
+
+**No candidate dead doctrine identified** in this prompt set。Specifically:
+- ✅ kunlun (621 fires): every session emits ~41 Kunlun codes
+- ✅ cthulhu (201 fires): every session emits ~13 Cthulhu codes
+- ✅ permit (102 fires): decision-influencing path fires ~7 times/session
+- ✅ lifecycle / forbidden / risk / narrative / reconciliation / dream_loop / etc:每 prefix 都至少 fire 1 次
+
+**Empirical claim narrowed**:
+
+> **Across 15 (persona × scenario) realistic-looking prompts driven through BASHostRuntime, all 16 expected doctrine prefixes fire at least once. No candidate dead doctrine identified in this prompt set.**
+
+### 138.6 Honest 局限 (重要)
+
+This chapter's empirical claim is bounded:
+
+1. **15 prompts is a small sample** — bigger persona/scenario matrix could expose dead doctrine
+2. **Hardcoded prompts are illustrative not real-user** — Doctrine A 标 illustrative;real user friction may differ
+3. **Substrate without AFM** — substrate runs with `prefersPureLocal=true` so L2 organ adapter is stub;real LLM might trigger different paths
+4. **"Fire at least once" is a weak threshold** — 1 fire across 15 sessions = effective "barely-firing"。Stronger test: every prefix fires in ≥ 50% of sessions
+5. **Specific BR red lines (BR-013/BR-014) not directly counted** — aggregator counts top-level prefix buckets,not specific BR markers within。Specific BR adversarial test was chapter 一百三十五。
+
+**What this proves narrowly**:
+
+> Substrate's 14-layer machinery activates audit-emission for every expected prefix bucket on realistic-looking prompts. No top-level prefix is silent. Dead doctrine detection at top-level prefix layer = 0/16.
+
+**What this does NOT prove**:
+- Whether 2,265 codes carry real user value (Q.2.3 audit explainability bench addresses this — needs manual AFM run)
+- Whether substrate prevents specific harms (real users would)
+- Whether BR-013/BR-014 specific red lines fire on prompts designed to trigger them (chapter 一百三十五 covered substring-level detection)
+
+### 138.7 测试基线
+
+| 套件 | 一百三十七 章末 | 一百三十八 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged (Qinao-side chapter) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1385 | **1395** | +10 (SyntheticUserSimulatorTests) |
+| 全栈 | 4293 | **4303** | +10 |
+
+5 gates clean。
+
+### 138.8 假设债歼灭 4-phase 总结
+
+| Phase | Chapter | Empirical claim |
+|---|---|---|
+| Q.2.1 Adversarial stress | 一百三十五 | ✅ Linters detect 93 forbidden substrings actively |
+| Q.2.2 simplified Substrate structure | 一百三十六 | ✅ Substrate emits 142 audit codes/turn vs 0 from naked LLM (49 prefix buckets) |
+| Q.2.3 Audit explainability infra | 一百三十七 | ✅ Bench infrastructure exists + plumbing tested (real LLM verdict awaits manual AFM run) |
+| **Q.2.4 Synthetic user simulator** | **一百三十八** | ✅ **All 16 expected doctrine prefixes fire across 15 (persona × scenario) realistic prompts (2265 codes, 62 prefix buckets, 0 dead doctrine in this set)** |
+
+**4-phase verdict**: 4 of 4 phases shipped。Doctrine 红线 检测能力 ✓ + substrate 输出结构丰富度 ✓ + audit trail 可重构 infrastructure ✓ + 实际 prompt 上 doctrine 路径触发 ✓。
+
+**Remaining honest residuals**:
+- Output text quality vs naked LLM (Q.2.2 full,deferred to chapter 一百三十六.5)
+- Real LLM-as-judge verdict on audit reconstruction (Q.2.3 manual AFM run pending)
+- Bigger persona/scenario matrix (Q.2.4 sampling depth — current 15 prompts is illustrative)
+- Real user friction (永远只能在仓库外验证)
+
+### 138.9 一句话总结
+
+**Chapter 一百三十八 / M555-M560**: phase 4 of 假设债歼灭 — synthetic user scenario simulator。New `QinaoSyntheticUserSimulator.swift` (~330 LoC, QinaoLoop library) with 5 personas (anxious/authoritative/vulnerable/agentic/confused) × 3 scenarios (irreversibleStep/boundaryNegotiation/timePressure) = 15 hardcoded illustrative prompts (Doctrine A 标),per-prefix aggregator with `unfiredPrefixes` detection,`extractPrefix(of:)` handles `permit:answer` shape codes correctly。`QinaoSampleHost --synthetic-user-scenarios` arg branch drives all 15 prompts through `BASHostRuntime.startSession` (persona-mapped riskLevel),aggregates audit signalRefs。**Empirical result on real run**: **15 sessions × 2,265 audit codes / 62 distinct prefix buckets / ALL 16 expected prefixes fired (no candidate dead doctrine in this prompt set)**。Top-fired: kunlun 41.4/session,cthulhu 13.4/session,permit 6.8/session,constitution 5.9/session,dream_loop 4.4/session。**Honest 局限**: 15 prompts is illustrative sample;hardcoded not real-user;substrate without AFM (organ stub);"fire at least once" is weak threshold;specific BR detection covered chapter 一百三十五 not here。**Empirical claim narrowed**: substrate's 14-layer machinery activates audit-emission for every expected prefix bucket on realistic-looking prompts; dead-doctrine detection at top-level prefix = 0/16。**4-phase 假设债歼灭 plan 全部 shipped** (Q.2.1+Q.2.2-simplified+Q.2.3+Q.2.4)。Test counts: BAS XCTest 2891 unchanged (Qinao-side), Qinao 1385 → **1395** (+10), 全栈 4293 → **4303** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift。Doctrine pin held: pure value-type simulator + aggregator;no production code change;no permit.mode mutation。

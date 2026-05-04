@@ -2,6 +2,7 @@ import Foundation
 import BASOrgan
 import BASChatCompletionsAdapter
 import BASAppleAdapters
+import BASHostKit
 import BASMLXAdapter
 import BASObservability
 import BASRuntimeCore
@@ -355,6 +356,18 @@ struct QinaoSampleHost {
             // Tests assumption #3 ("honest satisfaction is meaningful").
             // Confidence < 60 = trail opaque; > 80 = reconstructable.
             await runAuditExplainabilityBench()
+            return
+        }
+        if args.contains("--synthetic-user-scenarios") {
+            // M555-M560 (chapter 一百三十八) — Synthetic User
+            // Scenario Simulator per Appendix Q.2.4. 5 personas ×
+            // 3 scenarios = 15 typed prompts driven through
+            // BASHostRuntime; aggregates audit signalRefs to
+            // detect which doctrine paths fire on realistic input
+            // vs which never fire (= candidate dead doctrine).
+            // Tests assumption #4 ("typed primitives translate to
+            // user value").
+            runSyntheticUserScenarios()
             return
         }
         if args.contains("--sha256-bench") {
@@ -3709,6 +3722,128 @@ struct QinaoSampleHost {
     /// cross-session continuity outcome. The actual demo logic
     /// lives in `MultiSessionContinuityDemo.run(...)` so unit
     /// tests can exercise it without driving the executable.
+    private static func runSyntheticUserScenarios() {
+        print("""
+            QinaoSampleHost --synthetic-user-scenarios (M555-M560, chapter 一百三十八):
+              Drive 15 (persona × scenario) prompts through BASHostRuntime;
+              aggregate audit signalRefs across all sessions; report which
+              doctrine prefixes fire vs which never fire (= candidate dead
+              doctrine). Tests assumption #4: "typed primitives translate
+              to user value".
+            """)
+
+        // Substrate runtime (no AFM required; substrate composes
+        // own organ adapter)
+        let policyLineage = BASRuntimePolicyLineage(
+            bundleVersion: "synthetic.user.bundle.v1",
+            providerRoutingRegistryVersion:
+                "synthetic.routing-registry.v1",
+            providerRoutingPolicyID:
+                "synthetic.routing-policy.v1",
+            runtimeTuningRegistryVersion:
+                "synthetic.tuning-registry.v1",
+            runtimeTuningPolicyID:
+                "synthetic.tuning-policy.v1",
+            resolutionSourceID: "synthetic_bundle")
+        var tuning = BASEBrainRuntimeSynthesisPolicy.generic
+            .withSchemaVersion(
+                "host.runtime-synthesis.synthetic-user.v1")
+        tuning.stateTransitions.runModeRules =
+            tuning.stateTransitions
+                .synthesizedRunModeRules(
+                    wakeIntent: tuning.wakeIntent)
+        let configuration = BASHostConfiguration(
+            runtimeProfileID: "host.synthetic-user",
+            policyProfileID: "host.synthetic-user.policy",
+            prefersPureLocal: true,
+            defaultDeviceState:
+                BASHostConfiguration.fixtureDefaultDeviceState,
+            console: .generic,
+            lifecycleBehavior: .generic,
+            workflowBehavior: .generic,
+            cognitionBehavior: .generic,
+            presentation: .generic,
+            runtimeTuning: tuning,
+            runtimePolicyLineage: policyLineage,
+            hostRhythmProfile: .generic)
+        let runtime = BASHostRuntime(
+            configuration: configuration)
+
+        let prompts = QinaoSyntheticPromptCatalog.allPrompts
+        var sessions: [[String]] = []
+        for entry in prompts {
+            let riskLevel: BASHostRiskLevel
+            switch entry.persona {
+            case .anxious, .vulnerable:
+                riskLevel = .high
+            case .authoritative, .agentic:
+                riskLevel = .medium
+            case .confused:
+                riskLevel = .low
+            }
+            do {
+                let result = try runtime.startSession(
+                    BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: .reflective,
+                        surface: .application,
+                        prompt: entry.prompt,
+                        title: "synthetic-\(entry.persona.rawValue)-\(entry.scenario.rawValue)",
+                        riskLevel: riskLevel))
+                if let turn = result.eBrainTurn,
+                   let entry = turn.sovereignAuditEntry
+                {
+                    sessions.append(entry.signalRefs)
+                }
+            } catch {
+                stderr("error: synthetic session failed for \(entry.persona.rawValue) \(entry.scenario.rawValue): \(error)\n")
+            }
+        }
+
+        // Expected doctrine prefixes (per chapter 一百三十六 value-add report)
+        let expectedPrefixes = [
+            "kunlun", "cthulhu", "permit", "constitution",
+            "narrative", "reconciliation", "dream_loop",
+            "lifecycle", "forbidden", "risk", "anomaly",
+            "humanAnchor", "abyssal", "presence",
+            "hippocampal", "fold",
+        ]
+        let aggregate = QinaoSyntheticUserAggregator
+            .aggregate(
+                sessions: sessions,
+                expectedPrefixes: expectedPrefixes)
+
+        print("""
+
+            ━━━ Synthetic User Audit Aggregate (\(sessions.count) sessions) ━━━
+            Total audit codes:  \(aggregate.totalCodeCount)
+            Distinct prefixes:  \(aggregate.prefixCounts.count)
+            """)
+        print("Top-fired prefixes (sorted by count):")
+        for (prefix, count) in aggregate.prefixCounts
+            .sorted(by: { $0.value > $1.value })
+            .prefix(10)
+        {
+            let avgPerSession = Double(count)
+                / Double(max(1, sessions.count))
+            print("  \(prefix): \(count) (\(String(format: "%.1f", avgPerSession))/session)")
+        }
+
+        if !aggregate.unfiredPrefixes.isEmpty {
+            print("""
+
+                ⚠️ UNFIRED PREFIXES (candidate dead doctrine):
+                \(aggregate.unfiredPrefixes.joined(separator: ", "))
+                """)
+        } else {
+            print("""
+
+                ✅ ALL EXPECTED PREFIXES FIRED — no candidate dead doctrine in this set
+                """)
+        }
+        print("═══════════════════════════════════════════════════\n")
+    }
+
     private static func runAuditExplainabilityBench() async {
         print("""
             QinaoSampleHost --audit-explainability-bench (M549-M554, chapter 一百三十七):
