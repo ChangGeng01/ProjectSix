@@ -16095,3 +16095,89 @@ This was Q.2.2 full(deferred to chapter 一百三十六.5)— output text qualit
 ### 141.10 一句话总结
 
 **Chapter 一百四十一 / M561-M570** (Appendix R smoke test): respond to user "跑 高成本 组合 真实 实机 冒烟" + "Gemma 4 e2b 也跑一下" by shipping 4 files (~430 LoC + 13 unit tests) for naked-vs-substrate comparator + user-value LLM-as-judge,then **真实-机 smoke run on user's hardware**。**A bench finding**: AFM unavailable on this Mac (Code 1026 graceful skip);Gemma 4 E2B 5/5 work + 0 red-line violations on output;substrate routes 5/5 sessions to **block (3 emotional personas) or delay (2 agency personas)** with 141-162 audit codes/turn — **首次实证 substrate routing decisions structurally differ from naked LLM**。**E bench finding**: AFM unavailable → fall back to Gemma 4 E2B as judge;**median user-value = 21** (below threshold 40,verdict ❌ UNHELPFUL)。**Honest analysis**: surface verdict "假设 #4 broken" is **methodology-bound** — fixture has no organ adapter wired so substrate body=nil for all sessions → judge sees no response text → naturally scores low。Real test of 假设 #4 requires substrate WITH live organ adapter (Q.2.2 full deferred to chapter 一百三十六.5)。**Methodology gap identified**: to actually test "substrate output helps user accomplish goal" we need substrate generating user-facing text via organ adapter,not just routing decisions。**这是项目第一次让 LLM 评分自己,且发现真实 limitation**。Test counts: BAS XCTest 2891 unchanged (Qinao-side), Qinao 1395 → **1408** (+13), 全栈 4303 → **4316** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift。
+
+## 一百四十二、 iPhone 17e real-machine smoke test (2026-05-04, doc-only)
+
+### 142.1 触发动作
+
+User: "跑实机 iPhone 17e 冒烟" + 矫正 "不是的 是实机 不是模拟器" + "应该能搜到"。
+
+### 142.2 实测结果矩阵
+
+| 测试 | 状态 | 实证 |
+|---|---|---|
+| iPhone 17e simulator 找到 | ✓ | `xcrun simctl list devices` 返 2 个 iPhone 17e simulators (D2FD7E52 / 9A6FAF6E) |
+| iPhone 17e physical device 连接 | ✓ | `xcrun xctrace list devices` 列 ChangGeng的iPhone (00008150-000128D10E8A401C, iPhone18,5, iOS 26.3.1) |
+| BeforeUISmoke 在 simulator 跑 | ✓ | 3 tests / 0 failures / 74.9s (`xcodebuild -scheme BeforeUISmoke -destination 'platform=iOS Simulator,name=iPhone 17e'`) |
+| BAS substrate (BASHostKit) 编译为 real-device arm64-apple-ios18.0 | ✓ | `xcodebuild -scheme BASHostKit -destination 'platform=iOS,id=00008150-...' build` → BUILD SUCCEEDED |
+| 完整 Before app install 到 real iPhone 17e | ❌ | widget extension app-group provisioning 阻塞 |
+
+### 142.3 真机 install 阻塞原因 (honest disclosure)
+
+```
+error: Provisioning profile "iOS Team Provisioning Profile: com.changgeng.before.widget"
+  doesn't match the entitlements file's value for the
+  com.apple.security.application-groups entitlement.
+```
+
+`BeforeWidgetExtension.entitlements` 要求 `group.com.changgeng.before` app group。Auto-generated provisioning profile 由 Personal Team (U4ZLQM8399) 签发,**Personal Team 不能 allocate app-groups**(需付费 Apple Developer Program)。
+
+CLI 解决路径堵塞:
+1. ❌ `-allowProvisioningUpdates` — Personal Team 无 app-group capability,xcrun 无法新建
+2. ❌ `CODE_SIGN_IDENTITY="-"` ad-hoc — iOS 26.4 SDK 禁止 ad-hoc signing
+3. ⚠️ 直接编辑 `BeforeWidgetExtension.entitlements` 移除 app-group — 改 widget 行为,不诚实
+4. ✅ **用户手动在 Xcode GUI 加 App Group capability** OR 加入付费 Developer Program — 唯一干净路径
+
+### 142.4 实证 narrowed claim
+
+**What WAS proven on real iPhone 17e**:
+- ✅ Substrate library `BASHostKit` 编译干净 for arm64-apple-ios18.0 — substrate **代码层** real-device 兼容
+- ✅ Real iPhone 17e + iOS 26.3.1 在 dev 环境可见 + 可被 xcodebuild 寻址
+
+**What was NOT proven on real iPhone 17e**:
+- ❌ Full Before app install + UI smoke run 在 real device 上(simulator 通过,实机被 widget signing 阻塞)
+- ❌ Substrate 在真 iPhone 硬件 RAM/CPU/thermal 行为(只编译,未运行)
+
+**Surface honest verdict**:
+
+> 真 iPhone 17e 可见 + 可寻址 + substrate library 真机编译通过。但 full app deployment 被 Personal Team 不能分 app-groups 的限制阻塞。这是 deployment 环境问题,不是 substrate 兼容性问题。
+
+### 142.5 Workaround 路径(future user-side action)
+
+1. Open `Before.xcodeproj` in Xcode GUI
+2. Select `BeforeWidgetExtension` target → Signing & Capabilities tab
+3. Add **App Groups** capability → enable `group.com.changgeng.before`
+4. Or: 加入 Apple Developer Program (paid) 让 Personal Team 升级到 Developer Team
+5. 之后可重跑: `xcodebuild -scheme BeforeUISmoke -destination 'platform=iOS,id=00008150-000128D10E8A401C' test`
+
+### 142.6 Simulator 数据补充
+
+由于 real-device install 阻塞,simulator 数据是可用的最接近 real-machine 的 ground truth:
+
+```
+xcodebuild -scheme BeforeUISmoke -destination 'platform=iOS Simulator,name=iPhone 17e' test
+
+Test Suite 'AIFlowUITests' passed
+3 tests / 0 failures / 74.9s
+✓ testQuickFlowShowsStubRefinement (17.5s)
+✓ (2 more tests)
+```
+
+iPhone 17e simulator 跑同样的 ARM64 user-space code(arm64-apple-ios18.0-simulator triple),与 real device 唯一差别是 hardware (CPU/GPU/NPU) + sandbox。Substrate level (audit emission / permit routing / doctrine red lines) 行为应该一致 — 但**这是推断不是 measured**,所以保留 honest 限制。
+
+### 142.7 测试基线 (本章 doc-only)
+
+| 套件 | 一百四十一 章末 | 一百四十二 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged |
+| Qinao XCTest | 1408 | **1408** | unchanged |
+| 全栈 | 4316 | **4316** | unchanged |
+| iPhone 17e simulator BeforeUISmoke | (未跑) | **3 tests / 0 failures / 74.9s** | new |
+| iPhone 17e real-device BASHostKit build | (未跑) | **arm64-apple-ios18.0 BUILD SUCCEEDED** | new |
+| iPhone 17e real-device app install | n/a | **blocked (widget app-group, Personal Team limit)** | honest disclosure |
+
+无代码改动 (chapter 一百四十二 是 doc-only);5 gates 不重跑(无 source change)。
+
+### 142.8 一句话总结
+
+**Chapter 一百四十二 (doc-only)**: respond to user "跑实机 iPhone 17e 冒烟" by attempting full real-device deployment. **Confirmed**: iPhone 17e simulator + iPhone 17e physical device (00008150-000128D10E8A401C, iOS 26.3.1) 都 dev 环境可见;**iPhone 17e simulator BeforeUISmoke = 3 tests / 0 failures / 74.9s**;**real iPhone 17e BASHostKit library compiled 干净 arm64-apple-ios18.0** — substrate 代码层 real-device 兼容证据。**Blocked**: full app install on real device 卡在 widget extension app-group provisioning(Personal Team 无 app-group capability;ad-hoc signing iOS 26.4 SDK 禁止)。**Honest workaround**: 用户 Xcode GUI 手动添加 App Group capability OR 升级到付费 Developer Program。Surface verdict: **substrate level real-device 兼容 ✓;app deployment infrastructure 限制(非 substrate 问题)阻塞 full UI smoke**。Test counts unchanged (本章 doc-only);honesty board 真实记录 iPhone 17e 实机冒烟 attempt + 阻塞原因 + workaround 路径。
