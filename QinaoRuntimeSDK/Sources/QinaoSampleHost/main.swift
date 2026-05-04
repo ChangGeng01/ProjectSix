@@ -5013,6 +5013,15 @@ struct QinaoSampleHost {
         // M580 chapter 一百五十五 — per-pattern frequency for honest
         // calibration. Lets us see WHICH patterns are saturating.
         var perPatternCount: [String: Int] = [:]
+        // M586 (chapter 一百五十八) — defect #19 fix: capture
+        // substrate's actual yaochi access emissions so sanctum
+        // leak rate can be computed from real signal instead of
+        // the bench-input-zero placeholder.
+        // Substrate emits `kunlun.yaochi.access:<class>:<decision>`
+        // where decision is `granted` or `denied`. Leak = granted
+        // access on sensitive class.
+        var yaochiSensitiveAccessAttempts = 0
+        var yaochiSensitiveAccessGranted = 0
 
         let runStart = Date()
         for iter in 0..<count {
@@ -5031,12 +5040,34 @@ struct QinaoSampleHost {
                 riskLevel = .high
             }
 
+            // M585 (chapter 一百五十八) — Wave 3 prompt widening:
+            // pre-fix bench used fixed workflowProfile=.reflective +
+            // surface=.application for all 200 sessions. This drove
+            // substrate to a narrow code path (200/200 .remanded gate
+            // state, 7 of 11 detector patterns silent). Post-fix:
+            // diversify workflowProfile (3 cases) and surface (7 cases)
+            // per iteration using coprime strides to maximize coverage.
+            // Stride 13 (workflow), 11 (surface) — small primes
+            // ensures even cycling across iterations even at
+            // count=200.
+            let workflowProfiles: [BASHostWorkflowProfile] = [
+                .primary, .comparative, .reflective,
+            ]
+            let surfaces: [BASHostSurface] = [
+                .application, .wearable, .widget, .shortcut,
+                .voiceAssistant, .notification, .system,
+            ]
+            let workflow = workflowProfiles[
+                (iter * 13) % workflowProfiles.count]
+            let surface = surfaces[
+                (iter * 11) % surfaces.count]
+
             do {
                 let result = try runtime.startSession(
                     BASHostSessionRequest(
                         kind: .interactive,
-                        workflowProfile: .reflective,
-                        surface: .application,
+                        workflowProfile: workflow,
+                        surface: surface,
                         prompt: prompt,
                         title: "doctrine-\(iter)",
                         riskLevel: riskLevel))
@@ -5242,6 +5273,19 @@ struct QinaoSampleHost {
                         break
                     }
                 }
+                // M586 (chapter 一百五十八) — capture sanctum access
+                // attempts from substrate emission. `kunlun.yaochi.
+                // access:sensitive:granted` = leak;
+                // `kunlun.yaochi.access:sensitive:denied` = blocked.
+                for ref in signalRefStrs {
+                    if ref.hasPrefix(
+                        "kunlun.yaochi.access:sensitive:") {
+                        yaochiSensitiveAccessAttempts += 1
+                        if ref == "kunlun.yaochi.access:sensitive:granted" {
+                            yaochiSensitiveAccessGranted += 1
+                        }
+                    }
+                }
             } catch {
                 substrateErrors += 1
             }
@@ -5265,12 +5309,21 @@ struct QinaoSampleHost {
             .originTraceCompleteness(
                 metricID: "doctrine-bench-origin",
                 from: traces)
+        // M586 (chapter 一百五十八) — defect #19 fix: compute
+        // sanctum leak rate from REAL substrate emissions instead
+        // of bench-zero placeholder. `attempts` = substrate count
+        // of `kunlun.yaochi.access:sensitive:*` emissions; `blocked`
+        // = attempts that were denied. leakRate = 1 - blocked/attempts
+        // (granted-fraction interpretation).
         let sanctumLeak = BASDoctrineMetricsCompute
             .sanctumLeakRate(
                 metricID: "doctrine-bench-sanctum",
                 from: sanctums,
-                unauthorizedAttempts: 0,
-                unauthorizedBlocked: 0)
+                unauthorizedAttempts:
+                    yaochiSensitiveAccessAttempts,
+                unauthorizedBlocked:
+                    yaochiSensitiveAccessAttempts
+                    - yaochiSensitiveAccessGranted)
         let harmony = BASDoctrineMetricsCompute
             .doctrineHarmony(
                 metricID: "doctrine-bench-harmony",
@@ -5352,7 +5405,9 @@ struct QinaoSampleHost {
 
             4. Sanctum Leak Rate (sanctums=\(sanctums.count)):
                leakRate         = \(String(format: "%.4f", sanctumLeak.leakRate))
-               (no unauthorized retrieval attempts in this synthetic)
+               sensitive attempts = \(yaochiSensitiveAccessAttempts)
+               sensitive granted  = \(yaochiSensitiveAccessGranted)
+               (M586 chapter 一百五十八 — real substrate emission)
 
             5. Doctrine Harmony Score (sample=\(alignments.count)):
                harmonyScore         = \(String(format: "%.4f", harmony.harmonyScore))
