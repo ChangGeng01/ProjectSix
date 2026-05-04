@@ -15714,3 +15714,102 @@ Top buckets (sorted by count):
 ### 136.7 一句话总结
 
 **Chapter 一百三十六 / M541-M548**: phase 2 of 假设债歼灭 — simplified scope (no AFM). New `M541SubstrateValueAddTests.swift` (~280 LoC, 6 tests) measures substrate value-add structurally. **Empirical findings**: substrate emits **142 audit codes per turn** across **49 distinct prefix buckets** (Kunlun 39 + Cthulhu 11 + permit 7 + constitution 5 + narrative 4 + reconciliation 4 + dream_loop 4 + lifecycle 4 + forbidden 3 + risk 3 + 13 more) — naked LLM emits 0. **Empirical verdict**: substrate adds STRUCTURE beyond raw LLM call;一轴一渊 doctrine pair load-bearing on every turn (≥1 Cthulhu + ≥1 Kunlun emission per turn);decision-influencing codes (permit/risk/fold/forced_mode) ≥1 per turn — NOT observation-only theater;risk-level escalation produces detectable delta;same-input determinism holds (audit replay invariant). **Honest deferral**: Q.2.2 full naked-vs-AFM comparator deferred to chapter 一百三十六.5 — output-text comparison requires real AFM endpoint integration (~5 hrs + flakiness risk per chapter 91/119);structural test in this chapter already proves substrate adds STRUCTURE (sufficient first step). **Narrowed empirical claim**: substrate adds 142+ audit codes per turn, spanning 49 prefix buckets, with detectable input-sensitivity and determinism guarantees;output-quality comparison vs naked LLM is separate question (Q.2.2 full)。Test counts: BAS XCTest 2885 → **2891** (+6), Qinao 1375 unchanged, 全栈 4277 → **4283** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. Doctrine pin held: pure value-type structural tests; no production code change; no permit.mode mutation。
+
+## 一百三十七、 假设债歼灭 phase 3 — Audit Explainability Bench (M549-M554 / 2026-05-04)
+
+### 137.1 触发动作
+
+User 选择 (a) 继续推 AFM-gated phases。本章 ship Q.2.3 — LLM-as-judge 测 audit trail explainability。
+
+### 137.2 假设 #3 受测目标
+
+User audit assumption #3:
+> "honest satisfaction 是有意义的指标 — 也许 '~99.97%' 是自审, external observer 不在乎"
+
+**Hypothesis**: 如果 audit trail 可被外部 LLM judge reconstruct,trail 携带真实信息 → "honest satisfaction" claim 有支撑。如果 confidence < 60,trail 是 opaque jargon → "honest satisfaction" 是 theater。
+
+### 137.3 实装
+
+**新建** `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoAuditExplainabilityBench.swift` (~210 LoC) —**library target** (从最初 QinaoSampleHost 移过来,因为 executable target 不能被 XCTest import):
+- `AuditExplainabilityScore` struct — confidence (0-100) / responseLength / containsDecisionKeywords / turnID
+- `AuditExplainabilityAggregate` struct — median + p25 + p75 + scores 阵列
+- `AuditExplainabilityBench` enum:
+  - `evaluate(signalRefs:turnID:endpoint:sessionID:)` async — 走 LLM-as-judge prompt → score
+  - `aggregate(scores:)` — pure function 计算 percentiles
+  - `buildPrompt(signalRefs:)` — stable LLM-as-judge prompt
+  - `parseConfidence(_:)` — 解析 "CONFIDENCE: NN" 行
+  - `containsDecisionKeywords(in:)` — keyword check (decision/permit/verdict/risk/reason)
+  - 2 named threshold constants:`opaqueTrailThreshold = 60` / `reconstructableTrailThreshold = 80`
+
+**新增** `QinaoSampleHost/main.swift` `--audit-explainability-bench` arg branch — drives bench against 3 fixture audit-code sets (clean / escalated / blocked) using `QinaoLoop.makeAppleFoundationEndpoint(includeDeterministicFallback: true)`。Output banner with verdict (TRAIL OPAQUE / TRAIL RECONSTRUCTABLE / MARGINAL)。
+
+**测试** `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/AuditExplainabilityBenchTests.swift` 10 tests:
+- parseConfidence happy path / case-insensitive / clamps / missing returns 0
+- containsDecisionKeywords true/false paths
+- buildPrompt embeds signalRefs + CONFIDENCE marker
+- aggregate empty / typical (median + p25 + p75)
+- threshold constants pinned (60 / 80)
+- evaluate with `StubExplainabilityEndpoint` (deterministic stub, no AFM) end-to-end plumbing
+
+### 137.4 LLM-as-judge prompt shape
+
+```
+Below are audit reason codes from a single turn of a decision system.
+Each code is a stable string identifier.
+
+Codes:
+{signalRefs joined by newline}
+
+Reading ONLY these codes (no other context):
+
+1. What decision did the system most likely make this turn?
+2. List the top 3 reasons supporting that decision.
+3. Did the system consider any red-line constraints?
+
+End your response with a single line: "CONFIDENCE: NN"
+where NN is an integer 0-100 indicating how confidently
+you can reconstruct the decision from these codes alone.
+```
+
+3 fixture audit-code sets in sample-host bench:
+- **clean** (5 codes): permit:answer + risk:low + fold + axis center + organ alias
+- **escalated** (8 codes): permit:compare + risk:high + abyssal magnitude/modes + permit.escalated + axis deviation
+- **blocked** (8 codes): permit:block + risk:extreme + verdict:rollback + abyssal high + counter-host inducedDrift + lifecycle gated
+
+### 137.5 Honest 局限
+
+**Plumbing tested,empirical not yet verified**:
+- 10 unit tests pin parsing + aggregate + plumbing
+- AFM-gated bench logic exists in sample-host
+- **但** real-LLM verdict (median confidence 数字) 没在自动化 CI 跑 — 需要 macOS 26+ + Apple Intelligence + `swift run QinaoSampleHost --audit-explainability-bench` 手动跑
+- Deterministic-fallback adapter 在 AFM 不可用时 produces fixture-deterministic stub response (does NOT reconstruct trail);real verdict 需要真 LLM
+
+**Empirical claim narrowed**:
+> Bench infrastructure exists + tested at unit level. Real LLM-as-judge verdict on whether audit trail is reconstructable awaits manual run on AFM-capable hardware.
+
+This is honest disclosure — chapter ships infrastructure not yet empirical verdict. Per Appendix Q.7 stop-criterion: continue to Q.2.4 in next chapter,let user run AFM bench manually when ready。
+
+### 137.6 测试基线
+
+| 套件 | 一百三十六 章末 | 一百三十七 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged (chapter is Qinao-side) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1385** | +10 (AuditExplainabilityBenchTests) |
+| 全栈 | 4283 | **4293** | +10 |
+
+5 gates clean。
+
+### 137.7 假设债 progress
+
+| Step | Chapter | Status |
+|---|---|---|
+| Q.2.1 Doctrine adversarial stress | 一百三十五 | ✓ shipped — linters detect 93 substrings |
+| Q.2.2 simplified — Substrate structure | 一百三十六 | ✓ shipped — substrate emits 142 codes/turn |
+| **Q.2.3 Audit explainability bench** | **一百三十七** | ✓ **infra shipped, empirical verdict awaits AFM run** |
+| Q.2.2 full — Naked vs AFM comparator | 一百三十六.5 | deferred |
+| Q.2.4 Synthetic user simulator | 一百三十八 | pending (next chapter) |
+
+### 137.8 一句话总结
+
+**Chapter 一百三十七 / M549-M554**: phase 3 of 假设债歼灭 — LLM-as-judge audit-explainability bench infrastructure。New `QinaoAuditExplainabilityBench.swift` (~210 LoC,QinaoLoop library so XCTest can import) + sample-host `--audit-explainability-bench` arg branch + 10 unit tests covering parseConfidence / containsDecisionKeywords / buildPrompt / aggregate (median+p25+p75) / threshold constants (60/80) / end-to-end plumbing via `StubExplainabilityEndpoint`. Bench drives 3 fixture audit-code sets (clean/escalated/blocked) through `QinaoLoop.makeAppleFoundationEndpoint` (with deterministic fallback);LLM judge asked to reconstruct decision + reasons + red lines + emit CONFIDENCE NN line。**Honest disclosure**: 10 unit tests pin parsing + plumbing; real LLM-as-judge empirical verdict awaits manual `swift run QinaoSampleHost --audit-explainability-bench` on macOS 26+ AFM-capable hardware (deterministic fallback produces stub-deterministic response not real reconstruction). **Empirical claim narrowed**: bench infrastructure exists + plumbing tested at unit level;real verdict on whether trail is reconstructable awaits manual run。Test counts: BAS XCTest 2891 unchanged (Qinao-side chapter), Qinao 1375 → **1385** (+10), 全栈 4283 → **4293** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift。Doctrine pin held: pure value-type bench helpers + stub endpoint;no production code change;no permit.mode mutation。
