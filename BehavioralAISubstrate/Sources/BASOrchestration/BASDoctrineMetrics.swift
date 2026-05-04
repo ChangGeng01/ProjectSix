@@ -396,14 +396,21 @@ public enum BASDoctrineRedLineDetector {
     /// Cthulhu (向下 / 深渊) doctrine RED-LINE markers — substrate
     /// emissions that indicate Cthulhu doctrine red lines actually
     /// triggered (vs routine observability). Empirically calibrated
-    /// M580 chapter 一百五十五: filtered out `narrative.urgencyMask:` /
-    /// `anomaly.confidence:` / `cthulhu.shift.confidence:` (substrate
-    /// emits these every turn as informational), AND `forbidden.allHeld:true`
-    /// (normal sovereign-zone state, not violation; fires 200/200 sessions
-    /// in chapter 一百五十五 calibration run).
+    /// M580 chapter 一百五十五 + M582 chapter 一百五十七 (defect #20:
+    /// pattern mismatch with substrate emission strings).
+    ///
+    /// Calibration history:
+    /// - M580: filtered out `narrative.urgencyMask:` /
+    ///   `anomaly.confidence:` / `cthulhu.shift.confidence:` (routine
+    ///   substrate observability) AND `forbidden.allHeld:true`
+    ///   (normal sovereign-zone state, fires 200/200 sessions).
+    /// - M582: corrected `cthulhu.cosmic.dilution:true` →
+    ///   `cthulhu.cosmic.dilution:warning` (substrate's actual emit
+    ///   string at `EBrainRuntimeCoordinator+SovereignCommit:1319`
+    ///   is the constant `:warning`, not `:true`).
     public static let cthulhuConcernPatterns: [String] = [
         "humanAnchor.tone:reserved",           // anchor under stress
-        "cthulhu.cosmic.dilution:true",        // cosmic-scale dilution
+        "cthulhu.cosmic.dilution:warning",     // M582 fix — actual emit
         "cthulhu.distortionMap.dominant:true", // dominant distortion
         "abyssal.escalation:",                 // abyssal escalation triggered
         "abyssalBranch.escalation:",           // branch escalation triggered
@@ -411,13 +418,19 @@ public enum BASDoctrineRedLineDetector {
 
     /// Kunlun (向上 / 昆仑) doctrine RED-LINE markers — substrate
     /// emissions that indicate Kunlun doctrine red lines actually
-    /// triggered. Empirically calibrated M580 chapter 一百五十五:
-    /// filtered out `kunlun.axis.deviation:` / `kunlun.gate.urgency:`
-    /// (routine axis observability), AND `kunlun.axis.requires-gate:true`
-    /// (normal axis flow signaling, fires 200/200 sessions; not a violation).
+    /// triggered. Empirically calibrated M580 + M582:
+    /// - M580: filtered out `kunlun.axis.deviation:` /
+    ///   `kunlun.gate.urgency:` (routine axis observability),
+    ///   AND `kunlun.axis.requires-gate:true` (normal axis flow
+    ///   signaling, fires 200/200 sessions).
+    /// - M582: corrected `kunlun.return.dignityHonored:false` →
+    ///   `kunlun.return.dignityHonored:0` (substrate emits the
+    ///   COUNT of dignity-honored returns at line 1433, not a
+    ///   bool; red-line concern is count = 0, meaning NO return
+    ///   step honored dignity).
     public static let kunlunConcernPatterns: [String] = [
         "kunlun.ascent.dignity-violation:",        // ascent dignity violation
-        "kunlun.return.dignityHonored:false",      // return dignity not honored
+        "kunlun.return.dignityHonored:0",          // M582 fix — count=0
         "kunlun.river.cut:true",                   // lineage cut triggered
         "kunlun.jade.defects:",                    // jade defects
         "kunlun.tianmen.denial-well-formed:false", // malformed denial
@@ -507,8 +520,21 @@ public enum BASDoctrineMetricsCompute {
         let mean = scores.reduce(0, +) / Double(n)
         let p25 = scores[max(0, n / 4)]
         let p75 = scores[min(n - 1, (n * 3) / 4)]
-        let spread = max(0, p75 - p25)
-        let stability = max(0, min(1, 1 - spread))
+        // M584 (chapter 一百五十七) — defect #21 fix: pre-fix
+        // formula was `stability = 1 - (p75 - p25)` (IQR-based).
+        // IQR collapses to 0 whenever >50% of scores cluster at
+        // one value, even when 23% of turns visit a different
+        // centerScore. Empirical: 154/46 split produced mean 0.59
+        // (showing variation) but stabilityIndex = 1.0 (false-
+        // ceiling). Post-fix: standard-deviation-based formula
+        // catches all variation. Std for [0,1]-bounded score is
+        // ≤ 0.5 (max at Bernoulli 50/50); 2*std ∈ [0,1] gives a
+        // natural [0,1] inverted-stability score.
+        let variance = scores.map {
+            pow($0 - mean, 2)
+        }.reduce(0, +) / Double(n)
+        let std = variance.squareRoot()
+        let stability = max(0, min(1, 1 - 2 * std))
         let deviationCount = alignments
             .filter { !$0.deviationCodes.isEmpty }
             .count

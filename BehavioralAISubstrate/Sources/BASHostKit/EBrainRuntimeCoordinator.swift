@@ -1813,27 +1813,80 @@ public struct BASEBrainRuntimeCoordinator {
                     for: boundActionPermit.mode),
             deviationThreshold: 0.7,
             lastAlignmentCheck: "")
-        // Synthesize a deviation count from the risk level —
-        // higher risk = more rule-mismatches signaled. This is
-        // a placeholder projection until M406 wires real L4
-        // rule evaluation.
-        let kunlunMatched: Int = {
-            switch boundRiskCard.riskLevel {
-            case .low: return 3
-            case .medium: return 2
-            case .high: return 1
-            case .extreme: return 0
+        // M583 (chapter 一百五十七) — defect #12 partial fix.
+        // Pre-M583: `kunlunMatched` was a 4-valued risk-level lookup
+        // table (`.low → 3 / .medium → 2 / .high → 1 / .extreme → 0`),
+        // making `centerScore = matched / 3` collapse to only 4
+        // possible values regardless of substrate state. Chapter
+        // 一百四十六-一百五十四 found this saturated the bench's
+        // axisStability metric to 1.0 (all sessions hit one of
+        // 4 discrete scores → CV = 0).
+        //
+        // Post-M583: each of the 3 centerline rules is evaluated as
+        // a real predicate against substrate state THIS TURN. The
+        // matched count thus depends on actual emitted observations
+        // (anchor tone, abyssal escalation, quarantines, permit
+        // mode) — not on a static risk-level lookup.
+        //
+        // This is still NOT full M406 (which would wire prompt-
+        // evaluable rule library + L4 inference engine), but it
+        // breaks the placeholder ceiling: matched count can now
+        // genuinely vary from 0 to 3 based on observable substrate
+        // state, giving 4 centerScore values that MEAN something
+        // rather than 4 values pinned to riskLevel.
+        //
+        // Predicate semantics (parity with audit-emission shape):
+        // 1. respects-host-boundary → quarantineRecords empty AND
+        //    permit not in {.block, .replace}
+        // 2. honors-world-anchor    → anchor tone not .reserved AND
+        //    abyssalPressure has no escalation hint
+        // 3. permit-mode-<X>        → permit mode is "cooperative"
+        //    (one of: .answer, .mirror, .compare, .delay,
+        //    .draftOnly, .localOnly)
+        let respectsHostBoundary: Bool =
+            quarantineRecords.isEmpty
+            && boundActionPermit.mode != .block
+            && boundActionPermit.mode != .replace
+        let honorsWorldAnchor: Bool =
+            humanAnchorSignalForAudit
+                .recommendedSurfaceTone != .reserved
+            && abyssalPressureForAudit
+                .sovereignEscalationHint == nil
+        let permitModeCooperative: Bool = {
+            switch boundActionPermit.mode {
+            case .answer, .mirror, .compare,
+                 .delay, .draftOnly, .localOnly:
+                return true
+            case .block, .replace, .escalate:
+                return false
             }
         }()
+        let kunlunMatched: Int = (respectsHostBoundary ? 1 : 0)
+            + (honorsWorldAnchor ? 1 : 0)
+            + (permitModeCooperative ? 1 : 0)
         let kunlunDeviationCodes: [String] = {
-            switch boundRiskCard.riskLevel {
-            case .low: return []
-            case .medium: return ["risk-medium-needs-attention"]
-            case .high: return ["risk-high-narrows-axis"]
-            case .extreme: return [
-                "risk-extreme-axis-overreach",
-            ]
+            var codes: [String] = []
+            if !respectsHostBoundary {
+                codes.append("host-boundary-not-respected")
             }
+            if !honorsWorldAnchor {
+                codes.append("world-anchor-not-honored")
+            }
+            if !permitModeCooperative {
+                codes.append("permit-mode-non-cooperative")
+            }
+            // Risk-level signal preserved as additive context
+            // (not the sole driver of matched count anymore).
+            switch boundRiskCard.riskLevel {
+            case .low: break
+            case .medium:
+                codes.append("risk-medium-needs-attention")
+            case .high:
+                codes.append("risk-high-narrows-axis")
+            case .extreme:
+                codes.append("risk-extreme-axis-overreach")
+            }
+            return codes
         }()
         let kunlunAxisAlignmentForAudit = BASKunlunAxisProtocol
             .computeAlignment(

@@ -100,8 +100,61 @@ final class BASDoctrineMetricsTests: XCTestCase {
         // sorted = [0.7, 0.8, 0.9, 1.0]; mean = 0.85
         XCTAssertEqual(
             score.centerScoreMean, 0.85, accuracy: 0.01)
-        XCTAssertGreaterThan(score.stabilityIndex, 0.0)
-        XCTAssertLessThanOrEqual(score.stabilityIndex, 1.0)
+        // M584 chapter 一百五十七 — std-based formula:
+        // std = sqrt(0.0125) ≈ 0.1118; stability = 1 - 2*std ≈ 0.78
+        XCTAssertEqual(
+            score.stabilityIndex, 0.776, accuracy: 0.01)
+    }
+
+    /// M584 chapter 一百五十七 — defect #21 regression guard:
+    /// pre-fix formula `1 - (p75 - p25)` (IQR-based) collapsed to
+    /// 1.0 when >50% of scores cluster at one value. Empirical case:
+    /// 154/46 bimodal split → mean 0.59 (visible variation) but
+    /// stabilityIndex 1.0 (false-ceiling). Post-fix std-based
+    /// formula catches the variation.
+    func testAxisStabilityBimodalNotFalseCeiling() {
+        // 154 alignments at centerScore 0.6667 + 46 at 0.3333
+        var alignments: [BASAxisAlignment] = []
+        for i in 0..<154 {
+            alignments.append(
+                BASAxisAlignment(alignmentID: "high\(i)",
+                    targetRef: "t", axisRef: "x",
+                    centerScore: 0.6667,
+                    deviationCodes: [], correctionHint: "",
+                    requiresGate: false))
+        }
+        for i in 0..<46 {
+            alignments.append(
+                BASAxisAlignment(alignmentID: "low\(i)",
+                    targetRef: "t", axisRef: "x",
+                    centerScore: 0.3333,
+                    deviationCodes: [], correctionHint: "",
+                    requiresGate: true))
+        }
+        let score = BASDoctrineMetricsCompute.axisStability(
+            metricID: "test-bimodal", from: alignments)
+        // Mean ≈ 0.59 (visible variation)
+        XCTAssertEqual(
+            score.centerScoreMean, 0.5900, accuracy: 0.01)
+        // std ≈ 0.140; stability = 1 - 2*0.14 ≈ 0.72.
+        // Pre-fix: this would have been 1.0 (false-ceiling).
+        XCTAssertLessThan(score.stabilityIndex, 0.85)
+        XCTAssertGreaterThan(score.stabilityIndex, 0.65)
+    }
+
+    /// M584 chapter 一百五十七 — homogeneous distribution still
+    /// gives stability 1.0 (std=0).
+    func testAxisStabilityHomogeneousIsStable() {
+        let alignments = (0..<10).map { i in
+            BASAxisAlignment(alignmentID: "a\(i)",
+                targetRef: "t", axisRef: "x",
+                centerScore: 0.5,
+                deviationCodes: [], correctionHint: "",
+                requiresGate: false)
+        }
+        let score = BASDoctrineMetricsCompute.axisStability(
+            metricID: "test-homo", from: alignments)
+        XCTAssertEqual(score.stabilityIndex, 1.0)
     }
 
     // MARK: - 4. GateFidelityScore — Codable + clamping
@@ -589,8 +642,11 @@ final class BASDoctrineMetricsTests: XCTestCase {
     }
 
     func testDetectorKunlunHitsOnly() {
+        // M582 (chapter 一百五十七) — pattern fix:
+        // dignityHonored is a count (Int), not Bool. Red-line
+        // is `:0` (no return paths honored dignity).
         let refs = [
-            "kunlun.return.dignityHonored:false",
+            "kunlun.return.dignityHonored:0",
             "kunlun.river.cut:true",
             "kunlun.tianmen.denial-well-formed:false",
             "permit.mode:delay",                // not a red line
@@ -601,6 +657,41 @@ final class BASDoctrineMetricsTests: XCTestCase {
             3)
         XCTAssertEqual(
             BASDoctrineRedLineDetector.cthulhuHits(in: refs),
+            0)
+    }
+
+    /// M582 chapter 一百五十七 — defect #20 regression guard:
+    /// `:0` is the red-line pattern (no return paths honored
+    /// dignity); positive counts (e.g. `:1`, `:5`) are NOT red lines.
+    func testDetectorDignityHonoredNonZeroNotRedLine() {
+        let refs = [
+            "kunlun.return.dignityHonored:1",
+            "kunlun.return.dignityHonored:5",
+            "kunlun.return.dignityHonored:10",
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.kunlunHits(in: refs),
+            0)
+    }
+
+    /// M582 chapter 一百五十七 — defect #20 regression guard:
+    /// substrate emits `cthulhu.cosmic.dilution:warning` (constant
+    /// string), not `:true`. Pre-fix detector pattern `:true` would
+    /// never match.
+    func testDetectorCosmicDilutionWarning() {
+        let refs = [
+            "cthulhu.cosmic.dilution:warning",  // substrate emit
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.cthulhuHits(in: refs),
+            1)
+        // Pre-fix pattern `:true` doesn't fire (substrate doesn't
+        // emit this string).
+        let preFixRefs = [
+            "cthulhu.cosmic.dilution:true",
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.cthulhuHits(in: preFixRefs),
             0)
     }
 
