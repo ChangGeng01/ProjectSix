@@ -418,7 +418,7 @@ public enum BASDoctrineRedLineDetector {
 
     /// Kunlun (向上 / 昆仑) doctrine RED-LINE markers — substrate
     /// emissions that indicate Kunlun doctrine red lines actually
-    /// triggered. Empirically calibrated M580 + M582:
+    /// triggered. Empirically calibrated M580 + M582 + M588:
     /// - M580: filtered out `kunlun.axis.deviation:` /
     ///   `kunlun.gate.urgency:` (routine axis observability),
     ///   AND `kunlun.axis.requires-gate:true` (normal axis flow
@@ -428,12 +428,27 @@ public enum BASDoctrineRedLineDetector {
     ///   COUNT of dignity-honored returns at line 1433, not a
     ///   bool; red-line concern is count = 0, meaning NO return
     ///   step honored dignity).
+    /// - M588 (chapter 一百六十): added 3 patterns deep-review
+    ///   iteration 2 found in substrate but missing from detector
+    ///   (Issue B):
+    ///     - `kunlun.tianmen.warrant-missing:high-stakes` (line
+    ///       1002 of EBrainRuntimeCoordinator+SovereignCommit;
+    ///       red-line: 无授权不进门, high-stakes gate fired without
+    ///       sovereign warrant binding)
+    ///     - `kunlun.river.lineage:partial` (lines 897-901;
+    ///       red-line: 无来源不成玉, lineage analyzer reports not-
+    ///       well-formed)
+    ///     - `kunlun.river.warnings:` (lines 906-911; lineage
+    ///       analyzer surfaces non-empty warning codes)
     public static let kunlunConcernPatterns: [String] = [
         "kunlun.ascent.dignity-violation:",        // ascent dignity violation
         "kunlun.return.dignityHonored:0",          // M582 fix — count=0
         "kunlun.river.cut:true",                   // lineage cut triggered
         "kunlun.jade.defects:",                    // jade defects
         "kunlun.tianmen.denial-well-formed:false", // malformed denial
+        "kunlun.tianmen.warrant-missing:",         // M588 — high-stakes gate sans warrant
+        "kunlun.river.lineage:partial",            // M588 — lineage not well-formed
+        "kunlun.river.warnings:",                  // M588 — lineage warning codes
     ]
 
     /// Count Cthulhu doctrine red-line hits in a sequence of audit

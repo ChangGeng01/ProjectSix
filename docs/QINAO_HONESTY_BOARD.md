@@ -18693,3 +18693,113 @@ Ready for deep review iteration 2 (or declare satisfaction).
 ### 159.11 一句话总结
 
 **Chapter 一百五十九 (M587 — deep review iteration 1)**: respond to user "如果 满意 就 deep review 循环 直到 既无问题 也满意" by delegating deep-review agent to scrutinize chapters 156-158 work. Agent found 5 issues. Issue 1 (HIGH): chapter 158 M586 sanctum-leak wire was semantically wrong — substrate's `kunlun.yaochi.access:sensitive:granted` is AUTHORIZED access via `.conditional` policy, not a leak (substrate cannot leak by construction since `.sealed` policy always adds a deny reason). Reverted to bench-zero with honest disclosure banner. Issue 2 (MEDIUM): harmony formula double-counted — `humanAnchor.tone:reserved` triggers BOTH a Cthulhu hit AND a cross-conflict, double-deducting. Fixed: harmony numerator now just `cthulhu + kunlun`; cross-conflict reported separately as additive metadata. Issue 3-5 (LOW): partial-provenance bucket gap, bare-prefix future-fragility, missing edge-case tests. Addressed via 5 new tests (single-element, max-variation, partial-provenance, abyssal-escalation, harmony-no-double-count) + code-comment disclosures. Test counts: BAS 2932 → 2937 (+5), Qinao 1435 unchanged, 全栈 4367 → 4372 / 0 failures / 5 gates clean. 6 of 6 metrics still report real substrate signal; sanctum leak 0.0 now honestly disclosed as "substrate cannot leak by construction" rather than vacuous bench-zero. Doctrine pin: empirical calibration extended a sixth axis — semantic correctness of bench wire (not just numerical accuracy). Deep review iteration 1 complete; ready for iteration 2 or satisfaction declaration.
+
+---
+
+## 一百六十、 deep review iteration 2 — 3 new issues (A: bench crash, B: detector gap, C: non-deterministic JSON), all 3 closed (M588 / 2026-05-05)
+
+### 160.1 Iteration 2 trigger
+
+User: "全面 进化 满意为止 如果 满意 就 deep review 循环 直到 既无问题 也满意". Chapter 一百五十九 closed iteration 1's 5 issues. Iteration 2 scrutinized chapters 156-159 from 8 different angles (concurrency/lifetime/precision/red-line/JSON/permit-mode/detector-completeness/determinism) and found 3 NEW issues iteration 1 missed.
+
+### 160.2 Issue A (MEDIUM) — bench crashes on empty anchorSums
+
+Pre-fix bench's anchor distribution print at lines 5387-5390 indexed `anchorSums.sorted()[anchorSums.count / 4]` etc. without guarding emptiness. If `count == 0` (env override) OR all substrate calls fail (`substrateErrors == count` so `anchorSums.isEmpty == true`), the percentile lines crash with "Index out of range".
+
+Fix: extracted `formatAnchorDistribution(_:)` helper with guard `!sums.isEmpty` returning "n/a" for empty, otherwise computing bounds-checked percentile indices via `min(n-1, max(0, Int(Double(n) * frac)))`.
+
+### 160.3 Issue B (MEDIUM) — detector pattern catalog incomplete
+
+Iteration 1 said chapter 一百五十五 calibration was complete with 5 Cthulhu + 5 Kunlun patterns. Iteration 2 found 3 MORE substrate emissions in `EBrainRuntimeCoordinator+SovereignCommit.swift` carrying doctrine red-line semantics:
+
+| Pattern | Substrate site | Doctrine concern |
+|---|---|---|
+| `kunlun.tianmen.warrant-missing:` | line 1002 | 无授权不进门 (high-stakes gate sans warrant) |
+| `kunlun.river.lineage:partial` | lines 897-901 | 无来源不成玉 (lineage analyzer not-well-formed) |
+| `kunlun.river.warnings:` | lines 906-911 | lineage warning codes non-empty |
+
+Pre-fix: 5+5 patterns. Post-fix: 5+8 patterns (added 3 to `kunlunConcernPatterns`).
+
+**Empirical impact**: 200-session bench post-M588 shows:
+- `kunlun.tianmen.warrant-missing:` fires **48/200 sessions** — same 48 high-risk turns where cthulhu distortion is dominant
+- `kunlun.river.lineage:partial` and `kunlun.river.warnings:` did not fire in this synthetic (substrate's river analyzer reports well-formed for these prompts)
+
+**Harmony shift**: 0.7600 → **0.5200** (chapter 一百五十九 was 0.76 with 48 cthulhu hits; chapter 一百六十 is 0.52 with 48 cthulhu + 48 kunlun hits = 96/200 deduction). The pre-fix 0.76 was over-stated harmony — detector was missing real Kunlun red-line emissions. Post-fix is more honest.
+
+(Note: 48 cthulhu + 48 kunlun = 96 deductions across 200 turns where the underlying observation is plausibly the same 48 high-risk turns. This raises a doctrine-design question — should harmony deduct per-emission or per-turn-with-emissions? Current formula is per-emission. Per-turn dedup would require bench-side tracking. Documented as defect candidate for future iteration.)
+
+### 160.4 Issue C (LOW) — summary.json non-deterministic across runs
+
+Pre-fix `DoctrineMetricsBenchSummary` included `elapsedSeconds: Double` (wall-clock from `Date().timeIntervalSince(runStart)`). Two runs of same bench produced different JSON bytes (despite `.sortedKeys`).
+
+Empirical-calibration doctrine repeatedly invoked by chapters 一百五十四-一百五十九 implicitly assumed summary reproducibility for byte-equal regression detection.
+
+Fix: split into 3 outputs:
+- `metrics.json` — deterministic, contains only metric values (no wall-clock)
+- `telemetry.json` — wall-clock + sessionsRun + substrateErrors (NOT byte-equal across runs)
+- `summary.json` — backward-compat: metrics + telemetry combined (existing readers continue to work)
+
+### 160.5 Issues that iteration 2 did NOT find (8 angles × 8 candidates = 0 false positives, just 3 confirmed bugs)
+
+| Angle | Iteration 2 verdict |
+|---|---|
+| 1. Concurrency / data races | No issue — bench is fully sequential |
+| 2. Memory / lifetime / reference cycles | No issue — all structs, value types |
+| 3. Numerical precision (subnormals/NaN) | Already covered by chapter 159 tests |
+| 4. Doctrine red-line #2 (M583 reads permit.mode but never writes) | No violation |
+| 5. Backward-compat at JSON level | All 7 new fields use `decodeIfPresent` correctly |
+| 6. permitModeCooperative future-fragility | Swift exhaustive `switch` over `BASActionPermitMode` will fail-compile on enum extension — safe |
+| 7. Detector pattern audit | **3 NEW issues found here (Issue B)** |
+| 8. Determinism | **1 NEW issue found here (Issue C)** |
+| (extra) Edge cases | **1 NEW issue found here (Issue A — empty anchorSums)** |
+
+### 160.6 Test counts
+
+| Counter | Pre-M588 | Post-M588 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2937 | 2937 | 0 (no test changes) |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4372 | 4372 | 0 |
+| Failures | 0 | 0 | 0 |
+| Schema parity gate | clean | clean | maintained |
+| Boundary checks | 4/4 clean | 4/4 clean | maintained |
+
+(Chapter 一百六十 changes are bench-side + detector pattern additions; doesn't add new tests for the bench helpers — could be a future iteration target.)
+
+### 160.7 Bench output summary post chapter 一百六十
+
+```
+1. Axis Stability Score        = 0.7153 (real)
+2. Gate Fidelity Score         = 1.0000 (real, doctrine-correct)
+3. Origin Trace Completeness   = 1.0000 (real, full provenance every turn)
+4. Sanctum Leak Rate           = 0.0000 (honest, substrate cannot leak by construction)
+5. Doctrine Harmony Score      = 0.5200 (real, was 0.76 over-stated due to detector gap)
+6. Human Anchor Retention      = 0.7600 (real)
+
+Per-pattern hit frequencies:
+  kunlun.tianmen.warrant-missing:     48 (0.24/session) ← M588 NEW visibility
+  cthulhu.distortionMap.dominant:true 48 (0.24/session)
+```
+
+Independent real signals: **3 of 6** (axis + harmony + anchor). Same 3 as before, but harmony is now MORE honest (lower number reflects actual doctrine concern visibility).
+
+### 160.8 Doctrine pin held
+
+| Doctrine | Status |
+|---|---|
+| Honest-correction | ✓ pre-M588 harmony 0.76 was over-stated; chapter 160 disclosed AND fixed → 0.52 reflects real concern visibility |
+| Empirical calibration | ✓ extended a seventh axis — detector pattern catalog completeness via cross-source-file audit |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ (only detector additions, no substrate code changes for Issue B) |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 160.9 Open follow-ups
+
+- **Per-turn-dedup harmony question**: when 48 turns each emit cthulhu + kunlun red-line patterns, current formula counts 96 deductions; per-turn dedup would count 48 deductions (harmony 0.76 vs 0.52). Doctrine design choice — both readings defensible. Not a bug, but a candidate for future doctrine clarification.
+- **Detector pattern catalog still possibly incomplete** — iteration 2 audited `EBrainRuntimeCoordinator+SovereignCommit.swift` but other emission sites in BAS may exist. Future iteration could exhaustively scan.
+- **Wave 4 (real machine validation)** still pending — chapters 156-160 are all Mac synthetic.
+
+### 160.10 一句话总结
+
+**Chapter 一百六十 (M588 — deep review iteration 2)**: agent found 3 new issues iteration 1 missed across 8 different angles. **Issue A (MEDIUM)**: bench crashed on empty `anchorSums` (count=0 or all-fail path) — fixed with `formatAnchorDistribution` helper using bounds-checked indices + empty-guard returning "n/a". **Issue B (MEDIUM)**: detector pattern catalog was incomplete — found 3 more substrate emissions in EBrainRuntimeCoordinator+SovereignCommit.swift carrying doctrine red-line semantics (kunlun.tianmen.warrant-missing + kunlun.river.lineage:partial + kunlun.river.warnings:); added to `kunlunConcernPatterns` (now 5+8). Empirical: 48/200 sessions emit `kunlun.tianmen.warrant-missing:` (same 48 high-risk turns where cthulhu distortion fires); harmony shifted 0.76 → 0.52 (pre-fix was over-stated). **Issue C (LOW)**: summary.json non-deterministic due to `elapsedSeconds`; split into deterministic `metrics.json` + wall-clock `telemetry.json` + backward-compat `summary.json`. Test counts unchanged (no test changes this chapter; bench/detector-pattern additions don't gain unit-test coverage by themselves) / 5 gates clean. Doctrine pin: empirical calibration extended a seventh axis — detector pattern catalog completeness via cross-source-file audit. Deep review iteration 2 complete; ready for iteration 3.

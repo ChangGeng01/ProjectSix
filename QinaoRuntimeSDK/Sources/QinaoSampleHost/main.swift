@@ -5352,24 +5352,51 @@ struct QinaoSampleHost {
                 from: anchors)
 
         // Write summary
+        // M588 (chapter 一百六十) — Issue C (deep-review iter 2):
+        // separate canonical metric output (deterministic across
+        // runs, byte-equal-comparable) from telemetry (wall-clock
+        // dependent). Pre-fix: single summary.json contained both.
+        // Post-fix: `metrics.json` is deterministic (sortedKeys +
+        // metric values only); `telemetry.json` carries elapsed
+        // seconds + sessionsRun + substrateErrors. Empirical-
+        // calibration doctrine assumes summary reproducibility for
+        // byte-equal regression detection.
+        let metricsURL = outputURL
+            .appendingPathComponent("metrics.json")
+        let telemetryURL = outputURL
+            .appendingPathComponent("telemetry.json")
         let summaryURL = outputURL
             .appendingPathComponent("summary.json")
         let encoder = JSONEncoder()
         encoder.outputFormatting = [
             .sortedKeys, .prettyPrinted]
-        let summary = DoctrineMetricsBenchSummary(
-            sessionsRun: count,
-            substrateErrors: substrateErrors,
-            elapsedSeconds: elapsed,
+        let metrics = DoctrineMetricsBenchSummary(
             axisStability: axisStability,
             gateFidelity: gateFidelity,
             originTraceCompleteness: originCompleteness,
             sanctumLeakRate: sanctumLeak,
             doctrineHarmony: harmony,
             humanAnchorRetention: anchorRetention)
+        let telemetry = DoctrineMetricsBenchTelemetry(
+            sessionsRun: count,
+            substrateErrors: substrateErrors,
+            elapsedSeconds: elapsed)
         do {
-            let data = try encoder.encode(summary)
-            try data.write(to: summaryURL)
+            try encoder.encode(metrics).write(to: metricsURL)
+            try encoder.encode(telemetry).write(to: telemetryURL)
+            // Backward-compat: summary.json is metrics + telemetry
+            // combined (existing readers continue to work).
+            let summary = DoctrineMetricsBenchSummaryLegacy(
+                sessionsRun: count,
+                substrateErrors: substrateErrors,
+                elapsedSeconds: elapsed,
+                axisStability: axisStability,
+                gateFidelity: gateFidelity,
+                originTraceCompleteness: originCompleteness,
+                sanctumLeakRate: sanctumLeak,
+                doctrineHarmony: harmony,
+                humanAnchorRetention: anchorRetention)
+            try encoder.encode(summary).write(to: summaryURL)
         } catch {
             stderr("⚠ summary write failed: \(error)\n")
         }
@@ -5383,12 +5410,7 @@ struct QinaoSampleHost {
             Elapsed:             \(String(format: "%.2f", elapsed))s
 
             Anchor risk-sum distribution (M579 chapter 一百五十四 calibration):
-              min:    \(String(format: "%.3f", anchorSums.min() ?? 0))
-              p25:    \(String(format: "%.3f", anchorSums.sorted()[anchorSums.count / 4]))
-              median: \(String(format: "%.3f", anchorSums.sorted()[anchorSums.count / 2]))
-              p75:    \(String(format: "%.3f", anchorSums.sorted()[3 * anchorSums.count / 4]))
-              p99:    \(String(format: "%.3f", anchorSums.sorted()[anchorSums.count - 1]))
-              max:    \(String(format: "%.3f", anchorSums.max() ?? 0))
+              \(Self.formatAnchorDistribution(anchorSums))
               ≥ 1.0:  \(anchorSums.filter { $0 >= 1.0 }.count)
               ≥ 1.5:  \(anchorSums.filter { $0 >= 1.5 }.count)
               ≥ 2.0:  \(anchorSums.filter { $0 >= 2.0 }.count)
@@ -5459,7 +5481,77 @@ struct QinaoSampleHost {
         }
     }
 
+    /// M588 (chapter 一百六十) — Issue A (deep-review iter 2):
+    /// safe percentile/min/max formatter for the bench's anchor
+    /// risk-sum distribution. Pre-fix the bench crashed on empty
+    /// `anchorSums` (count=0 or all substrate calls failed)
+    /// because `sorted()[count / 4]` indexes empty array. Post-
+    /// fix: returns "no samples" for empty input, otherwise
+    /// computes percentiles with bounds-checked indices.
+    private static func formatAnchorDistribution(
+        _ sums: [Double]
+    ) -> String {
+        guard !sums.isEmpty else {
+            return """
+            min:    n/a
+              p25:    n/a
+              median: n/a
+              p75:    n/a
+              p99:    n/a
+              max:    n/a
+              (empty input — likely all substrate calls failed)
+              ≥ 1.0:  0
+              ≥ 1.5:  0
+              ≥ 2.0:  0
+            """
+        }
+        let sorted = sums.sorted()
+        let n = sorted.count
+        let safeIdx = { (frac: Double) -> Int in
+            min(n - 1, max(0, Int(Double(n) * frac)))
+        }
+        let p25 = sorted[safeIdx(0.25)]
+        let median = sorted[safeIdx(0.50)]
+        let p75 = sorted[safeIdx(0.75)]
+        let p99 = sorted[safeIdx(0.99)]
+        let f = { (v: Double) in String(format: "%.3f", v) }
+        return """
+        min:    \(f(sums.min() ?? 0))
+              p25:    \(f(p25))
+              median: \(f(median))
+              p75:    \(f(p75))
+              p99:    \(f(p99))
+              max:    \(f(sums.max() ?? 0))
+              ≥ 1.0:  \(sums.filter { $0 >= 1.0 }.count)
+              ≥ 1.5:  \(sums.filter { $0 >= 1.5 }.count)
+              ≥ 2.0:  \(sums.filter { $0 >= 2.0 }.count)
+        """
+    }
+
+    /// M588 (chapter 一百六十) — canonical (deterministic) metric
+    /// output. No wall-clock or run-dependent fields. Two runs of
+    /// the same bench produce byte-equal `metrics.json`.
     private struct DoctrineMetricsBenchSummary: Codable {
+        let axisStability: BASAxisStabilityScore
+        let gateFidelity: BASGateFidelityScore
+        let originTraceCompleteness: BASOriginTraceCompleteness
+        let sanctumLeakRate: BASSanctumLeakRate
+        let doctrineHarmony: BASDoctrineHarmonyScore
+        let humanAnchorRetention: BASHumanAnchorRetention
+    }
+
+    /// M588 — telemetry output (separate from canonical metrics).
+    /// Carries wall-clock and session counters. NOT byte-equal
+    /// across runs.
+    private struct DoctrineMetricsBenchTelemetry: Codable {
+        let sessionsRun: Int
+        let substrateErrors: Int
+        let elapsedSeconds: Double
+    }
+
+    /// M588 — backward-compat: `summary.json` continues to contain
+    /// metrics + telemetry combined for existing readers.
+    private struct DoctrineMetricsBenchSummaryLegacy: Codable {
         let sessionsRun: Int
         let substrateErrors: Int
         let elapsedSeconds: Double
