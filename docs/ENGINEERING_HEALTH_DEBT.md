@@ -1,7 +1,67 @@
 # Engineering Health Debt Log
 
 **Created**: 2026-05-04 (chapter 一百三十二)
+**Last update**: 2026-05-04 (chapter 一百三十三 — Section 1 defects audit closure)
 **Trigger**: User audit identified honesty board's systematic blind spot — doctrine purity audited extensively, engineering hygiene never audited.
+
+## Chapter 一百三十三 / Section 1 closure status (2026-05-04)
+
+User audit's "Section 1 defects" reviewed and verified per-item:
+
+### 🔴 Critical 1-3 — ALL ALREADY ADDRESSED in earlier chapters
+
+| # | Item | Status | Verified |
+|---|---|---|---|
+| Critical 1 | AFM 平台脆弱性 (`testFactoryWithFallbackProducesUsableEndpointOffline`) | ✅ ADDRESSED chapter 一百十九 + M400.1/M400.2 (`AFMTestSupport.swift` provides `skipIfAFMDegraded`) | grep `AFMTestSupport.swift` exists |
+| Critical 2 | `markRejected` 非幂等 | ✅ ADDRESSED chapter 91.5 (`idempotentMarkRejected` helper at `BASUpdateTicketLifecycleForbiddenGate.swift:167`, used in 2 callers, visibility lifted to internal in chapter 一百三十一) | source confirms |
+| Critical 3 | `.retract` 被 sovereign gate 拒 | ✅ ADDRESSED chapter 91 deep review #2 (`BASForbiddenLifecycleGate.swift:107-114` explicitly allows `.retract / .withdraw / .fail` for sovereign-rejected candidates with reason code `terminal-action-allowed`) | source confirms |
+
+### 🟡 Major 7 — over-stated; mostly serving test polymorphism
+
+User claim: "11 single-implementation protocols". **Verified false-positive rate ~85%**.
+
+Actual breakdown (grep `: ProtocolName` across first-party non-test sources):
+- BASRiskServicing: 1 production + 7 test mocks = **8 sites** → polymorphism load-bearing
+- BASContextServicing / BASMemoryServicing / BASLoopServicing / BASActionServicing / BASDecomposeServicing / BASEvolutionServicing / BASHostProfileServicing / BASTriSelfServicing / BASPowerClockServicing: same shape (1 prod + multiple test mocks) → polymorphism load-bearing
+- BASNeuralCoreServicing: 1 prod + 2 test mocks = polymorphism load-bearing
+- BASVitalMonitorServicing: 1 prod + 2 dev/test mocks = polymorphism load-bearing
+- **BASHostConstitutionServicing: 1 production impl, no test mocks** → genuinely single-impl, but constitutionService is dependency-injected via `any BASHostConstitutionServicing` so the protocol IS load-bearing for DI
+
+**Honest correction to user audit**: most Servicing protocols are NOT abstraction redundancy. They serve test substitutability. Only ~1 protocol is genuinely single-impl, and even that one supports DI. This claim was over-stated based on grep counts that didn't separate test mocks from production impls.
+
+### 🟡 Major 8 — partially ADDRESSED via layer-integrity sensitivity tests
+
+Chapter 一百三十二 acknowledged "0 mutation tests = no proof layers aren't dead code".
+
+**Chapter 一百三十三 partial fix**: M520-M523 ship `M520LayerIntegritySensitivityTests.swift` with 7 sensitivity tests verifying load-bearing layers respond to input changes:
+- testL1AbyssBudgetSensitivityToBudgetFrame — proves L1 derive responds to BASBudgetFrame
+- testL4OntologyFogSensitivityToCeiling — proves L4 derive responds to assertion ceiling
+- testL11AbyssalPressureSensitivityToRisk — proves L11 derive responds to risk + uncertainty
+- testL13CounterHostCheckSensitivityToRiskScore — proves L13 derive responds to inducedRiskScore
+- testL14SovereignDomainScopeLinterSensitivity — proves L14 lint responds to reason-code content
+- testCrossLayerL4L11Coherence — proves L4 + L11 compose coherently
+- testDeterminism — proves same inputs yield same outputs (audit-replay invariant)
+
+These are **NOT full mutation tests** (no code-deletion + expected-failure). They are **input-sensitivity tests**: vary input, assert output meaningfully changes. A no-op layer would fail them.
+
+**Status**: PARTIALLY ADDRESSED. Full mutation testing infrastructure (Stryker-style) still deferred. Layer-integrity sensitivity coverage is now ≥5 of 14 layers.
+
+### 🟡 Major 4-6 — multi-chapter, NOT closed in this chapter
+
+- Major 4 (god files 5K+ lines)
+- Major 5 (51 source files >800 lines)
+- Major 6 (BASHostKit 123 imports)
+
+These remain in Section A below. No surgical fix possible in single chapter; god-file decomposition needs test-harness improvements first.
+
+### 🟡 Major 9 — partially ADDRESSED M398.8
+
+M395 baseline rewrite silent failure was partially fixed in chapter 一百二十九 (M398.8). Remaining edge cases not audited.
+
+### 🟢 Minor 10-12 — low priority; not addressed
+
+---
+
 
 ## Why this file exists
 
@@ -214,7 +274,7 @@ grep "mutation test\|breakL5\|removeLayer\|disableLayer" → 0 matches
 
 This is the most damning gap. The 14-layer architecture claim **has no test that would fail if a layer silently became a no-op**. Layers could degrade to dead code and the test suite would stay green.
 
-**Status**: NOT YET ADDRESSED.
+**Status (chapter 一百三十二 → 一百三十三)**: **PARTIALLY ADDRESSED**. Chapter 一百三十三 / M520-M523 ship 7 layer-integrity **sensitivity tests** (`M520LayerIntegritySensitivityTests.swift`) covering L1/L4/L11/L13/L14 + cross-layer coherence + determinism. These are input-sensitivity tests (not full code-deletion mutation tests). 5 of 14 layers now have integrity coverage. Still missing: L2/L3/L5/L6/L7/L8/L9/L10/L12 sensitivity coverage + full Stryker-style mutation infrastructure.
 
 ---
 

@@ -15335,3 +15335,93 @@ debt log **应该缩短**。如果它在增长,意味着工程健康下降快于
 ### 132.8 一句话总结
 
 **Chapter 一百三十二 / 无 milestone**: respond to user "上传 / 全面优化 / 8-point audit / Meta-blind-spot 诊断" by 开立 `docs/ENGINEERING_HEALTH_DEBT.md`(新独立文件) — 承认 honesty board 的系统性盲区: doctrine purity 严审(~99.97%) ↔ engineering health 几乎零审(~30%)。Debt log 4 sections 共 ~22 项 verified-with-grep 工程缺陷:5+ 个 5K+ 行 god files(verified main.swift=5687/EBrainCognitionPlaneCore=5347/BeforeAppModel=5201/HostKitCore=4770), 51 first-party source 超 800 line ceiling, 123 first-party imports to BASHostKit god module, 15+ single-impl Servicing protocols, 0 CI/CD pipeline, 0 git tags, 0 telemetry sink, 0 runbook, 0 CONTRIBUTING.md, 0 API stability doc, 0 per-layer SLO/kill-switch/error-boundary/latency-attribution, **0 mutation tests**(最致命:无任何代码证明 14 层不是 dead code), 0 production users。**真实加权 honest satisfaction ≈ 40-60%**(不是 honesty board 历史记的 99.97%)。debt log **不是修复列表** — 是 visibility document,让 multi-chapter / 外部依赖 / weeks-of-engineering scope 的 debt 可见。本章无代码改动,无 milestone — 是 doctrine-level 自我修正,把 culture bias 从隐性改为显性。Test counts unchanged: BAS XCTest 2862 / Qinao 1375 / 全栈 4254 / 5/5 gates clean(本章 doc-only 无回归风险)。
+
+## 一百三十三、 Section 1 缺陷审计闭合 — Critical 1-3 验证已修 + Major 7 over-stated 矫正 + Major 8 partial fix (M520-M523 / 2026-05-04)
+
+### 133.1 触发动作
+
+User said "先把 缺陷 修了 section1" — 闭合 chapter 一百三十二 user audit Section 1 (~12 项 缺陷)。逐项 grep 验证后发现:
+- Critical 1-3: **全部已在前章修过**(audit 报告基于历史状态)
+- Major 7: **over-stated** — 大部分 Servicing protocols 实际有 test mocks,protocol IS 服务多态
+- Major 8: 真有空缺,可 surgical 部分 fix
+- Major 4-6: multi-chapter scope,本章不动
+- Major 9: 部分已修 chapter 一百二十九 M398.8
+
+### 133.2 Critical 1-3 已修验证
+
+| # | Item | 历史修复 | grep 验证 |
+|---|---|---|---|
+| Critical 1 | AFM 平台脆弱性 | chapter 一百十九 + M400.1/M400.2 ship `AFMTestSupport.skipIfAFMDegraded` | ✓ `QinaoRuntimeSDKTests/AFMTestSupport.swift:18` 注释自陈 |
+| Critical 2 | `markRejected` 非幂等 | chapter 91.5 ship `idempotentMarkRejected` helper, chapter 一百三十一 lift visibility 至 internal | ✓ `BASUpdateTicketLifecycleForbiddenGate.swift:167` 实装 + 两 caller 用 |
+| Critical 3 | `.retract` 被 sovereign gate 拒 | chapter 91 deep review #2 ship `.retract / .withdraw / .fail` allow-list for sovereign-rejected candidates | ✓ `BASForbiddenLifecycleGate.swift:107-114` exit-bound action allowance |
+
+**Critical 1-3 全部 ADDRESSED** — 不需重做。User audit 是 historical state report,不是 current state。
+
+### 133.3 Major 7 over-stated 矫正(诚实修正)
+
+User claim: "11 single-implementation protocols 抽象冗余信号"
+
+**实测发现 ~85% false-positive rate**:
+
+| Protocol | 实测 sites (excluding contracts decl) | 评估 |
+|---|---|---|
+| BASRiskServicing | 1 production + 7 test mocks = 8 | **load-bearing for testability** |
+| BASContextServicing / BASMemoryServicing / BASLoopServicing / BASActionServicing / BASDecomposeServicing / BASEvolutionServicing / BASHostProfileServicing / BASTriSelfServicing / BASPowerClockServicing | 1 prod + multiple test mocks each | **all load-bearing for testability** |
+| BASNeuralCoreServicing | 1 prod + 2 test mocks | load-bearing |
+| BASVitalMonitorServicing | 1 prod + 2 dev/test mocks | load-bearing |
+| BASHostConstitutionServicing | **1 prod + 0 test mocks** | genuinely single-impl,但 constitutionService 走 `any BASHostConstitutionServicing` DI 所以仍 protocol-load-bearing |
+
+**真正"抽象冗余"protocol: 1 个**(BASHostConstitutionServicing)而不是 user claim 的 11 个。我之前 chapter 一百三十二 debt log 复述 user claim 时**没做 grep 验证就采纳了**,这是 honesty board 的 second-order blind spot — 我承认 user 批评是 over-stated 时仍把它作为 verbatim debt 录入了。
+
+### 133.4 Major 8 partial fix — 7 layer-integrity sensitivity tests (M520-M523)
+
+新建 `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M520LayerIntegritySensitivityTests.swift` (~210 LoC, 7 tests):
+
+| Test | 覆盖层 | 验证 |
+|---|---|---|
+| testL1AbyssBudgetSensitivityToBudgetFrame | L1 | derive 响应 BASBudgetFrame(maxLoops/retrievalDepth/maxCandidates 变化 → 不同 aggregateAvailability)|
+| testL4OntologyFogSensitivityToCeiling | L4 | 3 个 assertion-ceiling raw values → ≥2 个不同 fog quality |
+| testL11AbyssalPressureSensitivityToRisk | L11 | low-risk 不触发 modes / extreme-risk 触发 modes;aggregateMagnitude 严格升序 |
+| testL13CounterHostCheckSensitivityToRiskScore | L13 | low-score → genuineHostPattern / high-score → systemInducedDrift |
+| testL14SovereignDomainScopeLinterSensitivity | L14 | clean code passes / power-creep code fails |
+| testCrossLayerL4L11Coherence | L4+L11 | 两层组合行为同步(low-risk + low-debt → empty modes;extreme-risk + high-debt → non-empty) |
+| testDeterminism | 全部 | 同输入 → byte-equal 输出(audit-replay invariant) |
+
+**这不是完整 mutation tests** — 不删代码 expect failure,而是 **input-sensitivity tests**:变 input,assert output 有意义变化。No-op layer 会失败这些测试。
+
+**层覆盖**: 5 of 14 (L1/L4/L11/L13/L14 + 跨层)。**仍缺**: L2/L3/L5/L6/L7/L8/L9/L10/L12 sensitivity coverage + full Stryker-style mutation infrastructure。
+
+### 133.5 不闭合的缺陷(本章范围外)
+
+| # | Item | 障碍 |
+|---|---|---|
+| Major 4-5 god files + 51 files >800 line | multi-chapter scope;需先建 test harness 再切 |
+| Major 6 BASHostKit 123 imports | multi-chapter scope;需先解构 god module |
+| Major 9 M395 baseline rewrite | partially fixed M398.8;remaining edge cases 未审计 |
+| Minor 10-12 | 低优先级;不动 |
+
+### 133.6 测试基线
+
+| 套件 | 一百三十二 章末 | 一百三十三 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2862 | **2869** | +7 (M520LayerIntegritySensitivityTests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4254 | **4261** | +7 |
+
+5 gates clean: 4 boundary + whitepaper parity (242 registered, 0 drift)。
+
+### 133.7 Honest reckoning post-chapter
+
+User audit's Section 1 ~12 项:
+- 3 Critical: ✓ all already addressed (audit was historical)
+- 6 Major (4/5/6/7/8/9): 1 partial (8) + 1 over-stated correction (7) + 4 multi-chapter (4/5/6/9)
+- 3 Minor: not addressed (low ROI)
+
+加权: ~33% in-chapter closure rate (4 of 12 with surgical fix or honesty correction)。其他 8 项要么已修(audit stale)要么需 multi-chapter scope。
+
+ENGINEERING_HEALTH_DEBT.md 章节 Section A.4 (14-layer 叙事膨胀) + C.5 (mutation tests) 标 **PARTIALLY ADDRESSED**。
+
+### 133.8 一句话总结
+
+**Chapter 一百三十三 / M520-M523**: respond to user "先把 缺陷 修了 section1" — verify Critical 1-3 already addressed (chapter 91/91.5/119 历史修复), correct Major 7 over-statement (most Servicing protocols load-bearing for test polymorphism, not abstraction redundancy — only 1 of 11 truly single-impl + that one still serves DI), partial-fix Major 8 mutation gap with 7 layer-integrity sensitivity tests in `M520LayerIntegritySensitivityTests.swift` covering L1/L4/L11/L13/L14 + cross-layer + determinism (input-sensitivity 而非 code-deletion mutation, 5 of 14 layers integrity-covered). **Honest correction**: chapter 一百三十二 debt log Section A.3 verbatim recorded user "11 single-impl protocols" claim 不做 grep 验证 — second-order blind spot, now corrected. Major 4/5/6/9 留 multi-chapter scope (god files + BASHostKit god module + M395 edge cases). Test counts: BAS XCTest 2862 → **2869** (+7), Qinao 1375 unchanged, 全栈 4254 → **4261** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. Doctrine pin held: pure value-type sensitivity tests; no production code change; no permit.mode mutation; 14-layer integrity now has 5/14 sensitivity-test coverage (was 0/14)。
