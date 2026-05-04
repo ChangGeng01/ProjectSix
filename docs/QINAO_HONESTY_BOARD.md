@@ -20098,3 +20098,112 @@ Remaining 3 are honestly classified as fixture/heuristic data rather than active
 ### 170.10 一句话总结
 
 **Chapter 一百七十 (M599 — continue)**: respond to user "continue" by closing chapter 一百六十六 §166.5 backlog item 3 of 5/6 — MemoryCore rate thresholds. 2 inline literals at lines ~2730/2733 (`pendingMemoryLoadRate >= 0.34` + `lowTrustMemoryLoadRate >= 0.25`) extracted to named static properties on `BASDecisionBrainState`: `highPendingInfluenceThreshold = 0.34` (≈ 1/3) + `lowTrustLoadThreshold = 0.25` (= 1/4). Doctrine ordering: `lowTrustLoadThreshold < highPendingInfluenceThreshold` — low-trust is more concerning than merely-pending; flag fires at lower load rate. 4 anti-drift tests in NEW M599MemoryLoadRateThresholdTests.swift: value pin + order pin + range pin + **NEW fraction-family pin** (testThresholdsAreFractionFamily — pins doctrine intent that 0.25 = 1/4 exactly + 0.34 ≈ 1/3 within 0.01 tolerance; if anyone replaces with non-intuitive value like 0.27, test surfaces doctrine question). Fraction-family is NEW doctrine layer: explicit doctrine intent (intuitive fractions) makes empirical-calibrated vs arbitrary distinction surface in tests. Chapter 一百六十六 backlog: 3 of 6 categories closed; remaining 3 (seed defaults, fixture probabilities, heuristic weights) classified as fixture/heuristic vs active threshold — lower priority. Test counts: BAS 2967 → 2971 (+4), Qinao 1435 unchanged, 全栈 4402 → 4406 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number + tier ordering + cross-reference + **fraction-family intent doctrine NEW**. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) unchanged.
+
+---
+
+## 一百七十一、 continue — composite heat weight extraction + sum-to-one doctrine layer (chapter 166 backlog 4 of 6) (M600 / 2026-05-05)
+
+### 171.1 触发动作
+
+User: "continue" trajectory continuation. Chapter 一百六十六 backlog item 4 — `BASMemoryTieringProfile.swift:76` heuristic combiner weights.
+
+### 171.2 3 weights extracted
+
+`BASMemoryTieringProfile.compositeHeat` formula at line ~76 had 3 inline weights:
+
+```swift
+// Pre-fix
+let positive = 0.55 * recencyScore + 0.35 * accessFrequency
+let penalty = 0.10 * worldContextStaleness
+```
+
+Extracted to named static properties:
+
+```swift
+public static let compositeHeatRecencyWeight: Double = 0.55
+public static let compositeHeatAccessWeight: Double = 0.35
+public static let compositeHeatStalenessPenaltyWeight: Double = 0.10
+```
+
+### 171.3 NEW doctrine layer: sum-to-one constraint
+
+Beyond chapter 一百七十's fraction-family pattern (each constant = intuitive fraction), chapter 一百七十一 introduces **sum-to-one constraint**: the 3 weights MUST sum to exactly 1.0 (probabilistic-style normalized blend).
+
+```swift
+0.55 + 0.35 + 0.10 = 1.00 ✓
+```
+
+`testWeightsSumToOne` pins this: if anyone changes any weight without rebalancing the others, the test fails AND surfaces the doctrine question of whether the formula is still a normalized weighted blend.
+
+This is **stronger than fraction-family**:
+- Fraction-family pins individual values (each ≈ 1/N for some N)
+- Sum-to-one pins a constraint ACROSS all weights jointly
+
+### 171.4 Doctrine ordering pinned
+
+Tier ordering: recency (0.55) > access (0.35) > staleness penalty (0.10).
+
+Doctrine: substrate memory is recency-biased; access boosts (repeated probes = relevance); staleness penalizes (drifted atoms cooler).
+
+`testWeightOrderingPinned` pins the ordering — regression guard against accidental weight inversion.
+
+### 171.5 Behavioral correctness pin
+
+`testBehavioralFormulaCorrectness` verifies formula correctness given the constants:
+- Max input (recency=1, access=1, staleness=0) → composite heat 0.90
+- Min input (recency=0, access=0, staleness=1) → composite heat 0.0 (clamped)
+
+### 171.6 Test counts
+
+| Counter | Pre-M600 | Post-M600 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2971 | 2976 | **+5** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4406 | 4411 | +5 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+### 171.7 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Sources/BASMemory/BASMemoryTieringProfile.swift` | +3 named static properties on `BASMemoryTieringProfile` with tier ordering + sum-to-one doc-comment; 3 inline weights replaced with named-constant references at line ~76-77 |
+| `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M600TieringProfileWeightTests.swift` | NEW — 5 tests (value pin + order pin + sum-to-one pin + range pin + behavioral correctness pin) |
+
+### 171.8 Chapter 166 backlog status
+
+| Category | Status |
+|---|---|
+| MemoryGovernanceCore confidence 0.58 | ✅ chapter 一百六十七 |
+| MemoryCore confidenceCeiling tiers | ✅ chapter 一百六十九 |
+| MemoryCore rate thresholds 0.34/0.25 | ✅ chapter 一百七十 |
+| **BASMemoryTieringProfile heuristic weights** | ✅ **chapter 一百七十一 (this chapter)** |
+| MemoryCore seed defaults | NOT DONE — fixture, not active |
+| BASShadowTrialObservation probabilities | NOT DONE — fixture |
+
+**4 of 6 categories closed**. Remaining 2 are honestly classified as fixture-style (initial-state config + Lifecycle-stage fixture data), lower priority than active gating thresholds.
+
+### 171.9 Doctrine layers cumulative
+
+| # | Doctrine layer | Chapter introduced |
+|---|---|---|
+| 1 | Anti-drift defensive infrastructure | 一百六十六 / 一百六十七 |
+| 2 | Test-the-test (meta-tests) | 一百六十八 |
+| 3 | Cross-callsite consistency tests | 一百六十六 / 一百六十七 |
+| 4 | Cross-reference between constants in different files | 一百六十九 |
+| 5 | Fraction-family intent doctrine | 一百七十 |
+| 6 | **Sum-to-one constraint doctrine (NEW)** | **一百七十一 (this chapter)** |
+
+**6 doctrine layers** now in the anti-drift defensive structure.
+
+### 171.10 Cumulative chapters 156-171 state
+
+- **26 defects + improvements** closed across 16 chapters
+- **21 anti-drift tests** in 4 dedicated test files
+- **6 doctrine layers** in anti-drift defensive structure
+- **4 of 6 BASMemory backlog categories** closed
+- **3 truly external residuals**: M406, iPhone deploy, substrate redesign
+
+### 171.11 一句话总结
+
+**Chapter 一百七十一 (M600 — continue)**: respond to user "continue" by closing chapter 一百六十六 backlog item 4 of 6 — BASMemoryTieringProfile composite heat weights. 3 inline weights at line ~76-77 (`0.55 * recency + 0.35 * access - 0.10 * staleness`) extracted to named static properties on `BASMemoryTieringProfile`: `compositeHeatRecencyWeight = 0.55` (dominant) + `compositeHeatAccessWeight = 0.35` (secondary) + `compositeHeatStalenessPenaltyWeight = 0.10` (penalty). Doctrine ordering: recency > access > staleness. **NEW doctrine layer**: sum-to-one constraint (testWeightsSumToOne pins `0.55 + 0.35 + 0.10 = 1.0` exactly — stronger than fraction-family because it enforces joint constraint across all 3 weights). 5 anti-drift tests in NEW M600TieringProfileWeightTests.swift: value pin + ordering pin + **sum-to-one pin (NEW)** + range pin + behavioral correctness pin (extreme inputs produce expected composite heat). Sum-to-one is **stronger than fraction-family** (chapter 一百七十): fraction-family pins each value individually as intuitive fraction; sum-to-one pins joint constraint across all weights — if any weight changes without rebalancing others, test fails. Chapter 一百六十六 backlog: 4 of 6 categories closed. 6 doctrine layers now in anti-drift defensive structure. Test counts: BAS 2971 → 2976 (+5), Qinao 1435 unchanged, 全栈 4406 → 4411 / 0 failures / 5 gates clean. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) unchanged.

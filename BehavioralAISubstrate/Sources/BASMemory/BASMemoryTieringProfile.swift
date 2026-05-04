@@ -38,6 +38,29 @@ import BASRuntimeCore
 ///   1.0 = world priors have shifted enough that this atom's causal
 ///   backing is questioned
 public struct BASMemoryTieringProfile: Sendable, Equatable, Codable {
+    /// **M600 chapter 一百七十一 — anti-magic-number** (chapter 一百六十六
+    /// §166.5 backlog 4 of 6): composite heat score weights for
+    /// `compositeHeat` formula at line ~80.
+    ///
+    /// Doctrine: heat is dominated by recency (substrate memory
+    /// is inherently recency-biased), boosted by access frequency
+    /// (repeated probes = relevance), penalized by staleness
+    /// (drifted atoms cooler even if recently touched).
+    ///
+    /// Pre-fix these 3 values were inline at line ~76-77:
+    ///   `let positive = 0.55 * recencyScore + 0.35 * accessFrequency`
+    ///   `let penalty = 0.10 * worldContextStaleness`
+    ///
+    /// **Tier ordering**: recency (0.55, dominant) > access (0.35,
+    /// secondary) > staleness (0.10, penalty). The 3 weights sum
+    /// 0.55 + 0.35 + 0.10 = 1.00 (sum-to-one fraction-family).
+    public static let
+        compositeHeatRecencyWeight: Double = 0.55
+    public static let
+        compositeHeatAccessWeight: Double = 0.35
+    public static let
+        compositeHeatStalenessPenaltyWeight: Double = 0.10
+
     public let atomID: String
     public let currentTier: BASMemoryTier
     public let recencyScore: Double
@@ -68,13 +91,16 @@ public struct BASMemoryTieringProfile: Sendable, Equatable, Codable {
     /// atom should trend toward `.hot`. Policy may override via
     /// sensitivity-drift or staleness short-circuits.
     public var compositeHeat: Double {
-        // Weighted blend. Recency dominates (0.55) because session
-        // memory is inherently recency-biased; access frequency
-        // (0.35) rewards repeated probes; 0.10 penalty for
-        // worldContextStaleness keeps drifted atoms cooler even if
-        // recently touched.
-        let positive = 0.55 * recencyScore + 0.35 * accessFrequency
-        let penalty = 0.10 * worldContextStaleness
+        // M600 chapter 一百七十一 — anti-magic-number: weights
+        // sourced from named static properties with doc-comment
+        // tier ordering. Doctrine: recency dominates → access
+        // boosts → staleness penalizes.
+        let positive = Self.compositeHeatRecencyWeight
+            * recencyScore
+            + Self.compositeHeatAccessWeight
+            * accessFrequency
+        let penalty = Self.compositeHeatStalenessPenaltyWeight
+            * worldContextStaleness
         return max(0, min(1, positive - penalty))
     }
 
