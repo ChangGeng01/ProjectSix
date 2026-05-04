@@ -17287,3 +17287,158 @@ The two trigger sources are **independent** (subadditive when combined) — the 
 ### 149.16 一句话总结 (1h iPhone bench closure)
 
 **Chapter 一百四十九 closure (1h iPhone combinatorial bench complete)**: bench auto-stopped at 3600s cap on schedule. **56,585 iterations / 40,320 unique signatures (100% coverage of 6-dim combinatorial space) / 0 errors** on real iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1) hardware. Median per-turn 9.35ms / p99 11.64ms — substrate stable through full hour with no thermal degradation. **11 distinct defects/findings captured**, of which 2 are tooling bugs (devicectl active-write 0-byte and 20MB-truncation), 4 are corrections to my own prior over-claims (chapters 148 audit-codes bimodal claim, persona-driven routing claim, chapter 149 part 1 "2-dim" claim, chapter 149 part 2 "tone has zero impact" claim), 3 are substrate-behavior gaps (only 2 of typed permit modes used; past-unresolved timeframe override never seen at chapter 148 scale; angry-tone override never seen until full coverage), and 2 are operational frictions (iPhone lock blocks cold-launch, linear seed walk delays full coverage). **Empirical doctrine model derived**: substrate routing is a deterministic 3-dim function `audit = f(stake, timeframe, anger-flag)` with exactly 5 typed audit branches (142/144/148/163/166) and 2 typed override triggers (past-unresolved timeframe OR angry tone, each forcing block + special audit code 148/166). Other 4 dims (domain/confidant/askShape, plus 7 of 8 tones) have **zero impact** on routing decisions — they are watcher-class observation hints (Cthulhu RL7 confirmed at scale). **Empirical density per iteration completely defeated chapter 148's raw-count strategy**: 56K combinatorial iter found 11 defects + complete 5-branch substrate model; 458K hardcoded-prompt iter found 0 new branches because never exercised the past-unresolved timeframe or angry tone dimensions. **真有信息 vs 数据多** — chapter 148's 458K iter answered "iPhone substrate doesn't crash"; chapter 149's 56K iter answered "iPhone substrate has these exact 5 branches with these exact 2 triggers".
+
+---
+
+## 一百五十、 消灭 缺陷 bug 全面进化 — chapter 一百四十九 defects fixed (2026-05-05)
+
+### 150.1 触发动作
+
+User instruction "消灭 缺陷 bug 全面进化" after chapter 一百四十九 closure (11 defects/findings catalogued). Triage which defects are code-fixable + ship fixes.
+
+### 150.2 11 defects triage
+
+| # | Description | Fixable in our code? |
+|---|---|---|
+| 1 | iPhone locked → cold-launch blocked | ❌ iOS security; cannot fix |
+| 2 | Linear seed walk clusters in adjacent dims | ✅ **coprime stride** |
+| 3 | Chapter 148 "bimodal audit codes" was 5-modal | ✅ already corrected in chapter 149 docs |
+| 4 | Chapter 148 "anxious=100% block" was stake-driven | ✅ already corrected in chapter 149 docs |
+| 5 | NEW past-unresolved timeframe override | ⚠️ NOT a bug — substrate doctrine evidence |
+| 6 | devicectl single-file pull → 0 bytes during write | ❌ Apple tool bug; cannot fix |
+| 7 | Only 2 of typed permit modes used (block, delay) | 🔍 **investigated** (see §150.5) |
+| 8 | devicectl full-container pull → 20MB cap | ⚠️ Apple tool bug — but **mitigatable in our code** via JSONL rotation |
+| 9 | Chapter 149 part 1 "2-dim" was over-simplified | ✅ already corrected in chapter 149 docs |
+| 10 | My T+35min "PURELY 2-dim" was hasty generalization | ✅ already corrected in chapter 149 docs |
+| 11 | NEW substrate trigger: tone=angry forces block | ⚠️ NOT a bug — substrate doctrine evidence |
+
+**Code fixes shipped this chapter**: #2 (coprime stride) + #8 (JSONL rotation mitigation) + #7 (investigation, no fix needed)
+
+### 150.3 Defect #2 fix — coprime stride 5041
+
+**File**: `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoExtendedPromptCorpus.swift`
+
+Added `scatterStride: Int = 5_041` and `generateScattered(iter:)` API:
+
+```swift
+public static let scatterStride: Int = 5_041  // 71², coprime to 40320
+
+public static func generateScattered(iter: Int) -> QinaoGeneratedPrompt {
+    let cap = totalCapacity
+    let raw = iter * scatterStride
+    let seed = ((raw % cap) + cap) % cap
+    return generate(seed: seed)
+}
+```
+
+**Math justification** (anti-magic-number):
+- 40320 = 2⁷ × 3² × 5 × 7
+- 5041 = 71² (single prime factor)
+- gcd(5041, 40320) = 1 → permutation visits all 40,320 slots exactly once across iter 0..40319
+- 5041 = 5040 + 1, where 5040 is the "tone bucket size" in linear walk decomposition → tone advances by 1 per iter (mod 8) → all 8 tones visited in iter 0..7
+
+**Tests added** (`ExtendedPromptCorpusTests.swift`, +4 tests):
+- `testScatterStrideIsCoprime` — 5041 = 71² + not divisible by 2/3/5/7
+- `testScatterFirst8ItersTouchAll8Tones` — empirically pinned (linear walk: 1/8 tones; scatter walk: 8/8 tones)
+- `testScatterCovers40320SlotsExactlyOnce` — perfect permutation across full capacity
+- `testScatterDeterminism` — same iter → same prompt
+
+**Mirror in iPhone SampleHost**: `SampleHost/SampleHostModel.swift` `SampleHostBenchPromptCatalog.scatterStride = 5_041` + `generateScattered(iter:)` (inlined because SampleHost iOS target can't dep on QinaoLoop without Xcode project surgery).
+
+**iPhone bench loop now uses scatter walk**: `let g = SampleHostBenchPromptCatalog.generateScattered(iter: iter)`.
+
+### 150.4 Defect #8 mitigation — JSONL rotation at 15MB
+
+**File**: `SampleHost/SampleHostModel.swift`
+
+Added `SampleHostBenchHelpers.rotationByteThreshold: Int64 = 15 * 1024 * 1024` and rotation logic in `SampleHostBenchRunner`:
+
+- Active file: `iterations.jsonl`
+- After 15 MB: rotate to `iterations.1.jsonl`, then `iterations.2.jsonl`, etc.
+- Each individual file stays well under Apple's devicectl 20 MB cap during active write
+- Pulls during active write get all rotated-out files COMPLETE (only the latest active file potentially truncated)
+- Post-bench: all files pull cleanly
+
+This doesn't fix Apple's tool defect (#6/#8) but **mitigates** the impact: data loss is bounded to the most recent <15MB rather than all-but-20MB.
+
+**Computation**: at 16 iter/sec × ~530 bytes/row → ~8.5 KB/sec → 15 MB file fills in ~30 minutes. So a 1h bench produces 2 files; 8h bench produces ~16 files. All except the active file pull cleanly via single-file devicectl copy mid-run.
+
+### 150.5 Defect #7 investigation
+
+**Finding**: BAS has 9 typed permit modes (`BASActionPermitMode.allCases`):
+1. answer
+2. mirror
+3. compare
+4. delay
+5. draft_only
+6. local_only
+7. block
+8. replace
+9. escalate
+
+We saw only 2 (delay, block) across 56,585 combinatorial iter. Not a bug — coverage limitation:
+
+- All bench prompts use `workflowProfile=.reflective` — substrate uses primary/comparative profiles for `answer`/`compare` paths
+- Stake mapping yields riskLevel ∈ {.low, .medium, .high} — `.extreme` riskLevel never reached, so escalate path never triggered
+- All prompts are decision questions — substrate emits `.answer` for low-risk Q&A which our prompts aren't
+- No tool intents in prompts — substrate emits `.replace` when suggesting alternative action; our prompts don't request actions
+- No privacy-sensitive content in prompts — substrate emits `.local_only` for sensitive content
+- No deliberate ambiguity that would trigger `.compare` / `.draft_only`
+
+**To trigger remaining 7 modes** (future bench): expand prompt corpus with:
+- Q&A prompts (factual questions, not decisions) → answer
+- Trade-off prompts with explicit alternatives → compare
+- Tool-intent prompts ("draft an email...") → draft_only
+- Privacy-sensitive prompts ("don't share with anyone") → local_only
+- Conflicting-goal prompts → replace
+- Crisis-level prompts → escalate
+- Reflection-only prompts → mirror
+
+Out of scope for chapter 150 fixes — would require new prompt template families.
+
+### 150.6 Verification on real iPhone 17e
+
+**Build**: `xcodebuild -scheme SampleHost -destination "id=00008150-..."` → BUILD SUCCEEDED
+**Deploy**: install via devicectl, launch (PID assigned post-launch)
+**Smoke (T+6s, 68 iter pulled via full-container workaround)**:
+
+```
+iter=0 anxious        / stake=low / timeframe=minutes
+iter=1 authoritative  / stake=low / timeframe=minutes
+iter=2 vulnerable     / stake=low / timeframe=minutes
+iter=3 agentic        / stake=low / timeframe=minutes
+iter=4 confused       / stake=low / timeframe=minutes
+iter=5 grieving       / stake=low / timeframe=minutes
+iter=6 curious        / stake=low / timeframe=minutes
+iter=7 angry          / stake=low / timeframe=minutes
+
+Unique tones in first 8 iter: 8 / 8
+```
+
+**Defect #2 真消灭**: scatter walk visits ALL 8 tones in first 8 iter on real iPhone hardware (vs chapter 149's linear walk taking 35,000+ iter to reach 7th tone, 56,000+ iter to reach 8th).
+
+### 150.7 Doctrine pin
+
+**Doctrine #1/#2/#3 invariants**: ✓ — pure value-type fix (coprime stride math) + actor file rotation; no permit.mode mutation; no audit hash chain change.
+
+**Anti-magic-number**: ✓ — stride 5041 = 71² documented as named constant with mathematical justification (gcd, prime square, bucket-size+1). Rotation threshold 15MB = 15 × 1024 × 1024 named constant.
+
+**Anti-recursion (chapter 一百三十一)**: ✓ — generator is iterative arithmetic, not recursive.
+
+**Honest-correction principle (chapter 一百三十一/144/145/148/149)**: ✓ — defects from chapter 149 explicitly addressed by code; uncovered subset (#1/#6/#8 are Apple-tool/iOS bugs we can't fix) honestly disclosed.
+
+### 150.8 测试基线
+
+| 套件 | 一百四十九 章末 | 一百五十 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged |
+| Qinao XCTest | 1431 | **1435** | +4 (scatter tests) |
+| 全栈 | 4322 | **4326** | +4 |
+| 5 gates | clean | **clean** | unchanged |
+| **Defect #2 fix verified** | linear 1/8 tones in 8 iter | **scatter 8/8 tones in 8 iter** | **fix shipped** |
+| **Defect #8 mitigation** | single 33MB file (truncated at 20MB during write) | **rotation at 15MB** | **mitigated** |
+| **Defect #7 investigation** | "only 2 modes" mystery | **9 typed modes total, coverage limitation by prompt template** | **understood** |
+
+### 150.9 一句话总结
+
+**Chapter 一百五十 (消灭 缺陷 bug 全面进化)**: respond to user "消灭 缺陷 bug 全面进化" after chapter 149's 11-defect catalog. Triaged: 4 defects already corrected in chapter 149 docs (over-claim corrections), 3 are not bugs (substrate doctrine evidence, e.g. past-unresolved/angry triggers), 3 are Apple-tool/iOS bugs we can't fix (defect #1 iOS lock + #6/#8 devicectl active-write issues), leaving **defect #2 (linear seed walk)** + **#8 (mitigatable)** + **#7 (investigatable)** as code work. **Defect #2 真消灭** via coprime stride 5041 = 71² (gcd to 40320 = 1, +1 from 5040 bucket size guarantees all 8 tones in first 8 iter); BAS-side `QinaoExtendedPromptCorpus.generateScattered(iter:)` + 4 new tests; mirrored to iPhone `SampleHostBenchPromptCatalog`; verified on real iPhone 17e — first 8 iter visits all 8 tones (vs linear walk's 1/8). **Defect #8 mitigated** via JSONL rotation at 15MB threshold — Apple's devicectl 20MB cap during active write affects only the latest <15MB file; rotated-out files pull cleanly. **Defect #7 investigated** — BAS has 9 typed permit modes (answer/mirror/compare/delay/draft_only/local_only/block/replace/escalate); only 2 used because synthetic prompts use single workflowProfile + decision-question template + no tool intents. Coverage limitation by prompt template, not bug; future expansion would add Q&A / trade-off / tool-intent / privacy / crisis / reflection prompt families. Test counts: BAS 2891 unchanged, Qinao 1431 → 1435 (+4 scatter tests), 全栈 4326 / 0 failures / 5 gates clean.

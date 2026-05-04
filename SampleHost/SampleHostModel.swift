@@ -85,6 +85,23 @@ enum SampleHostBenchPromptCatalog {
             * SampleHostPromptAskShape.allCases.count
     }
 
+    /// Coprime stride for scatter walk — chapter 一百五十 fix for
+    /// defect #2 (chapter 一百四十九). 5041 = 71². gcd(5041, 40320) = 1
+    /// because 40320 = 2^7 × 3² × 5 × 7 has no factor 71. Stride
+    /// design: 5041 = 5040 + 1 advances tone bucket by 1 each iter,
+    /// so iter 0..7 visits all 8 tones (vs linear walk visiting only
+    /// 1 tone in first 5040 iter).
+    static let scatterStride: Int = 5_041
+
+    /// Scatter walk: same prompt space coverage as `generate(seed:)`
+    /// but adjacent iter values produce distant signatures.
+    static func generateScattered(iter: Int) -> SampleHostGeneratedPrompt {
+        let cap = totalCapacity
+        let raw = iter * scatterStride
+        let seed = ((raw % cap) + cap) % cap
+        return generate(seed: seed)
+    }
+
     static func generate(seed: Int) -> SampleHostGeneratedPrompt {
         let cap = totalCapacity
         let n = ((seed % cap) + cap) % cap
@@ -199,6 +216,14 @@ enum SampleHostBenchPromptCatalog {
 }
 
 enum SampleHostBenchHelpers {
+    /// Chapter 一百五十 fix for defect #8 (devicectl 20MB cap during
+    /// active write): rotate JSONL files at 15MB so each individual
+    /// file stays well below 20MB cap. Pulls during active write get
+    /// the most recent rotated-out file complete; only the active file
+    /// is potentially truncated. After bench finishes, all rotated
+    /// files + final file pull cleanly.
+    static let rotationByteThreshold: Int64 = 15 * 1024 * 1024
+
     static func iso8601(_ date: Date) -> String {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -218,33 +243,80 @@ enum SampleHostBenchHelpers {
             in: .userDomainMask).first!
     }
 
-    static func benchOutputURL() -> URL {
+    static func benchOutputDir() -> URL {
         let dir = documentsDirectory()
             .appendingPathComponent(
                 "iphone-bench", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent(
-            "iterations.jsonl", isDirectory: false)
+        return dir
+    }
+
+    static func benchOutputURL(rotationIndex: Int = 0) -> URL {
+        let dir = benchOutputDir()
+        if rotationIndex == 0 {
+            return dir.appendingPathComponent(
+                "iterations.jsonl", isDirectory: false)
+        } else {
+            return dir.appendingPathComponent(
+                "iterations.\(rotationIndex).jsonl",
+                isDirectory: false)
+        }
     }
 }
 
 actor SampleHostBenchRunner {
     private var fileHandle: FileHandle?
+    private var currentURL: URL?
+    private var currentBytes: Int64 = 0
+    private var rotationIndex: Int = 0
 
+    /// Chapter 一百五十 fix for defect #8: when active file exceeds
+    /// rotation threshold, close it and start a new file with index
+    /// suffix (iterations.jsonl → iterations.1.jsonl → 2.jsonl …).
+    /// This ensures Apple's devicectl 20MB cap during active write
+    /// affects ONLY the latest file; all rotated-out files pull
+    /// cleanly via single-file copy.
     func appendRow(_ row: SampleHostBenchRow) async throws {
-        let url = SampleHostBenchHelpers.benchOutputURL()
-        if !FileManager.default.fileExists(atPath: url.path) {
-            FileManager.default.createFile(
-                atPath: url.path, contents: nil)
-        }
-        if fileHandle == nil {
-            fileHandle = try FileHandle(forWritingTo: url)
-            try fileHandle?.seekToEnd()
-        }
         let line = try SampleHostBenchHelpers.encode(row) + "\n"
         guard let data = line.data(using: .utf8) else { return }
+        let lineBytes = Int64(data.count)
+
+        // Rotate if active file would exceed threshold AND we've
+        // written something already
+        if let _ = fileHandle,
+           currentBytes + lineBytes
+            > SampleHostBenchHelpers.rotationByteThreshold
+        {
+            try? fileHandle?.synchronize()
+            try? fileHandle?.close()
+            fileHandle = nil
+            rotationIndex += 1
+            currentBytes = 0
+        }
+
+        if fileHandle == nil {
+            let url = SampleHostBenchHelpers.benchOutputURL(
+                rotationIndex: rotationIndex)
+            currentURL = url
+            if !FileManager.default.fileExists(atPath: url.path) {
+                FileManager.default.createFile(
+                    atPath: url.path, contents: nil)
+            }
+            fileHandle = try FileHandle(forWritingTo: url)
+            try fileHandle?.seekToEnd()
+            // Recompute size in case file already had content
+            // (post-relaunch resume path)
+            if let attrs = try? FileManager.default
+                .attributesOfItem(atPath: url.path),
+               let n = attrs[.size] as? Int64
+            {
+                currentBytes = n
+            }
+        }
+
         try fileHandle?.write(contentsOf: data)
+        currentBytes += lineBytes
     }
 
     func flush() async {
@@ -254,6 +326,11 @@ actor SampleHostBenchRunner {
     func close() async {
         try? fileHandle?.close()
         fileHandle = nil
+    }
+
+    /// Diagnostic accessor for tests + UI
+    func currentRotationIndex() async -> Int {
+        rotationIndex
     }
 }
 
@@ -780,12 +857,14 @@ final class SampleHostModel: ObservableObject {
                 {
                     break
                 }
-                // M574 (chapter 一百四十九) — combinatorial prompt
-                // generator. Each iter gets a unique prompt across
-                // 40,320-slot space (8 tones × 10 domains × 6 stakes
-                // × 7 timeframes × 4 confidants × 3 asks).
-                let g = SampleHostBenchPromptCatalog.generate(
-                    seed: iter)
+                // M574 (chapter 一百四十九) + chapter 一百五十 fix:
+                // combinatorial prompt generator with coprime stride
+                // scatter walk (defect #2 fix). Each iter gets a
+                // unique prompt across 40,320-slot space, but adjacent
+                // iter values produce distant signatures (all 8 tones
+                // visited in first 8 iter vs only 1 with linear walk).
+                let g = SampleHostBenchPromptCatalog
+                    .generateScattered(iter: iter)
                 let prompt = g.prompt
                 let signature = g.signature
                 let t0 = Date()

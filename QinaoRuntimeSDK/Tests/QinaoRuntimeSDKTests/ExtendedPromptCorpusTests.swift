@@ -133,7 +133,76 @@ final class ExtendedPromptCorpusTests: XCTestCase {
             QinaoPromptTone.grieving.rawValue, "grieving")
     }
 
-    // MARK: - 10. Stake / Timeframe / AskShape raw values stable
+    // MARK: - 10b. Coprime stride (chapter 一百四十九 defect #2 fix)
+
+    func testScatterStrideIsCoprime() {
+        // 40,320 = 2^7 × 3^2 × 5 × 7
+        // 5,041 = 71² must share no factors with these
+        let stride = QinaoExtendedPromptCorpus.scatterStride
+        XCTAssertEqual(stride, 5_041)
+        XCTAssertNotEqual(stride % 2, 0, "stride not 2-divisible")
+        XCTAssertNotEqual(stride % 3, 0, "stride not 3-divisible")
+        XCTAssertNotEqual(stride % 5, 0, "stride not 5-divisible")
+        XCTAssertNotEqual(stride % 7, 0, "stride not 7-divisible")
+        // 71² = 5041
+        XCTAssertEqual(stride, 71 * 71)
+    }
+
+    func testScatterFirst8ItersTouchAll8Tones() {
+        // Linear walk: iter 0..7 all share tone="anxious"
+        var linearTones: Set<QinaoPromptTone> = []
+        for iter in 0..<8 {
+            let g = QinaoExtendedPromptCorpus.generate(seed: iter)
+            linearTones.insert(g.signature.tone)
+        }
+        XCTAssertEqual(
+            linearTones.count, 1,
+            "linear walk: first 8 iter only visits 1 tone")
+
+        // Scatter walk: stride 5041 advances tone by 1 each iter
+        // (mod 8) so iter 0..7 visits ALL 8 tones
+        var scatterTones: Set<QinaoPromptTone> = []
+        for iter in 0..<8 {
+            let g = QinaoExtendedPromptCorpus.generateScattered(
+                iter: iter)
+            scatterTones.insert(g.signature.tone)
+        }
+        XCTAssertEqual(
+            scatterTones.count, 8,
+            "scatter walk: first 8 iter visits all 8 tones, got " +
+            "\(scatterTones.count): \(scatterTones)")
+    }
+
+    func testScatterCovers40320SlotsExactlyOnce() {
+        // Generate iter 0..40319 via scatter walk; verify all 40,320
+        // unique signatures exactly once (perfect permutation).
+        var seen: Set<QinaoPromptSignature> = []
+        for iter in 0..<QinaoExtendedPromptCorpus.totalCapacity {
+            let g = QinaoExtendedPromptCorpus.generateScattered(
+                iter: iter)
+            XCTAssertFalse(
+                seen.contains(g.signature),
+                "Scatter walk produced duplicate at iter \(iter)")
+            seen.insert(g.signature)
+        }
+        XCTAssertEqual(
+            seen.count,
+            QinaoExtendedPromptCorpus.totalCapacity,
+            "Scatter walk covers full 40,320-slot space exactly once")
+    }
+
+    func testScatterDeterminism() {
+        // Same iter → same prompt (deterministic, reproducible)
+        for iter in [0, 1, 100, 1000, 39999] {
+            let a = QinaoExtendedPromptCorpus.generateScattered(
+                iter: iter)
+            let b = QinaoExtendedPromptCorpus.generateScattered(
+                iter: iter)
+            XCTAssertEqual(a, b)
+        }
+    }
+
+    // MARK: - 11. Stake / Timeframe / AskShape raw values stable
 
     func testRawValuesStable() {
         XCTAssertEqual(

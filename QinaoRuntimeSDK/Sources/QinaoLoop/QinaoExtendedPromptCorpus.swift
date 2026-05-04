@@ -166,6 +166,39 @@ public enum QinaoExtendedPromptCorpus {
             seed: seed)
     }
 
+    /// Coprime stride for scatter walk — fixes chapter 一百四十九
+    /// defect #2 (linear seed walk clusters in adjacent dim space,
+    /// only 1 of 8 tones visited in first 5040 iter).
+    ///
+    /// Stride 5,041 = 71² (prime squared). gcd(5041, 40320) = 1
+    /// because 40320 = 2^7 × 3² × 5 × 7 has no factor of 71.
+    ///
+    /// Why this stride: 5041 = 1 × 5040 + 1, where 5040 is the "tone
+    /// bucket size" (the number of slots per tone in the linear walk's
+    /// decomposition). So each iter advances the tone bucket by 1 (mod
+    /// 8), guaranteeing all 8 tones appear in first 8 iter. Also gives
+    /// rich askShape/confidant/timeframe/stake/domain rotation since
+    /// 5041 mod (3·4·7·6·10) = 5041 mod 5040 = 1, advancing all
+    /// inner-dim residues by 1 per iter (modular cascade).
+    public static let scatterStride: Int = 5_041
+
+    /// Scatter walk: same deterministic permutation across all 40,320
+    /// slots, but adjacent iter values produce distant signatures.
+    /// At iter=0 first prompt is anxious-financial-low-minutes-friend-
+    /// narrative; at iter=1 second prompt jumps ~half-way across the
+    /// space (different tone, different domain, different stake, etc).
+    /// In first 8 iter, all 8 tones visited (vs 1 of 8 with linear walk).
+    public static func generateScattered(
+        iter: Int
+    ) -> QinaoGeneratedPrompt {
+        let cap = totalCapacity
+        let stride = scatterStride
+        // ((iter * stride) % cap) but handle negative iter
+        let raw = iter * stride
+        let seed = ((raw % cap) + cap) % cap
+        return generate(seed: seed)
+    }
+
     /// Decompose a seed integer into the 6-dimensional signature.
     /// Pure function. Modulo wraps the seed into [0, totalCapacity).
     public static func decompose(
