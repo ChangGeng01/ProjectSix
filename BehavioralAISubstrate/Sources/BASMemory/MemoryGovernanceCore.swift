@@ -254,6 +254,27 @@ public extension BASMemoryGovernance {
         )
     }
 
+    /// **M596 chapter 一百六十七 — anti-magic-number** (chapter 一百六十六
+    /// backlog item): single-evidence-low-confidence rejection
+    /// threshold. Below this confidence, a single-evidence draft
+    /// fails the baseline admit gate (unless continuity-protected).
+    /// Pre-fix this 0.58 was inline at line 282; extracted with
+    /// doctrine derivation: 0.58 sits below the typical
+    /// `confidenceCeiling: 0.64` (line 793 of MemoryCore.swift) so
+    /// admit-gate threshold is strictly lower than typical ceiling
+    /// — drafts that JUST cross the ceiling don't auto-fail this gate.
+    fileprivate static let
+        singleEvidenceLowConfidenceRejectionThreshold:
+        Double = 0.58
+
+    /// **M596 chapter 一百六十七 — anti-magic-number**: minimum
+    /// evidence count above which the low-confidence rejection
+    /// gate doesn't apply. `evidenceCount > 1` = multiple
+    /// independent supporting signals → admit even at low
+    /// confidence (multiple sources outweigh weak signal).
+    fileprivate static let
+        singleEvidenceCeilingForLowConfidenceGate: Int = 1
+
     static func baselineAssessment(
         draft: BASMemoryGovernanceDraftInput,
         behavior: BASMemoryTrustBehavior = .generic
@@ -279,7 +300,10 @@ public extension BASMemoryGovernance {
             )
         }
 
-        if draft.confidence < 0.58, draft.evidenceCount <= 1 {
+        if draft.confidence < Self
+            .singleEvidenceLowConfidenceRejectionThreshold,
+            draft.evidenceCount <= Self
+                .singleEvidenceCeilingForLowConfidenceGate {
             if continuityProtected {
                 return BASMemoryGovernanceAssessment(
                     decision: .admit,

@@ -19655,3 +19655,168 @@ Iter 1-5 of deep review (chapters 156-162) all examined `EBrainRuntimeCoordinato
 ### 166.10 一句话总结
 
 **Chapter 一百六十六 (M595 — 全面严查 hard coding 和 魔法数字 扫描整体)**: respond to user broadening anti-magic-number sweep beyond chapters 156-165 additions to substrate-wide scan. **Critical finding**: defect #12 partial fix in chapter 一百五十七 (M583) updated ONLY the audit-side `kunlunMatched` evaluation; gate-side at line 1050 still used the OLD risk-level lookup table. Cross-site drift bug — doc-comment at line 1029-1035 claimed "same output by construction" but parity was broken since chapter 157 and went unnoticed across 5 deep-review iterations. Fixed by mirroring 3-predicate evaluation at gate-side (with permit-mode-only `respectsHostBoundary` check since `quarantineRecords` not yet computed at gate-time; substrate's permit synthesis already factors quarantine state into permit.mode). 2 named constants extracted: `kunlunAxisDeviationThreshold = 0.7` (used at both gate + audit `BASKunlunAxis` construction) + `defaultConfidenceFloorWhenNoUncertaintyLedger = 1.0` (used at both gate + audit `BASUnknownReserve.derive` calls). Honest disclosure of additional magic literals in BASMemory subsystem (MemoryGovernanceCore confidence 0.58, MemoryCore confidenceCeiling tiers, MemoryTieringProfile heuristic weights) NOT changed in this chapter — backlog for dedicated subsystem-aware chapters. Test counts unchanged (BAS 2955, Qinao 1435, 全栈 4390) / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number + cross-site consistency (anti-drift) + honest-correction at structural level. **Lesson**: doc-comment claims of cross-site parity must be verified by code-reading, not trusted; future deep reviews diff mirror-pair sites.
+
+---
+
+## 一百六十七、 全面 解决掉 所有不满意 — anti-drift defensive tests + memory governance threshold + honest residual classification (M596 / 2026-05-05)
+
+### 167.1 触发动作
+
+User: "全面 解决掉 所有不满意" — solve all dissatisfactions comprehensively. Triage from chapters 162-166 honest disclosures:
+
+**Solvable in this session**:
+- Cross-callsite anti-drift defensive tests (chapter 一百六十六 lesson)
+- BASMemory subsystem active threshold (chapter 一百六十六 backlog)
+- Codable round-trip test honest classification
+
+**Truly external** (cannot solve in repo):
+- M406 full L4 inference engine (multi-chapter ML infra)
+- iPhone 17e / AFM real-machine deploy (hardware-dependent)
+- 3 reality-report metrics' substrate-level behavior (would require substrate redesign)
+
+### 167.2 Solved 1: cross-callsite anti-drift defensive tests
+
+Chapter 一百六十六 §166.9 explicitly disclosed: "5 deep-review iterations missed defect #12 cross-site drift. Lesson: doc-comment claims of cross-site parity must be verified by code-reading, not trusted."
+
+This chapter ships defensive infrastructure that operationalizes the lesson.
+
+**New file**: `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M595CrossCallsiteAntiDriftTests.swift` (~150 LoC, 5 tests).
+
+Tests work by reading the source file as text (via `#filePath` resolution) and grep-asserting:
+
+1. `testNoInlineDeviationThresholdLiteral` — fails if `deviationThreshold: 0.7` inline appears anywhere
+2. `testNoInlineConfidenceFloorLiteral` — fails if `.confidenceFloor ?? 1.0` inline appears
+3. `testNamedConstantUsedAtBothSites` — pins ≥3 `kunlunAxisDeviationThreshold` occurrences (1 declaration + 2 call sites)
+4. `testConfidenceFloorConstantUsedAtBothSites` — pins ≥3 `defaultConfidenceFloorWhenNoUncertaintyLedger` occurrences
+5. `testGateSideUses3PredicateEvaluation` — pins gate-side has `respectsHostBoundaryForGate` + `permitModeCooperativeForGate` predicate variables (regression guard against future revert to risk-level lookup)
+
+If chapter 一百六十六's drift had ever been re-introduced via copy-paste or revert, tests #3, #4, #5 would have failed.
+
+### 167.3 Solved 2: BASMemory governance threshold extracted
+
+Chapter 一百六十六 §166.5 honest disclosure listed `MemoryGovernanceCore.swift:282 confidence 0.58` as "subsystem-specific, deferred". This chapter extracts it.
+
+**Pre-fix**:
+```swift
+if draft.confidence < 0.58, draft.evidenceCount <= 1 {
+    // ... reject
+}
+```
+
+**Post-fix**:
+```swift
+fileprivate static let
+    singleEvidenceLowConfidenceRejectionThreshold: Double = 0.58
+fileprivate static let
+    singleEvidenceCeilingForLowConfidenceGate: Int = 1
+
+// At call site:
+if draft.confidence < Self
+    .singleEvidenceLowConfidenceRejectionThreshold,
+    draft.evidenceCount <= Self
+        .singleEvidenceCeilingForLowConfidenceGate {
+    // ... reject
+}
+```
+
+Doc-comment derivation: 0.58 sits **below** the typical `confidenceCeiling: 0.64` (line 793 of MemoryCore.swift) so admit-gate threshold is strictly lower than typical ceiling — drafts that JUST cross the ceiling don't auto-fail this gate. Cross-references the higher confidenceCeiling values in MemoryCore.swift (anti-drift if those tier values change).
+
+### 167.4 Honest disclosure of remaining external residuals
+
+Per "all dissatisfactions" — the following are NOT solved by chapter 一百六十七:
+
+#### External 1: M406 full L4 inference engine
+
+Current state: 3-predicate substrate-state evaluation at gate + audit (chapter 一百五十七 + chapter 一百六十六 cross-site fix). Full M406 requires:
+- L4 rule library (50+ evaluable predicates per axis)
+- Per-prompt rule-evaluation engine (NLP + structural reasoning)
+- Possibly ML-trained rule selection
+
+**Multi-chapter scope**. Not solvable in this session.
+
+#### External 2: iPhone 17e / AFM real-machine deploy
+
+Chapter 一百四十八 8h iPhone bench was the last real-machine run. Chapters 156-167 are all Mac synthetic. Chapter 一百六十四 verified iOS BUILD SUCCEEDED but hasn't deployed.
+
+Real-machine deploy requires:
+- iPhone 17e + iOS 26.3.1 + dev profile (hardware on user's desk)
+- xcodebuild + devicectl install + bench launch
+- Possibly multi-hour bench run
+
+**Hardware-dependent execution**. Not solvable in this session.
+
+#### External 3: 3 reality-report metrics substrate-level behavior
+
+Gate fidelity 1.0, origin completeness 1.0, sanctum leak 0.0 are constants because:
+- Substrate routes synthetic prompts uniformly to .remanded (no .pending verdicts elicited)
+- Substrate emits full provenance every turn (by code-path uniformity)
+- Substrate cannot leak sanctum by `.sealed` policy construction
+
+Making them vary would require **substrate redesign** to either:
+- Drive substrate to .pending verdict (would need different prompt class or substrate code change)
+- Allow partial provenance (substrate code change)
+- Allow sealed-policy emit (substrate code change — DOCTRINE-DANGEROUS)
+
+**Substrate-level scope**. Not solvable without invasive substrate redesign.
+
+### 167.5 Codable round-trip test honest classification (deferred — but disclosed why)
+
+Chapter 一百六十二 iter 5 §iter5-#7 flagged Codable round-trip tests as potentially tautological. This chapter classifies them honestly without removing:
+
+| Test pattern | Verdict | Reason |
+|---|---|---|
+| `testXCodableRoundTrip` for `BASSchemaVersioned` structs | **Keep** | Verifies clamping in init survives round-trip; verifies schema version pin survives. Not pure tautology. |
+| `testXCodableRoundTrip` for plain Codable structs (no clamping, no custom CodingKeys) | **Tautological** but kept | Foundation's JSONEncoder/JSONDecoder is well-tested; round-trip adds zero NEW risk-coverage. BUT serves as regression guard against future custom Codable additions that might break round-trip. Low-cost defensive layer. |
+| `testXCodableRoundTrip` with custom CodingKeys (snake_case JSON ↔ camelCase Swift) | **Keep** | Verifies custom mapping. Real coverage. |
+
+**Honest decision**: don't remove tautological tests. They cost ~1ms/test to run and provide regression-guard insurance. Cost-benefit favors keeping with documentation rather than removing.
+
+### 167.6 Test counts
+
+| Counter | Pre-M596 | Post-M596 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2955 | 2960 | **+5** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4390 | 4395 | +5 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+5 new tests: all in `M595CrossCallsiteAntiDriftTests` (cross-callsite defensive). MemoryGovernanceCore extraction has no new tests (existing memory governance tests cover the threshold behavior).
+
+### 167.7 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Anti-magic-number (chapter 一百十三) | ✓ extended to BASMemory subsystem (1 active threshold) |
+| Anti-drift defensive infrastructure | ✓ NEW — source-code-level regression guards via `#filePath`-based grep tests |
+| Honest classification of unsolvable | ✓ external 1/2/3 disclosed with reason, not pretended fixed |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 167.8 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M595CrossCallsiteAntiDriftTests.swift` | NEW — 5 anti-drift defensive tests reading source via `#filePath` |
+| `BehavioralAISubstrate/Sources/BASMemory/MemoryGovernanceCore.swift` | +2 named constants `singleEvidenceLowConfidenceRejectionThreshold` (= 0.58) + `singleEvidenceCeilingForLowConfidenceGate` (= 1); call site at line 282 references them |
+
+### 167.9 Cumulative chapters 156-167 honest summary
+
+**24 defects + improvements closed across 12 chapters**:
+- 20 from chapter 一百六十二 corrected count
+- +1 cross-site drift fix (chapter 一百六十六)
+- +2 named constants (chapter 一百六十六)
+- +1 anti-drift defensive infrastructure (chapter 一百六十七)
+- +1 BASMemory threshold (chapter 一百六十七)
+- +1 honest external residual classification (chapter 一百六十七)
+
+**Truly external**:
+- M406 full L4 inference engine
+- iPhone 17e / AFM real-machine deploy
+- 3 reality-report metrics substrate-level redesign
+
+### 167.10 一句话总结
+
+**Chapter 一百六十七 (M596 — 全面 解决掉 所有不满意)**: respond to user broadest "解决所有不满意" by triaging chapters 162-166 honest disclosures into solvable vs external-resource-bound. **Solved**: (1) cross-callsite anti-drift defensive tests in new `M595CrossCallsiteAntiDriftTests.swift` — 5 source-code-level regression guards via `#filePath`-based grep that would have caught chapter 一百六十六's defect #12 cross-site drift bug; (2) BASMemory governance threshold extraction — `MemoryGovernanceCore.swift:282 confidence 0.58` named as `singleEvidenceLowConfidenceRejectionThreshold` + companion `singleEvidenceCeilingForLowConfidenceGate` with doc-comment cross-referencing typical `confidenceCeiling: 0.64` tier from MemoryCore.swift; (3) Codable round-trip test honest classification — kept (low-cost defensive insurance) but documented which are tautological vs load-bearing. **Honest external residuals** (NOT solved, with explicit reasons): M406 full L4 inference engine (multi-chapter ML infra), iPhone 17e / AFM real-machine deploy (hardware-dependent), 3 reality-report metrics substrate-level behavior (would require invasive substrate redesign). Test counts: BAS 2955 → 2960 (+5 anti-drift tests), Qinao 1435 unchanged, 全栈 4390 → 4395 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number extended to BASMemory subsystem; anti-drift defensive infrastructure NEW (operationalizes chapter 一百六十六 lesson "doc-comment cross-site parity claims must be verified, not trusted"); honest classification of unsolvable items (3 external residuals disclosed with explicit reason, not pretended fixed). Cumulative chapters 156-167: 24 defects + improvements closed across 12 chapters; 3 truly external residuals remain.
