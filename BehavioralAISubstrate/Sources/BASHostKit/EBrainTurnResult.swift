@@ -4,6 +4,7 @@ import BASObservability
 import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
+import BASWorldPrior
 
 public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
     public var deviceState: BASDeviceState
@@ -51,6 +52,24 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
     public var retractionOrders: [BASRetractionOrder]
     public var evolutionSeals: [BASEvolutionSeal]
     public var runtimeTrace: BASRuntimeTrace
+
+    /// M578 (chapter 一百五十三 — 一次性解决掉) — 4 typed
+    /// projection fields exposed directly on turn result for
+    /// downstream observability (chapter 一百五十一 doctrine
+    /// metrics + future analyses). Each field is independently
+    /// `Codable` (all `BASSchemaVersioned`). Default `nil` for
+    /// backward-compat.
+    ///
+    /// Why these 4 specifically (not the full
+    /// `BASAuditObservationProjections` bag): the bag has 60+
+    /// fields with ~20 non-`Codable` aggregate sub-types making
+    /// full Codable refactor out-of-scope. These 4 cover the
+    /// doctrine metrics that previously hit synthesis ceiling
+    /// in chapter 一百五十二.
+    public var kunlunAxisAlignment: BASAxisAlignment?
+    public var humanAnchorSignal: BASHumanAnchorSignal?
+    public var abyssalPressure: BASAbyssalPressure?
+    public var unknownReserve: BASUnknownReserve?
 
     public init(
         deviceState: BASDeviceState,
@@ -100,7 +119,11 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         versionDeltas: [BASVersionDelta] = [],
         retractionOrders: [BASRetractionOrder] = [],
         evolutionSeals: [BASEvolutionSeal] = [],
-        runtimeTrace: BASRuntimeTrace
+        runtimeTrace: BASRuntimeTrace,
+        kunlunAxisAlignment: BASAxisAlignment? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        unknownReserve: BASUnknownReserve? = nil
     ) {
         self.deviceState = deviceState
         self.budgetFrame = budgetFrame
@@ -147,6 +170,10 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.retractionOrders = retractionOrders
         self.evolutionSeals = evolutionSeals
         self.runtimeTrace = runtimeTrace
+        self.kunlunAxisAlignment = kunlunAxisAlignment
+        self.humanAnchorSignal = humanAnchorSignal
+        self.abyssalPressure = abyssalPressure
+        self.unknownReserve = unknownReserve
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -195,6 +222,10 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         case retractionOrders
         case evolutionSeals
         case runtimeTrace
+        case kunlunAxisAlignment
+        case humanAnchorSignal
+        case abyssalPressure
+        case unknownReserve
     }
 
     public init(from decoder: Decoder) throws {
@@ -259,6 +290,14 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
             forKey: .evolutionSeals
         ) ?? []
         runtimeTrace = try container.decode(BASRuntimeTrace.self, forKey: .runtimeTrace)
+        kunlunAxisAlignment = try container.decodeIfPresent(
+            BASAxisAlignment.self, forKey: .kunlunAxisAlignment)
+        humanAnchorSignal = try container.decodeIfPresent(
+            BASHumanAnchorSignal.self, forKey: .humanAnchorSignal)
+        abyssalPressure = try container.decodeIfPresent(
+            BASAbyssalPressure.self, forKey: .abyssalPressure)
+        unknownReserve = try container.decodeIfPresent(
+            BASUnknownReserve.self, forKey: .unknownReserve)
         wakeIntent = try container.decodeIfPresent(BASWakeIntent.self, forKey: .wakeIntent)
             ?? BASEBrainTurnResult.defaultWakeIntent(for: budgetFrame)
         vitalState = try container.decodeIfPresent(BASVitalState.self, forKey: .vitalState)
@@ -374,6 +413,15 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         try container.encode(retractionOrders, forKey: .retractionOrders)
         try container.encode(evolutionSeals, forKey: .evolutionSeals)
         try container.encode(runtimeTrace, forKey: .runtimeTrace)
+        try container.encodeIfPresent(
+            kunlunAxisAlignment,
+            forKey: .kunlunAxisAlignment)
+        try container.encodeIfPresent(
+            humanAnchorSignal, forKey: .humanAnchorSignal)
+        try container.encodeIfPresent(
+            abyssalPressure, forKey: .abyssalPressure)
+        try container.encodeIfPresent(
+            unknownReserve, forKey: .unknownReserve)
     }
 
     private static func defaultWakeIntent(for budgetFrame: BASBudgetFrame) -> BASWakeIntent {

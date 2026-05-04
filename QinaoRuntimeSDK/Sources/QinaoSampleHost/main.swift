@@ -4988,6 +4988,13 @@ struct QinaoSampleHost {
         print("✓ Substrate runtime ready\n")
 
         // Source-type accumulators
+        // M578 (chapter 一百五十三) — track real-vs-synthesized
+        // counts so the report shows how many fields came from
+        // substrate's actual emission vs fallback synthesis.
+        var realAxisAlignments = 0
+        var realHumanAnchorSignals = 0
+        var realAbyssalPressures = 0
+        var realUnknownReserves = 0
         var alignments: [BASAxisAlignment] = []
         var gates: [BASHeavenGatePermit] = []
         var traces: [BASRiverOriginTrace] = []
@@ -5034,23 +5041,30 @@ struct QinaoSampleHost {
                 let signalRefs = turn.sovereignAuditEntry?
                     .signalRefs ?? []
 
-                // Synthesize BASAxisAlignment
+                // M578 (chapter 一百五十三) — prefer REAL substrate
+                // BASAxisAlignment from turn.kunlunAxisAlignment.
+                // Fall back to synthesis only if substrate didn't
+                // emit one (turn outside Kunlun-axis-emit code path).
                 let isAligned = permit == .delay
                     || permit == .answer
-                let centerScore: Double = isAligned
-                    ? 0.85 : 0.4
-                let alignment = BASAxisAlignment(
-                    alignmentID: "align-\(iter)",
-                    targetRef: "candidate-\(iter)",
-                    axisRef: "axis-doctrine-bench",
-                    centerScore: centerScore,
-                    deviationCodes: isAligned
-                        ? []
-                        : ["routing-misaligned"],
-                    correctionHint: isAligned
-                        ? ""
-                        : "consider-alternative",
-                    requiresGate: !isAligned)
+                let alignment: BASAxisAlignment
+                if let realAlignment = turn.kunlunAxisAlignment {
+                    alignment = realAlignment
+                    realAxisAlignments += 1
+                } else {
+                    alignment = BASAxisAlignment(
+                        alignmentID: "align-\(iter)",
+                        targetRef: "candidate-\(iter)",
+                        axisRef: "axis-doctrine-bench",
+                        centerScore: isAligned ? 0.85 : 0.4,
+                        deviationCodes: isAligned
+                            ? []
+                            : ["routing-misaligned"],
+                        correctionHint: isAligned
+                            ? ""
+                            : "consider-alternative",
+                        requiresGate: !isAligned)
+                }
                 alignments.append(alignment)
 
                 // Synthesize BASHeavenGatePermit
@@ -5130,18 +5144,34 @@ struct QinaoSampleHost {
                         ? 0.1
                         : 0.0
                 let totalRiskBase = stakeRisk + toneAdjust
-                let anchor = BASHumanAnchorSignal(
-                    anchorID: "anchor-\(iter)",
-                    hostSummaryRef: "host-doctrine-bench",
-                    agencyRisk: totalRiskBase,
-                    alienationRisk: totalRiskBase * 0.8,
-                    dignityRisk: totalRiskBase * 0.6,
-                    overwhelmRisk: totalRiskBase * 0.9,
-                    recommendedSurfaceTone: isAligned
-                        ? .warm : .reserved,
-                    requiredAgencyReservation:
-                        isAligned ? "" : "defer-to-host")
+                // M578 (chapter 一百五十三) — prefer REAL substrate
+                // BASHumanAnchorSignal from turn.humanAnchorSignal.
+                let anchor: BASHumanAnchorSignal
+                if let realAnchor = turn.humanAnchorSignal {
+                    anchor = realAnchor
+                    realHumanAnchorSignals += 1
+                } else {
+                    anchor = BASHumanAnchorSignal(
+                        anchorID: "anchor-\(iter)",
+                        hostSummaryRef: "host-doctrine-bench",
+                        agencyRisk: totalRiskBase,
+                        alienationRisk: totalRiskBase * 0.8,
+                        dignityRisk: totalRiskBase * 0.6,
+                        overwhelmRisk: totalRiskBase * 0.9,
+                        recommendedSurfaceTone: isAligned
+                            ? .warm : .reserved,
+                        requiredAgencyReservation:
+                            isAligned ? "" : "defer-to-host")
+                }
                 anchors.append(anchor)
+
+                // M578 — track real vs synthesized for the other 2
+                if turn.abyssalPressure != nil {
+                    realAbyssalPressures += 1
+                }
+                if turn.unknownReserve != nil {
+                    realUnknownReserves += 1
+                }
 
                 // Doctrine harmony: count red-line hits in signals
                 for ref in signalRefs {
@@ -5224,10 +5254,16 @@ struct QinaoSampleHost {
         // Print final report
         print("""
 
-            === FINAL DOCTRINE METRICS (M577 / chapter 一百五十二) ===
+            === FINAL DOCTRINE METRICS (M578 / chapter 一百五十三) ===
             Sessions run:        \(count)
             Substrate errors:    \(substrateErrors)
             Elapsed:             \(String(format: "%.2f", elapsed))s
+
+            REAL-vs-SYNTHESIZED counts (M578 chapter 一百五十三 wire):
+              kunlunAxisAlignment:     \(realAxisAlignments) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realAxisAlignments) / Double(count)))% real)
+              humanAnchorSignal:       \(realHumanAnchorSignals) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realHumanAnchorSignals) / Double(count)))% real)
+              abyssalPressure:         \(realAbyssalPressures) real / \(count) sessions
+              unknownReserve:          \(realUnknownReserves) real / \(count) sessions
 
             1. Axis Stability Score (alignments=\(alignments.count)):
                stabilityIndex   = \(String(format: "%.4f", axisStability.stabilityIndex))

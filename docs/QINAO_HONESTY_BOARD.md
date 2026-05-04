@@ -17689,3 +17689,124 @@ Elapsed:             0.48s
 ### 152.10 一句话总结
 
 **Chapter 一百五十二 (M577 — 全面开发: chapter 151 schemas 接到真生产 caller)**: respond to user "全面开发" after chapter 一百五十一 self-audit ("schema 多 ≠ 价值多"). Tried adding `BASAuditObservationProjections` to `BASEBrainTurnResult` for true wire — discovered projections are intentionally non-Codable, full Codable would require deep refactor. Pivoted to synthesis-from-public-fields: `runDoctrineMetricsBench()` drives N substrate sessions, synthesizes 6 typed source instances per turn from `(permitMode, stake, tone, signalRefs)`, runs all 6 `BASDoctrineMetricsCompute` helpers, writes typed metric values to `summary.json`. **Real empirical numbers** from 200 sessions: axis stability 1.0000 (bimodal), gate fidelity 1.0000 (all resolved), origin completeness 1.0000 (synthesis ceiling), sanctum leak 0.0000 (no attempts), doctrine harmony 1.0000 (signalRef patterns don't match detector), **human anchor retention 0.9600** (192/200 preserved, 8 eroded — high-stake+angry combinations) and **centerScore mean 0.7465** (matches 154/46 delay/block split). **Honest verdict**: 4 of 6 metrics hit synthesis ceilings trivially; 2 (anchor retention + center score) carry real substrate-derived signal. Chapter 151 schemas now have a production caller + reproducible empirical numbers — closes the "schema-only no real wire" critique. True real-data wiring (projections on turn result) deferred to future chapter requiring Codable refactor of projections + sub-aggregates. Test counts unchanged (BAS 2915, Qinao 1435, 全栈 4350) / 5 gates clean / no substrate code change (all changes in sample-host bench layer).
+
+---
+
+## 一百五十三、 一次性解决掉 — 4 typed projection fields wired to EBrainTurnResult, REAL substrate data exposes chapter 152 synthesis was wrong (M578 / 2026-05-05)
+
+### 153.1 触发动作
+
+User said "一次性解决掉" after chapter 一百五十二 honestly disclosed: 4 of 6 doctrine metrics hit synthesis ceiling because bench couldn't read substrate's real `BASAxisAlignment` / `BASHumanAnchorSignal` / `BASRiverOriginTrace` / `BASYaochiSanctumEntry` instances. Chapter 一百五十二 deferred true wire to "future chapter requiring Codable refactor of projections".
+
+### 153.2 Survey: full BASAuditObservationProjections Codable refactor is too big
+
+`BASAuditObservationProjections` has **60+ fields** with ~20 non-Codable aggregate sub-types (e.g. `BASOldSealSealingProtocol.Aggregate`, `BASEvolutionLifecycleSession.Aggregate`, `BASKunlunJadeCanonProtocol.Verification`, etc — each `Sendable + Equatable` only, NOT Codable per design).
+
+Making the whole bag Codable requires touching every aggregate type + sub-types. That's multi-chapter scope, NOT one-chapter.
+
+### 153.3 Pivot: scope to 4 specific Codable fields the bench needs
+
+Each of these is already `Codable` because `BASSchemaVersioned: Codable, Equatable, Sendable`:
+
+| Field | Source type | Module | Codable status |
+|---|---|---|---|
+| `kunlunAxisAlignment` | `BASAxisAlignment` | BASOrchestration | ✅ via BASSchemaVersioned |
+| `humanAnchorSignal` | `BASHumanAnchorSignal` | BASOrchestration | ✅ |
+| `abyssalPressure` | `BASAbyssalPressure` | BASOrchestration | ✅ |
+| `unknownReserve` | `BASUnknownReserve` | BASWorldPrior | ✅ |
+
+Add these 4 directly to `BASEBrainTurnResult` as additive optional fields. Default `nil` for backward-compat.
+
+### 153.4 Implementation (M578)
+
+**Modified**: `BehavioralAISubstrate/Sources/BASHostKit/EBrainTurnResult.swift`
+- Added `import BASWorldPrior`
+- Added 4 new `public var` fields after `runtimeTrace`
+- Extended init: 4 new params with `= nil` defaults (additive, backward-compat)
+- Extended init body: 4 new `self.X = X` assignments
+- Extended `CodingKeys` enum: 4 new cases
+- Extended `init(from decoder:)`: 4 new `decodeIfPresent` calls
+- Extended `encode(to encoder:)`: 4 new `encodeIfPresent` calls
+
+**Modified**: `BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift`
+- In `runTurn(...)` `BASEBrainTurnResult(...)` construction, pass 4 fields from `projections.kunlunAxisAlignment` / `projections.humanAnchorSignal` / `projections.abyssalPressure` / `projections.unknownReserve` (the projections bag is constructed earlier in the same function for audit emission; reuses existing data).
+
+**Modified**: `QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift`
+- `runDoctrineMetricsBench()` updated: prefer `turn.kunlunAxisAlignment` / `turn.humanAnchorSignal` over synthesis; fall back to synthesis if substrate didn't emit one
+- Track `realAxisAlignments` / `realHumanAnchorSignals` / `realAbyssalPressures` / `realUnknownReserves` counters
+- Final report shows real-vs-synthesized ratio per field
+
+### 153.5 Empirical run — REAL substrate data exposes chapter 152 synthesis was WRONG
+
+```
+=== FINAL DOCTRINE METRICS (M578 / chapter 一百五十三) ===
+Sessions run:        200
+Substrate errors:    0
+Elapsed:             0.48s
+
+REAL-vs-SYNTHESIZED counts (M578 chapter 一百五十三 wire):
+  kunlunAxisAlignment:     200 real / 200 sessions (100.0% real)
+  humanAnchorSignal:       200 real / 200 sessions (100.0% real)
+  abyssalPressure:         200 real / 200 sessions
+  unknownReserve:          200 real / 200 sessions
+
+1. Axis Stability Score (alignments=200):
+   stabilityIndex   = 1.0000
+   centerScore mean = 0.6667         ← was 0.7465 in chapter 152
+   deviation count  = 200            ← was 46 in chapter 152
+
+5. Doctrine Harmony Score: 1.0000
+6. Human Anchor Retention:
+   retentionRatio   = 0.0000         ← was 0.9600 in chapter 152
+   preserved        = 0              ← was 192 in chapter 152
+   eroded           = 200            ← was 8 in chapter 152
+```
+
+### 153.6 What real-vs-synth diff exposes
+
+**Chapter 152 was wrong on 3 of 6 metric values**:
+
+1. **Center Score Mean** chapter 152 synth = 0.7465 → REAL = **0.6667** (= 2/3 exactly).
+   - Substrate emits a constant 2/3 placeholder for `BASAxisAlignment.centerScore` across all turns in this synthetic-decision prompt class. Chapter 152's "0.85 delay / 0.4 block" mapping was reasonable conjecture but wrong — substrate's actual emission doesn't differentiate by permit mode at the alignment level.
+
+2. **Deviation Count** chapter 152 synth = 46 (matched block decisions) → REAL = **200**.
+   - Substrate flags **every** alignment with deviation codes, regardless of permit decision. My chapter 152 synth assumed "only block decisions are deviant" — substrate disagrees.
+
+3. **Human Anchor Retention** chapter 152 synth = 0.9600 → REAL = **0.0000**.
+   - Substrate emits anchor signals where the sum of `agencyRisk + alienationRisk + dignityRisk + overwhelmRisk` is > 1.0 across all 200 sessions.
+   - Chapter 152's "stake → 0.1-0.4 risk + tone +0.15" synth dramatically UNDER-estimated substrate's actual risk emissions.
+   - This means: **substrate considers ALL synthetic decision prompts to carry high host-anchor risk, regardless of stake/tone variation**. Either substrate's anchor emission is overly cautious (over-reporting risk on benign prompts) OR our synthetic prompt template genuinely triggers high-risk anchors per substrate's measure.
+   - Either way, chapter 152's "0.96 retention" claim was a synthesis artifact, not real signal.
+
+### 153.7 What this means
+
+Chapter 152 was honestly disclosed as "synthesis ceiling — only 2 of 6 metrics carry real signal". Chapter 153 reveals the situation was worse: **the 2 chapter 152 numbers we trusted (anchor retention 0.96 + center score 0.7465) were ALSO synthesis artifacts**. Real substrate emission gives different numbers entirely.
+
+This is **honest empirical correction**: chapter 152's synthesis-from-public-fields approach didn't capture substrate's actual emission patterns. Chapter 153 wire to real fields exposes the gap.
+
+**Doctrine implication**: substrate's `humanAnchorSignal` consistently emits high-risk values for synthetic decision prompts. To exercise the anchor retention metric properly, would need (a) prompts that genuinely lower risk (small-stakes Q&A) OR (b) understanding why substrate defaults to high risk on synthetic decision prompts (could be by-design pessimism / could be over-emission).
+
+### 153.8 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| #1 / #2 / #3 invariants | ✓ additive Codable fields on turn result; no permit.mode mutation; no audit hash chain change |
+| Anti-magic-number | ✓ no new numeric thresholds |
+| Anti-recursion | ✓ |
+| Honest-correction | ✓ §153.6 explicitly corrects chapter 152's claimed "real signals" — turns out they were synthesis artifacts too |
+| Schema parity gate | ✓ +0 new schemas (4 fields on existing struct) |
+
+### 153.9 测试基线
+
+| 套件 | 一百五十二 章末 | 一百五十三 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2915 | **2915** | unchanged |
+| Qinao XCTest | 1435 | **1435** | unchanged |
+| 全栈 | 4350 | **4350** | unchanged |
+| 5 gates | clean | **clean** | unchanged |
+| Bench real-projection wire | ❌ 0% real (full synthesis) | **✅ 100% real (4 fields)** | true wire |
+| Chapter 152 "real signal" claims | trusted | **invalidated by real data** | honest correction |
+
+### 153.10 一句话总结
+
+**Chapter 一百五十三 (M578 — 一次性解决掉)**: respond to user "一次性解决掉" after chapter 一百五十二 deferred "true real-data wiring requires Codable refactor of projections + sub-aggregates". Surveyed: full `BASAuditObservationProjections` Codable refactor too big (60+ fields, ~20 non-Codable aggregates). Pivoted to scoped 4-field approach: add `kunlunAxisAlignment` + `humanAnchorSignal` + `abyssalPressure` + `unknownReserve` directly to `BASEBrainTurnResult` as additive optional fields (each already `BASSchemaVersioned: Codable`); wire `EBrainRuntimeCoordinator.runTurn(...)` to pass them from existing projections bag (zero new computation, just thread the values). Bench now prefers `turn.kunlunAxisAlignment` / etc over synthesis. **Empirical run shows 100% real-data capture** (200/200 sessions get real `BASAxisAlignment` + `BASHumanAnchorSignal` + `BASAbyssalPressure` + `BASUnknownReserve` from substrate). **And exposes chapter 152's claimed "real signals" were ALSO synthesis artifacts**: center score mean 0.7465 → REAL 0.6667 (substrate emits constant 2/3); deviation count 46 → REAL 200 (substrate flags all as deviant); **anchor retention 0.9600 → REAL 0.0000** (substrate emits high-risk anchors across all 200 sessions). Honest empirical correction: chapter 152's synthesis-from-public-fields under-estimated substrate's actual risk emission. Test counts unchanged (BAS 2915, Qinao 1435, 全栈 4350) / 5 gates clean / additive backward-compat substrate API change. **Schema-only → schema-with-real-production-wire** in one chapter.

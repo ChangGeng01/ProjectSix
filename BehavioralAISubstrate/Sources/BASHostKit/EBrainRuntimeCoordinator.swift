@@ -2346,7 +2346,15 @@ public struct BASEBrainRuntimeCoordinator {
             versionDeltas: evolutionGovernance.versionDeltas,
             retractionOrders: evolutionGovernance.retractionOrders,
             evolutionSeals: evolutionGovernance.evolutionSeals,
-            runtimeTrace: finalizedRuntimeTrace
+            runtimeTrace: finalizedRuntimeTrace,
+            // M578 (chapter 一百五十三 — 一次性解决掉) — populate
+            // 4 typed projection fields directly on turn result so
+            // bench/observability code can read REAL substrate
+            // outputs instead of synthesizing from public fields.
+            kunlunAxisAlignment: projections.kunlunAxisAlignment,
+            humanAnchorSignal: projections.humanAnchorSignal,
+            abyssalPressure: projections.abyssalPressure,
+            unknownReserve: projections.unknownReserve
         )
     }
 
