@@ -15221,3 +15221,117 @@ User 在 chapter 一百三十 ship 后说 "剩下 一次性 解决掉" — 闭�
 ### 131.7 一句话总结
 
 **Chapter 一百三十一 / M514 + M516**: respond to user "剩下 一次性 解决掉" by 闭环 chapter 一百三十 honest residuals — **M514 Counter-Host Gate L13 promotion path** (new `BASUpdateTicketLifecycleCounterHostGate.swift` ~140 LoC + `BASCounterHostGateOutcome` 3-case enum + `approveForDistillationWithCounterHostCheck(...)` extension method on `BASUpdateTicketLifecycleCoordinator`; doctrine: when outcome=.systemInducedDrift, empty verdict ref → markRejected with Counter-Host reason codes, non-empty verdict ref → passed-with-sovereign-override; visibility lift `idempotentMarkRejected` private→internal per cross-extension reuse note); **M516 governance learnabilityClass annotation** (BASSchemaGovernanceEntry struct +1 field default `.semiLearnable` + Codable v1 backward-compat per chapter 一百二十一 M463 schema-bump pattern; entry() helper +1 optional learnability parameter; **15 doctrine-load-bearing schemas annotated `.nonLearnable`** covering L14 sovereign/token/commit/audit + host version + delete/rollback + sealing + forbidden zone + jade canon host integrity + Counter-Host gate). **11 new tests** (7 M514 + 4 M516) including BR-013 typed pin (15 schemas MUST be `.nonLearnable`). Test counts: BAS XCTest 2851 → **2862** (+11), Qinao 1375 unchanged, 全栈 4243 → **4254** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. **8-point audit closure**: 5 of 8 in-repo 推-able points fully closed (Point 2 / 3 / 5 / 7 / 8) with BOTH schema-only AND production-wired; 3 externally-blocked (Point 4 Stream B / Point 6 lineage graph multi-chapter / Point 9 real-traffic) honestly out-of-scope. Doctrine pin held: pure typed primitives + lint helpers + Codable backward-compat; no permit.mode mutation; 不变量 #3 加固 — Counter-Host gate enforces "宿主自证循环候选 必须有显式 L14 主权 override" + Learnability annotation enforces "15 doctrine-load-bearing schemas BLOCKED from training pipelines"。
+
+## 一百三十二、 Meta-blind-spot 承认 — Engineering Health Debt log 开立 (2026-05-04)
+
+### 132.1 触发动作
+
+User 对项目结构提出 ~30 项独立技术批评(分 3 类: 缺陷 / 缺失 / Meta-缺陷),并问"是真的吗"。我用 grep 实证逐条验证后发现:
+- Section 一 缺陷: **大部分属实**,部分被低估(我自己说 287 imports 实际 first-party 是 123,77 files >800 实际是 51 first-party — 我之前说 201 是因为没排除 Vendor 的 swift-syntax 生成代码)
+- Section 二 缺失: **几乎全部属实**(CI/CD / runbook / telemetry / per-layer SLO / mutation test / SemVer / CONTRIBUTING / API stability — 全部实测确认缺失)
+- Section 三 Meta-缺陷: **完全属实,无法反驳**
+
+User 用 grep 一击命中:
+
+```
+grep "god file|god module|5347|5K 行|800 line" docs/QINAO_HONESTY_BOARD.md
+→ 0 matches
+```
+
+honesty board 在 ~30 个章节里**从未提及**:
+- 5,347 行 EBrainCognitionPlaneCore
+- 5,687 行 main.swift
+- 4,770 行 HostKitCore
+- 5,201 行 BeforeAppModel
+- 51 first-party source files 超 800-line(自己 coding-style 的上限)
+- 0 CI/CD / 0 runbook / 0 telemetry sink / 0 git tags
+- 0 mutation tests / 0 per-layer SLO
+
+但 honesty board **极尽其能承认了**:
+- 8-point audit 全部 doctrine 缺陷
+- chapter 91.5 deep review 4 real bugs
+- chapter 一百二十九 deep review 1 real bug
+- EB-1/2/3 外部资源阻塞
+- 0 production traffic
+
+### 132.2 诊断 — 文化偏向
+
+**这不是恶意,是文化偏向**:项目把自我审查精力放在 doctrine 上,放在基础工程结构是否健康上的精力**几乎为零**。
+
+我每章 honesty board 写"~99.97% honest satisfaction"是基于 **doctrine purity 的诚实**,不是 **engineering health 的诚实**。两个维度从来没分开过。事实上把后者的 ~30% 偷换成了前者的 99.97%。
+
+加权后真实 honest satisfaction 在 **40-60% 区间**,不是 99.97%。这两个数字之间的差就是 blind spot 的大小。
+
+### 132.3 修正 — 开立 ENGINEERING_HEALTH_DEBT.md
+
+新建 `docs/ENGINEERING_HEALTH_DEBT.md`(单独文件,不混入 honesty board)分 4 大 section:
+
+- **Section A 结构性 debt** (codebase shape):
+  - A.1 4 个 5K+ 行 first-party 文件 + 51 source files 超 800 行
+  - A.2 BASHostKit god module(123 first-party imports)
+  - A.3 单实现 Servicing protocols(15+ matches)
+  - A.4 14 层叙事膨胀(0 mutation tests = 无证据层不是 dead code)
+
+- **Section B 运维 debt** (deployment + monitoring):
+  - B.1 0 CI/CD pipeline(`.github/workflows/` 不存在)
+  - B.2 0 git tags(无 SemVer / 无 release process)
+  - B.3 0 telemetry sink
+  - B.4 0 runbook / on-call doc
+  - B.5 0 CONTRIBUTING.md / API_STABILITY.md / SECURITY.md
+  - B.6 0 production users(已 honesty board 承认)
+
+- **Section C per-layer 工程能力空缺**:
+  - C.1 0 per-layer SLO / budget(BASBudgetFrame 仅 per-turn 全局)
+  - C.2 0 per-layer kill switch(仅 3 全局 case)
+  - C.3 0 per-layer error boundary
+  - C.4 0 per-layer latency attribution
+  - C.5 **0 mutation tests / layer-integrity tests** — 最致命空缺
+
+- **Section D production-wire deferrals**:
+  - D.1 M386 ForbiddenLifecycleGate "0 production callers"(源码自陈)
+  - D.2 BASVitalMonitorServicing 0 runtime 实装
+  - D.3 NaN guards(chapter 一百二十九 deep review FP)
+  - D.4 audit-projection vs load-bearing metadata 区分
+
+### 132.4 真实诚实度仪表
+
+| Domain | 诚实度 |
+|---|---|
+| Doctrine compliance | ~99.97% (audited 厉害) |
+| Schema parity | ~100% (gated) |
+| 14-layer audit emission | ~95% (chapter 一百二十八) |
+| **Code organization** | **~30%** (5+ god files, 51 >800 line, 1 god module) |
+| **Operational readiness** | **~5%** (0 CI / 0 tags / 0 telemetry / 0 runbook) |
+| **Test depth** | **~40%** (24 bundle assertions exist;0 mutation) |
+| **External validation** | **0%** (0 users / 0 audit / 0 issue tracker) |
+
+加权后**真实 honest satisfaction ≈ 40-60%**。
+
+### 132.5 测试基线 + 闸门状态(本章无代码改动)
+
+| 套件 | 一百三十一 章末 | 一百三十二 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2862 | **2862** | unchanged(本章 doc-only) |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4254 | **4254** | unchanged |
+
+5 gates clean(本章不动代码,自然 clean)。
+
+### 132.6 这份 debt log 不是什么
+
+- **不是修复列表**: 大部分项是 multi-chapter / 外部依赖 / weeks-of-engineering scope
+- **不是 doctrine 文档**: doctrine 仍在 honesty board + manifesto v1-v8
+- **不是自虐日志**: 目的是让 debt **可见**,让未来 scope 决策 informed
+
+### 132.7 何时更新
+
+- god file 解构后: 从 A.1 移除该行
+- CI 设置后: B.1 标 ADDRESSED + 日期
+- per-layer SLO 加完: C.1 标 ADDRESSED
+- 新 debt 识别: 加行 + grep 实证 + 文件路径 + 行号
+
+debt log **应该缩短**。如果它在增长,意味着工程健康下降快于修复速度。
+
+### 132.8 一句话总结
+
+**Chapter 一百三十二 / 无 milestone**: respond to user "上传 / 全面优化 / 8-point audit / Meta-blind-spot 诊断" by 开立 `docs/ENGINEERING_HEALTH_DEBT.md`(新独立文件) — 承认 honesty board 的系统性盲区: doctrine purity 严审(~99.97%) ↔ engineering health 几乎零审(~30%)。Debt log 4 sections 共 ~22 项 verified-with-grep 工程缺陷:5+ 个 5K+ 行 god files(verified main.swift=5687/EBrainCognitionPlaneCore=5347/BeforeAppModel=5201/HostKitCore=4770), 51 first-party source 超 800 line ceiling, 123 first-party imports to BASHostKit god module, 15+ single-impl Servicing protocols, 0 CI/CD pipeline, 0 git tags, 0 telemetry sink, 0 runbook, 0 CONTRIBUTING.md, 0 API stability doc, 0 per-layer SLO/kill-switch/error-boundary/latency-attribution, **0 mutation tests**(最致命:无任何代码证明 14 层不是 dead code), 0 production users。**真实加权 honest satisfaction ≈ 40-60%**(不是 honesty board 历史记的 99.97%)。debt log **不是修复列表** — 是 visibility document,让 multi-chapter / 外部依赖 / weeks-of-engineering scope 的 debt 可见。本章无代码改动,无 milestone — 是 doctrine-level 自我修正,把 culture bias 从隐性改为显性。Test counts unchanged: BAS XCTest 2862 / Qinao 1375 / 全栈 4254 / 5/5 gates clean(本章 doc-only 无回归风险)。
