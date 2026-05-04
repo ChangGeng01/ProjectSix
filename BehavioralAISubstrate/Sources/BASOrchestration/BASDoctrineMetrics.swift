@@ -872,3 +872,78 @@ public enum BASDoctrineMetricsCompute {
             retentionRatio: ratio)
     }
 }
+
+// MARK: - Percentile summary (M591 chapter 一百六十三)
+
+/// Typed percentile summary for a sample of doubles. Pure value-
+/// type produced by `BASDoctrinePercentileSummary.compute(_:)`.
+/// Empty input → all percentiles 0.0 + thresholdCounts all 0.
+///
+/// **M591 chapter 一百六十三**: extracted from main.swift bench
+/// (`formatAnchorDistribution` helper) into substrate library so
+/// percentile math is unit-testable. Pre-extraction the helper
+/// lived in executable target with no `@testable` reach.
+public struct BASDoctrinePercentileSummary:
+    Sendable, Equatable, Codable
+{
+    public let sampleCount: Int
+    public let min: Double
+    public let p25: Double
+    public let median: Double
+    public let p75: Double
+    public let p99: Double
+    public let max: Double
+    /// Number of samples ≥ each threshold (in order, 1:1 with
+    /// `thresholds` input to compute).
+    public let thresholdCounts: [Int]
+    public init(
+        sampleCount: Int, min: Double, p25: Double,
+        median: Double, p75: Double, p99: Double,
+        max: Double, thresholdCounts: [Int]
+    ) {
+        self.sampleCount = Swift.max(0, sampleCount)
+        self.min = min
+        self.p25 = p25
+        self.median = median
+        self.p75 = p75
+        self.p99 = p99
+        self.max = max
+        self.thresholdCounts = thresholdCounts
+    }
+
+    /// Compute typed percentile summary from a sample. Uses
+    /// nearest-rank percentile via `Int((n-1) * fraction)` (parity
+    /// with M590 chapter 一百六十二 axisStability formula fix).
+    /// Empty input → all-zero summary (safe; no crash).
+    public static func compute(
+        _ samples: [Double],
+        thresholds: [Double] = [1.0, 1.5, 2.0]
+    ) -> BASDoctrinePercentileSummary {
+        guard !samples.isEmpty else {
+            return BASDoctrinePercentileSummary(
+                sampleCount: 0,
+                min: 0, p25: 0, median: 0,
+                p75: 0, p99: 0, max: 0,
+                thresholdCounts: Array(
+                    repeating: 0, count: thresholds.count))
+        }
+        let sorted = samples.sorted()
+        let n = sorted.count
+        let safeIdx = { (frac: Double) -> Int in
+            Swift.min(n - 1,
+                Swift.max(0, Int(Double(n - 1) * frac)))
+        }
+        let counts = thresholds.map { t in
+            samples.filter { $0 >= t }.count
+        }
+        return BASDoctrinePercentileSummary(
+            sampleCount: n,
+            min: sorted[0],
+            p25: sorted[safeIdx(0.25)],
+            median: sorted[safeIdx(0.50)],
+            p75: sorted[safeIdx(0.75)],
+            p99: sorted[safeIdx(0.99)],
+            max: sorted[n - 1],
+            thresholdCounts: counts)
+    }
+}

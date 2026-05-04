@@ -927,4 +927,176 @@ final class BASDoctrineMetricsTests: XCTestCase {
                 sampleCount: 100)
         XCTAssertEqual(harmony.harmonyScore, 0.0)
     }
+
+    // MARK: - 16. M591 chapter 一百六十三 — Adversarial reality-report tests
+
+    /// **M591 chapter 一百六十三**: chapter 162 disclosed that 3 of 6
+    /// metrics (gate fidelity, origin completeness, sanctum leak)
+    /// are "reality reports" — constant by substrate construction
+    /// in the current bench. Adversarial tests below verify the
+    /// COMPUTE HELPERS produce non-constant output for non-constant
+    /// input, proving formulas are sound (the constants are due to
+    /// substrate exercise, not metric defect).
+
+    /// Adversarial: gate fidelity falls below 1.0 when ANY pending.
+    func testGateFidelityVariesWithPending() {
+        let gates = [
+            makeGate(id: "g1", state: .passed),
+            makeGate(id: "g2", state: .pending),  // unfaithful
+            makeGate(id: "g3", state: .denied),
+            makeGate(id: "g4", state: .pending),  // unfaithful
+        ]
+        let score = BASDoctrineMetricsCompute.gateFidelity(
+            metricID: "test-adversarial-pending",
+            from: gates)
+        // resolved = 2 / total 4 = 0.5 → fidelity < 1.0
+        XCTAssertEqual(score.fidelityRatio, 0.5)
+        XCTAssertLessThan(score.fidelityRatio, 1.0)
+    }
+
+    /// Adversarial: origin trace completeness falls below 1.0 when
+    /// ANY trace is missing roots.
+    func testOriginCompletenessVariesWithMissingRoots() {
+        let full = BASRiverOriginTrace(
+            traceID: "f", rootSourceRefs: ["r"],
+            tributaryRefs: [], derivedObjectRefs: [],
+            transformationSteps: ["s"],
+            consentRefs: [], permitRefs: [],
+            auditRefs: ["a"],
+            deletionDependents: [], lineageCutRefs: [])
+        let missing = BASRiverOriginTrace(
+            traceID: "m", rootSourceRefs: [],  // missing roots
+            tributaryRefs: [], derivedObjectRefs: [],
+            transformationSteps: ["s"],
+            consentRefs: [], permitRefs: [],
+            auditRefs: ["a"],
+            deletionDependents: [], lineageCutRefs: [])
+        let score = BASDoctrineMetricsCompute
+            .originTraceCompleteness(
+                metricID: "test-adversarial-orphan",
+                from: [full, missing])
+        // 1 of 2 full → 0.5
+        XCTAssertEqual(score.completenessRatio, 0.5)
+        XCTAssertEqual(score.tracesWithMissingRoots, 1)
+        XCTAssertLessThan(score.completenessRatio, 1.0)
+    }
+
+    /// Adversarial: sanctum leak rate rises above 0.0 when
+    /// unauthorized retrieval attempts succeed.
+    func testSanctumLeakRateVariesWithUnauthorizedSuccess() {
+        let entries = [
+            BASYaochiSanctumEntry(
+                entryID: "s1", memoryRef: "m",
+                hostRef: "h", sanctumClass: .sensitive,
+                accessPolicy: .sealed, revealConditions: [],
+                coolingPeriod: 0,
+                humanAnchorRequired: true,
+                lastRevealedAt: ""),
+        ]
+        let score = BASDoctrineMetricsCompute.sanctumLeakRate(
+            metricID: "test-adversarial-leak",
+            from: entries,
+            unauthorizedAttempts: 10,
+            unauthorizedBlocked: 7)
+        // 3 leaked / 10 = 0.3 leak rate
+        XCTAssertEqual(score.leakRate, 0.3, accuracy: 0.001)
+        XCTAssertGreaterThan(score.leakRate, 0.0)
+    }
+
+    /// Adversarial: zero leakRate is correctly reported when ALL
+    /// unauthorized attempts are blocked (substrate doing its job).
+    /// Distinguishes "metric measures perfect protection" from
+    /// "metric has no input" (chapter 159 disclosure).
+    func testSanctumLeakRateZeroWithFullBlocking() {
+        let entries = [
+            BASYaochiSanctumEntry(
+                entryID: "s1", memoryRef: "m",
+                hostRef: "h", sanctumClass: .sensitive,
+                accessPolicy: .sealed, revealConditions: [],
+                coolingPeriod: 0, humanAnchorRequired: true,
+                lastRevealedAt: ""),
+        ]
+        let score = BASDoctrineMetricsCompute.sanctumLeakRate(
+            metricID: "test-perfect-protection",
+            from: entries,
+            unauthorizedAttempts: 50,
+            unauthorizedBlocked: 50)
+        // 0 leaked / 50 = 0.0; meaningful (not vacuous 0/0)
+        XCTAssertEqual(score.leakRate, 0.0)
+        XCTAssertEqual(score.unauthorizedRetrievalAttempts, 50)
+        XCTAssertEqual(score.unauthorizedRetrievalsBlocked, 50)
+    }
+
+    // MARK: - 17. M591 — BASDoctrinePercentileSummary
+
+    /// Empty input → all zeros + threshold counts all 0.
+    func testPercentileSummaryEmpty() {
+        let s = BASDoctrinePercentileSummary.compute(
+            [], thresholds: [1.0, 1.5, 2.0])
+        XCTAssertEqual(s.sampleCount, 0)
+        XCTAssertEqual(s.min, 0)
+        XCTAssertEqual(s.max, 0)
+        XCTAssertEqual(s.p25, 0)
+        XCTAssertEqual(s.median, 0)
+        XCTAssertEqual(s.thresholdCounts, [0, 0, 0])
+    }
+
+    /// Single element → all percentiles equal the element value.
+    func testPercentileSummarySingleElement() {
+        let s = BASDoctrinePercentileSummary.compute(
+            [0.42], thresholds: [0.0, 1.0])
+        XCTAssertEqual(s.sampleCount, 1)
+        XCTAssertEqual(s.min, 0.42)
+        XCTAssertEqual(s.max, 0.42)
+        XCTAssertEqual(s.p25, 0.42)
+        XCTAssertEqual(s.median, 0.42)
+        XCTAssertEqual(s.p75, 0.42)
+        XCTAssertEqual(s.p99, 0.42)
+        XCTAssertEqual(s.thresholdCounts, [1, 0])
+    }
+
+    /// 200 elements bimodal {1.05 (154x), 1.85 (46x)} — chapter
+    /// 一百五十四 calibration empirical sample. Pin percentiles
+    /// AND threshold counts.
+    func testPercentileSummaryChapter154Bimodal() {
+        var samples: [Double] = []
+        samples.append(contentsOf:
+            Array(repeating: 1.05, count: 154))
+        samples.append(contentsOf:
+            Array(repeating: 1.85, count: 46))
+        let s = BASDoctrinePercentileSummary.compute(
+            samples, thresholds: [1.0, 1.5, 2.0])
+        XCTAssertEqual(s.sampleCount, 200)
+        XCTAssertEqual(s.min, 1.05)
+        XCTAssertEqual(s.max, 1.85)
+        // p25 (index Int(199*0.25)=49 → 1.05)
+        XCTAssertEqual(s.p25, 1.05)
+        // p75 (index Int(199*0.75)=149 → 1.05; 1.85 starts at 154)
+        XCTAssertEqual(s.p75, 1.05)
+        // p99 (index Int(199*0.99)=197 → 1.85)
+        XCTAssertEqual(s.p99, 1.85)
+        // ≥1.0: 200, ≥1.5: 46, ≥2.0: 0
+        XCTAssertEqual(s.thresholdCounts, [200, 46, 0])
+    }
+
+    /// Codable round-trip preserves all fields.
+    func testPercentileSummaryCodable() throws {
+        let original = BASDoctrinePercentileSummary(
+            sampleCount: 10,
+            min: 0.1, p25: 0.3, median: 0.5,
+            p75: 0.7, p99: 0.95, max: 1.0,
+            thresholdCounts: [10, 5, 1])
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(
+            BASDoctrinePercentileSummary.self, from: data)
+        XCTAssertEqual(decoded, original)
+    }
+
+    /// Custom thresholds.
+    func testPercentileSummaryCustomThresholds() {
+        let s = BASDoctrinePercentileSummary.compute(
+            [0.1, 0.2, 0.5, 0.8, 0.95],
+            thresholds: [0.5, 0.9])
+        XCTAssertEqual(s.thresholdCounts, [3, 1])
+    }
 }

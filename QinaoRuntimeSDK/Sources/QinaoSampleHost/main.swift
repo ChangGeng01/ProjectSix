@@ -5505,17 +5505,18 @@ struct QinaoSampleHost {
         }
     }
 
-    /// M588 (chapter 一百六十) — Issue A (deep-review iter 2):
-    /// safe percentile/min/max formatter for the bench's anchor
-    /// risk-sum distribution. Pre-fix the bench crashed on empty
-    /// `anchorSums` (count=0 or all substrate calls failed)
-    /// because `sorted()[count / 4]` indexes empty array. Post-
-    /// fix: returns "no samples" for empty input, otherwise
-    /// computes percentiles with bounds-checked indices.
+    /// M591 (chapter 一百六十三) — refactored to delegate
+    /// percentile math to `BASDoctrinePercentileSummary.compute`
+    /// in BAS substrate (now testable + reusable). This helper
+    /// just formats the typed summary for the bench banner.
+    /// M588 (chapter 一百六十) introduced the empty-guard; M591
+    /// extracts math to substrate so it can be unit-tested.
     private static func formatAnchorDistribution(
         _ sums: [Double]
     ) -> String {
-        guard !sums.isEmpty else {
+        let summary = BASDoctrinePercentileSummary.compute(
+            sums, thresholds: [1.0, 1.5, 2.0])
+        guard summary.sampleCount > 0 else {
             return """
             min:    n/a
               p25:    n/a
@@ -5529,26 +5530,18 @@ struct QinaoSampleHost {
               ≥ 2.0:  0
             """
         }
-        let sorted = sums.sorted()
-        let n = sorted.count
-        let safeIdx = { (frac: Double) -> Int in
-            min(n - 1, max(0, Int(Double(n) * frac)))
-        }
-        let p25 = sorted[safeIdx(0.25)]
-        let median = sorted[safeIdx(0.50)]
-        let p75 = sorted[safeIdx(0.75)]
-        let p99 = sorted[safeIdx(0.99)]
         let f = { (v: Double) in String(format: "%.3f", v) }
+        let counts = summary.thresholdCounts
         return """
-        min:    \(f(sums.min() ?? 0))
-              p25:    \(f(p25))
-              median: \(f(median))
-              p75:    \(f(p75))
-              p99:    \(f(p99))
-              max:    \(f(sums.max() ?? 0))
-              ≥ 1.0:  \(sums.filter { $0 >= 1.0 }.count)
-              ≥ 1.5:  \(sums.filter { $0 >= 1.5 }.count)
-              ≥ 2.0:  \(sums.filter { $0 >= 2.0 }.count)
+        min:    \(f(summary.min))
+              p25:    \(f(summary.p25))
+              median: \(f(summary.median))
+              p75:    \(f(summary.p75))
+              p99:    \(f(summary.p99))
+              max:    \(f(summary.max))
+              ≥ 1.0:  \(counts[0])
+              ≥ 1.5:  \(counts[1])
+              ≥ 2.0:  \(counts[2])
         """
     }
 
