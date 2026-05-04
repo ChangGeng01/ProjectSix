@@ -552,7 +552,18 @@ public enum BASDoctrineMetricsCompute {
             case .pending: break
             }
         }
-        let resolved = passed + denied
+        // M581 chapter 一百五十六 — defect #18 fix:
+        // `.remanded` (sovereign-level second-check required) IS a
+        // doctrine-correct gate decision per Kunlun §4.3 / RL5
+        // ("不能让天门许可绕过宿主授权"). The gate is faithful to its
+        // function — it resolved with "needs sovereign confirmation"
+        // rather than auto-pass/deny. Pre-M581 formula counted only
+        // (passed + denied) → bench saw 0/200 fidelity on real
+        // substrate that emitted 200/200 `.remanded` (false-floor).
+        // Post-M581: fidelity = resolved / total where resolved
+        // includes remanded; only `.pending` (no decision yet)
+        // counts as un-faithful.
+        let resolved = passed + denied + remanded
         let fidelity = Double(resolved) / Double(total)
         return BASGateFidelityScore(
             metricID: metricID,

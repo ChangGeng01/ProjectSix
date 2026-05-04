@@ -71,6 +71,26 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
     public var abyssalPressure: BASAbyssalPressure?
     public var unknownReserve: BASUnknownReserve?
 
+    /// M581 (chapter 一百五十六) — additional 3 typed schema-mode
+    /// projections wired so the doctrine metrics bench
+    /// (`runDoctrineMetricsBench`) can read REAL substrate-emitted
+    /// permits / lineage / sanctum entries instead of synthesizing
+    /// them from `(permitMode, stake, tone)` triples. Without these
+    /// 3 fields, gateFidelity / originTraceCompleteness /
+    /// sanctumLeakRate hit synthesis-saturation 1.0 / 1.0 / 0.0 in
+    /// chapter 一百五十五 final run.
+    ///
+    /// Substrate construction sites (verified):
+    /// - `BASHeavenGatePermit` constructed at
+    ///   `EBrainRuntimeCoordinator.swift:335` (per turn)
+    /// - `BASRiverOriginTrace` constructed at
+    ///   `EBrainRuntimeCoordinator.swift:1901` (per turn)
+    /// - `BASYaochiSanctumEntry` constructed at
+    ///   `EBrainRuntimeCoordinator.swift:267` (per turn)
+    public var kunlunHeavenGatePermit: BASHeavenGatePermit?
+    public var kunlunRiverOriginTrace: BASRiverOriginTrace?
+    public var yaochiSanctumEntry: BASYaochiSanctumEntry?
+
     public init(
         deviceState: BASDeviceState,
         budgetFrame: BASBudgetFrame,
@@ -123,7 +143,10 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         kunlunAxisAlignment: BASAxisAlignment? = nil,
         humanAnchorSignal: BASHumanAnchorSignal? = nil,
         abyssalPressure: BASAbyssalPressure? = nil,
-        unknownReserve: BASUnknownReserve? = nil
+        unknownReserve: BASUnknownReserve? = nil,
+        kunlunHeavenGatePermit: BASHeavenGatePermit? = nil,
+        kunlunRiverOriginTrace: BASRiverOriginTrace? = nil,
+        yaochiSanctumEntry: BASYaochiSanctumEntry? = nil
     ) {
         self.deviceState = deviceState
         self.budgetFrame = budgetFrame
@@ -174,6 +197,9 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.humanAnchorSignal = humanAnchorSignal
         self.abyssalPressure = abyssalPressure
         self.unknownReserve = unknownReserve
+        self.kunlunHeavenGatePermit = kunlunHeavenGatePermit
+        self.kunlunRiverOriginTrace = kunlunRiverOriginTrace
+        self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -226,6 +252,9 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         case humanAnchorSignal
         case abyssalPressure
         case unknownReserve
+        case kunlunHeavenGatePermit
+        case kunlunRiverOriginTrace
+        case yaochiSanctumEntry
     }
 
     public init(from decoder: Decoder) throws {
@@ -298,6 +327,15 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
             BASAbyssalPressure.self, forKey: .abyssalPressure)
         unknownReserve = try container.decodeIfPresent(
             BASUnknownReserve.self, forKey: .unknownReserve)
+        kunlunHeavenGatePermit = try container.decodeIfPresent(
+            BASHeavenGatePermit.self,
+            forKey: .kunlunHeavenGatePermit)
+        kunlunRiverOriginTrace = try container.decodeIfPresent(
+            BASRiverOriginTrace.self,
+            forKey: .kunlunRiverOriginTrace)
+        yaochiSanctumEntry = try container.decodeIfPresent(
+            BASYaochiSanctumEntry.self,
+            forKey: .yaochiSanctumEntry)
         wakeIntent = try container.decodeIfPresent(BASWakeIntent.self, forKey: .wakeIntent)
             ?? BASEBrainTurnResult.defaultWakeIntent(for: budgetFrame)
         vitalState = try container.decodeIfPresent(BASVitalState.self, forKey: .vitalState)
@@ -422,6 +460,14 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
             abyssalPressure, forKey: .abyssalPressure)
         try container.encodeIfPresent(
             unknownReserve, forKey: .unknownReserve)
+        try container.encodeIfPresent(
+            kunlunHeavenGatePermit,
+            forKey: .kunlunHeavenGatePermit)
+        try container.encodeIfPresent(
+            kunlunRiverOriginTrace,
+            forKey: .kunlunRiverOriginTrace)
+        try container.encodeIfPresent(
+            yaochiSanctumEntry, forKey: .yaochiSanctumEntry)
     }
 
     private static func defaultWakeIntent(for budgetFrame: BASBudgetFrame) -> BASWakeIntent {

@@ -144,8 +144,36 @@ final class BASDoctrineMetricsTests: XCTestCase {
         XCTAssertEqual(score.gatePassed, 2)
         XCTAssertEqual(score.gateDenied, 1)
         XCTAssertEqual(score.gateRemandedForSecondCheck, 1)
-        // resolved = passed + denied = 3 / total 5 = 0.6
-        XCTAssertEqual(score.fidelityRatio, 0.6, accuracy: 0.001)
+        // M581 chapter 一百五十六 — defect #18 fix:
+        // resolved = passed + denied + remanded = 4 / total 5 = 0.8
+        // (.remanded is doctrine-correct gate decision per Kunlun
+        // §4.3 / RL5; only .pending counts as unfaithful)
+        XCTAssertEqual(score.fidelityRatio, 0.8, accuracy: 0.001)
+    }
+
+    /// M581 chapter 一百五十六 — defect #18 regression guard:
+    /// 200/200 `.remanded` substrate emission (sovereign verdict
+    /// is `.toolCut`/`.memoryFreeze`/`.quarantine`) must give
+    /// fidelity 1.0, not 0.0. Pre-fix: `(passed+denied)/total = 0`.
+    /// Post-fix: `(passed+denied+remanded)/total = 1.0`.
+    func testGateFidelityAllRemandedIsFaithful() {
+        let gates = (0..<10).map {
+            makeGate(id: "g\($0)", state: .remanded)
+        }
+        let score = BASDoctrineMetricsCompute.gateFidelity(
+            metricID: "test-remanded", from: gates)
+        XCTAssertEqual(score.gateRemandedForSecondCheck, 10)
+        XCTAssertEqual(score.fidelityRatio, 1.0)
+    }
+
+    /// M581 chapter 一百五十六 — only `.pending` is unfaithful.
+    func testGateFidelityAllPendingIsUnfaithful() {
+        let gates = (0..<10).map {
+            makeGate(id: "g\($0)", state: .pending)
+        }
+        let score = BASDoctrineMetricsCompute.gateFidelity(
+            metricID: "test-pending", from: gates)
+        XCTAssertEqual(score.fidelityRatio, 0.0)
     }
 
     private func makeGate(

@@ -1391,6 +1391,94 @@ struct BASEBrainSchemaCoreTests {
         #expect(decoded.singleUse)
     }
 
+    /// M581 chapter 一百五十六 — verify substrate populates the 3
+    /// newly-wired typed schema-mode projection fields
+    /// (`kunlunHeavenGatePermit` / `kunlunRiverOriginTrace` /
+    /// `yaochiSanctumEntry`) on each turn AND that they round-trip
+    /// cleanly through Codable.
+    @Test("turn result populates 3 new typed schema fields and round-trips")
+    func turnResultThreeNewSchemaFieldsPopulatedAndRoundTrip() throws {
+        let runtime = BASHostRuntime(configuration: .fixtureGeneric)
+        let turn = try #require(
+            runtime.startSession(
+                BASHostSessionRequest(
+                    kind: .interactive,
+                    workflowProfile: .reflective,
+                    surface: .application,
+                    prompt: "Help me think this through.",
+                    riskLevel: .medium
+                )
+            ).eBrainTurn
+        )
+
+        // All 3 new fields populated from substrate (chapter 156
+        // empirical: 200/200 across 200-session synthetic).
+        let permit = try #require(turn.kunlunHeavenGatePermit)
+        let trace = try #require(turn.kunlunRiverOriginTrace)
+        let sanctum = try #require(turn.yaochiSanctumEntry)
+
+        // Schema versions pinned (regression guard against schema
+        // drift breaking serialization).
+        #expect(BASHeavenGatePermit.currentSchemaVersion == "1.0.0")
+        #expect(BASRiverOriginTrace.currentSchemaVersion == "1.0.0")
+        #expect(BASYaochiSanctumEntry.currentSchemaVersion == "1.0.0")
+
+        // Pin substrate emission shape: gate has gateID with
+        // tianmen prefix (deriveHeavenGateAuditProjection),
+        // trace has river prefix (kunlunRiverTraceForAudit
+        // construction), sanctum has yaochi prefix
+        // (deriveYaochiAuditProjection).
+        #expect(permit.gateID.hasPrefix("tianmen-"))
+        #expect(trace.traceID.hasPrefix("river-"))
+        #expect(sanctum.entryID.hasPrefix("yaochi-"))
+
+        // Round-trip: encode whole turn → decode → 3 fields
+        // preserved byte-equal.
+        let data = try JSONEncoder().encode(turn)
+        let decoded = try JSONDecoder().decode(
+            BASEBrainTurnResult.self, from: data)
+        #expect(decoded.kunlunHeavenGatePermit == permit)
+        #expect(decoded.kunlunRiverOriginTrace == trace)
+        #expect(decoded.yaochiSanctumEntry == sanctum)
+    }
+
+    /// M581 chapter 一百五十六 — backward-compat: legacy turn JSON
+    /// without the 3 new fields decodes successfully with `nil`
+    /// for the absent fields.
+    @Test("turn result decodes legacy payloads without M581 schema fields")
+    func turnResultBackwardDecodeWithoutM581Fields() throws {
+        let runtime = BASHostRuntime(configuration: .fixtureGeneric)
+        let turn = try #require(
+            runtime.startSession(
+                BASHostSessionRequest(
+                    kind: .interactive,
+                    workflowProfile: .primary,
+                    surface: .application,
+                    prompt: "ok",
+                    riskLevel: .low
+                )
+            ).eBrainTurn
+        )
+
+        var turnObject = try #require(
+            JSONSerialization.jsonObject(
+                with: try JSONEncoder().encode(turn)
+            ) as? [String: Any]
+        )
+        turnObject.removeValue(forKey: "kunlunHeavenGatePermit")
+        turnObject.removeValue(forKey: "kunlunRiverOriginTrace")
+        turnObject.removeValue(forKey: "yaochiSanctumEntry")
+
+        let legacyData = try JSONSerialization.data(
+            withJSONObject: turnObject)
+        let decoded = try JSONDecoder().decode(
+            BASEBrainTurnResult.self, from: legacyData)
+
+        #expect(decoded.kunlunHeavenGatePermit == nil)
+        #expect(decoded.kunlunRiverOriginTrace == nil)
+        #expect(decoded.yaochiSanctumEntry == nil)
+    }
+
     @Test("protective block action permit encodes the red-line fallback mode")
     func protectiveBlockPermitUsesBlockMode() {
         let permit = BASActionPermit.protectiveBlock(reasonCodes: ["risk.high", "gsi.elevated"])

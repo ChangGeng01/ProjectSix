@@ -2354,7 +2354,19 @@ public struct BASEBrainRuntimeCoordinator {
             kunlunAxisAlignment: projections.kunlunAxisAlignment,
             humanAnchorSignal: projections.humanAnchorSignal,
             abyssalPressure: projections.abyssalPressure,
-            unknownReserve: projections.unknownReserve
+            unknownReserve: projections.unknownReserve,
+            // M581 (chapter 一百五十六 — 解决缺陷 #15-#17) — wire 3
+            // additional REAL substrate-emitted schema types (locals
+            // built earlier in this function at lines 267 / 335 /
+            // 1901 — `kunlunYaochiSanctumForAudit` /
+            // `kunlunHeavenGateForAudit` / `kunlunRiverTraceForAudit`)
+            // so doctrine bench can use them directly instead of
+            // synthesizing from `(permitMode, stake, tone)`. Closes
+            // bench saturation: gateFidelity 1.0 / sanctumLeak 0.0 /
+            // originCompleteness 1.0 → real substrate variation.
+            kunlunHeavenGatePermit: kunlunHeavenGateForAudit,
+            kunlunRiverOriginTrace: kunlunRiverTraceForAudit,
+            yaochiSanctumEntry: kunlunYaochiSanctumForAudit
         )
     }
 

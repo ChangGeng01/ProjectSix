@@ -4995,6 +4995,11 @@ struct QinaoSampleHost {
         var realHumanAnchorSignals = 0
         var realAbyssalPressures = 0
         var realUnknownReserves = 0
+        // M581 (chapter 一百五十六) — track real-vs-synth for the
+        // 3 newly wired schema types (gate/trace/sanctum)
+        var realKunlunHeavenGatePermits = 0
+        var realKunlunRiverOriginTraces = 0
+        var realYaochiSanctumEntries = 0
         var anchorSums: [Double] = []
         var alignments: [BASAxisAlignment] = []
         var gates: [BASHeavenGatePermit] = []
@@ -5072,33 +5077,54 @@ struct QinaoSampleHost {
                 }
                 alignments.append(alignment)
 
-                // Synthesize BASHeavenGatePermit
-                let gateState: BASKunlunGateState
-                switch permit {
-                case .delay, .answer, .compare:
-                    gateState = .passed
-                case .block, .replace:
-                    gateState = .denied
-                case .escalate:
-                    gateState = .remanded
-                default:
-                    gateState = .pending
+                // M581 (chapter 一百五十六) — prefer REAL substrate
+                // BASHeavenGatePermit from turn.kunlunHeavenGatePermit.
+                // Fall back to synthesis only if substrate didn't emit
+                // one. Pre-M581 always-synthesized had passState
+                // determined entirely by `permit` switch which only
+                // had 2 typed permit modes in 200-session synthetic
+                // (defect #7 chapter 一百四十九) → gates always passed
+                // or denied, fidelityRatio saturated to 1.0.
+                let gate: BASHeavenGatePermit
+                if let realGate = turn.kunlunHeavenGatePermit {
+                    gate = realGate
+                    realKunlunHeavenGatePermits += 1
+                } else {
+                    let gateState: BASKunlunGateState
+                    switch permit {
+                    case .delay, .answer, .compare:
+                        gateState = .passed
+                    case .block, .replace:
+                        gateState = .denied
+                    case .escalate:
+                        gateState = .remanded
+                    default:
+                        gateState = .pending
+                    }
+                    gate = BASHeavenGatePermit(
+                        gateID: "gate-\(iter)",
+                        sourceRef: "intent-\(iter)",
+                        targetDomain: signature.domain.rawValue,
+                        gateClass: .cognitive,
+                        requiredSeals: [],
+                        actionPermitRef: "permit-\(iter)",
+                        sovereignWarrantRef: "",
+                        secondCheckRequired: !isAligned,
+                        passState: gateState,
+                        returnPathRef: "")
                 }
-                let gate = BASHeavenGatePermit(
-                    gateID: "gate-\(iter)",
-                    sourceRef: "intent-\(iter)",
-                    targetDomain: signature.domain.rawValue,
-                    gateClass: .cognitive,
-                    requiredSeals: [],
-                    actionPermitRef: "permit-\(iter)",
-                    sovereignWarrantRef: "",
-                    secondCheckRequired: !isAligned,
-                    passState: gateState,
-                    returnPathRef: "")
                 gates.append(gate)
 
-                // Synthesize BASRiverOriginTrace (1 per 5 iter)
-                if iter % 5 == 0 {
+                // M581 (chapter 一百五十六) — prefer REAL substrate
+                // BASRiverOriginTrace from turn.kunlunRiverOriginTrace.
+                // Fall back to synthesis (1 per 5 iter sampling) only
+                // if substrate didn't emit one. Pre-M581 synthesis
+                // always populated rootSourceRefs/auditRefs/transforma
+                // tionSteps → originCompleteness saturated to 1.0.
+                if let realTrace = turn.kunlunRiverOriginTrace {
+                    traces.append(realTrace)
+                    realKunlunRiverOriginTraces += 1
+                } else if iter % 5 == 0 {
                     let trace = BASRiverOriginTrace(
                         traceID: "trace-\(iter)",
                         rootSourceRefs: [auditID],
@@ -5115,9 +5141,18 @@ struct QinaoSampleHost {
                     traces.append(trace)
                 }
 
-                // Synthesize BASYaochiSanctumEntry (1 per 50 iter,
-                // proxy for memory-touch)
-                if iter % 50 == 0 {
+                // M581 (chapter 一百五十六) — prefer REAL substrate
+                // BASYaochiSanctumEntry from turn.yaochiSanctumEntry.
+                // Substrate emits one per turn (line 267 of
+                // EBrainRuntimeCoordinator.swift); fall back to
+                // 1-per-50-iter synthesis only if substrate didn't
+                // emit one. Pre-M581 synthesis was static
+                // sanctumClass=.sensitive accessPolicy=.sealed →
+                // sanctumLeakRate always 0.0 (no variation).
+                if let realSanctum = turn.yaochiSanctumEntry {
+                    sanctums.append(realSanctum)
+                    realYaochiSanctumEntries += 1
+                } else if iter % 50 == 0 {
                     let sanctum = BASYaochiSanctumEntry(
                         entryID: "sanctum-\(iter)",
                         memoryRef: "memory-\(iter)",
@@ -5290,11 +5325,14 @@ struct QinaoSampleHost {
               ≥ 1.5:  \(anchorSums.filter { $0 >= 1.5 }.count)
               ≥ 2.0:  \(anchorSums.filter { $0 >= 2.0 }.count)
 
-            REAL-vs-SYNTHESIZED counts (M578 chapter 一百五十三 wire):
+            REAL-vs-SYNTHESIZED counts (M578 + M581):
               kunlunAxisAlignment:     \(realAxisAlignments) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realAxisAlignments) / Double(count)))% real)
               humanAnchorSignal:       \(realHumanAnchorSignals) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realHumanAnchorSignals) / Double(count)))% real)
               abyssalPressure:         \(realAbyssalPressures) real / \(count) sessions
               unknownReserve:          \(realUnknownReserves) real / \(count) sessions
+              kunlunHeavenGatePermit:  \(realKunlunHeavenGatePermits) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realKunlunHeavenGatePermits) / Double(count)))% real)
+              kunlunRiverOriginTrace:  \(realKunlunRiverOriginTraces) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realKunlunRiverOriginTraces) / Double(count)))% real)
+              yaochiSanctumEntry:      \(realYaochiSanctumEntries) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realYaochiSanctumEntries) / Double(count)))% real)
 
             1. Axis Stability Score (alignments=\(alignments.count)):
                stabilityIndex   = \(String(format: "%.4f", axisStability.stabilityIndex))
