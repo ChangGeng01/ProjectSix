@@ -45,6 +45,8 @@ struct SampleHostView: View {
                     }
                     .buttonStyle(.borderedProminent)
 
+                    benchPanel
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text(model.result.activeSessionTitle)
                             .font(.headline)
@@ -179,6 +181,86 @@ struct SampleHostView: View {
             }
             .navigationTitle("BASHostKit")
         }
+    }
+
+    // MARK: - M573 (chapter 一百四十七 part 2) — bench panel
+
+    @ViewBuilder
+    private var benchPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Real-device substrate bench")
+                    .font(.headline)
+                Spacer()
+                Button(model.benchIsRunning ? "Stop" : "Run Bench") {
+                    model.toggleBench()
+                }
+                .buttonStyle(.bordered)
+                .tint(model.benchIsRunning ? .red : .green)
+            }
+
+            Text(
+                "Loops BASHostRuntime.startSession() with rotating " +
+                "synthetic prompts (5 personas × 3 scenarios). " +
+                "Per-iteration audit code count + permit mode + " +
+                "duration written to Documents/iphone-bench/" +
+                "iterations.jsonl. Keep app in foreground (iOS " +
+                "suspends backgrounded apps after ~30s)."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
+            if model.benchIsRunning {
+                Text(benchLiveStatusText)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.green)
+            } else if model.benchIterationsCompleted > 0 {
+                Text(benchFinalStatusText)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.blue)
+            }
+
+            if !model.benchOutputPath.isEmpty {
+                Text("→ \(model.benchOutputPath)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let benchError = model.benchLastError {
+                Text("Bench error: \(benchError)")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var benchLiveStatusText: String {
+        let elapsed: TimeInterval
+        if let start = model.benchStartTime {
+            elapsed = Date().timeIntervalSince(start)
+        } else {
+            elapsed = 0
+        }
+        let perSec = elapsed > 0
+            ? Double(model.benchIterationsCompleted) / elapsed
+            : 0
+        return String(
+            format: "RUNNING • iter=%d • %.1fs • %.2f/s • audit=%d",
+            model.benchIterationsCompleted,
+            elapsed,
+            perSec,
+            model.benchAuditCodesTotal)
+    }
+
+    private var benchFinalStatusText: String {
+        return String(
+            format: "DONE • iter=%d • audit=%d total • last error=%@",
+            model.benchIterationsCompleted,
+            model.benchAuditCodesTotal,
+            model.benchLastError ?? "none")
     }
 
     @ViewBuilder

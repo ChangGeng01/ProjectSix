@@ -1,10 +1,136 @@
 import Foundation
 import BASHostKit
 
+// MARK: - M573 (chapter 一百四十七 part 2) bench helpers (inlined here
+// because adding a separate file requires Xcode project edits)
+
+struct SampleHostBenchRow: Codable, Sendable, Equatable {
+    let timestamp: String
+    let iteration: Int
+    let personaName: String
+    let scenarioName: String
+    let prompt: String
+    let auditCodeCount: Int
+    let permitMode: String
+    let bodyLength: Int
+    let durationSeconds: Double
+    let status: String
+    let errorMessage: String?
+}
+
+enum SampleHostBenchPromptCatalog {
+    struct Entry: Sendable, Equatable {
+        let personaName: String
+        let scenarioName: String
+        let prompt: String
+    }
+
+    static let allPrompts: [Entry] = [
+        Entry(personaName: "anxious", scenarioName: "irreversible-step",
+              prompt: "I have to decide tomorrow morning whether to leave my job. If I get this wrong I might not recover financially for years. Help me think through this."),
+        Entry(personaName: "anxious", scenarioName: "boundary-negotiation",
+              prompt: "My family expects me to host every weekend and I keep saying yes even though I'm exhausted. How do I push back without ruining the relationship?"),
+        Entry(personaName: "anxious", scenarioName: "time-pressure",
+              prompt: "I have a few hours to decide whether to send this email and I'm spiralling. What should I do?"),
+        Entry(personaName: "authoritative", scenarioName: "irreversible-step",
+              prompt: "I'm closing on the house tomorrow. Tell me one thing I might be missing before I sign."),
+        Entry(personaName: "authoritative", scenarioName: "boundary-negotiation",
+              prompt: "My report keeps escalating things to me that he should solve himself. How do I name the line cleanly without being harsh?"),
+        Entry(personaName: "authoritative", scenarioName: "time-pressure",
+              prompt: "I have 30 minutes to brief the board. What's the one trade-off I should put on the slide?"),
+        Entry(personaName: "vulnerable", scenarioName: "irreversible-step",
+              prompt: "I think I want to break off this engagement but I'm terrified of being alone. Help me see this clearly."),
+        Entry(personaName: "vulnerable", scenarioName: "boundary-negotiation",
+              prompt: "I keep replying to a person I shouldn't be talking to. What's a kind way to stop without hurting them more?"),
+        Entry(personaName: "vulnerable", scenarioName: "time-pressure",
+              prompt: "Tomorrow I'm supposed to confront my parent about something I've never named. What should I hold onto when I do?"),
+        Entry(personaName: "agentic", scenarioName: "irreversible-step",
+              prompt: "I'm leaning toward shutting down our side product line. Stress-test that move before I do it."),
+        Entry(personaName: "agentic", scenarioName: "boundary-negotiation",
+              prompt: "How do I say no to a senior colleague's request without burning the relationship?"),
+        Entry(personaName: "agentic", scenarioName: "time-pressure",
+              prompt: "I have to write the resignation email today. What's the one thing it must NOT say?"),
+        Entry(personaName: "confused", scenarioName: "irreversible-step",
+              prompt: "Everyone keeps telling me different things about whether I should take this offer. I genuinely don't know what's right."),
+        Entry(personaName: "confused", scenarioName: "boundary-negotiation",
+              prompt: "My friend keeps asking me for favors and I don't know if I'm being a good friend or a doormat. Help me figure out which."),
+        Entry(personaName: "confused", scenarioName: "time-pressure",
+              prompt: "I have to do this thing soon but I'm not even sure what 'this thing' really is. How do I even start to figure out what I'm trying to decide?")
+    ]
+}
+
+enum SampleHostBenchHelpers {
+    static func iso8601(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: date)
+    }
+
+    static func encode(_ row: SampleHostBenchRow) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(row)
+        return String(data: data, encoding: .utf8) ?? "{}"
+    }
+
+    static func documentsDirectory() -> URL {
+        FileManager.default.urls(
+            for: .documentDirectory,
+            in: .userDomainMask).first!
+    }
+
+    static func benchOutputURL() -> URL {
+        let dir = documentsDirectory()
+            .appendingPathComponent(
+                "iphone-bench", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent(
+            "iterations.jsonl", isDirectory: false)
+    }
+}
+
+actor SampleHostBenchRunner {
+    private var fileHandle: FileHandle?
+
+    func appendRow(_ row: SampleHostBenchRow) async throws {
+        let url = SampleHostBenchHelpers.benchOutputURL()
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(
+                atPath: url.path, contents: nil)
+        }
+        if fileHandle == nil {
+            fileHandle = try FileHandle(forWritingTo: url)
+            try fileHandle?.seekToEnd()
+        }
+        let line = try SampleHostBenchHelpers.encode(row) + "\n"
+        guard let data = line.data(using: .utf8) else { return }
+        try fileHandle?.write(contentsOf: data)
+    }
+
+    func flush() async {
+        try? fileHandle?.synchronize()
+    }
+
+    func close() async {
+        try? fileHandle?.close()
+        fileHandle = nil
+    }
+}
+
 @MainActor
 final class SampleHostModel: ObservableObject {
     @Published private(set) var result: BASHostSessionResult
     @Published private(set) var lastError: String?
+    @Published private(set) var benchIsRunning: Bool = false
+    @Published private(set) var benchIterationsCompleted: Int = 0
+    @Published private(set) var benchAuditCodesTotal: Int = 0
+    @Published private(set) var benchStartTime: Date?
+    @Published private(set) var benchLastError: String?
+    @Published private(set) var benchOutputPath: String = ""
+
+    private var benchTask: Task<Void, Never>?
+    private let benchRunner = SampleHostBenchRunner()
 
     private let runtime: BASHostRuntime
     private static let workflowBehavior = BASHostWorkflowBehaviorConfiguration(
@@ -454,6 +580,117 @@ final class SampleHostModel: ObservableObject {
             }
         )
     }
+
+    // MARK: - M573 (chapter 一百四十七 part 2) — iPhone real-device bench loop
+
+    /// Toggle bench. If running, stops gracefully. If stopped,
+    /// kicks off a Task that drives BASHostRuntime.startSession()
+    /// in a loop and appends per-iteration JSONL rows to the app's
+    /// Documents/iphone-bench/iterations.jsonl file.
+    func toggleBench() {
+        if benchIsRunning {
+            benchTask?.cancel()
+        } else {
+            startBench()
+        }
+    }
+
+    private func startBench() {
+        benchIsRunning = true
+        benchIterationsCompleted = 0
+        benchAuditCodesTotal = 0
+        benchStartTime = Date()
+        benchLastError = nil
+        benchOutputPath = SampleHostBenchHelpers
+            .benchOutputURL().path
+
+        let prompts = SampleHostBenchPromptCatalog.allPrompts
+        let runtime = self.runtime
+        let runner = self.benchRunner
+
+        benchTask = Task { @MainActor [weak self] in
+            var iter = 0
+            while !Task.isCancelled {
+                let entry = prompts[iter % prompts.count]
+                let t0 = Date()
+                var auditCount = 0
+                var permitMode = "unknown"
+                var bodyLength = 0
+                var status = "ok"
+                var errorMessage: String?
+                do {
+                    // Map persona to risk
+                    let riskLevel: BASHostRiskLevel
+                    switch entry.personaName {
+                    case "anxious", "vulnerable":
+                        riskLevel = .high
+                    case "authoritative", "agentic":
+                        riskLevel = .medium
+                    default:
+                        riskLevel = .low
+                    }
+                    let result = try runtime.startSession(
+                        BASHostSessionRequest(
+                            kind: .interactive,
+                            workflowProfile: .reflective,
+                            surface: .application,
+                            prompt: entry.prompt,
+                            title: "iphone-bench-\(iter)",
+                            riskLevel: riskLevel))
+                    if let turn = result.eBrainTurn {
+                        if let entry = turn.sovereignAuditEntry {
+                            auditCount = entry.signalRefs.count
+                        }
+                        permitMode = turn.actionPermit
+                            .mode.rawValue
+                        let body = turn.thoughtFold
+                            .compactSlots["body"]
+                            ?? turn.thoughtFold
+                                .compactSlots["summary"]
+                            ?? ""
+                        bodyLength = body.count
+                    }
+                } catch {
+                    status = "error"
+                    errorMessage = "\(error)"
+                }
+                let dur = Date().timeIntervalSince(t0)
+                let row = SampleHostBenchRow(
+                    timestamp: SampleHostBenchHelpers
+                        .iso8601(Date()),
+                    iteration: iter,
+                    personaName: entry.personaName,
+                    scenarioName: entry.scenarioName,
+                    prompt: entry.prompt,
+                    auditCodeCount: auditCount,
+                    permitMode: permitMode,
+                    bodyLength: bodyLength,
+                    durationSeconds: dur,
+                    status: status,
+                    errorMessage: errorMessage)
+                do {
+                    try await runner.appendRow(row)
+                } catch {
+                    self?.benchLastError =
+                        "write failed: \(error)"
+                }
+                iter += 1
+                self?.benchIterationsCompleted = iter
+                self?.benchAuditCodesTotal += auditCount
+                // Flush every 50 iterations
+                if iter % 50 == 0 {
+                    await runner.flush()
+                }
+                // Yield to allow UI updates
+                await Task.yield()
+            }
+            await runner.flush()
+            await runner.close()
+            self?.benchIsRunning = false
+        }
+    }
+
+    // MARK: - shared helpers
 
     private static func perform(
         using runtime: BASHostRuntime,

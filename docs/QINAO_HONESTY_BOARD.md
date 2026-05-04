@@ -16682,3 +16682,141 @@ Qinao XCTest:  Executed 1408 tests, 40 skipped, 0 failures (1.501s)
 ### 146.10 一句话总结
 
 **Chapter 一百四十六 (M571 — 消灭 bug 缺陷)**: respond to user "消灭 bug 缺陷" by directly fixing the chapter 一百四十五-disclosed Before app product bug. HomeView 663-LoC monolithic body refactored — 11 PanelCards + nested VStacks/ScrollView extracted into 27 independent `some View` computed properties / private funcs. Each becomes its own Swift compilation unit, so SwiftUI's ViewBuilder closure chain in any single function stays shallow, render-time stack frames are per-call-site not cumulative. **Real-device verification**: rebuilt + reinstalled on iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1) → **Before main app PID 37662 stable across 60+ seconds polling (T+1s/+2/+3/+5/+8/+12/+18/+25/+35/+45/+60)** + widget alive. Pre-fix chapter 一百四十五 had main app SIGSEGV within 1 second; post-fix runs durably. **Simulator regression**: BeforeUISmoke 3/3 passed (77.0s). **Substrate regression**: BAS 2891 / Qinao 1408 / 5 gates all clean — no substrate change. **HomeView refactor 663 → 791 lines** (+128 LoC of method boundaries; rendering 1:1 equivalent with all accessibility identifiers preserved). Bug **真消灭**。Doctrine pin: chapter 一百三十一 anti-recursion principle now has concrete fix evidence on real device.
+
+---
+
+## 一百四十七、 8 小时高成本 AFM + Gemma 自动化 + iPhone 17e 真机 bench (M572-M573 / 2026-05-04)
+
+### 147.1 触发动作
+
+用户连发指令链:
+- "跑个高成本 afm + gemma 冒烟 pretraining 跑 8小时再说 一定要有成果 先做 automation running"
+- "我希望 跑 真机"
+
+### 147.2 Scope honest mapping
+
+**"Pretraining"** in user phrasing maps to "training-data-generation pretraining" in our doctrine — the 8-hour run produces thousands of (prompt, audit-trail, AFM-output, Gemma-output) tuples for downstream offline analysis (chapter 一百三十八 Q.2.4 doctrine). Real model weight pretraining is not feasible on a Mac laptop in 8 hours; what IS feasible is producing statistically-significant inference data at scale.
+
+**"真机"** = iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1) physical device.
+
+### 147.3 Two parallel deliverables
+
+**Part 1 (M572) — Mac 8-hour automation runner** (chapter 一百四十七 part 1, commit `2e26d2bb`):
+- New `QinaoLoop/QinaoLongRunningSmoke.swift` (~370 LoC): typed Configuration + Row + Progress + Summary + Helpers + actor Writer
+- New tests `LongRunningSmokeTests.swift` (~210 LoC, 13 tests covering iso8601, median, average, jsonLine, makeProgress, aggregatePerPersonaCounts, summary round-trip, configuration defaults, writer appendRow, writer atomic progress)
+- New sample-host arg `--long-smoke-bench` (~290 LoC in main.swift): loops persona×scenario catalog (15 prompts), drives AFM + Gemma 4 E2B endpoints, per iteration appends JSONL row with red-line count via 5 lint helpers, every checkpointInterval seconds writes progress.json atomically + flushes JSONL, on completion writes summary.json
+- Configurable via env: QINAO_LONG_SMOKE_DURATION_SECONDS, QINAO_LONG_SMOKE_OUTPUT, QINAO_LONG_SMOKE_CHECKPOINT_SECONDS, QINAO_LONG_SMOKE_RUN_JUDGE, QINAO_LONG_SMOKE_TIMEOUT_SECONDS
+
+**Part 2 (M573) — iPhone real-device substrate bench** (this chapter):
+- Extended `SampleHost/SampleHostModel.swift` with `SampleHostBenchRunner` actor + `SampleHostBenchPromptCatalog` (15 prompts inlined to avoid Xcode project surgery for QinaoLoop dep) + `SampleHostBenchHelpers` + `SampleHostBenchRow` Codable + `toggleBench()` / `startBench()` model methods
+- Extended `SampleHost/SampleHostView.swift` with `benchPanel` view: "Run Bench" button toggle, live counter (iter/sec, audit codes), output path display
+- Bench loop drives `BASHostRuntime.startSession()` with rotating prompts on main actor; per-iteration captures audit code count + permit mode + body length + duration
+- JSONL written to `Documents/iphone-bench/iterations.jsonl` on device
+
+### 147.4 Mac 90-second smoke verification (chapter 一百四十七 part 1)
+
+```
+QINAO_LONG_SMOKE_DURATION_SECONDS=90 swift run -c release QinaoSampleHost --long-smoke-bench
+```
+
+Result:
+- 20 iterations / 4 checkpoints / clean shutdown
+- **AFM 20/20 errors** (Code 1026 ModelManagerError — no Apple Intelligence on this Mac)
+- **Gemma 4 E2B 20/20 success** @ 4.55s avg / 4.64s median per inference
+- 1 red-line violation across 20 Gemma responses
+- JSONL/progress/summary all written correctly
+
+Empirical: **this Mac CANNOT run AFM** (errors instantly, ~20ms per error); Gemma works fine. iPhone 17e (Apple Intelligence-enabled) MAY actually run AFM successfully — main motivation for part 2.
+
+### 147.5 Mac 8-hour run status (kicked off, PID 70702)
+
+```
+$ QINAO_LONG_SMOKE_DURATION_SECONDS=28800 QINAO_LONG_SMOKE_OUTPUT=/tmp/qinao-long-smoke-8h \
+  QINAO_LONG_SMOKE_CHECKPOINT_SECONDS=300 swift run -c release \
+  QinaoSampleHost --long-smoke-bench &
+PID=70702
+```
+
+T+4 minutes status:
+- PID 70702 alive (state R = running)
+- 89 JSONL rows written
+- ~22 iterations/minute (Gemma-bound at ~4.55s/iter + AFM error 0.02s)
+- Projected: ~10,500 iterations in 8 hours
+- AFM expected error ratio 100%; Gemma expected success ratio 100%
+
+### 147.6 iPhone 17e bench deployment
+
+```
+$ xcodebuild -scheme SampleHost -destination "id=00008150-000128D10E8A401C" \
+  DEVELOPMENT_TEAM=U4ZLQM8399 -allowProvisioningUpdates build
+** BUILD SUCCEEDED **
+
+$ xcrun devicectl device install app --device 00008150-... SampleHost.app
+✓ App installed: bundleID com.changgeng.samplehost
+
+$ xcrun devicectl device process launch --device 00008150-... com.changgeng.samplehost
+✓ Launched application
+
+$ xcrun devicectl device info processes --device 00008150-...
+PID 37811 = SampleHost.app/SampleHost (alive on iPhone 17e)
+```
+
+User can now tap "Run Bench" button on physical iPhone 17e. Loop drives BASHostRuntime in foreground, per-iteration JSONL written to app Documents folder. iOS will background-suspend after ~30s, so user must keep screen on for sustained bench.
+
+### 147.7 Honest cost considerations
+
+**8h Mac run**:
+- Energy: ~50-200W × 8h = 0.4-1.6 kWh = ~$0.05-0.20 USD electricity
+- Thermal: laptop fan engaged but within normal operating range
+- Disk: ~2 KB/JSONL row × 10500 rows ≈ 21 MB total
+
+**iPhone 17e foreground bench**:
+- Battery: substrate-only inference is light (no LLM call); ~2-5% per hour
+- Foreground requirement: iOS background-suspends apps after 30s; sustained bench needs screen-on
+- App Documents: persists across app restarts; pull off via `xcrun devicectl device copy`
+
+### 147.8 Doctrine pins
+
+**Doctrine #1 / #2 / #3 invariants**: ✓ — pure value-type Configuration + actor file writer + pure helpers; bench loop drives existing `BASHostRuntime.startSession()` API; no permit.mode mutation; no audit hash chain change.
+
+**红线 #10 主品牌不默认恐怖化**: ✓ — bench is a sample-host development tool, not user-facing surface.
+
+**Anti-magic-number**: ✓ — defaults are named constants (`8 * 3600`, `60`, `60`); env-var overrides for everything.
+
+**Anti-recursion (chapter 一百三十一)**: ✓ — bench loop is iterative `while !Task.isCancelled`, not recursive.
+
+**Anti-drift 3-site**: N/A — no schema additions.
+
+### 147.9 Files
+
+**Mac side (chapter 一百四十七 part 1, M572, commit `2e26d2bb`)**:
+- `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoLongRunningSmoke.swift` (new, ~370 LoC)
+- `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/LongRunningSmokeTests.swift` (new, ~210 LoC, 13 tests)
+- `QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift` (modified, +290 LoC for `--long-smoke-bench` mode)
+
+**iPhone side (chapter 一百四十七 part 2, M573, this commit)**:
+- `SampleHost/SampleHostModel.swift` (modified, +bench helpers + state + `toggleBench()`)
+- `SampleHost/SampleHostView.swift` (modified, +`benchPanel` view + status display)
+
+**No substrate code change**, both parts use existing `BASHostRuntime` API.
+
+### 147.10 测试基线
+
+| 套件 | 一百四十六 章末 | 一百四十七 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged |
+| Qinao XCTest | 1408 | **1421** | +13 (LongRunningSmokeTests) |
+| 全栈 | 4299 | **4312** | +13 |
+| iPhone 17e simulator BeforeUISmoke | 3/0/77.0s | **3/0/77.0s** | unchanged |
+| iPhone 17e real-device Before main app | ✅ PID stable 60+ 秒 | **✅ same** | unchanged |
+| iPhone 17e real-device SampleHost (no bench) | ✅ PID stable 30+ 秒 | **✅ same** | unchanged |
+| **iPhone 17e real-device SampleHost-bench build** | (not built) | **✅ BUILD SUCCEEDED** | new |
+| **iPhone 17e real-device SampleHost-bench install** | (not installed) | **✅ bundleID com.changgeng.samplehost @ /private/var/containers/.../BBED4049-.../SampleHost.app/** | new |
+| **iPhone 17e real-device SampleHost-bench launch** | (not launched) | **✅ PID 37811 alive** | new |
+| **Mac 8h automation run (PID 70702)** | (not started) | **✅ Running, 89 iter @ T+4min** | new |
+| 5 gates | clean | **clean** | unchanged |
+| Entitlements git baseline | matches | **matches** | unchanged |
+
+### 147.11 一句话总结
+
+**Chapter 一百四十七 (M572-M573 — 高成本 AFM + Gemma 自动化 + iPhone 真机)**: respond to user "跑个高成本 afm + gemma 冒烟 pretraining 跑 8小时再说 一定要有成果 先做 automation running" + "我希望 跑 真机". **Part 1 (M572 Mac side)** ships QinaoLongRunningSmoke automation library + 13 unit tests + sample-host `--long-smoke-bench` arg with checkpoint/resume + JSONL output; 90-second smoke verified (20 iter, AFM 20/20 errors per Mac no-Apple-Intelligence, Gemma 4 E2B 20/20 success @ 4.55s/iter); 8-hour run kicked off in background (PID 70702 alive at T+4min, 89 iter written, projecting ~10,500 iter at ~22/min). **Part 2 (M573 iPhone side)** ships SampleHost bench-enabled build with on-device "Run Bench" button + JSONL persistence to Documents/iphone-bench/iterations.jsonl; deployed to iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1); SampleHost.app PID 37811 alive on physical iPhone hardware ready for user-tapped bench loop. **Substrate (BASHostKit) confirmed running on real iPhone 17e for both Before main app (chapter 一百四十六) AND SampleHost (chapter 一百四十五 / 一百四十七)** — durable execution across multiple substrate-bound iOS apps. **Test counts**: BAS 2891 unchanged (zero substrate change), Qinao 1408 → 1421 (+13 LongRunningSmokeTests). **Deliverable shape**: 8-hour Mac run produces JSONL+summary+progress files for offline analysis when complete; iPhone bench produces user-tap-driven on-device data captured in app Documents folder, pullable via `xcrun devicectl device copy`. Doctrine pin: pure value-type infrastructure + actor file writer + iterative loop (anti-recursion); zero substrate behavior change.
