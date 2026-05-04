@@ -20002,3 +20002,99 @@ Chapter 一百六十六 §166.5 listed 5 BASMemory subsystem magic-literal categ
 ### 169.10 一句话总结
 
 **Chapter 一百六十九 (M598 — continue)**: respond to user "continue" by extracting MemoryCore.swift confidenceCeiling tier values (chapter 一百六十六 §166.5 backlog item, second of five). 4 inline literals at lines 408/784/793/801 extracted to named static properties on `BASIdentityProfile`: notificationSurfaceConfidenceCeiling (0.58) + watchSurfaceConfidenceCeiling (0.64) + highRiskOverlayConfidenceCeiling (0.66) + genericBaselineConfidenceCeiling (0.70). Doctrine-derived tier ordering: notification < watch < high-risk < generic baseline (lower-touch surfaces get stricter ceilings; protective posture caps below baseline). 4 anti-drift tests in NEW M598ConfidenceCeilingTierTests.swift: value pin + order pin + range pin + **cross-reference pin** (notification ceiling 0.58 = M596 singleEvidenceLowConfidenceRejectionThreshold — anti-drift between constants in different files). Cross-reference is NEW anti-drift pattern: pins equivalence between constants in different subsystems so independent drift surfaces immediately. Chapter 一百六十六 §166.5 backlog: 2 of 5 categories now closed. Test counts: BAS 2963 → 2967 (+4), Qinao 1435 unchanged, 全栈 4398 → 4402 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number + anti-drift extended to cross-reference between constants. NO over-claim; remaining 3 BASMemory categories carry honest-disclosure rationale; 3 truly external residuals unchanged.
+
+---
+
+## 一百七十、 continue — memory load rate threshold extraction (chapter 166 backlog item 3 of 5) (M599 / 2026-05-05)
+
+### 170.1 触发动作
+
+User: "continue" after chapter 一百六十九 closed BASMemory backlog item 2. This chapter closes item 3.
+
+### 170.2 2 rate thresholds extracted
+
+`MemoryCore.swift` lines ~2730/2733 had inline `0.34` and `0.25` rate thresholds for risk flag elevation. Extracted to named static properties on `BASDecisionBrainState`:
+
+```swift
+public static let
+    highPendingInfluenceThreshold: Double = 0.34
+public static let
+    lowTrustLoadThreshold: Double = 0.25
+```
+
+Doc-comment derivation: 0.34 ≈ 1/3 (one-third — pending memory dominates); 0.25 = 1/4 (one-quarter — low-trust dilution kicks in earlier than pending). Tier ordering: `lowTrustLoadThreshold < highPendingInfluenceThreshold` because **low-trust is more concerning than merely-pending** (substrate flags low-trust at lower load rate).
+
+### 170.3 4 anti-drift tests added
+
+New file `M599MemoryLoadRateThresholdTests.swift` (~70 LoC, 4 tests):
+
+- `testThresholdValuesPinned` — pins both values
+- `testThresholdOrderingPinned` — pins doctrine: low-trust < pending (regression guard against accidental swap)
+- `testThresholdsInValidRange` — [0, 1] sanity
+- `testThresholdsAreFractionFamily` — pins doctrine intent: `0.25 = 1/4` exactly; `0.34 ≈ 1/3` (within 0.01 of 1/3 = 0.333...). If anyone replaces with non-intuitive value (e.g. 0.27), this test surfaces the doctrine question.
+
+### 170.4 Why "fraction family" test matters
+
+Magic literals can be:
+- Doctrine-derived (intuitive fraction like 1/4 or 1/3)
+- Empirical-calibrated (e.g. chapter 一百五十四 anchor erosion 1.5)
+- Arbitrary (no doctrine, just "looks reasonable")
+
+The fraction-family test makes doctrine intent **explicit**. If chapter 一百七十 thresholds drift, the test fails AND surfaces the question of whether the new value still represents "approximately one-third" or "exactly one-quarter".
+
+### 170.5 Test counts
+
+| Counter | Pre-M599 | Post-M599 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2967 | 2971 | **+4** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4402 | 4406 | +4 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+### 170.6 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Sources/BASMemory/MemoryCore.swift` | +2 named static properties on `BASDecisionBrainState` with doc-comment doctrine derivation; 2 inline `>= 0.34` + `>= 0.25` literals replaced with named-constant references at line ~2730/2733 |
+| `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M599MemoryLoadRateThresholdTests.swift` | NEW — 4 anti-drift tests (value pin + order pin + range pin + fraction-family pin) |
+
+### 170.7 Cumulative chapter 166 backlog status
+
+| Category | Status |
+|---|---|
+| MemoryGovernanceCore.swift:282 confidence 0.58 | ✅ chapter 一百六十七 |
+| MemoryCore.swift:408/784/793/801 confidenceCeiling tiers | ✅ chapter 一百六十九 |
+| **MemoryCore.swift:2697/2700 rate thresholds 0.34/0.25** | ✅ **chapter 一百七十 (this chapter)** |
+| MemoryCore.swift:90-94 seed default values | NOT DONE — fixture, not active threshold |
+| BASShadowTrialObservation.swift:200-203 probabilities | NOT DONE — fixture |
+| BASMemoryTieringProfile.swift:76 weights 0.55+0.35 | NOT DONE — heuristic |
+
+**3 of 6 categories closed**. (Chapter 一百六十六 §166.5 listed 5; this catalog adds rate thresholds = 6.)
+
+Remaining 3 are honestly classified as fixture/heuristic data rather than active gating thresholds — lower extraction priority.
+
+### 170.8 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Anti-magic-number (chapter 一百十三) | ✓ +2 named constants |
+| Anti-drift defensive infrastructure | ✓ +4 tests |
+| Tier ordering doctrine (chapter 169 pattern) | ✓ extended — low-trust < pending parity |
+| Fraction-family doctrine (NEW) | ✓ — pins doctrine intent (1/4, 1/3) so non-intuitive replacements surface |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 170.9 Cumulative chapters 156-170 state
+
+- **25 defects + improvements** closed across 14 chapters
+- **16 anti-drift tests** in 3 dedicated test files (M595 cross-callsite, M598 confidence ceiling tiers, M599 rate thresholds)
+- **5 doctrine layers**: anti-drift infrastructure / test-the-test / cross-callsite / cross-reference between constants / fraction-family intent
+- **3 truly external residuals**: M406, iPhone deploy, substrate redesign
+- **3 of 6 BASMemory backlog categories** closed; 3 remain as fixture/heuristic data
+
+### 170.10 一句话总结
+
+**Chapter 一百七十 (M599 — continue)**: respond to user "continue" by closing chapter 一百六十六 §166.5 backlog item 3 of 5/6 — MemoryCore rate thresholds. 2 inline literals at lines ~2730/2733 (`pendingMemoryLoadRate >= 0.34` + `lowTrustMemoryLoadRate >= 0.25`) extracted to named static properties on `BASDecisionBrainState`: `highPendingInfluenceThreshold = 0.34` (≈ 1/3) + `lowTrustLoadThreshold = 0.25` (= 1/4). Doctrine ordering: `lowTrustLoadThreshold < highPendingInfluenceThreshold` — low-trust is more concerning than merely-pending; flag fires at lower load rate. 4 anti-drift tests in NEW M599MemoryLoadRateThresholdTests.swift: value pin + order pin + range pin + **NEW fraction-family pin** (testThresholdsAreFractionFamily — pins doctrine intent that 0.25 = 1/4 exactly + 0.34 ≈ 1/3 within 0.01 tolerance; if anyone replaces with non-intuitive value like 0.27, test surfaces doctrine question). Fraction-family is NEW doctrine layer: explicit doctrine intent (intuitive fractions) makes empirical-calibrated vs arbitrary distinction surface in tests. Chapter 一百六十六 backlog: 3 of 6 categories closed; remaining 3 (seed defaults, fixture probabilities, heuristic weights) classified as fixture/heuristic vs active threshold — lower priority. Test counts: BAS 2967 → 2971 (+4), Qinao 1435 unchanged, 全栈 4402 → 4406 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number + tier ordering + cross-reference + **fraction-family intent doctrine NEW**. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) unchanged.

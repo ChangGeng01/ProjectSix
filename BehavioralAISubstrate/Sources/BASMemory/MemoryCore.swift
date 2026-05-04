@@ -2595,6 +2595,30 @@ public struct BASRetrievedEvidence: Codable, Sendable, Equatable {
 }
 
 public struct BASDecisionBrainState: Codable, Equatable, Sendable {
+    /// **M599 chapter 一百七十 — anti-magic-number** (chapter 一百六十六
+    /// §166.5 backlog item 3 of 5): pending-memory-load rate
+    /// threshold above which `highPendingInfluence` risk flag is
+    /// raised. Pre-fix this `0.34` was inline at line ~2730.
+    /// Doctrine: 0.34 ≈ 1/3 — when more than ~third of loaded
+    /// memory is pending (not yet validated), substrate flags
+    /// elevated risk of unverified influence.
+    public static let
+        highPendingInfluenceThreshold: Double = 0.34
+
+    /// **M599 chapter 一百七十 — anti-magic-number**: low-trust
+    /// memory load rate threshold above which `lowTrustLoad` risk
+    /// flag is raised. Pre-fix this `0.25` was inline at line ~2733.
+    /// Doctrine: 0.25 = 1/4 — when more than a quarter of loaded
+    /// memory is from low-trust sources, substrate flags elevated
+    /// risk of trust dilution.
+    ///
+    /// **Cross-reference**: low-trust threshold (0.25) is
+    /// strictly stricter than pending threshold (0.34) — low-
+    /// trust is more concerning than merely-pending. Tier
+    /// ordering: trust > pending > clean.
+    public static let
+        lowTrustLoadThreshold: Double = 0.25
+
     public var memorySlices: [BASGovernedMemorySlice]
     public var sessionBiases: [String]
     public var retrievalTags: [String]
@@ -2727,10 +2751,14 @@ public struct BASDecisionBrainState: Codable, Equatable, Sendable {
         let loadedRetrievalTags = Set(memorySlices.flatMap(\.retrievalTags))
 
         var riskFlags: [BASBrainStateRiskFlag] = []
-        if pendingMemoryLoadRate >= 0.34 {
+        // M599 chapter 一百七十 — anti-magic-number: thresholds
+        // sourced from named constants on BASDecisionBrainState.
+        if pendingMemoryLoadRate >= Self
+            .highPendingInfluenceThreshold {
             riskFlags.append(.highPendingInfluence)
         }
-        if lowTrustMemoryLoadRate >= 0.25 {
+        if lowTrustMemoryLoadRate >= Self
+            .lowTrustLoadThreshold {
             riskFlags.append(.lowTrustLoad)
         }
         if (memoryGovernance.screenedOutReasonCounts[.provenanceContamination] ?? 0) > 0 {
