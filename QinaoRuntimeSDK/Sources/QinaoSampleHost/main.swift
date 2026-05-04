@@ -391,6 +391,17 @@ struct QinaoSampleHost {
             await runUserValueJudgeBench()
             return
         }
+        if args.contains("--long-smoke-bench") {
+            // M572 (chapter 一百四十七) — Long-running automation
+            // for AFM + Gemma 4 E2B continuous inference smoke.
+            // Generates JSONL of (iteration × endpoint) tuples with
+            // crash-resume + checkpoint progress. Defaults to 8
+            // hours; QINAO_LONG_SMOKE_DURATION_SECONDS=N override.
+            // Output written to QINAO_LONG_SMOKE_OUTPUT (default
+            // /tmp/qinao-long-smoke).
+            await runLongSmokeBench(args: args)
+            return
+        }
         if args.contains("--sha256-bench") {
             // M364 — bench M341 pure-Swift SHA-256 hasher
             // throughput. Default 100K hashes;
@@ -4124,6 +4135,335 @@ struct QinaoSampleHost {
             verdict = "⚠️ MARGINAL — neither clearly helpful nor unhelpful"
         }
         print("Verdict: \(verdict)\n")
+    }
+
+    // MARK: - M572 (chapter 一百四十七) — long-running 8-hour smoke
+
+    private static func runLongSmokeBench(args: [String]) async {
+        // Configuration via env vars
+        let durationStr = ProcessInfo.processInfo
+            .environment["QINAO_LONG_SMOKE_DURATION_SECONDS"]
+        let outputStr = ProcessInfo.processInfo
+            .environment["QINAO_LONG_SMOKE_OUTPUT"]
+            ?? "/tmp/qinao-long-smoke"
+        let checkpointStr = ProcessInfo.processInfo
+            .environment["QINAO_LONG_SMOKE_CHECKPOINT_SECONDS"]
+        let runJudgeStr = ProcessInfo.processInfo
+            .environment["QINAO_LONG_SMOKE_RUN_JUDGE"]
+        let timeoutStr = ProcessInfo.processInfo
+            .environment["QINAO_LONG_SMOKE_TIMEOUT_SECONDS"]
+
+        let duration = Int(durationStr ?? "") ?? (8 * 3600)
+        let checkpoint = Int(checkpointStr ?? "") ?? 60
+        let timeout = Int(timeoutStr ?? "") ?? 60
+        let runJudge = (runJudgeStr ?? "0") == "1"
+        let outputURL = URL(fileURLWithPath: outputStr)
+
+        print("""
+            QinaoSampleHost --long-smoke-bench (M572, chapter 一百四十七):
+              Long-running automation for AFM + Gemma 4 E2B continuous
+              inference smoke. Generates JSONL of (iteration × endpoint)
+              tuples with per-iteration red-line counter + checkpoint
+              progress.
+
+              Duration:           \(duration) seconds (\(duration / 3600)h)
+              Output directory:   \(outputStr)
+              Checkpoint every:   \(checkpoint) seconds
+              Per-call timeout:   \(timeout) seconds
+              Run user-value judge: \(runJudge)
+
+              Override via env:
+                QINAO_LONG_SMOKE_DURATION_SECONDS=N
+                QINAO_LONG_SMOKE_OUTPUT=path
+                QINAO_LONG_SMOKE_CHECKPOINT_SECONDS=N
+                QINAO_LONG_SMOKE_RUN_JUDGE=1
+                QINAO_LONG_SMOKE_TIMEOUT_SECONDS=N
+            """)
+
+        let config = QinaoLongRunningSmokeConfiguration(
+            maxDurationSeconds: duration,
+            outputDirectory: outputURL,
+            checkpointIntervalSeconds: checkpoint,
+            runAFM: true,
+            runGemma: true,
+            runUserValueJudge: runJudge,
+            perEndpointTimeoutSeconds: timeout)
+
+        let writer = QinaoLongRunningSmokeWriter(
+            outputDirectory: outputURL)
+        do {
+            try await writer.ensureDirectory()
+        } catch {
+            stderr("ERROR: ensureDirectory failed: \(error)\n")
+            return
+        }
+        print("✓ Output directory ready: \(outputStr)\n")
+
+        // AFM endpoint (no deterministic fallback — let it fail
+        // honest if AFM unavailable)
+        let afmEndpoint = await QinaoLoop
+            .makeAppleFoundationEndpoint(
+                includeDeterministicFallback: false)
+        print("✓ AFM endpoint constructed")
+
+        // Gemma 4 E2B endpoint
+        var gemmaEndpoint: (any QinaoOrganEndpoint)?
+        do {
+            gemmaEndpoint = try await QinaoLoop
+                .makeMLXEndpoint(model: .gemma4E2B)
+            print("✓ Gemma 4 E2B endpoint loaded")
+        } catch {
+            gemmaEndpoint = nil
+            stderr("⚠ Gemma 4 E2B unavailable: \(error.localizedDescription)\n")
+        }
+
+        // Optional judge endpoint (reuse AFM)
+        let judgeEndpoint = config.runUserValueJudge
+            ? afmEndpoint
+            : nil
+        if config.runUserValueJudge {
+            print("✓ User-value judge enabled (uses AFM)")
+        }
+
+        let runStart = Date()
+        let runStartStr = QinaoLongRunningSmokeHelpers
+            .iso8601(runStart)
+
+        // Counters
+        var iteration = 0
+        var afmCompleted = 0
+        var gemmaCompleted = 0
+        var afmTimeouts = 0
+        var gemmaTimeouts = 0
+        var afmErrors = 0
+        var gemmaErrors = 0
+        var afmRedLineTotal = 0
+        var gemmaRedLineTotal = 0
+        var afmDurations: [Double] = []
+        var gemmaDurations: [Double] = []
+        var perPersonaCounts: [String: Int] = [:]
+
+        var lastCheckpoint = runStart
+
+        let allPrompts = QinaoSyntheticPromptCatalog.allPrompts
+
+        print("\nStarting long-running loop. \(allPrompts.count) prompts in catalog.\n")
+        print("=== T+0 ===\n")
+
+        // Main loop — iterate until duration elapsed
+        while true {
+            let now = Date()
+            let elapsed = now.timeIntervalSince(runStart)
+            if Int(elapsed) >= config.maxDurationSeconds {
+                print("\n[\(QinaoLongRunningSmokeHelpers.iso8601(now))] " +
+                    "duration reached: \(Int(elapsed))s elapsed; halting.")
+                break
+            }
+
+            let entry = allPrompts[iteration % allPrompts.count]
+            let prompt = entry.prompt
+            let personaName = entry.persona.rawValue
+            let scenarioName = entry.scenario.rawValue
+
+            // 1. AFM call
+            if config.runAFM {
+                let t0 = Date()
+                var status = "ok"
+                var errorMsg: String?
+                var responseText = ""
+                do {
+                    let r = try await afmEndpoint.produceBody(
+                        prompt: prompt,
+                        context: [],
+                        role: .core,
+                        sessionID:
+                            "long-smoke-afm-\(iteration)")
+                    responseText = r.body
+                } catch {
+                    status = "error"
+                    errorMsg = "\(error)"
+                    afmErrors += 1
+                }
+                let dur = Date().timeIntervalSince(t0)
+                let redCount = countRedLineViolations(in: responseText)
+                afmRedLineTotal += redCount
+                afmCompleted += 1
+                afmDurations.append(dur)
+                let row = QinaoLongRunningSmokeRow(
+                    timestamp: QinaoLongRunningSmokeHelpers
+                        .iso8601(Date()),
+                    iteration: iteration,
+                    persona: personaName,
+                    scenario: scenarioName,
+                    prompt: prompt,
+                    endpoint: "afm",
+                    responseLength: responseText.count,
+                    responseRedLineCount: redCount,
+                    durationSeconds: dur,
+                    status: status,
+                    errorMessage: errorMsg,
+                    userValueScore: nil)
+                do {
+                    try await writer.appendRow(row)
+                } catch {
+                    stderr("⚠ AFM row write failed: \(error)\n")
+                }
+            }
+
+            // 2. Gemma call
+            if config.runGemma, let gemma = gemmaEndpoint {
+                let t0 = Date()
+                var status = "ok"
+                var errorMsg: String?
+                var responseText = ""
+                do {
+                    let r = try await gemma.produceBody(
+                        prompt: prompt,
+                        context: [],
+                        role: .core,
+                        sessionID:
+                            "long-smoke-gemma-\(iteration)")
+                    responseText = r.body
+                } catch {
+                    status = "error"
+                    errorMsg = "\(error)"
+                    gemmaErrors += 1
+                }
+                let dur = Date().timeIntervalSince(t0)
+                let redCount = countRedLineViolations(in: responseText)
+                gemmaRedLineTotal += redCount
+                gemmaCompleted += 1
+                gemmaDurations.append(dur)
+                let row = QinaoLongRunningSmokeRow(
+                    timestamp: QinaoLongRunningSmokeHelpers
+                        .iso8601(Date()),
+                    iteration: iteration,
+                    persona: personaName,
+                    scenario: scenarioName,
+                    prompt: prompt,
+                    endpoint: "gemma",
+                    responseLength: responseText.count,
+                    responseRedLineCount: redCount,
+                    durationSeconds: dur,
+                    status: status,
+                    errorMessage: errorMsg,
+                    userValueScore: nil)
+                do {
+                    try await writer.appendRow(row)
+                } catch {
+                    stderr("⚠ Gemma row write failed: \(error)\n")
+                }
+            }
+
+            perPersonaCounts[personaName, default: 0] += 1
+            iteration += 1
+
+            // Optional checkpoint
+            let nowAfter = Date()
+            if Int(nowAfter.timeIntervalSince(lastCheckpoint))
+                >= config.checkpointIntervalSeconds
+            {
+                let progress = QinaoLongRunningSmokeHelpers
+                    .makeProgress(
+                        runStart: runStart,
+                        now: nowAfter,
+                        iterations: iteration,
+                        afmCompleted: afmCompleted,
+                        gemmaCompleted: gemmaCompleted,
+                        afmTimeouts: afmTimeouts,
+                        gemmaTimeouts: gemmaTimeouts,
+                        afmErrors: afmErrors,
+                        gemmaErrors: gemmaErrors,
+                        afmRedLineTotal: afmRedLineTotal,
+                        gemmaRedLineTotal: gemmaRedLineTotal)
+                do {
+                    try await writer.writeProgress(progress)
+                    try await writer.flush()
+                } catch {
+                    stderr("⚠ checkpoint write failed: \(error)\n")
+                }
+                lastCheckpoint = nowAfter
+                let elapsedHrs = nowAfter
+                    .timeIntervalSince(runStart) / 3600
+                let totalHrs = Double(config.maxDurationSeconds)
+                    / 3600
+                let etaPct = (elapsedHrs / totalHrs) * 100
+                print("""
+                    [\(QinaoLongRunningSmokeHelpers.iso8601(nowAfter))] checkpoint:
+                      iter=\(iteration) | elapsed=\(String(format: "%.2f", elapsedHrs))h / \(String(format: "%.2f", totalHrs))h (\(String(format: "%.1f", etaPct))%)
+                      AFM:   completed=\(afmCompleted), timeouts=\(afmTimeouts), errors=\(afmErrors), redlines=\(afmRedLineTotal)
+                      Gemma: completed=\(gemmaCompleted), timeouts=\(gemmaTimeouts), errors=\(gemmaErrors), redlines=\(gemmaRedLineTotal)
+                    """)
+            }
+
+            // Safety: if BOTH endpoints have errored every call so
+            // far past iteration 10, abort early
+            if iteration >= 10
+                && afmErrors == iteration
+                && (gemmaEndpoint == nil
+                    || gemmaErrors == iteration)
+            {
+                stderr("\nABORT: both endpoints failing every call; halting at iter=\(iteration)\n")
+                break
+            }
+        }
+
+        // Write final summary
+        let runEnd = Date()
+        let summary = QinaoLongRunningSmokeSummary(
+            runStartTimestamp: runStartStr,
+            runEndTimestamp: QinaoLongRunningSmokeHelpers
+                .iso8601(runEnd),
+            totalElapsedSeconds: runEnd
+                .timeIntervalSince(runStart),
+            totalIterations: iteration,
+            afmCallsCompleted: afmCompleted,
+            gemmaCallsCompleted: gemmaCompleted,
+            afmTimeouts: afmTimeouts,
+            gemmaTimeouts: gemmaTimeouts,
+            afmErrors: afmErrors,
+            gemmaErrors: gemmaErrors,
+            totalRedLineViolationsAFM: afmRedLineTotal,
+            totalRedLineViolationsGemma: gemmaRedLineTotal,
+            avgAFMDurationSeconds:
+                QinaoLongRunningSmokeHelpers.average(afmDurations),
+            avgGemmaDurationSeconds:
+                QinaoLongRunningSmokeHelpers.average(gemmaDurations),
+            medianAFMDurationSeconds:
+                QinaoLongRunningSmokeHelpers.median(afmDurations),
+            medianGemmaDurationSeconds:
+                QinaoLongRunningSmokeHelpers.median(gemmaDurations),
+            perPersonaCounts: perPersonaCounts)
+
+        do {
+            try await writer.writeSummary(summary)
+            try await writer.flush()
+            try await writer.close()
+        } catch {
+            stderr("⚠ summary write failed: \(error)\n")
+        }
+        _ = judgeEndpoint  // intentionally unused; reserved for future judge wiring
+
+        print("""
+
+            === FINAL SUMMARY ===
+            Run start: \(summary.runStartTimestamp)
+            Run end:   \(summary.runEndTimestamp)
+            Elapsed:   \(String(format: "%.2f", summary.totalElapsedSeconds / 3600))h
+            Iterations: \(summary.totalIterations)
+              AFM:   completed=\(summary.afmCallsCompleted), timeouts=\(summary.afmTimeouts), errors=\(summary.afmErrors)
+              Gemma: completed=\(summary.gemmaCallsCompleted), timeouts=\(summary.gemmaTimeouts), errors=\(summary.gemmaErrors)
+              AFM avg/median seconds:   \(String(format: "%.3f", summary.avgAFMDurationSeconds)) / \(String(format: "%.3f", summary.medianAFMDurationSeconds))
+              Gemma avg/median seconds: \(String(format: "%.3f", summary.avgGemmaDurationSeconds)) / \(String(format: "%.3f", summary.medianGemmaDurationSeconds))
+              AFM redlines:   \(summary.totalRedLineViolationsAFM)
+              Gemma redlines: \(summary.totalRedLineViolationsGemma)
+            Per-persona counts:
+            \(summary.perPersonaCounts.sorted { $0.key < $1.key }.map { "  \($0.key): \($0.value)" }.joined(separator: "\n"))
+
+            JSONL:    \(outputStr)/iterations.jsonl
+            Progress: \(outputStr)/progress.json
+            Summary:  \(outputStr)/summary.json
+            """)
     }
 
     private static func runSyntheticUserScenarios() {
