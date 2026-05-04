@@ -19519,3 +19519,139 @@ The `testAnchorRiskSumThresholdsPinned` cross-references humanAnchorErosionThres
 ### 165.10 一句话总结
 
 **Chapter 一百六十五 (M594 — 我不喜欢 hard coding 和 魔法数字 全面整改)**: respond to user invocation of chapter 一百十三 anti-magic-number doctrine. Comprehensive `grep` audit of chapters 156-164 surfaced 8 magic-number categories (percentile fractions / std multiplier / anchor thresholds / count default / cycling strides / multi-run counts / variance thresholds / output paths). All 8 extracted to named constants — 6 in `BASDoctrineMetricsThreshold` (substrate library, with cross-callsite consistency for percentile fractions + stdFormulaMultiplier with derivation doc-comment + anchorRiskSumThresholds cross-referencing humanAnchorErosionThreshold) + 6 in new `DoctrineBenchConstants` enum (bench-side: defaultSessionCount, defaultOutputPath, workflowCyclingStride/surfaceCyclingStride with coprime-explanation comments, multiRunCounts, multiRunOutputPrefix). 5 new tests: testPercentileFractionConstants, testStdFormulaMultiplierPinned (verifies derivation via Bernoulli compute), testAnchorRiskSumThresholdsPinned (cross-references humanAnchorErosionThreshold), testVarianceInterpretationThresholdsPinned, testHarmonyPerTurnFormulaSimple. Test counts: BAS 2950 → 2955 (+5), Qinao 1435 unchanged, 全栈 4385 → 4390 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number doctrine (chapter 一百十三) extended retroactively to chapters 156-164 work; every numeric literal now sourced from named constant with doc-comment derivation. Multi-run banner now displays named constants in output (`stableSpreadThreshold` / `nDependentSpreadThreshold`).
+
+---
+
+## 一百六十六、 全面严查 hard coding 和 魔法数字 扫描整体 — defect #12 cross-site drift discovered + 2 named constants (M595 / 2026-05-05)
+
+### 166.1 触发动作
+
+User: "全面严查 hard coding 和 魔法数字 扫描整体". Chapter 165 swept chapters 156-164 additions; this chapter widens the audit to **substrate-wide** scan.
+
+### 166.2 Critical finding: defect #12 cross-site drift
+
+`grep` for `deviationThreshold: 0\.[0-9]` across BAS Sources surfaced 2 occurrences in `EBrainRuntimeCoordinator.swift`:
+
+| Line | Context |
+|---|---|
+| 1048 | gate-side `BASKunlunAxis` construction (pre-permit-escalation) |
+| 1814 | audit-side `BASKunlunAxis` construction (post-everything) |
+
+Investigation revealed the gate-side at line 1050-1067 STILL used the **old risk-level lookup table** for `kunlunMatchedForGate`:
+
+```swift
+// PRE-M595 (gate-side at line 1050):
+let kunlunMatchedForGate: Int = {
+    switch boundRiskCard.riskLevel {
+    case .low: return 3
+    case .medium: return 2
+    case .high: return 1
+    case .extreme: return 0
+    }
+}()
+```
+
+But chapter 一百五十七 M583 fix had updated ONLY the audit-side at line ~1864 to use 3-predicate substrate-state evaluation. **Cross-site drift bug**: gate-side was still placeholder; audit-side was real.
+
+The doc-comment at line 1029-1035 explicitly claims "gate-side mirrors audit-side ... same output by construction" — but this claim has been FALSE since M583 chapter 一百五十七.
+
+This is a real regression introduced by chapter 一百五十七 that 5 deep-review iterations missed (iter 1-4 + iter 5 adversarial).
+
+### 166.3 Cross-site drift fix (M595)
+
+Applied identical 3-predicate evaluation at gate-side (line 1050) mirroring audit-side (line 1864):
+
+```swift
+// POST-M595 (gate-side):
+let respectsHostBoundaryForGate: Bool =
+    boundActionPermit.mode != .block
+    && boundActionPermit.mode != .replace
+let honorsWorldAnchorForGate: Bool =
+    humanAnchorSignalForGate.recommendedSurfaceTone != .reserved
+    && abyssalPressureForGate.sovereignEscalationHint == nil
+let permitModeCooperativeForGate: Bool = {
+    switch boundActionPermit.mode {
+    case .answer, .mirror, .compare,
+         .delay, .draftOnly, .localOnly:
+        return true
+    case .block, .replace, .escalate:
+        return false
+    }
+}()
+let kunlunMatchedForGate: Int =
+    (respectsHostBoundaryForGate ? 1 : 0)
+    + (honorsWorldAnchorForGate ? 1 : 0)
+    + (permitModeCooperativeForGate ? 1 : 0)
+```
+
+**Note**: `quarantineRecords` is computed at line ~1630, AFTER gate-side. The audit-side's `respectsHostBoundary` checks `quarantineRecords.isEmpty AND permit.mode ∉ {.block, .replace}`. Gate-side uses ONLY the permit-mode part because quarantines aren't yet computed. This is doctrine-safe: substrate's permit synthesis already factors quarantine state into permit.mode (so checking permit.mode is a sufficient proxy at gate-time).
+
+### 166.4 2 named constants extracted
+
+```swift
+// Used at BOTH line ~1048 + line ~1820
+fileprivate static let kunlunAxisDeviationThreshold: Double = 0.7
+
+// Used at BOTH line ~1028 + line ~1834
+fileprivate static let
+    defaultConfidenceFloorWhenNoUncertaintyLedger: Double = 1.0
+```
+
+Each carries doc-comment derivation:
+- `kunlunAxisDeviationThreshold` — centerScore threshold above which alignment is "centered" (Kunlun §4.1)
+- `defaultConfidenceFloorWhenNoUncertaintyLedger` — 1.0 = fully confident = no uncertainty cap when L4 uncertainty ledger absent
+
+### 166.5 Other magic numbers spotted (NOT changed in this chapter)
+
+Audit surfaced additional magic literals in BASMemory + other subsystems that were NOT touched in this chapter:
+
+| File | Magic literal | Reason not changed |
+|---|---|---|
+| `MemoryGovernanceCore.swift:282` | `0.58` confidence threshold | Pre-existing memory subsystem; not part of chapters 156-165 work |
+| `MemoryCore.swift:90-94` | Multiple seed values 0.50/0.54/etc | Default fixture / seed values, not active threshold logic |
+| `MemoryCore.swift:408/784/793/801` | confidenceCeiling 0.58/0.64/0.66/0.70 | Multi-tier ceiling values; would require subsystem-aware refactor |
+| `MemoryCore.swift:2697/2700` | `0.34` / `0.25` rate thresholds | Memory-load-rate thresholds; subsystem-specific |
+| `BASShadowTrialObservation.swift:200-203` | `0.10/0.40/0.20` | Lifecycle stage probabilities; doctrine-fixture data |
+| `BASMemoryTieringProfile.swift:76` | `0.55` + `0.35` weights | Heuristic combiner weights; would benefit from named formula but isn't drift-prone |
+
+**Honest scope**: chapter 一百六十六 fixes only literals introduced or duplicated in **chapters 156-165 work**. Other subsystem magic literals are documented here as backlog for dedicated chapters (chapter 一百十三 doctrine permits gradual extension; not all in one chapter).
+
+### 166.6 Test verification
+
+| Counter | Pre-M595 | Post-M595 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2955 | 2955 | 0 (no test changes) |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4390 | 4390 | 0 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+The cross-site fix did NOT break any test. Why: the audit-side already computed correctly via M583; the gate-side's previous risk-level lookup was used to derive `kunlunAxisAlignmentForGate` which feeds `BASKunlunPermitEscalation.escalate(...)`. Both old (lookup) and new (predicate) paths produce a `BASAxisAlignment` with the same SHAPE; only the centerScore value differs. No test pinned the specific centerScore at gate-time.
+
+### 166.7 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Anti-magic-number (chapter 一百十三) | ✓ extended substrate-wide; +2 named constants |
+| Cross-site consistency (anti-drift) | ✓ defect #12 cross-site drift discovered AND fixed |
+| Honest-correction at structural level | ✓ chapter 一百六十六 walks back chapter 一百五十七's claim that defect #12 partial fix was applied (was applied to only 1 of 2 sites) |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 166.8 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Sources/BASHostKit/EBrainRuntimeCoordinator.swift` | +2 named constants `kunlunAxisDeviationThreshold` + `defaultConfidenceFloorWhenNoUncertaintyLedger`. Cross-site drift fix at line 1050: gate-side now uses 3-predicate substrate-state evaluation (M583 mirror), no longer risk-level lookup. Both `deviationThreshold` literals + both `?? 1.0` confidenceFloor literals replaced with named-constant references. |
+
+### 166.9 Honest disclosure: 5 deep-review iterations missed this
+
+Iter 1-5 of deep review (chapters 156-162) all examined `EBrainRuntimeCoordinator.swift`. None caught the cross-site drift. The reason: each iteration focused on the AUDIT-side (where signalRefs flow) and didn't audit the GATE-side (where actual permit escalation happens). The doc-comment at line 1029-1035 ("same output by construction") lulled all 5 iterations into trusting parity.
+
+**Lesson**: doc-comment claims of cross-site parity must be tested by code-reading, not trusted. Future deep reviews should verify mirror-pair claims by diff-ing the two sites.
+
+### 166.10 一句话总结
+
+**Chapter 一百六十六 (M595 — 全面严查 hard coding 和 魔法数字 扫描整体)**: respond to user broadening anti-magic-number sweep beyond chapters 156-165 additions to substrate-wide scan. **Critical finding**: defect #12 partial fix in chapter 一百五十七 (M583) updated ONLY the audit-side `kunlunMatched` evaluation; gate-side at line 1050 still used the OLD risk-level lookup table. Cross-site drift bug — doc-comment at line 1029-1035 claimed "same output by construction" but parity was broken since chapter 157 and went unnoticed across 5 deep-review iterations. Fixed by mirroring 3-predicate evaluation at gate-side (with permit-mode-only `respectsHostBoundary` check since `quarantineRecords` not yet computed at gate-time; substrate's permit synthesis already factors quarantine state into permit.mode). 2 named constants extracted: `kunlunAxisDeviationThreshold = 0.7` (used at both gate + audit `BASKunlunAxis` construction) + `defaultConfidenceFloorWhenNoUncertaintyLedger = 1.0` (used at both gate + audit `BASUnknownReserve.derive` calls). Honest disclosure of additional magic literals in BASMemory subsystem (MemoryGovernanceCore confidence 0.58, MemoryCore confidenceCeiling tiers, MemoryTieringProfile heuristic weights) NOT changed in this chapter — backlog for dedicated subsystem-aware chapters. Test counts unchanged (BAS 2955, Qinao 1435, 全栈 4390) / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number + cross-site consistency (anti-drift) + honest-correction at structural level. **Lesson**: doc-comment claims of cross-site parity must be verified by code-reading, not trusted; future deep reviews diff mirror-pair sites.

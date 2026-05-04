@@ -89,6 +89,32 @@ public struct BASEBrainRuntimeCoordinator {
         "L13", "L14",
     ]
 
+    /// **M595 chapter 一百六十六 — anti-magic-number**: deviation
+    /// threshold for `BASKunlunAxis` construction. Used at BOTH
+    /// the gate-side (line ~1048) AND audit-side (line ~1820)
+    /// construction. Pre-fix both call sites had inline `0.7`,
+    /// duplicating the magic literal.
+    /// Doctrine derivation: 0.7 is the centerScore threshold above
+    /// which alignment is "centered" (axis aligned with target).
+    /// Below 0.7 → requiresGate = true → axis-aware permit
+    /// escalation per Kunlun §4.1.
+    fileprivate static let kunlunAxisDeviationThreshold: Double =
+        0.7
+
+    /// **M595 chapter 一百六十六 — anti-magic-number**: default
+    /// confidence floor when `thoughtFrame.uncertaintyLedger` is
+    /// nil (no L4 uncertainty derivation). 1.0 = fully confident
+    /// = no uncertainty cap = `BASUnknownReserve` returns
+    /// assertion ceiling `.unrestricted`. Used at BOTH gate-side
+    /// (line ~1028) AND audit-side (line ~1834) BASUnknownReserve
+    /// derive calls; pre-fix both call sites had inline `?? 1.0`.
+    /// Doctrine: absent uncertainty ledger → trust thought frame;
+    /// don't spurious-cap permit assertions when we have no
+    /// reason to.
+    fileprivate static let
+        defaultConfidenceFloorWhenNoUncertaintyLedger: Double =
+        1.0
+
     /// 5-step pipeline transformation list used by the M405
     /// River-Origin trace derive.
     fileprivate static let riverOriginTransformationSteps: [String] = [
@@ -1013,7 +1039,9 @@ public struct BASEBrainRuntimeCoordinator {
             reserveID:
                 "unknown-reserve-\(derivedSessionID)",
             confidenceFloor: thoughtFrame.uncertaintyLedger?
-                .confidenceFloor ?? 1.0)
+                .confidenceFloor
+                ?? Self
+                .defaultConfidenceFloorWhenNoUncertaintyLedger)
         let assertionCeilingDecisionForGate = BASAssertionCeilingGate
             .cap(
                 permit: boundActionPermit,
@@ -1045,25 +1073,72 @@ public struct BASEBrainRuntimeCoordinator {
             centerlineRules:
                 Self.kunlunCenterlineRules(
                     for: boundActionPermit.mode),
-            deviationThreshold: 0.7,
+            deviationThreshold: Self
+                .kunlunAxisDeviationThreshold,
             lastAlignmentCheck: "")
-        let kunlunMatchedForGate: Int = {
-            switch boundRiskCard.riskLevel {
-            case .low: return 3
-            case .medium: return 2
-            case .high: return 1
-            case .extreme: return 0
+        // M595 chapter 一百六十六 — defect #12 cross-site drift fix.
+        // Pre-M595 the gate-side at this seam used the OLD risk-
+        // level lookup table {low: 3, medium: 2, high: 1, extreme: 0}
+        // while M583 chapter 一百五十七 had updated only the audit-
+        // side at line ~1864. The doc-comment (line ~1029-1035)
+        // says "same output by construction" but parity broke when
+        // M583 fixed only one of two sites. Cross-site drift bug.
+        //
+        // Post-M595: gate-side mirrors audit-side substrate-state
+        // predicate evaluation. Two predicates of the audit-side
+        // 3-rule evaluation are usable here:
+        //   2. honorsWorldAnchor (anchor + abyssal both available)
+        //   3. permitModeCooperative (always available)
+        // The audit-side's `respectsHostBoundary` uses
+        // `quarantineRecords.isEmpty AND permit.mode ∉ {.block,
+        // .replace}`. quarantineRecords is computed at line ~1630,
+        // AFTER this gate-side seam. Use the simpler permit-mode
+        // check at gate-side; the substrate's permit synthesis
+        // already factors quarantine state into permit.mode.
+        let respectsHostBoundaryForGate: Bool =
+            boundActionPermit.mode != .block
+            && boundActionPermit.mode != .replace
+        let honorsWorldAnchorForGate: Bool =
+            humanAnchorSignalForGate
+                .recommendedSurfaceTone != .reserved
+            && abyssalPressureForGate
+                .sovereignEscalationHint == nil
+        let permitModeCooperativeForGate: Bool = {
+            switch boundActionPermit.mode {
+            case .answer, .mirror, .compare,
+                 .delay, .draftOnly, .localOnly:
+                return true
+            case .block, .replace, .escalate:
+                return false
             }
         }()
+        let kunlunMatchedForGate: Int =
+            (respectsHostBoundaryForGate ? 1 : 0)
+            + (honorsWorldAnchorForGate ? 1 : 0)
+            + (permitModeCooperativeForGate ? 1 : 0)
         let kunlunDeviationCodesForGate: [String] = {
-            switch boundRiskCard.riskLevel {
-            case .low: return []
-            case .medium: return ["risk-medium-needs-attention"]
-            case .high: return ["risk-high-narrows-axis"]
-            case .extreme: return [
-                "risk-extreme-axis-overreach",
-            ]
+            var codes: [String] = []
+            if !respectsHostBoundaryForGate {
+                codes.append("host-boundary-not-respected")
             }
+            if !honorsWorldAnchorForGate {
+                codes.append("world-anchor-not-honored")
+            }
+            if !permitModeCooperativeForGate {
+                codes.append("permit-mode-non-cooperative")
+            }
+            // Risk-level signal preserved as additive context
+            // (parity with audit-side post-M583).
+            switch boundRiskCard.riskLevel {
+            case .low: break
+            case .medium:
+                codes.append("risk-medium-needs-attention")
+            case .high:
+                codes.append("risk-high-narrows-axis")
+            case .extreme:
+                codes.append("risk-extreme-axis-overreach")
+            }
+            return codes
         }()
         let kunlunAxisAlignmentForGate = BASKunlunAxisProtocol
             .computeAlignment(
@@ -1772,7 +1847,9 @@ public struct BASEBrainRuntimeCoordinator {
             reserveID:
                 "unknown-reserve-\(runtimeTrace.sessionID)",
             confidenceFloor: thoughtFrame.uncertaintyLedger?
-                .confidenceFloor ?? 1.0)
+                .confidenceFloor
+                ?? Self
+                .defaultConfidenceFloorWhenNoUncertaintyLedger)
         // M385 cap now fires upstream (M392 — see the gating block
         // right after `thoughtFrame.actionPermit = boundActionPermit`
         // at line ~380). `unknownReserveForAudit` here is the
@@ -1811,7 +1888,8 @@ public struct BASEBrainRuntimeCoordinator {
             centerlineRules:
                 Self.kunlunCenterlineRules(
                     for: boundActionPermit.mode),
-            deviationThreshold: 0.7,
+            deviationThreshold: Self
+                .kunlunAxisDeviationThreshold,
             lastAlignmentCheck: "")
         // M583 (chapter 一百五十七) — defect #12 partial fix.
         // Pre-M583: `kunlunMatched` was a 4-valued risk-level lookup
