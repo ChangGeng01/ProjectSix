@@ -195,14 +195,39 @@ public struct BASShadowTrialObservationBundle:
 /// (0.0–1.0). Actually executing a trial is the most expensive
 /// signal — it runs a sandboxed pass over a reference corpus.
 public enum BASShadowTrialObservationBudget {
+    /// **M602 chapter 一百七十二 — anti-magic-number** (chapter 一百六十六
+    /// §166.5 backlog 6 of 6, FINAL): per-signal cost budget for
+    /// shadow-trial observation. Pre-fix these 6 values were inline
+    /// in the `signalCost` dictionary literal.
+    ///
+    /// **Doctrine ordering** (cost reflects compute cost):
+    /// trialRun (0.40, most expensive — sandboxed pass over
+    /// reference corpus) > parity/regression checks (0.20 each —
+    /// mid-tier verification) > ticketIssued (0.10 — cheap
+    /// metadata) > votes (0.05 each — cheapest, just signal
+    /// recording).
+    ///
+    /// **Sum-to-one constraint** (chapter 一百七十一 doctrine layer 6):
+    /// 0.10 + 0.40 + 0.20 + 0.20 + 0.05 + 0.05 = **1.00** exactly.
+    /// If any cost changes without rebalancing, the
+    /// `testSignalCostsSumToOne` test fails AND surfaces the
+    /// doctrine question of whether the budget is still
+    /// normalized.
+    public static let ticketIssuedCost: Double = 0.10
+    public static let trialRunCost: Double = 0.40
+    public static let parityVerifiedCost: Double = 0.20
+    public static let regressionDetectedCost: Double = 0.20
+    public static let promotionVoteCost: Double = 0.05
+    public static let quarantineVoteCost: Double = 0.05
+
     public static let signalCost:
         [BASShadowTrialSignalKind: Double] = [
-            .ticketIssued: 0.10,
-            .trialRun: 0.40,
-            .parityVerified: 0.20,
-            .regressionDetected: 0.20,
-            .promotionVote: 0.05,
-            .quarantineVote: 0.05
+            .ticketIssued: ticketIssuedCost,
+            .trialRun: trialRunCost,
+            .parityVerified: parityVerifiedCost,
+            .regressionDetected: regressionDetectedCost,
+            .promotionVote: promotionVoteCost,
+            .quarantineVote: quarantineVoteCost,
         ]
 
     public static func cost(

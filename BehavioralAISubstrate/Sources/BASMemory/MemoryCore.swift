@@ -50,6 +50,35 @@ public enum BASReactionWeightKey: String, CaseIterable, Codable, Sendable {
 }
 
 public struct BASReactionWeights: Codable, Sendable, Equatable {
+    /// **M601 chapter 一百七十二 — anti-magic-number** (chapter 一百六十六
+    /// §166.5 backlog 5 of 6): default reaction-weight seed values.
+    /// Pre-fix these 6 values were inline at line ~90-95 in
+    /// `defaults(for: modeName)`.
+    ///
+    /// **Doctrine**: seed defaults are 0.50-centered (neutral
+    /// baseline) with axis-specific deviations:
+    /// - briefLanguage 0.50: neutral preference for brevity
+    /// - warmDirectTone 0.54: slight bias toward warm directness
+    /// - lowCognitiveLoad 0.50: neutral preference for low load
+    /// - interruptiveActionBias 0.44: SLIGHT BIAS AGAINST
+    ///   interrupting (below 0.50 — substrate defaults to
+    ///   non-interruptive)
+    /// - boundaryNamingBias 0.46: slight bias against verbose
+    ///   boundary-naming (most boundaries should be implicit)
+    /// - tradeoffClarityBias 0.50: neutral
+    ///
+    /// These are seed defaults, not active gating thresholds —
+    /// they're starting values for runtime fitting. Lower
+    /// extraction priority than active thresholds (chapters 167-171).
+    /// Extracted for cross-reference + drift-prevention.
+    public static let defaultBriefLanguageSeed: Double = 0.50
+    public static let defaultWarmDirectToneSeed: Double = 0.54
+    public static let defaultLowCognitiveLoadSeed: Double = 0.50
+    public static let defaultInterruptiveActionBiasSeed: Double =
+        0.44
+    public static let defaultBoundaryNamingBiasSeed: Double = 0.46
+    public static let defaultTradeoffClarityBiasSeed: Double = 0.50
+
     public var briefLanguage: Double
     public var warmDirectTone: Double
     public var lowCognitiveLoad: Double
@@ -86,13 +115,17 @@ public struct BASReactionWeights: Codable, Sendable, Equatable {
 
     public static func defaults(for modeName: String) -> BASReactionWeights {
         _ = modeName
+        // M601 chapter 一百七十二 — anti-magic-number: seed values
+        // sourced from named static constants with doctrine
+        // doc-comment.
         return BASReactionWeights(
-            briefLanguage: 0.50,
-            warmDirectTone: 0.54,
-            lowCognitiveLoad: 0.50,
-            interruptiveActionBias: 0.44,
-            boundaryNamingBias: 0.46,
-            tradeoffClarityBias: 0.50
+            briefLanguage: defaultBriefLanguageSeed,
+            warmDirectTone: defaultWarmDirectToneSeed,
+            lowCognitiveLoad: defaultLowCognitiveLoadSeed,
+            interruptiveActionBias:
+                defaultInterruptiveActionBiasSeed,
+            boundaryNamingBias: defaultBoundaryNamingBiasSeed,
+            tradeoffClarityBias: defaultTradeoffClarityBiasSeed
         )
     }
 

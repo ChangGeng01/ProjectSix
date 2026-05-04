@@ -20207,3 +20207,168 @@ Doctrine: substrate memory is recency-biased; access boosts (repeated probes = r
 ### 171.11 一句话总结
 
 **Chapter 一百七十一 (M600 — continue)**: respond to user "continue" by closing chapter 一百六十六 backlog item 4 of 6 — BASMemoryTieringProfile composite heat weights. 3 inline weights at line ~76-77 (`0.55 * recency + 0.35 * access - 0.10 * staleness`) extracted to named static properties on `BASMemoryTieringProfile`: `compositeHeatRecencyWeight = 0.55` (dominant) + `compositeHeatAccessWeight = 0.35` (secondary) + `compositeHeatStalenessPenaltyWeight = 0.10` (penalty). Doctrine ordering: recency > access > staleness. **NEW doctrine layer**: sum-to-one constraint (testWeightsSumToOne pins `0.55 + 0.35 + 0.10 = 1.0` exactly — stronger than fraction-family because it enforces joint constraint across all 3 weights). 5 anti-drift tests in NEW M600TieringProfileWeightTests.swift: value pin + ordering pin + **sum-to-one pin (NEW)** + range pin + behavioral correctness pin (extreme inputs produce expected composite heat). Sum-to-one is **stronger than fraction-family** (chapter 一百七十): fraction-family pins each value individually as intuitive fraction; sum-to-one pins joint constraint across all weights — if any weight changes without rebalancing others, test fails. Chapter 一百六十六 backlog: 4 of 6 categories closed. 6 doctrine layers now in anti-drift defensive structure. Test counts: BAS 2971 → 2976 (+5), Qinao 1435 unchanged, 全栈 4406 → 4411 / 0 failures / 5 gates clean. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) unchanged.
+
+---
+
+## 一百七十二、 剩下一次性解决掉 — final BASMemory backlog 5+6 of 6 (M601-M602 / 2026-05-05)
+
+### 172.1 触发动作
+
+User: "剩下一次性解决掉" — close the rest at once. Chapter 一百六十六 §166.5 backlog had 6 categories; 4 closed across chapters 一百六十七/九/七十/七十一. **This chapter closes the final 2 simultaneously.**
+
+### 172.2 M601 — BASReactionWeights seed defaults (item 5 of 6)
+
+`MemoryCore.swift:90-95` had 6 inline seed values in `defaults(for: modeName)`:
+
+```swift
+// Pre-fix
+return BASReactionWeights(
+    briefLanguage: 0.50,
+    warmDirectTone: 0.54,
+    lowCognitiveLoad: 0.50,
+    interruptiveActionBias: 0.44,
+    boundaryNamingBias: 0.46,
+    tradeoffClarityBias: 0.50
+)
+```
+
+Extracted to 6 named static properties on `BASReactionWeights`:
+- `defaultBriefLanguageSeed: Double = 0.50`
+- `defaultWarmDirectToneSeed: Double = 0.54`
+- `defaultLowCognitiveLoadSeed: Double = 0.50`
+- `defaultInterruptiveActionBiasSeed: Double = 0.44`
+- `defaultBoundaryNamingBiasSeed: Double = 0.46`
+- `defaultTradeoffClarityBiasSeed: Double = 0.50`
+
+Doctrine doc-comment: seeds 0.50-centered (neutral baseline) with axis-specific deviations. **Specific doctrine pin** (test): `interruptiveActionBias` + `boundaryNamingBias` MUST be < 0.50 (substrate defaults to non-interruptive + implicit boundaries).
+
+### 172.3 M602 — BASShadowTrialObservation cost budget (item 6 of 6, FINAL)
+
+`BASShadowTrialObservation.swift:200-206` had 6 inline cost values in `signalCost` dictionary:
+
+```swift
+// Pre-fix
+public static let signalCost: [BASShadowTrialSignalKind: Double] = [
+    .ticketIssued: 0.10,
+    .trialRun: 0.40,
+    .parityVerified: 0.20,
+    .regressionDetected: 0.20,
+    .promotionVote: 0.05,
+    .quarantineVote: 0.05
+]
+```
+
+Extracted to 6 named static properties on `BASShadowTrialObservationBudget`:
+- `ticketIssuedCost: Double = 0.10`
+- `trialRunCost: Double = 0.40`
+- `parityVerifiedCost: Double = 0.20`
+- `regressionDetectedCost: Double = 0.20`
+- `promotionVoteCost: Double = 0.05`
+- `quarantineVoteCost: Double = 0.05`
+
+**Doctrine layer 6 (sum-to-one) applies**: 0.10 + 0.40 + 0.20 + 0.20 + 0.05 + 0.05 = **1.00** exactly. Normalized cost budget.
+
+Doctrine ordering (cost reflects compute cost):
+- `trialRun` (0.40, most expensive — sandboxed pass)
+- `parityVerified` == `regressionDetected` (0.20 each — mid-tier checks)
+- `ticketIssued` (0.10 — cheap metadata)
+- `promotionVote` == `quarantineVote` (0.05 each — cheapest, just recording)
+
+### 172.4 8 anti-drift tests added
+
+New file `M601M602BASMemoryFinalTests.swift` (~200 LoC, 8 tests):
+
+**M601 reaction weights (4 tests)**:
+- `testReactionWeightSeedsPinned` — pins 6 individual values
+- `testReactionWeightSeedsInValidRange` — [0, 1] sanity
+- `testReactionWeightSeedDoctrine` — pins **interruptive < 0.50** + **boundary naming < 0.50** (substrate defaults to non-interruptive + implicit boundaries)
+- `testDefaultsConstructorMatchesSeeds` — behavioral pin
+
+**M602 cost budget (4 tests)**:
+- `testSignalCostsPinned` — pins 6 individual values
+- `testSignalCostOrderingPinned` — pins doctrine ordering: trialRun > parity == regression > ticket > votes (parity == regression and votes equal-cost)
+- `testSignalCostsSumToOne` — **doctrine layer 6 (chapter 171) applied**: pins 1.0 exactly
+- `testSignalCostDictionaryMatchesConstants` — behavioral pin: dictionary contains 6 entries matching named constants
+
+### 172.5 Test counts
+
+| Counter | Pre-M601 | Post-M602 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2976 | 2984 | **+8** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4411 | 4419 | +8 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+### 172.6 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Sources/BASMemory/MemoryCore.swift` | +6 named static seeds on `BASReactionWeights`; 6 inline values replaced with named-constant references in `defaults(for:)` |
+| `BehavioralAISubstrate/Sources/BASMemory/BASShadowTrialObservation.swift` | +6 named static costs on `BASShadowTrialObservationBudget`; dictionary literal references named constants |
+| `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M601M602BASMemoryFinalTests.swift` | NEW — 8 tests (4 reaction weights + 4 cost budget) |
+
+### 172.7 Chapter 166 backlog: COMPLETELY CLOSED
+
+| # | Category | Status | Chapter |
+|---|---|---|---|
+| 1 | MemoryGovernanceCore confidence 0.58 | ✅ | 一百六十七 |
+| 2 | MemoryCore confidenceCeiling tiers (4 values) | ✅ | 一百六十九 |
+| 3 | MemoryCore rate thresholds 0.34/0.25 | ✅ | 一百七十 |
+| 4 | BASMemoryTieringProfile heuristic weights (3 values) | ✅ | 一百七十一 |
+| 5 | BASReactionWeights seed defaults (6 values) | ✅ | **一百七十二** |
+| 6 | BASShadowTrialObservation cost budget (6 values) | ✅ | **一百七十二** |
+
+**ALL 6 BASMemory subsystem categories now closed.** Chapter 一百六十六's honest disclosure of "subsystem-aware refactor backlog" is fully resolved across chapters 一百六十七-一百七十二 (6 chapters, ~5 days of work cumulative).
+
+### 172.8 Cumulative chapters 156-172 state
+
+- **27 defects + improvements** closed across 17 chapters
+- **29 anti-drift tests** in 5 dedicated test files
+- **6 doctrine layers** in anti-drift defensive structure
+- **6 of 6 BASMemory backlog categories** closed (FINAL)
+- **3 truly external residuals**: M406 + iPhone deploy + substrate redesign
+
+### 172.9 Total magic literals extracted across chapters 156-172
+
+| Chapter | Source | Count | Doctrine |
+|---|---|---|---|
+| 165 (M594) | BASDoctrineMetricsThreshold | 6 | percentile + std multiplier + variance thresholds + anchor risk thresholds |
+| 165 (M594) | DoctrineBenchConstants | 6 | bench config |
+| 166 (M595) | EBrainRuntimeCoordinator | 2 | deviation + confidence floor |
+| 167 (M596) | MemoryGovernanceCore | 2 | confidence + evidence count gate |
+| 169 (M598) | BASIdentityProfile | 4 | tier ordering |
+| 170 (M599) | BASDecisionBrainState | 2 | rate thresholds |
+| 171 (M600) | BASMemoryTieringProfile | 3 | sum-to-one weights |
+| **172 (M601-M602)** | **BASReactionWeights + BASShadowTrialObservationBudget** | **12** | **seed defaults + sum-to-one cost budget** |
+| **TOTAL** | | **37** | |
+
+**37 named constants extracted** across chapters 156-172 anti-magic-number sweep.
+
+### 172.10 Doctrine layers cumulative state
+
+| # | Layer | Chapter | Active in tests |
+|---|---|---|---|
+| 1 | Anti-drift infrastructure | 166-167 | M595 (5 tests) |
+| 2 | Test-the-test (meta) | 168 | M595 (3 meta-tests) |
+| 3 | Cross-callsite consistency | 166-167 | M595 (real-source greps) |
+| 4 | Cross-reference between constants in different files | 169 | M598 |
+| 5 | Fraction-family intent | 170 | M599 |
+| 6 | Sum-to-one constraint | 171 | M600 + **M602 (this chapter applies it again)** |
+
+### 172.11 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Anti-magic-number (chapter 一百十三) | ✓ EXTENDED retroactively to chapters 156-172 + final BASMemory backlog closure |
+| Sum-to-one constraint doctrine | ✓ APPLIED to second sum-to-one set (cost budget after weight blend) — pattern proves reusable |
+| Tier ordering doctrine | ✓ extended to cost-tier ordering (compute-cost-reflects-magnitude) |
+| Doctrine pin tests for behavioral defaults | ✓ NEW pattern — `testReactionWeightSeedDoctrine` pins specific axis defaults below neutral baseline |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 172.12 一句话总结
+
+**Chapter 一百七十二 (M601-M602 — 剩下一次性解决掉)**: respond to user "close the rest at once" by closing **BOTH remaining BASMemory backlog items in one chapter**. **M601 BASReactionWeights seeds** (item 5 of 6): 6 inline default values at `MemoryCore.swift:90-95` extracted to named static properties; doctrine pin: interruptive + boundary-naming MUST be < 0.50 (substrate defaults to non-interruptive + implicit boundaries). **M602 BASShadowTrialObservation cost budget** (item 6 of 6, FINAL): 6 inline cost values extracted with sum-to-one constraint preserved (0.10+0.40+0.20+0.20+0.05+0.05 = 1.00 exactly); doctrine ordering: trialRun (most expensive sandboxed pass) > parity == regression (mid-tier) > ticketIssued (cheap metadata) > votes (cheapest). 8 anti-drift tests in NEW `M601M602BASMemoryFinalTests.swift`: 4 for reaction-weight seeds (values pin + range pin + axis-specific doctrine pin + behavioral pin) + 4 for cost budget (values pin + ordering pin + sum-to-one pin + dictionary-matches-constants pin). **Chapter 一百六十六 §166.5 backlog COMPLETELY CLOSED — all 6 categories resolved across chapters 一百六十七-一百七十二**. Cumulative magic literals extracted: **37** across 8 source files. Test counts: BAS 2976 → 2984 (+8), Qinao 1435 unchanged, 全栈 4411 → 4419 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number doctrine retroactive sweep finished; sum-to-one constraint doctrine pattern proven reusable (applied second time in M602); doctrine pin tests for behavioral defaults NEW pattern. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) unchanged. Cumulative chapters 156-172: 27 defects + improvements closed across 17 chapters; 29 anti-drift tests in 5 dedicated test files; 6 doctrine layers in anti-drift defensive structure.
