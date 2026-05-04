@@ -1,5 +1,8 @@
 import Foundation
 import BASHostKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - M573 (chapter 一百四十七 part 2) bench helpers (inlined here
 // because adding a separate file requires Xcode project edits)
@@ -515,6 +518,16 @@ final class SampleHostModel: ObservableObject {
             }
         )
         self.lastError = initialError
+
+        // M573 auto-start: chapter 一百四十七 SampleHost build is the
+        // bench-enabled variant. Auto-start the bench loop on launch
+        // so the iPhone produces real-device data without requiring
+        // a button tap. User can still tap "Stop" via the bench panel
+        // if they want to halt it.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s grace
+            self?.startBench()
+        }
     }
 
     func bootstrap() {
@@ -604,13 +617,32 @@ final class SampleHostModel: ObservableObject {
         benchOutputPath = SampleHostBenchHelpers
             .benchOutputURL().path
 
+        // M573 (chapter 一百四十七 part 2 b) — keep screen on while
+        // bench runs so iOS doesn't suspend the foreground app.
+        // User must keep iPhone plugged to power for sustained 8h
+        // run; iOS still suspends if user backgrounds the app.
+        #if canImport(UIKit)
+        UIApplication.shared.isIdleTimerDisabled = true
+        #endif
+
+        // 8-hour maximum duration cap. Bench auto-stops at 8h to
+        // mirror chapter 一百四十七 part 1 Mac run duration.
+        let maxDurationSeconds: TimeInterval = 8 * 3600
+
         let prompts = SampleHostBenchPromptCatalog.allPrompts
         let runtime = self.runtime
         let runner = self.benchRunner
 
+        let benchStartedAt = Date()
         benchTask = Task { @MainActor [weak self] in
             var iter = 0
             while !Task.isCancelled {
+                // 8h cap — gracefully halt
+                if Date().timeIntervalSince(benchStartedAt)
+                    > maxDurationSeconds
+                {
+                    break
+                }
                 let entry = prompts[iter % prompts.count]
                 let t0 = Date()
                 var auditCount = 0
@@ -681,11 +713,19 @@ final class SampleHostModel: ObservableObject {
                 if iter % 50 == 0 {
                     await runner.flush()
                 }
-                // Yield to allow UI updates
+                // M573 rate limit: 50ms sleep keeps iPhone thermal
+                // headroom + storage bounded for sustained 8h run.
+                // ~20 iter/sec × 8h = ~576K iterations / ~80MB JSONL.
+                // Without this, ~94 iter/sec would overheat + write
+                // ~780MB in 8h on real device.
+                try? await Task.sleep(nanoseconds: 50_000_000)
                 await Task.yield()
             }
             await runner.flush()
             await runner.close()
+            #if canImport(UIKit)
+            UIApplication.shared.isIdleTimerDisabled = false
+            #endif
             self?.benchIsRunning = false
         }
     }
