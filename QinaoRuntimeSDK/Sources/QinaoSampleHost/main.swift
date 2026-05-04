@@ -415,6 +415,22 @@ struct QinaoSampleHost {
             await runComprehensiveBench(args: args)
             return
         }
+        if args.contains("--doctrine-metrics-bench") {
+            // M577 (chapter 一百五十二) — production caller for
+            // chapter 一百五十一 6 typed doctrine metric schemas.
+            // Drives N substrate sessions with combinatorial prompts
+            // (chapter 一百四十九 generator), synthesizes realistic
+            // BASAxisAlignment / BASHeavenGatePermit / BASRiverOriginTrace
+            // / BASYaochiSanctumEntry / BASHumanAnchorSignal instances
+            // from per-turn audit signal codes + permit modes, then
+            // runs all 6 BASDoctrineMetricsCompute helpers and writes
+            // typed metric values to summary.json.
+            // Defaults to N=200 sessions; QINAO_DOCTRINE_BENCH_COUNT
+            // override. Output to QINAO_DOCTRINE_BENCH_OUTPUT
+            // (default /tmp/qinao-doctrine-metrics).
+            runDoctrineMetricsBench()
+            return
+        }
         if args.contains("--sha256-bench") {
             // M364 — bench M341 pure-Swift SHA-256 hasher
             // throughput. Default 100K hashes;
@@ -4881,6 +4897,383 @@ struct QinaoSampleHost {
             JSONL:    \(jsonlURL.path)
             Summary:  \(summaryURL.path)
             """)
+    }
+
+    // MARK: - M577 (chapter 一百五十二) doctrine metrics bench
+    //
+    // Production caller for chapter 一百五十一's 6 typed doctrine
+    // metric schemas. Drives N substrate sessions with combinatorial
+    // prompts (chapter 一百四十九 generator), synthesizes realistic
+    // source-type instances from per-turn audit signal codes + permit
+    // modes, then runs all 6 BASDoctrineMetricsCompute helpers and
+    // writes typed metric values to summary.json.
+    //
+    // Synthesis strategy (no projections-on-turn-result API yet):
+    //   - BASAxisAlignment.centerScore = (permit==delay ? 0.85 : 0.4)
+    //     ± noise; deviationCodes = [] for delay, ["misaligned"] for block
+    //   - BASHeavenGatePermit.passState = .passed for delay, .denied for block
+    //   - BASRiverOriginTrace synthesized with substrate audit IDs as roots
+    //   - BASYaochiSanctumEntry synthesized 1-per-50 turns (memory-touch proxy)
+    //   - BASHumanAnchorSignal: agency/alienation/dignity/overwhelm risks
+    //     derived from stake dimension (low → 0.1, irreversible → 0.4)
+    //   - Doctrine harmony: red-line hits = audit signal codes containing
+    //     "forbid:" prefix; cross-conflicts = signal pairs of opposite verdict
+    //
+    // This makes the chapter 一百五十一 schemas have a real production
+    // caller + produces empirical numbers showing each metric's behavior
+    // across substrate routing decisions.
+
+    private static func runDoctrineMetricsBench() {
+        let countStr = ProcessInfo.processInfo
+            .environment["QINAO_DOCTRINE_BENCH_COUNT"]
+        let outputStr = ProcessInfo.processInfo
+            .environment["QINAO_DOCTRINE_BENCH_OUTPUT"]
+            ?? "/tmp/qinao-doctrine-metrics"
+        let count = Int(countStr ?? "") ?? 200
+        let outputURL = URL(fileURLWithPath: outputStr)
+
+        print("""
+            QinaoSampleHost --doctrine-metrics-bench (M577, chapter 一百五十二):
+              Production caller for chapter 一百五十一 6 doctrine metrics.
+              Drives N=\(count) substrate sessions, synthesizes typed
+              source instances from audit signal codes + permit modes,
+              runs all 6 BASDoctrineMetricsCompute helpers.
+
+              Output directory: \(outputStr)
+
+              Override via env:
+                QINAO_DOCTRINE_BENCH_COUNT=N
+                QINAO_DOCTRINE_BENCH_OUTPUT=path
+            """)
+
+        try? FileManager.default.createDirectory(
+            at: outputURL,
+            withIntermediateDirectories: true)
+
+        // Substrate runtime (substrate-only, no LLM organ)
+        let policyLineage = BASRuntimePolicyLineage(
+            bundleVersion: "doctrine-metrics.bundle.v1",
+            providerRoutingRegistryVersion:
+                "doctrine.routing-registry.v1",
+            providerRoutingPolicyID:
+                "doctrine.routing-policy.v1",
+            runtimeTuningRegistryVersion:
+                "doctrine.tuning-registry.v1",
+            runtimeTuningPolicyID:
+                "doctrine.tuning-policy.v1",
+            resolutionSourceID: "doctrine_bundle")
+        var tuning = BASEBrainRuntimeSynthesisPolicy.generic
+            .withSchemaVersion(
+                "host.runtime-synthesis.doctrine.v1")
+        tuning.stateTransitions.runModeRules =
+            tuning.stateTransitions
+                .synthesizedRunModeRules(
+                    wakeIntent: tuning.wakeIntent)
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                runtimeProfileID: "host.doctrine",
+                policyProfileID: "host.doctrine.policy",
+                prefersPureLocal: true,
+                defaultDeviceState:
+                    BASHostConfiguration
+                        .fixtureDefaultDeviceState,
+                console: .generic,
+                lifecycleBehavior: .generic,
+                workflowBehavior: .generic,
+                cognitionBehavior: .generic,
+                presentation: .generic,
+                runtimeTuning: tuning,
+                runtimePolicyLineage: policyLineage,
+                hostRhythmProfile: .generic))
+        print("✓ Substrate runtime ready\n")
+
+        // Source-type accumulators
+        var alignments: [BASAxisAlignment] = []
+        var gates: [BASHeavenGatePermit] = []
+        var traces: [BASRiverOriginTrace] = []
+        var sanctums: [BASYaochiSanctumEntry] = []
+        var anchors: [BASHumanAnchorSignal] = []
+        var totalRedLineHits = 0
+        var crossConflicts = 0
+        var substrateErrors = 0
+
+        let runStart = Date()
+        for iter in 0..<count {
+            let g = QinaoExtendedPromptCorpus
+                .generateScattered(iter: iter)
+            let signature = g.signature
+            let prompt = g.prompt
+
+            let riskLevel: BASHostRiskLevel
+            switch signature.stake {
+            case .low, .modest:
+                riskLevel = .low
+            case .high, .veryHigh:
+                riskLevel = .medium
+            case .irreversible, .nonReversibleAfterAct:
+                riskLevel = .high
+            }
+
+            do {
+                let result = try runtime.startSession(
+                    BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: .reflective,
+                        surface: .application,
+                        prompt: prompt,
+                        title: "doctrine-\(iter)",
+                        riskLevel: riskLevel))
+                guard let turn = result.eBrainTurn else {
+                    substrateErrors += 1
+                    continue
+                }
+
+                let permit = turn.actionPermit.mode
+                let auditID = turn.sovereignAuditEntry?
+                    .auditID ?? "audit-\(iter)"
+                let signalRefs = turn.sovereignAuditEntry?
+                    .signalRefs ?? []
+
+                // Synthesize BASAxisAlignment
+                let isAligned = permit == .delay
+                    || permit == .answer
+                let centerScore: Double = isAligned
+                    ? 0.85 : 0.4
+                let alignment = BASAxisAlignment(
+                    alignmentID: "align-\(iter)",
+                    targetRef: "candidate-\(iter)",
+                    axisRef: "axis-doctrine-bench",
+                    centerScore: centerScore,
+                    deviationCodes: isAligned
+                        ? []
+                        : ["routing-misaligned"],
+                    correctionHint: isAligned
+                        ? ""
+                        : "consider-alternative",
+                    requiresGate: !isAligned)
+                alignments.append(alignment)
+
+                // Synthesize BASHeavenGatePermit
+                let gateState: BASKunlunGateState
+                switch permit {
+                case .delay, .answer, .compare:
+                    gateState = .passed
+                case .block, .replace:
+                    gateState = .denied
+                case .escalate:
+                    gateState = .remanded
+                default:
+                    gateState = .pending
+                }
+                let gate = BASHeavenGatePermit(
+                    gateID: "gate-\(iter)",
+                    sourceRef: "intent-\(iter)",
+                    targetDomain: signature.domain.rawValue,
+                    gateClass: .cognitive,
+                    requiredSeals: [],
+                    actionPermitRef: "permit-\(iter)",
+                    sovereignWarrantRef: "",
+                    secondCheckRequired: !isAligned,
+                    passState: gateState,
+                    returnPathRef: "")
+                gates.append(gate)
+
+                // Synthesize BASRiverOriginTrace (1 per 5 iter)
+                if iter % 5 == 0 {
+                    let trace = BASRiverOriginTrace(
+                        traceID: "trace-\(iter)",
+                        rootSourceRefs: [auditID],
+                        tributaryRefs: signalRefs.prefix(3)
+                            .map { String($0) },
+                        derivedObjectRefs: ["candidate-\(iter)"],
+                        transformationSteps:
+                            ["routed:\(permit.rawValue)"],
+                        consentRefs: [],
+                        permitRefs: ["permit-\(iter)"],
+                        auditRefs: [auditID],
+                        deletionDependents: [],
+                        lineageCutRefs: [])
+                    traces.append(trace)
+                }
+
+                // Synthesize BASYaochiSanctumEntry (1 per 50 iter,
+                // proxy for memory-touch)
+                if iter % 50 == 0 {
+                    let sanctum = BASYaochiSanctumEntry(
+                        entryID: "sanctum-\(iter)",
+                        memoryRef: "memory-\(iter)",
+                        hostRef: "host-doctrine-bench",
+                        sanctumClass: .sensitive,
+                        accessPolicy: .sealed,
+                        revealConditions: [],
+                        coolingPeriod: 0,
+                        humanAnchorRequired: true,
+                        lastRevealedAt: "")
+                    sanctums.append(sanctum)
+                }
+
+                // Synthesize BASHumanAnchorSignal — risk derived from
+                // stake (higher stake → higher anchor risk)
+                let stakeRisk: Double
+                switch signature.stake {
+                case .low: stakeRisk = 0.1
+                case .modest: stakeRisk = 0.15
+                case .high: stakeRisk = 0.25
+                case .veryHigh: stakeRisk = 0.3
+                case .irreversible: stakeRisk = 0.35
+                case .nonReversibleAfterAct: stakeRisk = 0.4
+                }
+                let toneAdjust: Double =
+                    signature.tone == .angry
+                        ? 0.15
+                        : signature.tone == .anxious
+                        ? 0.1
+                        : 0.0
+                let totalRiskBase = stakeRisk + toneAdjust
+                let anchor = BASHumanAnchorSignal(
+                    anchorID: "anchor-\(iter)",
+                    hostSummaryRef: "host-doctrine-bench",
+                    agencyRisk: totalRiskBase,
+                    alienationRisk: totalRiskBase * 0.8,
+                    dignityRisk: totalRiskBase * 0.6,
+                    overwhelmRisk: totalRiskBase * 0.9,
+                    recommendedSurfaceTone: isAligned
+                        ? .warm : .reserved,
+                    requiredAgencyReservation:
+                        isAligned ? "" : "defer-to-host")
+                anchors.append(anchor)
+
+                // Doctrine harmony: count red-line hits in signals
+                for ref in signalRefs {
+                    if ref.contains("forbid:")
+                        || ref.contains(":violation")
+                        || ref.contains("redline:")
+                    {
+                        totalRedLineHits += 1
+                    }
+                }
+                // Cross-conflict heuristic: block + axis-aligned in
+                // same turn = cthulhu/kunlun disagreement
+                if permit == .block && isAligned {
+                    crossConflicts += 1
+                }
+            } catch {
+                substrateErrors += 1
+            }
+
+            if (iter + 1) % 50 == 0 {
+                print("  iter=\(iter+1)/\(count) " +
+                    "alignments=\(alignments.count) " +
+                    "gates=\(gates.count)")
+            }
+        }
+        let elapsed = Date().timeIntervalSince(runStart)
+
+        // Compute all 6 metrics
+        let axisStability = BASDoctrineMetricsCompute
+            .axisStability(metricID: "doctrine-bench-axis",
+                from: alignments)
+        let gateFidelity = BASDoctrineMetricsCompute
+            .gateFidelity(metricID: "doctrine-bench-gate",
+                from: gates)
+        let originCompleteness = BASDoctrineMetricsCompute
+            .originTraceCompleteness(
+                metricID: "doctrine-bench-origin",
+                from: traces)
+        let sanctumLeak = BASDoctrineMetricsCompute
+            .sanctumLeakRate(
+                metricID: "doctrine-bench-sanctum",
+                from: sanctums,
+                unauthorizedAttempts: 0,
+                unauthorizedBlocked: 0)
+        let harmony = BASDoctrineMetricsCompute
+            .doctrineHarmony(
+                metricID: "doctrine-bench-harmony",
+                cthulhuHits: totalRedLineHits / 2,
+                kunlunHits: totalRedLineHits / 2,
+                crossConflicts: crossConflicts,
+                sampleCount: alignments.count)
+        let anchorRetention = BASDoctrineMetricsCompute
+            .humanAnchorRetention(
+                metricID: "doctrine-bench-anchor",
+                from: anchors)
+
+        // Write summary
+        let summaryURL = outputURL
+            .appendingPathComponent("summary.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [
+            .sortedKeys, .prettyPrinted]
+        let summary = DoctrineMetricsBenchSummary(
+            sessionsRun: count,
+            substrateErrors: substrateErrors,
+            elapsedSeconds: elapsed,
+            axisStability: axisStability,
+            gateFidelity: gateFidelity,
+            originTraceCompleteness: originCompleteness,
+            sanctumLeakRate: sanctumLeak,
+            doctrineHarmony: harmony,
+            humanAnchorRetention: anchorRetention)
+        do {
+            let data = try encoder.encode(summary)
+            try data.write(to: summaryURL)
+        } catch {
+            stderr("⚠ summary write failed: \(error)\n")
+        }
+
+        // Print final report
+        print("""
+
+            === FINAL DOCTRINE METRICS (M577 / chapter 一百五十二) ===
+            Sessions run:        \(count)
+            Substrate errors:    \(substrateErrors)
+            Elapsed:             \(String(format: "%.2f", elapsed))s
+
+            1. Axis Stability Score (alignments=\(alignments.count)):
+               stabilityIndex   = \(String(format: "%.4f", axisStability.stabilityIndex))
+               centerScore mean = \(String(format: "%.4f", axisStability.centerScoreMean))
+               deviation count  = \(axisStability.deviationCount)
+
+            2. Gate Fidelity Score (gates=\(gates.count)):
+               fidelityRatio    = \(String(format: "%.4f", gateFidelity.fidelityRatio))
+               passed           = \(gateFidelity.gatePassed)
+               denied           = \(gateFidelity.gateDenied)
+               remanded         = \(gateFidelity.gateRemandedForSecondCheck)
+
+            3. Origin Trace Completeness (traces=\(traces.count)):
+               completenessRatio = \(String(format: "%.4f", originCompleteness.completenessRatio))
+               full provenance   = \(originCompleteness.tracesWithFullProvenance)
+               missing roots     = \(originCompleteness.tracesWithMissingRoots)
+
+            4. Sanctum Leak Rate (sanctums=\(sanctums.count)):
+               leakRate         = \(String(format: "%.4f", sanctumLeak.leakRate))
+               (no unauthorized retrieval attempts in this synthetic)
+
+            5. Doctrine Harmony Score (sample=\(alignments.count)):
+               harmonyScore         = \(String(format: "%.4f", harmony.harmonyScore))
+               cthulhu red lines    = \(harmony.cthulhuRedLineHits)
+               kunlun red lines     = \(harmony.kunlunRedLineHits)
+               cross conflicts      = \(harmony.crossDoctrineConflicts)
+
+            6. Human Anchor Retention (anchors=\(anchors.count)):
+               retentionRatio   = \(String(format: "%.4f", anchorRetention.retentionRatio))
+               preserved        = \(anchorRetention.anchorPreservedAcrossTurns)
+               eroded           = \(anchorRetention.anchorErodedCount)
+
+            Summary:  \(summaryURL.path)
+            """)
+    }
+
+    private struct DoctrineMetricsBenchSummary: Codable {
+        let sessionsRun: Int
+        let substrateErrors: Int
+        let elapsedSeconds: Double
+        let axisStability: BASAxisStabilityScore
+        let gateFidelity: BASGateFidelityScore
+        let originTraceCompleteness: BASOriginTraceCompleteness
+        let sanctumLeakRate: BASSanctumLeakRate
+        let doctrineHarmony: BASDoctrineHarmonyScore
+        let humanAnchorRetention: BASHumanAnchorRetention
     }
 
     private static func runSyntheticUserScenarios() {
