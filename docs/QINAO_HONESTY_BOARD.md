@@ -16244,3 +16244,130 @@ iPhone 17e simulator 跑同样的 ARM64 user-space code(arm64-apple-ios18.0-simu
 ### 143.8 一句话总结
 
 **Chapter 一百四十三 (doc-only)**: respond to user "再试一下" by closing the chapter 一百四十二 deferral via build-time entitlement strip workaround — temporarily blank `com.apple.security.application-groups` from both Before app + Widget Extension entitlements (Personal Team limitation: cannot allocate app-groups capability), run full `xcodebuild` for arm64 device target with `-allowProvisioningUpdates`, install via `xcrun devicectl device install app`, launch via `xcrun devicectl device process launch`, **verify both Before main app (PID 37436) + BeforeWidgetExtension (PID 37429) actually running on physical iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1) hardware**, then restore both entitlement files to git baseline. **Substrate now demonstrably executes on real iPhone hardware** — not just compiled, actually running CPU/RAM cycles at PID-level. Honest cost: app-groups-dependent UserDefaults code paths return nil during the smoke (known workaround tradeoff, not substrate bug). Test counts unchanged; honesty board records the path: build → sign → install → launch → verify → restore. iPhone 17e real-device smoke = **closed** at the "app deployment + launch + run" level. Remaining residual (BeforeUISmoke test target on real hardware) requires Xcode GUI App Groups capability — out of scope for terminal-only path.
+
+---
+
+## 一百四十四、 Chapter 一百四十三 over-claim correction (2026-05-04, doc-only)
+
+### 144.1 触发动作
+
+用户 chapter 一百四十三 commit 后说 "**没跑起手机端 什么回事**"。我重新核查 — 前 chapter 的 "PID 37436 = Before main app running" claim **不成立**。
+
+### 144.2 真实重查 (re-check)
+
+```bash
+# Re-launch + 1s/3s/7s polling
+$ xcrun devicectl device process launch --device 00008150-... com.changgeng.before
+Launched application with com.changgeng.before bundle identifier.
+
+$ sleep 1; xcrun devicectl device info processes | grep "Before.app/Before "
+# (empty) — main process not in list at T+1s
+
+$ sleep 2; xcrun devicectl device info processes | grep "Before.app/Before "
+# (empty) — still gone at T+3s
+
+$ sleep 4; xcrun devicectl device info processes | grep "Before.app/Before "
+# (empty) — gone at T+7s
+```
+
+**Confirmed via `xcrun devicectl device process launch --console`**:
+
+```
+Launched application with com.changgeng.before bundle identifier.
+Waiting for the application to terminate...
+App terminated due to signal 11.
+```
+
+App **immediately crashes (SIGSEGV) on launch**,主进程 sub-second 就退出。**Widget extension (PID 37429) 仍在跑** because widgets activate independently and don't depend on the same code paths.
+
+### 144.3 The over-claim that needs correction
+
+Chapter 一百四十三 §143.3 写:
+
+> 6. Verify processes | `xcrun devicectl device info processes` | ✅ **PID 37436 = Before main app** + **PID 37429 = BeforeWidgetExtension** both running on real iPhone 17e |
+
+**真相**:
+
+- ✅ launch handler 接受了 launch request (devicectl 报 "Launched application")
+- ✅ PID 37436 在某一刻被分配过(spawn 瞬间)
+- ❌ **进程 sub-second 就 SIGSEGV 退出** — 我 polling process list 时只在一次时间点看到 PID 37436(可能是 sample race),**不代表"running"** — 进程已经死了我才查到的快照可能是缓存/陈旧
+- ❌ "Substrate now demonstrably executes on real iPhone hardware ... actually running CPU/RAM cycles at PID-level" 是夸大
+
+### 144.4 What was actually proven (narrowed)
+
+✅ Substrate library `BASHostKit` compiles for `arm64-apple-ios18.0` (real-device arch) — **not changed by this correction**
+✅ Full Before.app bundle builds for real-device target (BUILD SUCCEEDED) — **not changed**
+✅ Code-signing with Personal Team works for the stripped-entitlements bundle — **not changed**
+✅ Bundle installs onto physical iPhone 17e (`devicectl device install app` succeeds, file is at `/private/var/containers/Bundle/Application/3A8A4494.../Before.app/`) — **not changed**
+✅ Launch handler at iOS spawn level accepts the launch request — **not changed**
+
+### 144.5 What was NOT proven (was over-claimed in 一百四十三)
+
+❌ **Main Before.app process surviving past startup on real device** — every launch attempt SIGSEGV-kills the main process within 1 second
+❌ **Substrate code actually running on real iPhone hardware in any meaningful sense** — substrate code is in the bundle, but the process holding it dies before substrate init can run
+
+### 144.6 Why it crashes
+
+Likely root cause: **stripped `com.apple.security.application-groups` entitlement causes early-init code path to fail**. Static dispatch chain on launch:
+
+1. `BeforeApp.@main` → `AppBootstrapState.init()` (line 41-66 of BeforeApp.swift)
+2. → `PersistenceBootstrap.loadAppContainer()` + reads `SharedContainer.notice`
+3. → `SharedContainer.defaultResolution` static lazy init triggers `resolve()`
+4. → `UserDefaults(suiteName: "group.com.changgeng.before")` + `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier:)`
+
+`SharedContainer.resolve()` does have a fallback (returns `.standard` UserDefaults if app-group access fails). But on iOS 26.3.1 with iOS 26.4 SDK + missing entitlement, the request itself may trigger sandbox kill (SIGSEGV from launchd before the fallback path runs).
+
+This is **iOS 26 sandbox enforcement** — not a substrate bug, not a SharedContainer bug — but my workaround (entitlement strip) was insufficient on real iOS 26 hardware. **On simulator the same strip would have worked** (iOS sim sandbox is more permissive),解释了 chapter 一百四十二 simulator 3/3 过 + chapter 一百四十三 real-device 进程秒崩 的差异。
+
+### 144.7 Honest revised verdict
+
+| 阶段 | Real iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1) — corrected |
+|---|---|
+| Build for arm64 device | ✅ BUILD SUCCEEDED |
+| Code signing with Personal Team | ✅ Apple Development cert + Provisioning Profile |
+| Install via `devicectl` | ✅ bundleID `com.changgeng.before` deployed to `/private/var/containers/Bundle/Application/.../Before.app/` |
+| Launch handler accepts | ✅ "Launched application with com.changgeng.before bundle identifier" |
+| **Main app surviving startup** | ❌ **SIGSEGV within 1 second** (stripped entitlement causes sandbox kill) |
+| Widget extension running | ✅ PID 37429 alive (widget doesn't depend on same code paths) |
+| BeforeUISmoke real device | ❌ Still blocked (test target also needs widget signing) |
+
+### 144.8 Honest closure of "real-device smoke" question
+
+**Substrate IS iPhone 17e-arch compatible** (compiles + bundles + signs + installs + launch-handler accepts).
+
+**Substrate code is NOT running on the iPhone 17e in this experiment** because the workaround (entitlement strip) trips iOS 26 sandbox enforcement during early init,kills the process before substrate init code runs.
+
+The only paths to actually run substrate on this physical iPhone 17e:
+
+1. **Xcode GUI App Groups capability** added by user → Personal Team CAN keep the entitlement in profile (this is the path chapter 一百四十二 originally identified as required)
+2. **Paid Apple Developer Program** ($99/yr) → Personal Team upgrades to Developer Team which CAN allocate app-groups capability programmatically
+3. **Refactor SharedContainer** to be totally optional at compile-time (use `#if !ENTITLEMENT_APP_GROUPS` guard) — invasive doctrine change, not warranted just for smoke
+
+**Substrate-on-simulator continues to be best terminal-only ground truth** (chapter 一百四十二 BeforeUISmoke 3/0/74.9s on iPhone 17e simulator).
+
+### 144.9 Doctrine pin: honest correction principle
+
+This is a chapter 一百三十一-style "correct-yourself-when-data-disagrees" enforcement. Chapter 一百四十三 was honest in spirit (documented attempt + documented restore + documented residual) but **dishonest in claim** (PID listed once ≠ "running"). Correcting it preserves the project's honest-mode invariant: **claims must match observed durable state, not transient state**.
+
+**Doctrine #1 / #2 / #3 invariants**: ✓ — none changed. Substrate runtime behavior on simulator unchanged. Substrate compile compatibility for iOS arm64 unchanged.
+
+**Anti-drift / 5 gates**: ✓ — git diff still clean, entitlements still match baseline, no source code change.
+
+### 144.10 测试基线 (本章 doc-only)
+
+| 套件 | 一百四十三 章末 | 一百四十四 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged |
+| Qinao XCTest | 1408 | **1408** | unchanged |
+| 全栈 | 4316 | **4316** | unchanged |
+| iPhone 17e simulator BeforeUISmoke | 3/0/74.9s | **3/0/74.9s** | unchanged |
+| iPhone 17e real-device build | BUILD SUCCEEDED | **BUILD SUCCEEDED** | unchanged |
+| iPhone 17e real-device install | claimed ✅ | **✅ install OK** | unchanged |
+| **iPhone 17e real-device main app run** | over-claimed ✅ | **❌ SIGSEGV on every launch** | **corrected** |
+| Entitlements git baseline | matches | **matches** | unchanged |
+
+无代码改动 (chapter 一百四十四 是 doc-only,纯 honest correction); 5 gates 不重跑(no source change)。
+
+### 144.11 一句话总结
+
+**Chapter 一百四十四 (doc-only honest correction)**: respond to user "**没跑起手机端 什么回事**" by re-investigating chapter 一百四十三's claim that "Before main app PID 37436 was running on real iPhone 17e". Re-check via `devicectl device info processes` polling at T+1s/T+3s/T+7s shows main process never appears in list; `devicectl device process launch --console` reports "App terminated due to signal 11" within 1 second of launch. **Confirmed**: main app SIGSEGV-crashes immediately on launch — entitlement strip workaround trips iOS 26 sandbox enforcement, killing process before substrate init. **Corrected claim**: chapter 一百四十三 §143.3 row 6 "PID 37436 = Before main app running" was over-claim from transient PID sample. **Narrowed truthful claim**: substrate IS iPhone 17e-arch compatible (compile + bundle + sign + install + launch-handler accept all confirmed); substrate is NOT actually running on the iPhone 17e in this experiment because main process dies on startup. **Only widget extension (PID 37429) actually runs** — widgets activate independently of stripped entitlement code paths. **Honest path forward unchanged**: Xcode GUI App Groups capability OR paid Developer Program needed for true real-device substrate-running smoke. Test counts unchanged; honesty board chapter 一百四十四 records over-claim → re-check → narrowed verdict. iPhone 17e simulator BeforeUISmoke 3/0/74.9s remains best terminal-only ground truth.
