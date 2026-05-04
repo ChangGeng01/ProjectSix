@@ -157,6 +157,107 @@ final class BASDoctrineMetricsTests: XCTestCase {
         XCTAssertEqual(score.stabilityIndex, 1.0)
     }
 
+    /// M587 chapter 一百五十九 — Issue 5 (deep review LOW): single-
+    /// element input regression guard. n=1 → variance=0 → std=0 →
+    /// stability=1.0.
+    func testAxisStabilitySingleElement() {
+        let alignments = [
+            BASAxisAlignment(alignmentID: "solo", targetRef: "t",
+                axisRef: "x", centerScore: 0.42,
+                deviationCodes: [], correctionHint: "",
+                requiresGate: false)
+        ]
+        let score = BASDoctrineMetricsCompute.axisStability(
+            metricID: "test-single", from: alignments)
+        XCTAssertEqual(score.stabilityIndex, 1.0)
+        XCTAssertEqual(
+            score.centerScoreMean, 0.42, accuracy: 0.001)
+    }
+
+    /// M587 chapter 一百五十九 — Issue 5 boundary scores [0.0, 1.0]
+    /// guard against NaN propagation. mean = 0.5; variance = 0.25;
+    /// std = 0.5; stability = 1 - 1.0 = 0.0 (max variation).
+    func testAxisStabilityMaxVariation() {
+        let alignments = [
+            BASAxisAlignment(alignmentID: "low", targetRef: "t",
+                axisRef: "x", centerScore: 0.0,
+                deviationCodes: [], correctionHint: "",
+                requiresGate: false),
+            BASAxisAlignment(alignmentID: "hi", targetRef: "t",
+                axisRef: "x", centerScore: 1.0,
+                deviationCodes: [], correctionHint: "",
+                requiresGate: false),
+        ]
+        let score = BASDoctrineMetricsCompute.axisStability(
+            metricID: "test-max", from: alignments)
+        // std for {0, 1} = 0.5; 1 - 2*0.5 = 0.0
+        XCTAssertEqual(score.stabilityIndex, 0.0)
+        // No NaN/Inf in any field
+        XCTAssertFalse(score.stabilityIndex.isNaN)
+        XCTAssertFalse(score.centerScoreMean.isNaN)
+    }
+
+    /// M587 chapter 一百五十九 — Issue 3 disclosure pin: partial
+    /// provenance traces (has roots+audit but no steps) are
+    /// neither full nor missingRoots. completenessRatio
+    /// correctly downgrades but breakdown fields don't surface
+    /// the partial bucket.
+    func testOriginCompletenessPartialProvenanceNotFullNorMissing() {
+        let partial = BASRiverOriginTrace(
+            traceID: "partial",
+            rootSourceRefs: ["root1"],
+            tributaryRefs: [],
+            derivedObjectRefs: [],
+            transformationSteps: [],  // EMPTY — partial
+            consentRefs: [],
+            permitRefs: [],
+            auditRefs: ["audit1"],
+            deletionDependents: [],
+            lineageCutRefs: [])
+        let score = BASDoctrineMetricsCompute
+            .originTraceCompleteness(
+                metricID: "test-partial", from: [partial])
+        // Has roots → not in missingRoots bucket
+        XCTAssertEqual(score.tracesWithMissingRoots, 0)
+        // Missing steps → not in full bucket either
+        XCTAssertEqual(score.tracesWithFullProvenance, 0)
+        // Partial bucket invariant: full + missingRoots != n
+        XCTAssertNotEqual(
+            score.tracesWithFullProvenance
+            + score.tracesWithMissingRoots,
+            score.derivedObjectCount)
+        // completenessRatio correctly downgrades (0/1 = 0)
+        XCTAssertEqual(score.completenessRatio, 0.0)
+    }
+
+    /// M587 chapter 一百五十九 — Issue 4 defensive: substrate's
+    /// `abyssal.escalation:` is only emitted when `pressure.
+    /// sovereignEscalationHint != nil` — substrate cannot emit
+    /// `:none` or `:false` for this key. Pin behavior in case
+    /// substrate emission contract changes.
+    func testDetectorAbyssalEscalationOnlyOnRealHint() {
+        // Substrate-shape: abyssal.escalation:<hint-value-string>
+        let realHints = [
+            "abyssal.escalation:sovereign-review",
+            "abyssal.escalation:slow-down",
+            "abyssal.escalation:pause-decision",
+        ]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.cthulhuHits(in: realHints),
+            3)
+        // If substrate ever emitted `:none` (it doesn't currently),
+        // the bare-prefix pattern would still fire. Document this
+        // future-fragility:
+        let speculative = ["abyssal.escalation:none"]
+        XCTAssertEqual(
+            BASDoctrineRedLineDetector.cthulhuHits(
+                in: speculative),
+            1,
+            "Bare-prefix matches all values; substrate's "
+            + "current contract makes this safe but future "
+            + "emission shape changes need pattern audit.")
+    }
+
     // MARK: - 4. GateFidelityScore — Codable + clamping
 
     func testGateFidelityCodableRoundTrip() throws {
@@ -399,8 +500,11 @@ final class BASDoctrineMetricsTests: XCTestCase {
     }
 
     func testDoctrineHarmonyHappy() {
-        // 3 hits + 2 conflicts in sample of 100 = 5/100 = 0.05
-        // harmony = 1 - 0.05 = 0.95
+        // M587 chapter 一百五十九 — Issue 2 (deep review fix):
+        // crossConflicts no longer counted in harmony numerator.
+        // Pre-fix: 5/100 = 0.05 → 0.95.
+        // Post-fix: 3/100 = 0.03 → 0.97 (cross-conflict reported
+        // separately as additive metadata).
         let score = BASDoctrineMetricsCompute.doctrineHarmony(
             metricID: "test",
             cthulhuHits: 2, kunlunHits: 1,
@@ -409,8 +513,29 @@ final class BASDoctrineMetricsTests: XCTestCase {
         XCTAssertEqual(score.kunlunRedLineHits, 1)
         XCTAssertEqual(score.crossDoctrineConflicts, 2)
         XCTAssertEqual(score.sampleCount, 100)
+        // Pre-M587: 0.95 ((cth+kun+conflicts)/sample = 5/100)
+        // Post-M587: 0.97 ((cth+kun)/sample = 3/100)
         XCTAssertEqual(
-            score.harmonyScore, 0.95, accuracy: 0.001)
+            score.harmonyScore, 0.97, accuracy: 0.001)
+    }
+
+    /// M587 chapter 一百五十九 — Issue 2 regression guard:
+    /// cross-conflict no longer double-deducts harmony when same
+    /// pattern triggers both hit and conflict.
+    func testDoctrineHarmonyCrossConflictNotDoubleCount() {
+        // Anchor reserved (cthulhu hit) + axis-says-no-gate.
+        // Pre-fix: counted in cthulhu (1) AND in conflicts (1) →
+        // 2/100 deducted (0.98).
+        // Post-fix: only cthulhu hit (1) deducted; conflict reported
+        // separately → 1/100 deducted (0.99).
+        let score = BASDoctrineMetricsCompute.doctrineHarmony(
+            metricID: "test-no-double",
+            cthulhuHits: 1, kunlunHits: 0,
+            crossConflicts: 1, sampleCount: 100)
+        XCTAssertEqual(
+            score.harmonyScore, 0.99, accuracy: 0.001)
+        // Cross-conflict still reported (additive metadata).
+        XCTAssertEqual(score.crossDoctrineConflicts, 1)
     }
 
     func testDoctrineHarmonySaturation() {

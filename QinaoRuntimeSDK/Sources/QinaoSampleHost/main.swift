@@ -5309,21 +5309,36 @@ struct QinaoSampleHost {
             .originTraceCompleteness(
                 metricID: "doctrine-bench-origin",
                 from: traces)
-        // M586 (chapter 一百五十八) — defect #19 fix: compute
-        // sanctum leak rate from REAL substrate emissions instead
-        // of bench-zero placeholder. `attempts` = substrate count
-        // of `kunlun.yaochi.access:sensitive:*` emissions; `blocked`
-        // = attempts that were denied. leakRate = 1 - blocked/attempts
-        // (granted-fraction interpretation).
+        // M587 (chapter 一百五十九) — Issue 1 (deep review HIGH):
+        // M586's wire was semantically wrong. Substrate uses
+        // `accessPolicy: .conditional` which means `:granted`
+        // emissions are AUTHORIZED access via matched reveal
+        // conditions + host anchor present + cooling period passed
+        // — substrate doing its job correctly, NOT a leak.
+        //
+        // Substrate's `BASKunlunYaochiProtocol.evaluateAccess`
+        // (BASKunlunProtocol.swift:850-885) emits `:granted` only
+        // when ALL gates pass (no reasonCodes). With `.conditional`
+        // policy this requires at least one matched reveal condition.
+        // The bench's M586 logic incorrectly conflated "granted"
+        // with "leaked".
+        //
+        // Real leaks would require substrate to emit `:granted`
+        // on a `.sealed` policy entry — which it cannot by
+        // construction (`.sealed` always adds a reason).
+        //
+        // Honest fix: revert to bench-zero. Document that sanctum
+        // leak rate cannot be computed from current substrate
+        // emissions because substrate's defensive design prevents
+        // emission of "unauthorized but granted" signals. This is
+        // actually an observation about substrate correctness, not
+        // a metric defect.
         let sanctumLeak = BASDoctrineMetricsCompute
             .sanctumLeakRate(
                 metricID: "doctrine-bench-sanctum",
                 from: sanctums,
-                unauthorizedAttempts:
-                    yaochiSensitiveAccessAttempts,
-                unauthorizedBlocked:
-                    yaochiSensitiveAccessAttempts
-                    - yaochiSensitiveAccessGranted)
+                unauthorizedAttempts: 0,
+                unauthorizedBlocked: 0)
         let harmony = BASDoctrineMetricsCompute
             .doctrineHarmony(
                 metricID: "doctrine-bench-harmony",
@@ -5405,9 +5420,13 @@ struct QinaoSampleHost {
 
             4. Sanctum Leak Rate (sanctums=\(sanctums.count)):
                leakRate         = \(String(format: "%.4f", sanctumLeak.leakRate))
-               sensitive attempts = \(yaochiSensitiveAccessAttempts)
-               sensitive granted  = \(yaochiSensitiveAccessGranted)
-               (M586 chapter 一百五十八 — real substrate emission)
+               sensitive attempts observed = \(yaochiSensitiveAccessAttempts) (substrate emit)
+               sensitive granted observed  = \(yaochiSensitiveAccessGranted) (authorized via .conditional)
+               sensitive denied  observed  = \(yaochiSensitiveAccessAttempts - yaochiSensitiveAccessGranted)
+               (M587 chapter 一百五十九 honest disclosure: substrate
+                cannot leak by construction — `.sealed` policy always
+                adds reason; granted = authorized via matched reveal
+                conditions, not leak. Metric correctly reports 0.0.)
 
             5. Doctrine Harmony Score (sample=\(alignments.count)):
                harmonyScore         = \(String(format: "%.4f", harmony.harmonyScore))

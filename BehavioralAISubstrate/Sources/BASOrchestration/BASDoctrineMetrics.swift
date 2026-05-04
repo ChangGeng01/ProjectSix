@@ -630,6 +630,17 @@ public enum BASDoctrineMetricsCompute {
             if !hasRoots {
                 missingRoots += 1
             }
+            // M587 chapter 一百五十九 — Issue 3 (deep review LOW)
+            // disclosure: traces with `hasRoots && (!hasAudit ||
+            // !hasSteps)` (partial provenance) are NEITHER counted
+            // as full NOR as missingRoots. They contribute to `n`
+            // (the divisor) but not to either bucket. Reader
+            // invariant `full + missingRoots == n` does NOT hold
+            // when partial-provenance traces exist. completenessRatio
+            // = full / n correctly downgrades partial traces (they
+            // bring the ratio down) but the breakdown fields don't
+            // surface them. Future schema bump may add
+            // `tracesWithPartialProvenance` to close this gap.
         }
         let ratio = Double(full) / Double(n)
         return BASOriginTraceCompleteness(
@@ -671,6 +682,22 @@ public enum BASDoctrineMetricsCompute {
 
     /// Compute Doctrine Harmony Score from observed Cthulhu + Kunlun
     /// red-line hit counts and cross-doctrine conflict count.
+    ///
+    /// **M587 chapter 一百五十九 — Issue 2 (deep review MEDIUM) fix**:
+    /// pre-fix formula was `1 - (cth + kun + conflicts) / sample`.
+    /// Cross-conflict double-counted Cthulhu hits because the same
+    /// `humanAnchor.tone:reserved` ref triggers BOTH a Cthulhu hit
+    /// (it's in `cthulhuConcernPatterns`) AND contributes to
+    /// `crossDoctrineConflicts` if `kunlun.axis.requires-gate:false`
+    /// is also present. One observed pattern was penalized twice in
+    /// the harmony arithmetic.
+    ///
+    /// **Post-fix**: harmony numerator is just `cth + kun`. Cross-
+    /// conflict is reported separately as additive metadata
+    /// (`crossDoctrineConflicts` field) but does NOT double-deduct.
+    /// Doctrine intent: harmony measures fraction-of-turns-without-
+    /// red-lines. Cross-conflict is a derived diagnostic of doctrine
+    /// inconsistency, but the underlying hits are already accounted.
     public static func doctrineHarmony(
         metricID: String,
         cthulhuHits: Int,
@@ -686,7 +713,10 @@ public enum BASDoctrineMetricsCompute {
         if sample == 0 {
             score = BASDoctrineMetricsThreshold.emptyInputScore
         } else {
-            let totalHits = Double(cth + kun + conflicts)
+            // M587: cross-conflict is reported separately, not
+            // included in harmony numerator (avoids double-deduct
+            // for same observed pattern).
+            let totalHits = Double(cth + kun)
             score = max(0, min(1, 1 - totalHits / Double(sample)))
         }
         return BASDoctrineHarmonyScore(
