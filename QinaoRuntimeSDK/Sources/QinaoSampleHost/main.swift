@@ -4995,6 +4995,7 @@ struct QinaoSampleHost {
         var realHumanAnchorSignals = 0
         var realAbyssalPressures = 0
         var realUnknownReserves = 0
+        var anchorSums: [Double] = []
         var alignments: [BASAxisAlignment] = []
         var gates: [BASHeavenGatePermit] = []
         var traces: [BASRiverOriginTrace] = []
@@ -5164,6 +5165,11 @@ struct QinaoSampleHost {
                             isAligned ? "" : "defer-to-host")
                 }
                 anchors.append(anchor)
+                let sumOf4 = anchor.agencyRisk
+                    + anchor.alienationRisk
+                    + anchor.dignityRisk
+                    + anchor.overwhelmRisk
+                anchorSums.append(sumOf4)
 
                 // M578 — track real vs synthesized for the other 2
                 if turn.abyssalPressure != nil {
@@ -5258,6 +5264,17 @@ struct QinaoSampleHost {
             Sessions run:        \(count)
             Substrate errors:    \(substrateErrors)
             Elapsed:             \(String(format: "%.2f", elapsed))s
+
+            Anchor risk-sum distribution (M579 chapter 一百五十四 calibration):
+              min:    \(String(format: "%.3f", anchorSums.min() ?? 0))
+              p25:    \(String(format: "%.3f", anchorSums.sorted()[anchorSums.count / 4]))
+              median: \(String(format: "%.3f", anchorSums.sorted()[anchorSums.count / 2]))
+              p75:    \(String(format: "%.3f", anchorSums.sorted()[3 * anchorSums.count / 4]))
+              p99:    \(String(format: "%.3f", anchorSums.sorted()[anchorSums.count - 1]))
+              max:    \(String(format: "%.3f", anchorSums.max() ?? 0))
+              ≥ 1.0:  \(anchorSums.filter { $0 >= 1.0 }.count)
+              ≥ 1.5:  \(anchorSums.filter { $0 >= 1.5 }.count)
+              ≥ 2.0:  \(anchorSums.filter { $0 >= 2.0 }.count)
 
             REAL-vs-SYNTHESIZED counts (M578 chapter 一百五十三 wire):
               kunlunAxisAlignment:     \(realAxisAlignments) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realAxisAlignments) / Double(count)))% real)

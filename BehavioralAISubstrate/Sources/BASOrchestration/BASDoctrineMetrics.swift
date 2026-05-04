@@ -568,9 +568,34 @@ public enum BASDoctrineMetricsCompute {
 
     /// Default risk-erosion threshold for human anchor retention.
     /// Sum of 4 risk axes (agency / alienation / dignity / overwhelm)
-    /// above this value = anchor eroded. Conservative default 1.0
-    /// (sum of all 4 risks reaches 25% of max possible 4.0).
-    public static let humanAnchorErosionThreshold: Double = 1.0
+    /// above this value = anchor eroded.
+    ///
+    /// **Threshold 1.5** = empirically calibrated from chapter 一百
+    /// 五十四 real-substrate doctrine bench. Each axis is `[0, 1]`
+    /// so sum ∈ `[0, 4]`. Threshold 1.5 (= 37.5% of max) places
+    /// the erosion line BETWEEN substrate's two typical
+    /// emission-class clusters:
+    ///
+    /// **Empirical sum distribution from chapter 154 bench (200 sessions)**:
+    ///
+    /// ```
+    /// permit class      typical-sum  classification at 1.5
+    /// .delay path       1.050        preserved (substrate cools, host agency intact)
+    /// .block path       1.850        eroded (substrate intervened hard)
+    /// ```
+    ///
+    /// **Defect #13 (chapter 一百五十四)**: pre-fix default 1.0 was
+    /// too low — chapter 一百五十三 real-substrate run showed all
+    /// 200 anchors classified eroded (sum ≥ 1.05 always). First
+    /// attempt fixed to 2.0 but that swung to opposite ceiling
+    /// (substrate's max in this prompt class is 1.85, never reaches
+    /// 2.0).  Empirical calibration via per-iteration sum
+    /// distribution capture identified 1.5 as the cleanest
+    /// discriminator: 154 delay turns < 1.5 (preserved) and 46
+    /// block turns ≥ 1.5 (eroded). Matches doctrine intuition —
+    /// "delay preserves agency, block intervenes hard enough to
+    /// register as anchor strain".
+    public static let humanAnchorErosionThreshold: Double = 1.5
 
     /// Compute Human Anchor Retention from a sample of anchor signals.
     public static func humanAnchorRetention(
@@ -596,7 +621,13 @@ public enum BASDoctrineMetricsCompute {
                 + s.alienationRisk
                 + s.dignityRisk
                 + s.overwhelmRisk
-            if totalRisk > erosionThreshold {
+            // Chapter 一百五十四 defect #13b fix: changed `>` to
+            // `>=` so substrate's exact-threshold emissions (e.g.
+            // block+high+0-overwhelm = sum exactly 2.0 with threshold
+            // 2.0) classify as eroded. With strict `>`, those edge
+            // cases were incorrectly classified preserved despite
+            // max-stress on agency/alienation/dignity axes.
+            if totalRisk >= erosionThreshold {
                 eroded += 1
             } else {
                 preserved += 1

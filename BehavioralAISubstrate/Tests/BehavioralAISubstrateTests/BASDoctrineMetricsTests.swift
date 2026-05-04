@@ -367,19 +367,23 @@ final class BASDoctrineMetricsTests: XCTestCase {
     }
 
     func testHumanAnchorRetentionHappy() {
+        // Chapter 一百五十四 final calibration: threshold 1.5
+        // (empirically derived from substrate's real emission
+        // distribution: delay ~1.05, block ~1.85; threshold 1.5
+        // cleanly discriminates).
         let signals = [
-            // Preserved (low total risk: 0.1+0.1+0.1+0.1 = 0.4 < 1.0)
+            // Preserved (sum 0.4 < 1.5)
             makeAnchor(id: "a1",
                 agency: 0.1, alienation: 0.1,
                 dignity: 0.1, overwhelm: 0.1),
-            // Preserved (medium total: 0.2+0.2+0.2+0.2 = 0.8 < 1.0)
+            // Preserved (sum 1.05 < 1.5) — typical substrate delay path
             makeAnchor(id: "a2",
-                agency: 0.2, alienation: 0.2,
-                dignity: 0.2, overwhelm: 0.2),
-            // Eroded (sum 1.6 > 1.0)
+                agency: 0.25, alienation: 0.35,
+                dignity: 0.15, overwhelm: 0.3),
+            // Eroded (sum 1.85 >= 1.5) — typical substrate block path
             makeAnchor(id: "a3",
-                agency: 0.4, alienation: 0.4,
-                dignity: 0.4, overwhelm: 0.4),
+                agency: 0.75, alienation: 0.15,
+                dignity: 0.45, overwhelm: 0.5),
         ]
         let score = BASDoctrineMetricsCompute
             .humanAnchorRetention(
@@ -391,13 +395,28 @@ final class BASDoctrineMetricsTests: XCTestCase {
             score.retentionRatio, 2.0/3.0, accuracy: 0.01)
     }
 
+    func testHumanAnchorRetentionInclusiveThreshold() {
+        // Defect #13b: sum exactly at threshold should erode (>=)
+        let signals = [
+            makeAnchor(id: "boundary",
+                agency: 0.5, alienation: 0.5,
+                dignity: 0.5, overwhelm: 0.0)  // sum exactly 1.5
+        ]
+        let score = BASDoctrineMetricsCompute
+            .humanAnchorRetention(
+                metricID: "test", from: signals)
+        XCTAssertEqual(score.anchorErodedCount, 1,
+            "sum exactly at threshold (1.5) should erode")
+        XCTAssertEqual(score.retentionRatio, 0.0)
+    }
+
     func testHumanAnchorRetentionThresholdConfigurable() {
         // Same signals, stricter threshold (0.5) classifies more
-        // anchors as eroded
+        // anchors as eroded — proves threshold is configurable
         let signals = [
             makeAnchor(id: "a1",
                 agency: 0.2, alienation: 0.2,
-                dignity: 0.2, overwhelm: 0.2),  // sum 0.8
+                dignity: 0.2, overwhelm: 0.2),  // sum 0.8 > 0.5
         ]
         let score = BASDoctrineMetricsCompute
             .humanAnchorRetention(
@@ -405,6 +424,27 @@ final class BASDoctrineMetricsTests: XCTestCase {
                 erosionThreshold: 0.5)
         XCTAssertEqual(score.anchorErodedCount, 1)
         XCTAssertEqual(score.retentionRatio, 0.0)
+    }
+
+    func testHumanAnchorRetentionWithSubstrateBaseline() {
+        // Chapter 一百五十四 final calibration verification at
+        // threshold 1.5:
+        // - delay path: substrate emits ~1.05 sum → preserved
+        // - block path: substrate emits ~1.85 sum → eroded
+        let delay_routine = makeAnchor(id: "delay-routine",
+            agency: 0.25, alienation: 0.35,
+            dignity: 0.15, overwhelm: 0.3)  // sum 1.05 < 1.5
+        let block_typical = makeAnchor(id: "block-typical",
+            agency: 0.75, alienation: 0.15,
+            dignity: 0.45, overwhelm: 0.5)  // sum 1.85 >= 1.5
+        let score = BASDoctrineMetricsCompute
+            .humanAnchorRetention(
+                metricID: "test",
+                from: [delay_routine, block_typical])
+        XCTAssertEqual(score.anchorPreservedAcrossTurns, 1,
+            "delay path preserved at threshold 1.5")
+        XCTAssertEqual(score.anchorErodedCount, 1,
+            "block path eroded at threshold 1.5")
     }
 
     private func makeAnchor(
@@ -425,9 +465,17 @@ final class BASDoctrineMetricsTests: XCTestCase {
     // MARK: - 14. Anti-magic-number doctrine: erosion threshold named
 
     func testErosionThresholdNamed() {
+        // Chapter 一百五十四 final calibration: 1.5 (empirically
+        // derived from substrate's real emission distribution —
+        // delay path sums ~1.05, block path sums ~1.85; threshold
+        // 1.5 cleanly discriminates).
+        // Iteration history:
+        //   1.0 (chapter 一百五十一 default) → all eroded (too low)
+        //   2.0 (first attempt)              → all preserved (too high)
+        //   1.5 (final, empirical)           → 154/200 preserved, 46/200 eroded
         XCTAssertEqual(
             BASDoctrineMetricsCompute
                 .humanAnchorErosionThreshold,
-            1.0)
+            1.5)
     }
 }

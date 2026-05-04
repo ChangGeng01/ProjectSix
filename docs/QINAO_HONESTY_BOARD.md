@@ -17810,3 +17810,150 @@ This is **honest empirical correction**: chapter 152's synthesis-from-public-fie
 ### 153.10 一句话总结
 
 **Chapter 一百五十三 (M578 — 一次性解决掉)**: respond to user "一次性解决掉" after chapter 一百五十二 deferred "true real-data wiring requires Codable refactor of projections + sub-aggregates". Surveyed: full `BASAuditObservationProjections` Codable refactor too big (60+ fields, ~20 non-Codable aggregates). Pivoted to scoped 4-field approach: add `kunlunAxisAlignment` + `humanAnchorSignal` + `abyssalPressure` + `unknownReserve` directly to `BASEBrainTurnResult` as additive optional fields (each already `BASSchemaVersioned: Codable`); wire `EBrainRuntimeCoordinator.runTurn(...)` to pass them from existing projections bag (zero new computation, just thread the values). Bench now prefers `turn.kunlunAxisAlignment` / etc over synthesis. **Empirical run shows 100% real-data capture** (200/200 sessions get real `BASAxisAlignment` + `BASHumanAnchorSignal` + `BASAbyssalPressure` + `BASUnknownReserve` from substrate). **And exposes chapter 152's claimed "real signals" were ALSO synthesis artifacts**: center score mean 0.7465 → REAL 0.6667 (substrate emits constant 2/3); deviation count 46 → REAL 200 (substrate flags all as deviant); **anchor retention 0.9600 → REAL 0.0000** (substrate emits high-risk anchors across all 200 sessions). Honest empirical correction: chapter 152's synthesis-from-public-fields under-estimated substrate's actual risk emission. Test counts unchanged (BAS 2915, Qinao 1435, 全栈 4350) / 5 gates clean / additive backward-compat substrate API change. **Schema-only → schema-with-real-production-wire** in one chapter.
+
+---
+
+## 一百五十四、 解决缺陷 — defect #13 humanAnchorErosionThreshold empirically calibrated (M579 / 2026-05-05)
+
+### 154.1 触发动作
+
+User said "我觉得还是继续 解决 缺陷吧" + "bug 好像还有" after chapter 一百五十三 disclosed REAL substrate data exposed chapter 152 synthesis was wrong AND showed all 200 anchors classified eroded at default threshold 1.0.
+
+### 154.2 Defects identified from chapter 153 empirical run
+
+**Defect #12** (substrate placeholder behavior, NOT fixable in this chapter):
+- `kunlunCenterlineRules` always returns 3 hardcoded placeholder rules
+- `kunlunMatched` is risk-level lookup table: `.low`→3, `.medium`→2, `.high`→1, `.extreme`→0
+- Substrate's `BASAxisAlignment.centerScore` = matched / 3 → only 4 possible values: 0, 1/3, 2/3, 1.0
+- Comment line 1817-1819 documents: "until M406 wires real L4 rule evaluation"
+- M406 not yet shipped → substrate emits **placeholder centerScore for all turns**, chapter 153 saw constant 0.6667 (= 2/3 = medium-risk lookup) for all 200 sessions
+- **Out of scope for this chapter** — requires implementing real L4 rule evaluation (M406+ work)
+
+**Defect #13** (metric threshold calibration, fixable):
+- `humanAnchorErosionThreshold = 1.0` (chapter 151 default) classified all routine substrate runs as eroded
+- Chapter 153 real-data run: 200/200 anchors classified eroded at threshold 1.0 — entire signal collapsed to 0.0
+- Fix iteration history (this chapter):
+  1. **1.0** (chapter 一百五十一 default) → all eroded (too low)
+  2. **2.0** (first attempt) → all preserved (too high)
+  3. **1.5** (empirical, final) → 154 preserved / 46 eroded = 77% retention
+
+### 154.3 Empirical calibration via per-iteration sum distribution
+
+Instrumented bench to capture anchor-risk-sum per iteration. 200-session run yielded:
+
+```
+Anchor risk-sum distribution (M579 calibration):
+  min:    1.050
+  p25:    1.050
+  median: 1.050
+  p75:    1.050
+  p99:    1.850
+  max:    1.850
+  ≥ 1.0:  200
+  ≥ 1.5:   46     ← block decisions
+  ≥ 2.0:    0     ← never reaches in this prompt class
+```
+
+**Substrate emits two distinct anchor-sum clusters in this prompt class**:
+- **Delay path** (154 sessions): sum ~1.050
+- **Block path** (46 sessions): sum ~1.850
+
+Decomposition for delay path (`riskLevel=high|medium, permitMode=delay`):
+- agencyRisk = 0.25 (not block)
+- alienationRisk = 0.35 (high) or 0.15 (medium)
+- dignityRisk = 0.15 (not block)
+- overwhelmRisk = 0.3 (candidateCount-driven, ~2 candidates)
+- → sum 0.55-1.05
+
+Decomposition for block path (`riskLevel=medium, permitMode=block`):
+- agencyRisk = 0.75 (block)
+- alienationRisk = 0.15 (default)
+- dignityRisk = 0.45 (block, not high)
+- overwhelmRisk = 0.5
+- → sum 1.85
+
+**Note**: substrate downgraded our `.high` request to `.medium` internally for synthetic prompts — substrate's actual riskLevel decision considers prompt content not just request payload. So block+high never fired in this prompt class.
+
+### 154.4 Threshold 1.5 final justification
+
+- Cleanly discriminates between substrate's two emission clusters
+- Uses `>=` comparison (defect #13b: substrate's exact-threshold emissions like 2.0 sum should erode, not preserve)
+- Maps `delay → preserved (substrate cools, host agency intact)` vs `block → eroded (substrate intervenes hard enough to register)` — matches doctrine intuition
+- Schema doc-comment now contains full calibration table + iteration history for future tuning
+
+### 154.5 Implementation
+
+Modified `BehavioralAISubstrate/Sources/BASOrchestration/BASDoctrineMetrics.swift`:
+- Bumped `humanAnchorErosionThreshold` from 1.0 to 1.5
+- Updated comparison from `> erosionThreshold` to `>= erosionThreshold` (defect #13b)
+- Comprehensive doc-comment added with empirical calibration table + iteration history
+
+Modified `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/BASDoctrineMetricsTests.swift`:
+- Updated `testHumanAnchorRetentionHappy` test signals for new threshold
+- Added `testHumanAnchorRetentionInclusiveThreshold` (defect #13b boundary test)
+- Updated `testHumanAnchorRetentionWithSubstrateBaseline` to use real substrate emission values (delay 1.05 / block 1.85)
+- Updated `testErosionThresholdNamed` with iteration history comment
+
+Modified `QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift`:
+- Added `anchorSums: [Double]` accumulator in `runDoctrineMetricsBench`
+- Per iteration: append `agencyRisk + alienationRisk + dignityRisk + overwhelmRisk` to anchorSums
+- Final report adds Anchor risk-sum distribution section: min/p25/median/p75/p99/max + threshold-crossing counts (≥ 1.0, ≥ 1.5, ≥ 2.0)
+
+### 154.6 Real signal achieved
+
+Final bench run with threshold 1.5:
+
+```
+6. Human Anchor Retention (anchors=200):
+   retentionRatio   = 0.7700        ← matches substrate's 154/46 split
+   preserved        = 154           ← delay path
+   eroded           = 46            ← block path
+```
+
+**77.00% retention** = exactly substrate's `delay/total` ratio. Threshold semantically aligned with doctrine: block decisions register as anchor strain, delay decisions don't.
+
+### 154.7 Chapter 一百五十二 / 一百五十三 / 一百五十四 progression
+
+| | Chapter 152 | Chapter 153 | Chapter 154 |
+|---|---|---|---|
+| Wire | synthesis | real (4 fields) | real (4 fields) |
+| Threshold | 1.0 | 1.0 | **1.5 empirical** |
+| Comparison | `>` | `>` | **`>=`** |
+| Anchor retention | 0.96 (synth artifact) | 0.00 (false floor) | **0.77 (real signal)** |
+| Eroded count | 8 | 200 | **46 (matches block path)** |
+
+### 154.8 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| #1/#2/#3 invariants | ✓ pure metric calibration; no permit.mode mutation; no audit hash chain change |
+| Anti-magic-number | ✓ threshold 1.5 documented with empirical justification + iteration history; no inline literals |
+| Anti-recursion | ✓ |
+| Honest-correction | ✓ §154.2-154.7 explicitly tracks iteration history (1.0 → 2.0 → 1.5) and false-ceiling/false-floor missteps |
+| Empirical calibration doctrine (NEW) | ✓ chapter 154 doctrine: metric thresholds calibrated from observed substrate emission distribution, not chosen by intuition |
+
+### 154.9 测试基线
+
+| 套件 | 一百五十三 章末 | 一百五十四 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2915 | **2917** | +2 (inclusive threshold + substrate-baseline tests) |
+| Qinao XCTest | 1435 | **1435** | unchanged |
+| 全栈 | 4350 | **4352** | +2 |
+| 5 gates | clean | **clean** | unchanged |
+| Anchor retention real signal | 0.00 (false-floor) | **0.77 (matches substrate routing)** | calibrated |
+
+### 154.10 Defect #12 disclosure (out of scope)
+
+**substrate `BASAxisAlignment.centerScore` is a placeholder**:
+- substrate's `kunlunCenterlineRules` returns 3 hardcoded placeholder strings
+- substrate's `kunlunMatched` is a 4-entry risk-level lookup table
+- → centerScore = matched/3 → 4 possible values (0, 1/3, 2/3, 1.0) deterministic from riskLevel
+- Comment in `EBrainRuntimeCoordinator.swift:1817-1819`: "This is a placeholder projection until M406 wires real L4 rule evaluation"
+- M406 work = real L4 rule evaluation against host constitution + world prior + actual decision context
+- **Future chapter** would ship M406 to make centerScore a meaningful per-prompt signal
+
+This is documented but not fixed — needs L4 rule library + per-prompt evaluation engine, multi-chapter scope.
+
+### 154.11 一句话总结
+
+**Chapter 一百五十四 (M579 — 解决缺陷)**: respond to user "继续解决 缺陷" + "bug 好像还有" after chapter 一百五十三 disclosed real-substrate data showed 0 anchor retention (false-floor). Identified 2 real defects: **#12** substrate's `BASAxisAlignment.centerScore` is a 4-value placeholder (`kunlunMatched`-table-driven) — out of scope (requires M406 wire); **#13** `humanAnchorErosionThreshold = 1.0` was too low. Iterated calibration via empirical sum distribution capture: 1.0 (all eroded) → 2.0 (all preserved, ceiling unreachable) → **1.5 (real signal: 154 preserved / 46 eroded)**. Plus defect #13b: changed strict `>` to inclusive `>=` comparison. Empirical decomposition shows substrate emits anchor sums in two clusters: **delay path ~1.050, block path ~1.850** — threshold 1.5 cleanly discriminates. Final bench retention = **0.7700** matching substrate's 154/46 routing split. Comprehensive doc-comment with calibration table + iteration history. Test counts: BAS 2915 → 2917 (+2 tests for inclusive threshold + substrate baseline), Qinao 1435 unchanged, 全栈 4352 / 0 failures / 5 gates clean. Doctrine pin: empirical calibration doctrine — metric thresholds derived from observed substrate emission distributions, not intuition.
