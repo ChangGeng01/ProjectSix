@@ -370,6 +370,33 @@ public enum BASIdentityInitiative: String, CaseIterable, Codable, Sendable {
 }
 
 public struct BASIdentityProfile: Codable, Equatable, Sendable {
+    /// **M598 chapter 一百六十九 — anti-magic-number** (chapter 一百六十六/七
+    /// backlog): tiered confidence ceilings for identity profile
+    /// surfaces. Tier ordering: notification (most defensive) <
+    /// watch < high-risk < generic baseline. Lower ceiling = more
+    /// defensive (less willing to assert).
+    ///
+    /// **Doctrine**: lower-touch surfaces (notification, watch) get
+    /// stricter ceilings — substrate is more conservative when
+    /// the surface itself doesn't show the user the full reasoning.
+    /// High-risk gets stricter than generic — protective posture
+    /// caps confidence below baseline. Generic baseline is the
+    /// "default trust" floor for normal surfaces.
+    ///
+    /// Pre-M598 these 4 values were inline at sites:
+    /// - line ~408 generic baseline (BASIdentityProfile.default)
+    /// - line ~784 notification surface (BASCognitionBehavior init)
+    /// - line ~793 watch surface (BASCognitionBehavior init)
+    /// - line ~801 high-risk overlay (BASCognitionBehavior init)
+    public static let
+        notificationSurfaceConfidenceCeiling: Double = 0.58
+    public static let
+        watchSurfaceConfidenceCeiling: Double = 0.64
+    public static let
+        highRiskOverlayConfidenceCeiling: Double = 0.66
+    public static let
+        genericBaselineConfidenceCeiling: Double = 0.70
+
     public let role: BASIdentityRole
     public let posture: BASIdentityPosture
     public let initiative: BASIdentityInitiative
@@ -405,7 +432,9 @@ public struct BASIdentityProfile: Codable, Equatable, Sendable {
             role: .boundedGuide,
             posture: .reflective,
             initiative: .guided,
-            confidenceCeiling: 0.70,
+            // M598 chapter 一百六十九 — anti-magic-number
+            confidenceCeiling: Self
+                .genericBaselineConfidenceCeiling,
             canAdvise: true,
             canExecuteActions: false,
             canEscalateToCloud: false,
@@ -781,7 +810,9 @@ public struct BASCognitionBehavior: Codable, Equatable, Sendable {
                 role: .predictiveSentinel,
                 posture: .coaching,
                 initiative: .guided,
-                confidenceCeiling: 0.58,
+                // M598 chapter 一百六十九 — anti-magic-number
+                confidenceCeiling: BASIdentityProfile
+                    .notificationSurfaceConfidenceCeiling,
                 canAdvise: true,
                 canExecuteActions: false,
                 canEscalateToCloud: false,
@@ -790,7 +821,8 @@ public struct BASCognitionBehavior: Codable, Equatable, Sendable {
             BASInteractionSurface.watch.rawValue: BASIdentityProfileOverlay(
                 role: .pauseCompanion,
                 initiative: .guided,
-                confidenceCeiling: 0.64,
+                confidenceCeiling: BASIdentityProfile
+                    .watchSurfaceConfidenceCeiling,
                 canExecuteActions: false,
                 canEscalateToCloud: false,
                 relationshipBoundary: "Keep the wearable surface lightweight, local, and interruptive."
@@ -798,7 +830,8 @@ public struct BASCognitionBehavior: Codable, Equatable, Sendable {
         ],
         highRiskIdentityOverlay: BASIdentityProfileOverlay = BASIdentityProfileOverlay(
             posture: .protective,
-            confidenceCeiling: 0.66,
+            confidenceCeiling: BASIdentityProfile
+                .highRiskOverlayConfidenceCeiling,
             canAdvise: true,
             canExecuteActions: false,
             canEscalateToCloud: false,

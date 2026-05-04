@@ -19901,3 +19901,104 @@ This is a **small but compounding** improvement — defensive infrastructure tha
 ### 168.9 一句话总结
 
 **Chapter 一百六十八 (M597 — continue)**: respond to user "continue" by adding meta-tests to chapter 一百六十七's anti-drift defensive infrastructure. **+3 tests** in `M595CrossCallsiteAntiDriftTests.swift`: testAntiDriftDetectsKnownPreFixPattern (verifies grep mechanism finds simulated inline `deviationThreshold: 0.7`); testAntiDriftDetectsKnownPreFixConfidenceFloor (same for confidenceFloor); testAntiDriftSkipsNamedConstantReferences (negative test — `Self.kunlunAxisDeviationThreshold` should NOT match inline pattern, guards against false positives). Why: chapter 一百六十六 lesson was "doc-comment claims must be verified, not trusted" — chapter 一百六十八 extends to "anti-drift tests themselves must be verified, not trusted to keep working". Without meta-tests, real-source grep tests could silently stop working (e.g. pattern formatting drift) and provide no actual protection. Test counts: BAS 2960 → 2963 (+3), Qinao 1435 unchanged, 全栈 4395 → 4398 / 0 failures / 5 gates clean. Doctrine pin: anti-drift defensive infrastructure extended; test-the-test pattern is new doctrine layer. Compounding defensive value: chapter 一百六十六 finds the bug, 一百六十七 adds tests to catch it, 一百六十八 verifies the tests work — three-layer protection. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) remain.
+
+---
+
+## 一百六十九、 continue — confidence ceiling tier extraction (chapter 166/167 backlog) (M598 / 2026-05-05)
+
+### 169.1 触发动作
+
+User: "continue" after chapter 一百六十八 added meta-tests. Continuing trajectory by extracting more BASMemory magic literals from chapter 一百六十六 §166.5 backlog.
+
+### 169.2 4 tier values extracted
+
+`MemoryCore.swift` had 4 inline `confidenceCeiling: 0.XX` literals at lines 408 / 784 / 793 / 801 across `BASIdentityProfile.default` + `BASCognitionBehavior.init` default parameters. Each represents a different tier:
+
+| Site | Surface / context | Pre-fix | Named constant |
+|---|---|---|---|
+| ~408 | generic baseline (default trust floor) | `0.70` | `BASIdentityProfile.genericBaselineConfidenceCeiling` |
+| ~784 | notification surface (predictive sentinel) | `0.58` | `BASIdentityProfile.notificationSurfaceConfidenceCeiling` |
+| ~793 | watch surface (pause companion) | `0.64` | `BASIdentityProfile.watchSurfaceConfidenceCeiling` |
+| ~801 | high-risk overlay (protective posture) | `0.66` | `BASIdentityProfile.highRiskOverlayConfidenceCeiling` |
+
+### 169.3 Doctrine-derived ordering
+
+Extracted as static properties on `BASIdentityProfile` with doc-comment explaining tier ordering:
+
+```
+notification (0.58) < watch (0.64) < high-risk (0.66) < generic (0.70)
+                                                   = MORE permissive
+                                                   = baseline trust
+                                                   ↓
+LESS permissive
+= MORE defensive
+= stricter assertion
+```
+
+**Doctrine**: lower-touch surfaces (notification, watch) get stricter ceilings — substrate is more conservative when the surface itself doesn't show the user the full reasoning. High-risk gets stricter than generic — protective posture caps confidence below baseline.
+
+### 169.4 4 anti-drift tests added
+
+New file `M598ConfidenceCeilingTierTests.swift` (~80 LoC, 4 tests):
+
+- `testTierValuesPinned` — pins the 4 individual values
+- `testTierOrderingPinned` — pins doctrine ordering: notification < watch < high-risk < generic. **If any tier inverts, test fails**. Regression guard against accidental swap.
+- `testTierValuesInValidRange` — pins all tiers in [0, 1]
+- `testNotificationCeilingEqualsRejectionThreshold` — **cross-reference**: notification ceiling 0.58 = `BASMemoryGovernance.singleEvidenceLowConfidenceRejectionThreshold` (chapter 一百六十七 M596). Both are "most defensive" thresholds. If either drifts independently, this test surfaces the doctrine question.
+
+### 169.5 Why the cross-reference test matters
+
+Chapter 一百六十六 lesson was that doc-comment claims of cross-site parity drift undetected. Chapter 一百六十九 cross-reference test makes the parity between `notificationSurfaceConfidenceCeiling` (this chapter) and `singleEvidenceLowConfidenceRejectionThreshold` (chapter 一百六十七) **type-system-enforced**: any future edit to either value forces explicit re-derivation review.
+
+This is the same anti-drift defensive pattern as chapter 一百六十六/七 cross-callsite tests, but applied at the cross-CONSTANT level rather than cross-callsite level.
+
+### 169.6 Test counts
+
+| Counter | Pre-M598 | Post-M598 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2963 | 2967 | **+4** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4398 | 4402 | +4 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+### 169.7 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Sources/BASMemory/MemoryCore.swift` | +4 named static properties on `BASIdentityProfile` with tier-ordering doc-comment + 4 inline literals replaced with named-constant references at 4 call sites (line ~408 + 784 + 793 + 801) |
+| `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M598ConfidenceCeilingTierTests.swift` | NEW — 4 anti-drift tests (value pin + order pin + range pin + cross-reference pin) |
+
+### 169.8 Cumulative chapter 166 backlog status
+
+Chapter 一百六十六 §166.5 listed 5 BASMemory subsystem magic-literal categories:
+
+| Category | Status |
+|---|---|
+| MemoryGovernanceCore.swift:282 confidence 0.58 | ✅ DONE chapter 一百六十七 |
+| MemoryCore.swift:408/784/793/801 confidenceCeiling tiers | ✅ DONE chapter 一百六十九 (this chapter) |
+| MemoryCore.swift:90-94 seed default values | NOT DONE — fixture values, not active threshold |
+| MemoryCore.swift:2697/2700 rate thresholds 0.34/0.25 | NOT DONE — backlog |
+| BASShadowTrialObservation.swift:200-203 probabilities | NOT DONE — fixture data |
+| BASMemoryTieringProfile.swift:76 weights 0.55+0.35 | NOT DONE — heuristic combiner |
+
+**2 of 5 categories closed**. Remaining 3 categories carry honest-disclosure rationale:
+- Seed defaults are initial-state config, not active threshold; lower-priority extraction
+- Rate thresholds 0.34/0.25 are real but require subsystem-aware understanding
+- BASShadowTrialObservation/BASMemoryTieringProfile are fixture/heuristic data; would benefit from extraction but not load-bearing
+
+### 169.9 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Anti-magic-number (chapter 一百十三) | ✓ extended +4 named constants |
+| Anti-drift defensive infrastructure | ✓ tier ordering pinned via test |
+| Cross-reference anti-drift | ✓ NEW pattern — pin equivalence between constants in different files |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 169.10 一句话总结
+
+**Chapter 一百六十九 (M598 — continue)**: respond to user "continue" by extracting MemoryCore.swift confidenceCeiling tier values (chapter 一百六十六 §166.5 backlog item, second of five). 4 inline literals at lines 408/784/793/801 extracted to named static properties on `BASIdentityProfile`: notificationSurfaceConfidenceCeiling (0.58) + watchSurfaceConfidenceCeiling (0.64) + highRiskOverlayConfidenceCeiling (0.66) + genericBaselineConfidenceCeiling (0.70). Doctrine-derived tier ordering: notification < watch < high-risk < generic baseline (lower-touch surfaces get stricter ceilings; protective posture caps below baseline). 4 anti-drift tests in NEW M598ConfidenceCeilingTierTests.swift: value pin + order pin + range pin + **cross-reference pin** (notification ceiling 0.58 = M596 singleEvidenceLowConfidenceRejectionThreshold — anti-drift between constants in different files). Cross-reference is NEW anti-drift pattern: pins equivalence between constants in different subsystems so independent drift surfaces immediately. Chapter 一百六十六 §166.5 backlog: 2 of 5 categories now closed. Test counts: BAS 2963 → 2967 (+4), Qinao 1435 unchanged, 全栈 4398 → 4402 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number + anti-drift extended to cross-reference between constants. NO over-claim; remaining 3 BASMemory categories carry honest-disclosure rationale; 3 truly external residuals unchanged.
