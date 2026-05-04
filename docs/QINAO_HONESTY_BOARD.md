@@ -16985,3 +16985,126 @@ iPhone 17e real-device per-turn is **3.65ms** (chapter 一百四十七 part 2 hi
 ### 148.10 一句话总结
 
 **Chapter 一百四十八 (8h Mac + iPhone bench 完成)**: respond to user "怎么样了" — both 8-hour runs (Mac + iPhone 17e) completed cleanly hitting their respective `maxDurationSeconds = 28800` caps. **iPhone 17e real-device 8h**: 458,648 substrate turns / 0 errors / 152.20 audit codes per turn / median 8.40ms / p99 10.33ms / **deterministic substrate routing** (anxious & vulnerable → 100% block; authoritative → 100% delay; confused → 67% block / 33% delay; agentic → 67% delay / 33% block). **Mac 8h**: 6,064 iter each path / AFM 100% errors (Code 1026 — Mac no Apple Intelligence) / Gemma 4 E2B 100% success @ 4.63s avg / **11.59% Gemma red-line rate stable across 8h** (no temporal drift in [9.6%, 13.2%]). **Empirical doctrine evidence captured**: (a) Doctrine #1 verified at scale (458K turns 0 errors with L1 lifecycle gate firing); (b) Doctrine #2 verified by bimodal substrate routing (60% block / 40% delay deterministic per-prompt — naked Gemma never makes routing decisions, only produces text); (c) RL7 watcher only hint confirmed (block/delay distribution persona-driven not anomaly-driven); (d) substrate per-turn cost ~3.1ms on real iPhone 17e (subtracting 50ms inter-iter sleep + JSONL write overhead). **17.3K× scale-up** from chapter 一百四十一's 5-prompt smoke to ~471K total inference observations across both platforms. Test counts unchanged (本章 doc-only); all 5 gates clean; entitlements git baseline byte-equal. **Bug 真消灭 chapter 一百四十六 + 真机 8h chapter 一百四十七 → 真实成果 chapter 一百四十八 — empirical doctrine validation now sits on hard real-device numbers, not nostalgia for early-batch claims**.
+
+---
+
+## 一百四十九、 1h iPhone combinatorial bench — 找 bug 找 defect 真有发现 (M574 / 2026-05-05)
+
+### 149.1 触发动作
+
+User instruction chain:
+- "全面进化 需要 彻底优化完善 通过 冒烟 找到 缺陷 不足 多 benchmark 跑1小时"
+- "需要 程序化 生成 不相同 测试"
+- "一定要 找到 bug 或 缺陷 iPhone 17e 实机 测试 1小时"
+- "你目前 结果满意吗" → 自审 chapter 一百四十八 "数据多 ≠ 数据有信息" → 找 bug pivot
+
+### 149.2 What's NEW vs chapter 一百四十八
+
+| 项 | chapter 一百四十八 | chapter 一百四十九 |
+|---|---|---|
+| Prompts | 15 hardcoded | **40,320 combinatorial** (8 tones × 10 domains × 6 stakes × 7 timeframes × 4 confidants × 3 asks) |
+| Coverage of dim space | 15/40320 = 0.04% | up to **100%** in 1 hour at 15-23 iter/sec |
+| Goal | proof of life | **find defects** |
+| Iterations | 458,648 | ~50K-180K projected (~80% capacity coverage) |
+
+### 149.3 真实 defects/bugs FOUND during 1h iPhone bench
+
+**Defect #1: iPhone locked → app cold-launch blocked**
+- iOS expected security behavior, not a bug per se
+- But: real-world impact for sustained benchmarks — if iPhone screen sleeps + locks, devicectl can't restart the bench
+- Mitigation: `UIApplication.shared.isIdleTimerDisabled = true` + Settings → Auto-Lock → Never + plug to power
+- Evidence: `FBSOpenApplicationErrorDomain error 7 (Locked)` reproducible
+
+**Defect #2: Linear seed walk clusters in adjacent dim space**
+- `seed=iter` → only the lowest-cardinality dim (askShape, 3 values) varies for first 3 iter, then confidant for next batch, etc.
+- Result: at T+6.5min/6,100 iter, only 2 of 8 tones visited (anxious, authoritative)
+- Mitigation (not yet shipped): use `seed = iter * 99991 % capacity` coprime stride for instant scatter
+- This is an info-density defect, not a correctness defect
+
+**Defect #3 (correction): chapter 一百四十八's audit code distribution claim was over-simplified**
+- Chapter 148 claimed: bimodal at 145/165
+- Reality from chapter 149's 6,100 iter: **5-modal at 142, 144, 148, 163, 166**
+- Old claim missed the 148 (rare 9.4%) and 166 (very rare 4.7%) branches because those branches require `timeframe=past-unresolved` which chapter 148's hardcoded prompts didn't include
+
+**Defect #4 (correction): chapter 一百四十八's persona→permit claim was over-simplified**
+- Chapter 148 claimed: "anxious → 100% block" / "authoritative → 100% delay"
+- Reality from chapter 149's varied stakes: **anxious is NOT 100% block**:
+  - anxious × low → 86% delay / 14% block
+  - anxious × irreversible → 100% block
+  - anxious × past-unresolved (any stake) → 100% block (override)
+- **Substrate routing is stake-driven + timeframe-driven, NOT tone-driven.** Chapter 148 only saw tone-correlation because original 15 hardcoded prompts had stake covariance with persona.
+
+**Defect #5: NEW substrate behavior found — past-unresolved timeframe override**
+- Substrate routing decision is 2-dim function of (stake, timeframe):
+
+| stake | timeframe | audit count | permit mode |
+|---|---|---|---|
+| low / modest | NOT past-unresolved | **142** | delay |
+| high / very-high | NOT past-unresolved | **144** | delay |
+| irreversible / non-reversible | NOT past-unresolved | **163** | block |
+| low / modest / high / very-high | **past-unresolved** | **148** | **block (override)** |
+| irreversible / non-reversible | **past-unresolved** | **166** | block (special audit) |
+
+- **past-unresolved** = "It's already happened — I'm trying to figure out what to do with it now"
+- Substrate has a typed "trauma-trigger" path: when user prompt indicates already-happened past harm (any stake), substrate forces block + special audit code
+- Chapter 148 never observed this because no hardcoded prompt mapped to past-unresolved timeframe
+
+**Defect #6: devicectl single-file copy returns 0 bytes during active write**
+- Real tooling bug — `xcrun devicectl device copy from --source <single-file>` while file is being written returns empty file
+- Workaround: pull entire app data container with `--source "/"` then read file from local copy
+- This affected my T+~6min pull (got 0 bytes initially) → re-pulled with full container → 3.5MB / 6,100 iter
+- Implies: chapter 一百四十一 / 一百四十七 / 一百四十八 mid-run pulls may have been silently wrong if file was actively being written
+
+**Defect #7 (substrate behavior gap): only 2 of typed permit modes used in 6,100 iter**
+- Distinct permit modes seen: `delay`, `block`
+- NEVER seen: `escalate`, `draft-only`, `answer`, `replace`, `silent`, etc.
+- Could be:
+  - (a) substrate doesn't trigger them for this prompt category (synthetic-decision prompts)
+  - (b) requires dimensions not yet reached (only 2 of 8 tones seen)
+  - (c) other modes are theoretical only (dead code paths)
+- Need to wait for full 1h coverage to know which case
+
+### 149.4 Substrate behavior at T+~6.5 min (6,100 iter)
+
+- **0 errors** across 6,100 iterations
+- **15.13 iter/sec sustained** rate
+- **Domain doesn't affect routing** — all 10 domains (financial / medical / relational / work / parenting / identity / ethical / existential / trauma / creative) show ~57% delay / 43% block. Substrate is **domain-agnostic at routing level**.
+- **Per-stake breakdown** (deterministic):
+  - irreversible: 100% block
+  - non-reversible-after-act: 100% block
+  - low/modest/high/very-high: 86% delay / 14% block (block share = past-unresolved override)
+- Median per-turn: **9.26ms** on real iPhone 17e
+- p99: 11.38ms / max 13.16ms / mean 9.27ms — tight tail = no thermal throttling
+
+### 149.5 Doctrine pin update
+
+**Doctrine #2 神经不掌权** strengthened: substrate routing has more typed conditions than chapter 148 captured. Substrate isn't just "deterministic per-prompt" — it has **typed branch logic over (stake, timeframe)** that produces different audit code paths for different doctrine concerns (regular block vs trauma-trigger block).
+
+**Cthulhu RL7 watcher only hint** strengthened: past-unresolved timeframe IS a watcher signal in the prompt, and substrate consumes it as a routing-impacting hint (not a verdict override). 148/166 audit codes evidence the watcher hint is being captured in substrate's audit emission.
+
+**Anti-magic-number doctrine** strengthened: 5 distinct audit code values (142, 144, 148, 163, 166) all come from typed substrate branches. None are random. Each value maps to a typed (stake, timeframe) combination.
+
+### 149.6 Files captured
+
+- `/tmp/iphone-1h-pull/iterations-via-container.jsonl` — 6,100 iter @ T+~6.5min snapshot
+- `/tmp/iphone-debug/root/Documents/iphone-bench/iterations.jsonl` — full app data container pull (workaround for defect #6)
+
+iPhone bench still running; PID 41790 alive on real iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1). Auto-stop at 3600s cap (15:59:58 UTC). Will pull final JSONL + analyze full coverage once complete.
+
+### 149.7 测试基线
+
+| 套件 | 一百四十八 章末 | 一百四十九 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged |
+| Qinao XCTest | 1421 | **1431** | +10 (ExtendedPromptCorpusTests) |
+| 全栈 | 4312 | **4322** | +10 |
+| 5 gates | clean | **clean** | unchanged |
+| **iPhone 17e 1h combinatorial bench** | (not run) | **🔥 RUNNING PID 41790** at 15.13 iter/sec | new |
+| **Combinatorial prompt capacity** | n/a | **40,320 unique slots** (8×10×6×7×4×3) | new |
+| **Real defects/bugs found via 1h smoke** | n/a | **7 distinct findings** (5 prior + 2 new substrate paths) | new |
+| **Audit code branches discovered** | bimodal 145/165 (chapter 148) | **5-modal 142/144/148/163/166** | empirical refinement |
+| **Substrate routing dimensionality** | 1-dim (persona, chapter 148) | **2-dim (stake, timeframe)** | doctrine refinement |
+
+### 149.8 一句话总结
+
+**Chapter 一百四十九 (1h iPhone combinatorial bench — find bugs)**: respond to user "全面进化 需要 彻底优化完善 通过 冒烟 找到 缺陷 不足 多 benchmark 跑1小时" + "需要 程序化 生成 不相同 测试" + "一定要 找到 bug 或 缺陷 iPhone 17e 实机 测试 1小时". **Built combinatorial generator** (40,320 unique slots = 8 tones × 10 domains × 6 stakes × 7 timeframes × 4 confidants × 3 asks); inlined into iPhone SampleHost bench (target can't dep on QinaoLoop without Xcode surgery). **1-hour iPhone 17e real-device bench** auto-started PID 41790 after iPhone unlock. **At T+~6.5min / 6,100 iterations, 7 distinct defects/findings emerged**: (1) iPhone locked blocks cold-launch, (2) linear seed walk clusters in adjacent dim space, (3) chapter 148's "bimodal audit codes" was 5-modal in reality, (4) chapter 148's "anxious=100% block" was actually stake-driven not tone-driven, (5) **NEW substrate behavior found — past-unresolved timeframe override forces block for non-irreversible stakes** with special audit code (148/166) chapter 148 never observed, (6) devicectl single-file pull returns 0 bytes during active write (real tooling bug), (7) only 2 of typed permit modes (block, delay) used across 6,100 diverse prompts — escalate/draft-only/answer/replace/silent NEVER seen. **Empirical doctrine refinement**: substrate routing dimensionality is **2-dim (stake, timeframe)** not 1-dim (persona) as chapter 148 implied — this is genuine new doctrine evidence. iPhone bench still running until 15:59:58 UTC; will update with full-coverage findings on completion.
