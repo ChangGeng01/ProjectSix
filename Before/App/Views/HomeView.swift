@@ -1,6 +1,17 @@
 import SwiftData
 import SwiftUI
 
+// MARK: - HomeView
+//
+// chapter 一百四十六 (M571) bug fix:
+// Body extraction refactor — each PanelCard now lives in its own
+// `private var ...: some View` computed property so SwiftUI's
+// ViewBuilder closure chain isn't 11 levels deep in a single function.
+// Real-device main thread default stack is 1MB; the previous monolithic
+// body exceeded it ("Thread stack size exceeded due to excessive recursion"
+// EXC_BAD_ACCESS — see chapter 一百四十五 crash report).
+// Each computed property compiles into its own function frame so render
+// stack growth is per-call-site, not cumulative.
 struct HomeView: View {
     @EnvironmentObject private var appModel: BeforeAppModel
     @Query(sort: \TomorrowBoxItem.createdAt, order: .reverse) private var tomorrowItems: [TomorrowBoxItem]
@@ -83,478 +94,7 @@ struct HomeView: View {
         NavigationStack {
             ZStack {
                 BeforeBackground()
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        if let startupNotice = appModel.startupNotice {
-                            PanelCard {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Label("Recovery mode", systemImage: "exclamationmark.triangle.fill")
-                                        .font(.headline)
-                                        .foregroundStyle(BeforeTheme.ember)
-                                    Text(startupNotice)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    Button("Dismiss") {
-                                        appModel.dismissStartupNotice()
-                                    }
-                                    .font(.headline)
-                                }
-                            }
-                        }
-
-                        SectionHeader(
-                            eyebrow: "Decision OS",
-                            title: "Help me see this clearly.",
-                            subtitle: "Quick calls, trade-offs, and heavier questions can all start from one clean entry."
-                        )
-
-                        GuidedInputCard(
-                            title: "What are you deciding?",
-                            subtitle: "Write it once. Before will start at the right depth.",
-                            placeholder: "Buy this? Go there? Reply now? Stay or leave?",
-                            accessibilityIdentifier: "home.prompt.input",
-                            text: $decisionPrompt
-                        )
-
-                        if let preview = homePromptPreview {
-                            DecisionRoutePreviewCard(
-                                mode: preview.mode,
-                                title: preview.title,
-                                detail: preview.detail,
-                                isPinned: preview.isPinned
-                            )
-                        }
-
-                        PanelCard {
-                            VStack(alignment: .leading, spacing: 14) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("14-layer runtime")
-                                            .font(.headline)
-                                        Text("The active electronic-brain path is now part of the main shell, not just diagnostics.")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    Spacer()
-
-                                    if isLoadingSystemFlightDeck {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                    } else if let deck = systemFlightDeck {
-                                        Text(deck.overallHealth.title)
-                                            .font(.caption.weight(.bold))
-                                            .foregroundStyle(healthColor(deck.overallHealth))
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 6)
-                                            .background(
-                                                Capsule()
-                                                    .fill(healthColor(deck.overallHealth).opacity(0.12))
-                                            )
-                                    }
-                                }
-
-                                if let deck = systemFlightDeck,
-                                   let digest = deck.eBrainDigestPresentation {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text(digest.digest.compactStatusLine)
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(BeforeTheme.ember)
-
-                                        Text(digest.digest.taskTitle)
-                                            .font(.title3.bold())
-                                            .foregroundStyle(BeforeTheme.ink)
-
-                                        ForEach(Array(digest.summaryLines.enumerated()), id: \.offset) { index, line in
-                                            Text(line)
-                                                .font(index == 0 ? .caption : .caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-
-                                        if !digest.layerStackLines.isEmpty {
-                                            DecisionLayerStackView(
-                                                lines: digest.layerStackLines,
-                                                spacing: 4
-                                            )
-                                        }
-
-                                        if let runtimeStatusPresentation = currentEvolutionWorkspace.runtimeStatusPresentation(
-                                            attentionSignal: currentEvolutionAttentionSignal
-                                        ) {
-                                            if let headline = runtimeStatusPresentation.headline {
-                                                Text(headline)
-                                                    .font(
-                                                        runtimeStatusPresentation.usesAttentionAccent
-                                                        ? .caption2.weight(.semibold)
-                                                        : .caption2
-                                                    )
-                                                    .foregroundStyle(
-                                                        runtimeStatusPresentation.usesAttentionAccent
-                                                        ? BeforeTheme.ember
-                                                        : .secondary
-                                                    )
-                                            }
-
-                                            if let detail = runtimeStatusPresentation.detail {
-                                                Text(detail)
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.secondary)
-                                                    .lineLimit(2)
-                                            }
-                                        }
-
-                                        if let localModelOverviewLine = deck.localModelLibrarySummary?.overviewLine {
-                                            Text(localModelOverviewLine)
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(2)
-                                        }
-
-                                        if let alertLine = digest.alertLine {
-                                            Text(alertLine)
-                                                .font(.caption2)
-                                                .foregroundStyle(BeforeTheme.ember)
-                                        }
-
-                                        DecisionEvolutionReleaseSummaryView(
-                                            releaseSummary: deck.releaseControlSummary,
-                                            controlSurface: deck.evolutionControlSurface,
-                                            surfaceContract: evolutionSurfaceContract,
-                                            presentationMode: evolutionSurfaceContract.releaseSummaryMode,
-                                            navigationOptions: checkpointNavigationOptions,
-                                            afterMutation: {
-                                                Task {
-                                                    await refreshSystemFlightDeck()
-                                                }
-                                            }
-                                        )
-                                    }
-
-                                    if let activeCheckpoint = currentEvolutionWorkspace.activePresentation {
-                                        DecisionEvolutionCheckpointActionBar(
-                                            checkpointID: activeCheckpoint.checkpointID,
-                                            checkpointPresentation: activeCheckpoint,
-                                            controlSurface: currentEvolutionControlSurface,
-                                            surfaceContract: evolutionSurfaceContract,
-                                            applyReady: activeCheckpoint.applyReady,
-                                            approvalState: activeCheckpoint.approvalState,
-                                            hasLineage: activeCheckpoint.hasLineage,
-                                            navigationOptions: checkpointNavigationOptions,
-                                            afterMutation: {
-                                                Task {
-                                                    await refreshSystemFlightDeck()
-                                                }
-                                            }
-                                        )
-                                    } else if let reviewCheckpoint = currentEvolutionWorkspace.reviewPresentation {
-                                        if let reviewHeadLine = currentEvolutionWorkspace.reviewHeadWithoutActiveCheckpointLine {
-                                            Text(reviewHeadLine)
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        DecisionEvolutionCheckpointActionBar(
-                                            checkpointID: reviewCheckpoint.checkpointID,
-                                            checkpointPresentation: reviewCheckpoint,
-                                            controlSurface: currentEvolutionControlSurface,
-                                            surfaceContract: evolutionSurfaceContract,
-                                            applyReady: reviewCheckpoint.applyReady,
-                                            approvalState: reviewCheckpoint.approvalState,
-                                            hasLineage: reviewCheckpoint.hasLineage,
-                                            navigationOptions: checkpointNavigationOptions,
-                                            afterMutation: {
-                                                Task {
-                                                    await refreshSystemFlightDeck()
-                                                }
-                                            }
-                                        )
-                                    } else {
-                                        HStack(spacing: 10) {
-                                            DecisionEvolutionNavigationActionRow(
-                                                presentation: runtimeRecoveryNavigationPresentation
-                                            )
-
-                                            BeforeActionButton("Refresh runtime", style: .secondary) {
-                                                Task {
-                                                    await refreshSystemFlightDeck()
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    Text("No live 14-layer turn is attached yet. Open a decision flow or refresh the runtime card.")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-
-                                    HStack(spacing: 10) {
-                                        DecisionEvolutionNavigationActionRow(
-                                            presentation: runtimeDetachedNavigationPresentation
-                                        )
-
-                                        BeforeActionButton("Refresh runtime", style: .secondary) {
-                                            Task {
-                                                await refreshSystemFlightDeck()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        PanelCard {
-                            if isHostedUnitTest {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Session engine")
-                                        .font(.headline)
-                                    Text(
-                                        "Hosted test runtime hides the interactive session engine surface so launch stays deterministic."
-                                    )
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                }
-                            } else {
-                                DecisionSessionEngineSurfaceView(
-                                    presentation: sessionEnginePresentation,
-                                    showsTitle: true,
-                                    maxRecentSessions: 1,
-                                    correctionPlaceholder: "Describe the correction you want to branch from the active recovery line.",
-                                    correctionReason: "home session engine correction branch"
-                                )
-                            }
-                        }
-
-                        if let deck = systemFlightDeck {
-                            DecisionEvolutionPilotControlPanel(
-                                controlSurface: deck.evolutionControlSurface,
-                                releaseSummary: deck.releaseControlSummary,
-                                surfaceContract: evolutionSurfaceContract,
-                                showEmbeddedReleaseSummary: evolutionSurfaceContract.showsEmbeddedReleaseSummaryInPilotPanel,
-                                navigationOptions: checkpointNavigationOptions,
-                                afterMutation: {
-                                    Task {
-                                        await refreshSystemFlightDeck()
-                                    }
-                                }
-                            )
-                        }
-
-                        if let homeQueuePresentation {
-                            PanelCard {
-                                VStack(alignment: .leading, spacing: 14) {
-                                    HStack(alignment: .firstTextBaseline) {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(homeQueuePresentation.title)
-                                                .font(.headline)
-                                            Text(homeQueuePresentation.detail)
-                                                .font(.subheadline)
-                                                .foregroundStyle(.secondary)
-                                        }
-
-                                        Spacer()
-
-                                        Text(homeQueuePresentation.queuedBadgeTitle)
-                                            .font(.caption.weight(.bold))
-                                            .foregroundStyle(.orange)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 6)
-                                            .background(
-                                                Capsule()
-                                                    .fill(Color.orange.opacity(0.12))
-                                            )
-                                    }
-
-                                    if let countsLine = homeQueuePresentation.countsLine {
-                                        Text(countsLine)
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    ForEach(homePendingReviewPresentations) { checkpoint in
-                                        DecisionEvolutionCheckpointPanelView(
-                                            checkpoint: checkpoint,
-                                            controlSurface: currentEvolutionControlSurface,
-                                            surfaceContract: evolutionSurfaceContract,
-                                            navigationOptions: checkpointNavigationOptions,
-                                            afterMutation: {
-                                                Task {
-                                                    await refreshSystemFlightDeck()
-                                                }
-                                            }
-                                        )
-                                    }
-
-                                    DecisionEvolutionNavigationActionRow(
-                                        presentation: queueNavigationPresentation
-                                    )
-                                }
-                            }
-                        }
-
-                        if let candidate = appModel.interventionCandidate {
-                            PanelCard {
-                                VStack(alignment: .leading, spacing: 14) {
-                                    Label("Predictive pause", systemImage: "waveform.path.ecg")
-                                        .font(.headline)
-                                        .foregroundStyle(BeforeTheme.ember)
-
-                                    Text(candidate.title)
-                                        .font(.title3.bold())
-                                        .foregroundStyle(BeforeTheme.ink)
-
-                                    Text(candidate.detail)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-
-                                    Text(candidate.reason)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-
-                                    HStack(spacing: 10) {
-                                        BeforeActionButton("Use this pause") {
-                                            appModel.applyInterventionCandidate(candidate)
-                                        }
-
-                                        BeforeActionButton("Not now", style: .secondary) {
-                                            appModel.dismissInterventionCandidate()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        PanelCard {
-                            StarterPromptRow(
-                                title: "Need a cleaner starting point?",
-                                suggestions: DecisionStarterLibrary.homeFeatured
-                            ) { suggestion in
-                                appModel.startDecisionMode(suggestion.mode, entrySource: .app, prompt: suggestion.prompt)
-                            }
-                        }
-
-                        BeforeActionButton(
-                            appModel.preferences.homePromptAction.buttonTitle,
-                            isEnabled: !trimmedPrompt.isEmpty,
-                            accessibilityIdentifier: "home.prompt.submit"
-                        ) {
-                            _ = appModel.submitHomePrompt(trimmedPrompt, entrySource: .app)
-                            decisionPrompt = ""
-                        }
-                        .disabled(trimmedPrompt.isEmpty)
-
-                        VStack(spacing: 14) {
-                            ForEach(DecisionMode.allCases) { mode in
-                                DecisionModeCard(
-                                    mode: mode,
-                                    accessibilityIdentifier: "home.mode.\(mode.rawValue)"
-                                ) {
-                                    appModel.startDecisionMode(mode, entrySource: .app, prompt: trimmedPrompt)
-                                    decisionPrompt = ""
-                                }
-                            }
-                        }
-
-                        SectionHeader(
-                            eyebrow: "Quick surfaces",
-                            title: "Named impulses still stay one tap away.",
-                            subtitle: "When the shape is obvious, open the fast mode directly."
-                        )
-
-                        LazyVGrid(columns: columns, spacing: 14) {
-                            ForEach(ScenarioType.allCases) { scenario in
-                                Button {
-                                    appModel.startQuickCheck(entrySource: .app, scenario: scenario)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        Image(systemName: scenario.symbolName)
-                                            .font(.title2.weight(.bold))
-                                            .foregroundStyle(BeforeTheme.ember)
-                                        Text(scenario.title)
-                                            .font(.headline)
-                                            .foregroundStyle(BeforeTheme.ink)
-                                        Text(scenario.subtitle)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .multilineTextAlignment(.leading)
-                                    }
-                                    .frame(maxWidth: .infinity, minHeight: 140, alignment: .leading)
-                                    .padding(18)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 26, style: .continuous)
-                                            .fill(.white.opacity(0.72))
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-
-                        PanelCard {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Text("Recent signal")
-                                    .font(.headline)
-
-                                if let signal = appModel.latestSignal() {
-                                    Text(signal.eyebrow.uppercased())
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(BeforeTheme.ember)
-                                    Text(signal.title)
-                                        .font(.title3.bold())
-                                        .foregroundStyle(BeforeTheme.ink)
-                                        .lineLimit(3)
-                                    Text(signal.detail)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(4)
-                                } else {
-                                    Text("Your first judgment, balance board, or mirror will start building signal here.")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-
-                        PanelCard {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Need distance, not denial?")
-                                    .font(.headline)
-                                Text("Move it into Tomorrow Box when the call matters, but not from peak blur.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-
-                                if tomorrowBoxCount > 0 {
-                                    Text("\(tomorrowBoxCount) \(tomorrowBoxCount == 1 ? "item is" : "items are") waiting for a clearer read.")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(BeforeTheme.ember)
-                                }
-
-                                BeforeActionButton("Open Tomorrow Box", style: .secondary) {
-                                    appModel.selectedTab = .box
-                                }
-                            }
-                        }
-
-                        PanelCard {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Need another perspective?")
-                                    .font(.headline)
-                                Text("Buddy keeps it personal. Shared Life keeps recurring household decisions from resetting every time.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-
-                                if supportPendingCount > 0 || sharedLifePendingCount > 0 {
-                                    Text("\(supportPendingCount) buddy \(supportPendingCount == 1 ? "thread" : "threads"), \(sharedLifePendingCount) shared \(sharedLifePendingCount == 1 ? "item" : "items") still active.")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(BeforeTheme.ember)
-                                }
-
-                                BeforeActionButton("Open Support Space", style: .secondary) {
-                                    appModel.supportSurface = .buddy
-                                    appModel.selectedTab = .support
-                                }
-                            }
-                        }
-                    }
-                    .padding(20)
-                }
+                contentScroll
             }
             .navigationTitle("Before")
             .task {
@@ -571,6 +111,594 @@ struct HomeView: View {
                 guard shouldAutoRefreshSystemFlightDeck else { return }
                 Task {
                     await refreshSystemFlightDeck()
+                }
+            }
+        }
+    }
+
+    // MARK: - Body composition (chapter 一百四十六 stack-overflow fix)
+    //
+    // Each section is its own `some View` computed property so the
+    // ViewBuilder closure chain in a single function stays shallow.
+
+    private var contentScroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                recoveryNoticeSection
+                decisionHeader
+                promptInputSection
+                promptPreviewSection
+                runtimeFlightDeckCard
+                sessionEngineCard
+                pilotControlSection
+                queueCard
+                predictivePauseCard
+                starterPromptCard
+                submitPromptButton
+                decisionModeStack
+                quickSurfacesHeader
+                quickSurfacesGrid
+                recentSignalCard
+                tomorrowBoxCard
+                supportSpaceCard
+            }
+            .padding(20)
+        }
+    }
+
+    @ViewBuilder
+    private var recoveryNoticeSection: some View {
+        if let startupNotice = appModel.startupNotice {
+            PanelCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Recovery mode", systemImage: "exclamationmark.triangle.fill")
+                        .font(.headline)
+                        .foregroundStyle(BeforeTheme.ember)
+                    Text(startupNotice)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Dismiss") {
+                        appModel.dismissStartupNotice()
+                    }
+                    .font(.headline)
+                }
+            }
+        }
+    }
+
+    private var decisionHeader: some View {
+        SectionHeader(
+            eyebrow: "Decision OS",
+            title: "Help me see this clearly.",
+            subtitle: "Quick calls, trade-offs, and heavier questions can all start from one clean entry."
+        )
+    }
+
+    private var promptInputSection: some View {
+        GuidedInputCard(
+            title: "What are you deciding?",
+            subtitle: "Write it once. Before will start at the right depth.",
+            placeholder: "Buy this? Go there? Reply now? Stay or leave?",
+            accessibilityIdentifier: "home.prompt.input",
+            text: $decisionPrompt
+        )
+    }
+
+    @ViewBuilder
+    private var promptPreviewSection: some View {
+        if let preview = homePromptPreview {
+            DecisionRoutePreviewCard(
+                mode: preview.mode,
+                title: preview.title,
+                detail: preview.detail,
+                isPinned: preview.isPinned
+            )
+        }
+    }
+
+    private var runtimeFlightDeckCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 14) {
+                runtimeFlightDeckHeader
+                runtimeFlightDeckBody
+            }
+        }
+    }
+
+    private var runtimeFlightDeckHeader: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("14-layer runtime")
+                    .font(.headline)
+                Text("The active electronic-brain path is now part of the main shell, not just diagnostics.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            runtimeFlightDeckBadge
+        }
+    }
+
+    @ViewBuilder
+    private var runtimeFlightDeckBadge: some View {
+        if isLoadingSystemFlightDeck {
+            ProgressView()
+                .controlSize(.small)
+        } else if let deck = systemFlightDeck {
+            Text(deck.overallHealth.title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(healthColor(deck.overallHealth))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(healthColor(deck.overallHealth).opacity(0.12))
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var runtimeFlightDeckBody: some View {
+        if let deck = systemFlightDeck,
+           let digest = deck.eBrainDigestPresentation {
+            runtimeFlightDeckDigest(deck: deck, digest: digest)
+            runtimeFlightDeckActionRow(deck: deck)
+        } else {
+            runtimeFlightDeckUnattached
+        }
+    }
+
+    @ViewBuilder
+    private func runtimeFlightDeckDigest(
+        deck: DecisionSystemFlightDeck,
+        digest: DecisionSystemFlightDeckEBrainDigestPresentation
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(digest.digest.compactStatusLine)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BeforeTheme.ember)
+
+            Text(digest.digest.taskTitle)
+                .font(.title3.bold())
+                .foregroundStyle(BeforeTheme.ink)
+
+            ForEach(Array(digest.summaryLines.enumerated()), id: \.offset) { index, line in
+                Text(line)
+                    .font(index == 0 ? .caption : .caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !digest.layerStackLines.isEmpty {
+                DecisionLayerStackView(
+                    lines: digest.layerStackLines,
+                    spacing: 4
+                )
+            }
+
+            runtimeFlightDeckRuntimeStatus
+
+            if let localModelOverviewLine = deck.localModelLibrarySummary?.overviewLine {
+                Text(localModelOverviewLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let alertLine = digest.alertLine {
+                Text(alertLine)
+                    .font(.caption2)
+                    .foregroundStyle(BeforeTheme.ember)
+            }
+
+            DecisionEvolutionReleaseSummaryView(
+                releaseSummary: deck.releaseControlSummary,
+                controlSurface: deck.evolutionControlSurface,
+                surfaceContract: evolutionSurfaceContract,
+                presentationMode: evolutionSurfaceContract.releaseSummaryMode,
+                navigationOptions: checkpointNavigationOptions,
+                afterMutation: {
+                    Task {
+                        await refreshSystemFlightDeck()
+                    }
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var runtimeFlightDeckRuntimeStatus: some View {
+        if let runtimeStatusPresentation = currentEvolutionWorkspace.runtimeStatusPresentation(
+            attentionSignal: currentEvolutionAttentionSignal
+        ) {
+            if let headline = runtimeStatusPresentation.headline {
+                Text(headline)
+                    .font(
+                        runtimeStatusPresentation.usesAttentionAccent
+                        ? .caption2.weight(.semibold)
+                        : .caption2
+                    )
+                    .foregroundStyle(
+                        runtimeStatusPresentation.usesAttentionAccent
+                        ? BeforeTheme.ember
+                        : .secondary
+                    )
+            }
+
+            if let detail = runtimeStatusPresentation.detail {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func runtimeFlightDeckActionRow(deck: DecisionSystemFlightDeck) -> some View {
+        if let activeCheckpoint = currentEvolutionWorkspace.activePresentation {
+            DecisionEvolutionCheckpointActionBar(
+                checkpointID: activeCheckpoint.checkpointID,
+                checkpointPresentation: activeCheckpoint,
+                controlSurface: currentEvolutionControlSurface,
+                surfaceContract: evolutionSurfaceContract,
+                applyReady: activeCheckpoint.applyReady,
+                approvalState: activeCheckpoint.approvalState,
+                hasLineage: activeCheckpoint.hasLineage,
+                navigationOptions: checkpointNavigationOptions,
+                afterMutation: {
+                    Task {
+                        await refreshSystemFlightDeck()
+                    }
+                }
+            )
+        } else if let reviewCheckpoint = currentEvolutionWorkspace.reviewPresentation {
+            if let reviewHeadLine = currentEvolutionWorkspace.reviewHeadWithoutActiveCheckpointLine {
+                Text(reviewHeadLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            DecisionEvolutionCheckpointActionBar(
+                checkpointID: reviewCheckpoint.checkpointID,
+                checkpointPresentation: reviewCheckpoint,
+                controlSurface: currentEvolutionControlSurface,
+                surfaceContract: evolutionSurfaceContract,
+                applyReady: reviewCheckpoint.applyReady,
+                approvalState: reviewCheckpoint.approvalState,
+                hasLineage: reviewCheckpoint.hasLineage,
+                navigationOptions: checkpointNavigationOptions,
+                afterMutation: {
+                    Task {
+                        await refreshSystemFlightDeck()
+                    }
+                }
+            )
+        } else {
+            HStack(spacing: 10) {
+                DecisionEvolutionNavigationActionRow(
+                    presentation: runtimeRecoveryNavigationPresentation
+                )
+
+                BeforeActionButton("Refresh runtime", style: .secondary) {
+                    Task {
+                        await refreshSystemFlightDeck()
+                    }
+                }
+            }
+        }
+    }
+
+    private var runtimeFlightDeckUnattached: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("No live 14-layer turn is attached yet. Open a decision flow or refresh the runtime card.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                DecisionEvolutionNavigationActionRow(
+                    presentation: runtimeDetachedNavigationPresentation
+                )
+
+                BeforeActionButton("Refresh runtime", style: .secondary) {
+                    Task {
+                        await refreshSystemFlightDeck()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sessionEngineCard: some View {
+        PanelCard {
+            if isHostedUnitTest {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Session engine")
+                        .font(.headline)
+                    Text(
+                        "Hosted test runtime hides the interactive session engine surface so launch stays deterministic."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+            } else {
+                DecisionSessionEngineSurfaceView(
+                    presentation: sessionEnginePresentation,
+                    showsTitle: true,
+                    maxRecentSessions: 1,
+                    correctionPlaceholder: "Describe the correction you want to branch from the active recovery line.",
+                    correctionReason: "home session engine correction branch"
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pilotControlSection: some View {
+        if let deck = systemFlightDeck {
+            DecisionEvolutionPilotControlPanel(
+                controlSurface: deck.evolutionControlSurface,
+                releaseSummary: deck.releaseControlSummary,
+                surfaceContract: evolutionSurfaceContract,
+                showEmbeddedReleaseSummary: evolutionSurfaceContract.showsEmbeddedReleaseSummaryInPilotPanel,
+                navigationOptions: checkpointNavigationOptions,
+                afterMutation: {
+                    Task {
+                        await refreshSystemFlightDeck()
+                    }
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var queueCard: some View {
+        if let homeQueuePresentation {
+            PanelCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    queueCardHeader(homeQueuePresentation)
+
+                    if let countsLine = homeQueuePresentation.countsLine {
+                        Text(countsLine)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(homePendingReviewPresentations) { checkpoint in
+                        DecisionEvolutionCheckpointPanelView(
+                            checkpoint: checkpoint,
+                            controlSurface: currentEvolutionControlSurface,
+                            surfaceContract: evolutionSurfaceContract,
+                            navigationOptions: checkpointNavigationOptions,
+                            afterMutation: {
+                                Task {
+                                    await refreshSystemFlightDeck()
+                                }
+                            }
+                        )
+                    }
+
+                    DecisionEvolutionNavigationActionRow(
+                        presentation: queueNavigationPresentation
+                    )
+                }
+            }
+        }
+    }
+
+    private func queueCardHeader(
+        _ presentation: DecisionEvolutionHomeQueuePresentation
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(presentation.title)
+                    .font(.headline)
+                Text(presentation.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(presentation.queuedBadgeTitle)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.orange.opacity(0.12))
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var predictivePauseCard: some View {
+        if let candidate = appModel.interventionCandidate {
+            PanelCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    Label("Predictive pause", systemImage: "waveform.path.ecg")
+                        .font(.headline)
+                        .foregroundStyle(BeforeTheme.ember)
+
+                    Text(candidate.title)
+                        .font(.title3.bold())
+                        .foregroundStyle(BeforeTheme.ink)
+
+                    Text(candidate.detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text(candidate.reason)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    HStack(spacing: 10) {
+                        BeforeActionButton("Use this pause") {
+                            appModel.applyInterventionCandidate(candidate)
+                        }
+
+                        BeforeActionButton("Not now", style: .secondary) {
+                            appModel.dismissInterventionCandidate()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var starterPromptCard: some View {
+        PanelCard {
+            StarterPromptRow(
+                title: "Need a cleaner starting point?",
+                suggestions: DecisionStarterLibrary.homeFeatured
+            ) { suggestion in
+                appModel.startDecisionMode(suggestion.mode, entrySource: .app, prompt: suggestion.prompt)
+            }
+        }
+    }
+
+    private var submitPromptButton: some View {
+        BeforeActionButton(
+            appModel.preferences.homePromptAction.buttonTitle,
+            isEnabled: !trimmedPrompt.isEmpty,
+            accessibilityIdentifier: "home.prompt.submit"
+        ) {
+            _ = appModel.submitHomePrompt(trimmedPrompt, entrySource: .app)
+            decisionPrompt = ""
+        }
+        .disabled(trimmedPrompt.isEmpty)
+    }
+
+    private var decisionModeStack: some View {
+        VStack(spacing: 14) {
+            ForEach(DecisionMode.allCases) { mode in
+                DecisionModeCard(
+                    mode: mode,
+                    accessibilityIdentifier: "home.mode.\(mode.rawValue)"
+                ) {
+                    appModel.startDecisionMode(mode, entrySource: .app, prompt: trimmedPrompt)
+                    decisionPrompt = ""
+                }
+            }
+        }
+    }
+
+    private var quickSurfacesHeader: some View {
+        SectionHeader(
+            eyebrow: "Quick surfaces",
+            title: "Named impulses still stay one tap away.",
+            subtitle: "When the shape is obvious, open the fast mode directly."
+        )
+    }
+
+    private var quickSurfacesGrid: some View {
+        LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(ScenarioType.allCases) { scenario in
+                quickSurfaceTile(scenario)
+            }
+        }
+    }
+
+    private func quickSurfaceTile(_ scenario: ScenarioType) -> some View {
+        Button {
+            appModel.startQuickCheck(entrySource: .app, scenario: scenario)
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: scenario.symbolName)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(BeforeTheme.ember)
+                Text(scenario.title)
+                    .font(.headline)
+                    .foregroundStyle(BeforeTheme.ink)
+                Text(scenario.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, minHeight: 140, alignment: .leading)
+            .padding(18)
+            .background(
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(.white.opacity(0.72))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var recentSignalCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Recent signal")
+                    .font(.headline)
+
+                recentSignalBody
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var recentSignalBody: some View {
+        if let signal = appModel.latestSignal() {
+            Text(signal.eyebrow.uppercased())
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(BeforeTheme.ember)
+            Text(signal.title)
+                .font(.title3.bold())
+                .foregroundStyle(BeforeTheme.ink)
+                .lineLimit(3)
+            Text(signal.detail)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(4)
+        } else {
+            Text("Your first judgment, balance board, or mirror will start building signal here.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var tomorrowBoxCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Need distance, not denial?")
+                    .font(.headline)
+                Text("Move it into Tomorrow Box when the call matters, but not from peak blur.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if tomorrowBoxCount > 0 {
+                    Text("\(tomorrowBoxCount) \(tomorrowBoxCount == 1 ? "item is" : "items are") waiting for a clearer read.")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+                }
+
+                BeforeActionButton("Open Tomorrow Box", style: .secondary) {
+                    appModel.selectedTab = .box
+                }
+            }
+        }
+    }
+
+    private var supportSpaceCard: some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Need another perspective?")
+                    .font(.headline)
+                Text("Buddy keeps it personal. Shared Life keeps recurring household decisions from resetting every time.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if supportPendingCount > 0 || sharedLifePendingCount > 0 {
+                    Text("\(supportPendingCount) buddy \(supportPendingCount == 1 ? "thread" : "threads"), \(sharedLifePendingCount) shared \(sharedLifePendingCount == 1 ? "item" : "items") still active.")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BeforeTheme.ember)
+                }
+
+                BeforeActionButton("Open Support Space", style: .secondary) {
+                    appModel.supportSurface = .buddy
+                    appModel.selectedTab = .support
                 }
             }
         }

@@ -16533,3 +16533,152 @@ These are **Before app product bugs** (product-debt, not substrate-debt). The su
 ### 145.10 一句话总结
 
 **Chapter 一百四十五 (genuine real-device closure)**: respond to user "再试一下" by going deeper on the diagnosis. Pulled actual on-device crash log with `idevicecrashreport` → found Before app SIGSEGV is **NOT entitlement-related**, it's `HomeView.body` 663-LoC nested ViewBuilder closures overflowing real-device 1MB main-thread stack (vs simulator 8MB stack — explains chapter 一百四十二 sim-passes-but-real-fails). **This is Before app product bug, not substrate bug**. **Pivot**: built SampleHost iOS target instead (substrate-only, no HomeView, depends only on BASHostKit). **SampleHost real-device end-to-end**: BUILD SUCCEEDED → bundleID `com.changgeng.samplehost` installed via `devicectl device install app` → launched → **PID 37577 stable across 30+ seconds polling (T+1s, +2, +3, +4, +5, +6, +8, +10, +15, +20, +25, +30) on physical iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1)**. **Substrate (BASHostKit) genuinely running on real iPhone hardware** — durable execution proven, not transient observation. Honest residuals: Before main app + BeforeUISmoke real-device run still blocked by HomeView stack-overflow product bug — out of scope for substrate-running smoke. Test counts unchanged; entitlements restored to git baseline. iPhone 17e real-device substrate smoke = **genuinely closed** at the SampleHost level.
+
+---
+
+## 一百四十六、 消灭 bug 缺陷 — HomeView stack-overflow 真消除 (M571 / 2026-05-04)
+
+### 146.1 触发动作
+
+用户 chapter 一百四十五 commit 后说 "**消灭 bug 缺陷**"。承接 chapter 一百四十五 自陈的"Before main app 真机 SIGSEGV 是 HomeView 663-LoC 嵌套 ViewBuilder 闭包栈帧总和 > 1MB"产品 bug,直接修。
+
+### 146.2 真因再确认
+
+Chapter 一百四十五 已 pull 到 crash log:
+
+```
+exception: 'Thread stack size exceeded due to excessive recursion'
+type: 'EXC_BAD_ACCESS', signal: 'SIGSEGV'
+subtype: 'KERN_PROTECTION_FAILURE at 0x000000016d22fff8'
+faultingThread: 0 (com.apple.main-thread)
+[1] HomeView.body.getter (closure #1 in closure #2 in closure #1 ...)
+[2-20] SwiftUICore VStack/PanelCard/ScrollView render path
+89 frames total
+```
+
+iOS 真机 main thread default stack = **1MB**;模拟器 = **8MB**。HomeView.body 单一 663 LoC 单体函数里 11 个 PanelCard + 嵌套 VStack/ScrollView 的 ViewBuilder 闭包链 — 编译时 Swift 把这堆嵌套打成 deep closure 栈,SwiftUI render time 调用时栈帧总和爆 1MB。
+
+### 146.3 修复策略 — Body 拆解
+
+**Doctrine**: 每个 PanelCard 抽成独立的 `private var someCard: some View { ... }` 计算属性 / 私有 func。每个计算属性是独立编译单元 — Swift 编译时函数边界明确,SwiftUI render time 调用各计算属性时栈帧 per-call-site 而不是 cumulative。
+
+**Refactor 结果** (`Before/App/Views/HomeView.swift`):
+
+- 单一 663-LoC body → body 极简 + `contentScroll` 计算属性顶层组合
+- 11 个 PanelCard 各自抽成独立 `some View` 计算属性
+- Body 内 if/let 分支(runtimeFlightDeckBody/Badge/Status 等) 也拆出来
+- 复杂内部分支函数 (queueCardHeader / quickSurfaceTile / runtimeFlightDeckActionRow) 用 `private func` 实现
+- **27 个独立 `some View` 编译单元** (chapter 一百三十一 anti-recursion doctrine)
+- 文件 663 → 791 lines (+128 lines, 全是 method 边界)
+
+### 146.4 真机验证 — Before app 真跑
+
+**Build for iPhone 17e real device**:
+
+```bash
+$ xcodebuild -scheme Before -destination "id=00008150-000128D10E8A401C" \
+    DEVELOPMENT_TEAM=U4ZLQM8399 -allowProvisioningUpdates build
+** BUILD SUCCEEDED **
+```
+
+**Install** (uninstall old → install fresh):
+
+```bash
+$ xcrun devicectl device install app --device 00008150-... Before.app
+✓ App installed: bundleID com.changgeng.before
+  installationURL: /private/var/containers/Bundle/Application/43218392-.../Before.app/
+```
+
+**Launch + 60s polling — Before main app PID stable**:
+
+```
+T+1s:  main_app_pid=[37662]
+T+2s:  main_app_pid=[37662]
+T+3s:  main_app_pid=[37662]
+T+5s:  main_app_pid=[37662]
+T+8s:  main_app_pid=[37662]
+T+12s: main_app_pid=[37662]
+T+18s: main_app_pid=[37662]
+T+25s: main_app_pid=[37662]
+T+35s: main_app_pid=[37662]
+T+45s: main_app_pid=[37662]
+T+60s: main_app_pid=[37662]
+```
+
+**Final state — both processes alive 60+ 秒**:
+
+```
+PID 37656  /private/var/containers/Bundle/Application/.../Before.app/PlugIns/BeforeWidgetExtension.appex/BeforeWidgetExtension
+PID 37662  /private/var/containers/Bundle/Application/.../Before.app/Before
+```
+
+**对比 chapter 一百四十五**:
+
+| 阶段 | chapter 一百四十五 | chapter 一百四十六 (本章) |
+|---|---|---|
+| Before main app 真机 | ❌ SIGSEGV within 1s | ✅ **PID 37662 stable 60+ 秒** |
+| BeforeWidget 真机 | ✅ alive | ✅ alive |
+| Substrate-bound iOS app 真机 | SampleHost only (PID 37577) | **Before main app + SampleHost both** |
+| 14-layer runtime UI 真机 | not exercised | **HomeView 真渲染** (PanelCard / ScrollView / SectionHeader 全显示) |
+
+### 146.5 Simulator 回归 — 不破
+
+```bash
+$ xcodebuild -scheme BeforeUISmoke -destination "platform=iOS Simulator,name=iPhone 17e" test
+Test Suite 'AIFlowUITests' passed
+Executed 3 tests, with 0 failures (0 unexpected) in 77.022 (77.023) seconds
+** TEST SUCCEEDED **
+```
+
+3/3 passed (vs 一百四十二 baseline 3/3 / 74.9s — 本次 77.0s,+2.1s,在 simulator 测试 scoping 噪声范围内)。
+
+### 146.6 Substrate 全栈回归 — 不破
+
+```bash
+BAS XCTest:    Executed 2891 tests, 21 skipped, 0 failures (5.533s)
+Qinao XCTest:  Executed 1408 tests, 40 skipped, 0 failures (1.501s)
+全栈:          4299 tests, 0 failures
+5 gates:       all clean (qinao_imports / sovereign_redaction / sdk_imports / substrate_residuals / whitepaper_parity)
+```
+
+### 146.7 改动文件
+
+**Modified**:
+- `Before/App/Views/HomeView.swift` — body 拆解,663 → 791 lines (+128 LoC,全是 method 边界,渲染等价)
+
+**Behavior preserved 1:1**:
+- 所有 11 个 PanelCard 渲染顺序不变
+- 所有 accessibility identifiers 不变 (`home.prompt.input` / `home.prompt.submit` / `home.mode.{rawValue}`)
+- 所有 `Task { await refreshSystemFlightDeck() }` 副作用路径不变
+- 所有 `appModel.*` 调用不变
+
+**Unmodified**:
+- Substrate (BAS / Qinao) — 没动一行 substrate 代码
+- Entitlements — 真机 build 时临时 strip widget,smoke 后 restore byte-equal
+- 项目 pbxproj / scheme — git baseline
+
+### 146.8 Doctrine pin
+
+**Doctrine #1/#2/#3 invariants**: ✓ — 没动 substrate runtime path
+**红线 #10 主品牌不默认恐怖化**: ✓ — pure SwiftUI body refactor,品牌层无变化
+**Anti-magic-number**: ✓ — 没新数字
+**Anti-recursion / chapter 一百三十一**: ✓ pin — 这次直接对应 chapter 一百三十一 "deep recursion is bug" doctrine 的具体修复
+
+### 146.9 测试基线
+
+| 套件 | 一百四十五 章末 | 一百四十六 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2891 | **2891** | unchanged |
+| Qinao XCTest | 1408 | **1408** | unchanged |
+| 全栈 (BAS+Qinao) | 4299 | **4299** | unchanged |
+| iPhone 17e simulator BeforeUISmoke | 3/0/74.9s | **3/0/77.0s** | maintained |
+| iPhone 17e real-device Before.app build | BUILD SUCCEEDED | **BUILD SUCCEEDED** | unchanged |
+| **iPhone 17e real-device Before.app run** | ❌ SIGSEGV (HomeView stack overflow) | **✅ PID stable 60+ 秒** | **bug 消灭** |
+| iPhone 17e real-device SampleHost | ✅ PID stable 30+ 秒 | **✅ same** | unchanged |
+| 5 gates | clean | **clean** | unchanged |
+| HomeView LoC | 663 (monolithic body) | **791 (27 split View units)** | refactored |
+| Entitlements git baseline | matches | **matches** | unchanged |
+
+### 146.10 一句话总结
+
+**Chapter 一百四十六 (M571 — 消灭 bug 缺陷)**: respond to user "消灭 bug 缺陷" by directly fixing the chapter 一百四十五-disclosed Before app product bug. HomeView 663-LoC monolithic body refactored — 11 PanelCards + nested VStacks/ScrollView extracted into 27 independent `some View` computed properties / private funcs. Each becomes its own Swift compilation unit, so SwiftUI's ViewBuilder closure chain in any single function stays shallow, render-time stack frames are per-call-site not cumulative. **Real-device verification**: rebuilt + reinstalled on iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1) → **Before main app PID 37662 stable across 60+ seconds polling (T+1s/+2/+3/+5/+8/+12/+18/+25/+35/+45/+60)** + widget alive. Pre-fix chapter 一百四十五 had main app SIGSEGV within 1 second; post-fix runs durably. **Simulator regression**: BeforeUISmoke 3/3 passed (77.0s). **Substrate regression**: BAS 2891 / Qinao 1408 / 5 gates all clean — no substrate change. **HomeView refactor 663 → 791 lines** (+128 LoC of method boundaries; rendering 1:1 equivalent with all accessibility identifiers preserved). Bug **真消灭**。Doctrine pin: chapter 一百三十一 anti-recursion principle now has concrete fix evidence on real device.
