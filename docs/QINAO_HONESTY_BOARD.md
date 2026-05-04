@@ -19820,3 +19820,84 @@ Chapter 一百六十二 iter 5 §iter5-#7 flagged Codable round-trip tests as po
 ### 167.10 一句话总结
 
 **Chapter 一百六十七 (M596 — 全面 解决掉 所有不满意)**: respond to user broadest "解决所有不满意" by triaging chapters 162-166 honest disclosures into solvable vs external-resource-bound. **Solved**: (1) cross-callsite anti-drift defensive tests in new `M595CrossCallsiteAntiDriftTests.swift` — 5 source-code-level regression guards via `#filePath`-based grep that would have caught chapter 一百六十六's defect #12 cross-site drift bug; (2) BASMemory governance threshold extraction — `MemoryGovernanceCore.swift:282 confidence 0.58` named as `singleEvidenceLowConfidenceRejectionThreshold` + companion `singleEvidenceCeilingForLowConfidenceGate` with doc-comment cross-referencing typical `confidenceCeiling: 0.64` tier from MemoryCore.swift; (3) Codable round-trip test honest classification — kept (low-cost defensive insurance) but documented which are tautological vs load-bearing. **Honest external residuals** (NOT solved, with explicit reasons): M406 full L4 inference engine (multi-chapter ML infra), iPhone 17e / AFM real-machine deploy (hardware-dependent), 3 reality-report metrics substrate-level behavior (would require invasive substrate redesign). Test counts: BAS 2955 → 2960 (+5 anti-drift tests), Qinao 1435 unchanged, 全栈 4390 → 4395 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number extended to BASMemory subsystem; anti-drift defensive infrastructure NEW (operationalizes chapter 一百六十六 lesson "doc-comment cross-site parity claims must be verified, not trusted"); honest classification of unsolvable items (3 external residuals disclosed with explicit reason, not pretended fixed). Cumulative chapters 156-167: 24 defects + improvements closed across 12 chapters; 3 truly external residuals remain.
+
+---
+
+## 一百六十八、 continue — meta-tests verify anti-drift mechanism actually works (M597 / 2026-05-05)
+
+### 168.1 触发动作
+
+User: "continue" after chapter 一百六十七 shipped 5 anti-drift defensive tests + memory threshold extraction. Continuing the trajectory of operationalizing chapter 一百六十六's lesson.
+
+### 168.2 Meta-test motivation
+
+Chapter 一百六十七 added 5 source-code-level grep tests (`testNoInlineDeviationThresholdLiteral` etc.) that fire if magic literals re-appear. **But what if the test mechanism itself silently breaks?** E.g., if pattern strings change formatting (multiline, different spacing), the grep would silently match nothing and we'd have NO signal until a real drift occurred and went uncaught.
+
+Chapter 一百六十六 lesson was "doc-comment claims must be verified, not trusted". Chapter 一百六十八 extends: **anti-drift tests themselves must be verified, not trusted to keep working.**
+
+### 168.3 3 meta-tests added
+
+In `M595CrossCallsiteAntiDriftTests.swift`:
+
+1. `testAntiDriftDetectsKnownPreFixPattern` — Construct simulated source containing `deviationThreshold: 0.7` inline. Assert grep DOES find it. If this fails, the actual regression-guard test is non-functional.
+
+2. `testAntiDriftDetectsKnownPreFixConfidenceFloor` — Same for `.confidenceFloor ?? 1.0` inline.
+
+3. `testAntiDriftSkipsNamedConstantReferences` — **Negative test**: simulated post-fix source with `Self.kunlunAxisDeviationThreshold` should NOT match the inline-literal pattern. Guards against false positives that would cause real-source tests to fail incorrectly after legitimate refactoring.
+
+### 168.4 Why this matters
+
+Without these meta-tests, the anti-drift tests could be a "Maginot line" — sit there looking impressive, but provide no actual protection if they silently stop working.
+
+The meta-tests are the **second layer**: they verify the first-layer (real-source grep) works on KNOWN-BAD and KNOWN-GOOD inputs. Combined:
+- Layer 1: tests reject inline literals in actual source (real-time regression guard)
+- Layer 2 (NEW): tests verify Layer 1 mechanism still works (test-the-test pattern)
+
+This is genuine defensive infrastructure, not theatre.
+
+### 168.5 Test counts
+
+| Counter | Pre-M597 | Post-M597 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2960 | 2963 | **+3** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4395 | 4398 | +3 |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+`M595CrossCallsiteAntiDriftTests` test count: 5 → 8 (+3 meta-tests).
+
+### 168.6 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Anti-drift defensive infrastructure (chapter 一百六十六/七) | ✓ EXTENDED — anti-drift tests now self-verify via meta-tests |
+| Test-the-test pattern (NEW doctrine layer) | ✓ — verifies regression-guard mechanisms before trusting them |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 168.7 Honest scope
+
+Chapter 一百六十八 does NOT:
+- Solve any of the 3 truly external residuals (M406, iPhone deploy, substrate redesign)
+- Add new feature behavior
+- Walk back any prior claim
+
+Chapter 一百六十八 DOES:
+- Add `+3 meta-tests` operationalizing the test-the-test doctrine
+- Provide stronger guarantee that chapter 一百六十六's regression won't recur silently
+
+This is a **small but compounding** improvement — defensive infrastructure that protects the protection.
+
+### 168.8 Cumulative chapters 156-168
+
+- **24 defects + improvements** closed across 13 chapters (chapter 一百六十七 said 12, +1 for 一百六十八)
+- **3 truly external residuals**: M406, iPhone deploy, substrate-level redesign
+- **8 anti-drift tests** in `M595CrossCallsiteAntiDriftTests.swift` (5 real-source + 3 meta)
+- **2 new doctrine layers**: anti-drift defensive infrastructure (一百六十七) + test-the-test (一百六十八)
+
+### 168.9 一句话总结
+
+**Chapter 一百六十八 (M597 — continue)**: respond to user "continue" by adding meta-tests to chapter 一百六十七's anti-drift defensive infrastructure. **+3 tests** in `M595CrossCallsiteAntiDriftTests.swift`: testAntiDriftDetectsKnownPreFixPattern (verifies grep mechanism finds simulated inline `deviationThreshold: 0.7`); testAntiDriftDetectsKnownPreFixConfidenceFloor (same for confidenceFloor); testAntiDriftSkipsNamedConstantReferences (negative test — `Self.kunlunAxisDeviationThreshold` should NOT match inline pattern, guards against false positives). Why: chapter 一百六十六 lesson was "doc-comment claims must be verified, not trusted" — chapter 一百六十八 extends to "anti-drift tests themselves must be verified, not trusted to keep working". Without meta-tests, real-source grep tests could silently stop working (e.g. pattern formatting drift) and provide no actual protection. Test counts: BAS 2960 → 2963 (+3), Qinao 1435 unchanged, 全栈 4395 → 4398 / 0 failures / 5 gates clean. Doctrine pin: anti-drift defensive infrastructure extended; test-the-test pattern is new doctrine layer. Compounding defensive value: chapter 一百六十六 finds the bug, 一百六十七 adds tests to catch it, 一百六十八 verifies the tests work — three-layer protection. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) remain.

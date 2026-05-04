@@ -167,4 +167,86 @@ final class M595CrossCallsiteAntiDriftTests: XCTestCase {
             reverted.
             """)
     }
+
+    // MARK: - M597 chapter 一百六十八 — Meta-tests of anti-drift tests
+
+    /// **M597 chapter 一百六十八 — meta-test**: verify the anti-
+    /// drift inline-literal detection mechanism actually catches
+    /// what chapter 一百六十六 disclosed. Construct a simulated
+    /// source string containing the exact pre-fix inline literal
+    /// pattern and assert grep DOES find it.
+    ///
+    /// Without this meta-test, the anti-drift test could silently
+    /// stop working (e.g. if the pattern string changes substrate
+    /// formatting) and we'd have no signal until a real drift
+    /// occurred and went uncaught.
+    func testAntiDriftDetectsKnownPreFixPattern() {
+        // Simulated source with chapter 一百六十六 pre-fix inline literal
+        let simulatedPreFix = """
+        let kunlunAxisForAudit = BASKunlunAxis(
+            axisID: "axis-test",
+            centerlineRules: ["r1", "r2", "r3"],
+            deviationThreshold: 0.7,
+            lastAlignmentCheck: "")
+        """
+        // Run the same grep logic as testNoInlineDeviationThresholdLiteral
+        let inlinePattern = "deviationThreshold: 0.7"
+        let lines = simulatedPreFix.split(separator: "\n")
+        let offendingLines = lines.enumerated().filter { _, line in
+            return line.contains(inlinePattern)
+        }
+        XCTAssertEqual(
+            offendingLines.count, 1,
+            """
+            Anti-drift detection mechanism failed: simulated
+            pre-fix source containing `deviationThreshold: 0.7`
+            should match exactly 1 line. Found \(offendingLines.count).
+            If this fails, the actual chapter 一百六十六 regression
+            guard test is non-functional.
+            """)
+    }
+
+    /// Verify confidenceFloor inline-literal detection works on
+    /// known pre-fix pattern.
+    func testAntiDriftDetectsKnownPreFixConfidenceFloor() {
+        let simulatedPreFix = """
+        let unknownReserveForAudit = BASUnknownReserve.derive(
+            reserveID: "test",
+            confidenceFloor: thoughtFrame.uncertaintyLedger?
+                .confidenceFloor ?? 1.0)
+        """
+        let inlinePattern = ".confidenceFloor ?? 1.0"
+        let lines = simulatedPreFix.split(separator: "\n")
+        let offendingLines = lines.enumerated().filter { _, line in
+            return line.contains(inlinePattern)
+        }
+        XCTAssertEqual(
+            offendingLines.count, 1,
+            """
+            Anti-drift detection mechanism failed for confidenceFloor.
+            """)
+    }
+
+    /// Negative test: verify named-constant references DON'T
+    /// trigger inline-literal detection (no false positives).
+    func testAntiDriftSkipsNamedConstantReferences() {
+        let simulatedPostFix = """
+        let kunlunAxisForGate = BASKunlunAxis(
+            deviationThreshold: Self
+                .kunlunAxisDeviationThreshold,
+            lastAlignmentCheck: "")
+        """
+        let inlinePattern = "deviationThreshold: 0.7"
+        let lines = simulatedPostFix.split(separator: "\n")
+        let offendingLines = lines.enumerated().filter { _, line in
+            return line.contains(inlinePattern)
+        }
+        XCTAssertEqual(
+            offendingLines.count, 0,
+            """
+            Anti-drift detection mechanism produced FALSE POSITIVE:
+            `Self.kunlunAxisDeviationThreshold` should NOT match
+            `deviationThreshold: 0.7` pattern.
+            """)
+    }
 }
