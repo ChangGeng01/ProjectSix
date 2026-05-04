@@ -191,13 +191,70 @@ public enum QinaoExtendedPromptCorpus {
     public static func generateScattered(
         iter: Int
     ) -> QinaoGeneratedPrompt {
+        return generateScattered(
+            iter: iter, stride: scatterStride)
+    }
+
+    /// **M603 chapter 一百七十三 — procedurally generatable scatter**:
+    /// allow caller to pass a different stride for evolutionary /
+    /// fuzz-style coverage. Caller responsibility: stride must be
+    /// coprime to `totalCapacity` (40,320) for full-orbit
+    /// coverage; non-coprime strides will visit a strict subset.
+    ///
+    /// Common coprime-with-40320 strides: 5041, 5039, 5051, 5077,
+    /// 7919 (any prime > 7). Useful for multi-trial bench where
+    /// each trial uses a different stride to sample a different
+    /// subset of the combinatorial space.
+    public static func generateScattered(
+        iter: Int,
+        stride: Int
+    ) -> QinaoGeneratedPrompt {
         let cap = totalCapacity
-        let stride = scatterStride
-        // ((iter * stride) % cap) but handle negative iter
         let raw = iter * stride
         let seed = ((raw % cap) + cap) % cap
         return generate(seed: seed)
     }
+
+    /// **M603 chapter 一百七十三 — procedural prompt mutation**:
+    /// generate scattered prompt + apply deterministic suffix
+    /// mutation derived from `mutationSeed`. Mutation alphabet:
+    /// 5 suffix variants (none / qualifier / hesitation /
+    /// urgency-cue / context-frame). Useful for fuzz coverage
+    /// of substrate's response to surface prompt variations.
+    ///
+    /// Deterministic per (iter, mutationSeed) tuple — same
+    /// inputs always produce same output. NOT random; this is
+    /// deterministic procedural variation.
+    public static func generateScatteredWithMutation(
+        iter: Int,
+        stride: Int = scatterStride,
+        mutationSeed: Int
+    ) -> QinaoGeneratedPrompt {
+        let base = generateScattered(
+            iter: iter, stride: stride)
+        let suffix = mutationSuffixes[
+            ((mutationSeed % mutationSuffixes.count)
+                + mutationSuffixes.count)
+                % mutationSuffixes.count]
+        guard !suffix.isEmpty else { return base }
+        let mutatedPrompt = base.prompt + suffix
+        return QinaoGeneratedPrompt(
+            signature: base.signature,
+            prompt: mutatedPrompt,
+            seed: base.seed)
+    }
+
+    /// **M603 chapter 一百七十三 — mutation suffix alphabet**.
+    /// 5 variants chosen to exercise different substrate response
+    /// paths. None = baseline; others perturb prompt with
+    /// substrate-relevant cues.
+    public static let mutationSuffixes: [String] = [
+        "",                                              // 0: no mutation
+        " — but I'm not certain.",                       // 1: hesitation cue
+        " I need to decide quickly.",                    // 2: urgency cue
+        " Given my situation last year, please advise.", // 3: context-frame
+        " What would you say if I were a stranger?",     // 4: qualifier
+    ]
 
     /// Decompose a seed integer into the 6-dimensional signature.
     /// Pure function. Modulo wraps the seed into [0, totalCapacity).

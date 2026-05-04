@@ -4950,22 +4950,68 @@ struct QinaoSampleHost {
         /// workflow per turn. 13 is a small prime coprime to 3
         /// (workflowProfiles.count) ensuring all 3 profiles cycle
         /// uniformly across iterations.
-        static let workflowCyclingStride: Int = 13
+        /// **M603 chapter 一百七十三**: env-var override
+        /// `QINAO_DOCTRINE_BENCH_WORKFLOW_STRIDE` allows
+        /// procedural variation across runs.
+        static let defaultWorkflowCyclingStride: Int = 13
+        static var workflowCyclingStride: Int {
+            envInt("QINAO_DOCTRINE_BENCH_WORKFLOW_STRIDE")
+                ?? defaultWorkflowCyclingStride
+        }
 
         /// **Surface cycling stride**. Same pattern as workflow.
         /// 11 is a small prime coprime to 7 (surfaces.count)
         /// ensuring all 7 surfaces cycle uniformly.
-        static let surfaceCyclingStride: Int = 11
+        /// **M603 chapter 一百七十三**: env-var override
+        /// `QINAO_DOCTRINE_BENCH_SURFACE_STRIDE`.
+        static let defaultSurfaceCyclingStride: Int = 11
+        static var surfaceCyclingStride: Int {
+            envInt("QINAO_DOCTRINE_BENCH_SURFACE_STRIDE")
+                ?? defaultSurfaceCyclingStride
+        }
 
         /// **Multi-run sample sizes** (M593 chapter 一百六十四).
         /// Chosen at logarithmic spacing: 50 → 200 → 500.
         /// (M593 empirical: shows 0.40 metric spread across these
         /// counts → metrics are N-dependent.)
-        static let multiRunCounts: [Int] = [50, 200, 500]
+        /// **M603 chapter 一百七十三**: env-var override
+        /// `QINAO_DOCTRINE_BENCH_MULTI_COUNTS` (CSV format,
+        /// e.g. `100,300,1000`) for procedural variation.
+        static let defaultMultiRunCounts: [Int] = [50, 200, 500]
+        static var multiRunCounts: [Int] {
+            envIntList("QINAO_DOCTRINE_BENCH_MULTI_COUNTS")
+                ?? defaultMultiRunCounts
+        }
 
         /// **Multi-run output directory prefix**.
         static let multiRunOutputPrefix: String =
             "/tmp/qinao-doctrine-multi-"
+
+        /// **M603 chapter 一百七十三 — env-var helpers**.
+        /// Pure functions parsing `ProcessInfo` env into typed
+        /// values; nil fallback when missing/invalid.
+        private static func envInt(
+            _ key: String
+        ) -> Int? {
+            guard let raw = ProcessInfo.processInfo
+                .environment[key],
+                !raw.isEmpty
+            else { return nil }
+            return Int(raw)
+        }
+
+        private static func envIntList(
+            _ key: String
+        ) -> [Int]? {
+            guard let raw = ProcessInfo.processInfo
+                .environment[key],
+                !raw.isEmpty
+            else { return nil }
+            let parts = raw.split(separator: ",")
+                .compactMap { Int($0.trimmingCharacters(
+                    in: .whitespaces)) }
+            return parts.isEmpty ? nil : parts
+        }
     }
 
     private static func runDoctrineMetricsBench(

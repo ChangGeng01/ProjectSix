@@ -202,6 +202,78 @@ final class ExtendedPromptCorpusTests: XCTestCase {
         }
     }
 
+    // MARK: - M603 chapter 一百七十三 — procedural mutation tests
+
+    /// Pin: parameterized stride API exists + matches default.
+    func testScatterWithCustomStrideMatchesDefault() {
+        let p1 = QinaoExtendedPromptCorpus.generateScattered(
+            iter: 0,
+            stride: QinaoExtendedPromptCorpus.scatterStride)
+        let p2 = QinaoExtendedPromptCorpus.generateScattered(
+            iter: 0)
+        XCTAssertEqual(p1.prompt, p2.prompt)
+    }
+
+    /// Pin: different strides produce different prompts at iter=1.
+    func testCustomStrideAffectsScatterPath() {
+        let stride1 = QinaoExtendedPromptCorpus.scatterStride
+        let stride2 = 7919  // prime > 7, coprime to 40320
+        let p1 = QinaoExtendedPromptCorpus.generateScattered(
+            iter: 1, stride: stride1)
+        let p2 = QinaoExtendedPromptCorpus.generateScattered(
+            iter: 1, stride: stride2)
+        XCTAssertNotEqual(p1.prompt, p2.prompt)
+    }
+
+    /// Pin: mutation alphabet has 5 entries.
+    func testMutationSuffixesCount() {
+        XCTAssertEqual(
+            QinaoExtendedPromptCorpus.mutationSuffixes.count, 5)
+    }
+
+    /// Pin: mutationSeed=0 is no-op (empty suffix).
+    func testMutationSeed0IsNoOp() {
+        let base = QinaoExtendedPromptCorpus
+            .generateScattered(iter: 0)
+        let mut = QinaoExtendedPromptCorpus
+            .generateScatteredWithMutation(
+                iter: 0, mutationSeed: 0)
+        XCTAssertEqual(base.prompt, mut.prompt)
+    }
+
+    /// Pin: mutationSeed > 0 appends a suffix.
+    func testMutationSeedAppendsSuffix() {
+        let base = QinaoExtendedPromptCorpus
+            .generateScattered(iter: 0)
+        let mut = QinaoExtendedPromptCorpus
+            .generateScatteredWithMutation(
+                iter: 0, mutationSeed: 1)
+        XCTAssertNotEqual(base.prompt, mut.prompt)
+        XCTAssertTrue(mut.prompt.hasPrefix(base.prompt))
+    }
+
+    /// Pin: mutation is deterministic per (iter, seed).
+    func testMutationDeterministic() {
+        let m1 = QinaoExtendedPromptCorpus
+            .generateScatteredWithMutation(
+                iter: 5, mutationSeed: 3)
+        let m2 = QinaoExtendedPromptCorpus
+            .generateScatteredWithMutation(
+                iter: 5, mutationSeed: 3)
+        XCTAssertEqual(m1.prompt, m2.prompt)
+    }
+
+    /// Pin: signature unchanged across mutations (only surface
+    /// text varies).
+    func testMutationPreservesSignature() {
+        let base = QinaoExtendedPromptCorpus
+            .generateScattered(iter: 7)
+        let mut = QinaoExtendedPromptCorpus
+            .generateScatteredWithMutation(
+                iter: 7, mutationSeed: 2)
+        XCTAssertEqual(base.signature, mut.signature)
+    }
+
     // MARK: - 11. Stake / Timeframe / AskShape raw values stable
 
     func testRawValuesStable() {

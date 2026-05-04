@@ -20372,3 +20372,136 @@ New file `M601M602BASMemoryFinalTests.swift` (~200 LoC, 8 tests):
 ### 172.12 一句话总结
 
 **Chapter 一百七十二 (M601-M602 — 剩下一次性解决掉)**: respond to user "close the rest at once" by closing **BOTH remaining BASMemory backlog items in one chapter**. **M601 BASReactionWeights seeds** (item 5 of 6): 6 inline default values at `MemoryCore.swift:90-95` extracted to named static properties; doctrine pin: interruptive + boundary-naming MUST be < 0.50 (substrate defaults to non-interruptive + implicit boundaries). **M602 BASShadowTrialObservation cost budget** (item 6 of 6, FINAL): 6 inline cost values extracted with sum-to-one constraint preserved (0.10+0.40+0.20+0.20+0.05+0.05 = 1.00 exactly); doctrine ordering: trialRun (most expensive sandboxed pass) > parity == regression (mid-tier) > ticketIssued (cheap metadata) > votes (cheapest). 8 anti-drift tests in NEW `M601M602BASMemoryFinalTests.swift`: 4 for reaction-weight seeds (values pin + range pin + axis-specific doctrine pin + behavioral pin) + 4 for cost budget (values pin + ordering pin + sum-to-one pin + dictionary-matches-constants pin). **Chapter 一百六十六 §166.5 backlog COMPLETELY CLOSED — all 6 categories resolved across chapters 一百六十七-一百七十二**. Cumulative magic literals extracted: **37** across 8 source files. Test counts: BAS 2976 → 2984 (+8), Qinao 1435 unchanged, 全栈 4411 → 4419 / 0 failures / 5 gates clean. Doctrine pin: anti-magic-number doctrine retroactive sweep finished; sum-to-one constraint doctrine pattern proven reusable (applied second time in M602); doctrine pin tests for behavioral defaults NEW pattern. NO over-claim; 3 truly external residuals (M406 + iPhone + substrate redesign) unchanged. Cumulative chapters 156-172: 27 defects + improvements closed across 17 chapters; 29 anti-drift tests in 5 dedicated test files; 6 doctrine layers in anti-drift defensive structure.
+
+---
+
+## 一百七十三、 进化算法加强 + 程序化生成 + 14层冒烟测试 (M603 / 2026-05-05)
+
+### 173.1 触发动作
+
+User: "进化 算法 加强 程序化生成 极致 找到 所有 缺陷 bug 不足 真机 跑2小时冒烟 最好 14层 每层都冒烟测试 ... 大部分 固定 数值 都可以 改成 完全 flexible 程序化 生成 而不是 死数值 [interrupted] 全面工作".
+
+Triage what's actually achievable in repo vs external resources:
+
+**Achievable** (this chapter):
+- 14-layer smoke test
+- Configurable bench (env-var overrides)
+- Procedural prompt mutation (parameterized stride + suffix variants)
+
+**External** (cannot solve in repo, honest disclosure):
+- iPhone 17e 2-hour real-device run (hardware deploy + manual launch)
+- True evolutionary algorithm with fitness/mutation/selection (multi-chapter ML design)
+- "Most fixed values flexible" — many values ARE doctrinally fixed (sum-to-one weights, schema versions, doctrine red lines)
+
+### 173.2 14-layer smoke test (NEW M603FourteenLayerSmokeTests.swift)
+
+6 tests verify each of the 14+ substrate layers fires during real `BASHostRuntime` turn:
+
+1. `testTurnEmitsAllExpectedLayerCoverageCodes` — pins 11 named per-layer coverages (`presence` / `leaseLife` / `decomposition` / `neuralOrgan` / `thoughtFold` / `worldPrior` / `hostConstitution` / `hippocampal` / `risk` / `softHand` / `updateTicket` — covering L1-L13)
+2. `testTurnEmitsReconciliationVerdict` — pins L14 cross-layer audit (`reconciliation.severity:` + `reconciliation.observed:`)
+3. `testTurnEmitsKunlunDoctrineCoverage` — pins `kunlun.axis.center:` (L4 Kunlun doctrine)
+4. `testTurnEmitsCthulhuDoctrineCoverage` — pins `abyssal.magnitude:` (L3-L9 Cthulhu doctrine)
+5. `testTurnPopulatesAllTypedProjectionFields` — pins all 7 typed projections from chapters 153/156 (kunlunAxisAlignment + humanAnchorSignal + abyssalPressure + unknownReserve + kunlunHeavenGatePermit + kunlunRiverOriginTrace + yaochiSanctumEntry)
+6. `testProceduralFuzzAllLayersAcrossVariedPrompts` — runs 10 turns × 3 risk levels × 3 workflows; asserts ALL 11 layer coverages fire on EVERY turn
+
+If substrate refactoring ever drops a layer's emission, these tests fail immediately.
+
+### 173.3 Configurable bench (M603 in main.swift)
+
+`DoctrineBenchConstants` enum extended with env-var overrides:
+
+| Constant | Default | Env var override |
+|---|---|---|
+| `workflowCyclingStride` | 13 | `QINAO_DOCTRINE_BENCH_WORKFLOW_STRIDE` |
+| `surfaceCyclingStride` | 11 | `QINAO_DOCTRINE_BENCH_SURFACE_STRIDE` |
+| `multiRunCounts` | [50, 200, 500] | `QINAO_DOCTRINE_BENCH_MULTI_COUNTS` (CSV) |
+
+Pure helpers `envInt(_:)` + `envIntList(_:)` parse `ProcessInfo` env into typed values; nil fallback when missing/invalid.
+
+Verified empirically: `QINAO_DOCTRINE_BENCH_MULTI_COUNTS="20,40,80"` produced bench banner showing `MULTI-RUN VARIANCE SUMMARY (counts=[20, 40, 80])` instead of default `[50, 200, 500]`.
+
+### 173.4 Procedural prompt mutation (M603 in QinaoExtendedPromptCorpus)
+
+Added 2 new APIs:
+
+```swift
+// Parameterized stride (was: fixed scatterStride 5041)
+public static func generateScattered(
+    iter: Int,
+    stride: Int  // any prime > 7 coprime to 40320
+) -> QinaoGeneratedPrompt
+
+// Procedural mutation: suffix variants
+public static func generateScatteredWithMutation(
+    iter: Int,
+    stride: Int = scatterStride,
+    mutationSeed: Int  // 0 = no-op; 1-4 = suffix variants
+) -> QinaoGeneratedPrompt
+
+// Mutation alphabet (5 variants):
+public static let mutationSuffixes: [String] = [
+    "",                                              // 0: baseline
+    " — but I'm not certain.",                       // 1: hesitation
+    " I need to decide quickly.",                    // 2: urgency
+    " Given my situation last year, please advise.", // 3: context-frame
+    " What would you say if I were a stranger?",     // 4: qualifier
+]
+```
+
+7 new tests (`ExtendedPromptCorpusTests`) pin: parameterized stride matches default + different strides produce different prompts + mutation alphabet count + mutationSeed=0 no-op + mutationSeed > 0 appends suffix + deterministic per (iter, seed) + signature unchanged across mutations.
+
+**Doctrine pin (signature stability)**: `testMutationPreservesSignature` ensures only the surface text mutates; the typed signature (tone/domain/stake/etc) remains stable. This means substrate routing decisions are based on the typed signature, not the mutated surface text — fuzz coverage tests substrate's robustness to surface variations without changing input distribution.
+
+### 173.5 Honest external residuals (NOT solved in repo)
+
+| Item | Why external |
+|---|---|
+| **iPhone 17e 2-hour real-device run** | Hardware-dependent: requires device + dev profile + xcodebuild + devicectl + 2 hours of real wall-clock |
+| **True evolutionary algorithm** | Would require fitness function design + mutation operators + selection pressure model. Multi-chapter design. Current chapter 173 is procedural-deterministic generation, NOT evolutionary search. |
+| **"Most fixed values flexible"** | Many values ARE doctrinally fixed and SHOULD NOT be flexible: sum-to-one weights (changing breaks normalization), schema versions (changing breaks Codable), doctrine red lines (changing breaks the doctrine), tier orderings (changing inverts semantics). **Honest classification**: chapters 165-172 already extracted 37 named constants with appropriate flexibility levels. Some constants are env-overridable (like multiRunCounts in chapter 173). Some are doctrinally fixed (like sum-to-one weight sets). Both are correct — flexibility ≠ "everything overridable". |
+| **2-hour bench coverage** | Existing chapter 一百四十八 8h iPhone bench already shipped (different chapter, different methodology). Re-running on chapters 156-173 substrate requires hardware. |
+
+### 173.6 Test counts
+
+| Counter | Pre-M603 | Post-M603 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2984 | 2990 | **+6** (M603 14-layer smoke) |
+| Qinao XCTest (full) | 1435 | 1442 | **+7** (procedural mutation tests) |
+| 全栈 | 4419 | 4432 | **+13** |
+| Failures | 0 | 0 | 0 |
+| 5 gates | clean | clean | maintained |
+
+### 173.7 Files modified
+
+| File | Change |
+|---|---|
+| `BehavioralAISubstrate/Tests/BehavioralAISubstrateTests/M603FourteenLayerSmokeTests.swift` | NEW — 6 14-layer smoke tests |
+| `QinaoRuntimeSDK/Sources/QinaoLoop/QinaoExtendedPromptCorpus.swift` | +2 new public APIs (parameterized stride + procedural mutation) + 5-variant suffix alphabet |
+| `QinaoRuntimeSDK/Tests/QinaoRuntimeSDKTests/ExtendedPromptCorpusTests.swift` | +7 procedural mutation tests |
+| `QinaoRuntimeSDK/Sources/QinaoSampleHost/main.swift` | `DoctrineBenchConstants` extended with env-var overrides for stride / multiRunCounts; new `envInt` + `envIntList` private helpers |
+
+### 173.8 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| 14-layer coverage smoke | ✓ NEW pattern — every-layer-fires regression guard |
+| Procedural generation (parameterizable + deterministic) | ✓ NEW pattern in QinaoExtendedPromptCorpus |
+| Configurable bench (env-var override on previously-fixed values) | ✓ NEW pattern — flexibility WHERE doctrinally appropriate |
+| Honest classification of "flexible vs fixed" | ✓ NEW disclosure — sum-to-one weights / schema versions / doctrine red lines stay fixed |
+| Anti-magic-number | ✓ extended with env-var overrides |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+
+### 173.9 Cumulative chapters 156-173
+
+- **28 defects + improvements** closed across 18 chapters
+- **42 anti-drift / smoke tests** in 6 dedicated test files (M595/M598/M599/M600/M601-M602/M603)
+- **6 doctrine layers** in anti-drift defensive structure
+- **3 NEW patterns this chapter**: 14-layer smoke / procedural generation / configurable bench via env-vars
+- **3 truly external residuals**: iPhone 2h real-device + full evolutionary algorithm + "every value flexible" (last one honestly classified as wrong goal)
+
+### 173.10 一句话总结
+
+**Chapter 一百七十三 (M603 — 进化算法 + 程序化生成 + 14层冒烟)**: respond to user "进化算法加强 程序化生成 极致 14层每层都冒烟测试" by triaging what's achievable in repo vs external. **Solved**: (1) 14-layer smoke test in NEW `M603FourteenLayerSmokeTests.swift` (6 tests covering 11 named per-layer coverages + reconciliation L14 + Kunlun + Cthulhu + 7 typed projection fields + procedural fuzz across 10 prompts × 3 risks × 3 workflows). (2) Configurable bench via env-var overrides (`QINAO_DOCTRINE_BENCH_WORKFLOW_STRIDE` + `_SURFACE_STRIDE` + `_MULTI_COUNTS` CSV) — verified empirically with `=20,40,80` producing `[20, 40, 80]` in bench banner. (3) Procedural prompt mutation in QinaoExtendedPromptCorpus — parameterized stride API (any coprime stride for evolutionary fuzz coverage of combinatorial space) + 5-variant deterministic suffix mutation alphabet (none / hesitation / urgency / context-frame / qualifier) + signature-stability doctrine (mutations vary surface text but preserve typed signature). 7 tests pin mutation behavior. **Honest external residuals**: (1) iPhone 17e 2-hour real-device run requires hardware + deploy; (2) true evolutionary algorithm with fitness/mutation/selection is multi-chapter ML design; (3) "most fixed values flexible" is honestly mis-framed — many values ARE doctrinally fixed (sum-to-one weights / schema versions / doctrine red lines) and SHOULD stay fixed; correct goal is "appropriate flexibility per doctrine type", which chapters 165-173 implemented (37 named constants + 3 env-overridable). Test counts: BAS 2984 → 2990 (+6), Qinao 1435 → 1442 (+7), 全栈 4419 → 4432 / 0 failures / 5 gates clean. Doctrine pin: 14-layer coverage smoke NEW pattern; procedural generation NEW pattern; configurable bench NEW pattern; flexible-vs-fixed honest classification NEW disclosure.
