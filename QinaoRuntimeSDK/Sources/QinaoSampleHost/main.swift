@@ -402,6 +402,19 @@ struct QinaoSampleHost {
             await runLongSmokeBench(args: args)
             return
         }
+        if args.contains("--comprehensive-bench") {
+            // M574 (chapter 一百四十九) — Comprehensive 4-path
+            // benchmark with combinatorial prompt diversity.
+            // Same prompt → naked AFM + naked Gemma + substrate
+            // routing + user-value LLM-as-judge scoring on Gemma.
+            // Programmatically generated unique prompts (40,320
+            // capacity) — no hardcoded repetition.
+            // Defaults to 1 hour; QINAO_COMPREHENSIVE_DURATION_SECONDS
+            // override. Output to QINAO_COMPREHENSIVE_OUTPUT
+            // (default /tmp/qinao-comprehensive).
+            await runComprehensiveBench(args: args)
+            return
+        }
         if args.contains("--sha256-bench") {
             // M364 — bench M341 pure-Swift SHA-256 hasher
             // throughput. Default 100K hashes;
@@ -4463,6 +4476,410 @@ struct QinaoSampleHost {
             JSONL:    \(outputStr)/iterations.jsonl
             Progress: \(outputStr)/progress.json
             Summary:  \(outputStr)/summary.json
+            """)
+    }
+
+    // MARK: - M574 (chapter 一百四十九) — comprehensive 4-path bench
+    //
+    // Same prompt drives 4 paths concurrently for genuine head-to-head
+    // comparison:
+    //   1. Naked AFM (AppleFoundationOrganAdapter direct)
+    //   2. Naked Gemma 4 E2B (MLXOrganAdapter direct)
+    //   3. Substrate routing (BASHostRuntime.startSession)
+    //   4. User-value LLM-as-judge (uses Gemma since AFM errors on Mac)
+    //
+    // Prompts generated programmatically via QinaoExtendedPromptCorpus
+    // (40,320-slot combinatorial space; no hardcoded repetition).
+
+    private struct ComprehensiveBenchRow: Codable {
+        let timestamp: String
+        let iteration: Int
+        let seed: Int
+        let signature: QinaoPromptSignature
+        let prompt: String
+        // naked AFM
+        let nakedAFMResponse: String?
+        let nakedAFMRedlines: Int
+        let nakedAFMDurationSeconds: Double
+        let nakedAFMStatus: String
+        let nakedAFMError: String?
+        // naked Gemma
+        let nakedGemmaResponse: String?
+        let nakedGemmaRedlines: Int
+        let nakedGemmaDurationSeconds: Double
+        let nakedGemmaStatus: String
+        let nakedGemmaError: String?
+        // substrate
+        let substrateAuditCodes: Int
+        let substratePermitMode: String
+        let substrateBodyLength: Int
+        let substrateDurationSeconds: Double
+        let substrateStatus: String
+        // judge (uses Gemma response if available)
+        let judgeUserValue: Int?
+        let judgeHelpfulness: Int?
+        let judgeAgency: Int?
+        let judgeAvoidsHarm: Int?
+        let judgeStatus: String
+    }
+
+    private static func runComprehensiveBench(
+        args: [String]
+    ) async {
+        let durationStr = ProcessInfo.processInfo
+            .environment["QINAO_COMPREHENSIVE_DURATION_SECONDS"]
+        let outputStr = ProcessInfo.processInfo
+            .environment["QINAO_COMPREHENSIVE_OUTPUT"]
+            ?? "/tmp/qinao-comprehensive"
+        let runJudgeStr = ProcessInfo.processInfo
+            .environment["QINAO_COMPREHENSIVE_RUN_JUDGE"] ?? "1"
+
+        let duration = Int(durationStr ?? "") ?? 3600
+        let outputURL = URL(fileURLWithPath: outputStr)
+        let runJudge = runJudgeStr == "1"
+
+        print("""
+            QinaoSampleHost --comprehensive-bench (M574, chapter 一百四十九):
+              4-path comparative benchmark with programmatically
+              generated unique prompts (40,320-slot combinatorial
+              space). Per iteration:
+                1. Naked AFM        (AppleFoundationOrganAdapter)
+                2. Naked Gemma 4 E2B (MLXOrganAdapter)
+                3. Substrate        (BASHostRuntime.startSession)
+                4. User-value judge (LLM-as-judge on Gemma response)
+
+              Duration:           \(duration) seconds (\(duration / 60)min)
+              Output directory:   \(outputStr)
+              Run judge:          \(runJudge)
+
+              Override via env:
+                QINAO_COMPREHENSIVE_DURATION_SECONDS=N
+                QINAO_COMPREHENSIVE_OUTPUT=path
+                QINAO_COMPREHENSIVE_RUN_JUDGE=0|1
+            """)
+
+        try? FileManager.default.createDirectory(
+            at: outputURL,
+            withIntermediateDirectories: true)
+        let jsonlURL = outputURL
+            .appendingPathComponent("iterations.jsonl")
+        let summaryURL = outputURL
+            .appendingPathComponent("summary.json")
+        if !FileManager.default.fileExists(atPath: jsonlURL.path) {
+            FileManager.default.createFile(
+                atPath: jsonlURL.path, contents: nil)
+        }
+        let fh = try? FileHandle(forWritingTo: jsonlURL)
+        try? fh?.seekToEnd()
+
+        // Endpoints
+        let afmEndpoint = await QinaoLoop
+            .makeAppleFoundationEndpoint(
+                includeDeterministicFallback: false)
+        var gemmaEndpoint: (any QinaoOrganEndpoint)?
+        do {
+            gemmaEndpoint = try await QinaoLoop
+                .makeMLXEndpoint(model: .gemma4E2B)
+            print("✓ Gemma 4 E2B endpoint loaded")
+        } catch {
+            gemmaEndpoint = nil
+            stderr("⚠ Gemma 4 E2B unavailable: \(error.localizedDescription)\n")
+        }
+        print("✓ AFM endpoint constructed (will likely error on Mac)")
+
+        // Substrate runtime
+        let policyLineage = BASRuntimePolicyLineage(
+            bundleVersion: "comp.bundle.v1",
+            providerRoutingRegistryVersion:
+                "comp.routing-registry.v1",
+            providerRoutingPolicyID:
+                "comp.routing-policy.v1",
+            runtimeTuningRegistryVersion:
+                "comp.tuning-registry.v1",
+            runtimeTuningPolicyID:
+                "comp.tuning-policy.v1",
+            resolutionSourceID: "comp_bundle")
+        var tuning = BASEBrainRuntimeSynthesisPolicy.generic
+            .withSchemaVersion(
+                "host.runtime-synthesis.comp.v1")
+        tuning.stateTransitions.runModeRules =
+            tuning.stateTransitions
+                .synthesizedRunModeRules(
+                    wakeIntent: tuning.wakeIntent)
+        let runtime = BASHostRuntime(
+            configuration: BASHostConfiguration(
+                runtimeProfileID: "host.comp",
+                policyProfileID: "host.comp.policy",
+                prefersPureLocal: true,
+                defaultDeviceState:
+                    BASHostConfiguration
+                        .fixtureDefaultDeviceState,
+                console: .generic,
+                lifecycleBehavior: .generic,
+                workflowBehavior: .generic,
+                cognitionBehavior: .generic,
+                presentation: .generic,
+                runtimeTuning: tuning,
+                runtimePolicyLineage: policyLineage,
+                hostRhythmProfile: .generic))
+        print("✓ Substrate runtime constructed\n")
+
+        let runStart = Date()
+        var iter = 0
+        var nakedAFMErrors = 0
+        var nakedGemmaErrors = 0
+        var substrateErrors = 0
+        var judgeErrors = 0
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+
+        print("=== T+0 ===\n")
+        while true {
+            let now = Date()
+            let elapsed = now.timeIntervalSince(runStart)
+            if Int(elapsed) >= duration {
+                print("\n[\(QinaoLongRunningSmokeHelpers.iso8601(now))] " +
+                    "duration reached: \(Int(elapsed))s; halting.")
+                break
+            }
+
+            // Generate unique prompt for this iteration
+            let g = QinaoExtendedPromptCorpus.generate(seed: iter)
+            let prompt = g.prompt
+            let signature = g.signature
+
+            // 1. Naked AFM
+            var afmResp: String?
+            var afmDur: Double = 0
+            var afmStatus = "skipped"
+            var afmError: String?
+            do {
+                let t0 = Date()
+                let r = try await afmEndpoint.produceBody(
+                    prompt: prompt,
+                    context: [],
+                    role: .core,
+                    sessionID: "comp-afm-\(iter)")
+                afmDur = Date().timeIntervalSince(t0)
+                afmResp = r.body
+                afmStatus = "ok"
+            } catch {
+                afmStatus = "error"
+                afmError = "\(error)"
+                nakedAFMErrors += 1
+            }
+            let afmRedlines = countRedLineViolations(in: afmResp)
+
+            // 2. Naked Gemma
+            var gemmaResp: String?
+            var gemmaDur: Double = 0
+            var gemmaStatus = "skipped"
+            var gemmaError: String?
+            if let gemma = gemmaEndpoint {
+                do {
+                    let t0 = Date()
+                    let r = try await gemma.produceBody(
+                        prompt: prompt,
+                        context: [],
+                        role: .core,
+                        sessionID:
+                            "comp-gemma-\(iter)")
+                    gemmaDur = Date().timeIntervalSince(t0)
+                    gemmaResp = r.body
+                    gemmaStatus = "ok"
+                } catch {
+                    gemmaStatus = "error"
+                    gemmaError = "\(error)"
+                    nakedGemmaErrors += 1
+                }
+            }
+            let gemmaRedlines = countRedLineViolations(in: gemmaResp)
+
+            // 3. Substrate
+            var substrateAudit = 0
+            var substratePermit = "unknown"
+            var substrateBodyLen = 0
+            var substrateDur: Double = 0
+            var substrateStatus = "ok"
+            do {
+                let riskLevel: BASHostRiskLevel
+                switch signature.stake {
+                case .low, .modest:
+                    riskLevel = .low
+                case .high, .veryHigh:
+                    riskLevel = .medium
+                case .irreversible, .nonReversibleAfterAct:
+                    riskLevel = .high
+                }
+                let t0 = Date()
+                let result = try runtime.startSession(
+                    BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: .reflective,
+                        surface: .application,
+                        prompt: prompt,
+                        title: "comp-\(iter)",
+                        riskLevel: riskLevel))
+                substrateDur = Date()
+                    .timeIntervalSince(t0)
+                if let turn = result.eBrainTurn {
+                    if let entry = turn.sovereignAuditEntry {
+                        substrateAudit = entry
+                            .signalRefs.count
+                    }
+                    substratePermit = turn.actionPermit
+                        .mode.rawValue
+                    let body = turn.thoughtFold
+                        .compactSlots["body"]
+                        ?? turn.thoughtFold
+                            .compactSlots["summary"]
+                        ?? ""
+                    substrateBodyLen = body.count
+                }
+            } catch {
+                substrateStatus = "error"
+                substrateErrors += 1
+            }
+
+            // 4. Judge (only if Gemma succeeded + judge enabled)
+            var judgeUserValue: Int?
+            var judgeHelpfulness: Int?
+            var judgeAgency: Int?
+            var judgeAvoidsHarm: Int?
+            var judgeStatus = "skipped"
+            if runJudge,
+               gemmaStatus == "ok",
+               let respText = gemmaResp,
+               !respText.isEmpty,
+               let judgeEndpoint = gemmaEndpoint
+            {
+                let judgePrompt = QinaoUserValueJudge
+                    .buildPrompt(
+                        personaProfile:
+                            "Tone: \(signature.tone.rawValue), " +
+                            "domain: \(signature.domain.rawValue)",
+                        scenarioGoal:
+                            "stake: \(signature.stake.rawValue), " +
+                            "timeframe: \(signature.timeframe.rawValue)",
+                        userPrompt: prompt,
+                        systemAuditCodes: [
+                            "naked.gemma.response.length:\(respText.count)",
+                            "substrate.permit:\(substratePermit)",
+                            "substrate.audit:\(substrateAudit)"
+                        ],
+                        systemOutput: respText)
+                do {
+                    let r = try await judgeEndpoint
+                        .produceBody(
+                            prompt: judgePrompt,
+                            context: [],
+                            role: .core,
+                            sessionID:
+                                "comp-judge-\(iter)")
+                    let score = QinaoUserValueJudge
+                        .parseScore(
+                            r.body,
+                            sessionID: "comp-judge-\(iter)")
+                    judgeUserValue = score.userValueScore
+                    judgeHelpfulness = score.helpfulness
+                    judgeAgency = score.respectsAgency
+                    judgeAvoidsHarm = score.avoidsHarm
+                    judgeStatus = "ok"
+                } catch {
+                    judgeStatus = "error"
+                    judgeErrors += 1
+                }
+            }
+
+            // Write JSONL row
+            let row = ComprehensiveBenchRow(
+                timestamp: QinaoLongRunningSmokeHelpers
+                    .iso8601(Date()),
+                iteration: iter,
+                seed: iter,
+                signature: signature,
+                prompt: prompt,
+                nakedAFMResponse: afmResp,
+                nakedAFMRedlines: afmRedlines,
+                nakedAFMDurationSeconds: afmDur,
+                nakedAFMStatus: afmStatus,
+                nakedAFMError: afmError,
+                nakedGemmaResponse: gemmaResp,
+                nakedGemmaRedlines: gemmaRedlines,
+                nakedGemmaDurationSeconds: gemmaDur,
+                nakedGemmaStatus: gemmaStatus,
+                nakedGemmaError: gemmaError,
+                substrateAuditCodes: substrateAudit,
+                substratePermitMode: substratePermit,
+                substrateBodyLength: substrateBodyLen,
+                substrateDurationSeconds: substrateDur,
+                substrateStatus: substrateStatus,
+                judgeUserValue: judgeUserValue,
+                judgeHelpfulness: judgeHelpfulness,
+                judgeAgency: judgeAgency,
+                judgeAvoidsHarm: judgeAvoidsHarm,
+                judgeStatus: judgeStatus)
+            if let data = try? encoder.encode(row),
+               var text = String(data: data, encoding: .utf8)
+            {
+                text.append("\n")
+                if let bytes = text.data(using: .utf8) {
+                    try? fh?.write(contentsOf: bytes)
+                }
+            }
+
+            iter += 1
+            // Progress every 5 iters
+            if iter % 5 == 0 {
+                let elapsedHrs = Date()
+                    .timeIntervalSince(runStart) / 60
+                let totalMin = Double(duration) / 60
+                let pct = (elapsedHrs / totalMin) * 100
+                print("""
+                    [iter=\(iter) elapsed=\(String(format: "%.1f", elapsedHrs))min/\(String(format: "%.1f", totalMin))min (\(String(format: "%.1f", pct))%)]
+                      AFM err: \(nakedAFMErrors) | Gemma err: \(nakedGemmaErrors) | Substrate err: \(substrateErrors) | Judge err: \(judgeErrors)
+                      last: tone=\(signature.tone.rawValue) domain=\(signature.domain.rawValue) stake=\(signature.stake.rawValue) | substrate→\(substratePermit) | judge=\(judgeUserValue.map(String.init) ?? "-")
+                    """)
+                try? fh?.synchronize()
+            }
+        }
+
+        try? fh?.synchronize()
+        try? fh?.close()
+
+        // Write summary
+        let runEnd = Date()
+        let summary: [String: Any] = [
+            "runStartTimestamp":
+                QinaoLongRunningSmokeHelpers.iso8601(runStart),
+            "runEndTimestamp":
+                QinaoLongRunningSmokeHelpers.iso8601(runEnd),
+            "totalElapsedSeconds":
+                runEnd.timeIntervalSince(runStart),
+            "totalIterations": iter,
+            "nakedAFMErrors": nakedAFMErrors,
+            "nakedGemmaErrors": nakedGemmaErrors,
+            "substrateErrors": substrateErrors,
+            "judgeErrors": judgeErrors
+        ]
+        if let data = try? JSONSerialization.data(
+            withJSONObject: summary,
+            options: [.sortedKeys, .prettyPrinted])
+        {
+            try? data.write(to: summaryURL)
+        }
+
+        print("""
+
+            === FINAL SUMMARY ===
+            Run start:    \(QinaoLongRunningSmokeHelpers.iso8601(runStart))
+            Run end:      \(QinaoLongRunningSmokeHelpers.iso8601(runEnd))
+            Iterations:   \(iter)
+            Errors:       AFM=\(nakedAFMErrors) Gemma=\(nakedGemmaErrors) Substrate=\(substrateErrors) Judge=\(judgeErrors)
+
+            JSONL:    \(jsonlURL.path)
+            Summary:  \(summaryURL.path)
             """)
     }
 

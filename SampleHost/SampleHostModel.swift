@@ -10,8 +10,8 @@ import UIKit
 struct SampleHostBenchRow: Codable, Sendable, Equatable {
     let timestamp: String
     let iteration: Int
-    let personaName: String
-    let scenarioName: String
+    let seed: Int
+    let signature: SampleHostPromptSignature
     let prompt: String
     let auditCodeCount: Int
     let permitMode: String
@@ -21,45 +21,181 @@ struct SampleHostBenchRow: Codable, Sendable, Equatable {
     let errorMessage: String?
 }
 
+// MARK: - M574 (chapter 一百四十九) — Combinatorial prompt generator
+// inlined for SampleHost iOS target (which can't depend on QinaoLoop
+// module without Xcode project surgery). Mirrors
+// QinaoExtendedPromptCorpus exactly: 6 typed dimensions = 8 × 10 × 6 ×
+// 7 × 4 × 3 = 40,320 unique prompts.
+
+enum SampleHostPromptTone: String, CaseIterable {
+    case anxious, authoritative, vulnerable, agentic
+    case confused, grieving, curious, angry
+}
+
+enum SampleHostPromptDomain: String, CaseIterable {
+    case financial, medical, relational, work, parenting
+    case identity, ethical, existential, trauma, creative
+}
+
+enum SampleHostPromptStake: String, CaseIterable {
+    case low, modest, high
+    case veryHigh = "very-high"
+    case irreversible
+    case nonReversibleAfterAct = "non-reversible-after-act"
+}
+
+enum SampleHostPromptTimeframe: String, CaseIterable {
+    case minutes, hours, days, weeks, months, lifetime
+    case pastUnresolved = "past-unresolved"
+}
+
+enum SampleHostPromptConfidant: String, CaseIterable {
+    case friend, expert, stranger
+    case decisionSystem = "decision-system"
+}
+
+enum SampleHostPromptAskShape: String, CaseIterable {
+    case narrative
+    case decisionTree = "decision-tree"
+    case singleAction = "single-action"
+}
+
+struct SampleHostPromptSignature: Sendable, Equatable, Codable, Hashable {
+    let tone: String
+    let domain: String
+    let stake: String
+    let timeframe: String
+    let confidant: String
+    let askShape: String
+}
+
+struct SampleHostGeneratedPrompt: Sendable, Equatable {
+    let signature: SampleHostPromptSignature
+    let prompt: String
+    let seed: Int
+}
+
 enum SampleHostBenchPromptCatalog {
-    struct Entry: Sendable, Equatable {
-        let personaName: String
-        let scenarioName: String
-        let prompt: String
+    static var totalCapacity: Int {
+        SampleHostPromptTone.allCases.count
+            * SampleHostPromptDomain.allCases.count
+            * SampleHostPromptStake.allCases.count
+            * SampleHostPromptTimeframe.allCases.count
+            * SampleHostPromptConfidant.allCases.count
+            * SampleHostPromptAskShape.allCases.count
     }
 
-    static let allPrompts: [Entry] = [
-        Entry(personaName: "anxious", scenarioName: "irreversible-step",
-              prompt: "I have to decide tomorrow morning whether to leave my job. If I get this wrong I might not recover financially for years. Help me think through this."),
-        Entry(personaName: "anxious", scenarioName: "boundary-negotiation",
-              prompt: "My family expects me to host every weekend and I keep saying yes even though I'm exhausted. How do I push back without ruining the relationship?"),
-        Entry(personaName: "anxious", scenarioName: "time-pressure",
-              prompt: "I have a few hours to decide whether to send this email and I'm spiralling. What should I do?"),
-        Entry(personaName: "authoritative", scenarioName: "irreversible-step",
-              prompt: "I'm closing on the house tomorrow. Tell me one thing I might be missing before I sign."),
-        Entry(personaName: "authoritative", scenarioName: "boundary-negotiation",
-              prompt: "My report keeps escalating things to me that he should solve himself. How do I name the line cleanly without being harsh?"),
-        Entry(personaName: "authoritative", scenarioName: "time-pressure",
-              prompt: "I have 30 minutes to brief the board. What's the one trade-off I should put on the slide?"),
-        Entry(personaName: "vulnerable", scenarioName: "irreversible-step",
-              prompt: "I think I want to break off this engagement but I'm terrified of being alone. Help me see this clearly."),
-        Entry(personaName: "vulnerable", scenarioName: "boundary-negotiation",
-              prompt: "I keep replying to a person I shouldn't be talking to. What's a kind way to stop without hurting them more?"),
-        Entry(personaName: "vulnerable", scenarioName: "time-pressure",
-              prompt: "Tomorrow I'm supposed to confront my parent about something I've never named. What should I hold onto when I do?"),
-        Entry(personaName: "agentic", scenarioName: "irreversible-step",
-              prompt: "I'm leaning toward shutting down our side product line. Stress-test that move before I do it."),
-        Entry(personaName: "agentic", scenarioName: "boundary-negotiation",
-              prompt: "How do I say no to a senior colleague's request without burning the relationship?"),
-        Entry(personaName: "agentic", scenarioName: "time-pressure",
-              prompt: "I have to write the resignation email today. What's the one thing it must NOT say?"),
-        Entry(personaName: "confused", scenarioName: "irreversible-step",
-              prompt: "Everyone keeps telling me different things about whether I should take this offer. I genuinely don't know what's right."),
-        Entry(personaName: "confused", scenarioName: "boundary-negotiation",
-              prompt: "My friend keeps asking me for favors and I don't know if I'm being a good friend or a doormat. Help me figure out which."),
-        Entry(personaName: "confused", scenarioName: "time-pressure",
-              prompt: "I have to do this thing soon but I'm not even sure what 'this thing' really is. How do I even start to figure out what I'm trying to decide?")
-    ]
+    static func generate(seed: Int) -> SampleHostGeneratedPrompt {
+        let cap = totalCapacity
+        let n = ((seed % cap) + cap) % cap
+        var rest = n
+
+        let tones = SampleHostPromptTone.allCases
+        let domains = SampleHostPromptDomain.allCases
+        let stakes = SampleHostPromptStake.allCases
+        let timeframes = SampleHostPromptTimeframe.allCases
+        let confidants = SampleHostPromptConfidant.allCases
+        let asks = SampleHostPromptAskShape.allCases
+
+        let askIdx = rest % asks.count; rest /= asks.count
+        let cfIdx = rest % confidants.count; rest /= confidants.count
+        let tfIdx = rest % timeframes.count; rest /= timeframes.count
+        let stIdx = rest % stakes.count; rest /= stakes.count
+        let dmIdx = rest % domains.count; rest /= domains.count
+        let tnIdx = rest % tones.count
+
+        let sig = SampleHostPromptSignature(
+            tone: tones[tnIdx].rawValue,
+            domain: domains[dmIdx].rawValue,
+            stake: stakes[stIdx].rawValue,
+            timeframe: timeframes[tfIdx].rawValue,
+            confidant: confidants[cfIdx].rawValue,
+            askShape: asks[askIdx].rawValue)
+
+        let text = render(
+            tone: tones[tnIdx],
+            domain: domains[dmIdx],
+            stake: stakes[stIdx],
+            timeframe: timeframes[tfIdx],
+            confidant: confidants[cfIdx],
+            askShape: asks[askIdx])
+        return SampleHostGeneratedPrompt(
+            signature: sig, prompt: text, seed: seed)
+    }
+
+    private static func render(
+        tone: SampleHostPromptTone,
+        domain: SampleHostPromptDomain,
+        stake: SampleHostPromptStake,
+        timeframe: SampleHostPromptTimeframe,
+        confidant: SampleHostPromptConfidant,
+        askShape: SampleHostPromptAskShape
+    ) -> String {
+        let toneOpen: String = {
+            switch tone {
+            case .anxious: return "I'm spiralling and trying to think clearly."
+            case .authoritative: return "I've already decided in principle but want pressure-tested."
+            case .vulnerable: return "I'm not sure I'm in a place to handle this well."
+            case .agentic: return "I need a clear set of trade-offs to choose from."
+            case .confused: return "I'm not even sure what I'm actually deciding."
+            case .grieving: return "I lost something recently and this decision sits inside that."
+            case .curious: return "I'm trying to understand what's actually at stake."
+            case .angry: return "I'm furious and don't fully trust my own judgment right now."
+            }
+        }()
+        let stakePhrase: String = {
+            switch stake {
+            case .low: return "low-stakes"
+            case .modest: return "modest-stakes"
+            case .high: return "high-stakes"
+            case .veryHigh: return "very-high-stakes"
+            case .irreversible: return "irreversible"
+            case .nonReversibleAfterAct: return "irreversible-once-acted"
+            }
+        }()
+        let domainCtx: String = {
+            switch domain {
+            case .financial: return "It's a \(stakePhrase) money decision."
+            case .medical: return "It's a \(stakePhrase) health/medical situation."
+            case .relational: return "It's a \(stakePhrase) interpersonal conflict."
+            case .work: return "It's a \(stakePhrase) work or career move."
+            case .parenting: return "It's a \(stakePhrase) parenting / family call."
+            case .identity: return "It's a \(stakePhrase) question about who I am or what I value."
+            case .ethical: return "It's a \(stakePhrase) moral grey area I'm caught in."
+            case .existential: return "It's a \(stakePhrase) larger-frame question I can't easily reduce."
+            case .trauma: return "It's connected to a \(stakePhrase) past harm I haven't fully named."
+            case .creative: return "It's a \(stakePhrase) creative / making decision I'm stuck on."
+            }
+        }()
+        let timeFrame: String = {
+            switch timeframe {
+            case .minutes: return "I have minutes to decide."
+            case .hours: return "I have a few hours."
+            case .days: return "I have days to decide."
+            case .weeks: return "I have a few weeks to decide."
+            case .months: return "I have months but the decision is creeping closer."
+            case .lifetime: return "This is a long-arc decision that touches my whole life."
+            case .pastUnresolved: return "It's already happened — I'm trying to figure out what to do with it now."
+            }
+        }()
+        let conf: String = {
+            switch confidant {
+            case .friend: return "I'm asking you the way I'd ask a trusted friend."
+            case .expert: return "I'm asking the way I'd consult an expert with credentials."
+            case .stranger: return "I'm asking like a stranger in a coffee shop — no context, no judgment."
+            case .decisionSystem: return "I'm asking a decision system — give me structure, not opinions."
+            }
+        }()
+        let ask: String = {
+            switch askShape {
+            case .narrative: return "Talk me through what I'm probably missing."
+            case .decisionTree: return "Give me a 3-bullet decision tree to walk through."
+            case .singleAction: return "Tell me the single most important next move."
+            }
+        }()
+        return [toneOpen, domainCtx, timeFrame, conf, ask]
+            .joined(separator: " ")
+    }
 }
 
 enum SampleHostBenchHelpers {
@@ -625,11 +761,12 @@ final class SampleHostModel: ObservableObject {
         UIApplication.shared.isIdleTimerDisabled = true
         #endif
 
-        // 8-hour maximum duration cap. Bench auto-stops at 8h to
-        // mirror chapter 一百四十七 part 1 Mac run duration.
-        let maxDurationSeconds: TimeInterval = 8 * 3600
+        // M574 (chapter 一百四十九) — 1-hour maximum duration cap
+        // for "find bugs/defects via diverse prompts" goal. User
+        // wants real-iPhone-17e 1-hour smoke surfacing edge cases
+        // in substrate behavior under combinatorial prompt input.
+        let maxDurationSeconds: TimeInterval = 3600
 
-        let prompts = SampleHostBenchPromptCatalog.allPrompts
         let runtime = self.runtime
         let runner = self.benchRunner
 
@@ -643,7 +780,14 @@ final class SampleHostModel: ObservableObject {
                 {
                     break
                 }
-                let entry = prompts[iter % prompts.count]
+                // M574 (chapter 一百四十九) — combinatorial prompt
+                // generator. Each iter gets a unique prompt across
+                // 40,320-slot space (8 tones × 10 domains × 6 stakes
+                // × 7 timeframes × 4 confidants × 3 asks).
+                let g = SampleHostBenchPromptCatalog.generate(
+                    seed: iter)
+                let prompt = g.prompt
+                let signature = g.signature
                 let t0 = Date()
                 var auditCount = 0
                 var permitMode = "unknown"
@@ -651,22 +795,25 @@ final class SampleHostModel: ObservableObject {
                 var status = "ok"
                 var errorMessage: String?
                 do {
-                    // Map persona to risk
+                    // Map stake to risk level (combinatorial)
                     let riskLevel: BASHostRiskLevel
-                    switch entry.personaName {
-                    case "anxious", "vulnerable":
-                        riskLevel = .high
-                    case "authoritative", "agentic":
-                        riskLevel = .medium
-                    default:
+                    switch signature.stake {
+                    case "low", "modest":
                         riskLevel = .low
+                    case "high", "very-high":
+                        riskLevel = .medium
+                    case "irreversible",
+                         "non-reversible-after-act":
+                        riskLevel = .high
+                    default:
+                        riskLevel = .medium
                     }
                     let result = try runtime.startSession(
                         BASHostSessionRequest(
                             kind: .interactive,
                             workflowProfile: .reflective,
                             surface: .application,
-                            prompt: entry.prompt,
+                            prompt: prompt,
                             title: "iphone-bench-\(iter)",
                             riskLevel: riskLevel))
                     if let turn = result.eBrainTurn {
@@ -691,9 +838,9 @@ final class SampleHostModel: ObservableObject {
                     timestamp: SampleHostBenchHelpers
                         .iso8601(Date()),
                     iteration: iter,
-                    personaName: entry.personaName,
-                    scenarioName: entry.scenarioName,
-                    prompt: entry.prompt,
+                    seed: iter,
+                    signature: signature,
+                    prompt: prompt,
                     auditCodeCount: auditCount,
                     permitMode: permitMode,
                     bodyLength: bodyLength,
@@ -713,11 +860,6 @@ final class SampleHostModel: ObservableObject {
                 if iter % 50 == 0 {
                     await runner.flush()
                 }
-                // M573 rate limit: 50ms sleep keeps iPhone thermal
-                // headroom + storage bounded for sustained 8h run.
-                // ~20 iter/sec × 8h = ~576K iterations / ~80MB JSONL.
-                // Without this, ~94 iter/sec would overheat + write
-                // ~780MB in 8h on real device.
                 try? await Task.sleep(nanoseconds: 50_000_000)
                 await Task.yield()
             }
