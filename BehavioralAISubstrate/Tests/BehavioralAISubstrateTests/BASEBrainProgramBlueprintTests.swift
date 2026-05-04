@@ -372,7 +372,12 @@ struct BASEBrainProgramBlueprintTests {
             "JadeFidelityMap",
             "HostJadeRegister",
             "JadeMirrorDraft",
-            "KunlunUnnamableSet"
+            "KunlunUnnamableSet",
+            // M513-M517 (chapter 一百三十) — 8-point audit Point 8
+            // Counter-Host Check (Point 7 BASLearnabilityClass +
+            // Point 5 BASSovereignDomainScope are enums not
+            // BASSchemaVersioned).
+            "CounterHostCheck"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

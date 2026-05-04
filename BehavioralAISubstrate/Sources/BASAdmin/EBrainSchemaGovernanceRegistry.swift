@@ -1282,6 +1282,15 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "KunlunUnnamableSet",
             versionedType: BASKunlunUnnamableSet.self,
             tests: ["schema.kunlun_unnamable_set.current", "schema.kunlun_unnamable_set.backward"]
+        ),
+        // M513-M517 (chapter 一百三十 / 8-point audit 全面优化) —
+        // Counter-Host Check (Point 8) + Sovereign Domain Scope
+        // (Point 5).  BASLearnabilityClass (Point 7) is an enum
+        // not a BASSchemaVersioned, so not registered here.
+        entry(
+            "CounterHostCheck",
+            versionedType: BASCounterHostCheck.self,
+            tests: ["schema.counter_host_check.current", "schema.counter_host_check.backward"]
         )
     ]
 

@@ -14994,3 +14994,137 @@ User requested "deep test" / "deep review" after chapter 一百二十八 ship. A
 ### 129.6 一句话总结
 
 **Chapter 一百二十九**: deep review of chapter 一百二十八 (M500-M510). Multi-run sweep clean (3/3 × 2823 tests). Agent code review surfaced 6 findings (0 CRITICAL / 0 HIGH / 2 MEDIUM / 4 LOW) with ~83% FP rate consistent with chapter 67/81/91.5/103 baseline. **1 REAL bug fixed (M511)**: `BASKunlunFarWestReserve.derive` for ceiling=`.qualified` mapped namingStatus to `.provisional` which violated `isHonoringDoctrine` invariant — fix maps `.qualified → .unattempted` per §5.4 "不急着命名" doctrine. **2 fix-pin tests added**: `testFarWestReserveAlwaysHonorsDoctrine` (M511 — walks all 5 BASUnknownAssertionCeiling cases asserting isHonoringDoctrine), `testCthulhuDraftShellAsymmetricEmission` (M512 — positive-asymmetry pin per §5.12 4-vs-5 alias doctrine). Deep review report: `docs/QINAO_M500_TO_M510_DEEP_REVIEW_2026-05-04.md`. Test counts: BAS XCTest 2823 → **2825** (+2 fix-pins), Qinao 1375 unchanged, 全栈 4215 → **4217** / 0 failures / 5/5 gates clean. Doctrine pin held: M511 fix doesn't change runtime behavior for non-`.qualified` paths (backward-compat preserved); §5.4 reserve-doctrine + §5.12 surface-asymmetry doctrine newly typed-pinned via fix-pins. Methodology lessons codified in deep review report (§Methodology) — schema invariants need derive-helper coverage, asymmetric mappings need bidirectional pins, agent FP rate stays ~80%.
+
+## 一百三十、 8-point 技术审计 全面优化 (M513-M519 / 2026-05-04)
+
+### 130.1 触发动作
+
+User 在 chapter 一百二十九 deep review 后提供 8-point 技术审计(numbered 2-9)涵盖:
+- Point 2: L6/L7、L9-L11、L13/L14 layer responsibility overlaps
+- Point 3: "无延迟" 物理上不成立(工程语言修辞)
+- Point 4: 共享状态图并发一致性灾难
+- Point 5: L14 太强但没严格"缩小"
+- Point 6: 删除/回滚/净启工程上没打穿(全域 lineage graph 缺)
+- Point 7: Learnable / Non-learnable 边界不硬
+- Point 8: 宿主自证循环防御缺(Counter-Host Check)
+- Point 9: 指标不够"验收化"(SLA 卡版本不够)
+
+User asked "是否属实", 我 grep-verified each point + 给 honest verdict (mostly 属实). User said "先上传 再 全面优化" → entered plan mode → wrote Appendix P → ExitPlanMode approved.
+
+### 130.2 In-chapter scope (5 of 8 points)
+
+**In-chapter** (chapter 一百三十): Points 2, 3, 5, 7, 8 (~6.6 hrs / 1 commit)
+**Future multi-chapter**: Point 6 (lineage graph — separate plan)
+**Out-of-scope**: Point 4 (Stream B blocked), Point 9 (real-traffic blocked)
+
+### 130.3 Sub-batch shipped
+
+| M | Sub-batch | 闭合 audit point |
+|---|---|---|
+| M513 | BASCounterHostCheck schema + BASCounterHostCheckProtocol derive helper (BASMemory; 4-case outcome enum + threshold-mapping) | Point 8 — 宿主自证循环防御 |
+| M514 | L13 promotion gate consume (deferred to M514 follow-up; doctrine pin in schema) | Point 8 — promotion gate |
+| M515 | BASLearnabilityClass typed enum (BASRuntimeCore; 3-tier strong-learnable/semi-learnable/non-learnable) | Point 7 — Learnability boundary |
+| M516 | Governance registry annotation (deferred — annotation requires registry struct field addition; chapter 一百三十一 follow-up) | Point 7 — registry sync |
+| M517 | BASSovereignDomainScope 6-case enum + BASSovereignDomainScopeLinter (BASSovereign; 6 typed sovereign domains + forbiddenSubstrings lint) | Point 5 — L14 sovereign-domain scope |
+| M518 | L6 doctrine note (no code) | Point 2 — L6/L7 doctrine binding |
+| M519 | 工程语言修辞 (no code) | Point 3 — "无延迟" → sub-20ms coordination overhead |
+
+### 130.4 Sub-batch A — BASCounterHostCheck (M513)
+
+**新建** `BehavioralAISubstrate/Sources/BASMemory/BASCounterHostCheck.swift` (~250 LoC):
+
+- `BASCounterHostCheckOutcome` 4-case enum (kebab-case raw values):
+  - `.genuineHostPattern` — host pattern existed before system observation
+  - `.systemInducedDrift` — host behavior shifted AFTER system surfacing → blocks promotion unless sovereign override
+  - `.insufficientEvidence` — neither stability nor induction confirmed
+  - `.notApplicable` — non-host candidate
+- `BASCounterHostCheck` BASSchemaVersioned struct: checkID / candidateRef / hostBaselineRef / observedDelta [0,1] / inducedRiskScore [0,1] / outcome / reasonCodes
+- `BASCounterHostCheckProtocol.derive(...)` pure-function helper with 2 named-static thresholds:
+  - `systemInducedRiskThreshold = 0.6` — anti-magic-number
+  - `genuinePatternDeltaCeiling = 0.2` — anti-magic-number
+- `requiresSovereignOverride: Bool` invariant accessor — `true` iff `outcome == .systemInducedDrift`
+
+**测试**: `BASCounterHostCheckTests.swift` 10 tests covering 4 outcomes + Codable + clamping + threshold pinning + reason code emission stability.
+
+**Doctrine pin**: 不变量 #3 加固 — "私有经验不进权重" + "不通过宿主自证循环塑造宿主"。
+
+### 130.5 Sub-batch B — BASLearnabilityClass (M515)
+
+**新建** `BehavioralAISubstrate/Sources/BASRuntimeCore/BASLearnabilityClass.swift` (~150 LoC):
+
+- 3-case enum (kebab-case raw values):
+  - `.strongLearnable` — L6/L7/L9/L12 derives (modeling/distillation/continuous learning)
+  - `.semiLearnable` — L8/L10/L11/L13 (rules+learning hybrid)
+  - `.nonLearnable` — L14/sovereign/token/commit/permission/host授权 (mechanically stable, doctrine-load-bearing)
+- 每 case 携带 `whitePaperRef` + `auditCodePrefix` + `policyDescription`
+- `.nonLearnable.policyDescription` 显式包含 "BLOCKED from training pipelines" — load-bearing doctrine sentence
+
+**测试**: `BASLearnabilityClassTests.swift` 7 tests covering cardinality + raw values + Codable + whitePaperRef pin + auditCodePrefix stability + BR-013 typed pin (`testNonLearnablePolicyBlocksTrainingPipeline`).
+
+**Doctrine pin**: **BR-013 typed pin** — non-learnable domains MUST NOT route through learnable training pipelines. Audit-walker greps `learnability:non-learnable` reason code.
+
+### 130.6 Sub-batch C — BASSovereignDomainScope (M517)
+
+**新建** `BehavioralAISubstrate/Sources/BASSovereign/BASSovereignDomainScope.swift` (~120 LoC):
+
+- 6-case enum per audit Point 5 doctrine:
+  - `.legitimacy` (合法性)
+  - `.deleteRollback` (删除/回滚)
+  - `.privilegeEscalation` (越权)
+  - `.artifactIntegrity` (工件完整性)
+  - `.lineagePollution` (污染谱系)
+  - `.highConsequenceCommit` (高后果提交资格)
+- `forbiddenSubstrings` static array (6 power-creep patterns: style-preference / product-experience / casual-risk / tool-routine / ux-polish / compare-mode-pick)
+- `BASSovereignDomainScopeLinter.violations(in:) / .isWithinSovereignScope(_:)` static lint helpers
+
+**测试**: `BASSovereignDomainScopeTests.swift` 6 tests covering cardinality + raw values + Codable + whitePaperRef + clean codes pass lint + power-creep codes fail lint (BR-014 typed pin).
+
+**Doctrine pin**: **BR-014 typed pin** — L14 emissions MUST stay within 6 sovereign domains. "L14 必须像核按钮，不是总控台。"
+
+### 130.7 Sub-batch D — L6 doctrine note (M518, no code)
+
+**Doctrine note**: `BASAnomalyTrace.deriveOrNil` emits with `anomaly.*` prefix (not `cthulhu.l6.*`) because:
+- AnomalyTrace 跨 L6 (临场眼检测) + L7 (镜刃集成) 两层
+- 检测在 L6,集成 emission 在 L7
+- prefix 反映 emission 位置 (L7 镜刃) 而不是 detection 位置 (L6 临场眼)
+
+不重命名 audit codes(churn 风险 > 价值;会破现有 audit walker grep)。
+
+### 130.8 Sub-batch E — 工程语言修辞 (M519, no code)
+
+**Doctrine note**: chapter 一百三十 显式声明:
+
+- "多 agents 协同无延迟" → 研究术语,工程上不成立
+- 工程目标(替代措辞):
+  - sub-20ms coordination overhead
+  - single-encode multi-seat inference
+  - zero-copy state bus
+  - hot-seat resident, cold-seat on-demand
+- 当前 ship 进度: **0/4** — 都是 ML infra + system engineering,不在 Swift-only 范围内
+- 这是 Stream B SDK packages 进入实战时才会撞的工程目标
+
+### 130.9 测试基线
+
+| 套件 | 一百二十九 章末 | 一百三十 章末 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2825 | **2851** | +26 (3 new test files: BASCounterHostCheckTests + BASLearnabilityClassTests + BASSovereignDomainScopeTests) |
+| BAS swift-testing | 417 | **417** | unchanged |
+| Qinao XCTest | 1375 | **1375** | unchanged |
+| 全栈 | 4217 | **4243** | +26 |
+
+5 gates clean: 4 boundary + whitepaper parity (242 registered, 0 drift; +1 BASCounterHostCheck schema; BASLearnabilityClass + BASSovereignDomainScope are enums not BASSchemaVersioned).
+
+### 130.10 Doctrine red lines tally post-chapter
+
+| Doctrine | 红线数 | Δ |
+|---|---|---|
+| Kunlun 8 红线 (chapter 九十五 M412) | 8 | unchanged |
+| Cthulhu 10 红线 (chapter 八十九 M389) | 10 | unchanged |
+| Product 5 红线 (chapter 一百十五 M440) | 5 | unchanged |
+| **新加 BR-013 (Learnability)** | 1 | **+1 chapter 一百三十** |
+| **新加 BR-014 (Sovereign Domain Scope)** | 1 | **+1 chapter 一百三十** |
+| **总 BR 数** | 25 | +2 |
+
+### 130.11 一句话总结
+
+**Chapter 一百三十 / M513-M519**: respond to user 8-point audit by 全面优化 5 in-repo 推-able items — **M513 Counter-Host Check** (Point 8 防御宿主自证循环 — 4-case outcome enum + 2 named thresholds + requiresSovereignOverride invariant + 10 tests pin BR-013 contract);  **M515 Learnability typed enum** (Point 7 — 3-tier strong/semi/non-learnable boundary + 7 tests including BR-013 typed pin "BLOCKED from training pipelines"); **M517 Sovereign Domain Scope** (Point 5 — 6-case sovereign domain enum + linter detecting 6 power-creep substrings + 6 tests including BR-014 typed pin "L14 emissions stay within sovereign-domain"); **M518 L6 doctrine note** (Point 2 — anomaly.* prefix 反映 emission 位置 而不是 detection 位置); **M519 工程语言修辞** (Point 3 — "无延迟" → sub-20ms coordination overhead + single-encode multi-seat + zero-copy state bus + hot-seat resident-cold-seat-on-demand 4-target language). **Out-of-scope honesty**: Point 4 (Stream B blocked) + Point 6 (multi-chapter — separate plan, lineage graph 4-6 chapters) + Point 9 (real-traffic blocked). **2 new BR red lines** typed-pinned (BR-013 Learnability + BR-014 Sovereign Domain Scope; 总 BR 23 → 25). **3 new typed schemas/enums** + 1 governance entry (BASCounterHostCheck) + 26 new tests. Test counts: BAS XCTest 2825 → **2851** (+26), Qinao 1375 unchanged, 全栈 4217 → **4243** / 0 failures / 5/5 gates clean / parity 242 registered, 0 drift. Doctrine pin held: pure typed primitives + lint helpers; no permit.mode mutation; 不变量 #3 + 单提交口 strengthened by Counter-Host Check + Learnability + Sovereign Domain Scope。Honest residuals: M514 L13 promotion gate consume + M516 governance learnability annotation 留 chapter 一百三十一 follow-up(scope 边界考虑后均为 schema-bump-style 改动,需要 BASEvolutionLifecycleAction enum 加 case + governance registry struct 加 field 字段 + 3-site 重新 sync + 跨 chapter regression 验证)。
