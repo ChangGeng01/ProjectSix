@@ -846,25 +846,85 @@ final class BASDoctrineMetricsTests: XCTestCase {
             0)
     }
 
-    /// Empirical chapter 一百五十五 result: 46/200 sessions hit
-    /// cthulhu.distortionMap.dominant:true. Synthesize a 200-session
-    /// replay and verify harmony score = 1 - (46/200) = 0.77.
-    /// This is a load-bearing test: locks in the chapter 一百五十五
-    /// calibration so future detector tweaks must justify the
-    /// resulting harmony shift.
-    func testEmpiricalHarmonyMatch() {
+    /// **M590 chapter 一百六十二 — Issue E (deep review iter 5)**:
+    /// renamed test to reflect that it pins a STATIC FIXTURE, not
+    /// the bench's empirical output (which has shifted with each
+    /// chapter's detector calibration). Pre-rename docstring
+    /// implied "empirical match" but bench output diverges from
+    /// fixture as detector evolves. Static fixture math:
+    /// (46+0)/200 = 0.23 → harmony 0.77.
+    func testHarmonyStaticFixture46Cthulhu0Kunlun() {
         let cthulhuHits = 46
         let kunlunHits = 0
         let crossConflicts = 0
         let sampleCount = 200
         let harmony = BASDoctrineMetricsCompute
             .doctrineHarmony(
-                metricID: "empirical-test",
+                metricID: "static-fixture-test",
                 cthulhuHits: cthulhuHits,
                 kunlunHits: kunlunHits,
                 crossConflicts: crossConflicts,
                 sampleCount: sampleCount)
         XCTAssertEqual(
             harmony.harmonyScore, 0.77, accuracy: 0.001)
+    }
+
+    /// **M590 chapter 一百六十二 — chapter 160 empirical lock**:
+    /// pins per-emission harmony for the post-M588 detector
+    /// catalog (5 Cthulhu + 8 Kunlun patterns). Bench shows 48
+    /// turns × 2 patterns = 96 deductions / 200 → harmony 0.52.
+    /// This is the per-EMISSION reading.
+    func testHarmonyChapter160PerEmissionLock() {
+        let harmony = BASDoctrineMetricsCompute
+            .doctrineHarmony(
+                metricID: "chapter-160-per-emission",
+                cthulhuHits: 48,
+                kunlunHits: 48,
+                crossConflicts: 0,
+                sampleCount: 200)
+        // (48+48)/200 = 0.48 → 1 - 0.48 = 0.52
+        XCTAssertEqual(
+            harmony.harmonyScore, 0.52, accuracy: 0.001)
+    }
+
+    /// **M590 chapter 一百六十二 — per-turn harmony**:
+    /// when 48 turns each emit cthulhu + kunlun red-lines,
+    /// per-turn dedup counts 48 deductions / 200 → harmony 0.76.
+    /// More semantically aligned with doctrine intent
+    /// ("fraction of turns without red lines").
+    func testHarmonyPerTurnDedup() {
+        let harmony = BASDoctrineMetricsCompute
+            .doctrineHarmonyPerTurn(
+                metricID: "per-turn-test",
+                turnsWithAnyRedLine: 48,
+                sampleCount: 200)
+        // 48/200 = 0.24 → 1 - 0.24 = 0.76
+        XCTAssertEqual(
+            harmony.harmonyScore, 0.76, accuracy: 0.001)
+        // Per-turn helper carries count in cthulhuRedLineHits
+        XCTAssertEqual(harmony.cthulhuRedLineHits, 48)
+        XCTAssertEqual(harmony.kunlunRedLineHits, 0)
+    }
+
+    /// Per-turn harmony empty-input → 0.0 (anti-recursion + safe
+    /// empty default).
+    func testHarmonyPerTurnEmpty() {
+        let harmony = BASDoctrineMetricsCompute
+            .doctrineHarmonyPerTurn(
+                metricID: "empty-test",
+                turnsWithAnyRedLine: 0,
+                sampleCount: 0)
+        XCTAssertEqual(harmony.harmonyScore, 0.0)
+    }
+
+    /// Per-turn harmony saturation: turnsWithAnyRedLine > sample
+    /// (defensive — shouldn't happen but tests bound).
+    func testHarmonyPerTurnSaturation() {
+        let harmony = BASDoctrineMetricsCompute
+            .doctrineHarmonyPerTurn(
+                metricID: "saturation-test",
+                turnsWithAnyRedLine: 200,
+                sampleCount: 100)
+        XCTAssertEqual(harmony.harmonyScore, 0.0)
     }
 }

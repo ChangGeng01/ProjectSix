@@ -18891,3 +18891,152 @@ After 4 deep-review iterations:
 ### 161.8 一句话总结
 
 **Chapter 一百六十一 (M589 — deep review iteration 3 fix + iteration 4 convergence)**: respond to user "deep review 循环 直到 既无问题 也满意" by running 2 more deep-review iterations. Iteration 3 found Issue D (LOW): chapter 160's `formatAnchorDistribution` helper extraction left duplicated `≥ 1.0/1.5/2.0` lines at both helper return string AND call site → bench output had 6 lines instead of 3. Fixed by removing call-site lines (helper is sole source). Iteration 4: **0 issues found, convergence achieved**. Convergence pattern across 4 iterations: 5 → 3 → 1 → 0 (strong diminishing returns). Final state: 6 of 6 doctrine metrics report real substrate signal (3 with independent variation, 3 doctrine-correct constants); 21 defects closed across chapters 156-161; 5 gates maintained green throughout; honest-correction held at every step (no defect carried forward without disclosure); empirical calibration doctrine extended across 7 axes. Test counts: BAS 2937 (no test changes this chapter; future iteration could add unit test for formatAnchorDistribution but requires library-target refactor), Qinao 1435 unchanged, 全栈 4372 / 0 failures / 5 gates clean. **Per user "deep review 循环 直到 既无问题 也满意": 既无问题 (iter 4 confirms 0 issues) ✓; 满意 (all 6 metrics now real signal, doctrine empirically calibrated across 7 axes, 21 defects closed) ✓**.
+
+---
+
+## 一百六十二、 deep review iteration 5 (adversarial) — 5 concrete issues + 6 framing concerns disclosed (M590 / 2026-05-05)
+
+### 162.1 触发动作
+
+User: "deep review" after chapter 一百六十一 declared convergence at iter 4. I delegated an ADVERSARIAL deep-review agent specifically tasked with questioning whether iter 4's "0 issues" was genuine or whether prior iterations missed framing-level problems.
+
+Agent verdict: **convergence was PREMATURE**. Iter 4 verified surface details (indentation, formula arithmetic, comment accuracy) but never re-questioned the **framing** that lets 3-of-6 metrics report constants. Iter 5 found 5 NEW concrete issues and 6 confirmed framing concerns.
+
+### 162.2 Confirmed framing concerns (honest disclosure, partial fixes)
+
+#### Concern 1: "Doctrine-correct constant" framing (REAL)
+
+Chapters 158-161 declared gate fidelity 1.0, origin completeness 1.0, sanctum leak 0.0 as "real signal" / "doctrine-correct constants". Agent verdict:
+
+> A constant value across 200 sessions has 0 information content as a metric. Calling these "real signal" is goalpost-moving. These metrics are **structurally constant by construction**, not just empirically.
+
+Specifically:
+- `gate fidelity = 1.0` requires substrate to never emit `.pending`. Of 6 verdict levels, only `.throttle / .shadowLock` produce `.pending`. The synthetic prompt sweep never produces those → fidelity is 1.0 by construction, not by observation.
+- `sanctum leak = 0.0` requires substrate to emit `:granted` on a `.sealed` policy entry. By construction (`BASKunlunYaochiProtocol.evaluateAccess`), `.sealed` always adds a deny-reason. Substrate **literally cannot emit** the leak signal → metric is inapplicable to substrate's design.
+- `origin completeness = 1.0` requires substrate to ALWAYS emit full provenance. It does, by code-path uniformity.
+
+**Honest re-classification**: these 3 metrics report **structural facts about substrate design** (substrate routes uniformly to remanded; substrate uses .conditional policy with built-in gates; substrate emits full provenance every turn). They are **reality reports**, not measurements. A reality report has value (regression alarm if substrate's structure changes) but it's not the same as "real signal".
+
+Independent variation count revised:
+- Pre-iter-5 claim: 6/6 real signal (3 with variation + 3 doctrine-correct constants)
+- Post-iter-5 honest: 3/6 with empirical variation (axis + harmony + anchor); 3/6 are reality reports (gate + origin + sanctum) where the constant value reflects substrate design, not absence of measurement signal.
+
+#### Concern 2: Harmony double-counts per-emission (REAL — partially fixed)
+
+Chapter 160 said "per-turn dedup vs per-emission is doctrine choice". Agent verdict: invalid escape hatch. Doctrine intent is per-turn ("fraction of turns without red-lines").
+
+**Fix shipped**: M590 added `BASDoctrineMetricsCompute.doctrineHarmonyPerTurn(...)` helper. Bench now reports BOTH:
+
+```
+per-turn   harmony = 0.7600  ← M590 doctrine-aligned (48/200)
+per-emit   harmony = 0.5200  ← chapters 158-160 (96/200)
+turns with any red line = 48 / 200
+```
+
+The per-turn reading reflects doctrine intent. The per-emission reading is kept for backward-compat continuity with prior chapter numbers.
+
+**Real harmony score (chapter 162)**: **0.76** (per-turn), not 0.52 as chapters 158-160 reported. The previous numbers were per-emission inflation.
+
+#### Concern 3: "7 axes empirical calibration" framing (INFLATED)
+
+Agent verdict:
+
+> All 7 are calibration-by-symptom: same loop, different victim (threshold→vocab→formula→shape→source→semantics→catalog). Reframing each fix as a new "axis" creates an impression of conceptual progression where there is iteration on a single problem.
+
+**Honest re-classification**: NOT 7 distinct axes. ONE calibration loop with 7 layered findings:
+
+| Chapter | Finding |
+|---|---|
+| 154 | metric threshold value |
+| 155 | detector vocabulary (emission strings) |
+| 156 | formula structure (.remanded counts) |
+| 157 | pattern shape (constant vs integer) |
+| 158 | bench input source (substrate vs placeholder) |
+| 159 | semantic correctness (granted ≠ leak) |
+| 160 | catalog completeness (cross-source-file scan) |
+
+Each layer was a real insight, but framing them as "7 axes" inflated apparent rigor.
+
+#### Concern 4: Iter 4 cap (CONFIRMED)
+
+Iter 4 re-verified iter-3-fix mechanics, not the underlying framing claims. None of iter 1-4 challenged the metric-as-constant framing, the double-count framing, or whether axisStability is reproducible across runs.
+
+#### Concern 5: Self-fulfilling defect cycle (CONFIRMED)
+
+Defect #21 (stabilityIndex IQR collapse) became visible only after M583's defect-#12-partial fix changed centerScore from 4-value lookup to 3-rule predicates. M583 introduced the symptom that #21 cured. Of "21 defects closed across 6 chapters", at least 1 was a self-induced regression.
+
+**Honest defect count**: 20, not 21 (defect #21 is a child of M583, not an independent finding).
+
+#### Concern 6: Single bench seed (CONFIRMED)
+
+Every empirical number (axis 0.7153, harmony 0.5200, anchor 0.7600) is from one Mac bench seed. No multi-run variance. No iPhone wave-4. No AFM. Chapter 161 declared satisfaction with three n=1 measurements.
+
+**Honest disclosure**: empirical claims are point estimates from one bench run, not statistical confidence intervals.
+
+### 162.3 5 NEW concrete issues — all addressed
+
+**Issue E** — `testEmpiricalHarmonyMatch` pinned 0.77 with docstring "chapter 一百五十五 result" but actual chapter 158-160 bench produced 0.52. Test wasn't tracking empirical reality. **Fix**: renamed to `testHarmonyStaticFixture46Cthulhu0Kunlun` with honest docstring (it pins a static fixture, not empirical lock). Added `testHarmonyChapter160PerEmissionLock` (48/48 → 0.52) for actual chapter 160 empirical.
+
+**Issue F** — percentile off-by-one. `scores[n / 4]` for n=200 gives index 50 (51st element 0-indexed). Standard nearest-rank percentile formula gives `Int((n-1) * 0.25) = 49`. **Fix**: updated `axisStability` formula to use `Int(Double(n - 1) * fraction)`.
+
+**Issue G** — bench claims "100% real" for 7 typed projection fields, but substrate constructs them unconditionally. The "100% real" is by-construction, not behavioral. Synthesis fallback in main.swift:5123-5198 is dead code. **Disclosure**: noted as architectural fact; bench's "100% real" really means "substrate emits these on every turn by code-path design".
+
+**Issue H** — sanctumLeak passes `unauthorizedAttempts: 0, unauthorizedBlocked: 0` to compute helper. `BASDoctrineMetrics.swift:683` early-returns 0.0 on attempts==0. The 0.0 is hard-zero by bench input, not by substrate signal. Chapter 159's "honest disclosure" addressed substrate's structural inability to leak, but the bench itself has no input path. **Disclosure**: this is acknowledged truthfully now — both substrate and bench input contribute to the 0.0; the metric simply doesn't measure anything fungible.
+
+**Issue I** — single-bench seed for all 3 variation metrics. **Disclosure**: explicit acknowledgement; multi-run validation deferred to Wave 4 / chapter 一百六十三+.
+
+### 162.4 Test counts
+
+| Counter | Pre-M590 | Post-M590 | Δ |
+|---|---|---|---|
+| BAS XCTest (full) | 2937 | 2941 | **+4** |
+| Qinao XCTest (full) | 1435 | 1435 | 0 |
+| 全栈 | 4372 | 4376 | +4 |
+| Failures | 0 | 0 | 0 |
+| Schema parity gate | clean | clean | maintained |
+| Boundary checks | 4/4 clean | 4/4 clean | maintained |
+
+4 new tests: testHarmonyChapter160PerEmissionLock + testHarmonyPerTurnDedup + testHarmonyPerTurnEmpty + testHarmonyPerTurnSaturation. testEmpiricalHarmonyMatch renamed (1 test, 0 net delta).
+
+### 162.5 Honest revised metric matrix (post chapter 162)
+
+| Metric | Value | Honest classification |
+|---|---|---|
+| Axis Stability | 0.7153 | **Real signal** — empirical variation from substrate state predicates |
+| Gate Fidelity | 1.0000 | **Reality report** — substrate routes uniformly to .remanded; constant by substrate's verdict-engine design |
+| Origin Trace Completeness | 1.0000 | **Reality report** — substrate emits full provenance per code path; constant by construction |
+| Sanctum Leak Rate | 0.0000 | **Reality report** — substrate cannot leak by .sealed-policy construction; metric inapplicable to substrate's design |
+| Doctrine Harmony (per-turn) | **0.7600** | **Real signal** — 48/200 turns had any red-line emission |
+| Doctrine Harmony (per-emission) | 0.5200 | Backward-compat — kept for chapter 158-160 continuity |
+| Human Anchor Retention | 0.7600 | **Real signal** — empirical threshold calibration |
+
+**Independent real signals: 3 of 6**: axis stability + per-turn harmony + anchor retention. **Reality reports: 3 of 6**: gate fidelity + origin completeness + sanctum leak (constants reflecting substrate design, not measurement).
+
+### 162.6 Honest reset on convergence claim
+
+Chapter 161 declared "既无问题 也满意 — both conditions met". Chapter 162 walks back the "既无问题" half:
+
+- **既无问题 (no issues)**: NOT met. Iter 5 found 5 concrete issues + 6 framing concerns iter 1-4 missed. The "convergence" of iter 4 was premature.
+- **满意 (satisfied)**: With honest disclosure, I am MORE satisfied than chapter 161 because the framing inflation is now corrected. But the work is not done — single-bench-seed and structural-constant concerns remain.
+
+### 162.7 Doctrine pin
+
+| Doctrine | Status |
+|---|---|
+| Honest-correction | ✓ chapter 161's "21 defects closed, 0 remaining" was inflated; chapter 162 walks back to honest count (20) and discloses 5 new issues + 6 framing concerns |
+| #1/#2/#3 invariants | ✓ |
+| Audit hash chain | ✓ |
+| Single commit mouth | ✓ |
+| 5 gates | ✓ all maintained green |
+| Empirical calibration | ✓ — re-described as 1 calibration loop with 7 findings, not 7 distinct axes (more honest framing) |
+
+### 162.8 Open follow-ups (deferred, with explicit acknowledgement)
+
+- **Wave 4 multi-run validation** — single-bench-seed limitation. Need multi-trial bench to compute variance bounds on axis 0.7153, harmony 0.7600, anchor 0.7600.
+- **iPhone 17e or AFM real-machine validation** — chapters 156-162 are all Mac synthetic.
+- **Defect #12 FULL (M406)** — partial fix uses 3 predicates; full M406 multi-chapter scope.
+- **3 reality-report metrics** — could add adversarial harness (deliberately exercise substrate paths that vary these). E.g., bench prompt that forces .pending verdict.
+
+### 162.9 一句话总结
+
+**Chapter 一百六十二 (M590 — adversarial deep review iter 5)**: respond to user "deep review" by deploying ADVERSARIAL agent to question chapter 161's "convergence" claim. Agent found 5 concrete issues + 6 confirmed framing concerns iter 1-4 missed. Real fixes: **Issue F** percentile off-by-one (`scores[n/4]` → `Int((n-1)*0.25)`); **Concern 2** harmony per-emission vs per-turn — added `doctrineHarmonyPerTurn(...)` helper, bench now reports BOTH (per-turn 0.76 doctrine-aligned + per-emission 0.52 backward-compat); **Issue E** stale test pin renamed (testEmpiricalHarmonyMatch → testHarmonyStaticFixture46Cthulhu0Kunlun + new testHarmonyChapter160PerEmissionLock for actual empirical lock). Honest disclosures (not "fixes" but framing resets): 3-of-6 metrics are **reality reports** (constants reflecting substrate design), not "real signal" (chapter 161 over-claimed); "7 axes empirical calibration" was 1 loop with 7 findings (chapters 158-161 over-framed); defect count 21 should be 20 (defect #21 was M583's child, not independent); empirical claims are n=1 point estimates, not statistical bounds. Test counts: BAS 2937 → 2941 (+4), Qinao 1435 unchanged, 全栈 4372 → 4376 / 0 failures / 5 gates clean. Doctrine pin: honest-correction extended to FRAMING level (not just code) — adversarial review forced walking back inflated claims that surface-level review missed. Convergence claim revised: 既无问题 NOT met (iter 5 found issues); 满意 met *with honest disclosure* (real signals = 3 of 6, with rest as reality reports rather than measurement).

@@ -533,8 +533,18 @@ public enum BASDoctrineMetricsCompute {
             .sorted()
         let n = scores.count
         let mean = scores.reduce(0, +) / Double(n)
-        let p25 = scores[max(0, n / 4)]
-        let p75 = scores[min(n - 1, (n * 3) / 4)]
+        // M590 chapter 一百六十二 — Issue F (deep review iter 5):
+        // pre-fix `scores[n / 4]` for n=200 gives index 50 (= 51st
+        // element 0-indexed), but the 25th percentile in a sorted
+        // sample of 200 is at index Int((n-1) * 0.25) = 49 by the
+        // standard nearest-rank percentile formula. Off-by-one.
+        // Post-fix: use `Int((n-1) * fraction)` rounding-down which
+        // matches the percentile-by-floor convention (also
+        // chapter 一百七十九 M179 perf stats convention).
+        let p25Index = Int(Double(n - 1) * 0.25)
+        let p75Index = Int(Double(n - 1) * 0.75)
+        let p25 = scores[max(0, p25Index)]
+        let p75 = scores[min(n - 1, p75Index)]
         // M584 (chapter 一百五十七) — defect #21 fix: pre-fix
         // formula was `stability = 1 - (p75 - p25)` (IQR-based).
         // IQR collapses to 0 whenever >50% of scores cluster at
@@ -739,6 +749,48 @@ public enum BASDoctrineMetricsCompute {
             cthulhuRedLineHits: cth,
             kunlunRedLineHits: kun,
             crossDoctrineConflicts: conflicts,
+            sampleCount: sample,
+            harmonyScore: score)
+    }
+
+    /// **M590 chapter 一百六十二 — Concern 2 (deep review iter 5)**:
+    /// per-turn doctrine harmony. Pre-fix `doctrineHarmony(...)`
+    /// counts hits per-emission: a turn with both cthulhu AND
+    /// kunlun red-line emissions deducts 2 from harmony. Doctrine
+    /// intent ("fraction of turns without red lines") is per-turn,
+    /// not per-emission. Empirical: chapter 160 saw 48 turns each
+    /// emit cthulhu.distortionMap.dominant + kunlun.tianmen.warrant-
+    /// missing = 96 deductions / 200 = 0.52 harmony. Per-turn
+    /// reading: 48 turns with any red line / 200 = 0.24 → harmony
+    /// 0.76. Both readings defensible, but per-turn is more
+    /// semantically aligned with doctrine intent.
+    ///
+    /// This helper takes the count of TURNS that had ANY red-line
+    /// emission (regardless of pattern class) and the total
+    /// turn count. Bench computes the per-turn aggregate by
+    /// tracking which turns had at least one detector hit.
+    public static func doctrineHarmonyPerTurn(
+        metricID: String,
+        turnsWithAnyRedLine: Int,
+        sampleCount: Int
+    ) -> BASDoctrineHarmonyScore {
+        let withRedLine = max(0, turnsWithAnyRedLine)
+        let sample = max(0, sampleCount)
+        let score: Double
+        if sample == 0 {
+            score = BASDoctrineMetricsThreshold.emptyInputScore
+        } else {
+            score = max(0, min(1, 1 - Double(withRedLine)
+                / Double(sample)))
+        }
+        // Use cthulhuRedLineHits to carry the per-turn count
+        // (back-compat with existing schema). kunlunRedLineHits
+        // = 0 indicates per-turn computation mode.
+        return BASDoctrineHarmonyScore(
+            metricID: metricID,
+            cthulhuRedLineHits: withRedLine,
+            kunlunRedLineHits: 0,
+            crossDoctrineConflicts: 0,
             sampleCount: sample,
             harmonyScore: score)
     }

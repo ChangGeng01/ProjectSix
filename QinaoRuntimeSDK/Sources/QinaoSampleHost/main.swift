@@ -5013,6 +5013,13 @@ struct QinaoSampleHost {
         // M580 chapter 一百五十五 — per-pattern frequency for honest
         // calibration. Lets us see WHICH patterns are saturating.
         var perPatternCount: [String: Int] = [:]
+        // M590 chapter 一百六十二 — Concern 2 (deep review iter 5):
+        // per-turn red-line tracking for harmony's per-turn
+        // semantic. A turn with multiple red-line emissions is
+        // ONE problematic turn, not multiple. Used by
+        // doctrineHarmonyPerTurn to compute the per-turn-honest
+        // harmony score.
+        var turnsWithAnyRedLine = 0
         // M586 (chapter 一百五十八) — defect #19 fix: capture
         // substrate's actual yaochi access emissions so sanctum
         // leak rate can be computed from real signal instead of
@@ -5255,12 +5262,18 @@ struct QinaoSampleHost {
                 // matched 0 real substrate signals (looked for
                 // forbid:/redline: which substrate doesn't emit).
                 let signalRefStrs = signalRefs.map { $0 }
-                cthulhuHits += BASDoctrineRedLineDetector
+                let turnCthulhuHits = BASDoctrineRedLineDetector
                     .cthulhuHits(in: signalRefStrs)
-                kunlunHits += BASDoctrineRedLineDetector
+                let turnKunlunHits = BASDoctrineRedLineDetector
                     .kunlunHits(in: signalRefStrs)
+                cthulhuHits += turnCthulhuHits
+                kunlunHits += turnKunlunHits
                 crossConflicts += BASDoctrineRedLineDetector
                     .crossDoctrineConflicts(in: signalRefStrs)
+                // M590 chapter 一百六十二 — per-turn aggregate
+                if turnCthulhuHits > 0 || turnKunlunHits > 0 {
+                    turnsWithAnyRedLine += 1
+                }
                 // Per-pattern accounting (M580 calibration)
                 let allPatterns = BASDoctrineRedLineDetector
                     .cthulhuConcernPatterns
@@ -5339,12 +5352,24 @@ struct QinaoSampleHost {
                 from: sanctums,
                 unauthorizedAttempts: 0,
                 unauthorizedBlocked: 0)
-        let harmony = BASDoctrineMetricsCompute
+        // M590 chapter 一百六十二 — Concern 2: compute BOTH harmony
+        // interpretations. Per-emission deducts each red-line ref;
+        // per-turn deducts once per turn with any red-line. Per-turn
+        // is more semantically aligned with doctrine intent
+        // ("fraction of turns without red lines"); per-emission is
+        // kept for backward-compat continuity with chapter 158-160
+        // numbers.
+        let harmonyPerEmission = BASDoctrineMetricsCompute
             .doctrineHarmony(
-                metricID: "doctrine-bench-harmony",
+                metricID: "doctrine-bench-harmony-per-emission",
                 cthulhuHits: cthulhuHits,
                 kunlunHits: kunlunHits,
                 crossConflicts: crossConflicts,
+                sampleCount: alignments.count)
+        let harmony = BASDoctrineMetricsCompute
+            .doctrineHarmonyPerTurn(
+                metricID: "doctrine-bench-harmony",
+                turnsWithAnyRedLine: turnsWithAnyRedLine,
                 sampleCount: alignments.count)
         let anchorRetention = BASDoctrineMetricsCompute
             .humanAnchorRetention(
@@ -5448,10 +5473,12 @@ struct QinaoSampleHost {
                 conditions, not leak. Metric correctly reports 0.0.)
 
             5. Doctrine Harmony Score (sample=\(alignments.count)):
-               harmonyScore         = \(String(format: "%.4f", harmony.harmonyScore))
-               cthulhu red lines    = \(harmony.cthulhuRedLineHits)
-               kunlun red lines     = \(harmony.kunlunRedLineHits)
-               cross conflicts      = \(harmony.crossDoctrineConflicts)
+               per-turn   harmony = \(String(format: "%.4f", harmony.harmonyScore))  ← M590 doctrine-aligned
+               per-emit   harmony = \(String(format: "%.4f", harmonyPerEmission.harmonyScore))  ← chapters 158-160 number
+               turns with any red line = \(turnsWithAnyRedLine) / \(alignments.count)
+               cthulhu emissions  = \(cthulhuHits)
+               kunlun  emissions  = \(kunlunHits)
+               cross conflicts    = \(crossConflicts)
 
             6. Human Anchor Retention (anchors=\(anchors.count)):
                retentionRatio   = \(String(format: "%.4f", anchorRetention.retentionRatio))
