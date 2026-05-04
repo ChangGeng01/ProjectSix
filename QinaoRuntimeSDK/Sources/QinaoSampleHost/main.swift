@@ -5411,9 +5411,6 @@ struct QinaoSampleHost {
 
             Anchor risk-sum distribution (M579 chapter 一百五十四 calibration):
               \(Self.formatAnchorDistribution(anchorSums))
-              ≥ 1.0:  \(anchorSums.filter { $0 >= 1.0 }.count)
-              ≥ 1.5:  \(anchorSums.filter { $0 >= 1.5 }.count)
-              ≥ 2.0:  \(anchorSums.filter { $0 >= 2.0 }.count)
 
             REAL-vs-SYNTHESIZED counts (M578 + M581):
               kunlunAxisAlignment:     \(realAxisAlignments) real / \(count) sessions (\(String(format: "%.1f", 100.0 * Double(realAxisAlignments) / Double(count)))% real)
