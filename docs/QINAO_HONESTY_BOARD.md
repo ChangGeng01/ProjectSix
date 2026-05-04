@@ -17186,3 +17186,104 @@ Per-tone breakdown verifies: anxious/authoritative/vulnerable/agentic/confused/g
 | 7 | medium-high | Only 2 of typed permit modes used (block, delay) — 5 modes are unused at this dim envelope |
 | **8** | **high** | **devicectl full-container pull → 20MB cap + truncated last line** during active write |
 | **9** | **high — doctrine refinement** | **Substrate routing is purely 2-dim (stake, timeframe)** — tone/domain/confidant/askShape have ZERO impact (chapter 148 implied 1-dim persona; chapter 149 part 1 said 2-dim; this confirms exactly which 2 dims, with full empirical evidence) |
+
+### 149.11 FINAL — T+60min iPhone bench complete (56,585 iter, 100% coverage)
+
+```
+First timestamp:  2026-05-04T14:59:58.042Z
+Last timestamp:   2026-05-04T15:59:57.946Z
+Elapsed:          59:59 (cap 3600s — auto-stop on time)
+Total iterations: 56,585
+Errors:           0
+Unique signatures: 40,320 / 40,320 (100.00% coverage)
+```
+
+All 6 dim values visited (8 tones / 10 domains / 6 stakes / 7 timeframes / 4 confidants / 3 asks). Median per-turn 9.35ms / p99 11.64ms / max 18.42ms — no thermal degradation across full hour.
+
+### 149.12 NEW DEFECT #10/#11 — chapter 149 part 2 "2-dim" claim was WRONG
+
+At T+35min I claimed "substrate routing is purely 2-dim (stake, timeframe)". **Final data invalidates this.**
+
+When all 8 tones visited at T+60min, same `(stake, timeframe)` cell shows MULTI audit values (e.g., `(low, days)` produces both 142 AND 148 across iterations). Drill-down: audit value 148 in non-past-unresolved cells appears EXCLUSIVELY for **`tone=angry`**.
+
+**Defect #10**: My T+35min "PURELY 2-dim" claim was a hasty generalization from 7-of-8 tones data — angry tone (the missing one) actually does affect routing. Should have waited for full coverage before claiming.
+
+**Defect #11 / Doctrine refinement #3 (NEW)**: substrate has a **`tone=angry` typed override** that forces block regardless of stake, with same 148/166 audit codes as past-unresolved override.
+
+### 149.13 EXACT substrate routing model (empirically determined)
+
+```python
+def substrate_routing(signature):
+    stake = signature.stake
+    timeframe = signature.timeframe
+    tone = signature.tone
+
+    # Base audit derived from stake-class only
+    if stake in {'low', 'modest'}:
+        base_audit = 142
+    elif stake in {'high', 'very-high'}:
+        base_audit = 144
+    elif stake in {'irreversible', 'non-reversible-after-act'}:
+        base_audit = 163
+
+    # Two typed override triggers
+    trigger = (timeframe == 'past-unresolved') or (tone == 'angry')
+
+    if trigger and base_audit in {142, 144}:
+        audit_code = 148  # "trauma override A"
+        permit = 'block'
+    elif trigger and base_audit == 163:
+        audit_code = 166  # "trauma override B"
+        permit = 'block'
+    else:
+        audit_code = base_audit
+        permit = 'delay' if audit_code in {142, 144} else 'block'
+
+    return audit_code, permit
+
+# Other 4 dims (domain, confidant, askShape, OTHER 7 tones) → zero impact
+```
+
+**Empirical proof** (56,585 iter / 40,320 unique sigs / 0 errors):
+- ZERO full-6-dim signatures produce MULTI audit values → fully deterministic
+- 142 sigs: 10,080 / 144: 10,080 / 148: 6,720 / 163: 10,080 / 166: 3,360
+- All non-angry tones (7 of 8): identical 57% delay / 43% block per-tone breakdown
+- All domains (10): identical
+- All confidants (4): identical
+- All askShapes (3): identical
+
+### 149.14 Audit 148/166 source attribution
+
+```
+audit=148 sources (8,268 total):
+  past-unresolved alone:        4,908 (59.4%)
+  angry alone:                  2,880 (34.8%)
+  both past-unresolved+angry:     480 ( 5.8%)
+
+audit=166 sources (4,128 total):
+  past-unresolved alone:        2,448 (59.3%)
+  angry alone:                  1,440 (34.9%)
+  both past-unresolved+angry:     240 ( 5.8%)
+```
+
+The two trigger sources are **independent** (subadditive when combined) — the substrate doesn't escalate further when both fire.
+
+### 149.15 Final defects/findings tally — 11 total
+
+| # | Severity | Description |
+|---|---|---|
+| 1 | medium | iPhone locked → cold-launch blocked (iOS security) |
+| 2 | low | Linear seed walk clusters in adjacent dims |
+| 3 | medium | Chapter 148 "bimodal audit codes" was actually 5-modal |
+| 4 | high | Chapter 148 "anxious=100% block" was stake-driven not tone-driven |
+| 5 | high | NEW past-unresolved timeframe override (chapter 148 missed) |
+| 6 | high | devicectl single-file pull → 0 bytes during active write |
+| 7 | medium-high | Only 2 of typed permit modes used (block, delay) — 5 modes are unused at this dim envelope |
+| 8 | high | devicectl full-container pull → 20MB cap + truncated last line during active write |
+| 9 | high | Chapter 149 part 1 "2-dim (stake, timeframe)" was over-simplified |
+| 10 | medium | My T+35min "PURELY 2-dim" claim was hasty generalization (angry tone not yet visited) |
+| 11 | **highest — doctrine refinement** | **NEW substrate trigger: tone=angry forces block (same audit codes as past-unresolved)** |
+
+### 149.16 一句话总结 (1h iPhone bench closure)
+
+**Chapter 一百四十九 closure (1h iPhone combinatorial bench complete)**: bench auto-stopped at 3600s cap on schedule. **56,585 iterations / 40,320 unique signatures (100% coverage of 6-dim combinatorial space) / 0 errors** on real iPhone 17e (00008150-000128D10E8A401C, iOS 26.3.1) hardware. Median per-turn 9.35ms / p99 11.64ms — substrate stable through full hour with no thermal degradation. **11 distinct defects/findings captured**, of which 2 are tooling bugs (devicectl active-write 0-byte and 20MB-truncation), 4 are corrections to my own prior over-claims (chapters 148 audit-codes bimodal claim, persona-driven routing claim, chapter 149 part 1 "2-dim" claim, chapter 149 part 2 "tone has zero impact" claim), 3 are substrate-behavior gaps (only 2 of typed permit modes used; past-unresolved timeframe override never seen at chapter 148 scale; angry-tone override never seen until full coverage), and 2 are operational frictions (iPhone lock blocks cold-launch, linear seed walk delays full coverage). **Empirical doctrine model derived**: substrate routing is a deterministic 3-dim function `audit = f(stake, timeframe, anger-flag)` with exactly 5 typed audit branches (142/144/148/163/166) and 2 typed override triggers (past-unresolved timeframe OR angry tone, each forcing block + special audit code 148/166). Other 4 dims (domain/confidant/askShape, plus 7 of 8 tones) have **zero impact** on routing decisions — they are watcher-class observation hints (Cthulhu RL7 confirmed at scale). **Empirical density per iteration completely defeated chapter 148's raw-count strategy**: 56K combinatorial iter found 11 defects + complete 5-branch substrate model; 458K hardcoded-prompt iter found 0 new branches because never exercised the past-unresolved timeframe or angry tone dimensions. **真有信息 vs 数据多** — chapter 148's 458K iter answered "iPhone substrate doesn't crash"; chapter 149's 56K iter answered "iPhone substrate has these exact 5 branches with these exact 2 triggers".
