@@ -1697,6 +1697,13 @@ struct HybridBenchConfig: Codable, Sendable, Equatable {
     enum SmokeMode: String, Codable, CaseIterable, Sendable {
         case canonical = "canonical"
         case fourteenLayer = "14-layer-smoke"
+        /// M719 chapter 一百九十二 — production-realistic heavy-tailed
+        /// layer distribution. Per-iter: weighted-random layer pick
+        /// from `SampleHostBenchPressureMixer.layerWeights` (L11
+        /// 25% / L9 18% / L8 12% / etc). Adversarial mutator
+        /// (M720) is ALSO active in this mode, layered on top of
+        /// the catalog prompt at ~5% probability.
+        case heavyTailed = "heavy-tailed"
     }
     var durationHours: Double
     var strideRotationCSV: String
@@ -1744,6 +1751,28 @@ struct HybridBenchConfig: Codable, Sendable, Equatable {
         postLLMBodyTruncationChars:
             HybridBenchTuning.postLLMBodyTruncationChars,
         smokeMode: .fourteenLayer)
+
+    /// 10h smoke preset — chapter 一百九十二 user vision:
+    /// "全面进化 满意之后 跑 10小时 冒烟 最学习". Heavy-tailed
+    /// pressure mixer + adversarial mutator (5%) for max signal
+    /// per minute. JSONL rotation bumped to 25 MB / shard so 10h
+    /// at ~5 iter/s lands ~7-9 shards. Crash checkpoints every
+    /// 1000 iters; thermal/battery gate auto-pauses on critical.
+    static let tenHourHeavyTailed = HybridBenchConfig(
+        durationHours: 10.0,
+        strideRotationCSV: "5041,5039,5051,5077,7919",
+        rotationPeriodIter: 11_300,
+        mutationSeedCount: 5,
+        jsonlRotationMB: 25,
+        verbosityThresholdChars:
+            HybridBenchTuning.verbosityThresholdChars,
+        sigmoidClassThreshold:
+            HybridBenchTuning.sigmoidClassThreshold,
+        yieldEveryNIters:
+            HybridBenchTuning.yieldEveryNIters,
+        postLLMBodyTruncationChars:
+            HybridBenchTuning.postLLMBodyTruncationChars,
+        smokeMode: .heavyTailed)
 }
 
 /// M711 chapter 一百九十一 — 14-layer smoke profile.
@@ -1880,7 +1909,12 @@ enum FourteenLayerSmokeProfile {
 /// M712 chapter 一百九十一 bumped to "8" — added smoke-mode +
 /// targetLayer fields enabling 14-layer per-layer coverage
 /// analysis (user vision: "14层 每层都冒烟测试").
-let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "8"
+/// M716+M718-M720 chapter 一百九十二 bumped to "9" — added
+/// rowChecksum (SHA-256 integrity), anomalyFlags (watcher hints),
+/// pressureProfile (heavy-tailed mixer), adversarialKind (mutator
+/// classification), driftSigma (length MAE drift), pauseSkipped
+/// (thermal/battery gate trace).
+let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "9"
 
 struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     /// M672 chapter 一百八十五 — schema version stamp.
@@ -2026,6 +2060,35 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let smokeMode: String?
     let targetLayer: Int?
     let targetLayerName: String?
+    // M716 chapter 一百九十二 — SHA-256 of canonical encoded row
+    // (excluding this field). nil on legacy rows. Validator
+    // recomputes; mismatch = corrupted line. Hex lowercase.
+    var rowChecksum: String?
+    // M718 chapter 一百九十二 — anomaly watcher hints. Empty when
+    // healthy. Multi-flag possible. Examples:
+    //   "substrate-stuck:answer" — same permitMode for 100 iters
+    //   "llm-stuck:all-empty"    — empty body for 100 iters
+    //   "nan-spike:3"            — 3 regression outputs were NaN
+    //   "nan-cluster:35/100"     — 35% of last 100 iters had NaN
+    //   "drift:length-mae:3.2-sigma" — Welford drift on length MAE
+    let anomalyFlags: [String]?
+    // M719 chapter 一百九十二 — pressure profile name when
+    // smokeMode == "heavy-tailed". E.g. "heavy-tail-L11-risk-gate"
+    // / "heavy-tail-L9-candidates". nil when smokeMode != heavy.
+    let pressureProfile: String?
+    // M720 chapter 一百九十二 — adversarial mutation kind applied
+    // to this iter's prompt. nil when no mutation. Values:
+    // empty / one-char / giant-10k / unicode-mixed / emoji-only /
+    // control-chars / repeated-tokens / mixed-languages.
+    let adversarialKind: String?
+    // M721 chapter 一百九十二 — number of std-deviations the
+    // length-MAE residual was above the running mean for this
+    // iter. nil when monitor empty / regression unavailable.
+    let driftSigma: Double?
+    // M717 chapter 一百九十二 — true iff thermal/battery gate
+    // paused this iter. When true, all LLM-execution fields are
+    // canned (firstStatus="paused-by-thermal-gate" etc.).
+    let pauseSkipped: Bool?
 }
 
 /// M628 chapter 一百七十八 — typed policy mapping
@@ -2148,8 +2211,21 @@ extension SampleHostBenchHelpers {
             positiveInfinity: "inf",
             negativeInfinity: "-inf",
             nan: "nan")
-        let data = try encoder.encode(row)
-        return String(data: data, encoding: .utf8) ?? ""
+        // M716 chapter 一百九十二 — compute SHA-256 of canonical
+        // encoding WITHOUT the rowChecksum field, then inject the
+        // hash and re-encode. Two-pass keeps the checksum
+        // deterministic across encoder re-orderings (sortedKeys
+        // already canonical, but explicit nil in pass 1 makes the
+        // doctrine 100%: "checksum covers the row body").
+        var bare = row
+        bare.rowChecksum = nil
+        let bareData = try encoder.encode(bare)
+        let bareString = String(data: bareData, encoding: .utf8) ?? ""
+        let checksum = SampleHostBenchRowChecksum.sha256Hex(of: bareString)
+        var stamped = row
+        stamped.rowChecksum = checksum
+        let stampedData = try encoder.encode(stamped)
+        return String(data: stampedData, encoding: .utf8) ?? ""
     }
 }
 
@@ -2462,6 +2538,22 @@ extension SampleHostModel {
             .hybridBenchOutputDirURL().path
 
         let runtime = self.runtime
+        // M718 chapter 一百九十二 — anomaly watcher (fresh per-bench).
+        let anomalyWatcher = SampleHostBenchAnomalyWatcher(
+            windowSize: 100)
+        // M721 chapter 一百九十二 — drift monitor on length-MAE
+        // residual (Welford std-dev). Per-iter sigma vs. running
+        // mean attached to row + flagged when > 3-sigma.
+        let lengthDriftMonitor = SampleHostBenchDriftMonitor()
+        let latencyDriftMonitor = SampleHostBenchDriftMonitor()
+        let benchStartIso = SampleHostBenchHelpers.iso8601(Date())
+        let strideCSVCaptured = strideRotation
+            .map(String.init).joined(separator: ",")
+        let mutationCountCaptured = mutationCount
+        let durationHoursCaptured = durationSec / 3600.0
+        // M722 chapter 一百九十二 — write checkpoint every 1000
+        // iters so a 10h crash loses ≤ ~3 minutes of progress.
+        let checkpointEveryN: Int = 1000
         hybridBenchTask = Task { @MainActor [weak self] in
             guard let self else { return }
             let startedAt = Date()
@@ -2483,21 +2575,48 @@ extension SampleHostModel {
                 // generated by catalog so we get variation under
                 // each layer's signature combination.
                 let smokeMode = self.hybridBenchSmokeMode
+                // M719 chapter 一百九十二 — `.heavyTailed` selects
+                // layer by weighted-random (deterministic seed=iter)
+                // from `SampleHostBenchPressureMixer.layerWeights`.
+                // Recorded in row.pressureProfile for replay.
+                var pressureProfile: String? = nil
                 let layerProfile: FourteenLayerSmokeProfile
                     .Profile? = {
-                    if smokeMode == .fourteenLayer {
+                    switch smokeMode {
+                    case .fourteenLayer:
                         return FourteenLayerSmokeProfile
                             .profile(forIter: iter)
+                    case .heavyTailed:
+                        let layerIdx = SampleHostBenchPressureMixer
+                            .pickLayerIndex(forIter: iter)
+                        let p = FourteenLayerSmokeProfile
+                            .profile(forLayerIndex: layerIdx)
+                        if let p = p {
+                            pressureProfile = "heavy-tail-\(p.layerName)"
+                        }
+                        return p
+                    case .canonical:
+                        return nil
                     }
-                    return nil
                 }()
+
+                // M720 chapter 一百九十二 — adversarial mutator
+                // is opt-in via `.heavyTailed`. 5% of iters get a
+                // pathological prompt overlay. Recorded so replay
+                // can stratify by adversarial type.
+                let adversarialKind = SampleHostBenchAdversarialMutator
+                    .decideMutation(
+                        forIter: iter,
+                        enabled: smokeMode == .heavyTailed)
 
                 let g = SampleHostBenchPromptCatalog
                     .generateScatteredWithMutation(
                         iter: iter,
                         stride: chosenStride,
                         mutationSeed: mutationSeed)
-                let prompt = g.prompt
+                let basePrompt = g.prompt
+                let prompt = adversarialKind?.apply(to: basePrompt)
+                    ?? basePrompt
                 let signature: SampleHostPromptSignature
                 if let profile = layerProfile {
                     // M711 — use layer-specific signature instead
@@ -2516,28 +2635,101 @@ extension SampleHostModel {
                 // M703 chapter 一百九十 — capture pressure context
                 // BEFORE substrate work (so it reflects situation
                 // at iter START, not perturbation iter caused).
-                let thermalRaw: String = {
-                    switch ProcessInfo.processInfo.thermalState {
-                    case .nominal: return "nominal"
-                    case .fair: return "fair"
-                    case .serious: return "serious"
-                    case .critical: return "critical"
-                    @unknown default: return "unknown"
-                    }
-                }()
-                let lowPower = ProcessInfo.processInfo
-                    .isLowPowerModeEnabled
-                #if canImport(UIKit)
-                let batteryRaw: Double = {
-                    UIDevice.current.isBatteryMonitoringEnabled = true
-                    let level = UIDevice.current.batteryLevel
-                    return level >= 0 ? Double(level) : -1.0
-                }()
-                #else
-                let batteryRaw: Double = -1.0
-                #endif
+                // M717 chapter 一百九十二 — single-source via
+                // `SampleHostBenchThermalGate.currentDeviceState()`.
+                let device = SampleHostBenchThermalGate.currentDeviceState()
+                let thermalRaw = device.thermal
+                let batteryRaw = device.battery
+                let lowPower = device.lowPower
+                let batteryStateRaw = device.batteryState
                 let hourCaptured = Calendar.current.component(
                     .hour, from: Date())
+
+                // M717 chapter 一百九十二 — thermal/battery gate.
+                // If gate says pause, emit a paused-row WITHOUT
+                // running substrate or LLM. Sleep 30s then re-loop.
+                // Doctrine: gate is INSIDE the iter loop, so the
+                // bench duration timer keeps running; effectively
+                // we lose iters during pause but never burn the
+                // device or get throttled mid-LLM call.
+                let gateDecision = SampleHostBenchThermalGate.decide(
+                    thermalRaw: thermalRaw,
+                    batteryLevel: batteryRaw,
+                    lowPowerMode: lowPower,
+                    batteryStateRaw: batteryStateRaw)
+                if case .pause(let reason) = gateDecision {
+                    // Emit paused-row so JSONL captures the gap
+                    // (downstream replay can spot the pause window).
+                    let pausedRow = SampleHostHybridBenchRow(
+                        timestamp: SampleHostBenchHelpers.iso8601(Date()),
+                        iteration: iter,
+                        seed: iter,
+                        stride: chosenStride,
+                        mutationSeed: mutationSeed,
+                        signature: signature,
+                        prompt: "",
+                        auditCodeCount: 0,
+                        permitMode: "paused-by-thermal-gate",
+                        routerVersion: "n/a",
+                        routerPredictedRoute: "n/a",
+                        routerProbability: 0,
+                        firstTriedLLM: "none",
+                        firstTriedStatus: "paused-by-thermal-gate",
+                        firstTriedBody: "",
+                        firstTriedDurationMs: 0,
+                        fallbackTriedLLM: nil,
+                        fallbackStatus: nil,
+                        fallbackBody: nil,
+                        fallbackDurationMs: nil,
+                        actualRoute: "paused-\(reason)",
+                        routerHit: false,
+                        totalDurationSeconds: 0,
+                        errorMessage: nil,
+                        dispatchPolicy: nil,
+                        dispatchTaken: nil,
+                        draftOnly: nil,
+                        llmSkipped: true,
+                        postLLMPermitMode: nil,
+                        postLLMAuditCodeCount: nil,
+                        postLLMShifted: nil,
+                        permitPredictBlockProb: nil,
+                        permitPredictClass: nil,
+                        permitPredictAgreement: nil,
+                        permitPredictDetailedAgreement: nil,
+                        routerOverridden: true,
+                        lengthPredicted: nil,
+                        lengthError: nil,
+                        latencyPredictedMs: nil,
+                        latencyErrorMs: nil,
+                        verbosityProbability: nil,
+                        verbosityCorrect: nil,
+                        thermalState: thermalRaw,
+                        batteryLevel: batteryRaw,
+                        lowPowerMode: lowPower,
+                        hourOfDay: hourCaptured,
+                        smokeMode: smokeMode.rawValue,
+                        targetLayer: layerProfile?.layerIndex,
+                        targetLayerName: layerProfile?.layerName,
+                        anomalyFlags: ["thermal-gate-paused:\(reason)"],
+                        pressureProfile: pressureProfile,
+                        adversarialKind: adversarialKind?.rawValue,
+                        driftSigma: nil,
+                        pauseSkipped: true)
+                    do {
+                        try await runner.appendRow(pausedRow)
+                    } catch {
+                        self.hybridBenchLastError = "jsonl-paused: \(error)"
+                    }
+                    iter += 1
+                    if self.hybridBenchGeneration != myGen { break }
+                    if self.hybridBenchGeneration == myGen {
+                        self.hybridBenchIterations = iter
+                    }
+                    // Sleep 30s out of detached task so MainActor
+                    // stays responsive. Yield back if cancelled.
+                    try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                    continue
+                }
 
                 // Substrate routing
                 let t0 = Date()
@@ -3134,6 +3326,41 @@ extension SampleHostModel {
                     }
                 }
 
+                // M718 chapter 一百九十二 — anomaly observation.
+                // Watcher takes permitMode + body emptiness + the
+                // 4 regression outputs (length / latency / verbosity
+                // / blockProb) for NaN detection.
+                let anomalyFlags = await anomalyWatcher.observe(
+                    permitMode: permitMode,
+                    bodyIsEmpty: servedBody.isEmpty,
+                    regressionOutputs: [
+                        lengthPredicted,
+                        latencyPredictedMs,
+                        verbosityProb,
+                        permitPredictBlockProb,
+                    ])
+
+                // M721 chapter 一百九十二 — drift sigma. Compute
+                // BEFORE updating monitor (so this iter's residual
+                // is sigma'd against history). Update after.
+                var driftSigma: Double? = nil
+                if let lerr = lengthError {
+                    let s = lengthDriftMonitor.sigmaAbove(abs(lerr))
+                    if lengthDriftMonitor.count >= 100 {
+                        driftSigma = s
+                    }
+                    lengthDriftMonitor.update(abs(lerr))
+                }
+                if let lerr = latencyErrorMs {
+                    latencyDriftMonitor.update(abs(lerr))
+                }
+                // 3-sigma threshold: tag in anomalyFlags for grep.
+                var allFlags = anomalyFlags
+                if let s = driftSigma, s > 3.0 {
+                    allFlags.append(
+                        "drift:length-mae:\(String(format: "%.1f", s))-sigma")
+                }
+
                 let row = SampleHostHybridBenchRow(
                     timestamp: SampleHostBenchHelpers.iso8601(Date()),
                     iteration: iter,
@@ -3183,11 +3410,41 @@ extension SampleHostModel {
                     hourOfDay: hourCaptured,
                     smokeMode: smokeMode.rawValue,
                     targetLayer: layerProfile?.layerIndex,
-                    targetLayerName: layerProfile?.layerName)
+                    targetLayerName: layerProfile?.layerName,
+                    anomalyFlags: allFlags.isEmpty ? nil : allFlags,
+                    pressureProfile: pressureProfile,
+                    adversarialKind: adversarialKind?.rawValue,
+                    driftSigma: driftSigma,
+                    pauseSkipped: false)
                 do {
                     try await runner.appendRow(row)
                 } catch {
                     self.hybridBenchLastError = "jsonl: \(error)"
+                }
+                // M722 chapter 一百九十二 — checkpoint every N iters.
+                // Atomic write via SampleHostBenchCheckpointStore so
+                // a crash mid-bench loses ≤ checkpointEveryN iters.
+                if (iter + 1) % checkpointEveryN == 0 {
+                    let snap = await anomalyWatcher.snapshot()
+                    let cp = SampleHostBenchCheckpoint(
+                        generation: myGen,
+                        iter: iter + 1,
+                        startTimeIso: benchStartIso,
+                        lastUpdatedIso: SampleHostBenchHelpers
+                            .iso8601(Date()),
+                        outputPath: SampleHostBenchHelpers
+                            .hybridBenchOutputDirURL().path,
+                        smokeMode: smokeMode.rawValue,
+                        durationHours: durationHoursCaptured,
+                        mutationSeedCount: mutationCountCaptured,
+                        strideCSV: strideCSVCaptured,
+                        afmOk: self.hybridBenchAFMOk,
+                        gemmaOk: self.hybridBenchGemmaOk,
+                        bothFailed: self.hybridBenchBothFailed,
+                        stuckSubstrates: snap.stuckSubstrates,
+                        stuckLLMs: snap.stuckLLMs)
+                    try? await SampleHostBenchCheckpointStore
+                        .shared.write(cp)
                 }
                 iter += 1
                 // M627 deep-review fix #3 — only update iter
@@ -3226,6 +3483,13 @@ extension SampleHostModel {
                 }
             }
             await runner.close()
+            // M722 chapter 一百九十二 — clean-finish checkpoint
+            // wipe so a fresh launch does not see a stale snap.
+            // (Crash-mid-bench leaves checkpoint untouched, which
+            // is exactly what we want for a future M723 resume UI.)
+            if self.hybridBenchGeneration == myGen {
+                await SampleHostBenchCheckpointStore.shared.clear()
+            }
             // M627 deep-review fix #3 — only flip isRunning if
             // we're still the active generation. If a newer start
             // already bumped generation + set isRunning=true, our

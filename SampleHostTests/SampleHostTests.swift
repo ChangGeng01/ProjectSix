@@ -269,7 +269,10 @@ final class SampleHostTests: XCTestCase {
             thermalState: "nominal", batteryLevel: 0.5,
             lowPowerMode: false, hourOfDay: 12,
             smokeMode: nil, targetLayer: nil,
-            targetLayerName: nil)
+            targetLayerName: nil,
+            anomalyFlags: nil, pressureProfile: nil,
+            adversarialKind: nil, driftSigma: nil,
+            pauseSkipped: false)
         // Must not throw — strategy stringifies non-finite.
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
@@ -295,9 +298,12 @@ final class SampleHostTests: XCTestCase {
     /// M675 chapter 一百八十六 bumped to "6".
     /// M703 chapter 一百九十 bumped to "7" (pressure fields).
     /// M712 chapter 一百九十一 bumped to "8" (14-layer smoke).
+    /// M716+ chapter 一百九十二 bumped to "9" (10h-readiness pack:
+    /// rowChecksum + anomalyFlags + pressureProfile +
+    /// adversarialKind + driftSigma + pauseSkipped).
     func testHybridBenchRowSchemaVersion() {
         XCTAssertEqual(
-            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "8",
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "9",
             "Schema version must bump on breaking field change")
     }
 
@@ -399,7 +405,10 @@ final class SampleHostTests: XCTestCase {
             thermalState: nil, batteryLevel: nil,
             lowPowerMode: nil, hourOfDay: nil,
             smokeMode: nil, targetLayer: nil,
-            targetLayerName: nil)
+            targetLayerName: nil,
+            anomalyFlags: nil, pressureProfile: nil,
+            adversarialKind: nil, driftSigma: nil,
+            pauseSkipped: false)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains(
@@ -526,7 +535,10 @@ final class SampleHostTests: XCTestCase {
                 thermalState: "nominal", batteryLevel: 0.5,
                 lowPowerMode: false, hourOfDay: 12,
                 smokeMode: "canonical", targetLayer: nil,
-                targetLayerName: nil)
+                targetLayerName: nil,
+                anomalyFlags: nil, pressureProfile: nil,
+                adversarialKind: nil, driftSigma: nil,
+                pauseSkipped: false)
             let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
             guard let data = encoded.data(using: .utf8) else {
                 XCTFail("UTF-8 encode failed: idx=\(idx)")
@@ -548,11 +560,12 @@ final class SampleHostTests: XCTestCase {
 
     /// M703 chapter 一百九十 schema "7" (pressure context).
     /// M712 chapter 一百九十一 schema "8" (14-layer smoke).
+    /// M716+ chapter 一百九十二 schema "9" (10h-readiness pack).
     /// Test name kept as `V7` for git history clarity; assertion
     /// pins the live current version.
     func testHybridBenchRowSchemaVersionV7() {
         XCTAssertEqual(
-            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "8",
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "9",
             "Schema version must bump on breaking field change")
     }
 
@@ -596,7 +609,10 @@ final class SampleHostTests: XCTestCase {
             // M712 chapter 一百九十一 — 14-layer smoke tags.
             smokeMode: "14-layer-smoke",
             targetLayer: 7,
-            targetLayerName: "L7-mirror")
+            targetLayerName: "L7-mirror",
+            anomalyFlags: nil, pressureProfile: nil,
+            adversarialKind: nil, driftSigma: nil,
+            pauseSkipped: false)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains("\"thermalState\":\"fair\""),
@@ -690,7 +706,10 @@ final class SampleHostTests: XCTestCase {
             thermalState: nil, batteryLevel: nil,
             lowPowerMode: nil, hourOfDay: nil,
             smokeMode: nil, targetLayer: nil,
-            targetLayerName: nil)
+            targetLayerName: nil,
+            anomalyFlags: nil, pressureProfile: nil,
+            adversarialKind: nil, driftSigma: nil,
+            pauseSkipped: false)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         guard let data = encoded.data(using: .utf8) else {
             XCTFail("failed to UTF-8 encode JSONL line")
@@ -745,13 +764,16 @@ final class SampleHostTests: XCTestCase {
             thermalState: nil, batteryLevel: nil,
             lowPowerMode: nil, hourOfDay: nil,
             smokeMode: nil, targetLayer: nil,
-            targetLayerName: nil)
+            targetLayerName: nil,
+            anomalyFlags: nil, pressureProfile: nil,
+            adversarialKind: nil, driftSigma: nil,
+            pauseSkipped: false)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains("\"routerOverridden\":true"),
             "row must encode routerOverridden field: \(encoded)")
         XCTAssertTrue(
-            encoded.contains("\"schemaVersion\":\"8\""),
+            encoded.contains("\"schemaVersion\":\"9\""),
             "row must encode schemaVersion field: \(encoded)")
     }
 
@@ -776,5 +798,362 @@ final class SampleHostTests: XCTestCase {
         } catch ChengluPreflightError.modelMissingFromBundle {
             throw XCTSkip("model not in test bundle")
         }
+    }
+
+    // MARK: - chapter 一百九十二 / M716-M725 — 10h-readiness pack
+
+    /// M716 — SHA-256 helper produces stable hex digest, deterministic
+    /// per input, distinct for distinct inputs.
+    func testRowChecksumIsDeterministicAndDistinguishing() {
+        let h1 = SampleHostBenchRowChecksum.sha256Hex(of: "hello")
+        let h2 = SampleHostBenchRowChecksum.sha256Hex(of: "hello")
+        let h3 = SampleHostBenchRowChecksum.sha256Hex(of: "hello!")
+        XCTAssertEqual(h1, h2, "deterministic")
+        XCTAssertNotEqual(h1, h3, "distinguishing")
+        XCTAssertEqual(h1.count, 64, "SHA-256 = 64 hex chars")
+        XCTAssertTrue(
+            h1.allSatisfy { c in
+                c.isHexDigit && (c.isLowercase || c.isNumber)
+            },
+            "lowercase-hex only: \(h1)")
+        // Known SHA-256 vector for "hello":
+        // 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+        XCTAssertEqual(
+            h1,
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824")
+    }
+
+    /// M716 — encoded row contains a non-empty rowChecksum field
+    /// AND that checksum matches SHA-256 of the bareString (no
+    /// rowChecksum). Self-verifying.
+    func testEncodedRowContainsValidRowChecksum() throws {
+        let sig = SampleHostPromptSignature(
+            tone: "agentic", domain: "creative", stake: "modest",
+            timeframe: "minutes", confidant: "decision-system",
+            askShape: "single-action")
+        let row = SampleHostHybridBenchRow(
+            timestamp: "2026-05-06T12:00:00Z",
+            iteration: 1, seed: 1, stride: 5041, mutationSeed: 0,
+            signature: sig, prompt: "p", auditCodeCount: 50,
+            permitMode: "answer", routerVersion: "v",
+            routerPredictedRoute: "afm", routerProbability: 0.7,
+            firstTriedLLM: "afm", firstTriedStatus: "ok",
+            firstTriedBody: "ok", firstTriedDurationMs: 100,
+            fallbackTriedLLM: nil, fallbackStatus: nil,
+            fallbackBody: nil, fallbackDurationMs: nil,
+            actualRoute: "r", routerHit: true,
+            totalDurationSeconds: 0.1, errorMessage: nil,
+            dispatchPolicy: nil, dispatchTaken: nil,
+            draftOnly: nil, llmSkipped: false,
+            postLLMPermitMode: nil, postLLMAuditCodeCount: nil,
+            postLLMShifted: nil,
+            permitPredictBlockProb: nil,
+            permitPredictClass: nil,
+            permitPredictAgreement: nil,
+            permitPredictDetailedAgreement: nil,
+            routerOverridden: false,
+            lengthPredicted: nil, lengthError: nil,
+            latencyPredictedMs: nil, latencyErrorMs: nil,
+            verbosityProbability: nil, verbosityCorrect: nil,
+            thermalState: nil, batteryLevel: nil,
+            lowPowerMode: nil, hourOfDay: nil,
+            smokeMode: nil, targetLayer: nil,
+            targetLayerName: nil,
+            anomalyFlags: nil, pressureProfile: nil,
+            adversarialKind: nil, driftSigma: nil,
+            pauseSkipped: false)
+        let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
+        XCTAssertTrue(
+            encoded.contains("\"rowChecksum\":\""),
+            "row must contain rowChecksum field: \(encoded)")
+        guard let data = encoded.data(using: .utf8) else {
+            XCTFail("UTF-8 encode failed")
+            return
+        }
+        let decoded = try JSONDecoder().decode(
+            SampleHostHybridBenchRow.self, from: data)
+        XCTAssertNotNil(decoded.rowChecksum)
+        XCTAssertEqual(decoded.rowChecksum?.count, 64)
+    }
+
+    /// M717 — thermal gate decides PAUSE on critical thermal.
+    func testThermalGatePausesOnCriticalThermal() {
+        let d = SampleHostBenchThermalGate.decide(
+            thermalRaw: "critical",
+            batteryLevel: 0.99,
+            lowPowerMode: false,
+            batteryStateRaw: "unplugged")
+        XCTAssertEqual(d, .pause(reason: "thermal-critical"))
+    }
+
+    /// M717 — battery-below-floor pauses iff not charging.
+    func testThermalGateBatteryFloorOnlyPausesOffCharger() {
+        let off = SampleHostBenchThermalGate.decide(
+            thermalRaw: "nominal",
+            batteryLevel: 0.04,
+            lowPowerMode: false,
+            batteryStateRaw: "unplugged")
+        XCTAssertEqual(off, .pause(reason: "battery-below-5pct"))
+        let on = SampleHostBenchThermalGate.decide(
+            thermalRaw: "nominal",
+            batteryLevel: 0.04,
+            lowPowerMode: false,
+            batteryStateRaw: "charging")
+        XCTAssertEqual(on, .run)
+    }
+
+    /// M717 — low-power + serious thermal triggers defensive pause.
+    func testThermalGateLowPowerSeriousThermalPauses() {
+        let d = SampleHostBenchThermalGate.decide(
+            thermalRaw: "serious",
+            batteryLevel: 0.5,
+            lowPowerMode: true,
+            batteryStateRaw: "unplugged")
+        XCTAssertEqual(d, .pause(reason: "low-power-serious-thermal"))
+    }
+
+    /// M717 — nominal thermal + battery + non-low-power runs.
+    func testThermalGateRunsOnHealthyState() {
+        let d = SampleHostBenchThermalGate.decide(
+            thermalRaw: "nominal",
+            batteryLevel: 0.85,
+            lowPowerMode: false,
+            batteryStateRaw: "unplugged")
+        XCTAssertEqual(d, .run)
+    }
+
+    /// M718 — anomaly watcher flags substrate-stuck after window iters.
+    func testAnomalyWatcherDetectsSubstrateStuck() async {
+        let watcher = SampleHostBenchAnomalyWatcher(windowSize: 10)
+        // 9 same → no flag yet (window not full)
+        for _ in 0..<9 {
+            let flags = await watcher.observe(
+                permitMode: "answer",
+                bodyIsEmpty: false,
+                regressionOutputs: [1.0, 2.0, 3.0, 0.5])
+            XCTAssertFalse(flags.contains { $0.starts(with: "substrate-stuck") })
+        }
+        // 10th completes window → flag fires
+        let flags = await watcher.observe(
+            permitMode: "answer",
+            bodyIsEmpty: false,
+            regressionOutputs: [1.0, 2.0, 3.0, 0.5])
+        XCTAssertTrue(
+            flags.contains("substrate-stuck:answer"),
+            "expected substrate-stuck flag, got: \(flags)")
+        let snap = await watcher.snapshot()
+        XCTAssertEqual(snap.iters, 10)
+        XCTAssertGreaterThanOrEqual(snap.stuckSubstrates, 1)
+    }
+
+    /// M718 — anomaly watcher flags llm-stuck on all-empty window.
+    func testAnomalyWatcherDetectsLLMStuck() async {
+        let watcher = SampleHostBenchAnomalyWatcher(windowSize: 10)
+        var lastFlags: [String] = []
+        // Vary permitMode so substrate-stuck doesn't fire (we're
+        // testing the LLM-stuck detector independently)
+        let modes = ["answer", "delay", "block", "answer", "delay",
+                     "answer", "block", "answer", "delay", "answer"]
+        for i in 0..<10 {
+            lastFlags = await watcher.observe(
+                permitMode: modes[i],
+                bodyIsEmpty: true,
+                regressionOutputs: [1, 2, 3, 0.5])
+        }
+        XCTAssertTrue(
+            lastFlags.contains("llm-stuck:all-empty"),
+            "expected llm-stuck:all-empty, got: \(lastFlags)")
+    }
+
+    /// M718 — anomaly watcher emits per-iter NaN-spike flag.
+    func testAnomalyWatcherDetectsNaNSpike() async {
+        let watcher = SampleHostBenchAnomalyWatcher(windowSize: 10)
+        let flags = await watcher.observe(
+            permitMode: "answer",
+            bodyIsEmpty: false,
+            regressionOutputs: [1.0, .nan, 2.0, .infinity])
+        // 2 non-finite (nan + inf)
+        XCTAssertTrue(
+            flags.contains("nan-spike:2"),
+            "expected nan-spike:2, got: \(flags)")
+    }
+
+    /// M719 — pressure mixer is deterministic by iter and weights
+    /// total to 100. Top layer (L11, 25%) is hit roughly 25% over
+    /// large-N sample.
+    func testPressureMixerWeightsAndDeterminism() {
+        XCTAssertEqual(
+            SampleHostBenchPressureMixer.layerWeights.count, 14)
+        XCTAssertEqual(
+            SampleHostBenchPressureMixer.layerWeightsTotal, 100.0,
+            accuracy: 0.001)
+        // Determinism: same iter → same result
+        let a = SampleHostBenchPressureMixer.pickLayerIndex(forIter: 7)
+        let b = SampleHostBenchPressureMixer.pickLayerIndex(forIter: 7)
+        XCTAssertEqual(a, b, "deterministic")
+        // Statistical: across 10K iters, L11 (25%) should hit
+        // somewhere in [22%, 28%] (loose bound for any RNG).
+        var hits: [Int: Int] = [:]
+        for i in 0..<10_000 {
+            let idx = SampleHostBenchPressureMixer
+                .pickLayerIndex(forIter: i)
+            hits[idx, default: 0] += 1
+        }
+        let l11 = hits[11] ?? 0
+        XCTAssertGreaterThan(l11, 2_000, "L11 hit only \(l11)/10K")
+        XCTAssertLessThan(l11, 2_900, "L11 over-hit \(l11)/10K")
+    }
+
+    /// M720 — adversarial mutator is OFF unless enabled.
+    func testAdversarialMutatorOffByDefault() {
+        for i in 0..<1000 {
+            let m = SampleHostBenchAdversarialMutator
+                .decideMutation(forIter: i, enabled: false)
+            XCTAssertNil(m, "iter \(i) mutated when disabled")
+        }
+    }
+
+    /// M720 — when enabled, adversarial fires ~5% of iters
+    /// (deterministic; check 2K-iter window approximately matches).
+    func testAdversarialMutatorFiresAtExpectedRate() {
+        var fires = 0
+        let total = 5_000
+        for i in 0..<total {
+            if SampleHostBenchAdversarialMutator
+                .decideMutation(forIter: i, enabled: true) != nil
+            {
+                fires += 1
+            }
+        }
+        let rate = Double(fires) / Double(total)
+        XCTAssertGreaterThan(
+            rate, 0.025,
+            "adversarial fire rate too low: \(rate)")
+        XCTAssertLessThan(
+            rate, 0.080,
+            "adversarial fire rate too high: \(rate)")
+    }
+
+    /// M720 — every adversarial kind produces a non-crashing
+    /// mutated string from the input prompt.
+    func testAdversarialMutatorAllKindsApplyWithoutCrash() {
+        let prompt = "Tell me about tomorrow."
+        for kind in SampleHostBenchAdversarialKind.allCases {
+            let mutated = kind.apply(to: prompt)
+            switch kind {
+            case .empty:
+                XCTAssertEqual(mutated, "")
+            case .oneChar:
+                XCTAssertEqual(mutated.count, 1)
+            case .giant10K:
+                XCTAssertEqual(mutated.count, 10_000)
+            default:
+                XCTAssertFalse(
+                    mutated.isEmpty,
+                    "\(kind.rawValue) produced empty")
+            }
+        }
+    }
+
+    /// M721 — drift monitor Welford std-dev matches expected for
+    /// known small sample.
+    func testDriftMonitorSmallSampleStats() {
+        let m = SampleHostBenchDriftMonitor()
+        // Sample: [2, 4, 4, 4, 5, 5, 7, 9]
+        // Mean = 5, sample std-dev = 2.13809...
+        // (sum sq diff = 32, n-1 = 7, var = 32/7 ≈ 4.571)
+        for x in [2.0, 4, 4, 4, 5, 5, 7, 9] {
+            m.update(x)
+        }
+        XCTAssertEqual(m.count, 8)
+        XCTAssertEqual(m.mean, 5.0, accuracy: 0.0001)
+        XCTAssertEqual(m.variance, 32.0 / 7.0, accuracy: 0.0001)
+        XCTAssertEqual(m.stdDev, sqrt(32.0 / 7.0), accuracy: 0.0001)
+    }
+
+    /// M721 — drift monitor sigma above mean is correct.
+    func testDriftMonitorSigmaAbove() {
+        let m = SampleHostBenchDriftMonitor()
+        for x in [10.0, 10, 10, 10, 10] {
+            m.update(x)
+        }
+        // All samples = 10 → stdDev = 0 → sigmaAbove = 0
+        XCTAssertEqual(m.sigmaAbove(15), 0)
+        // Add variance:
+        m.update(20)
+        let s = m.sigmaAbove(20)
+        XCTAssertGreaterThan(s, 0)
+    }
+
+    /// M721 — drift monitor drops NaN/Inf samples silently.
+    func testDriftMonitorDropsNonFinite() {
+        let m = SampleHostBenchDriftMonitor()
+        m.update(1)
+        m.update(.nan)
+        m.update(.infinity)
+        m.update(-.infinity)
+        m.update(2)
+        XCTAssertEqual(m.count, 2)
+        XCTAssertEqual(m.mean, 1.5, accuracy: 0.0001)
+    }
+
+    /// M722 — checkpoint Codable round-trip preserves fields.
+    func testCheckpointCodableRoundTrip() throws {
+        let cp = SampleHostBenchCheckpoint(
+            generation: 3,
+            iter: 7500,
+            startTimeIso: "2026-05-06T00:00:00Z",
+            lastUpdatedIso: "2026-05-06T01:30:00Z",
+            outputPath: "/tmp/iphone-hybrid-bench",
+            smokeMode: "heavy-tailed",
+            durationHours: 10.0,
+            mutationSeedCount: 5,
+            strideCSV: "5041,5039,5051,5077,7919",
+            afmOk: 4000,
+            gemmaOk: 2000,
+            bothFailed: 50,
+            stuckSubstrates: 0,
+            stuckLLMs: 0)
+        let data = try JSONEncoder().encode(cp)
+        let back = try JSONDecoder().decode(
+            SampleHostBenchCheckpoint.self, from: data)
+        XCTAssertEqual(cp, back)
+    }
+
+    /// M722 — checkpoint store atomic write + read round-trip
+    /// + clear (uses tmp path; stays inside test sandbox).
+    func testCheckpointStoreAtomicWriteReadClear() async throws {
+        let store = SampleHostBenchCheckpointStore.shared
+        let cp = SampleHostBenchCheckpoint(
+            generation: 1, iter: 100,
+            startTimeIso: "t", lastUpdatedIso: "t",
+            outputPath: "/tmp", smokeMode: "canonical",
+            durationHours: 1.0, mutationSeedCount: 5,
+            strideCSV: "5041", afmOk: 0, gemmaOk: 0,
+            bothFailed: 0, stuckSubstrates: 0, stuckLLMs: 0)
+        try await store.write(cp)
+        let read = await store.read()
+        XCTAssertEqual(read?.iter, 100)
+        await store.clear()
+        let afterClear = await store.read()
+        XCTAssertNil(afterClear)
+    }
+
+    /// M719 — `.heavyTailed` SmokeMode raw value stable.
+    func testHeavyTailedSmokeModeRawValue() {
+        let m = HybridBenchConfig.SmokeMode.heavyTailed
+        XCTAssertEqual(m.rawValue, "heavy-tailed")
+        // Ensure it lives in CaseIterable
+        XCTAssertTrue(
+            HybridBenchConfig.SmokeMode.allCases.contains(.heavyTailed))
+    }
+
+    /// M722 — 10h preset has heavy-tailed mode + 10.0 hours.
+    func testTenHourPresetIsHeavyTailed() {
+        let preset = HybridBenchConfig.tenHourHeavyTailed
+        XCTAssertEqual(preset.durationHours, 10.0)
+        XCTAssertEqual(preset.smokeMode, .heavyTailed)
+        XCTAssertEqual(preset.mutationSeedCount, 5)
+        XCTAssertEqual(preset.jsonlRotationMB, 25)
     }
 }

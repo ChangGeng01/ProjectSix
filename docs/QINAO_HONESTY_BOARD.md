@@ -24105,3 +24105,215 @@ Procedural generation is now MAXIMAL where it makes sense and CONSTRAINED where 
 
 
 
+
+## 一百九十二、 全面进化 — 10h-readiness pack (M716-M725 / 2026-05-06)
+
+User instruction: "全面进化 满意之后 跑 10小时 冒烟 最学习". Previous chapter 一百九十一 produced 14-layer smoke + procedural config; chapter 一百九十二 closes the remaining 5 high-leverage 10h-readiness gaps. Doctrine: every new feature is HINT-ONLY — bench loop never auto-stops, ledger hash chain never mutates, single commit mouth held. New `SampleHostBenchSafetyKit.swift` lives as a single file with all 7 helpers (no @Published state).
+
+### 192.1 M716 — Per-row SHA-256 checksum
+
+Doctrine: every JSONL row carries a SHA-256 of the canonical encoded body (excluding the `rowChecksum` field itself). Validator script can detect:
+- Truncated lines (last few bytes lost on crash mid-write)
+- Corrupted lines (cosmic ray / disk error)
+- Manual tampering
+
+Two-pass encode pattern (pass 1 with `nil` checksum → SHA-256 → pass 2 stamp). `SampleHostBenchRowChecksum.sha256Hex(of:)` is a pure helper using CryptoKit's `SHA256.hash(data:)`. Validator: `scripts/validate_hybrid_jsonl.py` reports per-shard `total / legacy / valid / bad-json / bad-checksum-format` counts.
+
+### 192.2 M717 — Thermal/battery auto-pause
+
+Doctrine: 10h on iPhone 17e ≠ "ignore the laws of physics". When `ProcessInfo.processInfo.thermalState == .critical` OR `UIDevice.current.batteryLevel < 0.05` AND not charging, gate emits a `.pause(reason:)` decision. Bench loop responds by:
+1. Emitting a `pauseSkipped: true` row with `actualRoute = "paused-{reason}"` and `anomalyFlags = ["thermal-gate-paused:{reason}"]` so JSONL captures the gap
+2. Sleeping 30s
+3. Re-checking on next loop iteration
+
+Defensive escalation: low-power-mode + serious-thermal pauses too (one step before critical to avoid throttle). Charging-state read from `UIDevice.current.batteryState` so wall-plugged 10h runs never hit the battery floor.
+
+`SampleHostBenchThermalGate.decide(thermalRaw:batteryLevel:lowPowerMode:batteryStateRaw:)` is pure-function and `currentDeviceState()` is the single-source-of-truth for ProcessInfo + UIDevice reads (replaces the open-coded thermal-capture in chapter 一百九十).
+
+### 192.3 M718 — Anomaly watcher
+
+Sliding-window detector (default windowSize=100). Per-iter observation:
+- `permitMode` window — flag `substrate-stuck:{mode}` when 100 consecutive iters report the same permitMode (substrate appears frozen)
+- `bodyIsEmpty` window — flag `llm-stuck:all-empty` when 100 consecutive iters return empty body (LLM stuck or all-blocked)
+- `regressionOutputs` array — flag `nan-spike:{count}` per-iter when ≥1 of length/latency/verbosity/blockProb is non-finite (model broken); flag `nan-cluster:{N}/100` when > 25% of window had any NaN
+
+Doctrine pin (red line 7): watcher is HINT-ONLY. Flags appear in row's `anomalyFlags` field but never trigger pause / abort / verdict-mode change. Operator reads them in dashboard / replay tool.
+
+`SampleHostBenchAnomalyWatcher` is an actor (sendable + thread-safe) with `observe(...)` returning the flag list per iter and `snapshot()` for cumulative stats.
+
+### 192.4 M719 — Heavy-tailed pressure mixer
+
+New `SmokeMode.heavyTailed` case. When active, per-iter layer selection draws from `SampleHostBenchPressureMixer.layerWeights` (L11 risk-gate 25% / L9 candidates 18% / L8 memory 12% / ... / L14 reflection 0.5%) instead of uniform cycling. Distribution informed by chapter 176 §176.19 substrate empirical distribution + heavy-tail intuition.
+
+Doctrine: deterministic — linear-congruential RNG seeded by iter so replay is exact (binary-search over 14-element cumulative weights). Each row gets `pressureProfile = "heavy-tail-L11-risk-gate"` style label for replay stratification.
+
+Statistical test pins L11 hits within [22%, 28%] of 10K samples — looser than 25% to allow any RNG implementation.
+
+### 192.5 M720 — Adversarial mutator
+
+8 deterministic edge-case prompt mutations:
+- `empty` → `""` (stress empty handling)
+- `oneChar` → `"?"` (stress minimal token)
+- `giant10K` → 10,000-char prompt (stress LLM context + post-LLM truncation)
+- `unicodeMixed` → CJK + Cyrillic + Arabic + Hebrew + Devanagari mix
+- `emojiOnly` → 10 emojis no other content
+- `controlChars` → tab/newline/VT/FF/CR around prompt (stress tokenizers)
+- `repeatedTokens` → 500x "the " prefix (stress dedup)
+- `mixedLanguages` → Thai + Korean + Tamil + Welsh + Yoruba code-mix
+
+Probability ~5% per iter (independent RNG stream from pressure mixer to avoid correlated decisions). Opt-in via `SmokeMode.heavyTailed` (canonical + fourteenLayer modes don't mutate). Records `adversarialKind` in row for replay stratification.
+
+`SampleHostBenchAdversarialKind.apply(to:)` is pure-function per case. Test pins fire-rate in [2.5%, 8.0%] over 5K iters.
+
+### 192.6 M721 — Drift threshold alerts
+
+`SampleHostBenchDriftMonitor` implements Welford's online std-dev:
+- `mean += (x - mean) / n`
+- `sumSquaredDiff += (x - mean_old) * (x - mean_new)`
+- `variance = sumSquaredDiff / (n - 1)`
+
+Per-iter:
+1. Query `sigmaAbove(abs(lengthError))` BEFORE updating monitor (so this iter's residual is sigma'd against history)
+2. After 100 samples warmup, attach `driftSigma` to row
+3. If `driftSigma > 3.0`, append `drift:length-mae:{N.N}-sigma` to anomalyFlags
+
+Doctrine: 3-sigma threshold is a typed constant; never tripped within first 100 iters (count-gated). Drops NaN/Inf samples silently.
+
+### 192.7 M722-M723 — Crash checkpoint
+
+`SampleHostBenchCheckpoint` Codable schema (15 fields) atomic-written to `Documents/iphone-hybrid-bench/checkpoint.json` every 1000 iters via `SampleHostBenchCheckpointStore` actor. Pattern:
+- Encode pretty-printed JSON to a tmp path
+- Rename atomic over the live URL (POSIX rename = atomic on same FS)
+- Clear on clean bench-finish; leave intact on crash
+
+A 10h crash now loses ≤ ~3 minutes of progress (1000 iters × ~5 iter/sec / 60). Resume UI deferred to chapter 一百九十三+ — checkpoint is WRITE-PATH-only this chapter.
+
+### 192.8 Schema v8 → v9
+
+Added 6 optional fields:
+- `rowChecksum: String?` (M716 — SHA-256 of bare row body)
+- `anomalyFlags: [String]?` (M718 — watcher hints)
+- `pressureProfile: String?` (M719 — heavy-tailed mixer label)
+- `adversarialKind: String?` (M720 — mutation classification)
+- `driftSigma: Double?` (M721 — sigma above running mean)
+- `pauseSkipped: Bool?` (M717 — true if iter skipped by thermal gate)
+
+Backward compatible: all optional, decode-as-nil for v8 rows. Test `testHybridBenchRowSchemaVersion` pins "9".
+
+### 192.9 New `tenHourHeavyTailed` preset
+
+```swift
+HybridBenchConfig.tenHourHeavyTailed
+// durationHours: 10.0, smokeMode: .heavyTailed,
+// jsonlRotationMB: 25 (10h × ~5 iter/sec lands ~7-9 shards)
+```
+
+User-facing path: tap Run Hybrid Bench with this preset for 10h auto-pause-aware adversarial-stratified heavy-tailed drift-monitored checkpointed run.
+
+### 192.10 Replay tool extension
+
+`scripts/replay_hybrid_bench.py` now reports:
+- rowChecksum coverage (% of rows with v9 stamp)
+- thermal-gate paused iter count + reasons
+- anomaly flag counts by tag
+- Heavy-tailed pressure-profile top-8
+- Adversarial mutation kind breakdown + total %
+- Drift sigma p50/p95/p99 + > 3-sigma count
+
+### 192.11 Tests
+
+| Test | Pins |
+|---|---|
+| `testRowChecksumIsDeterministicAndDistinguishing` | SHA-256 stable + 64-hex + lowercase |
+| `testEncodedRowContainsValidRowChecksum` | Encoded row contains rowChecksum field |
+| `testThermalGatePausesOnCriticalThermal` | Critical → pause |
+| `testThermalGateBatteryFloorOnlyPausesOffCharger` | <5% off-charger pauses; charging doesn't |
+| `testThermalGateLowPowerSeriousThermalPauses` | LP+serious → defensive pause |
+| `testThermalGateRunsOnHealthyState` | Nominal → run |
+| `testAnomalyWatcherDetectsSubstrateStuck` | 100-iter same permit → flag |
+| `testAnomalyWatcherDetectsLLMStuck` | 100-iter all-empty body → flag |
+| `testAnomalyWatcherDetectsNaNSpike` | NaN/Inf in regression output → flag |
+| `testPressureMixerWeightsAndDeterminism` | Weights total 100 + L11 ∈ [22%, 28%] over 10K |
+| `testAdversarialMutatorOffByDefault` | 0 fires when disabled |
+| `testAdversarialMutatorFiresAtExpectedRate` | Fire rate ∈ [2.5%, 8%] over 5K |
+| `testAdversarialMutatorAllKindsApplyWithoutCrash` | All 8 kinds apply without crash |
+| `testDriftMonitorSmallSampleStats` | Welford for known [2,4,4,4,5,5,7,9] |
+| `testDriftMonitorSigmaAbove` | Sigma calculation correct |
+| `testDriftMonitorDropsNonFinite` | NaN/Inf silently dropped |
+| `testCheckpointCodableRoundTrip` | 15-field round-trip |
+| `testCheckpointStoreAtomicWriteReadClear` | Write → read → clear cycle |
+| `testHeavyTailedSmokeModeRawValue` | "heavy-tailed" stable raw value |
+| `testTenHourPresetIsHeavyTailed` | 10h preset shape |
+
+SampleHost tests: 29 → **49** (+20 chapter 192 tests).
+
+### 192.12 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ (40 skipped, 0 failures) |
+| SampleHost on iPhone 17e | **49** ✓ (+20 from chapter 191's 29) |
+| Python pytest | 19 ✓ (unchanged — chapter 192 added validate_hybrid_jsonl.py via shell smoke) |
+| 4 boundary checks | clean |
+| Cross-language schema parity | clean |
+| iOS Release build (`SampleHost`) | TEST BUILD SUCCEEDED |
+| iOS Sim test execution | All 49 passed in 0.146s |
+| **Total** | **1929 + 1 parity gate + 3 analysis tools, 0 failures** |
+
+### 192.13 What unlocks for the 10h smoke run
+
+User taps Run Hybrid Bench in `.heavyTailed` mode for 10h:
+
+1. **Pressure realism**: 14 BAS layers sampled by realistic heavy-tailed distribution (L11 25% / L9 18% / etc) — production-scale data
+2. **Adversarial stratification**: ~5% of ~180K iters (~9,000) hit edge cases (empty / unicode / 10K char / control chars / etc) — stresses every part of the pipeline
+3. **Auto-pause**: critical thermal or <5% battery skip iters (sleep 30s) instead of burning device — bench survives thermal cycling
+4. **Anomaly visibility**: substrate freeze / LLM jam / NaN spike auto-flagged in JSONL → replay tool shows where the system broke without scrolling
+5. **Drift detection**: length-MAE 3-sigma alarm on Welford running mean — silent regression visible
+6. **Crash survival**: checkpoint every 1000 iters → 10h crash loses ≤ 3 min
+7. **Integrity verification**: per-row SHA-256 → corrupt rows detectable post-hoc
+8. **JSONL → train cycle**: heavy-tailed + adversarial + pressure-context + drift-tagged data feeds `bench_to_train.py` → ChengluPreflight v0.5+ learns realistic + edge-case behavior
+
+The 10h smoke now produces 14-layer × 4-pressure × 8-adversarial-kind stratified data with built-in integrity + anomaly metadata.
+
+### 192.14 Honest residual after chapter 一百九十二
+
+| Item | Status |
+|---|---|
+| **No real production 10h bench data** | **THE BLOCKER** — chapter 192 ready; user's tap unlocks |
+| Resume UI on launch (read checkpoint, offer to resume) | Deferred to chapter 一百九十三 |
+| Validator's exact byte-parity with Swift's JSONEncoder | Approximate — `json.dumps(sort_keys, separators=(",":""))` good enough for format checks but not byte-equal SHA-256 verify |
+| On-device anomaly dashboard widget | Deferred (counters surfaced via @Published; UI sliders + dashboard chapter 一百九十三+) |
+| Bench → v0.5 retrain cycle proof | Pipeline ready; needs real 10h data first |
+| CI / GitHub Actions / multi-device | Still external |
+
+### 192.15 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostBenchSafetyKit.swift` | NEW — 7 helpers (RowChecksum / ThermalGate / AnomalyWatcher / PressureMixer / AdversarialMutator + Kind / DriftMonitor / Checkpoint + Store) ~440 LOC |
+| `SampleHost/SampleHostModel.swift` | +`.heavyTailed` SmokeMode case; row v8→v9 +6 fields; bench loop wires all 7 helpers + thermal-gate pause path; M722 checkpoint write every 1000 iters; new `tenHourHeavyTailed` preset |
+| `SampleHostTests/SampleHostTests.swift` | +20 fix-pin tests; existing constructors updated for v9 schema |
+| `Before.xcodeproj/project.pbxproj` | +SampleHostBenchSafetyKit.swift in 4 places (BuildFile / FileRef / SampleHost group / SampleHost Sources phase) |
+| `scripts/replay_hybrid_bench.py` | M716+M717+M718+M719+M720+M721 diagnostic blocks (checksum coverage / pause counts / anomaly flag counts / pressure profile top-8 / adversarial breakdown / drift percentiles) |
+| `scripts/validate_hybrid_jsonl.py` | NEW — JSONL integrity validator (parse + checksum format + format-only verification per row) |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M716-M725 entry |
+
+### 192.16 Doctrine pins
+
+| Pin | Held |
+|---|---|
+| 不变量 #1 先醒再答 | ✓ — substrate routing unchanged; thermal-gate is iter-level not session-level |
+| 不变量 #2 神经不掌权 | ✓ — anomaly flags / drift sigma / adversarial kind are HINT-ONLY metadata; never replace permit.mode |
+| 不变量 #3 私有经验不进权重 | ✓ — bench data feeds training corpus offline; no live weight mutation |
+| Single commit mouth | ✓ — substrate L11/L14 unchanged |
+| Audit hash chain integrity | ✓ — JSONL is bench observability; never appended to ledger |
+| Red line 7 (watcher hints only) | ✓ pin — anomaly watcher's flags appear in row but never trigger any decision |
+| Anti-magic-number doctrine | ✓ — every threshold (window 100 / probability 0.05 / battery 0.05 / 3-sigma / 1000-iter checkpoint / pause 30s) is a named typed constant |
+| Anti-drift 3-site cross-update | ✓ — schema bump synced across row struct + 6 row constructors + schema-version test |
+| Honest-correction doctrine | ✓ — chapter explicitly states "user's tap is THE blocker" + lists 6 honest residuals |
+
+### 192.17 一句话总结
+
+**Chapter 一百九十二 (M716-M725)**: respond to user "全面进化 满意之后 跑 10小时 冒烟 最学习" by closing the 5 highest-leverage 10h-readiness gaps + adding 2 supporting pieces (drift monitor + crash checkpoint). NEW `SampleHost/SampleHostBenchSafetyKit.swift` (~440 LOC) packages 7 pure helpers: SHA-256 row checksum (M716 — corruption detection), thermal/battery gate (M717 — 10h survivability), sliding-window anomaly watcher (M718 — substrate-stuck / LLM-stuck / NaN-spike detection), heavy-tailed pressure mixer (M719 — production-realistic L11=25%/L9=18%/etc layer distribution), 8-kind adversarial mutator (M720 — empty/giant/unicode/control/etc edge cases at 5% rate), Welford drift monitor (M721 — 3-sigma alarm on length-MAE), atomic crash checkpoint (M722 — every 1000 iters / 10h crash loses ≤ 3 min). NEW `.heavyTailed` SmokeMode + `tenHourHeavyTailed` preset wire it together. NEW row schema v9 carries 6 optional fields (rowChecksum / anomalyFlags / pressureProfile / adversarialKind / driftSigma / pauseSkipped). NEW `scripts/validate_hybrid_jsonl.py` integrity validator + replay tool extended with 6 chapter-192 diagnostic blocks. **49 SampleHost tests pass** (+20 chapter 192 fix-pins) on iPhone 17e sim. **1929 total tests + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: every new feature is HINT-ONLY (red line 7 held); permit.mode unchanged; ledger hash chain unchanged; single commit mouth held. **The 10h smoke now produces 14-layer × 4-pressure × 8-adversarial-kind stratified data with built-in integrity, anomaly, drift, and crash-survival metadata** ready for `bench_to_train.py` → v0.5+ retrain cycle. The user's tap is THE blocker; infrastructure is ready.

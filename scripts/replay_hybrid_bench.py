@@ -302,6 +302,86 @@ def replay(rows: list[dict]) -> tuple[bool, list[str]]:
                 f"verb={verb_acc:.2f} "
                 f"len-MAE={mae_l:.0f}")
 
+    # M716+ chapter 一百九十二 — 10h-readiness pack diagnostics.
+    # rowChecksum coverage (every row should have one when v9+).
+    rows_with_checksum = sum(
+        1 for r in rows if r.get("rowChecksum"))
+    diagnostics.append(
+        f"rowChecksum coverage: {rows_with_checksum}/{len(rows)} "
+        f"({rows_with_checksum / max(1, len(rows)):.1%})")
+
+    # M717 thermal-gate paused iters
+    paused = sum(1 for r in rows if r.get("pauseSkipped") is True)
+    if paused > 0:
+        pause_reasons: Counter[str] = Counter()
+        for r in rows:
+            if r.get("pauseSkipped") is True:
+                ar = r.get("actualRoute", "paused-?")
+                pause_reasons[ar] += 1
+        diagnostics.append(
+            f"thermal-gate paused: {paused} iters; "
+            f"reasons: {dict(pause_reasons)}")
+
+    # M718 anomaly flags
+    anomaly_flag_counts: Counter[str] = Counter()
+    rows_with_flags = 0
+    for r in rows:
+        flags = r.get("anomalyFlags") or []
+        if flags:
+            rows_with_flags += 1
+            for f in flags:
+                # Strip the suffix (e.g. "substrate-stuck:answer" → "substrate-stuck")
+                tag = f.split(":")[0]
+                anomaly_flag_counts[tag] += 1
+    if anomaly_flag_counts:
+        diagnostics.append(
+            f"anomaly flags ({rows_with_flags} rows): "
+            f"{dict(anomaly_flag_counts)}")
+
+    # M719 pressure-profile (heavy-tailed) distribution
+    pressure_profiles: Counter[str] = Counter()
+    for r in rows:
+        pp = r.get("pressureProfile")
+        if pp:
+            pressure_profiles[pp] += 1
+    if pressure_profiles:
+        # Top 8 by count
+        top = pressure_profiles.most_common(8)
+        diagnostics.append(
+            "heavy-tailed pressure-profile top-8: "
+            + ", ".join(f"{k}={v}" for k, v in top))
+
+    # M720 adversarial mutation kinds
+    adv_counts: Counter[str] = Counter()
+    for r in rows:
+        ak = r.get("adversarialKind")
+        if ak:
+            adv_counts[ak] += 1
+    if adv_counts:
+        total_adv = sum(adv_counts.values())
+        diagnostics.append(
+            f"adversarial mutations: {total_adv} iters "
+            f"({total_adv / max(1, len(rows)):.2%}); "
+            f"breakdown: {dict(adv_counts)}")
+
+    # M721 drift sigma percentiles (length-MAE)
+    drift_sigmas = [
+        r["driftSigma"] for r in rows
+        if isinstance(r.get("driftSigma"), (int, float))
+        and math.isfinite(r["driftSigma"])
+    ]
+    if drift_sigmas:
+        drift_sigmas.sort()
+        n = len(drift_sigmas)
+        p50 = drift_sigmas[n // 2]
+        p95 = drift_sigmas[min(n - 1, int(n * 0.95))]
+        p99 = drift_sigmas[min(n - 1, int(n * 0.99))]
+        gt3 = sum(1 for s in drift_sigmas if s > 3.0)
+        diagnostics.append(
+            f"drift sigma (length-MAE) p50={p50:.2f} "
+            f"p95={p95:.2f} p99={p99:.2f}; "
+            f"{gt3} iters > 3-sigma")
+
     # Length / Latency MAE
     length_errs = [
         abs(r["lengthError"]) for r in rows
