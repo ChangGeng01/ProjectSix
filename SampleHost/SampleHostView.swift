@@ -532,6 +532,73 @@ struct SampleHostView: View {
                             .font(.caption.monospacedDigit())
                     }
                 }
+                // M732 chapter 一百九十四 — UI sliders for the 4
+                // chapter-192 safety-kit flex constants.
+                // Disabled mid-bench so changes don't desync.
+                HStack {
+                    Text("Anomaly window:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchAnomalyWindowSize },
+                            set: { model.updateAnomalyWindowSize($0) }
+                        ),
+                        in: 10...1000,
+                        step: 10
+                    ) {
+                        Text("\(model.hybridBenchAnomalyWindowSize)")
+                            .font(.caption.monospacedDigit())
+                    }
+                    .disabled(model.hybridBenchIsRunning)
+                }
+                HStack {
+                    Text("Drift σ-thresh:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchDriftSigmaThreshold },
+                            set: { model.updateDriftSigmaThreshold($0) }
+                        ),
+                        in: 1.0...10.0,
+                        step: 0.5
+                    ) {
+                        Text(String(
+                            format: "%.1fσ",
+                            model.hybridBenchDriftSigmaThreshold))
+                            .font(.caption.monospacedDigit())
+                    }
+                    .disabled(model.hybridBenchIsRunning)
+                }
+                HStack {
+                    Text("Mutation prob:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchMutationProbability },
+                            set: { model.updateMutationProbability($0) }
+                        ),
+                        in: 0.0...1.0,
+                        step: 0.01
+                    ) {
+                        Text(String(
+                            format: "%.0f%%",
+                            model.hybridBenchMutationProbability * 100))
+                            .font(.caption.monospacedDigit())
+                    }
+                    .disabled(model.hybridBenchIsRunning)
+                }
+                HStack {
+                    Text("Checkpoint @:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchCheckpointEveryNIters },
+                            set: { model.updateCheckpointEveryNIters($0) }
+                        ),
+                        in: 100...100_000,
+                        step: 100
+                    ) {
+                        Text("\(model.hybridBenchCheckpointEveryNIters)")
+                            .font(.caption.monospacedDigit())
+                    }
+                    .disabled(model.hybridBenchIsRunning)
+                }
             }
 
             if model.hybridBenchIsRunning {

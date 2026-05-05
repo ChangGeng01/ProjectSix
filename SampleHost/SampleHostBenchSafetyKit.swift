@@ -100,6 +100,9 @@ enum SampleHostBenchThermalGate {
     /// Read current device thermal/battery from ProcessInfo + UIDevice.
     /// Returns the raw 4-tuple suitable for `decide(...)`.
     /// macOS / non-UIKit hosts return `batteryLevel = -1`.
+    /// `@MainActor` because UIDevice.current properties are
+    /// MainActor-isolated on iOS.
+    @MainActor
     static func currentDeviceState() -> (
         thermal: String,
         battery: Double,
@@ -391,15 +394,22 @@ enum SampleHostBenchAdversarialKind: String, CaseIterable, Sendable {
 /// Decide whether to mutate this iter and which kind. Returns nil
 /// if no mutation. Deterministic by iter so replay is exact.
 enum SampleHostBenchAdversarialMutator {
-    /// Probability of mutating an iter (0.0 .. 1.0). 0.05 = 5%.
-    static let mutationProbability: Double = 0.05
+    /// Default probability of mutating an iter (0.0 .. 1.0).
+    /// 0.05 = 5%. M731 chapter 一百九十四: callers can override
+    /// via `decideMutation(forIter:enabled:probability:)` to flex
+    /// the rate per-bench.
+    static let defaultMutationProbability: Double = 0.05
 
     /// Decide for an iter. Returns nil if not mutated.
+    /// `probability`: clamped to [0, 1]; default 0.05.
     static func decideMutation(
         forIter iter: Int,
-        enabled: Bool
+        enabled: Bool,
+        probability: Double = defaultMutationProbability
     ) -> SampleHostBenchAdversarialKind? {
         guard enabled else { return nil }
+        let p = max(0.0, min(1.0, probability))
+        guard p > 0.0 else { return nil }
         // Linear-congruential RNG by iter (independent stream from
         // pressure mixer to avoid correlated decisions).
         let seed = UInt64(bitPattern: Int64(iter)) &* 0x517c_c1b7_2722_0a95
@@ -407,7 +417,7 @@ enum SampleHostBenchAdversarialMutator {
         rng = rng >> 32
         let r = Double(UInt32(truncatingIfNeeded: rng))
             / Double(UInt32.max)
-        guard r < mutationProbability else { return nil }
+        guard r < p else { return nil }
         // Pick kind uniformly among 8 cases
         let kindIdx = Int(rng % UInt64(SampleHostBenchAdversarialKind
             .allCases.count))
@@ -547,6 +557,93 @@ actor SampleHostBenchCheckpointStore {
 
     /// URL for tests / replay tool.
     var checkpointURL: URL { url }
+}
+
+// MARK: - M733 chapter 一百九十四 — JSONL shard manifest
+
+/// Per-bench manifest written at bench end. Lets replay tool know
+/// total shard count + total iters + anomaly summary + bench config
+/// without scanning all rows. JSON file at
+/// `Documents/iphone-hybrid-bench/manifest.json`.
+///
+/// Doctrine: manifest is OBSERVABILITY only — replay tool reads it
+/// for fast summary; actual ground truth still lives in JSONL rows
+/// (manifest may be stale / missing on crash; replay tool falls
+/// back to scanning).
+struct SampleHostBenchShardManifest: Codable, Sendable, Equatable {
+    let benchID: String          // start time iso as identifier
+    let startTimeIso: String
+    let endTimeIso: String
+    let totalIters: Int
+    let totalShards: Int          // count of *.jsonl files
+    let smokeMode: String
+    let durationHours: Double
+    let mutationSeedCount: Int
+    let strideCSV: String
+    /// Captured at bench end for fast summary
+    let afmOk: Int
+    let gemmaOk: Int
+    let bothFailed: Int
+    let routerHits: Int
+    let routerMisses: Int
+    let stuckSubstrates: Int
+    let stuckLLMs: Int
+    let pauseSkipped: Int
+    let adversarialFired: Int
+    let driftAlarms: Int
+    /// Chapter-192 flex constants in effect for this bench
+    let anomalyWindowSize: Int
+    let driftSigmaThreshold: Double
+    let mutationProbability: Double
+    let checkpointEveryNIters: Int
+}
+
+actor SampleHostBenchShardManifestStore {
+    static let shared = SampleHostBenchShardManifestStore()
+    private let url: URL
+
+    init() {
+        let docs = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        ).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let dir = docs.appendingPathComponent("iphone-hybrid-bench")
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true)
+        self.url = dir.appendingPathComponent("manifest.json")
+    }
+
+    /// Atomic write — same pattern as checkpoint store.
+    func write(_ manifest: SampleHostBenchShardManifest) async throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(manifest)
+        let tmp = url.appendingPathExtension("tmp")
+        try data.write(to: tmp, options: .atomic)
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try? FileManager.default.removeItem(at: url)
+        }
+        try FileManager.default.moveItem(at: tmp, to: url)
+    }
+
+    func read() async -> SampleHostBenchShardManifest? {
+        guard let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return try? JSONDecoder()
+            .decode(SampleHostBenchShardManifest.self, from: data)
+    }
+
+    var manifestURL: URL { url }
+}
+
+/// Count `*.jsonl` shards in the bench output directory.
+/// Called at bench end to populate manifest.
+func sampleHostBenchCountShards(in directory: URL) -> Int {
+    let fm = FileManager.default
+    guard let contents = try? fm.contentsOfDirectory(
+        at: directory, includingPropertiesForKeys: nil)
+    else { return 0 }
+    return contents.filter { $0.pathExtension == "jsonl" }.count
 }
 
 // MARK: - M719 selection helper

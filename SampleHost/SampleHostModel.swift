@@ -453,8 +453,17 @@ final class SampleHostModel: ObservableObject {
         HybridBenchTuning.postLLMBodyTruncationChars
     /// M711 chapter 一百九十一 — `.canonical` (chapter 178+
     /// default) vs `.fourteenLayer` (M711 14-layer smoke).
+    /// M719 chapter 一百九十二 — `.heavyTailed` 10h preset.
     @Published var hybridBenchSmokeMode:
         HybridBenchConfig.SmokeMode = .canonical
+    /// M731 chapter 一百九十四 — chapter-192 safety-kit flex
+    /// constants exposed to UI. Bench loop reads live so operator
+    /// can adjust mid-config without rebuild. Bounds enforced
+    /// via `update*` methods to keep doctrine within sane range.
+    @Published var hybridBenchAnomalyWindowSize: Int = 100
+    @Published var hybridBenchDriftSigmaThreshold: Double = 3.0
+    @Published var hybridBenchMutationProbability: Double = 0.05
+    @Published var hybridBenchCheckpointEveryNIters: Int = 1000
     @Published private(set) var hybridBenchIsRunning: Bool = false
     @Published private(set) var hybridBenchIterations: Int = 0
     @Published private(set) var hybridBenchAFMOk: Int = 0
@@ -2563,8 +2572,13 @@ extension SampleHostModel {
 
         let runtime = self.runtime
         // M718 chapter 一百九十二 — anomaly watcher (fresh per-bench).
+        // M731 chapter 一百九十四 — windowSize from @Published flex.
+        let anomalyWindowCaptured = self.hybridBenchAnomalyWindowSize
+        let driftThresholdCaptured = self.hybridBenchDriftSigmaThreshold
+        let mutationProbCaptured = self.hybridBenchMutationProbability
+        let checkpointEveryNCaptured = self.hybridBenchCheckpointEveryNIters
         let anomalyWatcher = SampleHostBenchAnomalyWatcher(
-            windowSize: 100)
+            windowSize: anomalyWindowCaptured)
         // M721 chapter 一百九十二 — drift monitor on length-MAE
         // residual (Welford std-dev). Per-iter sigma vs. running
         // mean attached to row + flagged when > 3-sigma.
@@ -2575,9 +2589,9 @@ extension SampleHostModel {
             .map(String.init).joined(separator: ",")
         let mutationCountCaptured = mutationCount
         let durationHoursCaptured = durationSec / 3600.0
-        // M722 chapter 一百九十二 — write checkpoint every 1000
-        // iters so a 10h crash loses ≤ ~3 minutes of progress.
-        let checkpointEveryN: Int = 1000
+        // M722 chapter 一百九十二 — write checkpoint every N iters.
+        // M731 chapter 一百九十四 — N from @Published flex.
+        let checkpointEveryN: Int = checkpointEveryNCaptured
         hybridBenchTask = Task { @MainActor [weak self] in
             guard let self else { return }
             let startedAt = Date()
@@ -2628,10 +2642,13 @@ extension SampleHostModel {
                 // is opt-in via `.heavyTailed`. 5% of iters get a
                 // pathological prompt overlay. Recorded so replay
                 // can stratify by adversarial type.
+                // M731 chapter 一百九十四 — probability from
+                // @Published flex (per-bench captured value).
                 let adversarialKind = SampleHostBenchAdversarialMutator
                     .decideMutation(
                         forIter: iter,
-                        enabled: smokeMode == .heavyTailed)
+                        enabled: smokeMode == .heavyTailed,
+                        probability: mutationProbCaptured)
 
                 let g = SampleHostBenchPromptCatalog
                     .generateScatteredWithMutation(
@@ -3398,8 +3415,9 @@ extension SampleHostModel {
                     latencyDriftMonitor.update(abs(lerr))
                 }
                 // 3-sigma threshold: tag in anomalyFlags for grep.
+                // M731 chapter 一百九十四 — threshold from @Published.
                 var allFlags = anomalyFlags
-                if let s = driftSigma, s > 3.0 {
+                if let s = driftSigma, s > driftThresholdCaptured {
                     allFlags.append(
                         "drift:length-mae:\(String(format: "%.1f", s))-sigma")
                     applyIfActive(myGen) {
@@ -3529,6 +3547,40 @@ extension SampleHostModel {
                 }
             }
             await runner.close()
+            // M733 chapter 一百九十四 — write shard manifest at
+            // clean-finish for fast replay summary.
+            if self.hybridBenchGeneration == myGen {
+                let outDir = SampleHostBenchHelpers
+                    .hybridBenchOutputDirURL()
+                let shardCount = sampleHostBenchCountShards(in: outDir)
+                let manifest = SampleHostBenchShardManifest(
+                    benchID: benchStartIso,
+                    startTimeIso: benchStartIso,
+                    endTimeIso: SampleHostBenchHelpers
+                        .iso8601(Date()),
+                    totalIters: iter,
+                    totalShards: shardCount,
+                    smokeMode: self.hybridBenchSmokeMode.rawValue,
+                    durationHours: durationHoursCaptured,
+                    mutationSeedCount: mutationCountCaptured,
+                    strideCSV: strideCSVCaptured,
+                    afmOk: self.hybridBenchAFMOk,
+                    gemmaOk: self.hybridBenchGemmaOk,
+                    bothFailed: self.hybridBenchBothFailed,
+                    routerHits: self.hybridBenchRouterHits,
+                    routerMisses: self.hybridBenchRouterMisses,
+                    stuckSubstrates: self.hybridBenchStuckSubstrateCount,
+                    stuckLLMs: self.hybridBenchStuckLLMCount,
+                    pauseSkipped: self.hybridBenchPauseSkippedCount,
+                    adversarialFired: self.hybridBenchAdversarialFiredCount,
+                    driftAlarms: self.hybridBenchDriftAlarmCount,
+                    anomalyWindowSize: anomalyWindowCaptured,
+                    driftSigmaThreshold: driftThresholdCaptured,
+                    mutationProbability: mutationProbCaptured,
+                    checkpointEveryNIters: checkpointEveryNCaptured)
+                try? await SampleHostBenchShardManifestStore
+                    .shared.write(manifest)
+            }
             // M722 chapter 一百九十二 — clean-finish checkpoint
             // wipe so a fresh launch does not see a stale snap.
             // (Crash-mid-bench leaves checkpoint untouched, which
@@ -3572,6 +3624,24 @@ extension SampleHostModel {
 
     func updateHybridBenchMutationCount(_ newValue: Int) {
         hybridBenchMutationSeedCount = max(1, min(5, newValue))
+    }
+
+    // M731 chapter 一百九十四 — bound-enforcing setters for the
+    // chapter-192 safety-kit flex constants. Doctrine: bench
+    // loop reads the @Published value live but ranges must stay
+    // within sane operating envelope so mid-bench adjustments
+    // don't break invariants (e.g. windowSize = 0 → infinite loop).
+    func updateAnomalyWindowSize(_ v: Int) {
+        hybridBenchAnomalyWindowSize = max(10, min(1000, v))
+    }
+    func updateDriftSigmaThreshold(_ v: Double) {
+        hybridBenchDriftSigmaThreshold = max(1.0, min(10.0, v))
+    }
+    func updateMutationProbability(_ v: Double) {
+        hybridBenchMutationProbability = max(0.0, min(1.0, v))
+    }
+    func updateCheckpointEveryNIters(_ v: Int) {
+        hybridBenchCheckpointEveryNIters = max(100, min(100_000, v))
     }
 
     /// M726 chapter 一百九十三 — resume detector. Read latest

@@ -24431,3 +24431,114 @@ Pre chapter 一百九十三, all 5 chapter-192 counters lived only in JSONL — 
 ### 193.9 一句话总结
 
 **Chapter 一百九十三 (M726-M730)**: continue chapter 一百九十二's "全面进化" by closing the 2 highest-impact UI residuals — **M726 Resume UI** (orange banner surfaces previous bench's last-known state on app launch; auto-clears stale >24h checkpoints; "Dismiss" button to wipe; doctrine: PROMPTS, never auto-resumes) + **M727 Live Safety Dashboard** (5 new @Published cumulative counters: stuck-substrate / stuck-LLM / pause-skipped / adversarial-fired / drift-alarm; surfaced in hybridBenchPanel as "🛡️ Safety kit" section; tint switches to orange when any anomaly fires). The 10h smoke run now SHOWS the chapter-192 safety kit working in real time instead of accumulating silently in JSONL. **53 SampleHost tests pass** (+4 chapter 193 fix-pins). **1933 total tests + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: dashboard is HINT-ONLY; bench loop is the only writer to @Published counters; resume PROMPTS the operator (no auto-restart); UI mutations zero. **Honest residual: real production 10h data remains THE blocker. Infrastructure is now COMPLETE for the 10h tap.**
+
+## 一百九十四、 全面进化 续² — flex sliders + shard manifest (M731-M734 / 2026-05-06)
+
+User trail: continued evolution toward "满意之后". Chapter 一百九十三 surfaced chapter-192 safety counters; chapter 一百九十四 makes the chapter-192 thresholds themselves operator-tunable + adds JSONL manifest summary at bench-end.
+
+### 194.1 M731 — 4 chapter-192 flex constants @Published
+
+`SampleHostModel` exposes:
+- `hybridBenchAnomalyWindowSize: Int = 100` (range [10, 1000])
+- `hybridBenchDriftSigmaThreshold: Double = 3.0` (range [1.0, 10.0])
+- `hybridBenchMutationProbability: Double = 0.05` (range [0.0, 1.0])
+- `hybridBenchCheckpointEveryNIters: Int = 1000` (range [100, 100_000])
+
+Bench loop captures all 4 values at `startHybridBench()` time (so mid-bench changes don't desync the per-iter state machine). `SampleHostBenchAdversarialMutator.decideMutation` extended with a `probability:` parameter (defaults to `defaultMutationProbability = 0.05`). Bench loop's `> 3.0` threshold replaced with the captured `driftThresholdCaptured`.
+
+### 194.2 M732 — UI sliders for the 4 flex constants
+
+4 new `Stepper` controls in hybridBenchPanel below the existing Hours/Stride/Mutations row. All 4 disabled while bench is running (`.disabled(model.hybridBenchIsRunning)`) so changes only apply on next start.
+
+Display formats:
+- Anomaly window: `"100"` (steps of 10)
+- Drift σ-thresh: `"3.0σ"` (steps of 0.5)
+- Mutation prob: `"5%"` (steps of 0.01 = 1%)
+- Checkpoint @: `"1000"` (steps of 100)
+
+### 194.3 M733 — JSONL shard manifest
+
+New `SampleHostBenchShardManifest` Codable struct (24 fields) atomic-written to `Documents/iphone-hybrid-bench/manifest.json` at bench clean-finish. Captures:
+- benchID / startTimeIso / endTimeIso
+- totalIters / totalShards (counted via new helper `sampleHostBenchCountShards`)
+- smokeMode / durationHours / mutationSeedCount / strideCSV
+- 5 outcome counters (afmOk / gemmaOk / bothFailed / routerHits / routerMisses)
+- 5 anomaly counters (stuckSubstrates / stuckLLMs / pauseSkipped / adversarialFired / driftAlarms)
+- 4 chapter-192 flex constants in effect for this bench (anomaly window / drift σ-thresh / mutation prob / checkpoint every-N)
+
+Doctrine: manifest is OBSERVABILITY only — replay tool reads it for fast summary; ground truth still lives in JSONL rows. Manifest may be missing on crash (cleaning-finish only writes); replay tool falls back to scanning.
+
+`SampleHostBenchShardManifestStore` actor mirrors `SampleHostBenchCheckpointStore` pattern (atomic via tmp + rename).
+
+### 194.4 Tests (M734)
+
+| Test | Pin |
+|---|---|
+| `testChapter192FlexConstantsHaveSaneDefaults` | 4 constants default values |
+| `testChapter192FlexConstantsBounds` | All 4 setters clamp to typed range |
+| `testAdversarialMutatorRespectsCustomProbability` | p=0 never fires / p=1 always / p=0.5 ~half |
+| `testShardManifestCodableRoundTrip` | 24-field round-trip |
+| `testShardManifestStoreAtomicWriteRead` | Manifest store write+read |
+| `testCountShardsCountsOnlyJsonlFiles` | Counter ignores non-jsonl |
+
+SampleHost tests: 53 → **59**.
+
+### 194.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ (unchanged) |
+| Qinao XCTest | 1442 ✓ (unchanged) |
+| SampleHost on iPhone 17e sim | **59** ✓ (+6 chapter 194) |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| iOS Sim test execution | All 59 passed in 0.169s |
+| 4 boundary checks | clean |
+| Cross-language schema parity | clean |
+| **Total** | **1939 + 1 parity gate + 3 analysis tools, 0 failures** |
+
+### 194.6 What's now operator-tunable for the 10h smoke
+
+Mid-launch, before tapping Start, operator can set:
+1. Anomaly window — smaller = more sensitive (more FP); larger = slower to detect
+2. Drift σ-threshold — lower = more drift alarms; higher = only severe drifts
+3. Mutation probability — higher = more adversarial coverage; lower = closer to baseline
+4. Checkpoint every-N iters — smaller = better crash recovery; larger = less I/O
+
+Default values match chapter-192's typed constants (100 / 3.0 / 5% / 1000) — no behavior change unless operator opts to flex.
+
+At bench clean-finish, manifest.json is auto-written for fast post-hoc summary.
+
+### 194.7 Honest residual after chapter 一百九十四
+
+| Item | Status |
+|---|---|
+| **No real production 10h bench data** | **Still THE BLOCKER** |
+| Validator byte-parity with Swift JSONEncoder | Still approximate |
+| Bench → v0.5 retrain proof | Pipeline ready; awaits real bench |
+| Manifest read in replay tool | Schema ready; replay tool integration deferred |
+| CI / multi-device / load test | Still external |
+
+### 194.8 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | +4 @Published flex constants; +4 update setters with bounds; bench loop captures all 4 + writes manifest at clean-finish |
+| `SampleHost/SampleHostBenchSafetyKit.swift` | `decideMutation` + `probability:` param; +`SampleHostBenchShardManifest` Codable + `SampleHostBenchShardManifestStore` actor + `sampleHostBenchCountShards()` helper; @MainActor on `currentDeviceState()` to fix UIKit isolation warnings |
+| `SampleHost/SampleHostView.swift` | +4 Stepper controls in hybridBenchPanel for flex constants |
+| `SampleHostTests/SampleHostTests.swift` | +6 chapter 194 fix-pin tests |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M731-M734 entry |
+
+### 194.9 Doctrine pins
+
+| Pin | Held |
+|---|---|
+| 不变量 #1/#2/#3 | ✓ |
+| Single commit mouth | ✓ |
+| Red line 7 (watcher hint only) | ✓ — flex constants only tune sensitivity, not decisions |
+| Anti-magic-number | ✓ — every range bound is a typed literal in update setter |
+| Anti-drift 3-site cross-update | ✓ — defaults pinned in tests; ranges in setters |
+
+### 194.10 一句话总结
+
+**Chapter 一百九十四 (M731-M734)**: continue chapter 一百九十二/九十三 trajectory toward "满意之后" by closing 2 more residuals — **M731+M732 UI sliders** for 4 chapter-192 safety-kit flex constants (anomaly window 10-1000 / drift σ-threshold 1.0-10.0 / mutation probability 0-100% / checkpoint every-N iters 100-100K) with bound enforcement on setters; bench loop captures values at start so mid-bench UI changes don't desync. **M733 JSONL shard manifest** (24-field Codable atomic-written to `manifest.json` at bench clean-finish; captures total iters / shard count / 5 outcome counters + 5 anomaly counters + 4 flex-constants in effect for fast post-hoc summary without scanning rows). **6 fix-pin tests** added (defaults / bounds / adversarial probability / manifest round-trip / manifest store / shard counter). **59 SampleHost tests pass**; full stack **1939 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: flex constants only tune sensitivity (not decisions); manifest is OBSERVABILITY only; ranges enforced via typed literals in setters; @MainActor on `currentDeviceState()` fixed UIKit isolation warnings (8 → 0). Operator can now adjust the safety kit's 4 thresholds before tapping the 10h Run button without rebuilding.

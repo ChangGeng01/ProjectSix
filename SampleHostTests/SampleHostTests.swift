@@ -1234,4 +1234,152 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(m.hybridBenchAdversarialFiredCount, 0)
         XCTAssertEqual(m.hybridBenchDriftAlarmCount, 0)
     }
+
+    // MARK: - chapter 一百九十四 / M731-M734 — flex sliders + manifest
+
+    /// M731 — 4 chapter-192 safety constants are @Published with
+    /// safe defaults.
+    @MainActor
+    func testChapter192FlexConstantsHaveSaneDefaults() {
+        let m = SampleHostModel()
+        XCTAssertEqual(m.hybridBenchAnomalyWindowSize, 100)
+        XCTAssertEqual(m.hybridBenchDriftSigmaThreshold, 3.0)
+        XCTAssertEqual(m.hybridBenchMutationProbability, 0.05)
+        XCTAssertEqual(m.hybridBenchCheckpointEveryNIters, 1000)
+    }
+
+    /// M731 — bound enforcement on the 4 setters.
+    @MainActor
+    func testChapter192FlexConstantsBounds() {
+        let m = SampleHostModel()
+        m.updateAnomalyWindowSize(5)        // below 10 floor
+        XCTAssertEqual(m.hybridBenchAnomalyWindowSize, 10)
+        m.updateAnomalyWindowSize(99_999)   // above 1000 ceiling
+        XCTAssertEqual(m.hybridBenchAnomalyWindowSize, 1000)
+
+        m.updateDriftSigmaThreshold(0.5)    // below 1.0 floor
+        XCTAssertEqual(m.hybridBenchDriftSigmaThreshold, 1.0)
+        m.updateDriftSigmaThreshold(99.0)   // above 10 ceiling
+        XCTAssertEqual(m.hybridBenchDriftSigmaThreshold, 10.0)
+
+        m.updateMutationProbability(-0.5)   // below 0.0 floor
+        XCTAssertEqual(m.hybridBenchMutationProbability, 0.0)
+        m.updateMutationProbability(2.0)    // above 1.0 ceiling
+        XCTAssertEqual(m.hybridBenchMutationProbability, 1.0)
+
+        m.updateCheckpointEveryNIters(50)   // below 100 floor
+        XCTAssertEqual(m.hybridBenchCheckpointEveryNIters, 100)
+        m.updateCheckpointEveryNIters(1_000_000) // above 100K
+        XCTAssertEqual(m.hybridBenchCheckpointEveryNIters, 100_000)
+    }
+
+    /// M731 — adversarial mutator accepts custom probability.
+    func testAdversarialMutatorRespectsCustomProbability() {
+        // probability = 0 → never fires
+        var fires = 0
+        for i in 0..<1000 {
+            if SampleHostBenchAdversarialMutator
+                .decideMutation(forIter: i, enabled: true,
+                                probability: 0.0) != nil
+            {
+                fires += 1
+            }
+        }
+        XCTAssertEqual(fires, 0, "p=0 should never fire")
+
+        // probability = 1 → always fires
+        var alwaysFires = 0
+        for i in 0..<100 {
+            if SampleHostBenchAdversarialMutator
+                .decideMutation(forIter: i, enabled: true,
+                                probability: 1.0) != nil
+            {
+                alwaysFires += 1
+            }
+        }
+        XCTAssertEqual(alwaysFires, 100, "p=1 should always fire")
+
+        // probability = 0.5 → ~50%
+        var halfFires = 0
+        for i in 0..<10_000 {
+            if SampleHostBenchAdversarialMutator
+                .decideMutation(forIter: i, enabled: true,
+                                probability: 0.5) != nil
+            {
+                halfFires += 1
+            }
+        }
+        XCTAssertGreaterThan(halfFires, 4_500)
+        XCTAssertLessThan(halfFires, 5_500)
+    }
+
+    /// M733 — manifest Codable round-trip.
+    func testShardManifestCodableRoundTrip() throws {
+        let manifest = SampleHostBenchShardManifest(
+            benchID: "2026-05-06T00:00:00Z",
+            startTimeIso: "2026-05-06T00:00:00Z",
+            endTimeIso: "2026-05-06T10:00:00Z",
+            totalIters: 180_000,
+            totalShards: 7,
+            smokeMode: "heavy-tailed",
+            durationHours: 10.0,
+            mutationSeedCount: 5,
+            strideCSV: "5041,5039,5051,5077,7919",
+            afmOk: 100_000,
+            gemmaOk: 70_000,
+            bothFailed: 100,
+            routerHits: 162_000,
+            routerMisses: 18_000,
+            stuckSubstrates: 0,
+            stuckLLMs: 0,
+            pauseSkipped: 50,
+            adversarialFired: 9_000,
+            driftAlarms: 12,
+            anomalyWindowSize: 100,
+            driftSigmaThreshold: 3.0,
+            mutationProbability: 0.05,
+            checkpointEveryNIters: 1000)
+        let data = try JSONEncoder().encode(manifest)
+        let back = try JSONDecoder().decode(
+            SampleHostBenchShardManifest.self, from: data)
+        XCTAssertEqual(manifest, back)
+    }
+
+    /// M733 — manifest store atomic write + read round-trip.
+    func testShardManifestStoreAtomicWriteRead() async throws {
+        let store = SampleHostBenchShardManifestStore.shared
+        let m = SampleHostBenchShardManifest(
+            benchID: "test", startTimeIso: "t", endTimeIso: "t",
+            totalIters: 42, totalShards: 1, smokeMode: "canonical",
+            durationHours: 0.1, mutationSeedCount: 1,
+            strideCSV: "5041", afmOk: 0, gemmaOk: 0, bothFailed: 0,
+            routerHits: 0, routerMisses: 0,
+            stuckSubstrates: 0, stuckLLMs: 0,
+            pauseSkipped: 0, adversarialFired: 0, driftAlarms: 0,
+            anomalyWindowSize: 100, driftSigmaThreshold: 3.0,
+            mutationProbability: 0.05, checkpointEveryNIters: 1000)
+        try await store.write(m)
+        let back = await store.read()
+        XCTAssertEqual(back?.totalIters, 42)
+        XCTAssertEqual(back?.smokeMode, "canonical")
+    }
+
+    /// M733 — sampleHostBenchCountShards counts only `*.jsonl`.
+    func testCountShardsCountsOnlyJsonlFiles() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-shards-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: tmpDir, withIntermediateDirectories: true)
+        defer {
+            _ = try? FileManager.default.removeItem(at: tmpDir)
+        }
+        // 3 *.jsonl files + 2 unrelated
+        for i in 1...3 {
+            let url = tmpDir.appendingPathComponent("shard.\(i).jsonl")
+            try Data("hello".utf8).write(to: url)
+        }
+        try Data().write(to: tmpDir.appendingPathComponent("notes.txt"))
+        try Data().write(to: tmpDir.appendingPathComponent("manifest.json"))
+        XCTAssertEqual(sampleHostBenchCountShards(in: tmpDir), 3)
+    }
 }

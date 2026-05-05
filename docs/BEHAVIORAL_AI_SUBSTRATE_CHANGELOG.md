@@ -1143,3 +1143,12 @@ NEW `SampleHost/SampleHostBenchSafetyKit.swift` (~440 LOC) packages all 7 helper
 - **M729-M730** chapter 一百九十三 honesty board + changelog.
 
 The 10h smoke run now SHOWS chapter-192 safety kit working in real time. SampleHost tests 49 → **53**; full stack **1933 + 1 parity gate + 3 analysis tools, 0 failures**.
+
+## 2026-05-06 — chapter 一百九十四 (M731-M734) 全面进化 续² — flex sliders + shard manifest
+
+- **M731** 4 chapter-192 safety constants now @Published with bound-enforcing setters: anomalyWindowSize [10, 1000], driftSigmaThreshold [1.0, 10.0], mutationProbability [0.0, 1.0], checkpointEveryNIters [100, 100_000]. `SampleHostBenchAdversarialMutator.decideMutation` accepts `probability:` parameter. Bench loop captures values at start time (mid-bench changes don't desync state machines).
+- **M732** 4 new Stepper controls in hybridBenchPanel for the flex constants, disabled while bench is running.
+- **M733** New `SampleHostBenchShardManifest` Codable struct (24 fields) + `SampleHostBenchShardManifestStore` actor + `sampleHostBenchCountShards()` helper. Manifest atomic-written to `manifest.json` at bench clean-finish. Captures iters / shard count / 5 outcome + 5 anomaly counters + 4 flex constants in effect.
+- **M734** 6 fix-pin tests + UIKit MainActor isolation warning fix on `SampleHostBenchThermalGate.currentDeviceState()` (now `@MainActor`).
+
+SampleHost tests 53 → **59**; full stack **1939 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: flex constants tune sensitivity (not decisions); manifest is OBSERVABILITY only; replay tool integration of manifest deferred.
