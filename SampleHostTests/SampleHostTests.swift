@@ -261,6 +261,7 @@ final class SampleHostTests: XCTestCase {
             permitPredictBlockProb: .nan,
             permitPredictClass: nil,
             permitPredictAgreement: nil,
+            routerOverridden: false,
             lengthPredicted: .nan, lengthError: .infinity,
             latencyPredictedMs: .nan, latencyErrorMs: -.infinity,
             verbosityProbability: .nan, verbosityCorrect: nil)
@@ -281,6 +282,95 @@ final class SampleHostTests: XCTestCase {
         let p1 = ChengluPreflightInference.shared
         let p2 = ChengluPreflightInference.shared
         XCTAssertTrue(p1 === p2, "Preflight .shared not singleton")
+    }
+
+    // MARK: - M666-M672 chapter 一百八十五 — fix-pin tests
+
+    /// M672 chapter 一百八十五 — B14 schema version constant.
+    func testHybridBenchRowSchemaVersion() {
+        XCTAssertEqual(
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "5",
+            "Schema version must bump on breaking field change")
+    }
+
+    /// M672 chapter 一百八十五 — B10 magic numbers extracted.
+    func testHybridBenchTuningConstants() {
+        XCTAssertEqual(
+            HybridBenchTuning.verbosityThresholdChars, 1500)
+        XCTAssertEqual(
+            HybridBenchTuning.sigmoidClassThreshold, 0.5)
+        XCTAssertEqual(
+            HybridBenchTuning.yieldEveryNIters, 1)
+        XCTAssertEqual(
+            HybridBenchTuning.postLLMBodyTruncationChars, 4000)
+    }
+
+    /// M669 chapter 一百八十五 — B8 Welford running mean is
+    /// numerically equivalent to Sum/Count for finite samples
+    /// and avoids precision drift over many iterations.
+    func testWelfordRunningMeanMatchesSumCountForFiniteSamples() {
+        // Manual replay of the Welford recurrence used in the
+        // bench loop: mean += (x - mean) / n.
+        var mean: Double = 0
+        var n: Int = 0
+        var sum: Double = 0
+        let samples: [Double] = [479, 421, 502, 380, 555, 488]
+        for s in samples {
+            n += 1
+            sum += s
+            mean += (s - mean) / Double(n)
+        }
+        let sumThenDivide = sum / Double(samples.count)
+        XCTAssertEqual(
+            mean, sumThenDivide, accuracy: 1e-9,
+            "Welford recurrence diverges from Sum/Count")
+    }
+
+    /// M666 chapter 一百八十五 — B1 fix: row carries
+    /// routerOverridden flag, default false, optional.
+    func testHybridBenchRowEncodesRouterOverridden() throws {
+        let sig = SampleHostPromptSignature(
+            tone: "anxious", domain: "financial", stake: "low",
+            timeframe: "minutes", confidant: "friend",
+            askShape: "narrative")
+        let row = SampleHostHybridBenchRow(
+            timestamp: "2026-05-06T00:00:00Z",
+            iteration: 0, seed: 0, stride: 5041, mutationSeed: 0,
+            signature: sig, prompt: "test",
+            auditCodeCount: 100,
+            permitMode: "block",
+            routerVersion: "test",
+            routerPredictedRoute: "afm",
+            routerProbability: 0.5,
+            firstTriedLLM: "none-substrate-skip",
+            firstTriedStatus: "ok-substrate-skip",
+            firstTriedBody: "canned",
+            firstTriedDurationMs: 0,
+            fallbackTriedLLM: nil, fallbackStatus: nil,
+            fallbackBody: nil, fallbackDurationMs: nil,
+            actualRoute: "skipped-by-substrate-block",
+            routerHit: true,                // legacy default
+            totalDurationSeconds: 0.05,
+            errorMessage: nil,
+            dispatchPolicy: "skip-block",
+            dispatchTaken: "skip-block",
+            draftOnly: false, llmSkipped: true,
+            postLLMPermitMode: nil, postLLMAuditCodeCount: nil,
+            postLLMShifted: nil,
+            permitPredictBlockProb: 0.99,
+            permitPredictClass: "block",
+            permitPredictAgreement: true,
+            routerOverridden: true,         // M666 NEW
+            lengthPredicted: nil, lengthError: nil,
+            latencyPredictedMs: nil, latencyErrorMs: nil,
+            verbosityProbability: nil, verbosityCorrect: nil)
+        let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
+        XCTAssertTrue(
+            encoded.contains("\"routerOverridden\":true"),
+            "row must encode routerOverridden field: \(encoded)")
+        XCTAssertTrue(
+            encoded.contains("\"schemaVersion\":\"5\""),
+            "row must encode schemaVersion field: \(encoded)")
     }
 
     /// Predict on out-of-vocab tone (e.g. typo) should not crash —

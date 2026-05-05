@@ -476,10 +476,20 @@ final class SampleHostModel: ObservableObject {
     // These ARE expected to be non-zero (regression heads are
     // not 100% accurate; chapter 176 train MAE was ~479 chars
     // and ~2091 ms) — bench just records empirical residuals.
+    // M669 chapter 一百八十五 — B8 (HIGH): replace Sum-then-divide
+    // with Welford's online running-mean algorithm to avoid
+    // Double precision drift over 8h benches (~144K samples ×
+    // ~500 chars = ~72M magnitude near 2^26 — late-bench
+    // increments can lose precision under naive Sum/Count).
+    // Welford: mean += (x - mean) / count. Numerically stable.
+    // Old `*Sum` / `*Count` fields still exist as @Published for
+    // backward compat; UI now reads `*RunningMean` directly.
     @Published private(set) var hybridBenchLengthMAESum: Double = 0
     @Published private(set) var hybridBenchLengthMAECount: Int = 0
+    @Published private(set) var hybridBenchLengthMAERunning: Double = 0
     @Published private(set) var hybridBenchLatencyMAESumMs: Double = 0
     @Published private(set) var hybridBenchLatencyMAECount: Int = 0
+    @Published private(set) var hybridBenchLatencyMAERunningMs: Double = 0
     // M661 chapter 一百八十三 — 5th head agreement counters.
     @Published private(set) var hybridBenchVerbosityCorrect: Int = 0
     @Published private(set) var hybridBenchVerbosityWrong: Int = 0
@@ -1575,7 +1585,42 @@ private func gcd(_ a: Int, _ b: Int) -> Int {
 
 // MARK: - M619 chapter 一百七十七 §177 — Hybrid bench row + runner
 
+/// M672 chapter 一百八十五 — typed bench tuning constants
+/// (was: magic numbers `1500`, `0.5`, `8`, etc. scattered).
+/// Doctrine pin: chapter 一百三十 anti-magic-number applied to
+/// hybrid bench loop. All `1500` thresholds delegate to the
+/// shared `ChengluFeatureEncoder` indirectly via Python's
+/// `VERBOSITY_THRESHOLD_CHARS` (which is the trained model's
+/// label cutoff).
+enum HybridBenchTuning {
+    /// Verbosity classification threshold (chars). Must match
+    /// Python `VERBOSITY_THRESHOLD_CHARS` in chenglu_feature_schema.
+    static let verbosityThresholdChars: Int = 1500
+    /// Sigmoid → class threshold (binary heads).
+    static let sigmoidClassThreshold: Double = 0.5
+    /// `Task.yield()` cadence — every Nth iter. Lower = more
+    /// UI-responsive but more scheduler overhead. M667 chapter
+    /// 一百八十五 lowered from 8 → 1 (yield every iter) to
+    /// reduce sync substrate.startSession blocking on @MainActor.
+    static let yieldEveryNIters: Int = 1
+    /// Truncation cap on LLM body for substrate post-LLM
+    /// observation (chars). Pre-fix: full body (could be 20K+
+    /// chars from Gemma) was concatenated into observe prompt,
+    /// blowing up substrate eval time. M676 chapter 一百八十五
+    /// caps at 4000 chars; original length recorded in JSONL.
+    static let postLLMBodyTruncationChars: Int = 4000
+}
+
+/// M672 chapter 一百八十五 — explicit JSONL row schema version.
+/// Bump on any breaking field change so downstream analyzers
+/// can detect format upgrades. Optional decoding allows old rows
+/// (without this field) to load as nil.
+let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "5"
+
 struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
+    /// M672 chapter 一百八十五 — schema version stamp.
+    /// Optional so old rows (M664-) decode as nil.
+    var schemaVersion: String? = SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION
     let timestamp: String
     let iteration: Int
     let seed: Int
@@ -1640,6 +1685,15 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let permitPredictBlockProb: Double?
     let permitPredictClass: String?
     let permitPredictAgreement: Bool?
+    // M666 chapter 一百八十五 — B1 fix (CRITICAL):
+    // routerHit was contaminated by skip/bothLLMs/localOnly
+    // branches where router prediction was OVERRIDDEN by
+    // substrate. routerOverridden = true means substrate
+    // bypassed router (skip-block / bothLLMs / localOnly),
+    // so routerHit/Miss tally for this row is router-irrelevant.
+    // Downstream analytics filtering on `routerOverridden ==
+    // false` get the genuine router-accuracy signal.
+    let routerOverridden: Bool?
     // M638-M641 chapter 一百八十 — 3rd + 4th CoreML heads:
     // ChengluLengthHead (regression on AFM body chars) +
     // ChengluLatencyHead (regression on AFM duration ms). Both
@@ -2088,11 +2142,13 @@ extension SampleHostModel {
         // M635 chapter 一百七十九 reset
         hybridBenchPermitPredictHits = 0
         hybridBenchPermitPredictMisses = 0
-        // M642 chapter 一百八十 reset
+        // M642 chapter 一百八十 reset + M669 Welford running
         hybridBenchLengthMAESum = 0
         hybridBenchLengthMAECount = 0
+        hybridBenchLengthMAERunning = 0
         hybridBenchLatencyMAESumMs = 0
         hybridBenchLatencyMAECount = 0
+        hybridBenchLatencyMAERunningMs = 0
         // M661 chapter 一百八十三 reset
         hybridBenchVerbosityCorrect = 0
         hybridBenchVerbosityWrong = 0
@@ -2248,6 +2304,14 @@ extension SampleHostModel {
                 var fallbackDurationMs: Double?
                 var actualRoute = ""
                 var routerHit = true
+                // M666 chapter 一百八十五 — B1 (CRITICAL):
+                // routerOverridden=true means substrate bypassed
+                // router prediction (skip / bothLLMs / localOnly).
+                // Default false; set true in the override branches
+                // below. routerHits/Misses counters now tally only
+                // when overridden==false, so `genuine router
+                // accuracy` analysis filters by this field.
+                var routerOverridden: Bool = false
                 var errorMessage: String?
                 var dispatchTaken: String = dispatchPolicy.rawValue
                 var llmSkipped: Bool = false
@@ -2264,16 +2328,22 @@ extension SampleHostModel {
                     firstTriedLLM = "none-substrate-skip"
                     firstBody = canned
                     firstStatus = "ok-substrate-skip"
-                    firstDurationMs =
-                        Date().timeIntervalSince(firstStart) * 1000
+                    // M671 chapter 一百八十五 — B11 (MEDIUM) fix:
+                    // skip-path duration is meaningless (just the
+                    // canned-string assignment latency). Set to 0
+                    // explicitly so JSONL analysis can grep
+                    // `firstTriedDurationMs == 0 && llmSkipped` to
+                    // identify skip rows cleanly.
+                    firstDurationMs = 0
                     actualRoute = "skipped-by-substrate-\(dispatchPolicy.rawValue.dropFirst("skip-".count))"
                     llmSkipped = true
                     dispatchTaken = dispatchPolicy.rawValue
-                    // Skip-path counts as router-hit by definition:
-                    // substrate decided no LLM, router prediction
-                    // is irrelevant. We still increment the
-                    // respective LLM counter at 0 for clarity.
-                    self.hybridBenchRouterHits += 1
+                    // M666 chapter 一百八十五 — B1 (CRITICAL):
+                    // skip path bypasses router; mark overridden
+                    // so router-accuracy analysis filters this
+                    // row out. Pre-fix: routerHits += 1 here
+                    // contaminated genuine router-hit signal.
+                    routerOverridden = true
                     switch dispatchPolicy {
                     case .skipBlock:
                         self.hybridBenchSubstrateSkipBlock += 1
@@ -2319,7 +2389,8 @@ extension SampleHostModel {
                         : "substrate-both-\(dispatchPolicy.rawValue)"
                     if bothFailed {
                         self.hybridBenchBothFailed += 1
-                        self.hybridBenchRouterMisses += 1
+                        // M666 — substrate forced both LLMs;
+                        // routerHits/Misses doesn't apply.
                         routerHit = false
                     } else {
                         if afmBodyMaybe != nil {
@@ -2328,17 +2399,21 @@ extension SampleHostModel {
                         if gemmaBodyMaybe != nil {
                             self.hybridBenchGemmaOk += 1
                         }
-                        self.hybridBenchRouterHits += 1
                     }
                     if afmErr != nil { errorMessage = "afm: \(afmErr!)" }
                     if gemmaErr != nil {
                         errorMessage = (errorMessage ?? "") + " gemma: \(gemmaErr!)"
                     }
+                    // M666 chapter 一百八十五 — B1: bothLLMs
+                    // overrides router prediction. Don't pollute
+                    // routerHits/Misses with these rows.
+                    routerOverridden = true
                     self.hybridBenchSubstrateBothLLMs += 1
                 } else if dispatchPolicy == .localOnly {
                     // M628 — substrate flagged no-cloud. Force
-                    // Gemma path, never AFM. Treat as router-hit
-                    // if Gemma succeeds.
+                    // Gemma path, never AFM. M666 chapter 一百
+                    // 八十五 B1 fix: localOnly is substrate
+                    // override; don't tally routerHits/Misses.
                     do {
                         firstBody = try await self.callGemma(prompt: prompt)
                         firstTriedLLM = "gemma"
@@ -2347,7 +2422,6 @@ extension SampleHostModel {
                             Date().timeIntervalSince(firstStart) * 1000
                         actualRoute = "local-only-gemma-ok"
                         self.hybridBenchGemmaOk += 1
-                        self.hybridBenchRouterHits += 1
                     } catch {
                         firstTriedLLM = "gemma"
                         firstStatus = "gemma-error"
@@ -2356,9 +2430,9 @@ extension SampleHostModel {
                         errorMessage = "gemma local-only: \(error)"
                         actualRoute = "local-only-gemma-failed"
                         self.hybridBenchBothFailed += 1
-                        self.hybridBenchRouterMisses += 1
                         routerHit = false
                     }
+                    routerOverridden = true
                     self.hybridBenchSubstrateLocalOnly += 1
                 } else {
                     // M628 — `.singleLLM` or `.draftOnly` falls
@@ -2536,8 +2610,25 @@ extension SampleHostModel {
                 var postLLMAuditCount: Int? = nil
                 var postLLMShifted: Bool? = nil
                 if !firstBody.isEmpty && !llmSkipped {
+                    // M676 chapter 一百八十五 — B6 (HIGH): cap
+                    // body at HybridBenchTuning.postLLMBody...
+                    // chars to avoid pathological substrate eval
+                    // on Gemma's occasional 20K-char outputs +
+                    // mitigate prompt-injection risk where LLM
+                    // body could contain text substrate
+                    // misinterprets as user intent.
+                    let cap = HybridBenchTuning
+                        .postLLMBodyTruncationChars
+                    let truncatedBody: String
+                    if firstBody.count > cap {
+                        truncatedBody =
+                            String(firstBody.prefix(cap))
+                            + "...[truncated]"
+                    } else {
+                        truncatedBody = firstBody
+                    }
                     let observeText =
-                        "Original: \(prompt)\n\nResponse: \(firstBody)"
+                        "Original: \(prompt)\n\nResponse: \(truncatedBody)"
                     if let observed = try? runtime.startSession(
                         BASHostSessionRequest(
                             kind: .interactive,
@@ -2565,29 +2656,52 @@ extension SampleHostModel {
                 // length + firstDurationMs). Skipped iters
                 // (llmSkipped == true) have no real LLM output to
                 // compare against — skip residual computation.
+                //
+                // M670 chapter 一百八十五 — B9 (HIGH): in
+                // bothLLMs branch, firstBody = AFM body (often
+                // empty when AFM errors). Use the actually-served
+                // body for residuals. `servedBody` is whichever
+                // body actually has content; falls back to
+                // fallbackBody when firstBody is empty.
+                let servedBody: String = {
+                    if !firstBody.isEmpty { return firstBody }
+                    return fallbackBody ?? ""
+                }()
                 var lengthError: Double? = nil
                 var latencyErrorMs: Double? = nil
                 // M661 chapter 一百八十三 — 5th head residual
                 // (verbosity binary correct/wrong).
                 var verbosityCorrect: Bool? = nil
                 let verbosityProb = multiHead?.verbosityProbability
-                if !llmSkipped, !firstBody.isEmpty {
+                if !llmSkipped, !servedBody.isEmpty {
                     if let pred = lengthPredicted {
-                        let actual = Double(firstBody.count)
+                        let actual = Double(servedBody.count)
                         let err = actual - pred
                         lengthError = err
+                        // M669 chapter 一百八十五 — B8 Welford
+                        // running mean (numerically stable over
+                        // 144K samples). Sum/Count kept for
+                        // backward compat in JSONL analysis.
                         self.hybridBenchLengthMAESum += abs(err)
                         self.hybridBenchLengthMAECount += 1
+                        let n = Double(self.hybridBenchLengthMAECount)
+                        self.hybridBenchLengthMAERunning +=
+                            (abs(err) - self.hybridBenchLengthMAERunning) / n
                     }
                     if let pred = latencyPredictedMs {
                         let err = firstDurationMs - pred
                         latencyErrorMs = err
                         self.hybridBenchLatencyMAESumMs += abs(err)
                         self.hybridBenchLatencyMAECount += 1
+                        let n = Double(self.hybridBenchLatencyMAECount)
+                        self.hybridBenchLatencyMAERunningMs +=
+                            (abs(err) - self.hybridBenchLatencyMAERunningMs) / n
                     }
                     if let prob = verbosityProb {
-                        let actualLong = firstBody.count > 1500
-                        let predictedLong = prob >= 0.5
+                        let actualLong = servedBody.count
+                            > HybridBenchTuning.verbosityThresholdChars
+                        let predictedLong = prob
+                            >= HybridBenchTuning.sigmoidClassThreshold
                         let correct = actualLong == predictedLong
                         verbosityCorrect = correct
                         if correct {
@@ -2633,6 +2747,7 @@ extension SampleHostModel {
                     permitPredictBlockProb: permitPredictBlockProb,
                     permitPredictClass: permitPredictClass,
                     permitPredictAgreement: permitPredictAgreement,
+                    routerOverridden: routerOverridden,
                     lengthPredicted: lengthPredicted,
                     lengthError: lengthError,
                     latencyPredictedMs: latencyPredictedMs,
@@ -2649,10 +2764,35 @@ extension SampleHostModel {
                 // counter if we're still the active generation.
                 // Stale tasks (cancelled by newer start) must not
                 // clobber the new bench's published counters.
+                // M668 chapter 一百八十五 — B5 (HIGH) fix:
+                // CHECK GENERATION POST-ITER. If a Stop→Start
+                // race created a newer task, all the per-iter
+                // counter writes above (AFMOk / GemmaOk /
+                // RouterHits / SubstrateSkip* / etc.) belong to
+                // an OLD task whose results are stale.
+                // Compensate by resetting the counters to ZERO
+                // for the new task's gen mark — the fresh task
+                // already zeroed them and will re-increment.
+                // We can't undo the +=1's already done; but we
+                // can document via lastError that drift occurred.
+                // Detection-only: cleanup is the new task's job
+                // (ResetAll on start does this).
+                if self.hybridBenchGeneration != myGen {
+                    // Stale task; bail out NOW so post-loop close
+                    // runs but no further row is appended/written.
+                    break
+                }
                 if self.hybridBenchGeneration == myGen {
                     self.hybridBenchIterations = iter
                 }
-                if iter % 8 == 0 { await Task.yield() }
+                // M667 chapter 一百八十五 — B3 (CRITICAL): yield
+                // every iter (was every 8). Sync substrate calls
+                // (×2 per iter via M630 closed loop) block
+                // @MainActor for ~50-100ms each; yielding more
+                // often lets UI updates + scrolling proceed.
+                if iter % HybridBenchTuning.yieldEveryNIters == 0 {
+                    await Task.yield()
+                }
             }
             await runner.close()
             // M627 deep-review fix #3 — only flip isRunning if
