@@ -24882,3 +24882,108 @@ All 3 disabled during run so settings stick to start-time captured values.
 ### 197.9 一句话总结
 
 **Chapter 一百九十七 (M740-M743)**: respond to user "全面开发" by directly addressing 3 iPhone smoke findings — **M740 pauseOnSerious flex toggle** (iPhone 17e hits `.serious` thermal in 110s, stays there for 10+ min; default false preserves chapter-192 baseline; operator opts in for 10h on hot device → pause iter-level on `.serious`). **M741 SmokeMode UI SegmentedPicker** (canonical / 14-layer / heavy-tailed selectable pre-tap; iPhone smoke ran default canonical = 100% substrate-skip; heavy-tailed produces real LLM dispatch + adversarial). **M742 LLM timeout UI Stepper** (chapter 195 backend deferred its UI; now exposed at 5-300s range). **71 SampleHost tests pass; 1948 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: opt-in flexes preserve baseline behavior (default false / canonical / 60s); operator chooses 10h profile pre-tap.
+
+## 一百九十八、 全面开发 续 — active cooling + thermal widget + timeout coverage (M744-M747 / 2026-05-06)
+
+User trail: continued "全面开发" — close 3 more carry-forward residuals from chapter 一百九十七.
+
+### 198.1 M744 — Active cooling sleep
+
+iPhone 17e smoke showed 91% iters at `.serious` thermal. Pause-on-serious (chapter 197 M740) helps but binary all-or-nothing. Active cooling injects periodic sleeps for sustained thermal recovery.
+
+`@Published hybridBenchCoolingEveryNIters: Int = 0` (0 = disabled). When > 0, every N iters where current device thermal is `.serious` or `.critical`, sleep `hybridBenchCoolingSleepSeconds` (default 10s, range [5, 60]).
+
+Doctrine: cooling reads CURRENT device state (not iter-start state) so the cooling decision reflects real-time thermal. Disabled by default — operator opts in.
+
+iPhone math: 18 iter/sec × cooling-every-1000 = sleep 10s every ~55s when serious. Effective 35s working / 10s cooling cycle. Reduces sustained heat accumulation.
+
+### 198.2 M745 — Live thermal dashboard widget
+
+Pre-this-batch, operator had to grep JSONL post-hoc to see thermal trajectory. Chapter 198 surfaces 5 new `@Published` fields in real time:
+
+- `hybridBenchLastThermalRaw: String` — current thermal state
+- `hybridBenchThermalNominalIters / FairIters / SeriousIters / CriticalIters: Int`
+
+Dashboard widget shows:
+```
+🛡️ Safety kit (chapter 192 10h-readiness pack)
+  Smoke mode: heavy-tailed
+  Thermal NOW: serious (n=123/f=456/s=12045/c=0 → 1%/3%/91%/0%)
+  Cooling sleeps fired: 12 (M744)
+  LLM timeouts fired: 0 (M735)
+  ...
+```
+
+Tint logic upgraded:
+- `.red` if thermal NOW = `.critical` (immediate concern)
+- `.orange` if any safety counter > 0 OR thermal `.serious`
+- `.secondary` (gray) if all clean
+
+### 198.3 M746 — LLM timeout in non-confident paths
+
+Chapter 195 M735 wrapped only the `.singleLLM` confident path (4 call sites). Chapter 一百九十五 §195.7 honest residual noted bothLLMs / uncertain / localOnly paths (≈10-15% of iters) still used raw calls — hung LLM in those paths could still freeze.
+
+Chapter 198 wraps the remaining 5 sites:
+1. `.bothLLMs` AFM call → `callAFMWithTimeout`
+2. `.bothLLMs` Gemma call → `callGemmaWithTimeout`
+3. `.localOnly` Gemma call → `callGemmaWithTimeout`
+4. uncertain-zone AFM call → `callAFMWithTimeout`
+5. uncertain-zone Gemma call → `callGemmaWithTimeout`
+
+Now ALL bench-loop LLM calls have 60s default deadline + auto-counter. Single-prompt UI panel still uses raw calls (deliberate — UI smoke benefits from raw error visibility).
+
+### 198.4 Tests (M747)
+
+| Test | Pin |
+|---|---|
+| `testCoolingFlexConstantsHaveSaneDefaults` | 0/10s/0 defaults |
+| `testCoolingFlexConstantsBounds` | every-N [0, 100K], sleep [5s, 60s] |
+| `testFreshModelThermalCountersZero` | unknown / 0 / 0 / 0 / 0 defaults |
+
+SampleHost tests: 71 → **74** (+3 chapter 198).
+
+### 198.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17e sim | **74** ✓ |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| **Total** | **1951 + 1 parity gate + 3 analysis tools, 0 failures** |
+
+### 198.6 What's now visible / protected during 10h on iPhone
+
+Pre-chapter-198 operator on hot iPhone:
+- Could only see "stuckSubstrates: 12 / pauseSkipped: 0" — no thermal info on screen
+- 10-15% of iters' LLM calls had no timeout protection
+- No active cooling
+
+Post-chapter-198 operator:
+- **Live thermal NOW state visible** in dashboard, color-coded
+- **Per-state iter counts + percentages** (1%/3%/91%/0% live)
+- **Cooling sleeps fired counter** if cooling enabled
+- **LLM timeouts fired counter** for ALL bench-loop paths
+- **Cooling Stepper** lets operator dial `Cool every: 1000 iters` with `Cool sleep: 10s`
+- **Tint goes red on critical** thermal — immediate visual signal
+
+### 198.7 Honest residual
+
+| Item | Status |
+|---|---|
+| **No real production 10h bench data** | Still THE BLOCKER |
+| Resume actually-resume button (vs read-only banner) | chapter 199 candidate |
+| Bench-to-train v0.5 dry-run smoke | chapter 199 candidate |
+| LLM timeout in single-prompt UI panel | Deliberate — kept raw for UI smoke error visibility |
+
+### 198.8 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | M744 +`hybridBenchCoolingEveryNIters` / `CoolingSleepSeconds` / `CoolingSleepCount` @Published; M745 +5 thermal counters; setters with bounds; bench loop captures + cooling sleep injection + thermal counter increment; M746 5 raw calls → timeout-wrapped (bothLLMs/localOnly/uncertain) |
+| `SampleHost/SampleHostView.swift` | M745 dashboard upgraded (thermal state line + per-state %% + cooling/timeout counters); tint switches red on critical; M744 cooling controls (Stepper for every-N + sleep-seconds) |
+| `SampleHostTests/SampleHostTests.swift` | +3 chapter 198 fix-pin tests |
+
+### 198.9 一句话总结
+
+**Chapter 一百九十八 (M744-M747)**: continue "全面开发" by closing 3 carry-forward residuals — **M744 Active cooling sleep** (operator opts in via `Cool every: N iters` + `Cool sleep: Ns`; reads CURRENT thermal not iter-start; injects sleep when device at `.serious` or worse; iPhone math: ~10s sleep every 55s at 18 iter/sec when serious). **M745 Live thermal dashboard widget** (5 new @Published surfaces: current state + per-state iter counts + per-state percentages; tint switches `.red` on critical, `.orange` on serious + any alarm). **M746 Bench-loop timeout coverage extended** (chapter 195 deferred bothLLMs/localOnly/uncertain paths; 5 raw calls → timeout-wrapped; ALL bench-loop LLM paths now protected). **74 SampleHost tests pass; 1951 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: cooling/thermal-state-tinting are HINT-ONLY (red line 7 held); single-commit-mouth unchanged; operator chooses engagement level pre-tap.

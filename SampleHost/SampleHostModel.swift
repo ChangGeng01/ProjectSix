@@ -477,6 +477,29 @@ final class SampleHostModel: ObservableObject {
     /// device can flip true so `.serious` triggers pause in
     /// addition to `.critical`. Default false to preserve doctrine.
     @Published var hybridBenchPauseOnSerious: Bool = false
+    /// M744 chapter 一百九十八 — active cooling sleep period.
+    /// Every N iters where the device is at `.serious` or worse,
+    /// inject a 10-second cooling sleep. 0 = disabled (default).
+    /// Chapter 一百九十六 iPhone smoke showed sustained `.serious`
+    /// for 10+ min; 1000-iter cooling at 18 iter/sec ≈ once every
+    /// 55s. Operator opts in for 10h on hot device.
+    @Published var hybridBenchCoolingEveryNIters: Int = 0
+    /// M744 — cooling sleep duration in seconds. Range [5, 60].
+    @Published var hybridBenchCoolingSleepSeconds: Double = 10.0
+    /// M744 — track cooling sleep fires for live dashboard.
+    @Published private(set) var hybridBenchCoolingSleepCount: Int = 0
+    /// M745 chapter 一百九十八 — live thermal state surface for
+    /// dashboard widget. Updated per-iter from
+    /// `SampleHostBenchThermalGate.currentDeviceState()`. Lets
+    /// operator see current thermal in real time during 10h
+    /// instead of grepping JSONL post-hoc.
+    @Published private(set) var hybridBenchLastThermalRaw: String = "unknown"
+    /// M745 — count of iters spent at each thermal level.
+    /// Lets dashboard show "% at serious", etc.
+    @Published private(set) var hybridBenchThermalNominalIters: Int = 0
+    @Published private(set) var hybridBenchThermalFairIters: Int = 0
+    @Published private(set) var hybridBenchThermalSeriousIters: Int = 0
+    @Published private(set) var hybridBenchThermalCriticalIters: Int = 0
     @Published private(set) var hybridBenchIsRunning: Bool = false
     @Published private(set) var hybridBenchIterations: Int = 0
     @Published private(set) var hybridBenchAFMOk: Int = 0
@@ -2652,6 +2675,14 @@ extension SampleHostModel {
         hybridBenchDriftAlarmCount = 0
         // M735 chapter 一百九十五 reset
         hybridBenchLLMTimeoutCount = 0
+        // M744 chapter 一百九十八 reset
+        hybridBenchCoolingSleepCount = 0
+        // M745 chapter 一百九十八 reset thermal counters
+        hybridBenchLastThermalRaw = "unknown"
+        hybridBenchThermalNominalIters = 0
+        hybridBenchThermalFairIters = 0
+        hybridBenchThermalSeriousIters = 0
+        hybridBenchThermalCriticalIters = 0
         hybridBenchLastError = nil
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
@@ -2667,6 +2698,8 @@ extension SampleHostModel {
         let checkpointEveryNCaptured = self.hybridBenchCheckpointEveryNIters
         let llmTimeoutCaptured = self.hybridBenchLLMTimeoutSeconds
         let pauseOnSeriousCaptured = self.hybridBenchPauseOnSerious
+        let coolingEveryNCaptured = self.hybridBenchCoolingEveryNIters
+        let coolingSleepSecondsCaptured = self.hybridBenchCoolingSleepSeconds
         let anomalyWatcher = SampleHostBenchAnomalyWatcher(
             windowSize: anomalyWindowCaptured)
         // M721 chapter 一百九十二 — drift monitor on length-MAE
@@ -2775,6 +2808,23 @@ extension SampleHostModel {
                 let batteryStateRaw = device.batteryState
                 let hourCaptured = Calendar.current.component(
                     .hour, from: Date())
+
+                // M745 chapter 一百九十八 — update live thermal
+                // surface + per-state iter counts for dashboard.
+                applyIfActive(myGen) {
+                    self.hybridBenchLastThermalRaw = thermalRaw
+                    switch thermalRaw {
+                    case "nominal":
+                        self.hybridBenchThermalNominalIters += 1
+                    case "fair":
+                        self.hybridBenchThermalFairIters += 1
+                    case "serious":
+                        self.hybridBenchThermalSeriousIters += 1
+                    case "critical":
+                        self.hybridBenchThermalCriticalIters += 1
+                    default: break
+                    }
+                }
 
                 // M717 chapter 一百九十二 — thermal/battery gate.
                 // If gate says pause, emit a paused-row WITHOUT
@@ -3077,12 +3127,16 @@ extension SampleHostModel {
                     var gemmaErr: Error?
                     let afmStart = Date()
                     do {
-                        afmBodyMaybe = try await self.callAFM(prompt: prompt)
+                        // M746 chapter 一百九十八 — bothLLMs path
+                        // also gets per-iter timeout protection.
+                        afmBodyMaybe = try await self.callAFMWithTimeout(
+                            prompt: prompt, seconds: llmTimeoutCaptured)
                     } catch { afmErr = error }
                     let afmMs = Date().timeIntervalSince(afmStart) * 1000
                     let gemmaStart = Date()
                     do {
-                        gemmaBodyMaybe = try await self.callGemma(prompt: prompt)
+                        gemmaBodyMaybe = try await self.callGemmaWithTimeout(
+                            prompt: prompt, seconds: llmTimeoutCaptured)
                     } catch { gemmaErr = error }
                     let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
 
@@ -3128,8 +3182,10 @@ extension SampleHostModel {
                     // Gemma path, never AFM. M666 chapter 一百
                     // 八十五 B1 fix: localOnly is substrate
                     // override; don't tally routerHits/Misses.
+                    // M746 chapter 一百九十八 — apply timeout.
                     do {
-                        firstBody = try await self.callGemma(prompt: prompt)
+                        firstBody = try await self.callGemmaWithTimeout(
+                            prompt: prompt, seconds: llmTimeoutCaptured)
                         firstTriedLLM = "gemma"
                         firstStatus = "ok-substrate-local-only"
                         firstDurationMs =
@@ -3168,12 +3224,16 @@ extension SampleHostModel {
                     var gemmaErr: Error?
                     let afmStart = Date()
                     do {
-                        afmBodyMaybe = try await self.callAFM(prompt: prompt)
+                        // M746 chapter 一百九十八 — uncertain-zone
+                        // dual-call also wrapped with timeout.
+                        afmBodyMaybe = try await self.callAFMWithTimeout(
+                            prompt: prompt, seconds: llmTimeoutCaptured)
                     } catch { afmErr = error }
                     let afmMs = Date().timeIntervalSince(afmStart) * 1000
                     let gemmaStart = Date()
                     do {
-                        gemmaBodyMaybe = try await self.callGemma(prompt: prompt)
+                        gemmaBodyMaybe = try await self.callGemmaWithTimeout(
+                            prompt: prompt, seconds: llmTimeoutCaptured)
                     } catch { gemmaErr = error }
                     let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
 
@@ -3646,6 +3706,32 @@ extension SampleHostModel {
                 if iter % max(1, self.hybridBenchYieldEveryNIters) == 0 {
                     await Task.yield()
                 }
+                // M744 chapter 一百九十八 — active cooling sleep.
+                // When operator has enabled (coolingEveryN > 0)
+                // AND iter is divisible AND device is at .serious
+                // or worse, sleep coolingSleepSeconds. Lets the
+                // phone radiate heat between iter clusters.
+                // Doctrine: cooling is OPT-IN (default 0 disabled);
+                // device-state read directly so the cooling decision
+                // reflects CURRENT thermal not iter-start thermal.
+                if coolingEveryNCaptured > 0
+                    && iter % coolingEveryNCaptured == 0
+                    && iter > 0
+                {
+                    let nowDevice = SampleHostBenchThermalGate
+                        .currentDeviceState()
+                    if nowDevice.thermal == "serious"
+                        || nowDevice.thermal == "critical"
+                    {
+                        applyIfActive(myGen) {
+                            self.hybridBenchCoolingSleepCount += 1
+                        }
+                        let nanos = UInt64(
+                            max(0.001, coolingSleepSecondsCaptured)
+                            * 1_000_000_000)
+                        try? await Task.sleep(nanoseconds: nanos)
+                    }
+                }
             }
             await runner.close()
             // M733 chapter 一百九十四 — write shard manifest at
@@ -3750,6 +3836,17 @@ extension SampleHostModel {
     /// unreasonably-long (defeats purpose) settings.
     func updateLLMTimeoutSeconds(_ v: Double) {
         hybridBenchLLMTimeoutSeconds = max(5.0, min(300.0, v))
+    }
+    /// M744 chapter 一百九十八 — cooling-every-N-iters setter.
+    /// Bounds: [0, 100_000]. 0 = disabled. 1000 = every ~55s on
+    /// 18 iter/sec iPhone.
+    func updateCoolingEveryNIters(_ v: Int) {
+        hybridBenchCoolingEveryNIters = max(0, min(100_000, v))
+    }
+    /// M744 chapter 一百九十八 — cooling sleep seconds setter.
+    /// Bounds: [5, 60]. 10s default lets thermal recover slowly.
+    func updateCoolingSleepSeconds(_ v: Double) {
+        hybridBenchCoolingSleepSeconds = max(5.0, min(60.0, v))
     }
 
     /// M726 chapter 一百九十三 — resume detector. Read latest

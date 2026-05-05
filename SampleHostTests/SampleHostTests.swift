@@ -1591,6 +1591,47 @@ final class SampleHostTests: XCTestCase {
         XCTAssertFalse(m.hybridBenchPauseOnSerious)
     }
 
+    // MARK: - chapter 一百九十八 / M744-M747 — cooling + thermal widget
+
+    /// M744 — cooling settings have sane defaults.
+    @MainActor
+    func testCoolingFlexConstantsHaveSaneDefaults() {
+        let m = SampleHostModel()
+        XCTAssertEqual(m.hybridBenchCoolingEveryNIters, 0)  // disabled
+        XCTAssertEqual(m.hybridBenchCoolingSleepSeconds, 10.0)
+        XCTAssertEqual(m.hybridBenchCoolingSleepCount, 0)
+    }
+
+    /// M744 — bound enforcement on cooling setters.
+    @MainActor
+    func testCoolingFlexConstantsBounds() {
+        let m = SampleHostModel()
+        m.updateCoolingEveryNIters(-50)
+        XCTAssertEqual(m.hybridBenchCoolingEveryNIters, 0)
+        m.updateCoolingEveryNIters(999_999)
+        XCTAssertEqual(m.hybridBenchCoolingEveryNIters, 100_000)
+        m.updateCoolingEveryNIters(2500)
+        XCTAssertEqual(m.hybridBenchCoolingEveryNIters, 2500)
+
+        m.updateCoolingSleepSeconds(2.0)  // below 5s
+        XCTAssertEqual(m.hybridBenchCoolingSleepSeconds, 5.0)
+        m.updateCoolingSleepSeconds(120.0)  // above 60s
+        XCTAssertEqual(m.hybridBenchCoolingSleepSeconds, 60.0)
+        m.updateCoolingSleepSeconds(15)
+        XCTAssertEqual(m.hybridBenchCoolingSleepSeconds, 15.0)
+    }
+
+    /// M745 — fresh model has zero thermal counters + unknown state.
+    @MainActor
+    func testFreshModelThermalCountersZero() {
+        let m = SampleHostModel()
+        XCTAssertEqual(m.hybridBenchLastThermalRaw, "unknown")
+        XCTAssertEqual(m.hybridBenchThermalNominalIters, 0)
+        XCTAssertEqual(m.hybridBenchThermalFairIters, 0)
+        XCTAssertEqual(m.hybridBenchThermalSeriousIters, 0)
+        XCTAssertEqual(m.hybridBenchThermalCriticalIters, 0)
+    }
+
     /// M737 — bench-loop integration smoke test: start with
     /// 0.001h (3.6s) duration, verify it starts + can be stopped
     /// without crash. Doesn't rely on LLM availability — substrate

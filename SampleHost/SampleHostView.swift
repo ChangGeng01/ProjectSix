@@ -653,6 +653,46 @@ struct SampleHostView: View {
                         .font(.caption)
                 }
                 .disabled(model.hybridBenchIsRunning)
+                // M744 chapter 一百九十八 — active cooling sleep
+                // every N iters when device is at .serious or worse.
+                // 0 = disabled (default). 1000 = ~once every 55s
+                // on 18 iter/sec iPhone — gives device time to cool
+                // between iter clusters.
+                HStack {
+                    Text("Cool every:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchCoolingEveryNIters },
+                            set: { model.updateCoolingEveryNIters($0) }
+                        ),
+                        in: 0...100_000,
+                        step: 100
+                    ) {
+                        Text(model.hybridBenchCoolingEveryNIters == 0
+                             ? "off" : "\(model.hybridBenchCoolingEveryNIters)")
+                            .font(.caption.monospacedDigit())
+                    }
+                    .disabled(model.hybridBenchIsRunning)
+                }
+                if model.hybridBenchCoolingEveryNIters > 0 {
+                    HStack {
+                        Text("Cool sleep:").font(.caption)
+                        Stepper(
+                            value: Binding(
+                                get: { model.hybridBenchCoolingSleepSeconds },
+                                set: { model.updateCoolingSleepSeconds($0) }
+                            ),
+                            in: 5.0...60.0,
+                            step: 1.0
+                        ) {
+                            Text(String(
+                                format: "%.0fs",
+                                model.hybridBenchCoolingSleepSeconds))
+                                .font(.caption.monospacedDigit())
+                        }
+                        .disabled(model.hybridBenchIsRunning)
+                    }
+                }
             }
 
             if model.hybridBenchIsRunning {
@@ -758,32 +798,69 @@ struct SampleHostView: View {
     /// Surfaces 5 chapter-192 cumulative counters so during a 10h
     /// run the operator sees thermal pauses / anomaly hits /
     /// adversarial fires / drift alarms in real time.
+    /// M745 chapter 一百九十八 — added thermal current state +
+    /// iter %% breakdown + cooling sleep count + LLM timeout count.
     private var safetyKitStatus: String {
         let smoke = model.hybridBenchSmokeMode.rawValue
+        let thermalTotal = model.hybridBenchThermalNominalIters
+            + model.hybridBenchThermalFairIters
+            + model.hybridBenchThermalSeriousIters
+            + model.hybridBenchThermalCriticalIters
+        let pct: (Int) -> String = { count in
+            if thermalTotal == 0 { return "0%" }
+            return "\(count * 100 / thermalTotal)%"
+        }
         return String(
             format:
                 "  Smoke mode: %@\n" +
+                "  Thermal NOW: %@ (n=%d/f=%d/s=%d/c=%d → " +
+                "%@/%@/%@/%@)\n" +
+                "  Cooling sleeps fired: %d (M744)\n" +
+                "  LLM timeouts fired: %d (M735)\n" +
                 "  Thermal/battery paused: %d\n" +
-                "  Substrate stuck (100-iter): %d\n" +
-                "  LLM stuck (100-iter): %d\n" +
+                "  Substrate stuck (entries): %d\n" +
+                "  LLM stuck (entries): %d\n" +
                 "  Adversarial fired: %d\n" +
-                "  Drift > 3-sigma alarms: %d",
+                "  Drift > %@-sigma alarms: %d",
             smoke,
+            model.hybridBenchLastThermalRaw,
+            model.hybridBenchThermalNominalIters,
+            model.hybridBenchThermalFairIters,
+            model.hybridBenchThermalSeriousIters,
+            model.hybridBenchThermalCriticalIters,
+            pct(model.hybridBenchThermalNominalIters),
+            pct(model.hybridBenchThermalFairIters),
+            pct(model.hybridBenchThermalSeriousIters),
+            pct(model.hybridBenchThermalCriticalIters),
+            model.hybridBenchCoolingSleepCount,
+            model.hybridBenchLLMTimeoutCount,
             model.hybridBenchPauseSkippedCount,
             model.hybridBenchStuckSubstrateCount,
             model.hybridBenchStuckLLMCount,
             model.hybridBenchAdversarialFiredCount,
+            String(format: "%.1f",
+                model.hybridBenchDriftSigmaThreshold),
             model.hybridBenchDriftAlarmCount)
     }
 
-    /// M727 — tint changes red if any safety counter > 0
-    /// (visual signal that something flagged during the run).
+    /// M727 — tint changes color based on health:
+    /// .red if .critical thermal NOW (immediate concern)
+    /// .orange if any safety counter > 0 OR .serious thermal
+    /// .secondary if all clean
+    /// M745 chapter 一百九十八 — added thermal-state-based tint.
     private var safetyKitTint: Color {
-        let any = model.hybridBenchPauseSkippedCount > 0
+        let now = model.hybridBenchLastThermalRaw
+        if now == "critical" {
+            return .red
+        }
+        let anyAlarm = model.hybridBenchPauseSkippedCount > 0
             || model.hybridBenchStuckSubstrateCount > 0
             || model.hybridBenchStuckLLMCount > 0
             || model.hybridBenchDriftAlarmCount > 0
-        return any ? .orange : .secondary
+            || model.hybridBenchLLMTimeoutCount > 0
+            || model.hybridBenchCoolingSleepCount > 0
+            || now == "serious"
+        return anyAlarm ? .orange : .secondary
     }
 
     private var hybridBenchLiveStatus: String {

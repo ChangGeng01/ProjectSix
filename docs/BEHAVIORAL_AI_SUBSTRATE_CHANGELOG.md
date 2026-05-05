@@ -1179,3 +1179,12 @@ SampleHost tests 64 → **67**; full stack **1947 + 1 parity gate + 3 analysis t
 - **M743** +4 fix-pin tests; UI Toggle for pauseOnSerious; doctrine pin: critical always pauses regardless of opt.
 
 SampleHost tests 67 → **71**; full stack **1948 + 1 parity gate + 3 analysis tools, 0 failures**.
+
+## 2026-05-06 — chapter 一百九十八 (M744-M747) active cooling + thermal widget + timeout coverage
+
+- **M744** Active cooling sleep — `@Published hybridBenchCoolingEveryNIters` (0=disabled, [0, 100K]) + `hybridBenchCoolingSleepSeconds` (10s default, [5, 60]) + `hybridBenchCoolingSleepCount`. Bench loop reads CURRENT device thermal post-iter; if `.serious`/`.critical` AND every-N divisible AND > 0, sleeps. iPhone math: 1000 every-N at 18 iter/sec ≈ 10s sleep every 55s.
+- **M745** Live thermal dashboard widget — 5 new @Published fields (lastThermalRaw / nominal/fair/serious/critical iter counts). UI surfaces "Thermal NOW: serious (n=123/f=456/s=12045/c=0 → 1%/3%/91%/0%)". Tint logic: `.red` if critical, `.orange` if serious or any alarm, `.secondary` clean.
+- **M746** Apply timeout to bothLLMs/localOnly/uncertain paths — chapter 195 deferred 5 call sites; now all bench-loop LLM calls have 60s default deadline. Single-prompt UI panel still raw (deliberate).
+- **M747** +3 fix-pin tests.
+
+SampleHost tests 71 → **74**; full stack **1951 + 1 parity gate + 3 analysis tools, 0 failures**.
