@@ -1,0 +1,174 @@
+
+¥
+featuresŒ43-dim one-hot feature vector: 8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed (in this exact order).
+*
++ €R•
+afm_success_probabilitynProbability that AFM will produce ok response (vs guardrail-refuse). Threshold at 0.5 to choose router action.
+*
+ €¢Ù
+´ChengluPreflight v0 â€” predicts AFM-success probability for a given prompt signature. Output >= 0.5 â†’ route AFM; < 0.5 â†’ route Gemma. Train accuracy ~89% on chapter 176 bench.1.0.0.Qinao Runtime SDK chapter ä¸€ç™¾ä¸ƒåä¸ƒ M617"
+Apache-2.0¢+
+$com.github.apple.coremltools.version9.0¢:
+,com.github.apple.coremltools.conversion_date
+2026-05-05¢4
+#com.github.apple.coremltools.sourcetorch==2.11.0¢:
++com.github.apple.coremltools.source_dialectTorchScript²½Ï	
+mainÆ	
+
+features
+
+
++CoreML7š	
+CoreML7Ž	afm_success_probabilityt
+const 
+features_to_fp16_dtype_0
+*
+val
+
+
+"
+fp16*.
+name&
+
+"
+features_to_fp16_dtype_0¢
+const+
+linear_weight_to_fp16
+
+
+
++*?
+val8
+
+
+
++*"
+@model_path/weights/weight.bin@*+
+name#
+
+"
+linear_weight_to_fp16x
+const#
+linear_bias_to_fp16
+
+
+
+*
+val
+
+
+
+
+:
+ô?*)
+name!
+
+"
+linear_bias_to_fp16†
+cast%
+dtype
+
+features_to_fp16_dtype_0
+x
+
+
+features&
+features_to_fp16
+
+
+
++*
+name
+
+
+"
+cast_1½
+linear
+bias
+
+linear_bias_to_fp16#
+weight
+
+linear_weight_to_fp16
+x
+
+features_to_fp16(
+linear_0_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_0_cast_fp16s
+sigmoid
+x
+
+linear_0_cast_fp16%
+var_6_cast_fp16
+
+
+
+*$
+name
+
+"
+op_6_cast_fp16
+const'
+var_6_cast_fp16_to_fp32_dtype_0
+*
+val
+
+
+"
+fp32*4
+name,
+$
+"" 
+op_6_cast_fp16_to_fp32_dtype_0›
+cast,
+dtype#
+!
+var_6_cast_fp16_to_fp32_dtype_0
+x
+
+var_6_cast_fp16-
+afm_success_probability
+
+
+*
+name
+
+
+"
+cast_0"æ
+	buildInfoØ"
+
+
+Å"Â
+6
+!
+
+"
+coremltools-version
+	
+"
+9.0
+A
+)
+!
+"
+coremltools-component-torch
+
+
+"
+2.11.0
+E
+(
+ 
+"
+coremltools-source-dialect
+
+"
+TorchScript

@@ -51,6 +51,10 @@ struct SampleHostView: View {
 
                     afmBenchPanel
 
+                    hybridTestPanel
+
+                    hybridBenchPanel
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text(model.result.activeSessionTitle)
                             .font(.headline)
@@ -295,6 +299,206 @@ struct SampleHostView: View {
         }
         .padding(12)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - M620 chapter 一百七十七 §177 — Hybrid AFM+Gemma router panels
+
+    private var hybridTestPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Hybrid AFM⇄Gemma router test")
+                    .font(.headline)
+                Spacer()
+                Button("Run Hybrid") {
+                    model.runHybridSinglePrompt()
+                }
+                .buttonStyle(.bordered)
+                .tint(.cyan)
+            }
+
+            Text(
+                "ChengluPreflight v0 (CoreML 3 KB, 88.5% test acc) " +
+                "predicts AFM-success vs Gemma-fallback for the " +
+                "current prompt, calls predicted LLM, falls back " +
+                "on error so user sees no error (chapter 一百七十七)."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
+            HStack {
+                Text("Status:").font(.caption.bold())
+                Spacer()
+                if model.hybridGemmaLoadStatus != "idle" {
+                    Text("Gemma: \(model.hybridGemmaLoadStatus)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.purple)
+                }
+            }
+            Text(model.hybridSinglePromptStatus)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.cyan)
+
+            if !model.hybridSinglePromptRoute.isEmpty {
+                Text("Router: \(model.hybridSinglePromptRoute) (afm prob \(String(format: "%.3f", model.hybridSinglePromptProb)))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.indigo)
+            }
+
+            if !model.hybridSinglePromptOutput.isEmpty {
+                Text("Output:").font(.caption.bold())
+                Text(model.hybridSinglePromptOutput)
+                    .font(.caption.monospaced())
+                    .padding(8)
+                    .background(.regularMaterial,
+                                in: RoundedRectangle(cornerRadius: 6))
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial,
+                    in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var hybridBenchPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Hybrid 8h bench (router + AFM⇄Gemma fallback)")
+                    .font(.headline)
+                Spacer()
+                Button(model.hybridBenchIsRunning ? "Stop" : "Start") {
+                    if model.hybridBenchIsRunning {
+                        model.stopHybridBench()
+                    } else {
+                        model.startHybridBench()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(model.hybridBenchIsRunning ? .red : .cyan)
+            }
+
+            Text(
+                "Per-iter: substrate routing (14 layers) → " +
+                "ChengluPreflight router → AFM or Gemma → fallback " +
+                "to other on error. Records prediction vs actual " +
+                "outcome to JSONL for next-gen training."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
+            Group {
+                HStack {
+                    Text("Hours:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchDurationHours },
+                            set: { model.updateHybridBenchDurationHours($0) }
+                        ),
+                        in: 0.1...24.0,
+                        step: 0.5
+                    ) {
+                        Text(String(format: "%.1f h",
+                                    model.hybridBenchDurationHours))
+                            .font(.caption.monospacedDigit())
+                    }
+                }
+                HStack {
+                    Text("Stride CSV:").font(.caption)
+                    TextField("coprime to 40320", text: Binding(
+                        get: { model.hybridBenchStrideRotationCSV },
+                        set: { model.updateHybridBenchStrideCSV($0) }
+                    ))
+                    .font(.caption.monospaced())
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(model.hybridBenchIsRunning)
+                }
+                HStack {
+                    Text("Mutations:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchMutationSeedCount },
+                            set: { model.updateHybridBenchMutationCount($0) }
+                        ),
+                        in: 1...5,
+                        step: 1
+                    ) {
+                        Text("\(model.hybridBenchMutationSeedCount)")
+                            .font(.caption.monospacedDigit())
+                    }
+                }
+            }
+
+            if model.hybridBenchIsRunning {
+                Text(hybridBenchLiveStatus)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.cyan)
+            } else if model.hybridBenchIterations > 0 {
+                Text(hybridBenchFinalStatus)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.blue)
+            }
+
+            if !model.hybridBenchOutputPath.isEmpty {
+                Text("→ \(model.hybridBenchOutputPath)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            if let err = model.hybridBenchLastError {
+                Text("Bench error: \(err)")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial,
+                    in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var hybridBenchLiveStatus: String {
+        let elapsed = model.hybridBenchStartTime.map {
+            Date().timeIntervalSince($0)
+        } ?? 0
+        let perSec = elapsed > 0
+            ? Double(model.hybridBenchIterations) / elapsed
+            : 0
+        let totalOk = model.hybridBenchAFMOk
+            + model.hybridBenchGemmaOk
+            + model.hybridBenchAFMFallbackToGemmaOk
+            + model.hybridBenchGemmaFallbackToAFMOk
+        let routerHits = model.hybridBenchRouterHits
+        let routerTotal = routerHits + model.hybridBenchRouterMisses
+        let routerHitRate = routerTotal > 0
+            ? Double(routerHits) / Double(routerTotal) * 100
+            : 0
+        return String(
+            format:
+                "RUN iter=%d elapsed=%.0fs %.2f/s\n" +
+                "  afm=%d gemma=%d afm→gemma=%d gemma→afm=%d both-failed=%d\n" +
+                "  router-hit=%d miss=%d (%.1f%%) total-ok=%d",
+            model.hybridBenchIterations,
+            elapsed,
+            perSec,
+            model.hybridBenchAFMOk,
+            model.hybridBenchGemmaOk,
+            model.hybridBenchAFMFallbackToGemmaOk,
+            model.hybridBenchGemmaFallbackToAFMOk,
+            model.hybridBenchBothFailed,
+            routerHits,
+            model.hybridBenchRouterMisses,
+            routerHitRate,
+            totalOk)
+    }
+
+    private var hybridBenchFinalStatus: String {
+        return String(
+            format:
+                "DONE iter=%d afm=%d gemma=%d fallback=%d both-failed=%d",
+            model.hybridBenchIterations,
+            model.hybridBenchAFMOk,
+            model.hybridBenchGemmaOk,
+            model.hybridBenchAFMFallbackToGemmaOk
+                + model.hybridBenchGemmaFallbackToAFMOk,
+            model.hybridBenchBothFailed)
     }
 
     // MARK: - M610 chapter 一百七十六 §176.14 — AFM 8h long-running bench panel

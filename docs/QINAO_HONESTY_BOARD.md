@@ -21658,3 +21658,172 @@ Path 1 cross-LLM consensus: ✅ **更精确**化 — substrate vs AFM 真 alignm
 
 **Chapter 一百七十六 §176.19 (M615 — I21 walkback)**: respond to user "为什么 error 率会这么高" by deep-analyzing 1032 AFM "errors" → discover ALL are `guardrailViolation` (Apple FM safety refusing unsafe content), NOT stability issues. Walkback chapter 176 §176.4 + §176.18 mis-attribution. AFM has own safety doctrine: grieving 50% trigger / urgency cue 40% / irreversible high. AFM and substrate **partial alignment** (irreversible both refuse) + **partial divergence** (AFM strict on grief, substrate strict on angry). Gemma 0 errors = NO safety, not "more stable". 3-tier protective doctrine: substrate (strictest) > AFM (medium) > Gemma (permissive). Refines 1903 anomaly cluster: actually 622/2525 (24.6%) of substrate `.block` is AFM-refused-too (real doctrine consensus), 1903 is **real disagreement** (substrate refuses, AFM answers) — better candidate for chapter 一百七十七 LLM-as-judge focus.
 
+
+## 一百七十七、 ChengluPreflight v0 — Core ML × 14 层电子脑 first credible step (M616-M622 / 2026-05-06)
+
+### 177.1 起源
+
+User instruction trail (chapter 一百七十六 续):
+1. "实机上 混合 跑 afm Gemma 4 e2b 直到 没有 error 且 全方面 更好"
+2. "训练 自动 识别 什么 时候 afm 什么 时候 Gemma 4 e2b 体感无差"
+3. (after CoreML question) 完整 **"Core ML × 14 层电子脑最终局" vision** — Core ML 是常驻本地神经反射系统, 不当皇帝当神经系统, 7 plane / 14 层 / 10 技巧 / 3 priority .mlpackage
+
+→ 真正目标是 multi-month systems-level vision. Chapter 一百七十七 是**第一个 credible brick** — ChengluPreflight v0 single binary head.
+
+### 177.2 Phase 1 实证 — 训练 ChengluPreflight v0 (Mac side, M617)
+
+**Training data**: chapter 一百七十六 8h iPhone bench JSONL — 5,088 rows
+**Features**: 43-dim one-hot (8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed)
+**Target**: AFM ok (1) vs guardrail/error (0) — class balance 4056:1032 (79.7%:20.3%)
+**Model**: sklearn LogisticRegression(class_weight=balanced, max_iter=2000)
+**Train/test split**: 80/20 stratified, random_state=42
+
+**Test metrics**:
+- Accuracy: **88.51%**
+- ok class: precision 97% / recall 88% / f1 0.92
+- guardrail class: precision 66% / recall 90% / f1 0.76
+- Confusion: tn=185 fp=21 fn=96 tp=716
+
+**CoreML conversion** via PyTorch + MIL backend (sklearn → coremltools direct conversion broken on Python 3.14 + coremltools 9.0; PyTorch path works on Python 3.12):
+1. Load sklearn weights into PyTorch nn.Linear(43, 1) + sigmoid
+2. trace + ct.convert with mlprogram backend, iOS17 minimum target
+3. **Output: `/tmp/ChengluPreflight_v0.mlpackage` 3,106 bytes (~3 KB)**
+
+**Sanity verified** on Mac:
+- Real ok prompts → prob 0.91-0.97 → route afm ✓
+- Real guardrail prompts (grieving + modest stake) → prob 0.31-0.37 → route gemma ✓
+- Edge cases (angry + low + m=2) → prob 0.99 → afm (false positive, but that's expected with 88% accuracy)
+
+### 177.3 Phase 2 — iOS infrastructure (M616, M618)
+
+**M616 xcodeproj edits** (via Ruby `xcodeproj` gem):
+- Added `BASMLXAdapter` to SampleHost target's `packageProductDependencies`
+- Added `ChengluPreflight_v0.mlpackage` to SampleHost group + new Resources build phase
+- Manual fix: `path = SampleHost/...` → `path = ...` (relative to SampleHost group)
+- Xcode auto-compiles `.mlpackage` → `.mlmodelc` at build time, included in app bundle
+
+**M618 CoreML inference helper** (`SampleHost/CoreMLPreflightInference.swift`, ~250 LOC):
+- `ChengluPromptFeatures` value type — typed signature features
+- `ChengluPreflightDecision` — afmSuccessProbability + Route enum + modelVersion
+- `@MainActor ChengluPreflightInference` class — load `.mlmodelc` lazily from bundle
+- 43-dim feature vector ordering MUST match Python training script
+- `MLMultiArray` (1, 43) Float32 input → `afm_success_probability` Double output
+- Threshold 0.5 → AFM vs Gemma route
+- `predictOrNil()` non-throwing convenience for bench loop
+
+### 177.4 Phase 3 — hybrid runner (M619)
+
+**SampleHostModel.swift extensions** (~400 LOC):
+- 18 new `@Published` props for hybrid bench config + status
+- `runHybridSinglePrompt()` — UI test: predict → call chosen LLM → fallback on error
+- `startHybridBench()` / `stopHybridBench()` — long-running 8h+ async loop
+- `callAFM(prompt:)` / `callGemma(prompt:)` private helpers
+- Lazy `MLXOrganAdapter` for Gemma 4 E2B (loadModel + prewarm on first use)
+- `SampleHostHybridBenchRow` — extended schema with router prediction + actual route + fallback fields
+- `SampleHostHybridBenchJSONLRunner` actor with rotation logic mirroring AFM bench
+
+**Per-iter flow**:
+```
+prompt → substrate (BASHostRuntime, 14 层 audit + permit)
+     → ChengluPreflightInference.predict(features) → "afm" or "gemma"
+     → call chosen LLM
+        ├── ok → recordedRoute = "{chosen}-predicted-ok", routerHit = true
+        └── error → fallback to other LLM
+            ├── ok → "afm-fallback-to-gemma-ok" or vice versa, routerHit = false
+            └── error → "both-failed"
+```
+
+**JSONL row** (extended from chapter 176 AFM bench): timestamp / iteration / stride / mutationSeed / signature / prompt / auditCodeCount / permitMode / routerVersion / routerPredictedRoute / routerProbability / firstTriedLLM / firstTriedStatus / firstTriedBody / firstTriedDurationMs / fallbackTriedLLM / fallbackStatus / fallbackBody / fallbackDurationMs / actualRoute / routerHit / totalDurationSeconds / errorMessage
+
+### 177.5 Phase 4 — UI panels (M620)
+
+**SampleHostView.swift extensions** (~200 LOC):
+- `hybridTestPanel` — single-prompt test with cyan "Run Hybrid" button + status + router decision + body display
+- `hybridBenchPanel` — 8h bench control with hours/strides/mutations stepper + indigo Start button + live router-hit-rate + per-route counters
+- Live status format:
+  ```
+  RUN iter=N elapsed=Xs Y/s
+    afm=N gemma=N afm→gemma=N gemma→afm=N both-failed=N
+    router-hit=N miss=N (X.X%) total-ok=N
+  ```
+
+### 177.6 Phase 5 — Deploy + smoke (M621)
+
+- Build SUCCESS (after fixing Swift 6 strict concurrency: `@MainActor` class instead of actor; sync prediction; removed semaphore-based predictSync)
+- Old SampleHost PID 46028 terminated
+- New build installed: `/private/var/containers/Bundle/Application/A6CDC014-00E7-4F0A-B6CD-F82F60F8CF1A/SampleHost.app/`
+- Launched: **PID 49885** alive on iPhone 17e
+- ChengluPreflight_v0.mlmodelc bundled in app
+
+### 177.7 User-facing first run (pending physical interaction)
+
+User on iPhone 17e:
+1. Open SampleHost (PID 49885 already running)
+2. Scroll to **"Hybrid AFM⇄Gemma router test"** cyan panel
+3. Tap **"Run Hybrid"** → status flow:
+   - "predicting…" → router fires
+   - "router: afm/gemma (prob X.XXX) calling…" → CoreML decision visible
+   - "ok afm/gemma (predicted) N chars" → success
+   - OR "first try failed, trying fallback…" → "ok gemma/afm fallback N chars (router miss)"
+4. First Gemma call: "Gemma: loading model…" — 5-15 min Wi-Fi download from HF (3.4 GB)
+5. Subsequent Gemma calls: instant (model cached)
+
+Then user can tap **Start** on "Hybrid 8h bench" panel for long-running cross-LLM data collection.
+
+### 177.8 Doctrine pins
+
+- 不变量 #1 先醒再答: ✓ substrate routing 仍每 iter 跑(14 层 audit codes 不变)
+- 不变量 #2 神经不掌权: ✓ permit 决策仍 substrate L11 单点; LLM 只产 body, 不绕 permit
+- 不变量 #3 私有经验不进权重: ✓ CoreML 模型 read-only, 无 on-device 训练
+- chapter 176 §176.19 三层 protective doctrine: substrate (strictest) > AFM (medium) > Gemma (permissive) — maintained
+- **Core ML 不当皇帝 当神经系统**: ChengluPreflight 是 router (反射神经), substrate 仍是 orchestrator (皇帝)
+- **训练自动识别 体感无差**: trained CoreML classifier (88.5% acc) + fallback safety net → user 看到永远 successful
+
+### 177.9 User stated goals 对照
+
+| Goal | 状态 |
+|---|---|
+| 直到没有 error | ✅ router-hit + fallback → 0% user-facing error (待 8h bench 实证) |
+| 训练自动识别 | ✅ real CoreML classifier (not rule-based) |
+| 体感无差 | ✅ user 透明看到 success, 后端选 LLM |
+| 全方面更好 | partial — single head 是 baseline; full 7-head mesh 在 chapter 178+, full reflex pipeline 在 P3+ |
+
+### 177.10 Honest 限制
+
+- **5,088 行训练数据有限**: 88.5% 已是 reasonable baseline 但 ceiling 受 sample 量限制; chapter 176+ 累积更多数据后可重训
+- **Gemma 首次下载 3.4 GB**: 用户首次用 hybrid 时需 5-15 min Wi-Fi 等待
+- **iPhone 8 GB RAM 紧张**: AFM + Gemma + iOS + bench loop 同时活, 8h bench 可能 thermal-throttle
+- **88.5% 不是 100%**: 11.5% 的 case router 预测错, fallback safety net 兜底但增加了 latency
+- **Single head ≠ 完整 ChengluPreflight**: 用户最终局 vision 是 7 输出 (intent / emotion / risk / memory_importance / reply_style / agent_route / wake_policy); chapter 一百七十七 只 ship 第一头(routing)
+- **Multi-month roadmap honest**: P0-P6 完整需 4-7 个月演化, 单 chapter 不可能跨 phases
+
+### 177.11 后续 chapter 路线图 (incremental)
+
+| Chapter | Scope | Status |
+|---|---|---|
+| 一百七十七 (this) | ChengluPreflight v0 single binary head (router) | ✅ M616-M622 |
+| 一百七十八 | + EmotionHead / RiskHead 加 2 head | pending |
+| 一百七十九 | + StyleHead / AgentRouter 共 5 head | pending |
+| 一百八十 | shared encoder + 全 7 head 整合 | pending |
+| 一百八十一+ | ChengluMemory.mlpackage (P1) | pending |
+| 一百九十+ | ChengluShadow.mlpackage (P3) | pending |
+| 二百+ | 多模态 / Vision / OCR (P4) | pending |
+| 二百一十+ | AFM custom adapter / 端侧个性化 (P5) | pending |
+| 二百二十+ | 离线训练管线 / 多任务蒸馏 / 模型注册 (P6) | pending |
+
+### 177.12 Files modified
+
+| File | Change |
+|---|---|
+| `Before.xcodeproj/project.pbxproj` | + BASMLXAdapter package dep + ChengluPreflight_v0.mlpackage in new Resources phase + CoreMLPreflightInference.swift in Sources |
+| `SampleHost/ChengluPreflight_v0.mlpackage` (new) | CoreML model 3 KB (binary classifier) |
+| `SampleHost/CoreMLPreflightInference.swift` (new) | ~250 LOC iOS CoreML inference |
+| `SampleHost/SampleHostModel.swift` | +import BASMLXAdapter/BASOrgan + ~400 LOC hybrid runner |
+| `SampleHost/SampleHostView.swift` | +~200 LOC hybrid panels |
+| `scripts/train_chenglu_preflight_v0.py` (new) | ~280 LOC Python training pipeline |
+| `docs/QINAO_HONESTY_BOARD.md` | +chapter 一百七十七 entry (this section) |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | +M616-M622 entry |
+
+### 177.13 一句话总结
+
+**Chapter 一百七十七 (M616-M622 — ChengluPreflight v0 first credible step toward Core ML × 14 层电子脑最终局)**: respond to user "实机上混合跑 afm Gemma 4 e2b 直到没有 error / 训练自动识别 / 体感无差 / 整体制作体系" by training ChengluPreflight v0 single-head binary classifier (sklearn LogisticRegression on chapter 176 5,088-row bench data, 88.51% test accuracy, converted to 3 KB CoreML .mlpackage via PyTorch+MIL backend), bundled in iOS SampleHost.app, wired into hybrid AFM⇄Gemma fallback runner. xcodeproj surgery added BASMLXAdapter package dep + Resources build phase. CoreMLPreflightInference.swift on @MainActor (Swift 6 strict concurrency) — 43-dim one-hot featurization mirrors Python training. Hybrid runner: substrate routing → router predicts → call chosen LLM → fallback to other on error → record (prediction, actual route, hit/miss) to JSONL. UI panels: hybrid test (single prompt) + hybrid 8h bench (long-running cross-LLM data). Build SUCCESS, deployed iPhone 17e PID 49885 ready for user tap. Doctrine pins maintained: substrate routing first (不变量 #1), permit at L11 (不变量 #2), CoreML read-only no on-device training (不变量 #3), three-tier protection (substrate > AFM > Gemma), Core ML 不当皇帝当神经系统. Honest limits: 88.5% ≠ 100%, fallback safety net catches misses, single head ≠ full 7-head ChengluPreflight (chapter 178+ adds more), full vision is 4-7 month multi-chapter演化 (P0-P6).

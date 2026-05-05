@@ -296,6 +296,7 @@
 		9A0E4EDC0F6E89753B5D6449 /* GemmaE4BIntelligenceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26E7755077AFB3B6FF8CA22 /* GemmaE4BIntelligenceServiceTests.swift */; };
 		9B391CD6FD31BB6092442103 /* DecisionIntelligenceDebugStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D128D25C85A9030D123405C2 /* DecisionIntelligenceDebugStore.swift */; };
 		9B92E3523E6D9B4405E5EF4E /* InferenceBackendPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */; };
+		9BE148B3DD53F13CAE65F59A /* ChengluPreflight_v0.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 3031231D68A1F190033BB7C2 /* ChengluPreflight_v0.mlpackage */; };
 		9D56A7072CAB47F64B26DE61 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */; };
 		9D63A7039450AF9A6DC9E54E /* DecisionIntelligenceProviderPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C752273FF17DB5178CAB5C8 /* DecisionIntelligenceProviderPipeline.swift */; };
 		9DBC40DD0B08493EBE363D27 /* DecisionContextPreparedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */; };
@@ -459,6 +460,7 @@
 		F955E5F64B8623E3E4C28FC0 /* DecisionEvolutionWorkspaceSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 497D7CC3CDE61F7BCE40EB02 /* DecisionEvolutionWorkspaceSnapshotTests.swift */; };
 		F9BD2BED06676E7550F737F7 /* DecisionContextLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 167E5FF74A76B475CE75CC1F /* DecisionContextLifecycleTests.swift */; };
 		F9E1151C7529383382623872 /* TomorrowBoxDelayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */; };
+		FA48CB3BFB2C48996835826B /* BASMLXAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = 9157955B9D0279CB329D3E7F /* BASMLXAdapter */; };
 		FA6CD0411FF0C7906E7A36A5 /* DecisionBrainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1C0C323D158521A815D9BE /* DecisionBrainState.swift */; };
 		FC0E461363A93C5121E51141 /* SupportInboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24184A62A2B7E01F7BEA869A /* SupportInboxStoreTests.swift */; };
 		FD5DE461606E818CE5229E43 /* OpenQuickCheckIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDCB8C02350F6CC22C4DAAC /* OpenQuickCheckIntent.swift */; };
@@ -466,6 +468,7 @@
 		FE34BE8C0AC5BFC49A90771B /* WidgetSafeCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB7F1306151CE6EAB2CA002 /* WidgetSafeCopy.swift */; };
 		FE76F2ACE67FB7B6CE1598E4 /* DecisionCognitionSubstrate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49722E89E23670BC138C7228 /* DecisionCognitionSubstrate.swift */; };
 		FE88D0393786AA1BD42FAD90 /* DecisionEvolutionNavigationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D770A3C0B5FBC4E7E7AC9B6 /* DecisionEvolutionNavigationRouting.swift */; };
+		FEF537E69FF335A26C156992 /* CoreMLPreflightInference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04DF9EBCF6F4A70E8CF0A829 /* CoreMLPreflightInference.swift */; };
 		FF4BDF6AE214EF91F4BFBD8E /* DecisionSessionEngineReviewSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF7AFB4B094AB233739EC017 /* DecisionSessionEngineReviewSurfaceView.swift */; };
 		FF8818ABD3CE2840697F5DB9 /* QuickBufferDuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28559294F554136C5D9334B2 /* QuickBufferDuration.swift */; };
 		FFE9B155120181A57899A64D /* DecisionContextFieldKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15786A7BDA5F624F94D347DA /* DecisionContextFieldKey.swift */; };
@@ -523,6 +526,7 @@
 		037C3A68CA75526154BDF062 /* DecisionLocalModelLibrarySnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionLocalModelLibrarySnapshotTests.swift; sourceTree = "<group>"; };
 		04618F494D693CF09E1F8055 /* DecisionSessionEngineControlCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSessionEngineControlCenterView.swift; sourceTree = "<group>"; };
 		046430427C6F923C8A3F62B4 /* DecisionFoldedLung.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionFoldedLung.swift; sourceTree = "<group>"; };
+		04DF9EBCF6F4A70E8CF0A829 /* CoreMLPreflightInference.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreMLPreflightInference.swift; sourceTree = "<group>"; };
 		05412B6E47A277E56EC0236E /* StarterPromptRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarterPromptRow.swift; sourceTree = "<group>"; };
 		0648BE774B959E7E99C1F410 /* BeforeWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BeforeWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		078D41DF98B71E11CD93C772 /* SharedLifeItemFactoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedLifeItemFactoryTests.swift; sourceTree = "<group>"; };
@@ -599,6 +603,7 @@
 		2FAC5C6DB191C7409ECB98CD /* DecisionEvolutionBatchMutationSelectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionBatchMutationSelectionTests.swift; sourceTree = "<group>"; };
 		2FC0E53534B32B214E62F4E5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2FF0AE4C04AAF5821C532270 /* BeforeAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeAppModel.swift; sourceTree = "<group>"; };
+		3031231D68A1F190033BB7C2 /* ChengluPreflight_v0.mlpackage */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.mlpackage; path = ChengluPreflight_v0.mlpackage; sourceTree = "<group>"; };
 		313C02613D4D481F2D4F661F /* DecisionSessionEngineCorrectionComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSessionEngineCorrectionComposerView.swift; sourceTree = "<group>"; };
 		3196F4083F833BD2CEB714E2 /* EmbeddingMemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingMemoryStore.swift; sourceTree = "<group>"; };
 		321C60A119DD6B81B1E5CF4F /* DecisionIntelligenceCircuitBreakerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceCircuitBreakerTests.swift; sourceTree = "<group>"; };
@@ -912,6 +917,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				24AB126F10A3A28E9051B751 /* BASHostKit in Frameworks */,
+				FA48CB3BFB2C48996835826B /* BASMLXAdapter in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -985,6 +991,8 @@
 				6B8A0222B125860714FA85B4 /* SampleHostApp.swift */,
 				F1F7142D85642EB96EA41DF7 /* SampleHostModel.swift */,
 				AA32CE995A464EC0547C8D99 /* SampleHostView.swift */,
+				3031231D68A1F190033BB7C2 /* ChengluPreflight_v0.mlpackage */,
+				04DF9EBCF6F4A70E8CF0A829 /* CoreMLPreflightInference.swift */,
 			);
 			path = SampleHost;
 			sourceTree = "<group>";
@@ -1554,6 +1562,7 @@
 			buildPhases = (
 				74B65DB4F03B9B242F8816D7 /* Sources */,
 				CB811E631B66AB86492BDD9C /* Frameworks */,
+				C280707DEB19052E0055C335 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -1562,6 +1571,7 @@
 			name = SampleHost;
 			packageProductDependencies = (
 				B472957FD46CB58B0B54EFBF /* BASHostKit */,
+				9157955B9D0279CB329D3E7F /* BASMLXAdapter */,
 			);
 			productName = SampleHost;
 			productReference = 447B7BAA40D3536FE8A71BC4 /* SampleHost.app */;
@@ -1641,8 +1651,6 @@
 				1620D42C032B2BB2CE2E3603 /* PBXTargetDependency */,
 			);
 			name = BeforeUITests;
-			packageProductDependencies = (
-			);
 			productName = BeforeUITests;
 			productReference = C3BFFCA464A287525714042A /* BeforeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -1758,6 +1766,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C280707DEB19052E0055C335 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9BE148B3DD53F13CAE65F59A /* ChengluPreflight_v0.mlpackage in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E93B58130832A94EF191BAF4 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1776,6 +1792,7 @@
 				834B0350C43BB3210998BBCB /* SampleHostApp.swift in Sources */,
 				5959B34244B04EBC6CFAADED /* SampleHostModel.swift in Sources */,
 				653C40C37DE5E0003F3BD458 /* SampleHostView.swift in Sources */,
+				FEF537E69FF335A26C156992 /* CoreMLPreflightInference.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2791,6 +2808,11 @@
 		459D4EA551298DA6B3E45C28 /* BASHostKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BASHostKit;
+		};
+		9157955B9D0279CB329D3E7F /* BASMLXAdapter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 61B7D071D6FD841E5139CB2E /* XCLocalSwiftPackageReference "BehavioralAISubstrate" */;
+			productName = BASMLXAdapter;
 		};
 		B472957FD46CB58B0B54EFBF /* BASHostKit */ = {
 			isa = XCSwiftPackageProductDependency;

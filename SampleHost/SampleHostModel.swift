@@ -6,6 +6,10 @@ import UIKit
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
+#if canImport(BASMLXAdapter)
+import BASMLXAdapter
+import BASOrgan
+#endif
 
 // MARK: - M573 (chapter 一百四十七 part 2) bench helpers (inlined here
 // because adding a separate file requires Xcode project edits)
@@ -429,6 +433,36 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var afmBenchStartTime: Date?
     @Published private(set) var afmBenchLastError: String?
     private var afmBenchTask: Task<Void, Never>?
+
+    // M619 chapter 一百七十七 §177 — Hybrid AFM + Gemma bench with
+    // CoreML-driven router (ChengluPreflight v0 single head).
+    @Published var hybridBenchDurationHours: Double = 8.0
+    @Published var hybridBenchStrideRotationCSV: String = "5041,5039,5051,5077,7919"
+    @Published var hybridBenchRotationPeriodIter: Int = 11_300
+    @Published var hybridBenchMutationSeedCount: Int = 5
+    @Published var hybridBenchJSONLRotationMB: Int = 15
+    @Published private(set) var hybridBenchIsRunning: Bool = false
+    @Published private(set) var hybridBenchIterations: Int = 0
+    @Published private(set) var hybridBenchAFMOk: Int = 0
+    @Published private(set) var hybridBenchGemmaOk: Int = 0
+    @Published private(set) var hybridBenchAFMFallbackToGemmaOk: Int = 0
+    @Published private(set) var hybridBenchGemmaFallbackToAFMOk: Int = 0
+    @Published private(set) var hybridBenchBothFailed: Int = 0
+    @Published private(set) var hybridBenchRouterHits: Int = 0
+    @Published private(set) var hybridBenchRouterMisses: Int = 0
+    @Published private(set) var hybridBenchOutputPath: String = ""
+    @Published private(set) var hybridBenchStartTime: Date?
+    @Published private(set) var hybridBenchLastError: String?
+    @Published private(set) var hybridGemmaLoadStatus: String = "idle"
+    @Published private(set) var hybridSinglePromptStatus: String = "idle"
+    @Published private(set) var hybridSinglePromptOutput: String = ""
+    @Published private(set) var hybridSinglePromptRoute: String = ""
+    @Published private(set) var hybridSinglePromptProb: Double = 0
+    private var hybridBenchTask: Task<Void, Never>?
+
+    #if canImport(BASMLXAdapter)
+    private var gemmaAdapter: MLXOrganAdapter?
+    #endif
 
     private var benchTask: Task<Void, Never>?
     private let benchRunner = SampleHostBenchRunner()
@@ -1480,4 +1514,445 @@ private func gcd(_ a: Int, _ b: Int) -> Int {
     var (x, y) = (abs(a), abs(b))
     while y != 0 { (x, y) = (y, x % y) }
     return x
+}
+
+// MARK: - M619 chapter 一百七十七 §177 — Hybrid bench row + runner
+
+struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
+    let timestamp: String
+    let iteration: Int
+    let seed: Int
+    let stride: Int
+    let mutationSeed: Int
+    let signature: SampleHostPromptSignature
+    let prompt: String
+    // Substrate routing
+    let auditCodeCount: Int
+    let permitMode: String
+    // Router prediction
+    let routerVersion: String  // "v0-rule-based-binary-LR"
+    let routerPredictedRoute: String  // "afm" or "gemma"
+    let routerProbability: Double  // afm_success_probability
+    // Actual LLM execution
+    let firstTriedLLM: String  // "afm" or "gemma"
+    let firstTriedStatus: String  // "ok" / "afm-error" / "gemma-error"
+    let firstTriedBody: String
+    let firstTriedDurationMs: Double
+    let fallbackTriedLLM: String?  // nil if first try succeeded
+    let fallbackStatus: String?
+    let fallbackBody: String?
+    let fallbackDurationMs: Double?
+    // Final outcome
+    let actualRoute: String
+    // "afm-predicted-ok" / "gemma-predicted-ok" /
+    // "afm-fallback-to-gemma-ok" / "gemma-fallback-to-afm-ok" /
+    // "both-failed"
+    let routerHit: Bool
+    let totalDurationSeconds: Double
+    let errorMessage: String?
+}
+
+extension SampleHostBenchHelpers {
+    static func hybridBenchOutputDirURL() -> URL {
+        let docs = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        ).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let dir = docs.appendingPathComponent("iphone-hybrid-bench")
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    static func encodeHybrid(_ row: SampleHostHybridBenchRow) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(row)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+}
+
+actor SampleHostHybridBenchJSONLRunner {
+    private let rotationBytes: Int
+    private var fileHandle: FileHandle?
+    private var currentURL: URL?
+    private var rotationIndex: Int = 0
+
+    init(rotationBytes: Int) {
+        self.rotationBytes = rotationBytes
+    }
+
+    func appendRow(_ row: SampleHostHybridBenchRow) async throws {
+        let line = try SampleHostBenchHelpers.encodeHybrid(row) + "\n"
+        guard let data = line.data(using: .utf8) else { return }
+        let needNew: Bool
+        if let h = fileHandle, let url = currentURL {
+            let attrs = try? FileManager.default
+                .attributesOfItem(atPath: url.path)
+            let size = (attrs?[.size] as? Int) ?? 0
+            needNew = size + data.count > rotationBytes
+            _ = h
+        } else {
+            needNew = true
+        }
+        if needNew {
+            await close()
+            rotationIndex += 1
+            let dir = SampleHostBenchHelpers.hybridBenchOutputDirURL()
+            let url = dir.appendingPathComponent(
+                "hybrid-iterations.\(rotationIndex).jsonl")
+            FileManager.default.createFile(
+                atPath: url.path, contents: nil)
+            currentURL = url
+            fileHandle = try FileHandle(forWritingTo: url)
+        }
+        try fileHandle?.write(contentsOf: data)
+    }
+
+    func close() async {
+        try? fileHandle?.close()
+        fileHandle = nil
+        currentURL = nil
+    }
+}
+
+// MARK: - M619 chapter 一百七十七 §177 — Hybrid bench methods on SampleHostModel
+
+extension SampleHostModel {
+    /// Single-prompt hybrid test (UI panel). Predicts route via
+    /// CoreML, calls chosen LLM, falls back to other on error.
+    func runHybridSinglePrompt() {
+        let prompt = afmTestPrompt
+        let features = ChengluPromptFeatures(
+            tone: "agentic",
+            domain: "creative",
+            stake: "modest",
+            timeframe: "minutes",
+            confidant: "decision-system",
+            askShape: "single-action",
+            mutationSeed: 0)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.hybridSinglePromptStatus = "predicting…"
+            let decision = ChengluPreflightInference.shared
+                .predictOrNil(features: features)
+            guard let d = decision else {
+                self.hybridSinglePromptStatus = "router unavailable"
+                return
+            }
+            self.hybridSinglePromptProb = d.afmSuccessProbability
+            self.hybridSinglePromptRoute = d.route.rawValue
+            self.hybridSinglePromptStatus =
+                "router: \(d.route.rawValue) (prob \(String(format: "%.3f", d.afmSuccessProbability))) calling…"
+            // Try chosen LLM
+            do {
+                if d.route == .afm {
+                    let body = try await self.callAFM(prompt: prompt)
+                    self.hybridSinglePromptOutput = body
+                    self.hybridSinglePromptStatus =
+                        "ok afm (predicted) \(body.count) chars"
+                } else {
+                    let body = try await self.callGemma(prompt: prompt)
+                    self.hybridSinglePromptOutput = body
+                    self.hybridSinglePromptStatus =
+                        "ok gemma (predicted) \(body.count) chars"
+                }
+            } catch {
+                // Fallback to the other LLM
+                self.hybridSinglePromptStatus =
+                    "first try failed (\(d.route.rawValue)), trying fallback…"
+                do {
+                    let body: String
+                    if d.route == .afm {
+                        body = try await self.callGemma(prompt: prompt)
+                        self.hybridSinglePromptStatus =
+                            "ok gemma fallback \(body.count) chars (router miss)"
+                    } else {
+                        body = try await self.callAFM(prompt: prompt)
+                        self.hybridSinglePromptStatus =
+                            "ok afm fallback \(body.count) chars (router miss)"
+                    }
+                    self.hybridSinglePromptOutput = body
+                } catch {
+                    self.hybridSinglePromptStatus =
+                        "both failed: \(error)"
+                    self.hybridSinglePromptOutput = ""
+                }
+            }
+        }
+    }
+
+    /// Call AFM with a prompt. Throws on error/guardrail.
+    private func callAFM(prompt: String) async throws -> String {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macOS 26.0, *) {
+            let session = LanguageModelSession()
+            let response = try await session.respond(to: prompt)
+            return response.content
+        }
+        #endif
+        throw NSError(domain: "AFMUnavailable", code: -1)
+    }
+
+    /// Call Gemma 4 E2B (MLX) with a prompt. Lazy-loads on first
+    /// call. Throws on error.
+    private func callGemma(prompt: String) async throws -> String {
+        #if canImport(BASMLXAdapter)
+        if gemmaAdapter == nil {
+            await MainActor.run {
+                self.hybridGemmaLoadStatus = "loading model…"
+            }
+            let adapter = MLXOrganAdapter(
+                model: MLXModelCatalog.gemma4_E2B_4bit)
+            try await adapter.loadModel()
+            try await adapter.prewarm()
+            gemmaAdapter = adapter
+            await MainActor.run {
+                self.hybridGemmaLoadStatus = "ready"
+            }
+        }
+        guard let adapter = gemmaAdapter else {
+            throw NSError(domain: "GemmaUnavailable", code: -2)
+        }
+        let request = BASOrganRequest(
+            requestID: "hybrid-prompt",
+            role: .scout,
+            preset: .scout,
+            instruction: prompt)
+        let draft = try await adapter.draft(request)
+        return draft.body
+        #else
+        throw NSError(
+            domain: "GemmaUnavailable",
+            code: -3,
+            userInfo: [NSLocalizedDescriptionKey: "BASMLXAdapter not built"])
+        #endif
+    }
+
+    /// Update prompt text for single-prompt hybrid test.
+    /// (Reuses afmTestPrompt setter.)
+
+    /// Start long-running hybrid bench (8h default).
+    func startHybridBench() {
+        guard !hybridBenchIsRunning else { return }
+        let strideRotation = hybridBenchStrideRotationCSV
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            .filter { $0 > 0 && gcd($0, 40_320) == 1 }
+        guard !strideRotation.isEmpty else {
+            hybridBenchLastError = "stride CSV empty / no coprime entries"
+            return
+        }
+        let durationSec = hybridBenchDurationHours * 3600.0
+        let rotationPeriod = max(1, hybridBenchRotationPeriodIter)
+        let mutationCount = max(1, min(5, hybridBenchMutationSeedCount))
+        let rotationBytes = max(1, hybridBenchJSONLRotationMB) * 1024 * 1024
+
+        hybridBenchIsRunning = true
+        hybridBenchIterations = 0
+        hybridBenchAFMOk = 0
+        hybridBenchGemmaOk = 0
+        hybridBenchAFMFallbackToGemmaOk = 0
+        hybridBenchGemmaFallbackToAFMOk = 0
+        hybridBenchBothFailed = 0
+        hybridBenchRouterHits = 0
+        hybridBenchRouterMisses = 0
+        hybridBenchLastError = nil
+        hybridBenchStartTime = Date()
+        hybridBenchOutputPath = SampleHostBenchHelpers
+            .hybridBenchOutputDirURL().path
+
+        let runtime = self.runtime
+        hybridBenchTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let startedAt = Date()
+            var iter = 0
+            let runner = SampleHostHybridBenchJSONLRunner(
+                rotationBytes: rotationBytes)
+            while !Task.isCancelled {
+                if Date().timeIntervalSince(startedAt) > durationSec {
+                    break
+                }
+                let strideIndex = (iter / rotationPeriod) % strideRotation.count
+                let chosenStride = strideRotation[strideIndex]
+                let mutationSeed = iter % mutationCount
+                let g = SampleHostBenchPromptCatalog
+                    .generateScatteredWithMutation(
+                        iter: iter,
+                        stride: chosenStride,
+                        mutationSeed: mutationSeed)
+                let prompt = g.prompt
+                let signature = g.signature
+
+                // Substrate routing
+                let t0 = Date()
+                var auditCount = 0
+                var permitMode = "unknown"
+                let riskLevel: BASHostRiskLevel
+                switch signature.stake {
+                case "low", "modest": riskLevel = .low
+                case "high", "very-high": riskLevel = .medium
+                case "irreversible", "non-reversible-after-act":
+                    riskLevel = .high
+                default: riskLevel = .medium
+                }
+                do {
+                    let result = try runtime.startSession(
+                        BASHostSessionRequest(
+                            kind: .interactive,
+                            workflowProfile: .reflective,
+                            surface: .application,
+                            prompt: prompt,
+                            riskLevel: riskLevel))
+                    if let turn = result.eBrainTurn {
+                        if let entry = turn.sovereignAuditEntry {
+                            auditCount = entry.signalRefs.count
+                        }
+                        permitMode = turn.actionPermit.mode.rawValue
+                    }
+                } catch {
+                    permitMode = "substrate-error"
+                }
+
+                // Router predict
+                let features = ChengluPromptFeatures(
+                    tone: signature.tone,
+                    domain: signature.domain,
+                    stake: signature.stake,
+                    timeframe: signature.timeframe,
+                    confidant: signature.confidant,
+                    askShape: signature.askShape,
+                    mutationSeed: mutationSeed)
+                let decision = ChengluPreflightInference.shared
+                    .predictOrNil(features: features)
+                let routerRoute = decision?.route ?? .afm
+                let routerProb = decision?.afmSuccessProbability ?? 0.5
+                let routerVersion = decision?.modelVersion ?? "missing"
+
+                // Call chosen LLM
+                var firstTriedLLM = routerRoute.rawValue
+                var firstStatus = "ok"
+                var firstBody = ""
+                var firstDurationMs: Double = 0
+                var fallbackLLM: String?
+                var fallbackStatus: String?
+                var fallbackBody: String?
+                var fallbackDurationMs: Double?
+                var actualRoute = ""
+                var routerHit = true
+                var errorMessage: String?
+
+                let firstStart = Date()
+                do {
+                    if routerRoute == .afm {
+                        firstBody = try await self.callAFM(prompt: prompt)
+                    } else {
+                        firstBody = try await self.callGemma(prompt: prompt)
+                    }
+                    firstDurationMs = Date().timeIntervalSince(firstStart) * 1000
+                    actualRoute = "\(routerRoute.rawValue)-predicted-ok"
+                    if routerRoute == .afm {
+                        self.hybridBenchAFMOk += 1
+                    } else {
+                        self.hybridBenchGemmaOk += 1
+                    }
+                    self.hybridBenchRouterHits += 1
+                } catch {
+                    firstStatus = "\(routerRoute.rawValue)-error"
+                    firstDurationMs = Date().timeIntervalSince(firstStart) * 1000
+                    errorMessage = "first: \(error)"
+                    routerHit = false
+                    self.hybridBenchRouterMisses += 1
+                    // Fallback to the other LLM
+                    let fbStart = Date()
+                    do {
+                        let other: String
+                        if routerRoute == .afm {
+                            other = try await self.callGemma(prompt: prompt)
+                            fallbackLLM = "gemma"
+                            fallbackStatus = "ok"
+                            fallbackBody = other
+                            actualRoute = "afm-fallback-to-gemma-ok"
+                            self.hybridBenchAFMFallbackToGemmaOk += 1
+                        } else {
+                            other = try await self.callAFM(prompt: prompt)
+                            fallbackLLM = "afm"
+                            fallbackStatus = "ok"
+                            fallbackBody = other
+                            actualRoute = "gemma-fallback-to-afm-ok"
+                            self.hybridBenchGemmaFallbackToAFMOk += 1
+                        }
+                        fallbackDurationMs =
+                            Date().timeIntervalSince(fbStart) * 1000
+                    } catch {
+                        fallbackLLM = routerRoute == .afm ? "gemma" : "afm"
+                        fallbackStatus = "error"
+                        errorMessage = (errorMessage ?? "") + " fb: \(error)"
+                        actualRoute = "both-failed"
+                        self.hybridBenchBothFailed += 1
+                        fallbackDurationMs =
+                            Date().timeIntervalSince(fbStart) * 1000
+                    }
+                }
+
+                let dur = Date().timeIntervalSince(t0)
+                let row = SampleHostHybridBenchRow(
+                    timestamp: SampleHostBenchHelpers.iso8601(Date()),
+                    iteration: iter,
+                    seed: iter,
+                    stride: chosenStride,
+                    mutationSeed: mutationSeed,
+                    signature: signature,
+                    prompt: prompt,
+                    auditCodeCount: auditCount,
+                    permitMode: permitMode,
+                    routerVersion: routerVersion,
+                    routerPredictedRoute: routerRoute.rawValue,
+                    routerProbability: routerProb,
+                    firstTriedLLM: firstTriedLLM,
+                    firstTriedStatus: firstStatus,
+                    firstTriedBody: firstBody,
+                    firstTriedDurationMs: firstDurationMs,
+                    fallbackTriedLLM: fallbackLLM,
+                    fallbackStatus: fallbackStatus,
+                    fallbackBody: fallbackBody,
+                    fallbackDurationMs: fallbackDurationMs,
+                    actualRoute: actualRoute,
+                    routerHit: routerHit,
+                    totalDurationSeconds: dur,
+                    errorMessage: errorMessage)
+                do {
+                    try await runner.appendRow(row)
+                } catch {
+                    self.hybridBenchLastError = "jsonl: \(error)"
+                }
+                iter += 1
+                self.hybridBenchIterations = iter
+                if iter % 8 == 0 { await Task.yield() }
+            }
+            await runner.close()
+            self.hybridBenchIsRunning = false
+        }
+    }
+
+    func stopHybridBench() {
+        hybridBenchTask?.cancel()
+        hybridBenchTask = nil
+        hybridBenchIsRunning = false
+    }
+
+    func updateHybridBenchDurationHours(_ newValue: Double) {
+        hybridBenchDurationHours = max(0.1, min(24.0, newValue))
+    }
+
+    func updateHybridBenchStrideCSV(_ newValue: String) {
+        hybridBenchStrideRotationCSV = newValue
+    }
+
+    func updateHybridBenchRotationPeriod(_ newValue: Int) {
+        hybridBenchRotationPeriodIter = max(1_000, min(100_000, newValue))
+    }
+
+    func updateHybridBenchMutationCount(_ newValue: Int) {
+        hybridBenchMutationSeedCount = max(1, min(5, newValue))
+    }
 }
