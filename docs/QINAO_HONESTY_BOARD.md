@@ -22817,6 +22817,176 @@ Net: **+115 NEW + ~50 modified − ~100 duplicated = ~65 net LOC** for single-so
 
 **Chapter 一百八十二 (M652-M656)**: respond to user "continue" by closing chapter 一百八十一's two explicit honest limits. **M652-M653 single-source featurize**: new `ChengluFeatureEncoder` shared file hosts the ONLY definition of 43-dim signature alphabet + encoder; 4 inference helpers (Preflight + PermitPredict + RegressionHeads + MultiHead) refactored to delegate; net deletion ~80 LOC of duplication across 4 files. **M654 UI meridian panel**: SampleHostView renders 6-line live status of 5 CoreML heads (PermitPredict agreement, Length MAE, Latency MAE) + substrate dispatch counts (skip / both-LLM / local-only / draft) + post-LLM shifted closed-loop count — FIRST time meridian is user-visible during bench. **3 new featurize tests** (dimensions consistency, one-hot shape, unknown-values-all-zero) bring SampleHost test count to 13. Build + deploy + 1874 tests + 5 gates all green. Doctrine pins held + anti-drift schema-cross-check added. Honest limits: Python training-side featurize_row STILL duplicates Swift encoder (cross-language single-source pending), UI is text-only (no graph), single-prompt panel doesn't yet show predictions inline, SwiftUI panel untested.
 
+## 一百八十三、 全面 收口 — close residual gaps in one batch (M657-M664 / 2026-05-06)
+
+### 起源
+
+User: "全面 收口 剩余 缺口 一次性 解决掉"
+
+Per chapter 一百八十二's "Path forward" section (7 candidates) + chapter 一百八十二's own honest limits, this chapter closes the maximum subset of remaining gaps in one batch:
+
+| Gap | Closed in chapter 183? | Mechanism |
+|---|---|---|
+| Cross-language schema single-source | **✓ M657-M658** | Python `chenglu_feature_schema.py` shared module |
+| Cross-language consistency check | **✓ M660** | `scripts/check_chenglu_schema_parity.py` parses Swift, compares Python |
+| Single-prompt panel inline predictions | **✓ M659** | All 5 head outputs render in test panel before LLM completes |
+| 5th CoreML head via established trunk | **✓ M661-M662** | ChengluMultiHead v0.1 with verbosity_class binary head |
+| Real TextEncoder (sentence-transformers) | NOT closable | Multi-week (chapter 一百九十+) |
+| 任 side ShadowEvaluator | NOT closable in this batch | Needs body features + post-LLM-shift labels (chapter 一百八十四+) |
+| 8h iPhone bench | NOT closable | User physical action |
+
+### 183.1 M657 — Python single-source schema
+
+New `scripts/chenglu_feature_schema.py` (~150 LOC):
+- 7 alphabet arrays (TONES / DOMAINS / STAKES / TIMEFRAMES / CONFIDANTS / ASKSHAPES / MUTATIONS)
+- `FEATURE_COUNT = 43` constant + `FEATURE_NAMES` list
+- Compile-time invariant: `_alphabet_sum == FEATURE_COUNT == len(FEATURE_NAMES)` asserted at import (fails fast on schema drift)
+- `featurize_row(row) -> list[float]` canonical encoder matching Swift's `ChengluFeatureEncoder.encode`
+- 5 label functions: `label_afm_ok` / `label_block` / `label_body_length` / `label_duration_ms` / `label_verbosity_class`
+- `schema_summary()` diagnostic helper
+
+Pre-this-batch: 4 train scripts each had their own copies of TONES/DOMAINS/etc. Post-this-batch: ONE Python source.
+
+### 183.2 M658 — refactor 4 train scripts
+
+| Script | Before | After |
+|---|---|---|
+| `train_chenglu_preflight_v0.py` | own alphabet + featurize | re-exports from shared schema |
+| `train_chenglu_preflight_v0_4.py` | imports from v0 (transitive) | unchanged (still works) |
+| `train_chenglu_regression_heads_v0.py` | own labels + imports v0 | direct shared schema import |
+| `train_chenglu_multihead_v0.py` | own label_block/length/latency | direct shared schema import + new label_verbosity_class |
+
+`audit_chenglu_preflight.py` re-uses v0 transitively — keeps working without edit.
+
+### 183.3 M659 — single-prompt panel inline predictions
+
+`SampleHostView.hybridTestPanel` now renders meridian predictions **before** LLM call completes:
+
+```
+📡 Meridian (predictions before LLM)
+  PermitPredict: block=0.012 (non-block)
+  Length predicted: 1247 chars
+  Latency predicted: 4583 ms
+  Verbosity: 0.187 (short ≤1500)
+```
+
+5-head output visible in single-prompt mode (was: only bench panel had this). Pre-this-batch: `runHybridSinglePrompt` only called `ChengluPreflightInference`; now also calls `ChengluMultiHeadInference` and surfaces all 5 outputs.
+
+### 183.4 M660 — cross-language schema parity check
+
+New `scripts/check_chenglu_schema_parity.py`:
+
+- Parses `SampleHost/ChengluFeatureEncoder.swift` via regex (small + stable file)
+- Compares against Python `chenglu_feature_schema.py` constants
+- Asserts byte-equal across all 7 alphabets + featureCount
+- Exit 0 = clean; exit 1 = drift detected with specific mismatch report
+
+Output today:
+
+```
+check_chenglu_schema_parity: clean — Swift + Python schemas
+match across 7 alphabets + 43-dim featureCount.
+```
+
+Now the cross-language boundary that was the LAST honest limit from chapter 一百八十二 (Python `featurize_row` separate from Swift encoder) is **gated by a runnable test**. If anyone edits one side without the other, this fails.
+
+### 183.5 M661 — 5th CoreML head: ChengluMultiHead v0.1
+
+Demonstrates chapter 一百八十一's "cheap head-add" claim by actually adding a head:
+
+- New 5th sigmoid output: `verbosity_prob` = P(AFM body > 1500 chars)
+- Architecture change: `MultiHeadModel` adds `self.head_verbosity = nn.Linear(32, 1)` plus 1 line in `forward(x)`. Total ~3 LOC of new model code.
+- Joint training: 5-tuple loss with weights `(1.0, 1.0, 0.5, 0.5, 1.0)`
+- New label `label_verbosity_class(row, threshold=1500)` in shared schema
+
+**Test results**:
+| Head | v0.1 (5-head) | v0 (4-head) | Notes |
+|---|---|---|---|
+| AFM | 90.67% / AUC 0.962 | 91.75% / 0.966 | tiny regression |
+| Block | 100.00% / AUC 1.0 | 100% / 1.0 | match |
+| Length | MAE 433 / R² 0.593 | MAE 432 / R² 0.599 | nearly identical |
+| Latency | MAE 2220 / R² 0.152 | MAE 2268 / R² 0.121 | slight improvement |
+| **Verbosity** (NEW) | **77.31% / AUC 0.861** | n/a | solid signal |
+
+`.mlpackage` size: 18,079 → 19,308 bytes (**+1.2 KB for an entire new head**). The architectural promise from chapter 一百八十一 ("18-head goal is now structurally feasible") is empirically validated — adding a head costs <2KB of model + ~3 LOC of training code + 1 output extract in inference helper.
+
+### 183.6 M662 — wire 5th head end-to-end
+
+| Layer | Change |
+|---|---|
+| `ChengluMultiHeadPrediction` struct | +`verbosityProbability: Double` field |
+| `CoreMLMultiHeadInference.predict` | +`verbosity_prob` extract with graceful fallback to 0.0 if model is older v0 (4-output) |
+| `SampleHostHybridBenchRow` | +`verbosityProbability` + `verbosityCorrect: Bool?` |
+| `@Published` counters | +`hybridBenchVerbosityCorrect` + `Wrong` |
+| Bench loop residual block | computes `verbosityCorrect = actualLong == predictedLong`; updates counters |
+| Single-prompt published | +`hybridSinglePromptVerbosityProb: Double?` |
+| UI bench panel meridian status | +"Verbosity acc: X/N (P%) [5th head]" line |
+| UI single-prompt panel | +"Verbosity: 0.NNN (long >1500 / short ≤1500)" line |
+
+### 183.7 Verification — all green
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17e | 13 ✓ |
+| 5 boundary checks | clean |
+| **NEW: cross-language schema parity** | **clean** |
+| iOS Release build | SUCCESS |
+| Deploy + relaunch on iPhone 17e | SUCCESS |
+| `.mlpackage` files in app | 5 (4 legacy v0.x + MultiHead v0.1) |
+
+### 183.8 Doctrine pins held + new
+
+All 6 + 1 invariants from chapter 一百八十二 still pin. **NEW**: cross-language anti-drift via runnable script (chapter 一百十四 anti-drift 3-site pattern extended to Swift/Python boundary). Six places now share the schema: 1 Swift file, 1 Python module, 4 train scripts (importing it), 1 parity check script (gating drift).
+
+### 183.9 Meridian network progress
+
+| Chapter | Heads | New | Architectural |
+|---|---|---|---|
+| 一百七十七 | 1 | Preflight | per-head |
+| 一百七十九 | 2 | +PermitPredict | per-head |
+| 一百八十 | 4 | +Length, +Latency | per-head + shared regression helper |
+| 一百八十一 | 4 | (consolidation) | shared encoder + multi-head |
+| 一百八十二 | 4 | (cleanup) | single-source featurize + UI |
+| **一百八十三** | **5** | **+Verbosity** | cross-language single-source + 5th head proves cheap-head-add |
+
+5/18 = **~28% meridian progress**. **+1.2 KB per new head** is now the marginal cost (chapter 181's claim → chapter 183 empirical validation).
+
+### 183.10 Honest limits (real residuals after 一百八十三)
+
+These are gaps that **cannot be closed in repo** without external resources:
+
+- **R² ~0.5 on regression targets** — fundamental LLM stochasticity. Better featurization (sentence-transformers embedding) is multi-week.
+- **Adversarial-only training corpus** — chapter 175/176 5,088 rows are intentionally high-charge prompts. Benign-prompt accuracy unvalidated. New corpus collection is multi-week.
+- **真 TextEncoder** — hand-crafted 43-dim features will always cap at low R². Real encoder needs sentence-transformers integration (chapter 一百九十+).
+- **任 side 0 heads** — ShadowEvaluator on body features needs (a) body-feature pipeline + (b) post-LLM-shift training labels from M630 bench data (which hasn't run 8h yet).
+- **8h iPhone bench** — user physical action; can't ship.
+- **No real-product UX** — current UI is diagnostic-grade. Real product would have rich UI / accessibility / localization.
+- **CoreML inference single-threaded** — could batch multiple turns through one MLModel.prediction call for higher throughput. Not a pressing limit at 5 iter/sec.
+
+### 183.11 Files modified
+
+| File | Change |
+|---|---|
+| `scripts/chenglu_feature_schema.py` | NEW — Python single-source schema (~150 LOC) |
+| `scripts/check_chenglu_schema_parity.py` | NEW — cross-language drift gate (~145 LOC) |
+| `scripts/train_chenglu_preflight_v0.py` | refactored to import from shared schema |
+| `scripts/train_chenglu_regression_heads_v0.py` | refactored |
+| `scripts/train_chenglu_multihead_v0.py` | refactored + 5th head training + 5-output CoreML conversion |
+| `SampleHost/ChengluMultiHead_v0.mlpackage` | retrained — 5 outputs, 19,308 bytes |
+| `SampleHost/CoreMLMultiHeadInference.swift` | +verbosityProbability field, +5th output extract with fallback |
+| `SampleHost/SampleHostModel.swift` | +verbosityProb single-prompt published, +verbosityProb/Correct row fields, +VerbosityCorrect/Wrong counters, residual computation, single-prompt prediction call |
+| `SampleHost/SampleHostView.swift` | +inline 5-head predictions in single-prompt panel, +Verbosity line in bench meridian status |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M657-M664 entry |
+
+### 183.12 一句话总结
+
+**Chapter 一百八十三 (M657-M664)**: respond to user "全面 收口 剩余 缺口 一次性 解决掉" by closing 4 of 7 path-forward candidates from chapter 一百八十二 in one batch. **M657-M658 Python single-source**: new `chenglu_feature_schema.py` shared module + 4 train scripts refactored to import from it (cross-language schema now Swift-side ONE file + Python-side ONE file). **M660 cross-language parity gate**: new `check_chenglu_schema_parity.py` parses Swift via regex + compares Python — runnable drift detector. **M659 single-prompt inline predictions**: `runHybridSinglePrompt` now calls all 5 heads, UI renders meridian predictions before LLM call completes. **M661-M662 5th CoreML head (Verbosity)**: ChengluMultiHead v0.1 retrained with 5th output (P(body > 1500 chars)) — 77.31% acc / AUC 0.861; .mlpackage +1.2 KB total cost demonstrates "cheap head-add" claim. End-to-end wired: prediction struct + inference helper + bench row schema + 2 published counters + UI in 2 panels. Build + deploy + 1874 tests + 5 gates + cross-language parity all green. **Meridian network: 4/18 → 5/18 (~28%)**, with empirically validated architecture for adding heads 6-18 cheaply. NOT closable in repo: real TextEncoder (multi-week), 任 side ShadowEvaluator (needs labels from 8h bench), 8h iPhone bench (user action). Doctrine pins all held + cross-language anti-drift gate added.
+
+
+
 
 
 

@@ -50,60 +50,27 @@ from sklearn.model_selection import train_test_split
 
 import coremltools as ct
 
-TONES = ["anxious", "authoritative", "vulnerable", "agentic",
-         "confused", "grieving", "curious", "angry"]
-DOMAINS = ["financial", "medical", "relational", "work",
-           "parenting", "identity", "ethical", "existential",
-           "trauma", "creative"]
-STAKES = ["low", "modest", "high", "very-high",
-          "irreversible", "non-reversible-after-act"]
-TIMEFRAMES = ["minutes", "hours", "days", "weeks",
-              "months", "lifetime", "past-unresolved"]
-CONFIDANTS = ["friend", "expert", "stranger", "decision-system"]
-ASKSHAPES = ["narrative", "decision-tree", "single-action"]
-MUTATIONS = list(range(5))
-
-FEATURE_NAMES = []
-for t in TONES:        FEATURE_NAMES.append(f"tone_{t}")
-for d in DOMAINS:      FEATURE_NAMES.append(f"domain_{d}")
-for s in STAKES:       FEATURE_NAMES.append(f"stake_{s}")
-for t in TIMEFRAMES:   FEATURE_NAMES.append(f"timeframe_{t}")
-for c in CONFIDANTS:   FEATURE_NAMES.append(f"confidant_{c}")
-for a in ASKSHAPES:    FEATURE_NAMES.append(f"askshape_{a}")
-for m in MUTATIONS:    FEATURE_NAMES.append(f"mutation_{m}")
+# M657 chapter 一百八十三 — single-source via
+# scripts/chenglu_feature_schema.py. Re-export so existing
+# downstream imports `from train_chenglu_preflight_v0 import
+# featurize_row, FEATURE_NAMES` keep working.
+from chenglu_feature_schema import (
+    TONES, DOMAINS, STAKES, TIMEFRAMES, CONFIDANTS, ASKSHAPES,
+    MUTATIONS, FEATURE_NAMES, FEATURE_COUNT,
+    featurize_row, label_afm_ok,
+)
 
 assert len(FEATURE_NAMES) == 43
 
 
-def featurize_row(row):
-    sig = row.get("signature") or {}
-    if not isinstance(sig, dict):
-        sig = {}
-    tone = sig.get("tone")
-    domain = sig.get("domain")
-    stake = sig.get("stake")
-    timeframe = sig.get("timeframe")
-    confidant = sig.get("confidant")
-    ask_shape = sig.get("askShape")
-    mutation_seed = row.get("mutationSeed")
-
-    features = []
-    features += [1.0 if tone == t else 0.0 for t in TONES]
-    features += [1.0 if domain == d else 0.0 for d in DOMAINS]
-    features += [1.0 if stake == s else 0.0 for s in STAKES]
-    features += [1.0 if timeframe == t else 0.0 for t in TIMEFRAMES]
-    features += [1.0 if confidant == c else 0.0 for c in CONFIDANTS]
-    features += [1.0 if ask_shape == a else 0.0 for a in ASKSHAPES]
-    features += [1.0 if mutation_seed == m else 0.0 for m in MUTATIONS]
-    return features
-
-
 def label_row(row):
-    """1 = AFM ok, 0 = AFM guardrail / error."""
-    status = row.get("afmStatus", "")
-    if status == "ok":
-        return 1
-    return 0
+    """1 = AFM ok, 0 = AFM guardrail / error.
+
+    M657 — delegate to shared schema's label_afm_ok. Kept this
+    name for backward compatibility with audit + downstream
+    train scripts that import `label_row`.
+    """
+    return label_afm_ok(row)
 
 
 def load_jsonl_dir(dir_path):

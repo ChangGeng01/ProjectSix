@@ -49,10 +49,10 @@ from sklearn.model_selection import train_test_split
 import coremltools as ct
 
 sys.path.insert(0, os.path.dirname(__file__))
-from train_chenglu_preflight_v0 import (
-    featurize_row,
-    load_jsonl_dir,
-)
+# M658 chapter 一百八十三 — featurize_row imported from shared
+# schema (single-source); load_jsonl_dir from v0 (untouched).
+from chenglu_feature_schema import featurize_row
+from train_chenglu_preflight_v0 import load_jsonl_dir
 
 
 class RegressionMLP(nn.Module):
@@ -106,14 +106,11 @@ def train_regression(
     return model
 
 
-def label_length(row: dict) -> float:
-    val = row.get("afmBodyLength")
-    return float(val) if val is not None else 0.0
-
-
-def label_latency(row: dict) -> float:
-    val = row.get("afmDurationMs")
-    return float(val) if val is not None else 0.0
+# M658 chapter 一百八十三 — labels imported from shared schema.
+from chenglu_feature_schema import (
+    label_body_length as label_length,
+    label_duration_ms as label_latency,
+)
 
 
 def train_and_export(

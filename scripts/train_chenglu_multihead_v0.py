@@ -66,35 +66,32 @@ from sklearn.model_selection import train_test_split
 import coremltools as ct
 
 sys.path.insert(0, os.path.dirname(__file__))
-from train_chenglu_preflight_v0 import (
+# M658 chapter 一百八十三 — single-source via shared schema.
+from chenglu_feature_schema import (
     featurize_row,
-    label_row,
-    load_jsonl_dir,
+    label_afm_ok as label_row,
+    label_block,
+    label_body_length as label_length,
+    label_duration_ms as label_latency,
+    label_verbosity_class,
 )
-
-
-def label_block(row: dict) -> int:
-    return 1 if row.get("permitMode") == "block" else 0
-
-
-def label_length(row: dict) -> float:
-    val = row.get("afmBodyLength")
-    return float(val) if val is not None else 0.0
-
-
-def label_latency(row: dict) -> float:
-    val = row.get("afmDurationMs")
-    return float(val) if val is not None else 0.0
+from train_chenglu_preflight_v0 import load_jsonl_dir
 
 
 class MultiHeadModel(nn.Module):
-    """Shared trunk + 4 task heads.
+    """Shared trunk + 5 task heads (M661 chapter 183 — added 5th).
 
-    Trunk: 43 → 64 → 32 (ReLU). 4 heads each (32 → 1):
+    Trunk: 43 → 64 → 32 (ReLU). 5 heads each (32 → 1):
     - out_afm_success: sigmoid (binary)
     - out_block: sigmoid (binary)
     - out_length: linear (regression on z-normalized target)
     - out_latency: linear (regression on z-normalized target)
+    - out_verbosity: sigmoid (binary, body > 1500 chars)
+
+    The 5th head demonstrates the architectural promise of
+    chapter 一百八十一: adding a head is now a single
+    `head_X: 32 → 1` Linear layer + 1 forward-pass output, no
+    new model loads, no new featurize duplication.
     """
 
     def __init__(self, n_features: int = 43):
@@ -105,6 +102,7 @@ class MultiHeadModel(nn.Module):
         self.head_block = nn.Linear(32, 1)
         self.head_length = nn.Linear(32, 1)
         self.head_latency = nn.Linear(32, 1)
+        self.head_verbosity = nn.Linear(32, 1)
 
     def forward(self, x):
         h = torch.relu(self.fc1(x))
@@ -113,7 +111,8 @@ class MultiHeadModel(nn.Module):
         block = torch.sigmoid(self.head_block(h))
         length_norm = self.head_length(h)  # in z-space
         latency_norm = self.head_latency(h)  # in z-space
-        return afm, block, length_norm, latency_norm
+        verbosity = torch.sigmoid(self.head_verbosity(h))
+        return afm, block, length_norm, latency_norm, verbosity
 
 
 def train_multihead(
@@ -122,18 +121,18 @@ def train_multihead(
     y_block_tr: np.ndarray,
     y_length_norm_tr: np.ndarray,
     y_latency_norm_tr: np.ndarray,
+    y_verbosity_tr: np.ndarray,
     epochs: int = 200,
     lr: float = 1e-3,
     batch: int = 64,
     seed: int = 42,
-    loss_weights: tuple = (1.0, 1.0, 0.5, 0.5),
+    loss_weights: tuple = (1.0, 1.0, 0.5, 0.5, 1.0),
 ) -> MultiHeadModel:
-    """Joint train all 4 heads with weighted sum loss.
+    """Joint train all 5 heads with weighted sum loss.
 
-    loss_weights: (afm_bce, block_bce, length_mse, latency_mse).
-    Regression weights deliberately lower because MSE on z-norm
-    targets has larger magnitude than BCE; we balance to give
-    each head ~equal gradient pressure.
+    loss_weights: (afm_bce, block_bce, length_mse, latency_mse,
+                   verbosity_bce). M661 chapter 183 — verbosity
+    weight 1.0 to match the binary heads' gradient pressure.
     """
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -152,8 +151,11 @@ def train_multihead(
     y_lat_t = torch.tensor(
         y_latency_norm_tr, dtype=torch.float32
     ).view(-1, 1)
+    y_verb_t = torch.tensor(
+        y_verbosity_tr, dtype=torch.float32
+    ).view(-1, 1)
     n = len(Xt)
-    w_afm, w_block, w_length, w_latency = loss_weights
+    w_afm, w_block, w_length, w_latency, w_verbosity = loss_weights
     for epoch in range(epochs):
         idx = torch.randperm(n)
         Xs = Xt[idx]
@@ -161,19 +163,25 @@ def train_multihead(
         ys_block = y_block_t[idx]
         ys_length = y_len_t[idx]
         ys_latency = y_lat_t[idx]
+        ys_verbosity = y_verb_t[idx]
         for i in range(0, n, batch):
             xb = Xs[i:i + batch]
             yb_afm = ys_afm[i:i + batch]
             yb_block = ys_block[i:i + batch]
             yb_length = ys_length[i:i + batch]
             yb_latency = ys_latency[i:i + batch]
+            yb_verbosity = ys_verbosity[i:i + batch]
             optimizer.zero_grad()
-            pred_afm, pred_block, pred_length, pred_latency = model(xb)
+            (
+                pred_afm, pred_block,
+                pred_length, pred_latency, pred_verbosity,
+            ) = model(xb)
             loss = (
                 w_afm * bce(pred_afm, yb_afm)
                 + w_block * bce(pred_block, yb_block)
                 + w_length * mse(pred_length, yb_length)
                 + w_latency * mse(pred_latency, yb_latency)
+                + w_verbosity * bce(pred_verbosity, yb_verbosity)
             )
             loss.backward()
             optimizer.step()
@@ -210,6 +218,10 @@ def main() -> None:
     y_latency = np.array(
         [label_latency(r) for r in rows], dtype=np.float32
     )
+    # M661 chapter 一百八十三 — 5th head label.
+    y_verbosity = np.array(
+        [label_verbosity_class(r) for r in rows], dtype=np.float32
+    )
 
     print(f"  features:     {X.shape}")
     print(
@@ -228,6 +240,10 @@ def main() -> None:
         f"  latency stats:  mean={y_latency.mean():.1f} "
         f"stdev={y_latency.std():.1f}"
     )
+    print(
+        f"  verbosity:      long(>1500)={int((y_verbosity == 1).sum())} / "
+        f"short={int((y_verbosity == 0).sum())}"
+    )
 
     # Single train/test split for ALL heads (so test set is consistent
     # across head metric reporting).
@@ -241,6 +257,9 @@ def main() -> None:
     y_block_tr, y_block_te = y_block[idx_tr], y_block[idx_te]
     y_length_tr, y_length_te = y_length[idx_tr], y_length[idx_te]
     y_latency_tr, y_latency_te = y_latency[idx_tr], y_latency[idx_te]
+    y_verbosity_tr, y_verbosity_te = (
+        y_verbosity[idx_tr], y_verbosity[idx_te]
+    )
 
     # Z-normalize regression targets on training set
     length_mean = float(y_length_tr.mean())
@@ -257,7 +276,7 @@ def main() -> None:
     print(f"  latency: mean={latency_mean:.2f} std={latency_std:.2f}")
 
     print(
-        f"\nTraining MultiHead (43→64→32 trunk + 4 heads), "
+        f"\nTraining MultiHead (43→64→32 trunk + 5 heads), "
         f"200 epochs, joint loss…"
     )
     model = train_multihead(
@@ -266,17 +285,19 @@ def main() -> None:
         y_block_tr=y_block_tr,
         y_length_norm_tr=y_length_norm_tr,
         y_latency_norm_tr=y_latency_norm_tr,
+        y_verbosity_tr=y_verbosity_tr,
         epochs=200,
         seed=args.random_seed,
     )
     model.eval()
 
-    # Test metrics
+    # Test metrics — 5 heads now
     with torch.no_grad():
         Xte_t = torch.tensor(Xte, dtype=torch.float32)
-        pred_afm, pred_block, pred_length_norm, pred_latency_norm = (
-            model(Xte_t)
-        )
+        (
+            pred_afm, pred_block,
+            pred_length_norm, pred_latency_norm, pred_verbosity,
+        ) = model(Xte_t)
         pred_afm_np = pred_afm.numpy().flatten()
         pred_block_np = pred_block.numpy().flatten()
         pred_length_np = (
@@ -287,6 +308,7 @@ def main() -> None:
             pred_latency_norm.numpy().flatten() * latency_std
             + latency_mean
         )
+        pred_verbosity_np = pred_verbosity.numpy().flatten()
 
     # AFM success head
     pred_afm_class = (pred_afm_np >= 0.5).astype(int)
@@ -318,11 +340,20 @@ def main() -> None:
     print(f"  MAE: {latency_mae:.2f} ms (LatencyHead was 2091)")
     print(f"  R²:  {latency_r2:.4f} (LatencyHead was 0.511)")
 
-    # Convert to CoreML — single model with 4 outputs.
-    # CoreML doesn't directly support de-norm in the graph for our
-    # use case, so we save norm constants in metadata and let the
-    # Swift inference helper do the multiply+add post-prediction.
-    print(f"\nConverting MultiHead to CoreML (4 outputs)…")
+    # Verbosity head (M661 chapter 一百八十三 — NEW 5th head)
+    pred_verbosity_class = (pred_verbosity_np >= 0.5).astype(int)
+    verb_acc = accuracy_score(
+        y_verbosity_te.astype(int), pred_verbosity_class
+    )
+    verb_auc = roc_auc_score(
+        y_verbosity_te.astype(int), pred_verbosity_np
+    )
+    print(f"\n=== Verbosity head (NEW 5th — chapter 183) ===")
+    print(f"  Accuracy: {verb_acc:.4f} (binary: body > 1500 chars)")
+    print(f"  AUC:      {verb_auc:.4f}")
+
+    # Convert to CoreML — single model with 5 outputs.
+    print(f"\nConverting MultiHead to CoreML (5 outputs)…")
     n_features = X.shape[1]
     example = torch.zeros((1, n_features), dtype=torch.float32)
     traced = torch.jit.trace(model, example)
@@ -340,24 +371,25 @@ def main() -> None:
             ct.TensorType(name="block_prob", dtype=np.float32),
             ct.TensorType(name="length_norm", dtype=np.float32),
             ct.TensorType(name="latency_norm", dtype=np.float32),
+            ct.TensorType(name="verbosity_prob", dtype=np.float32),
         ],
         convert_to="mlprogram",
         compute_units=ct.ComputeUnit.ALL,
         minimum_deployment_target=ct.target.iOS17,
     )
     cml.short_description = (
-        f"ChengluMultiHead v0 — shared encoder (43→64→32) + 4 task "
-        f"heads. Single CoreML model replacing 4 separate .mlpackages "
-        f"(Preflight v0.4 + PermitPredict v0 + LengthHead v0 + "
-        f"LatencyHead v0). 4 outputs: afm_success_prob (sigmoid), "
-        f"block_prob (sigmoid), length_norm (z-space, denorm via "
-        f"length_mean={length_mean:.2f}, length_std={length_std:.2f}), "
-        f"latency_norm (z-space, denorm via "
-        f"latency_mean={latency_mean:.2f}, latency_std={latency_std:.2f})."
+        f"ChengluMultiHead v0.1 — shared encoder (43→64→32) + 5 task "
+        f"heads. Chapter 一百八十三 added 5th head (verbosity_prob). "
+        f"5 outputs: afm_success_prob (sigmoid), block_prob (sigmoid), "
+        f"length_norm (z-space, denorm via length_mean={length_mean:.2f}, "
+        f"length_std={length_std:.2f}), latency_norm (z-space, denorm "
+        f"via latency_mean={latency_mean:.2f}, "
+        f"latency_std={latency_std:.2f}), verbosity_prob (sigmoid, "
+        f"P(body > 1500 chars))."
     )
     cml.author = (
-        "Qinao Runtime SDK chapter 一百八十一 — "
-        "shared encoder + multi-head meridian architecture"
+        "Qinao Runtime SDK chapter 一百八十三 — "
+        "5th head via shared encoder (verbosity_class)"
     )
     cml.license = "Apache-2.0"
     cml.version = "0.0.1"
@@ -382,12 +414,17 @@ def main() -> None:
         "Z-normalized linear output. Denorm: "
         "predicted_ms = latency_norm * latency_std + latency_mean."
     )
+    cml.output_description["verbosity_prob"] = (
+        "Sigmoid output: P(AFM body > 1500 chars). UI hint: "
+        "long-response anticipation. Threshold 0.5 → 'long'."
+    )
     # Save normalization constants in user_defined_metadata so
     # Swift inference helper can read them at load time.
     cml.user_defined_metadata["length_mean"] = str(length_mean)
     cml.user_defined_metadata["length_std"] = str(length_std)
     cml.user_defined_metadata["latency_mean"] = str(latency_mean)
     cml.user_defined_metadata["latency_std"] = str(latency_std)
+    cml.user_defined_metadata["verbosity_threshold_chars"] = str(1500)
 
     if os.path.exists(args.output):
         import shutil
@@ -421,13 +458,14 @@ def main() -> None:
         blk = float(result["block_prob"].flatten()[0])
         ln = float(result["length_norm"].flatten()[0])
         lt = float(result["latency_norm"].flatten()[0])
+        verb = float(result["verbosity_prob"].flatten()[0])
         # Denorm
         ln_chars = ln * length_std + length_mean
         lt_ms = lt * latency_std + latency_mean
         sig = r.get("signature", {})
         print(
             f"  {sig.get('tone'):14s} "
-            f"afm={afm:.3f} block={blk:.3f} "
+            f"afm={afm:.3f} block={blk:.3f} verb={verb:.3f} "
             f"len={ln_chars:>7.1f} lat={lt_ms:>8.1f}"
         )
 

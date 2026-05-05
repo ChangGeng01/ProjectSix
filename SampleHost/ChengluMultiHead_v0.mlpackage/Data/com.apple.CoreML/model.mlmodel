@@ -1,4 +1,4 @@
-∂
+œ
 â
 featuresq43-dim signature one-hot: 8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed.
 *
@@ -15,27 +15,31 @@ block_probZSigmoid output: probability substrate routes to .block. Threshold 0.
 †ÄRy
 latency_norm]Z-normalized linear output. Denorm: predicted_ms = latency_norm * latency_std + latency_mean.
 *
-†Ä¢Ù
-ïChengluMultiHead v0 ‚Äî shared encoder (43‚Üí64‚Üí32) + 4 task heads. Single CoreML model replacing 4 separate .mlpackages (Preflight v0.4 + PermitPredict v0 + LengthHead v0 + LatencyHead v0). 4 outputs: afm_success_prob (sigmoid), block_prob (sigmoid), length_norm (z-space, denorm via length_mean=1360.34, length_std=886.82), latency_norm (z-space, denorm via latency_mean=5671.48, latency_std=6729.38).0.0.1_Qinao Runtime SDK chapter ‰∏ÄÁôæÂÖ´ÂçÅ‰∏Ä ‚Äî shared encoder + multi-head meridian architecture"
-Apache-2.0¢
-length_mean1360.34326171875¢:
-+com.github.apple.coremltools.source_dialectTorchScript¢
-
-length_std886.8180541992188¢4
+†ÄRÜ
+verbosity_probhSigmoid output: P(AFM body > 1500 chars). UI hint: long-response anticipation. Threshold 0.5 ‚Üí 'long'.
+*
+†Ä¢Ñ
+ÖChengluMultiHead v0.1 ‚Äî shared encoder (43‚Üí64‚Üí32) + 5 task heads. Chapter ‰∏ÄÁôæÂÖ´ÂçÅ‰∏â added 5th head (verbosity_prob). 5 outputs: afm_success_prob (sigmoid), block_prob (sigmoid), length_norm (z-space, denorm via length_mean=1360.34, length_std=886.82), latency_norm (z-space, denorm via latency_mean=5671.48, latency_std=6729.38), verbosity_prob (sigmoid, P(body > 1500 chars)).0.0.1[Qinao Runtime SDK chapter ‰∏ÄÁôæÂÖ´ÂçÅ‰∏â ‚Äî 5th head via shared encoder (verbosity_class)"
+Apache-2.0¢+
+$com.github.apple.coremltools.version9.0¢4
 #com.github.apple.coremltools.sourcetorch==2.11.0¢ 
-latency_mean5671.47607421875¢
-latency_std6729.37939453125¢:
+latency_mean5671.47607421875¢:
 ,com.github.apple.coremltools.conversion_date
-2026-05-05¢+
-$com.github.apple.coremltools.version9.0≤˜(â'
-mainÄ'
+2026-05-06¢:
++com.github.apple.coremltools.source_dialectTorchScript¢
+length_mean1360.34326171875¢!
+verbosity_threshold_chars1500¢
+latency_std6729.37939453125¢
+
+length_std886.8180541992188≤´0Ω.
+main¥.
 
 features
 
 
-+CoreML7‘&
-CoreML7»&afm_success_prob
-block_problength_normlatency_normt
++CoreML7à.
+CoreML7¸-afm_success_prob
+block_problength_normlatency_normverbosity_probt
 const 
 features_to_fp16_dtype_0
 *.
@@ -80,14 +84,14 @@ block_problength_normlatency_normt
 
 @*#
 @model_path/weights/weight.binÄ,Ü
-cast
+cast%
+dtype
+
+features_to_fp16_dtype_0
 x
 
 
-features%
-dtype
-
-features_to_fp16_dtype_0&
+features&
 features_to_fp16
 
 
@@ -97,17 +101,17 @@ block_problength_normlatency_normt
 
 
 "
-cast_4∑
-linear 
-weight
-
-fc1_weight_to_fp16
+cast_5∑
+linear
 x
 
 features_to_fp16
 bias
 
-fc1_bias_to_fp16(
+fc1_bias_to_fp16 
+weight
+
+fc1_weight_to_fp16(
 linear_0_cast_fp16
 
 
@@ -162,16 +166,16 @@ block_problength_normlatency_normt
 
  *#
 @model_path/weights/weight.binÄN∏
-linear 
-weight
-
-fc2_weight_to_fp16
+linear
 x
 
 input_1_cast_fp16
 bias
 
-fc2_bias_to_fp16(
+fc2_bias_to_fp16 
+weight
+
+fc2_weight_to_fp16(
 linear_1_cast_fp16
 
 
@@ -226,17 +230,17 @@ block_problength_normlatency_normt
 
 
 :
-∑*¿
-linear%
-weight
-
-head_afm_weight_to_fp16
+1¿
+linear
 x
 
 input_cast_fp16!
 bias
 
-head_afm_bias_to_fp16(
+head_afm_bias_to_fp16%
+weight
+
+head_afm_weight_to_fp16(
 linear_2_cast_fp16
 
 
@@ -250,7 +254,7 @@ block_problength_normlatency_normt
 x
 
 linear_2_cast_fp16&
-var_19_cast_fp16
+var_20_cast_fp16
 
 
 
@@ -258,14 +262,14 @@ block_problength_normlatency_normt
 name
 
 "
-op_19_cast_fp16É
+op_20_cast_fp16É
 const(
- var_19_cast_fp16_to_fp32_dtype_0
+ var_20_cast_fp16_to_fp32_dtype_0
 *5
 name-
 %
 #"!
-op_19_cast_fp16_to_fp32_dtype_0*
+op_20_cast_fp16_to_fp32_dtype_0*
 val
 
 
@@ -303,17 +307,17 @@ block_problength_normlatency_normt
 
 
 :
-64ƒ
-linear'
-weight
-
-head_block_weight_to_fp16
+/ƒ
+linear
 x
 
 input_cast_fp16#
 bias
 
-head_block_bias_to_fp16(
+head_block_bias_to_fp16'
+weight
+
+head_block_weight_to_fp16(
 linear_3_cast_fp16
 
 
@@ -327,7 +331,7 @@ block_problength_normlatency_normt
 x
 
 linear_3_cast_fp16&
-var_23_cast_fp16
+var_24_cast_fp16
 
 
 
@@ -335,14 +339,14 @@ block_problength_normlatency_normt
 name
 
 "
-op_23_cast_fp16É
+op_24_cast_fp16É
 const(
- var_23_cast_fp16_to_fp32_dtype_0
+ var_24_cast_fp16_to_fp32_dtype_0
 *5
 name-
 %
 #"!
-op_23_cast_fp16_to_fp32_dtype_0*
+op_24_cast_fp16_to_fp32_dtype_0*
 val
 
 
@@ -380,17 +384,17 @@ block_problength_normlatency_normt
 
 
 :
-º§∆
-linear(
-weight
-
-head_length_weight_to_fp16
+Œ†∆
+linear
 x
 
 input_cast_fp16$
 bias
 
-head_length_bias_to_fp16(
+head_length_bias_to_fp16(
+weight
+
+head_length_weight_to_fp16(
 linear_4_cast_fp16
 
 
@@ -444,17 +448,17 @@ block_problength_normlatency_normt
 
 
 :
-Ò$»
-linear)
-weight
-
-head_latency_weight_to_fp16
+h(»
+linear
 x
 
 input_cast_fp16%
 bias
 
-head_latency_bias_to_fp16(
+head_latency_bias_to_fp16)
+weight
+
+head_latency_weight_to_fp16(
 linear_5_cast_fp16
 
 
@@ -475,14 +479,107 @@ block_problength_normlatency_normt
 
 
 "
-fp32ñ
-cast
+fp32≥
+const3
+head_verbosity_weight_to_fp16
+
+
+
+ *3
+name+
+#
+!"
+head_verbosity_weight_to_fp16*@
+val9
+
+
+
+ *#
+@model_path/weights/weight.binÄSà
+const+
+head_verbosity_bias_to_fp16
+
+
+
+*1
+name)
+!
+"
+head_verbosity_bias_to_fp16*
+val
+
+
+
+
+:
+ø¨Ã
+linear
+x
+
+input_cast_fp16'
+bias
+
+head_verbosity_bias_to_fp16+
+weight!
+
+head_verbosity_weight_to_fp16(
+linear_6_cast_fp16
+
+
+
+*(
+name 
+
+"
+linear_6_cast_fp16u
+sigmoid
 x
 
-linear_5_cast_fp16/
+linear_6_cast_fp16&
+var_34_cast_fp16
+
+
+
+*%
+name
+
+"
+op_34_cast_fp16É
+const(
+ var_34_cast_fp16_to_fp32_dtype_0
+*5
+name-
+%
+#"!
+op_34_cast_fp16_to_fp32_dtype_0*
+val
+
+
+"
+fp32î
+cast-
+dtype$
+"
+ var_34_cast_fp16_to_fp32_dtype_0
+x
+
+var_34_cast_fp16$
+verbosity_prob
+
+
+*
+name
+
+
+"
+cast_0ñ
+cast/
 dtype&
 $
-"linear_5_cast_fp16_to_fp32_dtype_0"
+"linear_5_cast_fp16_to_fp32_dtype_0
+x
+
+linear_5_cast_fp16"
 latency_norm
 
 
@@ -491,14 +588,14 @@ $
 
 
 "
-cast_0ï
-cast
-x
-
-linear_4_cast_fp16/
+cast_1ï
+cast/
 dtype&
 $
-"linear_4_cast_fp16_to_fp32_dtype_0!
+"linear_4_cast_fp16_to_fp32_dtype_0
+x
+
+linear_4_cast_fp16!
 length_norm
 
 
@@ -507,14 +604,14 @@ $
 
 
 "
-cast_1ê
-cast
-x
-
-var_23_cast_fp16-
+cast_2ê
+cast-
 dtype$
 "
- var_23_cast_fp16_to_fp32_dtype_0 
+ var_24_cast_fp16_to_fp32_dtype_0
+x
+
+var_24_cast_fp16 
 
 block_prob
 
@@ -524,14 +621,14 @@ block_prob
 
 
 "
-cast_2ñ
-cast
-x
-
-var_19_cast_fp16-
+cast_3ñ
+cast-
 dtype$
 "
- var_19_cast_fp16_to_fp32_dtype_0&
+ var_20_cast_fp16_to_fp32_dtype_0
+x
+
+var_20_cast_fp16&
 afm_success_prob
 
 
@@ -540,7 +637,7 @@ block_prob
 
 
 "
-cast_3"Ê
+cast_4"Ê
 	buildInfoÿ"
 
 

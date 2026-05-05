@@ -480,6 +480,9 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var hybridBenchLengthMAECount: Int = 0
     @Published private(set) var hybridBenchLatencyMAESumMs: Double = 0
     @Published private(set) var hybridBenchLatencyMAECount: Int = 0
+    // M661 chapter 一百八十三 — 5th head agreement counters.
+    @Published private(set) var hybridBenchVerbosityCorrect: Int = 0
+    @Published private(set) var hybridBenchVerbosityWrong: Int = 0
     @Published private(set) var hybridBenchOutputPath: String = ""
     @Published private(set) var hybridBenchStartTime: Date?
     @Published private(set) var hybridBenchLastError: String?
@@ -488,6 +491,14 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var hybridSinglePromptOutput: String = ""
     @Published private(set) var hybridSinglePromptRoute: String = ""
     @Published private(set) var hybridSinglePromptProb: Double = 0
+    // M659 chapter 一百八十三 — single-prompt inline all-head
+    // predictions. Populated when runHybridSinglePrompt fires;
+    // surface 5 head outputs alongside the LLM body so user sees
+    // meridian network predictions BEFORE waiting for LLM.
+    @Published private(set) var hybridSinglePromptBlockProb: Double?
+    @Published private(set) var hybridSinglePromptLengthChars: Double?
+    @Published private(set) var hybridSinglePromptLatencyMs: Double?
+    @Published private(set) var hybridSinglePromptVerbosityProb: Double?
     private var hybridBenchTask: Task<Void, Never>?
     // M627 chapter 177 deep-review fix #3 — Stop→Start race.
     // Each start bumps generation + captures myGen. Old task at
@@ -1647,6 +1658,15 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let lengthError: Double?
     let latencyPredictedMs: Double?
     let latencyErrorMs: Double?
+    // M661 chapter 一百八十三 — 5th CoreML head: verbosity_class
+    // (binary, P(body > 1500 chars)). Demonstrates cheap head-add
+    // via shared encoder. Value 0..1 from MultiHead's 5th output.
+    // verbosityCorrect: nil if no LLM body or no MultiHead;
+    //                   else true if predicted class
+    //                   (verbosityProb >= 0.5) matches actual
+    //                   (firstBody.count > 1500).
+    let verbosityProbability: Double?
+    let verbosityCorrect: Bool?
 }
 
 /// M628 chapter 一百七十八 — typed policy mapping
@@ -1839,8 +1859,28 @@ extension SampleHostModel {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.hybridSinglePromptStatus = "predicting…"
+            // M659 chapter 一百八十三 — call ALL heads for the
+            // single-prompt path so UI surfaces full meridian
+            // before LLM fires (router stays the load-bearing
+            // decision; other 4 outputs are observability hints).
             let decision = ChengluPreflightInference.shared
                 .predictOrNil(features: features)
+            let multiHead = ChengluMultiHeadInference.shared
+                .predictOrNil(features: features)
+            // Reset previous inline values
+            self.hybridSinglePromptBlockProb = nil
+            self.hybridSinglePromptLengthChars = nil
+            self.hybridSinglePromptLatencyMs = nil
+            self.hybridSinglePromptVerbosityProb = nil
+            if let mh = multiHead {
+                self.hybridSinglePromptBlockProb = mh.blockProbability
+                self.hybridSinglePromptLengthChars =
+                    mh.predictedBodyLength
+                self.hybridSinglePromptLatencyMs =
+                    mh.predictedDurationMs
+                self.hybridSinglePromptVerbosityProb =
+                    mh.verbosityProbability
+            }
             guard let d = decision else {
                 self.hybridSinglePromptStatus = "router unavailable"
                 return
@@ -2034,6 +2074,9 @@ extension SampleHostModel {
         hybridBenchLengthMAECount = 0
         hybridBenchLatencyMAESumMs = 0
         hybridBenchLatencyMAECount = 0
+        // M661 chapter 一百八十三 reset
+        hybridBenchVerbosityCorrect = 0
+        hybridBenchVerbosityWrong = 0
         hybridBenchLastError = nil
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
@@ -2505,6 +2548,10 @@ extension SampleHostModel {
                 // compare against — skip residual computation.
                 var lengthError: Double? = nil
                 var latencyErrorMs: Double? = nil
+                // M661 chapter 一百八十三 — 5th head residual
+                // (verbosity binary correct/wrong).
+                var verbosityCorrect: Bool? = nil
+                let verbosityProb = multiHead?.verbosityProbability
                 if !llmSkipped, !firstBody.isEmpty {
                     if let pred = lengthPredicted {
                         let actual = Double(firstBody.count)
@@ -2518,6 +2565,17 @@ extension SampleHostModel {
                         latencyErrorMs = err
                         self.hybridBenchLatencyMAESumMs += abs(err)
                         self.hybridBenchLatencyMAECount += 1
+                    }
+                    if let prob = verbosityProb {
+                        let actualLong = firstBody.count > 1500
+                        let predictedLong = prob >= 0.5
+                        let correct = actualLong == predictedLong
+                        verbosityCorrect = correct
+                        if correct {
+                            self.hybridBenchVerbosityCorrect += 1
+                        } else {
+                            self.hybridBenchVerbosityWrong += 1
+                        }
                     }
                 }
 
@@ -2559,7 +2617,9 @@ extension SampleHostModel {
                     lengthPredicted: lengthPredicted,
                     lengthError: lengthError,
                     latencyPredictedMs: latencyPredictedMs,
-                    latencyErrorMs: latencyErrorMs)
+                    latencyErrorMs: latencyErrorMs,
+                    verbosityProbability: verbosityProb,
+                    verbosityCorrect: verbosityCorrect)
                 do {
                     try await runner.appendRow(row)
                 } catch {

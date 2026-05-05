@@ -28,7 +28,7 @@ import Foundation
 import CoreML
 #endif
 
-/// Bundle of all 4 head predictions returned in one inference call.
+/// Bundle of all 5 head predictions returned in one inference call.
 public struct ChengluMultiHeadPrediction: Sendable, Codable, Equatable {
     /// Sigmoid output: P(AFM call returns "ok"). >= 0.5 → AFM.
     public let afmSuccessProbability: Double
@@ -38,6 +38,11 @@ public struct ChengluMultiHeadPrediction: Sendable, Codable, Equatable {
     public let predictedBodyLength: Double
     /// Predicted AFM duration in milliseconds (denormalized).
     public let predictedDurationMs: Double
+    /// M661 chapter 一百八十三 — 5th head.
+    /// Sigmoid output: P(AFM body > 1500 chars). UI hint for
+    /// long-response anticipation. Threshold 0.5 → "long".
+    /// Demonstrates cheap head-add via shared encoder pattern.
+    public let verbosityProbability: Double
     /// Model identifier.
     public let modelVersion: String
 
@@ -46,12 +51,14 @@ public struct ChengluMultiHeadPrediction: Sendable, Codable, Equatable {
         blockProbability: Double,
         predictedBodyLength: Double,
         predictedDurationMs: Double,
+        verbosityProbability: Double,
         modelVersion: String
     ) {
         self.afmSuccessProbability = afmSuccessProbability
         self.blockProbability = blockProbability
         self.predictedBodyLength = predictedBodyLength
         self.predictedDurationMs = predictedDurationMs
+        self.verbosityProbability = verbosityProbability
         self.modelVersion = modelVersion
     }
 }
@@ -73,7 +80,7 @@ public final class ChengluMultiHeadInference {
     public static let shared = ChengluMultiHeadInference()
 
     private static let modelVersion =
-        "v0-multihead-shared-encoder-43-64-32"
+        "v0.1-multihead-shared-encoder-43-64-32-5heads"
     private static let modelResource = "ChengluMultiHead_v0"
 
     // M652 chapter 一百八十二 — single-source via
@@ -197,6 +204,18 @@ public final class ChengluMultiHeadInference {
             result, key: "length_norm")
         let latencyNorm = try extractScalar(
             result, key: "latency_norm")
+        // M661 chapter 一百八十三 — 5th head extract. Treated as
+        // optional: if model is older v0 (4-output), this throws
+        // unexpectedOutput and we fall back to 0.0 via NaN guard
+        // path. Defensive fallback so production keeps working
+        // through model version transition.
+        let verbosityProb: Double
+        do {
+            verbosityProb = try extractScalar(
+                result, key: "verbosity_prob")
+        } catch {
+            verbosityProb = 0.0
+        }
 
         // Denormalize z-space regression outputs to human units.
         let predictedBodyLength = lengthNorm * lengthStd + lengthMean
@@ -207,6 +226,7 @@ public final class ChengluMultiHeadInference {
             blockProbability: blockProb,
             predictedBodyLength: predictedBodyLength,
             predictedDurationMs: predictedDurationMs,
+            verbosityProbability: verbosityProb,
             modelVersion: Self.modelVersion)
     }
 

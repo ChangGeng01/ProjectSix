@@ -344,6 +344,51 @@ struct SampleHostView: View {
                     .foregroundStyle(.indigo)
             }
 
+            // M659 chapter 一百八十三 — inline meridian predictions.
+            // Visible AFTER predict (before LLM completes if slow)
+            // so user sees full 5-head output without waiting for
+            // bench. Each line is a separate head's prediction;
+            // missing head shows nothing (graceful degradation).
+            if model.hybridSinglePromptBlockProb != nil
+                || model.hybridSinglePromptLengthChars != nil
+                || model.hybridSinglePromptLatencyMs != nil
+            {
+                Divider().padding(.vertical, 2)
+                Text("📡 Meridian (predictions before LLM)")
+                    .font(.caption.bold())
+                    .foregroundStyle(.purple)
+                if let p = model.hybridSinglePromptBlockProb {
+                    Text(String(
+                        format: "  PermitPredict: block=%.3f (%@)",
+                        p,
+                        p >= 0.5 ? "would-block" : "non-block"))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                if let len = model.hybridSinglePromptLengthChars {
+                    Text(String(
+                        format: "  Length predicted: %.0f chars",
+                        len))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                if let ms = model.hybridSinglePromptLatencyMs {
+                    Text(String(
+                        format: "  Latency predicted: %.0f ms",
+                        ms))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                if let vp = model.hybridSinglePromptVerbosityProb {
+                    Text(String(
+                        format: "  Verbosity: %.3f (%@)",
+                        vp,
+                        vp >= 0.5 ? "long >1500" : "short ≤1500"))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if !model.hybridSinglePromptOutput.isEmpty {
                 Text("Output:").font(.caption.bold())
                 Text(model.hybridSinglePromptOutput)
@@ -487,11 +532,19 @@ struct SampleHostView: View {
             ? model.hybridBenchLatencyMAESumMs
                 / Double(model.hybridBenchLatencyMAECount)
             : 0
+        // M661 chapter 一百八十三 — 5th head accuracy.
+        let verbosityTotal = model.hybridBenchVerbosityCorrect
+            + model.hybridBenchVerbosityWrong
+        let verbosityAccuracy = verbosityTotal > 0
+            ? Double(model.hybridBenchVerbosityCorrect)
+                / Double(verbosityTotal) * 100
+            : 0
         return String(
             format:
                 "  PermitPredict: agree=%d/%d (%.1f%%)\n" +
                 "  Length MAE: %.0f chars (n=%d)\n" +
                 "  Latency MAE: %.0f ms  (n=%d)\n" +
+                "  Verbosity acc: %d/%d (%.1f%%) [5th head]\n" +
                 "  Substrate dispatch: skip[block=%d replace=%d delay=%d]\n" +
                 "                       both-LLM=%d local-only=%d draft=%d\n" +
                 "  Post-LLM shifted: %d (closed-loop)",
@@ -499,6 +552,8 @@ struct SampleHostView: View {
             permitAgreementPct,
             lengthMAE, model.hybridBenchLengthMAECount,
             latencyMAE, model.hybridBenchLatencyMAECount,
+            model.hybridBenchVerbosityCorrect, verbosityTotal,
+            verbosityAccuracy,
             model.hybridBenchSubstrateSkipBlock,
             model.hybridBenchSubstrateSkipReplace,
             model.hybridBenchSubstrateSkipDelay,
