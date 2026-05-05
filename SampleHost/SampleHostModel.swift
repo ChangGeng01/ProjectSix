@@ -2117,30 +2117,37 @@ extension SampleHostModel {
                     SampleHostHybridDispatchPolicy.from(
                         permitMode: permitMode)
 
-                // M635 chapter 一百七十九 — 2nd CoreML head.
-                // Predicts substrate's .block class from signature
-                // features. Runs ALONGSIDE substrate (substrate
-                // already ran above; we have actual permitMode).
-                // The prediction is logged + agreement recorded;
-                // it does NOT replace substrate authority.
-                //
-                // 2nd meridian point: 1st head (ChengluPreflight)
-                // sits at substrate→LLM gateway; 2nd head sits in
-                // parallel to substrate itself. Two CoreML heads,
-                // two meridian points (2/18 of planned mesh).
-                let permitDecision = ChengluPermitPredictInference
+                // M649 chapter 一百八十一 — try MultiHead FIRST
+                // (1 inference call, 4 outputs). Fall back to
+                // separate per-head models if MultiHead missing.
+                let multiHead = ChengluMultiHeadInference
                     .shared.predictOrNil(features: features)
-                let permitPredictBlockProb =
-                    permitDecision?.blockProbability
-                let permitPredictClass =
-                    permitDecision?.predictedClass.rawValue
+
+                // M635 chapter 一百七十九 — 2nd CoreML head.
+                // Permit predict: prefer MultiHead's block_prob;
+                // fall back to standalone PermitPredict head if
+                // MultiHead unavailable.
+                let permitPredictBlockProb: Double?
+                let permitPredictClass: String?
+                if let mh = multiHead {
+                    permitPredictBlockProb = mh.blockProbability
+                    permitPredictClass = mh.blockProbability >= 0.5
+                        ? "block" : "non-block"
+                } else {
+                    let permitDecision = ChengluPermitPredictInference
+                        .shared.predictOrNil(features: features)
+                    permitPredictBlockProb =
+                        permitDecision?.blockProbability
+                    permitPredictClass =
+                        permitDecision?.predictedClass.rawValue
+                }
                 // Agreement: predicted class matches substrate's
                 // actual .block decision. nil if model unavailable.
                 let permitPredictAgreement: Bool? = {
-                    guard let predicted = permitDecision?
-                        .predictedClass else { return nil }
+                    guard let cls = permitPredictClass
+                    else { return nil }
                     let actualIsBlock = (permitMode == "block")
-                    let predictedIsBlock = (predicted == .block)
+                    let predictedIsBlock = (cls == "block")
                     return actualIsBlock == predictedIsBlock
                 }()
                 if let agree = permitPredictAgreement {
@@ -2152,16 +2159,21 @@ extension SampleHostModel {
                 }
 
                 // M638-M641 chapter 一百八十 — 3rd + 4th CoreML
-                // heads. Predict AFM body length + AFM duration ms
-                // BEFORE LLM call. Doctrine pin: prediction is
-                // observability only; LLM call always proceeds
-                // (red line #1: 先醒再答 + #2: 神经不掌权).
-                let lengthDecision = ChengluRegressionHeadInference
-                    .lengthHead.predictOrNil(features: features)
-                let latencyDecision = ChengluRegressionHeadInference
-                    .latencyHead.predictOrNil(features: features)
-                let lengthPredicted = lengthDecision?.predicted
-                let latencyPredictedMs = latencyDecision?.predicted
+                // heads. M649 chapter 一百八十一 — prefer
+                // MultiHead, fall back to separate heads.
+                let lengthPredicted: Double?
+                let latencyPredictedMs: Double?
+                if let mh = multiHead {
+                    lengthPredicted = mh.predictedBodyLength
+                    latencyPredictedMs = mh.predictedDurationMs
+                } else {
+                    let lengthDecision = ChengluRegressionHeadInference
+                        .lengthHead.predictOrNil(features: features)
+                    let latencyDecision = ChengluRegressionHeadInference
+                        .latencyHead.predictOrNil(features: features)
+                    lengthPredicted = lengthDecision?.predicted
+                    latencyPredictedMs = latencyDecision?.predicted
+                }
 
                 // Call chosen LLM
                 var firstTriedLLM = routerRoute.rawValue

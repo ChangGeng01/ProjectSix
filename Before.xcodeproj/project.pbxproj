@@ -18,6 +18,7 @@
 		0435BCEFA8A07CE59796719A /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EDEFDEA19B8C992836638F9 /* AppTab.swift */; };
 		046F56A2947A1E8287D8392E /* DecisionContextPreparedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */; };
 		0504573E50B4E25F56B23950 /* DecisionMemoryGovernorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAE5FCADB7777436BB5F668 /* DecisionMemoryGovernorTests.swift */; };
+		058142AADE48A3789D125FCB /* CoreMLMultiHeadInference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 309BCD84AA622DB7F19C0739 /* CoreMLMultiHeadInference.swift */; };
 		05DE60BF21270D62ED8AEA08 /* DecisionFrontstageState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1EF1DBB04E66319BF5C80E /* DecisionFrontstageState.swift */; };
 		0631D505C4BD028BFDA89AA1 /* DecisionEvolutionCheckpointActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32A13B15D20FC5AE43C886C /* DecisionEvolutionCheckpointActionBar.swift */; };
 		063B95CB0003BED2CEFA42C0 /* SupportRequestKindTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E920EDE589F5E07C3D3C2C1F /* SupportRequestKindTests.swift */; };
@@ -378,6 +379,7 @@
 		C2A757AD0931D5611D135007 /* TomorrowBoxDelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */; };
 		C2A96E22FAAC5ACBFBC71928 /* DecisionEvolutionCheckpointLineageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D103FF6D5DF7EFE2B7D4704 /* DecisionEvolutionCheckpointLineageDetailsView.swift */; };
 		C453E6D9035E66AEDD7C16B4 /* gemma-4-E4B-it.litertlm in Resources */ = {isa = PBXBuildFile; fileRef = 8B51E3D57D268624717EAA40 /* gemma-4-E4B-it.litertlm */; };
+		C46631935922E88F496B8BD0 /* ChengluMultiHead_v0.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 34DD92D7993A327365810560 /* ChengluMultiHead_v0.mlpackage */; };
 		C46A50ABD5DCD6B7FC47FFE3 /* BeforeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7A4B71C9286A522BBDC902 /* BeforeWidget.swift */; };
 		C4D81E95F755899F1AB2A0E9 /* ReflectionContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1548E93121C0DEC8D3A983A /* ReflectionContext.swift */; };
 		C4FC4B0EB6AE710055BCC915 /* GemmaModelDownloadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DC7DA0EAE0972243E31EEBC /* GemmaModelDownloadServiceTests.swift */; };
@@ -612,11 +614,13 @@
 		2FC0E53534B32B214E62F4E5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2FF0AE4C04AAF5821C532270 /* BeforeAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeAppModel.swift; sourceTree = "<group>"; };
 		3031231D68A1F190033BB7C2 /* ChengluPreflight_v0.mlpackage */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.mlpackage; path = ChengluPreflight_v0.mlpackage; sourceTree = "<group>"; };
+		309BCD84AA622DB7F19C0739 /* CoreMLMultiHeadInference.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreMLMultiHeadInference.swift; sourceTree = "<group>"; };
 		313C02613D4D481F2D4F661F /* DecisionSessionEngineCorrectionComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSessionEngineCorrectionComposerView.swift; sourceTree = "<group>"; };
 		3196F4083F833BD2CEB714E2 /* EmbeddingMemoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingMemoryStore.swift; sourceTree = "<group>"; };
 		321C60A119DD6B81B1E5CF4F /* DecisionIntelligenceCircuitBreakerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceCircuitBreakerTests.swift; sourceTree = "<group>"; };
 		32B421144DE1D5D71F3CFC70 /* PanelCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelCard.swift; sourceTree = "<group>"; };
 		3418C7D3898FC17BBD65C3DB /* DecisionTestingInterface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionTestingInterface.swift; sourceTree = "<group>"; };
+		34DD92D7993A327365810560 /* ChengluMultiHead_v0.mlpackage */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.mlpackage; path = ChengluMultiHead_v0.mlpackage; sourceTree = "<group>"; };
 		356488FB3BD630898DBAF6D5 /* OnDeviceIntelligenceSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnDeviceIntelligenceSessionTests.swift; sourceTree = "<group>"; };
 		358F63E1785D9998B02612A4 /* DecisionCognitionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionCognitionTypes.swift; sourceTree = "<group>"; };
 		36C1B1878D0199AC35774967 /* InterventionTemplateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionTemplateStore.swift; sourceTree = "<group>"; };
@@ -1011,6 +1015,8 @@
 				897FB3064BB9C965DFCEA8B5 /* ChengluLengthHead_v0.mlpackage */,
 				5042BAA99B7F37C9D61383B2 /* ChengluLatencyHead_v0.mlpackage */,
 				795168677E23AA021AF324E7 /* CoreMLRegressionHeads.swift */,
+				34DD92D7993A327365810560 /* ChengluMultiHead_v0.mlpackage */,
+				309BCD84AA622DB7F19C0739 /* CoreMLMultiHeadInference.swift */,
 			);
 			path = SampleHost;
 			sourceTree = "<group>";
@@ -1793,6 +1799,7 @@
 				615BB35B2C23EB29A888044C /* ChengluPermitPredict_v0.mlpackage in Resources */,
 				E711A34618BEA09E220AACB0 /* ChengluLengthHead_v0.mlpackage in Resources */,
 				3A35664A445AA5A23AF6F468 /* ChengluLatencyHead_v0.mlpackage in Resources */,
+				C46631935922E88F496B8BD0 /* ChengluMultiHead_v0.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1817,6 +1824,7 @@
 				FEF537E69FF335A26C156992 /* CoreMLPreflightInference.swift in Sources */,
 				0EBBB3AF4842A4CC6FD11156 /* CoreMLPermitPredictInference.swift in Sources */,
 				7FD7C2C73406E3199A268BC1 /* CoreMLRegressionHeads.swift in Sources */,
+				058142AADE48A3789D125FCB /* CoreMLMultiHeadInference.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
