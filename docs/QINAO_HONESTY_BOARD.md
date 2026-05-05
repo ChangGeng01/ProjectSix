@@ -21344,3 +21344,90 @@ QINAO_GEMMA_BENCH_SUBSTRATE=0 \
 swift run -c release --package-path QinaoRuntimeSDK QinaoSampleHost --gemma-bench
 ```
 
+
+### 176.17 M613 ship — cross-LLM substrate analysis tool + 双 8h bench launched (2026-05-05 续)
+
+**User**: "你来 准备 万全" → "直接 mac 启动 + 完善 step 3 + 文档"
+
+**Pre-flight 实证发现 — iPhone AFM bench 实际在 working**:
+- User claim "全 skip 了" 经实证矫正
+- Pull iPhone Documents/iphone-afm-bench/: 138 rows, **97.8% afm ok**, avg 1610 chars/body
+- afmStatus 分布: 135 ok / 3 afm-error / **0 真 skip**
+- permitMode: 110 delay / 28 block
+- Archive: `/tmp/iphone-afm-bench-validation-snapshot/`
+
+→ "全 skip" 是 UI 误读, AFM 实际正常调用. 这条进 I 类 walkback (I21 候选).
+
+**M613 ship — `scripts/cross_llm_substrate_analysis.py`** (~250 LOC):
+
+5 个 metrics:
+1. **Substrate 跨平台 determinism** — Mac vs iPhone permit decisions on 同 prompt
+2. **Cross-LLM body length 比较** — AFM vs Gemma 输出长度分布
+3. **Per-tone permit fingerprint** — 验证 chapter 175 `angry → 100% block`
+4. **Anomaly clusters** — substrate block 但 LLM 仍产 ≥100 char body 的 prompts
+5. **Cross-LLM agreement matrix** — both answered / both refused / disagreement
+
+Output: Markdown report with optimization candidate suggestions.
+
+**Smoke run on validation snapshot (138 iPhone × 92 Mac → 92 joined)**:
+- ✅ **Substrate determinism: 100%** (92/92 Mac vs iPhone match) — doctrine holds
+- ✅ **`angry → 100% block` fingerprint VALIDATED**: 11/11 angry prompts → block (matches chapter 175 finding)
+- ✅ **AFM verbose**: avg 1637 chars vs Gemma 503 chars (3.25× ratio)
+- ✅ **LLM consensus 96.7%**: 89/92 both answered (high alignment)
+- ⚠️ **21 anomalies**: substrate block + AFM 仍产 body — substrate over-blocking 候选 list
+- ⚠️ **Other tones block% lower than chapter 175 baseline**: ~9-17% vs ~50% — sample size or different combinatorial subspace
+
+**8h dual-side bench launched (2026-05-05 11:56 UTC)**:
+
+| | iPhone AFM | Mac Gemma+substrate |
+|---|---|---|
+| Status | running (PID 46028, M610.1 skipBlocked=false) | running (caffeinated, PID 64765 prevents sleep) |
+| Output | iPhone Documents/iphone-afm-bench/ | /tmp/gemma-cross-8h/iterations.N.jsonl |
+| Rate | ~3 iter/s 实测 | 1.4 iter/s 实测 (200 iter / 2min smoke) |
+| Projected 8h | 86,400 rows AFM | 40,320 rows = full corpus capacity |
+| Schema | M610 (afm body + permit + audit) | M612 (gemma body + substrate permit + audit) |
+| Joinable | ✓ same procedural prompt corpus, same defaults | ✓ |
+
+**8h 后 join + analyze**:
+```bash
+# Pull iPhone bench data
+xcrun devicectl device copy from \
+    --device 740AA10A-F910-50B5-BB22-C98CD86C416C \
+    --domain-type appDataContainer \
+    --domain-identifier com.changgeng.samplehost \
+    --source Documents/iphone-afm-bench \
+    --destination /tmp/iphone-afm-bench-final-pull/
+
+# Run cross-LLM analysis
+python3 scripts/cross_llm_substrate_analysis.py \
+    --iphone /tmp/iphone-afm-bench-final-pull \
+    --mac /tmp/gemma-cross-8h \
+    --report /tmp/cross-llm-final-report.md
+```
+
+**Doctrine pin — 5 substrate optimization paths progress**:
+| Path | M613 status |
+|---|---|
+| 1. Cross-LLM consensus 验证 doctrine | ✅ M613 实证 — `angry → 100% block` 重现, determinism 100%, consensus 96.7% |
+| 2. LLM-as-judge permit 准确性 | ✓ data 收集中, 8h 后可分析 |
+| 3. LoRA distill substrate | ✓ 数据收集中(可以用 8h 数据当 curriculum)|
+| 4. Substrate distill from LLM | ✓ 数据收集中 |
+| 5. Cross-validation feedback loop | ✓ 第一代数据收集中 |
+
+**Cumulative chapter 一百七十六 完整图**:
+- §176.1-§176.8 (M606): A2/A5 实测 + walkback I17
+- §176.9 (M607): 3-way compare + iPhone vs Mac AI 区分
+- §176.10-§176.11 (M607): deep LoRA M247 — markers learned
+- §176.12 (M608): I20 walkback — AFM is OS-architectural blocker
+- §176.13 (M609): iPhone foreground AFM panel — A2 真 unblock
+- §176.14 (M610): AFM 8h flexible bench
+- §176.14 fix (M610.1): skipBlocked default false
+- §176.15 (M611): Mac Gemma 8h bench
+- §176.16 (M612): cross-LLM bench (substrate + Gemma)
+- §176.17 (M613): cross-LLM analysis tool + 双 8h bench launched + smoke validation 显示 doctrine 100% 重现
+
+**Honest residual** (8h 后才能 close):
+- 真 anomaly cluster 大规模分析(目前 21 个 from 92 prompts smoke)
+- LLM disagreement 模式 + 对应 substrate 矫正建议
+- 4 个 path (#2-#5) 真实证
+
