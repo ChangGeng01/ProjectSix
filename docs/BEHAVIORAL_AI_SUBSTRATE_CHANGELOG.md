@@ -1214,3 +1214,10 @@ Self-improvement loop now mechanically validated end-to-end. SampleHost tests 76
 - **M758** Smoke test verified 100+100 row pipeline runs end-to-end in ~30s; v0.5 calibration MACE 0.04-0.07 per head.
 
 Self-improvement loop now operator-runnable end-to-end. Full stack 1953 + 1 parity gate + 6 analysis tools, 0 failures.
+
+## 2026-05-06 — chapter 二百二 (M759-M760) model A/B compare tool
+
+- **M759** NEW `scripts/compare_mlpackages.py` — A/B compare two .mlpackage on same labeled JSONL eval corpus. Per-head accuracy/MAE + diff + WIN/LOSS/TIE verdict + ship-decision rule of thumb (5W ≥ 3 + L = 0 → ship; 2W + ≤1L → canary; ≥ 2L → stay).
+- **M760** Honest doctrine pin: eval corpus must be REAL held-out data (synthetic-on-synthetic returns artificial WINs). Operator's decision = combined verdict from calibration_check + compare_mlpackages.
+
+Full stack 1953 + 1 parity gate + 7 analysis tools (replay / validate / analyze-only / synthesize / verify / calibration-check / compare-mlpackages), 0 failures. Self-improvement loop now operator-runnable end-to-end from synthesize → ship-decision.

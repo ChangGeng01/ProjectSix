@@ -25343,3 +25343,76 @@ All 6 + 1 are scripted, documented in CHENGLU_LOOP_README.md.
 ### 201.7 一句话总结
 
 **Chapter 二百一 (M756-M758)**: continue "全面开发" by closing chapter 192 honest "next step #2: calibration check (bins 0.0-1.0)" and writing the operator runbook. NEW `scripts/calibration_check.py` (10-bin calibration tables + MACE per binary head + per-thermal-stratum breakdown; threshold doctrine: <0.05 well-calibrated / 0.05-0.10 acceptable / >0.10 don't ship). NEW `scripts/CHENGLU_LOOP_README.md` (8-step diagram + quick synthetic smoke + real-data 10h iPhone loop + honest scope limits + schema versions + safety doctrines). Pipeline now operator-runnable end-to-end without me. **Synthetic 100+100 smoke runs in ~30s, produces v0.5 .mlpackage with MACE 0.04-0.07 per head**. Real-data loop awaits real iPhone bench. Doctrine pin: synthetic-trained model never deploys to production; calibration check is REQUIRED before bundle swap. **76 SampleHost tests still green; full stack 1953 + 1 parity gate + 6 analysis tools (replay / validate / analyze-only / synthesize / verify / calibration-check), 0 failures**.
+
+## 二百二、 全面开发 续⁵ — model A/B compare tool (M759-M760 / 2026-05-06)
+
+User trail: continued "全面开发" — close operator UX gap "should I ship v0.5 vs v0.4?".
+
+### 202.1 M759 — compare_mlpackages.py
+
+NEW `scripts/compare_mlpackages.py` — A/B compare two `.mlpackage` on the same labeled JSONL eval corpus. For each binary head (afm_success_prob / block_prob / verbosity_prob), reports baseline vs candidate accuracy + delta. For each regression head (length / latency), reports MAE + delta.
+
+Output:
+
+```
+  Metric                   Baseline  Candidate          Δ  Verdict
+  ---------------------- ---------- ---------- ----------  -------
+  AFM acc                    0.7000     0.9350 +   0.2350  WIN
+  Block acc                  0.5400     0.9050 +   0.3650  WIN
+  Verbosity acc              0.5300     0.9250 +   0.3950  WIN
+  Length MAE (chars)      2386.3003  2283.4793 -102.8210  WIN
+  Latency MAE (ms)        5295.1707  4751.1834 -543.9872  WIN
+
+=== VERDICT ===
+  WINS: 5 / LOSSES: 0 / TIES: 0
+  Decision rule:
+    wins ≥ 3 AND losses == 0    → ship candidate
+    wins ≥ 2 AND losses ≤ 1     → consider canary
+    losses ≥ 2                  → stay on baseline
+  → SHIP CANDIDATE
+```
+
+### 202.2 Honest sanity-check warning
+
+The smoke test above compared production v0.4 vs synthetic-trained v0.5 on the synthetic eval corpus. The verdict was "SHIP CANDIDATE" because the eval corpus IS the synthetic train distribution — circular evaluation, not real signal.
+
+**Doctrine: eval corpus must be REAL labeled data, held-out from training.** For real bundle-swap decisions:
+- Use a portion of the chapter 175/176 base corpus that was NOT used for training
+- OR use a fresh real-iPhone bench JSONL collected after v0.5 was trained
+- OR use synthetic data ONLY to verify the script mechanics (this run)
+
+Script doesn't enforce — operator must apply doctrine.
+
+### 202.3 What's now operator-runnable for v0.5 ship decision
+
+After real iPhone 10h bench → v0.5_real.mlpackage emerges, operator runs:
+
+```bash
+# 1. Calibration check on candidate
+python3 scripts/calibration_check.py \
+    --mlpackage /tmp/v0_5_real.mlpackage \
+    --eval-corpus /tmp/iphone-bench-pull/    # held-out from train
+
+# 2. A/B compare baseline vs candidate
+python3 scripts/compare_mlpackages.py \
+    --baseline SampleHost/ChengluMultiHead_v0.mlpackage \
+    --candidate /tmp/v0_5_real.mlpackage \
+    --eval-corpus /tmp/iphone-bench-pull/    # held-out from train
+
+# 3. Decision per verdict rule
+```
+
+Combined verdict from steps 1+2 drives:
+- BOTH calibration MACE < 0.10 AND compare wins ≥ 3 → ship
+- EITHER calibration > 0.10 OR compare losses ≥ 2 → don't ship
+- MIXED → canary (chapter 203 candidate)
+
+### 202.4 Files modified
+
+| File | Change |
+|---|---|
+| `scripts/compare_mlpackages.py` | NEW — A/B compare two .mlpackage on labeled eval corpus, per-head metrics + diff + verdict |
+
+### 202.5 一句话总结
+
+**Chapter 二百二 (M759-M760)**: continue "全面开发" by closing operator UX gap for ship-decision. NEW `scripts/compare_mlpackages.py` (A/B compare two .mlpackage on labeled JSONL eval corpus; reports per-head accuracy/MAE + delta + WIN/LOSS/TIE verdict + ship-decision rule of thumb). Smoke test on prod v0.4 vs synthetic v0.5 returns 5W/0L/0T (CIRCULAR — eval corpus IS the synthetic train distribution; doctrine pin: eval corpus must be REAL held-out data). After real iPhone bench produces v0.5_real, operator chains calibration_check + compare_mlpackages → combined verdict drives ship/no-ship/canary decision. **76 SampleHost tests still green; full stack 1953 + 1 parity gate + 7 analysis tools (replay / validate / analyze-only / synthesize / verify / calibration-check / compare-mlpackages), 0 failures**. Pipeline now end-to-end operator-runnable from synthesize → ship-decision.
