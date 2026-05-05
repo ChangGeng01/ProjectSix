@@ -21278,3 +21278,69 @@ QINAO_GEMMA_BENCH_ROTATION_ITER=20000 QINAO_GEMMA_BENCH_MUTATIONS=3 \
 swift run -c release --package-path QinaoRuntimeSDK QinaoSampleHost --gemma-bench
 ```
 
+
+### 176.16 M612 — 用 2 LLM 优化基底: cross-LLM bench(substrate + Gemma 同行 JSONL) (2026-05-05 续)
+
+**User**: "我想通过 2个 llm 来优化 基底"
+
+**M612 ship — `--gemma-bench` 升级**: 现在每 iter 同 prompt 走两路并记录:
+1. **Substrate routing**: BASHostRuntime.startSession → permit mode + 14 层 audit codes
+2. **Gemma 4 E2B body**: MLXOrganAdapter.draft → 真 LLM 输出
+3. **同行 JSONL**: 两层 data 合并写入 `Documents/.../iterations.N.jsonl`
+
+**新 env var**: `QINAO_GEMMA_BENCH_SUBSTRATE` (default 1, set 0 to disable substrate routing)
+
+**Per-iter JSONL row 新增字段**:
+- `substratePermit`: "delay" / "block" / "answer" / "n/a" / etc.
+- `substrateAuditCount`: 14 层 audit codes 总数
+
+**Smoke verify (72s)**:
+- 92 iter / 0 errors / 1.27 iter/sec
+- substratePermit 实证 "delay" (consistent with chapter 175 ~50% delay routing)
+- substrateAuditCount 141 codes/turn (chapter 175 实证 142-170 范围一致)
+- Gemma body 真 LLM output
+
+**Cross-LLM 优化 substrate doctrine 立论**:
+
+5 条 path:
+1. ✅ **Cross-LLM consensus 验证 substrate doctrine**: 同 prompt 跑 2 LLM, agree → substrate 决策正确; disagree → anomaly 标记 → 累积矫正
+2. **LLM-as-judge 评估 permit 准确性**: ask LLM "this prompt + substrate routed `block`, was that right?"
+3. **LoRA distill substrate**: 用 bench data (prompt + audit codes) 训练 adapter → Gemma 变 substrate-aware
+4. **Substrate distill from LLM**: 用 LLM 行为反推 substrate 应有的 routing → 调 flexible 阈值 max alignment
+5. **Cross-validation feedback loop**: bench → analyze → tune → re-bench → 进化
+
+M612 ship 第 1 条所需的 data infrastructure. 第 2-5 条建立在 M612 数据上.
+
+**关键 — Mac Gemma + iPhone AFM 数据可 join**:
+- 两个 bench 用**同 procedural prompt 生成**(`generateScatteredWithMutation`)
+- 同 (stride, mutationSeed, iter) → **同 prompt** byte-for-byte
+- Post-bench: join Mac JSONL ⨯ iPhone JSONL on (stride, mutationSeed, iter) 即可
+- 每行有 prompt + AFM body + Gemma body + substrate decision (Mac 端, iPhone 端的 substrate 也记)
+
+**8h 双侧并跑 expected output**:
+- iPhone AFM bench: ~3-5 iter/s × 8h ≈ 86K-144K rows AFM body
+- Mac Gemma bench: ~1.3 iter/s × 8h ≈ 37K rows Gemma body + substrate
+- 共同 prompt 范围: 取小者 ≈ 37K iterations
+- 每 prompt 4 个数据维度: AFM body, Gemma body, substrate permit (iPhone), substrate permit (Mac)
+- Mac/iPhone substrate 应一致 — 可作 substrate determinism cross-check
+
+**首批分析候选 (post-8h)**:
+1. AFM body 长度 vs Gemma body 长度 — refusal pattern 差异
+2. AFM/Gemma 都 refuse 的 prompt → 是否 substrate 也 block
+3. AFM/Gemma 都 answer 的 prompt → 是否 substrate 允许
+4. anomaly 子集: 2 LLM agree 但 substrate 反向 → 候选 substrate fix list
+5. `angry` tone 在 AFM/Gemma 输出风格上 — chapter 175 fingerprint 验证
+
+**Doctrine pin**: cross-LLM 分析 NOT 替代 doctrine — 它是**实证验证 + 候选矫正建议**. 真 doctrine 改动仍需 chapter 级 walkback + typed-pin 测试. 本 bench 是**收集 evidence**, 不是 auto-tune.
+
+**Run command**:
+```bash
+# 8h Mac Gemma vs substrate cross-bench
+QINAO_GEMMA_BENCH_HOURS=8.0 \
+swift run -c release --package-path QinaoRuntimeSDK QinaoSampleHost --gemma-bench
+
+# Disable substrate routing (saves ~1ms / iter, baseline Gemma only)
+QINAO_GEMMA_BENCH_SUBSTRATE=0 \
+swift run -c release --package-path QinaoRuntimeSDK QinaoSampleHost --gemma-bench
+```
+

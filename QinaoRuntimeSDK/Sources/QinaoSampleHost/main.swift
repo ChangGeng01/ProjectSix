@@ -3373,6 +3373,45 @@ struct QinaoSampleHost {
             exit(2)
         }
 
+        // M612 chapter 一百七十六 §176.16 — also route through
+        // substrate so JSONL captures BOTH substrate decision + Gemma
+        // body per prompt. Enables post-bench cross-LLM analysis with
+        // iPhone AFM bench (same procedural prompts → join-able by
+        // (stride, mutationSeed, iter)).
+        let includeSubstrate =
+            (env["QINAO_GEMMA_BENCH_SUBSTRATE"] ?? "1") == "1"
+        let runtime: BASHostRuntime? = includeSubstrate
+            ? BASHostRuntime(
+                configuration: BASHostConfiguration(
+                    runtimeProfileID: "gemma-bench.runtime",
+                    policyProfileID: "gemma-bench.policy",
+                    prefersPureLocal: true,
+                    defaultDeviceState:
+                        BASHostConfiguration
+                            .fixtureDefaultDeviceState,
+                    console: .generic,
+                    lifecycleBehavior: .generic,
+                    workflowBehavior: .generic,
+                    cognitionBehavior: .generic,
+                    presentation: .generic,
+                    runtimeTuning: .generic,
+                    runtimePolicyLineage:
+                        BASRuntimePolicyLineage(
+                            bundleVersion:
+                                "gemma-bench.runtime.v1",
+                            providerRoutingRegistryVersion:
+                                "gemma-bench.routing-registry.v1",
+                            providerRoutingPolicyID:
+                                "gemma-bench.routing.v1",
+                            runtimeTuningRegistryVersion:
+                                "gemma-bench.tuning-registry.v1",
+                            runtimeTuningPolicyID:
+                                "gemma-bench.tuning.v1",
+                            resolutionSourceID:
+                                "gemma_bench"),
+                    hostRhythmProfile: .generic))
+            : nil
+
         let durationSec = hours * 3600.0
         let rotationBytes = jsonlMB * 1024 * 1024
         let startedAt = Date()
@@ -3406,6 +3445,42 @@ struct QinaoSampleHost {
                     stride: chosenStride,
                     mutationSeed: mutationSeed)
             let prompt = g.prompt
+
+            // M612 — substrate routing first (if enabled). Maps stake
+            // → riskLevel same as iPhone bench (consistent across
+            // both bench platforms for post-bench join).
+            var substrateAuditCount = 0
+            var substratePermit = "n/a"
+            if let runtime = runtime {
+                let riskLevel: BASHostRiskLevel
+                switch g.signature.stake.rawValue {
+                case "low", "modest":         riskLevel = .low
+                case "high", "very-high":     riskLevel = .medium
+                case "irreversible",
+                     "non-reversible-after-act": riskLevel = .high
+                default:                      riskLevel = .medium
+                }
+                do {
+                    let result = try runtime.startSession(
+                        BASHostSessionRequest(
+                            kind: .interactive,
+                            workflowProfile: .reflective,
+                            surface: .application,
+                            prompt: prompt,
+                            title: "gemma-bench-\(iter)",
+                            riskLevel: riskLevel))
+                    if let turn = result.eBrainTurn {
+                        if let entry = turn.sovereignAuditEntry {
+                            substrateAuditCount =
+                                entry.signalRefs.count
+                        }
+                        substratePermit = turn.actionPermit
+                            .mode.rawValue
+                    }
+                } catch {
+                    substratePermit = "substrate-error"
+                }
+            }
 
             let req = BASOrganRequest(
                 requestID: "gemma-bench-\(iter)",
@@ -3451,7 +3526,11 @@ struct QinaoSampleHost {
                 "body": body,
                 "bodyLength": body.count,
                 "latencyMs": latencyMs,
-                "errorMessage": errorMessage as Any
+                "errorMessage": errorMessage as Any,
+                // M612 substrate cross-fields (always emitted, "n/a"
+                // means substrate disabled via env or substrate-error)
+                "substrateAuditCount": substrateAuditCount,
+                "substratePermit": substratePermit
             ]
             // Manual JSONL serialize (sorted keys for stable diff)
             let jsonData = try? JSONSerialization.data(
