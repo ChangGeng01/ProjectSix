@@ -21095,3 +21095,36 @@ chapter 91 ship 的 `AFMTestSupport.skipIfAFMDegraded()` 把 #1 / #2 统一标"d
 
 **Cumulative 21 chapters of honest correction continue** — chapter 156-176 maintained walkback discipline; this is I20.
 
+
+### 176.13 B 方案 ship — iPhone foreground AFM direct test panel (M609 / 2026-05-05)
+
+User: "好 那我选b" (chose option B from §176.4 unblock plan).
+
+**Implementation**:
+- `SampleHost/SampleHostModel.swift`: +`import FoundationModels` (system framework, no xcodeproj edit needed) + 4 new `@Published` props (afmTestStatus / afmTestOutput / afmTestPrompt / afmTestDurationMs / afmIsRunning) + `runAFMTestNow()` async method that creates `LanguageModelSession` directly and calls `respond(to:)` from foreground @MainActor Task.
+- `SampleHost/SampleHostView.swift`: +`afmTestPanel` computed property — TextField for prompt + purple "Run AFM" button + status line + response display box.
+
+**Why FoundationModels framework directly (not via BASOrganRegistry)**:
+- BAS modules `BASAppleAdapters` + `BASOrgan` would need xcodeproj edit (multi-step PBXBuildFile + XCSwiftPackageProductDependency additions, fragile)
+- `FoundationModels` is system-provided (iOS 26+ / macOS 26+) — implicitly linked
+- Direct `LanguageModelSession()` call is **the simplest path** that satisfies macOS 26's foreground-only modelmanagerd policy
+- This bypasses BAS substrate L2 stub entirely — pure AFM smoke test
+
+**Build + deploy**:
+- `xcodebuild -project Before.xcodeproj -scheme SampleHost -configuration Release -destination 'generic/platform=iOS' DEVELOPMENT_TEAM=U4ZLQM8399 -allowProvisioningUpdates build` → SUCCEEDED (1 unrelated warning, 0 errors)
+- Old SampleHost terminated on iPhone (PID 44466 from chapter 174 bench, ran 16+h between bench complete + new install)
+- New build installed + launched (PID 45951)
+
+**Pending — needs physical tap by user**:
+- devicectl can install + launch but cannot tap UI buttons remotely
+- User must pick up iPhone + tap purple "Run AFM" button → see status + response
+- Status outcomes:
+  - `ok — XXX ms / YYY chars` + response = **A2 真 unblock from iPhone foreground**
+  - `error: ...` = some other blocker (region / account / etc.)
+
+**doctrine pin**: chapter 176 §176.4 listed 4 unblock paths (A/B/C/D); B (iPhone UI panel) is **lowest cost path** (~3 hours total: explore + 2 file edits + build + install + launch) without xcodeproj surgery. Foundation Models framework's system availability means no BAS module dependency wiring needed.
+
+**Files modified**:
+- `SampleHost/SampleHostModel.swift` (+~75 lines: import + 5 published props + runAFMTestNow + updateAFMTestPrompt)
+- `SampleHost/SampleHostView.swift` (+~50 lines: afmTestPanel + benchPanel placement)
+

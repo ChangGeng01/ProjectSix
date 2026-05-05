@@ -47,6 +47,8 @@ struct SampleHostView: View {
 
                     benchPanel
 
+                    afmTestPanel
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text(model.result.activeSessionTitle)
                             .font(.headline)
@@ -231,6 +233,62 @@ struct SampleHostView: View {
                 Text("Bench error: \(benchError)")
                     .font(.caption2)
                     .foregroundStyle(.red)
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - M609 chapter 一百七十六 §176.13 — AFM direct foreground test panel
+
+    private var afmTestPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("AFM (Apple Foundation Models) direct test")
+                    .font(.headline)
+                Spacer()
+                Button(model.afmIsRunning ? "Running…" : "Run AFM") {
+                    model.runAFMTestNow()
+                }
+                .buttonStyle(.bordered)
+                .tint(.purple)
+                .disabled(model.afmIsRunning)
+            }
+
+            Text(
+                "Bypasses BAS substrate (which has L2 organ stubbed). " +
+                "Calls FoundationModels.LanguageModelSession directly " +
+                "from foreground UI — only path that satisfies macOS 26 " +
+                "/ iOS 26 modelmanagerd's foreground-only policy. " +
+                "Requires Apple Intelligence enabled."
+            )
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
+            HStack {
+                Text("Prompt:").font(.caption.bold())
+                Spacer()
+            }
+            TextField("AFM prompt", text: Binding(
+                get: { model.afmTestPrompt },
+                set: { model.updateAFMTestPrompt($0) }
+            ))
+            .font(.caption)
+            .textFieldStyle(.roundedBorder)
+            .disabled(model.afmIsRunning)
+
+            Text("Status: \(model.afmTestStatus)")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(model.afmTestStatus.hasPrefix("ok") ? .green : (model.afmTestStatus.hasPrefix("error") ? .red : .secondary))
+
+            if !model.afmTestOutput.isEmpty {
+                Text("Response:")
+                    .font(.caption.bold())
+                Text(model.afmTestOutput)
+                    .font(.caption.monospaced())
+                    .padding(8)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                    .textSelection(.enabled)
             }
         }
         .padding(12)

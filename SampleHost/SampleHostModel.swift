@@ -3,6 +3,9 @@ import BASHostKit
 #if canImport(UIKit)
 import UIKit
 #endif
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 // MARK: - M573 (chapter 一百四十七 part 2) bench helpers (inlined here
 // because adding a separate file requires Xcode project edits)
@@ -395,6 +398,12 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var benchStartTime: Date?
     @Published private(set) var benchLastError: String?
     @Published private(set) var benchOutputPath: String = ""
+    // M609 chapter 一百七十六 §176.13 — direct AFM test (foreground UI invocation)
+    @Published private(set) var afmTestStatus: String = "idle"
+    @Published private(set) var afmTestOutput: String = ""
+    @Published private(set) var afmTestPrompt: String = "Suggest one calming evening habit in one sentence."
+    @Published private(set) var afmTestDurationMs: Double = 0
+    @Published private(set) var afmIsRunning: Bool = false
 
     private var benchTask: Task<Void, Never>?
     private let benchRunner = SampleHostBenchRunner()
@@ -1096,5 +1105,57 @@ final class SampleHostModel: ObservableObject {
                 reports: []
             )
         )
+    }
+
+    // MARK: - M609 chapter 一百七十六 §176.13 — direct AFM foreground test
+    //
+    // The chapter 174 bench has bodyLength=0 in all 119K rows because
+    // BASHostRuntime's L2 organ stage is stubbed (no AFM adapter
+    // registered). chapter 176 §176.12 (I20 walkback) confirmed Mac
+    // CLI cannot invoke AFM at all due to macOS 26 modelmanagerd
+    // foreground-only architectural policy. iPhone is the only
+    // realistic path: SampleHost.app foreground UI directly creates
+    // a `LanguageModelSession` (FoundationModels framework) and
+    // calls `respond(to:)`. This bypasses BAS substrate entirely
+    // — pure AFM end-to-end smoke test.
+
+    func runAFMTestNow() {
+        guard !afmIsRunning else { return }
+        afmIsRunning = true
+        afmTestStatus = "starting…"
+        afmTestOutput = ""
+        afmTestDurationMs = 0
+        let prompt = afmTestPrompt
+        Task { @MainActor [weak self] in
+            #if canImport(FoundationModels)
+            if #available(iOS 26.0, macOS 26.0, *) {
+                do {
+                    let session = LanguageModelSession()
+                    self?.afmTestStatus = "calling AFM…"
+                    let started = Date()
+                    let response = try await session.respond(to: prompt)
+                    let elapsed = Date().timeIntervalSince(started)
+                    self?.afmTestOutput = response.content
+                    self?.afmTestDurationMs = elapsed * 1000
+                    self?.afmTestStatus =
+                        "ok — \(String(format: "%.0f", elapsed * 1000)) ms / \(response.content.count) chars"
+                } catch {
+                    self?.afmTestOutput = ""
+                    self?.afmTestStatus = "error: \(error)"
+                }
+            } else {
+                self?.afmTestStatus =
+                    "AFM unavailable — needs iOS 26+ / macOS 26+"
+            }
+            #else
+            self?.afmTestStatus =
+                "AFM unavailable — FoundationModels framework not imported"
+            #endif
+            self?.afmIsRunning = false
+        }
+    }
+
+    func updateAFMTestPrompt(_ newPrompt: String) {
+        afmTestPrompt = newPrompt
     }
 }
