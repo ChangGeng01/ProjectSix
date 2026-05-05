@@ -20835,3 +20835,118 @@ Chapter 175 是 doc-only chapter — 无新代码, 仅 honesty board + ENG_HEALT
 ### 175.11 一句话总结
 
 **Chapter 一百七十五 (M605 — 全面开发 iPhone bench 实证 + catalog 自纠)**: respond to user "全面开发" by closing the iPhone bench data analysis arc honestly. **Bench complete**: 2h cap fired precisely, 119K iterations, 16.53 iter/sec sustained, 0 status anomalies, **5 stride × 5 mutation × 8 tones perfectly uniform via coprime-stride proof**. **Real empirical findings**: (1) `angry` tone routes 100% to `.block` while other 7 tones split ~57/43 delay/block — substrate doctrine fingerprint that anger = high-reactivity = chapter 130 Counter-Host gate; (2) thermal throttle visible iter 30K-50K (15% slowdown, recovery by 60K); (3) mutation seeds have NO significant effect on permit distribution — surface prompt variation doesn't change deep substrate routing. **Honest walkbacks (I11-I16)**: catalog L3 stale (M433 closed-as-not-a-bug), L5 over-count (5→4+1), L8 over-count (3→2), L9 number confusion (18 items 4-class), my own "16h overdue" mis-claim from stale TODO timestamp, chapter 174 "find all bugs" partial-met (found doctrine fingerprint + thermal evidence, NOT crash bugs). **Honest catalog corrections (G class)**: G1 over-claim (1 not 4 >5K), G2 half (27 not 51), G3 mis-framed (10 unique vs 123 total imports), G12 STALE (already wired chapter 91 M391, ENG_HEALTH doc D.1 corrected this chapter). **J class fully closed (5/5)**: bench complete + JSONL pulled + analyzed + stride/mutation validated + mutation effectiveness empirically null. **Doctrine pin**: chapter 174 trigger "find all bugs" reframed as "surface fingerprint + validate infrastructure"; honest correction principle (chapter 144) extended to TODO list timestamps; catalog stale-claim pattern recurs (G/L class) — Appendix T's "5 missed sources" assertion was itself partly stale, ~150% expansion claim still under-cited 4 docs. NO over-claim; bench surfaced real signal AND real limitations; both disclosed. Cumulative chapters 156-175 — honest correction discipline running for 20 chapters, walkback frequency ~1 per 1.4 chapters, NO claims of "convergence" maintained throughout.
+
+## 一百七十六、 全面开发 — A2/A5 解阻实证 (M606 / 2026-05-05)
+
+### 176.1 起源 / 上下文
+
+User instruction trail (2026-05-05 续):
+1. "关于 a2 a5 现在能完成吗" — 询问 Appendix T A 类 A2 (AFM) + A5 (ML training) 当前可行性
+2. 我 catalog 标 A/H 类 "external blocked"
+3. 实测发现 hardware 已满足: macOS 26.4.1 + M5 Max 64GB + FoundationModels.framework 存在 + mlx_lm.lora 已装
+4. User: "3" — 选 A2 + A5 combined unblock 推进
+
+Chapter 176 是 A 类 catalog 部分 unblock 的实证 — 不是 100% close A 类, 而是 honestly reclassify 哪些"external"实际是 platform-policy / setup quirk vs 真 external (compute / expert).
+
+### 176.2 A5 实测成功 — M5 Max LoRA fine-tune pipeline runs
+
+**`--lora-train` (small smoke)**:
+| Param | Value |
+|---|---|
+| 模型 | gemma4_E2B_4bit (mlx-community) |
+| Rank | 4 |
+| Iterations | 20 |
+| Corpus | 20 train + 5 val |
+| **训练时间** | **1.5 seconds** |
+| Training loss | 6.94 → 4.08 |
+| Validation loss | 6.15 → 3.42 (收敛, 无 over-fit) |
+| Adapter | `/tmp/qinao_lora_demo.safetensors` 765 KB |
+
+**`--lora-curriculum-train` (substantial)**:
+| Param | Value |
+|---|---|
+| 模型 | gemma4_E2B_4bit |
+| Rank | 8 |
+| Iterations | 200 |
+| Corpus | 80 train + 20 val (4 categories: harm_risk / info_only / advisory / side_effect) |
+| **训练时间** | **21.5 seconds on M5 Max** |
+| Training loss | 9.76 → 1.52 (**6× 改进**) |
+| Validation loss | 9.76 → 2.00 (**4.9× 改进**) |
+| Throughput peak | 1389 tok/s |
+| Adapter | `/tmp/qinao_curriculum_lora.safetensors` 1.5 MB |
+
+### 176.3 A5 doctrine 立场 — partial unblock, 不是 EB-1 解阻
+
+**重要诚实区分**:
+
+✅ **A5 pipeline 实测 works**: M5 Max 64GB 能跑 mlx_lm.lora + Gemma 3n E2B 4-bit + LoRA fine-tune end-to-end. Adapter 文件真生成, training/validation loss 真收敛.
+
+❌ **EB-1 仍未解阻**: 这个 LoRA adapter 是 **`.illustrative` tier**(80 AI-drafted 模板 + 200 iter), **不是 `.domainExpertReviewed`**:
+- Curriculum 仍 AI-drafted (M295.1 starter, 没有 domain expert sign-off)
+- 200 iter 远少于 EB-1.A "200 GPU-hours on A100 80GB" production 量级
+- M5 Max 不等价于 A100 80GB(算力 + memory 都低一档)
+- 没有 `BASOrganTrainedWeightProvenance` envelope wrap + provenance signature
+
+✅ **真新增能力**: 这次实证 ship 了**仓内可重复跑的 LoRA pipeline**. 任何人现在可以在 M5 Max(或类似 Apple Silicon)跑 `swift run QinaoSampleHost --lora-curriculum-train` 在 21.5 秒内产出一个 sample adapter. 这是从 Appendix T A5 "completely external" → **partial repo-internal** 的真实推进.
+
+### 176.4 A2 仍 blocked — Apple Intelligence 未在 Settings 启用
+
+**实测结果**:
+- ✅ macOS 26.4.1 (满足版本要求)
+- ✅ M5 Max + 64GB (硬件满足)
+- ✅ `FoundationModels.framework` 存在
+- ✅ 全套 AFM E2E test infra ship 完整 (10+ test files, AFMTestSupport helper)
+- ❌ `QINAO_AFM_MULTI_TURN_DEMO=1 swift run QinaoSampleHost --multi-turn-demo` → fall back to **mock-fallback-no-afm**
+- ❌ `QINAO_FM_E2E=1 swift test --filter QinaoAppleFoundationFactoryTests` → 3/4 测试 skipped via `XCTSkip` (ModelManagerError Code=1026)
+- ❌ `open -a Xcode` foreground 35s warmup 也无效
+
+**真 A2 阻塞**(比 doc 描述的更深一层):
+- `docs/QINAO_AFM_PLATFORM_POLICY_2026-05-02.md` 说 "Open Xcode foreground 30s to warm cache" → **本次实测无效**
+- 推测 Apple Intelligence **未在 Settings → Apple Intelligence 中 enable**
+- 或地区 / 语言 / 账户级别 block (e.g. China region 默认不开 Apple Intelligence)
+- 或需要额外的 entitlement / privacy permission
+
+**A2 真 unblock 条件**(基于实测精确化):
+1. ⚠️ Settings → Apple Intelligence → enable — **需要用户 manual 操作 GUI**
+2. ⚠️ 可能需要更换 iCloud 区域到支持的 region
+3. ⚠️ 可能需要授予额外 Foundation Models privacy permission
+4. ✓ Once enabled, run from foreground process (swift run, not xctest CLI)
+
+**Catalog A2 矫正**: "Pending AFM real-machine" 应改为 "Pending Apple Intelligence Settings enable + region check". 比 catalog 措辞更具体.
+
+### 176.5 真 walkback I17 (catalog A 类 partial 矫正)
+
+**前 claim**(Appendix T A 类): 5 项全部 "external-resource-bound, 仓外阻塞"
+**实证 2026-05-05**:
+- A1 iPhone 实机 — ✅ 真完成(chapter 174-175)
+- A2 AFM — ⚠️ 部分 unblock, 真阻塞是 Settings + region 不是 hardware
+- A3 多设备 bench — ❌ 仍真 external (需 ≥ 2 物理设备)
+- A4 真客户 SLA — ❌ 仍真 external (仓外)
+- A5 ML training — ⚠️ **partial unblock 实测**: M5 Max LoRA pipeline works, EB-1 production-grade 仍 external
+
+**矫正**: A 类不是"全部 external", 是 **"3 项真 external + 2 项 partial unblock-able"**. Appendix T 把所有 A 类列同一档是 over-classification.
+
+### 176.6 Test counts
+
+| Counter | Pre-M606 | Post-M606 | Δ |
+|---|---|---|---|
+| BAS XCTest | 2990 | 2990 | 0 |
+| Qinao XCTest | 1442 | 1442 | 0 |
+| 全栈 | 4432 | 4432 | 0 |
+| Failures | 0 | 0 | 0 |
+| **新 LoRA adapters** | **0** | **2** | +2 (`/tmp/qinao_lora_demo.safetensors` + `/tmp/qinao_curriculum_lora.safetensors`) |
+
+Chapter 176 是 doc + execution chapter — 无新代码, 仅跑既有 `--lora-train` / `--lora-curriculum-train` modes 验证 A5 + 实测 A2 阻塞精确化.
+
+### 176.7 Files modified
+
+| File | Change |
+|---|---|
+| `docs/QINAO_HONESTY_BOARD.md` | +chapter 一百七十六 entry (this section) |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | +M606 entry |
+| `/tmp/qinao_lora_demo.safetensors` (untracked) | M5 Max small-scale LoRA adapter (765 KB) |
+| `/tmp/qinao_curriculum_lora.safetensors` (untracked) | M5 Max curriculum LoRA adapter (1.5 MB) |
+
+### 176.8 一句话总结
+
+**Chapter 一百七十六 (M606 — A2/A5 解阻实证)**: respond to user choice "3" (A2 + A5 combined) by empirically testing Appendix T A 类 unblock viability on this M5 Max 64GB machine. **A5 partial unblock**: ran `--lora-train` (1.5s, 20 iter, loss 6.94→4.08) + `--lora-curriculum-train` (21.5s, 200 iter, loss 9.76→1.52, 1389 tok/s peak) producing 2 real LoRA adapter `.safetensors` files. **mlx_lm.lora + Gemma 3n E2B + M5 Max pipeline works end-to-end** — but adapters are `.illustrative` tier only (curriculum AI-drafted, not domain-expert-signed; 200 iter << EB-1.A 200 GPU-hours), so **EB-1 production-grade adapter is NOT closed** — only repo-internal pipeline is. **A2 still blocked**: macOS 26.4.1 + M5 Max + FoundationModels.framework all present, but `QINAO_AFM_MULTI_TURN_DEMO=1` falls back to mock + AFM E2E tests skip with ModelManagerError 1026 even after Xcode foreground warmup. Real blocker is **Apple Intelligence not enabled in Settings** (or region/account-level block) — requires user manual GUI action, not surgical code. **Walkback I17**: Appendix T A 类 over-classified — 3 truly external (A1✓ closed last chapter / A3 multi-device / A4 real customer) + **2 partial-unblock** (A2 setup-quirk-blocked / A5 pipeline-works-but-tier-illustrative). Doctrine pin: catalog A 类 "all external" assertion was lazy classification; real boundary is between "needs hardware/users/customers external to Mac" (A3/A4) and "needs Settings GUI / production GPU compute" (A2/A5). NO over-claim of EB-1 closure; LoRA adapter shipped is `.illustrative` tier per `BASOrganTrainedWeightProvenance` floor. NO over-claim of A2 close; honestly disclosed Settings-level blocker. Cumulative chapters 156-176: 21 chapters of honest correction, ~1 walkback per 1.4 chapters.
