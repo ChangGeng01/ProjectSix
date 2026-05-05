@@ -1676,9 +1676,14 @@ enum HybridBenchTuning {
 /// Bump on any breaking field change so downstream analyzers
 /// can detect format upgrades. Optional decoding allows old rows
 /// (without this field) to load as nil.
-/// M675 chapter 一百八十六 bumped to "6" (added
-/// `permitPredictDetailedAgreement` field).
-let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "6"
+/// M703 chapter 一百九十 bumped to "7" — added pressure context
+/// fields (thermalState / batteryLevel / lowPowerMode /
+/// hourOfDay) so retrain pipeline (chapter 一百九十 M704) has
+/// situational context, not just signature features. Enables
+/// the user's stated vision: "make next 8h bench data train the
+/// model stronger / fit actual state / different scenarios /
+/// different pressures / different assumptions all handled".
+let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "7"
 
 struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     /// M672 chapter 一百八十五 — schema version stamp.
@@ -1795,6 +1800,26 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     //                   (firstBody.count > 1500).
     let verbosityProbability: Double?
     let verbosityCorrect: Bool?
+    // M703 chapter 一百九十 — pressure context (HIGH NEW value).
+    // Captured per iter so future retrain pipeline (M704
+    // bench_to_train.py) can stratify training by situation.
+    // User's vision: "different scenarios / different pressures
+    // / different assumptions all handled" — requires the row
+    // to record the situation so retrain can learn the manifold.
+    /// `ProcessInfo.thermalState` rawValue — "nominal" / "fair"
+    /// / "serious" / "critical". Substrate behavior may shift
+    /// under thermal pressure.
+    let thermalState: String?
+    /// `UIDevice.batteryLevel` clamped [0, 1]. -1 if unknown
+    /// (e.g. battery monitoring disabled). Helps retrain learn
+    /// low-battery / charging patterns.
+    let batteryLevel: Double?
+    /// `ProcessInfo.isLowPowerModeEnabled`. Low-power mode
+    /// throttles CoreML / network / yields differently.
+    let lowPowerMode: Bool?
+    /// `Calendar.current.component(.hour, from: timestamp)`
+    /// 0-23. Time-of-day patterns (user fatigue / context).
+    let hourOfDay: Int?
 }
 
 /// M628 chapter 一百七十八 — typed policy mapping
@@ -2251,6 +2276,32 @@ extension SampleHostModel {
                         mutationSeed: mutationSeed)
                 let prompt = g.prompt
                 let signature = g.signature
+
+                // M703 chapter 一百九十 — capture pressure context
+                // BEFORE substrate work (so it reflects situation
+                // at iter START, not perturbation iter caused).
+                let thermalRaw: String = {
+                    switch ProcessInfo.processInfo.thermalState {
+                    case .nominal: return "nominal"
+                    case .fair: return "fair"
+                    case .serious: return "serious"
+                    case .critical: return "critical"
+                    @unknown default: return "unknown"
+                    }
+                }()
+                let lowPower = ProcessInfo.processInfo
+                    .isLowPowerModeEnabled
+                #if canImport(UIKit)
+                let batteryRaw: Double = {
+                    UIDevice.current.isBatteryMonitoringEnabled = true
+                    let level = UIDevice.current.batteryLevel
+                    return level >= 0 ? Double(level) : -1.0
+                }()
+                #else
+                let batteryRaw: Double = -1.0
+                #endif
+                let hourCaptured = Calendar.current.component(
+                    .hour, from: Date())
 
                 // Substrate routing
                 let t0 = Date()
@@ -2887,7 +2938,11 @@ extension SampleHostModel {
                     latencyPredictedMs: latencyPredictedMs,
                     latencyErrorMs: latencyErrorMs,
                     verbosityProbability: verbosityProb,
-                    verbosityCorrect: verbosityCorrect)
+                    verbosityCorrect: verbosityCorrect,
+                    thermalState: thermalRaw,
+                    batteryLevel: batteryRaw,
+                    lowPowerMode: lowPower,
+                    hourOfDay: hourCaptured)
                 do {
                     try await runner.appendRow(row)
                 } catch {

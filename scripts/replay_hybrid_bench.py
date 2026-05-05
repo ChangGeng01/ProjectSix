@@ -26,7 +26,7 @@ from collections import Counter
 from glob import glob
 from pathlib import Path
 
-EXPECTED_SCHEMA_VERSION = "6"
+EXPECTED_SCHEMA_VERSION = "7"  # M703 chapter 一百九十
 
 
 def load_jsonl(path: str) -> list[dict]:
@@ -190,6 +190,62 @@ def replay(rows: list[dict]) -> tuple[bool, list[str]]:
         diagnostics.append(
             f"verbosity 5th head: {vc}/{vc+vw} correct "
             f"({acc:.1f}%; train was 77.31%)")
+
+    # M705 chapter 一百九十 — calibration histogram.
+    # Bin router probability into 10 buckets [0.0-0.1, ..., 0.9-1.0]
+    # and report actual hit rate per bin. A well-calibrated router
+    # should have hit-rate ≈ bin midpoint. If predicted 0.9 but
+    # actual 0.6, model is over-confident at the high-prob tail.
+    # Excludes routerOverridden rows (chapter 185 B1 — those
+    # rows aren't router decisions).
+    cal_buckets: dict[int, dict[str, int]] = {
+        i: {"n": 0, "hit": 0} for i in range(10)
+    }
+    for r in rows:
+        if r.get("routerOverridden") is True:
+            continue
+        prob = r.get("routerProbability")
+        if not isinstance(prob, (int, float)):
+            continue
+        if not math.isfinite(prob):
+            continue
+        if prob < 0 or prob > 1:
+            continue
+        bin_idx = min(int(prob * 10), 9)
+        cal_buckets[bin_idx]["n"] += 1
+        if r.get("routerHit") is True:
+            cal_buckets[bin_idx]["hit"] += 1
+    cal_lines = []
+    cal_lines.append(
+        "calibration histogram (router prob bin → actual hit rate):"
+    )
+    for i in range(10):
+        b = cal_buckets[i]
+        if b["n"] == 0:
+            continue
+        bin_lo = i * 0.1
+        bin_hi = (i + 1) * 0.1
+        bin_mid = bin_lo + 0.05
+        hit_rate = b["hit"] / b["n"]
+        delta = hit_rate - bin_mid
+        cal_lines.append(
+            f"  [{bin_lo:.1f},{bin_hi:.1f}): n={b['n']:>5d} "
+            f"hit_rate={hit_rate:.3f} "
+            f"(midpoint={bin_mid:.2f}, Δ={delta:+.3f})"
+        )
+    if any(b["n"] > 0 for b in cal_buckets.values()):
+        diagnostics.extend(cal_lines)
+
+    # Pressure-stratified drift detection (chapter 一百九十 NEW).
+    pressure_buckets: dict[str, int] = Counter()
+    for r in rows:
+        thermal = r.get("thermalState") or "unknown"
+        lp = "lp" if r.get("lowPowerMode") else "norm"
+        pressure_buckets[f"{thermal}/{lp}"] += 1
+    if pressure_buckets:
+        diagnostics.append(
+            f"pressure context distribution: "
+            f"{dict(pressure_buckets)}")
 
     # Length / Latency MAE
     length_errs = [

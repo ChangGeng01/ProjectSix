@@ -265,7 +265,9 @@ final class SampleHostTests: XCTestCase {
             routerOverridden: false,
             lengthPredicted: .nan, lengthError: .infinity,
             latencyPredictedMs: .nan, latencyErrorMs: -.infinity,
-            verbosityProbability: .nan, verbosityCorrect: nil)
+            verbosityProbability: .nan, verbosityCorrect: nil,
+            thermalState: "nominal", batteryLevel: 0.5,
+            lowPowerMode: false, hourOfDay: 12)
         // Must not throw — strategy stringifies non-finite.
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
@@ -288,11 +290,13 @@ final class SampleHostTests: XCTestCase {
     // MARK: - M666-M672 chapter 一百八十五 — fix-pin tests
 
     /// M672 chapter 一百八十五 — B14 schema version constant.
-    /// M675 chapter 一百八十六 bumped to "6" (added
-    /// `permitPredictDetailedAgreement` field).
+    /// M675 chapter 一百八十六 bumped to "6".
+    /// M703 chapter 一百九十 bumped to "7" (pressure fields).
+    /// Test pinned to current; `testHybridBenchRowSchemaVersionV7`
+    /// is the live pin.
     func testHybridBenchRowSchemaVersion() {
         XCTAssertEqual(
-            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "6",
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "7",
             "Schema version must bump on breaking field change")
     }
 
@@ -362,7 +366,9 @@ final class SampleHostTests: XCTestCase {
             routerOverridden: false,
             lengthPredicted: nil, lengthError: nil,
             latencyPredictedMs: nil, latencyErrorMs: nil,
-            verbosityProbability: nil, verbosityCorrect: nil)
+            verbosityProbability: nil, verbosityCorrect: nil,
+            thermalState: nil, batteryLevel: nil,
+            lowPowerMode: nil, hourOfDay: nil)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains(
@@ -485,7 +491,9 @@ final class SampleHostTests: XCTestCase {
                 latencyPredictedMs: 5000,
                 latencyErrorMs: 0,
                 verbosityProbability: 0.3,
-                verbosityCorrect: tc.body.count > 1500 ? false : true)
+                verbosityCorrect: tc.body.count > 1500 ? false : true,
+                thermalState: "nominal", batteryLevel: 0.5,
+                lowPowerMode: false, hourOfDay: 12)
             let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
             guard let data = encoded.data(using: .utf8) else {
                 XCTFail("UTF-8 encode failed: idx=\(idx)")
@@ -504,6 +512,76 @@ final class SampleHostTests: XCTestCase {
     }
 
     // MARK: - chapter 一百八十七 + earlier tests continue below
+
+    /// M703 chapter 一百九十 — schema bumped to "7" (added
+    /// pressure context fields).
+    func testHybridBenchRowSchemaVersionV7() {
+        XCTAssertEqual(
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "7",
+            "Schema version must bump on breaking field change")
+    }
+
+    /// M703 chapter 一百九十 — pressure context fields encode
+    /// + decode cleanly through Codable round-trip.
+    func testHybridBenchRowPressureContextRoundTrip() throws {
+        let sig = SampleHostPromptSignature(
+            tone: "anxious", domain: "financial", stake: "low",
+            timeframe: "minutes", confidant: "friend",
+            askShape: "narrative")
+        let row = SampleHostHybridBenchRow(
+            timestamp: "2026-05-06T14:30:00Z",
+            iteration: 0, seed: 0, stride: 5041, mutationSeed: 0,
+            signature: sig, prompt: "p", auditCodeCount: 100,
+            permitMode: "answer", routerVersion: "v",
+            routerPredictedRoute: "afm",
+            routerProbability: 0.5,
+            firstTriedLLM: "afm", firstTriedStatus: "ok",
+            firstTriedBody: "x", firstTriedDurationMs: 1,
+            fallbackTriedLLM: nil, fallbackStatus: nil,
+            fallbackBody: nil, fallbackDurationMs: nil,
+            actualRoute: "afm-predicted-ok", routerHit: true,
+            totalDurationSeconds: 0.1, errorMessage: nil,
+            dispatchPolicy: nil, dispatchTaken: nil,
+            draftOnly: nil, llmSkipped: false,
+            postLLMPermitMode: nil, postLLMAuditCodeCount: nil,
+            postLLMShifted: nil,
+            permitPredictBlockProb: nil,
+            permitPredictClass: nil,
+            permitPredictAgreement: nil,
+            permitPredictDetailedAgreement: nil,
+            routerOverridden: false,
+            lengthPredicted: nil, lengthError: nil,
+            latencyPredictedMs: nil, latencyErrorMs: nil,
+            verbosityProbability: nil, verbosityCorrect: nil,
+            // M703 chapter 一百九十 — pressure context.
+            thermalState: "fair",
+            batteryLevel: 0.42,
+            lowPowerMode: true,
+            hourOfDay: 14)
+        let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
+        XCTAssertTrue(
+            encoded.contains("\"thermalState\":\"fair\""),
+            "thermalState in JSONL: \(encoded)")
+        XCTAssertTrue(
+            encoded.contains("\"batteryLevel\":0.42"),
+            "batteryLevel in JSONL: \(encoded)")
+        XCTAssertTrue(
+            encoded.contains("\"lowPowerMode\":true"),
+            "lowPowerMode in JSONL: \(encoded)")
+        XCTAssertTrue(
+            encoded.contains("\"hourOfDay\":14"),
+            "hourOfDay in JSONL: \(encoded)")
+        guard let data = encoded.data(using: .utf8) else {
+            XCTFail("UTF-8 encode failed")
+            return
+        }
+        let decoded = try JSONDecoder().decode(
+            SampleHostHybridBenchRow.self, from: data)
+        XCTAssertEqual(decoded.thermalState, "fair")
+        XCTAssertEqual(decoded.batteryLevel, 0.42)
+        XCTAssertEqual(decoded.lowPowerMode, true)
+        XCTAssertEqual(decoded.hourOfDay, 14)
+    }
 
     /// M683 chapter 一百八十七 — A2 Swift 6 prep:
     /// `private nonisolated init()` lets `static let shared`
@@ -569,7 +647,9 @@ final class SampleHostTests: XCTestCase {
             routerOverridden: false,
             lengthPredicted: nil, lengthError: nil,
             latencyPredictedMs: nil, latencyErrorMs: nil,
-            verbosityProbability: nil, verbosityCorrect: nil)
+            verbosityProbability: nil, verbosityCorrect: nil,
+            thermalState: nil, batteryLevel: nil,
+            lowPowerMode: nil, hourOfDay: nil)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         guard let data = encoded.data(using: .utf8) else {
             XCTFail("failed to UTF-8 encode JSONL line")
@@ -620,13 +700,15 @@ final class SampleHostTests: XCTestCase {
             routerOverridden: true,         // M666 NEW
             lengthPredicted: nil, lengthError: nil,
             latencyPredictedMs: nil, latencyErrorMs: nil,
-            verbosityProbability: nil, verbosityCorrect: nil)
+            verbosityProbability: nil, verbosityCorrect: nil,
+            thermalState: nil, batteryLevel: nil,
+            lowPowerMode: nil, hourOfDay: nil)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains("\"routerOverridden\":true"),
             "row must encode routerOverridden field: \(encoded)")
         XCTAssertTrue(
-            encoded.contains("\"schemaVersion\":\"6\""),
+            encoded.contains("\"schemaVersion\":\"7\""),
             "row must encode schemaVersion field: \(encoded)")
     }
 
