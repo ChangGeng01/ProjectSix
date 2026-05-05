@@ -26,7 +26,7 @@ from collections import Counter
 from glob import glob
 from pathlib import Path
 
-EXPECTED_SCHEMA_VERSION = "8"  # M712 chapter 一百九十一
+EXPECTED_SCHEMA_VERSION = "9"  # M725 chapter 一百九十二
 
 
 def load_jsonl(path: str) -> list[dict]:
