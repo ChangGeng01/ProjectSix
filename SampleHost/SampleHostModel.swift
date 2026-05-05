@@ -464,6 +464,13 @@ final class SampleHostModel: ObservableObject {
     @Published var hybridBenchDriftSigmaThreshold: Double = 3.0
     @Published var hybridBenchMutationProbability: Double = 0.05
     @Published var hybridBenchCheckpointEveryNIters: Int = 1000
+    /// M735 chapter 一百九十五 — per-iter LLM call timeout in seconds.
+    /// Both AFM and Gemma calls are wrapped with this deadline so a
+    /// hung LLM never freezes the bench loop. Default 60s is loose
+    /// (Gemma cold-start can be ~30s; AFM normal is sub-2s).
+    @Published var hybridBenchLLMTimeoutSeconds: Double = 60.0
+    /// M735 — track per-iter timeout fires for live dashboard.
+    @Published private(set) var hybridBenchLLMTimeoutCount: Int = 0
     @Published private(set) var hybridBenchIsRunning: Bool = false
     @Published private(set) var hybridBenchIterations: Int = 0
     @Published private(set) var hybridBenchAFMOk: Int = 0
@@ -2408,6 +2415,78 @@ extension SampleHostModel {
         }
     }
 
+    /// M735 chapter 一百九十五 — wrap callAFM with per-iter
+    /// timeout. Bench loop uses this in the .singleLLM confident
+    /// path so a hung AFM call (~30s+) doesn't freeze the whole
+    /// 10h run; it bails after `seconds` and lets the fallback
+    /// path try Gemma.
+    ///
+    /// Doctrine: TIMEOUT IS BAIL-OUT, not session-killer. Throws
+    /// `SampleHostBenchLLMTimeoutError.timeoutExceeded` so the
+    /// bench-loop catch can record a clean failure. `hybridBenchLLMTimeoutCount`
+    /// is incremented so the dashboard shows live timeout rate.
+    @MainActor
+    fileprivate func callAFMWithTimeout(
+        prompt: String, seconds: Double
+    ) async throws -> String {
+        let llmTask = Task { [weak self] () async throws -> String in
+            guard let self else {
+                throw NSError(domain: "model-deinit", code: -1)
+            }
+            return try await self.callAFM(prompt: prompt)
+        }
+        let timeoutTask = Task {
+            try? await Task.sleep(
+                nanoseconds: UInt64(max(0.001, seconds) * 1_000_000_000))
+            llmTask.cancel()
+        }
+        do {
+            let body = try await llmTask.value
+            timeoutTask.cancel()
+            return body
+        } catch {
+            timeoutTask.cancel()
+            if llmTask.isCancelled {
+                self.hybridBenchLLMTimeoutCount += 1
+                throw SampleHostBenchLLMTimeoutError
+                    .timeoutExceeded(seconds: seconds)
+            }
+            throw error
+        }
+    }
+
+    /// M735 chapter 一百九十五 — Gemma equivalent of
+    /// `callAFMWithTimeout`. Same doctrine.
+    @MainActor
+    fileprivate func callGemmaWithTimeout(
+        prompt: String, seconds: Double
+    ) async throws -> String {
+        let llmTask = Task { [weak self] () async throws -> String in
+            guard let self else {
+                throw NSError(domain: "model-deinit", code: -1)
+            }
+            return try await self.callGemma(prompt: prompt)
+        }
+        let timeoutTask = Task {
+            try? await Task.sleep(
+                nanoseconds: UInt64(max(0.001, seconds) * 1_000_000_000))
+            llmTask.cancel()
+        }
+        do {
+            let body = try await llmTask.value
+            timeoutTask.cancel()
+            return body
+        } catch {
+            timeoutTask.cancel()
+            if llmTask.isCancelled {
+                self.hybridBenchLLMTimeoutCount += 1
+                throw SampleHostBenchLLMTimeoutError
+                    .timeoutExceeded(seconds: seconds)
+            }
+            throw error
+        }
+    }
+
     /// Call AFM with a prompt. Throws on error/guardrail.
     private func callAFM(prompt: String) async throws -> String {
         #if canImport(FoundationModels)
@@ -2565,6 +2644,8 @@ extension SampleHostModel {
         hybridBenchPauseSkippedCount = 0
         hybridBenchAdversarialFiredCount = 0
         hybridBenchDriftAlarmCount = 0
+        // M735 chapter 一百九十五 reset
+        hybridBenchLLMTimeoutCount = 0
         hybridBenchLastError = nil
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
@@ -2573,10 +2654,12 @@ extension SampleHostModel {
         let runtime = self.runtime
         // M718 chapter 一百九十二 — anomaly watcher (fresh per-bench).
         // M731 chapter 一百九十四 — windowSize from @Published flex.
+        // M735 chapter 一百九十五 — LLM timeout from @Published flex.
         let anomalyWindowCaptured = self.hybridBenchAnomalyWindowSize
         let driftThresholdCaptured = self.hybridBenchDriftSigmaThreshold
         let mutationProbCaptured = self.hybridBenchMutationProbability
         let checkpointEveryNCaptured = self.hybridBenchCheckpointEveryNIters
+        let llmTimeoutCaptured = self.hybridBenchLLMTimeoutSeconds
         let anomalyWatcher = SampleHostBenchAnomalyWatcher(
             windowSize: anomalyWindowCaptured)
         // M721 chapter 一百九十二 — drift monitor on length-MAE
@@ -3157,11 +3240,17 @@ extension SampleHostModel {
                     }
                 } else {
                     // Confident — original single-LLM-with-fallback path
+                    // M735 chapter 一百九十五 — wrap with timeout
+                    // for 10h hang resistance.
                     do {
                         if routerRoute == .afm {
-                            firstBody = try await self.callAFM(prompt: prompt)
+                            firstBody = try await self.callAFMWithTimeout(
+                                prompt: prompt,
+                                seconds: llmTimeoutCaptured)
                         } else {
-                            firstBody = try await self.callGemma(prompt: prompt)
+                            firstBody = try await self.callGemmaWithTimeout(
+                                prompt: prompt,
+                                seconds: llmTimeoutCaptured)
                         }
                         firstDurationMs =
                             Date().timeIntervalSince(firstStart) * 1000
@@ -3183,14 +3272,18 @@ extension SampleHostModel {
                         do {
                             let other: String
                             if routerRoute == .afm {
-                                other = try await self.callGemma(prompt: prompt)
+                                other = try await self.callGemmaWithTimeout(
+                                    prompt: prompt,
+                                    seconds: llmTimeoutCaptured)
                                 fallbackLLM = "gemma"
                                 fallbackStatus = "ok"
                                 fallbackBody = other
                                 actualRoute = "afm-fallback-to-gemma-ok"
                                 applyIfActive(myGen) { self.hybridBenchAFMFallbackToGemmaOk += 1 }
                             } else {
-                                other = try await self.callAFM(prompt: prompt)
+                                other = try await self.callAFMWithTimeout(
+                                    prompt: prompt,
+                                    seconds: llmTimeoutCaptured)
                                 fallbackLLM = "afm"
                                 fallbackStatus = "ok"
                                 fallbackBody = other
@@ -3642,6 +3735,13 @@ extension SampleHostModel {
     }
     func updateCheckpointEveryNIters(_ v: Int) {
         hybridBenchCheckpointEveryNIters = max(100, min(100_000, v))
+    }
+    /// M735 chapter 一百九十五 — per-iter LLM timeout setter.
+    /// Bounds: [5s, 300s = 5min]. 60s default. Bounds protect
+    /// against pathological 0-second (always timeout) and
+    /// unreasonably-long (defeats purpose) settings.
+    func updateLLMTimeoutSeconds(_ v: Double) {
+        hybridBenchLLMTimeoutSeconds = max(5.0, min(300.0, v))
     }
 
     /// M726 chapter 一百九十三 — resume detector. Read latest

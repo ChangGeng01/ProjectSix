@@ -1364,6 +1364,102 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(back?.smokeMode, "canonical")
     }
 
+    // MARK: - chapter 一百九十五 / M735-M738 — LLM timeout + smoke
+
+    /// M735 — withLLMTimeout returns the result when work finishes
+    /// before the deadline.
+    func testWithLLMTimeoutReturnsFastResult() async throws {
+        let result = try await withLLMTimeout(5.0) { () -> String in
+            try await Task.sleep(nanoseconds: 10_000_000)  // 10ms
+            return "ok"
+        }
+        XCTAssertEqual(result, "ok")
+    }
+
+    /// M735 — withLLMTimeout throws .timeoutExceeded when work
+    /// hangs past the deadline.
+    func testWithLLMTimeoutFiresOnHang() async throws {
+        do {
+            _ = try await withLLMTimeout(0.1) { () -> String in
+                try await Task.sleep(nanoseconds: 10_000_000_000)  // 10s
+                return "should not see this"
+            }
+            XCTFail("expected timeout")
+        } catch SampleHostBenchLLMTimeoutError.timeoutExceeded(let s) {
+            XCTAssertEqual(s, 0.1)
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    /// M735 — withLLMTimeout propagates work errors (not its own
+    /// timeout) when work fails before deadline.
+    func testWithLLMTimeoutPropagatesWorkError() async {
+        struct WorkError: Error, Equatable {}
+        do {
+            _ = try await withLLMTimeout(5.0) { () -> String in
+                throw WorkError()
+            }
+            XCTFail("expected throw")
+        } catch is WorkError {
+            // expected
+        } catch {
+            XCTFail("wrong error: \(error)")
+        }
+    }
+
+    /// M735 — fresh model has zero LLM-timeout count + has flex setter.
+    @MainActor
+    func testLLMTimeoutFlexSetterAndCounter() {
+        let m = SampleHostModel()
+        XCTAssertEqual(m.hybridBenchLLMTimeoutCount, 0)
+        XCTAssertEqual(m.hybridBenchLLMTimeoutSeconds, 60.0)
+        m.updateLLMTimeoutSeconds(2.5)  // below 5s floor
+        XCTAssertEqual(m.hybridBenchLLMTimeoutSeconds, 5.0)
+        m.updateLLMTimeoutSeconds(500)  // above 300s ceiling
+        XCTAssertEqual(m.hybridBenchLLMTimeoutSeconds, 300.0)
+        m.updateLLMTimeoutSeconds(45)
+        XCTAssertEqual(m.hybridBenchLLMTimeoutSeconds, 45.0)
+    }
+
+    /// M737 — bench-loop integration smoke test: start with
+    /// 0.001h (3.6s) duration, verify it starts + can be stopped
+    /// without crash. Doesn't rely on LLM availability — substrate
+    /// routing always works in test sim.
+    @MainActor
+    func testBenchLoopStartsAndStopsWithoutCrash() async throws {
+        let m = SampleHostModel()
+        m.bootstrap()
+        // Wait a bit for bootstrap before starting bench
+        try await Task.sleep(nanoseconds: 200_000_000)
+        m.updateHybridBenchDurationHours(0.001)  // 3.6s; clamped to 0.1
+        // (clamp will floor 0.001 → 0.1 = 6 min; we'll stop early)
+        // Actually 0.1h = 360s; we'll stop after 0.5s
+        m.startHybridBench()
+        XCTAssertTrue(m.hybridBenchIsRunning)
+        try await Task.sleep(nanoseconds: 500_000_000)  // 0.5s
+        m.stopHybridBench()
+        // Give the bench task time to observe cancellation
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertFalse(m.hybridBenchIsRunning,
+            "bench should be stopped after 1s")
+        // No assertion on iter count — substrate may or may not
+        // have completed an iter in the 500ms window. Just verify
+        // it started + stopped without crash and no error.
+        if let err = m.hybridBenchLastError {
+            // LLM unavailable on test sim is expected; only crash
+            // on UNEXPECTED error categories.
+            let acceptable = [
+                "GemmaUnavailable", "AFMUnavailable",
+                "lora-load-failed", "BASMLXAdapter not built",
+            ]
+            let isAcceptable = acceptable.contains { err.contains($0) }
+            if !isAcceptable {
+                XCTFail("unexpected bench error: \(err)")
+            }
+        }
+    }
+
     /// M733 — sampleHostBenchCountShards counts only `*.jsonl`.
     func testCountShardsCountsOnlyJsonlFiles() throws {
         let tmpDir = FileManager.default.temporaryDirectory

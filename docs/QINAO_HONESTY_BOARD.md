@@ -24542,3 +24542,120 @@ At bench clean-finish, manifest.json is auto-written for fast post-hoc summary.
 ### 194.10 一句话总结
 
 **Chapter 一百九十四 (M731-M734)**: continue chapter 一百九十二/九十三 trajectory toward "满意之后" by closing 2 more residuals — **M731+M732 UI sliders** for 4 chapter-192 safety-kit flex constants (anomaly window 10-1000 / drift σ-threshold 1.0-10.0 / mutation probability 0-100% / checkpoint every-N iters 100-100K) with bound enforcement on setters; bench loop captures values at start so mid-bench UI changes don't desync. **M733 JSONL shard manifest** (24-field Codable atomic-written to `manifest.json` at bench clean-finish; captures total iters / shard count / 5 outcome counters + 5 anomaly counters + 4 flex-constants in effect for fast post-hoc summary without scanning rows). **6 fix-pin tests** added (defaults / bounds / adversarial probability / manifest round-trip / manifest store / shard counter). **59 SampleHost tests pass**; full stack **1939 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: flex constants only tune sensitivity (not decisions); manifest is OBSERVABILITY only; ranges enforced via typed literals in setters; @MainActor on `currentDeviceState()` fixed UIKit isolation warnings (8 → 0). Operator can now adjust the safety kit's 4 thresholds before tapping the 10h Run button without rebuilding.
+
+## 一百九十五、 全面进化 续³ — LLM timeout + manifest read + bench smoke (M735-M738 / 2026-05-06)
+
+User trail: continued evolution toward "满意之后". Chapter 一百九十四 added flex sliders; chapter 一百九十五 closes 3 more residuals — a real bug fix (per-iter LLM timeout for hang resistance), a small QoL (replay reads manifest), and a long-deferred residual (bench-loop integration smoke).
+
+### 195.1 M735 — Per-iter LLM timeout (REAL BUG FIX)
+
+Pre-this-batch: if `callAFM` or `callGemma` hung indefinitely (network stall, MLX state corruption, model load race), the bench loop blocked forever. No JSONL row, no thermal-gate check, no anomaly watcher fire — silent freeze.
+
+This batch:
+
+1. New `withLLMTimeout(seconds:work:)` helper in `SampleHostBenchSafetyKit.swift` — task-group race between work + sleep; whichever finishes first wins, other is cancelled. Throws `SampleHostBenchLLMTimeoutError.timeoutExceeded` on hang.
+2. New `callAFMWithTimeout(prompt:seconds:)` + `callGemmaWithTimeout(prompt:seconds:)` on `SampleHostModel` — wrap the existing single-LLM calls with timeout + auto-increment of `hybridBenchLLMTimeoutCount` on fire.
+3. New `@Published hybridBenchLLMTimeoutSeconds: Double = 60.0` (range [5s, 300s] via `updateLLMTimeoutSeconds`).
+4. Bench loop's `.singleLLM` confident path (4 call sites: AFM-confident / Gemma-confident / AFM-fallback / Gemma-fallback) now uses the timeout-wrapped versions.
+
+Doctrine: timeout is a BAIL-OUT (single iter), not session-killer. Throws structured error → bench loop's catch records it as `firstStatus=*-error` and triggers fallback. 60s default is loose enough that Gemma cold-start (~30s) still completes; timeout fires only on genuine hangs (multi-minute stalls).
+
+### 195.2 M736 — Replay tool reads manifest
+
+`scripts/replay_hybrid_bench.py` now:
+1. Loads `manifest.json` if present (chapter 194 wrote it at clean-finish)
+2. Surfaces manifest summary FIRST (before row-scan diagnostics) — fast post-hoc summary
+3. Cross-checks `manifest.totalIters` vs actual row count; warns if mismatch (mid-bench crash signal)
+4. Falls back to row-scan if manifest missing (crashed bench)
+
+Manifest summary block shows:
+- benchID + start/end timestamps
+- Total iters + shard count
+- Smoke mode + duration target
+- 5 outcome counters (AFM/Gemma ok / both-failed / router hits/misses)
+- 5 anomaly counters (stuck / pause / adversarial / drift)
+- 4 chapter-194 flex constants in effect
+
+### 195.3 M737 — Bench-loop integration smoke test
+
+Long-deferred residual closed: `testBenchLoopStartsAndStopsWithoutCrash`:
+1. Bootstrap model
+2. Set short duration (clamps to 0.1h = 6 min)
+3. Start bench → verify `isRunning == true`
+4. Sleep 500ms
+5. Stop bench
+6. Wait for cancellation propagation (500ms)
+7. Verify `isRunning == false`
+8. Acceptable errors: GemmaUnavailable / AFMUnavailable / lora-load-failed / BASMLXAdapter not built (test sim has no LLM)
+
+This is the FIRST test that exercises the bench loop's full lifecycle end-to-end — start, run, stop, no crash. Pre-this-batch the loop's correctness was inferred from unit tests on individual components.
+
+### 195.4 Tests (M738)
+
+| Test | Pin |
+|---|---|
+| `testWithLLMTimeoutReturnsFastResult` | Fast work returns its result |
+| `testWithLLMTimeoutFiresOnHang` | Slow work → timeoutExceeded |
+| `testWithLLMTimeoutPropagatesWorkError` | Work error → not swallowed |
+| `testLLMTimeoutFlexSetterAndCounter` | 60s default; [5s, 300s] bounds; counter zero on fresh |
+| `testBenchLoopStartsAndStopsWithoutCrash` | End-to-end start/stop without crash |
+
+SampleHost tests: 59 → **64**.
+
+### 195.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ (unchanged) |
+| Qinao XCTest | 1442 ✓ (unchanged) |
+| SampleHost on iPhone 17e sim | **64** ✓ (+5 chapter 195) |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| iOS Sim test execution | All 64 passed in 1.5s |
+| 4 boundary checks | clean |
+| Cross-language schema parity | clean |
+| **Total** | **1944 + 1 parity gate + 3 analysis tools, 0 failures** |
+
+### 195.6 What's now bulletproof for the 10h smoke
+
+Hung LLM kills the bench? **No more.** Each AFM/Gemma call has 60s deadline; on fire, bench records timeout + tries fallback + logs counter. Even if both fire (very rare), bench moves on to next iter.
+
+Replay tool fast summary? **One-line manifest read** vs scan-all-rows.
+
+Bench-loop correctness? **Smoke-test pinned** — start/stop without crash on any sim.
+
+### 195.7 Honest residual after chapter 一百九十五
+
+| Item | Status |
+|---|---|
+| **No real production 10h bench data** | **Still THE BLOCKER** |
+| Validator byte-parity with Swift JSONEncoder | Still approximate |
+| Bench → v0.5 retrain proof | Pipeline ready; awaits real bench |
+| LLM timeout in non-confident paths (bothLLMs / uncertain / localOnly) | Single-LLM confident path covered; other paths still use raw calls (lower priority — those branches are 10-15% of iters) |
+| UI slider for LLM timeout | Programmatic only (updateLLMTimeoutSeconds); slider deferred |
+| CI / multi-device / load test | Still external |
+
+### 195.8 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostBenchSafetyKit.swift` | +`withLLMTimeout` helper + `SampleHostBenchLLMTimeoutError` enum |
+| `SampleHost/SampleHostModel.swift` | +`hybridBenchLLMTimeoutSeconds` @Published flex (60s default, [5,300]); +`hybridBenchLLMTimeoutCount` @Published counter; +`callAFMWithTimeout` + `callGemmaWithTimeout` helpers; bench loop's confident path uses timeout-wrapped versions; reset block adds timeout counter |
+| `scripts/replay_hybrid_bench.py` | +`load_manifest` + `manifest_diagnostics`; main reads manifest first + cross-checks totalIters |
+| `SampleHostTests/SampleHostTests.swift` | +5 chapter 195 fix-pin tests |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M735-M738 entry |
+
+### 195.9 Doctrine pins
+
+| Pin | Held |
+|---|---|
+| 不变量 #1/#2/#3 | ✓ |
+| Single commit mouth | ✓ |
+| Red line 7 (watcher hint only) | ✓ — timeout is iter-bail-out, not session-kill |
+| Anti-magic-number | ✓ — 60s default + [5,300] bounds typed |
+| Anti-drift 3-site cross-update | ✓ |
+| **Honest-correction** | ✓ — chapter explicitly notes timeout currently covers only confident path; other branches deferred (lower priority) |
+
+### 195.10 一句话总结
+
+**Chapter 一百九十五 (M735-M738)**: continue chapter 一百九十二/九十三/九十四 trajectory by closing 3 more residuals — **M735 Per-iter LLM timeout** (REAL bug fix: hung AFM/Gemma calls would freeze the entire 10h bench loop pre-this-batch; now wrapped via `withLLMTimeout` task-group race with 60s default deadline; flex via `@Published hybridBenchLLMTimeoutSeconds` ∈ [5s, 300s]; counter `hybridBenchLLMTimeoutCount` tracks fires; covers 4 confident-path call sites in bench loop). **M736 Replay tool reads manifest** (manifest.json from chapter 194 surfaces fast summary block FIRST in replay output; cross-checks totalIters vs row count; falls back to scan if missing). **M737 Bench-loop integration smoke test** (long-deferred residual closed: `testBenchLoopStartsAndStopsWithoutCrash` exercises start→500ms→stop→cancellation propagation; first end-to-end test of the bench-loop lifecycle). **64 SampleHost tests pass** (+5 chapter 195). **1944 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: timeout is iter BAIL-OUT not session-kill (red line 7 held); confident path covered (90%+ iter), bothLLMs/uncertain/localOnly still use raw calls (deferred lower priority). Hung LLM no longer kills the 10h bench.

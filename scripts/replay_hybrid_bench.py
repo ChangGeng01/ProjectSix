@@ -408,14 +408,91 @@ def replay(rows: list[dict]) -> tuple[bool, list[str]]:
     return True, diagnostics
 
 
+def load_manifest(directory: str) -> dict | None:
+    """M736 chapter 一百九十五 — read manifest.json if present.
+
+    Returns None if missing; replay tool falls back to row scan.
+    Manifest is bench-end summary so a crashed bench yields no
+    manifest (not an error — just less info).
+    """
+    from pathlib import Path
+    path = Path(directory) / "manifest.json"
+    if not path.exists():
+        return None
+    try:
+        with path.open("r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def manifest_diagnostics(manifest: dict) -> list[str]:
+    """M736 — render manifest as diagnostic lines."""
+    lines = ["=== Manifest summary (chapter 194 M733) ==="]
+    lines.append(
+        f"  benchID:  {manifest.get('benchID', '?')}")
+    lines.append(
+        f"  start →end: {manifest.get('startTimeIso', '?')} → "
+        f"{manifest.get('endTimeIso', '?')}")
+    lines.append(
+        f"  total iters: {manifest.get('totalIters', 0)}; "
+        f"shards: {manifest.get('totalShards', 0)}")
+    lines.append(
+        f"  smoke mode: {manifest.get('smokeMode', '?')} "
+        f"({manifest.get('durationHours', 0)}h target)")
+    lines.append(
+        f"  outcome: AFM-ok={manifest.get('afmOk', 0)} "
+        f"Gemma-ok={manifest.get('gemmaOk', 0)} "
+        f"both-failed={manifest.get('bothFailed', 0)}")
+    rh = manifest.get("routerHits", 0)
+    rm = manifest.get("routerMisses", 0)
+    rate = rh / (rh + rm) if (rh + rm) > 0 else 0
+    lines.append(
+        f"  router: hits={rh} misses={rm} ({rate:.1%})")
+    lines.append(
+        f"  anomalies: stuck-substrate={manifest.get('stuckSubstrates', 0)} "
+        f"stuck-LLM={manifest.get('stuckLLMs', 0)} "
+        f"pause-skipped={manifest.get('pauseSkipped', 0)} "
+        f"adv-fired={manifest.get('adversarialFired', 0)} "
+        f"drift-alarms={manifest.get('driftAlarms', 0)}")
+    lines.append(
+        f"  flex: window={manifest.get('anomalyWindowSize', 100)} "
+        f"σ-thresh={manifest.get('driftSigmaThreshold', 3.0)} "
+        f"mut-prob={manifest.get('mutationProbability', 0.05)} "
+        f"chkpt={manifest.get('checkpointEveryNIters', 1000)}")
+    return lines
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(
             "usage: replay_hybrid_bench.py <bench-dir>",
             file=sys.stderr)
         return 2
-    rows = load_jsonl(sys.argv[1])
-    print(f"Loaded {len(rows)} bench rows")
+    directory = sys.argv[1]
+    rows = load_jsonl(directory)
+    print(f"Loaded {len(rows)} bench rows from {directory}")
+
+    # M736 chapter 一百九十五 — surface manifest summary first
+    manifest = load_manifest(directory)
+    if manifest is not None:
+        print()
+        for line in manifest_diagnostics(manifest):
+            print(line)
+        # Cross-check: manifest's totalIters should match row count
+        # (within tolerance — manifest written at clean-finish so
+        # a crashed bench would have rows > manifest.totalIters or
+        # no manifest at all).
+        m_iters = manifest.get("totalIters", 0)
+        if m_iters != len(rows):
+            print(
+                f"  ⚠ manifest.totalIters={m_iters} ≠ "
+                f"row count={len(rows)} (mid-bench crash?)")
+    else:
+        print(
+            "(no manifest.json — bench may have crashed before "
+            "clean-finish; falling back to row scan)")
+
     ok, diag = replay(rows)
     print("\n=== Bench replay diagnostics ===")
     for line in diag:

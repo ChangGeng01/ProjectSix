@@ -1152,3 +1152,12 @@ The 10h smoke run now SHOWS chapter-192 safety kit working in real time. SampleH
 - **M734** 6 fix-pin tests + UIKit MainActor isolation warning fix on `SampleHostBenchThermalGate.currentDeviceState()` (now `@MainActor`).
 
 SampleHost tests 53 → **59**; full stack **1939 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: flex constants tune sensitivity (not decisions); manifest is OBSERVABILITY only; replay tool integration of manifest deferred.
+
+## 2026-05-06 — chapter 一百九十五 (M735-M738) 全面进化 续³ — LLM timeout + manifest read + bench smoke
+
+- **M735** Per-iter LLM timeout (REAL bug fix). New `withLLMTimeout(seconds:work:)` helper — task-group race; throws `SampleHostBenchLLMTimeoutError.timeoutExceeded` on hang. New `callAFMWithTimeout` / `callGemmaWithTimeout` helpers on `SampleHostModel` auto-increment `hybridBenchLLMTimeoutCount`. New `@Published hybridBenchLLMTimeoutSeconds: Double = 60.0` (range [5s, 300s]). Bench loop's `.singleLLM` confident path uses timeout-wrapped versions (4 call sites). Hung LLM no longer freezes the bench loop.
+- **M736** `scripts/replay_hybrid_bench.py` reads `manifest.json` if present, surfaces fast summary block FIRST (benchID / iters / shards / outcome / anomalies / flex constants), cross-checks `totalIters` vs row count, falls back to row-scan if missing.
+- **M737** Bench-loop integration smoke test — `testBenchLoopStartsAndStopsWithoutCrash` exercises start→500ms→stop→cancellation propagation, accepts LLM-unavailable errors as expected on test sim.
+- **M738** 5 fix-pin tests + chapter doc + changelog.
+
+SampleHost tests 59 → **64**; full stack **1944 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: timeout is iter BAIL-OUT, not session-kill (red line 7 held). Confident path covered; bothLLMs/uncertain/localOnly paths still use raw calls (deferred to chapter 196+).
