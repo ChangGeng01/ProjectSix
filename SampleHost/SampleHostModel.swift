@@ -450,6 +450,20 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var hybridBenchBothFailed: Int = 0
     @Published private(set) var hybridBenchRouterHits: Int = 0
     @Published private(set) var hybridBenchRouterMisses: Int = 0
+    // M628 chapter 一百七十八 — dispatch policy live counters.
+    // Tracks how often substrate's permit mode causes LLM skip /
+    // both-call / local-only / draft-only path. UI surfaces these
+    // so user sees substrate-LLM coupling in real time.
+    @Published private(set) var hybridBenchSubstrateSkipBlock: Int = 0
+    @Published private(set) var hybridBenchSubstrateSkipReplace: Int = 0
+    @Published private(set) var hybridBenchSubstrateSkipDelay: Int = 0
+    @Published private(set) var hybridBenchSubstrateBothLLMs: Int = 0
+    @Published private(set) var hybridBenchSubstrateLocalOnly: Int = 0
+    @Published private(set) var hybridBenchSubstrateDraftOnly: Int = 0
+    // M630 chapter 一百七十八 — closed-loop tracking. How often
+    // post-LLM substrate observation shifts permit mode (i.e.
+    // LLM produced something that would have been blocked).
+    @Published private(set) var hybridBenchPostLLMShifted: Int = 0
     @Published private(set) var hybridBenchOutputPath: String = ""
     @Published private(set) var hybridBenchStartTime: Date?
     @Published private(set) var hybridBenchLastError: String?
@@ -1562,10 +1576,116 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let actualRoute: String
     // "afm-predicted-ok" / "gemma-predicted-ok" /
     // "afm-fallback-to-gemma-ok" / "gemma-fallback-to-afm-ok" /
-    // "both-failed"
+    // "both-failed" / "skipped-by-substrate-{block,delay,replace}"
     let routerHit: Bool
     let totalDurationSeconds: Double
     let errorMessage: String?
+    // M628 chapter 一百七十八 — substrate→LLM dispatch coupling.
+    // Records HOW substrate's permit mode shaped LLM dispatch.
+    // - dispatchPolicy: the typed policy derived from permitMode
+    //   (e.g. "skip-block" / "single-llm" / "both-llms" / etc.)
+    // - dispatchTaken: actual execution path observed
+    // - draftOnly: true if substrate marked output as draft-only
+    // - llmSkipped: true if substrate prevented LLM call entirely
+    let dispatchPolicy: String?
+    let dispatchTaken: String?
+    let draftOnly: Bool?
+    let llmSkipped: Bool?
+    // M630 chapter 一百七十八 — closed-loop observation.
+    // After LLM responds, substrate observes the response.
+    // If post-LLM permit mode differs from pre-LLM, we know the
+    // generated body shifted substrate's verdict (e.g. content
+    // would have been blocked if substrate saw it).
+    let postLLMPermitMode: String?
+    let postLLMAuditCodeCount: Int?
+    let postLLMShifted: Bool?  // pre-LLM mode != post-LLM mode
+}
+
+/// M628 chapter 一百七十八 — typed policy mapping
+/// `BASActionPermitMode` → real LLM dispatch behavior.
+///
+/// 9 permit modes × 3 axes (skip / single / dual) condense into
+/// 6 typed policies. Doctrine pin: substrate decides FIRST, then
+/// LLM dispatch follows substrate's permit, not the other way
+/// around (不变量 #1 先醒再答; #2 神经不掌权).
+enum SampleHostHybridDispatchPolicy: String, Sendable {
+    /// `.block` / `.replace` — substrate refuses or substitutes.
+    /// LLM call is SKIPPED entirely. Returns canned safe text.
+    case skipBlock = "skip-block"
+    case skipReplace = "skip-replace"
+    /// `.delay` — substrate stalls. LLM call is SKIPPED. Returns
+    /// canned "let me think about this" stall response.
+    case skipDelay = "skip-delay"
+    /// `.answer` / `.mirror` — normal path: route via router,
+    /// fall back if first LLM errors. v0.2 uncertain-zone logic
+    /// still applies (calls both LLMs in [0.30, 0.70] zone).
+    case singleLLM = "single-llm"
+    /// `.compare` / `.escalate` — call BOTH AFM + Gemma always
+    /// regardless of router prediction (substrate explicitly
+    /// requested side-by-side / second-check).
+    case bothLLMs = "both-llms"
+    /// `.localOnly` — only call Gemma (local), never AFM.
+    /// substrate flagged this turn as no-cloud-allowed.
+    case localOnly = "local-only"
+    /// `.draftOnly` — call LLM but tag output as draft-only.
+    /// User UI should not commit this output without explicit
+    /// confirmation.
+    case draftOnly = "draft-only"
+
+    /// Derive the dispatch policy from the substrate permit mode.
+    /// Default falls back to `.singleLLM` for unknown / error.
+    static func from(permitMode: String) -> Self {
+        switch permitMode {
+        case "block":
+            return .skipBlock
+        case "replace":
+            return .skipReplace
+        case "delay":
+            return .skipDelay
+        case "compare", "escalate":
+            return .bothLLMs
+        case "local_only", "localOnly":
+            return .localOnly
+        case "draft_only", "draftOnly":
+            return .draftOnly
+        case "answer", "mirror":
+            return .singleLLM
+        default:
+            // unknown / "substrate-error" / future modes
+            return .singleLLM
+        }
+    }
+
+    /// Whether this policy skips the LLM call entirely.
+    var skipsLLM: Bool {
+        self == .skipBlock || self == .skipReplace || self == .skipDelay
+    }
+
+    /// Canned response string when LLM is skipped. Doctrine pin:
+    /// these strings are typed (not free-form), so JSONL grep on
+    /// "skip-*" captures every substrate-driven skip.
+    var cannedResponse: String? {
+        switch self {
+        case .skipBlock:
+            return SampleHostHybridDispatchCanned.block
+        case .skipReplace:
+            return SampleHostHybridDispatchCanned.replace
+        case .skipDelay:
+            return SampleHostHybridDispatchCanned.delay
+        default:
+            return nil
+        }
+    }
+}
+
+/// M628 chapter 一百七十八 — typed canned responses for skipped
+/// LLM dispatches. Per anti-magic-number doctrine (chapter 一百
+/// 三十) these are named constants, not inline literals scattered
+/// across call sites.
+enum SampleHostHybridDispatchCanned {
+    static let block = "I can't help with that request."
+    static let replace = "Let me suggest a different approach: I'd want to understand more before answering."
+    static let delay = "Let me think about this carefully before responding."
 }
 
 extension SampleHostBenchHelpers {
@@ -1850,6 +1970,14 @@ extension SampleHostModel {
         hybridBenchBothFailed = 0
         hybridBenchRouterHits = 0
         hybridBenchRouterMisses = 0
+        // M628/M630 chapter 一百七十八 reset
+        hybridBenchSubstrateSkipBlock = 0
+        hybridBenchSubstrateSkipReplace = 0
+        hybridBenchSubstrateSkipDelay = 0
+        hybridBenchSubstrateBothLLMs = 0
+        hybridBenchSubstrateLocalOnly = 0
+        hybridBenchSubstrateDraftOnly = 0
+        hybridBenchPostLLMShifted = 0
         hybridBenchLastError = nil
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
@@ -1926,6 +2054,13 @@ extension SampleHostModel {
                 // zone, use chosen LLM with fallback safety net.
                 let routerConfidence = decision?.confidence ?? .high
 
+                // M628 chapter 一百七十八 — derive substrate
+                // dispatch policy BEFORE calling LLM. Substrate's
+                // permit mode shapes WHETHER + HOW we call LLM.
+                let dispatchPolicy =
+                    SampleHostHybridDispatchPolicy.from(
+                        permitMode: permitMode)
+
                 // Call chosen LLM
                 var firstTriedLLM = routerRoute.rawValue
                 var firstStatus = "ok"
@@ -1938,9 +2073,128 @@ extension SampleHostModel {
                 var actualRoute = ""
                 var routerHit = true
                 var errorMessage: String?
+                var dispatchTaken: String = dispatchPolicy.rawValue
+                var llmSkipped: Bool = false
+                var draftOnlyFlag: Bool = false
 
                 let firstStart = Date()
-                if routerConfidence == .uncertain {
+
+                // M628 — substrate-skip path: when permit is
+                // .block / .replace / .delay, do NOT call LLM.
+                // Return canned response. This is THE 真实 path
+                // for "substrate decides we shouldn't ask LLM".
+                if dispatchPolicy.skipsLLM {
+                    let canned = dispatchPolicy.cannedResponse ?? ""
+                    firstTriedLLM = "none-substrate-skip"
+                    firstBody = canned
+                    firstStatus = "ok-substrate-skip"
+                    firstDurationMs =
+                        Date().timeIntervalSince(firstStart) * 1000
+                    actualRoute = "skipped-by-substrate-\(dispatchPolicy.rawValue.dropFirst("skip-".count))"
+                    llmSkipped = true
+                    dispatchTaken = dispatchPolicy.rawValue
+                    // Skip-path counts as router-hit by definition:
+                    // substrate decided no LLM, router prediction
+                    // is irrelevant. We still increment the
+                    // respective LLM counter at 0 for clarity.
+                    self.hybridBenchRouterHits += 1
+                    switch dispatchPolicy {
+                    case .skipBlock:
+                        self.hybridBenchSubstrateSkipBlock += 1
+                    case .skipReplace:
+                        self.hybridBenchSubstrateSkipReplace += 1
+                    case .skipDelay:
+                        self.hybridBenchSubstrateSkipDelay += 1
+                    default: break
+                    }
+                } else if dispatchPolicy == .bothLLMs {
+                    // M628 — substrate explicitly wants both LLMs
+                    // (compare / escalate). Force dual-call
+                    // regardless of router prediction.
+                    var afmBodyMaybe: String?
+                    var gemmaBodyMaybe: String?
+                    var afmErr: Error?
+                    var gemmaErr: Error?
+                    let afmStart = Date()
+                    do {
+                        afmBodyMaybe = try await self.callAFM(prompt: prompt)
+                    } catch { afmErr = error }
+                    let afmMs = Date().timeIntervalSince(afmStart) * 1000
+                    let gemmaStart = Date()
+                    do {
+                        gemmaBodyMaybe = try await self.callGemma(prompt: prompt)
+                    } catch { gemmaErr = error }
+                    let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
+
+                    firstTriedLLM = "afm"
+                    firstBody = afmBodyMaybe ?? ""
+                    firstStatus = afmErr == nil ? "ok" : "afm-error"
+                    firstDurationMs = afmMs
+                    if let g = gemmaBodyMaybe {
+                        fallbackLLM = "gemma"
+                        fallbackBody = g
+                        fallbackStatus = gemmaErr == nil ? "ok-substrate-both" : "gemma-error"
+                    }
+                    fallbackDurationMs = gemmaMs
+                    let bothFailed =
+                        afmBodyMaybe == nil && gemmaBodyMaybe == nil
+                    actualRoute = bothFailed
+                        ? "substrate-both-failed"
+                        : "substrate-both-\(dispatchPolicy.rawValue)"
+                    if bothFailed {
+                        self.hybridBenchBothFailed += 1
+                        self.hybridBenchRouterMisses += 1
+                        routerHit = false
+                    } else {
+                        if afmBodyMaybe != nil {
+                            self.hybridBenchAFMOk += 1
+                        }
+                        if gemmaBodyMaybe != nil {
+                            self.hybridBenchGemmaOk += 1
+                        }
+                        self.hybridBenchRouterHits += 1
+                    }
+                    if afmErr != nil { errorMessage = "afm: \(afmErr!)" }
+                    if gemmaErr != nil {
+                        errorMessage = (errorMessage ?? "") + " gemma: \(gemmaErr!)"
+                    }
+                    self.hybridBenchSubstrateBothLLMs += 1
+                } else if dispatchPolicy == .localOnly {
+                    // M628 — substrate flagged no-cloud. Force
+                    // Gemma path, never AFM. Treat as router-hit
+                    // if Gemma succeeds.
+                    do {
+                        firstBody = try await self.callGemma(prompt: prompt)
+                        firstTriedLLM = "gemma"
+                        firstStatus = "ok-substrate-local-only"
+                        firstDurationMs =
+                            Date().timeIntervalSince(firstStart) * 1000
+                        actualRoute = "local-only-gemma-ok"
+                        self.hybridBenchGemmaOk += 1
+                        self.hybridBenchRouterHits += 1
+                    } catch {
+                        firstTriedLLM = "gemma"
+                        firstStatus = "gemma-error"
+                        firstDurationMs =
+                            Date().timeIntervalSince(firstStart) * 1000
+                        errorMessage = "gemma local-only: \(error)"
+                        actualRoute = "local-only-gemma-failed"
+                        self.hybridBenchBothFailed += 1
+                        self.hybridBenchRouterMisses += 1
+                        routerHit = false
+                    }
+                    self.hybridBenchSubstrateLocalOnly += 1
+                } else {
+                    // M628 — `.singleLLM` or `.draftOnly` falls
+                    // through to original router-driven logic.
+                    // For `.draftOnly` we additionally tag the
+                    // row so downstream UI can flag the output
+                    // as not-yet-committed.
+                    if dispatchPolicy == .draftOnly {
+                        draftOnlyFlag = true
+                        self.hybridBenchSubstrateDraftOnly += 1
+                    }
+                    if routerConfidence == .uncertain {
                     // v0.2 — uncertain zone: call BOTH LLMs, pick
                     // longer body (simple heuristic, will swap to
                     // ShadowEvaluator-based picker in chapter 一百八十).
@@ -2083,6 +2337,50 @@ extension SampleHostModel {
                         }
                     }
                 }
+                }
+                // M628 — close of outer else for .singleLLM/.draftOnly
+
+                // M630 chapter 一百七十八 — CLOSED LOOP post-LLM
+                // observation. After LLM responds (or skip-canned),
+                // run substrate observation pass on the response
+                // body. If substrate's permit shifts (e.g. body
+                // would have been blocked), we know LLM crossed a
+                // line invisible to pre-call substrate.
+                //
+                // Doctrine pin: substrate is THE arbiter — even
+                // its own LLM's body is subject to substrate
+                // re-audit. This is "shadow evaluator lite":
+                // ShadowEvaluator full ML model lives in chapter
+                // 一百八十+; this one is single substrate-pass.
+                //
+                // Cost: doubles substrate calls per iter. Trade:
+                // empirical visibility into "did the LLM say
+                // something substrate wouldn't have permitted".
+                var postLLMPermitMode: String? = nil
+                var postLLMAuditCount: Int? = nil
+                var postLLMShifted: Bool? = nil
+                if !firstBody.isEmpty && !llmSkipped {
+                    let observeText =
+                        "Original: \(prompt)\n\nResponse: \(firstBody)"
+                    if let observed = try? runtime.startSession(
+                        BASHostSessionRequest(
+                            kind: .interactive,
+                            workflowProfile: .reflective,
+                            surface: .application,
+                            prompt: observeText,
+                            riskLevel: riskLevel)).eBrainTurn
+                    {
+                        postLLMPermitMode = observed.actionPermit
+                            .mode.rawValue
+                        postLLMAuditCount = observed
+                            .sovereignAuditEntry?.signalRefs.count ?? 0
+                        postLLMShifted =
+                            postLLMPermitMode != permitMode
+                        if postLLMShifted == true {
+                            self.hybridBenchPostLLMShifted += 1
+                        }
+                    }
+                }
 
                 let dur = Date().timeIntervalSince(t0)
                 let row = SampleHostHybridBenchRow(
@@ -2109,7 +2407,14 @@ extension SampleHostModel {
                     actualRoute: actualRoute,
                     routerHit: routerHit,
                     totalDurationSeconds: dur,
-                    errorMessage: errorMessage)
+                    errorMessage: errorMessage,
+                    dispatchPolicy: dispatchPolicy.rawValue,
+                    dispatchTaken: dispatchTaken,
+                    draftOnly: draftOnlyFlag,
+                    llmSkipped: llmSkipped,
+                    postLLMPermitMode: postLLMPermitMode,
+                    postLLMAuditCodeCount: postLLMAuditCount,
+                    postLLMShifted: postLLMShifted)
                 do {
                     try await runner.appendRow(row)
                 } catch {
