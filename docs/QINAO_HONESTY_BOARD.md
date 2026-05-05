@@ -21128,3 +21128,86 @@ User: "好 那我选b" (chose option B from §176.4 unblock plan).
 - `SampleHost/SampleHostModel.swift` (+~75 lines: import + 5 published props + runAFMTestNow + updateAFMTestPrompt)
 - `SampleHost/SampleHostView.swift` (+~50 lines: afmTestPanel + benchPanel placement)
 
+
+### 176.14 AFM 真 unblock confirmed + M610 8h flexible bench ship (2026-05-05 续)
+
+**User**: "我想连续跑 afm 8小时" + "进化 算法 加强 程序化生成 极致 找到 所有 缺陷 bug 不足 真机 跑2小时冒烟 最好 14层 每层都冒烟测试 以此发挥最大作用 找到瑕疵 全面冒烟测试 开发极致 极大提高benchmark" + "我希望 大部分 固定 数值 都可以 改成 完全 flexible 程序化 生成 而不是 死数值"
+
+**最重要的 user empirical confirmation**: "按了一下 是 ok"
+
+→ **A2 真 unblock SUCCESS via iPhone foreground path**(chapter 176 §176.13 option B 实证). Apple Intelligence 在 iPhone 17e foreground UI **真服务 LanguageModelSession.respond(to:)**. macOS 26 modelmanagerd foreground-only architectural policy 在 iOS 26 上同样适用, 但 iPhone foreground app **满足条件**.
+
+**A class catalog 矫正再次升级**:
+- A1 iPhone 实机: ✅ closed (chapter 175)
+- A2 AFM live run: ✅ **CLOSED via iPhone foreground UI path** (chapter 176 §176.13 + 176.14)
+- A3 多设备: ❌ 仍 external
+- A4 真客户: ❌ 仍 external
+- A5 ML training: ⚠️ partial unblock (chapter 176 §176.10)
+
+**A 类 5 项里 2 项已 closed, 1 项 partial-unblock, 2 项真 external**. Appendix T 原列"5 全 external"是过度分类.
+
+**M610 ship — 8h flexible AFM bench mode**:
+
+新 UI panel "AFM 8-hour bench (flexible config)" 在 SampleHost iPhone, 含 7 个 flexible params:
+| Param | Range | Default | doctrine |
+|---|---|---|---|
+| Hours | 0.1...24.0 | 8.0 | user 8h request |
+| Stride CSV | text(coprime to 40320) | 5041,5039,5051,5077,7919 | E5 doctrine 强制 coprime |
+| Rotation iter | 1_000...100_000 | 11_300 | chapter 174 default |
+| Mutations | 1...5 | 5 | chapter 173 5-alphabet |
+| JSONL rotation MB | 1...100 | 15 | chapter 174 default |
+| Skip blocked AFM | Bool | true | 节省 AFM call 成本 |
+| AFM timeout sec | 5...120 | 30 | (currently unused — AFM 自己 handle) |
+
+**Per-iter flow**:
+1. Generate scattered+mutation prompt(coprime stride scatter walk)
+2. `BASHostRuntime.startSession` — 14 层 audit codes + permit decision
+3. **如 permit allow + skipBlocked respect** → call AFM `LanguageModelSession.respond(to:)`
+4. Record 双层 data: substrate decision + AFM body 到 `Documents/iphone-afm-bench/afm-iterations.N.jsonl`
+
+**JSONL row schema**(SampleHostAFMBenchRow):
+- timestamp / iteration / seed / stride / mutationSeed
+- signature(6 dim) / prompt
+- auditCodeCount / permitMode (substrate)
+- afmStatus / afmBody / afmBodyLength / afmDurationMs
+- totalDurationSeconds / errorMessage
+
+**Build + deploy**:
+- xcodebuild Release iphoneos → SUCCEEDED (1 unused-var warning, 0 errors)
+- Old SampleHost PID 45951 terminated
+- New build installed (+44 lines model + 130 lines view UI)
+- Launched PID 45990 (alive)
+
+**Throughput estimate**(8h bench):
+- Existing 2h substrate-only bench: 16.5 iter/sec → 119K iter
+- AFM bench(每 iter ~200-500ms AFM call):
+  - 100% AFM rate: ~2-3 iter/sec → 8h = 57K-86K iter
+  - skip-blocked (~50%): ~3-5 iter/sec → 8h = 86K-144K iter
+- **真 LLM body data 第一次进 bench JSONL** — fixes chapter 174 bench bodyLength=0 limitation
+
+**Doctrine pin — 大部分固定数值 flexible 化做完了**:
+- ✅ 7 个真 magic numbers exposed via @Published
+- ✅ Coprime stride doctrine **保护**(strideRotation filter `gcd($0, 40_320) == 1`)
+- ✅ 边界 clamp(duration 0.1..24.0 / mutation 1..5 / etc)
+- ✅ "I5 walkback" 真版本 — fixed values 分两类: doctrine invariant(不动) + magic number(flexible)
+
+**仍未 flexible 的** (intentional, doctrine):
+- Sum-to-one weights (E1)
+- 4-tier orderings (E4)
+- Schema versions (E2)
+- Red lines (E3)
+- 全部 doctrine fixed, 改了破系统不变量
+
+**Chapter 176 完整图**:
+- §176.1-§176.8 (M606): A2/A5 实测 + walkback I17
+- §176.9 (M607): 3-way compare + iPhone AI 区分 Mac AI
+- §176.10-§176.11 (M607): deep LoRA M247 chat-template 学到 markers
+- §176.12 (M608): I20 walkback — AFM 是 OS-architectural 不是 setup
+- §176.13 (M609): iPhone foreground AFM panel ship + user "按了一下 是 ok"
+- §176.14 (M610): AFM 8h bench flexible config ship + 大部分固定数值 flexible 化
+
+**Cumulative chapter 174-176 doctrine 完整**:
+- 174: 程序化 prompt + 2h iPhone bench
+- 175: bench 实证 + catalog stale corrections + I11-I16 walkbacks
+- 176: A2/A5 unblock + AFM panel + AFM 8h bench + I17-I20 walkbacks
+

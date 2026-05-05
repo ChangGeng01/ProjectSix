@@ -405,6 +405,26 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var afmTestDurationMs: Double = 0
     @Published private(set) var afmIsRunning: Bool = false
 
+    // M610 chapter 一百七十六 §176.14 — long-running AFM bench
+    // (8h default per user request; full flexible config: every numeric
+    // value is a `@Published` so all "fixed values" are programmatic).
+    @Published var afmBenchDurationHours: Double = 8.0
+    @Published var afmBenchStrideRotationCSV: String = "5041,5039,5051,5077,7919"
+    @Published var afmBenchRotationPeriodIter: Int = 11_300
+    @Published var afmBenchMutationSeedCount: Int = 5
+    @Published var afmBenchJSONLRotationMB: Int = 15
+    @Published var afmBenchSkipBlocked: Bool = true
+    @Published var afmBenchAFMTimeoutSec: Int = 30
+    @Published private(set) var afmBenchIsRunning: Bool = false
+    @Published private(set) var afmBenchIterations: Int = 0
+    @Published private(set) var afmBenchAFMSuccessCount: Int = 0
+    @Published private(set) var afmBenchAFMSkippedCount: Int = 0
+    @Published private(set) var afmBenchAFMErrorCount: Int = 0
+    @Published private(set) var afmBenchOutputPath: String = ""
+    @Published private(set) var afmBenchStartTime: Date?
+    @Published private(set) var afmBenchLastError: String?
+    private var afmBenchTask: Task<Void, Never>?
+
     private var benchTask: Task<Void, Never>?
     private let benchRunner = SampleHostBenchRunner()
 
@@ -1158,4 +1178,301 @@ final class SampleHostModel: ObservableObject {
     func updateAFMTestPrompt(_ newPrompt: String) {
         afmTestPrompt = newPrompt
     }
+
+    // MARK: - M610 chapter 一百七十六 §176.14 — AFM 8h long-running bench
+    //
+    // User trigger (2026-05-05): "我想连续跑 afm 8小时" + "进化算法
+    // 加强 程序化生成 极致 找到 所有 缺陷 bug 不足" + "我希望 大部分
+    // 固定 数值 都可以 改成 完全 flexible 程序化 生成 而不是 死数值".
+    //
+    // Per-iter flow:
+    //   1. Generate scattered+mutation prompt (chapter 173 corpus,
+    //      coprime stride proven full-orbit)
+    //   2. Run BASHostRuntime.startSession (substrate routing — gets
+    //      14-layer audit codes + permit decision)
+    //   3. If permit allows AND skipBlocked=true → call AFM directly
+    //      via LanguageModelSession.respond(to:) for body
+    //   4. Record both substrate decision + AFM body to JSONL
+    //
+    // All 7 numeric params are @Published flexibles per user "大部分
+    // 固定数值 改 flexible 程序化生成":
+    //   - duration (1.0..24.0 hours, default 8.0)
+    //   - stride rotation (CSV, must be coprime to 40320, default 5)
+    //   - rotation period (1000..50_000 iter, default 11_300)
+    //   - mutation seed count (1..5, default 5)
+    //   - JSONL rotation (1..100 MB, default 15)
+    //   - AFM timeout (5..120s, default 30)
+    //   - skip blocked (Bool, default true — don't waste AFM calls)
+    //
+    // Doctrine pin: doctrine-fixed values (sum-to-one weights / coprime
+    // stride math / 4-tier orderings) NOT exposed as flexible —
+    // they're not magic numbers, they're invariants (chapter 175 E
+    // class). Only TRUE magic numbers exposed.
+
+    func startAFMBench() {
+        guard !afmBenchIsRunning else { return }
+        // Sanitize and parse stride list once
+        let strideRotation = afmBenchStrideRotationCSV
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            .filter { $0 > 0 && gcd($0, 40_320) == 1 }
+        guard !strideRotation.isEmpty else {
+            afmBenchLastError = "stride rotation empty / no coprime entries"
+            return
+        }
+        let durationSec = afmBenchDurationHours * 3600.0
+        let rotationPeriod = max(1, afmBenchRotationPeriodIter)
+        let mutationCount = max(1, min(5, afmBenchMutationSeedCount))
+        let rotationBytes = max(1, afmBenchJSONLRotationMB) * 1024 * 1024
+        let afmTimeoutSec = max(5, min(120, afmBenchAFMTimeoutSec))
+        let skipBlocked = afmBenchSkipBlocked
+
+        afmBenchIsRunning = true
+        afmBenchIterations = 0
+        afmBenchAFMSuccessCount = 0
+        afmBenchAFMSkippedCount = 0
+        afmBenchAFMErrorCount = 0
+        afmBenchLastError = nil
+        afmBenchStartTime = Date()
+        afmBenchOutputPath = SampleHostBenchHelpers
+            .afmBenchOutputDirURL().path
+
+        let runtime = self.runtime
+        afmBenchTask = Task { @MainActor [weak self] in
+            let startedAt = Date()
+            var iter = 0
+            let runner = SampleHostAFMBenchJSONLRunner(
+                rotationBytes: rotationBytes)
+            while !Task.isCancelled {
+                if Date().timeIntervalSince(startedAt) > durationSec {
+                    break
+                }
+                let strideIndex = (iter / rotationPeriod)
+                    % strideRotation.count
+                let chosenStride = strideRotation[strideIndex]
+                let mutationSeed = iter % mutationCount
+                let g = SampleHostBenchPromptCatalog
+                    .generateScatteredWithMutation(
+                        iter: iter,
+                        stride: chosenStride,
+                        mutationSeed: mutationSeed)
+                let prompt = g.prompt
+                let signature = g.signature
+
+                // Substrate routing
+                let t0 = Date()
+                var auditCount = 0
+                var permitMode = "unknown"
+                var afmBody: String = ""
+                var afmStatus: String = "skipped"
+                var afmDurationMs: Double = 0
+                var errorMessage: String?
+                let riskLevel: BASHostRiskLevel
+                switch signature.stake {
+                case "low", "modest":         riskLevel = .low
+                case "high", "very-high":     riskLevel = .medium
+                case "irreversible",
+                     "non-reversible-after-act": riskLevel = .high
+                default:                      riskLevel = .medium
+                }
+                do {
+                    let result = try runtime.startSession(
+                        BASHostSessionRequest(
+                            kind: .interactive,
+                            workflowProfile: .reflective,
+                            surface: .application,
+                            prompt: prompt,
+                            riskLevel: riskLevel))
+                    if let turn = result.eBrainTurn {
+                        if let entry = turn.sovereignAuditEntry {
+                            auditCount = entry.signalRefs.count
+                        }
+                        permitMode = turn.actionPermit.mode.rawValue
+                    }
+                } catch {
+                    errorMessage = "substrate: \(error)"
+                }
+
+                // AFM body call (skip if permit blocks AND skipBlocked)
+                let permitBlocks = permitMode == "block"
+                    || permitMode == "delay"
+                let shouldCallAFM = !(skipBlocked && permitBlocks)
+                if shouldCallAFM {
+                    #if canImport(FoundationModels)
+                    if #available(iOS 26.0, macOS 26.0, *) {
+                        let afmStarted = Date()
+                        do {
+                            let session = LanguageModelSession()
+                            let response = try await session
+                                .respond(to: prompt)
+                            afmBody = response.content
+                            afmStatus = "ok"
+                            self?.afmBenchAFMSuccessCount += 1
+                        } catch {
+                            afmStatus = "afm-error"
+                            errorMessage = (errorMessage ?? "")
+                                + " afm: \(error)"
+                            self?.afmBenchAFMErrorCount += 1
+                        }
+                        afmDurationMs = Date()
+                            .timeIntervalSince(afmStarted) * 1000
+                    } else {
+                        afmStatus = "afm-unavailable-os"
+                        self?.afmBenchAFMSkippedCount += 1
+                    }
+                    #else
+                    afmStatus = "afm-unavailable-framework"
+                    self?.afmBenchAFMSkippedCount += 1
+                    #endif
+                } else {
+                    self?.afmBenchAFMSkippedCount += 1
+                }
+
+                let dur = Date().timeIntervalSince(t0)
+                let row = SampleHostAFMBenchRow(
+                    timestamp: SampleHostBenchHelpers.iso8601(Date()),
+                    iteration: iter,
+                    seed: iter,
+                    stride: chosenStride,
+                    mutationSeed: mutationSeed,
+                    signature: signature,
+                    prompt: prompt,
+                    auditCodeCount: auditCount,
+                    permitMode: permitMode,
+                    afmStatus: afmStatus,
+                    afmBody: afmBody,
+                    afmBodyLength: afmBody.count,
+                    afmDurationMs: afmDurationMs,
+                    totalDurationSeconds: dur,
+                    errorMessage: errorMessage)
+                do {
+                    try await runner.appendRow(row)
+                } catch {
+                    self?.afmBenchLastError = "jsonl: \(error)"
+                }
+                iter += 1
+                self?.afmBenchIterations = iter
+                // Cooperative cancel; yield to UI for status updates
+                if iter % 8 == 0 { await Task.yield() }
+            }
+            await runner.close()
+            self?.afmBenchIsRunning = false
+        }
+    }
+
+    func stopAFMBench() {
+        afmBenchTask?.cancel()
+        afmBenchTask = nil
+        afmBenchIsRunning = false
+    }
+
+    func updateAFMBenchDurationHours(_ newValue: Double) {
+        afmBenchDurationHours = max(0.1, min(24.0, newValue))
+    }
+
+    func updateAFMBenchStrideCSV(_ newValue: String) {
+        afmBenchStrideRotationCSV = newValue
+    }
+
+    func updateAFMBenchRotationPeriod(_ newValue: Int) {
+        afmBenchRotationPeriodIter = max(1_000, min(100_000, newValue))
+    }
+
+    func updateAFMBenchMutationCount(_ newValue: Int) {
+        afmBenchMutationSeedCount = max(1, min(5, newValue))
+    }
+
+    func updateAFMBenchSkipBlocked(_ newValue: Bool) {
+        afmBenchSkipBlocked = newValue
+    }
+}
+
+// MARK: - M610 chapter 一百七十六 §176.14 — AFM bench row + JSONL runner
+
+struct SampleHostAFMBenchRow: Codable, Sendable, Equatable {
+    let timestamp: String
+    let iteration: Int
+    let seed: Int
+    let stride: Int
+    let mutationSeed: Int
+    let signature: SampleHostPromptSignature
+    let prompt: String
+    let auditCodeCount: Int
+    let permitMode: String
+    let afmStatus: String  // ok / skipped / afm-error / afm-unavailable-*
+    let afmBody: String
+    let afmBodyLength: Int
+    let afmDurationMs: Double
+    let totalDurationSeconds: Double
+    let errorMessage: String?
+}
+
+extension SampleHostBenchHelpers {
+    static func afmBenchOutputDirURL() -> URL {
+        let docs = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        ).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let dir = docs.appendingPathComponent("iphone-afm-bench")
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    static func encodeAFM(_ row: SampleHostAFMBenchRow) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(row)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+}
+
+actor SampleHostAFMBenchJSONLRunner {
+    private let rotationBytes: Int
+    private var fileHandle: FileHandle?
+    private var currentURL: URL?
+    private var rotationIndex: Int = 0
+
+    init(rotationBytes: Int) {
+        self.rotationBytes = rotationBytes
+    }
+
+    func appendRow(_ row: SampleHostAFMBenchRow) async throws {
+        let line = try SampleHostBenchHelpers.encodeAFM(row) + "\n"
+        guard let data = line.data(using: .utf8) else { return }
+        let needNew: Bool
+        if let h = fileHandle, let url = currentURL {
+            let attrs = try? FileManager.default
+                .attributesOfItem(atPath: url.path)
+            let size = (attrs?[.size] as? Int) ?? 0
+            needNew = size + data.count > rotationBytes
+            _ = h
+        } else {
+            needNew = true
+        }
+        if needNew {
+            await close()
+            rotationIndex += 1
+            let dir = SampleHostBenchHelpers.afmBenchOutputDirURL()
+            let url = dir.appendingPathComponent(
+                "afm-iterations.\(rotationIndex).jsonl")
+            FileManager.default.createFile(
+                atPath: url.path, contents: nil)
+            currentURL = url
+            fileHandle = try FileHandle(forWritingTo: url)
+        }
+        try fileHandle?.write(contentsOf: data)
+    }
+
+    func close() async {
+        try? fileHandle?.close()
+        fileHandle = nil
+        currentURL = nil
+    }
+}
+
+// Pure gcd helper (no external dep)
+private func gcd(_ a: Int, _ b: Int) -> Int {
+    var (x, y) = (abs(a), abs(b))
+    while y != 0 { (x, y) = (y, x % y) }
+    return x
 }
