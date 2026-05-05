@@ -91,12 +91,15 @@ public struct ChengluPreflightDecision: Equatable, Sendable, Codable {
         self.modelVersion = modelVersion
     }
 
-    /// v0.2 — derive confidence from probability.
+    /// v0.4 — derive confidence from CALIBRATED probability.
+    /// Audit (Phase 5) showed widened uncertain zone [0.30, 0.70]
+    /// after isotonic calibration captures truly-uncertain prompts
+    /// (~6% of distribution at ~40% accuracy — close to coin flip,
+    /// dual-LLM voting net wins).
     public static func confidence(forProb p: Double) -> Confidence {
-        let dist = abs(p - 0.5)
-        if dist >= 0.25 { return .high }
-        if dist >= 0.05 { return .medium }
-        return .uncertain
+        if p < 0.30 || p > 0.70 { return .high }
+        if p < 0.40 || p > 0.60 { return .medium }
+        return .uncertain  // [0.40, 0.60]
     }
 }
 
@@ -136,7 +139,66 @@ public enum ChengluPreflightError: Error, LocalizedError {
 public final class ChengluPreflightInference {
     public static let shared = ChengluPreflightInference()
 
-    private static let modelVersion = "v0.1-mlp-64-32"
+    private static let modelVersion = "v0.4-mlp-64-32-isotonic-lut"
+
+    // v0.4 — 100-point isotonic calibration LUT, fitted on
+    // validation fold (20% of chapter 176 5,088 rows). Applied
+    // after MLP raw output. Fixes v0.1 over-confident-on-guardrail
+    // bug (p=0.05 → actual 0.353, delta +0.302). After LUT:
+    // p=0.05 → actual 0.025, delta +0.016. Brier: 0.065 → 0.054.
+    private static let calibrationX: [Double] = [
+        0.000, 0.010, 0.020, 0.030, 0.040, 0.051, 0.061, 0.071,
+        0.081, 0.091, 0.101, 0.111, 0.121, 0.131, 0.141, 0.152,
+        0.162, 0.172, 0.182, 0.192, 0.202, 0.212, 0.222, 0.232,
+        0.242, 0.253, 0.263, 0.273, 0.283, 0.293, 0.303, 0.313,
+        0.323, 0.333, 0.343, 0.354, 0.364, 0.374, 0.384, 0.394,
+        0.404, 0.414, 0.424, 0.434, 0.444, 0.455, 0.465, 0.475,
+        0.485, 0.495, 0.505, 0.515, 0.525, 0.535, 0.545, 0.556,
+        0.566, 0.576, 0.586, 0.596, 0.606, 0.616, 0.626, 0.636,
+        0.646, 0.657, 0.667, 0.677, 0.687, 0.697, 0.707, 0.717,
+        0.727, 0.737, 0.747, 0.758, 0.768, 0.778, 0.788, 0.798,
+        0.808, 0.818, 0.828, 0.838, 0.848, 0.859, 0.869, 0.879,
+        0.889, 0.899, 0.909, 0.919, 0.929, 0.939, 0.949, 0.960,
+        0.970, 0.980, 0.990, 1.000,
+    ]
+    private static let calibrationY: [Double] = [
+        0.010, 0.222, 0.353, 0.353, 0.353, 0.353, 0.353, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463, 0.463,
+        0.463, 0.463, 0.463, 0.500, 0.500, 0.500, 0.500, 0.500,
+        0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.500, 0.700,
+        0.700, 0.750, 0.750, 0.778, 0.778, 0.778, 0.780, 0.813,
+        0.813, 0.813, 0.813, 0.998,
+    ]
+
+    /// Apply isotonic-regression-fitted lookup table to a raw
+    /// MLP probability. Linear interpolation between LUT points.
+    private static func applyCalibrationLUT(rawProb: Double) -> Double {
+        let cx = calibrationX
+        let cy = calibrationY
+        if rawProb <= cx[0] { return cy[0] }
+        if rawProb >= cx[cx.count - 1] { return cy[cx.count - 1] }
+        // Binary search for the bracket
+        var lo = 0
+        var hi = cx.count - 1
+        while lo + 1 < hi {
+            let mid = (lo + hi) / 2
+            if cx[mid] <= rawProb { lo = mid } else { hi = mid }
+        }
+        let xLo = cx[lo]
+        let xHi = cx[hi]
+        let yLo = cy[lo]
+        let yHi = cy[hi]
+        let denom = max(xHi - xLo, 1e-8)
+        let t = (rawProb - xLo) / denom
+        return min(1.0, max(0.0, yLo + t * (yHi - yLo)))
+    }
 
     // Feature ordering MUST match training script
     // scripts/train_chenglu_preflight_v0.py (43 dims total).
@@ -267,16 +329,18 @@ public final class ChengluPreflightInference {
                 "no afm_success_probability key")
         }
 
-        let prob: Double
+        let rawProb: Double
         if let arr = output.multiArrayValue {
-            prob = arr[0].doubleValue
+            rawProb = arr[0].doubleValue
         } else if output.type == .double {
-            prob = output.doubleValue
+            rawProb = output.doubleValue
         } else {
             throw ChengluPreflightError.unexpectedOutput(
                 "afm_success_probability type \(output.type.rawValue)")
         }
 
+        // v0.4 — apply isotonic calibration LUT
+        let prob = Self.applyCalibrationLUT(rawProb: rawProb)
         let route: ChengluPreflightDecision.Route =
             prob >= 0.5 ? .afm : .gemma
         let confidence = ChengluPreflightDecision

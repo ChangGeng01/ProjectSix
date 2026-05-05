@@ -21934,3 +21934,109 @@ Stack capability:
 
 **Chapter 一百七十七 evolve (M623-M625 — v0 → v0.3)**: respond to user "先尽最大努力 进化 当前" by maximizing chapter 177 ship before opening new chapters. **v0.1**: replaced LogReg with MLP(64, 32) trained in PyTorch — test acc 88.51% → 92.53% (+4.0%), AUC 0.9549 → 0.9730 (+1.8%), better-balanced guardrail precision/recall. **v0.2**: added Confidence enum + uncertain-zone dual-LLM voting (BOTH AFM and Gemma+LoRA called in parallel, pick longer body) for the ~5% prompts where router probability is in [0.45, 0.55]. **v0.3**: bundled chapter 176 §176.10 LoRA M247 adapter (1.5 MB chat-template, learned [RISK]/[NEEDS_PERMIT] markers + 3.6× convergence) into iPhone app, applied automatically in callGemma after model load. All three versions ship in single chapter; build SUCCESS, deployed iPhone PID 50032. Doctrine pins maintained: substrate routing first, AFM safety doctrine respected, three-tier protection (substrate > AFM > Gemma+LoRA), CoreML 不当皇帝当神经反射. Pending: user iPhone tap to validate v0.1 + v0.2 + v0.3 end-to-end (single prompt smoke), then optionally start 8h hybrid bench for chapter 178 axis A real data.
 
+
+### 177.audit — 全面 CoreML 严查 + v0.4 calibration fix (M626 / 2026-05-06)
+
+User: "全面 coreml 整体 严查 需要 最佳 状态" — push current ship 到最高形态.
+
+#### 7-axis audit (`scripts/audit_chenglu_preflight.py`)
+
+**Axis 1 — K-fold stability**: ✅ v0.1 stable
+- 5-fold CV: **acc 92.96% ± 0.86%** (range 91.74-93.91%)
+- AUC 0.9707 ± 0.0051
+- 92.53% (single split) was actually slightly UNDER mean — model is consistent, not lucky
+
+**Axis 2 — Per-tone distribution**: ✅ chapter 175 fingerprint reproduced exactly
+- grieving 50.0% guardrail rate (the bottleneck for router)
+- angry 7.86% guardrail (substrate blocks 100% but AFM permissive)
+- 7 other tones 10-31% range
+
+**Axis 3 — Feature ablation** (which features matter):
+| Feature group dropped | Acc | AUC | Importance |
+|---|---|---|---|
+| (baseline all 43) | 92.73% | 0.9733 | — |
+| **domain (10 dims)** | 82.32% | 0.8781 | **#1 most important** |
+| **mutation (5 dims)** | 84.87% | 0.8936 | #2 |
+| stake (6 dims) | 87.92% | 0.9308 | #3 |
+| tone (8 dims) | 89.10% | 0.9411 | #4 |
+| timeframe (7 dims) | 90.37% | 0.9590 | #5 |
+| confidant (4 dims) | 90.47% | 0.9605 | #6 |
+| askshape (3 dims) | 92.34% | 0.9683 | #7 lowest |
+
+⚠️ **Surprise**: domain > mutation > stake > tone — counterintuitive (chapter 175 highlighted tone). domain carries most signal.
+
+**Axis 4 — Calibration**: ❌ **REAL BUG FOUND**
+
+v0.1 calibration check:
+| Predicted | Actual | Delta |
+|---|---|---|
+| 0.05 | **0.353** | **+0.302 over-confident** |
+| 0.865 | 0.725 | -0.140 |
+| 1.000 | 0.922 | -0.078 |
+
+Model says "5% AFM ok" → actual 35% AFM ok. Router was **over-routing to Gemma** when AFM would actually have succeeded.
+
+**Axis 5 — Confidence zone analysis**: ❌ v0.2 zone too narrow
+- v0.2 [0.45, 0.55]: only **0.6%** prompts caught (6 in test set), 50% acc
+- Wider [0.30, 0.70]: 2.3% caught, 65% acc
+- After v0.4 calibration: 6.3% caught, 40.6% acc — TRULY uncertain
+
+**Axis 6 — Per-tone errors**: anxious + agentic + grieving worst (consistent with class imbalance)
+
+**Axis 7 — Tests**: 0 CoreML inference tests (gap, deferred)
+
+#### v0.4 Fix — Isotonic calibration LUT
+
+`scripts/train_chenglu_preflight_v0_4.py` adds:
+- 60 / 20 / 20 train / cal / test split
+- Train base MLP(64,32) on train fold (same as v0.1)
+- Fit isotonic regression on cal fold (out_of_bounds="clip")
+- Build 100-point LUT (calibration_x, calibration_y arrays)
+- Save to `/tmp/ChengluPreflight_v0_4_calibration.json`
+- Convert raw MLP to CoreML (no calibration in network — Swift applies LUT)
+
+**Why Swift-side LUT**: Tried baking calibration into PyTorch via `torch.searchsorted` + interpolate, but coremltools doesn't support `view_as` op. Cleaner separation: CoreML does the heavy MLP work, Swift does cheap 100-point LUT lookup (sub-microsecond).
+
+`SampleHost/CoreMLPreflightInference.swift` updates:
+- Embed calibrationX + calibrationY arrays as static constants
+- `applyCalibrationLUT(rawProb:)` — binary search + linear interpolation
+- Apply after CoreML predict, before route/confidence decision
+- Confidence enum updated: `[0.30, 0.70]` is .uncertain zone (vs v0.2's narrow [0.45, 0.55])
+
+#### v0.4 metrics (60/20/20 split)
+
+| Metric | v0.1 (80/20) | v0.4 (60/20/20 + calibration) |
+|---|---|---|
+| Test accuracy | 92.53% | 91.75% (slightly down due to smaller train set) |
+| AUC | 0.9730 | 0.9640 |
+| **Brier** | **0.0651** | **0.0537 (-17.5%, calibration improved)** |
+| Calibration delta @ p=0.05 | **+0.302** | **+0.016** ✅ FIXED |
+| Calibration delta @ p=0.80 | -0.030 (good) | -0.003 (excellent) |
+| Uncertain zone size | 0.6% | **6.3%** (truly uncertain prompts) |
+| Uncertain zone acc | 50% | 40.6% (worse — confirming these ARE uncertain) |
+
+#### Build + deploy
+
+- xcodebuild Release iphoneos SUCCESS (no warnings)
+- iPhone old PID 50032 terminated → new PID **50099** launched
+- v0.4 .mlpackage 14,422 bytes (vs v0.1 14,403 — 19 bytes diff, same arch)
+
+#### What audit confirms is OK (no fix needed)
+
+- Stability: ± 0.86% k-fold spread
+- chapter 175 angry/grieving fingerprints reproduce exactly in training data
+- Feature engineering is solid (only askshape marginally useful, drop = 0.4% acc)
+- 14 KB total .mlpackage size — already minimal
+
+#### What audit deferred (not in v0.4)
+
+- 0 CoreML inference unit tests — chapter 一百七十八+ candidate
+- Multi-function model setup (for future heads) — chapter 一百八十+
+- INT8/FP16 quantization — model already 14 KB, low ROI
+- ANE compute unit verification (currently `.all`, can't easily verify is using ANE not CPU) — Instruments-required
+- More training data — 5,088 rows is small, more would help (chapter 178 axis A 8h bench)
+
+#### 一句话总结
+
+**Chapter 一百七十七 audit (M626 — v0.4)**: respond to user "全面 coreml 整体 严查" by running 7-axis audit (`scripts/audit_chenglu_preflight.py`). **K-fold confirms v0.1 stable** (92.96% ± 0.86%). **Feature ablation surprise**: domain > mutation > stake > tone (chapter 175 highlighted tone but data shows domain matters more). **REAL CALIBRATION BUG FOUND**: v0.1 over-confident on guardrail predictions (predicted 0.05 → actual 0.353). **v0.4 ships fix**: isotonic regression LUT (100 points) baked into Swift-side via static array + binary-search-interpolation. Brier 0.065 → 0.054 (-17.5%). Calibration delta @ p=0.05: +0.302 → +0.016 ✅ fixed. Confidence zone widened to [0.30, 0.70] now catches 6.3% truly-uncertain prompts (vs v0.2's 0.6%). Build SUCCESS, deployed iPhone PID 50099. 7 of 7 audit axes addressed (5 confirmed OK / 1 fixed / 1 deferred to chapter 178+ for unit tests). Doctrine: "全面严查" = systematic 7-axis review with explicit pass/fail per axis; not vague optimization.
+

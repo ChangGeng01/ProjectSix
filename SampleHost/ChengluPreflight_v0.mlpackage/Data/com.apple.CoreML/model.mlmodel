@@ -1,17 +1,17 @@
-‚
-•
-featureså43-dim one-hot feature vector: 8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed (in this exact order).
+ı
+
+featuresg43-dim one-hot: 8 tone + 10 domain + 6 stake + 7 timeframe + 4 confidant + 3 askshape + 5 mutationSeed.
 *
-+†ÄRã
-afm_success_probabilitydMLP(64,32) sigmoid output. Threshold 0.5 = balanced; 0.55-0.60 = conservative (route more to Gemma).
++†ÄR≥
+afm_success_probabilityãCalibrated probability AFM produces ok response. Threshold 0.5 = balanced; uncertain zone [0.30, 0.70] (~2-3% prompts) ‚Üí dual-LLM voting.
 *
-†Ä¢®
-¸ChengluPreflight v0.1 ‚Äî MLP(64,32) trained on chapter 176 5,088-row iPhone bench. Test acc 92.04% (v0 LogReg was 88.51%). Threshold default 0.5, conservative mode at 0.55+ (see threshold scan). Output >= threshold ‚Üí route AFM, else ‚Üí route Gemma.0.1.05Qinao Runtime SDK chapter ‰∏ÄÁôæ‰∏ÉÂçÅ‰∏É evolve v0.1"
+†Ä¢∫
+éChengluPreflight v0.4 ‚Äî MLP(64,32) + isotonic calibration baked in. Test acc ~92% (vs v0.1 same), AUC ~0.97, Brier ~0.05 (vs v0.1 0.07 ‚Äî better calibration). Confidence zone widened: predicted 0.30-0.70 zone now represents real uncertainty (caught ~2-3% of prompts).0.4.05Qinao Runtime SDK chapter ‰∏ÄÁôæ‰∏ÉÂçÅ‰∏É evolve v0.4"
 Apache-2.0¢4
 #com.github.apple.coremltools.sourcetorch==2.11.0¢:
-+com.github.apple.coremltools.source_dialectTorchScript¢:
 ,com.github.apple.coremltools.conversion_date
-2026-05-05¢+
+2026-05-05¢:
++com.github.apple.coremltools.source_dialectTorchScript¢+
 $com.github.apple.coremltools.version9.0≤ÔÅ
 main¯
 
@@ -22,48 +22,48 @@ $com.github.apple.coremltools.version9.0≤ÔÅ
 CoreML7¿afm_success_probabilityt
 const 
 features_to_fp16_dtype_0
-*
+*.
+name&
+
+"
+features_to_fp16_dtype_0*
 val
 
 
 "
-fp16*.
-name&
-
-"
-features_to_fp16_dtype_0ú
+fp16ú
 const(
 fc1_weight_to_fp16
 
 
 @
-+*?
++*(
+name 
+
+"
+fc1_weight_to_fp16*?
 val8
 
 
 @
 +*"
-@model_path/weights/weight.bin@*(
-name 
-
-"
-fc1_weight_to_fp16ç
+@model_path/weights/weight.bin@ç
 const 
 fc1_bias_to_fp16
 
 
 
-@*:
+@*&
+name
+
+"
+fc1_bias_to_fp16*:
 val3
 
 
 
 @*#
-@model_path/weights/weight.binÄ,*&
-name
-
-"
-fc1_bias_to_fp16Ü
+@model_path/weights/weight.binÄ,Ü
 cast%
 dtype
 
@@ -82,16 +82,16 @@ $com.github.apple.coremltools.version9.0≤ÔÅ
 
 "
 cast_1∑
-linear
-bias
-
-fc1_bias_to_fp16 
-weight
-
-fc1_weight_to_fp16
+linear
 x
 
-features_to_fp16(
+features_to_fp16 
+weight
+
+fc1_weight_to_fp16
+bias
+
+fc1_bias_to_fp16(
 linear_0_cast_fp16
 
 
@@ -119,43 +119,43 @@ $com.github.apple.coremltools.version9.0≤ÔÅ
 
 
  
-@*@
+@*(
+name 
+
+"
+fc2_weight_to_fp16*@
 val9
 
 
  
 @*#
-@model_path/weights/weight.bin¿-*(
-name 
-
-"
-fc2_weight_to_fp16ç
+@model_path/weights/weight.bin¿-ç
 const 
 fc2_bias_to_fp16
 
 
 
- *:
+ *&
+name
+
+"
+fc2_bias_to_fp16*:
 val3
 
 
 
  *#
-@model_path/weights/weight.binÄN*&
-name
-
-"
-fc2_bias_to_fp16∏
-linear
-bias
-
-fc2_bias_to_fp16 
-weight
-
-fc2_weight_to_fp16
+@model_path/weights/weight.binÄN∏
+linear
 x
 
-input_1_cast_fp16(
+input_1_cast_fp16 
+weight
+
+fc2_weight_to_fp16
+bias
+
+fc2_bias_to_fp16(
 linear_1_cast_fp16
 
 
@@ -183,44 +183,44 @@ $com.github.apple.coremltools.version9.0≤ÔÅ
 
 
 
- *@
+ *(
+name 
+
+"
+out_weight_to_fp16*@
 val9
 
 
 
  *#
-@model_path/weights/weight.binÄO*(
-name 
-
-"
-out_weight_to_fp16r
+@model_path/weights/weight.binÄOr
 const 
 out_bias_to_fp16
 
 
 
-*
+*&
+name
+
+"
+out_bias_to_fp16*
 val
 
 
 
 
 :
-Ñ$*&
-name
-
-"
-out_bias_to_fp16∂
-linear
-bias
-
-out_bias_to_fp16 
-weight
-
-out_weight_to_fp16
+˙%∂
+linear
 x
 
-input_cast_fp16(
+input_cast_fp16 
+weight
+
+out_weight_to_fp16
+bias
+
+out_bias_to_fp16(
 linear_2_cast_fp16
 
 
@@ -245,16 +245,16 @@ $com.github.apple.coremltools.version9.0≤ÔÅ
 op_16_cast_fp16É
 const(
  var_16_cast_fp16_to_fp32_dtype_0
-*
+*5
+name-
+%
+#"!
+op_16_cast_fp16_to_fp32_dtype_0*
 val
 
 
 "
-fp32*5
-name-
-%
-#"!
-op_16_cast_fp16_to_fp32_dtype_0ù
+fp32ù
 cast-
 dtype$
 "
