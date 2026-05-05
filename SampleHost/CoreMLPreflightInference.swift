@@ -55,25 +55,48 @@ public struct ChengluPromptFeatures: Equatable, Sendable {
     }
 }
 
-/// Routing decision produced by ChengluPreflight v0.
+/// Routing decision produced by ChengluPreflight.
 public struct ChengluPreflightDecision: Equatable, Sendable, Codable {
     public enum Route: String, Codable, Sendable {
         case afm     // predict AFM will succeed → call AFM
         case gemma   // predict AFM will guardrail-refuse → call Gemma
     }
 
+    /// v0.2 — confidence band classifies prob into 3 zones.
+    /// In `uncertain` zone, hybrid runner can call BOTH LLMs and
+    /// pick best output (instead of single + fallback).
+    public enum Confidence: String, Codable, Sendable {
+        /// prob >= 0.75 → confident AFM (or <= 0.25 → confident Gemma)
+        case high
+        /// prob in [0.55, 0.75) or (0.25, 0.45]
+        case medium
+        /// prob in [0.45, 0.55] — model uncertain, both LLMs viable
+        case uncertain
+    }
+
     public let afmSuccessProbability: Double
     public let route: Route
+    public let confidence: Confidence
     public let modelVersion: String
 
     public init(
         afmSuccessProbability: Double,
         route: Route,
+        confidence: Confidence,
         modelVersion: String
     ) {
         self.afmSuccessProbability = afmSuccessProbability
         self.route = route
+        self.confidence = confidence
         self.modelVersion = modelVersion
+    }
+
+    /// v0.2 — derive confidence from probability.
+    public static func confidence(forProb p: Double) -> Confidence {
+        let dist = abs(p - 0.5)
+        if dist >= 0.25 { return .high }
+        if dist >= 0.05 { return .medium }
+        return .uncertain
     }
 }
 
@@ -113,7 +136,7 @@ public enum ChengluPreflightError: Error, LocalizedError {
 public final class ChengluPreflightInference {
     public static let shared = ChengluPreflightInference()
 
-    private static let modelVersion = "v0-rule-based-binary-LR"
+    private static let modelVersion = "v0.1-mlp-64-32"
 
     // Feature ordering MUST match training script
     // scripts/train_chenglu_preflight_v0.py (43 dims total).
@@ -256,9 +279,12 @@ public final class ChengluPreflightInference {
 
         let route: ChengluPreflightDecision.Route =
             prob >= 0.5 ? .afm : .gemma
+        let confidence = ChengluPreflightDecision
+            .confidence(forProb: prob)
         return ChengluPreflightDecision(
             afmSuccessProbability: prob,
             route: route,
+            confidence: confidence,
             modelVersion: Self.modelVersion)
     }
 

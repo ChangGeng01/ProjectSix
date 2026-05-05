@@ -370,6 +370,7 @@
 		C0207C461F3D6887062BB65F /* DecisionLocalModelLibrarySnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037C3A68CA75526154BDF062 /* DecisionLocalModelLibrarySnapshotTests.swift */; };
 		C03031D69F7880DCDEFCDDBC /* PendingLaunchRequestStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E0334A8565803EF7707BB38 /* PendingLaunchRequestStore.swift */; };
 		C28363B76C8CEA14FBD3A1AD /* OnDeviceIntelligenceSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 356488FB3BD630898DBAF6D5 /* OnDeviceIntelligenceSessionTests.swift */; };
+		C2993168CFBFFA85B73654A3 /* qinao_curriculum_lora_m247.safetensors in Resources */ = {isa = PBXBuildFile; fileRef = 29BF07481065322B1013EF65 /* qinao_curriculum_lora_m247.safetensors */; };
 		C2A757AD0931D5611D135007 /* TomorrowBoxDelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B506CA81E60C2268F94BB49 /* TomorrowBoxDelay.swift */; };
 		C2A96E22FAAC5ACBFBC71928 /* DecisionEvolutionCheckpointLineageDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D103FF6D5DF7EFE2B7D4704 /* DecisionEvolutionCheckpointLineageDetailsView.swift */; };
 		C453E6D9035E66AEDD7C16B4 /* gemma-4-E4B-it.litertlm in Resources */ = {isa = PBXBuildFile; fileRef = 8B51E3D57D268624717EAA40 /* gemma-4-E4B-it.litertlm */; };
@@ -593,6 +594,7 @@
 		286D49787E0A430FA0F8FC95 /* SampleHostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHostTests.swift; sourceTree = "<group>"; };
 		2976E20A58302839AFB3FF14 /* DecisionEvolutionReleaseSummaryBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionReleaseSummaryBuilder.swift; sourceTree = "<group>"; };
 		29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedProtectedStateStore.swift; sourceTree = "<group>"; };
+		29BF07481065322B1013EF65 /* qinao_curriculum_lora_m247.safetensors */ = {isa = PBXFileReference; includeInIndex = 1; path = qinao_curriculum_lora_m247.safetensors; sourceTree = "<group>"; };
 		2A7B6A83F0C81717A9A5D601 /* BeforeActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeActionButton.swift; sourceTree = "<group>"; };
 		2AF30BA404040B6ECD5A2652 /* PendingLaunchRequestStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingLaunchRequestStoreTests.swift; sourceTree = "<group>"; };
 		2BF5DACA08082B764C73C19F /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
@@ -993,6 +995,7 @@
 				AA32CE995A464EC0547C8D99 /* SampleHostView.swift */,
 				3031231D68A1F190033BB7C2 /* ChengluPreflight_v0.mlpackage */,
 				04DF9EBCF6F4A70E8CF0A829 /* CoreMLPreflightInference.swift */,
+				29BF07481065322B1013EF65 /* qinao_curriculum_lora_m247.safetensors */,
 			);
 			path = SampleHost;
 			sourceTree = "<group>";
@@ -1771,6 +1774,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9BE148B3DD53F13CAE65F59A /* ChengluPreflight_v0.mlpackage in Resources */,
+				C2993168CFBFFA85B73654A3 /* qinao_curriculum_lora_m247.safetensors in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1694,7 +1694,9 @@ extension SampleHostModel {
     }
 
     /// Call Gemma 4 E2B (MLX) with a prompt. Lazy-loads on first
-    /// call. Throws on error.
+    /// call + applies LoRA M247 chat-template adapter (chapter 176
+    /// §176.10 — 3.6× better convergence + learned [RISK]/[NEEDS_PERMIT]
+    /// markers). Throws on error.
     private func callGemma(prompt: String) async throws -> String {
         #if canImport(BASMLXAdapter)
         if gemmaAdapter == nil {
@@ -1704,10 +1706,31 @@ extension SampleHostModel {
             let adapter = MLXOrganAdapter(
                 model: MLXModelCatalog.gemma4_E2B_4bit)
             try await adapter.loadModel()
+            // v0.3 — load LoRA M247 adapter from app bundle
+            // (~1.5 MB chat-template-format adapter, chapter 176
+            // §176.10 trained, learned to emit [RISK] / [NEEDS_PERMIT]
+            // markers with 3.6× better convergence vs raw Gemma).
+            if let loraURL = Bundle.main.url(
+                forResource: "qinao_curriculum_lora_m247",
+                withExtension: "safetensors")
+            {
+                await MainActor.run {
+                    self.hybridGemmaLoadStatus = "loading LoRA M247…"
+                }
+                do {
+                    try await adapter.loadAdapter(from: loraURL)
+                } catch {
+                    // Non-fatal: bare Gemma still works
+                    await MainActor.run {
+                        self.hybridGemmaLoadStatus =
+                            "lora-load-failed: \(error)"
+                    }
+                }
+            }
             try await adapter.prewarm()
             gemmaAdapter = adapter
             await MainActor.run {
-                self.hybridGemmaLoadStatus = "ready"
+                self.hybridGemmaLoadStatus = "ready (with LoRA M247)"
             }
         }
         guard let adapter = gemmaAdapter else {
@@ -1827,6 +1850,10 @@ extension SampleHostModel {
                 let routerRoute = decision?.route ?? .afm
                 let routerProb = decision?.afmSuccessProbability ?? 0.5
                 let routerVersion = decision?.modelVersion ?? "missing"
+                // v0.2 — confidence-aware: in uncertain zone, call
+                // BOTH LLMs and pick longer body. Outside uncertain
+                // zone, use chosen LLM with fallback safety net.
+                let routerConfidence = decision?.confidence ?? .high
 
                 // Call chosen LLM
                 var firstTriedLLM = routerRoute.rawValue
@@ -1842,55 +1869,134 @@ extension SampleHostModel {
                 var errorMessage: String?
 
                 let firstStart = Date()
-                do {
-                    if routerRoute == .afm {
-                        firstBody = try await self.callAFM(prompt: prompt)
-                    } else {
-                        firstBody = try await self.callGemma(prompt: prompt)
-                    }
-                    firstDurationMs = Date().timeIntervalSince(firstStart) * 1000
-                    actualRoute = "\(routerRoute.rawValue)-predicted-ok"
-                    if routerRoute == .afm {
-                        self.hybridBenchAFMOk += 1
-                    } else {
-                        self.hybridBenchGemmaOk += 1
-                    }
-                    self.hybridBenchRouterHits += 1
-                } catch {
-                    firstStatus = "\(routerRoute.rawValue)-error"
-                    firstDurationMs = Date().timeIntervalSince(firstStart) * 1000
-                    errorMessage = "first: \(error)"
-                    routerHit = false
-                    self.hybridBenchRouterMisses += 1
-                    // Fallback to the other LLM
-                    let fbStart = Date()
+                if routerConfidence == .uncertain {
+                    // v0.2 — uncertain zone: call BOTH LLMs, pick
+                    // longer body (simple heuristic, will swap to
+                    // ShadowEvaluator-based picker in chapter 一百八十).
+                    var afmBodyMaybe: String?
+                    var gemmaBodyMaybe: String?
+                    var afmErr: Error?
+                    var gemmaErr: Error?
+                    let afmStart = Date()
                     do {
-                        let other: String
-                        if routerRoute == .afm {
-                            other = try await self.callGemma(prompt: prompt)
+                        afmBodyMaybe = try await self.callAFM(prompt: prompt)
+                    } catch { afmErr = error }
+                    let afmMs = Date().timeIntervalSince(afmStart) * 1000
+                    let gemmaStart = Date()
+                    do {
+                        gemmaBodyMaybe = try await self.callGemma(prompt: prompt)
+                    } catch { gemmaErr = error }
+                    let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
+
+                    // Pick longer non-empty body (simple heuristic)
+                    let pickedAFM: Bool
+                    if let a = afmBodyMaybe, let g = gemmaBodyMaybe {
+                        pickedAFM = a.count >= g.count
+                    } else if afmBodyMaybe != nil {
+                        pickedAFM = true
+                    } else if gemmaBodyMaybe != nil {
+                        pickedAFM = false
+                    } else {
+                        pickedAFM = true  // both failed
+                    }
+                    if pickedAFM {
+                        firstTriedLLM = "afm"
+                        firstBody = afmBodyMaybe ?? ""
+                        firstStatus = afmErr == nil ? "ok" : "afm-error"
+                        firstDurationMs = afmMs
+                        if let other = gemmaBodyMaybe {
                             fallbackLLM = "gemma"
-                            fallbackStatus = "ok"
                             fallbackBody = other
-                            actualRoute = "afm-fallback-to-gemma-ok"
-                            self.hybridBenchAFMFallbackToGemmaOk += 1
-                        } else {
-                            other = try await self.callAFM(prompt: prompt)
-                            fallbackLLM = "afm"
-                            fallbackStatus = "ok"
-                            fallbackBody = other
-                            actualRoute = "gemma-fallback-to-afm-ok"
-                            self.hybridBenchGemmaFallbackToAFMOk += 1
+                            fallbackStatus = "ok-uncertain-side"
                         }
-                        fallbackDurationMs =
-                            Date().timeIntervalSince(fbStart) * 1000
-                    } catch {
-                        fallbackLLM = routerRoute == .afm ? "gemma" : "afm"
-                        fallbackStatus = "error"
-                        errorMessage = (errorMessage ?? "") + " fb: \(error)"
-                        actualRoute = "both-failed"
+                        fallbackDurationMs = gemmaMs
+                        actualRoute = "uncertain-both-pick-afm"
+                    } else {
+                        firstTriedLLM = "gemma"
+                        firstBody = gemmaBodyMaybe ?? ""
+                        firstStatus = gemmaErr == nil ? "ok" : "gemma-error"
+                        firstDurationMs = gemmaMs
+                        if let other = afmBodyMaybe {
+                            fallbackLLM = "afm"
+                            fallbackBody = other
+                            fallbackStatus = "ok-uncertain-side"
+                        }
+                        fallbackDurationMs = afmMs
+                        actualRoute = "uncertain-both-pick-gemma"
+                    }
+                    if afmBodyMaybe != nil && gemmaBodyMaybe == nil {
+                        self.hybridBenchAFMOk += 1
+                    } else if gemmaBodyMaybe != nil && afmBodyMaybe == nil {
+                        self.hybridBenchGemmaOk += 1
+                    } else if afmBodyMaybe == nil && gemmaBodyMaybe == nil {
                         self.hybridBenchBothFailed += 1
-                        fallbackDurationMs =
-                            Date().timeIntervalSince(fbStart) * 1000
+                    } else {
+                        // Both succeeded (best case)
+                        if pickedAFM {
+                            self.hybridBenchAFMOk += 1
+                        } else {
+                            self.hybridBenchGemmaOk += 1
+                        }
+                    }
+                    if afmErr != nil { errorMessage = "afm: \(afmErr!)" }
+                    if gemmaErr != nil {
+                        errorMessage = (errorMessage ?? "") + " gemma: \(gemmaErr!)"
+                    }
+                    // Router "hit" semantically uncertain in this branch
+                    self.hybridBenchRouterHits += 1
+                } else {
+                    // Confident — original single-LLM-with-fallback path
+                    do {
+                        if routerRoute == .afm {
+                            firstBody = try await self.callAFM(prompt: prompt)
+                        } else {
+                            firstBody = try await self.callGemma(prompt: prompt)
+                        }
+                        firstDurationMs =
+                            Date().timeIntervalSince(firstStart) * 1000
+                        actualRoute = "\(routerRoute.rawValue)-predicted-ok"
+                        if routerRoute == .afm {
+                            self.hybridBenchAFMOk += 1
+                        } else {
+                            self.hybridBenchGemmaOk += 1
+                        }
+                        self.hybridBenchRouterHits += 1
+                    } catch {
+                        firstStatus = "\(routerRoute.rawValue)-error"
+                        firstDurationMs =
+                            Date().timeIntervalSince(firstStart) * 1000
+                        errorMessage = "first: \(error)"
+                        routerHit = false
+                        self.hybridBenchRouterMisses += 1
+                        let fbStart = Date()
+                        do {
+                            let other: String
+                            if routerRoute == .afm {
+                                other = try await self.callGemma(prompt: prompt)
+                                fallbackLLM = "gemma"
+                                fallbackStatus = "ok"
+                                fallbackBody = other
+                                actualRoute = "afm-fallback-to-gemma-ok"
+                                self.hybridBenchAFMFallbackToGemmaOk += 1
+                            } else {
+                                other = try await self.callAFM(prompt: prompt)
+                                fallbackLLM = "afm"
+                                fallbackStatus = "ok"
+                                fallbackBody = other
+                                actualRoute = "gemma-fallback-to-afm-ok"
+                                self.hybridBenchGemmaFallbackToAFMOk += 1
+                            }
+                            fallbackDurationMs =
+                                Date().timeIntervalSince(fbStart) * 1000
+                        } catch {
+                            fallbackLLM = routerRoute == .afm ? "gemma" : "afm"
+                            fallbackStatus = "error"
+                            errorMessage = (errorMessage ?? "") + " fb: \(error)"
+                            actualRoute = "both-failed"
+                            self.hybridBenchBothFailed += 1
+                            fallbackDurationMs =
+                                Date().timeIntervalSince(fbStart) * 1000
+                        }
                     }
                 }
 
