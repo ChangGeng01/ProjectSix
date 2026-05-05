@@ -228,6 +228,61 @@ final class SampleHostTests: XCTestCase {
         XCTAssertTrue(v.allSatisfy { $0 == 0.0 })
     }
 
+    // MARK: - M665 chapter 一百八十四 — deep review fix-pin tests
+
+    /// M665 fix B2 (CRITICAL): JSONEncoder must encode NaN /
+    /// ±Infinity as string sentinels, not throw. Pre-fix a single
+    /// non-finite Double in any of 11 row fields would silently
+    /// drop the entire iter row from JSONL.
+    func testHybridBenchRowEncodesNaNWithoutThrowing() throws {
+        let sig = SampleHostPromptSignature(
+            tone: "anxious", domain: "financial", stake: "low",
+            timeframe: "minutes", confidant: "friend",
+            askShape: "narrative")
+        let row = SampleHostHybridBenchRow(
+            timestamp: "2026-05-06T00:00:00Z",
+            iteration: 0, seed: 0, stride: 5041, mutationSeed: 0,
+            signature: sig, prompt: "test",
+            auditCodeCount: 100,
+            permitMode: "answer",
+            routerVersion: "test",
+            routerPredictedRoute: "afm",
+            routerProbability: .nan,           // NaN
+            firstTriedLLM: "afm", firstTriedStatus: "ok",
+            firstTriedBody: "ok", firstTriedDurationMs: .infinity,
+            fallbackTriedLLM: nil, fallbackStatus: nil,
+            fallbackBody: nil, fallbackDurationMs: -.infinity,
+            actualRoute: "afm-predicted-ok", routerHit: true,
+            totalDurationSeconds: .nan, errorMessage: nil,
+            dispatchPolicy: nil, dispatchTaken: nil,
+            draftOnly: nil, llmSkipped: nil,
+            postLLMPermitMode: nil, postLLMAuditCodeCount: nil,
+            postLLMShifted: nil,
+            permitPredictBlockProb: .nan,
+            permitPredictClass: nil,
+            permitPredictAgreement: nil,
+            lengthPredicted: .nan, lengthError: .infinity,
+            latencyPredictedMs: .nan, latencyErrorMs: -.infinity,
+            verbosityProbability: .nan, verbosityCorrect: nil)
+        // Must not throw — strategy stringifies non-finite.
+        let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
+        XCTAssertTrue(
+            encoded.contains("\"nan\"")
+            || encoded.contains("\"inf\"")
+            || encoded.contains("\"-inf\""),
+            "Non-finite Double should serialize as string sentinel: "
+            + encoded)
+    }
+
+    /// M665 fix A24 (LOW): private init enforces shared singleton.
+    /// (Indirect test — verifies `.shared` returns same instance
+    /// every time.)
+    func testCoreMLSharedSingletonsAreStable() {
+        let p1 = ChengluPreflightInference.shared
+        let p2 = ChengluPreflightInference.shared
+        XCTAssertTrue(p1 === p2, "Preflight .shared not singleton")
+    }
+
     /// Predict on out-of-vocab tone (e.g. typo) should not crash —
     /// all features become 0, model still produces valid output.
     func testPredictHandlesOutOfVocabFeatures() async throws {

@@ -226,7 +226,12 @@ public final class ChengluPreflightInference {
 
     private var model: MLModel?
 
-    public init() {}
+    /// M665 chapter 一百八十四 deep-review fix A24 (LOW): mark
+    /// init private so callers can't bypass `.shared` and
+    /// accidentally allocate parallel MLModel instances. The
+    /// shared singleton holds a lazily-loaded model that's
+    /// expensive to duplicate.
+    private init() {}
 
     /// Load the model lazily on first call.
     private func ensureLoaded() throws -> MLModel {

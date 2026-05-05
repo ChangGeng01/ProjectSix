@@ -102,7 +102,10 @@ public final class ChengluMultiHeadInference {
     private var latencyMean: Double = 5671.48
     private var latencyStd: Double = 6729.38
 
-    public init() {}
+    /// M665 chapter 一百八十四 deep-review fix A24 (LOW): private
+    /// init enforces `.shared` singleton; bypass would allocate
+    /// duplicate MLModel + duplicate metadata read.
+    private init() {}
 
     private func ensureLoaded() throws -> MLModel {
         if let m = model { return m }
@@ -119,21 +122,51 @@ public final class ChengluMultiHeadInference {
             // Read normalization constants from
             // user_defined_metadata. CoreML compiled the metadata
             // into the .mlmodelc bundle's metadata.json.
+            //
+            // M665 chapter 一百八十四 deep-review fix A4 + A26
+            // (HIGH): metadata cast accepts `[String: Any]` and
+            // converts each value via `String(describing:)` —
+            // tolerant to NSString vs Swift String quirks. After
+            // load, validate each std is positive + finite. Zero
+            // std would make denorm a constant predictor (huge
+            // observability bug); we throw
+            // `missingNormalizationMetadata` instead of falling
+            // through to stale chapter 175/176 defaults.
             let meta = m.modelDescription.metadata
-            if let userKV = meta[
-                MLModelMetadataKey.creatorDefinedKey
-            ] as? [String: String] {
-                if let s = userKV["length_mean"],
-                   let d = Double(s) { lengthMean = d }
-                if let s = userKV["length_std"],
-                   let d = Double(s) { lengthStd = d }
-                if let s = userKV["latency_mean"],
-                   let d = Double(s) { latencyMean = d }
-                if let s = userKV["latency_std"],
-                   let d = Double(s) { latencyStd = d }
+            let userKV = (meta[MLModelMetadataKey.creatorDefinedKey]
+                as? [String: Any]) ?? [:]
+            func stringValue(_ k: String) -> String? {
+                guard let v = userKV[k] else { return nil }
+                if let s = v as? String { return s }
+                return String(describing: v)
+            }
+            if let s = stringValue("length_mean"),
+               let d = Double(s) { lengthMean = d }
+            if let s = stringValue("length_std"),
+               let d = Double(s) { lengthStd = d }
+            if let s = stringValue("latency_mean"),
+               let d = Double(s) { latencyMean = d }
+            if let s = stringValue("latency_std"),
+               let d = Double(s) { latencyStd = d }
+            // A4 fail-loud invariant: std must be positive +
+            // finite. Zero / NaN std would silently corrupt all
+            // regression predictions (denorm becomes constant).
+            guard lengthStd > 0, lengthStd.isFinite,
+                  latencyStd > 0, latencyStd.isFinite,
+                  lengthMean.isFinite, latencyMean.isFinite
+            else {
+                throw ChengluMultiHeadError
+                    .missingNormalizationMetadata(
+                        "length_std=\(lengthStd) "
+                        + "latency_std=\(latencyStd) "
+                        + "length_mean=\(lengthMean) "
+                        + "latency_mean=\(latencyMean)")
             }
             self.model = m
             return m
+        } catch let mhErr as ChengluMultiHeadError {
+            // Re-throw typed errors unchanged.
+            throw mhErr
         } catch {
             throw ChengluMultiHeadError.modelLoadFailed("\(error)")
         }
@@ -166,6 +199,32 @@ public final class ChengluMultiHeadInference {
         return raw.isFinite ? raw : 0.0
     }
 
+    /// M665 chapter 一百八十四 deep-review fix A6 (HIGH):
+    /// extractScalar's 0.0 NaN fallback silently routes
+    /// classification heads to the negative class. For probability
+    /// outputs (sigmoid heads) the doctrinally correct NaN
+    /// fallback is 0.5 (uncertain) — matches
+    /// `ChengluPreflightInference.applyCalibrationLUT`'s contract.
+    /// This wrapper extracts AND remaps NaN→0.5 for sigmoid heads.
+    private func extractProbability(
+        _ result: MLFeatureProvider, key: String
+    ) throws -> Double {
+        guard let output = result.featureValue(for: key) else {
+            throw ChengluMultiHeadError.unexpectedOutput(
+                "no \(key) key")
+        }
+        let raw: Double
+        if let arr = output.multiArrayValue {
+            raw = arr[0].doubleValue
+        } else if output.type == .double {
+            raw = output.doubleValue
+        } else {
+            throw ChengluMultiHeadError.unexpectedOutput(
+                "\(key) type \(output.type.rawValue)")
+        }
+        return raw.isFinite ? raw : 0.5
+    }
+
     /// One forward pass produces all 4 head outputs.
     public func predict(
         features: ChengluPromptFeatures
@@ -196,30 +255,42 @@ public final class ChengluMultiHeadInference {
             throw ChengluMultiHeadError.predictionFailed("\(error)")
         }
 
-        let afmProb = try extractScalar(
+        // M665 chapter 一百八十四 deep-review fix A6 (HIGH):
+        // sigmoid outputs use extractProbability (NaN→0.5);
+        // regression outputs use extractScalar (NaN→0.0).
+        let afmProb = try extractProbability(
             result, key: "afm_success_prob")
-        let blockProb = try extractScalar(
+        let blockProb = try extractProbability(
             result, key: "block_prob")
         let lengthNorm = try extractScalar(
             result, key: "length_norm")
         let latencyNorm = try extractScalar(
             result, key: "latency_norm")
-        // M661 chapter 一百八十三 — 5th head extract. Treated as
-        // optional: if model is older v0 (4-output), this throws
-        // unexpectedOutput and we fall back to 0.0 via NaN guard
-        // path. Defensive fallback so production keeps working
-        // through model version transition.
+        // M661 chapter 一百八十三 — 5th head extract. M665 chapter
+        // 一百八十四 fix A6+M17: only catch the precise
+        // "no verbosity_prob key" error from older 4-output v0
+        // model — let other errors (malformed type, NaN
+        // pathology if any) propagate so they're observable.
         let verbosityProb: Double
         do {
-            verbosityProb = try extractScalar(
+            verbosityProb = try extractProbability(
                 result, key: "verbosity_prob")
-        } catch {
-            verbosityProb = 0.0
+        } catch ChengluMultiHeadError.unexpectedOutput(let msg)
+            where msg == "no verbosity_prob key"
+        {
+            // Older v0 model (4 outputs); use uncertain fallback.
+            verbosityProb = 0.5
         }
 
         // Denormalize z-space regression outputs to human units.
-        let predictedBodyLength = lengthNorm * lengthStd + lengthMean
-        let predictedDurationMs = latencyNorm * latencyStd + latencyMean
+        // M665 chapter 一百八十四 deep-review fix A5 (HIGH):
+        // clamp to >= 0 so a strongly-negative z doesn't yield
+        // negative chars / negative ms (physically impossible
+        // values would confuse UI consumers).
+        let predictedBodyLength = max(
+            0.0, lengthNorm * lengthStd + lengthMean)
+        let predictedDurationMs = max(
+            0.0, latencyNorm * latencyStd + latencyMean)
 
         return ChengluMultiHeadPrediction(
             afmSuccessProbability: afmProb,

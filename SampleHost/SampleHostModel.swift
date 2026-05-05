@@ -1770,6 +1770,25 @@ extension SampleHostBenchHelpers {
     static func encodeHybrid(_ row: SampleHostHybridBenchRow) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
+        // M665 chapter 一百八十四 deep-review fix B2 (CRITICAL):
+        // CoreML model outputs can occasionally yield NaN /
+        // ±Infinity (input vector pathological, dropout layer
+        // active by mistake, etc.). Default JSONEncoder THROWS on
+        // these values. Pre-this-batch a single non-finite Double
+        // in any of 11 Double fields (routerProbability,
+        // firstTriedDurationMs, fallbackDurationMs,
+        // totalDurationSeconds, lengthPredicted, lengthError,
+        // latencyPredictedMs, latencyErrorMs,
+        // permitPredictBlockProb, verbosityProbability +
+        // postLLMAuditCodeCount when nil) would silently drop the
+        // ENTIRE iter row from JSONL with only `hybridBenchLastError`
+        // as a clue. Now: stringify non-finite as "nan" / "inf" /
+        // "-inf" so the row always lands and downstream analysis
+        // can grep these markers.
+        encoder.nonConformingFloatEncodingStrategy = .convertToString(
+            positiveInfinity: "inf",
+            negativeInfinity: "-inf",
+            nan: "nan")
         let data = try encoder.encode(row)
         return String(data: data, encoding: .utf8) ?? ""
     }

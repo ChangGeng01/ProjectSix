@@ -83,7 +83,10 @@ public final class ChengluPermitPredictInference {
 
     private var model: MLModel?
 
-    public init() {}
+    /// M665 chapter 一百八十四 deep-review fix A24 (LOW): private
+    /// init enforces `.shared` singleton; bypass would allocate
+    /// duplicate MLModel.
+    private init() {}
 
     private func ensureLoaded() throws -> MLModel {
         if let m = model { return m }

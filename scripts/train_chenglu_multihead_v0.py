@@ -67,6 +67,7 @@ import coremltools as ct
 
 sys.path.insert(0, os.path.dirname(__file__))
 # M658 chapter 一百八十三 — single-source via shared schema.
+# M665 chapter 一百八十四 fix C5 — VERBOSITY_THRESHOLD_CHARS too.
 from chenglu_feature_schema import (
     featurize_row,
     label_afm_ok as label_row,
@@ -74,6 +75,7 @@ from chenglu_feature_schema import (
     label_body_length as label_length,
     label_duration_ms as label_latency,
     label_verbosity_class,
+    VERBOSITY_THRESHOLD_CHARS,
 )
 from train_chenglu_preflight_v0 import load_jsonl_dir
 
@@ -241,7 +243,8 @@ def main() -> None:
         f"stdev={y_latency.std():.1f}"
     )
     print(
-        f"  verbosity:      long(>1500)={int((y_verbosity == 1).sum())} / "
+        f"  verbosity:      long(>{VERBOSITY_THRESHOLD_CHARS})="
+        f"{int((y_verbosity == 1).sum())} / "
         f"short={int((y_verbosity == 0).sum())}"
     )
 
@@ -261,11 +264,24 @@ def main() -> None:
         y_verbosity[idx_tr], y_verbosity[idx_te]
     )
 
-    # Z-normalize regression targets on training set
+    # Z-normalize regression targets on training set.
+    # M665 chapter 一百八十四 deep-review fix C9 (MEDIUM):
+    # raise on zero-variance target (1e-9 epsilon was theater —
+    # would yield z-scores ~1e9 magnitude making MSE diverge).
     length_mean = float(y_length_tr.mean())
-    length_std = float(y_length_tr.std() + 1e-9)
+    length_std_raw = float(y_length_tr.std())
     latency_mean = float(y_latency_tr.mean())
-    latency_std = float(y_latency_tr.std() + 1e-9)
+    latency_std_raw = float(y_latency_tr.std())
+    if length_std_raw == 0 or latency_std_raw == 0:
+        raise ValueError(
+            f"Cannot z-normalize: zero-variance target "
+            f"(length_std={length_std_raw}, "
+            f"latency_std={latency_std_raw}). "
+            f"Filter your training set or skip multihead "
+            f"training on this corpus."
+        )
+    length_std = length_std_raw
+    latency_std = latency_std_raw
     y_length_norm_tr = (y_length_tr - length_mean) / length_std
     y_latency_norm_tr = (y_latency_tr - latency_mean) / latency_std
 
@@ -349,7 +365,10 @@ def main() -> None:
         y_verbosity_te.astype(int), pred_verbosity_np
     )
     print(f"\n=== Verbosity head (NEW 5th — chapter 183) ===")
-    print(f"  Accuracy: {verb_acc:.4f} (binary: body > 1500 chars)")
+    print(
+        f"  Accuracy: {verb_acc:.4f} "
+        f"(binary: body > {VERBOSITY_THRESHOLD_CHARS} chars)"
+    )
     print(f"  AUC:      {verb_auc:.4f}")
 
     # Convert to CoreML — single model with 5 outputs.
@@ -424,7 +443,9 @@ def main() -> None:
     cml.user_defined_metadata["length_std"] = str(length_std)
     cml.user_defined_metadata["latency_mean"] = str(latency_mean)
     cml.user_defined_metadata["latency_std"] = str(latency_std)
-    cml.user_defined_metadata["verbosity_threshold_chars"] = str(1500)
+    cml.user_defined_metadata["verbosity_threshold_chars"] = str(
+        VERBOSITY_THRESHOLD_CHARS
+    )
 
     if os.path.exists(args.output):
         import shutil

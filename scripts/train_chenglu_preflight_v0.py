@@ -74,19 +74,61 @@ def label_row(row):
 
 
 def load_jsonl_dir(dir_path):
-    rows = []
+    """Load all *.jsonl from dir_path, top-level only.
+
+    M665 chapter 一百八十四 deep-review fixes:
+    - C6 (HIGH): malformed JSON now logs a stderr warning with
+      file:lineno + first 80 chars of bad line. Pre-fix: silent
+      swallow could drop hundreds of rows from a truncated bench
+      dump while reporting "5,088 rows loaded" — undetectable.
+    - C8 (MEDIUM): missing dir_path raises FileNotFoundError
+      instead of returning [] (audit + downstream callers were
+      relying on the empty-list error path which gave cryptic
+      shape errors instead of clear "wrong path" message).
+    """
     if not os.path.isdir(dir_path):
-        return rows
-    for path in sorted(glob(os.path.join(dir_path, "*.jsonl"))):
+        raise FileNotFoundError(
+            f"--iphone path is not a directory: {dir_path}")
+    rows = []
+    malformed = 0
+    # M665 chapter 一百八十四 deep-review fix C7 (MEDIUM):
+    # recursive glob so nested bench layouts (e.g.
+    # /tmp/iphone-bench/2026-05-04/run-001/iter.jsonl) work.
+    # Pre-fix: only top-level *.jsonl loaded; nested dirs silently
+    # gave 0 rows.
+    for path in sorted(glob(
+        os.path.join(dir_path, "**", "*.jsonl"),
+        recursive=True,
+    )):
         with open(path) as f:
-            for line in f:
+            for lineno, line in enumerate(f, start=1):
                 line = line.strip()
                 if not line:
                     continue
                 try:
                     rows.append(json.loads(line))
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    malformed += 1
+                    if malformed <= 5:
+                        snippet = line[:80].replace("\n", " ")
+                        print(
+                            f"WARN: malformed JSON at "
+                            f"{os.path.basename(path)}:{lineno}: "
+                            f"{e} | line={snippet!r}",
+                            file=sys.stderr,
+                        )
                     continue
+    if malformed > 5:
+        print(
+            f"WARN: {malformed - 5} additional malformed lines "
+            f"suppressed (showed first 5)",
+            file=sys.stderr,
+        )
+    if malformed:
+        print(
+            f"WARN: total malformed lines skipped: {malformed}",
+            file=sys.stderr,
+        )
     return rows
 
 

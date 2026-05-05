@@ -37,19 +37,43 @@ from chenglu_feature_schema import (  # noqa: E402
 )
 
 
+def _strip_swift_comments(swift_src: str) -> str:
+    """M665 chapter 一百八十四 deep-review fix C2 (HIGH):
+    strip Swift comments BEFORE regex extraction so an inline
+    `// "old-name" deprecated` comment containing a quoted string
+    doesn't pollute the parsed alphabet. Removes:
+      - line comments: `// ... \n`
+      - block comments: `/* ... */`
+    """
+    src = re.sub(r"//[^\n]*", "", swift_src)
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.DOTALL)
+    return src
+
+
 def parse_swift_array(swift_src: str, name: str) -> list[str]:
     """Parse a `public static let X: [String] = ["a", "b", ...]`
     declaration. Tolerates multi-line, whitespace, trailing
-    comma."""
+    comma. M665 chapter 一百八十四 deep-review fix C1 + C2:
+    asserts EXACTLY one declaration matches (so a stray
+    duplicate elsewhere in the source can't silently shadow);
+    strips Swift comments first so quoted strings inside
+    comments don't leak into the alphabet."""
+    src = _strip_swift_comments(swift_src)
     # Match "public static let NAME: [String] = [ ... ]"
     pattern = (
         r"public\s+static\s+let\s+" + re.escape(name)
         + r"\s*:\s*\[String\]\s*=\s*\[(.*?)\]"
     )
-    m = re.search(pattern, swift_src, re.DOTALL)
-    if not m:
-        raise ValueError(f"could not locate {name} in Swift source")
-    body = m.group(1)
+    matches = re.findall(pattern, src, re.DOTALL)
+    if len(matches) == 0:
+        raise ValueError(
+            f"could not locate {name} in Swift source")
+    if len(matches) > 1:
+        raise ValueError(
+            f"{name}: expected exactly 1 declaration, "
+            f"found {len(matches)} — drift detection ambiguous"
+        )
+    body = matches[0]
     # Extract all "..." quoted strings
     items = re.findall(r'"([^"]+)"', body)
     return items

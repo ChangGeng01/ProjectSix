@@ -71,15 +71,30 @@ def _build_feature_names() -> list[str]:
 
 FEATURE_NAMES = _build_feature_names()
 
-# Compile-time invariant: alphabet sums to feature count.
+# M665 chapter 一百八十四 deep-review fix C3 (HIGH): replace
+# `assert` with a real raise. Python `-O` strips asserts, which
+# would silently bypass this drift gate. Real RuntimeError can't
+# be optimized away.
 _alphabet_sum = (
     len(TONES) + len(DOMAINS) + len(STAKES) + len(TIMEFRAMES)
     + len(CONFIDANTS) + len(ASKSHAPES) + len(MUTATIONS)
 )
-assert _alphabet_sum == FEATURE_COUNT == len(FEATURE_NAMES), (
-    f"Schema dimension drift: alphabet={_alphabet_sum}, "
-    f"FEATURE_COUNT={FEATURE_COUNT}, names={len(FEATURE_NAMES)}"
-)
+if _alphabet_sum != FEATURE_COUNT or len(FEATURE_NAMES) != FEATURE_COUNT:
+    raise RuntimeError(
+        "Schema dimension drift: "
+        f"tones={len(TONES)} domains={len(DOMAINS)} "
+        f"stakes={len(STAKES)} timeframes={len(TIMEFRAMES)} "
+        f"confidants={len(CONFIDANTS)} askshapes={len(ASKSHAPES)} "
+        f"mutations={len(MUTATIONS)} "
+        f"sum={_alphabet_sum} FEATURE_COUNT={FEATURE_COUNT} "
+        f"FEATURE_NAMES={len(FEATURE_NAMES)}"
+    )
+
+# M665 chapter 一百八十四 deep-review fix C5 (HIGH): single
+# source for verbosity_class threshold. Was hardcoded in 4
+# places (label fn default, train script print, CoreML metadata
+# write, Swift inference UI). Now imported once.
+VERBOSITY_THRESHOLD_CHARS = 1500
 
 
 def featurize_row(row: dict) -> list[float]:
@@ -109,7 +124,13 @@ def featurize_row(row: dict) -> list[float]:
     features += [1.0 if confidant == c else 0.0 for c in CONFIDANTS]
     features += [1.0 if ask_shape == a else 0.0 for a in ASKSHAPES]
     features += [1.0 if mutation_seed == m else 0.0 for m in MUTATIONS]
-    assert len(features) == FEATURE_COUNT
+    # M665 chapter 一百八十四 deep-review fix C3: hard-raise (not
+    # assert) so `python -O` can't strip the safety check.
+    if len(features) != FEATURE_COUNT:
+        raise RuntimeError(
+            f"featurize_row produced {len(features)} dims, "
+            f"expected {FEATURE_COUNT}"
+        )
     return features
 
 
@@ -133,18 +154,30 @@ def label_duration_ms(row: dict) -> float:
     return float(val) if val is not None else 0.0
 
 
-def label_verbosity_class(row: dict, threshold: int = 1500) -> int:
+def label_verbosity_class(
+    row: dict,
+    threshold: int = VERBOSITY_THRESHOLD_CHARS,
+) -> int:
     """Binary label: 1 if AFM body > threshold chars, else 0.
 
-    Threshold 1500 chars = chapter 175/176 corpus median (post-
-    chapter 一百八十一 audit). M661 5th CoreML head trains on
-    this label. Useful UI hint: 'this prompt likely produces a
-    long response' before LLM call completes.
+    Default threshold is `VERBOSITY_THRESHOLD_CHARS` (chapter 175/
+    176 corpus median, post-chapter 一百八十一 audit). M661 5th
+    CoreML head trains on this label. Useful UI hint: 'this prompt
+    likely produces a long response' before LLM call completes.
+
+    M665 chapter 一百八十四 deep-review fix C4 (HIGH): use
+    `float(val)` for type tolerance — string `"1500"` and float
+    `1500.0` and int `1500` all work consistently. Pre-fix,
+    `int("1.5e3")` raised ValueError but `float()` accepts it.
     """
     val = row.get("afmBodyLength")
     if val is None:
         return 0
-    return 1 if int(val) > threshold else 0
+    try:
+        return 1 if float(val) > threshold else 0
+    except (TypeError, ValueError):
+        # Truly malformed values count as short / unknown.
+        return 0
 
 
 def schema_summary() -> dict:
