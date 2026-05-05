@@ -21049,3 +21049,49 @@ Bare Gemma:
 
 **doctrine pin**: 训练 format 选择(M246 raw vs M247 chat-template)对**convergence + capability acquisition**影响巨大. M247 chat-template 4× 更好收敛 + 学到 markers. 这条 finding 对未来 fine-tune 工作有 doctrine 意义 — chat-template + 显式 system+user+model 边界比 raw concat 训练更高效.
 
+
+### 176.12 真 walkback I20 — AFM 阻塞是 macOS 26 架构限制, 不是 setup 问题 (M608 / 2026-05-05)
+
+User: "mac 已经有了 你试着跑一下" → AFM 仍 ModelManagerError 1026
+
+**实证(modelmanagerd 状态)**:
+- ✅ PID 683 modelmanagerd alive, 122:53 CPU 时间(长期运行 + 真 workload)
+- ✅ PID 28218 generativeexperiencesd alive
+- ✅ PID 8222 GenerativeExperiencesSafetyInferenceProvider alive (18:42 CPU)
+- ✅ Mac Settings → Apple Intelligence enabled
+- ✅ FoundationModels.framework 存在
+- 模型实际**已下载完毕**(daemon 处理过 workload, 不是 cold cache)
+
+**但 Mac CLI / swift run / xctest 仍 5/5 ModelManagerError 1026**.
+
+**真根因**(读 AFMTestSupport.swift + 实测多角度):
+> macOS 26's modelmanagerd **releases model assets when caller is not foreground** (`xctest from CLI hits this`).
+
+不是 Settings 没开 / 模型没下载 / cache 没暖, 是 **macOS 26 modelmanagerd 的 foreground-only architectural policy**:
+- ✅ 前台 GUI app(NSWorkspace.frontmost + visible NSWindow) → AFM 服务
+- ❌ CLI 进程 / xctest / swift run → 释放模型 → 1026 error
+
+这条**架构限制对 CLI 路径不可绕过**:
+- `open -a Xcode` 让 Xcode 前台 → swift run 子进程仍 background → 仍失败
+- `QINAO_FM_E2E=1 swift test` → xctest 永远不是 frontmost → 仍失败
+- `swift run -c release QinaoSampleHost` → terminal 子进程 → 仍失败
+
+**Walkback I20 — A2 阻塞性质矫正**:
+- chapter 175 §175.5: "AFM Pending hardware"
+- chapter 176 §176.4: "A2 still blocked at Apple Intelligence Settings"
+- chapter 176 §176.9 (M607): "Mac AI on, models likely still downloading"
+- **真相** (M608 实证): **macOS 26 foreground-only architectural policy** — 不是 setup, 是 OS-level enforcement
+
+**含义**:
+- A2 在 CLI / xctest / swift run 路径上**永远不可解阻**
+- 唯一路径: **foreground GUI app** (Mac SwiftUI app OR iPhone foreground UI invoked)
+- chapter 174 iPhone bench 即使 SampleHost.app 在 iPhone 前台, 也得**真注册 AFM organ + 真调 AFM body 路径**(当前 stub)
+
+**doctrine pin**: AFM E2E 测试 doctrine 应区分两种"unavailable":
+1. **Setup unavailable**: Settings off / models not downloaded / region not supported — 可解阻
+2. **Architectural unavailable**: CLI / xctest 进程身份 — **不可解阻**
+
+chapter 91 ship 的 `AFMTestSupport.skipIfAFMDegraded()` 把 #1 / #2 统一标"degraded" 是 lazy. 真 doctrine 应**显式区分** — #2 应永远 skip(no waste retrying), #1 应 retry-with-warmup 然后 skip.
+
+**Cumulative 21 chapters of honest correction continue** — chapter 156-176 maintained walkback discipline; this is I20.
+
