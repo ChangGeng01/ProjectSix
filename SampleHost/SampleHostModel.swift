@@ -470,6 +470,16 @@ final class SampleHostModel: ObservableObject {
     // policy cache; disagreement = doctrine drift signal.
     @Published private(set) var hybridBenchPermitPredictHits: Int = 0
     @Published private(set) var hybridBenchPermitPredictMisses: Int = 0
+    // M642 chapter 一百八十 — running mean absolute error of
+    // Length + Latency regression heads vs actual LLM outputs.
+    // Updated per-iter when LLM body returns; nil samples skipped.
+    // These ARE expected to be non-zero (regression heads are
+    // not 100% accurate; chapter 176 train MAE was ~479 chars
+    // and ~2091 ms) — bench just records empirical residuals.
+    @Published private(set) var hybridBenchLengthMAESum: Double = 0
+    @Published private(set) var hybridBenchLengthMAECount: Int = 0
+    @Published private(set) var hybridBenchLatencyMAESumMs: Double = 0
+    @Published private(set) var hybridBenchLatencyMAECount: Int = 0
     @Published private(set) var hybridBenchOutputPath: String = ""
     @Published private(set) var hybridBenchStartTime: Date?
     @Published private(set) var hybridBenchLastError: String?
@@ -1619,6 +1629,24 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let permitPredictBlockProb: Double?
     let permitPredictClass: String?
     let permitPredictAgreement: Bool?
+    // M638-M641 chapter 一百八十 — 3rd + 4th CoreML heads:
+    // ChengluLengthHead (regression on AFM body chars) +
+    // ChengluLatencyHead (regression on AFM duration ms). Both
+    // run before LLM call as UI pre-warm hints. Recorded for
+    // empirical accuracy analysis: actualLength - predictedLength
+    // is the residual error per row.
+    // - lengthPredicted: predicted afmBodyLength chars (nil if
+    //   model unavailable)
+    // - lengthError: actual - predicted (nil if model or LLM
+    //   unavailable)
+    // - latencyPredictedMs: predicted afmDurationMs (nil if model
+    //   unavailable)
+    // - latencyErrorMs: actual - predicted (nil if model or LLM
+    //   unavailable)
+    let lengthPredicted: Double?
+    let lengthError: Double?
+    let latencyPredictedMs: Double?
+    let latencyErrorMs: Double?
 }
 
 /// M628 chapter 一百七十八 — typed policy mapping
@@ -2001,6 +2029,11 @@ extension SampleHostModel {
         // M635 chapter 一百七十九 reset
         hybridBenchPermitPredictHits = 0
         hybridBenchPermitPredictMisses = 0
+        // M642 chapter 一百八十 reset
+        hybridBenchLengthMAESum = 0
+        hybridBenchLengthMAECount = 0
+        hybridBenchLatencyMAESumMs = 0
+        hybridBenchLatencyMAECount = 0
         hybridBenchLastError = nil
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
@@ -2117,6 +2150,18 @@ extension SampleHostModel {
                         self.hybridBenchPermitPredictMisses += 1
                     }
                 }
+
+                // M638-M641 chapter 一百八十 — 3rd + 4th CoreML
+                // heads. Predict AFM body length + AFM duration ms
+                // BEFORE LLM call. Doctrine pin: prediction is
+                // observability only; LLM call always proceeds
+                // (red line #1: 先醒再答 + #2: 神经不掌权).
+                let lengthDecision = ChengluRegressionHeadInference
+                    .lengthHead.predictOrNil(features: features)
+                let latencyDecision = ChengluRegressionHeadInference
+                    .latencyHead.predictOrNil(features: features)
+                let lengthPredicted = lengthDecision?.predicted
+                let latencyPredictedMs = latencyDecision?.predicted
 
                 // Call chosen LLM
                 var firstTriedLLM = routerRoute.rawValue
@@ -2440,6 +2485,30 @@ extension SampleHostModel {
                 }
 
                 let dur = Date().timeIntervalSince(t0)
+
+                // M642 chapter 一百八十 — compute regression
+                // residuals against actual LLM outputs (firstBody
+                // length + firstDurationMs). Skipped iters
+                // (llmSkipped == true) have no real LLM output to
+                // compare against — skip residual computation.
+                var lengthError: Double? = nil
+                var latencyErrorMs: Double? = nil
+                if !llmSkipped, !firstBody.isEmpty {
+                    if let pred = lengthPredicted {
+                        let actual = Double(firstBody.count)
+                        let err = actual - pred
+                        lengthError = err
+                        self.hybridBenchLengthMAESum += abs(err)
+                        self.hybridBenchLengthMAECount += 1
+                    }
+                    if let pred = latencyPredictedMs {
+                        let err = firstDurationMs - pred
+                        latencyErrorMs = err
+                        self.hybridBenchLatencyMAESumMs += abs(err)
+                        self.hybridBenchLatencyMAECount += 1
+                    }
+                }
+
                 let row = SampleHostHybridBenchRow(
                     timestamp: SampleHostBenchHelpers.iso8601(Date()),
                     iteration: iter,
@@ -2474,7 +2543,11 @@ extension SampleHostModel {
                     postLLMShifted: postLLMShifted,
                     permitPredictBlockProb: permitPredictBlockProb,
                     permitPredictClass: permitPredictClass,
-                    permitPredictAgreement: permitPredictAgreement)
+                    permitPredictAgreement: permitPredictAgreement,
+                    lengthPredicted: lengthPredicted,
+                    lengthError: lengthError,
+                    latencyPredictedMs: latencyPredictedMs,
+                    latencyErrorMs: latencyErrorMs)
                 do {
                     try await runner.appendRow(row)
                 } catch {

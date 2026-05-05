@@ -112,6 +112,7 @@
 		3961A033BC0325AE93B59910 /* DecisionEvolutionAttentionSignal.swift in Sources */ = {isa = PBXBuildFile; fileRef = CADB7615D8F88530E8BCF7DD /* DecisionEvolutionAttentionSignal.swift */; };
 		39A0B1DE4990595E6C7031C1 /* WatchHandoffCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D165C4A6D28879BC0C05145E /* WatchHandoffCoordinator.swift */; };
 		39E5EE8D94AF2B2DA54359A5 /* BeforeAppModelSessionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E7B78104E60CAE23AD7F781 /* BeforeAppModelSessionEngineTests.swift */; };
+		3A35664A445AA5A23AF6F468 /* ChengluLatencyHead_v0.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 5042BAA99B7F37C9D61383B2 /* ChengluLatencyHead_v0.mlpackage */; };
 		3A536076524917B7933F03D0 /* BeforeProductLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3115645CBF28E432F77BE1E /* BeforeProductLanguage.swift */; };
 		3AABB9AFB831AA7B13639358 /* LetGoMotionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DCE2D1CD25FF7CBFD9046C5 /* LetGoMotionMonitor.swift */; };
 		3B089C46951F800EED544905 /* InterventionTemplateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C1B1878D0199AC35774967 /* InterventionTemplateStore.swift */; };
@@ -243,6 +244,7 @@
 		7EA2E6F09A1E6B83B0CBEBF6 /* DecisionEvolutionControlInteractionMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7114FCB6BB7DF1755F774393 /* DecisionEvolutionControlInteractionMode.swift */; };
 		7ECBAF3634F4DA96F69DA40C /* DecisionEvolutionMutationIntentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3CD847D546C2A16BB784521 /* DecisionEvolutionMutationIntentTests.swift */; };
 		7F10177EA6726A9ECC93531E /* LocalModelAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F476A392EB99124E0CBDBF /* LocalModelAdapter.swift */; };
+		7FD7C2C73406E3199A268BC1 /* CoreMLRegressionHeads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 795168677E23AA021AF324E7 /* CoreMLRegressionHeads.swift */; };
 		803A163B61B327AD0E611DEE /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAFAB4D7AB512041EFC3A51F /* OnboardingView.swift */; };
 		8160EF7C9019AAF6B6D48F76 /* DecisionSessionEnginePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 697DC7A2CCD5C2154A714DA5 /* DecisionSessionEnginePresentationTests.swift */; };
 		8341B3116B5153BCDD7CE471 /* DecisionEvolutionMutationIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E392A2D0AE2CA893D917F1FB /* DecisionEvolutionMutationIntent.swift */; };
@@ -431,6 +433,7 @@
 		E4E307C29DC37CDB3C88DB3F /* BalanceBoardSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A240A4A08405C8D91821CD /* BalanceBoardSession.swift */; };
 		E66DABC430EF98A944153C58 /* GemmaLocalRuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C202B77A6D3DD97C78CDC6F /* GemmaLocalRuntimeBridge.swift */; };
 		E66E1D9557452208BD2DB5A3 /* SharedLifeStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28C38C791E2C0F608142BBA /* SharedLifeStoreTests.swift */; };
+		E711A34618BEA09E220AACB0 /* ChengluLengthHead_v0.mlpackage in Resources */ = {isa = PBXBuildFile; fileRef = 897FB3064BB9C965DFCEA8B5 /* ChengluLengthHead_v0.mlpackage */; };
 		E79C33979E66AE0AAB611471 /* LetGoContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B72D5126B9C441ACCC72B5 /* LetGoContext.swift */; };
 		E86301EA0C43918C3B37E1C6 /* ReminderSelectionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7152E91B0D3E0D96AA280B51 /* ReminderSelectionPolicyTests.swift */; };
 		E87D34B9E9764CA383535A2C /* MirrorWorkspaceLens.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4255DC66F4292E701DAF678 /* MirrorWorkspaceLens.swift */; };
@@ -655,6 +658,7 @@
 		4FC15551C8847566B4860806 /* BeforePreferencesStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforePreferencesStoreTests.swift; sourceTree = "<group>"; };
 		4FDA1C9BA9969C09D3C5C65C /* DecisionEvolutionReleaseSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionReleaseSummaryView.swift; sourceTree = "<group>"; };
 		50367995DE2C2666ECEB7A15 /* DecisionSessionEngineActionBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSessionEngineActionBarView.swift; sourceTree = "<group>"; };
+		5042BAA99B7F37C9D61383B2 /* ChengluLatencyHead_v0.mlpackage */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.mlpackage; path = ChengluLatencyHead_v0.mlpackage; sourceTree = "<group>"; };
 		50BBFB705151929784197F63 /* DecisionEvolutionTrailPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionTrailPolicy.swift; sourceTree = "<group>"; };
 		5263B35DEB9254806060CCA3 /* EntrySource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntrySource.swift; sourceTree = "<group>"; };
 		546368DC120CDB70926CB195 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
@@ -715,6 +719,7 @@
 		76AB44BEB7E3B914370809DB /* DecisionSessionEngineControlMergeReviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSessionEngineControlMergeReviewCard.swift; sourceTree = "<group>"; };
 		788D0A8A1D8137BDA6A5EDE0 /* BeforeBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeforeBackground.swift; sourceTree = "<group>"; };
 		78C49F3E360B8716740D4806 /* DecisionEvolutionPilotControlPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionPilotControlPanel.swift; sourceTree = "<group>"; };
+		795168677E23AA021AF324E7 /* CoreMLRegressionHeads.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoreMLRegressionHeads.swift; sourceTree = "<group>"; };
 		79FE2701FB38D185371AA573 /* ScenarioType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioType.swift; sourceTree = "<group>"; };
 		7ACE14AA595C9EA5B7FEB035 /* ActiveDecisionWorkspaceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveDecisionWorkspaceStore.swift; sourceTree = "<group>"; };
 		7AE75E02F04EBA937CA1B8A3 /* LetGoMotionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LetGoMotionDetector.swift; sourceTree = "<group>"; };
@@ -739,6 +744,7 @@
 		876A79134ED77794D35A6D75 /* DecisionEvolutionNavigationActionRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionNavigationActionRowTests.swift; sourceTree = "<group>"; };
 		87EEA20A63C42FBEC22B0C95 /* InterventionPredictionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterventionPredictionEngine.swift; sourceTree = "<group>"; };
 		8803C58B37023CB5C616CD7C /* DecisionMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionMode.swift; sourceTree = "<group>"; };
+		897FB3064BB9C965DFCEA8B5 /* ChengluLengthHead_v0.mlpackage */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.mlpackage; path = ChengluLengthHead_v0.mlpackage; sourceTree = "<group>"; };
 		89976181A6C6D07117C3220F /* GemmaE4BIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaE4BIntelligenceService.swift; sourceTree = "<group>"; };
 		8B39FD863F2DEF066F88FCF7 /* DecisionSessionEngineReviewDetailListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSessionEngineReviewDetailListView.swift; sourceTree = "<group>"; };
 		8B45BDE0A0AC8F56688BBF51 /* InferenceBackendPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InferenceBackendPolicy.swift; sourceTree = "<group>"; };
@@ -1002,6 +1008,9 @@
 				29BF07481065322B1013EF65 /* qinao_curriculum_lora_m247.safetensors */,
 				698BFFB91101DDC1E0009679 /* ChengluPermitPredict_v0.mlpackage */,
 				19B757A01FE81D84D6483830 /* CoreMLPermitPredictInference.swift */,
+				897FB3064BB9C965DFCEA8B5 /* ChengluLengthHead_v0.mlpackage */,
+				5042BAA99B7F37C9D61383B2 /* ChengluLatencyHead_v0.mlpackage */,
+				795168677E23AA021AF324E7 /* CoreMLRegressionHeads.swift */,
 			);
 			path = SampleHost;
 			sourceTree = "<group>";
@@ -1782,6 +1791,8 @@
 				9BE148B3DD53F13CAE65F59A /* ChengluPreflight_v0.mlpackage in Resources */,
 				C2993168CFBFFA85B73654A3 /* qinao_curriculum_lora_m247.safetensors in Resources */,
 				615BB35B2C23EB29A888044C /* ChengluPermitPredict_v0.mlpackage in Resources */,
+				E711A34618BEA09E220AACB0 /* ChengluLengthHead_v0.mlpackage in Resources */,
+				3A35664A445AA5A23AF6F468 /* ChengluLatencyHead_v0.mlpackage in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1805,6 +1816,7 @@
 				653C40C37DE5E0003F3BD458 /* SampleHostView.swift in Sources */,
 				FEF537E69FF335A26C156992 /* CoreMLPreflightInference.swift in Sources */,
 				0EBBB3AF4842A4CC6FD11156 /* CoreMLPermitPredictInference.swift in Sources */,
+				7FD7C2C73406E3199A268BC1 /* CoreMLRegressionHeads.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

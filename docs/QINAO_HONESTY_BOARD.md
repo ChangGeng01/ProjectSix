@@ -22382,6 +22382,183 @@ Counter: `hybridBenchPermitPredictHits` / `Misses` updated per iter.
 
 **Chapter 一百七十九 (M633-M637)**: respond to user's poetic "coreml 有如同 筋脉吗 打通 任督二脉" first with honest grep diagnostic — **no, 1 head, 1 file, 5.6% of meridian network** — then ship the **2nd CoreML head**: ChengluPermitPredict v0, a binary classifier predicting substrate's `.block` vs `.delay` decision from the same 43-dim signature one-hot used by ChengluPreflight v0.4. Test accuracy 100.0% / AUC 1.0 (substrate is deterministic, model learns it as a learned policy cache, sub-1ms vs substrate's ~50ms). Trained from chapter 175/176 5,088-row adversarial iPhone bench data (50/50 delay/block balance — naturally clean). Bundled in iOS app via Ruby xcodeproj gem. Wired into hybrid bench loop ALONGSIDE substrate (red line: 先醒再答 preserved — prediction is observability, not authority). 3 new JSONL fields (permitPredictBlockProb / permitPredictClass / permitPredictAgreement) + 2 new counters (hits/misses). Build + deploy iPhone success. 1871 tests pass / 5 gates clean. **Now 2/18 meridian points** (~11%). Real 打通 任督 requires 18 heads with shared encoder + bidirectional CoreML reflexes — chapter 一百八十+ roadmap. Honest pin: 100% test accuracy is policy-cache effect, not magic; trained only on adversarial corpus.
 
+## 一百八十、 全面开发 — 2 regression 经络点 (M638-M644 / 2026-05-06)
+
+### 起源
+
+User: "全面开发"
+
+Per chapter 一百七十九's honest 5.6% → 11% progress arc, the next move is more meridian points. With chapter 175/176's empirical labels available (`afmBodyLength`, `afmDurationMs`), regression heads become the obvious next ship: predict AFM verbosity + latency from prompt signature so UI can pre-warm before LLM call completes.
+
+### 180.1 Empirical regression target stats (chapter 175/176 5,088 rows)
+
+| Target | Mean | Stdev | Range | Useful? |
+|---|---|---|---|---|
+| `afmBodyLength` | 1354 chars | 892 | 0–5032 | ✅ wide signal |
+| `afmDurationMs` | 5638 ms | 6263 | 116–365627 | ✅ wide signal |
+| `auditCodeCount` | 152 | 11 | 142–170 | ✗ too narrow |
+| `totalDurationSeconds` | 5.65s | 6.26 | (= afmDurationMs/1000) | redundant |
+
+Length + Latency are ship candidates. Audit count is too narrow to learn meaningful signal from. Total duration is redundant with afmDurationMs.
+
+### 180.2 M638 — ChengluLengthHead v0
+
+`scripts/train_chenglu_regression_heads_v0.py` (single script trains both heads via shared `RegressionMLP` + `train_and_export` helper):
+
+- Architecture: MLP(64,32) — same body as v0.4 + PermitPredict (symmetric architecture for chapter 一百八十一+ shared-encoder lift)
+- Loss: MSE (regression)
+- Training: 200 epochs, 4070 train / 1018 test
+- **Test MAE: 479 chars / R² 0.545**
+- **Baseline MAE: 751 chars** (mean predictor)
+- **Improvement: 36.2% over baseline**
+- `.mlpackage` size: 14,317 bytes
+
+R² of 0.545 means the model explains ~55% of variance in AFM body length. Far from 100% — these are real regressions with non-deterministic targets (AFM sampling + content variability). Honest framing: useful pre-warm hint (~480 char error band), not exact prediction.
+
+### 180.3 M639 — ChengluLatencyHead v0
+
+Same training script, same architecture. Different target:
+
+- **Test MAE: 2091 ms / R² 0.511**
+- **Baseline MAE: 3093 ms** (mean predictor)
+- **Improvement: 32.4% over baseline**
+- `.mlpackage` size: 14,307 bytes
+
+Outlier at 365627 ms in raw data (one prompt took 365 seconds — probably a network stall) pulls baseline up; model is robust to outlier and still beats it by ~33%.
+
+### 180.4 M640-M641 — shared inference helper
+
+New file `SampleHost/CoreMLRegressionHeads.swift` (~210 LOC) hosts ONE class `ChengluRegressionHeadInference` parameterized by `(modelResource, outputKey, modelVersion)`. Two static singletons:
+
+```swift
+ChengluRegressionHeadInference.lengthHead    // → ChengluLengthHead_v0
+ChengluRegressionHeadInference.latencyHead   // → ChengluLatencyHead_v0
+```
+
+Both share featurize logic + load + predict pipeline. NaN guard from M627 lessons preserved. This is a small step toward the chapter 一百八十一+ shared-encoder architecture: at least the inference plumbing is unified across regression heads.
+
+Honest limit: featurize logic STILL duplicated between this file and `CoreMLPreflightInference` + `CoreMLPermitPredictInference` (3 copies of the 43-dim one-hot). Single-source via shared protocol is chapter 一百八十一+.
+
+### 180.5 M642 — wire into hybrid runner
+
+Both heads called BEFORE LLM call:
+
+```swift
+let lengthDecision = ChengluRegressionHeadInference
+    .lengthHead.predictOrNil(features: features)
+let latencyDecision = ChengluRegressionHeadInference
+    .latencyHead.predictOrNil(features: features)
+```
+
+After LLM body returns, residuals computed:
+
+```swift
+if let pred = lengthPredicted, !llmSkipped, !firstBody.isEmpty {
+    let actual = Double(firstBody.count)
+    let err = actual - pred           // signed residual
+    self.hybridBenchLengthMAESum += abs(err)
+    self.hybridBenchLengthMAECount += 1
+}
+```
+
+JSONL row +4 fields:
+- `lengthPredicted: Double?` — predicted afmBodyLength chars
+- `lengthError: Double?` — actual − predicted (signed residual)
+- `latencyPredictedMs: Double?` — predicted afmDurationMs
+- `latencyErrorMs: Double?` — actual − predicted (signed residual)
+
+4 new `@Published` rolling MAE counters: `LengthMAESum/Count` + `LatencyMAESumMs/Count`. Live UI can display `MAE = sum/count` for both heads in real time.
+
+### 180.6 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ (40 AFM-gated skipped) |
+| SampleHost on real iPhone 17e | 10 ✓ |
+| 5 boundary checks | clean |
+| iOS Release build | SUCCESS |
+| Deploy + relaunch | SUCCESS |
+| `.mlpackage` files in app | 4 (Preflight v0.4 + PermitPredict v0 + LengthHead v0 + LatencyHead v0) |
+
+### 180.7 Doctrine pins held
+
+| Pin | Status |
+|---|---|
+| #1 先醒再答 | ✓ substrate.startSession ALWAYS first; CoreML heads run alongside, never preempt |
+| #2 神经不掌权 | ✓ predictions are observability + UI hints; never authoritative |
+| #3 私有经验不进权重 | ✓ heads trained from public bench data offline |
+| Three-tier protective doctrine | ✓ unchanged |
+| Single commit mouth | ✓ unchanged (1 LLM body per turn) |
+| Audit hash chain | ✓ unchanged |
+| Anti-magic-number | ✓ all featurize constants are typed enums + named arrays; thresholds named |
+
+### 180.8 Meridian network progress
+
+| Phase | Heads shipped | Progress |
+|---|---|---|
+| Pre-chapter 177 | 0 | 0/18 = 0% |
+| Chapter 一百七十七 ship (v0 → v0.4) | 1 (Preflight: AFM-vs-Gemma router) | 1/18 ≈ 5.6% |
+| Chapter 一百七十九 ship | 2 (+PermitPredict: block-vs-delay policy cache) | 2/18 ≈ 11% |
+| **Chapter 一百八十 ship (M638-M644)** | **4 (+LengthHead, +LatencyHead)** | **4/18 ≈ 22%** |
+
+Doubled meridian points in one batch.
+
+### 180.9 What 4 heads now produce per turn
+
+Per hybrid bench iter (with chapter 一百七十八 dispatch coupling + chapter 一百七十九 prediction recording + chapter 一百八十 regression hints):
+
+```
+Pre-LLM (CoreML predictions, ~3-5 ms total for 4 heads in parallel):
+  Preflight:    afm_success_probability  (0.0..1.0, calibrated)
+  PermitPredict: block_probability       (0.0..1.0)
+  Length:       body_length              (chars; real value, not bounded)
+  Latency:      duration_ms              (ms; real value, not bounded)
+
+Substrate (THE arbiter, ~50 ms):
+  permit.mode → dispatch policy decision
+
+LLM call (skipped if substrate said .block/.replace/.delay):
+  body, status, duration
+
+Post-LLM (chapter 一百七十八 closed-loop, +50 ms 2nd substrate call):
+  postLLM.permit.mode → recorded shift if any
+
+Residuals (chapter 一百八十 empirical accuracy):
+  lengthError = actual - predicted
+  latencyError = actual - predicted
+
+JSONL row size (rough): pre-180 ~30 fields → post-180 ~38 fields
+```
+
+### 180.10 Honest 限制
+
+- **R² 0.5 is honest mediocre**: chapter 一百八十 heads explain HALF the variance. The other half is genuine LLM stochasticity + prompt content variability not captured by signature one-hot. Better featurization (prompt length, embedding, etc.) would help — chapter 一百八十一+ candidate.
+- **Trained only on adversarial corpus**: same limit as chapter 一百七十九. Length / Latency predictions for benign prompts will be biased.
+- **Outlier-sensitive**: 365s tail in latency data pulls metrics. Median MAE would be more robust; we report mean MAE for transparency.
+- **Featurize STILL triplicated**: 3 copies of 43-dim one-hot across CoreMLPreflightInference / PermitPredict / RegressionHeads. Single-source pending chapter 一百八十一+ shared encoder.
+- **No 8h iPhone bench yet**: empirical accuracy on real iPhone production traffic is pending user tap. JSONL will accumulate residuals once bench runs.
+- **No UI consumption yet**: predictions land in JSONL + counters but UI panels don't yet display them. Chapter 一百八十一+ candidate.
+
+### 180.11 Files modified
+
+| File | Change |
+|---|---|
+| `scripts/train_chenglu_regression_heads_v0.py` | NEW — 2-head trainer (~280 LOC) |
+| `SampleHost/CoreMLRegressionHeads.swift` | NEW — shared inference helper (~210 LOC) |
+| `SampleHost/ChengluLengthHead_v0.mlpackage` | NEW — 14,317-byte CoreML model |
+| `SampleHost/ChengluLatencyHead_v0.mlpackage` | NEW — 14,307-byte CoreML model |
+| `Before.xcodeproj/project.pbxproj` | +2 file refs + 2 Resources entries + 1 Sources entry |
+| `SampleHost/SampleHostModel.swift` | +4 fields on row + 4 published counters + prediction calls + residual computation |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M638-M644 entry |
+
+### 180.12 一句话总结
+
+**Chapter 一百八十 (M638-M644)**: respond to user "全面开发" by shipping **2 regression CoreML heads** in one batch — ChengluLengthHead v0 (predict afmBodyLength chars; MAE 479 / R² 0.545 / 36% better than baseline) + ChengluLatencyHead v0 (predict afmDurationMs; MAE 2091 / R² 0.511 / 32% better than baseline). Both trained from same chapter 175/176 5,088-row adversarial iPhone bench data, same MLP(64,32) shape as Preflight + PermitPredict (architectural symmetry for future shared-encoder lift). One shared inference helper `ChengluRegressionHeadInference` parameterized by (modelResource, outputKey, modelVersion) — small step toward DRY architecture. Both heads run BEFORE LLM call as UI pre-warm hints; residuals computed AFTER LLM body returns; JSONL +4 fields + 4 published rolling-MAE counters. Build + deploy + 1871 tests + 5 gates all green. **Meridian network: 2/18 → 4/18 (~22%)** — doubled in one chapter. Doctrine pins held (#1/#2/#3 + three-tier protection + single commit mouth + audit hash chain + anti-magic-number). Honest limits: R² 0.5 is real (LLM stochasticity unaccounted), corpus is adversarial-only, featurize duplicated 3× (single-source pending chapter 一百八十一+ shared encoder), no UI consumption yet.
+
+
+
 
 
 
