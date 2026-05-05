@@ -1196,3 +1196,13 @@ SampleHost tests 71 → **74**; full stack **1951 + 1 parity gate + 3 analysis t
 - **M750** +2 fix-pin tests (resume restores settings + starts bench / resume with no checkpoint = no-op).
 
 SampleHost tests 74 → **76**; full stack **1953 + 1 parity gate + 3 analysis tools, 0 failures**. Session shipped: chapters 192-199 (21 milestones M716-M750, 5 chapters in 1 session).
+
+## 2026-05-06 — chapter 二百 (M751-M755) synthetic loop closure smoke
+
+- **M751** NEW `scripts/synthesize_corpus.py` — generates 200 chapter 175/176-style base-corpus rows + 200 chapter 192 schema v9 hybrid bench rows in canonical schemas.
+- **M752** End-to-end pipeline verified: synthesize → `bench_to_train.py` (full mode with --base-corpus + --output + --require-bench-rows 50) → emits `ChengluMultiHead_v0_5_synthetic.mlpackage` (24K, MIL program). 100% bench retention, augmented corpus 200+200=400, 25 pressure-stratified buckets reported.
+- **M753** v0.5_synthetic.mlpackage structure verified: inputs=[features], outputs=[afm_success_prob, block_prob, length_norm, latency_norm, verbosity_prob], input shape [1, 43].
+- **M754** NEW `scripts/verify_v0_5_synthetic.py` loads via coremltools + runs synthetic predict via `ChengluFeatureEncoder.featurize_row` → SUCCESS. All 5 outputs return valid (1, 1) float arrays.
+- **M755** Doctrine pin: **synthetic-trained model is doctrine-REFUSED for production bundle**. Synthetic data is mechanically valid but not statistically representative. Real iPhone bench with LLM responses is THE only remaining blocker for real-data loop closure.
+
+Self-improvement loop now mechanically validated end-to-end. SampleHost tests 76 still green; full stack 1953 + 1 parity gate + 5 analysis tools, 0 failures. Pipeline runs in ~10s.
