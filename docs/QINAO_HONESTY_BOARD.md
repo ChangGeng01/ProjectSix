@@ -22284,5 +22284,105 @@ This is what "极致闭环" means in code: the substrate isn't an opinion that g
 
 **Chapter 一百七十八 全面打通真实推理通道 (M628-M632)**: respond to user "全面打通真实推理通道 14 层电子脑 + afm + Gemma 4 e2b 极致闭环 反复压榨" by closing the structural gap where substrate's `actionPermit.mode` was advisory, not load-bearing. Ship 6-case `SampleHostHybridDispatchPolicy` typed enum mapping each `BASActionPermitMode` to real LLM dispatch behavior: 3 skip modes (block / replace / delay) prevent LLM call entirely + return typed canned responses; 2 dual-call modes (compare / escalate) force both AFM + Gemma; 1 local-only mode forces Gemma only; 1 draft-only mode tags output. Post-LLM substrate observation pass closes the loop — substrate audits its own LLM body and records permit-mode shift. 7 new published counters surface coupling live. JSONL schema +7 fields capture every dispatch decision for empirical analysis. **每个 permit mode 都 load-bearing**. 1871 tests pass / 5 gates clean / iPhone deployed. Throughput cost: ~halves iter rate (substrate calls doubled). Cost worth it for first time substrate is structurally — not advisorily — coupled to LLM dispatch. Honest limit: 8h empirical bench user-pending; throughput halved; canned responses minimal; ShadowEvaluator full ML scorer is chapter 一百八十+.
 
+## 一百七十九、 CoreML 2nd 经络点 — ChengluPermitPredict v0 (M633-M637 / 2026-05-06)
+
+### 起源 — 任督二脉的诊断
+
+User: "coreml 有如同 筋脉吗 打通 任督二脉"
+
+Honest grep audit answered: **no, far from**. Single .mlpackage in our code (ChengluPreflight_v0); 1 Swift file using MLModel; 0 CoreML usage in 15 BAS substrate modules; 0 in 16 Qinao SDK packages. CoreML was 1 acupuncture point, not flowing channels.
+
+### 179.1 任督 mapping
+
+| 脉 | 在哪 | 现在 CoreML | 目标 |
+|---|---|---|---|
+| **督脉** (governance/yang/spine) | substrate 14 层 + permit + verdict + audit | 0 heads | 8 reflex heads (L1/L4/L6/L7/L9/L10/L11/L12) |
+| **任脉** (generation/yin/front) | AFM + Gemma + LLM body production | 0 heads | 4 review heads (quality/halluc/sycoph/safety) |
+| **gate** (任督交汇) | substrate→LLM dispatch decision | 1 head ✓ | retain (router) |
+
+Pre-M633 progress: **1/18 = 5.6%**. M628/M630 connected the two vessels logically (substrate's permit shapes LLM dispatch + LLM body flows back as substrate observation), but the connection itself is substrate-call-based, not CoreML-based.
+
+### 179.2 M633 — train 2nd head
+
+`scripts/train_chenglu_permit_predict_v0.py` trains binary classifier predicting substrate's `.block` vs `.delay` from same 43-dim signature one-hot used by ChengluPreflight v0.4.
+
+- Same MLP(64,32) architecture as v0.4 — symmetric body for future shared-encoder lift
+- Training data: chapter 175/176 5,088-row iPhone bench JSONL (50.4% delay / 49.6% block — naturally balanced adversarial corpus)
+- **Test accuracy: 100.0% (1018 rows). AUC: 1.0000.**
+
+Honest framing of the 100% — this is NOT magic prediction. Substrate's permit decision is deterministic from signature features (substrate's L11 risk gate is a known-rules engine). The CoreML model is essentially **a learned policy cache** — fast lookup of substrate's deterministic rule, sub-1ms vs substrate's ~50ms. Useful as:
+1. UI pre-warm (show predicted dispatch policy before substrate finishes)
+2. Doctrine drift detector (if substrate disagrees with cache, substrate has changed)
+3. Architecture pattern proof for future shared-encoder + multi-head
+
+Output `.mlpackage` size: **14,599 bytes** (similar order-of-magnitude as ChengluPreflight v0.4's 14,422 bytes — same MLP shape).
+
+### 179.3 M634 — bundle in iOS app
+
+Added via Ruby xcodeproj gem to `Before.xcodeproj`:
+- File reference `ChengluPermitPredict_v0.mlpackage` in SampleHost group
+- Resources build phase entry
+- New source `CoreMLPermitPredictInference.swift` in SampleHost Sources
+
+### 179.4 M635 — wire into hybrid runner
+
+New `ChengluPermitPredictInference` `@MainActor` class mirrors `ChengluPreflightInference` shape (same 43-dim featurize, same `predictOrNil` convenience pattern, same NaN guard from M627 review).
+
+Hybrid bench loop now runs `ChengluPermitPredictInference.shared.predictOrNil(features:)` **alongside** substrate (substrate already ran first per 不变量 #1 先醒再答). Records:
+- `permitPredictBlockProb: Double?` — probability of `.block` from CoreML
+- `permitPredictClass: String?` — `block` / `non-block` predicted class
+- `permitPredictAgreement: Bool?` — whether predicted class matches substrate's actual `.block` decision
+
+Counter: `hybridBenchPermitPredictHits` / `Misses` updated per iter.
+
+### 179.5 M636 — verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ (40 AFM-gated skipped) |
+| SampleHost on real iPhone 17e | 10 ✓ |
+| 5 boundary checks | clean |
+| iOS Release build | SUCCESS |
+| Deploy + relaunch on iPhone 17e | SUCCESS |
+
+### 179.6 Doctrine pins held
+
+| Pin | Status |
+|---|---|
+| #1 先醒再答 | ✓ substrate.startSession runs FIRST; CoreML prediction runs alongside, never preempts |
+| #2 神经不掌权 | ✓ prediction is observability only; substrate's permit is the load-bearing decision |
+| #3 私有经验不进权重 | ✓ trained from public bench data; no online weight update |
+| Three-tier protective doctrine | ✓ unchanged |
+| Single commit mouth | ✓ unchanged |
+| Audit hash chain | ✓ unchanged |
+| Anti-magic-number | ✓ all featurize constants are typed enums + named arrays |
+
+### 179.7 Honest limits
+
+- **Trained on adversarial corpus only**: 5,088 rows are intentionally high-charge tones × high-stake scenarios. Generalization to benign prompts NOT validated. v0.x will overfit substrate's deterministic rule for THIS corpus.
+- **100% test accuracy is policy-cache, not magic**: see §179.2. Don't read this as "ChengluPermitPredict is more accurate than substrate" — it's just a fast lookup of substrate's deterministic rule.
+- **Still 2/18 of meridian network**: progress is incremental. Real "打通 任督二脉" requires (a) full 18-head architecture (b) shared encoder pattern (c) 任 side (output review) heads. Chapter 一百八十+ candidates.
+- **Feature schema duplication**: ChengluPermitPredictInference.featurize duplicates the 43-dim one-hot from ChengluPreflightInference. v1 will single-source via shared protocol. v0 keeps duplication for header-only encapsulation.
+- **No train-time validation against substrate divergence**: model trained on chapter 176 fixed substrate snapshot; if substrate's L11 rule changes mid-flight, agreement metric will surface drift but model itself becomes stale.
+
+### 179.8 Files modified
+
+| File | Change |
+|---|---|
+| `scripts/train_chenglu_permit_predict_v0.py` | NEW — 2nd-head trainer (~250 LOC) |
+| `SampleHost/CoreMLPermitPredictInference.swift` | NEW — 2nd-head inference helper (~230 LOC) |
+| `SampleHost/ChengluPermitPredict_v0.mlpackage` | NEW — 14,599-byte CoreML model |
+| `Before.xcodeproj/project.pbxproj` | +file ref + Sources phase entry + Resources phase entry |
+| `SampleHost/SampleHostModel.swift` | +3 fields on SampleHostHybridBenchRow + 2 published counters + prediction-vs-actual recording in bench loop |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M633-M637 entry |
+
+### 179.9 一句话总结
+
+**Chapter 一百七十九 (M633-M637)**: respond to user's poetic "coreml 有如同 筋脉吗 打通 任督二脉" first with honest grep diagnostic — **no, 1 head, 1 file, 5.6% of meridian network** — then ship the **2nd CoreML head**: ChengluPermitPredict v0, a binary classifier predicting substrate's `.block` vs `.delay` decision from the same 43-dim signature one-hot used by ChengluPreflight v0.4. Test accuracy 100.0% / AUC 1.0 (substrate is deterministic, model learns it as a learned policy cache, sub-1ms vs substrate's ~50ms). Trained from chapter 175/176 5,088-row adversarial iPhone bench data (50/50 delay/block balance — naturally clean). Bundled in iOS app via Ruby xcodeproj gem. Wired into hybrid bench loop ALONGSIDE substrate (red line: 先醒再答 preserved — prediction is observability, not authority). 3 new JSONL fields (permitPredictBlockProb / permitPredictClass / permitPredictAgreement) + 2 new counters (hits/misses). Build + deploy iPhone success. 1871 tests pass / 5 gates clean. **Now 2/18 meridian points** (~11%). Real 打通 任督 requires 18 heads with shared encoder + bidirectional CoreML reflexes — chapter 一百八十+ roadmap. Honest pin: 100% test accuracy is policy-cache effect, not magic; trained only on adversarial corpus.
+
+
+
 
 

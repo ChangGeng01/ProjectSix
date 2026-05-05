@@ -464,6 +464,12 @@ final class SampleHostModel: ObservableObject {
     // post-LLM substrate observation shifts permit mode (i.e.
     // LLM produced something that would have been blocked).
     @Published private(set) var hybridBenchPostLLMShifted: Int = 0
+    // M635 chapter 一百七十九 — 2nd CoreML head agreement counter.
+    // How often ChengluPermitPredict's class matches substrate's
+    // actual .block decision. High agreement = model is a faithful
+    // policy cache; disagreement = doctrine drift signal.
+    @Published private(set) var hybridBenchPermitPredictHits: Int = 0
+    @Published private(set) var hybridBenchPermitPredictMisses: Int = 0
     @Published private(set) var hybridBenchOutputPath: String = ""
     @Published private(set) var hybridBenchStartTime: Date?
     @Published private(set) var hybridBenchLastError: String?
@@ -1599,6 +1605,20 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let postLLMPermitMode: String?
     let postLLMAuditCodeCount: Int?
     let postLLMShifted: Bool?  // pre-LLM mode != post-LLM mode
+    // M633-M635 chapter 一百七十九 — 2nd CoreML head:
+    // ChengluPermitPredict predicts substrate's permit class from
+    // signature features. Runs alongside substrate (red line:
+    // never replaces). Records prediction-vs-actual agreement.
+    // - permitPredictBlockProb: model output probability ∈ [0,1]
+    // - permitPredictClass: "block" / "non-block" / nil if model
+    //   unavailable
+    // - permitPredictAgreement: nil if model unavailable;
+    //   else true if predicted class matches substrate's actual
+    //   permit-mode being .block (predicted=block && actual=block)
+    //   or both non-block.
+    let permitPredictBlockProb: Double?
+    let permitPredictClass: String?
+    let permitPredictAgreement: Bool?
 }
 
 /// M628 chapter 一百七十八 — typed policy mapping
@@ -1978,6 +1998,9 @@ extension SampleHostModel {
         hybridBenchSubstrateLocalOnly = 0
         hybridBenchSubstrateDraftOnly = 0
         hybridBenchPostLLMShifted = 0
+        // M635 chapter 一百七十九 reset
+        hybridBenchPermitPredictHits = 0
+        hybridBenchPermitPredictMisses = 0
         hybridBenchLastError = nil
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
@@ -2060,6 +2083,40 @@ extension SampleHostModel {
                 let dispatchPolicy =
                     SampleHostHybridDispatchPolicy.from(
                         permitMode: permitMode)
+
+                // M635 chapter 一百七十九 — 2nd CoreML head.
+                // Predicts substrate's .block class from signature
+                // features. Runs ALONGSIDE substrate (substrate
+                // already ran above; we have actual permitMode).
+                // The prediction is logged + agreement recorded;
+                // it does NOT replace substrate authority.
+                //
+                // 2nd meridian point: 1st head (ChengluPreflight)
+                // sits at substrate→LLM gateway; 2nd head sits in
+                // parallel to substrate itself. Two CoreML heads,
+                // two meridian points (2/18 of planned mesh).
+                let permitDecision = ChengluPermitPredictInference
+                    .shared.predictOrNil(features: features)
+                let permitPredictBlockProb =
+                    permitDecision?.blockProbability
+                let permitPredictClass =
+                    permitDecision?.predictedClass.rawValue
+                // Agreement: predicted class matches substrate's
+                // actual .block decision. nil if model unavailable.
+                let permitPredictAgreement: Bool? = {
+                    guard let predicted = permitDecision?
+                        .predictedClass else { return nil }
+                    let actualIsBlock = (permitMode == "block")
+                    let predictedIsBlock = (predicted == .block)
+                    return actualIsBlock == predictedIsBlock
+                }()
+                if let agree = permitPredictAgreement {
+                    if agree {
+                        self.hybridBenchPermitPredictHits += 1
+                    } else {
+                        self.hybridBenchPermitPredictMisses += 1
+                    }
+                }
 
                 // Call chosen LLM
                 var firstTriedLLM = routerRoute.rawValue
@@ -2414,7 +2471,10 @@ extension SampleHostModel {
                     llmSkipped: llmSkipped,
                     postLLMPermitMode: postLLMPermitMode,
                     postLLMAuditCodeCount: postLLMAuditCount,
-                    postLLMShifted: postLLMShifted)
+                    postLLMShifted: postLLMShifted,
+                    permitPredictBlockProb: permitPredictBlockProb,
+                    permitPredictClass: permitPredictClass,
+                    permitPredictAgreement: permitPredictAgreement)
                 do {
                     try await runner.appendRow(row)
                 } catch {
