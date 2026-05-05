@@ -524,14 +524,10 @@ struct SampleHostView: View {
             ? Double(model.hybridBenchPermitPredictHits)
                 / Double(permitTotal) * 100
             : 0
-        let lengthMAE = model.hybridBenchLengthMAECount > 0
-            ? model.hybridBenchLengthMAESum
-                / Double(model.hybridBenchLengthMAECount)
-            : 0
-        let latencyMAE = model.hybridBenchLatencyMAECount > 0
-            ? model.hybridBenchLatencyMAESumMs
-                / Double(model.hybridBenchLatencyMAECount)
-            : 0
+        // M689 chapter 一百八十八 — B8 retire: read Welford
+        // running mean directly (was: Sum/Count).
+        let lengthMAE = model.hybridBenchLengthMAERunning
+        let latencyMAE = model.hybridBenchLatencyMAERunningMs
         // M661 chapter 一百八十三 — 5th head accuracy.
         let verbosityTotal = model.hybridBenchVerbosityCorrect
             + model.hybridBenchVerbosityWrong

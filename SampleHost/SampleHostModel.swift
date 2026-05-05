@@ -513,18 +513,17 @@ final class SampleHostModel: ObservableObject {
     // These ARE expected to be non-zero (regression heads are
     // not 100% accurate; chapter 176 train MAE was ~479 chars
     // and ~2091 ms) — bench just records empirical residuals.
-    // M669 chapter 一百八十五 — B8 (HIGH): replace Sum-then-divide
-    // with Welford's online running-mean algorithm to avoid
-    // Double precision drift over 8h benches (~144K samples ×
-    // ~500 chars = ~72M magnitude near 2^26 — late-bench
-    // increments can lose precision under naive Sum/Count).
-    // Welford: mean += (x - mean) / count. Numerically stable.
-    // Old `*Sum` / `*Count` fields still exist as @Published for
-    // backward compat; UI now reads `*RunningMean` directly.
-    @Published private(set) var hybridBenchLengthMAESum: Double = 0
+    // M669 chapter 一百八十五 — B8: Welford online running mean.
+    // M689 chapter 一百八十八 — B8 retire (HIGH closed):
+    // removed legacy `*Sum` (kept Count for UI sample-count
+    // display + Running for the actual mean). Welford alone
+    // delivers the same metric with stable precision over 144K
+    // samples; Sum was redundant + drifted over 2^26 magnitude.
+    // Backward compat: JSONL row never had Sum/Count fields
+    // (those were @Published runtime-only), so retiring them
+    // doesn't break analysis tooling.
     @Published private(set) var hybridBenchLengthMAECount: Int = 0
     @Published private(set) var hybridBenchLengthMAERunning: Double = 0
-    @Published private(set) var hybridBenchLatencyMAESumMs: Double = 0
     @Published private(set) var hybridBenchLatencyMAECount: Int = 0
     @Published private(set) var hybridBenchLatencyMAERunningMs: Double = 0
     // M661 chapter 一百八十三 — 5th head agreement counters.
@@ -554,6 +553,31 @@ final class SampleHostModel: ObservableObject {
     // we must not clobber its true. Also defends against the old
     // task's final JSONL write racing the new task's runner.
     private var hybridBenchGeneration: Int = 0
+
+    /// M690 chapter 一百八十八 — B5-extended (HIGH) helper:
+    /// apply a mutating closure ONLY if the caller's generation
+    /// matches the current bench. Stale tasks (Stop→Start race
+    /// after they cancelled but before they exited mid-iter) get
+    /// no-op'd here instead of writing to fresh task's counters.
+    ///
+    /// Use:
+    /// ```swift
+    /// applyIfActive(myGen) {
+    ///     self.hybridBenchAFMOk += 1
+    /// }
+    /// ```
+    ///
+    /// vs pre-fix:
+    /// ```swift
+    /// self.hybridBenchAFMOk += 1  // pollutes new gen on race
+    /// ```
+    func applyIfActive(
+        _ myGen: Int,
+        _ mutate: () -> Void
+    ) {
+        guard hybridBenchGeneration == myGen else { return }
+        mutate()
+    }
 
     #if canImport(BASMLXAdapter)
     private var gemmaAdapter: MLXOrganAdapter?
@@ -2193,10 +2217,9 @@ extension SampleHostModel {
         hybridBenchPermitPredictHits = 0
         hybridBenchPermitPredictMisses = 0
         // M642 chapter 一百八十 reset + M669 Welford running
-        hybridBenchLengthMAESum = 0
+        // M689 chapter 一百八十八 — B8 retire: Sum properties gone.
         hybridBenchLengthMAECount = 0
         hybridBenchLengthMAERunning = 0
-        hybridBenchLatencyMAESumMs = 0
         hybridBenchLatencyMAECount = 0
         hybridBenchLatencyMAERunningMs = 0
         // M661 chapter 一百八十三 reset
@@ -2242,13 +2265,28 @@ extension SampleHostModel {
                 default: riskLevel = .medium
                 }
                 do {
-                    let result = try runtime.startSession(
-                        BASHostSessionRequest(
-                            kind: .interactive,
-                            workflowProfile: .reflective,
-                            surface: .application,
-                            prompt: prompt,
-                            riskLevel: riskLevel))
+                    // M691 chapter 一百八十八 — B3-extended (HIGH):
+                    // run substrate.startSession off-MainActor via
+                    // Task.detached. BASHostRuntime is Sendable
+                    // (`public struct BASHostRuntime: Sendable`),
+                    // so cross-actor capture is type-system safe.
+                    // Bench loop's @MainActor isolation is needed
+                    // only for @Published mutations + UI binds;
+                    // substrate eval has no @Published touch.
+                    // Pre-fix: every iter blocked main thread for
+                    // substrate eval (~50-100ms). Post-fix:
+                    // background thread. UI stays responsive.
+                    let request = BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: .reflective,
+                        surface: .application,
+                        prompt: prompt,
+                        riskLevel: riskLevel)
+                    let result = try await Task.detached(
+                        priority: .userInitiated
+                    ) {
+                        try runtime.startSession(request)
+                    }.value
                     if let turn = result.eBrainTurn {
                         if let entry = turn.sovereignAuditEntry {
                             auditCount = entry.signalRefs.count
@@ -2706,14 +2744,21 @@ extension SampleHostModel {
                     }
                     let observeText =
                         "Original: \(prompt)\n\nResponse: \(truncatedBody)"
-                    if let observed = try? runtime.startSession(
-                        BASHostSessionRequest(
-                            kind: .interactive,
-                            workflowProfile: .reflective,
-                            surface: .application,
-                            prompt: observeText,
-                            riskLevel: riskLevel)).eBrainTurn
-                    {
+                    // M691 chapter 一百八十八 — B3-extended:
+                    // post-LLM substrate observation also off-main.
+                    let observeRequest = BASHostSessionRequest(
+                        kind: .interactive,
+                        workflowProfile: .reflective,
+                        surface: .application,
+                        prompt: observeText,
+                        riskLevel: riskLevel)
+                    let observedResult: BASHostSessionResult? =
+                        try? await Task.detached(
+                            priority: .userInitiated
+                        ) {
+                            try runtime.startSession(observeRequest)
+                        }.value
+                    if let observed = observedResult?.eBrainTurn {
                         postLLMPermitMode = observed.actionPermit
                             .mode.rawValue
                         postLLMAuditCount = observed
@@ -2759,7 +2804,7 @@ extension SampleHostModel {
                         // running mean (numerically stable over
                         // 144K samples). Sum/Count kept for
                         // backward compat in JSONL analysis.
-                        self.hybridBenchLengthMAESum += abs(err)
+                        // M689 ch188 — B8 retire: only Count + Running.
                         self.hybridBenchLengthMAECount += 1
                         let n = Double(self.hybridBenchLengthMAECount)
                         self.hybridBenchLengthMAERunning +=
@@ -2768,7 +2813,7 @@ extension SampleHostModel {
                     if let pred = latencyPredictedMs {
                         let err = firstDurationMs - pred
                         latencyErrorMs = err
-                        self.hybridBenchLatencyMAESumMs += abs(err)
+                        // M689 ch188 — B8 retire: only Count + Running.
                         self.hybridBenchLatencyMAECount += 1
                         let n = Double(self.hybridBenchLatencyMAECount)
                         self.hybridBenchLatencyMAERunningMs +=
