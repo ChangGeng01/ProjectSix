@@ -1748,4 +1748,77 @@ final class SampleHostTests: XCTestCase {
         try Data().write(to: tmpDir.appendingPathComponent("manifest.json"))
         XCTAssertEqual(sampleHostBenchCountShards(in: tmpDir), 3)
     }
+
+    // MARK: - chapter 二百三 / M764 — architectural invariants
+
+    /// M764 — pin schema version monotonic.
+    /// Future chapters MAY bump version (additive Codable fields)
+    /// but version MUST be a String parseable as Int and >= the
+    /// last shipped value (currently "9" from chapter 192).
+    func testSchemaVersionIsMonotonicallyParseable() {
+        let v = SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION
+        guard let n = Int(v) else {
+            XCTFail("Schema version must parse as Int: \(v)")
+            return
+        }
+        XCTAssertGreaterThanOrEqual(
+            n, 9,
+            "Schema version cannot decrease below shipped " +
+            "chapter-192 baseline of 9")
+    }
+
+    /// M764 — pin SmokeMode case names stable.
+    /// chapter 195 has 3 smoke modes; future chapters may add
+    /// but cannot remove (would break replay tools).
+    func testSmokeModeRawValuesAreStable() {
+        let modes = HybridBenchConfig.SmokeMode.allCases
+        XCTAssertGreaterThanOrEqual(modes.count, 3,
+            "SmokeMode case count cannot decrease")
+        let raws = Set(modes.map(\.rawValue))
+        XCTAssertTrue(raws.contains("canonical"))
+        XCTAssertTrue(raws.contains("14-layer-smoke"))
+        XCTAssertTrue(raws.contains("heavy-tailed"))
+    }
+
+    /// M764 — pin DispatchPolicy case names stable (chapter 178 doctrine).
+    func testDispatchPolicyCasesAreStable() {
+        let raws = [
+            "skip-block", "skip-replace", "skip-delay",
+            "single-llm", "both-llms",
+            "local-only", "draft-only",
+        ]
+        for raw in raws {
+            XCTAssertNotNil(
+                SampleHostHybridDispatchPolicy(rawValue: raw),
+                "DispatchPolicy must have case for raw \(raw)")
+        }
+    }
+
+    /// M764 — pin BenchCheckpoint Codable shape stable.
+    /// Future chapters add fields as Optional or bump schema.
+    func testCheckpointSchemaFieldsAreStable() throws {
+        let cp = SampleHostBenchCheckpoint(
+            generation: 1, iter: 100,
+            startTimeIso: "t", lastUpdatedIso: "t",
+            outputPath: "/tmp", smokeMode: "canonical",
+            durationHours: 1.0, mutationSeedCount: 5,
+            strideCSV: "5041", afmOk: 0, gemmaOk: 0,
+            bothFailed: 0, stuckSubstrates: 0, stuckLLMs: 0)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(cp)
+        let json = String(data: data, encoding: .utf8) ?? ""
+        let expected = [
+            "afmOk", "bothFailed", "durationHours", "gemmaOk",
+            "generation", "iter", "lastUpdatedIso",
+            "mutationSeedCount", "outputPath", "smokeMode",
+            "startTimeIso", "strideCSV", "stuckLLMs",
+            "stuckSubstrates",
+        ]
+        for name in expected {
+            XCTAssertTrue(
+                json.contains("\"\(name)\""),
+                "Checkpoint missing expected field: \(name)")
+        }
+    }
 }

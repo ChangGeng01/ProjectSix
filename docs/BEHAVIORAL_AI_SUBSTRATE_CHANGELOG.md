@@ -1221,3 +1221,12 @@ Self-improvement loop now operator-runnable end-to-end. Full stack 1953 + 1 pari
 - **M760** Honest doctrine pin: eval corpus must be REAL held-out data (synthetic-on-synthetic returns artificial WINs). Operator's decision = combined verdict from calibration_check + compare_mlpackages.
 
 Full stack 1953 + 1 parity gate + 7 analysis tools (replay / validate / analyze-only / synthesize / verify / calibration-check / compare-mlpackages), 0 failures. Self-improvement loop now operator-runnable end-to-end from synthesize → ship-decision.
+
+## 2026-05-06 — chapter 二百三 (M761-M765) 完全底层架构进化 — guardrails over churn
+
+- **M761** NEW `.github/workflows/test.yml` — 5-job CI (BAS / Qinao / SampleHost / 4 boundary + parity / pytest). Runs on every push + PR. First CI infrastructure for the project.
+- **M762** NEW `scripts/check_god_files.sh` — size guard with legacy-aware limits (SampleHost 4K warn / 6K max; BAS 3K warn / 6K max; QinaoSampleHost/main 9K max). Current state: 3 warnings (HostKitCore 4770 / EBrainCognitionPlaneCore 5347 / MemoryCore 3316), 0 errors.
+- **M763** NEW `docs/ARCHITECTURE_DECISION_RECORDS.md` — 5 ADRs (HINT-ONLY observability / BAIL-OUT timeout / synthetic-trained REFUSED / guardrails-over-churn / cross-language parity) + 8-red-line doctrine summary table.
+- **M764** +4 architectural invariant tests (schema version monotonic / SmokeMode stable / DispatchPolicy stable / Checkpoint shape stable). Future chapters cannot silently break these.
+
+SampleHost tests 76 → **80**; full stack **1957 + 1 parity gate + 7 analysis tools + CI workflow + size guard, 0 failures**. Doctrine ADR-004: guardrails ship now; extraction is chapter 204+ candidate.

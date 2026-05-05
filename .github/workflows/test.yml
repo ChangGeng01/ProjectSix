@@ -1,0 +1,89 @@
+name: Test + boundary checks
+
+# M761 chapter 二百三 — first CI workflow.
+# Triggers on every push + PR to main / branch.
+# Runs: BAS XCTest + Qinao XCTest + 4 boundary scripts +
+# cross-language schema parity gate + god-file size guard.
+
+on:
+  push:
+    branches: [ main, "m605-chapter-*" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  bas-tests:
+    name: BehavioralAISubstrate XCTest
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: BAS test
+        run: swift test --package-path BehavioralAISubstrate
+
+  qinao-tests:
+    name: QinaoRuntimeSDK XCTest
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qinao test
+        working-directory: QinaoRuntimeSDK
+        run: swift test
+
+  samplehost-tests:
+    name: SampleHost iOS XCTest
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for testing
+        run: |
+          xcodebuild -project Before.xcodeproj \
+            -scheme SampleHost \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 17e' \
+            build-for-testing
+      - name: Test
+        run: |
+          xcodebuild -project Before.xcodeproj \
+            -scheme SampleHost \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 17e' \
+            test-without-building
+
+  boundary-checks:
+    name: 4 boundary scripts + schema parity
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Qinao import boundaries
+        run: bash scripts/check_qinao_import_boundaries.sh
+      - name: Sovereign redaction
+        run: bash scripts/check_sovereign_redaction.sh
+      - name: SDK import boundaries
+        run: bash scripts/check_sdk_import_boundaries.sh
+      - name: Substrate residuals
+        run: bash scripts/check_substrate_residuals.sh
+      - name: Cross-language schema parity
+        run: python3 scripts/check_chenglu_schema_parity.py
+      - name: God-file size guard (M762 chapter 203)
+        run: bash scripts/check_god_files.sh
+
+  python-fuzz:
+    name: Python pytest fuzz tests
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run pytest
+        run: |
+          pip install pytest
+          python3 -m pytest scripts/test_chenglu_feature_schema.py -v

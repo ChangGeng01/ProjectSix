@@ -25416,3 +25416,115 @@ Combined verdict from steps 1+2 drives:
 ### 202.5 一句话总结
 
 **Chapter 二百二 (M759-M760)**: continue "全面开发" by closing operator UX gap for ship-decision. NEW `scripts/compare_mlpackages.py` (A/B compare two .mlpackage on labeled JSONL eval corpus; reports per-head accuracy/MAE + delta + WIN/LOSS/TIE verdict + ship-decision rule of thumb). Smoke test on prod v0.4 vs synthetic v0.5 returns 5W/0L/0T (CIRCULAR — eval corpus IS the synthetic train distribution; doctrine pin: eval corpus must be REAL held-out data). After real iPhone bench produces v0.5_real, operator chains calibration_check + compare_mlpackages → combined verdict drives ship/no-ship/canary decision. **76 SampleHost tests still green; full stack 1953 + 1 parity gate + 7 analysis tools (replay / validate / analyze-only / synthesize / verify / calibration-check / compare-mlpackages), 0 failures**. Pipeline now end-to-end operator-runnable from synthesize → ship-decision.
+
+## 二百三、 完全底层架构进化 — guardrails over churn (M761-M765 / 2026-05-06)
+
+User instruction: "完全 底层 架构 进化" — after honest 9-attribute audit (✅ 2 / 🟡 5 / ❌ 2). Two paths considered:
+- A) Big-bang refactor (extract bench engine actor / protocol DI / module split) — 10-15 hr, high regression risk
+- B) Architectural guardrails (CI / size guard / ADR / invariant tests) — 2 hr, low risk, prevents future regressions
+
+Picked **B**. Doctrine: pin current state, prevent silent god-file growth, document decisions, enable safe gradual extraction in future chapters. Chapter 203 ships infrastructure that protects future chapters; the actual extract refactor is chapter 204+ candidate.
+
+### 203.1 M761 — CI workflow (.github/workflows/test.yml)
+
+NEW `.github/workflows/test.yml` with 5 parallel jobs:
+1. **bas-tests**: `swift test --package-path BehavioralAISubstrate`
+2. **qinao-tests**: `swift test` in QinaoRuntimeSDK
+3. **samplehost-tests**: build + run all 80 SampleHost tests on iPhone 17 sim
+4. **boundary-checks**: 4 boundary scripts + cross-language schema parity gate + god-file size guard
+5. **python-fuzz**: `pytest scripts/test_chenglu_feature_schema.py`
+
+Triggers: every push to main / branch + PRs to main. Timeout: 5-45 min per job.
+
+Pre-this-batch: 0 CI. Future PRs could break tests silently.
+Post: every commit gates on full test suite + boundary checks.
+
+### 203.2 M762 — God-file size guard (scripts/check_god_files.sh)
+
+Shell script that scans Sources/ + SampleHost/ + SampleHostTests/ for `.swift` files exceeding LOC limits.
+
+Limits (informed by chapter 195 honest assessment):
+- SampleHost layer: 4000 warn / 6000 max
+- BAS sources: 3000 warn / 6000 max (accommodates 5347 EBrainCognitionPlaneCore)
+- QinaoSampleHost/main.swift: 9000 max (special — 8224 LOC CLI demo container)
+
+Output (current state):
+```
+WARN   BehavioralAISubstrate/Sources/BASHostKit/HostKitCore.swift: 4770 lines
+WARN   BehavioralAISubstrate/Sources/BASOrchestration/EBrainCognitionPlaneCore.swift: 5347 lines
+WARN   BehavioralAISubstrate/Sources/BASMemory/MemoryCore.swift: 3316 lines
+Summary: 3 warnings, 0 errors
+```
+
+Doctrine: WARN = visible architectural pressure; ERROR = CI block. Legacy god files are pinned at warn (not blocking) so CI doesn't fail on existing debt; but new files added in future chapters CANNOT silently grow past limits.
+
+### 203.3 M763 — ADR document (ARCHITECTURE_DECISION_RECORDS.md)
+
+NEW `docs/ARCHITECTURE_DECISION_RECORDS.md` documenting 5 architectural decisions:
+
+- **ADR-001 (chapter 192)** — HINT-ONLY observability separates from decision (red line 7)
+- **ADR-002 (chapter 195)** — Per-iter timeout is iter BAIL-OUT, not session-kill
+- **ADR-003 (chapter 200)** — Synthetic-trained .mlpackage REFUSED for production
+- **ADR-004 (chapter 203)** — Architectural guardrails over churn refactor
+- **ADR-005 (chapter 一百八十一+)** — Cross-language schema parity gate
+
+Each ADR records: Context / Decision / Consequences / Future migration. Doctrine summary table at end pins 8 red lines that future chapters cannot relax.
+
+### 203.4 M764 — Architectural invariants Swift tests
+
+4 new fix-pin tests in SampleHostTests:
+
+| Test | Invariant pinned |
+|---|---|
+| `testSchemaVersionIsMonotonicallyParseable` | Schema version Int-parseable + ≥ 9 |
+| `testSmokeModeRawValuesAreStable` | canonical / 14-layer-smoke / heavy-tailed always present |
+| `testDispatchPolicyCasesAreStable` | 7 dispatch policies always defined |
+| `testCheckpointSchemaFieldsAreStable` | 14-field Codable shape pinned |
+
+Future chapters CANNOT silently break these. Adding a new SmokeMode case is fine; removing canonical breaks the test.
+
+### 203.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17 sim | **80** ✓ (+4 chapter 203 invariants) |
+| 4 boundary checks + parity | clean |
+| God-file guard | 3 warnings / 0 errors |
+| **Total** | **1957 + 1 parity gate + 7 analysis tools + CI workflow + 1 size guard, 0 failures** |
+
+### 203.6 What's now architecturally protected
+
+| Concern | Protection |
+|---|---|
+| Future commits breaking tests | CI runs full stack on every push |
+| God-file growth | Size guard blocks files exceeding limit |
+| Schema regressions | Cross-language parity gate + monotonic test |
+| Doctrine erosion | ADR docs pin decisions; invariant tests pin types |
+| Red-line violation | Boundary scripts (4) + sovereign redaction + ADR-001 |
+
+### 203.7 What's STILL not enterprise-grade (honest)
+
+- ❌ No release tag / SemVer (chapter 204 candidate?)
+- ❌ No telemetry sink / OTLP exporter (chapter 208 candidate)
+- ❌ No SLO budgets per layer (multi-chapter scope)
+- ❌ No incident runbook (operator runbook exists for happy path only)
+- ❌ No multi-device test
+- ❌ No load test infra
+- 🟡 god files exist (HostKitCore 4770 / EBrainCognitionPlaneCore 5347 / MemoryCore 3316) — flagged but not blocked
+
+ADR-004 explicitly defers extraction to chapter 204+. CI now catches regressions; gradual extraction is now safer.
+
+### 203.8 Files modified
+
+| File | Change |
+|---|---|
+| `.github/workflows/test.yml` | NEW — 5-job CI workflow |
+| `scripts/check_god_files.sh` | NEW — size guard, legacy-aware limits |
+| `docs/ARCHITECTURE_DECISION_RECORDS.md` | NEW — 5 ADRs + doctrine summary |
+| `SampleHostTests/SampleHostTests.swift` | +4 invariant tests |
+
+### 203.9 一句话总结
+
+**Chapter 二百三 (M761-M765)**: respond to "完全 底层 架构 进化" by picking architectural guardrails over churn refactor (10-15 hr big-bang refactor → 2 hr guardrail layer; doctrine ADR-004). NEW `.github/workflows/test.yml` (5 parallel jobs: BAS XCTest 419 / Qinao XCTest 1442 / SampleHost 80 / 4 boundary scripts + parity gate / pytest fuzz; runs on every push). NEW `scripts/check_god_files.sh` (size guard with legacy-aware limits — 3 warns / 0 errors current state; future commits cannot grow files past limit). NEW `docs/ARCHITECTURE_DECISION_RECORDS.md` (5 ADRs + 8-red-line doctrine summary; future chapters cite/contradict ADRs explicitly). 4 NEW invariant tests pin schema version monotonic + SmokeMode/DispatchPolicy case stability + Checkpoint Codable shape. **80 SampleHost tests pass; full stack 1957 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. Doctrine: legacy god files (HostKitCore 4770 / EBrainCognitionPlaneCore 5347 / MemoryCore 3316) are flagged WARN not ERROR — extraction is chapter 204+ candidate, but CI now prevents NEW god files from sprouting. Architecture is now **regression-protected**, not "fully evolved" (still 🟡 architecture-grade per 9-attribute audit).
