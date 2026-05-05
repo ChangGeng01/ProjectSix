@@ -1156,4 +1156,82 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(preset.mutationSeedCount, 5)
         XCTAssertEqual(preset.jsonlRotationMB, 25)
     }
+
+    // MARK: - chapter 一百九十三 / M726-M730 — resume + dashboard
+
+    /// M726 — fresh model has nil resumable checkpoint.
+    @MainActor
+    func testFreshModelHasNoResumableCheckpoint() async {
+        let m = SampleHostModel()
+        // Pre-emptively clear in case prior test left one
+        await m.clearResumableCheckpoint()
+        await m.loadResumableCheckpoint()
+        XCTAssertNil(m.hybridBenchResumableCheckpoint)
+    }
+
+    /// M726 — write a recent checkpoint, then load → present.
+    @MainActor
+    func testRecentCheckpointSurfacesAfterLoad() async throws {
+        let store = SampleHostBenchCheckpointStore.shared
+        await store.clear()
+        let recentIso = ISO8601DateFormatter()
+            .string(from: Date().addingTimeInterval(-300))  // 5min ago
+        let cp = SampleHostBenchCheckpoint(
+            generation: 1, iter: 4242,
+            startTimeIso: recentIso, lastUpdatedIso: recentIso,
+            outputPath: "/tmp", smokeMode: "heavy-tailed",
+            durationHours: 10.0, mutationSeedCount: 5,
+            strideCSV: "5041", afmOk: 100, gemmaOk: 50,
+            bothFailed: 1, stuckSubstrates: 0, stuckLLMs: 0)
+        try await store.write(cp)
+
+        let m = SampleHostModel()
+        await m.loadResumableCheckpoint()
+        XCTAssertEqual(
+            m.hybridBenchResumableCheckpoint?.iter, 4242)
+        XCTAssertEqual(
+            m.hybridBenchResumableCheckpoint?.smokeMode, "heavy-tailed")
+
+        // Cleanup
+        await m.clearResumableCheckpoint()
+        XCTAssertNil(m.hybridBenchResumableCheckpoint)
+    }
+
+    /// M726 — stale checkpoint (>24h) is auto-cleared on load.
+    @MainActor
+    func testStaleCheckpointIsAutoCleared() async throws {
+        let store = SampleHostBenchCheckpointStore.shared
+        await store.clear()
+        let staleIso = ISO8601DateFormatter()
+            .string(from: Date().addingTimeInterval(-25 * 3600))  // 25h ago
+        let cp = SampleHostBenchCheckpoint(
+            generation: 1, iter: 100,
+            startTimeIso: staleIso, lastUpdatedIso: staleIso,
+            outputPath: "/tmp", smokeMode: "canonical",
+            durationHours: 1.0, mutationSeedCount: 5,
+            strideCSV: "5041", afmOk: 0, gemmaOk: 0,
+            bothFailed: 0, stuckSubstrates: 0, stuckLLMs: 0)
+        try await store.write(cp)
+
+        let m = SampleHostModel()
+        await m.loadResumableCheckpoint()
+        XCTAssertNil(
+            m.hybridBenchResumableCheckpoint,
+            "stale checkpoint should be auto-cleared")
+
+        // Verify on-disk was wiped
+        let after = await store.read()
+        XCTAssertNil(after, "store should be empty after auto-clear")
+    }
+
+    /// M727 — fresh model has zero anomaly counters.
+    @MainActor
+    func testFreshModelAnomalyCountersZero() {
+        let m = SampleHostModel()
+        XCTAssertEqual(m.hybridBenchStuckSubstrateCount, 0)
+        XCTAssertEqual(m.hybridBenchStuckLLMCount, 0)
+        XCTAssertEqual(m.hybridBenchPauseSkippedCount, 0)
+        XCTAssertEqual(m.hybridBenchAdversarialFiredCount, 0)
+        XCTAssertEqual(m.hybridBenchDriftAlarmCount, 0)
+    }
 }

@@ -24317,3 +24317,117 @@ The 10h smoke now produces 14-layer × 4-pressure × 8-adversarial-kind stratifi
 ### 192.17 一句话总结
 
 **Chapter 一百九十二 (M716-M725)**: respond to user "全面进化 满意之后 跑 10小时 冒烟 最学习" by closing the 5 highest-leverage 10h-readiness gaps + adding 2 supporting pieces (drift monitor + crash checkpoint). NEW `SampleHost/SampleHostBenchSafetyKit.swift` (~440 LOC) packages 7 pure helpers: SHA-256 row checksum (M716 — corruption detection), thermal/battery gate (M717 — 10h survivability), sliding-window anomaly watcher (M718 — substrate-stuck / LLM-stuck / NaN-spike detection), heavy-tailed pressure mixer (M719 — production-realistic L11=25%/L9=18%/etc layer distribution), 8-kind adversarial mutator (M720 — empty/giant/unicode/control/etc edge cases at 5% rate), Welford drift monitor (M721 — 3-sigma alarm on length-MAE), atomic crash checkpoint (M722 — every 1000 iters / 10h crash loses ≤ 3 min). NEW `.heavyTailed` SmokeMode + `tenHourHeavyTailed` preset wire it together. NEW row schema v9 carries 6 optional fields (rowChecksum / anomalyFlags / pressureProfile / adversarialKind / driftSigma / pauseSkipped). NEW `scripts/validate_hybrid_jsonl.py` integrity validator + replay tool extended with 6 chapter-192 diagnostic blocks. **49 SampleHost tests pass** (+20 chapter 192 fix-pins) on iPhone 17e sim. **1929 total tests + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: every new feature is HINT-ONLY (red line 7 held); permit.mode unchanged; ledger hash chain unchanged; single commit mouth held. **The 10h smoke now produces 14-layer × 4-pressure × 8-adversarial-kind stratified data with built-in integrity, anomaly, drift, and crash-survival metadata** ready for `bench_to_train.py` → v0.5+ retrain cycle. The user's tap is THE blocker; infrastructure is ready.
+
+## 一百九十三、 全面进化 续 — resume UI + live safety dashboard (M726-M730 / 2026-05-06)
+
+User trail: chapter 一百九十二 closed 5 high-leverage 10h-readiness gaps but listed 4 honest residuals. Chapter 一百九十三 closes the 2 highest-impact UI residuals so the operator running 10h actually SEES the safety kit working.
+
+### 193.1 M726 — Resume UI
+
+`SampleHostBenchCheckpointStore.read()` was write-path-only after chapter 一百九十二. Chapter 一百九十三 wires the read path:
+
+1. `SampleHostModel.loadResumableCheckpoint()` — reads checkpoint from disk; if `lastUpdatedIso` parses to >24h ago, auto-clears (operator forgot, no point surfacing). Otherwise sets `@Published hybridBenchResumableCheckpoint`.
+2. `.task` modifier on `NavigationStack` calls `loadResumableCheckpoint()` once on first appear.
+3. New `resumeBannerPanel(_)` SwiftUI view (orange-tinted card above hybrid bench panel) surfaces:
+   - "Previous bench did not finish cleanly"
+   - Last-known iter / smokeMode / duration target
+   - AFM ok / Gemma ok / both-failed counts
+   - Stuck-substrate / stuck-LLM count (ORANGE if > 0)
+   - Last update timestamp
+4. "Dismiss" button calls `clearResumableCheckpoint()` to wipe disk + clear @Published.
+
+Doctrine: resume PROMPTS user — never auto-restarts. Starting a new bench from the panel auto-overwrites the checkpoint via M722 write path.
+
+### 193.2 M727 — Live safety dashboard
+
+5 new `@Published` cumulative counters added to `SampleHostModel`:
+- `hybridBenchStuckSubstrateCount` — synced from `AnomalyWatcher.snapshot().stuckSubstrates`
+- `hybridBenchStuckLLMCount` — synced from `AnomalyWatcher.snapshot().stuckLLMs`
+- `hybridBenchPauseSkippedCount` — incremented on each thermal-gate pause iter
+- `hybridBenchAdversarialFiredCount` — incremented when `adversarialKind != nil`
+- `hybridBenchDriftAlarmCount` — incremented when `driftSigma > 3.0`
+
+All zeroed on bench Start. Surfaced in `hybridBenchPanel` as a new "🛡️ Safety kit" section below the meridian status, showing:
+```
+  Smoke mode: heavy-tailed
+  Thermal/battery paused: 0
+  Substrate stuck (100-iter): 0
+  LLM stuck (100-iter): 0
+  Adversarial fired: 1843
+  Drift > 3-sigma alarms: 7
+```
+
+Tint: `.secondary` when all-zero (healthy), `.orange` when ≥1 substrate-stuck / LLM-stuck / pause-skipped / drift-alarm fires (visual signal to operator).
+
+Doctrine: dashboard READS @Published; no UI logic mutates counters (those flow only from bench loop on the bench task's MainActor hop).
+
+### 193.3 Tests (M728)
+
+| Test | Pin |
+|---|---|
+| `testFreshModelHasNoResumableCheckpoint` | empty store → nil checkpoint |
+| `testRecentCheckpointSurfacesAfterLoad` | recent checkpoint → surfaced; iter / smokeMode preserved |
+| `testStaleCheckpointIsAutoCleared` | >24h checkpoint → auto-cleared on load + nil |
+| `testFreshModelAnomalyCountersZero` | all 5 chapter-193 @Published counters start at 0 |
+
+SampleHost tests: 49 → **53**.
+
+### 193.4 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ (unchanged) |
+| Qinao XCTest | 1442 ✓ (unchanged) |
+| SampleHost on iPhone 17e sim | **53** ✓ (+4 chapter 193) |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| iOS Sim test execution | All 53 passed in 0.152s |
+| 4 boundary checks | clean |
+| Cross-language schema parity | clean |
+| **Total** | **1933 + 1 parity gate + 3 analysis tools, 0 failures** |
+
+### 193.5 What's now visible during 10h smoke
+
+The operator tapping Run Hybrid Bench in `.heavyTailed` mode for 10h now sees IN APP:
+
+1. **Pre-run**: if previous bench crashed, orange banner shows last-known iter + state; operator can dismiss or start fresh
+2. **Live (during 10h run)**:
+   - Hybrid bench section: iter count / per-second rate / AFM/Gemma split / router hit-rate
+   - Meridian section: 5 CoreML head accuracy + dispatch counters + post-LLM shifted
+   - 🛡️ Safety kit section: thermal pauses / substrate stuck / LLM stuck / adversarial fired / drift alarms — TINTED ORANGE if any anomaly fires
+3. **Post-crash**: app re-launches → orange banner surfaces last-known state; operator decides
+
+Pre chapter 一百九十三, all 5 chapter-192 counters lived only in JSONL — invisible during the run, only visible post-hoc via replay tool. Now they're live on screen.
+
+### 193.6 Honest residual after chapter 一百九十三
+
+| Item | Status |
+|---|---|
+| **No real production 10h bench data** | **Still THE BLOCKER** — user's tap unlocks |
+| Validator byte-parity with Swift JSONEncoder | Still approximate (good for format check; not byte-equal SHA verify) |
+| Bench → v0.5 retrain proof | Pipeline ready; awaits real bench |
+| UI sliders for chapter-192 flex constants (anomaly window / drift threshold / mutation probability / checkpoint frequency) | Counters surfaced; sliders deferred |
+| CI / multi-device / load test | Still external |
+
+### 193.7 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | +5 @Published counters; +`hybridBenchResumableCheckpoint`; +`loadResumableCheckpoint()` + `clearResumableCheckpoint()`; bench loop wires counter increments |
+| `SampleHost/SampleHostView.swift` | +`resumeBannerPanel(_)` view; `.task { loadResumableCheckpoint() }` on appear; safety-kit dashboard inside hybridBenchPanel; `safetyKitStatus` + `safetyKitTint` computed properties |
+| `SampleHostTests/SampleHostTests.swift` | +4 chapter 193 fix-pin tests |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M726-M730 entry |
+
+### 193.8 Doctrine pins
+
+| Pin | Held |
+|---|---|
+| 不变量 #1/#2/#3 | ✓ — no substrate / verdict / weight changes |
+| Single commit mouth | ✓ — view reads @Published only |
+| Red line 7 (watcher hint only) | ✓ — dashboard surfaces hints; no decision change |
+| Anti-magic-number | ✓ — 24h cutoff via `addingTimeInterval(-24 * 3600)` typed |
+| Anti-drift 3-site cross-update | ✓ — counters reset list synced w/ schema list |
+
+### 193.9 一句话总结
+
+**Chapter 一百九十三 (M726-M730)**: continue chapter 一百九十二's "全面进化" by closing the 2 highest-impact UI residuals — **M726 Resume UI** (orange banner surfaces previous bench's last-known state on app launch; auto-clears stale >24h checkpoints; "Dismiss" button to wipe; doctrine: PROMPTS, never auto-resumes) + **M727 Live Safety Dashboard** (5 new @Published cumulative counters: stuck-substrate / stuck-LLM / pause-skipped / adversarial-fired / drift-alarm; surfaced in hybridBenchPanel as "🛡️ Safety kit" section; tint switches to orange when any anomaly fires). The 10h smoke run now SHOWS the chapter-192 safety kit working in real time instead of accumulating silently in JSONL. **53 SampleHost tests pass** (+4 chapter 193 fix-pins). **1933 total tests + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: dashboard is HINT-ONLY; bench loop is the only writer to @Published counters; resume PROMPTS the operator (no auto-restart); UI mutations zero. **Honest residual: real production 10h data remains THE blocker. Infrastructure is now COMPLETE for the 10h tap.**

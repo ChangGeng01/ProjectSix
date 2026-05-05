@@ -546,6 +546,24 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var hybridBenchOutputPath: String = ""
     @Published private(set) var hybridBenchStartTime: Date?
     @Published private(set) var hybridBenchLastError: String?
+    // M727 chapter 一百九十三 — live anomaly counters surfaced
+    // for the dashboard widget. Updated per-iter from
+    // SampleHostBenchAnomalyWatcher.snapshot(). Distinct from
+    // anomalyFlags-on-row (which is per-iter) — these are
+    // cumulative for the whole bench.
+    @Published private(set) var hybridBenchStuckSubstrateCount: Int = 0
+    @Published private(set) var hybridBenchStuckLLMCount: Int = 0
+    @Published private(set) var hybridBenchPauseSkippedCount: Int = 0
+    @Published private(set) var hybridBenchAdversarialFiredCount: Int = 0
+    @Published private(set) var hybridBenchDriftAlarmCount: Int = 0
+    /// M726 chapter 一百九十三 — resume snapshot from a previous
+    /// (possibly crashed) bench. Populated by `loadResumableCheckpoint()`
+    /// at app launch. nil = no checkpoint or last bench finished
+    /// cleanly. UI banner offers `clearResumableCheckpoint()` or
+    /// allows starting a new bench (which auto-clears the stale
+    /// checkpoint via fresh write).
+    @Published private(set) var hybridBenchResumableCheckpoint:
+        SampleHostBenchCheckpoint?
     @Published private(set) var hybridGemmaLoadStatus: String = "idle"
     @Published private(set) var hybridSinglePromptStatus: String = "idle"
     @Published private(set) var hybridSinglePromptOutput: String = ""
@@ -2532,6 +2550,12 @@ extension SampleHostModel {
         // M661 chapter 一百八十三 reset
         hybridBenchVerbosityCorrect = 0
         hybridBenchVerbosityWrong = 0
+        // M727 chapter 一百九十三 reset live anomaly counters
+        hybridBenchStuckSubstrateCount = 0
+        hybridBenchStuckLLMCount = 0
+        hybridBenchPauseSkippedCount = 0
+        hybridBenchAdversarialFiredCount = 0
+        hybridBenchDriftAlarmCount = 0
         hybridBenchLastError = nil
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
@@ -2658,6 +2682,11 @@ extension SampleHostModel {
                     lowPowerMode: lowPower,
                     batteryStateRaw: batteryStateRaw)
                 if case .pause(let reason) = gateDecision {
+                    // M727 chapter 一百九十三 — live counter
+                    applyIfActive(myGen) {
+                        self.hybridBenchPauseSkippedCount += 1
+                    }
+                    _ = reason  // (used in row construction below)
                     // Emit paused-row so JSONL captures the gap
                     // (downstream replay can spot the pause window).
                     let pausedRow = SampleHostHybridBenchRow(
@@ -3339,6 +3368,20 @@ extension SampleHostModel {
                         verbosityProb,
                         permitPredictBlockProb,
                     ])
+                // M727 chapter 一百九十三 — sync live counters
+                // from watcher snapshot (cumulative; cheap to read).
+                let watcherSnap = await anomalyWatcher.snapshot()
+                applyIfActive(myGen) {
+                    self.hybridBenchStuckSubstrateCount =
+                        watcherSnap.stuckSubstrates
+                    self.hybridBenchStuckLLMCount =
+                        watcherSnap.stuckLLMs
+                }
+                if adversarialKind != nil {
+                    applyIfActive(myGen) {
+                        self.hybridBenchAdversarialFiredCount += 1
+                    }
+                }
 
                 // M721 chapter 一百九十二 — drift sigma. Compute
                 // BEFORE updating monitor (so this iter's residual
@@ -3359,6 +3402,9 @@ extension SampleHostModel {
                 if let s = driftSigma, s > 3.0 {
                     allFlags.append(
                         "drift:length-mae:\(String(format: "%.1f", s))-sigma")
+                    applyIfActive(myGen) {
+                        self.hybridBenchDriftAlarmCount += 1
+                    }
                 }
 
                 let row = SampleHostHybridBenchRow(
@@ -3526,5 +3572,41 @@ extension SampleHostModel {
 
     func updateHybridBenchMutationCount(_ newValue: Int) {
         hybridBenchMutationSeedCount = max(1, min(5, newValue))
+    }
+
+    /// M726 chapter 一百九十三 — resume detector. Read latest
+    /// checkpoint from disk; if it exists AND `lastUpdatedIso`
+    /// is within the last 24 hours, surface it for UI prompt.
+    /// Stale checkpoints (> 24h old) are auto-cleared.
+    /// Doctrine: resume PROMPTS user, never auto-restarts. The
+    /// checkpoint contains stride / smokeMode / iter — UI banner
+    /// shows "previous bench reached iter N before crash" so the
+    /// operator decides whether to start fresh or carry forward.
+    func loadResumableCheckpoint() async {
+        let cp = await SampleHostBenchCheckpointStore.shared.read()
+        guard let cp = cp else {
+            hybridBenchResumableCheckpoint = nil
+            return
+        }
+        // Parse lastUpdatedIso — if older than 24h, auto-clear
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let fallback = ISO8601DateFormatter()
+        let last = formatter.date(from: cp.lastUpdatedIso)
+            ?? fallback.date(from: cp.lastUpdatedIso)
+        let cutoff = Date().addingTimeInterval(-24 * 3600)
+        if let last = last, last < cutoff {
+            await SampleHostBenchCheckpointStore.shared.clear()
+            hybridBenchResumableCheckpoint = nil
+            return
+        }
+        hybridBenchResumableCheckpoint = cp
+    }
+
+    /// M726 — UI button: dismiss resume banner without starting.
+    /// Clears checkpoint from disk so a future launch sees clean state.
+    func clearResumableCheckpoint() async {
+        await SampleHostBenchCheckpointStore.shared.clear()
+        hybridBenchResumableCheckpoint = nil
     }
 }

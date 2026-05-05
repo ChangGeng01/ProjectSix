@@ -1134,3 +1134,12 @@ M145 · TurnOutcome.surfaceDecision: BASSurfaceDecision? → **BASSurfaceDecisio
 - **M725** Schema v8 → v9 (+6 optional fields); new `tenHourHeavyTailed` preset; 20 new SampleHost tests; replay tool + validator script
 
 NEW `SampleHost/SampleHostBenchSafetyKit.swift` (~440 LOC) packages all 7 helpers as pure value types / actor / enum. SampleHost tests 29 → **49**; full stack **1929 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: HINT-ONLY bench-side observability never mutates substrate decisions or audit hash chain.
+
+## 2026-05-06 — chapter 一百九十三 (M726-M730) 全面进化 续 — resume UI + live safety dashboard
+
+- **M726** Resume detector — `SampleHostModel.loadResumableCheckpoint()` reads chapter-192 checkpoint from disk, auto-clears if >24h stale, otherwise surfaces via @Published `hybridBenchResumableCheckpoint`. Hooked via `.task` on NavigationStack first appear. New `resumeBannerPanel(_)` orange-tinted SwiftUI card surfaces last-known iter / smokeMode / AFM/Gemma counts / stuck-anomaly counts. "Dismiss" button calls `clearResumableCheckpoint()`. Doctrine: PROMPTS user, never auto-resumes.
+- **M727** Live safety dashboard — 5 new @Published counters synced from `AnomalyWatcher.snapshot()` per-iter: stuck-substrate / stuck-LLM / pause-skipped / adversarial-fired / drift-alarm. Surfaced in hybridBenchPanel as "🛡️ Safety kit" section below meridian status; tint switches `.secondary → .orange` when any anomaly fires.
+- **M728** 4 fix-pin tests (resume nil / recent surface / stale auto-clear / fresh-counter zero).
+- **M729-M730** chapter 一百九十三 honesty board + changelog.
+
+The 10h smoke run now SHOWS chapter-192 safety kit working in real time. SampleHost tests 49 → **53**; full stack **1933 + 1 parity gate + 3 analysis tools, 0 failures**.

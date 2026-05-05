@@ -45,6 +45,15 @@ struct SampleHostView: View {
                     }
                     .buttonStyle(.borderedProminent)
 
+                    // M726 chapter 一百九十三 — resume banner.
+                    // Surfaces a previous (possibly crashed) bench's
+                    // last-known state so the user can decide whether
+                    // to start fresh or treat the existing JSONL as
+                    // continuing data. UI is hint-only — no auto-resume.
+                    if let cp = model.hybridBenchResumableCheckpoint {
+                        resumeBannerPanel(cp)
+                    }
+
                     benchPanel
 
                     afmTestPanel
@@ -188,7 +197,60 @@ struct SampleHostView: View {
                 .padding(24)
             }
             .navigationTitle("BASHostKit")
+            // M726 chapter 一百九十三 — load resumable checkpoint
+            // (if any) on first appear. Surfaces banner if a
+            // previous bench crashed mid-run.
+            .task { await model.loadResumableCheckpoint() }
         }
+    }
+
+    // MARK: - M726 chapter 一百九十三 — resume banner
+
+    @ViewBuilder
+    private func resumeBannerPanel(
+        _ cp: SampleHostBenchCheckpoint
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("⚠️ Previous bench did not finish cleanly")
+                    .font(.headline)
+                    .foregroundStyle(.orange)
+                Spacer()
+                Button("Dismiss") {
+                    Task { await model.clearResumableCheckpoint() }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            Text("Last known state:")
+                .font(.caption.bold())
+            Text("• iter \(cp.iter) of "
+                + "\(String(format: "%.1f", cp.durationHours))h target "
+                + "(\(cp.smokeMode))")
+                .font(.caption.monospacedDigit())
+            Text("• AFM ok \(cp.afmOk) / Gemma ok \(cp.gemmaOk) / "
+                + "both-failed \(cp.bothFailed)")
+                .font(.caption.monospacedDigit())
+            if cp.stuckSubstrates > 0 || cp.stuckLLMs > 0 {
+                Text("• stuck-substrates \(cp.stuckSubstrates) / "
+                    + "stuck-LLMs \(cp.stuckLLMs)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.orange)
+            }
+            Text("• last update: \(cp.lastUpdatedIso)")
+                .font(.caption2.monospaced())
+                .foregroundStyle(.secondary)
+            Text("Starting a new bench will overwrite the checkpoint.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(.orange.opacity(0.1),
+                    in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.orange.opacity(0.5), lineWidth: 1)
+        )
     }
 
     // MARK: - M573 (chapter 一百四十七 part 2) — bench panel
@@ -506,6 +568,14 @@ struct SampleHostView: View {
                 Text(meridianHeadsStatus)
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
+                // M727 chapter 一百九十三 — live anomaly dashboard.
+                Divider().padding(.vertical, 2)
+                Text("🛡️ Safety kit (chapter 192 10h-readiness pack)")
+                    .font(.caption.bold())
+                    .foregroundStyle(.orange)
+                Text(safetyKitStatus)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(safetyKitTint)
             }
         }
         .padding(12)
@@ -561,6 +631,38 @@ struct SampleHostView: View {
             model.hybridBenchPartitionDelta,
             model.hybridBenchAccountedTotal,
             model.hybridBenchIterations)
+    }
+
+    /// M727 chapter 一百九十三 — live safety-kit dashboard.
+    /// Surfaces 5 chapter-192 cumulative counters so during a 10h
+    /// run the operator sees thermal pauses / anomaly hits /
+    /// adversarial fires / drift alarms in real time.
+    private var safetyKitStatus: String {
+        let smoke = model.hybridBenchSmokeMode.rawValue
+        return String(
+            format:
+                "  Smoke mode: %@\n" +
+                "  Thermal/battery paused: %d\n" +
+                "  Substrate stuck (100-iter): %d\n" +
+                "  LLM stuck (100-iter): %d\n" +
+                "  Adversarial fired: %d\n" +
+                "  Drift > 3-sigma alarms: %d",
+            smoke,
+            model.hybridBenchPauseSkippedCount,
+            model.hybridBenchStuckSubstrateCount,
+            model.hybridBenchStuckLLMCount,
+            model.hybridBenchAdversarialFiredCount,
+            model.hybridBenchDriftAlarmCount)
+    }
+
+    /// M727 — tint changes red if any safety counter > 0
+    /// (visual signal that something flagged during the run).
+    private var safetyKitTint: Color {
+        let any = model.hybridBenchPauseSkippedCount > 0
+            || model.hybridBenchStuckSubstrateCount > 0
+            || model.hybridBenchStuckLLMCount > 0
+            || model.hybridBenchDriftAlarmCount > 0
+        return any ? .orange : .secondary
     }
 
     private var hybridBenchLiveStatus: String {
