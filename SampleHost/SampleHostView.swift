@@ -448,10 +448,64 @@ struct SampleHostView: View {
                     .font(.caption2)
                     .foregroundStyle(.red)
             }
+
+            // M654 chapter 一百八十二 — meridian network status.
+            // Visualizes the 5 CoreML head outputs that are firing
+            // alongside substrate. Pre-this-batch they accumulated
+            // silently in JSONL only; UI now shows them live.
+            if model.hybridBenchIterations > 0 {
+                Divider().padding(.vertical, 2)
+                Text("📡 Meridian (5 CoreML heads + substrate dispatch)")
+                    .font(.caption.bold())
+                    .foregroundStyle(.purple)
+                Text(meridianHeadsStatus)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(12)
         .background(.thinMaterial,
                     in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// M654 chapter 一百八十二 — render 5 CoreML heads' running
+    /// stats: PermitPredict agreement, Length head MAE, Latency
+    /// head MAE, plus substrate dispatch counts (skip / dual-LLM /
+    /// local-only / draft / post-LLM shifted).
+    private var meridianHeadsStatus: String {
+        let permitTotal = model.hybridBenchPermitPredictHits
+            + model.hybridBenchPermitPredictMisses
+        let permitAgreementPct = permitTotal > 0
+            ? Double(model.hybridBenchPermitPredictHits)
+                / Double(permitTotal) * 100
+            : 0
+        let lengthMAE = model.hybridBenchLengthMAECount > 0
+            ? model.hybridBenchLengthMAESum
+                / Double(model.hybridBenchLengthMAECount)
+            : 0
+        let latencyMAE = model.hybridBenchLatencyMAECount > 0
+            ? model.hybridBenchLatencyMAESumMs
+                / Double(model.hybridBenchLatencyMAECount)
+            : 0
+        return String(
+            format:
+                "  PermitPredict: agree=%d/%d (%.1f%%)\n" +
+                "  Length MAE: %.0f chars (n=%d)\n" +
+                "  Latency MAE: %.0f ms  (n=%d)\n" +
+                "  Substrate dispatch: skip[block=%d replace=%d delay=%d]\n" +
+                "                       both-LLM=%d local-only=%d draft=%d\n" +
+                "  Post-LLM shifted: %d (closed-loop)",
+            model.hybridBenchPermitPredictHits, permitTotal,
+            permitAgreementPct,
+            lengthMAE, model.hybridBenchLengthMAECount,
+            latencyMAE, model.hybridBenchLatencyMAECount,
+            model.hybridBenchSubstrateSkipBlock,
+            model.hybridBenchSubstrateSkipReplace,
+            model.hybridBenchSubstrateSkipDelay,
+            model.hybridBenchSubstrateBothLLMs,
+            model.hybridBenchSubstrateLocalOnly,
+            model.hybridBenchSubstrateDraftOnly,
+            model.hybridBenchPostLLMShifted)
     }
 
     private var hybridBenchLiveStatus: String {

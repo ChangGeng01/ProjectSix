@@ -22702,6 +22702,123 @@ Going from "4 standalone models" to "1 shared-encoder model" doesn't add new mer
 
 **Chapter 一百八十一 (M645-M651)**: respond to user "continue" by shipping **shared encoder + multi-head architecture** — the chapter 一百七十七 P0 plan's central architectural shift. ONE CoreML model with shared trunk (43→64→32 ReLU) + 4 task heads (afm sigmoid + block sigmoid + length linear + latency linear). Joint training with weighted MSE+BCE loss; 3 loss-weight configs explored. Per-head metrics: AFM 91.75% (slight regression vs v0.4's 92.96%), Block 100% (matches PermitPredict), Length R² 0.599 (improved from 0.545), Latency R² 0.121 (regression from 0.511 — joint training cost on high-variance target). **Architectural wins: -69% .mlpackage size (57,645 → 18,079 bytes) / -3 model loads / -3 forward passes / -3 featurize duplications.** Production path tries MultiHead first with graceful fallback to per-head models. AFM router still uses ChengluPreflight v0.4 (slightly more accurate) — best-of-both-worlds. Z-norm denormalization via user_defined_metadata. Build + deploy + 1871 tests + 5 gates all green. **Meridian network 4/18 architecturally — and 18-head goal is now structurally feasible.** Doctrine pins all held. Honest limits: per-head metrics not uniformly better, featurize STILL duplicated 4× across helpers (single-source via shared protocol pending chapter 一百八十二+), no real TextEncoder yet (using hand-crafted features), Latency head's high-variance target regresses under shared encoder.
 
+## 一百八十二、 Continue — single-source featurize + UI meridian (M652-M656 / 2026-05-06)
+
+### 起源
+
+User: "continue"
+
+Per chapter 一百八十一's outlined honest limits, this chapter ships the two cleanups that 181 explicitly deferred:
+1. **Single-source featurize via shared protocol** (eliminate 4× duplication)
+2. **UI panel rendering 5 head predictions + counters** (make meridian visible to user)
+
+Both are architectural-debt cleanup + user-visible improvements without requiring new ML training or new heads.
+
+### 182.1 M652 — `ChengluFeatureEncoder` single-source
+
+New file `SampleHost/ChengluFeatureEncoder.swift` (~115 LOC) hosts THE one-and-only definition of:
+- 7 alphabet arrays (tones / domains / stakes / timeframes / confidants / askShapes / mutationSeedRange)
+- `featureCount = 43` constant
+- `dimensionsAreConsistent()` invariant check
+- `encode(_ features: ChengluPromptFeatures) -> [Float]` canonical encoder
+
+Pre-this-batch the same alphabet arrays + same loop existed in 4 separate Swift files (PreflightInference, PermitPredictInference, RegressionHeads, MultiHeadInference). 4 places to update if the corpus changes. Now: 1 place.
+
+### 182.2 M653 — refactor 4 inference helpers
+
+Each helper's private `featurize(_:)` reduced from ~25 lines to:
+
+```swift
+private static func featurize(
+    _ features: ChengluPromptFeatures
+) -> [Float] {
+    return ChengluFeatureEncoder.encode(features)
+}
+```
+
+Each helper's `featureCount` reduced from 7-line sum-of-counts to:
+
+```swift
+private static let featureCount =
+    ChengluFeatureEncoder.featureCount
+```
+
+Net deletion across 4 files: ~80 LOC of duplication.
+
+### 182.3 M654 — UI meridian panel
+
+`SampleHostView.hybridBenchPanel` now renders a 6-line live status block when bench has any iters:
+
+```
+📡 Meridian (5 CoreML heads + substrate dispatch)
+  PermitPredict: agree=N/M (P%)
+  Length MAE: X chars (n=N)
+  Latency MAE: Y ms  (n=N)
+  Substrate dispatch: skip[block=N replace=N delay=N]
+                       both-LLM=N local-only=N draft=N
+  Post-LLM shifted: N (closed-loop)
+```
+
+This is the FIRST time the meridian network is visible to the user during bench runs. Previously all 5 head outputs went straight to JSONL and counters with NO UI surface.
+
+### 182.4 Featurize-consistency tests (3 new)
+
+`SampleHostTests.swift` +3 tests:
+- `testFeatureEncoderDimensionsConsistent` — invariant pin (catches drift if anyone adds tone without bumping featureCount)
+- `testFeatureEncoderOneHotShape` — encoded vector has 43 dims, exactly 7 active (one per alphabet group)
+- `testFeatureEncoderUnknownValuesAllZero` — degenerate case (out-of-vocab everywhere) produces all-zero vector without crashing
+
+Total SampleHost tests: 10 → 13.
+
+### 182.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on real iPhone 17e | **13** ✓ (+3 new featurize tests) |
+| 5 boundary checks | clean |
+| iOS Release build | SUCCESS |
+| Deploy + relaunch | SUCCESS |
+
+### 182.6 Doctrine pins held
+
+All 6 + 1 invariants from chapter 一百八十一 still pin. Plus:
+
+- **Anti-drift cross-source**: `ChengluFeatureEncoder.dimensionsAreConsistent()` test catches alphabet drift at compile-time (well, test-time) — chapter 一百十四 anti-drift 3-site pattern applied to feature schema.
+- **Single source of truth**: schema lives in ONE file. If alphabet ever needs to change (e.g. new tone added), it's edited once. The Python training script `train_chenglu_preflight_v0.py` still has its own copy (Swift/Python boundary) — that mismatch is honest leftover, but at least Swift side has 1 source.
+
+### 182.7 Honest limits
+
+- **Python featurize_row stays separate from Swift encoder**: cross-language single-source not solved. A future chapter 一百八十二+ could ship a code generator that produces both Swift + Python from one schema YAML.
+- **UI panel is text-only**: no graph / sparkline / color-coded heatmap. Predictions render as 6 lines of monospace text. Pretty enough for diagnostic, not for presentation.
+- **No tests for UI**: SwiftUI panels untested. Visual regression would catch UI changes; we have none.
+- **No live-feedback predictions for single-prompt panel**: the new meridian status only renders during bench runs (`hybridBenchIterations > 0`). Single-prompt test panel doesn't yet show predictions inline.
+- **Featurize STILL duplicated in Python training side**: ship-side single-source, training-side still parallel.
+
+### 182.8 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/ChengluFeatureEncoder.swift` | NEW — single-source featurize (~115 LOC) |
+| `SampleHost/CoreMLPreflightInference.swift` | refactored to use shared encoder (-25 LOC) |
+| `SampleHost/CoreMLPermitPredictInference.swift` | refactored (-25 LOC) |
+| `SampleHost/CoreMLRegressionHeads.swift` | refactored (-25 LOC) |
+| `SampleHost/CoreMLMultiHeadInference.swift` | refactored (-25 LOC) |
+| `SampleHost/SampleHostView.swift` | +meridian status panel + computed property (~50 LOC) |
+| `SampleHostTests/SampleHostTests.swift` | +3 featurize-consistency tests |
+| `Before.xcodeproj/project.pbxproj` | +ChengluFeatureEncoder Sources entry |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M652-M656 entry |
+
+Net: **+115 NEW + ~50 modified − ~100 duplicated = ~65 net LOC** for single-source + visibility.
+
+### 182.9 一句话总结
+
+**Chapter 一百八十二 (M652-M656)**: respond to user "continue" by closing chapter 一百八十一's two explicit honest limits. **M652-M653 single-source featurize**: new `ChengluFeatureEncoder` shared file hosts the ONLY definition of 43-dim signature alphabet + encoder; 4 inference helpers (Preflight + PermitPredict + RegressionHeads + MultiHead) refactored to delegate; net deletion ~80 LOC of duplication across 4 files. **M654 UI meridian panel**: SampleHostView renders 6-line live status of 5 CoreML heads (PermitPredict agreement, Length MAE, Latency MAE) + substrate dispatch counts (skip / both-LLM / local-only / draft) + post-LLM shifted closed-loop count — FIRST time meridian is user-visible during bench. **3 new featurize tests** (dimensions consistency, one-hot shape, unknown-values-all-zero) bring SampleHost test count to 13. Build + deploy + 1874 tests + 5 gates all green. Doctrine pins held + anti-drift schema-cross-check added. Honest limits: Python training-side featurize_row STILL duplicates Swift encoder (cross-language single-source pending), UI is text-only (no graph), single-prompt panel doesn't yet show predictions inline, SwiftUI panel untested.
+
+
+
 
 
 

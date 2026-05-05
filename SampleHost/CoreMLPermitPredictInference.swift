@@ -76,35 +76,10 @@ public final class ChengluPermitPredictInference {
 
     private static let modelVersion = "v0-mlp-64-32-binary-block"
 
-    /// Same 43-dim feature schema as ChengluPreflight v0.4.
-    /// Reuses ChengluPromptFeatures from CoreMLPreflightInference
-    /// (single source of truth for feature schema across heads).
-
-    private static let featureCount = 43
-
-    private static let tones = [
-        "anxious", "authoritative", "vulnerable", "agentic",
-        "confused", "grieving", "curious", "angry"
-    ]
-    private static let domains = [
-        "financial", "medical", "relational", "work", "parenting",
-        "identity", "ethical", "existential", "trauma", "creative"
-    ]
-    private static let stakes = [
-        "low", "modest", "high", "very-high",
-        "irreversible", "non-reversible-after-act"
-    ]
-    private static let timeframes = [
-        "minutes", "hours", "days", "weeks",
-        "months", "lifetime", "past-unresolved"
-    ]
-    private static let confidants = [
-        "friend", "expert", "stranger", "decision-system"
-    ]
-    private static let askShapes = [
-        "narrative", "decision-tree", "single-action"
-    ]
-    private static let mutationSeedRange = 0..<5
+    // M652 chapter 一百八十二 — single-source via
+    // ChengluFeatureEncoder (alphabet + featureCount + encode).
+    private static let featureCount =
+        ChengluFeatureEncoder.featureCount
 
     private var model: MLModel?
 
@@ -130,36 +105,11 @@ public final class ChengluPermitPredictInference {
         }
     }
 
-    /// Featurize identical to ChengluPreflight (cross-head shared
-    /// schema). If schemas drift, single-source via ChengluPromptFeatures
-    /// will be enforced in chapter 一百八十+ shared-encoder refactor.
+    /// M652 chapter 一百八十二 — delegate to shared encoder.
     private static func featurize(
         _ features: ChengluPromptFeatures
     ) -> [Float] {
-        var v: [Float] = []
-        v.reserveCapacity(featureCount)
-        for t in tones {
-            v.append(features.tone == t ? 1.0 : 0.0)
-        }
-        for d in domains {
-            v.append(features.domain == d ? 1.0 : 0.0)
-        }
-        for s in stakes {
-            v.append(features.stake == s ? 1.0 : 0.0)
-        }
-        for t in timeframes {
-            v.append(features.timeframe == t ? 1.0 : 0.0)
-        }
-        for c in confidants {
-            v.append(features.confidant == c ? 1.0 : 0.0)
-        }
-        for a in askShapes {
-            v.append(features.askShape == a ? 1.0 : 0.0)
-        }
-        for m in mutationSeedRange {
-            v.append(features.mutationSeed == m ? 1.0 : 0.0)
-        }
-        return v
+        return ChengluFeatureEncoder.encode(features)
     }
 
     /// Predict permit-mode class. Threshold 0.5 — block vs non-block.

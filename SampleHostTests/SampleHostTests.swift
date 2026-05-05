@@ -175,6 +175,59 @@ final class SampleHostTests: XCTestCase {
         XCTAssertNotEqual(a, c)
     }
 
+    // MARK: - M652 chapter 一百八十二 — single-source featurize tests
+
+    /// `ChengluFeatureEncoder.dimensionsAreConsistent()` invariant
+    /// catches alphabet drift: if anyone adds a tone / domain /
+    /// stake without bumping featureCount, this test fails.
+    func testFeatureEncoderDimensionsConsistent() {
+        XCTAssertTrue(ChengluFeatureEncoder.dimensionsAreConsistent())
+        XCTAssertEqual(ChengluFeatureEncoder.featureCount, 43)
+    }
+
+    /// Encoded vector has correct dimensionality + correct one-hot
+    /// values for a known signature.
+    func testFeatureEncoderOneHotShape() {
+        let features = ChengluPromptFeatures(
+            tone: "anxious",       // index 0 in tones (8)
+            domain: "financial",    // index 0 in domains (10), offset 8
+            stake: "low",           // index 0 in stakes (6), offset 18
+            timeframe: "minutes",   // index 0 in timeframes (7), offset 24
+            confidant: "friend",    // index 0 in confidants (4), offset 31
+            askShape: "narrative",  // index 0 in askShapes (3), offset 35
+            mutationSeed: 0)        // index 0 in mutationSeed (5), offset 38
+        let v = ChengluFeatureEncoder.encode(features)
+        XCTAssertEqual(v.count, 43)
+        // First-element of each alphabet must be 1.0
+        XCTAssertEqual(v[0], 1.0, "tone[0]=anxious")
+        XCTAssertEqual(v[8], 1.0, "domain[0]=financial")
+        XCTAssertEqual(v[18], 1.0, "stake[0]=low")
+        XCTAssertEqual(v[24], 1.0, "timeframe[0]=minutes")
+        XCTAssertEqual(v[31], 1.0, "confidant[0]=friend")
+        XCTAssertEqual(v[35], 1.0, "askshape[0]=narrative")
+        XCTAssertEqual(v[38], 1.0, "mutation[0]=0")
+        // All others should be 0.0 — count zeros to confirm.
+        let onesCount = v.filter { $0 == 1.0 }.count
+        XCTAssertEqual(onesCount, 7,
+                       "exactly 7 active dims (one per group)")
+    }
+
+    /// Out-of-vocab values produce all-zero vector (degenerate
+    /// case — model still gets a valid input shape).
+    func testFeatureEncoderUnknownValuesAllZero() {
+        let features = ChengluPromptFeatures(
+            tone: "INVALID",
+            domain: "INVALID",
+            stake: "INVALID",
+            timeframe: "INVALID",
+            confidant: "INVALID",
+            askShape: "INVALID",
+            mutationSeed: 99)  // out of 0..<5
+        let v = ChengluFeatureEncoder.encode(features)
+        XCTAssertEqual(v.count, 43)
+        XCTAssertTrue(v.allSatisfy { $0 == 0.0 })
+    }
+
     /// Predict on out-of-vocab tone (e.g. typo) should not crash —
     /// all features become 0, model still produces valid output.
     func testPredictHandlesOutOfVocabFeatures() async throws {
