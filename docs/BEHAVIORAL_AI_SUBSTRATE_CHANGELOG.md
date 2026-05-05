@@ -1206,3 +1206,11 @@ SampleHost tests 74 → **76**; full stack **1953 + 1 parity gate + 3 analysis t
 - **M755** Doctrine pin: **synthetic-trained model is doctrine-REFUSED for production bundle**. Synthetic data is mechanically valid but not statistically representative. Real iPhone bench with LLM responses is THE only remaining blocker for real-data loop closure.
 
 Self-improvement loop now mechanically validated end-to-end. SampleHost tests 76 still green; full stack 1953 + 1 parity gate + 5 analysis tools, 0 failures. Pipeline runs in ~10s.
+
+## 2026-05-06 — chapter 二百一 (M756-M758) calibration check + operator runbook
+
+- **M756** NEW `scripts/calibration_check.py` — load .mlpackage + labeled corpus → 10-bin calibration tables per binary head (afm_success_prob / block_prob / verbosity_prob) + MACE (Mean Absolute Calibration Error) + per-thermal-stratum breakdown. Threshold doctrine: <0.05 well-calibrated / 0.05-0.10 acceptable / >0.10 don't ship without retraining.
+- **M757** NEW `scripts/CHENGLU_LOOP_README.md` — operator runbook with 8-step loop diagram, quick synthetic smoke (~30s), real-data 10h iPhone cycle, honest scope limits, schema versions, safety doctrines.
+- **M758** Smoke test verified 100+100 row pipeline runs end-to-end in ~30s; v0.5 calibration MACE 0.04-0.07 per head.
+
+Self-improvement loop now operator-runnable end-to-end. Full stack 1953 + 1 parity gate + 6 analysis tools, 0 failures.

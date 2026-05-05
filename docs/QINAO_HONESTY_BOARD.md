@@ -25236,3 +25236,110 @@ python3 scripts/verify_v0_5_synthetic.py /tmp/v05.mlpackage
 ### 200.9 一句话总结
 
 **Chapter 二百 (M751-M755)**: respond to "全面开发" (after honest "not fully closed" answer) by demonstrating the full self-improvement loop **mechanically end-to-end**. NEW `synthesize_corpus.py` generates 200 base + 200 bench rows in canonical schemas. NEW `verify_v0_5_synthetic.py` loads emitted `.mlpackage` via coremltools + predicts on 43-dim feature vector + verifies all 5 MultiHead outputs return valid `(1, 1)` float arrays. Pipeline runs in ~10s: synthesize → bench_to_train → emit → load → predict. v0.2 (augmented) vs v0.1 (base only) diff metrics show expected synthetic-data drift (AFM acc +0.018, block acc -0.138, length MAE +571 chars). **All 7 loop steps now mechanically validated** — only blocker is REAL iPhone bench with LLM responses (synthetic-trained model is doctrine-refused for production bundle). 76 SampleHost tests still pass; 1953 + 1 parity gate + 5 analysis tools (now: replay + validate + analyze-only + synthesize + verify), 0 failures. Honest "完全闭环" now: **mechanics closed, data isn't**.
+
+## 二百一、 全面开发 续⁴ — calibration check + loop runbook (M756-M758 / 2026-05-06)
+
+User trail: continued "全面开发" after chapter 二百 closed mechanical loop. Chapter 二百一 closes calibration validation (chapter 192 honest "next step #2") + writes operator runbook for the full real-data cycle.
+
+### 201.1 M756 — calibration_check.py
+
+Loads any `.mlpackage` + labeled JSONL → bins predictions into 10 buckets → reports per-bucket observed-rate vs predicted-rate gap → MACE (Mean Absolute Calibration Error).
+
+Synthetic v0.5 calibration on 200-row eval corpus:
+
+```
+=== afm_success_prob calibration ===
+  bin             n  mean_pred  observed   gap
+  [0.9,1.0)    166     0.987     0.982   -0.006
+  [0.8,0.9)     15     0.855     0.800   -0.055
+  [0.7,0.8)      1     0.781     1.000   +0.219
+  ...
+  MACE: 0.0419  (well-calibrated, < 0.05 threshold)
+
+=== block_prob calibration ===
+  MACE: 0.0667  (acceptable, 0.05-0.10)
+
+=== verbosity_prob calibration ===
+  MACE: 0.0519  (acceptable)
+
+=== Per-thermal-stratum calibration (afm_success) ===
+  thermal=  critical  n=   7  MACE=0.0377
+  thermal=      fair  n=  54  MACE=0.0648
+  thermal=   nominal  n=  83  MACE=0.0457
+  thermal=   serious  n=  56  MACE=0.0483
+```
+
+Threshold doctrine:
+- < 0.05 = well-calibrated
+- 0.05-0.10 = acceptable; consider isotonic LUT
+- > 0.10 = miscalibrated; don't ship without retraining or recalibration
+
+Per-thermal-stratum breakdown surfaces hidden bias (e.g. one pressure regime might be systematically over/under-confident).
+
+### 201.2 M757 — Operator runbook
+
+`scripts/CHENGLU_LOOP_README.md` documents the full self-improvement cycle:
+
+1. Loop diagram (8 steps)
+2. **Quick smoke** (synthetic, ~30s) — for regression-checking pipeline mechanics
+3. **Real-data loop** (10h iPhone) — operator-action steps for production
+4. Honest scope limits (synthetic ≠ real; iPhone smoke needs AFM+Gemma availability + thermal protection + charging)
+5. Schema versions reference table
+6. Key safety doctrines (red lines + 不变量)
+
+Single source of truth for "how to actually run the loop". Operator opens README, runs commands in sequence, decides at each step.
+
+### 201.3 Verification
+
+End-to-end smoke (~30s) on 100+100 row synthetic data:
+
+```
+synthesize  → 100 base + 100 bench rows → /tmp/sb /tmp/sbn
+bench_to_train → /tmp/v05.mlpackage (24K MIL program)
+v0.2 vs v0.1 diff:
+  AFM acc:    0.9000 (Δ -0.0067)
+  Block acc:  0.9000 (Δ -0.1000)
+  Length MAE: 1154 (Δ +721)
+  Latency MAE: 1921 (Δ -300)
+  Verbosity acc: 0.6250 (Δ -0.1481)
+calibration:
+  AFM MACE: 0.0475
+  Block MACE: 0.0710
+  Verbosity MACE: 0.0335
+```
+
+All scripts run cleanly. Diff metrics show expected synthetic-data drift; calibration metrics are reasonable for small sample.
+
+### 201.4 Files modified
+
+| File | Change |
+|---|---|
+| `scripts/calibration_check.py` | NEW — load .mlpackage + labeled corpus → 10-bin calibration table per binary head + MACE + per-thermal-stratum breakdown |
+| `scripts/CHENGLU_LOOP_README.md` | NEW — operator runbook for synthetic + real-data loop |
+
+### 201.5 What's now ship-ready for real iPhone loop
+
+After real 10h bench produces ≥100 LLM-response rows, operator runs:
+
+1. `replay_hybrid_bench.py` — diagnostics + manifest summary
+2. `validate_hybrid_jsonl.py` — integrity check
+3. `bench_to_train.py --analyze-only` — viability verdict
+4. `bench_to_train.py --base-corpus + --output` — produce v0.5_real.mlpackage
+5. `verify_v0_5_synthetic.py` (rename or use as-is — same load+predict logic) — structure check
+6. `calibration_check.py` — MACE per head + per-stratum breakdown
+7. (Operator decision) — bundle swap if metrics ≥ v0.4 baseline
+
+All 6 + 1 are scripted, documented in CHENGLU_LOOP_README.md.
+
+### 201.6 Honest residual
+
+| Item | Status |
+|---|---|
+| Real iPhone bench with LLM responses | THE only blocker |
+| Holdout 80/20 split inside bench_to_train.py | bench_to_train.py uses single train/test split internally; explicit holdout flag is chapter 202 candidate |
+| Per-pressure-stratum sub-models | Heavy work; user-vision aligned but multi-chapter scope |
+| Production canary (shadow predict before swap) | chapter 202 candidate — load v0.4 + v0.5 simultaneously, compare predictions for N iters before bundle swap |
+
+### 201.7 一句话总结
+
+**Chapter 二百一 (M756-M758)**: continue "全面开发" by closing chapter 192 honest "next step #2: calibration check (bins 0.0-1.0)" and writing the operator runbook. NEW `scripts/calibration_check.py` (10-bin calibration tables + MACE per binary head + per-thermal-stratum breakdown; threshold doctrine: <0.05 well-calibrated / 0.05-0.10 acceptable / >0.10 don't ship). NEW `scripts/CHENGLU_LOOP_README.md` (8-step diagram + quick synthetic smoke + real-data 10h iPhone loop + honest scope limits + schema versions + safety doctrines). Pipeline now operator-runnable end-to-end without me. **Synthetic 100+100 smoke runs in ~30s, produces v0.5 .mlpackage with MACE 0.04-0.07 per head**. Real-data loop awaits real iPhone bench. Doctrine pin: synthetic-trained model never deploys to production; calibration check is REQUIRED before bundle swap. **76 SampleHost tests still green; full stack 1953 + 1 parity gate + 6 analysis tools (replay / validate / analyze-only / synthesize / verify / calibration-check), 0 failures**.
