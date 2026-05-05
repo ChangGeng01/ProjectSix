@@ -547,7 +547,8 @@ struct SampleHostView: View {
                 "  Verbosity acc: %d/%d (%.1f%%) [5th head]\n" +
                 "  Substrate dispatch: skip[block=%d replace=%d delay=%d]\n" +
                 "                       both-LLM=%d local-only=%d draft=%d\n" +
-                "  Post-LLM shifted: %d (closed-loop)",
+                "  Post-LLM shifted: %d (closed-loop)\n" +
+                "  Partition Δ: %+d (acct=%d / iter=%d) [B15]",
             model.hybridBenchPermitPredictHits, permitTotal,
             permitAgreementPct,
             lengthMAE, model.hybridBenchLengthMAECount,
@@ -560,7 +561,10 @@ struct SampleHostView: View {
             model.hybridBenchSubstrateBothLLMs,
             model.hybridBenchSubstrateLocalOnly,
             model.hybridBenchSubstrateDraftOnly,
-            model.hybridBenchPostLLMShifted)
+            model.hybridBenchPostLLMShifted,
+            model.hybridBenchPartitionDelta,
+            model.hybridBenchAccountedTotal,
+            model.hybridBenchIterations)
     }
 
     private var hybridBenchLiveStatus: String {

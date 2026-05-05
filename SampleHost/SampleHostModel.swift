@@ -464,6 +464,43 @@ final class SampleHostModel: ObservableObject {
     // post-LLM substrate observation shifts permit mode (i.e.
     // LLM produced something that would have been blocked).
     @Published private(set) var hybridBenchPostLLMShifted: Int = 0
+
+    /// M676 chapter 一百八十六 — B15 (MEDIUM) fix:
+    /// counter partition sanity — sum of all per-iter outcome
+    /// counters MUST equal `hybridBenchIterations`. If they
+    /// drift, either there's a missing increment in some
+    /// dispatch branch OR a double-increment somewhere.
+    /// UI surfaces this for live diagnostic.
+    ///
+    /// Outcome counters tracked: AFMOk + GemmaOk + AFMFallback +
+    /// GemmaFallback + BothFailed (LLM-result tally) + 3 skip
+    /// counters (skipBlock + skipReplace + skipDelay).
+    /// `bothLLMs` and `localOnly` paths fold into AFMOk +
+    /// GemmaOk and BothFailed, so their separate counters
+    /// (hybridBenchSubstrateBothLLMs / LocalOnly / DraftOnly)
+    /// are independent observability — NOT part of the
+    /// outcome partition.
+    var hybridBenchAccountedTotal: Int {
+        return hybridBenchAFMOk
+            + hybridBenchGemmaOk
+            + hybridBenchAFMFallbackToGemmaOk
+            + hybridBenchGemmaFallbackToAFMOk
+            + hybridBenchBothFailed
+            + hybridBenchSubstrateSkipBlock
+            + hybridBenchSubstrateSkipReplace
+            + hybridBenchSubstrateSkipDelay
+    }
+
+    /// True iff outcome counters partition the iter count.
+    /// `hybridBenchAccountedTotal == hybridBenchIterations`.
+    /// `bothLLMs` outcomes increment 2 counters (AFMOk +
+    /// GemmaOk both succeed) so this can be > iterations under
+    /// chapter 178's bothLLMs branch — that's a known
+    /// non-strict partition. UI displays sign of drift.
+    var hybridBenchPartitionDelta: Int {
+        return hybridBenchAccountedTotal - hybridBenchIterations
+    }
+
     // M635 chapter 一百七十九 — 2nd CoreML head agreement counter.
     // How often ChengluPermitPredict's class matches substrate's
     // actual .block decision. High agreement = model is a faithful
@@ -1615,7 +1652,9 @@ enum HybridBenchTuning {
 /// Bump on any breaking field change so downstream analyzers
 /// can detect format upgrades. Optional decoding allows old rows
 /// (without this field) to load as nil.
-let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "5"
+/// M675 chapter 一百八十六 bumped to "6" (added
+/// `permitPredictDetailedAgreement` field).
+let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "6"
 
 struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     /// M672 chapter 一百八十五 — schema version stamp.
@@ -1685,6 +1724,17 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let permitPredictBlockProb: Double?
     let permitPredictClass: String?
     let permitPredictAgreement: Bool?
+    // M675 chapter 一百八十六 — B7 fix (HIGH):
+    // permitPredictAgreement is binary (block / non-block) but
+    // substrate has 9 actual permit modes. Pre-fix, a model
+    // predicting "non-block" while substrate routed to .delay
+    // counted as "agree" — losing 8-way semantic signal.
+    // permitPredictDetailedAgreement records the 2-tuple
+    // "predicted-class:actual-permit" so downstream analytics
+    // can do 9-way confusion matrix without re-deriving from
+    // separately-stored fields. Format: "block:block" /
+    // "non-block:delay" / "non-block:answer" / etc.
+    let permitPredictDetailedAgreement: String?
     // M666 chapter 一百八十五 — B1 fix (CRITICAL):
     // routerHit was contaminated by skip/bothLLMs/localOnly
     // branches where router prediction was OVERRIDDEN by
@@ -2268,6 +2318,16 @@ extension SampleHostModel {
                     let predictedIsBlock = (cls == "block")
                     return actualIsBlock == predictedIsBlock
                 }()
+                // M675 chapter 一百八十六 — B7 fix (HIGH):
+                // record the 2-tuple "predicted-class:actual-permit"
+                // so analyses get the 9-way confusion matrix info.
+                // Example values: "block:block" / "non-block:delay"
+                // / "non-block:answer" / "block:replace".
+                let permitPredictDetailedAgreement: String? = {
+                    guard let cls = permitPredictClass
+                    else { return nil }
+                    return "\(cls):\(permitMode)"
+                }()
                 if let agree = permitPredictAgreement {
                     if agree {
                         self.hybridBenchPermitPredictHits += 1
@@ -2747,6 +2807,7 @@ extension SampleHostModel {
                     permitPredictBlockProb: permitPredictBlockProb,
                     permitPredictClass: permitPredictClass,
                     permitPredictAgreement: permitPredictAgreement,
+                    permitPredictDetailedAgreement: permitPredictDetailedAgreement,
                     routerOverridden: routerOverridden,
                     lengthPredicted: lengthPredicted,
                     lengthError: lengthError,

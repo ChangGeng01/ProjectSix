@@ -261,6 +261,7 @@ final class SampleHostTests: XCTestCase {
             permitPredictBlockProb: .nan,
             permitPredictClass: nil,
             permitPredictAgreement: nil,
+            permitPredictDetailedAgreement: nil,
             routerOverridden: false,
             lengthPredicted: .nan, lengthError: .infinity,
             latencyPredictedMs: .nan, latencyErrorMs: -.infinity,
@@ -287,9 +288,11 @@ final class SampleHostTests: XCTestCase {
     // MARK: - M666-M672 chapter 一百八十五 — fix-pin tests
 
     /// M672 chapter 一百八十五 — B14 schema version constant.
+    /// M675 chapter 一百八十六 bumped to "6" (added
+    /// `permitPredictDetailedAgreement` field).
     func testHybridBenchRowSchemaVersion() {
         XCTAssertEqual(
-            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "5",
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "6",
             "Schema version must bump on breaking field change")
     }
 
@@ -326,6 +329,106 @@ final class SampleHostTests: XCTestCase {
             "Welford recurrence diverges from Sum/Count")
     }
 
+    /// M675 chapter 一百八十六 — B7 fix: detailed permit
+    /// agreement preserves the 9-way actual permit alongside
+    /// the binary class so analyses can do confusion matrix.
+    func testHybridBenchRowEncodesDetailedPermitAgreement() throws {
+        let sig = SampleHostPromptSignature(
+            tone: "anxious", domain: "financial", stake: "low",
+            timeframe: "minutes", confidant: "friend",
+            askShape: "narrative")
+        let row = SampleHostHybridBenchRow(
+            timestamp: "t", iteration: 1, seed: 1,
+            stride: 5041, mutationSeed: 0, signature: sig,
+            prompt: "p", auditCodeCount: 100,
+            permitMode: "delay",                    // 9-way actual
+            routerVersion: "v", routerPredictedRoute: "afm",
+            routerProbability: 0.5,
+            firstTriedLLM: "afm", firstTriedStatus: "ok",
+            firstTriedBody: "x", firstTriedDurationMs: 1,
+            fallbackTriedLLM: nil, fallbackStatus: nil,
+            fallbackBody: nil, fallbackDurationMs: nil,
+            actualRoute: "r", routerHit: true,
+            totalDurationSeconds: 0.1, errorMessage: nil,
+            dispatchPolicy: nil, dispatchTaken: nil,
+            draftOnly: nil, llmSkipped: false,
+            postLLMPermitMode: nil, postLLMAuditCodeCount: nil,
+            postLLMShifted: nil,
+            permitPredictBlockProb: 0.3,
+            permitPredictClass: "non-block",        // binary
+            permitPredictAgreement: true,
+            permitPredictDetailedAgreement:
+                "non-block:delay",                  // 2-tuple
+            routerOverridden: false,
+            lengthPredicted: nil, lengthError: nil,
+            latencyPredictedMs: nil, latencyErrorMs: nil,
+            verbosityProbability: nil, verbosityCorrect: nil)
+        let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
+        XCTAssertTrue(
+            encoded.contains(
+                "\"permitPredictDetailedAgreement\":\"non-block:delay\""),
+            "row must encode the 2-tuple: \(encoded)")
+    }
+
+    /// M676 chapter 一百八十六 — B15 fix: counter partition
+    /// helpers (hybridBenchAccountedTotal +
+    /// hybridBenchPartitionDelta).
+    @MainActor
+    func testHybridBenchPartitionHelpersOnFreshModel() {
+        let model = SampleHostModel()
+        // Fresh model: all counters 0, iter 0, partition Δ = 0.
+        XCTAssertEqual(model.hybridBenchAccountedTotal, 0)
+        XCTAssertEqual(model.hybridBenchPartitionDelta, 0)
+    }
+
+    /// M678 chapter 一百八十六 — B6-extended fix-pin: bench row
+    /// Codable handles control characters in body (newline, tab,
+    /// quote, backslash) without crashing and preserves
+    /// content under round-trip.
+    func testHybridBenchRowRoundTripsControlChars() throws {
+        let sig = SampleHostPromptSignature(
+            tone: "anxious", domain: "financial", stake: "low",
+            timeframe: "minutes", confidant: "friend",
+            askShape: "narrative")
+        let body = "Hi\n\"quoted\"\tback\\slash\u{0007}bell"
+        let row = SampleHostHybridBenchRow(
+            timestamp: "t", iteration: 1, seed: 1,
+            stride: 5041, mutationSeed: 0, signature: sig,
+            prompt: "p", auditCodeCount: 100,
+            permitMode: "answer",
+            routerVersion: "v", routerPredictedRoute: "afm",
+            routerProbability: 0.5,
+            firstTriedLLM: "afm", firstTriedStatus: "ok",
+            firstTriedBody: body,        // control chars
+            firstTriedDurationMs: 1,
+            fallbackTriedLLM: nil, fallbackStatus: nil,
+            fallbackBody: nil, fallbackDurationMs: nil,
+            actualRoute: "r", routerHit: true,
+            totalDurationSeconds: 0.1, errorMessage: nil,
+            dispatchPolicy: nil, dispatchTaken: nil,
+            draftOnly: nil, llmSkipped: false,
+            postLLMPermitMode: nil, postLLMAuditCodeCount: nil,
+            postLLMShifted: nil,
+            permitPredictBlockProb: nil,
+            permitPredictClass: nil,
+            permitPredictAgreement: nil,
+            permitPredictDetailedAgreement: nil,
+            routerOverridden: false,
+            lengthPredicted: nil, lengthError: nil,
+            latencyPredictedMs: nil, latencyErrorMs: nil,
+            verbosityProbability: nil, verbosityCorrect: nil)
+        let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
+        guard let data = encoded.data(using: .utf8) else {
+            XCTFail("failed to UTF-8 encode JSONL line")
+            return
+        }
+        let decoded = try JSONDecoder().decode(
+            SampleHostHybridBenchRow.self, from: data)
+        XCTAssertEqual(
+            decoded.firstTriedBody, body,
+            "Codable round-trip lost body content")
+    }
+
     /// M666 chapter 一百八十五 — B1 fix: row carries
     /// routerOverridden flag, default false, optional.
     func testHybridBenchRowEncodesRouterOverridden() throws {
@@ -360,6 +463,7 @@ final class SampleHostTests: XCTestCase {
             permitPredictBlockProb: 0.99,
             permitPredictClass: "block",
             permitPredictAgreement: true,
+            permitPredictDetailedAgreement: "block:block",  // M675 NEW
             routerOverridden: true,         // M666 NEW
             lengthPredicted: nil, lengthError: nil,
             latencyPredictedMs: nil, latencyErrorMs: nil,
@@ -369,7 +473,7 @@ final class SampleHostTests: XCTestCase {
             encoded.contains("\"routerOverridden\":true"),
             "row must encode routerOverridden field: \(encoded)")
         XCTAssertTrue(
-            encoded.contains("\"schemaVersion\":\"5\""),
+            encoded.contains("\"schemaVersion\":\"6\""),
             "row must encode schemaVersion field: \(encoded)")
     }
 
