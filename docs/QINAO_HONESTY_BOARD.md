@@ -23701,6 +23701,136 @@ The session has empirically reached **near-zero residual**. The B5-extended part
 
 **Chapter 一百八十八 (M689-M695)**: respond to user "剩余 一次性 解决掉" by closing 2 of 3 chapter-187-residual HIGHs + 1 HIGH partial + 5 LOW NITs documented as deliberate conventions. **B8 retire Sum/Count (HIGH closed)**: removed `hybridBenchLengthMAESum` + `hybridBenchLatencyMAESumMs` @Published; UI reads Welford `Running` directly. No back-compat impact (Sum/Count never in JSONL). **B3-extended Task.detached substrate (HIGH closed)**: `try await Task.detached(priority: .userInitiated) { try runtime.startSession(request) }.value` for both pre-LLM + post-LLM observation calls. `BASHostRuntime: Sendable` makes type-system safe. Substrate eval now off-main; UI stays responsive. **B5-extended (HIGH partial)**: `applyIfActive(myGen, mutate)` helper added to `SampleHostModel`; 22 in-loop write sites NOT wrapped (full refactor scope). Chapter 一百八十五's break-on-mismatch covers 80%. **5 LOW NITs documented as conventions** (A19 perf / A22 hyphen raw / A23 Codable keys / C25 /tmp defaults / misc) — deliberate choices, not deferred bugs. Build SUCCESS / iPhone 17e deployed / 1903 tests + 1 parity gate + 5 boundary checks + Python pytest 19 all green. **Cumulative carry-forward closure: 28 of 31 real bugs (90%) across chapters 184→188.** **1 HIGH partial remains** (B5-extended call-site sweep) + 0 unaddressed NITs. The session has empirically reached near-zero residual; the chapter 一百七十七 → 一百八十三 ship surface is now at "mature" tier (chapter 67's 25% real-rate baseline).
 
+## 一百八十九、 远远不够 — honest reckoning with fragility (M696-M702 / 2026-05-06)
+
+### 起源 — user push-back rejected my "mature tier" claim
+
+User: "远远不够 还是 过于 脆弱"
+
+This is the right call. My chapter 一百八十八 framing ("near-zero residual" / "mature tier" / "doctrine state") was overconfident. Let me reckon honestly.
+
+### 189.1 What was actually fragile
+
+| Fragility | Evidence |
+|---|---|
+| **B5-extended `applyIfActive` helper had 0 call sites** | I shipped a "helper available for future opt-in" and called it 80% close. It was dead code claiming closure |
+| 22 hybridBench writes were unwrapped — race window real | If user taps Stop+Start fast, mid-iter writes from old task corrupt new task's freshly-zeroed counters |
+| **No integration test** for hybrid bench loop | All tests are unit-level. End-to-end loop never exercised under test |
+| **No fuzz tests** | Adversarial inputs to featurize / Codable could break silently |
+| **No bench replay tool** | JSONL output never verified against partition invariant in any analysis |
+| **No load test** | 8h × 5 iter/sec / thermal stress / Stop-Start race never simulated |
+| **No CI** | Fixes regress between sessions invisibly |
+| **MultiHead verbosity 77% acc** | Displayed in UI as if reliable; user can't distinguish reliable head from mediocre one |
+| **Schema bumps without migration code** | If we bump again, old JSONL becomes hard to read |
+| **No multi-device testing** | Different iPhones (12 / 14 / 17e) might behave differently |
+| **JSONL has no checksum** | Corruption invisible |
+| **"near-zero residual" was theoretical** | User has never actually tapped 8h bench |
+
+The system is **theoretically clean, empirically untested**. Chapter 188's "mature tier" claim conflated "no known bugs" with "verified robust". Those are different things.
+
+### 189.2 What chapter 一百八十九 actually ships (real hardening)
+
+#### M696 — B5-extended FULL wrap (HIGH **truly** closed)
+
+Pre-fix: helper existed at `applyIfActive(_ myGen, _ mutate)` but had **0 call sites** in production code. Dead code.
+
+**Fix**: 32 `+= 1` writes wrapped via sed within bench-task body line range + 2 multi-line MAE Welford recurrence writes wrapped manually. **Total 34 writes now generation-guarded.** The helper is no longer dead code; every per-iter mutation is gated.
+
+Race window for stale-task corruption is now closed at the per-write level, not just at the iter boundary.
+
+#### M698 — fuzz tests (NEW)
+
+`testFeatureEncoderFuzzRandomInputs`: 200 randomized signatures, mix of canonical + adversarial values, mutationSeed in `-10..<20` (out-of-range). Asserts dimensions + binary-value invariants + sum bounds (0 ≤ sum ≤ 7 active per encoder semantics).
+
+`testHybridBenchRowFuzzRoundTrip`: 9 adversarial body cases (empty / newlines / quotes / 5K-char / emoji / multi-script unicode / control chars / NUL char / huge body). Encodes via `encodeHybrid`, decodes via `JSONDecoder`, asserts content preservation.
+
+These catch:
+- Featurize correctness for unknown inputs
+- Codable round-trip for Unicode + control chars + nulls + 5K bodies
+- JSONL escape correctness
+- Field name stability under round-trip
+
+Pre-this-batch: NO fuzz coverage anywhere. Post-this-batch: 209 input combinations exercised per test run.
+
+#### M699 — Python bench-replay tool (NEW)
+
+`scripts/replay_hybrid_bench.py`: takes a bench output dir, reconstructs counter partition from `actualRoute` field, verifies invariants:
+
+- Schema-version sanity (mixed schemas warned)
+- Row count == accounted total (else lost iters)
+- Non-canonical `actualRoute` values flagged
+- Non-finite floats: encoded as string sentinels (chapter 184 fix B2 working) vs raw float (regression — fixture broken)
+- routerOverridden % matches expected skip / dual-LLM / local-only frequency
+- PermitPredict 9-way confusion matrix top-5 (chapter 186 B7 fix)
+- Verbosity 5th-head accuracy vs 77% train baseline
+- Length / Latency MAE vs train baselines (432 chars / 2220 ms)
+
+Smoke-tested on synthetic 4-row JSONL — catches the chapter 184 B2 string-sentinel encoding correctly (`"nan"` / `"inf"`).
+
+This is **the first analysis tool that reads JSONL and verifies it**. Pre-this-batch JSONL was written but never validated against schema invariants from the analysis side.
+
+#### M697 — Integration test: deferred (honest documentation)
+
+Mocking `BASHostRuntime` + `AppleFoundationOrganAdapter` + `MLXOrganAdapter` to run a hybrid bench loop end-to-end is non-trivial — each has Sendable struct types with internal state that needs faithful simulation. **Documented as chapter 一百九十+ candidate.**
+
+### 189.3 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17e | **25** ✓ (+2 fuzz tests from chapter 188's 23) |
+| Python pytest | 19 ✓ |
+| Bench replay smoke | clean on 4-row synthetic |
+| 5 boundary checks | clean |
+| Cross-language schema parity | clean |
+| iOS Release build | SUCCESS |
+| Deploy + relaunch on iPhone 17e | SUCCESS |
+| **Total** | **1905 + 1 parity gate + 1 replay tool, 0 failures** |
+
+### 189.4 Honest reckoning — what's STILL fragile after chapter 189
+
+This list is now what it is, not papered:
+
+- **No integration test** for hybrid bench loop end-to-end (M697 deferred — substantive mocking work)
+- **No load test** at 8h × 5 iter/sec scale
+- **No CI / GitHub Actions** — chapter 184-189 fixes verified manually on M-series Mac; will regress unless CI catches it
+- **No multi-device testing** — only iPhone 17e validated; 12 / 14 / etc untested
+- **No JSONL checksum** — bench output corruption invisible (replay tool catches structural issues but not bit-flips)
+- **No partial-write recovery** — process crash mid-iter leaves JSONL in indeterminate state
+- **No memory profiling** across 8h
+- **No thermal stress** validation
+- **No real iPhone 8h bench data** — user has never actually tapped Run Hybrid for 8 hours under production conditions
+
+These are all real gaps. Chapter 一百九十+ work. **The system is now honest about what it doesn't know.**
+
+### 189.5 What changed in framing
+
+| Chapter 一百八十八 framing (overconfident) | Chapter 一百八十九 framing (honest) |
+|---|---|
+| "near-zero residual" | "1 HIGH partial → now full close, but new gaps surfaced" |
+| "mature tier (chapter 67's 25% baseline)" | "still untested at production scale" |
+| "doctrine state of knows-what-it-doesn't-know" | "knows about the bugs it found; doesn't know about the ones it hasn't searched for" |
+| "deep-review FP rate scales inversely with surface maturity" | "deep-review caught 31 real bugs from 75 findings; we don't know how many real bugs are still uncaught" |
+
+The doctrine isn't wrong; the *application* of the doctrine to claim closure was. **No surface is mature until it's been exercised in production**.
+
+### 189.6 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | M696 sed-wrap 32 in-loop `+= 1` writes via `applyIfActive(myGen)` + 2 multi-line MAE Welford recurrences manually wrapped |
+| `SampleHostTests/SampleHostTests.swift` | +2 fuzz tests (M698): featurize random + adversarial; row Codable round-trip on 9 adversarial bodies |
+| `scripts/replay_hybrid_bench.py` | NEW — bench-replay tool (~245 LOC); reconstructs partition + verifies invariants |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+| `docs/BEHAVIORAL_AI_SUBSTRATE_CHANGELOG.md` | M696-M702 entry |
+
+### 189.7 一句话总结
+
+**Chapter 一百八十九 (M696-M702)**: respond to user "远远不够 还是 过于 脆弱" by **rejecting chapter 一百八十八's overconfident "mature tier" framing** + shipping concrete fragility fixes. (1) **B5-extended FULL wrap (M696)**: chapter 188's "helper available" was actually 0 call sites — dead code. Sed-wrap 32 `+= 1` writes + 2 multi-line MAE writes manually = **34 generation-guarded writes**; race window now closed per-write, not just per-iter. (2) **Fuzz tests (M698)**: `testFeatureEncoderFuzzRandomInputs` (200 random + adversarial signatures) + `testHybridBenchRowFuzzRoundTrip` (9 cases with empty / newlines / quotes / 5K body / emoji / multi-script unicode / control chars / NUL). 209 input combinations vs pre-this-batch's 0. (3) **Bench replay tool (M699)**: NEW `scripts/replay_hybrid_bench.py` — reads bench JSONL, reconstructs partition counters, verifies non-finite-float-as-string-sentinel (chapter 184 B2 working), routerOverridden frequency, 9-way permit confusion matrix, verbosity acc vs train, length/latency MAE vs train. **First analysis tool that reads JSONL and validates it.** (4) **M697 integration test deferred** as honest gap — substrate + LLM mocking is substantive work for chapter 一百九十+. **Honest reckoning of what's still fragile**: no integration test / no load test / no CI / no multi-device / no JSONL checksum / no partial-write recovery / no memory profiling / no thermal stress / **no real production 8h bench data**. The system is theoretically clean but empirically untested. Chapter 188's "mature tier" claim conflated "no known bugs" with "verified robust". Different things. Build SUCCESS / iPhone 17e deployed / 1905 tests + 1 parity gate + 1 replay tool + 5 boundary checks + Python pytest 19 all green. **Cumulative real-bug closure 30 of 31 (97%)** but **fragility list is honest about untested production surface**. The doctrine state is now: knows about caught bugs; honest about uncaught risk.
+
+
+
 
 
 

@@ -381,6 +381,130 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(model.hybridBenchPartitionDelta, 0)
     }
 
+    // MARK: - M698 chapter 一百八十九 — fuzz tests
+
+    /// M698 fuzz: feed random + adversarial signature inputs to
+    /// `ChengluFeatureEncoder.encode` — verify dimensions
+    /// invariant + sum-bounds invariant hold for ALL inputs.
+    func testFeatureEncoderFuzzRandomInputs() {
+        // 200 random signatures, no crash, dim+sum invariants.
+        var rng = SystemRandomNumberGenerator()
+        let canon = [
+            ChengluFeatureEncoder.tones,
+            ChengluFeatureEncoder.domains,
+            ChengluFeatureEncoder.stakes,
+            ChengluFeatureEncoder.timeframes,
+            ChengluFeatureEncoder.confidants,
+            ChengluFeatureEncoder.askShapes,
+        ]
+        for _ in 0..<200 {
+            // Mix of canonical + adversarial values.
+            let inAlphabet = Bool.random(using: &rng)
+            let pick: (Int) -> String = { i in
+                inAlphabet
+                    ? (canon[i].randomElement(using: &rng) ?? "")
+                    : "INVALID-\(Int.random(in: 0..<99, using: &rng))"
+            }
+            let f = ChengluPromptFeatures(
+                tone: pick(0),
+                domain: pick(1),
+                stake: pick(2),
+                timeframe: pick(3),
+                confidant: pick(4),
+                askShape: pick(5),
+                mutationSeed: Int.random(
+                    in: -10..<20, using: &rng))
+            let v = ChengluFeatureEncoder.encode(f)
+            XCTAssertEqual(v.count, 43, "dim invariant broke")
+            // Each value 0.0 or 1.0 (no other floats possible)
+            for value in v {
+                XCTAssertTrue(
+                    value == 0.0 || value == 1.0,
+                    "encode produced non-binary value: \(value)")
+            }
+            // Sum is bounded by alphabet count (max 7 active).
+            let sum = v.reduce(0, +)
+            XCTAssertGreaterThanOrEqual(sum, 0)
+            XCTAssertLessThanOrEqual(sum, 7)
+        }
+    }
+
+    /// M698 fuzz: random `SampleHostHybridBenchRow` round-trip
+    /// through encodeHybrid → JSON → decode. Catches Codable
+    /// edge cases beyond what hand-crafted tests cover.
+    func testHybridBenchRowFuzzRoundTrip() throws {
+        let testCases: [(body: String, prompt: String, status: String)] = [
+            ("ok response", "ok prompt", "ok"),
+            ("", "empty body case", "afm-error"),
+            ("Body with\nnewlines\nand\ttabs", "p", "ok"),
+            ("\"quoted\" \\backslash 'single'", "p", "ok"),
+            (String(repeating: "x", count: 5000),
+             "huge body", "ok"),
+            ("emoji 🚀💥🔥", "p", "ok"),
+            ("unicode: 你好 こんにちは مرحبا", "p", "ok"),
+            ("control \u{0001}\u{0002}\u{001F}", "p", "ok"),
+            ("nul \u{0000}char", "p", "ok"),
+        ]
+        let sig = SampleHostPromptSignature(
+            tone: "anxious", domain: "financial", stake: "low",
+            timeframe: "minutes", confidant: "friend",
+            askShape: "narrative")
+        for (idx, tc) in testCases.enumerated() {
+            let row = SampleHostHybridBenchRow(
+                timestamp: "2026-05-06T01:00:00Z",
+                iteration: idx, seed: idx,
+                stride: 5041, mutationSeed: idx % 5,
+                signature: sig, prompt: tc.prompt,
+                auditCodeCount: 100,
+                permitMode: "answer",
+                routerVersion: "fuzz",
+                routerPredictedRoute: "afm",
+                routerProbability: Double.random(in: 0...1),
+                firstTriedLLM: "afm",
+                firstTriedStatus: tc.status,
+                firstTriedBody: tc.body,
+                firstTriedDurationMs: Double.random(in: 0...10000),
+                fallbackTriedLLM: nil, fallbackStatus: nil,
+                fallbackBody: nil, fallbackDurationMs: nil,
+                actualRoute: "afm-predicted-ok", routerHit: true,
+                totalDurationSeconds: Double.random(in: 0...10),
+                errorMessage: nil,
+                dispatchPolicy: "single-llm",
+                dispatchTaken: "single-llm",
+                draftOnly: false, llmSkipped: false,
+                postLLMPermitMode: nil,
+                postLLMAuditCodeCount: nil,
+                postLLMShifted: nil,
+                permitPredictBlockProb: 0.3,
+                permitPredictClass: "non-block",
+                permitPredictAgreement: true,
+                permitPredictDetailedAgreement: "non-block:answer",
+                routerOverridden: false,
+                lengthPredicted: 1200,
+                lengthError: Double(tc.body.count) - 1200,
+                latencyPredictedMs: 5000,
+                latencyErrorMs: 0,
+                verbosityProbability: 0.3,
+                verbosityCorrect: tc.body.count > 1500 ? false : true)
+            let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
+            guard let data = encoded.data(using: .utf8) else {
+                XCTFail("UTF-8 encode failed: idx=\(idx)")
+                continue
+            }
+            let decoded = try JSONDecoder().decode(
+                SampleHostHybridBenchRow.self, from: data)
+            // Critical fields must round-trip.
+            XCTAssertEqual(
+                decoded.firstTriedBody, tc.body,
+                "body round-trip failed: idx=\(idx)")
+            XCTAssertEqual(
+                decoded.firstTriedStatus, tc.status,
+                "status round-trip failed: idx=\(idx)")
+        }
+    }
+
+    // MARK: - chapter 一百八十七 + earlier tests continue below
+
     /// M683 chapter 一百八十七 — A2 Swift 6 prep:
     /// `private nonisolated init()` lets `static let shared`
     /// initialize without isolation conflict. Callable from any

@@ -2368,9 +2368,9 @@ extension SampleHostModel {
                 }()
                 if let agree = permitPredictAgreement {
                     if agree {
-                        self.hybridBenchPermitPredictHits += 1
+                        applyIfActive(myGen) { self.hybridBenchPermitPredictHits += 1 }
                     } else {
-                        self.hybridBenchPermitPredictMisses += 1
+                        applyIfActive(myGen) { self.hybridBenchPermitPredictMisses += 1 }
                     }
                 }
 
@@ -2444,11 +2444,11 @@ extension SampleHostModel {
                     routerOverridden = true
                     switch dispatchPolicy {
                     case .skipBlock:
-                        self.hybridBenchSubstrateSkipBlock += 1
+                        applyIfActive(myGen) { self.hybridBenchSubstrateSkipBlock += 1 }
                     case .skipReplace:
-                        self.hybridBenchSubstrateSkipReplace += 1
+                        applyIfActive(myGen) { self.hybridBenchSubstrateSkipReplace += 1 }
                     case .skipDelay:
-                        self.hybridBenchSubstrateSkipDelay += 1
+                        applyIfActive(myGen) { self.hybridBenchSubstrateSkipDelay += 1 }
                     default: break
                     }
                 } else if dispatchPolicy == .bothLLMs {
@@ -2486,16 +2486,16 @@ extension SampleHostModel {
                         ? "substrate-both-failed"
                         : "substrate-both-\(dispatchPolicy.rawValue)"
                     if bothFailed {
-                        self.hybridBenchBothFailed += 1
+                        applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
                         // M666 — substrate forced both LLMs;
                         // routerHits/Misses doesn't apply.
                         routerHit = false
                     } else {
                         if afmBodyMaybe != nil {
-                            self.hybridBenchAFMOk += 1
+                            applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
                         }
                         if gemmaBodyMaybe != nil {
-                            self.hybridBenchGemmaOk += 1
+                            applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
                         }
                     }
                     if afmErr != nil { errorMessage = "afm: \(afmErr!)" }
@@ -2506,7 +2506,7 @@ extension SampleHostModel {
                     // overrides router prediction. Don't pollute
                     // routerHits/Misses with these rows.
                     routerOverridden = true
-                    self.hybridBenchSubstrateBothLLMs += 1
+                    applyIfActive(myGen) { self.hybridBenchSubstrateBothLLMs += 1 }
                 } else if dispatchPolicy == .localOnly {
                     // M628 — substrate flagged no-cloud. Force
                     // Gemma path, never AFM. M666 chapter 一百
@@ -2519,7 +2519,7 @@ extension SampleHostModel {
                         firstDurationMs =
                             Date().timeIntervalSince(firstStart) * 1000
                         actualRoute = "local-only-gemma-ok"
-                        self.hybridBenchGemmaOk += 1
+                        applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
                     } catch {
                         firstTriedLLM = "gemma"
                         firstStatus = "gemma-error"
@@ -2527,11 +2527,11 @@ extension SampleHostModel {
                             Date().timeIntervalSince(firstStart) * 1000
                         errorMessage = "gemma local-only: \(error)"
                         actualRoute = "local-only-gemma-failed"
-                        self.hybridBenchBothFailed += 1
+                        applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
                         routerHit = false
                     }
                     routerOverridden = true
-                    self.hybridBenchSubstrateLocalOnly += 1
+                    applyIfActive(myGen) { self.hybridBenchSubstrateLocalOnly += 1 }
                 } else {
                     // M628 — `.singleLLM` or `.draftOnly` falls
                     // through to original router-driven logic.
@@ -2540,7 +2540,7 @@ extension SampleHostModel {
                     // as not-yet-committed.
                     if dispatchPolicy == .draftOnly {
                         draftOnlyFlag = true
-                        self.hybridBenchSubstrateDraftOnly += 1
+                        applyIfActive(myGen) { self.hybridBenchSubstrateDraftOnly += 1 }
                     }
                     if routerConfidence == .uncertain {
                     // v0.2 — uncertain zone: call BOTH LLMs, pick
@@ -2600,11 +2600,11 @@ extension SampleHostModel {
                     let bothFailed =
                         afmBodyMaybe == nil && gemmaBodyMaybe == nil
                     if afmBodyMaybe != nil && gemmaBodyMaybe == nil {
-                        self.hybridBenchAFMOk += 1
+                        applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
                     } else if gemmaBodyMaybe != nil && afmBodyMaybe == nil {
-                        self.hybridBenchGemmaOk += 1
+                        applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
                     } else if bothFailed {
-                        self.hybridBenchBothFailed += 1
+                        applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
                         // M627 review #6: actualRoute lied as
                         // "uncertain-both-pick-afm" when both bodies
                         // are empty. Correct semantic:
@@ -2612,9 +2612,9 @@ extension SampleHostModel {
                     } else {
                         // Both succeeded (best case)
                         if pickedAFM {
-                            self.hybridBenchAFMOk += 1
+                            applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
                         } else {
-                            self.hybridBenchGemmaOk += 1
+                            applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
                         }
                     }
                     if afmErr != nil { errorMessage = "afm: \(afmErr!)" }
@@ -2625,10 +2625,10 @@ extension SampleHostModel {
                     // at least one body returned. Both-failed
                     // increments routerMisses instead.
                     if bothFailed {
-                        self.hybridBenchRouterMisses += 1
+                        applyIfActive(myGen) { self.hybridBenchRouterMisses += 1 }
                         routerHit = false
                     } else {
-                        self.hybridBenchRouterHits += 1
+                        applyIfActive(myGen) { self.hybridBenchRouterHits += 1 }
                     }
                 } else {
                     // Confident — original single-LLM-with-fallback path
@@ -2642,18 +2642,18 @@ extension SampleHostModel {
                             Date().timeIntervalSince(firstStart) * 1000
                         actualRoute = "\(routerRoute.rawValue)-predicted-ok"
                         if routerRoute == .afm {
-                            self.hybridBenchAFMOk += 1
+                            applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
                         } else {
-                            self.hybridBenchGemmaOk += 1
+                            applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
                         }
-                        self.hybridBenchRouterHits += 1
+                        applyIfActive(myGen) { self.hybridBenchRouterHits += 1 }
                     } catch {
                         firstStatus = "\(routerRoute.rawValue)-error"
                         firstDurationMs =
                             Date().timeIntervalSince(firstStart) * 1000
                         errorMessage = "first: \(error)"
                         routerHit = false
-                        self.hybridBenchRouterMisses += 1
+                        applyIfActive(myGen) { self.hybridBenchRouterMisses += 1 }
                         let fbStart = Date()
                         do {
                             let other: String
@@ -2663,14 +2663,14 @@ extension SampleHostModel {
                                 fallbackStatus = "ok"
                                 fallbackBody = other
                                 actualRoute = "afm-fallback-to-gemma-ok"
-                                self.hybridBenchAFMFallbackToGemmaOk += 1
+                                applyIfActive(myGen) { self.hybridBenchAFMFallbackToGemmaOk += 1 }
                             } else {
                                 other = try await self.callAFM(prompt: prompt)
                                 fallbackLLM = "afm"
                                 fallbackStatus = "ok"
                                 fallbackBody = other
                                 actualRoute = "gemma-fallback-to-afm-ok"
-                                self.hybridBenchGemmaFallbackToAFMOk += 1
+                                applyIfActive(myGen) { self.hybridBenchGemmaFallbackToAFMOk += 1 }
                             }
                             fallbackDurationMs =
                                 Date().timeIntervalSince(fbStart) * 1000
@@ -2679,7 +2679,7 @@ extension SampleHostModel {
                             fallbackStatus = "error"
                             errorMessage = (errorMessage ?? "") + " fb: \(error)"
                             actualRoute = "both-failed"
-                            self.hybridBenchBothFailed += 1
+                            applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
                             fallbackDurationMs =
                                 Date().timeIntervalSince(fbStart) * 1000
                         }
@@ -2766,7 +2766,7 @@ extension SampleHostModel {
                         postLLMShifted =
                             postLLMPermitMode != permitMode
                         if postLLMShifted == true {
-                            self.hybridBenchPostLLMShifted += 1
+                            applyIfActive(myGen) { self.hybridBenchPostLLMShifted += 1 }
                         }
                     }
                 }
@@ -2805,19 +2805,30 @@ extension SampleHostModel {
                         // 144K samples). Sum/Count kept for
                         // backward compat in JSONL analysis.
                         // M689 ch188 — B8 retire: only Count + Running.
-                        self.hybridBenchLengthMAECount += 1
-                        let n = Double(self.hybridBenchLengthMAECount)
-                        self.hybridBenchLengthMAERunning +=
-                            (abs(err) - self.hybridBenchLengthMAERunning) / n
+                        // M696 ch189 — wrap multi-line Welford
+                        // recurrence in applyIfActive too.
+                        applyIfActive(myGen) {
+                            self.hybridBenchLengthMAECount += 1
+                            let n = Double(
+                                self.hybridBenchLengthMAECount)
+                            self.hybridBenchLengthMAERunning +=
+                                (abs(err)
+                                 - self.hybridBenchLengthMAERunning)
+                                / n
+                        }
                     }
                     if let pred = latencyPredictedMs {
                         let err = firstDurationMs - pred
                         latencyErrorMs = err
-                        // M689 ch188 — B8 retire: only Count + Running.
-                        self.hybridBenchLatencyMAECount += 1
-                        let n = Double(self.hybridBenchLatencyMAECount)
-                        self.hybridBenchLatencyMAERunningMs +=
-                            (abs(err) - self.hybridBenchLatencyMAERunningMs) / n
+                        applyIfActive(myGen) {
+                            self.hybridBenchLatencyMAECount += 1
+                            let n = Double(
+                                self.hybridBenchLatencyMAECount)
+                            self.hybridBenchLatencyMAERunningMs +=
+                                (abs(err)
+                                 - self.hybridBenchLatencyMAERunningMs)
+                                / n
+                        }
                     }
                     if let prob = verbosityProb {
                         let actualLong = servedBody.count
@@ -2827,9 +2838,9 @@ extension SampleHostModel {
                         let correct = actualLong == predictedLong
                         verbosityCorrect = correct
                         if correct {
-                            self.hybridBenchVerbosityCorrect += 1
+                            applyIfActive(myGen) { self.hybridBenchVerbosityCorrect += 1 }
                         } else {
-                            self.hybridBenchVerbosityWrong += 1
+                            applyIfActive(myGen) { self.hybridBenchVerbosityWrong += 1 }
                         }
                     }
                 }
