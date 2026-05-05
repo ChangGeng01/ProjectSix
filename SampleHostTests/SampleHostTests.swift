@@ -267,7 +267,9 @@ final class SampleHostTests: XCTestCase {
             latencyPredictedMs: .nan, latencyErrorMs: -.infinity,
             verbosityProbability: .nan, verbosityCorrect: nil,
             thermalState: "nominal", batteryLevel: 0.5,
-            lowPowerMode: false, hourOfDay: 12)
+            lowPowerMode: false, hourOfDay: 12,
+            smokeMode: nil, targetLayer: nil,
+            targetLayerName: nil)
         // Must not throw — strategy stringifies non-finite.
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
@@ -292,12 +294,39 @@ final class SampleHostTests: XCTestCase {
     /// M672 chapter 一百八十五 — B14 schema version constant.
     /// M675 chapter 一百八十六 bumped to "6".
     /// M703 chapter 一百九十 bumped to "7" (pressure fields).
-    /// Test pinned to current; `testHybridBenchRowSchemaVersionV7`
-    /// is the live pin.
+    /// M712 chapter 一百九十一 bumped to "8" (14-layer smoke).
     func testHybridBenchRowSchemaVersion() {
         XCTAssertEqual(
-            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "7",
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "8",
             "Schema version must bump on breaking field change")
+    }
+
+    /// M711 chapter 一百九十一 — 14-layer smoke profile MUST
+    /// cover exactly 14 layers with monotonic indices 1..14.
+    func testFourteenLayerSmokeProfileCoverage() {
+        let layers = FourteenLayerSmokeProfile.layers
+        XCTAssertEqual(layers.count, 14,
+            "FourteenLayerSmokeProfile must have 14 entries")
+        let indices = layers.map(\.layerIndex).sorted()
+        XCTAssertEqual(indices, Array(1...14),
+            "layer indices must be monotonic 1..14")
+        let names = Set(layers.map(\.layerName))
+        XCTAssertEqual(names.count, 14,
+            "layer names must be unique")
+    }
+
+    /// M711 — `profile(forIter:)` cycles through all 14 layers.
+    func testFourteenLayerSmokeProfileCycles() {
+        // 28 iters → each layer hit exactly twice.
+        var hits: [Int: Int] = [:]
+        for iter in 0..<28 {
+            let p = FourteenLayerSmokeProfile.profile(forIter: iter)
+            hits[p.layerIndex, default: 0] += 1
+        }
+        for layer in 1...14 {
+            XCTAssertEqual(hits[layer], 2,
+                "L\(layer) hit \(hits[layer] ?? 0) times in 28 iters")
+        }
     }
 
     /// M672 chapter 一百八十五 — B10 magic numbers extracted.
@@ -368,7 +397,9 @@ final class SampleHostTests: XCTestCase {
             latencyPredictedMs: nil, latencyErrorMs: nil,
             verbosityProbability: nil, verbosityCorrect: nil,
             thermalState: nil, batteryLevel: nil,
-            lowPowerMode: nil, hourOfDay: nil)
+            lowPowerMode: nil, hourOfDay: nil,
+            smokeMode: nil, targetLayer: nil,
+            targetLayerName: nil)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains(
@@ -493,7 +524,9 @@ final class SampleHostTests: XCTestCase {
                 verbosityProbability: 0.3,
                 verbosityCorrect: tc.body.count > 1500 ? false : true,
                 thermalState: "nominal", batteryLevel: 0.5,
-                lowPowerMode: false, hourOfDay: 12)
+                lowPowerMode: false, hourOfDay: 12,
+                smokeMode: "canonical", targetLayer: nil,
+                targetLayerName: nil)
             let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
             guard let data = encoded.data(using: .utf8) else {
                 XCTFail("UTF-8 encode failed: idx=\(idx)")
@@ -513,11 +546,13 @@ final class SampleHostTests: XCTestCase {
 
     // MARK: - chapter 一百八十七 + earlier tests continue below
 
-    /// M703 chapter 一百九十 — schema bumped to "7" (added
-    /// pressure context fields).
+    /// M703 chapter 一百九十 schema "7" (pressure context).
+    /// M712 chapter 一百九十一 schema "8" (14-layer smoke).
+    /// Test name kept as `V7` for git history clarity; assertion
+    /// pins the live current version.
     func testHybridBenchRowSchemaVersionV7() {
         XCTAssertEqual(
-            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "7",
+            SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION, "8",
             "Schema version must bump on breaking field change")
     }
 
@@ -557,7 +592,11 @@ final class SampleHostTests: XCTestCase {
             thermalState: "fair",
             batteryLevel: 0.42,
             lowPowerMode: true,
-            hourOfDay: 14)
+            hourOfDay: 14,
+            // M712 chapter 一百九十一 — 14-layer smoke tags.
+            smokeMode: "14-layer-smoke",
+            targetLayer: 7,
+            targetLayerName: "L7-mirror")
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains("\"thermalState\":\"fair\""),
@@ -649,7 +688,9 @@ final class SampleHostTests: XCTestCase {
             latencyPredictedMs: nil, latencyErrorMs: nil,
             verbosityProbability: nil, verbosityCorrect: nil,
             thermalState: nil, batteryLevel: nil,
-            lowPowerMode: nil, hourOfDay: nil)
+            lowPowerMode: nil, hourOfDay: nil,
+            smokeMode: nil, targetLayer: nil,
+            targetLayerName: nil)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         guard let data = encoded.data(using: .utf8) else {
             XCTFail("failed to UTF-8 encode JSONL line")
@@ -702,13 +743,15 @@ final class SampleHostTests: XCTestCase {
             latencyPredictedMs: nil, latencyErrorMs: nil,
             verbosityProbability: nil, verbosityCorrect: nil,
             thermalState: nil, batteryLevel: nil,
-            lowPowerMode: nil, hourOfDay: nil)
+            lowPowerMode: nil, hourOfDay: nil,
+            smokeMode: nil, targetLayer: nil,
+            targetLayerName: nil)
         let encoded = try SampleHostBenchHelpers.encodeHybrid(row)
         XCTAssertTrue(
             encoded.contains("\"routerOverridden\":true"),
             "row must encode routerOverridden field: \(encoded)")
         XCTAssertTrue(
-            encoded.contains("\"schemaVersion\":\"7\""),
+            encoded.contains("\"schemaVersion\":\"8\""),
             "row must encode schemaVersion field: \(encoded)")
     }
 

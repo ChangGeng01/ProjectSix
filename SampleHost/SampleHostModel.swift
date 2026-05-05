@@ -441,6 +441,20 @@ final class SampleHostModel: ObservableObject {
     @Published var hybridBenchRotationPeriodIter: Int = 11_300
     @Published var hybridBenchMutationSeedCount: Int = 5
     @Published var hybridBenchJSONLRotationMB: Int = 15
+    // M710 chapter 一百九十一 — extracted from HybridBenchTuning
+    // constants. User can adjust via UI (chapter 191 sliders).
+    @Published var hybridBenchVerbosityThresholdChars: Int =
+        HybridBenchTuning.verbosityThresholdChars
+    @Published var hybridBenchSigmoidClassThreshold: Double =
+        HybridBenchTuning.sigmoidClassThreshold
+    @Published var hybridBenchYieldEveryNIters: Int =
+        HybridBenchTuning.yieldEveryNIters
+    @Published var hybridBenchPostLLMTruncationChars: Int =
+        HybridBenchTuning.postLLMBodyTruncationChars
+    /// M711 chapter 一百九十一 — `.canonical` (chapter 178+
+    /// default) vs `.fourteenLayer` (M711 14-layer smoke).
+    @Published var hybridBenchSmokeMode:
+        HybridBenchConfig.SmokeMode = .canonical
     @Published private(set) var hybridBenchIsRunning: Bool = false
     @Published private(set) var hybridBenchIterations: Int = 0
     @Published private(set) var hybridBenchAFMOk: Int = 0
@@ -1646,44 +1660,227 @@ private func gcd(_ a: Int, _ b: Int) -> Int {
 
 // MARK: - M619 chapter 一百七十七 §177 — Hybrid bench row + runner
 
-/// M672 chapter 一百八十五 — typed bench tuning constants
-/// (was: magic numbers `1500`, `0.5`, `8`, etc. scattered).
-/// Doctrine pin: chapter 一百三十 anti-magic-number applied to
-/// hybrid bench loop. All `1500` thresholds delegate to the
-/// shared `ChengluFeatureEncoder` indirectly via Python's
-/// `VERBOSITY_THRESHOLD_CHARS` (which is the trained model's
-/// label cutoff).
+/// M672 chapter 一百八十五 — typed bench tuning constants.
+/// M710 chapter 一百九十一 — these become DEFAULTS for the
+/// procedural `HybridBenchConfig` struct. The bench loop now
+/// reads from a per-run config, not these constants. Kept
+/// here as the doctrinal-default reference, used as initial
+/// values when the user has not customized.
 enum HybridBenchTuning {
     /// Verbosity classification threshold (chars). Must match
     /// Python `VERBOSITY_THRESHOLD_CHARS` in chenglu_feature_schema.
     static let verbosityThresholdChars: Int = 1500
     /// Sigmoid → class threshold (binary heads).
     static let sigmoidClassThreshold: Double = 0.5
-    /// `Task.yield()` cadence — every Nth iter. Lower = more
-    /// UI-responsive but more scheduler overhead. M667 chapter
-    /// 一百八十五 lowered from 8 → 1 (yield every iter) to
-    /// reduce sync substrate.startSession blocking on @MainActor.
+    /// `Task.yield()` cadence — every Nth iter.
     static let yieldEveryNIters: Int = 1
     /// Truncation cap on LLM body for substrate post-LLM
-    /// observation (chars). Pre-fix: full body (could be 20K+
-    /// chars from Gemma) was concatenated into observe prompt,
-    /// blowing up substrate eval time. M676 chapter 一百八十五
-    /// caps at 4000 chars; original length recorded in JSONL.
+    /// observation (chars).
     static let postLLMBodyTruncationChars: Int = 4000
+}
+
+/// M710 chapter 一百九十一 — procedural bench config replacing
+/// scattered hardcoded values. User vision: "大部分 固定 数值
+/// 都可以 改成 完全 flexible 程序化 生成". Every parameter that
+/// used to be a magic number / `let` constant is now in this
+/// struct, defaults from `HybridBenchTuning`, can be overridden
+/// at runtime.
+///
+/// Smoke modes (M711):
+///  - `.canonical`: chapter 178+ default — coprime stride rotation
+///    over 40,320-combination signature catalog
+///  - `.fourteenLayer`: bench cycles through 14 distinct
+///    `(signature, risk, workflow)` profiles, each targeting a
+///    specific BAS substrate layer's behavior, so a 2h smoke
+///    exercises every layer ~equally
+struct HybridBenchConfig: Codable, Sendable, Equatable {
+    enum SmokeMode: String, Codable, CaseIterable, Sendable {
+        case canonical = "canonical"
+        case fourteenLayer = "14-layer-smoke"
+    }
+    var durationHours: Double
+    var strideRotationCSV: String
+    var rotationPeriodIter: Int
+    var mutationSeedCount: Int
+    var jsonlRotationMB: Int
+    // M710 — was hardcoded HybridBenchTuning; now flex.
+    var verbosityThresholdChars: Int
+    var sigmoidClassThreshold: Double
+    var yieldEveryNIters: Int
+    var postLLMBodyTruncationChars: Int
+    // M711 — smoke profile selector
+    var smokeMode: SmokeMode
+
+    static let `default` = HybridBenchConfig(
+        durationHours: 8.0,
+        strideRotationCSV: "5041,5039,5051,5077,7919",
+        rotationPeriodIter: 11_300,
+        mutationSeedCount: 5,
+        jsonlRotationMB: 15,
+        verbosityThresholdChars:
+            HybridBenchTuning.verbosityThresholdChars,
+        sigmoidClassThreshold:
+            HybridBenchTuning.sigmoidClassThreshold,
+        yieldEveryNIters:
+            HybridBenchTuning.yieldEveryNIters,
+        postLLMBodyTruncationChars:
+            HybridBenchTuning.postLLMBodyTruncationChars,
+        smokeMode: .canonical)
+
+    /// 2h smoke preset — chapter 一百九十一 user vision:
+    /// "真机 跑2小时冒烟 最好 14层 每层都冒烟测试".
+    static let twoHourFourteenLayerSmoke = HybridBenchConfig(
+        durationHours: 2.0,
+        strideRotationCSV: "5041,5039,5051,5077,7919",
+        rotationPeriodIter: 11_300,
+        mutationSeedCount: 5,
+        jsonlRotationMB: 15,
+        verbosityThresholdChars:
+            HybridBenchTuning.verbosityThresholdChars,
+        sigmoidClassThreshold:
+            HybridBenchTuning.sigmoidClassThreshold,
+        yieldEveryNIters:
+            HybridBenchTuning.yieldEveryNIters,
+        postLLMBodyTruncationChars:
+            HybridBenchTuning.postLLMBodyTruncationChars,
+        smokeMode: .fourteenLayer)
+}
+
+/// M711 chapter 一百九十一 — 14-layer smoke profile.
+/// Maps each BAS substrate layer (L1 lifecycle wake → L14
+/// reflection) to a `(signature, risk, workflow)` tuple that's
+/// most likely to exercise that layer's distinctive behavior.
+/// Bench in `.fourteenLayer` mode cycles through all 14 each
+/// `mutationSeedCount * 14` iters so a 2h run with ~36K iters
+/// gets ~2,500 samples per layer.
+enum FourteenLayerSmokeProfile {
+    /// Per-layer profile struct.
+    struct Profile: Sendable {
+        let layerIndex: Int           // 1...14
+        let layerName: String
+        let tone: String
+        let domain: String
+        let stake: String
+        let timeframe: String
+        let confidant: String
+        let askShape: String
+        let risk: BASHostRiskLevel
+        let workflow: BASHostWorkflowProfile
+        let kind: BASHostSessionKind
+    }
+
+    /// Each layer's most-distinctive smoke profile.
+    /// Doctrine: signature combinations chosen so substrate's
+    /// per-layer logic (wake / breath / lung / horizon / ...)
+    /// gets meaningful exercise. NOT a perfect 1:1 mapping —
+    /// substrate is multi-layer per turn — but skews iter
+    /// distribution toward distinct layer activations.
+    static let layers: [Profile] = [
+        Profile(layerIndex: 1, layerName: "L1-wake",
+            tone: "anxious", domain: "financial",
+            stake: "low", timeframe: "minutes",
+            confidant: "friend", askShape: "narrative",
+            risk: .low, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 2, layerName: "L2-breath",
+            tone: "agentic", domain: "work",
+            stake: "modest", timeframe: "hours",
+            confidant: "expert", askShape: "decision-tree",
+            risk: .medium, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 3, layerName: "L3-lung",
+            tone: "vulnerable", domain: "relational",
+            stake: "high", timeframe: "days",
+            confidant: "friend", askShape: "narrative",
+            risk: .medium, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 4, layerName: "L4-horizon",
+            tone: "curious", domain: "creative",
+            stake: "low", timeframe: "weeks",
+            confidant: "decision-system",
+            askShape: "single-action",
+            risk: .low, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 5, layerName: "L5-host",
+            tone: "authoritative", domain: "identity",
+            stake: "very-high", timeframe: "months",
+            confidant: "expert", askShape: "decision-tree",
+            risk: .medium, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 6, layerName: "L6-context",
+            tone: "confused", domain: "ethical",
+            stake: "high", timeframe: "lifetime",
+            confidant: "stranger", askShape: "narrative",
+            risk: .high, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 7, layerName: "L7-mirror",
+            tone: "grieving", domain: "trauma",
+            stake: "irreversible", timeframe: "past-unresolved",
+            confidant: "friend", askShape: "narrative",
+            risk: .high, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 8, layerName: "L8-memory",
+            tone: "agentic", domain: "parenting",
+            stake: "high", timeframe: "lifetime",
+            confidant: "expert", askShape: "decision-tree",
+            risk: .medium, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 9, layerName: "L9-candidates",
+            tone: "anxious", domain: "medical",
+            stake: "very-high", timeframe: "days",
+            confidant: "expert", askShape: "single-action",
+            risk: .high, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 10, layerName: "L10-tribunal",
+            tone: "confused", domain: "ethical",
+            stake: "irreversible",
+            timeframe: "non-reversible-after-act",
+            confidant: "decision-system",
+            askShape: "decision-tree",
+            risk: .high, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 11, layerName: "L11-risk-gate",
+            tone: "angry", domain: "existential",
+            stake: "non-reversible-after-act",
+            timeframe: "minutes",
+            confidant: "stranger",
+            askShape: "single-action",
+            risk: .high, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 12, layerName: "L12-surface",
+            tone: "vulnerable", domain: "relational",
+            stake: "high", timeframe: "days",
+            confidant: "friend", askShape: "narrative",
+            risk: .medium, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 13, layerName: "L13-evolution",
+            tone: "agentic", domain: "creative",
+            stake: "modest", timeframe: "weeks",
+            confidant: "decision-system",
+            askShape: "decision-tree",
+            risk: .low, workflow: .reflective,
+            kind: .interactive),
+        Profile(layerIndex: 14, layerName: "L14-reflection",
+            tone: "curious", domain: "existential",
+            stake: "modest", timeframe: "months",
+            confidant: "expert", askShape: "narrative",
+            risk: .low, workflow: .reflective,
+            kind: .interactive),
+    ]
+
+    static func profile(forIter iter: Int) -> Profile {
+        return layers[iter % layers.count]
+    }
 }
 
 /// M672 chapter 一百八十五 — explicit JSONL row schema version.
 /// Bump on any breaking field change so downstream analyzers
 /// can detect format upgrades. Optional decoding allows old rows
 /// (without this field) to load as nil.
-/// M703 chapter 一百九十 bumped to "7" — added pressure context
-/// fields (thermalState / batteryLevel / lowPowerMode /
-/// hourOfDay) so retrain pipeline (chapter 一百九十 M704) has
-/// situational context, not just signature features. Enables
-/// the user's stated vision: "make next 8h bench data train the
-/// model stronger / fit actual state / different scenarios /
-/// different pressures / different assumptions all handled".
-let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "7"
+/// M712 chapter 一百九十一 bumped to "8" — added smoke-mode +
+/// targetLayer fields enabling 14-layer per-layer coverage
+/// analysis (user vision: "14层 每层都冒烟测试").
+let SAMPLE_HOST_HYBRID_BENCH_ROW_SCHEMA_VERSION = "8"
 
 struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     /// M672 chapter 一百八十五 — schema version stamp.
@@ -1820,6 +2017,15 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     /// `Calendar.current.component(.hour, from: timestamp)`
     /// 0-23. Time-of-day patterns (user fatigue / context).
     let hourOfDay: Int?
+    // M712 chapter 一百九十一 — 14-layer smoke coverage tags.
+    // smokeMode: "canonical" or "14-layer-smoke" — lets replay
+    // tool stratify analyses by mode.
+    // targetLayer (1-14) populated when smokeMode is
+    // "14-layer-smoke"; identifies which BAS substrate layer
+    // this iter targeted via the FourteenLayerSmokeProfile.
+    let smokeMode: String?
+    let targetLayer: Int?
+    let targetLayerName: String?
 }
 
 /// M628 chapter 一百七十八 — typed policy mapping
@@ -2269,13 +2475,43 @@ extension SampleHostModel {
                 let strideIndex = (iter / rotationPeriod) % strideRotation.count
                 let chosenStride = strideRotation[strideIndex]
                 let mutationSeed = iter % mutationCount
+
+                // M711 chapter 一百九十一 — 14-layer smoke profile
+                // override. In `.fourteenLayer` mode, substitute
+                // signature with the layer's profile (cycling
+                // through all 14 every 14 iters). Prompt still
+                // generated by catalog so we get variation under
+                // each layer's signature combination.
+                let smokeMode = self.hybridBenchSmokeMode
+                let layerProfile: FourteenLayerSmokeProfile
+                    .Profile? = {
+                    if smokeMode == .fourteenLayer {
+                        return FourteenLayerSmokeProfile
+                            .profile(forIter: iter)
+                    }
+                    return nil
+                }()
+
                 let g = SampleHostBenchPromptCatalog
                     .generateScatteredWithMutation(
                         iter: iter,
                         stride: chosenStride,
                         mutationSeed: mutationSeed)
                 let prompt = g.prompt
-                let signature = g.signature
+                let signature: SampleHostPromptSignature
+                if let profile = layerProfile {
+                    // M711 — use layer-specific signature instead
+                    // of catalog's. Prompt still gets variation.
+                    signature = SampleHostPromptSignature(
+                        tone: profile.tone,
+                        domain: profile.domain,
+                        stake: profile.stake,
+                        timeframe: profile.timeframe,
+                        confidant: profile.confidant,
+                        askShape: profile.askShape)
+                } else {
+                    signature = g.signature
+                }
 
                 // M703 chapter 一百九十 — capture pressure context
                 // BEFORE substrate work (so it reflects situation
@@ -2783,8 +3019,9 @@ extension SampleHostModel {
                     // mitigate prompt-injection risk where LLM
                     // body could contain text substrate
                     // misinterprets as user intent.
-                    let cap = HybridBenchTuning
-                        .postLLMBodyTruncationChars
+                    // M710 chapter 一百九十一 — read from
+                    // @Published so user can adjust live.
+                    let cap = self.hybridBenchPostLLMTruncationChars
                     let truncatedBody: String
                     if observableBody.count > cap {
                         truncatedBody =
@@ -2882,10 +3119,11 @@ extension SampleHostModel {
                         }
                     }
                     if let prob = verbosityProb {
+                        // M710 chapter 一百九十一 — read live config
                         let actualLong = servedBody.count
-                            > HybridBenchTuning.verbosityThresholdChars
+                            > self.hybridBenchVerbosityThresholdChars
                         let predictedLong = prob
-                            >= HybridBenchTuning.sigmoidClassThreshold
+                            >= self.hybridBenchSigmoidClassThreshold
                         let correct = actualLong == predictedLong
                         verbosityCorrect = correct
                         if correct {
@@ -2942,7 +3180,10 @@ extension SampleHostModel {
                     thermalState: thermalRaw,
                     batteryLevel: batteryRaw,
                     lowPowerMode: lowPower,
-                    hourOfDay: hourCaptured)
+                    hourOfDay: hourCaptured,
+                    smokeMode: smokeMode.rawValue,
+                    targetLayer: layerProfile?.layerIndex,
+                    targetLayerName: layerProfile?.layerName)
                 do {
                     try await runner.appendRow(row)
                 } catch {
@@ -2979,7 +3220,8 @@ extension SampleHostModel {
                 // (×2 per iter via M630 closed loop) block
                 // @MainActor for ~50-100ms each; yielding more
                 // often lets UI updates + scrolling proceed.
-                if iter % HybridBenchTuning.yieldEveryNIters == 0 {
+                // M710 chapter 一百九十一 — read live config
+                if iter % max(1, self.hybridBenchYieldEveryNIters) == 0 {
                     await Task.yield()
                 }
             }

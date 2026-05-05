@@ -26,7 +26,7 @@ from collections import Counter
 from glob import glob
 from pathlib import Path
 
-EXPECTED_SCHEMA_VERSION = "7"  # M703 chapter 一百九十
+EXPECTED_SCHEMA_VERSION = "8"  # M712 chapter 一百九十一
 
 
 def load_jsonl(path: str) -> list[dict]:
@@ -246,6 +246,61 @@ def replay(rows: list[dict]) -> tuple[bool, list[str]]:
         diagnostics.append(
             f"pressure context distribution: "
             f"{dict(pressure_buckets)}")
+
+    # M713 chapter 一百九十一 — 14-layer smoke per-layer coverage.
+    # In `.fourteenLayer` smokeMode, every iter targets one of
+    # 14 BAS substrate layers via FourteenLayerSmokeProfile.
+    # This block reports per-layer iter count + per-layer
+    # mean-permit-mode + verbosity-acc + length-MAE so user can
+    # spot which layer's coverage / model accuracy is weakest.
+    layer_iters: dict[int, list[dict]] = {i: [] for i in range(1, 15)}
+    smoke_modes: Counter[str] = Counter()
+    for r in rows:
+        smoke_modes[r.get("smokeMode") or "unknown"] += 1
+        tl = r.get("targetLayer")
+        if isinstance(tl, int) and 1 <= tl <= 14:
+            layer_iters[tl].append(r)
+    diagnostics.append(
+        f"smoke modes: {dict(smoke_modes)}")
+    if any(layer_iters.values()):
+        diagnostics.append(
+            "14-layer smoke per-layer coverage:")
+        for layer in range(1, 15):
+            group = layer_iters[layer]
+            if not group:
+                diagnostics.append(
+                    f"  L{layer:>2}: 0 iters (NO COVERAGE)")
+                continue
+            permit_modes = Counter(
+                r.get("permitMode", "?") for r in group)
+            top_permit = permit_modes.most_common(1)[0]
+            verb_correct = sum(
+                1 for r in group
+                if r.get("verbosityCorrect") is True)
+            verb_seen = sum(
+                1 for r in group
+                if r.get("verbosityCorrect") is not None)
+            verb_acc = (
+                verb_correct / verb_seen if verb_seen else 0.0)
+            length_errs = [
+                abs(r["lengthError"]) for r in group
+                if isinstance(r.get("lengthError"), (int, float))
+                and math.isfinite(r["lengthError"])
+            ]
+            mae_l = (
+                sum(length_errs) / len(length_errs)
+                if length_errs else 0.0)
+            layer_name_set = Counter(
+                r.get("targetLayerName", "?") for r in group)
+            layer_name = (
+                layer_name_set.most_common(1)[0][0]
+                if layer_name_set else "?")
+            diagnostics.append(
+                f"  L{layer:>2} {layer_name:18s}: "
+                f"n={len(group):>4d} "
+                f"top-permit={top_permit[0]}({top_permit[1]}) "
+                f"verb={verb_acc:.2f} "
+                f"len-MAE={mae_l:.0f}")
 
     # Length / Latency MAE
     length_errs = [
