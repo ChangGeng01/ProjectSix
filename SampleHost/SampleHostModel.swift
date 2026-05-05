@@ -459,9 +459,25 @@ final class SampleHostModel: ObservableObject {
     @Published private(set) var hybridSinglePromptRoute: String = ""
     @Published private(set) var hybridSinglePromptProb: Double = 0
     private var hybridBenchTask: Task<Void, Never>?
+    // M627 chapter 177 deep-review fix #3 — Stop→Start race.
+    // Each start bumps generation + captures myGen. Old task at
+    // exit only writes hybridBenchIsRunning=false if its myGen
+    // still matches; otherwise a newer start has already run and
+    // we must not clobber its true. Also defends against the old
+    // task's final JSONL write racing the new task's runner.
+    private var hybridBenchGeneration: Int = 0
 
     #if canImport(BASMLXAdapter)
     private var gemmaAdapter: MLXOrganAdapter?
+    // M627 chapter 177 deep-review fix #2 — gate concurrent loads
+    // via in-flight Task. Two callGemma invocations during await
+    // suspension would both start loading the 4-bit model + LoRA
+    // (~3.4 GB, hundreds of MB resident wasted). Now they share.
+    private var gemmaLoadInFlight: Task<MLXOrganAdapter, Error>?
+    // M627 deep-review fix #4 — track LoRA load success separately
+    // from adapter init so a failed LoRA load doesn't poison the
+    // session: status tells the truth + future calls can retry.
+    private var gemmaLoraLoaded: Bool = false
     #endif
 
     private var benchTask: Task<Void, Never>?
@@ -1576,6 +1592,13 @@ actor SampleHostHybridBenchJSONLRunner {
     private var fileHandle: FileHandle?
     private var currentURL: URL?
     private var rotationIndex: Int = 0
+    // M627 chapter 177 deep-review fix #9 — track running byte
+    // count in-actor instead of querying FileManager.attributesOf.
+    // attributesOf may not reflect just-written bytes (FS / OS
+    // buffering), causing rotation to miss its window. Running
+    // tally is exact + cheap. Pre-existing files (resume case)
+    // seed currentBytes from disk on first open.
+    private var currentBytes: Int = 0
 
     init(rotationBytes: Int) {
         self.rotationBytes = rotationBytes
@@ -1585,12 +1608,8 @@ actor SampleHostHybridBenchJSONLRunner {
         let line = try SampleHostBenchHelpers.encodeHybrid(row) + "\n"
         guard let data = line.data(using: .utf8) else { return }
         let needNew: Bool
-        if let h = fileHandle, let url = currentURL {
-            let attrs = try? FileManager.default
-                .attributesOfItem(atPath: url.path)
-            let size = (attrs?[.size] as? Int) ?? 0
-            needNew = size + data.count > rotationBytes
-            _ = h
+        if fileHandle != nil, currentURL != nil {
+            needNew = currentBytes + data.count > rotationBytes
         } else {
             needNew = true
         }
@@ -1604,14 +1623,20 @@ actor SampleHostHybridBenchJSONLRunner {
                 atPath: url.path, contents: nil)
             currentURL = url
             fileHandle = try FileHandle(forWritingTo: url)
+            // Fresh file → 0 bytes. (For resume: seek-to-end +
+            // offset would be the path; we always create a new
+            // numbered shard so this is exact.)
+            currentBytes = 0
         }
         try fileHandle?.write(contentsOf: data)
+        currentBytes += data.count
     }
 
     func close() async {
         try? fileHandle?.close()
         fileHandle = nil
         currentURL = nil
+        currentBytes = 0
     }
 }
 
@@ -1620,6 +1645,19 @@ actor SampleHostHybridBenchJSONLRunner {
 extension SampleHostModel {
     /// Single-prompt hybrid test (UI panel). Predicts route via
     /// CoreML, calls chosen LLM, falls back to other on error.
+    ///
+    /// **M627 deep-review note #12** — by design this single-prompt
+    /// path does NOT take the v0.2 confidence-aware uncertain-zone
+    /// dual-LLM branch (chosen→fallback only). Rationale: the UI
+    /// panel is a "tap once + see it work" smoke probe. Always
+    /// calling both LLMs would double the latency that the user
+    /// is staring at, for marginal benefit on a single sample.
+    /// Bench path (`startHybridBench`) still uses dual-LLM voting
+    /// in the uncertain zone for the real signal collection.
+    /// Hardcoded features (agentic / creative / modest / …) are
+    /// also intentional: it's a smoke test, not signature-driven
+    /// inference. Bench rows derive features from the actual
+    /// generated prompt's signature.
     func runHybridSinglePrompt() {
         let prompt = afmTestPrompt
         let features = ChengluPromptFeatures(
@@ -1697,45 +1735,14 @@ extension SampleHostModel {
     /// call + applies LoRA M247 chat-template adapter (chapter 176
     /// §176.10 — 3.6× better convergence + learned [RISK]/[NEEDS_PERMIT]
     /// markers). Throws on error.
+    ///
+    /// M627 deep-review fix #2 + #4: load is gated through a single
+    /// in-flight Task so concurrent callers share, and LoRA load
+    /// status is tracked separately from adapter readiness so a
+    /// failed LoRA doesn't poison subsequent retries.
     private func callGemma(prompt: String) async throws -> String {
         #if canImport(BASMLXAdapter)
-        if gemmaAdapter == nil {
-            await MainActor.run {
-                self.hybridGemmaLoadStatus = "loading model…"
-            }
-            let adapter = MLXOrganAdapter(
-                model: MLXModelCatalog.gemma4_E2B_4bit)
-            try await adapter.loadModel()
-            // v0.3 — load LoRA M247 adapter from app bundle
-            // (~1.5 MB chat-template-format adapter, chapter 176
-            // §176.10 trained, learned to emit [RISK] / [NEEDS_PERMIT]
-            // markers with 3.6× better convergence vs raw Gemma).
-            if let loraURL = Bundle.main.url(
-                forResource: "qinao_curriculum_lora_m247",
-                withExtension: "safetensors")
-            {
-                await MainActor.run {
-                    self.hybridGemmaLoadStatus = "loading LoRA M247…"
-                }
-                do {
-                    try await adapter.loadAdapter(from: loraURL)
-                } catch {
-                    // Non-fatal: bare Gemma still works
-                    await MainActor.run {
-                        self.hybridGemmaLoadStatus =
-                            "lora-load-failed: \(error)"
-                    }
-                }
-            }
-            try await adapter.prewarm()
-            gemmaAdapter = adapter
-            await MainActor.run {
-                self.hybridGemmaLoadStatus = "ready (with LoRA M247)"
-            }
-        }
-        guard let adapter = gemmaAdapter else {
-            throw NSError(domain: "GemmaUnavailable", code: -2)
-        }
+        let adapter = try await ensureGemmaAdapter()
         let request = BASOrganRequest(
             requestID: "hybrid-prompt",
             role: .scout,
@@ -1750,6 +1757,62 @@ extension SampleHostModel {
             userInfo: [NSLocalizedDescriptionKey: "BASMLXAdapter not built"])
         #endif
     }
+
+    #if canImport(BASMLXAdapter)
+    /// Singleton-load gate — concurrent callers share one in-flight
+    /// Task instead of racing on `if gemmaAdapter == nil` (review #2).
+    private func ensureGemmaAdapter() async throws -> MLXOrganAdapter {
+        if let existing = gemmaAdapter { return existing }
+        if let inFlight = gemmaLoadInFlight {
+            return try await inFlight.value
+        }
+        let task = Task { [weak self] () throws -> MLXOrganAdapter in
+            // Off-actor work — we don't capture self's actor here.
+            let adapter = MLXOrganAdapter(
+                model: MLXModelCatalog.gemma4_E2B_4bit)
+            try await adapter.loadModel()
+            await MainActor.run { [weak self] in
+                self?.hybridGemmaLoadStatus = "model loaded, loading LoRA M247…"
+            }
+            // v0.3 — load LoRA M247 adapter from app bundle
+            var loraOK = false
+            if let loraURL = Bundle.main.url(
+                forResource: "qinao_curriculum_lora_m247",
+                withExtension: "safetensors")
+            {
+                do {
+                    try await adapter.loadAdapter(from: loraURL)
+                    loraOK = true
+                } catch {
+                    // Non-fatal — bare Gemma still works (review #4)
+                    await MainActor.run { [weak self] in
+                        self?.hybridGemmaLoadStatus =
+                            "lora-load-failed: \(error)"
+                    }
+                }
+            }
+            try await adapter.prewarm()
+            await MainActor.run { [weak self] in
+                self?.gemmaLoraLoaded = loraOK
+                self?.hybridGemmaLoadStatus = loraOK
+                    ? "ready (with LoRA M247)"
+                    : "ready (bare Gemma, NO LoRA)"
+            }
+            return adapter
+        }
+        gemmaLoadInFlight = task
+        hybridGemmaLoadStatus = "loading model…"
+        do {
+            let adapter = try await task.value
+            gemmaAdapter = adapter
+            gemmaLoadInFlight = nil
+            return adapter
+        } catch {
+            gemmaLoadInFlight = nil  // Allow retry next call
+            throw error
+        }
+    }
+    #endif
 
     /// Update prompt text for single-prompt hybrid test.
     /// (Reuses afmTestPrompt setter.)
@@ -1769,6 +1832,14 @@ extension SampleHostModel {
         let rotationPeriod = max(1, hybridBenchRotationPeriodIter)
         let mutationCount = max(1, min(5, hybridBenchMutationSeedCount))
         let rotationBytes = max(1, hybridBenchJSONLRotationMB) * 1024 * 1024
+
+        // M627 deep-review fix #3 — defensively cancel any
+        // previous task before starting (Stop→Start race guard).
+        // The previous task may still be in its loop (finishing
+        // an iter); cancellation propagates so it bails out.
+        hybridBenchTask?.cancel()
+        hybridBenchGeneration += 1
+        let myGen = hybridBenchGeneration
 
         hybridBenchIsRunning = true
         hybridBenchIterations = 0
@@ -1924,12 +1995,18 @@ extension SampleHostModel {
                         fallbackDurationMs = afmMs
                         actualRoute = "uncertain-both-pick-gemma"
                     }
+                    let bothFailed =
+                        afmBodyMaybe == nil && gemmaBodyMaybe == nil
                     if afmBodyMaybe != nil && gemmaBodyMaybe == nil {
                         self.hybridBenchAFMOk += 1
                     } else if gemmaBodyMaybe != nil && afmBodyMaybe == nil {
                         self.hybridBenchGemmaOk += 1
-                    } else if afmBodyMaybe == nil && gemmaBodyMaybe == nil {
+                    } else if bothFailed {
                         self.hybridBenchBothFailed += 1
+                        // M627 review #6: actualRoute lied as
+                        // "uncertain-both-pick-afm" when both bodies
+                        // are empty. Correct semantic:
+                        actualRoute = "uncertain-both-failed"
                     } else {
                         // Both succeeded (best case)
                         if pickedAFM {
@@ -1942,8 +2019,15 @@ extension SampleHostModel {
                     if gemmaErr != nil {
                         errorMessage = (errorMessage ?? "") + " gemma: \(gemmaErr!)"
                     }
-                    // Router "hit" semantically uncertain in this branch
-                    self.hybridBenchRouterHits += 1
+                    // M627 review #5: only count router-hit when
+                    // at least one body returned. Both-failed
+                    // increments routerMisses instead.
+                    if bothFailed {
+                        self.hybridBenchRouterMisses += 1
+                        routerHit = false
+                    } else {
+                        self.hybridBenchRouterHits += 1
+                    }
                 } else {
                     // Confident — original single-LLM-with-fallback path
                     do {
@@ -2032,15 +2116,33 @@ extension SampleHostModel {
                     self.hybridBenchLastError = "jsonl: \(error)"
                 }
                 iter += 1
-                self.hybridBenchIterations = iter
+                // M627 deep-review fix #3 — only update iter
+                // counter if we're still the active generation.
+                // Stale tasks (cancelled by newer start) must not
+                // clobber the new bench's published counters.
+                if self.hybridBenchGeneration == myGen {
+                    self.hybridBenchIterations = iter
+                }
                 if iter % 8 == 0 { await Task.yield() }
             }
             await runner.close()
-            self.hybridBenchIsRunning = false
+            // M627 deep-review fix #3 — only flip isRunning if
+            // we're still the active generation. If a newer start
+            // already bumped generation + set isRunning=true, our
+            // exit must not flip it back to false.
+            if self.hybridBenchGeneration == myGen {
+                self.hybridBenchIsRunning = false
+            }
         }
     }
 
     func stopHybridBench() {
+        // M627 deep-review fix #3 — keep the task ref so we don't
+        // lose the cancellation handle. Setting isRunning=false
+        // here lets UI react immediately; the task itself will
+        // see Task.isCancelled, exit its loop, close the JSONL
+        // runner, and (via generation check) skip the final
+        // isRunning=false write so a fast restart isn't clobbered.
         hybridBenchTask?.cancel()
         hybridBenchTask = nil
         hybridBenchIsRunning = false

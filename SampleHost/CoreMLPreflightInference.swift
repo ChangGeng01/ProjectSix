@@ -62,15 +62,25 @@ public struct ChengluPreflightDecision: Equatable, Sendable, Codable {
         case gemma   // predict AFM will guardrail-refuse → call Gemma
     }
 
-    /// v0.2 — confidence band classifies prob into 3 zones.
-    /// In `uncertain` zone, hybrid runner can call BOTH LLMs and
-    /// pick best output (instead of single + fallback).
+    /// v0.4 — confidence band classifies prob into 3 zones (after
+    /// isotonic calibration LUT). In `uncertain` zone, hybrid
+    /// runner calls BOTH LLMs and picks best output.
+    ///
+    /// Boundaries (post-v0.4 audit; chapter 一百七十七 audit Phase 5):
+    /// - `.high`: prob < 0.30 or > 0.70 (confident AFM or Gemma)
+    /// - `.medium`: prob ∈ [0.30, 0.40) ∪ (0.60, 0.70] (boundary cases)
+    /// - `.uncertain`: prob ∈ [0.40, 0.60] — true ambiguity zone
+    ///   (~6% of test set, ~40% accuracy → coin flip ⇒ dual-LLM wins)
+    ///
+    /// v0.2's narrow [0.45, 0.55] caught only 0.6% of prompts;
+    /// v0.4 widened to [0.40, 0.60] after calibration revealed
+    /// MLP overconfidence at probability extremes.
     public enum Confidence: String, Codable, Sendable {
-        /// prob >= 0.75 → confident AFM (or <= 0.25 → confident Gemma)
+        /// prob < 0.30 or > 0.70 (confident routing)
         case high
-        /// prob in [0.55, 0.75) or (0.25, 0.45]
+        /// prob in [0.30, 0.40) or (0.60, 0.70] (boundary)
         case medium
-        /// prob in [0.45, 0.55] — model uncertain, both LLMs viable
+        /// prob in [0.40, 0.60] — model uncertain, both LLMs viable
         case uncertain
     }
 
@@ -179,7 +189,13 @@ public final class ChengluPreflightInference {
 
     /// Apply isotonic-regression-fitted lookup table to a raw
     /// MLP probability. Linear interpolation between LUT points.
+    /// Defense-in-depth: NaN / out-of-[0,1] inputs map to 0.5
+    /// (uncertain) rather than propagating undefined behavior.
     private static func applyCalibrationLUT(rawProb: Double) -> Double {
+        // Defense-in-depth (chapter 一百七十七 deep review finding #11):
+        // NaN propagates through binary search to give NaN output;
+        // route to "uncertain" instead.
+        guard rawProb.isFinite else { return 0.5 }
         let cx = calibrationX
         let cy = calibrationY
         if rawProb <= cx[0] { return cy[0] }

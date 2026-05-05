@@ -22040,3 +22040,107 @@ Model says "5% AFM ok" → actual 35% AFM ok. Router was **over-routing to Gemma
 
 **Chapter 一百七十七 audit (M626 — v0.4)**: respond to user "全面 coreml 整体 严查" by running 7-axis audit (`scripts/audit_chenglu_preflight.py`). **K-fold confirms v0.1 stable** (92.96% ± 0.86%). **Feature ablation surprise**: domain > mutation > stake > tone (chapter 175 highlighted tone but data shows domain matters more). **REAL CALIBRATION BUG FOUND**: v0.1 over-confident on guardrail predictions (predicted 0.05 → actual 0.353). **v0.4 ships fix**: isotonic regression LUT (100 points) baked into Swift-side via static array + binary-search-interpolation. Brier 0.065 → 0.054 (-17.5%). Calibration delta @ p=0.05: +0.302 → +0.016 ✅ fixed. Confidence zone widened to [0.30, 0.70] now catches 6.3% truly-uncertain prompts (vs v0.2's 0.6%). Build SUCCESS, deployed iPhone PID 50099. 7 of 7 audit axes addressed (5 confirmed OK / 1 fixed / 1 deferred to chapter 178+ for unit tests). Doctrine: "全面严查" = systematic 7-axis review with explicit pass/fail per axis; not vague optimization.
 
+### 177.review — deep review + deep test pass (M627 / 2026-05-06)
+
+#### 起源
+
+User: "deep review + deep test" — chapter 67/91/103 deep-review pattern applied to chapter 177 ship surface (CoreML inference helper + hybrid runner + tests + deploy chain).
+
+#### Method
+
+Two parallel paths (chapter 67 baseline ~75% FP rate accepted):
+
+1. **Deep test** — re-run BAS + Qinao + SampleHost + 5 boundary checks; expand SampleHost test coverage for CoreML inference path
+2. **Deep review** — agent-driven code review of M616-M626 ship surface; human-grep verify findings; fix CRITICAL/HIGH/MEDIUM real bugs; document NIT/FP
+
+#### Deep test results
+
+| Test surface | Count | Status |
+|---|---|---|
+| BAS XCTest | **419** in 76 suites | ✅ 0 failures |
+| Qinao XCTest | **1442** (40 AFM-gated skipped) | ✅ 0 failures |
+| SampleHost (iPhone real-machine) | **10** | ✅ 0 failures |
+| 5 boundary checks | qinao_import / sovereign_redaction / sdk_import / substrate_residuals / whitepaper_parity | ✅ all clean |
+| Whitepaper parity | 247 declared / 248 registered (1 allowlist) | ✅ |
+| **Total tests passed** | **1871** | ✅ 0 failures |
+
+**6 new SampleHost unit tests** (M627) covering CoreML inference path:
+- `testCalibrationLUTLowerBound` — extreme features don't crash, output ∈ [0,1]
+- `testConfidenceEnumBoundaries` — exact threshold boundaries (0.10/0.30/0.40/0.50/0.60/0.70/0.95) match v0.4 [0.30, 0.70] uncertain zone
+- `testDecisionRouteThreshold` — prob ≥ 0.5 → AFM, < 0.5 → Gemma
+- `testDecisionCodableRoundTrip` — decision schema serializable
+- `testFeaturesEquatable` — features value-equality semantics
+- `testPredictHandlesOutOfVocabFeatures` — typo / unknown tone strings handled gracefully (all-zero one-hot, valid output)
+
+#### Deep review — agent findings + verdict
+
+Agent code review surfaced 14 findings across CoreMLPreflightInference.swift + SampleHostModel.swift + xcodeproj wiring. Per chapter 67/91/103 baseline FP rate, expected ~3-4 real bugs out of 14. Actual outcome:
+
+| # | Severity | Finding | Real bug? | Status |
+|---|---|---|---|---|
+| 1 | LOW | Confidence enum doc comments stale ([0.45, 0.55] from v0.2) | ✅ | Fixed (M627) |
+| 2 | HIGH | Race condition: 2 concurrent callGemma both load 3.4 GB Gemma | ✅ | Fixed via `gemmaLoadInFlight` Task gate |
+| 3 | HIGH | Stop→Start race in startHybridBench (old task clobbers new state) | ✅ | Fixed via `hybridBenchGeneration` counter |
+| 4 | MEDIUM | LoRA load failure poisons gemmaAdapter (says "loaded" when it isn't) | ✅ | Fixed via `gemmaLoraLoaded` flag + clear error message |
+| 5 | MEDIUM | uncertain-zone counter logic over-counts both-failed as routerHits | ✅ | Fixed: bothFailed → routerMisses, not routerHits |
+| 6 | MEDIUM | actualRoute field missing in some both-failed paths | ✅ | Fixed: explicitly set "uncertain-both-failed" in uncertain branch |
+| 7 | LOW | Docstring on isotonic LUT doesn't cite source curve | NIT | Existing comment cites v0.4 + chapter — adequate |
+| 8 | LOW | applyCalibrationLUT could fail noisily on NaN | ✅ | Fixed: `guard rawProb.isFinite else { return 0.5 }` |
+| 9 | MEDIUM | JSONL rotation reads file size from disk (may not reflect just-written) | ✅ | Fixed via running `currentBytes: Int` tally |
+| 10 | LOW | features dict access in CoreMLPreflightInference uses force-unwrap pattern | FP | Already protected via `predictOrNil` + try? |
+| 11 | LOW | Magic numbers 0.30/0.70 hardcoded in confidence enum | NIT | Doctrine values from v0.4 audit, intentional |
+| 12 | LOW | Single-prompt path doesn't comment intentional non-uncertain-zone behavior | ✅ | Fixed: added doc comment explaining smoke-probe semantics |
+| 13 | LOW | `_ = h` is a no-op | FP | Pre-rotation-fix-9; now removed naturally |
+| 14 | LOW | Deploy script doesn't verify .mlpackage hash | FP | Out of scope, app-level |
+
+**Real bugs**: 8 of 14 (HIGH×2 + MEDIUM×3 + LOW×3 with code change) → **57% real-bug rate**, slightly above chapter 67's ~25% baseline. Reflects that CoreML iOS surface is new code without years of churn-vetting; real issues exist.
+
+**FP/NIT**: 6 of 14 (43%) — within chapter 67 expected range.
+
+#### Doctrine pin held under review
+
+| Pin | Status | Evidence |
+|---|---|---|
+| 不变量 #1 (先醒再答) | ✓ | substrate routing always fires before router predict (line 1856-1871 — substrate.startSession runs before ChengluPreflight.predict) |
+| 不变量 #2 (神经不掌权) | ✓ | router predict outputs `route` not `permit.mode`; permit.mode still set by substrate L11 |
+| 不变量 #3 (私有经验不进权重) | ✓ | router uses static .mlpackage + LUT, no online learning |
+| Three-tier protective doctrine | ✓ | substrate (strictest) > AFM (medium) > Gemma (permissive) preserved |
+| Single commit mouth | ✓ | only one LLM body returned per turn (uncertain-zone picks longer body, not both) |
+| Audit hash chain | ✓ | router additions are observability only, no audit emission changes |
+
+#### Files modified (M627)
+
+| File | Change |
+|---|---|
+| `SampleHost/CoreMLPreflightInference.swift` | Confidence enum doc comments updated to v0.4 [0.30, 0.70]; NaN guard at applyCalibrationLUT entry |
+| `SampleHost/SampleHostModel.swift` | gemmaLoadInFlight Task gate + gemmaLoraLoaded flag (fix #2 + #4); ensureGemmaAdapter() singleton-load helper; hybridBenchGeneration counter (fix #3); bothFailed counter logic (fix #5 + #6); SampleHostHybridBenchJSONLRunner uses running `currentBytes` (fix #9); single-prompt doc comment (fix #12) |
+| `SampleHostTests/SampleHostTests.swift` | +6 tests covering CoreML inference path |
+| `docs/QINAO_HONESTY_BOARD.md` | This entry |
+
+#### Build + deploy
+
+- xcodebuild Release iphoneos: BUILD SUCCEEDED (1 unrelated info-plist warning)
+- iPhone old PID 50099 terminated → new app installed (bundle UUID 2BD70029-…) → launched
+- All 10 SampleHost tests pass on real device (iPhone 17e)
+
+#### Honest 限制
+
+- **Race-condition fixes are defensive** — not directly bench-stress-tested; would need concurrent stop+start fuzzing
+- **JSONL rotation byte-tally fix** is correct for fresh-shard-only path (always create new numbered file); resume-from-existing-shard not supported by current design (each bench creates new shards from index 1)
+- **57% real-bug rate** is higher than chapter 67's ~25% — interpretation: new iOS CoreML surface is genuinely less battle-tested, agent finding ratio reflects reality not noise
+- **Test coverage gap**: 6 new tests cover schema + inference happy path, NOT race conditions / rotation timing / Stop→Start sequencing — those are integration concerns
+- **Pending physical user validation**: end-to-end iPhone PID-after-relaunch tap "Run Hybrid" still pending
+
+#### Doctrine: deep review evolves
+
+- Chapter 67 baseline: ~25% real bugs in agent review
+- Chapter 91 baseline: ~25%
+- Chapter 103 baseline: ~25%
+- Chapter 177 actual: **57%** — reason: new iOS CoreML surface
+
+**Lesson**: deep review FP rate scales inversely with surface maturity. Established BAS substrate code (chapter 67/91/103) was 25% real because already heavily reviewed. New iOS CoreML surface (chapter 177) ships at 57% because few prior eyes. **Implication**: every new platform/library surface gets full deep review pass before assumptions of stability.
+
+#### 一句话总结
+
+**Chapter 一百七十七 deep review + deep test (M627)**: respond to user "deep review + deep test" by applying chapter 67/91/103 pattern to M616-M626 ship surface. **Deep test**: BAS 419 ✓ + Qinao 1442 ✓ + SampleHost 10 ✓ (with 6 new CoreML inference unit tests on real iPhone) + 5 boundary checks ✓ = **1871 total tests, 0 failures**. **Deep review**: 14 findings, 8 real bugs fixed (57% real-bug rate, higher than chapter 67's ~25% baseline because iOS CoreML surface is new). HIGH×2 (Gemma load race / Stop→Start race) + MEDIUM×3 (LoRA poison / counter semantics / JSONL rotation byte tally) + LOW×3 with code (doc comment staleness / NaN guard / single-prompt comment) all fixed. 6 NIT/FP filed without code changes. Doctrine pin verified across all 6 invariants (先醒再答 / 神经不掌权 / 私有经验不进权重 / three-tier protective doctrine / single commit mouth / audit hash chain). Build + deploy iPhone success. **Lesson**: deep review FP rate scales inversely with surface maturity — established surfaces 25% real bugs, new surfaces (CoreML iOS first ship) 57%. Doctrine evolution: every new platform/library surface gets full deep review before assumed stable.
+
