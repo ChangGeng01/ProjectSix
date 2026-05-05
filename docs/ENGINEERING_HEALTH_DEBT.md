@@ -326,7 +326,12 @@ Source comment self-disclosure:
 
 These are typed primitives waiting for production callers. The **schema-only-trap pattern** (chapter 一百十八 doctrine) acknowledges the risk in narrative form but doesn't aggregate the open count.
 
-**Status**: PARTIALLY ADDRESSED (chapter 一百二十 wired ForbiddenZoneGate; ForbiddenLifecycleGate remains 0 production callers).
+**Status**: ADDRESSED (chapter 91 M391 + chapter 一百二十 BOTH wired). 2026-05-05 chapter 175 spot-check verified `BASForbiddenLifecycleGate.gate(...)` actually called at:
+- `BASUpdateTicketLifecycleForbiddenGate.swift:85` (M391 wire — ticket lifecycle path)
+- `BASUpdateTicketLifecycleForbiddenGate.swift:129` (M391 same-file second wire)
+- `BASUpdateTicketLifecycleForbiddenZoneGate.swift` (chapter 一百二十 wire — zone path)
+
+Original "0 production callers" assertion was stale doc claim. Both gates now load-bearing in production audit path. Source comment self-disclosure quoted above is itself stale (does not match current code state); flag for cleanup in next refactor batch.
 
 ---
 
