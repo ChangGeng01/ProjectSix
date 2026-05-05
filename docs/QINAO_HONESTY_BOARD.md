@@ -21431,3 +21431,119 @@ python3 scripts/cross_llm_substrate_analysis.py \
 - LLM disagreement 模式 + 对应 substrate 矫正建议
 - 4 个 path (#2-#5) 真实证
 
+
+### 176.18 M614 — 双 8h bench complete + cross-LLM 实证终报告 (2026-05-05 续)
+
+**8h dual-bench results**:
+
+| | Mac Gemma+substrate | iPhone AFM |
+|---|---|---|
+| Total iter | **34,454** | **5,088** |
+| Errors | **0** (100% ok) | 1,032 (79.7% ok) |
+| Avg latency | 831 ms | ~5.66 s |
+| Throughput | **1.20 iter/s** sustained 8h | **0.177 iter/s** |
+| File size | 42 MB / 3 rotation files | 10 MB / 1 file |
+| Bench start | 2026-05-05 11:56 (HKT 19:56 ?) | 2026-05-05 01:28 UTC (09:28 HKT) |
+| Bench end | 2026-05-05 19:56 (HKT) ✓ 8h cap | 09:28 UTC ✓ 8h cap |
+
+**Mac 6.78× faster** than iPhone (Gemma 4 E2B MLX local vs AFM iOS thermal-throttled).
+
+### 176.18.1 Cross-LLM analysis 真实证(joined 5088 prompts)
+
+#### ✅ Substrate cross-platform determinism: **100%** (5088/5088 match)
+
+Mac substrate (BASHostRuntime + reflective workflow) vs iPhone substrate (same config) on **same procedural prompt** → **byte-equal permit decisions**. doctrine 平台 invariant 在 5K 数据上验证.
+
+#### ✅ chapter 175 `angry → 100% block` fingerprint VALIDATED at scale
+
+| Tone | Block / Total | Block % |
+|---|---|---|
+| **angry** | **636 / 636** | **100.0%** |
+| agentic | 270 / 636 | 42.5% |
+| anxious | 270 / 636 | 42.5% |
+| authoritative | 270 / 636 | 42.5% |
+| confused | 270 / 636 | 42.5% |
+| curious | 270 / 636 | 42.5% |
+| grieving | 270 / 636 | 42.5% |
+| vulnerable | 270 / 636 | 42.5% |
+
+**关键发现 — 7 个非 angry tones 全部 42.5% block 精确数学一致**:
+- 不是统计噪声 (sample 636 each)
+- substrate 对 angry 与其他 tones 的处理是**严格二分**
+- chapter 175 §175.3 estimate "~57/43 delay/block" 现在精确化为 **42.5/57.5**
+- 这在 119K iter 数据 (chapter 175) 和 5K iter 数据 (本章) 重现, 高 doctrine confidence
+
+#### ⚠️ 1903 anomaly prompts (37.4%) — substrate over-blocking 大候选
+
+substrate 路由 `.block` 但 AFM 产 ≥100 char body. 这超过 1/3 数据. 含义:
+- substrate 倾向 over-blocking (LLM 实际能合理处理的 prompt substrate 拒绝)
+- 或 AFM 倾向 over-permissive (substrate 正确拒绝但 AFM 仍 generate)
+- 1903 个 prompt 是 substrate routing threshold tuning 的实证候选 list
+
+**未来 chapter 一百七十七 候选**: 取这 1903 个 prompt 子集, 用 LLM-as-judge (option 2 from §176.16 paths) 评判 substrate 决策正确性, 输出 substrate parameter tuning 建议.
+
+#### LLM consensus 79.7%
+
+| | AFM ok | AFM err/short |
+|---|---|---|
+| Gemma ok | 4055 (both ok) | 1033 (gemma-only) |
+| Gemma err | 0 | 0 |
+
+- **Gemma 0 errors in 34K iter** — exceptional reliability
+- AFM 20.3% error rate — chapter 176 §176.4 "Apple Intelligence service" 仍有不稳定性
+- LLM 不一致全部由 AFM error 引起, 不是 doctrine 分歧
+
+#### AFM 3.05× verbose Gemma
+
+- AFM avg 1699 ch (range 49-5032)
+- Gemma avg 557 ch (range 113-1681)
+- 不同 LLM 风格本质 — AFM 倾向冗长解释, Gemma 倾向简洁结构化
+
+### 176.18.2 5 substrate optimization paths progress
+
+| Path | Status | Evidence |
+|---|---|---|
+| 1. Cross-LLM consensus 验证 doctrine | ✅ **strongly validated** | 100% determinism + angry fingerprint exact match + 42.5% non-angry block exact |
+| 2. LLM-as-judge permit 准确性 | ⏸ pending | 1903 anomaly cluster 是天然 input 候选 — chapter 一百七十七 续作 |
+| 3. LoRA distill substrate | ⏸ pending | 34K Mac data + substrate codes 已可作为 LoRA curriculum |
+| 4. Substrate distill from LLM | ⏸ pending | 1903 anomaly + 42.5% threshold 已是 candidate parameter |
+| 5. Cross-validation feedback loop | ⏸ pending | 第 1 代数据完整, 第 2 代待 #2/#3/#4 ship |
+
+### 176.18.3 关键 doctrine 实证清单
+
+✅ **substrate doctrine 确认**:
+- Cross-platform deterministic at 5088 prompts (100%)
+- `angry` tone hard-route to .block at 636 prompts (100%)
+- Non-angry tones precise 42.5/57.5 block/delay split
+- 14-layer audit codes range 142-170 stable (chapter 175 baseline)
+
+⚠️ **substrate doctrine 候选 review**:
+- 37.4% anomaly rate suggests over-blocking — but **可能也是 doctrine 正确**(substrate 是 protective by design, AFM 答 ≠ substrate 应允)
+- AFM 20% error rate — chapter 176 §176.4 已诚实标 AFM 平台稳定性问题
+- 真要矫正需 chapter 一百七十七 LLM-as-judge 实证
+
+### 176.18.4 Chapter 一百七十六 完整章节图
+
+§176.1-§176.8 (M606): A2/A5 实测 + walkback I17
+§176.9 (M607): 3-way compare
+§176.10-§176.11 (M607): deep LoRA M247 (3.6× convergence + 3/5 markers)
+§176.12 (M608): I20 walkback (AFM is OS-architectural blocker)
+§176.13 (M609): iPhone foreground AFM panel — A2 真 unblock
+§176.14 (M610): AFM 8h flexible bench
+§176.14 fix (M610.1): skipBlocked default false
+§176.15 (M611): Mac Gemma 8h bench
+§176.16 (M612): cross-LLM bench (substrate + Gemma)
+§176.17 (M613): cross-LLM analysis tool + smoke validation
+§176.18 (M614): **8h dual-bench complete + cross-LLM 实证终报告**
+
+### 176.18.5 Honest 限制 (chapter 一百七十六 末尾)
+
+- 5,088 joined prompts is **12.6% of 40,320 corpus capacity** — full coverage 需要 ~64h iPhone bench (8× 8h)
+- AFM 20% error rate 影响 cross-LLM 分析的 sampling completeness
+- "anomaly" 的判定是 heuristic (block + body ≥100 ch) 不是真 doctrine 错误
+- 下一阶段 LLM-as-judge 才能真 validate "anomaly" 是否真 substrate 错
+
+### 176.18.6 一句话总结
+
+**Chapter 一百七十六 §176.18 (M614)**: respond to user "你来 准备 万全 / 直接 mac 启动" → ship 8h dual-bench complete with **34,454 Mac Gemma+substrate iter (0 errors) + 5,088 iPhone AFM iter (79.7% ok) + 5,088 cross-LLM joined prompts**. **Cross-platform substrate determinism 100% (5088/5088 match)**. **Chapter 175 `angry → 100% block` fingerprint precisely validated** (636/636) + **non-angry 7 tones precisely 42.5% block** (mathematical exact, not noise). **1903 anomaly prompts** (37.4%) where substrate blocks but AFM produces body — substrate over-blocking candidates. **LLM consensus 79.7%** (4055/5088 both answered + 1033 AFM-error). **Gemma 0 errors in 34K iter** vs AFM 20.3% error rate. AFM 3.05× verbose Gemma. Substrate optimization path 1 (cross-LLM consensus 验证 doctrine) **strongly validated**; paths 2-5 (LLM-as-judge / LoRA distill / substrate-from-LLM / feedback loop) data ready, ship in chapter 一百七十七. Doctrine pin: cross-LLM analysis is **empirical evidence + candidate suggestions only** — real substrate doctrine changes still require chapter-level walkback + typed-pin tests.
+
