@@ -3884,4 +3884,31 @@ extension SampleHostModel {
         await SampleHostBenchCheckpointStore.shared.clear()
         hybridBenchResumableCheckpoint = nil
     }
+
+    /// M748 chapter 一百九十九 — restore config from checkpoint
+    /// then start a fresh bench. "Resume" semantic: same smokeMode /
+    /// duration / mutation count / stride as the crashed bench.
+    /// Counter state DOES NOT restore (too risky — would corrupt
+    /// the new bench's anomaly windows + Welford running means).
+    /// New bench writes new JSONL shards; old shards remain on
+    /// disk for replay. Banner clears.
+    ///
+    /// Doctrine: "resume settings, fresh state". Operator carrying
+    /// forward thoughtfully-tuned settings without re-typing them.
+    func resumeBenchFromCheckpoint() async {
+        guard let cp = hybridBenchResumableCheckpoint else { return }
+        // Restore typed settings
+        if let mode = HybridBenchConfig.SmokeMode(
+            rawValue: cp.smokeMode)
+        {
+            hybridBenchSmokeMode = mode
+        }
+        updateHybridBenchDurationHours(cp.durationHours)
+        updateHybridBenchMutationCount(cp.mutationSeedCount)
+        updateHybridBenchStrideCSV(cp.strideCSV)
+        // Clear banner (settings now restored)
+        await clearResumableCheckpoint()
+        // Start fresh bench with restored settings
+        startHybridBench()
+    }
 }

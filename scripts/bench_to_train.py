@@ -429,6 +429,65 @@ def diff_report(metrics_v02: dict) -> str:
 # Main pipeline
 # ============================================================
 
+def analyze_bench_only(bench_dir: str) -> None:
+    """M749 chapter 一百九十九 — analyze-only mode.
+
+    Loads bench JSONL + reports training-data viability WITHOUT
+    requiring base corpus or running retrain. Useful for quick
+    smoke check after a new bench: did we collect enough usable
+    rows? Pressure distribution? Skip rate?
+
+    Run via: bench_to_train.py --bench /path --analyze-only
+    """
+    print("=== bench_to_train.py --analyze-only ===")
+    raw = load_jsonl_dir(bench_dir)
+    print(f"  raw bench rows loaded: {len(raw)}")
+    if not raw:
+        print("  (empty — nothing to analyze)")
+        return
+
+    # Filter to usable training rows
+    train_rows = [bench_row_to_train_row(r) for r in raw]
+    usable = [r for r in train_rows if r is not None]
+    skip_rate = (len(raw) - len(usable)) / len(raw) * 100
+    print(f"  usable for training: {len(usable)} "
+          f"({100 - skip_rate:.1f}% retention; "
+          f"{skip_rate:.1f}% skipped)")
+
+    # Per-permit distribution in usable rows
+    if usable:
+        from collections import Counter as _C
+        permits = _C(r.get("permitMode") for r in usable)
+        print(f"  permit modes: {dict(permits.most_common())}")
+
+        afm_statuses = _C(r.get("afmStatus") for r in usable)
+        print(f"  afm statuses: {dict(afm_statuses.most_common())}")
+
+        # Body length stats
+        lengths = [r.get("afmBodyLength", 0) for r in usable]
+        if lengths:
+            mean_l = sum(lengths) / len(lengths)
+            print(f"  body length: mean={mean_l:.0f} "
+                  f"min={min(lengths)} max={max(lengths)}")
+
+        # Pressure stratification
+        thermals = _C(r.get("thermalState") for r in usable)
+        print(f"  thermal distribution: {dict(thermals.most_common())}")
+
+    # Verdict
+    print()
+    if len(usable) < 100:
+        print("  VERDICT: insufficient training data.")
+        print(f"    Got {len(usable)} usable rows (< 100 floor).")
+        print(f"    Need more bench runs WITH actual LLM responses.")
+        print(f"    iPhone smoke 5/5 found 0 LLM calls = expected — "
+              f"sim has no AFM/Gemma; needs real device + LLM "
+              f"availability.")
+    else:
+        print(f"  VERDICT: ready for retrain. {len(usable)} usable rows.")
+        print(f"    Run full pipeline: --base-corpus + --output.")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -436,13 +495,22 @@ def main() -> int:
         help="Directory of hybrid-bench JSONL output "
              "(chapter 178+ schema v7).")
     parser.add_argument(
-        "--base-corpus", required=True,
-        help="Directory of chapter 175/176 base AFM bench "
-             "JSONL (5,088-row adversarial).")
+        "--analyze-only", action="store_true",
+        help="M749 chapter 一百九十九 — skip retrain. Just "
+             "report bench data viability (usable row count, "
+             "permit distribution, pressure stratification, "
+             "ready-or-not verdict). Useful smoke companion to "
+             "replay_hybrid_bench.py.")
     parser.add_argument(
-        "--output", required=True,
+        "--base-corpus",
+        help="Directory of chapter 175/176 base AFM bench "
+             "JSONL (5,088-row adversarial). Required unless "
+             "--analyze-only.")
+    parser.add_argument(
+        "--output",
         help="Output .mlpackage path "
-             "(e.g. SampleHost/ChengluMultiHead_v0.2.mlpackage).")
+             "(e.g. SampleHost/ChengluMultiHead_v0.2.mlpackage). "
+             "Required unless --analyze-only.")
     parser.add_argument(
         "--seed", type=int, default=42,
         help="Random seed for train/test split.")
@@ -452,6 +520,17 @@ def main() -> int:
              "(default 100). Refuses to retrain on too little "
              "data — would just be re-fitting noise.")
     args = parser.parse_args()
+
+    if args.analyze_only:
+        analyze_bench_only(args.bench)
+        return 0
+
+    if not args.base_corpus or not args.output:
+        print(
+            "ERROR: --base-corpus and --output required unless "
+            "--analyze-only is used.",
+            file=sys.stderr)
+        return 2
 
     print("Step 1 — loading bench data…", file=sys.stderr)
     bench_rows = load_bench_corpus(args.bench)

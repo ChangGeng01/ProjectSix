@@ -216,6 +216,16 @@ struct SampleHostView: View {
                     .font(.headline)
                     .foregroundStyle(.orange)
                 Spacer()
+                // M748 chapter 一百九十九 — actual Resume button.
+                // Restores smokeMode / duration / mutation /
+                // stride from checkpoint, clears banner, starts
+                // bench. Counter state NOT restored (fresh).
+                Button("Resume Settings") {
+                    Task { await model.resumeBenchFromCheckpoint() }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(.orange)
                 Button("Dismiss") {
                     Task { await model.clearResumableCheckpoint() }
                 }

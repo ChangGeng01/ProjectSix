@@ -1188,3 +1188,11 @@ SampleHost tests 67 → **71**; full stack **1948 + 1 parity gate + 3 analysis t
 - **M747** +3 fix-pin tests.
 
 SampleHost tests 71 → **74**; full stack **1951 + 1 parity gate + 3 analysis tools, 0 failures**.
+
+## 2026-05-06 — chapter 一百九十九 (M748-M750) actual resume button + analyze-only mode
+
+- **M748** `SampleHostModel.resumeBenchFromCheckpoint()` — restores smokeMode / durationHours / mutationSeedCount / strideCSV from checkpoint + clears banner + `startHybridBench()`. UI adds orange "Resume Settings" button next to "Dismiss" in chapter-193 resume banner.
+- **M749** `bench_to_train.py --analyze-only` — skip retrain, just report bench viability (raw rows / usable rows / permit distribution / pressure stratification / verdict). iPhone smoke output: "13,229 raw / 0 usable / VERDICT: insufficient — need real LLM responses". `--base-corpus` / `--output` now optional when --analyze-only.
+- **M750** +2 fix-pin tests (resume restores settings + starts bench / resume with no checkpoint = no-op).
+
+SampleHost tests 74 → **76**; full stack **1953 + 1 parity gate + 3 analysis tools, 0 failures**. Session shipped: chapters 192-199 (21 milestones M716-M750, 5 chapters in 1 session).

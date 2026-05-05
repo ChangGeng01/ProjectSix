@@ -1632,6 +1632,66 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(m.hybridBenchThermalCriticalIters, 0)
     }
 
+    // MARK: - chapter 一百九十九 / M748-M750 — resume + analyze-only
+
+    /// M748 — resumeBenchFromCheckpoint() restores config from
+    /// checkpoint. Checks that smokeMode / duration / mutation /
+    /// stride flow from checkpoint to model state.
+    @MainActor
+    func testResumeRestoresSettingsFromCheckpoint() async throws {
+        let store = SampleHostBenchCheckpointStore.shared
+        await store.clear()
+        let recentIso = ISO8601DateFormatter()
+            .string(from: Date().addingTimeInterval(-300))
+        let cp = SampleHostBenchCheckpoint(
+            generation: 1, iter: 1234,
+            startTimeIso: recentIso, lastUpdatedIso: recentIso,
+            outputPath: "/tmp", smokeMode: "heavy-tailed",
+            durationHours: 5.5,
+            mutationSeedCount: 3,
+            strideCSV: "5039,7919",
+            afmOk: 0, gemmaOk: 0, bothFailed: 0,
+            stuckSubstrates: 0, stuckLLMs: 0)
+        try await store.write(cp)
+
+        let m = SampleHostModel()
+        m.bootstrap()
+        try await Task.sleep(nanoseconds: 200_000_000)
+        await m.loadResumableCheckpoint()
+        XCTAssertNotNil(m.hybridBenchResumableCheckpoint)
+        // Initial state — defaults
+        XCTAssertEqual(m.hybridBenchSmokeMode, .canonical)
+        XCTAssertEqual(m.hybridBenchDurationHours, 8.0)
+
+        // Resume: restores settings + clears banner + starts bench
+        await m.resumeBenchFromCheckpoint()
+
+        // Settings restored
+        XCTAssertEqual(m.hybridBenchSmokeMode, .heavyTailed)
+        XCTAssertEqual(m.hybridBenchDurationHours, 5.5)
+        XCTAssertEqual(m.hybridBenchMutationSeedCount, 3)
+        XCTAssertEqual(m.hybridBenchStrideRotationCSV, "5039,7919")
+        // Banner cleared
+        XCTAssertNil(m.hybridBenchResumableCheckpoint)
+        // Bench started
+        XCTAssertTrue(m.hybridBenchIsRunning)
+
+        // Cleanup: stop the bench so it doesn't run forever
+        m.stopHybridBench()
+        try await Task.sleep(nanoseconds: 500_000_000)
+    }
+
+    /// M748 — resume with no checkpoint is a no-op.
+    @MainActor
+    func testResumeWithoutCheckpointIsNoOp() async {
+        let m = SampleHostModel()
+        await SampleHostBenchCheckpointStore.shared.clear()
+        XCTAssertNil(m.hybridBenchResumableCheckpoint)
+        // Should not crash; should not start bench.
+        await m.resumeBenchFromCheckpoint()
+        XCTAssertFalse(m.hybridBenchIsRunning)
+    }
+
     /// M737 — bench-loop integration smoke test: start with
     /// 0.001h (3.6s) duration, verify it starts + can be stopped
     /// without crash. Doesn't rely on LLM availability — substrate

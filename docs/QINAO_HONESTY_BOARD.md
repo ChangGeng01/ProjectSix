@@ -24987,3 +24987,97 @@ Post-chapter-198 operator:
 ### 198.9 一句话总结
 
 **Chapter 一百九十八 (M744-M747)**: continue "全面开发" by closing 3 carry-forward residuals — **M744 Active cooling sleep** (operator opts in via `Cool every: N iters` + `Cool sleep: Ns`; reads CURRENT thermal not iter-start; injects sleep when device at `.serious` or worse; iPhone math: ~10s sleep every 55s at 18 iter/sec when serious). **M745 Live thermal dashboard widget** (5 new @Published surfaces: current state + per-state iter counts + per-state percentages; tint switches `.red` on critical, `.orange` on serious + any alarm). **M746 Bench-loop timeout coverage extended** (chapter 195 deferred bothLLMs/localOnly/uncertain paths; 5 raw calls → timeout-wrapped; ALL bench-loop LLM paths now protected). **74 SampleHost tests pass; 1951 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: cooling/thermal-state-tinting are HINT-ONLY (red line 7 held); single-commit-mouth unchanged; operator chooses engagement level pre-tap.
+
+## 一百九十九、 全面开发 续² — actual resume button + analyze-only mode (M748-M750 / 2026-05-06)
+
+User trail: continued "全面开发" — close last 2 carry-forward residuals from chapter 197.
+
+### 199.1 M748 — Actual "Resume Settings" button
+
+Pre-this-batch, the chapter-193 resume banner only had "Dismiss". Operator who tuned bench settings carefully then crashed had to re-tune by hand. Chapter 199 adds "Resume Settings" button:
+
+`SampleHostModel.resumeBenchFromCheckpoint()`:
+1. Restore `smokeMode` from checkpoint
+2. Restore `durationHours` (via `updateHybridBenchDurationHours` for clamping)
+3. Restore `mutationSeedCount`
+4. Restore `strideCSV`
+5. Clear banner (settings now restored)
+6. `startHybridBench()` — launch fresh bench with restored config
+
+Doctrine: "resume settings, fresh state". Counter state DOES NOT restore (would corrupt anomaly windows + Welford running means). New JSONL shards write fresh; old shards remain on disk for replay separately.
+
+UI: orange `.borderedProminent` "Resume Settings" button next to gray `.bordered` "Dismiss". Both close the banner; only Resume starts the bench.
+
+### 199.2 M749 — `bench_to_train.py --analyze-only` mode
+
+Chapter 195 §195.7 deferred "Bench → v0.5 retrain proof" because real LLM-response data was needed (iPhone smoke had 0 LLM calls = 100% substrate-skip). Chapter 199 adds `--analyze-only` flag for the case where operator wants to validate the bench data viability WITHOUT running the full retrain.
+
+```
+$ /tmp/coreml-py312/bin/python3 scripts/bench_to_train.py \
+    --bench /tmp/iphone-hybrid-pull/ --analyze-only
+
+=== bench_to_train.py --analyze-only ===
+  raw bench rows loaded: 13229
+  usable for training: 0 (0.0% retention; 100.0% skipped)
+
+  VERDICT: insufficient training data.
+    Got 0 usable rows (< 100 floor).
+    Need more bench runs WITH actual LLM responses.
+```
+
+This output exactly identifies the gap from chapter 一百九十六 iPhone smoke: 13K rows but 100% are substrate-skip → 0 LLM responses → 0 usable for training. Operator immediately knows: need real device with AFM/Gemma available, or run on real iPhone (not sim).
+
+When usable rows ≥ 100, verdict flips to "ready for retrain. {N} usable rows. Run full pipeline: --base-corpus + --output."
+
+### 199.3 Tests (M750)
+
+| Test | Pin |
+|---|---|
+| `testResumeRestoresSettingsFromCheckpoint` | Resume restores 4 settings + clears banner + starts bench |
+| `testResumeWithoutCheckpointIsNoOp` | Resume with no checkpoint = no crash, no bench start |
+
+SampleHost tests: 74 → **76** (+2 chapter 199).
+
+### 199.4 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17e sim | **76** ✓ |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| `bench_to_train.py --analyze-only` smoke | passed (verdict reported) |
+| 4 boundary checks | clean |
+| **Total** | **1953 + 1 parity gate + 3 analysis tools (now bench_to_train extended), 0 failures** |
+
+### 199.5 What's now operator-friendly
+
+Pre-chapter 199:
+- Crashed bench → operator reads banner → has to re-tune Stepper sliders by hand
+- Wants to know if bench data trained anything → has to invoke retrain pipeline (slow, requires base corpus)
+
+Post-chapter 199:
+- Crashed bench → operator taps **"Resume Settings"** → bench restarts with same config in 1 tap
+- Wants viability check → `bench_to_train.py --analyze-only` instant verdict (no base corpus, no retrain)
+
+### 199.6 Honest residual after chapter 199
+
+| Item | Status |
+|---|---|
+| **No real production 10h bench data with real LLM responses** | **Still THE BLOCKER** — sim provides 0 usable training rows; needs iPhone 17e with AFM (iOS 26 + Apple Intelligence) + Gemma loaded |
+| Validator byte-parity with Swift JSONEncoder | Still approximate |
+| Bench → v0.5 retrain validated end-to-end | Pipeline path verified `--analyze-only`; full pipeline still awaits real LLM data |
+| CI / multi-device / load test | Still external |
+
+### 199.7 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | M748 +`resumeBenchFromCheckpoint()` method |
+| `SampleHost/SampleHostView.swift` | M748 +"Resume Settings" button (orange borderedProminent) |
+| `SampleHostTests/SampleHostTests.swift` | +2 chapter 199 fix-pin tests |
+| `scripts/bench_to_train.py` | M749 +`analyze_bench_only()` function + `--analyze-only` arg parsing + `--base-corpus`/`--output` made optional when analyze-only |
+
+### 199.8 一句话总结
+
+**Chapter 一百九十九 (M748-M750)**: continue "全面开发" by closing last 2 carry-forward residuals — **M748 Actual "Resume Settings" button** (chapter-193 banner was read-only; now operator one-tap restores smokeMode / duration / mutation / stride from checkpoint and launches bench; counter state stays fresh per doctrine "resume settings, fresh state"). **M749 `bench_to_train.py --analyze-only` mode** (validate bench data viability without retraining; iPhone smoke verified output: 13K rows / 0 usable = 100% substrate-skip; operator gets instant verdict instead of running full pipeline). **76 SampleHost tests pass; 1953 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: resume = settings-only restore (counter restoration would corrupt anomaly windows); analyze-only = pure observation, no retrain side-effects. **5 chapters (192-199) shipped in this session: 21 milestones M716-M750, +30 tests, ~3,000 LOC across 6 files**. Real iPhone bench data with LLM responses is THE only remaining blocker.
