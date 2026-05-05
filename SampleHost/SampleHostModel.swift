@@ -413,7 +413,12 @@ final class SampleHostModel: ObservableObject {
     @Published var afmBenchRotationPeriodIter: Int = 11_300
     @Published var afmBenchMutationSeedCount: Int = 5
     @Published var afmBenchJSONLRotationMB: Int = 15
-    @Published var afmBenchSkipBlocked: Bool = true
+    // Default `false` — substrate routes ~50% to .delay + ~50% to
+    // .block (chapter 175 empirical), so default skipBlocked=true would
+    // skip every iter. User saw "全 skip 了" with default true. New
+    // default: always call AFM (toggle on if 8h bench should respect
+    // substrate routing for AFM cost-saving).
+    @Published var afmBenchSkipBlocked: Bool = false
     @Published var afmBenchAFMTimeoutSec: Int = 30
     @Published private(set) var afmBenchIsRunning: Bool = false
     @Published private(set) var afmBenchIterations: Int = 0
