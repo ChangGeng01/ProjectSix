@@ -159,6 +159,15 @@ actor SampleHostBenchAnomalyWatcher {
     private var totalIters: Int = 0
     private var stuckSubstratesEmitted: Int = 0
     private var stuckLLMsEmitted: Int = 0
+    // M739 chapter 一百九十六 — fire-on-entry doctrine fix.
+    // Pre-this-batch, once a stuck-window started, the flag fired
+    // EVERY iter forever (e.g. 5,988-iter sim run with sticky
+    // permitMode = 913 consecutive fires) — spammed JSONL +
+    // misled cumulative dashboard counter. Now: fire ONCE on
+    // entry into stuck state; require exit (window unique > 1)
+    // before next entry can fire.
+    private var inSubstrateStuckState: Bool = false
+    private var inLLMStuckState: Bool = false
 
     init(windowSize: Int = 100) {
         self.windowSize = max(10, windowSize)
@@ -199,7 +208,7 @@ actor SampleHostBenchAnomalyWatcher {
 
         // Substrate stuck — full window same permitMode (and not
         // a "natural" repeat like all-block on adversarial run).
-        // Only fires once per stuck-window-pass to avoid spam.
+        // M739 chapter 一百九十六 — fire-on-entry only.
         if permitModeWindow.count == windowSize {
             let unique = Set(permitModeWindow).count
             if unique == 1 {
@@ -207,17 +216,30 @@ actor SampleHostBenchAnomalyWatcher {
                 // Don't flag substrate-error blocks (those are
                 // already captured via permitMode itself)
                 if mode != "substrate-error" {
-                    flags.append("substrate-stuck:\(mode)")
-                    stuckSubstratesEmitted += 1
+                    if !inSubstrateStuckState {
+                        flags.append("substrate-stuck:\(mode)")
+                        stuckSubstratesEmitted += 1
+                        inSubstrateStuckState = true
+                    }
                 }
+            } else {
+                // Window has variation again → exit stuck state
+                // so a future re-entry can fire fresh.
+                inSubstrateStuckState = false
             }
         }
         // LLM stuck — full window all-empty body
+        // M739 — same fire-on-entry doctrine.
         if bodyEmptyWindow.count == windowSize {
             let allEmpty = bodyEmptyWindow.allSatisfy { $0 }
             if allEmpty {
-                flags.append("llm-stuck:all-empty")
-                stuckLLMsEmitted += 1
+                if !inLLMStuckState {
+                    flags.append("llm-stuck:all-empty")
+                    stuckLLMsEmitted += 1
+                    inLLMStuckState = true
+                }
+            } else {
+                inLLMStuckState = false
             }
         }
         // NaN cluster — > 25% of window had nans
@@ -248,6 +270,8 @@ actor SampleHostBenchAnomalyWatcher {
         totalIters = 0
         stuckSubstratesEmitted = 0
         stuckLLMsEmitted = 0
+        inSubstrateStuckState = false
+        inLLMStuckState = false
     }
 }
 

@@ -1161,3 +1161,12 @@ SampleHost tests 53 → **59**; full stack **1939 + 1 parity gate + 3 analysis t
 - **M738** 5 fix-pin tests + chapter doc + changelog.
 
 SampleHost tests 59 → **64**; full stack **1944 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: timeout is iter BAIL-OUT, not session-kill (red line 7 held). Confident path covered; bothLLMs/uncertain/localOnly paths still use raw calls (deferred to chapter 196+).
+
+## 2026-05-06 — chapter 一百九十六 (M739) 双端 smoke caught real bug
+
+- **M739** Real bug fix found by user-requested 60s smoke. Chapter-192 `SampleHostBenchAnomalyWatcher` fired `substrate-stuck:X` flag EVERY iter once stuck instead of once-per-entry. 60s sim run produced 913 fires for what was actually 1 deterministic stuck region. Fix: added `inSubstrateStuckState` / `inLLMStuckState` private state — fire only on `false→true` transition; reset on window-variation. Result: 1000 stuck iters now = 1 fire (1000× reduction). Re-run smoke: 12 fires in 60s (76× improvement).
+- **+2 fix-pin tests** (`testAnomalyWatcherFiresOnceOnContinuousSubstrateStuck` / `testAnomalyWatcherFiresAgainOnReEntry`).
+- **Stepper step bumped 0.5 → 0.1** so operator can flex bench duration to 10-12 min smoke without TextField.
+- **iPhone 17e deployed**: SampleHost.app installed + launched via `xcrun devicectl`. Second 端 smoke ready for operator's tap.
+
+SampleHost tests 64 → **67**; full stack **1947 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: red line 7 held (fix changes flag semantics, not decision influence). Without this smoke, 10h dashboard would have been useless.

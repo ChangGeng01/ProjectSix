@@ -922,6 +922,65 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(d, .run)
     }
 
+    /// M739 chapter 一百九十六 — fire-on-entry doctrine for substrate-stuck.
+    /// Pre-fix: 1000 stuck iters = 901 fires (every iter once stuck).
+    /// Post-fix: 1000 stuck iters = 1 fire (only on entry).
+    func testAnomalyWatcherFiresOnceOnContinuousSubstrateStuck() async {
+        let watcher = SampleHostBenchAnomalyWatcher(windowSize: 10)
+        var fireCount = 0
+        // 1000 iters, all same permitMode "answer"
+        for _ in 0..<1000 {
+            let flags = await watcher.observe(
+                permitMode: "answer",
+                bodyIsEmpty: false,
+                regressionOutputs: [1.0, 2.0, 3.0, 0.5])
+            if flags.contains("substrate-stuck:answer") {
+                fireCount += 1
+            }
+        }
+        XCTAssertEqual(
+            fireCount, 1,
+            "fire-on-entry doctrine: 1000 stuck iters = 1 fire")
+        let snap = await watcher.snapshot()
+        XCTAssertEqual(snap.stuckSubstrates, 1)
+    }
+
+    /// M739 — exit + re-entry should fire AGAIN (1 → many → 1 = 2 fires).
+    func testAnomalyWatcherFiresAgainOnReEntry() async {
+        let watcher = SampleHostBenchAnomalyWatcher(windowSize: 10)
+        var entries = 0
+        // First stuck region: 100 iters of "answer"
+        for _ in 0..<100 {
+            let flags = await watcher.observe(
+                permitMode: "answer",
+                bodyIsEmpty: false,
+                regressionOutputs: [1, 2, 3, 0.5])
+            if flags.contains("substrate-stuck:answer") {
+                entries += 1
+            }
+        }
+        // Diverse window: 20 iters of varied permits → exits stuck
+        for i in 0..<20 {
+            _ = await watcher.observe(
+                permitMode: i % 2 == 0 ? "answer" : "delay",
+                bodyIsEmpty: false,
+                regressionOutputs: [1, 2, 3, 0.5])
+        }
+        // Second stuck region: 100 iters → re-entry fires
+        for _ in 0..<100 {
+            let flags = await watcher.observe(
+                permitMode: "block",
+                bodyIsEmpty: false,
+                regressionOutputs: [1, 2, 3, 0.5])
+            if flags.contains("substrate-stuck:block") {
+                entries += 1
+            }
+        }
+        XCTAssertEqual(
+            entries, 2,
+            "expected 2 entries (one per stuck region)")
+    }
+
     /// M718 — anomaly watcher flags substrate-stuck after window iters.
     func testAnomalyWatcherDetectsSubstrateStuck() async {
         let watcher = SampleHostBenchAnomalyWatcher(windowSize: 10)
@@ -1420,6 +1479,68 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(m.hybridBenchLLMTimeoutSeconds, 300.0)
         m.updateLLMTimeoutSeconds(45)
         XCTAssertEqual(m.hybridBenchLLMTimeoutSeconds, 45.0)
+    }
+
+    /// M737-extended — bench-loop 60-second water-test smoke.
+    /// Gated behind `BENCH_60SEC_SMOKE=1` env var so it doesn't
+    /// run in normal CI (would add 60s per run). Activate with:
+    ///
+    ///     BENCH_60SEC_SMOKE=1 xcodebuild ... test ...
+    ///
+    /// Validates end-to-end that:
+    ///   1. Bench loop iterates for 60s without freezing
+    ///   2. Substrate routing fires every iter
+    ///   3. Counters increment monotonically
+    ///   4. Anomaly watcher fires no false positives in 60s
+    ///   5. Stop is responsive (cancellation honored within 1s)
+    @MainActor
+    func testBenchLoop60SecondWaterSmoke() async throws {
+        // M737-extended chapter 195 + M739 chapter 196 —
+        // 60-second water smoke. Skipped by default because it
+        // adds 60s to test runtime. To run: change `true` →
+        // `false` below and rebuild. (xcodebuild's test runner
+        // ignores parent-shell env so file-edit gating is the
+        // simplest mechanism.)
+        let skipForCI = true
+        if skipForCI {
+            throw XCTSkip("Toggle skipForCI=false to run the 60s smoke")
+        }
+        let m = SampleHostModel()
+        m.bootstrap()
+        try await Task.sleep(nanoseconds: 500_000_000)
+        // 0.1h = 360s = 6 min. We'll stop after 60s.
+        m.updateHybridBenchDurationHours(0.1)
+        m.startHybridBench()
+        XCTAssertTrue(m.hybridBenchIsRunning)
+        // Run 60s
+        try await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+        let mid = m.hybridBenchIterations
+        XCTAssertGreaterThan(
+            mid, 0,
+            "expected ≥1 iter in 60s; saw \(mid)")
+        m.stopHybridBench()
+        // Wait 1s for cancellation
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        XCTAssertFalse(m.hybridBenchIsRunning,
+            "should stop within 1s")
+        // M739 chapter 一百九十六 — fire-on-entry doctrine.
+        // Pre-M739 this saw 913 in 60s (every iter once stuck).
+        // Post-M739 with sim's deterministic substrate, count is
+        // bounded — typically 10-50 entries in 60s. Assert bounded
+        // (not runaway) — anything > 100 = regression.
+        XCTAssertLessThan(
+            m.hybridBenchStuckSubstrateCount, 100,
+            "substrate-stuck regression — pre-M739 saw 913 in 60s")
+        // Document outcome to test log
+        print(
+            "[smoke] iters=\(mid) afmOk=\(m.hybridBenchAFMOk) " +
+            "gemmaOk=\(m.hybridBenchGemmaOk) " +
+            "bothFailed=\(m.hybridBenchBothFailed) " +
+            "routerHits=\(m.hybridBenchRouterHits) " +
+            "stuckSubstrates=\(m.hybridBenchStuckSubstrateCount) " +
+            "stuckLLMs=\(m.hybridBenchStuckLLMCount) " +
+            "pauseSkipped=\(m.hybridBenchPauseSkippedCount) " +
+            "lastError=\(m.hybridBenchLastError ?? "none")")
     }
 
     /// M737 — bench-loop integration smoke test: start with

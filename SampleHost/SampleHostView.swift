@@ -495,13 +495,16 @@ struct SampleHostView: View {
             Group {
                 HStack {
                     Text("Hours:").font(.caption)
+                    // M736 (chapter 195 follow-up): step 0.1 lets
+                    // operator flex to 0.1h (6 min) / 0.2h (12 min)
+                    // for short smoke tests instead of jumping by 30 min.
                     Stepper(
                         value: Binding(
                             get: { model.hybridBenchDurationHours },
                             set: { model.updateHybridBenchDurationHours($0) }
                         ),
                         in: 0.1...24.0,
-                        step: 0.5
+                        step: 0.1
                     ) {
                         Text(String(format: "%.1f h",
                                     model.hybridBenchDurationHours))
