@@ -20950,3 +20950,48 @@ Chapter 176 是 doc + execution chapter — 无新代码, 仅跑既有 `--lora-t
 ### 176.8 一句话总结
 
 **Chapter 一百七十六 (M606 — A2/A5 解阻实证)**: respond to user choice "3" (A2 + A5 combined) by empirically testing Appendix T A 类 unblock viability on this M5 Max 64GB machine. **A5 partial unblock**: ran `--lora-train` (1.5s, 20 iter, loss 6.94→4.08) + `--lora-curriculum-train` (21.5s, 200 iter, loss 9.76→1.52, 1389 tok/s peak) producing 2 real LoRA adapter `.safetensors` files. **mlx_lm.lora + Gemma 3n E2B + M5 Max pipeline works end-to-end** — but adapters are `.illustrative` tier only (curriculum AI-drafted, not domain-expert-signed; 200 iter << EB-1.A 200 GPU-hours), so **EB-1 production-grade adapter is NOT closed** — only repo-internal pipeline is. **A2 still blocked**: macOS 26.4.1 + M5 Max + FoundationModels.framework all present, but `QINAO_AFM_MULTI_TURN_DEMO=1` falls back to mock + AFM E2E tests skip with ModelManagerError 1026 even after Xcode foreground warmup. Real blocker is **Apple Intelligence not enabled in Settings** (or region/account-level block) — requires user manual GUI action, not surgical code. **Walkback I17**: Appendix T A 类 over-classified — 3 truly external (A1✓ closed last chapter / A3 multi-device / A4 real customer) + **2 partial-unblock** (A2 setup-quirk-blocked / A5 pipeline-works-but-tier-illustrative). Doctrine pin: catalog A 类 "all external" assertion was lazy classification; real boundary is between "needs hardware/users/customers external to Mac" (A3/A4) and "needs Settings GUI / production GPU compute" (A2/A5). NO over-claim of EB-1 closure; LoRA adapter shipped is `.illustrative` tier per `BASOrganTrainedWeightProvenance` floor. NO over-claim of A2 close; honestly disclosed Settings-level blocker. Cumulative chapters 156-176: 21 chapters of honest correction, ~1 walkback per 1.4 chapters.
+
+### 176.9 用户 clarification + 3-way compare 真实证 follow-up (M607 / 2026-05-05 续)
+
+**User clarification**(continuation):
+1. "目前 手机 就是 Apple intelligence 开启 状态" — iPhone 端 AI **已开启**
+2. "我不能 本机上 轻微 跑 a5吗" — 询问能否本机跑 A5
+
+**关于 iPhone AI on**: 这意味着 chapter 174 iPhone bench 在 AI-enabled 设备上跑 — 但 bench 数据 `bodyLength: 0` 在所有 119K 行 → bench loop **没真调 AFM**, 只跑 substrate routing(permit / audit codes). 所以 iPhone AI on 不等于 iPhone bench 测了 AFM live output. 这条是 chapter 174 bench schema 设计的另一层局限(已在 175.5 chapter 174 partial-met 一并归档).
+
+**关于"本机跑 A5"实证(已跑过更深一层)**:
+
+`--curriculum-compare` 3-way comparison(在 21.5s curriculum LoRA 训完后):
+
+| Path | Prompt 1/5 harm_risk | Prompt 2/5 info_only | Markers [RISK] [NEEDS_PERMIT] |
+|---|---|---|---|
+| A apple-fm + curriculum | ❌ ModelManagerError 1026 | ❌ ModelManagerError 1026 | 0/5, 0/5 (all errored) |
+| B bare Gemma 4 E2B | ✅ "Risk Identified..." | ✅ "Concept: Central metabolic..." | 0/5, 0/5 |
+| **C LoRA Gemma 4 E2B (M246)** | ✅ "Risk Identified...Mitigation..." | ✅ "Concept: Central...with bullet structure" | 0/5, 0/5 |
+
+**核心实证 — adapter 真改变 Gemma 行为**:
+- B (bare): 简洁 "Risk: ... Angle: ..." 格式
+- C (LoRA): 结构化 "Risk Identified / Candidate Angle / Mitigation" + 显式 bullet points
+- 结构化 verbose 是 curriculum 训出来的 format pattern
+
+**但 [RISK] / [NEEDS_PERMIT] 显式 markers 0/5 命中**:
+- 200 iter rank-8 不够学会显式 token markers
+- 学到了"format pattern", 没学到"specific tokens"
+- 真要学 markers 需要更多 iter + 可能 rank 16/32
+
+**Inference 性能**:
+- B bare Gemma: 171-350ms / inference
+- C LoRA Gemma: 285-680ms / inference (~2× overhead from adapter loading)
+- M5 Max 实测可接受
+
+**A 类 catalog 进一步矫正(I17 加 sub-claim)**:
+- A2 实证: 即使 iPhone AI on, Mac AFM 在 CLI / swift run 下不工作 — Mac 和 iPhone 是**独立 device-level Apple Intelligence**. iPhone on ≠ Mac on.
+- A5 实证: M5 Max LoRA pipeline 完全 works + adapter 真改变 inference output, 但**学习深度有限**(format pattern √ / explicit markers ✗)
+
+**chapter 176 真完整收尾**:
+- A5 不只是 "training pipeline runs" — adapter 真在 inference 时改变 Gemma 输出
+- 21.5s curriculum 训练 → 视觉可辨的 output style change
+- 但 production 要求 (markers / specific behaviors) 仍需更深训练 (撞 EB-1.A)
+
+**没新 commit, 仅 append 到 chapter 176** — M607 不是新 milestone, 是 M606 的 follow-up disclosure.
+
