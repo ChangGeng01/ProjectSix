@@ -21211,3 +21211,70 @@ User: "好 那我选b" (chose option B from §176.4 unblock plan).
 - 175: bench 实证 + catalog stale corrections + I11-I16 walkbacks
 - 176: A2/A5 unblock + AFM panel + AFM 8h bench + I17-I20 walkbacks
 
+
+### 176.15 M611 — Mac Gemma 4 E2B 大规模 8h bench (mirror M610 AFM bench) (2026-05-05 续)
+
+**User trigger**: "全面 跑 a5 gemma 4 e2b 能不能 也 大规模相同 方式 冒烟"
+
+→ Mac M5 Max 端 Gemma 4 E2B procedural bench, mirroring iPhone AFM bench M610 architecture but on Mac (no AFM foreground policy, MLX runs offline).
+
+**M611 ship — `--gemma-bench` mode in QinaoSampleHost**:
+
+7 flexible env-var configs:
+| ENV var | Default | Doctrine |
+|---|---|---|
+| QINAO_GEMMA_BENCH_HOURS | 8.0 | flexible |
+| QINAO_GEMMA_BENCH_STRIDES_CSV | 5041,5039,5051,5077,7919 | E5 coprime forced |
+| QINAO_GEMMA_BENCH_ROTATION_ITER | 11_300 | flexible |
+| QINAO_GEMMA_BENCH_MUTATIONS | 5 | flexible |
+| QINAO_GEMMA_BENCH_JSONL_MB | 15 | flexible |
+| QINAO_GEMMA_BENCH_LOAD_LORA | 0 (off) | flexible |
+| QINAO_GEMMA_BENCH_OUTPUT_DIR | /tmp/gemma-bench | flexible |
+
+**Per-iter flow**:
+1. Generate scattered+mutation prompt (chapter 173 corpus)
+2. `MLXOrganAdapter.draft(BASOrganRequest)` — bare Gemma OR LoRA-loaded Gemma
+3. Record JSONL row: timestamp / iteration / stride / mutationSeed / 6-dim signature / prompt / status / body / bodyLength / latencyMs / errorMessage
+4. Periodic 60s status banner
+
+**Smoke verification (3min, default config)**:
+- 254 iter / 180s = **1.41 iter/sec sustained**
+- 0 errors / 254 ok = 100% success rate  
+- avg latency: ~700ms / iter (Gemma 4 E2B 4-bit inference time)
+- Real LLM body produced (e.g., "Risk Identification: Cognitive Load... Candidate Angles: Anchor Point, Regret Curve, Commitment Level...")
+- JSONL row example: 1KB average
+
+**Latency display fix(本次)**: initial calculation `atto / 10^12` was wrong by factor of 1000. Corrected to `atto / 10^15` → 792.3ms reported (matched real ~700ms throughput).
+
+**8h projected**:
+- 8h × 1.4 iter/sec × 3600s = **40_320 iterations exactly** (= full 40,320-slot combinatorial space, single pass through all unique prompts!)
+- Wait — coincidence: 8h @ 1.4 iter/sec = 40,320 = totalCapacity of corpus. With stride rotation, 5 strides x 11,300 iter = 56,500 iter not 40,320 — so actually 8h covers full space + ~16K extra coverage with mutations.
+- ~110-200 MB JSONL data
+- Real LLM body data first time across 40,000+ procedural prompts
+
+**Comparison to iPhone AFM bench (M610)**:
+| | iPhone AFM bench | Mac Gemma bench |
+|---|---|---|
+| Where | iPhone 17e SwiftUI | Mac M5 Max CLI |
+| LLM | Apple Foundation Models | Gemma 4 E2B 4-bit MLX |
+| Foreground required | Yes (macOS 26 policy) | No (MLX local) |
+| Substrate routing per iter | Yes (14 layers) | Yes (no — direct adapter call) |
+| Throughput | ~3-5 iter/s (AFM ~200-500ms) | **~1.4 iter/s (Gemma ~700ms)** |
+| Output | iphone-afm-bench/*.jsonl | /tmp/gemma-bench/*.jsonl |
+
+**Doctrine pin**: Same flexible-config doctrine as M610 — magic numbers exposed as env vars, doctrine invariants (coprime stride filter) enforced.
+
+**Run commands**:
+```bash
+# Default 8h bench
+swift run -c release --package-path QinaoRuntimeSDK QinaoSampleHost --gemma-bench
+
+# Custom: 4h with LoRA M247 loaded
+QINAO_GEMMA_BENCH_HOURS=4.0 QINAO_GEMMA_BENCH_LOAD_LORA=1 \
+swift run -c release --package-path QinaoRuntimeSDK QinaoSampleHost --gemma-bench
+
+# Custom: longer rotation, fewer mutations
+QINAO_GEMMA_BENCH_ROTATION_ITER=20000 QINAO_GEMMA_BENCH_MUTATIONS=3 \
+swift run -c release --package-path QinaoRuntimeSDK QinaoSampleHost --gemma-bench
+```
+

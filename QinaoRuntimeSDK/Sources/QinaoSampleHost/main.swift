@@ -511,6 +511,22 @@ struct QinaoSampleHost {
             await runCurriculumCompare()
             return
         }
+        if args.contains("--gemma-bench") {
+            // M611 chapter 一百七十六 §176.15 — large-scale Gemma 4
+            // E2B procedural bench mirroring iPhone AFM bench (M610).
+            // Runs N hours of programmatic prompt generation through
+            // bare Gemma 4 E2B (4-bit MLX) on Mac M5 Max. All numeric
+            // params via env vars (flexible, no hardcoded magic):
+            //   QINAO_GEMMA_BENCH_HOURS         (default 8.0)
+            //   QINAO_GEMMA_BENCH_STRIDES_CSV   (default 5041,5039,5051,5077,7919)
+            //   QINAO_GEMMA_BENCH_ROTATION_ITER (default 11_300)
+            //   QINAO_GEMMA_BENCH_MUTATIONS     (default 5)
+            //   QINAO_GEMMA_BENCH_JSONL_MB      (default 15)
+            //   QINAO_GEMMA_BENCH_LOAD_LORA     (default 0; 1=load M247)
+            //   QINAO_GEMMA_BENCH_OUTPUT_DIR    (default /tmp/gemma-bench)
+            await runGemmaLongBench()
+            return
+        }
         if args.contains("--apple-fm-curriculum") {
             // M234 — drive Apple FM twice per prompt (bare /
             // curriculum-on) and print side-by-side. The closest
@@ -3284,6 +3300,227 @@ struct QinaoSampleHost {
                 "error: lora-curriculum-train-m252 failed: \(error)\n")
             exit(2)
         }
+    }
+
+    /// M611 chapter 一百七十六 §176.15 — large-scale long-running
+    /// Gemma 4 E2B procedural bench mirroring iPhone AFM bench
+    /// (M610). All flexible config via env vars, no hardcoded magic.
+    private static func runGemmaLongBench() async {
+        let env = ProcessInfo.processInfo.environment
+        let hours = Double(env["QINAO_GEMMA_BENCH_HOURS"] ?? "8.0") ?? 8.0
+        let stridesCSV =
+            env["QINAO_GEMMA_BENCH_STRIDES_CSV"]
+            ?? "5041,5039,5051,5077,7919"
+        let rotationIter =
+            Int(env["QINAO_GEMMA_BENCH_ROTATION_ITER"] ?? "11300")
+            ?? 11_300
+        let mutationCount =
+            Int(env["QINAO_GEMMA_BENCH_MUTATIONS"] ?? "5") ?? 5
+        let jsonlMB =
+            Int(env["QINAO_GEMMA_BENCH_JSONL_MB"] ?? "15") ?? 15
+        let loadLoRA =
+            (env["QINAO_GEMMA_BENCH_LOAD_LORA"] ?? "0") == "1"
+        let outputDir =
+            env["QINAO_GEMMA_BENCH_OUTPUT_DIR"]
+            ?? "/tmp/gemma-bench"
+
+        // Coprime stride doctrine — filter non-coprime entries
+        let strides = stridesCSV
+            .split(separator: ",")
+            .compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
+            .filter { $0 > 0 && gcdHelper($0, 40_320) == 1 }
+        guard !strides.isEmpty else {
+            stderr("error: stride CSV empty / no coprime entries\n")
+            exit(2)
+        }
+
+        // Setup output dir + helper
+        let outDirURL = URL(fileURLWithPath: outputDir, isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: outDirURL, withIntermediateDirectories: true)
+
+        print("""
+            QinaoSampleHost --gemma-bench (M611):
+              model:        gemma4_E2B_4bit (mlx-community)
+              lora:         \(loadLoRA ? "M247 adapter loaded" : "bare gemma")
+              duration:     \(hours)h
+              strides:      \(strides) (coprime to 40320)
+              rotation:     \(rotationIter) iter / stride
+              mutations:    \(mutationCount)
+              jsonl rotation: \(jsonlMB) MB
+              output:       \(outputDir)/iterations.N.jsonl
+            """)
+
+        // Load Gemma adapter
+        let gemma = MLXOrganAdapter(
+            model: MLXModelCatalog.gemma4_E2B_4bit)
+        do {
+            try await gemma.loadModel()
+            if loadLoRA {
+                let m247URL = URL(
+                    fileURLWithPath:
+                        "/tmp/qinao_curriculum_lora_m247.safetensors")
+                let m246URL = URL(
+                    fileURLWithPath:
+                        "/tmp/qinao_curriculum_lora.safetensors")
+                let adapterURL = FileManager.default.fileExists(
+                    atPath: m247URL.path) ? m247URL : m246URL
+                try await gemma.loadAdapter(from: adapterURL)
+            }
+            try await gemma.prewarm()
+        } catch {
+            stderr("error: gemma load failed: \(error)\n")
+            exit(2)
+        }
+
+        let durationSec = hours * 3600.0
+        let rotationBytes = jsonlMB * 1024 * 1024
+        let startedAt = Date()
+        var iter = 0
+        var rotationIdx = 0
+        var currentURL: URL? = nil
+        var currentSize: Int = 0
+        var currentHandle: FileHandle? = nil
+        var okCount = 0
+        var errCount = 0
+        var totalLatencyMs: Double = 0
+        var lastBannerAt = startedAt
+        let signalNotifier = Task { @MainActor in
+            // Periodic status banner every 60s
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 60_000_000_000)
+            }
+        }
+        defer { signalNotifier.cancel() }
+
+        while !Task.isCancelled {
+            if Date().timeIntervalSince(startedAt) > durationSec {
+                break
+            }
+            let strideIdx = (iter / rotationIter) % strides.count
+            let chosenStride = strides[strideIdx]
+            let mutationSeed = iter % mutationCount
+            let g = QinaoExtendedPromptCorpus
+                .generateScatteredWithMutation(
+                    iter: iter,
+                    stride: chosenStride,
+                    mutationSeed: mutationSeed)
+            let prompt = g.prompt
+
+            let req = BASOrganRequest(
+                requestID: "gemma-bench-\(iter)",
+                role: .scout,
+                preset: .scout,
+                instruction: prompt)
+            let t0 = ContinuousClock().now
+            var status = "ok"
+            var body = ""
+            var errorMessage: String? = nil
+            do {
+                let draft = try await gemma.draft(req)
+                body = draft.body
+                okCount += 1
+            } catch {
+                status = "error"
+                errorMessage = "\(error)"
+                errCount += 1
+            }
+            let elapsed = ContinuousClock().now - t0
+            // attoseconds = 10^-18 s, ms = 10^-3 s, so atto / 10^15 = ms
+            let latencyMs = Double(
+                elapsed.components.attoseconds / 1_000_000_000_000_000)
+                + Double(elapsed.components.seconds) * 1000.0
+            totalLatencyMs += latencyMs
+
+            // JSONL row
+            let row: [String: Any] = [
+                "timestamp": ISO8601DateFormatter()
+                    .string(from: Date()),
+                "iteration": iter,
+                "seed": iter,
+                "stride": chosenStride,
+                "mutationSeed": mutationSeed,
+                "tone": g.signature.tone.rawValue,
+                "domain": g.signature.domain.rawValue,
+                "stake": g.signature.stake.rawValue,
+                "timeframe": g.signature.timeframe.rawValue,
+                "confidant": g.signature.confidant.rawValue,
+                "askShape": g.signature.askShape.rawValue,
+                "prompt": prompt,
+                "status": status,
+                "body": body,
+                "bodyLength": body.count,
+                "latencyMs": latencyMs,
+                "errorMessage": errorMessage as Any
+            ]
+            // Manual JSONL serialize (sorted keys for stable diff)
+            let jsonData = try? JSONSerialization.data(
+                withJSONObject: row,
+                options: [.sortedKeys])
+            guard let data = jsonData else {
+                iter += 1
+                continue
+            }
+            let line = data + Data([0x0A])  // newline
+
+            // Rotation logic
+            if currentHandle == nil
+                || currentSize + line.count > rotationBytes
+            {
+                try? currentHandle?.close()
+                rotationIdx += 1
+                let url = outDirURL.appendingPathComponent(
+                    "iterations.\(rotationIdx).jsonl")
+                FileManager.default.createFile(
+                    atPath: url.path, contents: nil)
+                currentURL = url
+                currentSize = 0
+                currentHandle = try? FileHandle(forWritingTo: url)
+            }
+            try? currentHandle?.write(contentsOf: line)
+            currentSize += line.count
+
+            // Banner every 60s
+            if Date().timeIntervalSince(lastBannerAt) >= 60.0 {
+                let elapsedSec = Date().timeIntervalSince(startedAt)
+                let perSec = elapsedSec > 0
+                    ? Double(iter + 1) / elapsedSec
+                    : 0
+                let avgLat = (iter + 1) > 0
+                    ? totalLatencyMs / Double(iter + 1) : 0
+                print(String(
+                    format:
+                        "[gemma-bench] iter=%d  ok=%d err=%d  " +
+                        "elapsed=%.0fs/%.0fs  %.2f iter/s  " +
+                        "avgLat=%.1fms  rot=%d  rotSize=%dKB",
+                    iter + 1, okCount, errCount,
+                    elapsedSec, durationSec, perSec, avgLat,
+                    rotationIdx, currentSize / 1024))
+                lastBannerAt = Date()
+            }
+            iter += 1
+        }
+        try? currentHandle?.close()
+        let totalElapsed = Date().timeIntervalSince(startedAt)
+        print("""
+
+            ━━━ gemma-bench complete ━━━
+              total iterations: \(iter)
+              ok:               \(okCount)
+              error:            \(errCount)
+              total time:       \(String(format: "%.1f", totalElapsed))s
+              avg iter/sec:     \(String(format: "%.2f", Double(iter) / totalElapsed))
+              avg latency:      \(String(format: "%.1f", iter > 0 ? totalLatencyMs / Double(iter) : 0))ms
+              rotation files:   \(rotationIdx)
+              output dir:       \(outputDir)
+            """)
+    }
+
+    /// gcd helper for runGemmaLongBench coprime filtering
+    private static func gcdHelper(_ a: Int, _ b: Int) -> Int {
+        var (x, y) = (abs(a), abs(b))
+        while y != 0 { (x, y) = (y, x % y) }
+        return x
     }
 
     /// D — real 3-way comparison: 5 hand-picked prompts run
