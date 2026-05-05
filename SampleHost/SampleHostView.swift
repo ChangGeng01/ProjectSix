@@ -602,6 +602,57 @@ struct SampleHostView: View {
                     }
                     .disabled(model.hybridBenchIsRunning)
                 }
+                // M741 chapter 一百九十七 — SmokeMode picker.
+                // 3 modes: canonical (chapter 178+ default) /
+                // 14-layer (chapter 191) / heavy-tailed (chapter 192).
+                // iPhone smoke ran .canonical (default) → 100%
+                // skip path. .heavyTailed = production-realistic.
+                HStack {
+                    Text("Smoke mode:").font(.caption)
+                    Picker("", selection: Binding(
+                        get: { model.hybridBenchSmokeMode },
+                        set: { model.hybridBenchSmokeMode = $0 }
+                    )) {
+                        Text("canonical")
+                            .tag(HybridBenchConfig.SmokeMode.canonical)
+                        Text("14-layer")
+                            .tag(HybridBenchConfig.SmokeMode.fourteenLayer)
+                        Text("heavy-tailed")
+                            .tag(HybridBenchConfig.SmokeMode.heavyTailed)
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(model.hybridBenchIsRunning)
+                }
+                // M742 chapter 一百九十七 — LLM timeout slider.
+                HStack {
+                    Text("LLM timeout:").font(.caption)
+                    Stepper(
+                        value: Binding(
+                            get: { model.hybridBenchLLMTimeoutSeconds },
+                            set: { model.updateLLMTimeoutSeconds($0) }
+                        ),
+                        in: 5.0...300.0,
+                        step: 5.0
+                    ) {
+                        Text(String(
+                            format: "%.0fs",
+                            model.hybridBenchLLMTimeoutSeconds))
+                            .font(.caption.monospacedDigit())
+                    }
+                    .disabled(model.hybridBenchIsRunning)
+                }
+                // M740 chapter 一百九十七 — pause-on-serious toggle.
+                // iPhone smoke: 91% of 12-min run at .serious thermal.
+                // Default false (chapter-192 baseline). Operator on
+                // hot device can flip true for 10h survivability.
+                Toggle(isOn: Binding(
+                    get: { model.hybridBenchPauseOnSerious },
+                    set: { model.hybridBenchPauseOnSerious = $0 }
+                )) {
+                    Text("Pause on .serious thermal")
+                        .font(.caption)
+                }
+                .disabled(model.hybridBenchIsRunning)
             }
 
             if model.hybridBenchIsRunning {

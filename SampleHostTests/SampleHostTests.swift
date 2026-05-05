@@ -1543,6 +1543,54 @@ final class SampleHostTests: XCTestCase {
             "lastError=\(m.hybridBenchLastError ?? "none")")
     }
 
+    // MARK: - chapter 一百九十七 / M740-M743 — iPhone-smoke responses
+
+    /// M740 — pauseOnSerious=false (default) keeps gate at
+    /// chapter-192 doctrine baseline: serious thermal runs.
+    func testThermalGateRunsOnSeriousByDefault() {
+        let d = SampleHostBenchThermalGate.decide(
+            thermalRaw: "serious",
+            batteryLevel: 0.85,
+            lowPowerMode: false,
+            batteryStateRaw: "charging",
+            pauseOnSerious: false)
+        XCTAssertEqual(d, .run)
+    }
+
+    /// M740 — pauseOnSerious=true pauses on serious thermal
+    /// (10h iPhone survivability opt-in).
+    func testThermalGatePausesOnSeriousWhenOptedIn() {
+        let d = SampleHostBenchThermalGate.decide(
+            thermalRaw: "serious",
+            batteryLevel: 0.85,
+            lowPowerMode: false,
+            batteryStateRaw: "charging",
+            pauseOnSerious: true)
+        XCTAssertEqual(d,
+            .pause(reason: "thermal-serious-flex-opt-in"))
+    }
+
+    /// M740 — pauseOnSerious DOESN'T affect critical path
+    /// (critical always pauses regardless of toggle).
+    func testThermalGateAlwaysPausesOnCriticalRegardlessOfFlex() {
+        for opt in [false, true] {
+            let d = SampleHostBenchThermalGate.decide(
+                thermalRaw: "critical",
+                batteryLevel: 0.85,
+                lowPowerMode: false,
+                batteryStateRaw: "charging",
+                pauseOnSerious: opt)
+            XCTAssertEqual(d, .pause(reason: "thermal-critical"))
+        }
+    }
+
+    /// M740 — model has @Published flex with default false.
+    @MainActor
+    func testFreshModelPauseOnSeriousFalseByDefault() {
+        let m = SampleHostModel()
+        XCTAssertFalse(m.hybridBenchPauseOnSerious)
+    }
+
     /// M737 — bench-loop integration smoke test: start with
     /// 0.001h (3.6s) duration, verify it starts + can be stopped
     /// without crash. Doesn't rely on LLM availability — substrate

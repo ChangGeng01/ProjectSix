@@ -71,15 +71,27 @@ enum SampleHostBenchThermalGate {
     /// `batteryLevel`: -1 unknown, else 0..1.
     /// `lowPowerMode`: ProcessInfo.isLowPowerModeEnabled.
     /// `batteryStateRaw`: "charging" / "full" / "unplugged" / "unknown".
+    /// `pauseOnSerious`: M740 chapter 一百九十七 — chapter 一百
+    /// 九十六 iPhone smoke showed 91% of 12-min substrate-only run
+    /// at `.serious` thermal. For 10h on iPhone, operator can
+    /// opt to pause on `.serious` in addition to `.critical`
+    /// (default false to preserve chapter-192 doctrine baseline).
     static func decide(
         thermalRaw: String,
         batteryLevel: Double,
         lowPowerMode: Bool,
-        batteryStateRaw: String
+        batteryStateRaw: String,
+        pauseOnSerious: Bool = false
     ) -> SampleHostBenchThermalDecision {
         // Critical thermal — always pause
         if thermalRaw == "critical" {
             return .pause(reason: "thermal-critical")
+        }
+        // M740 — operator-opt-in serious-thermal pause for 10h
+        // on hot devices (iPhone smoke showed iPhone 17e hits
+        // serious in ~110s of substrate-only at 18 iter/sec).
+        if pauseOnSerious && thermalRaw == "serious" {
+            return .pause(reason: "thermal-serious-flex-opt-in")
         }
         // Charging → battery floor never trips
         let charging = batteryStateRaw == "charging"

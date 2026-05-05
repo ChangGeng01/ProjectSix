@@ -24793,3 +24793,92 @@ User's "查error" was right. **Pre-M739, the watcher would have made the 10h das
 ### 196.10 一句话总结
 
 **Chapter 一百九十六 (M739)**: respond to user "双端 跑个 10分钟 试试水 查error" — Mac-side programmatic 60s smoke FOUND A REAL BUG. Pre-this-batch the chapter-192 anomaly watcher fired EVERY iter once stuck-state entered (913 fires in 60s of deterministic sim run). Fix: fire-on-entry doctrine via `inSubstrateStuckState` / `inLLMStuckState` private state — 1000 stuck iters now = 1 fire (1000× reduction). Re-run smoke confirms: 12 stuck-entries in 60s (76× improvement). +2 fix-pin tests; 60s smoke re-gated for CI but verified working pre-commit. iPhone 17e deployed + launched for second 端. **Without this smoke, the 10h dashboard would have been useless** — would have read 200K+ "stuck" events for a single deterministic region. The user's instinct to "查error before committing" caught a real doctrine bug. **67 SampleHost tests pass; 1947 + 1 parity gate + 3 analysis tools, 0 failures**.
+
+## 一百九十七、 全面开发 — iPhone smoke 3 findings 直接响应 (M740-M743 / 2026-05-06)
+
+User instruction: "全面开发" — chapter 一百九十六 iPhone 17e 12-min smoke surfaced 3 real findings; chapter 一百九十七 ships direct responses to Findings 1-3.
+
+### 197.1 M740 — pauseOnSerious flex toggle (Finding 1)
+
+iPhone smoke trajectory:
+- iter 0-1000 (~55s): nominal/fair (cool)
+- iter 1000-2000 (~55-110s): rapid escalation
+- iter 2000-13229 (~110-720s, **10+ min**): **100% serious thermal**
+
+M717's gate only paused on `.critical`. Default behavior at `.serious` = run. For 10h on iPhone, this means the device runs hot for hours then potentially escalates to `.critical` and pauses. Better: operator flex.
+
+`SampleHostBenchThermalGate.decide()` now takes `pauseOnSerious: Bool = false`. New `@Published hybridBenchPauseOnSerious: Bool = false`. When true → `.serious` thermal triggers `pause(reason: "thermal-serious-flex-opt-in")`. Default false preserves chapter-192 doctrine baseline.
+
+UI Toggle in hybridBenchPanel: "Pause on .serious thermal" — disabled while bench running.
+
+Doctrine: critical always pauses (unconditional). Serious pause is OPT-IN per operator preference. Charging-state battery floor and low-power-mode + serious paths unchanged.
+
+### 197.2 M741 — SmokeMode UI Picker (Finding 2)
+
+iPhone smoke ran `.canonical` (default) → 100% iters were substrate-skip path (block/delay), 0 real LLM calls. `.heavyTailed` = production-realistic distribution + adversarial mutations. UI now lets operator choose pre-tap.
+
+New SegmentedPicker in hybridBenchPanel:
+- canonical (chapter 178+ default)
+- 14-layer (chapter 191 layer-stratified)
+- heavy-tailed (chapter 192 production-realistic)
+
+Disabled mid-bench so changes only apply on next start.
+
+### 197.3 M742 — LLM timeout UI Stepper (chapter 195 deferred)
+
+Chapter 195 added `@Published hybridBenchLLMTimeoutSeconds` (60s default, [5, 300] bounds) but deferred UI exposure. Chapter 197 wires the Stepper:
+
+`Hours: 60s` (steps of 5s, range 5-300) — disabled while bench running. Operator on slow Gemma-loading device can bump higher; operator on fast AFM can dial lower for tighter hang detection.
+
+### 197.4 Tests
+
+| Test | Pin |
+|---|---|
+| `testThermalGateRunsOnSeriousByDefault` | pauseOnSerious=false → serious runs |
+| `testThermalGatePausesOnSeriousWhenOptedIn` | pauseOnSerious=true → serious pauses |
+| `testThermalGateAlwaysPausesOnCriticalRegardlessOfFlex` | critical pauses for both opt values |
+| `testFreshModelPauseOnSeriousFalseByDefault` | @Published default value |
+
+SampleHost tests: 67 → **71** (+4 chapter 197).
+
+### 197.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17e sim | **71** ✓ (1 60s smoke skipped) |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| **Total** | **1948 + 1 parity gate + 3 analysis tools, 0 failures** |
+
+### 197.6 What's now operator-tunable
+
+For the next iPhone 10h smoke, operator can:
+1. Pick **smokeMode** (canonical / 14-layer / heavy-tailed) via SegmentedPicker
+2. Toggle **pause-on-serious** for thermal protection on hot device
+3. Adjust **LLM timeout** (5-300s) via Stepper
+
+All 3 disabled during run so settings stick to start-time captured values.
+
+### 197.7 Honest residual
+
+| Item | Status |
+|---|---|
+| Active cooling sleep (chapter 198 candidate) | Sleep N seconds every M iters when sustained `.serious` |
+| Live thermal dashboard widget (chapter 198 candidate) | Show current state + time-at-serious in real time |
+| Timeout in non-confident paths (bothLLMs / uncertain / localOnly) | Still using raw call (chapter 198 candidate) |
+| Resume actually-resume button | Banner is read-only (chapter 199 candidate) |
+| Bench-to-train v0.5 dry-run smoke | Pipeline ready (chapter 199 candidate) |
+
+### 197.8 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostBenchSafetyKit.swift` | M740 `decide` + `pauseOnSerious: Bool` parameter |
+| `SampleHost/SampleHostModel.swift` | M740 `@Published hybridBenchPauseOnSerious`; bench loop captures + passes to gate |
+| `SampleHost/SampleHostView.swift` | M741 SmokeMode SegmentedPicker; M742 LLM timeout Stepper; M740 pause-on-serious Toggle |
+| `SampleHostTests/SampleHostTests.swift` | +4 chapter 197 fix-pin tests |
+
+### 197.9 一句话总结
+
+**Chapter 一百九十七 (M740-M743)**: respond to user "全面开发" by directly addressing 3 iPhone smoke findings — **M740 pauseOnSerious flex toggle** (iPhone 17e hits `.serious` thermal in 110s, stays there for 10+ min; default false preserves chapter-192 baseline; operator opts in for 10h on hot device → pause iter-level on `.serious`). **M741 SmokeMode UI SegmentedPicker** (canonical / 14-layer / heavy-tailed selectable pre-tap; iPhone smoke ran default canonical = 100% substrate-skip; heavy-tailed produces real LLM dispatch + adversarial). **M742 LLM timeout UI Stepper** (chapter 195 backend deferred its UI; now exposed at 5-300s range). **71 SampleHost tests pass; 1948 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine: opt-in flexes preserve baseline behavior (default false / canonical / 60s); operator chooses 10h profile pre-tap.

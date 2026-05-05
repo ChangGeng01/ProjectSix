@@ -1170,3 +1170,12 @@ SampleHost tests 59 → **64**; full stack **1944 + 1 parity gate + 3 analysis t
 - **iPhone 17e deployed**: SampleHost.app installed + launched via `xcrun devicectl`. Second 端 smoke ready for operator's tap.
 
 SampleHost tests 64 → **67**; full stack **1947 + 1 parity gate + 3 analysis tools, 0 failures**. Doctrine pin: red line 7 held (fix changes flag semantics, not decision influence). Without this smoke, 10h dashboard would have been useless.
+
+## 2026-05-06 — chapter 一百九十七 (M740-M743) iPhone smoke 3 findings 响应
+
+- **M740** `SampleHostBenchThermalGate.decide` + `pauseOnSerious: Bool` parameter. New `@Published hybridBenchPauseOnSerious: Bool = false`. When true → `.serious` thermal triggers `thermal-serious-flex-opt-in` pause. Default false preserves chapter-192 baseline. iPhone 17e smoke showed 91% of 12-min substrate run at `.serious`; 10h needs operator opt-in for thermal protection.
+- **M741** SmokeMode SegmentedPicker in UI — canonical / 14-layer / heavy-tailed selectable pre-tap. Disabled mid-run.
+- **M742** LLM timeout Stepper in UI (range 5-300s, step 5s) — chapter 195's backend deferred its UI; now wired.
+- **M743** +4 fix-pin tests; UI Toggle for pauseOnSerious; doctrine pin: critical always pauses regardless of opt.
+
+SampleHost tests 67 → **71**; full stack **1948 + 1 parity gate + 3 analysis tools, 0 failures**.

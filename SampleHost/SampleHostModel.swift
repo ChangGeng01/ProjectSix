@@ -471,6 +471,12 @@ final class SampleHostModel: ObservableObject {
     @Published var hybridBenchLLMTimeoutSeconds: Double = 60.0
     /// M735 — track per-iter timeout fires for live dashboard.
     @Published private(set) var hybridBenchLLMTimeoutCount: Int = 0
+    /// M740 chapter 一百九十七 — opt-in pause on `.serious` thermal.
+    /// Chapter 一百九十六 iPhone 17e smoke: 91% of 12-min substrate-
+    /// only run at `.serious` thermal. For 10h, operator on hot
+    /// device can flip true so `.serious` triggers pause in
+    /// addition to `.critical`. Default false to preserve doctrine.
+    @Published var hybridBenchPauseOnSerious: Bool = false
     @Published private(set) var hybridBenchIsRunning: Bool = false
     @Published private(set) var hybridBenchIterations: Int = 0
     @Published private(set) var hybridBenchAFMOk: Int = 0
@@ -2660,6 +2666,7 @@ extension SampleHostModel {
         let mutationProbCaptured = self.hybridBenchMutationProbability
         let checkpointEveryNCaptured = self.hybridBenchCheckpointEveryNIters
         let llmTimeoutCaptured = self.hybridBenchLLMTimeoutSeconds
+        let pauseOnSeriousCaptured = self.hybridBenchPauseOnSerious
         let anomalyWatcher = SampleHostBenchAnomalyWatcher(
             windowSize: anomalyWindowCaptured)
         // M721 chapter 一百九十二 — drift monitor on length-MAE
@@ -2780,7 +2787,8 @@ extension SampleHostModel {
                     thermalRaw: thermalRaw,
                     batteryLevel: batteryRaw,
                     lowPowerMode: lowPower,
-                    batteryStateRaw: batteryStateRaw)
+                    batteryStateRaw: batteryStateRaw,
+                    pauseOnSerious: pauseOnSeriousCaptured)
                 if case .pause(let reason) = gateDecision {
                     // M727 chapter 一百九十三 — live counter
                     applyIfActive(myGen) {
