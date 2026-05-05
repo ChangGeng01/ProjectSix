@@ -381,6 +381,35 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(model.hybridBenchPartitionDelta, 0)
     }
 
+    /// M683 chapter 一百八十七 — A2 Swift 6 prep:
+    /// `private nonisolated init()` lets `static let shared`
+    /// initialize without isolation conflict. Callable from any
+    /// context (private — actually only Swift-internal); only
+    /// the `predict*` methods are @MainActor isolated.
+    /// Indirect test — builds + accesses `.shared` 2× from
+    /// MainActor; equivalence verified.
+    @MainActor
+    func testCoreMLSharedSingletonsAccessible() {
+        // 4 helpers — verify .shared is identity-stable.
+        let p1 = ChengluPreflightInference.shared
+        let p2 = ChengluPreflightInference.shared
+        XCTAssertTrue(p1 === p2)
+        let pp1 = ChengluPermitPredictInference.shared
+        let pp2 = ChengluPermitPredictInference.shared
+        XCTAssertTrue(pp1 === pp2)
+        let mh1 = ChengluMultiHeadInference.shared
+        let mh2 = ChengluMultiHeadInference.shared
+        XCTAssertTrue(mh1 === mh2)
+        let lh1 = ChengluRegressionHeadInference.lengthHead
+        let lh2 = ChengluRegressionHeadInference.lengthHead
+        XCTAssertTrue(lh1 === lh2)
+        let lat1 = ChengluRegressionHeadInference.latencyHead
+        let lat2 = ChengluRegressionHeadInference.latencyHead
+        XCTAssertTrue(lat1 === lat2)
+        // length and latency are different singletons.
+        XCTAssertFalse(lh1 === lat1)
+    }
+
     /// M678 chapter 一百八十六 — B6-extended fix-pin: bench row
     /// Codable handles control characters in body (newline, tab,
     /// quote, backslash) without crashing and preserves

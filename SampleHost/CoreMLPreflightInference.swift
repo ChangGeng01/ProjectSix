@@ -226,12 +226,15 @@ public final class ChengluPreflightInference {
 
     private var model: MLModel?
 
-    /// M665 chapter 一百八十四 deep-review fix A24 (LOW): mark
-    /// init private so callers can't bypass `.shared` and
-    /// accidentally allocate parallel MLModel instances. The
-    /// shared singleton holds a lazily-loaded model that's
-    /// expensive to duplicate.
-    private init() {}
+    /// M665 chapter 一百八十四 fix A24 (LOW): private — enforces
+    /// `.shared` singleton.
+    /// M683 chapter 一百八十七 fix A2 (HIGH) Swift 6 strict mode:
+    /// `nonisolated` because empty body touches no actor state.
+    /// Lets `static let shared = ChengluPreflightInference()` —
+    /// initializer call from default-context — compile under
+    /// Swift 6 without `@MainActor` boundary violation. Method
+    /// calls (predict / predictOrNil) remain @MainActor isolated.
+    private nonisolated init() {}
 
     /// Load the model lazily on first call.
     private func ensureLoaded() throws -> MLModel {

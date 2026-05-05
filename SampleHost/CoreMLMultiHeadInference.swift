@@ -91,21 +91,32 @@ public final class ChengluMultiHeadInference {
 
     private var model: MLModel?
 
-    /// Z-norm constants read from .mlpackage user_defined_metadata
-    /// at first load. We need these to denormalize the regression
-    /// outputs (length_norm, latency_norm) back to chars / ms.
-    /// Fallback to chapter 175/176 training-set values if metadata
-    /// missing (defensive — should always be present in bundled
-    /// .mlpackage).
-    private var lengthMean: Double = 1360.34
-    private var lengthStd: Double = 886.82
-    private var latencyMean: Double = 5671.48
-    private var latencyStd: Double = 6729.38
+    /// M687 chapter 一百八十七 — A20 (LOW closed): typed
+    /// fallback constants (was: scattered magic numbers in
+    /// stored-property defaults). These are chapter 175/176
+    /// training-set means/stds; if metadata is stripped from
+    /// bundle, M665 fix A4 throws missingNormalizationMetadata
+    /// instead of silently using these — but they remain as
+    /// safety floor in case future change un-throws.
+    private enum Chapter175TrainingSetFallback {
+        static let lengthMean: Double = 1360.34
+        static let lengthStd: Double = 886.82
+        static let latencyMean: Double = 5671.48
+        static let latencyStd: Double = 6729.38
+    }
+    private var lengthMean: Double =
+        Chapter175TrainingSetFallback.lengthMean
+    private var lengthStd: Double =
+        Chapter175TrainingSetFallback.lengthStd
+    private var latencyMean: Double =
+        Chapter175TrainingSetFallback.latencyMean
+    private var latencyStd: Double =
+        Chapter175TrainingSetFallback.latencyStd
 
-    /// M665 chapter 一百八十四 deep-review fix A24 (LOW): private
-    /// init enforces `.shared` singleton; bypass would allocate
-    /// duplicate MLModel + duplicate metadata read.
-    private init() {}
+    /// M665 chapter 一百八十四 fix A24 (LOW) + M683 chapter 一百
+    /// 八十七 fix A2 (HIGH): private nonisolated — singleton
+    /// enforced + Swift 6 strict mode compatible.
+    private nonisolated init() {}
 
     private func ensureLoaded() throws -> MLModel {
         if let m = model { return m }

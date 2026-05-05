@@ -2669,7 +2669,24 @@ extension SampleHostModel {
                 var postLLMPermitMode: String? = nil
                 var postLLMAuditCount: Int? = nil
                 var postLLMShifted: Bool? = nil
-                if !firstBody.isEmpty && !llmSkipped {
+                // M685 chapter 一百八十七 — B4 (MEDIUM) fix:
+                // also observe `bothLLMs` Gemma body if AFM
+                // returned empty / errored. servedBody (defined
+                // below as the actually-rendered body for
+                // residuals) IS the right input for substrate
+                // post-LLM observation. Pre-fix: AFM-empty +
+                // Gemma-success in `.bothLLMs` branch left
+                // postLLMShifted = nil (skipped) even though
+                // Gemma's body was substrate-relevant.
+                //
+                // Skip iters (llmSkipped) still skip — substrate
+                // already gave canned response, no LLM speech to
+                // re-audit.
+                let observableBody: String = {
+                    if !firstBody.isEmpty { return firstBody }
+                    return fallbackBody ?? ""
+                }()
+                if !observableBody.isEmpty && !llmSkipped {
                     // M676 chapter 一百八十五 — B6 (HIGH): cap
                     // body at HybridBenchTuning.postLLMBody...
                     // chars to avoid pathological substrate eval
@@ -2680,12 +2697,12 @@ extension SampleHostModel {
                     let cap = HybridBenchTuning
                         .postLLMBodyTruncationChars
                     let truncatedBody: String
-                    if firstBody.count > cap {
+                    if observableBody.count > cap {
                         truncatedBody =
-                            String(firstBody.prefix(cap))
+                            String(observableBody.prefix(cap))
                             + "...[truncated]"
                     } else {
-                        truncatedBody = firstBody
+                        truncatedBody = observableBody
                     }
                     let observeText =
                         "Original: \(prompt)\n\nResponse: \(truncatedBody)"

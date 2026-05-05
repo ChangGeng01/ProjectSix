@@ -80,11 +80,11 @@ public final class ChengluRegressionHeadInference {
     private let modelVersion: String
     private var model: MLModel?
 
-    /// M665 chapter 一百八十四 deep-review fix A24 (LOW): private
-    /// init forces callers through the named `.lengthHead` /
-    /// `.latencyHead` singletons. Bypass would allocate
-    /// arbitrary-config heads and duplicate MLModel state.
-    private init(
+    /// M665 chapter 一百八十四 fix A24 (LOW) + M683 chapter 一百
+    /// 八十七 fix A2 (HIGH): private nonisolated — only stored
+    /// property assignments (no actor state touched), so safe
+    /// to run from any context.
+    private nonisolated init(
         modelResource: String,
         outputKey: String,
         modelVersion: String
