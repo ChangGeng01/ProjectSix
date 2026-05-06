@@ -394,7 +394,12 @@ struct BASEBrainProgramBlueprintTests {
             // budget slice + ML head slot protocol contract.
             "LayerSlice",
             "LayerInferenceInput",
-            "LayerInferenceOutput"
+            "LayerInferenceOutput",
+            // M788 (chapter 三百〇一) — Phase Beta cut 3 (final
+            // foundation): per-layer kill switch state + error
+            // boundary report.
+            "LayerKillSwitchState",
+            "LayerErrorBoundaryReport"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

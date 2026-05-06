@@ -538,7 +538,13 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "LayerInferenceInput":
                 BASLayerInferenceInput.currentSchemaVersion,
             "LayerInferenceOutput":
-                BASLayerInferenceOutput.currentSchemaVersion
+                BASLayerInferenceOutput.currentSchemaVersion,
+            // M788 (chapter 三百〇一) — Phase Beta cut 3 (final
+            // foundation): per-layer kill switch + error boundary.
+            "LayerKillSwitchState":
+                BASLayerKillSwitchState.currentSchemaVersion,
+            "LayerErrorBoundaryReport":
+                BASLayerErrorBoundaryReport.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

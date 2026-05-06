@@ -1381,6 +1381,22 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "LayerInferenceOutput",
             versionedType: BASLayerInferenceOutput.self,
             tests: ["schema.layer_inference_output.current", "schema.layer_inference_output.backward"]
+        ),
+        // M788 (chapter 三百〇一) — Phase Beta cut 3 (final foundation):
+        // 14-case per-layer kill switch + state record + 5-case
+        // fallthrough strategy + error boundary report (with derive
+        // helper from BASLayerActorError). Distinct from existing
+        // 4-case BASKillSwitchID in BASObservability (policy-class
+        // kill switches).
+        entry(
+            "LayerKillSwitchState",
+            versionedType: BASLayerKillSwitchState.self,
+            tests: ["schema.layer_kill_switch_state.current", "schema.layer_kill_switch_state.backward"]
+        ),
+        entry(
+            "LayerErrorBoundaryReport",
+            versionedType: BASLayerErrorBoundaryReport.self,
+            tests: ["schema.layer_error_boundary_report.current", "schema.layer_error_boundary_report.backward"]
         )
     ]
 
