@@ -58,6 +58,7 @@
 		219ABCDDDEF067890AAFE9ABC /* SampleHostBenchHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 219FEDCBBA9876543DBEABCD /* SampleHostBenchHelpers.swift */; };
 		221ABCDFFFE0123456ABFEDCD /* SampleHostBenchRiskDerivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 221FEDCDDC0987654DDC0EFAB /* SampleHostBenchRiskDerivation.swift */; };
 		222ABCD00FFE234567ABCFEDC /* SampleHostHybridBenchSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222FEDCEED01098765EEDFCBA /* SampleHostHybridBenchSettings.swift */; };
+		223ABCD11FFF345678BCDFFEC /* SampleHostAFMBenchSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223FEDCFFE12109876FFEFEDC /* SampleHostAFMBenchSettings.swift */; };
 		105BF21C50C59DBB15AD140C /* DecisionEvolutionOperatorSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEE8922BA0CE0000C98FAEF1 /* DecisionEvolutionOperatorSnapshotTests.swift */; };
 		1084D18252A8D49597852F6B /* LetGoCopyLibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F13F4F8FCABDC10C963D75 /* LetGoCopyLibraryTests.swift */; };
 		108A911D2F173D9E68E54B6C /* DecisionContextPreparedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F94CB71B4918233F505006 /* DecisionContextPreparedState.swift */; };
@@ -869,6 +870,7 @@
 		219FEDCBBA9876543DBEABCD /* SampleHostBenchHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchHelpers.swift; sourceTree = "<group>"; };
 		221FEDCDDC0987654DDC0EFAB /* SampleHostBenchRiskDerivation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchRiskDerivation.swift; sourceTree = "<group>"; };
 		222FEDCEED01098765EEDFCBA /* SampleHostHybridBenchSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostHybridBenchSettings.swift; sourceTree = "<group>"; };
+		223FEDCFFE12109876FFEFEDC /* SampleHostAFMBenchSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostAFMBenchSettings.swift; sourceTree = "<group>"; };
 		CF7AFB4B094AB233739EC017 /* DecisionSessionEngineReviewSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionSessionEngineReviewSurfaceView.swift; sourceTree = "<group>"; };
 		D07F875A892342DA7E6EBF09 /* DecisionEvolutionControlSurfaceSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionControlSurfaceSummaryView.swift; sourceTree = "<group>"; };
 		D128D25C85A9030D123405C2 /* DecisionIntelligenceDebugStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionIntelligenceDebugStore.swift; sourceTree = "<group>"; };
@@ -1065,6 +1067,7 @@
 				219FEDCBBA9876543DBEABCD /* SampleHostBenchHelpers.swift */,
 				221FEDCDDC0987654DDC0EFAB /* SampleHostBenchRiskDerivation.swift */,
 				222FEDCEED01098765EEDFCBA /* SampleHostHybridBenchSettings.swift */,
+				223FEDCFFE12109876FFEFEDC /* SampleHostAFMBenchSettings.swift */,
 			);
 			path = SampleHost;
 			sourceTree = "<group>";
@@ -1889,6 +1892,7 @@
 				219ABCDDDEF067890AAFE9ABC /* SampleHostBenchHelpers.swift in Sources */,
 				221ABCDFFFE0123456ABFEDCD /* SampleHostBenchRiskDerivation.swift in Sources */,
 				222ABCD00FFE234567ABCFEDC /* SampleHostHybridBenchSettings.swift in Sources */,
+				223ABCD11FFF345678BCDFFEC /* SampleHostAFMBenchSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1254,25 +1254,9 @@ final class SampleHostModel: ObservableObject {
         afmBenchIsRunning = false
     }
 
-    func updateAFMBenchDurationHours(_ newValue: Double) {
-        afmBenchDurationHours = max(0.1, min(24.0, newValue))
-    }
-
-    func updateAFMBenchStrideCSV(_ newValue: String) {
-        afmBenchStrideRotationCSV = newValue
-    }
-
-    func updateAFMBenchRotationPeriod(_ newValue: Int) {
-        afmBenchRotationPeriodIter = max(1_000, min(100_000, newValue))
-    }
-
-    func updateAFMBenchMutationCount(_ newValue: Int) {
-        afmBenchMutationSeedCount = max(1, min(5, newValue))
-    }
-
-    func updateAFMBenchSkipBlocked(_ newValue: Bool) {
-        afmBenchSkipBlocked = newValue
-    }
+    // M804 chapter 二百二十三 — 5 AFM-bench setters extracted to
+    // dedicated extension file `SampleHostAFMBenchSettings.swift`.
+    // Bounds reused from chapter 二百二十二 typed bundle.
 }
 
 // M797 chapter 二百十六 — `SampleHostAFMBenchRow` + helpers
