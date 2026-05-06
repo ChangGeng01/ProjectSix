@@ -459,16 +459,168 @@ opaque `DispatchOverrides` struct. Stop adding flag args.
 
 ---
 
+## ADR-010 (chapters 二百十二 → 二百三十八) — Architectural deconstruction wave: 30-chapter rebirth
+
+### Context
+
+Chapters 二百九 → 二百十一 shipped the first 3 architectural carve-
+outs (cooldown / iter context / dispatch policy) per ADR-007 to ADR-
+009 doctrine. After those landed, 27 more chapters (二百十二 → 二百三
+十八) executed the same pattern systematically until SampleHost
+target's two god files thinned dramatically.
+
+Pre-arc state (chapter 二百八 末尾):
+- `SampleHost/SampleHostModel.swift`: 4097 LOC
+- `SampleHost/SampleHostView.swift`: 1146 LOC
+- chapter 203 god-file guard: WARN on SampleHostModel ≥ 4K
+
+Post-arc state (chapter 二百三十八 末尾):
+- `SampleHost/SampleHostModel.swift`: 637 LOC (-3460, -84.5%)
+- `SampleHost/SampleHostView.swift`: 101 LOC (-1045, -91.2%)
+- chapter 203 god-file guard: CLEAR on both targets
+- 28 new dedicated focused files
+
+### Decision
+
+Apply 5 systematic carve-out patterns over 30 chapters:
+
+**Pattern 1: Pure value-type extraction**
+Self-contained `enum` / `struct` / pure-derive helper → dedicated
+file. Examples: cooldown ladder (chapter 二百九), iter context
+(chapter 二百十), prompt catalog (chapter 二百十二), 14-layer profile
+(chapter 二百十三), row schema (chapter 二百十四), bench config
+(chapter 二百十五), legacy bench runner (chapter 二百十七), prompt
+types (chapter 二百十八).
+
+**Pattern 2: Single-source-of-truth consolidation**
+Multi-site duplication → one canonical file with derive helper.
+Examples: dispatch policy (chapter 二百十一: chapter 178+208 hack),
+14-layer profile (chapter 二百十三: 3-site consolidation), risk
+derivation (chapter 二百二十一: 3-site stake→risk), bench bounds
+(chapter 二百二十二: 11 inline clamps → 10 named constants), AFM-
+bench bounds (chapter 二百二十三: shared with hybrid).
+
+**Pattern 3: Typed value-bundle factory**
+Repetitive 50+-field constructions → typed factory function on the
+schema struct. Examples: paused-row builder (chapter 二百二十).
+
+**Pattern 4: Standalone SwiftUI struct from inline view block**
+`private var fooPanel: some View` on parent View → standalone
+`struct SampleHostFooPanel: View` taking `@ObservedObject var
+model`. Examples: chapter 二百二十四 (test panels), chapter 二百二
+十五 (AFM bench panel), chapter 二百二十六 (legacy bench panel),
+chapter 二百二十七 (hybrid bench panel — 529 LOC), chapter 二百二十八
+(resume banner), chapter 二百二十九 (13-layer turn detail), chapter
+二百三十 (active-session panel), chapter 二百二十六 (status helpers
+move-with-panel).
+
+**Pattern 5: Extension-on-Model carve-out (after access promotion)**
+`@Published private(set) var` → `@Published var` (chapter 二百三十
+三 / M815) + `private func`/`fileprivate func` → `func` so cross-
+file `extension SampleHostModel` files can write state.
+Examples: LLM helpers (chapter 二百三十三), single-prompt tests
+(chapter 二百三十四), checkpoint lifecycle (chapter 二百三十五),
+legacy bench entry (chapter 二百三十六), AFM bench entry (chapter
+二百三十七), hybrid bench entry (chapter 二百三十八 — 1172 LOC).
+
+### Consequences
+
+- **God-file guard**: Both SampleHost target files now well under
+  4K WARN threshold (637 + 101 = 738 LOC total in the two original
+  god files, vs 5243 LOC pre-arc).
+- **28 single-responsibility files**: Each carve-out has one file,
+  one doctrine, independent test surface. Future tuning goes to
+  one place.
+- **Pattern reuse**: 5 patterns above are templates for future
+  carve-outs (ADR-013 candidate: same patterns applied to BAS-
+  side god files HostKitCore / EBrainCognitionPlaneCore /
+  MemoryCore — multi-day each).
+- **0 regressions across 128 tests** during the entire 30-chapter
+  arc. The disciplined "extract → test → commit" cadence held.
+- **Access doctrine shift**: 70 `@Published private(set)` →
+  `@Published` + 8 `private` → `internal` to enable cross-file
+  extensions. View-reads-Model-writes convention preserved by
+  doctrine + 24-chapter carve-out evidence (no carved file
+  actually mutates model state via extension; only Model
+  methods themselves now in extension files do).
+
+### Doctrine pins (red-line preservation across all 30 chapters)
+
+- 不变量 #1 (先醒再答): held — substrate decides FIRST in every
+  carve-out.
+- 不变量 #2 (神经不掌权): held — permit single-mouth at L11 / L14;
+  no carve-out introduces a new commit path.
+- 不变量 #3 (私有经验不进权重): held — bench data feeds offline
+  retrain only.
+- Red line 7 (HINT-ONLY observability): held — anomaly + drift
+  watchers + cooldown + safety-kit never decide.
+- chapter 二百八 / ADR-006 `.rawLLM` doctrine: held — bench-data-
+  only path preserved, never feeds production permit decisions.
+- chapter 一百九十二 single-source-of-truth: ✓ extended to 14+
+  invariant domains (cooldown / iter context / dispatch policy /
+  prompt catalog / 14-layer profile / row schema / bench config /
+  JSONL runners / legacy bench / prompt types / foundation
+  helpers / row builders / risk derivation / settings bounds /
+  Cthulhu helpers via stable kebab-case raw values).
+
+### Future migration
+
+ADR-013+ candidates after this arc:
+
+| Topic | Chapter |
+|---|---|
+| BenchEngine actor (true carve from `extension SampleHostModel` → standalone `actor SampleHostBenchEngine`) | tbd |
+| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters; mockable for unit tests) | tbd |
+| SampleHostBenchSink protocol (decouple JSONL persistence — chapter 一百四十九 `iterations.jsonl` writer becomes mockable) | tbd |
+| MemoryCore submodule split (BAS substrate, multi-day) | tbd |
+| EBrainCognitionPlaneCore subsystem extraction (BAS substrate, multi-day) | tbd |
+| HostKitCore subsystem extraction (BAS substrate, multi-day) | tbd |
+| Resume-from-iter mechanism (vs settings-only) | tbd |
+| Production canary (shadow predict) | tbd |
+| Per-pressure-stratum sub-models | tbd |
+| Telemetry sink protocol | tbd |
+
+### Lessons (for future architectural deconstruction waves)
+
+1. **Pure value types extract cheapest**: enums + structs without
+   I/O are 1-day chapters. Schema + helpers + presets bundles
+   are predictable shape carve-outs.
+
+2. **SwiftUI views extract cleanly via composition**: `@Observed-
+   Object var model` + standalone struct preserves the live
+   binding. View body becomes pure composer of N panels.
+
+3. **Cross-file extension on `@Published private(set)` requires
+   access promotion**: doctrine cost is loose encapsulation
+   (any module-internal code COULD write); doctrine benefit is
+   carve-out feasibility. The 24 carve-out chapters that
+   completed without ANY external write to model state validates
+   the convention is preserved by doctrine, not just by
+   `private(set)` enforcement.
+
+4. **The biggest function is movable but expensive**: the 1172-
+   LOC `startHybridBench` body moved cleanly to a dedicated
+   extension file (chapter 二百三十八). It's still 1172 LOC of
+   complex async logic — but now isolated, regression-tested, and
+   the path to converting it into a true `actor` is clear (next
+   ADR candidate).
+
+5. **30-chapter arcs sustained 0 regressions** because each
+   chapter ships independently committed + tested + reverted-
+   able. Disciplined incrementalism beats big-bang refactor.
+
+---
+
 ## Future ADR candidates
 
 | Topic | Chapter |
 |---|---|
-| SampleHostBenchEngine actor (carve out iter loop body to actor) | 212 |
-| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | 213 |
-| SampleHostBenchSink protocol (decouple JSONL persistence) | 214 |
-| MemoryCore submodule split | 215 |
-| EBrainCognitionPlaneCore subsystem extraction | 216 |
-| HostKitCore subsystem extraction | 217 |
+| SampleHostBenchEngine actor (extract loop body from extension to actor) | tbd |
+| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | tbd |
+| SampleHostBenchSink protocol (decouple JSONL persistence) | tbd |
+| MemoryCore submodule split | tbd |
+| EBrainCognitionPlaneCore subsystem extraction | tbd |
+| HostKitCore subsystem extraction | tbd |
 | Resume-from-iter mechanism (vs settings-only) | tbd |
 | Production canary (shadow predict) | tbd |
 | Per-pressure-stratum sub-models | tbd |
