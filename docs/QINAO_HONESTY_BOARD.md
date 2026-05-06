@@ -25697,3 +25697,49 @@ If substrate STILL skips benign prompts: chapter 206+ — investigate substrate'
 ### 205.9 一句话总结
 
 **Chapter 二百五 (M771-M775)**: substrate-engage path opened via NEW `SampleHostBenignPromptCatalog` (80 prompts × 8 categories: factual / translation / math / cooking / creative / programming / geography / how-to). Pinned low-risk signature (curious / creative / low / minutes / decision-system / single-action). NEW `SmokeMode.benign` case in bench loop branches prompt source + forces `riskLevel = .low` (override stake mapping). UI Picker 4 cases. Doctrine: substrate's L7+L11 risk evaluation STILL runs every iter (red line 7 + 不变量 #2 held); we feed different inputs. **Hypothesis**: ~70-90% LLM-fire on benign prompts → training data accumulates → bench_to_train.py emits v0.5_real. **87 SampleHost tests pass**; 1964 全栈 / 0 failures. Real iPhone Release build + deployed PID 55673. Operator next: tap **benign** + **primary** workflow + Start. If substrate STILL skips: chapter 206 investigates substrate-side risk eval doctrine.
+
+## 二百六、 .benign auto-forces .primary (M776 / 2026-05-06)
+
+User instruction: "你测试 到没问题 再长跑". Hybrid-verify monitor caught chapter 205 .benign + default .reflective combo: 72 rows / 0 LLM fires (delay 87.5% / block 12.5%). Root cause: `.reflective` workflow always defaults to .delay regardless of catalog risk-level — the benign catalog choice is meaningless without also flipping workflow to .primary.
+
+### 206.1 M776 — Auto-force .primary on .benign
+
+Bench loop's workflowProfile capture now overrides:
+
+```swift
+let workflowProfileCaptured: BASHostWorkflowProfile = {
+    if self.hybridBenchSmokeMode == .benign {
+        return .primary  // training-data accumulation
+    }
+    return self.hybridBenchWorkflowProfile
+}()
+```
+
+Doctrine: benign mode IS for training-data accumulation. `.reflective` + `.benign` is a contradictory operator config (benign signals data-accumulation intent; reflective routes to delay = no data). Auto-force removes the user-error path.
+
+Non-benign smokeModes preserve operator's workflow choice unchanged.
+
+### 206.2 Auto-verify monitor doctrine
+
+User pointed out: "每次 测试 hybrid". Monitor `/tmp/hybrid-verify-monitor.sh` runs at every bench start; pulls shard 1 at 3 min mark; counts LLM-fire rate; gives 3-tier verdict:
+
+| Verdict | Rule | Action |
+|---|---|---|
+| ✅ LLM FIRES | > 50 fires in 3 min | Worth running long |
+| 🟡 MARGINAL | 5-50 fires | Investigate |
+| ❌ STILL SUBSTRATE-SKIP | ≤ 5 fires | Don't waste 10h, debug |
+
+Chapter 205 verdict: ❌ → triggered chapter 206 fix. Chapter 206 deployed; awaiting next bench start to verify ✅.
+
+### 206.3 Tests
+
+| Test | Pin |
+|---|---|
+| `testBenignModeImpliesPrimaryWorkflowDoctrine` | .benign + .reflective @Published → captured = .primary |
+| `testNonBenignModePreservesWorkflowChoice` | canonical/14-layer/heavy modes preserve operator choice |
+
+SampleHost tests: 87 → **89** (+2 chapter 206).
+
+### 206.4 一句话总结
+
+**Chapter 二百六 (M776)**: hybrid-verify monitor caught chapter 205 .benign + default .reflective = 0 LLM fires after 3 min. Root cause: .reflective always routes to .delay regardless of catalog. Fix: bench loop's workflowProfile capture overrides .reflective → .primary when smokeMode is .benign. Operator-error-proof: benign mode IS training-data mode, never compatible with .reflective. +2 fix-pin tests / 89 SampleHost / 1966 全栈 / 0 failures. iPhone deployed PID 55739. Auto-verify monitor running again — will give verdict at 3 min after next tap Start.

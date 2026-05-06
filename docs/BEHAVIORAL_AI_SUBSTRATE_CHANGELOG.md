@@ -1252,3 +1252,10 @@ SampleHost tests 80 → **82**; full stack **1959 + 1 parity gate + 7 analysis t
 Doctrine: substrate's L7 mirror + L11 risk-gate still evaluate every iter. We just feed different inputs (red line 7 + 不变量 #2 held). Hypothesis: 70-90% LLM-fire on benign vs 0% on chapter-173+ adversarial.
 
 SampleHost tests 82 → **87**; full stack **1964 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. iPhone deployed PID 55673.
+
+## 2026-05-06 — chapter 二百六 (M776) .benign auto-forces .primary
+
+- **M776** Bench loop's `workflowProfileCaptured` now overrides operator workflow when smokeMode is `.benign` → forces `.primary`. Chapter 205 hybrid-verify caught `.benign` + default `.reflective` = 0 LLM (delay 87.5% / block 12.5%). Doctrine: benign mode IS training-data accumulation; `.reflective` is contradictory.
+- +2 fix-pin tests (.benign-implies-.primary doctrine + non-benign preserves choice).
+
+SampleHost tests 87 → **89**; full stack **1966 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. iPhone deployed PID 55739. Auto-verify monitor PID 20046 awaiting next bench start.

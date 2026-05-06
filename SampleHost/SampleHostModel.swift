@@ -2721,7 +2721,19 @@ extension SampleHostModel {
         let pauseOnSeriousCaptured = self.hybridBenchPauseOnSerious
         let coolingEveryNCaptured = self.hybridBenchCoolingEveryNIters
         let coolingSleepSecondsCaptured = self.hybridBenchCoolingSleepSeconds
-        let workflowProfileCaptured = self.hybridBenchWorkflowProfile
+        // M776 chapter 二百六 — benign smokeMode auto-forces
+        // .primary workflow. Chapter 205 verified .benign + default
+        // .reflective = STILL 100% substrate-skip (delay 87.5% /
+        // block 12.5%) because .reflective always defaults to
+        // .delay. Benign mode IS for training-data accumulation;
+        // .reflective + .benign is a contradictory operator config.
+        // Auto-force .primary removes the user-error path.
+        let workflowProfileCaptured: BASHostWorkflowProfile = {
+            if self.hybridBenchSmokeMode == .benign {
+                return .primary  // training-data accumulation
+            }
+            return self.hybridBenchWorkflowProfile
+        }()
         let anomalyWatcher = SampleHostBenchAnomalyWatcher(
             windowSize: anomalyWindowCaptured)
         // M721 chapter 一百九十二 — drift monitor on length-MAE
