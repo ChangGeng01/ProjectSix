@@ -362,7 +362,7 @@ final class SampleHostModel: ObservableObject {
     ) {
         var initialError: String?
         self.runtime = runtime
-        self.result = Self.perform(
+        self.result = SampleHostBASHostInvocation.perform(
             using: runtime,
             errorSink: { initialError = $0 },
             request: {
@@ -392,7 +392,7 @@ final class SampleHostModel: ObservableObject {
     }
 
     func bootstrap() {
-        result = Self.perform(
+        result = SampleHostBASHostInvocation.perform(
             using: runtime,
             errorSink: { lastError = $0 },
             request: {
@@ -416,7 +416,7 @@ final class SampleHostModel: ObservableObject {
             .comparative: "What tradeoff am I refusing to name?",
             .reflective: "What is the honest story here?"
         ]
-        result = Self.perform(
+        result = SampleHostBASHostInvocation.perform(
             using: runtime,
             errorSink: { lastError = $0 },
             request: {
@@ -435,7 +435,7 @@ final class SampleHostModel: ObservableObject {
     }
 
     func reopen() {
-        result = Self.perform(
+        result = SampleHostBASHostInvocation.perform(
             using: runtime,
             errorSink: { lastError = $0 },
             request: {
@@ -619,72 +619,10 @@ final class SampleHostModel: ObservableObject {
 
     // MARK: - shared helpers
 
-    private static func perform(
-        using runtime: BASHostRuntime,
-        errorSink: (String?) -> Void,
-        request: () throws -> BASHostSessionResult
-    ) -> BASHostSessionResult {
-        do {
-            errorSink(nil)
-            return try request()
-        } catch {
-            errorSink(String(describing: error))
-            return fallbackResult(using: runtime)
-        }
-    }
-
-    private static func fallbackResult(using runtime: BASHostRuntime) -> BASHostSessionResult {
-        (try? runtime.startSession(
-            BASHostSessionRequest(
-                kind: .interactive,
-                workflowProfile: .primary,
-                surface: .application,
-                prompt: "Recover the host shell after an integration error.",
-                title: "Integration Recovery",
-                riskLevel: .low
-            )
-        )) ?? BASHostSessionResult(
-            requestKind: .interactive,
-            workflowProfile: .primary,
-            currentBrain: BASHostCurrentBrain(
-                workflowProfile: .primary,
-                workflowTitle: "Primary",
-                roleID: "samplehost.recovery",
-                identityPosture: .reflective,
-                identityInitiative: .guided,
-                confidenceCeiling: 0.5,
-                relationshipBoundary: "Fallback shell",
-                boundaryHeadline: "SampleHost is holding a safe fallback state.",
-                boundaryMode: .localOnlyAdvisory,
-                boundaryConstraints: [.lockSensitiveMemory],
-                calibrationStatus: .stable,
-                calibrationAlerts: [],
-                riskFlags: [],
-                dominantGoals: ["Recover from host integration failure."],
-                activeConstraints: ["integration-fallback"],
-                retrievalTags: ["fallback"],
-                verificationSummary: "samplehost/fallback",
-                activeTemplateCount: 0,
-                failureGuardCount: 0,
-                evolutionPendingReviewCount: 0,
-                evolutionRollbackReady: true
-            ),
-            projection: BASHostProjectionSummary(
-                recordCount: 0,
-                candidateCount: 0,
-                recentEventCount: 0,
-                activeTemplateIDs: [],
-                failureGuardIDs: []
-            ),
-            activeSessionTitle: "Integration Recovery",
-            notices: ["SampleHost recovered from an integration configuration error."],
-            followUpActions: [],
-            consoleSnapshot: BASHostConsoleSnapshot(
-                overallSummary: "SampleHost recovered from an integration configuration error.",
-                reports: []
-            )
-        )
-    }
+    // M814 chapter 二百三十二 — `perform(using:errorSink:request:)` +
+    // `fallbackResult(using:)` static helpers extracted to dedicated
+    // file `SampleHostBASHostInvocation.swift`. Callers now use
+    // `SampleHostBASHostInvocation.perform(...)` etc.
 
     // MARK: - M609 chapter 一百七十六 §176.13 — direct AFM foreground test
     //
