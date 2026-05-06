@@ -1729,3 +1729,68 @@ Stage 4 progress: **2/5 chapters shipped** (二百六十一 ✓ doctrine / 二�
 Test impact: BAS XCTest 3081 → **3095** (+14 chapter 二百六十三 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
 
 Stage 4 progress: **3/5 chapters shipped** (二百六十一 ✓ doctrine / 二百六十二 ✓ aggregator script / 二百六十三 ✓ typed bundle / 二百六十四 L11 wire pending / 二百六十五 per-stratum sub-models pending).
+
+## 2026-05-07 — chapter 二百六十四 (M747) `BASRiskCalibrationGate` — Stage 4 Step 4 of 5
+
+附录 V Stage 4 fourth chapter — the substrate-side primitive that **holds, validates replacements of, and provides effective thresholds from** a `BASRiskCalibrationBundle`. With chapter 二百六十一 (doctrine), 二百六十二 (aggregator), and 二百六十三 (typed bundle) shipped, the gate is the production-side seam that makes the Hybrid pipeline real for L11 risk calibration.
+
+- **M747** NEW `BehavioralAISubstrate/Sources/BASPolicy/BASRiskCalibrationGate.swift` (~210 LOC). Two new public types:
+  - `BASRiskCalibrationGateReplaceOutcome` — typed result of one successful `replace(_:)` call. Pre/new bundle versions, strataChanged count, totalEvidenceRowCount, audit reason codes, applied-at timestamp.
+  - `actor BASRiskCalibrationGate` — one per L11 deployment. Holds the active bundle (initial = `.baseline`); reads concurrent; replacements serialized.
+- **API contract**:
+  - `currentBundle` / `currentBundleVersion` — read-only view of active bundle
+  - `replace(_:) async throws -> ReplaceOutcome` — atomic bundle swap with three validation gates
+  - `effective<Tier>Threshold(forStratumKey:base:) -> Double` — per-stratum delta application (3 tiers: medium/high/extreme)
+  - `hasDelta(forStratumKey:) -> Bool` — emit-conditional flag for hosts wanting "this turn used a calibration delta" audit codes
+- **Three validation gates in `replace(_:)`**:
+  1. `proposed.isWellFormed` must be `true` (defends against half-built bundles slipping through). Failure → `.malformedBundle(reason:)`.
+  2. `proposed.bundleVersion` must be **strictly greater** than current version (string compare; baseline counts as lower than any non-baseline). Replay-replacement defense. Failure → `.nonMonotonicVersion(current:proposed:)`.
+  3. **Supersedes-chain consistency**: if `proposed.supersedesBundleVersion` is non-nil, must match current; if nil, current must be `.baseline` (defends against bundle authored against an older audit chain being deployed onto a more recent gate). Failure → `.supersedesMismatch(...)`.
+- **Audit code emission per replacement** (5 typed codes):
+  - `risk-calibration:bundle-replaced:from-vN.M.P:to-vM.M.P`
+  - `risk-calibration:strata-changed:N`
+  - `risk-calibration:evidence-rows:N`
+  - `risk-calibration:warrant:<warrantRef>`
+  - `risk-calibration:provenance:<provenanceRef>`
+- **Effective threshold**: `base + delta` clamped to `[0, 1]` (L11 thresholds are normalized risk scores). NaN inputs resolve to `0`. No delta exists → returns `base` unchanged.
+- 13 fix-pin tests in `BASRiskCalibrationGateTests.swift` (~290 LOC):
+  - initial state = baseline
+  - well-formed bundle replace succeeds + emits 5 typed audit codes
+  - malformed bundle rejected with `.malformedBundle(reason:)`; gate state unchanged
+  - non-monotonic version rejected with `.nonMonotonicVersion(...)`; gate state unchanged
+  - supersedes-chain mismatch rejected (5 path: explicit-mismatch + nil-when-non-baseline)
+  - effective threshold returns base when no delta
+  - effective threshold applies delta correctly across all 3 tiers
+  - effective threshold clamped to `[0, 1]` (1.15 → 1.0 / -0.15 → 0.0)
+  - `hasDelta` correct for present + present-zero + missing strata
+  - cross-stratum lookup returns the right delta
+  - replace from baseline allows nil-supersedes
+  - replace with explicit initial bundle works
+
+**Doctrine pins maintained**:
+- 不变量 #2 神经不掌权: bundle replacement is operator-driven + L14-signed (gate validates `sovereignWarrantRef` non-empty via `isWellFormed`). Substrate doesn't auto-derive.
+- 不变量 #3 私有经验不进权重: stratum keys are the only identifier — never host-IDs. Bundle's input was pre-filtered by aggregator (chapter 二百六十二).
+- ADR-006 strict: gate accepts replacements **between** turns, never mid-turn. Two consecutive turns with the same bundle produce identical decisions (gate is a deterministic function of its bundle).
+- ADR-012: bundle is the typed payload of the Hybrid pipeline. Monotonic version + supersedes-chain enforcement defend against accidental replay-replacement and against bundles deployed onto unexpected predecessors.
+- 红线 7 HINT-ONLY: gate's deltas are inputs to deterministic L11 logic, not hints; the bundle is only PRODUCED via observation-driven analysis + operator decision.
+- chapter 二百十一 single-source-of-truth: gate primitives live in this file; bundle schema stays in `BASRiskCalibrationBundle.swift`.
+
+Test impact: BAS XCTest 3095 → **3108** (+13 chapter 二百六十四 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+Stage 4 progress: **4/5 chapters shipped**.
+
+**附录 V Stage 4 honest scope status**:
+- 二百六十一 ✓ doctrine (ADR-012)
+- 二百六十二 ✓ aggregator script (`scripts/aggregate_risk_stratum.py`)
+- 二百六十三 ✓ typed bundle (`BASRiskCalibrationBundle`)
+- 二百六十四 ✓ deploy-time gate (`BASRiskCalibrationGate`) ← **THIS COMMIT**
+- 二百六十五 per-stratum sub-models — **deferred** (附录 V plan: "needs real bench data to justify per-stratum heads"; depends on Stage 3 real-bench output that requires user iPhone hardware + 8h runtime)
+
+**Stage 4 production-wire status**: the four shipped chapters are sufficient for hosts to opt in to the Hybrid pipeline today. The remaining work is:
+1. User runs `.rawLLM` 8h iPhone bench (chapter 二百五十六, user action).
+2. Operator runs `aggregate_risk_stratum.py` against the pulled JSONL (chapter 二百六十二 ready).
+3. Operator authors a `BASRiskCalibrationBundle` from the stats (chapter 二百六十三 ready) + obtains L14 sovereign warrant.
+4. Host code constructs a `BASRiskCalibrationGate` and calls `replace(bundle)` between turns (chapter 二百六十四 ready).
+5. Per-turn L11 logic calls `gate.effective<Tier>Threshold(forStratumKey:base:)` instead of using base thresholds directly (additive wiring; existing L11 paths can adopt incrementally).
+
+The gate is **ready to be wired into existing L11 calibrate-risk paths** but doing so is a separate incremental refactor (each L11 site adopting the gate is its own small chapter). No existing L11 path is broken by chapter 二百六十四 — the gate is an additive primitive.
