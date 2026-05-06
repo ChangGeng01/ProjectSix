@@ -544,7 +544,13 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "LayerKillSwitchState":
                 BASLayerKillSwitchState.currentSchemaVersion,
             "LayerErrorBoundaryReport":
-                BASLayerErrorBoundaryReport.currentSchemaVersion
+                BASLayerErrorBoundaryReport.currentSchemaVersion,
+            // M790 (chapter 三百〇三) — Phase Gamma 1st code cut:
+            // typed storage options + wire report.
+            "HostStorageOptions":
+                BASHostStorageOptions.currentSchemaVersion,
+            "HostStorageWireReport":
+                BASHostStorageWireReport.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

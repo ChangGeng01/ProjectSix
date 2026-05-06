@@ -1397,6 +1397,21 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "LayerErrorBoundaryReport",
             versionedType: BASLayerErrorBoundaryReport.self,
             tests: ["schema.layer_error_boundary_report.current", "schema.layer_error_boundary_report.backward"]
+        ),
+        // M790 (chapter 三百〇三) — Phase Gamma 1st code cut: typed
+        // storage options primitive + post-construction wire
+        // report. ADR-014 (chapter 三百〇二) requires every Phase
+        // Gamma OPT-IN→PROD wire-up to ride a typed config struct
+        // with backward-compat opt-out flag; this is that struct.
+        entry(
+            "HostStorageOptions",
+            versionedType: BASHostStorageOptions.self,
+            tests: ["schema.host_storage_options.current", "schema.host_storage_options.backward"]
+        ),
+        entry(
+            "HostStorageWireReport",
+            versionedType: BASHostStorageWireReport.self,
+            tests: ["schema.host_storage_wire_report.current", "schema.host_storage_wire_report.backward"]
         )
     ]
 

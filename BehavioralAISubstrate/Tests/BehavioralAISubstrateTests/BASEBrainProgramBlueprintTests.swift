@@ -399,7 +399,11 @@ struct BASEBrainProgramBlueprintTests {
             // foundation): per-layer kill switch state + error
             // boundary report.
             "LayerKillSwitchState",
-            "LayerErrorBoundaryReport"
+            "LayerErrorBoundaryReport",
+            // M790 (chapter 三百〇三) — Phase Gamma 1st code cut:
+            // typed storage options primitive + wire report.
+            "HostStorageOptions",
+            "HostStorageWireReport"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)
