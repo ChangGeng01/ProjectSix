@@ -150,4 +150,61 @@ public enum BASHostStorageWireBuilder {
                 ? "yes" : "no")
         ]
     }
+
+    // MARK: - L5 Host vault factory (chapter 三百〇六 / M793)
+
+    /// Construct an `BASHostConstitutionSQLiteStorage?` from typed
+    /// storage options。Returns nil for in-memory mode (callers
+    /// fall back to value-type vault snapshot)。
+    ///
+    /// Resolution rules (mirrors atom store factory):
+    ///
+    /// - `.inMemoryDefault` preference → returns nil (caller uses
+    ///   value-type `BASHostConstitutionVault` snapshot)
+    /// - `.sqliteWhenURLProvided` + URL → returns SQLite storage
+    ///   actor
+    /// - `.sqliteWhenURLProvided` + nil URL → returns nil
+    /// - `.sqliteRequired` + URL → returns SQLite storage actor
+    /// - `.sqliteRequired` + nil URL → throws
+    ///   `.missingSQLiteURL(component: "vault")`
+    ///
+    /// Returns optional rather than `any` (vault has no protocol
+    /// abstraction over in-memory + SQLite — the in-memory case
+    /// uses the value-type `BASHostConstitutionVault` directly,
+    /// which doesn't fit a single `any Storage` return type)。
+    public static func makeVaultStorage(
+        options: BASHostStorageOptions
+    ) throws -> BASHostConstitutionSQLiteStorage? {
+        guard options.shouldUseSQLiteVault else {
+            return nil
+        }
+        guard let url = options.effectiveVaultURL else {
+            // Only reachable under .sqliteRequired with no URL.
+            throw BASHostStorageWireError.missingSQLiteURL(
+                component: "vault")
+        }
+        do {
+            return try BASHostConstitutionSQLiteStorage(
+                databaseURL: url)
+        } catch {
+            throw BASHostStorageWireError.storageInitFailed(
+                component: "vault",
+                message: "\(error)")
+        }
+    }
+
+    /// Helper:emit reason codes for vault wire path。
+    public static func vaultWireReasonCodes(
+        options: BASHostStorageOptions
+    ) -> [String] {
+        let willUseSQLite = options.shouldUseSQLiteVault
+        return [
+            "vault-wire:" +
+            (willUseSQLite ? "sqlite" : "in-memory"),
+            "vault-preference:\(options.preference.rawValue)",
+            "vault-url-provided:" +
+            (options.effectiveVaultURL != nil
+                ? "yes" : "no")
+        ]
+    }
 }

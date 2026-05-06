@@ -243,6 +243,111 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
 
     // MARK: - Cross-session SQLite persistence
 
+    // MARK: - Vault factory (chapter 三百〇六 / M793)
+
+    func testVaultLegacyInMemoryReturnsNil() throws {
+        let result = try BASHostStorageWireBuilder
+            .makeVaultStorage(options: .legacyInMemory)
+        XCTAssertNil(
+            result,
+            "Legacy preference must return nil for vault " +
+            "(caller falls back to value-type snapshot vault)")
+    }
+
+    func testVaultSQLiteWhenURLProvidedWithURLProducesActor()
+        throws
+    {
+        let url = tempRoot.appendingPathComponent("vault.sqlite")
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            vaultURL: url)
+        let storage = try BASHostStorageWireBuilder
+            .makeVaultStorage(options: options)
+        XCTAssertNotNil(
+            storage,
+            ".sqliteWhenURLProvided + URL → SQLite vault actor " +
+            "constructed")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: url.path),
+            "vault SQLite database file must be created on disk")
+    }
+
+    func testVaultSQLiteWhenURLProvidedWithoutURLReturnsNil()
+        throws
+    {
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            vaultURL: nil)
+        let storage = try BASHostStorageWireBuilder
+            .makeVaultStorage(options: options)
+        XCTAssertNil(
+            storage,
+            ".sqliteWhenURLProvided + nil URL → nil (graceful " +
+            "fallback to value-type vault)")
+    }
+
+    func testVaultSQLiteRequiredWithoutURLThrows() {
+        let options = BASHostStorageOptions(
+            preference: .sqliteRequired,
+            vaultURL: nil)
+        XCTAssertThrowsError(
+            try BASHostStorageWireBuilder.makeVaultStorage(
+                options: options)
+        ) { error in
+            guard let wireError =
+                error as? BASHostStorageWireError
+            else {
+                XCTFail("expected BASHostStorageWireError, got " +
+                    "\(type(of: error))")
+                return
+            }
+            XCTAssertEqual(
+                wireError,
+                .missingSQLiteURL(component: "vault"),
+                "fail-fast: .sqliteRequired with no vault URL " +
+                "must throw .missingSQLiteURL(component: vault)")
+        }
+    }
+
+    func testVaultUnifiedRootDerivesURL() throws {
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            unifiedRoot: BASHostStorageRoot(rootURL: tempRoot))
+        let storage = try BASHostStorageWireBuilder
+            .makeVaultStorage(options: options)
+        XCTAssertNotNil(storage)
+        let expectedFile = tempRoot.appendingPathComponent(
+            "host-vault.sqlite")
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: expectedFile.path),
+            "vault SQLite file must exist at unifiedRoot/" +
+            "host-vault.sqlite (chapter 三百〇三 derivation pin)")
+    }
+
+    func testVaultReasonCodesForLegacyMode() {
+        let codes = BASHostStorageWireBuilder
+            .vaultWireReasonCodes(options: .legacyInMemory)
+        XCTAssertTrue(codes.contains("vault-wire:in-memory"))
+        XCTAssertTrue(
+            codes.contains(
+                "vault-preference:in-memory-default"))
+        XCTAssertTrue(codes.contains("vault-url-provided:no"))
+    }
+
+    func testVaultReasonCodesForSQLiteConfigured() {
+        let url = URL(fileURLWithPath: "/tmp/v.sqlite")
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            vaultURL: url)
+        let codes = BASHostStorageWireBuilder
+            .vaultWireReasonCodes(options: options)
+        XCTAssertTrue(codes.contains("vault-wire:sqlite"))
+        XCTAssertTrue(codes.contains("vault-url-provided:yes"))
+    }
+
+    // MARK: - Cross-session SQLite persistence (atom store)
+
     func testSQLiteStorePersistsAcrossWireBuilds() async throws {
         let url = tempRoot.appendingPathComponent(
             "persistent.sqlite")
