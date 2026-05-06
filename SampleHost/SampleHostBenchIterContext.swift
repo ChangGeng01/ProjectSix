@@ -202,28 +202,7 @@ struct SampleHostBenchIterContext: Sendable, Equatable {
     }
 }
 
-// MARK: - Equatable conformance for FourteenLayerSmokeProfile.Profile
-//
-// Profile is `Sendable` but the source declaration omitted Equatable.
-// Adding it via extension here so `SampleHostBenchIterContext` can
-// derive Equatable automatically. Chapter 二百十 doctrine: small
-// type-system additions go to the carve-out file that needs them,
-// not back into the god file SampleHostModel.swift.
-extension FourteenLayerSmokeProfile.Profile: Equatable {
-    static func == (
-        lhs: FourteenLayerSmokeProfile.Profile,
-        rhs: FourteenLayerSmokeProfile.Profile
-    ) -> Bool {
-        return lhs.layerIndex == rhs.layerIndex
-            && lhs.layerName == rhs.layerName
-            && lhs.tone == rhs.tone
-            && lhs.domain == rhs.domain
-            && lhs.stake == rhs.stake
-            && lhs.timeframe == rhs.timeframe
-            && lhs.confidant == rhs.confidant
-            && lhs.askShape == rhs.askShape
-            && lhs.risk == rhs.risk
-            && lhs.workflow == rhs.workflow
-            && lhs.kind == rhs.kind
-    }
-}
+// chapter 二百十三 / M794 — `FourteenLayerSmokeProfile.Profile`
+// Equatable conformance moved to its home file `SampleHostFour-
+// teenLayerSmokeProfile.swift` along with the type definition.
+// Profile is now `Sendable + Equatable` declared in one place.

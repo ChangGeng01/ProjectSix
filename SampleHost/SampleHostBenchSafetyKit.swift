@@ -722,13 +722,6 @@ func sampleHostBenchCountShards(in directory: URL) -> Int {
     return contents.filter { $0.pathExtension == "jsonl" }.count
 }
 
-// MARK: - M719 selection helper
-
-/// Look up the FourteenLayerSmokeProfile for a layer index 1-14.
-/// Centralized so PressureMixer + bench loop share the same source.
-extension FourteenLayerSmokeProfile {
-    static func profile(forLayerIndex idx: Int) -> Profile? {
-        guard idx >= 1 && idx <= layers.count else { return nil }
-        return layers[idx - 1]
-    }
-}
+// M794 chapter 二百十三 — `profile(forLayerIndex:)` consolidated
+// into `SampleHostFourteenLayerSmokeProfile.swift` along with the
+// rest of the type (single-source-of-truth doctrine).
