@@ -175,30 +175,59 @@ def main() -> int:
             cand_preds["verbosity_prob"], verb_labels)
         metrics.append(("Verbosity acc", base_acc, cand_acc, "higher"))
 
+    # M781 chapter 二百七 — DEEP-REVIEW FIX CRITICAL: train script
+    # uses z-score normalization (`(y - mean) / std`), NOT
+    # `y / 3000`. mean/std are baked into `short_description`,
+    # not `user_defined_metadata`. Multiplying z-score by 3000
+    # produces nonsense MAE. Honest fix: report relative MAE in
+    # z-space (each model's own normalization). Absolute chars/ms
+    # MAE requires reading each model's mean/std from description
+    # (deferred to chapter 208+). For ship/no-ship A/B comparison,
+    # z-space delta is sufficient signal — both ends emit z-scores
+    # so candidate's z-MAE < baseline's z-MAE means candidate
+    # is closer to its OWN mean (lower variance prediction).
+    # Caveat: if baseline + candidate were trained on different
+    # corpora, their z-spaces use different (mean, std) — z-MAE
+    # delta is qualitative not absolute.
     if "length_norm" in base_preds and \
        "length_norm" in cand_preds:
-        # length_norm is normalized to [0, 1] via /3000 typically
-        # Approximate de-norm by *3000; acceptable for MAE diff
-        base_mae = regression_mae(
-            [p * 3000 for p in base_preds["length_norm"]],
-            length_labels)
-        cand_mae = regression_mae(
-            [p * 3000 for p in cand_preds["length_norm"]],
-            length_labels)
-        metrics.append(("Length MAE (chars)",
-                        base_mae, cand_mae, "lower"))
+        # Z-space MAE: each model emits its own z-score; we
+        # compare prediction VARIANCE relative to label.
+        # Convert label to z via (label - mean(labels)) / std(labels)
+        # so both prediction and label are in same z-space per
+        # eval corpus. (This is approximate; real fix reads each
+        # model's metadata.)
+        import statistics
+        if length_labels:
+            label_mean = statistics.mean(length_labels)
+            label_std = statistics.stdev(length_labels) \
+                if len(length_labels) > 1 else 1.0
+            label_std = max(label_std, 1.0)  # avoid div-by-zero
+            label_z = [(l - label_mean) / label_std
+                       for l in length_labels]
+            base_mae = regression_mae(
+                base_preds["length_norm"], label_z)
+            cand_mae = regression_mae(
+                cand_preds["length_norm"], label_z)
+            metrics.append(("Length MAE (z-space, eval-corpus)",
+                            base_mae, cand_mae, "lower"))
 
     if "latency_norm" in base_preds and \
        "latency_norm" in cand_preds:
-        # latency_norm is /5000 typically
-        base_mae = regression_mae(
-            [p * 5000 for p in base_preds["latency_norm"]],
-            duration_labels)
-        cand_mae = regression_mae(
-            [p * 5000 for p in cand_preds["latency_norm"]],
-            duration_labels)
-        metrics.append(("Latency MAE (ms)",
-                        base_mae, cand_mae, "lower"))
+        if duration_labels:
+            import statistics
+            label_mean = statistics.mean(duration_labels)
+            label_std = statistics.stdev(duration_labels) \
+                if len(duration_labels) > 1 else 1.0
+            label_std = max(label_std, 1.0)
+            label_z = [(l - label_mean) / label_std
+                       for l in duration_labels]
+            base_mae = regression_mae(
+                base_preds["latency_norm"], label_z)
+            cand_mae = regression_mae(
+                cand_preds["latency_norm"], label_z)
+            metrics.append(("Latency MAE (z-space, eval-corpus)",
+                            base_mae, cand_mae, "lower"))
 
     print()
     print(f"  {'Metric':<22} {'Baseline':>10} {'Candidate':>10} "

@@ -2465,6 +2465,22 @@ extension SampleHostModel {
         }
     }
 
+    /// M780 chapter 二百七 — DEEP-REVIEW FIX C2 helper.
+    /// Increment timeoutCount via applyIfActive when error is a
+    /// LLM-timeout. Stale-generation tasks see no-op. Called from
+    /// every bench-loop catch where callAFMWithTimeout /
+    /// callGemmaWithTimeout might have thrown.
+    @MainActor
+    fileprivate func recordTimeoutIfApplicable(
+        _ error: Error, generation: Int
+    ) {
+        if case SampleHostBenchLLMTimeoutError.timeoutExceeded = error {
+            applyIfActive(generation) {
+                self.hybridBenchLLMTimeoutCount += 1
+            }
+        }
+    }
+
     /// M735 chapter 一百九十五 — wrap callAFM with per-iter
     /// timeout. Bench loop uses this in the .singleLLM confident
     /// path so a hung AFM call (~30s+) doesn't freeze the whole
@@ -2497,7 +2513,10 @@ extension SampleHostModel {
         } catch {
             timeoutTask.cancel()
             if llmTask.isCancelled {
-                self.hybridBenchLLMTimeoutCount += 1
+                // M780 chapter 二百七 — DEEP-REVIEW FIX C2:
+                // counter mutation moved to bench-loop catch
+                // wrapped in applyIfActive(myGen). Helper is
+                // pure error path; caller handles state.
                 throw SampleHostBenchLLMTimeoutError
                     .timeoutExceeded(seconds: seconds)
             }
@@ -2529,7 +2548,10 @@ extension SampleHostModel {
         } catch {
             timeoutTask.cancel()
             if llmTask.isCancelled {
-                self.hybridBenchLLMTimeoutCount += 1
+                // M780 chapter 二百七 — DEEP-REVIEW FIX C2:
+                // counter mutation moved to bench-loop catch
+                // wrapped in applyIfActive(myGen). Helper is
+                // pure error path; caller handles state.
                 throw SampleHostBenchLLMTimeoutError
                     .timeoutExceeded(seconds: seconds)
             }
@@ -3195,13 +3217,21 @@ extension SampleHostModel {
                         // also gets per-iter timeout protection.
                         afmBodyMaybe = try await self.callAFMWithTimeout(
                             prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch { afmErr = error }
+                    } catch {
+                        afmErr = error
+                        self.recordTimeoutIfApplicable(
+                            error, generation: myGen)
+                    }
                     let afmMs = Date().timeIntervalSince(afmStart) * 1000
                     let gemmaStart = Date()
                     do {
                         gemmaBodyMaybe = try await self.callGemmaWithTimeout(
                             prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch { gemmaErr = error }
+                    } catch {
+                        gemmaErr = error
+                        self.recordTimeoutIfApplicable(
+                            error, generation: myGen)
+                    }
                     let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
 
                     firstTriedLLM = "afm"
@@ -3257,6 +3287,9 @@ extension SampleHostModel {
                         actualRoute = "local-only-gemma-ok"
                         applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
                     } catch {
+                        // M780 chapter 二百七 — record timeout count.
+                        self.recordTimeoutIfApplicable(
+                            error, generation: myGen)
                         firstTriedLLM = "gemma"
                         firstStatus = "gemma-error"
                         firstDurationMs =
@@ -3292,13 +3325,21 @@ extension SampleHostModel {
                         // dual-call also wrapped with timeout.
                         afmBodyMaybe = try await self.callAFMWithTimeout(
                             prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch { afmErr = error }
+                    } catch {
+                        afmErr = error
+                        self.recordTimeoutIfApplicable(
+                            error, generation: myGen)
+                    }
                     let afmMs = Date().timeIntervalSince(afmStart) * 1000
                     let gemmaStart = Date()
                     do {
                         gemmaBodyMaybe = try await self.callGemmaWithTimeout(
                             prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch { gemmaErr = error }
+                    } catch {
+                        gemmaErr = error
+                        self.recordTimeoutIfApplicable(
+                            error, generation: myGen)
+                    }
                     let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
 
                     // Pick longer non-empty body (simple heuristic)
@@ -3394,6 +3435,9 @@ extension SampleHostModel {
                         }
                         applyIfActive(myGen) { self.hybridBenchRouterHits += 1 }
                     } catch {
+                        // M780 chapter 二百七 — record timeout count.
+                        self.recordTimeoutIfApplicable(
+                            error, generation: myGen)
                         firstStatus = "\(routerRoute.rawValue)-error"
                         firstDurationMs =
                             Date().timeIntervalSince(firstStart) * 1000
@@ -3425,6 +3469,9 @@ extension SampleHostModel {
                             fallbackDurationMs =
                                 Date().timeIntervalSince(fbStart) * 1000
                         } catch {
+                            // M780 chapter 二百七 — fallback timeout
+                            self.recordTimeoutIfApplicable(
+                                error, generation: myGen)
                             fallbackLLM = routerRoute == .afm ? "gemma" : "afm"
                             fallbackStatus = "error"
                             errorMessage = (errorMessage ?? "") + " fb: \(error)"
@@ -3857,6 +3904,14 @@ extension SampleHostModel {
         // see Task.isCancelled, exit its loop, close the JSONL
         // runner, and (via generation check) skip the final
         // isRunning=false write so a fast restart isn't clobbered.
+        // M779 chapter 二百七 — DEEP-REVIEW FIX C3: bump generation
+        // here too. Pre-fix: stop only cancels; stale task may
+        // still be mid-iter (mid-LLM call, mid-substrate eval) and
+        // its `applyIfActive(myGen)` writes succeed BEFORE
+        // cancellation observation. Post-fix: gen++ here means
+        // ANY post-stop `applyIfActive(myGen)` from the stale task
+        // sees gen mismatch and skips. Pure stop semantics.
+        hybridBenchGeneration += 1
         hybridBenchTask?.cancel()
         hybridBenchTask = nil
         hybridBenchIsRunning = false

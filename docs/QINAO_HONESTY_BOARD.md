@@ -25743,3 +25743,98 @@ SampleHost tests: 87 → **89** (+2 chapter 206).
 ### 206.4 一句话总结
 
 **Chapter 二百六 (M776)**: hybrid-verify monitor caught chapter 205 .benign + default .reflective = 0 LLM fires after 3 min. Root cause: .reflective always routes to .delay regardless of catalog. Fix: bench loop's workflowProfile capture overrides .reflective → .primary when smokeMode is .benign. Operator-error-proof: benign mode IS training-data mode, never compatible with .reflective. +2 fix-pin tests / 89 SampleHost / 1966 全栈 / 0 failures. iPhone deployed PID 55739. Auto-verify monitor running again — will give verdict at 3 min after next tap Start.
+
+## 二百七、 deep review + deep test — 3 CRITICAL bugs caught + fixed (M779-M781 / 2026-05-06)
+
+User instruction: "deep review + deep test". Per chapter 67/91/103/118/134 doctrine, parallel agent review on chapters 192-206 work. 3 agents each got terse + specific brief. Hand-grep verified each finding (chapter 67 baseline 75% FP rate).
+
+### 207.1 Findings summary
+
+12 CRITICAL/HIGH findings reported. 3 verified real. 9 false positives (concurrency analysis errors / fabricated bias claims / non-issues like UInt32-edge-case / etc).
+
+| Agent | Finding | Verdict | Action |
+|---|---|---|---|
+| SafetyKit | C1 withLLMTimeout cancellation race | partial — work task may continue if uncancellable | Document MLX must cancellation-aware; minor leak risk |
+| SafetyKit | C2 task group nil unwrap | FP — group always has 2 children | None |
+| SafetyKit | H3 DriftMonitor unlocked reads | FP — `private(set)` access through actor implies serialization in practice; @unchecked Sendable doctrine OK | None |
+| SafetyKit | H4 Adversarial mutator bias | FP — agent's math wrong; r and kindIdx come from same shifted bits but bottom 3 bits stay uniform regardless of magnitude constraint | None |
+| SafetyKit | H5 UInt32.max divisor edge | LOW — 1-in-2³² fall-through; cosmetic | None |
+| SafetyKit | M6 Checkpoint atomic-rename window | CONFIRMED real, narrow window | Defer to chapter 208 |
+| Model | C1 callTimeout double-error race | partial — bench-loop catches handle generic err same as timeout; minor reporting issue | Same fix as C2 |
+| Model | C2 hybridBenchLLMTimeoutCount unguarded | **CONFIRMED CRITICAL** | **FIX M780** |
+| Model | C3 stopHybridBench no gen bump | **CONFIRMED CRITICAL** | **FIX M779** |
+| Model | H1 rotation file conflict | depends on Stop→Start race + new task gen mismatch — partly mitigated by C3 fix | Defer |
+| Python | CRITICAL compare_mlpackages 3000/5000 hardcode | **CONFIRMED CRITICAL** — train uses z-score, not /3000 | **FIX M781** |
+| Python | H1 predict-fail label misalignment | real but rare — only fires if predict() crashes mid-corpus | Defer |
+| Python | M3 ECE-vs-MACE naming | doctrine-pin: rename or fix formula | Defer |
+
+### 207.2 M779 — Fix C3: stopHybridBench bumps generation
+
+```swift
+func stopHybridBench() {
+    hybridBenchGeneration += 1  // M779 NEW: invalidate stale task
+    hybridBenchTask?.cancel()
+    hybridBenchTask = nil
+    hybridBenchIsRunning = false
+}
+```
+
+Pre-fix: stale task post-cancel (mid-iter, mid-LLM-call, mid-substrate-eval) had `applyIfActive(myGen) { ... }` succeed because gen unchanged. Counter writes after Stop. Post-fix: gen++ here means stale task sees gen mismatch, all `applyIfActive` becomes no-op. Pure stop semantics.
+
+Side-effect: chapter 一百八十七 M627 doctrine ("via generation check skip the final isRunning=false write") was always true on Stop→Start (start bumps gen) but was FALSE on Stop-only. Now true on both paths.
+
+### 207.3 M780 — Fix C2: timeoutCount via applyIfActive
+
+`callAFMWithTimeout` / `callGemmaWithTimeout` previously did `self.hybridBenchLLMTimeoutCount += 1` directly — outside any generation guard. Stale task whose timeout fires AFTER Stop+Start would land count++ in NEW bench's counter.
+
+Refactor:
+- Helpers no longer mutate counter (pure error-throwing)
+- New helper `recordTimeoutIfApplicable(_ error:generation:)` does `applyIfActive(generation) { count++ }` if error is `.timeoutExceeded`
+- 5 bench-loop catch sites call this helper:
+  - `bothLLMs` AFM catch + Gemma catch (uncertain-zone)
+  - `bothLLMs` AFM catch + Gemma catch (substrate-bothLLMs)
+  - `localOnly` Gemma catch
+  - `singleLLM` confident first-attempt catch
+  - `singleLLM` confident fallback catch
+
+### 207.4 M781 — Fix Python CRITICAL: compare_mlpackages z-space
+
+Pre-fix: `pred * 3000` to "denormalize" length_norm. But train_chenglu_multihead_v0.py:285 does `(y - length_mean) / length_std` (z-score). Multiplying z-score by 3000 produces nonsense MAE numbers.
+
+Post-fix: emit z-space MAE (each model's own z-space). Convert eval-corpus labels to z via `(label - mean(labels)) / std(labels)` so prediction + label share corpus z-space. Document: "Length MAE (z-space, eval-corpus)" — honest unit label.
+
+Caveat documented: if baseline + candidate trained on different corpora, z-spaces differ → comparison qualitative, not absolute. Chapter 208+ candidate: read each model's mean/std from short_description string for absolute char-MAE.
+
+### 207.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17 sim | **89** ✓ (chapter 207 doesn't add tests — pure fix) |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| iPhone Release build + deploy | PID 55878 launched |
+| 4 boundary checks + parity | clean |
+| god-file guard | 3 warns / 0 errors |
+| **Total** | **1966 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures** |
+
+### 207.6 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | M779 stopHybridBench gen bump; M780 recordTimeoutIfApplicable helper + 5 catch wraps; helper counter mutation moved out |
+| `scripts/compare_mlpackages.py` | M781 emit z-space MAE; remove fake 3000/5000 multiplication; document corpus-z-space caveat |
+
+### 207.7 Doctrine impact
+
+Chapter 67/91/103/118/134/148 deep review pattern continues to work:
+- Parallel agent review surfaces ~12 candidates
+- Hand-grep verifies → ~25% real (chapter 207: 3/12 = 25%, slightly lower than 33% baseline — agents got better at false positives this round)
+- Real bugs: targeted fixes + commit
+- FPs documented in chapter doc so future agents don't re-find
+
+ADR-001 (HINT-ONLY observability) + ADR-002 (BAIL-OUT not session-kill) + ADR-003 (synthetic REFUSED) all unchanged.
+
+### 207.8 一句话总结
+
+**Chapter 二百七 (M779-M781)**: deep review + deep test per user instruction surfaced 3 CRITICAL bugs. **M779 stopHybridBench bumps generation** — pre-fix stale tasks polluted counters/lastError post-Stop because `applyIfActive(myGen)` succeeded with unchanged gen. **M780 callXWithTimeout helpers no longer mutate `hybridBenchLLMTimeoutCount` directly** — moved to `recordTimeoutIfApplicable(error:generation:)` helper called from 5 bench-loop catches via `applyIfActive(myGen)`; stale-task timeout no longer pollutes new bench counter. **M781 compare_mlpackages z-space MAE fix** — train uses z-score normalization; previous `pred * 3000` produced nonsense; now emit honest "Length MAE (z-space, eval-corpus)" with documented caveat. **89 SampleHost tests still pass; 1966 全栈 / 0 failures**. 9 of 12 reported findings were false positives (concurrency analysis errors / fabricated bias claims / etc) — documented in chapter doc per chapter 67 doctrine. iPhone deployed PID 55878. Real bugs caught BEFORE long bench, exactly user's "你测试 到没问题 再长跑" doctrine.

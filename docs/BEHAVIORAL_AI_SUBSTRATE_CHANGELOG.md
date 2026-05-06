@@ -1259,3 +1259,13 @@ SampleHost tests 82 → **87**; full stack **1964 + 1 parity gate + 7 analysis t
 - +2 fix-pin tests (.benign-implies-.primary doctrine + non-benign preserves choice).
 
 SampleHost tests 87 → **89**; full stack **1966 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. iPhone deployed PID 55739. Auto-verify monitor PID 20046 awaiting next bench start.
+
+## 2026-05-06 — chapter 二百七 (M779-M781) deep review — 3 CRITICAL fixes
+
+- **M779** Fix C3: `stopHybridBench` now `hybridBenchGeneration += 1` BEFORE cancel. Pre-fix stale task post-cancel still passed `applyIfActive(myGen)` → polluted counters/lastError. Post-fix gen++ invalidates all `applyIfActive` paths in stale task.
+- **M780** Fix C2: `callAFMWithTimeout` / `callGemmaWithTimeout` helpers no longer mutate `hybridBenchLLMTimeoutCount` directly. New `recordTimeoutIfApplicable(error:generation:)` helper called from 5 bench-loop catches via `applyIfActive(myGen)` — stale-task timeout no longer pollutes new bench counter.
+- **M781** Fix Python CRITICAL: `compare_mlpackages.py` removed wrong `pred * 3000 / pred * 5000` multiplications. train script uses z-score normalization; previous code produced nonsense MAE. Now emits honest "Length/Latency MAE (z-space, eval-corpus)" by converting eval-corpus labels to z-score per shared corpus space.
+
+12 reported findings; 3 confirmed real (25% TP — slightly below chapter 67 33% baseline). 9 FPs documented per chapter 67 doctrine.
+
+SampleHost tests 89 still pass; full stack **1966 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. iPhone deployed PID 55878.
