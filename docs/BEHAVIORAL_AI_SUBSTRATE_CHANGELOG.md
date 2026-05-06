@@ -1391,3 +1391,36 @@ Cross-session continuity is no longer a paper promise — every Stage 0 storage 
 Test impact: BAS XCTest 3021 → **3028** (+7 chapter 二百五十 fix-pins); SampleHost iOS 128 unchanged; 0 failures, 0 doctrine red lines broken, 0 regressions.
 
 Stage 1 (Memory Importance Loop, chapters 二百五十一-二百五十三) is next. Stage 1 is fully in-doctrine, no doctrine evolution needed — just chip away at the Gap #4 closed loop (L8 retrieval usage tracker → importance scorer → tier promotion/demotion).
+
+## 2026-05-07 — chapter 二百五十一 (M738) `BASMemoryUsageTracker` — Stage 1 Step 1 of 3
+
+附录 V Stage 1 (Memory Importance Loop) opens. Pre-chapter 二百五十一 the L8 atom store had **one** signal for "was this atom actually used": `BASGovernedMemory.lastConfirmedAt: Date?` — a single timestamp per atom mutated on retrieval. With one timestamp the importance scorer cannot distinguish "retrieved 100 times in the past hour" from "retrieved once a week ago"; both look like the same `lastConfirmedAt`. Frequency is invisible. Helped-vs-not-helped is invisible. The closed loop cannot exist with only one timestamp.
+
+- **M738** NEW `BehavioralAISubstrate/Sources/BASMemory/BASMemoryUsageTracker.swift` (~480 LOC). Two new public types:
+  - `BASMemoryUsageRecord: BASSchemaVersioned` — one retrieval event (recordID / atomID / retrievedAt / sessionRef / turnRef / permitMode / helpedFlag). `HelpedFlag` enum: `.unknown` / `.helped` / `.notHelped`.
+  - `actor BASMemoryUsageTracker` — append-only event log with two modes:
+    - `init()` — in-memory mode (actor-resident only). Tests + ephemeral hosts.
+    - `init(databaseURL:)` — SQLite-backed (cross-session continuity via the chapter 二百四十八 idiom).
+- API: `record(atomID:sessionRef:turnRef:permitMode:retrievedAt:) -> recordID` / `markHelped(recordID:helped:)` / `usageCount(forAtomID:)` / `recentRecords(forAtomID:limit:)` / `allRecords()` / `record(forID:)` / `purge(olderThan:)`.
+- Schema v1: single `memory_usage_records` table (record_id PK + atom_id + retrieved_at_ms + session_ref + turn_ref + permit_mode + helped_state) + indices on atom_id and session_ref. Same M91 + M270 SQLite idiom (WAL mode / `synchronous=NORMAL` / transient bind / schema-version pragma / actor-isolated `OpaquePointer` via `nonisolated(unsafe)`).
+- Write-through cache: SQLite-backed mode loads prior records into in-memory dict at init so subsequent reads (`usageCount`, `recentRecords`) don't need SQL round-trips. Writes hit both.
+- 14 fix-pin tests in `BASMemoryUsageTrackerTests.swift` (~340 LOC):
+  - in-memory empty start
+  - record returns ID + persists, multiple records counted per atom
+  - markHelped flips state, throws on missing recordID
+  - recentRecords descending by retrievedAt + respects limit
+  - allRecords ascending
+  - purge older-than removes stale, leaves fresh
+  - **THE KEY TEST** — SQLite cross-session persistence: write 2 records → close → reopen → both records reloaded with correct field values
+  - SQLite markHelped survives reopen, SQLite purge survives reopen
+  - schema version pin (tracker + record), HelpedFlag exhaustiveness
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3 unchanged: tracker is observability — records what happened, never grants permits, never feeds base weights.
+- 红线 7 watcher-only-hint: the tracker stores raw events; the scorer (chapter 二百五十二) emits hint records, not commits.
+- chapter 二百四十八 SQLite idiom (system framework + WAL + transient bind + schema-version pragma).
+- chapter 二百十一 single-source-of-truth: schema + tracker actor live in one file; no duplicate definitions.
+
+Test impact: BAS XCTest 3028 → **3042** (+14 chapter 二百五十一 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+Stage 1 progress: **1/3 chapters shipped** (二百五十一 ✓ usage tracker / 二百五十二 importance scorer pending / 二百五十三 L8 retrieval integration pending).
