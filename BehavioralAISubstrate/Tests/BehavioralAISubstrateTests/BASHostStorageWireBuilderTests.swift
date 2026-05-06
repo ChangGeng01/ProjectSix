@@ -445,6 +445,115 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
                 "ticket-lifecycle-url-provided:yes"))
     }
 
+    // MARK: - Audit ledger factory (chapter 三百〇八 / M795)
+
+    func testAuditLedgerLegacyInMemoryReturnsNil() throws {
+        let result = try BASHostStorageWireBuilder
+            .makeAuditLedgerStorage(options: .legacyInMemory)
+        XCTAssertNil(
+            result,
+            "Legacy preference returns nil — caller falls back " +
+            "to BASSovereignLedgerNullStorage default")
+    }
+
+    func testAuditLedgerSQLiteWhenURLProvidedCreatesFile()
+        throws
+    {
+        let url = tempRoot.appendingPathComponent(
+            "audit.sqlite")
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            auditLedgerURL: url)
+        let storage = try BASHostStorageWireBuilder
+            .makeAuditLedgerStorage(options: options)
+        XCTAssertNotNil(
+            storage,
+            ".sqliteWhenURLProvided + URL → SQLite ledger storage")
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: url.path),
+            "audit ledger SQLite database file must be created " +
+            "on disk")
+    }
+
+    func testAuditLedgerSQLiteWhenURLProvidedWithoutURLReturnsNil()
+        throws
+    {
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            auditLedgerURL: nil)
+        let storage = try BASHostStorageWireBuilder
+            .makeAuditLedgerStorage(options: options)
+        XCTAssertNil(
+            storage,
+            ".sqliteWhenURLProvided + nil URL → nil (graceful)")
+    }
+
+    func testAuditLedgerSQLiteRequiredWithoutURLThrows() {
+        let options = BASHostStorageOptions(
+            preference: .sqliteRequired,
+            auditLedgerURL: nil)
+        XCTAssertThrowsError(
+            try BASHostStorageWireBuilder
+                .makeAuditLedgerStorage(options: options)
+        ) { error in
+            guard let wireError =
+                error as? BASHostStorageWireError
+            else {
+                XCTFail("expected BASHostStorageWireError, got " +
+                    "\(type(of: error))")
+                return
+            }
+            XCTAssertEqual(
+                wireError,
+                .missingSQLiteURL(component: "audit-ledger"),
+                "fail-fast: .sqliteRequired with no audit-ledger " +
+                "URL must throw .missingSQLiteURL with component " +
+                "audit-ledger")
+        }
+    }
+
+    func testAuditLedgerUnifiedRootDerivesURL() throws {
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            unifiedRoot: BASHostStorageRoot(rootURL: tempRoot))
+        let storage = try BASHostStorageWireBuilder
+            .makeAuditLedgerStorage(options: options)
+        XCTAssertNotNil(storage)
+        let expectedFile = tempRoot.appendingPathComponent(
+            "audit-ledger.sqlite")
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: expectedFile.path),
+            "audit-ledger SQLite file must exist at unifiedRoot/" +
+            "audit-ledger.sqlite (chapter 三百〇三 derivation pin)")
+    }
+
+    func testAuditLedgerReasonCodesForLegacyMode() {
+        let codes = BASHostStorageWireBuilder
+            .auditLedgerWireReasonCodes(options: .legacyInMemory)
+        XCTAssertTrue(
+            codes.contains("audit-ledger-wire:in-memory"))
+        XCTAssertTrue(
+            codes.contains(
+                "audit-ledger-preference:in-memory-default"))
+        XCTAssertTrue(
+            codes.contains("audit-ledger-url-provided:no"))
+    }
+
+    func testAuditLedgerReasonCodesForSQLiteConfigured() {
+        let url = URL(fileURLWithPath: "/tmp/al.sqlite")
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            auditLedgerURL: url)
+        let codes = BASHostStorageWireBuilder
+            .auditLedgerWireReasonCodes(options: options)
+        XCTAssertTrue(
+            codes.contains("audit-ledger-wire:sqlite"))
+        XCTAssertTrue(
+            codes.contains(
+                "audit-ledger-url-provided:yes"))
+    }
+
     // MARK: - Cross-session SQLite persistence (atom store)
 
     func testSQLiteStorePersistsAcrossWireBuilds() async throws {

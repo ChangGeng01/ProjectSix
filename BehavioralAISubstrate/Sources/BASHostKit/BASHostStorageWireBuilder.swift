@@ -58,6 +58,7 @@
 import Foundation
 @_exported import BASMemory
 @_exported import BASRuntimeCore
+import BASSovereign
 
 // MARK: - Typed error taxonomy
 
@@ -270,6 +271,65 @@ public enum BASHostStorageWireBuilder {
             "\(options.preference.rawValue)",
             "ticket-lifecycle-url-provided:" +
             (options.effectiveTicketLifecycleURL != nil
+                ? "yes" : "no")
+        ]
+    }
+
+    // MARK: - L14 Audit ledger storage factory (chapter 三百〇八 / M795)
+
+    /// Construct a `BASSovereignLedgerStorage` from typed storage
+    /// options。Returns nil for in-memory mode (caller passes
+    /// `BASSovereignLedgerNullStorage()` to ledger init);returns
+    /// `BASSovereignLedgerSQLiteStorage` for configured cases。
+    ///
+    /// Same ADR-014 resolution rules:
+    ///
+    /// - `.inMemoryDefault` → returns nil (legacy path —
+    ///   `BASSovereignLedgerNullStorage` used by ledger default)
+    /// - `.sqliteWhenURLProvided` + URL → SQLite ledger storage
+    /// - `.sqliteWhenURLProvided` + nil URL → returns nil
+    ///   (graceful fallback)
+    /// - `.sqliteRequired` + URL → SQLite ledger storage
+    /// - `.sqliteRequired` + nil URL → throws .missingSQLiteURL(
+    ///   component: "audit-ledger")
+    ///
+    /// Returns optional rather than `any` because the in-memory
+    /// path uses `BASSovereignLedgerNullStorage()` which is a
+    /// concrete null-object implementation; nil signals "use the
+    /// default null storage". This mirrors vault factory's nil
+    /// semantic.
+    public static func makeAuditLedgerStorage(
+        options: BASHostStorageOptions
+    ) throws -> (any BASSovereignLedgerStorage)? {
+        guard options.shouldUseSQLiteAuditLedger else {
+            return nil
+        }
+        guard let url = options.effectiveAuditLedgerURL else {
+            throw BASHostStorageWireError.missingSQLiteURL(
+                component: "audit-ledger")
+        }
+        do {
+            return try BASSovereignLedgerSQLiteStorage(
+                path: url.path)
+        } catch {
+            throw BASHostStorageWireError.storageInitFailed(
+                component: "audit-ledger",
+                message: "\(error)")
+        }
+    }
+
+    /// Helper:emit reason codes for audit ledger wire path。
+    public static func auditLedgerWireReasonCodes(
+        options: BASHostStorageOptions
+    ) -> [String] {
+        let willUseSQLite = options.shouldUseSQLiteAuditLedger
+        return [
+            "audit-ledger-wire:" +
+            (willUseSQLite ? "sqlite" : "in-memory"),
+            "audit-ledger-preference:" +
+            "\(options.preference.rawValue)",
+            "audit-ledger-url-provided:" +
+            (options.effectiveAuditLedgerURL != nil
                 ? "yes" : "no")
         ]
     }
