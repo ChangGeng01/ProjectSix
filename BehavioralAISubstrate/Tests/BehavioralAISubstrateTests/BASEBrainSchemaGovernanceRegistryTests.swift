@@ -550,7 +550,11 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "HostStorageOptions":
                 BASHostStorageOptions.currentSchemaVersion,
             "HostStorageWireReport":
-                BASHostStorageWireReport.currentSchemaVersion
+                BASHostStorageWireReport.currentSchemaVersion,
+            // M797 (chapter 三百一〇) — Phase Delta 1st code cut:
+            // typed ML head slot record.
+            "LayerMLHeadSlot":
+                BASLayerMLHeadSlot.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

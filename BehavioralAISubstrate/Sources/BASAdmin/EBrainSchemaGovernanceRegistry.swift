@@ -1412,6 +1412,15 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "HostStorageWireReport",
             versionedType: BASHostStorageWireReport.self,
             tests: ["schema.host_storage_wire_report.current", "schema.host_storage_wire_report.backward"]
+        ),
+        // M797 (chapter 三百一〇) — Phase Delta 1st code cut: typed
+        // ML head slot record. Phase Delta foundation for chapter
+        // 一百七十七 14-layer CoreML mesh — registry actor itself
+        // is not BASSchemaVersioned (mutable state container).
+        entry(
+            "LayerMLHeadSlot",
+            versionedType: BASLayerMLHeadSlot.self,
+            tests: ["schema.layer_ml_head_slot.current", "schema.layer_ml_head_slot.backward"]
         )
     ]
 

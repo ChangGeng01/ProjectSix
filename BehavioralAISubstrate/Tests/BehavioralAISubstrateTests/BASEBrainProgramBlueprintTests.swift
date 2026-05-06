@@ -403,7 +403,10 @@ struct BASEBrainProgramBlueprintTests {
             // M790 (chapter 三百〇三) — Phase Gamma 1st code cut:
             // typed storage options primitive + wire report.
             "HostStorageOptions",
-            "HostStorageWireReport"
+            "HostStorageWireReport",
+            // M797 (chapter 三百一〇) — Phase Delta 1st code cut:
+            // typed ML head slot record (registry foundation).
+            "LayerMLHeadSlot"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)
