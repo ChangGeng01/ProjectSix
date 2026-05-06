@@ -1465,3 +1465,50 @@ Stage 1 progress: **1/3 chapters shipped** (二百五十一 ✓ usage tracker / 
 Test impact: BAS XCTest 3042 → **3061** (+19 chapter 二百五十二 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
 
 Stage 1 progress: **2/3 chapters shipped** (二百五十一 ✓ usage tracker / 二百五十二 ✓ importance scorer / 二百五十三 L8 retrieval integration pending).
+
+## 2026-05-07 — chapter 二百五十三 (M740) `BASMemoryClosedLoopApplier` — Stage 1 fully closed
+
+附录 V Stage 1 (Memory Importance Loop) third + final chapter — the closed loop is now end-to-end demonstrable. Pre-chapter 二百五十三 the substrate had:
+- chapter 二百五十一 / M738 — usage tracker (the log)
+- chapter 二百五十二 / M739 — importance scorer (the formula)
+- chapter 二百四十八 / M735 — atom store (the persistent data)
+
+Missing: the orchestration site that wires log → scorer → store mutation. Hosts could write the boilerplate themselves but every host would write it the same way.
+
+- **M740** NEW `BehavioralAISubstrate/Sources/BASMemory/BASMemoryClosedLoopApplier.swift` (~210 LOC). Two new public types:
+  - `BASMemoryClosedLoopApplyOutcome` — typed result of one apply pass: full report + appliedMutations (atomID → newTier) + rejectedMutations (recommended but store said no) + dryRun flag.
+  - `actor BASMemoryClosedLoopApplier` — wraps store + tracker + scorer. API:
+    - `recordRetrieval(atomID:sessionRef:turnRef:permitMode:retrievedAt:)` → forwards to tracker, returns recordID
+    - `markHelped(recordID:helped:)` → forwards to tracker
+    - `purgeOldUsage(olderThan:)` → forwards to tracker, returns purged count
+    - `applyImportanceReport(atomTiers:now:dryRun:)` → THE CLOSED LOOP — read tracker → score → apply via `store.updateTier(forID:to:)` → return outcome
+- 9 fix-pin integration tests in `BASMemoryClosedLoopApplierTests.swift` (~290 LOC):
+  - empty applier applies nothing
+  - recordRetrieval lands in tracker
+  - **THE KEY TEST** — full closed loop, cold atom + 30 helped retrievals → applier promotes to .warm + atom in store actually mutated
+  - hot atom + week-old retrieval → demoted to .warm
+  - dry-run computes report but applies nothing
+  - hold path leaves atom unchanged (between thresholds)
+  - rejected mutation when atom missing from store (orphan record)
+  - purgeOldUsage forwarding
+  - **SQLite cross-session** — full closed loop with SQLite-backed store + tracker; atom mutation persists across reopen
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3: applier is a coordinator, not a permit gate. Tier mutations go through the existing `BASMemoryAtomStore` protocol; every existing L8 governance gate (admission status, sensitivity, scope) remains in effect.
+- 红线 7 watcher-only-hint: the scorer's `recommendedTier` is consumed by the applier, but `dryRun: true` lets hosts inspect first. Auto-application is opt-in.
+- chapter 二百十一 single-source-of-truth: the applier owns orchestration logic only — does not redefine tracker / scorer / store contracts.
+- chapter 一百零二 五级删除: tier mutation is a level-2 transition (atom stays governed). The applier never invokes `remove(forID:)` or `updateGovernanceStatus(...)` — those remain higher-layer concerns.
+
+**附录 V Stage 1 fully closed** (3/3 chapters):
+- 二百五十一 ✓ usage tracker (`BASMemoryUsageTracker` / `BASMemoryUsageRecord`)
+- 二百五十二 ✓ importance scorer (`BASMemoryImportanceScorer` / `BASMemoryImportanceScore` / `BASMemoryImportanceReport`)
+- 二百五十三 ✓ closed-loop applier (`BASMemoryClosedLoopApplier` / `BASMemoryClosedLoopApplyOutcome`) ← **THIS COMMIT**
+
+The Memory Importance Loop is fully in-doctrine — no doctrine evolution was needed (no ADR-012 required at this stage). Hosts that want it opt in by constructing one applier per L8 deployment and calling `recordRetrieval(...)` per recall + `applyImportanceReport(atomTiers:)` periodically.
+
+Test impact: BAS XCTest 3061 → **3070** (+9 chapter 二百五十三 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+**Stages summary**:
+- Stage 0 ✓ Foundation: Persistence (chapters 二百四十八-二百五十)
+- Stage 1 ✓ Memory Importance Loop (chapters 二百五十一-二百五十三) ← **JUST CLOSED**
+- Stage 2 — Counter-Host Gate Auto-Wire (chapters 二百五十四-二百五十五) is next.
