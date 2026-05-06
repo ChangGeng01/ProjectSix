@@ -1269,3 +1269,14 @@ SampleHost tests 87 → **89**; full stack **1966 + 1 parity gate + 7 analysis t
 12 reported findings; 3 confirmed real (25% TP — slightly below chapter 67 33% baseline). 9 FPs documented per chapter 67 doctrine.
 
 SampleHost tests 89 still pass; full stack **1966 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. iPhone deployed PID 55878.
+
+## 2026-05-06 — chapter 二百八 (M783-M789) `.rawLLM` mode bypassing substrate gate
+
+- **M783** NEW `SmokeMode.rawLLM` ("raw-llm") — 5th case. Per ADR-006 bench-data-only mode for observability ONLY.
+- **M784** Bench loop forces dispatchPolicy=.singleLLM when smokeMode=.rawLLM.
+- **M785** UI Picker 5 cases.
+- **M786-M787** +3 fix-pin tests + chapter-203 invariant updated.
+- **M788** NEW ADR-006 doctrine pin.
+- **M789** Build + deploy iPhone PID 55952.
+
+SampleHost tests 89 → **92**; full stack **1969 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**.

@@ -25838,3 +25838,15 @@ ADR-001 (HINT-ONLY observability) + ADR-002 (BAIL-OUT not session-kill) + ADR-00
 ### 207.8 一句话总结
 
 **Chapter 二百七 (M779-M781)**: deep review + deep test per user instruction surfaced 3 CRITICAL bugs. **M779 stopHybridBench bumps generation** — pre-fix stale tasks polluted counters/lastError post-Stop because `applyIfActive(myGen)` succeeded with unchanged gen. **M780 callXWithTimeout helpers no longer mutate `hybridBenchLLMTimeoutCount` directly** — moved to `recordTimeoutIfApplicable(error:generation:)` helper called from 5 bench-loop catches via `applyIfActive(myGen)`; stale-task timeout no longer pollutes new bench counter. **M781 compare_mlpackages z-space MAE fix** — train uses z-score normalization; previous `pred * 3000` produced nonsense; now emit honest "Length MAE (z-space, eval-corpus)" with documented caveat. **89 SampleHost tests still pass; 1966 全栈 / 0 failures**. 9 of 12 reported findings were false positives (concurrency analysis errors / fabricated bias claims / etc) — documented in chapter doc per chapter 67 doctrine. iPhone deployed PID 55878. Real bugs caught BEFORE long bench, exactly user's "你测试 到没问题 再长跑" doctrine.
+
+## 二百八、 `.rawLLM` mode — bench-data-only path bypassing substrate gate (M783-M789 / 2026-05-06)
+
+User picked option after chapter 207 finding: substrate's `calibrateRisk()` ignores bench's `riskLevel` argument; computes own risk from accumulated host state; produces 100% delay permit on benign+primary+low-risk inputs. **Real root cause: substrate's design CORRECTLY refuses LLM dispatch on potentially-risky prompts via internal eval**.
+
+Per NEW ADR-006: `.rawLLM` SmokeMode bypasses substrate's permit gate for OBSERVABILITY ONLY. Substrate STILL runs (audit accumulates + permitMode still recorded); BUT dispatchPolicy forced `.singleLLM` regardless. LLM actually fires per iter. Data NEVER feeds production permit decisions.
+
+5-case UI Picker: canon / 14-L / heavy / benign / **raw**.
+
+92 SampleHost tests pass / 1969 全栈 / 0 failures. iPhone PID 55952. Auto-verify monitor restarted; expects ≥ 50 LLM fires at 3 min after next bench start.
+
+**Chapter 192-208 = 17 chapters / 73 milestones in this session**.
