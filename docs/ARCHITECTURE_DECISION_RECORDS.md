@@ -370,16 +370,105 @@ two places they will drift.
 
 ---
 
+## ADR-009 (chapter 211) — Extract dispatch policy + single-source derive
+
+### Context
+
+Chapter 一百七十八 (M628) shipped `SampleHostHybridDispatchPolicy`
+buried inside `SampleHostModel.swift` (~85 LOC of typed mapping
+from substrate `permitMode` to LLM dispatch behavior, plus a
+`SampleHostHybridDispatchCanned` companion enum for skip-policy
+canned responses).
+
+Chapter 二百八 (M784, ADR-006) added a `.rawLLM` smokeMode that
+must force `.singleLLM` regardless of permitMode (bench
+observability ONLY — bypasses substrate's protective `.delay`
+permit so AFM/Gemma actually fire to accumulate training data).
+The override was a 8-LOC inline if/else inside
+`startHybridBench()` next to the dispatchPolicy decision site.
+
+Two doctrine sites for the same invariant (permit-mode →
+dispatch shape) is anti-doctrine. Future chapters adding new
+overrides (e.g. a hypothetical `.shadowOnly` mode) would scatter
+more inline branches.
+
+### Decision
+
+Extract `SampleHostHybridDispatchPolicy` + `SampleHostHybridDispatch-
+Canned` to dedicated file `SampleHostHybridDispatchPolicy.swift`.
+Add a single-source `derive(permitMode:forceSingleLLM:)` static
+method that combines:
+- chapter 一百七十八 baseline mapping (preserved as `from(permit-
+  Mode:)` for backward compat)
+- chapter 二百八 `.rawLLM` bypass (via `forceSingleLLM` flag)
+
+Bench loop replaces the inline if/else with a one-line call:
+
+```swift
+let dispatchPolicy = SampleHostHybridDispatchPolicy.derive(
+    permitMode: permitMode,
+    forceSingleLLM: smokeMode == .rawLLM)
+```
+
+The doctrine of WHY `.rawLLM` forces `.singleLLM` is documented
+in the policy file's `derive(...)` doc-comment with a link to
+ADR-006. The flag name (`forceSingleLLM`) is descriptive on its
+own; future overrides can add more flags or replace with an
+opaque struct without touching the bench loop.
+
+### Consequences
+
+- `SampleHostModel.swift` drops from 4028 → 3942 LOC, **clearing
+  the chapter 203 god-file 4K WARN threshold for the first time
+  in 3 chapters of carve-outs**.
+- Single source of truth for permit-mode → dispatch invariant.
+- 5 chapter 211 tests pin: derive-default-matches-from /
+  forceSingleLLM-overrides-all-permits / raw-values-stable /
+  skipsLLM-partition / canned-responses-non-empty.
+- Future smokeMode overrides go to one place. No more scatter.
+
+### Doctrine pins
+
+- 不变量 #1 (先醒再答): held — substrate decides FIRST. The
+  `permitMode` arg to `derive(...)` is what substrate produced;
+  we just map it.
+- 不变量 #2 (神经不掌权): held — this enum doesn't produce
+  permit decisions; it consumes them.
+- 不变量 #3 (私有经验不进权重): held — no weight write.
+- Red line 7 (HINT-ONLY observability): held — control-flow
+  only.
+- ADR-006 preserved: `.rawLLM` data is RECORDED but doctrine-
+  REFUSED for production permit predictions.
+
+### Future migration
+
+If a chapter wants per-permit flex (e.g. `.delay` to actually
+fire LLM in a debug-mode A/B), add a flag to `derive(...)`:
+```swift
+static func derive(
+    permitMode: String,
+    forceSingleLLM: Bool = false,
+    forceFireOnDelay: Bool = false  // hypothetical
+) -> Self
+```
+Document each flag with its ADR / doctrine source. Don't add
+inline branches at the call site.
+
+If the flag matrix grows past 3-4 booleans, replace with an
+opaque `DispatchOverrides` struct. Stop adding flag args.
+
+---
+
 ## Future ADR candidates
 
 | Topic | Chapter |
 |---|---|
-| SampleHostBenchEngine actor (carve out iter loop body to actor) | 211 |
-| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | 212 |
-| SampleHostBenchSink protocol (decouple JSONL persistence) | 213 |
-| MemoryCore submodule split | 214 |
-| EBrainCognitionPlaneCore subsystem extraction | 215 |
-| HostKitCore subsystem extraction | 216 |
+| SampleHostBenchEngine actor (carve out iter loop body to actor) | 212 |
+| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | 213 |
+| SampleHostBenchSink protocol (decouple JSONL persistence) | 214 |
+| MemoryCore submodule split | 215 |
+| EBrainCognitionPlaneCore subsystem extraction | 216 |
+| HostKitCore subsystem extraction | 217 |
 | Resume-from-iter mechanism (vs settings-only) | tbd |
 | Production canary (shadow predict) | tbd |
 | Per-pressure-stratum sub-models | tbd |

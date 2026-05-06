@@ -2315,4 +2315,115 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(ctx.chosenStride, 5041)
         XCTAssertEqual(ctx.mutationSeed, 0)
     }
+
+    // MARK: - chapter 二百十一 / M792 — dispatch policy single-source derive
+
+    func testDispatchPolicyDeriveDefaultsToFromMapping() {
+        // Default forceSingleLLM == false → matches chapter 一百
+        // 七十八 from(permitMode:) byte-for-byte.
+        let cases: [(permit: String, expected: SampleHostHybridDispatchPolicy)] = [
+            ("block", .skipBlock),
+            ("replace", .skipReplace),
+            ("delay", .skipDelay),
+            ("compare", .bothLLMs),
+            ("escalate", .bothLLMs),
+            ("local_only", .localOnly),
+            ("localOnly", .localOnly),
+            ("draft_only", .draftOnly),
+            ("draftOnly", .draftOnly),
+            ("answer", .singleLLM),
+            ("mirror", .singleLLM),
+            ("substrate-error", .singleLLM),  // unknown → singleLLM
+            ("", .singleLLM),                 // empty → singleLLM
+        ]
+        for (permit, expected) in cases {
+            let derived = SampleHostHybridDispatchPolicy.derive(
+                permitMode: permit, forceSingleLLM: false)
+            XCTAssertEqual(derived, expected,
+                "derive(permit=\(permit), force=false) " +
+                "should match from(permitMode:)")
+            XCTAssertEqual(derived,
+                SampleHostHybridDispatchPolicy.from(permitMode: permit),
+                "derive default must equal from() for permit=\(permit)")
+        }
+    }
+
+    func testDispatchPolicyDeriveForceSingleLLMOverridesAllPermits() {
+        // chapter 二百八 (.rawLLM, ADR-006): forceSingleLLM=true
+        // forces .singleLLM regardless of permitMode. Even when
+        // substrate would have refused (.delay / .block / .replace).
+        let permits = [
+            "block", "replace", "delay", "compare", "escalate",
+            "local_only", "draft_only", "answer", "mirror",
+            "substrate-error", "",
+        ]
+        for permit in permits {
+            let derived = SampleHostHybridDispatchPolicy.derive(
+                permitMode: permit, forceSingleLLM: true)
+            XCTAssertEqual(derived, .singleLLM,
+                "forceSingleLLM=true must override permit=\(permit) " +
+                "to .singleLLM (chapter 二百八 ADR-006)")
+        }
+    }
+
+    func testDispatchPolicyRawValuesAreStable() {
+        // JSONL grep across chapters depends on these strings.
+        // Doctrine pin (chapter 一百七十八): kebab-case stable.
+        XCTAssertEqual(
+            SampleHostHybridDispatchPolicy.skipBlock.rawValue,
+            "skip-block")
+        XCTAssertEqual(
+            SampleHostHybridDispatchPolicy.skipReplace.rawValue,
+            "skip-replace")
+        XCTAssertEqual(
+            SampleHostHybridDispatchPolicy.skipDelay.rawValue,
+            "skip-delay")
+        XCTAssertEqual(
+            SampleHostHybridDispatchPolicy.singleLLM.rawValue,
+            "single-llm")
+        XCTAssertEqual(
+            SampleHostHybridDispatchPolicy.bothLLMs.rawValue,
+            "both-llms")
+        XCTAssertEqual(
+            SampleHostHybridDispatchPolicy.localOnly.rawValue,
+            "local-only")
+        XCTAssertEqual(
+            SampleHostHybridDispatchPolicy.draftOnly.rawValue,
+            "draft-only")
+    }
+
+    func testDispatchPolicySkipsLLMFlagPartitions() {
+        // Doctrine: `skipsLLM` is true iff policy is in the skip-*
+        // family. Bench loop reads this to decide whether to call
+        // any LLM at all.
+        XCTAssertTrue(SampleHostHybridDispatchPolicy.skipBlock.skipsLLM)
+        XCTAssertTrue(SampleHostHybridDispatchPolicy.skipReplace.skipsLLM)
+        XCTAssertTrue(SampleHostHybridDispatchPolicy.skipDelay.skipsLLM)
+        XCTAssertFalse(SampleHostHybridDispatchPolicy.singleLLM.skipsLLM)
+        XCTAssertFalse(SampleHostHybridDispatchPolicy.bothLLMs.skipsLLM)
+        XCTAssertFalse(SampleHostHybridDispatchPolicy.localOnly.skipsLLM)
+        XCTAssertFalse(SampleHostHybridDispatchPolicy.draftOnly.skipsLLM)
+    }
+
+    func testDispatchPolicyCannedResponsesAreNonEmpty() {
+        // chapter 一百七十八 doctrine: skip-* policies must have
+        // canned responses. Any non-skip policy returns nil.
+        XCTAssertNotNil(
+            SampleHostHybridDispatchPolicy.skipBlock.cannedResponse)
+        XCTAssertNotNil(
+            SampleHostHybridDispatchPolicy.skipReplace.cannedResponse)
+        XCTAssertNotNil(
+            SampleHostHybridDispatchPolicy.skipDelay.cannedResponse)
+        XCTAssertFalse(
+            SampleHostHybridDispatchPolicy.skipBlock.cannedResponse?
+                .isEmpty ?? true)
+        XCTAssertNil(
+            SampleHostHybridDispatchPolicy.singleLLM.cannedResponse)
+        XCTAssertNil(
+            SampleHostHybridDispatchPolicy.bothLLMs.cannedResponse)
+        XCTAssertNil(
+            SampleHostHybridDispatchPolicy.localOnly.cannedResponse)
+        XCTAssertNil(
+            SampleHostHybridDispatchPolicy.draftOnly.cannedResponse)
+    }
 }

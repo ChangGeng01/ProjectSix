@@ -2199,92 +2199,11 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     let pauseSkipped: Bool?
 }
 
-/// M628 chapter 一百七十八 — typed policy mapping
-/// `BASActionPermitMode` → real LLM dispatch behavior.
-///
-/// 9 permit modes × 3 axes (skip / single / dual) condense into
-/// 6 typed policies. Doctrine pin: substrate decides FIRST, then
-/// LLM dispatch follows substrate's permit, not the other way
-/// around (不变量 #1 先醒再答; #2 神经不掌权).
-enum SampleHostHybridDispatchPolicy: String, Sendable {
-    /// `.block` / `.replace` — substrate refuses or substitutes.
-    /// LLM call is SKIPPED entirely. Returns canned safe text.
-    case skipBlock = "skip-block"
-    case skipReplace = "skip-replace"
-    /// `.delay` — substrate stalls. LLM call is SKIPPED. Returns
-    /// canned "let me think about this" stall response.
-    case skipDelay = "skip-delay"
-    /// `.answer` / `.mirror` — normal path: route via router,
-    /// fall back if first LLM errors. v0.2 uncertain-zone logic
-    /// still applies (calls both LLMs in [0.30, 0.70] zone).
-    case singleLLM = "single-llm"
-    /// `.compare` / `.escalate` — call BOTH AFM + Gemma always
-    /// regardless of router prediction (substrate explicitly
-    /// requested side-by-side / second-check).
-    case bothLLMs = "both-llms"
-    /// `.localOnly` — only call Gemma (local), never AFM.
-    /// substrate flagged this turn as no-cloud-allowed.
-    case localOnly = "local-only"
-    /// `.draftOnly` — call LLM but tag output as draft-only.
-    /// User UI should not commit this output without explicit
-    /// confirmation.
-    case draftOnly = "draft-only"
-
-    /// Derive the dispatch policy from the substrate permit mode.
-    /// Default falls back to `.singleLLM` for unknown / error.
-    static func from(permitMode: String) -> Self {
-        switch permitMode {
-        case "block":
-            return .skipBlock
-        case "replace":
-            return .skipReplace
-        case "delay":
-            return .skipDelay
-        case "compare", "escalate":
-            return .bothLLMs
-        case "local_only", "localOnly":
-            return .localOnly
-        case "draft_only", "draftOnly":
-            return .draftOnly
-        case "answer", "mirror":
-            return .singleLLM
-        default:
-            // unknown / "substrate-error" / future modes
-            return .singleLLM
-        }
-    }
-
-    /// Whether this policy skips the LLM call entirely.
-    var skipsLLM: Bool {
-        self == .skipBlock || self == .skipReplace || self == .skipDelay
-    }
-
-    /// Canned response string when LLM is skipped. Doctrine pin:
-    /// these strings are typed (not free-form), so JSONL grep on
-    /// "skip-*" captures every substrate-driven skip.
-    var cannedResponse: String? {
-        switch self {
-        case .skipBlock:
-            return SampleHostHybridDispatchCanned.block
-        case .skipReplace:
-            return SampleHostHybridDispatchCanned.replace
-        case .skipDelay:
-            return SampleHostHybridDispatchCanned.delay
-        default:
-            return nil
-        }
-    }
-}
-
-/// M628 chapter 一百七十八 — typed canned responses for skipped
-/// LLM dispatches. Per anti-magic-number doctrine (chapter 一百
-/// 三十) these are named constants, not inline literals scattered
-/// across call sites.
-enum SampleHostHybridDispatchCanned {
-    static let block = "I can't help with that request."
-    static let replace = "Let me suggest a different approach: I'd want to understand more before answering."
-    static let delay = "Let me think about this carefully before responding."
-}
+// M792 chapter 二百十一 — `SampleHostHybridDispatchPolicy` and
+// `SampleHostHybridDispatchCanned` extracted to dedicated file
+// `SampleHostHybridDispatchPolicy.swift`. Bench loop calls
+// `derive(permitMode:forceSingleLLM:)` (single source of truth
+// for chapter 一百七十八 mapping + chapter 二百八 .rawLLM bypass).
 
 extension SampleHostBenchHelpers {
     static func hybridBenchOutputDirURL() -> URL {
@@ -3054,20 +2973,15 @@ extension SampleHostModel {
                 // M628 chapter 一百七十八 — derive substrate
                 // dispatch policy BEFORE calling LLM. Substrate's
                 // permit mode shapes WHETHER + HOW we call LLM.
-                // M784 chapter 二百八 — `.rawLLM` mode (ADR-006)
-                // bypasses substrate gate. permitMode still
-                // recorded (audit accumulates); dispatchPolicy
-                // forced to .singleLLM so LLM actually fires.
-                // Doctrine: bench observability ONLY; data
-                // never used for production permit decisions.
-                let dispatchPolicy: SampleHostHybridDispatchPolicy
-                if smokeMode == .rawLLM {
-                    dispatchPolicy = .singleLLM
-                } else {
-                    dispatchPolicy =
-                        SampleHostHybridDispatchPolicy.from(
-                            permitMode: permitMode)
-                }
+                // M792 chapter 二百十一 — single-source derive:
+                // chapter 一百七十八 permit-mode mapping +
+                // chapter 二百八 .rawLLM bypass (ADR-006: bench
+                // observability ONLY, data never feeds production
+                // permit decisions).
+                let dispatchPolicy =
+                    SampleHostHybridDispatchPolicy.derive(
+                        permitMode: permitMode,
+                        forceSingleLLM: smokeMode == .rawLLM)
 
                 // M649 chapter 一百八十一 — try MultiHead FIRST
                 // (1 inference call, 4 outputs). Fall back to
