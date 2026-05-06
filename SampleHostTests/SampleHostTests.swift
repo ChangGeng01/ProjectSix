@@ -2622,6 +2622,91 @@ final class SampleHostTests: XCTestCase {
         }
     }
 
+    // MARK: - chapter 二百二十二 / M803 — bench-settings bounds
+
+    func testBoundsClampDurationHours() {
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.durationHours(0), 0.1,
+            "Below lower bound clamps up to 0.1h")
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.durationHours(0.05), 0.1)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.durationHours(0.1), 0.1)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.durationHours(8.0), 8.0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.durationHours(24.0), 24.0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.durationHours(50), 24.0,
+            "Above upper bound clamps down to 24h")
+    }
+
+    func testBoundsClampMutationProbability() {
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationProbability(-0.5), 0.0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationProbability(0.0), 0.0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationProbability(0.5), 0.5)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationProbability(1.0), 1.0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationProbability(2.0), 1.0)
+    }
+
+    func testBoundsClampLLMTimeoutSeconds() {
+        // chapter 一百九十五 doctrine: [5, 300] s
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.llmTimeoutSeconds(0), 5.0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.llmTimeoutSeconds(60.0), 60.0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.llmTimeoutSeconds(500), 300.0)
+    }
+
+    func testBoundsClampCoolingEveryNIters() {
+        // chapter 一百九十八 doctrine: [0, 100_000]; 0 = disabled
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.coolingEveryNIters(-100), 0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.coolingEveryNIters(0), 0)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.coolingEveryNIters(1000), 1000)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.coolingEveryNIters(1_000_000),
+            100_000)
+    }
+
+    func testBoundsClampMutationSeedCount() {
+        // chapter 一百七十四 doctrine: pinned at 5 (chapter 一百七十四
+        // alphabet); allow 1..5 lower variants for ablation runs.
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationSeedCount(0), 1)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationSeedCount(1), 1)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationSeedCount(5), 5)
+        XCTAssertEqual(
+            SampleHostHybridBenchBounds.mutationSeedCount(10), 5)
+    }
+
+    func testBoundsAllConstantsAreInternallyConsistent() {
+        // Doctrine pin: every bound function's lower < upper.
+        // Sample several to catch an accidental swap.
+        XCTAssertLessThan(
+            SampleHostHybridBenchBounds.durationHours(-100),
+            SampleHostHybridBenchBounds.durationHours(1_000_000),
+            "duration: lower < upper")
+        XCTAssertLessThan(
+            SampleHostHybridBenchBounds.coolingSleepSeconds(-100),
+            SampleHostHybridBenchBounds.coolingSleepSeconds(1000),
+            "cooling sleep: lower < upper")
+        XCTAssertLessThan(
+            SampleHostHybridBenchBounds.checkpointEveryNIters(-100),
+            SampleHostHybridBenchBounds.checkpointEveryNIters(1_000_000),
+            "checkpoint every-N: lower < upper")
+    }
+
     func testRiskDerivationNonBenignModesPreserveStakeMapping() {
         // Non-.benign modes preserve baseline mapping
         for mode in [HybridBenchConfig.SmokeMode.canonical,

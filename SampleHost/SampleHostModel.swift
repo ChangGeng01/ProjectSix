@@ -2789,57 +2789,11 @@ extension SampleHostModel {
         hybridBenchIsRunning = false
     }
 
-    func updateHybridBenchDurationHours(_ newValue: Double) {
-        hybridBenchDurationHours = max(0.1, min(24.0, newValue))
-    }
-
-    func updateHybridBenchStrideCSV(_ newValue: String) {
-        hybridBenchStrideRotationCSV = newValue
-    }
-
-    func updateHybridBenchRotationPeriod(_ newValue: Int) {
-        hybridBenchRotationPeriodIter = max(1_000, min(100_000, newValue))
-    }
-
-    func updateHybridBenchMutationCount(_ newValue: Int) {
-        hybridBenchMutationSeedCount = max(1, min(5, newValue))
-    }
-
-    // M731 chapter 一百九十四 — bound-enforcing setters for the
-    // chapter-192 safety-kit flex constants. Doctrine: bench
-    // loop reads the @Published value live but ranges must stay
-    // within sane operating envelope so mid-bench adjustments
-    // don't break invariants (e.g. windowSize = 0 → infinite loop).
-    func updateAnomalyWindowSize(_ v: Int) {
-        hybridBenchAnomalyWindowSize = max(10, min(1000, v))
-    }
-    func updateDriftSigmaThreshold(_ v: Double) {
-        hybridBenchDriftSigmaThreshold = max(1.0, min(10.0, v))
-    }
-    func updateMutationProbability(_ v: Double) {
-        hybridBenchMutationProbability = max(0.0, min(1.0, v))
-    }
-    func updateCheckpointEveryNIters(_ v: Int) {
-        hybridBenchCheckpointEveryNIters = max(100, min(100_000, v))
-    }
-    /// M735 chapter 一百九十五 — per-iter LLM timeout setter.
-    /// Bounds: [5s, 300s = 5min]. 60s default. Bounds protect
-    /// against pathological 0-second (always timeout) and
-    /// unreasonably-long (defeats purpose) settings.
-    func updateLLMTimeoutSeconds(_ v: Double) {
-        hybridBenchLLMTimeoutSeconds = max(5.0, min(300.0, v))
-    }
-    /// M744 chapter 一百九十八 — cooling-every-N-iters setter.
-    /// Bounds: [0, 100_000]. 0 = disabled. 1000 = every ~55s on
-    /// 18 iter/sec iPhone.
-    func updateCoolingEveryNIters(_ v: Int) {
-        hybridBenchCoolingEveryNIters = max(0, min(100_000, v))
-    }
-    /// M744 chapter 一百九十八 — cooling sleep seconds setter.
-    /// Bounds: [5, 60]. 10s default lets thermal recover slowly.
-    func updateCoolingSleepSeconds(_ v: Double) {
-        hybridBenchCoolingSleepSeconds = max(5.0, min(60.0, v))
-    }
+    // M803 chapter 二百二十二 — 11 hybrid-bench setters extracted
+    // to dedicated extension file `SampleHostHybridBenchSettings
+    // .swift`. Bounds doctrine consolidated in `SampleHostHybrid-
+    // BenchBounds` typed enum (single-source-of-truth per chapter
+    // 二百十一 doctrine).
 
     /// M726 chapter 一百九十三 — resume detector. Read latest
     /// checkpoint from disk; if it exists AND `lastUpdatedIso`
