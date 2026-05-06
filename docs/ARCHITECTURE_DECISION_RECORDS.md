@@ -611,17 +611,132 @@ ADR-013+ candidates after this arc:
 
 ---
 
-## Future ADR candidates
+## ADR-011 (chapters 二百四十 → 二百四十六) — Bench-loop body deconstruction + DI protocols
 
-| Topic | Chapter |
+### Context
+
+Post-ADR-010 (chapters 二百九 → 二百三十八) the SampleHost target had
+both god files (Model + View) thinned to <1K LOC. The remaining
+1223-LOC concentration was `SampleHostHybridBenchEntry.swift` — the
+hybrid bench loop body lifted from `startHybridBench()` in
+chapter 二百三十八.
+
+Inside that 1223-LOC file: 4 coherent sections still inline (5-head
+CoreML invocation / closed-loop substrate observation / regression
+residuals / LLM dispatch), each a candidate for extraction into a
+typed value bundle + extension method.
+
+### Decision
+
+7-chapter wave (二百四十 → 二百四十六) carving the bench loop body
+into typed bundles + adding DI protocol contracts:
+
+| Chapter | M    | Carve-out                                          | Lines saved |
+|---------|------|----------------------------------------------------|-------------|
+| 二百四十   | M822 | `SampleHostBenchCoreMLBundle` (5-head bundle)      | -42         |
+| 二百四十一 | M823 | 9-way SafetyKit split                              | (cohesion)  |
+| 二百四十二 | M824 | `SampleHostBenchPostLLMObserver` (closed-loop)      | -66         |
+| 二百四十三 | M825 | `SampleHostBenchRegressionResiduals`                | -45         |
+| 二百四十四 | M826 | `SampleHostBenchLLMDispatcher` (LARGEST: ~340 LOC)  | -308        |
+| 二百四十五 | M827 | `SampleHostBenchLLMDispatching` protocol marker     | (DI)        |
+| 二百四十六 | M828 | `SampleHostBenchSinking` protocol marker            | (DI)        |
+
+Bench loop body trajectory: 1223 → 762 LOC (-461, -37.7%).
+
+### Consequences
+
+- **Bench loop is now declarative**: 4 typed bundle reads + 2 method
+  calls + 4 sections of cohesive narrative (iter setup / substrate
+  routing / row construction / iter postscript). Each section is
+  ~50 LOC. Total < 800 LOC.
+
+- **DI protocols enable test injection**: 2 protocol contracts
+  (`SampleHostBenchLLMDispatching` + `SampleHostBenchSinking`)
+  document the bench loop's external dependencies. Future test
+  chapters can inject `MockLLMDispatcher` + `RecordingMockSink`
+  to drive the bench loop deterministically without CoreML / AFM /
+  Gemma / FS.
+
+- **0 regressions across all 7 chapters**: 128 tests passing. The
+  carve-out pattern (typed-bundle → extension method) is now
+  fully validated for async + counter-mutating logic.
+
+### Doctrine pins (red-line preservation across 38-chapter arc 二百九 → 二百四十六)
+
+- 不变量 #1 (先醒再答): held — substrate decides FIRST in every
+  carve-out
+- 不变量 #2 (神经不掌权): held — permit single-mouth at L11 / L14
+- 不变量 #3 (私有经验不进权重): held — bench data feeds offline
+  retrain only
+- Red line 7 (HINT-ONLY observability): held — anomaly + drift
+  + cooldown + safety-kit never decide
+- chapter 二百八 / ADR-006 `.rawLLM` doctrine: held
+- chapter 一百九十二 single-source-of-truth: ✓ extended to 23+
+  invariant domains
+
+### Final state (post-ADR-011)
+
+```
+SampleHost target file structure:
+  SampleHostModel.swift:           4097 →  637 LOC  (-84.5%)
+  SampleHostView.swift:            1146 →  101 LOC  (-91.2%)
+  SampleHostHybridBenchEntry.swift: N/A →  762 LOC  (largest carve)
+  SampleHostBenchSafetyKit.swift:  727  → DELETED   (split into 9)
+
+  Total .swift files: 8 → 49
+  god-file 4K WARN guard: clear on all SampleHost files
+  Tests: 113 → 128 / 0 failures across 38-chapter arc
+  Commits: 38 (one per chapter, all pushed to origin)
+```
+
+---
+
+## Honest backlog (post-ADR-011 — explicitly out of scope for SampleHost-side architectural deconstruction)
+
+The following items remain as future architectural work but require
+**multi-session arcs** (not single-chapter incrementally feasible):
+
+### Multi-day BAS substrate carve-outs
+
+| File | LOC | Top-level types | Estimated scope |
+|---|---|---|---|
+| `EBrainCognitionPlaneCore.swift` | 5347 | ~80 | 2-3 dedicated sessions; cross-module dep audit needed |
+| `HostKitCore.swift` | 4770 | ~70 | 2-3 dedicated sessions; many module consumers |
+| `MemoryCore.swift` | 3316 | ~49 | 1-2 dedicated sessions; cleanest of the three |
+
+These BAS substrate god files are genuinely beyond surgical scope.
+Each splits across multiple substrate modules + has many cross-
+module consumers. Doctrine: surgical-incremental (chapter-per-day)
+applies to SampleHost-target files; BAS substrate refactors need
+multi-session bundling to track cross-module changes coherently.
+
+### Multi-session SampleHost-side work (deferred but feasible)
+
+| Topic | Estimated scope |
 |---|---|
-| SampleHostBenchEngine actor (extract loop body from extension to actor) | tbd |
-| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | tbd |
-| SampleHostBenchSink protocol (decouple JSONL persistence) | tbd |
-| MemoryCore submodule split | tbd |
-| EBrainCognitionPlaneCore subsystem extraction | tbd |
-| HostKitCore subsystem extraction | tbd |
-| Resume-from-iter mechanism (vs settings-only) | tbd |
+| SampleHostBenchEngine actor (true async actor, not just extension) | 1 session: redesign concurrency boundary with `actor` semantics |
+| Concrete `MockLLMDispatcher` + `RecordingMockSink` test fixtures | 1 chapter each |
+| Bench engine tests via DI mocks | 1 chapter |
+| Resume-from-iter mechanism (vs settings-only) | 1 chapter |
+| Production canary (shadow predict) | 1 chapter |
+| Per-pressure-stratum sub-models | 1 chapter |
+| Telemetry sink protocol | 1 chapter |
+| Cross-process auto-restart | 1 chapter |
+
+### What "完整 重生" means at this point
+
+The SampleHost target is **structurally reborn**:
+- 49 single-responsibility files (was 8)
+- 38 chapters of disciplined incrementalism with 0 regressions
+- 5 carve-out patterns documented as doctrine (ADR-007 → 011)
+- 70 access-promoted `@Published private(set)` validated by 38
+  chapters of "View reads, Model writes" convention
+- 2 DI protocol contracts ready for future test injection
+
+Further architectural work is **substrate-level / cross-module**
+or **concurrency-redesign-level** — both qualitatively different
+from the surgical SampleHost-side deconstruction completed in
+chapters 二百九 → 二百四十六.
 | Production canary (shadow predict) | tbd |
 | Per-pressure-stratum sub-models | tbd |
 | Telemetry sink protocol | tbd |
