@@ -746,90 +746,24 @@ extension SampleHostModel {
                 }
                 // M628 — close of outer else for .singleLLM/.draftOnly
 
-                // M630 chapter 一百七十八 — CLOSED LOOP post-LLM
-                // observation. After LLM responds (or skip-canned),
-                // run substrate observation pass on the response
-                // body. If substrate's permit shifts (e.g. body
-                // would have been blocked), we know LLM crossed a
-                // line invisible to pre-call substrate.
-                //
-                // Doctrine pin: substrate is THE arbiter — even
-                // its own LLM's body is subject to substrate
-                // re-audit. This is "shadow evaluator lite":
-                // ShadowEvaluator full ML model lives in chapter
-                // 一百八十+; this one is single substrate-pass.
-                //
-                // Cost: doubles substrate calls per iter. Trade:
-                // empirical visibility into "did the LLM say
-                // something substrate wouldn't have permitted".
-                var postLLMPermitMode: String? = nil
-                var postLLMAuditCount: Int? = nil
-                var postLLMShifted: Bool? = nil
-                // M685 chapter 一百八十七 — B4 (MEDIUM) fix:
-                // also observe `bothLLMs` Gemma body if AFM
-                // returned empty / errored. servedBody (defined
-                // below as the actually-rendered body for
-                // residuals) IS the right input for substrate
-                // post-LLM observation. Pre-fix: AFM-empty +
-                // Gemma-success in `.bothLLMs` branch left
-                // postLLMShifted = nil (skipped) even though
-                // Gemma's body was substrate-relevant.
-                //
-                // Skip iters (llmSkipped) still skip — substrate
-                // already gave canned response, no LLM speech to
-                // re-audit.
-                let observableBody: String = {
-                    if !firstBody.isEmpty { return firstBody }
-                    return fallbackBody ?? ""
-                }()
-                if !observableBody.isEmpty && !llmSkipped {
-                    // M676 chapter 一百八十五 — B6 (HIGH): cap
-                    // body at HybridBenchTuning.postLLMBody...
-                    // chars to avoid pathological substrate eval
-                    // on Gemma's occasional 20K-char outputs +
-                    // mitigate prompt-injection risk where LLM
-                    // body could contain text substrate
-                    // misinterprets as user intent.
-                    // M710 chapter 一百九十一 — read from
-                    // @Published so user can adjust live.
-                    let cap = self.hybridBenchPostLLMTruncationChars
-                    let truncatedBody: String
-                    if observableBody.count > cap {
-                        truncatedBody =
-                            String(observableBody.prefix(cap))
-                            + "...[truncated]"
-                    } else {
-                        truncatedBody = observableBody
-                    }
-                    let observeText =
-                        "Original: \(prompt)\n\nResponse: \(truncatedBody)"
-                    // M691 chapter 一百八十八 — B3-extended:
-                    // post-LLM substrate observation also off-main.
-                    // M767 chapter 二百四 — workflowProfile from flex.
-                    let observeRequest = BASHostSessionRequest(
-                        kind: .interactive,
-                        workflowProfile: workflowProfileCaptured,
-                        surface: .application,
-                        prompt: observeText,
-                        riskLevel: riskLevel)
-                    let observedResult: BASHostSessionResult? =
-                        try? await Task.detached(
-                            priority: .userInitiated
-                        ) {
-                            try runtime.startSession(observeRequest)
-                        }.value
-                    if let observed = observedResult?.eBrainTurn {
-                        postLLMPermitMode = observed.actionPermit
-                            .mode.rawValue
-                        postLLMAuditCount = observed
-                            .sovereignAuditEntry?.signalRefs.count ?? 0
-                        postLLMShifted =
-                            postLLMPermitMode != permitMode
-                        if postLLMShifted == true {
-                            applyIfActive(myGen) { self.hybridBenchPostLLMShifted += 1 }
-                        }
-                    }
-                }
+                // M824 chapter 二百四十二 — CLOSED LOOP post-LLM
+                // observation extracted to typed value bundle +
+                // extension method (chapter 一百七十八 / M630
+                // doctrine in `SampleHostBenchPostLLMObserver`).
+                let postLLMObs = await self.observePostLLM(
+                    runtime: runtime,
+                    workflowProfile: workflowProfileCaptured,
+                    riskLevel: riskLevel,
+                    prompt: prompt,
+                    firstBody: firstBody,
+                    fallbackBody: fallbackBody,
+                    llmSkipped: llmSkipped,
+                    prePermitMode: permitMode,
+                    bodyTruncationChars: self.hybridBenchPostLLMTruncationChars,
+                    generation: myGen)
+                let postLLMPermitMode = postLLMObs.postLLMPermitMode
+                let postLLMAuditCount = postLLMObs.postLLMAuditCount
+                let postLLMShifted = postLLMObs.postLLMShifted
 
                 let dur = Date().timeIntervalSince(t0)
 
