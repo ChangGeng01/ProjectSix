@@ -346,7 +346,10 @@ extension SampleHostModel {
                     permitMode = "substrate-error"
                 }
 
-                // Router predict
+                // M822 chapter 二百四十 — 5-head CoreML inference
+                // bundle (was ~100 LOC inline; now 1-line predict +
+                // 7-line typed read-back). Bundle handles MultiHead-
+                // FIRST + per-head fallback (chapter 一百八十一 / M649).
                 let features = ChengluPromptFeatures(
                     tone: signature.tone,
                     domain: signature.domain,
@@ -355,15 +358,13 @@ extension SampleHostModel {
                     confidant: signature.confidant,
                     askShape: signature.askShape,
                     mutationSeed: mutationSeed)
-                let decision = ChengluPreflightInference.shared
-                    .predictOrNil(features: features)
-                let routerRoute = decision?.route ?? .afm
-                let routerProb = decision?.afmSuccessProbability ?? 0.5
-                let routerVersion = decision?.modelVersion ?? "missing"
-                // v0.2 — confidence-aware: in uncertain zone, call
-                // BOTH LLMs and pick longer body. Outside uncertain
-                // zone, use chosen LLM with fallback safety net.
-                let routerConfidence = decision?.confidence ?? .high
+                let coreML = SampleHostBenchCoreMLBundle.predict(
+                    features: features)
+                let routerRoute = coreML.routerRoute
+                let routerProb = coreML.routerProb
+                let routerVersion = coreML.routerVersion
+                let routerConfidence = coreML.routerConfidence
+                let multiHead = coreML.multiHead
 
                 // M628 chapter 一百七十八 — derive substrate
                 // dispatch policy BEFORE calling LLM. Substrate's
@@ -378,49 +379,17 @@ extension SampleHostModel {
                         permitMode: permitMode,
                         forceSingleLLM: smokeMode == .rawLLM)
 
-                // M649 chapter 一百八十一 — try MultiHead FIRST
-                // (1 inference call, 4 outputs). Fall back to
-                // separate per-head models if MultiHead missing.
-                let multiHead = ChengluMultiHeadInference
-                    .shared.predictOrNil(features: features)
-
-                // M635 chapter 一百七十九 — 2nd CoreML head.
-                // Permit predict: prefer MultiHead's block_prob;
-                // fall back to standalone PermitPredict head if
-                // MultiHead unavailable.
-                let permitPredictBlockProb: Double?
-                let permitPredictClass: String?
-                if let mh = multiHead {
-                    permitPredictBlockProb = mh.blockProbability
-                    permitPredictClass = mh.blockProbability >= 0.5
-                        ? "block" : "non-block"
-                } else {
-                    let permitDecision = ChengluPermitPredictInference
-                        .shared.predictOrNil(features: features)
-                    permitPredictBlockProb =
-                        permitDecision?.blockProbability
-                    permitPredictClass =
-                        permitDecision?.predictedClass.rawValue
-                }
-                // Agreement: predicted class matches substrate's
-                // actual .block decision. nil if model unavailable.
-                let permitPredictAgreement: Bool? = {
-                    guard let cls = permitPredictClass
-                    else { return nil }
-                    let actualIsBlock = (permitMode == "block")
-                    let predictedIsBlock = (cls == "block")
-                    return actualIsBlock == predictedIsBlock
-                }()
-                // M675 chapter 一百八十六 — B7 fix (HIGH):
-                // record the 2-tuple "predicted-class:actual-permit"
-                // so analyses get the 9-way confusion matrix info.
-                // Example values: "block:block" / "non-block:delay"
-                // / "non-block:answer" / "block:replace".
-                let permitPredictDetailedAgreement: String? = {
-                    guard let cls = permitPredictClass
-                    else { return nil }
-                    return "\(cls):\(permitMode)"
-                }()
+                // chapter 二百四十 — typed read-back of permit-
+                // predict + agreement (chapter 一百七十九 / M635 +
+                // chapter 一百八十六 / M675 doctrine in bundle helpers).
+                let permitPredictBlockProb = coreML.permitPredictBlockProb
+                let permitPredictClass = coreML.permitPredictClass
+                let permitPredictAgreement =
+                    coreML.permitPredictAgreement(
+                        actualPermitMode: permitMode)
+                let permitPredictDetailedAgreement =
+                    coreML.permitPredictDetailedAgreement(
+                        actualPermitMode: permitMode)
                 if let agree = permitPredictAgreement {
                     if agree {
                         applyIfActive(myGen) { self.hybridBenchPermitPredictHits += 1 }
@@ -429,22 +398,11 @@ extension SampleHostModel {
                     }
                 }
 
-                // M638-M641 chapter 一百八十 — 3rd + 4th CoreML
-                // heads. M649 chapter 一百八十一 — prefer
-                // MultiHead, fall back to separate heads.
-                let lengthPredicted: Double?
-                let latencyPredictedMs: Double?
-                if let mh = multiHead {
-                    lengthPredicted = mh.predictedBodyLength
-                    latencyPredictedMs = mh.predictedDurationMs
-                } else {
-                    let lengthDecision = ChengluRegressionHeadInference
-                        .lengthHead.predictOrNil(features: features)
-                    let latencyDecision = ChengluRegressionHeadInference
-                        .latencyHead.predictOrNil(features: features)
-                    lengthPredicted = lengthDecision?.predicted
-                    latencyPredictedMs = latencyDecision?.predicted
-                }
+                // chapter 二百四十 — typed read-back of length +
+                // latency predictions (chapter 一百八十 / M638-M641
+                // doctrine in bundle).
+                let lengthPredicted = coreML.lengthPredicted
+                let latencyPredictedMs = coreML.latencyPredictedMs
 
                 // Call chosen LLM
                 var firstTriedLLM = routerRoute.rawValue
