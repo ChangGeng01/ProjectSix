@@ -1311,3 +1311,43 @@ SampleHost tests 89 → **92**; full stack **1969 + 1 parity gate + 7 analysis t
 **Production wiring deferred**: hosts that want SQLite-backed memory pass a `BASSQLiteMemoryAtomStore(databaseURL:)` to whatever consumer they build. Hooking `BASMemoryMutationWriter` into `EBrainRuntimeCoordinator` is its own substantial chapter (no existing memory-mutation pipeline runs through the coordinator yet) and stays on the附录 V Stage 0 backlog.
 
 SampleHost tests 92 still pass; full stack **3007 BAS + 128 Qinao + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**.
+
+## 2026-05-07 — chapter 二百四十九 (M736) `BASHostConstitutionSQLiteStorage` — Stage 0 Step 2 of 3
+
+附录 V Stage 0 second persistence primitive — **L5 host constitution vault cross-session persistence**. Pre-chapter 二百四十九 the L5 vault (`BASHostConstitutionVault`: 11 lattice / genome / spine / veil / canopy / etc. domains + deletion manifest + rollback lineage + sync revocation ledger + device consistency report) lived only in actor state — every session boot rebuilt the vault from scratch. Closed-loop status: chapter 二百四十八 unblocked L8 atoms; this unblocks L5 host constitution.
+
+- **M736** NEW `BehavioralAISubstrate/Sources/BASMemory/BASHostConstitutionSQLiteStorage.swift` (~520 LOC). `public actor BASHostConstitutionSQLiteStorage`:
+  - `save(_:) async throws -> Bool` (upsert; returns `isNew`)
+  - `loadVault(vaultID:) async throws -> BASHostConstitutionVault?`
+  - `loadFirstVault(forHostID:) async throws -> BASHostConstitutionVault?` (single-host common case)
+  - `loadAll() async throws -> [BASHostConstitutionVault]` (multi-host install)
+  - `remove(vaultID:) async -> BASHostConstitutionVault?` (real DELETE per chapter 一百二 五级删除)
+  - `vaultCount`, `allVaultIDs` observation surface
+- **Schema decision** (single-table JSON blob, NOT 12-table normalized as plan初稿 sketched):
+  - `BASHostConstitution` is a single Codable struct containing all 11 domain types; splitting into JOINs creates artificial complexity for what is conceptually one snapshot
+  - Domain-level revocation is orchestrated by `BASHostDeletionManifest` (already a vault field) — host runtime mutates manifest + re-saves vault; storage just persists state
+  - M270 ticket `entry_json` proved this shape works for evolving Codable schemas
+  - Schema v1: `host_constitution_vaults` table, `vault_id` PK + structural mirror cols (host_id / constitution_id / active_version / schema_version / version_signature / last_updated_at_ms) + `payload_json` Codable blob + index on host_id
+- Same M91 + M270 idiom: `import SQLite3`, WAL journal mode + `synchronous=NORMAL`, transient bind destructor, schema-version pragma verified on every open, actor-isolated `OpaquePointer` via `nonisolated(unsafe)` storage.
+- 14 fix-pin tests in `BASHostConstitutionSQLiteStorageTests.swift` (~340 LOC):
+  - empty init, miss returns nil, save+loadVault round-trip
+  - **THE KEY TEST**: cross-session persistence — close → reopen → 2 vaults both fetched byte-equal
+  - re-save replaces prior vault, remove returns prior + real DELETE
+  - 2 miss-returns-nil guards, real DELETE survives reopen
+  - loadFirstVault by hostID across multi-host install
+  - loadAll returns all-saved-vaults ordered by lastUpdate
+  - allVaultIDs reflects multi-host install
+  - active-version mutation survives reopen
+  - schema version pin
+  - **vault with `BASHostDeletionManifest` round-trips byte-for-byte** (chapter 一百二 五级删除 invariant — host crash recovery can resume the cascade)
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3 unchanged (storage is plumbing).
+- chapter 一百二 五级删除: storage handles terminal-level cascade (real DELETE); domain-level cascading is host-runtime work via `BASHostDeletionManifest` (which round-trips through storage).
+- chapter 二百十一 single-source-of-truth: vault data model stays in `HostConstitutionCore.swift`; this file is a storage adapter.
+
+**Production wiring deferred**: hosts that want SQLite-backed constitution pass a `BASHostConstitutionSQLiteStorage(databaseURL:)` to whatever vault consumer they build. Hooking this into `EBrainRuntimeCoordinator` requires building the vault read/write path through coordinator first — separate chapter (附录 V Stage 0 backlog).
+
+Test impact: BAS XCTest 3007 → **3021** (+14 chapter 二百四十九 fix-pins); SampleHost iOS 128 unchanged; 0 failures, 0 doctrine red lines broken, 0 regressions.
+
+附录 V Stage 0 progress: **2/3 chapters shipped** (二百四十八 ✓ memory atoms / 二百四十九 ✓ host constitution / 二百五十 ticket lifecycle SQLite production wire pending).
