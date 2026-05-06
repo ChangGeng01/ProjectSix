@@ -2152,4 +2152,167 @@ final class SampleHostTests: XCTestCase {
             "Cooldown equality is structural — reason string is " +
             "consumed by the gate row, not stored in cooldown state")
     }
+
+    // MARK: - chapter 二百十 / M791 — per-iter context derive
+    //
+    // The carve-out moved ~95 LOC of inline logic out of
+    // `startHybridBench()`. These tests pin the doctrine flow:
+    // canonical / .fourteenLayer / .heavyTailed / .benign / .rawLLM
+    // all flow through the SAME pure-derive entry point and produce
+    // typed context with the right shape per smokeMode.
+
+    func testIterContextDeterministicByIter() {
+        // Two independent calls with same args → byte-equal contexts.
+        // Doctrine: replay must reconstruct iter context exactly.
+        let a = SampleHostBenchIterContext.derive(
+            iter: 42,
+            rotationPeriod: 8,
+            strideRotation: [5041, 5039, 5051, 5077, 7919],
+            mutationCount: 5,
+            smokeMode: .canonical,
+            mutationProbability: 0.05)
+        let b = SampleHostBenchIterContext.derive(
+            iter: 42,
+            rotationPeriod: 8,
+            strideRotation: [5041, 5039, 5051, 5077, 7919],
+            mutationCount: 5,
+            smokeMode: .canonical,
+            mutationProbability: 0.05)
+        XCTAssertEqual(a, b)
+        XCTAssertEqual(a.iter, 42)
+    }
+
+    func testIterContextStrideRotationSchedule() {
+        // rotationPeriod=8 means stride changes every 8 iters.
+        // First 8 iters: index 0; iters 8..15: index 1; etc.
+        let strides = [5041, 5039, 5051, 5077, 7919]
+
+        for iter in 0..<8 {
+            let ctx = SampleHostBenchIterContext.derive(
+                iter: iter, rotationPeriod: 8,
+                strideRotation: strides, mutationCount: 5,
+                smokeMode: .canonical, mutationProbability: 0.0)
+            XCTAssertEqual(
+                ctx.chosenStride, strides[0],
+                "Iters 0..7 use first stride")
+        }
+
+        for iter in 8..<16 {
+            let ctx = SampleHostBenchIterContext.derive(
+                iter: iter, rotationPeriod: 8,
+                strideRotation: strides, mutationCount: 5,
+                smokeMode: .canonical, mutationProbability: 0.0)
+            XCTAssertEqual(
+                ctx.chosenStride, strides[1],
+                "Iters 8..15 use second stride")
+        }
+    }
+
+    func testIterContextMutationSeedIsModulo() {
+        for iter in 0..<20 {
+            let ctx = SampleHostBenchIterContext.derive(
+                iter: iter, rotationPeriod: 8,
+                strideRotation: [5041], mutationCount: 5,
+                smokeMode: .canonical, mutationProbability: 0.0)
+            XCTAssertEqual(ctx.mutationSeed, iter % 5)
+        }
+    }
+
+    func testIterContextCanonicalModeHasNoLayerProfile() {
+        let ctx = SampleHostBenchIterContext.derive(
+            iter: 100, rotationPeriod: 8,
+            strideRotation: [5041], mutationCount: 5,
+            smokeMode: .canonical, mutationProbability: 0.05)
+        XCTAssertNil(ctx.layerProfile,
+            ".canonical mode disables layer override")
+        XCTAssertNil(ctx.pressureProfile,
+            ".canonical mode emits no pressure tag")
+        XCTAssertNil(ctx.adversarialKind,
+            ".canonical mode disables adversarial mutator " +
+            "(only .heavyTailed enables it)")
+    }
+
+    func testIterContextFourteenLayerModePopulatesLayerProfile() {
+        let ctx = SampleHostBenchIterContext.derive(
+            iter: 5, rotationPeriod: 8,
+            strideRotation: [5041], mutationCount: 5,
+            smokeMode: .fourteenLayer, mutationProbability: 0.0)
+        XCTAssertNotNil(ctx.layerProfile,
+            ".fourteenLayer must produce a layer profile per iter")
+        // Layer profile's signature should be the one used.
+        if let profile = ctx.layerProfile {
+            XCTAssertEqual(ctx.signature.tone, profile.tone)
+            XCTAssertEqual(ctx.signature.domain, profile.domain)
+            XCTAssertEqual(ctx.signature.stake, profile.stake)
+        }
+    }
+
+    func testIterContextBenignModePinsLowRiskSignature() {
+        let ctx = SampleHostBenchIterContext.derive(
+            iter: 7, rotationPeriod: 8,
+            strideRotation: [5041], mutationCount: 5,
+            smokeMode: .benign, mutationProbability: 0.05)
+        XCTAssertNil(ctx.layerProfile,
+            ".benign disables layer override")
+        XCTAssertNil(ctx.adversarialKind,
+            ".benign disables adversarial mutator " +
+            "(only .heavyTailed enables it)")
+        // Benign signature should match catalog (low-risk pinned).
+        XCTAssertEqual(ctx.signature.stake, "low",
+            ".benign signature must be low-risk")
+    }
+
+    func testIterContextRawLLMModeHasNoLayerOverride() {
+        // chapter 二百八 doctrine: .rawLLM uses catalog signatures
+        // unaltered; substrate routing still runs but dispatch
+        // override forces .singleLLM.
+        let ctx = SampleHostBenchIterContext.derive(
+            iter: 50, rotationPeriod: 8,
+            strideRotation: [5041], mutationCount: 5,
+            smokeMode: .rawLLM, mutationProbability: 0.05)
+        XCTAssertNil(ctx.layerProfile,
+            ".rawLLM disables layer override")
+        XCTAssertNil(ctx.pressureProfile,
+            ".rawLLM emits no pressure tag")
+        XCTAssertNil(ctx.adversarialKind,
+            ".rawLLM disables adversarial mutator")
+    }
+
+    func testIterContextHeavyTailedModeMixesPressure() {
+        // .heavyTailed should produce a layer profile + pressure tag
+        // (modulo the mixer's distribution; checking ANY iter in a
+        // window of 20 fires at least one pressureProfile).
+        var sawProfile = false
+        for iter in 0..<20 {
+            let ctx = SampleHostBenchIterContext.derive(
+                iter: iter, rotationPeriod: 8,
+                strideRotation: [5041], mutationCount: 5,
+                smokeMode: .heavyTailed, mutationProbability: 0.0)
+            if ctx.pressureProfile != nil {
+                sawProfile = true
+                XCTAssertTrue(
+                    ctx.pressureProfile?.hasPrefix("heavy-tail-")
+                        ?? false,
+                    "Pressure tag must be `heavy-tail-<layerName>`")
+            }
+        }
+        XCTAssertTrue(sawProfile,
+            ".heavyTailed must produce at least one pressure-tagged " +
+            "iter in 20-iter window")
+    }
+
+    func testIterContextDefensesAgainstZeroDivisors() {
+        // mutationCount=0 / strideRotation.isEmpty / rotationPeriod=0
+        // must NOT crash. Defensive math clamps to 1.
+        let ctx = SampleHostBenchIterContext.derive(
+            iter: 100,
+            rotationPeriod: 0,            // bogus
+            strideRotation: [5041],
+            mutationCount: 0,             // bogus
+            smokeMode: .canonical,
+            mutationProbability: 0.0)
+        XCTAssertEqual(ctx.iter, 100)
+        XCTAssertEqual(ctx.chosenStride, 5041)
+        XCTAssertEqual(ctx.mutationSeed, 0)
+    }
 }

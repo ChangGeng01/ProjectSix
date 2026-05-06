@@ -299,16 +299,87 @@ ladder is the doctrine; longer ladders are easier to mis-read).
 
 ---
 
+## ADR-008 (chapter 210) — Per-iter context derive as pure value type
+
+### Context
+
+Chapter 二百九 carved out thermal cooldown into `SampleHostThermal-
+Cooldown.swift`. Bench loop body was still ~95 LOC of inline pure-
+derive logic (stride rotation / mutation seed / smokeMode-conditional
+layer profile / heavy-tailed pressure mixer / adversarial mutator /
+prompt catalog selection / final signature derivation) inlined inside
+the iter loop in `SampleHostModel.startHybridBench()`.
+
+This made the iter loop hard to:
+- Unit-test in isolation (would need a fake bench Task, mocked
+  @Published state, etc.)
+- Replay deterministically for a single iter (couldn't construct
+  the same context outside a running bench)
+- Reason about (mixed pure derive + I/O + @Published mutation)
+
+### Decision
+
+Extract per-iter derive into `SampleHostBenchIterContext`, a pure
+value type with a single `derive(...)` static factory.
+
+Inputs (all per-iter or per-bench-config, no @Published, no I/O):
+- iter / rotationPeriod / strideRotation / mutationCount /
+  smokeMode / mutationProbability
+
+Outputs (typed value bundle):
+- chosenStride / mutationSeed / layerProfile / pressureProfile /
+  adversarialKind / prompt / signature
+
+Bench loop replaces 95 LOC of inline derive with 12 LOC of typed
+read-back, shrinking SampleHostModel.swift from 4097 → 4028 LOC.
+
+### Consequences
+
+- Bench iter context is now independently unit-testable. 9 chapter
+  210 tests pin: deterministic-by-iter / stride rotation schedule /
+  mutationSeed modulo / canonical-mode no-overrides / fourteenLayer
+  populates profile / benign pins low-risk / rawLLM no-override /
+  heavyTailed pressure mix / defenses against zero divisors.
+- Replay tools can construct the exact same context for any (iter,
+  config) tuple — useful when reconstructing a row's signature
+  during JSONL post-processing without spinning up a bench task.
+- Sets the typed-value-bundle pattern for chapter 二百十一 +
+  二百十二 carve-outs (LLM dispatcher / sink protocols will consume
+  this struct as input).
+- `FourteenLayerSmokeProfile.Profile` gained an `Equatable`
+  conformance (added in the carve-out file, not pushed back into
+  the god file).
+
+### Doctrine pins
+
+- Red line 7 (HINT-ONLY observability): held — context is pure
+  derive, no decision-making. Substrate's `calibrateRisk()` etc
+  remain authoritative.
+- 不变量 #1-#3: held — no wake / permit / weight changes.
+- chapter 一百九十二 single-source-of-truth: this file owns the
+  per-iter-input → prompt+signature derive invariant. Bench loop
+  calls in via `derive(...)`.
+
+### Future migration
+
+Future smokeMode additions (e.g. a hypothetical `.systematicReversal`
+mode that flips signature semantics) modify `derive(...)` here —
+NOT scatter another switch into the bench loop. The "single derive
+function" invariant is the doctrine; once you have two switches in
+two places they will drift.
+
+---
+
 ## Future ADR candidates
 
 | Topic | Chapter |
 |---|---|
-| SampleHostBenchEngine actor extraction (~1000 LOC carve-out) | 210 |
-| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | 211 |
-| SampleHostBenchSink protocol (decouple JSONL persistence) | 212 |
-| MemoryCore submodule split | 213 |
-| EBrainCognitionPlaneCore subsystem extraction | 214 |
-| HostKitCore subsystem extraction | 215 |
+| SampleHostBenchEngine actor (carve out iter loop body to actor) | 211 |
+| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | 212 |
+| SampleHostBenchSink protocol (decouple JSONL persistence) | 213 |
+| MemoryCore submodule split | 214 |
+| EBrainCognitionPlaneCore subsystem extraction | 215 |
+| HostKitCore subsystem extraction | 216 |
 | Resume-from-iter mechanism (vs settings-only) | tbd |
 | Production canary (shadow predict) | tbd |
 | Per-pressure-stratum sub-models | tbd |
