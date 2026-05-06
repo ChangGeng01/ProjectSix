@@ -767,78 +767,33 @@ extension SampleHostModel {
 
                 let dur = Date().timeIntervalSince(t0)
 
-                // M642 chapter 一百八十 — compute regression
-                // residuals against actual LLM outputs (firstBody
-                // length + firstDurationMs). Skipped iters
-                // (llmSkipped == true) have no real LLM output to
-                // compare against — skip residual computation.
+                // M825 chapter 二百四十三 — regression residuals
+                // (length / latency / verbosity correctness)
+                // extracted to typed value bundle + extension method.
+                // chapter 一百八十 / M642 + chapter 一百八十三 / M661
+                // doctrine in `SampleHostBenchRegressionResiduals`.
                 //
-                // M670 chapter 一百八十五 — B9 (HIGH): in
-                // bothLLMs branch, firstBody = AFM body (often
-                // empty when AFM errors). Use the actually-served
-                // body for residuals. `servedBody` is whichever
-                // body actually has content; falls back to
-                // fallbackBody when firstBody is empty.
+                // M670 chapter 一百八十五 — B9 (HIGH): in bothLLMs
+                // branch, firstBody = AFM body (often empty when AFM
+                // errors). Use the actually-served body for residuals.
                 let servedBody: String = {
                     if !firstBody.isEmpty { return firstBody }
                     return fallbackBody ?? ""
                 }()
-                var lengthError: Double? = nil
-                var latencyErrorMs: Double? = nil
-                // M661 chapter 一百八十三 — 5th head residual
-                // (verbosity binary correct/wrong).
-                var verbosityCorrect: Bool? = nil
                 let verbosityProb = multiHead?.verbosityProbability
-                if !llmSkipped, !servedBody.isEmpty {
-                    if let pred = lengthPredicted {
-                        let actual = Double(servedBody.count)
-                        let err = actual - pred
-                        lengthError = err
-                        // M669 chapter 一百八十五 — B8 Welford
-                        // running mean (numerically stable over
-                        // 144K samples). Sum/Count kept for
-                        // backward compat in JSONL analysis.
-                        // M689 ch188 — B8 retire: only Count + Running.
-                        // M696 ch189 — wrap multi-line Welford
-                        // recurrence in applyIfActive too.
-                        applyIfActive(myGen) {
-                            self.hybridBenchLengthMAECount += 1
-                            let n = Double(
-                                self.hybridBenchLengthMAECount)
-                            self.hybridBenchLengthMAERunning +=
-                                (abs(err)
-                                 - self.hybridBenchLengthMAERunning)
-                                / n
-                        }
-                    }
-                    if let pred = latencyPredictedMs {
-                        let err = firstDurationMs - pred
-                        latencyErrorMs = err
-                        applyIfActive(myGen) {
-                            self.hybridBenchLatencyMAECount += 1
-                            let n = Double(
-                                self.hybridBenchLatencyMAECount)
-                            self.hybridBenchLatencyMAERunningMs +=
-                                (abs(err)
-                                 - self.hybridBenchLatencyMAERunningMs)
-                                / n
-                        }
-                    }
-                    if let prob = verbosityProb {
-                        // M710 chapter 一百九十一 — read live config
-                        let actualLong = servedBody.count
-                            > self.hybridBenchVerbosityThresholdChars
-                        let predictedLong = prob
-                            >= self.hybridBenchSigmoidClassThreshold
-                        let correct = actualLong == predictedLong
-                        verbosityCorrect = correct
-                        if correct {
-                            applyIfActive(myGen) { self.hybridBenchVerbosityCorrect += 1 }
-                        } else {
-                            applyIfActive(myGen) { self.hybridBenchVerbosityWrong += 1 }
-                        }
-                    }
-                }
+                let residuals = self.computeRegressionResiduals(
+                    llmSkipped: llmSkipped,
+                    servedBody: servedBody,
+                    firstDurationMs: firstDurationMs,
+                    lengthPredicted: lengthPredicted,
+                    latencyPredictedMs: latencyPredictedMs,
+                    verbosityProbability: verbosityProb,
+                    verbosityThresholdChars: self.hybridBenchVerbosityThresholdChars,
+                    sigmoidClassThreshold: self.hybridBenchSigmoidClassThreshold,
+                    generation: myGen)
+                let lengthError = residuals.lengthError
+                let latencyErrorMs = residuals.latencyErrorMs
+                let verbosityCorrect = residuals.verbosityCorrect
 
                 // M718 chapter 一百九十二 — anomaly observation.
                 // Watcher takes permitMode + body emptiness + the
