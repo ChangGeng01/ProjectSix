@@ -1424,3 +1424,44 @@ Stage 1 (Memory Importance Loop, chapters 二百五十一-二百五十三) is ne
 Test impact: BAS XCTest 3028 → **3042** (+14 chapter 二百五十一 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
 
 Stage 1 progress: **1/3 chapters shipped** (二百五十一 ✓ usage tracker / 二百五十二 importance scorer pending / 二百五十三 L8 retrieval integration pending).
+
+## 2026-05-07 — chapter 二百五十二 (M739) `BASMemoryImportanceScorer` — Stage 1 Step 2 of 3
+
+附录 V Stage 1 next link in the closed loop. Pre-chapter 二百五十二 nothing converted usage events into tier-mutation recommendations. The existing M21 reconciler emits tier transitions only on contamination / quarantine / eviction signals — not on "hot atom needs promotion" or "cold atom needs demotion" derived from usage history.
+
+- **M739** NEW `BehavioralAISubstrate/Sources/BASMemory/BASMemoryImportanceScorer.swift` (~440 LOC). Three new public types (all pure Sendable / Codable):
+  - `BASMemoryImportanceScore` — one atom's score with all 4 components broken out (recencyComponent / frequencyComponent / helpedComponent / tierDecayComponent / totalScore / recommendedTier).
+  - `BASMemoryImportanceReport` — aggregate covering N atoms, with promotion/demotion/hold counts auto-computed + `mutations` view filtering down to the changes-tier subset.
+  - `BASMemoryImportanceScorer` — the pure-function scorer (struct, not actor — stateless, deterministic).
+- Score formula: weighted geometric mean of 4 components clamped to [0, 1]:
+  - **recency**: `exp(-age * ln(2) / halfLife)` — true half-life decay (1 halfLife → 0.5, 2 halfLives → 0.25). Default halfLife = 1 day.
+  - **frequency**: `min(1, log10(1+count) / log10(1+saturation))` — log-saturated. Default saturation = 50.
+  - **helped**: `(helped + 0.5×unknown) / total`. Empty usage → 0.5 (neutral).
+  - **tierDecay**: per-tier constant. hot=1.0 / warm=0.7 / cold=0.4 (defaults).
+- Tier mutation logic:
+  - `total >= promoteThreshold` AND tier != .hot → promote one tier
+  - `total <= demoteThreshold` AND tier != .cold → demote one tier
+  - else → hold
+- 19 fix-pin tests in `BASMemoryImportanceScorerTests.swift` (~410 LOC):
+  - empty records → neutral helped + zero recency + zero frequency
+  - recency: now ≈ 1.0, 1 halfLife ≈ 0.5, 2 halfLives ≈ 0.25 (formula validation)
+  - frequency: log-saturated near 1.0 at 100 records, exactly 1.0 at saturation
+  - helped: all-helped → 1.0, all-notHelped → 0.0, all-unknown → 0.5
+  - tierDecay: per-tier constants exposed
+  - hot atom no usage → demoted to .warm
+  - cold atom 30 helped events in past hour → promoted to .warm
+  - hot atom can't promote above .hot, cold can't demote below .cold
+  - total score in [0, 1] for adversarial 1000-record batch
+  - scoreAll aggregates promotion/demotion/hold counts, mutations view filters correctly
+  - determinism for fixed `now`
+  - init clamping protects misuse (threshold=5.0 → 1.0, threshold=-1.0 → 0.0)
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3: scorer is a **pure function**. No side effects. The host applies recommendations or rejects them per its own policy (which still respects every existing L8 governance gate).
+- 红线 7 watcher-only-hint: `recommendedTier` is a HINT. Auto-application is up to the integration site (chapter 二百五十三).
+- chapter 二百十一 single-source-of-truth: score struct + report + scorer all in one file.
+- Anti-magic-number doctrine (chapter 一百十三): every default tunable extracted as `static let default*` constant so the scorer's behavior is auditable and overridable from one site.
+
+Test impact: BAS XCTest 3042 → **3061** (+19 chapter 二百五十二 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+Stage 1 progress: **2/3 chapters shipped** (二百五十一 ✓ usage tracker / 二百五十二 ✓ importance scorer / 二百五十三 L8 retrieval integration pending).
