@@ -2010,4 +2010,146 @@ final class SampleHostTests: XCTestCase {
                 "Checkpoint missing expected field: \(name)")
         }
     }
+
+    // MARK: - chapter 二百九 / M790 — adaptive thermal cooldown
+    //
+    // Doctrine pins for the cooldown ladder. The bench loop trusts
+    // these values; if anyone re-tunes them they MUST update both
+    // the source file's static constants AND these tests, otherwise
+    // a 10h bench will silently sleep too short or too long.
+
+    func testThermalCooldownInitialStateIsZeroStreak() {
+        let cooldown = SampleHostThermalCooldown()
+        XCTAssertEqual(cooldown.pauseStreak, 0)
+        XCTAssertEqual(cooldown.sleepSeconds(), 0)
+        XCTAssertEqual(cooldown.sleepNanoseconds(), 0)
+        XCTAssertEqual(cooldown.ladderLabel(), "cooldown-idle")
+    }
+
+    func testThermalCooldownLadderIs30_60_120_300Capped() {
+        var cooldown = SampleHostThermalCooldown()
+
+        // 1st pause: 30s baseline (chapter 一百九十七 preserved)
+        cooldown.observe(decision: .pause(reason: "test"))
+        XCTAssertEqual(cooldown.pauseStreak, 1)
+        XCTAssertEqual(cooldown.sleepSeconds(), 30)
+        XCTAssertEqual(cooldown.ladderLabel(), "cooldown-30s")
+
+        // 2nd pause: 60s
+        cooldown.observe(decision: .pause(reason: "test"))
+        XCTAssertEqual(cooldown.pauseStreak, 2)
+        XCTAssertEqual(cooldown.sleepSeconds(), 60)
+        XCTAssertEqual(cooldown.ladderLabel(), "cooldown-60s")
+
+        // 3rd pause: 120s
+        cooldown.observe(decision: .pause(reason: "test"))
+        XCTAssertEqual(cooldown.pauseStreak, 3)
+        XCTAssertEqual(cooldown.sleepSeconds(), 120)
+        XCTAssertEqual(cooldown.ladderLabel(), "cooldown-120s")
+
+        // 4th pause: 300s ceiling
+        cooldown.observe(decision: .pause(reason: "test"))
+        XCTAssertEqual(cooldown.pauseStreak, 4)
+        XCTAssertEqual(cooldown.sleepSeconds(), 300)
+        XCTAssertEqual(cooldown.ladderLabel(), "cooldown-300s-ceiling")
+
+        // 5th-Nth pause: still 300s (ceiling holds)
+        for i in 5...20 {
+            cooldown.observe(decision: .pause(reason: "test"))
+            XCTAssertEqual(cooldown.pauseStreak, i)
+            XCTAssertEqual(cooldown.sleepSeconds(), 300)
+            XCTAssertEqual(
+                cooldown.ladderLabel(), "cooldown-300s-ceiling")
+        }
+    }
+
+    func testThermalCooldownObserveRunResetsStreak() {
+        var cooldown = SampleHostThermalCooldown()
+
+        // Climb to ceiling
+        for _ in 1...10 {
+            cooldown.observe(decision: .pause(reason: "test"))
+        }
+        XCTAssertEqual(cooldown.pauseStreak, 10)
+        XCTAssertEqual(cooldown.sleepSeconds(), 300)
+
+        // Single .run resets to zero
+        cooldown.observe(decision: .run)
+        XCTAssertEqual(cooldown.pauseStreak, 0)
+        XCTAssertEqual(cooldown.sleepSeconds(), 0)
+        XCTAssertEqual(cooldown.ladderLabel(), "cooldown-idle")
+
+        // Next pause re-starts at 30s baseline
+        cooldown.observe(decision: .pause(reason: "test"))
+        XCTAssertEqual(cooldown.pauseStreak, 1)
+        XCTAssertEqual(cooldown.sleepSeconds(), 30)
+    }
+
+    func testThermalCooldownSleepNanosecondsMatchesSeconds() {
+        var cooldown = SampleHostThermalCooldown()
+        cooldown.observe(decision: .pause(reason: "test"))
+        // 30s = 30_000_000_000 ns
+        XCTAssertEqual(
+            cooldown.sleepNanoseconds(),
+            UInt64(30 * 1_000_000_000))
+
+        cooldown.observe(decision: .pause(reason: "test"))
+        cooldown.observe(decision: .pause(reason: "test"))
+        cooldown.observe(decision: .pause(reason: "test"))
+        // 300s ceiling = 300_000_000_000 ns
+        XCTAssertEqual(
+            cooldown.sleepNanoseconds(),
+            UInt64(300 * 1_000_000_000))
+    }
+
+    func testThermalCooldownStreakSaturatesAtSane() {
+        var cooldown = SampleHostThermalCooldown()
+        // Force the streak past saturation by observing many pauses.
+        // We don't iter to Int.max in a test (slow); instead, push
+        // beyond `pauseStreakSaturation` and confirm it caps.
+        for _ in 1...(SampleHostThermalCooldown.pauseStreakSaturation + 50) {
+            cooldown.observe(decision: .pause(reason: "test"))
+        }
+        XCTAssertEqual(
+            cooldown.pauseStreak,
+            SampleHostThermalCooldown.pauseStreakSaturation,
+            "Streak must saturate, not overflow")
+        XCTAssertEqual(
+            cooldown.sleepSeconds(), 300,
+            "Saturated streak still sleeps 300s ceiling")
+    }
+
+    func testThermalCooldownLadderConstantsAreStable() {
+        // Pin the ladder constants. If anyone re-tunes the schedule
+        // they must also update this test (deliberate friction —
+        // the ladder values are doctrine, not magic numbers).
+        XCTAssertEqual(
+            SampleHostThermalCooldown.firstSleepSeconds, 30,
+            "1st-pause baseline preserves chapter 一百九十七 doctrine")
+        XCTAssertEqual(
+            SampleHostThermalCooldown.secondSleepSeconds, 60)
+        XCTAssertEqual(
+            SampleHostThermalCooldown.thirdSleepSeconds, 120)
+        XCTAssertEqual(
+            SampleHostThermalCooldown.ceilingSleepSeconds, 300,
+            "5-min ceiling is the chapter 二百九 invariant")
+        XCTAssertEqual(
+            SampleHostThermalCooldown.pauseStreakSaturation, 1000,
+            "Saturation point above any practical 10h bench horizon")
+    }
+
+    func testThermalCooldownEquatableSemantics() {
+        var a = SampleHostThermalCooldown()
+        var b = SampleHostThermalCooldown()
+        XCTAssertEqual(a, b)
+
+        a.observe(decision: .pause(reason: "x"))
+        XCTAssertNotEqual(a, b)
+
+        b.observe(decision: .pause(reason: "y"))
+        // Different reasons but both produce streak == 1
+        XCTAssertEqual(a, b,
+            "Cooldown equality is structural — reason string is " +
+            "consumed by the gate row, not stored in cooldown state")
+    }
 }

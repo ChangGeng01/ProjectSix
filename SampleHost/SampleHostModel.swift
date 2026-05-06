@@ -2801,6 +2801,12 @@ extension SampleHostModel {
             var iter = 0
             let runner = SampleHostHybridBenchJSONLRunner(
                 rotationBytes: rotationBytes)
+            // chapter 二百九 / M790 — adaptive thermal cooldown.
+            // Persists across iters of THIS bench task; a fresh
+            // Stop→Start cycle gets a brand-new task and a fresh
+            // cooldown (zero streak), preserving chapter 二百七
+            // generation-guard doctrine.
+            var cooldown = SampleHostThermalCooldown()
             while !Task.isCancelled {
                 if Date().timeIntervalSince(startedAt) > durationSec {
                     break
@@ -2940,6 +2946,10 @@ extension SampleHostModel {
                     lowPowerMode: lowPower,
                     batteryStateRaw: batteryStateRaw,
                     pauseOnSerious: pauseOnSeriousCaptured)
+                // chapter 二百九 / M790 — observe BEFORE branching so
+                // any `.run` iter resets pauseStreak to 0 (the next
+                // pause starts fresh at the 30s ladder rung).
+                cooldown.observe(decision: gateDecision)
                 if case .pause(let reason) = gateDecision {
                     // M727 chapter 一百九十三 — live counter
                     applyIfActive(myGen) {
@@ -2998,7 +3008,11 @@ extension SampleHostModel {
                         smokeMode: smokeMode.rawValue,
                         targetLayer: layerProfile?.layerIndex,
                         targetLayerName: layerProfile?.layerName,
-                        anomalyFlags: ["thermal-gate-paused:\(reason)"],
+                        anomalyFlags: [
+                            "thermal-gate-paused:\(reason)",
+                            "cooldown:\(cooldown.ladderLabel())",
+                            "cooldown-streak:\(cooldown.pauseStreak)",
+                        ],
                         pressureProfile: pressureProfile,
                         adversarialKind: adversarialKind?.rawValue,
                         driftSigma: nil,
@@ -3013,9 +3027,20 @@ extension SampleHostModel {
                     if self.hybridBenchGeneration == myGen {
                         self.hybridBenchIterations = iter
                     }
-                    // Sleep 30s out of detached task so MainActor
-                    // stays responsive. Yield back if cancelled.
-                    try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                    // chapter 二百九 / M790 — adaptive cooldown ladder
+                    // (30s / 60s / 120s / 300s ceiling) replaces the
+                    // fixed 30s sleep. chapter 二百八 2h bench surfaced
+                    // 93% pause rate (236/253 iters) because iPhone
+                    // 17e holds `.serious` thermal for minutes-to-hours;
+                    // fixed 30s sleep just polled wastefully and burned
+                    // battery. Adaptive ladder lets the device actually
+                    // radiate heat between thermal re-checks while
+                    // keeping a 5-min ceiling so a cooled ambient
+                    // unlocks the bench within reasonable latency.
+                    // Yield back if cancelled (Task.sleep is throwing
+                    // on cancellation).
+                    try? await Task.sleep(
+                        nanoseconds: cooldown.sleepNanoseconds())
                     continue
                 }
 

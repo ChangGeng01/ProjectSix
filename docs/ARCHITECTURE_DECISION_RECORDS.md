@@ -219,16 +219,101 @@ If future training pipeline starts using `.rawLLM` data for permit-prediction mo
 
 ---
 
+## ADR-007 (chapter 209) — Adaptive cooldown ladder over fixed sleep
+
+### Context
+
+Chapter 一百九十七 (M740) shipped `pauseOnSerious` so operators on
+hot devices could let `.serious` thermal trip the gate in addition
+to `.critical`. Pause path slept FIXED 30 seconds then re-checked.
+
+Chapter 208 .rawLLM 2h iPhone 17e bench surfaced architectural
+mismatch: iPhone 17e holds `.serious` thermal for minutes-to-hours
+under sustained bench load (recovery requires ~5-10 min idle).
+With fixed 30s sleep, gate fired 236 times in 2 hours (93%).
+Net: 17 real-LLM rows in 2h. Bench was effectively a polling loop
+that woke up every 30s, found device still hot, slept again, while
+the wakes themselves added enough work to keep heat from radiating.
+
+### Decision
+
+Replace fixed 30s sleep with explicit ladder bounded at 5 minutes:
+
+| pauseStreak | sleep |
+|---|---|
+| 0 | 0 (gate said .run) |
+| 1 | 30s (chapter 一百九十七 baseline preserved) |
+| 2 | 60s |
+| 3 | 120s |
+| ≥ 4 | 300s (5-min ceiling) |
+
+Streak resets to 0 on first `.run` decision. Logic lives in
+`SampleHost/SampleHostThermalCooldown.swift` as a pure value type
+(no @Published, no actor, no I/O); `SampleHostModel`'s bench loop
+holds one instance per Run/Stop cycle.
+
+The 5-min ceiling is the OUTER bound — deliberately not "sleep
+forever". Stuck-hot device still emits one paused-row every 5 min
+(JSONL replay sees the gap), and a cooled ambient unlocks the
+bench within reasonable latency.
+
+### Consequences
+
+- iPhone 17e sustained `.serious` no longer wastes 30s polling.
+  Cooldown widens automatically; device gets uninterrupted
+  windows to radiate heat.
+- JSONL paused-rows tagged with `cooldown:<label>` +
+  `cooldown-streak:<n>` so downstream replay can reconstruct
+  thermal trajectory.
+- Pure value type co-exists with chapter 一百九十二 SafetyKit
+  pattern (single-source-of-truth: this file owns the
+  adaptive-cooldown invariant; SampleHostModel calls in).
+- 7 unit tests pin ladder constants — re-tuning the schedule
+  requires updating both source AND tests (deliberate friction).
+- First file extracted out of `SampleHostModel`'s bench-loop body
+  per ADR-004 future migration list. Sets the pattern for
+  upcoming chapter 210 SampleHostBenchEngine actor extraction.
+
+### Doctrine pins (red-line preservation)
+
+- Red line 7 (HINT-ONLY observability): held — cooldown is
+  local control-flow, doesn't affect substrate decision /
+  permit / verdict. Substrate's `calibrateRisk()` still owns risk.
+- 不变量 #1 (先醒再答): held — wake path unchanged.
+- 不变量 #2 (神经不掌权): held — permit single-mouth stays at
+  L11 / L14. Cooldown only paces the bench iter loop.
+- 不变量 #3 (私有经验不进权重): held — no weight write.
+
+### Future migration
+
+If a future chapter wants per-thermal-state cooldown (e.g. shorter
+ladder for `.fair` flapping vs longer for sustained `.critical`),
+extend `SampleHostThermalCooldown` with a per-state streak, NOT
+add another sleep call site. Single-source-of-truth principle
+must hold.
+
+If 5-min ceiling proves insufficient on iPhone Pro Max sustained
+load, the ceiling constant is the only knob to tune — keep the
+ladder shape, raise the ceiling. Don't add more rungs (4-rung
+ladder is the doctrine; longer ladders are easier to mis-read).
+
+---
+
 ## Future ADR candidates
 
 | Topic | Chapter |
 |---|---|
-| Bench engine actor extraction | 204 |
-| Resume-from-iter mechanism (vs settings-only) | 205 |
-| Production canary (shadow predict) | 206 |
-| Per-pressure-stratum sub-models | 207 |
-| Telemetry sink protocol | 208 |
-| Cross-process auto-restart | 209 |
+| SampleHostBenchEngine actor extraction (~1000 LOC carve-out) | 210 |
+| SampleHostLLMDispatching protocol (DI for AFM/Gemma adapters) | 211 |
+| SampleHostBenchSink protocol (decouple JSONL persistence) | 212 |
+| MemoryCore submodule split | 213 |
+| EBrainCognitionPlaneCore subsystem extraction | 214 |
+| HostKitCore subsystem extraction | 215 |
+| Resume-from-iter mechanism (vs settings-only) | tbd |
+| Production canary (shadow predict) | tbd |
+| Per-pressure-stratum sub-models | tbd |
+| Telemetry sink protocol | tbd |
+| Cross-process auto-restart | tbd |
 
 Each candidate ADR becomes concrete when its chapter ships. Pre-ship
 investigation should reference whether the pattern in question
