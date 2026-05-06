@@ -629,12 +629,17 @@ struct SampleHostView: View {
                             .tag(HybridBenchConfig.SmokeMode.fourteenLayer)
                         Text("heavy")
                             .tag(HybridBenchConfig.SmokeMode.heavyTailed)
-                        // M773 chapter 二百五 — benign mode for
-                        // training-data accumulation. Substrate
-                        // engages LLM on factual / translation /
-                        // math / cooking prompts.
                         Text("benign")
                             .tag(HybridBenchConfig.SmokeMode.benign)
+                        // M785 chapter 二百八 — raw LLM mode (ADR-006).
+                        // Substrate audit-only; dispatch FORCED to
+                        // singleLLM. For training-data accumulation
+                        // when substrate's risk eval refuses the
+                        // .answer permit on benign inputs (chapter
+                        // 207 finding). Doctrine pin: data NEVER
+                        // used for production permit decisions.
+                        Text("raw")
+                            .tag(HybridBenchConfig.SmokeMode.rawLLM)
                     }
                     .pickerStyle(.segmented)
                     .disabled(model.hybridBenchIsRunning)

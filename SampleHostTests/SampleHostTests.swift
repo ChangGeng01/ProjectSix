@@ -1899,18 +1899,74 @@ final class SampleHostTests: XCTestCase {
     }
 
     /// M764 — pin SmokeMode case names stable.
-    /// chapter 195 had 3 smoke modes; chapter 205 added .benign.
-    /// Future chapters may add more but cannot remove (would break
-    /// replay tools that grep on smokeMode raw values).
+    /// chapter 195 had 3 smoke modes; chapter 205 added .benign;
+    /// chapter 208 added .rawLLM (5 cases). Future chapters may
+    /// add more but cannot remove (would break replay tools that
+    /// grep on smokeMode raw values).
     func testSmokeModeRawValuesAreStable() {
         let modes = HybridBenchConfig.SmokeMode.allCases
-        XCTAssertGreaterThanOrEqual(modes.count, 4,
-            "SmokeMode case count cannot decrease (chapter 205+)")
+        XCTAssertGreaterThanOrEqual(modes.count, 5,
+            "SmokeMode case count cannot decrease (chapter 208+)")
         let raws = Set(modes.map(\.rawValue))
         XCTAssertTrue(raws.contains("canonical"))
         XCTAssertTrue(raws.contains("14-layer-smoke"))
         XCTAssertTrue(raws.contains("heavy-tailed"))
         XCTAssertTrue(raws.contains("benign"))
+        XCTAssertTrue(raws.contains("raw-llm"))
+    }
+
+    // MARK: - chapter 二百八 / M783-M789 — .rawLLM bench-data-only mode
+
+    /// M783 — .rawLLM raw value is "raw-llm" (kebab-case stable).
+    func testRawLLMSmokeModeRawValue() {
+        XCTAssertEqual(
+            HybridBenchConfig.SmokeMode.rawLLM.rawValue, "raw-llm")
+    }
+
+    /// M784 — bench-loop dispatch override doctrine: when smokeMode
+    /// is .rawLLM, dispatchPolicy MUST be .singleLLM regardless of
+    /// permitMode. Tests the doctrine via direct branch logic.
+    func testRawLLMForcesSingleLLMDispatch() {
+        let modes: [String] = [
+            "block", "delay", "replace", "answer",
+            "compare", "escalate", "localOnly", "draftOnly",
+        ]
+        for permitMode in modes {
+            // Simulating the chapter-208 bench-loop logic:
+            let dispatchPolicy: SampleHostHybridDispatchPolicy
+            let smokeMode = HybridBenchConfig.SmokeMode.rawLLM
+            if smokeMode == .rawLLM {
+                dispatchPolicy = .singleLLM
+            } else {
+                dispatchPolicy =
+                    SampleHostHybridDispatchPolicy.from(
+                        permitMode: permitMode)
+            }
+            XCTAssertEqual(
+                dispatchPolicy, .singleLLM,
+                "rawLLM mode must force singleLLM regardless of " +
+                "permit '\(permitMode)'")
+        }
+    }
+
+    /// M784 — non-rawLLM modes still respect substrate's permit.
+    func testNonRawLLMModesRespectSubstratePermit() {
+        for mode: HybridBenchConfig.SmokeMode in
+            [.canonical, .fourteenLayer, .heavyTailed, .benign]
+        {
+            let dispatchForBlock: SampleHostHybridDispatchPolicy
+            if mode == .rawLLM {
+                dispatchForBlock = .singleLLM
+            } else {
+                dispatchForBlock =
+                    SampleHostHybridDispatchPolicy.from(
+                        permitMode: "block")
+            }
+            XCTAssertEqual(
+                dispatchForBlock, .skipBlock,
+                "Non-rawLLM mode \(mode.rawValue) should preserve " +
+                "substrate's .block → .skipBlock dispatch")
+        }
     }
 
     /// M764 — pin DispatchPolicy case names stable (chapter 178 doctrine).

@@ -180,6 +180,45 @@ alphabets differ in count, order, or values.
 
 ---
 
+## ADR-006 (chapter 208) — `.rawLLM` bench mode bypasses substrate permit gate (observability ONLY)
+
+### Context
+
+Chapter 196+200+204+205+206 verified: substrate's `calibrateRisk()` (in `EBrainHostRuntime+RiskService.swift:134`) recomputes risk INTERNALLY from `contextFrame.emotionalLoad / timePressure / consequenceLevel`, `currentBrain.hostGuardrailPressure`, `constitutionSignals / courtSignals / presenceSignals`. The bench's `riskLevel` argument is IGNORED. On benign + low-stake + .primary workflow, substrate STILL routes 100% to `.delay` permit because internal accumulated risk pushes totalRisk above mediumThreshold by design.
+
+This is correct production substrate behavior (不变量 #2 神经不掌权 + protective doctrine). But it makes training-data accumulation impossible via the substrate path. The router (ChengluPreflight: signature → AFM/Gemma) needs LLM-response data to train. Without LLM data, no v0.5 model.
+
+### Decision
+
+New `SmokeMode.rawLLM` case ("raw-llm" raw value):
+- Substrate STILL runs (audit accumulates, contextFrame still built)
+- `permitMode` STILL recorded in JSONL row (substrate's actual decision)
+- BUT `dispatchPolicy` is FORCED to `.singleLLM` regardless of permitMode
+- LLM (AFM via router preference + Gemma fallback) actually fires per iter
+- Resulting JSONL is **OBSERVABILITY ONLY**
+
+### Consequences
+
+- ChengluPreflight router can train on signature → AFM-vs-Gemma success outcomes
+- Training data NEVER drives production permit decisions (red line 7 held)
+- 不变量 #2 held: substrate's production decisions UNCHANGED — `.rawLLM` only affects bench's dispatch, not substrate's internal logic
+- Bench JSONL clearly labeled `smokeMode: "raw-llm"` so downstream tools can grep + filter
+- ChengluPreflight router is metadata (not permit), so training on `.rawLLM` data is doctrine-aligned
+
+### Future migration
+
+If a future chapter wants to ALSO bypass substrate for production permit decisions, that's a NEW ADR (ADR-007+) and contradicts ADR-006's "observability only". Must be rejected.
+
+If future training pipeline starts using `.rawLLM` data for permit-prediction model training, that's also a contradiction — `.rawLLM` data shows what AFM/Gemma produces under permissive dispatch, NOT what substrate would have permitted. PermitPredict head should train on full bench data including substrate-skip rows (chapter 208+ candidate).
+
+### Related red lines
+
+- Red line 7 (HINT-ONLY observability): held
+- 不变量 #2 (神经不掌权): held — substrate internal logic unchanged
+- 不变量 #3 (私有经验不进权重): held — `.rawLLM` data feeds offline retrain only
+
+---
+
 ## Future ADR candidates
 
 | Topic | Chapter |

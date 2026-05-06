@@ -1788,6 +1788,30 @@ struct HybridBenchConfig: Codable, Sendable, Equatable {
         /// designed so substrate's L7+L11 evaluation routes to
         /// `.answer` permit). Risk forced to `.low`.
         case benign = "benign"
+        /// M783 chapter 二百八 — bench-data-only mode (ADR-006).
+        /// chapter 207 verified substrate's calibrateRisk()
+        /// internally recomputes risk from contextFrame +
+        /// thoughtFrame + host state, IGNORING the bench's
+        /// riskLevel argument. Even on .benign + .primary +
+        /// pinned-low signature, substrate routes 100% to
+        /// `.delay` permit because hostGuardrailPressure +
+        /// constitutionSignals + courtSignals push totalRisk
+        /// above mediumThreshold by design.
+        ///
+        /// Doctrine pin (ADR-006): `.rawLLM` bench mode is
+        /// OBSERVABILITY ONLY:
+        ///   - substrate STILL runs (audit accumulates)
+        ///   - permitMode STILL recorded in row
+        ///   - BUT dispatchPolicy is FORCED to .singleLLM
+        ///     bypassing substrate's permit gate
+        ///   - LLM (AFM/Gemma) actually fires per iter
+        ///   - Resulting data is NEVER used for production
+        ///     permit decisions — only for training the
+        ///     ChengluPreflight router (signature → AFM/Gemma)
+        ///   - Red line 7 (HINT-ONLY observability) held
+        ///   - 不变量 #2 (神经不掌权) held — substrate's
+        ///     production decisions unchanged
+        case rawLLM = "raw-llm"
     }
     var durationHours: Double
     var strideRotationCSV: String
@@ -2812,10 +2836,13 @@ extension SampleHostModel {
                             pressureProfile = "heavy-tail-\(p.layerName)"
                         }
                         return p
-                    case .canonical, .benign:
+                    case .canonical, .benign, .rawLLM:
                         // M772 chapter 二百五 — benign mode uses
                         // pinned low-risk signature (no layer
                         // routing).
+                        // M784 chapter 二百八 — .rawLLM uses
+                        // catalog signatures (any), no layer
+                        // override; substrate runs but is bypassed.
                         return nil
                     }
                 }()
@@ -3071,9 +3098,20 @@ extension SampleHostModel {
                 // M628 chapter 一百七十八 — derive substrate
                 // dispatch policy BEFORE calling LLM. Substrate's
                 // permit mode shapes WHETHER + HOW we call LLM.
-                let dispatchPolicy =
-                    SampleHostHybridDispatchPolicy.from(
-                        permitMode: permitMode)
+                // M784 chapter 二百八 — `.rawLLM` mode (ADR-006)
+                // bypasses substrate gate. permitMode still
+                // recorded (audit accumulates); dispatchPolicy
+                // forced to .singleLLM so LLM actually fires.
+                // Doctrine: bench observability ONLY; data
+                // never used for production permit decisions.
+                let dispatchPolicy: SampleHostHybridDispatchPolicy
+                if smokeMode == .rawLLM {
+                    dispatchPolicy = .singleLLM
+                } else {
+                    dispatchPolicy =
+                        SampleHostHybridDispatchPolicy.from(
+                            permitMode: permitMode)
+                }
 
                 // M649 chapter 一百八十一 — try MultiHead FIRST
                 // (1 inference call, 4 outputs). Fall back to
