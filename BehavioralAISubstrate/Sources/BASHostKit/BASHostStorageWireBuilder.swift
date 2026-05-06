@@ -333,4 +333,91 @@ public enum BASHostStorageWireBuilder {
                 ? "yes" : "no")
         ]
     }
+
+    // MARK: - Bundle assembly (chapter 三百〇九 / M796)
+
+    /// Construct all 4 storage components from typed options in
+    /// one call。Returns a `BASHostStorageWireBundle` containing
+    /// each component (or nil for in-memory mode where applicable)
+    /// + the post-construction wire report。
+    ///
+    /// Hosts use this when they want to opt in to ALL 4 SQLite
+    /// paths consistently from a single typed config. Equivalent
+    /// to calling all 4 individual factories sequentially, but
+    /// guarantees consistent error handling + emits the typed
+    /// wire report in one step.
+    ///
+    /// - Throws: any of the 4 factories' typed errors. Whichever
+    ///   factory fails first aborts assembly.
+    public static func makeBundle(
+        options: BASHostStorageOptions,
+        atomStoreInitial: [BASGovernedMemory] = [],
+        ticketLifecycleClock: @escaping @Sendable () -> Date
+            = { .now },
+        ticketLifecycleAuditSink:
+            BASUpdateTicketLifecycleCoordinator.AuditSink? = nil
+    ) async throws -> BASHostStorageWireBundle {
+        let atomStore = try makeAtomStore(
+            options: options, initial: atomStoreInitial)
+        let vault = try makeVaultStorage(options: options)
+        let lifecycle = try await makeTicketLifecycleCoordinator(
+            options: options,
+            clock: ticketLifecycleClock,
+            auditSink: ticketLifecycleAuditSink)
+        let auditLedger = try makeAuditLedgerStorage(
+            options: options)
+        let report = BASHostStorageWireReport.derive(
+            from: options)
+        return BASHostStorageWireBundle(
+            atomStore: atomStore,
+            vault: vault,
+            ticketLifecycle: lifecycle,
+            auditLedger: auditLedger,
+            wireReport: report)
+    }
+}
+
+// MARK: - BASHostStorageWireBundle (chapter 三百〇九 / M796)
+
+/// Typed bundle containing all 4 storage components constructed
+/// from one `BASHostStorageOptions` config + the post-construction
+/// wire report。
+///
+/// Hosts wire this through their initialization paths to thread
+/// all 4 stores via a single typed value:
+///
+///     let bundle = try await BASHostStorageWireBuilder.makeBundle(
+///         options: hostConfig.storageOptions)
+///     // bundle.atomStore — ready for substrate use
+///     // bundle.vault — nil if in-memory; non-nil for SQLite
+///     // bundle.ticketLifecycle — coordinator (in-memory or SQLite)
+///     // bundle.auditLedger — nil if in-memory; non-nil for SQLite
+///     // bundle.wireReport — typed audit trail of what fired
+///
+/// Bundle is **not** Sendable — `BASSovereignLedgerStorage`
+/// protocol doesn't promise Sendable. Callers thread the bundle
+/// through their initialization paths within a single isolation
+/// domain; once each store is handed off to its owning actor,
+/// concurrency is managed at the actor level (chapter 一百九十一
+/// M91 SQLite serialization doctrine).
+public struct BASHostStorageWireBundle {
+    public let atomStore: any BASMemoryAtomStore
+    public let vault: BASHostConstitutionSQLiteStorage?
+    public let ticketLifecycle: BASUpdateTicketLifecycleCoordinator
+    public let auditLedger: (any BASSovereignLedgerStorage)?
+    public let wireReport: BASHostStorageWireReport
+
+    public init(
+        atomStore: any BASMemoryAtomStore,
+        vault: BASHostConstitutionSQLiteStorage?,
+        ticketLifecycle: BASUpdateTicketLifecycleCoordinator,
+        auditLedger: (any BASSovereignLedgerStorage)?,
+        wireReport: BASHostStorageWireReport
+    ) {
+        self.atomStore = atomStore
+        self.vault = vault
+        self.ticketLifecycle = ticketLifecycle
+        self.auditLedger = auditLedger
+        self.wireReport = wireReport
+    }
 }

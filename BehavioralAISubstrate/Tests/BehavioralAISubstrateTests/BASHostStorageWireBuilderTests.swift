@@ -554,6 +554,89 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
                 "audit-ledger-url-provided:yes"))
     }
 
+    // MARK: - Bundle assembly (chapter 三百〇九 / M796)
+
+    func testBundleLegacyInMemoryHasInMemoryAtomNoVaultNoLedger()
+        async throws
+    {
+        let bundle = try await BASHostStorageWireBuilder
+            .makeBundle(options: .legacyInMemory)
+        XCTAssertTrue(bundle.atomStore is BASInMemoryMemoryAtomStore)
+        XCTAssertNil(bundle.vault)
+        XCTAssertNil(bundle.auditLedger)
+        // Lifecycle is always non-nil (in-memory or SQLite path)
+        let count = await bundle.ticketLifecycle.count()
+        XCTAssertEqual(count, 0)
+        // Wire report reflects all-in-memory
+        XCTAssertFalse(bundle.wireReport.anySQLiteUsed)
+    }
+
+    func testBundleSQLiteEverywhereWithUnifiedRoot() async throws {
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            unifiedRoot: BASHostStorageRoot(rootURL: tempRoot))
+        let bundle = try await BASHostStorageWireBuilder
+            .makeBundle(options: options)
+        XCTAssertTrue(bundle.atomStore is BASSQLiteMemoryAtomStore)
+        XCTAssertNotNil(bundle.vault)
+        XCTAssertNotNil(bundle.auditLedger)
+        // All 4 SQLite files exist on disk
+        let expectedFiles = [
+            "memory-atoms.sqlite",
+            "host-vault.sqlite",
+            "ticket-lifecycle.sqlite",
+            "audit-ledger.sqlite"
+        ]
+        for filename in expectedFiles {
+            let url = tempRoot.appendingPathComponent(filename)
+            XCTAssertTrue(
+                FileManager.default.fileExists(atPath: url.path),
+                "all 4 SQLite files must exist after bundle " +
+                "assembly with unifiedRoot — missing: \(filename)")
+        }
+        XCTAssertTrue(bundle.wireReport.anySQLiteUsed)
+        XCTAssertTrue(bundle.wireReport.atomStoreUsedSQLite)
+        XCTAssertTrue(bundle.wireReport.vaultUsedSQLite)
+        XCTAssertTrue(bundle.wireReport.ticketLifecycleUsedSQLite)
+        XCTAssertTrue(bundle.wireReport.auditLedgerUsedSQLite)
+    }
+
+    func testBundleAbortsOnFirstFactoryFailure() async {
+        // .sqliteRequired with no URLs at all should fail at the
+        // FIRST factory call (atom store), not silently succeed
+        // partial assembly.
+        let options = BASHostStorageOptions(
+            preference: .sqliteRequired)
+        do {
+            _ = try await BASHostStorageWireBuilder
+                .makeBundle(options: options)
+            XCTFail("expected throw — .sqliteRequired with no URLs")
+        } catch let wireError as BASHostStorageWireError {
+            XCTAssertEqual(
+                wireError,
+                .missingSQLiteURL(component: "atom-store"),
+                "fail-fast: bundle assembly aborts at the FIRST " +
+                "missing URL — atom store comes first in the chain")
+        } catch {
+            XCTFail("expected BASHostStorageWireError, got " +
+                "\(type(of: error))")
+        }
+    }
+
+    func testBundleAtomStoreSeedingPropagates() async throws {
+        let atom = sampleAtom(content: "bundle-seed")
+        let bundle = try await BASHostStorageWireBuilder
+            .makeBundle(
+                options: .legacyInMemory,
+                atomStoreInitial: [atom])
+        let recovered = await bundle.atomStore.atom(
+            forID: atom.id.uuidString)
+        XCTAssertEqual(
+            recovered?.content, "bundle-seed",
+            "atomStoreInitial: parameter must propagate to " +
+            "constructed atom store within bundle")
+    }
+
     // MARK: - Cross-session SQLite persistence (atom store)
 
     func testSQLiteStorePersistsAcrossWireBuilds() async throws {
