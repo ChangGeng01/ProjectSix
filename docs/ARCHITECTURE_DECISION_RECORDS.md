@@ -749,6 +749,159 @@ BAIL-OUT-not-kill).
 
 ---
 
+## ADR-012 (chapter 二百六十一) — Hybrid offline-pipeline doctrine: ADR-006 strict preserved + version-bumped bundle update for permit thresholds
+
+### Context
+
+附录 V (chapter 二百四十七) audited the substrate's closed-loop
+state and identified Gap #1 as the largest remaining doctrine gap:
+"Risk gate adaptive recalibration". The substrate's L11 risk gate
+ships fixed thresholds (e.g. `mediumRiskThreshold`, `highRisk
+Threshold`) that were tuned offline once. As more bench data
+accumulates, the right thresholds drift — a tone signature that
+empirically produces 90% block-or-delay should not still be using
+the original threshold tuned at 50%.
+
+ADR-006 (chapter 208) is strict: bench data is observability ONLY,
+NEVER feeds production permit. That blocks naïve "self-tuning"
+adaptive thresholds — exactly the right call for live mutation
+of weights / permit logic. But it *also* would block "we ran a
+month of benches, aggregated by stratum, found three thresholds
+need a small tune, ship a new version of the bundle".
+
+The user's plan-mode AskUserQuestion (附录 V context) explicitly
+chose **Hybrid**: keep ADR-006 strict + permit a separate offline
+pipeline that aggregates *generalized* (non-host-specific) signal
+across many users / sessions, produces a versioned threshold
+bundle, and ships via explicit bundle replacement. The bundle is a
+typed value, signed by L14 sovereign warrant, deployed by operator
+review — not a live mutation.
+
+### Decision
+
+ADR-006 strict preserved verbatim:
+- Live bench data NEVER mutates production permit threshold.
+- `.rawLLM` mode and every bench JSONL pipeline remain
+  observability-only as far as the substrate's own permit logic
+  is concerned.
+- The substrate's L11 risk gate does not read from any bench-data
+  store.
+
+Newly permitted via ADR-012:
+- A separate **offline aggregation pipeline** (Mac-side, distinct
+  from substrate runtime) reads bench JSONL across many sessions,
+  aggregates by stratum (e.g. tone × stake × confidant), strips
+  host-specific identifiers, and produces a typed
+  `BASRiskCalibrationBundle` with per-stratum threshold deltas.
+- The bundle is **version-bumped** (`bundleVersion: String`) so
+  every deployed version is auditable. `bundleVersion` strings
+  follow `vN.M.P` format with a monotonic sequence.
+- Each bundle carries an L14 **sovereignWarrant** ref —
+  unsigned bundles are refused. The signing workflow is operator
+  review, not auto-derive: operator inspects the offline pipeline's
+  output, decides whether the deltas are reasonable, requests a
+  warrant, ships the bundle.
+- The substrate's L11 risk gate, on bundle replacement, applies
+  the threshold deltas to its in-memory tunables. This is a
+  **deploy-time mutation**, not a per-turn mutation. Two
+  consecutive turns with the same bundle produce identical
+  decisions.
+
+### Boundary (what doctrine permits and what it forbids)
+
+Permitted:
+- Aggregating bench data offline by **stratum**, removing
+  host-identifiers (chapter 一百零二 五级删除-aware: only data the
+  user has not revoked is eligible).
+- Producing a typed `BASRiskCalibrationBundle` with a versioned
+  diff against the prior bundle.
+- Operator-reviewed deployment (chapter 一百七十七 P0→P3
+  staircase pattern: explicit canary + version bundle replacement).
+- L14 sovereign warrant signing each bundle; ledger records
+  every bundle replacement.
+
+Forbidden (would require ADR-013+ to relax):
+- Live mutation of any permit threshold from inside a turn.
+- Per-host-specific threshold tuning (host-specific data must NOT
+  enter the bundle — bundle is generalized signal only).
+- Auto-deploy without operator review.
+- Bundle replacement without L14 warrant ref.
+- Hidden or implicit threshold changes (every change is explicit
+  in `BASRiskCalibrationBundle.strataDeltas[]`).
+- Bundle replacement during an active turn (replacement is
+  between-turn only).
+
+### Consequences
+
+- ADR-006 ("bench JSONL is observability ONLY") remains the per-
+  turn truth: live bench data never feeds live permit decision.
+- ADR-012 introduces the **between-deploy** path: aggregated
+  generalized signal → version-bumped bundle → operator review →
+  L14 warrant → deploy → between-turn threshold mutation.
+- Substrate's per-turn behavior is auditable: given a fixed
+  bundle version, every turn with the same input produces the
+  same decision. Bundles are immutable once shipped.
+- Substrate exposes `bundleVersion` in audit emission (chapter
+  二百六十四 will wire this) so audit walkers can grep "this turn
+  ran under bundle vN.M.P".
+- 不变量 #3 ("私有经验不进权重") is reinforced — host data is
+  filtered OUT of the bundle's input pipeline. The bundle
+  represents the signal pattern across a population of sessions,
+  not any individual host's history.
+- Red line 7 (HINT-ONLY observability) is held within each turn:
+  no live observation feeds permit. The deploy step is operator
+  decision, not observation feedback.
+
+### Implementation (chapters 二百六十二 → 二百六十五)
+
+| Chapter | Component | Module |
+|---|---|---|
+| 二百六十二 | `scripts/aggregate_risk_stratum.py` (Mac-side) | scripts/ |
+| 二百六十三 | `BASRiskCalibrationBundle` typed value | BASPolicy |
+| 二百六十四 | L11 risk gate accepts bundle replacement | BASPolicy |
+| 二百六十五 | Per-stratum sub-models (deferred — needs real data) | BASPolicy |
+
+Chapter 二百六十二 ships the offline aggregator. Chapter 二百六十三
+ships the typed bundle schema. Chapter 二百六十四 wires bundle
+replacement at the substrate side. Chapter 二百六十五 (per-stratum
+sub-models) is deferred until enough real bench data exists to
+justify per-stratum heads (附录 V noted this depends on Stage 3
+real-bench output).
+
+### Related red lines
+
+- ADR-006 (`.rawLLM` observability-only): held — ADR-012 only
+  allows between-deploy mutation, never per-turn.
+- 不变量 #2 (神经不掌权): held — bundle deploy is operator-
+  reviewed + L14-signed. Substrate logic doesn't auto-decide
+  threshold drift.
+- 不变量 #3 (私有经验不进权重): held — bundle is generalized
+  signal (host data filtered out at aggregation step).
+- 红线 7 (HINT-ONLY observability): held — every per-turn
+  observation remains observation; deploy is a separate event
+  outside the per-turn loop.
+
+### Future migration
+
+If a future chapter wants to:
+- Auto-deploy bundles without operator review → contradicts
+  ADR-012, must be a new ADR (ADR-013+) and probably should be
+  refused (operator review is the trust boundary).
+- Permit-host-specific tuning inside a bundle → contradicts
+  不变量 #3, must be refused.
+- Per-turn threshold mutation from observation data → contradicts
+  ADR-006, must be refused.
+- Multi-bundle composition (e.g. "host A uses bundle X, host B
+  uses bundle Y") → likely permissible under ADR-012 but needs
+  explicit clarification of how bundle selection happens (must
+  not leak host-specific data).
+
+The chapter 二百六十一 ship is the doctrine document only. Chapters
+二百六十二-二百六十四 ship the typed pipeline + bundle + deploy
+path. Chapter 二百六十五 awaits real bench data.
+
+---
+
 ## Doctrine summary (red lines that must hold across all chapters)
 
 | Red line | Doctrine | First defined |

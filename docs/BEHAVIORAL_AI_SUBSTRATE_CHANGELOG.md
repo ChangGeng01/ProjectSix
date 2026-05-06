@@ -1622,3 +1622,27 @@ The infrastructure is now ready. Stage 3 closes when the user runs the iPhone be
 - Stage 2 ✓ Counter-Host Gate Auto-Wire (chapters 二百五十四-二百五十五)
 - Stage 3 ⚠️ Real Bench Data Closure (chapter 二百五十七 ✓ infrastructure / chapters 二百五十六/二百五十八/二百五十九/二百六十 await user action)
 - Stage 4 — ADR-012 Hybrid Risk Calibration (chapters 二百六十一-二百六十五) is the next doctrine-evolution batch.
+
+## 2026-05-07 — chapter 二百六十一 (M744) ADR-012 doctrine document — Stage 4 Step 1 of 5
+
+附录 V Stage 4 (Hybrid Risk Calibration) opens with the doctrine document. The user's plan-mode AskUserQuestion explicitly chose Hybrid: ADR-006 strict preserved + new ADR-012 permits a separate offline pipeline producing version-bumped threshold bundles. Chapter 二百六十一 ships the ADR document recording that decision so subsequent code chapters (二百六十二-二百六十五) have a doctrine reference to point at.
+
+- **M744** modify `docs/ARCHITECTURE_DECISION_RECORDS.md` — add ADR-012 between ADR-011 and Doctrine summary section. ~140 lines documenting:
+  - **Context**: 附录 V Gap #1 audit + ADR-006 limitation + plan-mode Hybrid choice
+  - **Decision**: ADR-006 strict per-turn unchanged + ADR-012 permits offline aggregation → versioned bundle → operator review → L14 warrant → deploy-time mutation
+  - **Boundary** table: what is permitted (offline aggregation, versioned bundles, between-deploy mutation, L14 warrant signing) vs what is forbidden (live mutation, per-host tuning, auto-deploy, hidden changes, mid-turn replacement) — every forbidden item names which doctrine pin would block ADR-013+ relaxation
+  - **Consequences**: per-turn determinism (bundle is immutable once shipped); audit emission of `bundleVersion` so walkers can grep; 不变量 #3 reinforced (host data filtered OUT)
+  - **Implementation map** (chapters 二百六十二 → 二百六十五): script / typed bundle / L11 wire / deferred per-stratum sub-models
+  - **Related red lines** matrix
+  - **Future migration** clauses for would-be ADR-013+ that contradict ADR-012
+
+**Doctrine pins maintained**:
+- ADR-006 strict: held verbatim. Bench data is observability ONLY at per-turn scope. ADR-012 doesn't relax that — it adds a *separate* between-deploy path.
+- 不变量 #2 (神经不掌权): held — bundle deploy is operator-reviewed + L14-signed.
+- 不变量 #3 (私有经验不进权重): held — host data filtered OUT at aggregation step.
+- 红线 7 (HINT-ONLY observability): held within each turn.
+- chapter 一百零二 五级删除: ADR-012 explicitly notes "only data the user has not revoked is eligible" for aggregation input.
+
+This is a docs-only chapter — 0 code changes, 0 test changes, BAS XCTest count unchanged at 3081.
+
+Stage 4 progress: **1/5 chapters shipped** (二百六十一 ✓ doctrine / 二百六十二 aggregator script / 二百六十三 typed bundle / 二百六十四 L11 wire / 二百六十五 per-stratum sub-models pending).
