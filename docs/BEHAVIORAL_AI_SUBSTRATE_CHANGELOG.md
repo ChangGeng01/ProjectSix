@@ -1585,3 +1585,40 @@ Test impact: BAS XCTest 3076 → **3081** (+5 chapter 二百五十五 fix-pins);
 - Stage 1 ✓ Memory Importance Loop (chapters 二百五十一-二百五十三)
 - Stage 2 ✓ Counter-Host Gate Auto-Wire (chapters 二百五十四-二百五十五) ← **JUST CLOSED**
 - Stage 3 — Real Bench Data Closure (chapters 二百五十六-二百六十) is next. Stage 3 begins the data-feedback chapters: real iPhone `.rawLLM` 8h bench → bench JSONL → ChengluPreflight v1 retrain → ship.
+
+## 2026-05-07 — chapter 二百五十七 (M743) `pull_iphone_bench_and_retrain.py` orchestration — Stage 3 Step 2 of 5 (infrastructure-only)
+
+附录 V Stage 3 (Real Bench Data Closure) — second chapter ships **infrastructure** for the data-feedback loop. Chapter 二百五十六 ("real iPhone `.rawLLM` 8h bench") is user-action; chapters 二百五十八-二百六十 (train v1 + canary + multi-CoreML pipeline) depend on real bench data and operator approval gates. **Chapter 二百五十七 ships the Mac-side glue script** that runs without real data via `--skip-pull` / `--skip-train` modes.
+
+- **M743** NEW `scripts/pull_iphone_bench_and_retrain.py` (~280 LOC). Three-step orchestration:
+  1. **Pull** — `xcrun devicectl device copy from --domain-type appDataContainer --domain-identifier com.changgeng.samplehost --source Documents/iphone-hybrid-bench` into `--pull-dest`. Skippable via `--skip-pull` for retrain-only iteration.
+  2. **Retrain** — invokes existing `scripts/bench_to_train.py` (chapter 一百九十 / M704 — already in repo). Optional `--base-corpus` merges chapter 175/176 5,088-row adversarial corpus. Skippable via `--skip-train` for inspect-only.
+  3. **Diff** — best-effort `scripts/compare_mlpackages.py` invocation when `--prior-package` provided. Failure here is non-fatal (operator can compare manually).
+- Anti-magic-number constants: `DEFAULT_PULL_DEST`, `DEFAULT_OUTPUT_PACKAGE`, `SAMPLEHOST_BUNDLE_ID`, `IPHONE_BENCH_SUBDIR`, `BENCH_TO_TRAIN_RELATIVE` — all named so a future bundle ID rename or path change has one site to update.
+- Typed exit codes: 0 (ok) / 1 (missing pull-dest) / 2 (missing --device) / 3 (no JSONL pulled) / 4 (bench_to_train.py failed) / 5 (output package not produced). Operators can wire to monitoring.
+- 4 ad-hoc smoke modes verified post-ship:
+  - `--help` renders all options correctly
+  - `--skip-pull` + missing dir → exit 1 with stderr explanation
+  - missing `--device` (without `--skip-pull`) → exit 2
+  - `--skip-pull --skip-train --pull-dest <empty-dir>` → exit 0 with "found 0 JSONL" + "skipped"
+
+**Stage 3 honest scope status**:
+- chapter 二百五十六 — real iPhone 8h `.rawLLM` bench: **deferred — user action required** (iPhone hardware + 8h runtime). Chapter 二百八 / ADR-006 `.rawLLM` mode is shipped + ready; user invokes when ready.
+- chapter 二百五十七 — Mac-side pull + retrain orchestrator: **shipped** (this commit) — usable end-to-end the moment a real bench JSONL is available; usable today via `--skip-pull` against a fixture or pre-existing bench data.
+- chapter 二百五十八 — ChengluPreflight v1 train from real data: **deferred — depends on chapter 二百五十六**.
+- chapter 二百五十九 — v1 bundle ship + canary: **deferred — depends on chapter 二百五十八 + operator review**.
+- chapter 二百六十 — Multi-CoreML pipeline: **deferred — chapter 一百七十七 P3+ multi-month roadmap**.
+
+The infrastructure is now ready. Stage 3 closes when the user runs the iPhone bench and the script's pipeline produces a v1 model the operator approves. **Until then, Stage 3 is intentionally only 1/5 chapters auto-shippable**.
+
+**Doctrine pins maintained**:
+- 不变量 #2 神经不掌权: trained `.mlpackage` is a candidate, not a permit. Bundle replacement (chapter 二百五十九) is the controlling step. Auto-deploy is explicitly NOT supported.
+- chapter 二百八 ADR-006: bench JSONL is observability ONLY. The retrain pipeline reads it but does NOT mutate any production permit decision.
+- chapter 一百七十七 P0→P2 staircase: P0 (rule-based) + P1 (single-CoreML head) shipped; this orchestration is the P2 data-feedback rung that turns iPhone reality into the next-version model on the next operator decision.
+
+**Stages summary** (post-chapter-二百五十七):
+- Stage 0 ✓ Foundation: Persistence (chapters 二百四十八-二百五十)
+- Stage 1 ✓ Memory Importance Loop (chapters 二百五十一-二百五十三)
+- Stage 2 ✓ Counter-Host Gate Auto-Wire (chapters 二百五十四-二百五十五)
+- Stage 3 ⚠️ Real Bench Data Closure (chapter 二百五十七 ✓ infrastructure / chapters 二百五十六/二百五十八/二百五十九/二百六十 await user action)
+- Stage 4 — ADR-012 Hybrid Risk Calibration (chapters 二百六十一-二百六十五) is the next doctrine-evolution batch.
