@@ -562,7 +562,13 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             // M800 (chapter 三百一三) — Phase Delta 4th code cut:
             // typed 14-layer × ML head canonical mesh map slot.
             "LayerMeshSlot":
-                BAS14LayerMeshSlot.currentSchemaVersion
+                BAS14LayerMeshSlot.currentSchemaVersion,
+            // M805 (chapter 三百一八) — Phase Epsilon 5th code cut:
+            // typed cross-instance mesh sync frame + merge report.
+            "MeshSyncFrame":
+                BASMeshSyncFrame.currentSchemaVersion,
+            "MeshSyncFrameMergeReport":
+                BASMeshSyncFrameMergeReport.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

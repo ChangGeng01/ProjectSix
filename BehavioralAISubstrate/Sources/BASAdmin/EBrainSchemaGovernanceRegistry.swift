@@ -1437,6 +1437,20 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "LayerMeshSlot",
             versionedType: BAS14LayerMeshSlot.self,
             tests: ["schema.layer_mesh_slot.current", "schema.layer_mesh_slot.backward"]
+        ),
+        // M805 (chapter 三百一八) — Phase Epsilon 5th code cut:
+        // typed cross-instance mesh sync frame + merge report.
+        // v9 manifesto §8 closed at the schema layer (transport
+        // + protocol still external work).
+        entry(
+            "MeshSyncFrame",
+            versionedType: BASMeshSyncFrame.self,
+            tests: ["schema.mesh_sync_frame.current", "schema.mesh_sync_frame.backward"]
+        ),
+        entry(
+            "MeshSyncFrameMergeReport",
+            versionedType: BASMeshSyncFrameMergeReport.self,
+            tests: ["schema.mesh_sync_frame_merge_report.current", "schema.mesh_sync_frame_merge_report.backward"]
         )
     ]
 

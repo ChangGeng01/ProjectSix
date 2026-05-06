@@ -412,7 +412,11 @@ struct BASEBrainProgramBlueprintTests {
             "LayerCascadeResult",
             // M800 (chapter 三百一三) — Phase Delta 4th code cut:
             // typed 14-layer × ML head canonical mesh map slot.
-            "LayerMeshSlot"
+            "LayerMeshSlot",
+            // M805 (chapter 三百一八) — Phase Epsilon 5th code cut:
+            // typed cross-instance mesh sync frame + merge report.
+            "MeshSyncFrame",
+            "MeshSyncFrameMergeReport"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)
