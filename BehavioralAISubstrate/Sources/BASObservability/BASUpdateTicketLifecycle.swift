@@ -402,15 +402,29 @@ public actor BASUpdateTicketLifecycleCoordinator {
 
     /// `trialPassed` → `queuedForDistillation`. Requires a
     /// sovereign verdict ref so the lineage is auditable.
+    ///
+    /// **chapter 二百五十五 / M742**: optional `extraReasonCodes`
+    /// param threads gate-specific audit codes through the
+    /// transition record without breaking the existing call sites.
+    /// chapter 一百三十一 Counter-Host gate uses this to emit
+    /// `counter-host-gate:passed-with-sovereign-override` when
+    /// the override branch fires; audit walkers grep for that
+    /// code to distinguish natural-pass promotions from
+    /// sovereign-overridden self-confirmation-loop candidates.
+    /// Default `[]` preserves pre-chapter-二百五十五 behaviour
+    /// byte-for-byte.
     public func approveForDistillation(
         ticketID: String,
-        sovereignVerdictRef: String
+        sovereignVerdictRef: String,
+        extraReasonCodes: [String] = []
     ) async throws {
+        let codes = [
+            "sovereign-verdict:\(sovereignVerdictRef)"
+        ] + extraReasonCodes
         try mutate(
             ticketID: ticketID,
             to: .queuedForDistillation,
-            reasonCodes: [
-                "sovereign-verdict:\(sovereignVerdictRef)"]
+            reasonCodes: codes
         ) { entry in
             entry.sovereignVerdictRef = sovereignVerdictRef
         }

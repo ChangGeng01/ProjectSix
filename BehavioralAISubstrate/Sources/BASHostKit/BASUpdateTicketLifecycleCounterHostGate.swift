@@ -139,9 +139,25 @@ public extension BASUpdateTicketLifecycleCoordinator {
         // verdict ref is recorded in the lifecycle entry so the
         // audit trail explicitly shows the sovereign authorized
         // this self-confirmation-loop candidate's promotion.
+        //
+        // chapter 二百五十五 / M742: emit
+        // `counter-host-gate:passed-with-sovereign-override`
+        // alongside the standard `sovereign-verdict:<ref>` so
+        // audit walkers can distinguish natural-pass promotions
+        // from sovereign-overridden self-confirmation-loop
+        // candidates. Without this code the override path was
+        // indistinguishable from `.passed` in the ledger.
+        var overrideCodes = [
+            "counter-host-gate:passed-with-sovereign-override"
+        ]
+        // Carry forward the Counter-Host check's reason codes so
+        // the audit trail explains *why* the gate considered this
+        // a self-confirmation-loop candidate in the first place.
+        overrideCodes.append(contentsOf: check.reasonCodes)
         try await approveForDistillation(
             ticketID: ticketID,
-            sovereignVerdictRef: sovereignVerdictRef)
+            sovereignVerdictRef: sovereignVerdictRef,
+            extraReasonCodes: overrideCodes)
         return .passedWithSovereignOverride
     }
 }

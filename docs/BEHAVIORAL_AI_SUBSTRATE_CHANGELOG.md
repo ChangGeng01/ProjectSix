@@ -1539,3 +1539,49 @@ The fix: a **resolver pattern** — hosts wire one closure that derives a `BASCo
 Test impact: BAS XCTest 3070 → **3076** (+6 chapter 二百五十四 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
 
 Stage 2 progress: **1/2 chapters shipped** (二百五十四 ✓ resolver auto-flow / 二百五十五 sovereign-override audit emission pending).
+
+## 2026-05-07 — chapter 二百五十五 (M742) Counter-Host gate sovereign-override audit emission — Stage 2 fully closed
+
+附录 V Stage 2 (Counter-Host Gate Auto-Wire) second + final chapter. Pre-chapter 二百五十五 the chapter 一百三十一 / M514 gate's override path emitted only the standard `sovereign-verdict:<ref>` reason code. Audit walkers couldn't distinguish:
+- "promoted because Counter-Host check passed naturally" (`outcome == .genuineHostPattern` etc.)
+- "promoted because sovereign authorized counter-host-drift" (`outcome == .systemInducedDrift` + override)
+
+Both produced byte-equal audit trails. The doctrine pin "不变量 #3 加固 — 不通过宿主自证循环塑造宿主" was load-bearing as of chapter 二百五十四, but forensic queries asking "did the override path fire this turn?" had no signal to grep.
+
+- **M742** modify `BehavioralAISubstrate/Sources/BASObservability/BASUpdateTicketLifecycle.swift`:
+  - Extend `approveForDistillation(ticketID:sovereignVerdictRef:)` with optional `extraReasonCodes: [String] = []` argument. Default `[]` preserves pre-chapter-二百五十五 behaviour byte-for-byte. Reason codes append after `sovereign-verdict:<ref>`.
+- **M742** modify `BehavioralAISubstrate/Sources/BASHostKit/BASUpdateTicketLifecycleCounterHostGate.swift`:
+  - The override branch (`.systemInducedDrift` + non-empty verdictRef) now passes `["counter-host-gate:passed-with-sovereign-override"]` plus the Counter-Host check's own `reasonCodes` (so the audit trail explains *why* the gate considered this a self-confirmation-loop candidate).
+  - Block branch unchanged (`counter-host-gate:blocked-no-sovereign-override` already shipped chapter 一百三十一).
+- 5 fix-pin tests in `BASUpdateTicketLifecycleCounterHostOverrideAuditTests.swift` (~190 LOC):
+  - default `extraReasonCodes: []` produces byte-equal pre-chapter-二百五十五 reason codes (`["sovereign-verdict:<ref>"]`)
+  - `extraReasonCodes:` append in order after the sovereign-verdict code
+  - **THE KEY TEST**: override branch (`.systemInducedDrift` + verdictRef) emits `counter-host-gate:passed-with-sovereign-override` + check's reason codes carried forward
+  - natural-pass branch does NOT emit the override code (the load-bearing distinguishing test)
+  - block branch retains existing `counter-host-gate:blocked-no-sovereign-override` audit code
+
+**Audit walker grep table (post-chapter-二百五十五)**:
+| Reason code | Branch | Meaning |
+|---|---|---|
+| `sovereign-verdict:<ref>` | natural pass + override | every promotion |
+| `counter-host-gate:passed-with-sovereign-override` | override only | self-confirmation-loop candidate sovereign-authorized |
+| `counter-host-gate:blocked-no-sovereign-override` | block only | self-confirmation-loop candidate REFUSED |
+| `<check-specific reason codes>` | override + block | WHY the gate fired (e.g. `self-confirmation-loop`) |
+
+**Doctrine pins maintained**:
+- 不变量 #3 加固 (now both load-bearing AND auditable): every override path gets an explicit grep target.
+- 红线 7 watcher-only-hint: audit code is hint-emission (observability), not a permit gate.
+- chapter 二百十一 single-source-of-truth: the actual gate logic stays in `BASUpdateTicketLifecycleCounterHostGate.swift`; the new audit code is one constant string emitted at the override site.
+- Backward-compat: default-empty `extraReasonCodes` preserves all existing callers (verified by `testApproveForDistillationDefaultArgUnchanged`).
+
+**附录 V Stage 2 fully closed** (2/2 chapters):
+- 二百五十四 ✓ resolver auto-flow
+- 二百五十五 ✓ sovereign-override audit emission ← **THIS COMMIT**
+
+Test impact: BAS XCTest 3076 → **3081** (+5 chapter 二百五十五 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+**Stages summary**:
+- Stage 0 ✓ Foundation: Persistence (chapters 二百四十八-二百五十)
+- Stage 1 ✓ Memory Importance Loop (chapters 二百五十一-二百五十三)
+- Stage 2 ✓ Counter-Host Gate Auto-Wire (chapters 二百五十四-二百五十五) ← **JUST CLOSED**
+- Stage 3 — Real Bench Data Closure (chapters 二百五十六-二百六十) is next. Stage 3 begins the data-feedback chapters: real iPhone `.rawLLM` 8h bench → bench JSONL → ChengluPreflight v1 retrain → ship.
