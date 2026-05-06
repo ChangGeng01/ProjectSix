@@ -917,3 +917,269 @@ path. Chapter 二百六十五 awaits real bench data.
 
 These cannot be relaxed by future chapters. ADR-NNN that
 proposes to relax must be explicitly rejected.
+
+---
+
+## ADR-013 (chapters 二百九十九-三百〇一) — Per-layer concurrency doctrine: typed actor + budget slice + ML head slot + kill switch + error boundary
+
+### Context
+
+Phase Alpha (chapters 二百七十五-二百九十八) deconstructed 4 god
+files (5,347 / 3,316 / 4,770 / 8,224 LOC) + 1 god test file (5,626
+LOC) into layer-isolated files ≤ ~1500 LOC each, with 0 behavior
+change. The split alone is not enough — each layer's typed
+processing boundary needs a contract so future cuts can wire
+actor-isolation, per-layer budgets, and ML head slots without
+breaking the file split.
+
+附录 W §W.3 specified the Phase Beta foundation as "BASLayerActor
+protocol + LayerSlice budget + ML head slot ready" + "BASKill
+SwitchID 14 cases + per-layer error boundary". Chapters 二百九十九,
+三百, 三百〇一 each ship one cut of this typed foundation.
+
+### Decision
+
+The per-layer typed contract has 17 primitives across 3 chapters:
+
+**chapter 二百九十九 (M786) ships the actor protocol:**
+- `BASLayerActor` actor protocol — `layerID:
+  BASMotherboardLayer14` (固定) + `process(input:) async throws ->
+  BASLayerActorOutput`
+- `BASLayerActorInput` (BASSchemaVersioned 1.0.0)
+- `BASLayerActorOutput` (BASSchemaVersioned 1.0.0)
+- `BASLayerActorStatus` (8-case: completed / skippedByGate /
+  skippedByKill / errorBoundaryHandled / budgetExceeded /
+  mlHeadFallthrough / partial / quarantined)
+- `BASLayerInferenceConfidence` (4-case: high / medium / low /
+  unknown)
+- `BASLayerActorError` (5-case Error enum: budgetExceeded /
+  killSwitchActive / dependencyMissing / quarantine /
+  internalFailure)
+
+**chapter 三百 (M787) ships budget slice + ML head slot:**
+- `BASLayerSlice` (BASSchemaVersioned 1.0.0) — per-call budget
+  with allocated/hardCap/decode/loop allowances + observabilityOnly
+  flag
+- `BASLayerMLHeadKind` (5-case: rules / coreml-on-device / mlx-local
+  / apple-foundation-model / external-provider — matches chapter
+  一百七十七 cascading inference stack)
+- `BASLayerMLHead` protocol — `headID` + `kind` + `infer(input:)`
+- `BASLayerInferenceInput` / `BASLayerInferenceOutput` frames
+  (BASSchemaVersioned 1.0.0)
+
+**chapter 三百〇一 (M788) ships kill switch + error boundary:**
+- `BASLayerKillSwitchID` (14-case enum bijective with
+  `BASMotherboardLayer14`) — distinct from existing 4-case
+  `BASKillSwitchID` (policy-class) in BASObservability
+- `BASLayerKillSwitchReason` (8-case: manual / thermalEmergency /
+  sovereignVerdict / budgetCascade / observabilityHalt /
+  quarantineEscalation / errorBoundaryTrip / dependencyMissing)
+- `BASLayerKillSwitchState` (BASSchemaVersioned 1.0.0)
+- `BASLayerErrorFallthroughStrategy` (5-case: gracefulSkip /
+  useLastKnown / mlHeadFallthrough / abortTurn / sovereignEscalate)
+- `BASLayerErrorBoundaryReport` (BASSchemaVersioned 1.0.0) with
+  `.from(error:capturedAt:)` derive helper
+
+### Doctrine pins
+
+The error-boundary derive helper enforces 4 invariants by default:
+
+| Layer | Default Strategy | Why |
+|---|---|---|
+| L1 wake error | `.abortTurn` | 不变量 #1 enforcement — without wake, turn cannot honor 先醒再答 |
+| L11 permit error | `.sovereignEscalate` | 单提交口 doctrine — permit authority cannot graceful-skip |
+| L14 sovereign error | `.sovereignEscalate` | 单提交口 doctrine — verdict authority cannot graceful-skip |
+| `.quarantine` (any layer) | `.sovereignEscalate` | BR-014 sovereign-domain-scope — contamination requires L14 review |
+| All other observability errors | `.gracefulSkip` | Lose this turn's layer output, turn continues |
+
+These default strategies are tested in `BASLayerKillSwitchIDTests`
+and cannot be relaxed by callers — the derive helper hardcodes the
+mapping.
+
+### Boundary (what doctrine permits and what it forbids)
+
+**Permits:**
+- Each layer can be implemented as an actor that conforms to
+  `BASLayerActor`
+- `BASLayerSlice.observabilityOnly = true` for watcher / hint-only
+  layers (红线 7) — output never feeds permit/verdict logic
+- ML heads (chapter 三百一三+ CoreML mesh) plug into actor's
+  optional `mlHeadSlot` field (added in future chapter); cascade
+  fallthrough on `confidence < confidenceFloor`
+- Coordinator catches `BASLayerActorError`, derives an
+  `BASLayerErrorBoundaryReport`, applies the strategy
+
+**Forbids:**
+- Layer A's `process` cannot await Layer B's actor — turn
+  coordinator is single-threaded scheduler; layer-to-layer
+  communication via typed Sendable input/output frames only
+- ML heads cannot issue permits or warrants — `recommendedAction`
+  is hint, `BASLayerActor.process` retains verdict authority
+- Kill switch firing does not grant new privilege — only declares
+  layer unavailable; the `.sovereignVerdict` reason is the only
+  case requiring L14 warrant (BR-014)
+- L1 wake actor errors must abort turn — graceful-skip would
+  violate 不变量 #1
+
+### Why three chapters (not one)
+
+The typed contract is large enough that one chapter would have
+exceeded the working-memory bounds for review. Splitting into
+three cuts (protocol → slice+slot → kill+boundary) lets each cut
+ship cleanly with focused tests:
+
+- chapter 二百九十九: 18 tests (cardinality + Codable + protocol
+  conformance via mock actor + 5-case error boundary equality)
+- chapter 三百: 20 tests (clamping invariants + 5-case kind enum +
+  stub MLHead conformance + cascade fallthrough)
+- chapter 三百〇一: 18 tests (14-case bijection + 8-case reason +
+  5-case strategy + `.from(error:)` doctrine pins)
+
+### Doctrine alignment
+
+ADR-013 does not introduce new red-line invariants. It encodes the
+existing doctrine (不变量 #1-#3 + 单提交口 + 红线 7 + BR-014) into
+typed primitives that the future Phase Gamma + Phase Delta can
+consume safely.
+
+### Doctrine tests pinning ADR-013
+
+- `BASLayerActorTests` (18 tests): 不变量 #1 not violated, single
+  commit mouth preserved by protocol contract
+- `BASLayerSliceAndMLHeadTests` (20 tests): 红线 7 enforced via
+  `observabilityOnly` flag; cascading inference doctrine pinned
+- `BASLayerKillSwitchIDTests` (18 tests): all 4 derive-helper
+  default strategies pinned in tests
+
+---
+
+## ADR-014 (chapter 三百〇二) — OPT-IN → PROD migration doctrine: backward-compat opt-out flags + integration test per chapter
+
+### Context
+
+附录 V chapter 二百七十四 (Honesty Corrigendum) shipped with the
+explicit observation that 14 of 24 closed chapters at that time
+were "OPT-IN" rather than "PROD" — meaning typed primitives were
+ready but the substrate's default code path was unchanged. Hosts
+had to opt in via explicit construction (passing `databaseURL:`,
+calling `.sqliteBacked` factory, etc).
+
+The 6 OPT-IN gaps were:
+1. L8 atom store — `BASInMemoryMemoryAtomStore` is default;
+   `BASSQLiteMemoryAtomStore` requires explicit `databaseURL:`
+2. L8 importance loop — `BASMemoryClosedLoopApplier` exists but
+   `BASHostRuntime` doesn't auto-construct one
+3. L5 host vault — value-type `BASHostConstitutionVault` is in-
+   memory; `BASHostConstitutionSQLiteStorage` exists but hosts
+   wire it themselves
+4. L11 calibration gate — `BASRiskCalibrationGate` exists; L11
+   risk threshold reads default tunables, not the gate
+5. L9 shadow evaluator — `BASShadowEvaluatorPipeline` exists;
+   bench loop default uses substrate-reaudit hardcoded path
+6. L13 ticket lifecycle — `BASUpdateTicketLifecycleSQLiteStorage`
+   exists; default coordinator init is in-memory
+
+附录 W §W.4 specified Phase Gamma to wire these 6 gaps to PROD.
+But naïvely changing default behavior risks breaking existing
+hosts that depend on in-memory semantics (e.g. test fixtures,
+isolated test runs).
+
+### Decision
+
+Phase Gamma (chapters 三百〇二-三百一三) wires OPT-IN → PROD with
+**three required guardrails per cut**:
+
+**Guardrail 1: Backward-compat opt-out flag**
+
+Each PROD wire-up adds a `preferLegacy*: Bool = false` field to
+the relevant configuration struct (e.g.
+`BASHostConfiguration.preferLegacyMemoryStore`). When `true`, the
+substrate falls back to the old default (in-memory store, hardcoded
+threshold, etc). The flag exists for one purpose: existing hosts
+can flip the flag and revert to pre-Phase-Gamma behavior without
+touching code beyond a single config edit.
+
+**Guardrail 2: Integration test per chapter**
+
+Each PROD wire-up adds at least one integration test that proves
+the chain wires:
+- "construct BASHostRuntime with new defaults"
+- "drive 1 turn"
+- "assert the new wire fired" (e.g. SQLite file created, importance
+  loop emitted reason code, etc)
+
+This test is the binary truth for whether the wire-up shipped or
+not. It cannot be replaced by a unit test of the typed primitive
+in isolation — the integration test must drive through real
+runtime construction.
+
+**Guardrail 3: Doctrine alignment audit**
+
+Each PROD wire-up explicitly states which doctrine pins it
+strengthens (or carries forward). For example, L8 atom store wire
+strengthens "memory persists across sessions" (a substrate-level
+property previously only held when hosts opted in). Each chapter's
+honesty board entry MUST state this.
+
+### Boundary (what doctrine permits and what it forbids)
+
+**Permits:**
+- Default behavior changes (e.g. SQLite-backed instead of in-memory)
+  WHEN guardrails 1+2+3 are met
+- Removal of `preferLegacy*` flags in a future major version (ADR-NNN)
+  if the migration period is over
+- Addition of audit signalRefs documenting which path fired
+  (`memory-store:sqlite-backed` vs `memory-store:in-memory`)
+
+**Forbids:**
+- Default behavior changes WITHOUT guardrails (silent migration)
+- Removing the in-memory fallback path entirely (test fixtures
+  still need it; isolated test runs cannot be SQLite-coupled)
+- Wiring 6 OPT-INs in a single chapter — each gets its own chapter
+  with own integration test; one PR cannot consolidate the changes
+- Mutating L11 / L14 production decision logic (single-commit-mouth
+  doctrine) — only their *inputs* (calibration thresholds,
+  audit codes) can be wired, not their decision authority
+
+### Why per-chapter (not bulk migration)
+
+附录 V chapter 二百七十二 (M759 closes self-assessment Gap #1) and
+chapter 二百七十三 (M760 closes self-assessment Gap #4) demonstrated
+that production-wire integration tests catch issues unit tests miss.
+Bulk migration would compound risk; per-chapter gives:
+
+- 1 commit per wire-up → independently revertable
+- 1 integration test per wire-up → binary signal
+- 1 honesty board entry per wire-up → doctrine alignment audit
+
+### Doctrine alignment
+
+ADR-014 does not relax red-line invariants. It encodes the OPT-IN →
+PROD migration discipline that previous Phase Alpha + Phase Beta
+foundations made possible. The discipline is: every default
+behavior change is observable, reversible, and gated by integration
+test.
+
+### Doctrine tests pinning ADR-014
+
+To be added per chapter as Phase Gamma cuts ship. Each chapter's
+integration test serves as the doctrine pin — without the test,
+the chapter is not considered shipped.
+
+### Phase Gamma scope (附录 W §W.4)
+
+| Chapter | Scope |
+|---|---|
+| 三百〇二 | ADR-013 + ADR-014 doctrine documents (this) |
+| 三百〇三 | L8 atom store SQLite-backed default + opt-out + integration test |
+| 三百〇四 | L8 memory usage tracker auto-injection + integration test |
+| 三百〇五 | L8 importance loop applier auto-construction + integration test |
+| 三百〇六 | L5 host vault SQLite-backed default + integration test |
+| 三百〇七 | L11 calibration gate auto-consult + integration test |
+| 三百〇八 | L11 stratum sub-model registry auto-load + integration test |
+| 三百〇九 | L9 shadow evaluator pipeline default + integration test |
+| 三百一〇 | L9 ML-backed evaluator default + integration test |
+| 三百一一 | L13 ticket lifecycle SQLite-backed default + integration test |
+| 三百一二 | L13 counter-host gate auto-fire + integration test |
+| 三百一三 | Phase Gamma audit + cumulative integration test sweep |
+
