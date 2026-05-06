@@ -1794,3 +1794,38 @@ Stage 4 progress: **4/5 chapters shipped**.
 5. Per-turn L11 logic calls `gate.effective<Tier>Threshold(forStratumKey:base:)` instead of using base thresholds directly (additive wiring; existing L11 paths can adopt incrementally).
 
 The gate is **ready to be wired into existing L11 calibrate-risk paths** but doing so is a separate incremental refactor (each L11 site adopting the gate is its own small chapter). No existing L11 path is broken by chapter 二百六十四 — the gate is an additive primitive.
+
+## 2026-05-07 — chapter 二百六十六 (M748) `BASShadowEvaluating` protocol — Stage 5 Step 1 of 5
+
+附录 V Stage 5 (Shadow Evaluator) opens. Pre-chapter 二百六十六 SampleHost shipped a substrate-driven post-LLM observer (chapter 二百四十二 / M824) but no BAS-side protocol existed for the abstract "shadow evaluator" contract. Without the protocol, every host that wants a shadow evaluator builds the same shape ad-hoc with no shared type for composition / mocking / future-ML-backed swap-in.
+
+Chapter 二百六十六 ships the protocol + result type + a trivial conformer (no-op for tests + ephemeral hosts). Subsequent chapters wire substrate-driven (二百六十七), ML-backed (二百六十八), and bench-loop integration (二百六十九, 二百七十).
+
+- **M748** NEW `BehavioralAISubstrate/Sources/BASEvaluation/BASShadowEvaluating.swift` (~210 LOC). Three new public types:
+  - **`BASShadowEvaluationResult`** — `BASSchemaVersioned` + `Sendable` + `Equatable` + `Codable` + `Hashable`. Fields: `postPermitMode: String?` / `postAuditCodeCount: Int?` / `shifted: Bool` / `reasonCodes: [String]` / `evaluatorVersion: String` / `evaluatedAt: Date`. Plus `.skipped(evaluatorVersion:evaluatedAt:)` factory for empty/skipped paths.
+  - **`BASShadowEvaluating`** — `protocol: Sendable`. One required method: `evaluate(prompt:body:prePermitMode:sessionRef:turnRef:) async -> BASShadowEvaluationResult`. Plus `evaluatorVersion: String` static property.
+  - **`BASNoOpShadowEvaluator`** — trivial conformer. Always returns `.skipped`. For tests + hosts that don't want to wire a real evaluator yet.
+- Defensive validation in `BASShadowEvaluationResult` init: `evaluatorVersion` trimmed; `postPermitMode` trimmed (when non-nil); `reasonCodes` trim + filter empties.
+- 10 fix-pin tests in `BASShadowEvaluatingTests.swift` (~165 LOC):
+  - schema version pinned
+  - `.skipped` sentinel shape
+  - reasonCodes trim + filter empties
+  - evaluatorVersion trimmed
+  - postPermitMode trimmed when present + nil-preserved
+  - **Codable round-trip preserves all fields**
+  - NoOp always returns `.skipped`
+  - NoOp accepts custom version
+  - NoOp deterministic across inputs
+  - Hashable set membership
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3: protocol is observability — conformers MUST NOT mutate production state.
+- 红线 7 watcher-only-hint: results are HINTS. Hosts decide whether to act on `shifted == true`; the evaluator itself never decides.
+- chapter 一百七十八 / M630 closed-loop substrate-is-arbiter doctrine: substrate-driven conformer (chapter 二百六十七) re-runs substrate against the LLM body. Protocol itself is doctrine-agnostic; ML-backed conformers (chapter 二百六十八+) follow a different shape but expose the same contract.
+- chapter 二百十一 single-source-of-truth: protocol + result type live in this one file.
+
+Lives in **BASEvaluation** (not BASOrchestration / BASMemory) because evaluation is the natural home — `EvaluationCore.swift` already houses regression / calibration types. BASEvaluation depends on BASRuntimeCore + BASMemory + BASPolicy + BASObservability per Package.swift; BASHostKit (which would create a cycle) is intentionally avoided.
+
+Test impact: BAS XCTest 3108 → **3118** (+10 chapter 二百六十六 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+Stage 5 progress: **1/5 chapters shipped** (二百六十六 ✓ protocol + no-op conformer / 二百六十七 substrate-driven conformer pending / 二百六十八 ML-backed conformer pending — needs real bench data / 二百六十九 bench loop integration pending / 二百七十 meridian expansion pending — multi-month).
