@@ -1,25 +1,9 @@
 import SwiftUI
 import BASHostKit
 
-enum SampleHostWindGatePresentationSupport {
-    static func modeLabel(_ mode: BASActionPermitMode) -> String {
-        humanizedToken(mode.rawValue)
-    }
-
-    static func modeLabels(_ modes: [BASActionPermitMode]) -> String {
-        modes.map(modeLabel).joined(separator: " • ")
-    }
-
-    static func domainList(_ domains: [String], limit: Int = 3) -> String {
-        Array(domains.prefix(limit)).map(humanizedToken).joined(separator: " • ")
-    }
-
-    static func humanizedToken(_ token: String) -> String {
-        token
-            .replacingOccurrences(of: "_", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-}
+// M811 chapter 二百三十 — `SampleHostWindGatePresentationSupport`
+// extracted to dedicated foundation file
+// `SampleHostWindGatePresentationSupport.swift`.
 
 struct SampleHostView: View {
     @ObservedObject var model: SampleHostModel
@@ -64,37 +48,7 @@ struct SampleHostView: View {
 
                     SampleHostHybridBenchPanel(model: model)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(model.result.activeSessionTitle)
-                            .font(.headline)
-                        if let lastError = model.lastError {
-                            Text(lastError)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                        Text("Workflow: \(model.result.currentBrain.workflowTitle)")
-                            .font(.subheadline.weight(.medium))
-                        Text("Posture \(model.result.currentBrain.identityPosture.rawValue) • initiative \(model.result.currentBrain.identityInitiative.rawValue) • boundary \(model.result.currentBrain.boundaryMode.rawValue)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("Calibration \(model.result.currentBrain.calibrationStatus.rawValue) • confidence \(Int((model.result.currentBrain.confidenceCeiling * 100).rounded()))% • pending review \(model.result.currentBrain.evolutionPendingReviewCount)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if !model.result.currentBrain.dominantGoals.isEmpty {
-                            Text(model.result.currentBrain.dominantGoals.joined(separator: " • "))
-                                .font(.subheadline)
-                        }
-                        if !model.result.currentBrain.activeConstraints.isEmpty {
-                            Text(model.result.currentBrain.activeConstraints.joined(separator: " • "))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        if !model.result.notices.isEmpty {
-                            Text(model.result.notices.joined(separator: " • "))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    SampleHostActiveSessionPanel(model: model)
 
                     SampleHostThirteenLayerTurnDetailView(
                         turn: model.result.eBrainTurn,
