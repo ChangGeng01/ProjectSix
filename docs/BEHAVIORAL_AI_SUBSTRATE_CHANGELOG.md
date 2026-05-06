@@ -1646,3 +1646,38 @@ The infrastructure is now ready. Stage 3 closes when the user runs the iPhone be
 This is a docs-only chapter — 0 code changes, 0 test changes, BAS XCTest count unchanged at 3081.
 
 Stage 4 progress: **1/5 chapters shipped** (二百六十一 ✓ doctrine / 二百六十二 aggregator script / 二百六十三 typed bundle / 二百六十四 L11 wire / 二百六十五 per-stratum sub-models pending).
+
+## 2026-05-07 — chapter 二百六十二 (M745) `aggregate_risk_stratum.py` Mac-side aggregator — Stage 4 Step 2 of 5
+
+附录 V Stage 4 (Hybrid Risk Calibration) second chapter. ADR-012's "offline aggregation pipeline" needs a concrete tool. Chapter 二百六十二 ships the Mac-side script that reads bench JSONL across many sessions, aggregates by stratum, strips host-specific identifiers, and emits generalized stratum stats for operator review.
+
+- **M745** NEW `scripts/aggregate_risk_stratum.py` (~410 LOC). Pure-Python Mac-side tool:
+  - Reads bench JSONL recursively from one-or-more `--input` directories.
+  - Aggregates by configurable stratum keys (default: tone × stake × confidant per chapter 一百七十六 / 一百九十 highest-signal dimensions).
+  - **Anti-leakage doctrine** (ADR-012 + 不变量 #3): `FORBIDDEN_OUTPUT_FIELDS` denylist drops user-input echoes (`prompt` / `errorMessage`), LLM body fields (5 historical name variants), per-iter identifiers (`timestamp` / `iteration` / `seed` / etc.), and any `*Ref` field. Strict mode (`--strict`) raises on unexpected `*Ref` keys instead of just warning.
+  - **Small-cell suppression**: strata with fewer than `--min-stratum-count` (default 5) rows are coalesced into a `lowSignalCoalesced` aggregate to prevent leakage via small-cell statistics.
+  - **Provenance metadata** in output: file count, total rows, file mtime range (since per-row timestamps are stripped), generation timestamp, doctrine reference (`"ADR-012"`).
+  - Output JSON shape:
+    ```
+    { "provenance": {...},
+      "strata": [
+        { "stratum": {tone, stake, confidant},
+          "rowCount": N,
+          "permitMode": {answer: x, delay: y, block: z, ...},
+          "firstTriedLLM": {...}, "firstTriedStatus": {...},
+          "routerHits": N, "llmSkipped": N }
+      ],
+      "lowSignalCoalesced": {...} }
+    ```
+- 5 anti-magic-number constants: `DEFAULT_STRATUM_KEYS`, `VALID_STRATUM_KEYS` (frozenset of 6 SampleHostPromptSignature dims), `FORBIDDEN_OUTPUT_FIELDS` (denylist of leakage vectors), `MIN_STRATUM_COUNT_FOR_EMIT`. Mis-spelled `--stratum-keys` fails fast (exit 2 with valid-keys list).
+- Smoke-tested with 7-row synthetic JSONL: 5 angry/high/public rows aggregated into "block: 4, delay: 1" stratum; 2 calm/low/self rows coalesced into `lowSignalCoalesced` (below 4-row threshold). Output JSON contains 0 prompt-text echoes, 0 timestamps, 0 iteration numbers — **field-stripping doctrine verified**.
+
+**Doctrine pins maintained**:
+- 不变量 #2 (神经不掌权): script is observability-only; does NOT mutate any permit decision; output is decision-support for operator-authored bundle (chapter 二百六十三+).
+- 不变量 #3 (私有经验不进权重): host-specific fields are STRIPPED at the row-extraction step. Only stratum keys + counts survive.
+- ADR-006 strict: bench data is observability ONLY at per-turn scope. ADR-012 permits this between-deploy aggregation; the script's output is itself observability — operator must explicitly produce + ship a bundle to affect any decision.
+- chapter 一百零二 五级删除: documented in script — operators are responsible for filtering revoked sessions out of their input directories before aggregation. (Until bench JSONL carries a `forgetMarker` field, the input is assumed clean per operator pre-filter.)
+
+This is a docs+script chapter — 0 BAS source changes, 0 BAS test changes, 0 SampleHost changes. BAS XCTest count unchanged at 3081.
+
+Stage 4 progress: **2/5 chapters shipped** (二百六十一 ✓ doctrine / 二百六十二 ✓ aggregator script / 二百六十三 typed bundle pending / 二百六十四 L11 wire pending / 二百六十五 per-stratum sub-models pending).
