@@ -409,7 +409,10 @@ struct BASEBrainProgramBlueprintTests {
             "LayerMLHeadSlot",
             // M799 (chapter 三百一二) — Phase Delta 3rd code cut:
             // typed cascading inference result.
-            "LayerCascadeResult"
+            "LayerCascadeResult",
+            // M800 (chapter 三百一三) — Phase Delta 4th code cut:
+            // typed 14-layer × ML head canonical mesh map slot.
+            "LayerMeshSlot"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

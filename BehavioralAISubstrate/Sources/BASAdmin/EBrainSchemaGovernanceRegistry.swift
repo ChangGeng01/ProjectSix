@@ -1429,6 +1429,14 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "LayerCascadeResult",
             versionedType: BASLayerCascadeResult.self,
             tests: ["schema.layer_cascade_result.current", "schema.layer_cascade_result.backward"]
+        ),
+        // M800 (chapter 三百一三) — Phase Delta 4th code cut: typed
+        // 14-layer × ML head canonical mesh map slot record.
+        // chapter 一百七十七 vision typed encoding.
+        entry(
+            "LayerMeshSlot",
+            versionedType: BAS14LayerMeshSlot.self,
+            tests: ["schema.layer_mesh_slot.current", "schema.layer_mesh_slot.backward"]
         )
     ]
 

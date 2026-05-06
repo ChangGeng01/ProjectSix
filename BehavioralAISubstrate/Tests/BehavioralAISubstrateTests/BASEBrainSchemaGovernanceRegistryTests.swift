@@ -558,7 +558,11 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             // M799 (chapter 三百一二) — Phase Delta 3rd code cut:
             // typed cascading inference result.
             "LayerCascadeResult":
-                BASLayerCascadeResult.currentSchemaVersion
+                BASLayerCascadeResult.currentSchemaVersion,
+            // M800 (chapter 三百一三) — Phase Delta 4th code cut:
+            // typed 14-layer × ML head canonical mesh map slot.
+            "LayerMeshSlot":
+                BAS14LayerMeshSlot.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)
