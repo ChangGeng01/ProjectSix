@@ -1240,3 +1240,15 @@ SampleHost tests 76 → **80**; full stack **1957 + 1 parity gate + 7 analysis t
 - **M770** Build Release iPhone 17e + deployed PID 55449.
 
 SampleHost tests 80 → **82**; full stack **1959 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. Two prior bench runs archived: heavy-tailed 175MB / canonical 65MB substrate-stress data.
+
+## 2026-05-06 — chapter 二百五 (M771-M775) benign prompt catalog — substrate-engage path
+
+- **M771** NEW `SampleHost/SampleHostBenignPromptCatalog.swift` — 80 prompts × 8 categories (factual / translation / math / cooking / creative / programming / geography / how-to) + pinned low-risk signature + deterministic `generate(forIter:)` cycling.
+- **M772** `SmokeMode.benign` case in `HybridBenchConfig.SmokeMode`; bench loop branches on smokeMode for prompt source.
+- **M773** UI Picker 4 cases (canon / 14-L / heavy / benign). Disabled mid-bench.
+- **M774** Bench loop forces `riskLevel = .low` in benign mode (override stake mapping).
+- **M775** +5 fix-pin tests; updated chapter-203 invariant `testSmokeModeRawValuesAreStable` (≥4 cases now); xcodeproj +4 entries.
+
+Doctrine: substrate's L7 mirror + L11 risk-gate still evaluate every iter. We just feed different inputs (red line 7 + 不变量 #2 held). Hypothesis: 70-90% LLM-fire on benign vs 0% on chapter-173+ adversarial.
+
+SampleHost tests 82 → **87**; full stack **1964 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. iPhone deployed PID 55673.

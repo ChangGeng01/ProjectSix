@@ -25596,3 +25596,104 @@ Build Release for iPhone 17e: TEST BUILD SUCCEEDED. Deployed PID 55449.
 ### 204.7 一句话总结
 
 **Chapter 二百四 (M766-M770)**: iPhone bench data accumulation hypothesis chase. Chapter 196 + chapter 200-prep BOTH yielded 100% substrate-skip (heavy-tailed: block-heavy / canonical: delay-heavy), 0 LLM calls. Root cause traced: bench loop hardcoded `workflowProfile: .reflective` since chapter 178 — substrate's reflective workflow always routes to .delay regardless of stake. Chapter 204 ships `@Published hybridBenchWorkflowProfile: BASHostWorkflowProfile = .reflective` flex + UI SegmentedPicker (primary / comparative / reflective). Default reflective preserves chapter 178+ doctrine; operator picks `.primary` for LLM-data runs (hypothesis: ~30-40% LLM-fire rate proportional to low/modest stakes). Bench loop captures + uses at 2 sites (substrate routing + post-LLM observation). +2 fix-pin tests / 82 SampleHost / 1959 全栈 / 0 failures. iPhone 17e build deployed PID 55449. Both prior bench runs archived (heavy-tailed 175MB + canonical 65MB) — substrate-stress data even without LLM responses. Next bench: tap `.primary` workflow + canonical mode + Start → expect first real LLM-data accumulation.
+
+## 二百五、 benign prompt catalog — substrate-engage path (M771-M775 / 2026-05-06)
+
+User picked option 3 after chapter 196+200+204 finding: substrate routes 100% of chapter-173+ adversarial catalog to skip path regardless of workflowProfile (chapter 204 .primary still got 100% delay/block in 415-row sample). Real root cause: catalog stresses substrate's L7+L11 risk detection BY DESIGN. For training-data accumulation we need a DIFFERENT catalog that legitimately routes to .answer permit.
+
+### 205.1 M771 — SampleHostBenignPromptCatalog
+
+NEW `SampleHost/SampleHostBenignPromptCatalog.swift` with 80 prompts across 8 categories (10 each):
+
+- Factual general-knowledge ("What's the boiling point of water at sea level?")
+- Translation ("Translate 'good morning' into Spanish.")
+- Math/arithmetic ("Calculate two hundred forty divided by six.")
+- Cooking ("How long should I boil a soft-boiled egg for?")
+- Creative writing — bounded ("Write a four-line haiku about autumn leaves.")
+- Programming — factual ("What does HTTP stand for?")
+- Geography ("Which ocean is the largest by area?")
+- Light hobbies / how-to ("How do I tie a basic shoelace knot in steps?")
+
+Pinned low-risk signature: tone=curious / domain=creative / stake=low / timeframe=minutes / confidant=decision-system / askShape=single-action.
+
+`generate(forIter:)` cycles deterministically through the 80-prompt list (iter % 80).
+
+### 205.2 M772-M774 — wired into bench loop
+
+- New `SmokeMode.benign` case ("benign" raw value)
+- Bench loop checks `smokeMode == .benign`:
+  - Uses `SampleHostBenignPromptCatalog.generate(forIter:)` instead of adversarial generator
+  - Forces `riskLevel = .low` regardless of stake mapping
+  - Skips layer-profile signature override (benign signature is fixed)
+- UI Picker now 4 cases: canon / 14-L / heavy / **benign**
+
+### 205.3 Doctrine pin
+
+Red line 7 + 不变量 #2 NOT broken: substrate STILL evaluates the prompt + signature + risk. We just feed it different inputs. Substrate's L7 (mirror) and L11 (risk-gate) still run on every iter; they just (hopefully) route benign prompts to `.answer`.
+
+If substrate STILL routes benign prompts to skip, that's a deeper finding (substrate's risk evaluation is over-conservative even on benign inputs). If substrate engages → training data accumulates → bench_to_train.py produces v0.5.
+
+### 205.4 Tests (M774)
+
+| Test | Pin |
+|---|---|
+| `testBenignCatalogHas80Prompts` | exactly 80 entries |
+| `testBenignCatalogPromptsAreLowRisk` | no "I'm" / "Help me" prefixes |
+| `testBenignSignatureIsLowRisk` | stake=low / tone=curious / timeframe=minutes |
+| `testBenignGenerateIsDeterministic` | same iter → same output |
+| `testBenignGenerateCyclesThrough80` | all 80 distinct seen in 80 iters |
+
+Plus updated chapter 203 invariant `testSmokeModeRawValuesAreStable` to require ≥4 cases (was 3) and check "benign" present.
+
+SampleHost tests: 82 → **87** (+5 chapter 205).
+
+### 205.5 Verification
+
+| Surface | Result |
+|---|---|
+| BAS XCTest | 419 ✓ |
+| Qinao XCTest | 1442 ✓ |
+| SampleHost on iPhone 17 sim | **87** ✓ |
+| iOS Sim build | TEST BUILD SUCCEEDED |
+| iPhone Release build + deploy | PID 55673 launched |
+| 4 boundary checks + parity | clean |
+| god-file guard | 3 warns / 0 errors |
+| **Total** | **1964 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures** |
+
+### 205.6 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostBenignPromptCatalog.swift` | NEW — 80 benign prompts + pinned low-risk signature + generate(forIter:) |
+| `SampleHost/SampleHostModel.swift` | M772 +`.benign` SmokeMode case; bench loop branches on smokeMode for prompt source + risk override |
+| `SampleHost/SampleHostView.swift` | M773 4-case Picker (added "benign") |
+| `SampleHostTests/SampleHostTests.swift` | +5 fix-pin tests; updated chapter-203 invariant for 4-case minimum |
+| `Before.xcodeproj/project.pbxproj` | +SampleHostBenignPromptCatalog.swift in 4 places |
+
+### 205.7 Hypothesis to verify (next bench)
+
+```
+.benign mode + .reflective workflow:
+  Hypothesis: substrate routes benign prompts to .answer permit
+  Expected: ~70-90% iters fire LLM (AFM or Gemma)
+  At iPhone ~5-10 iter/sec rate × 50% LLM × 5h = 50K+ training rows
+  bench_to_train.py --analyze-only should report VERDICT: ready
+
+.benign mode + .primary workflow:
+  Should produce even higher LLM-fire rate (faster decisions)
+  Expected: ~80-95% LLM-fire
+```
+
+If substrate STILL skips benign prompts: chapter 206+ — investigate substrate's risk-evaluation logic directly OR add explicit ".veryLow" risk override.
+
+### 205.8 Bench data archives now
+
+| Run | Description |
+|---|---|
+| 2026-05-06-heavy-tailed-4h33m/ | 175 MB / 106K rows / heavy-tailed substrate-stress |
+| 2026-05-06-canonical-45m-reflective/ | 65 MB / 41K rows / canonical reflective baseline |
+| 2026-05-06-chapter204-primary-4min-stillskip/ | small / 415 rows / proves workflow ≠ root cause |
+
+### 205.9 一句话总结
+
+**Chapter 二百五 (M771-M775)**: substrate-engage path opened via NEW `SampleHostBenignPromptCatalog` (80 prompts × 8 categories: factual / translation / math / cooking / creative / programming / geography / how-to). Pinned low-risk signature (curious / creative / low / minutes / decision-system / single-action). NEW `SmokeMode.benign` case in bench loop branches prompt source + forces `riskLevel = .low` (override stake mapping). UI Picker 4 cases. Doctrine: substrate's L7+L11 risk evaluation STILL runs every iter (red line 7 + 不变量 #2 held); we feed different inputs. **Hypothesis**: ~70-90% LLM-fire on benign prompts → training data accumulates → bench_to_train.py emits v0.5_real. **87 SampleHost tests pass**; 1964 全栈 / 0 failures. Real iPhone Release build + deployed PID 55673. Operator next: tap **benign** + **primary** workflow + Start. If substrate STILL skips: chapter 206 investigates substrate-side risk eval doctrine.

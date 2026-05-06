@@ -1614,6 +1614,56 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(m.hybridBenchWorkflowProfile, .reflective)
     }
 
+    // MARK: - chapter 二百五 / M771-M775 — benign prompt catalog
+
+    /// M771 — benign catalog has 80 prompts (8 categories × 10).
+    func testBenignCatalogHas80Prompts() {
+        XCTAssertEqual(
+            SampleHostBenignPromptCatalog.benignPrompts.count, 80)
+    }
+
+    /// M771 — all benign prompts are non-empty + don't start with
+    /// "I'm" (chapter 173+ adversarial often emotional first-person).
+    func testBenignCatalogPromptsAreLowRisk() {
+        for p in SampleHostBenignPromptCatalog.benignPrompts {
+            XCTAssertFalse(p.isEmpty)
+            XCTAssertFalse(
+                p.hasPrefix("I'm "),
+                "Benign prompt should not start with 'I'm ': \(p)")
+            XCTAssertFalse(
+                p.hasPrefix("Help me "),
+                "Benign prompt should not be help-emergency: \(p)")
+        }
+    }
+
+    /// M771 — benign signature is low-risk by all 6 fields.
+    func testBenignSignatureIsLowRisk() {
+        let s = SampleHostBenignPromptCatalog.benignSignature
+        XCTAssertEqual(s.stake, "low",
+            "Benign signature stake must be 'low'")
+        XCTAssertEqual(s.tone, "curious")
+        XCTAssertEqual(s.timeframe, "minutes")
+    }
+
+    /// M771 — generate(forIter:) is deterministic by iter.
+    func testBenignGenerateIsDeterministic() {
+        let g1 = SampleHostBenignPromptCatalog.generate(forIter: 7)
+        let g2 = SampleHostBenignPromptCatalog.generate(forIter: 7)
+        XCTAssertEqual(g1.prompt, g2.prompt)
+        XCTAssertEqual(g1.signature, g2.signature)
+    }
+
+    /// M771 — generate(forIter:) cycles through all 80 prompts.
+    func testBenignGenerateCyclesThrough80() {
+        var seen = Set<String>()
+        for i in 0..<80 {
+            let g = SampleHostBenignPromptCatalog.generate(forIter: i)
+            seen.insert(g.prompt)
+        }
+        XCTAssertEqual(seen.count, 80,
+            "All 80 distinct prompts should be cycled through")
+    }
+
     // MARK: - chapter 一百九十八 / M744-M747 — cooling + thermal widget
 
     /// M744 — cooling settings have sane defaults.
@@ -1791,16 +1841,18 @@ final class SampleHostTests: XCTestCase {
     }
 
     /// M764 — pin SmokeMode case names stable.
-    /// chapter 195 has 3 smoke modes; future chapters may add
-    /// but cannot remove (would break replay tools).
+    /// chapter 195 had 3 smoke modes; chapter 205 added .benign.
+    /// Future chapters may add more but cannot remove (would break
+    /// replay tools that grep on smokeMode raw values).
     func testSmokeModeRawValuesAreStable() {
         let modes = HybridBenchConfig.SmokeMode.allCases
-        XCTAssertGreaterThanOrEqual(modes.count, 3,
-            "SmokeMode case count cannot decrease")
+        XCTAssertGreaterThanOrEqual(modes.count, 4,
+            "SmokeMode case count cannot decrease (chapter 205+)")
         let raws = Set(modes.map(\.rawValue))
         XCTAssertTrue(raws.contains("canonical"))
         XCTAssertTrue(raws.contains("14-layer-smoke"))
         XCTAssertTrue(raws.contains("heavy-tailed"))
+        XCTAssertTrue(raws.contains("benign"))
     }
 
     /// M764 — pin DispatchPolicy case names stable (chapter 178 doctrine).

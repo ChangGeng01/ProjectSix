@@ -1778,6 +1778,16 @@ struct HybridBenchConfig: Codable, Sendable, Equatable {
         /// (M720) is ALSO active in this mode, layered on top of
         /// the catalog prompt at ~5% probability.
         case heavyTailed = "heavy-tailed"
+        /// M772 chapter 二百五 — benign prompt catalog mode.
+        /// chapter 196+200+204 finding: chapter-173+ adversarial
+        /// catalog produces 100% substrate-skip across all
+        /// workflowProfiles. For training-data accumulation we
+        /// need substrate's ENGAGE path — `.benign` mode swaps
+        /// in `SampleHostBenignPromptCatalog` (80 factual /
+        /// translation / math / cooking / programming queries
+        /// designed so substrate's L7+L11 evaluation routes to
+        /// `.answer` permit). Risk forced to `.low`.
+        case benign = "benign"
     }
     var durationHours: Double
     var strideRotationCSV: String
@@ -2768,7 +2778,10 @@ extension SampleHostModel {
                             pressureProfile = "heavy-tail-\(p.layerName)"
                         }
                         return p
-                    case .canonical:
+                    case .canonical, .benign:
+                        // M772 chapter 二百五 — benign mode uses
+                        // pinned low-risk signature (no layer
+                        // routing).
                         return nil
                     }
                 }()
@@ -2785,16 +2798,31 @@ extension SampleHostModel {
                         enabled: smokeMode == .heavyTailed,
                         probability: mutationProbCaptured)
 
-                let g = SampleHostBenchPromptCatalog
-                    .generateScatteredWithMutation(
-                        iter: iter,
-                        stride: chosenStride,
-                        mutationSeed: mutationSeed)
+                // M772 chapter 二百五 — benign mode swaps prompt
+                // catalog. ALL other modes use chapter-173+ adversarial
+                // catalog which produces 100% substrate-skip
+                // (chapter 196+200+204 verified on real iPhone).
+                let g: SampleHostGeneratedPrompt
+                if smokeMode == .benign {
+                    g = SampleHostBenignPromptCatalog
+                        .generate(forIter: iter)
+                } else {
+                    g = SampleHostBenchPromptCatalog
+                        .generateScatteredWithMutation(
+                            iter: iter,
+                            stride: chosenStride,
+                            mutationSeed: mutationSeed)
+                }
                 let basePrompt = g.prompt
                 let prompt = adversarialKind?.apply(to: basePrompt)
                     ?? basePrompt
                 let signature: SampleHostPromptSignature
-                if let profile = layerProfile {
+                if smokeMode == .benign {
+                    // Benign mode pins low-risk signature; layer
+                    // profile override doesn't apply (no layer
+                    // routing in benign mode).
+                    signature = g.signature
+                } else if let profile = layerProfile {
                     // M711 — use layer-specific signature instead
                     // of catalog's. Prompt still gets variation.
                     signature = SampleHostPromptSignature(
@@ -2935,12 +2963,20 @@ extension SampleHostModel {
                 var auditCount = 0
                 var permitMode = "unknown"
                 let riskLevel: BASHostRiskLevel
-                switch signature.stake {
-                case "low", "modest": riskLevel = .low
-                case "high", "very-high": riskLevel = .medium
-                case "irreversible", "non-reversible-after-act":
-                    riskLevel = .high
-                default: riskLevel = .medium
+                // M774 chapter 二百五 — benign mode forces low risk.
+                // Even though benign signature has stake="low" already,
+                // explicit override is doctrine-clearer + future-proof
+                // against signature drift.
+                if smokeMode == .benign {
+                    riskLevel = .low
+                } else {
+                    switch signature.stake {
+                    case "low", "modest": riskLevel = .low
+                    case "high", "very-high": riskLevel = .medium
+                    case "irreversible", "non-reversible-after-act":
+                        riskLevel = .high
+                    default: riskLevel = .medium
+                    }
                 }
                 do {
                     // M691 chapter 一百八十八 — B3-extended (HIGH):

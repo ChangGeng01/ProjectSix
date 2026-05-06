@@ -623,12 +623,18 @@ struct SampleHostView: View {
                         get: { model.hybridBenchSmokeMode },
                         set: { model.hybridBenchSmokeMode = $0 }
                     )) {
-                        Text("canonical")
+                        Text("canon")
                             .tag(HybridBenchConfig.SmokeMode.canonical)
-                        Text("14-layer")
+                        Text("14-L")
                             .tag(HybridBenchConfig.SmokeMode.fourteenLayer)
-                        Text("heavy-tailed")
+                        Text("heavy")
                             .tag(HybridBenchConfig.SmokeMode.heavyTailed)
+                        // M773 chapter 二百五 — benign mode for
+                        // training-data accumulation. Substrate
+                        // engages LLM on factual / translation /
+                        // math / cooking prompts.
+                        Text("benign")
+                            .tag(HybridBenchConfig.SmokeMode.benign)
                     }
                     .pickerStyle(.segmented)
                     .disabled(model.hybridBenchIsRunning)
