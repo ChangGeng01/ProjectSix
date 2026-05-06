@@ -1343,6 +1343,23 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "HumanAnchorRetention",
             versionedType: BASHumanAnchorRetention.self,
             tests: ["schema.human_anchor_retention.current", "schema.human_anchor_retention.backward"]
+        ),
+        // M786 (chapter 二百九十九) — Phase Beta foundation: per-layer
+        // actor concurrency primitives (BASLayerActorInput +
+        // BASLayerActorOutput). Pure value-types with typed status +
+        // confidence enums; protocol contract `BASLayerActor`
+        // declared but not BASSchemaVersioned (protocol). Both
+        // value-types are observability-class (per-layer trace
+        // frames) — semi-learnable.
+        entry(
+            "LayerActorInput",
+            versionedType: BASLayerActorInput.self,
+            tests: ["schema.layer_actor_input.current", "schema.layer_actor_input.backward"]
+        ),
+        entry(
+            "LayerActorOutput",
+            versionedType: BASLayerActorOutput.self,
+            tests: ["schema.layer_actor_output.current", "schema.layer_actor_output.backward"]
         )
     ]
 

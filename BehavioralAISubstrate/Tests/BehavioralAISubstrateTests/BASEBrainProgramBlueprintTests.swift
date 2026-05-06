@@ -385,7 +385,11 @@ struct BASEBrainProgramBlueprintTests {
             "OriginTraceCompleteness",
             "SanctumLeakRate",
             "DoctrineHarmonyScore",
-            "HumanAnchorRetention"
+            "HumanAnchorRetention",
+            // M786 (chapter 二百九十九) — Phase Beta foundation:
+            // per-layer actor concurrency primitives.
+            "LayerActorInput",
+            "LayerActorOutput"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

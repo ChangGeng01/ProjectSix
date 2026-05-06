@@ -526,7 +526,12 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "DoctrineHarmonyScore":
                 BASDoctrineHarmonyScore.currentSchemaVersion,
             "HumanAnchorRetention":
-                BASHumanAnchorRetention.currentSchemaVersion
+                BASHumanAnchorRetention.currentSchemaVersion,
+            // M786 (chapter 二百九十九) — Phase Beta foundation.
+            "LayerActorInput":
+                BASLayerActorInput.currentSchemaVersion,
+            "LayerActorOutput":
+                BASLayerActorOutput.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)
