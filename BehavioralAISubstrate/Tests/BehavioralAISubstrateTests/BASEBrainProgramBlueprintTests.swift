@@ -406,7 +406,10 @@ struct BASEBrainProgramBlueprintTests {
             "HostStorageWireReport",
             // M797 (chapter 三百一〇) — Phase Delta 1st code cut:
             // typed ML head slot record (registry foundation).
-            "LayerMLHeadSlot"
+            "LayerMLHeadSlot",
+            // M799 (chapter 三百一二) — Phase Delta 3rd code cut:
+            // typed cascading inference result.
+            "LayerCascadeResult"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

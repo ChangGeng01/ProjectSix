@@ -1421,6 +1421,14 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "LayerMLHeadSlot",
             versionedType: BASLayerMLHeadSlot.self,
             tests: ["schema.layer_ml_head_slot.current", "schema.layer_ml_head_slot.backward"]
+        ),
+        // M799 (chapter 三百一二) — Phase Delta 3rd code cut: typed
+        // cascading inference result. Encodes chapter 一百七十七
+        // cascading inference doctrine into testable record.
+        entry(
+            "LayerCascadeResult",
+            versionedType: BASLayerCascadeResult.self,
+            tests: ["schema.layer_cascade_result.current", "schema.layer_cascade_result.backward"]
         )
     ]
 
