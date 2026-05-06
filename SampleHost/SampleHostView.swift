@@ -54,7 +54,7 @@ struct SampleHostView: View {
                         resumeBannerPanel(cp)
                     }
 
-                    benchPanel
+                    SampleHostBenchPanel(model: model)
 
                     SampleHostAFMTestPanel(model: model)
 
@@ -263,59 +263,8 @@ struct SampleHostView: View {
         )
     }
 
-    // MARK: - M573 (chapter 一百四十七 part 2) — bench panel
-
-    @ViewBuilder
-    private var benchPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Real-device substrate bench")
-                    .font(.headline)
-                Spacer()
-                Button(model.benchIsRunning ? "Stop" : "Run Bench") {
-                    model.toggleBench()
-                }
-                .buttonStyle(.bordered)
-                .tint(model.benchIsRunning ? .red : .green)
-            }
-
-            Text(
-                "Loops BASHostRuntime.startSession() with rotating " +
-                "synthetic prompts (5 personas × 3 scenarios). " +
-                "Per-iteration audit code count + permit mode + " +
-                "duration written to Documents/iphone-bench/" +
-                "iterations.jsonl. Keep app in foreground (iOS " +
-                "suspends backgrounded apps after ~30s)."
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-
-            if model.benchIsRunning {
-                Text(benchLiveStatusText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.green)
-            } else if model.benchIterationsCompleted > 0 {
-                Text(benchFinalStatusText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.blue)
-            }
-
-            if !model.benchOutputPath.isEmpty {
-                Text("→ \(model.benchOutputPath)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            if let benchError = model.benchLastError {
-                Text("Bench error: \(benchError)")
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-            }
-        }
-        .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-    }
+    // M807 chapter 二百二十六 — `benchPanel` + 2 status helpers
+    // extracted to `SampleHostBenchPanel.swift` standalone struct.
 
     // M805 chapter 二百二十四 — `afmTestPanel` + `hybridTestPanel`
     // extracted to dedicated standalone SwiftUI structs in
@@ -805,31 +754,9 @@ struct SampleHostView: View {
     // M806 chapter 二百二十五 — `afmBenchPanel` + 2 status helpers
     // extracted to `SampleHostAFMBenchPanel.swift` standalone struct.
 
-    private var benchLiveStatusText: String {
-        let elapsed: TimeInterval
-        if let start = model.benchStartTime {
-            elapsed = Date().timeIntervalSince(start)
-        } else {
-            elapsed = 0
-        }
-        let perSec = elapsed > 0
-            ? Double(model.benchIterationsCompleted) / elapsed
-            : 0
-        return String(
-            format: "RUNNING • iter=%d • %.1fs • %.2f/s • audit=%d",
-            model.benchIterationsCompleted,
-            elapsed,
-            perSec,
-            model.benchAuditCodesTotal)
-    }
-
-    private var benchFinalStatusText: String {
-        return String(
-            format: "DONE • iter=%d • audit=%d total • last error=%@",
-            model.benchIterationsCompleted,
-            model.benchAuditCodesTotal,
-            model.benchLastError ?? "none")
-    }
+    // M807 chapter 二百二十六 — `benchLiveStatusText` +
+    // `benchFinalStatusText` consolidated into `SampleHostBenchPanel`
+    // (only callers were that panel).
 
     @ViewBuilder
     private func sourceBadge(title: String, detail: String) -> some View {
