@@ -1829,3 +1829,44 @@ Lives in **BASEvaluation** (not BASOrchestration / BASMemory) because evaluation
 Test impact: BAS XCTest 3108 → **3118** (+10 chapter 二百六十六 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
 
 Stage 5 progress: **1/5 chapters shipped** (二百六十六 ✓ protocol + no-op conformer / 二百六十七 substrate-driven conformer pending / 二百六十八 ML-backed conformer pending — needs real bench data / 二百六十九 bench loop integration pending / 二百七十 meridian expansion pending — multi-month).
+
+## 2026-05-07 — chapter 二百六十七 (M749) `BASSubstrateReauditShadowEvaluator` — Stage 5 Step 2 of 5
+
+附录 V Stage 5 second chapter ships the production conformer of `BASShadowEvaluating` — the substrate-driven re-audit evaluator. SampleHost shipped the prototype (`SampleHostBenchPostLLMObservation`, chapter 二百四十二 / M824) but it was SampleHost-target-bound and embedded counter-mutation side effects. Chapter 二百六十七 ships the BAS-side equivalent: pure-Sendable, observability-only, any-host can reuse via the `BASShadowEvaluating` protocol contract.
+
+- **M749** NEW `BehavioralAISubstrate/Sources/BASHostKit/BASSubstrateReauditShadowEvaluator.swift` (~190 LOC). One new public type:
+  - `BASSubstrateReauditShadowEvaluator: BASShadowEvaluating, Sendable` — wraps a `BASHostRuntime` + workflowProfile + riskLevel + surface + body-truncation cap. `evaluate(prompt:body:prePermitMode:sessionRef:turnRef:)` runs the substrate against the LLM body off-MainActor and returns a typed `BASShadowEvaluationResult`.
+- **Static constants** (anti-magic-number):
+  - `defaultBodyTruncationChars: Int = 4096` — chapter 一百八十五 / M676 fix B6 doctrine. Configurable via init; clamped to `max(64, value)` so misuse can't disable truncation entirely.
+  - `version: String = "substrate-reaudit-v1"` — stable evaluator identifier surfaced in `BASShadowEvaluationResult.evaluatorVersion`.
+- **Skip path**: empty body returns `BASShadowEvaluationResult.skipped(...)` — substrate has nothing to re-audit.
+- **Off-MainActor execution** (chapter 一百八十八 / M691 doctrine): substrate eval runs inside `Task.detached(priority: .userInitiated) { ... }.value` to avoid blocking the host's main actor.
+- **Audit reason codes**:
+  - `evaluator:substrate-reaudit` (always on non-skip path)
+  - `shadow:permit-shifted:from-<pre>:to-<post>` (when `shifted == true`)
+  - `shadow:body-truncated` (when body length > truncation cap)
+  - `evaluator:substrate-reaudit-failed` (when substrate threw)
+- 9 fix-pin tests in `BASSubstrateReauditShadowEvaluatorTests.swift` (~165 LOC):
+  - default `evaluatorVersion` matches `BASSubstrateReauditShadowEvaluator.version` constant
+  - empty body returns `.skipped`
+  - non-empty body produces `evaluator:substrate-reaudit` reason code + non-nil `postPermitMode`
+  - long body (200 chars vs 64-char cap) emits `shadow:body-truncated`
+  - short body (10 chars vs 4096-char cap) does NOT emit truncation code
+  - custom `evaluatorVersion` propagates through to result
+  - custom workflowProfile / riskLevel / surface accepted (smoke)
+  - body-truncation cap of 0 clamps to 64 (defends against misuse)
+  - **conforms to `BASShadowEvaluating` protocol** (cross-module type-check pin)
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3: evaluator runs the substrate against the body but never mutates production state. The result is HINT for the host to act on (or not).
+- 红线 7 watcher-only-hint: this evaluator is exactly the "watcher" doctrine references. It produces `shifted: Bool` hint; the host runtime decides whether to respond.
+- chapter 一百七十八 / M630 closed-loop substrate-is-arbiter doctrine: substrate is THE arbiter — even its own LLM's body is subject to substrate re-audit. This is the production realization.
+- chapter 一百八十五 / M676 fix B6: 4K-char body cap.
+- chapter 一百八十八 / M691: off-MainActor via `Task.detached`.
+- chapter 二百十一 single-source-of-truth: protocol stays in `BASShadowEvaluating.swift`; this file is one conformer.
+
+Lives in **BASHostKit** (not BASEvaluation) because `BASHostRuntime` lives in BASHostKit and the conformer must reference it. BASEvaluation cannot import BASHostKit (DAG: BASHostKit imports BASEvaluation, not the reverse).
+
+Test impact: BAS XCTest 3118 → **3127** (+9 chapter 二百六十七 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+Stage 5 progress: **2/5 chapters shipped** (二百六十六 ✓ protocol + no-op / 二百六十七 ✓ substrate-driven conformer / 二百六十八 ML-backed pending — needs real bench data / 二百六十九 bench loop integration pending / 二百七十 meridian expansion pending — multi-month).
