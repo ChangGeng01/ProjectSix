@@ -1681,3 +1681,51 @@ Stage 4 progress: **1/5 chapters shipped** (二百六十一 ✓ doctrine / 二�
 This is a docs+script chapter — 0 BAS source changes, 0 BAS test changes, 0 SampleHost changes. BAS XCTest count unchanged at 3081.
 
 Stage 4 progress: **2/5 chapters shipped** (二百六十一 ✓ doctrine / 二百六十二 ✓ aggregator script / 二百六十三 typed bundle pending / 二百六十四 L11 wire pending / 二百六十五 per-stratum sub-models pending).
+
+## 2026-05-07 — chapter 二百六十三 (M746) `BASRiskCalibrationBundle` typed value — Stage 4 Step 3 of 5
+
+附录 V Stage 4 third chapter ships the typed bundle. ADR-012's Hybrid pipeline produces a payload — typed, versioned, signed, immutable once shipped. Chapter 二百六十一 documented the doctrine; chapter 二百六十二 shipped the aggregator that produces stratum stats from bench JSONL. **Chapter 二百六十三 ships the bundle the operator authors from those stats.** Chapter 二百六十四 will wire the L11 risk gate to consume bundles.
+
+- **M746** NEW `BehavioralAISubstrate/Sources/BASPolicy/BASRiskCalibrationBundle.swift` (~290 LOC). Two new public types (both `BASSchemaVersioned` + `Sendable` + `Equatable` + `Codable` + `Hashable`):
+  - **`BASRiskCalibrationStratumDelta`**: per-stratum threshold offsets. Fields: `stratumKey: String` (e.g. `"tone=angry|stake=high|confidant=public"`) / `mediumThresholdDelta: Double` / `highThresholdDelta: Double` / `extremeThresholdDelta: Double` (each clamped to `±0.25`) / `evidenceRowCount: Int` (clamped non-negative) / `reasonCodes: [String]` (trimmed + empty-filtered).
+  - **`BASRiskCalibrationBundle`**: the deploy-time payload. Fields: `bundleVersion: String` (monotonic `vN.M.P`) / `producedAt: Date` / `aggregateProvenanceRef: String` (sha256 of input JSON) / `strataDeltas: [BASRiskCalibrationStratumDelta]` / `sovereignWarrantRef: String` (L14 ref required) / `supersedesBundleVersion: String?` / `summary: String`.
+- **Defensive validation in `init`**:
+  - Delta values clamped to `±maximumAbsoluteDelta` (defaults to 0.25). Operator typo of `5.0` resolves to `0.25` not a runaway threshold.
+  - NaN deltas resolved to `0`.
+  - `evidenceRowCount` clamped non-negative.
+  - String fields trimmed; empty `reasonCodes` filtered.
+  - **Bundle de-duplicates same-stratum deltas (last-wins)** for typo recovery.
+- **`isWellFormed`**: enforces non-empty version + version != baseline-sentinel + non-empty provenance ref + non-empty warrant ref. The L11 gate (chapter 二百六十四) will reject any bundle where this returns false.
+- **`baseline` sentinel**: `BASRiskCalibrationBundle.baseline` represents "no calibration applied". L11 gates that have never received a bundle behave as if they had this. `baseline.isWellFormed` is `false` — special case the gate accepts.
+- **Lookup helpers**:
+  - `delta(forStratumKey:) -> BASRiskCalibrationStratumDelta?` — O(N) lookup
+  - `totalEvidenceRowCount` — sum across strata
+  - `changingStrata` — filters zero-delta strata for audit emission
+- 14 fix-pin tests in `BASRiskCalibrationBundleTests.swift` (~290 LOC):
+  - schema versions pinned (bundle + delta)
+  - delta clamps to `±maximumAbsoluteDelta`
+  - NaN deltas → 0
+  - bundle de-duplicates same-stratum (last-wins)
+  - `isWellFormed` enforces 4 required-field invariants
+  - baseline sentinel shape
+  - `delta(forStratumKey:)` lookup hit + miss
+  - `totalEvidenceRowCount` aggregation across strata
+  - `changingStrata` filters zero-delta
+  - **Codable round-trip preserves all fields byte-for-byte**
+  - reasonCodes trim + filter empties
+  - evidenceRowCount clamps non-negative
+  - changesAnyThreshold flag
+  - supersedesBundleVersion preserved
+
+**Doctrine pins maintained**:
+- 不变量 #2 神经不掌权: bundle is operator-authored + L14-signed; substrate consumes it as input. Substrate doesn't auto-derive.
+- 不变量 #3 私有经验不进权重: stratum keys are generalized (`tone|stake|confidant`) — never host-IDs. Aggregator filters host data; bundle's input is already filtered.
+- ADR-006 strict: bundle is between-deploy mutation only. Per-turn permit logic doesn't read bench JSONL directly; it reads frozen bundle deltas.
+- ADR-012: bundle is the typed payload of the Hybrid offline pipeline. `bundleVersion` is monotonic; `sovereignWarrantRef` is required (empty refs are invalid via `isWellFormed`).
+- 红线 7 HINT-ONLY: bundle's deltas are inputs to deterministic L11 logic, not hints. The bundle is only PRODUCED via observation-driven analysis + operator decision; the live observation never directly mutates anything.
+- chapter 一百十三 anti-magic-number: every default tunable extracted as `static let default*` constant. `maximumAbsoluteDelta`, `baselineVersion`, `currentSchemaVersion` all named.
+- chapter 二百十一 single-source-of-truth: bundle schema lives in this one file.
+
+Test impact: BAS XCTest 3081 → **3095** (+14 chapter 二百六十三 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+Stage 4 progress: **3/5 chapters shipped** (二百六十一 ✓ doctrine / 二百六十二 ✓ aggregator script / 二百六十三 ✓ typed bundle / 二百六十四 L11 wire pending / 二百六十五 per-stratum sub-models pending).
