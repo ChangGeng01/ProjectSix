@@ -126,24 +126,46 @@ final class M340ThroughputBenchScopeHonestyTests: XCTestCase {
     }
 
     func testMainBannerEmitsScopeStatement() throws {
+        // Phase Alpha (chapter 二百八十九 / M776) extracted
+        // `runThroughputBench` from `main.swift` to
+        // `SampleHostDemoExtensions.swift`. Test now scans all
+        // .swift files under the QinaoSampleHost source directory
+        // for the disclaimer reference — file-org-change-safe.
         let testFileURL = URL(
             fileURLWithPath: #filePath)
         let packageRoot = testFileURL
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let mainURL = packageRoot
+        let sourceDirectory = packageRoot
             .appendingPathComponent("Sources")
             .appendingPathComponent("QinaoSampleHost")
-            .appendingPathComponent("main.swift")
-        let mainSource = try String(
-            contentsOf: mainURL, encoding: .utf8)
+
+        let fm = FileManager.default
+        let urls =
+            try fm.contentsOfDirectory(
+                at: sourceDirectory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles])
+            .filter { $0.pathExtension == "swift" }
+
+        var found = false
+        for url in urls {
+            let source = try String(
+                contentsOf: url, encoding: .utf8)
+            if source.contains(
+                "ThroughputBenchDemo.scopeStatement")
+            {
+                found = true
+                break
+            }
+        }
 
         XCTAssertTrue(
-            mainSource.contains(
-                "ThroughputBenchDemo.scopeStatement"),
-            "main.swift's runThroughputBench banner must emit " +
-            "ThroughputBenchDemo.scopeStatement so every " +
+            found,
+            "QinaoSampleHost source must emit " +
+            "ThroughputBenchDemo.scopeStatement somewhere in " +
+            "the runThroughputBench banner so every " +
             "`--throughput-bench` run shows the disclaimer at " +
             "the top of stdout.")
     }
