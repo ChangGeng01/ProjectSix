@@ -389,7 +389,12 @@ struct BASEBrainProgramBlueprintTests {
             // M786 (chapter 二百九十九) — Phase Beta foundation:
             // per-layer actor concurrency primitives.
             "LayerActorInput",
-            "LayerActorOutput"
+            "LayerActorOutput",
+            // M787 (chapter 三百) — Phase Beta cut 2: per-layer
+            // budget slice + ML head slot protocol contract.
+            "LayerSlice",
+            "LayerInferenceInput",
+            "LayerInferenceOutput"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

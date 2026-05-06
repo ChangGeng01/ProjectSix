@@ -1360,6 +1360,27 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "LayerActorOutput",
             versionedType: BASLayerActorOutput.self,
             tests: ["schema.layer_actor_output.current", "schema.layer_actor_output.backward"]
+        ),
+        // M787 (chapter 三百) — Phase Beta cut 2: per-layer budget
+        // slice + ML head slot protocol contract. 3 schemas:
+        // BASLayerSlice (per-call budget allocation),
+        // BASLayerInferenceInput / BASLayerInferenceOutput (ML
+        // head input/output frames). Protocol BASLayerMLHead is
+        // not BASSchemaVersioned (protocol).
+        entry(
+            "LayerSlice",
+            versionedType: BASLayerSlice.self,
+            tests: ["schema.layer_slice.current", "schema.layer_slice.backward"]
+        ),
+        entry(
+            "LayerInferenceInput",
+            versionedType: BASLayerInferenceInput.self,
+            tests: ["schema.layer_inference_input.current", "schema.layer_inference_input.backward"]
+        ),
+        entry(
+            "LayerInferenceOutput",
+            versionedType: BASLayerInferenceOutput.self,
+            tests: ["schema.layer_inference_output.current", "schema.layer_inference_output.backward"]
         )
     ]
 

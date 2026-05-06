@@ -531,7 +531,14 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "LayerActorInput":
                 BASLayerActorInput.currentSchemaVersion,
             "LayerActorOutput":
-                BASLayerActorOutput.currentSchemaVersion
+                BASLayerActorOutput.currentSchemaVersion,
+            // M787 (chapter 三百) — Phase Beta cut 2.
+            "LayerSlice":
+                BASLayerSlice.currentSchemaVersion,
+            "LayerInferenceInput":
+                BASLayerInferenceInput.currentSchemaVersion,
+            "LayerInferenceOutput":
+                BASLayerInferenceOutput.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)
