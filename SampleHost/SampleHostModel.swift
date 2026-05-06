@@ -1833,68 +1833,26 @@ extension SampleHostModel {
                     applyIfActive(myGen) {
                         self.hybridBenchPauseSkippedCount += 1
                     }
-                    _ = reason  // (used in row construction below)
-                    // Emit paused-row so JSONL captures the gap
-                    // (downstream replay can spot the pause window).
-                    let pausedRow = SampleHostHybridBenchRow(
-                        timestamp: SampleHostBenchHelpers.iso8601(Date()),
-                        iteration: iter,
-                        seed: iter,
-                        stride: chosenStride,
+                    // M801 chapter 二百二十 — typed paused-row factory.
+                    // Replaces ~58 LOC inline construction (chapter 一百
+                    // 九十二 thermal gate + chapter 二百九 cooldown ladder
+                    // doctrine bundled into one call site).
+                    let pausedRow = SampleHostHybridBenchRow.pausedByThermalGate(
+                        iter: iter,
+                        chosenStride: chosenStride,
                         mutationSeed: mutationSeed,
                         signature: signature,
-                        prompt: "",
-                        auditCodeCount: 0,
-                        permitMode: "paused-by-thermal-gate",
-                        routerVersion: "n/a",
-                        routerPredictedRoute: "n/a",
-                        routerProbability: 0,
-                        firstTriedLLM: "none",
-                        firstTriedStatus: "paused-by-thermal-gate",
-                        firstTriedBody: "",
-                        firstTriedDurationMs: 0,
-                        fallbackTriedLLM: nil,
-                        fallbackStatus: nil,
-                        fallbackBody: nil,
-                        fallbackDurationMs: nil,
-                        actualRoute: "paused-\(reason)",
-                        routerHit: false,
-                        totalDurationSeconds: 0,
-                        errorMessage: nil,
-                        dispatchPolicy: nil,
-                        dispatchTaken: nil,
-                        draftOnly: nil,
-                        llmSkipped: true,
-                        postLLMPermitMode: nil,
-                        postLLMAuditCodeCount: nil,
-                        postLLMShifted: nil,
-                        permitPredictBlockProb: nil,
-                        permitPredictClass: nil,
-                        permitPredictAgreement: nil,
-                        permitPredictDetailedAgreement: nil,
-                        routerOverridden: true,
-                        lengthPredicted: nil,
-                        lengthError: nil,
-                        latencyPredictedMs: nil,
-                        latencyErrorMs: nil,
-                        verbosityProbability: nil,
-                        verbosityCorrect: nil,
-                        thermalState: thermalRaw,
-                        batteryLevel: batteryRaw,
-                        lowPowerMode: lowPower,
-                        hourOfDay: hourCaptured,
-                        smokeMode: smokeMode.rawValue,
-                        targetLayer: layerProfile?.layerIndex,
-                        targetLayerName: layerProfile?.layerName,
-                        anomalyFlags: [
-                            "thermal-gate-paused:\(reason)",
-                            "cooldown:\(cooldown.ladderLabel())",
-                            "cooldown-streak:\(cooldown.pauseStreak)",
-                        ],
+                        smokeMode: smokeMode,
+                        layerProfile: layerProfile,
                         pressureProfile: pressureProfile,
-                        adversarialKind: adversarialKind?.rawValue,
-                        driftSigma: nil,
-                        pauseSkipped: true)
+                        adversarialKind: adversarialKind,
+                        thermalRaw: thermalRaw,
+                        batteryRaw: batteryRaw,
+                        lowPower: lowPower,
+                        hourOfDay: hourCaptured,
+                        reason: reason,
+                        cooldownLadderLabel: cooldown.ladderLabel(),
+                        cooldownStreak: cooldown.pauseStreak)
                     do {
                         try await runner.appendRow(pausedRow)
                     } catch {

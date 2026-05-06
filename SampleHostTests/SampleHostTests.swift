@@ -2426,4 +2426,177 @@ final class SampleHostTests: XCTestCase {
         XCTAssertNil(
             SampleHostHybridDispatchPolicy.draftOnly.cannedResponse)
     }
+
+    // MARK: - chapter 二百二十 / M801 — typed paused-row builder
+
+    private func makeTestSignature() -> SampleHostPromptSignature {
+        return SampleHostPromptSignature(
+            tone: "anxious",
+            domain: "financial",
+            stake: "low",
+            timeframe: "minutes",
+            confidant: "friend",
+            askShape: "narrative")
+    }
+
+    func testPausedRowBuilderProducesPauseMarkers() {
+        let row = SampleHostHybridBenchRow.pausedByThermalGate(
+            iter: 42,
+            chosenStride: 5041,
+            mutationSeed: 2,
+            signature: makeTestSignature(),
+            smokeMode: .canonical,
+            layerProfile: nil,
+            pressureProfile: nil,
+            adversarialKind: nil,
+            thermalRaw: "serious",
+            batteryRaw: 0.85,
+            lowPower: false,
+            hourOfDay: 14,
+            reason: "thermal-serious-flex-opt-in",
+            cooldownLadderLabel: "cooldown-30s",
+            cooldownStreak: 1)
+
+        // Pause-specific markers
+        XCTAssertEqual(row.permitMode, "paused-by-thermal-gate")
+        XCTAssertEqual(row.firstTriedLLM, "none")
+        XCTAssertEqual(row.firstTriedStatus, "paused-by-thermal-gate")
+        XCTAssertEqual(row.firstTriedBody, "")
+        XCTAssertEqual(row.firstTriedDurationMs, 0)
+        XCTAssertEqual(row.actualRoute, "paused-thermal-serious-flex-opt-in")
+        XCTAssertEqual(row.routerHit, false)
+        XCTAssertEqual(row.routerOverridden, true)
+        XCTAssertEqual(row.pauseSkipped, true)
+        XCTAssertEqual(row.llmSkipped, true)
+
+        // Iter coordinates preserved
+        XCTAssertEqual(row.iteration, 42)
+        XCTAssertEqual(row.seed, 42)
+        XCTAssertEqual(row.stride, 5041)
+        XCTAssertEqual(row.mutationSeed, 2)
+
+        // Device state recorded
+        XCTAssertEqual(row.thermalState, "serious")
+        XCTAssertEqual(row.batteryLevel, 0.85)
+        XCTAssertEqual(row.lowPowerMode, false)
+        XCTAssertEqual(row.hourOfDay, 14)
+    }
+
+    func testPausedRowBuilderAnomalyFlagsHaveCooldownTrace() {
+        let row = SampleHostHybridBenchRow.pausedByThermalGate(
+            iter: 100,
+            chosenStride: 5041,
+            mutationSeed: 0,
+            signature: makeTestSignature(),
+            smokeMode: .rawLLM,
+            layerProfile: nil,
+            pressureProfile: nil,
+            adversarialKind: nil,
+            thermalRaw: "critical",
+            batteryRaw: -1,
+            lowPower: true,
+            hourOfDay: 3,
+            reason: "thermal-critical",
+            cooldownLadderLabel: "cooldown-300s-ceiling",
+            cooldownStreak: 7)
+
+        XCTAssertEqual(row.anomalyFlags?.count, 3)
+        let flags = row.anomalyFlags ?? []
+        XCTAssertTrue(flags.contains("thermal-gate-paused:thermal-critical"))
+        XCTAssertTrue(flags.contains("cooldown:cooldown-300s-ceiling"))
+        XCTAssertTrue(flags.contains("cooldown-streak:7"))
+    }
+
+    func testPausedRowBuilderLLMFieldsAllNilOrCanned() {
+        let row = SampleHostHybridBenchRow.pausedByThermalGate(
+            iter: 0, chosenStride: 5041, mutationSeed: 0,
+            signature: makeTestSignature(),
+            smokeMode: .canonical, layerProfile: nil,
+            pressureProfile: nil, adversarialKind: nil,
+            thermalRaw: "serious", batteryRaw: 0.5,
+            lowPower: false, hourOfDay: 12,
+            reason: "test",
+            cooldownLadderLabel: "cooldown-30s",
+            cooldownStreak: 1)
+
+        // All LLM-execution fields nil (red line: no LLM was called)
+        XCTAssertNil(row.fallbackTriedLLM)
+        XCTAssertNil(row.fallbackStatus)
+        XCTAssertNil(row.fallbackBody)
+        XCTAssertNil(row.fallbackDurationMs)
+        XCTAssertNil(row.errorMessage)
+        XCTAssertNil(row.dispatchPolicy)
+        XCTAssertNil(row.dispatchTaken)
+        XCTAssertNil(row.draftOnly)
+        // Post-LLM substrate observation also nil (substrate didn't run)
+        XCTAssertNil(row.postLLMPermitMode)
+        XCTAssertNil(row.postLLMAuditCodeCount)
+        XCTAssertNil(row.postLLMShifted)
+        // CoreML head predictions nil (no prediction made)
+        XCTAssertNil(row.permitPredictBlockProb)
+        XCTAssertNil(row.permitPredictClass)
+        XCTAssertNil(row.permitPredictAgreement)
+        XCTAssertNil(row.permitPredictDetailedAgreement)
+        XCTAssertNil(row.lengthPredicted)
+        XCTAssertNil(row.lengthError)
+        XCTAssertNil(row.latencyPredictedMs)
+        XCTAssertNil(row.latencyErrorMs)
+        XCTAssertNil(row.verbosityProbability)
+        XCTAssertNil(row.verbosityCorrect)
+        XCTAssertNil(row.driftSigma)
+    }
+
+    func testPausedRowBuilderRoundTripsCodable() {
+        // The carved-out builder must produce rows that round-trip
+        // cleanly through JSONEncoder + JSONDecoder, matching the
+        // chapter 一百九十二 row-checksum doctrine.
+        let row = SampleHostHybridBenchRow.pausedByThermalGate(
+            iter: 7, chosenStride: 5039, mutationSeed: 3,
+            signature: makeTestSignature(),
+            smokeMode: .heavyTailed,
+            layerProfile: FourteenLayerSmokeProfile.profile(forIter: 0),
+            pressureProfile: "heavy-tail-L1-wake",
+            adversarialKind: nil,
+            thermalRaw: "fair", batteryRaw: 0.99,
+            lowPower: false, hourOfDay: 9,
+            reason: "thermal-critical",
+            cooldownLadderLabel: "cooldown-60s",
+            cooldownStreak: 2)
+        let encoded = try? JSONEncoder().encode(row)
+        XCTAssertNotNil(encoded)
+        guard let data = encoded else { return }
+        let decoded = try? JSONDecoder().decode(
+            SampleHostHybridBenchRow.self, from: data)
+        XCTAssertEqual(decoded, row)
+    }
+
+    func testPausedRowBuilderTimestampStableAcrossInjection() {
+        // Doctrine: timestamp arg defaults to Date() but tests
+        // inject a fixed Date so JSONL byte-equality is checkable.
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let a = SampleHostHybridBenchRow.pausedByThermalGate(
+            iter: 0, chosenStride: 5041, mutationSeed: 0,
+            signature: makeTestSignature(),
+            smokeMode: .canonical, layerProfile: nil,
+            pressureProfile: nil, adversarialKind: nil,
+            thermalRaw: "fair", batteryRaw: 0.5,
+            lowPower: false, hourOfDay: 12,
+            reason: "test",
+            cooldownLadderLabel: "cooldown-30s",
+            cooldownStreak: 1,
+            timestamp: fixedDate)
+        let b = SampleHostHybridBenchRow.pausedByThermalGate(
+            iter: 0, chosenStride: 5041, mutationSeed: 0,
+            signature: makeTestSignature(),
+            smokeMode: .canonical, layerProfile: nil,
+            pressureProfile: nil, adversarialKind: nil,
+            thermalRaw: "fair", batteryRaw: 0.5,
+            lowPower: false, hourOfDay: 12,
+            reason: "test",
+            cooldownLadderLabel: "cooldown-30s",
+            cooldownStreak: 1,
+            timestamp: fixedDate)
+        XCTAssertEqual(a, b,
+            "Same args + same fixed timestamp → byte-equal rows")
+    }
 }

@@ -221,3 +221,104 @@ struct SampleHostHybridBenchRow: Codable, Sendable, Equatable {
     // canned (firstStatus="paused-by-thermal-gate" etc.).
     let pauseSkipped: Bool?
 }
+
+// MARK: - chapter 二百二十 / M801 — typed paused-row builder
+
+extension SampleHostHybridBenchRow {
+    /// Construct a paused-by-thermal-gate row from current iter
+    /// context + device state + cooldown ladder. All LLM-execution
+    /// fields are nil / canned ("paused-by-thermal-gate" markers).
+    /// Bench loop calls this once per thermal-pause iter instead of
+    /// inlining ~58 LOC of optional-handling at the call site.
+    ///
+    /// Doctrine pin (chapter 二百九 / M790 cooldown ladder + chapter
+    /// 一百九十二 / M717 thermal gate): paused-row carries enough
+    /// metadata for downstream JSONL replay to fully reconstruct
+    /// the pause window — which iter / which thermal state /
+    /// which cooldown rung / what reason. Never silently drops
+    /// the iter number (so iter sequence integrity is preserved).
+    ///
+    /// Doctrine pin (red lines): row is observability ONLY. The
+    /// `routerOverridden = true` field tells downstream router-
+    /// accuracy analysis to exclude this iter from the hit/miss
+    /// tally (router prediction was bypassed by the thermal
+    /// gate, not contradicted by reality).
+    static func pausedByThermalGate(
+        iter: Int,
+        chosenStride: Int,
+        mutationSeed: Int,
+        signature: SampleHostPromptSignature,
+        smokeMode: HybridBenchConfig.SmokeMode,
+        layerProfile: FourteenLayerSmokeProfile.Profile?,
+        pressureProfile: String?,
+        adversarialKind: SampleHostBenchAdversarialKind?,
+        thermalRaw: String,
+        batteryRaw: Double,
+        lowPower: Bool,
+        hourOfDay: Int,
+        reason: String,
+        cooldownLadderLabel: String,
+        cooldownStreak: Int,
+        timestamp: Date = Date()
+    ) -> SampleHostHybridBenchRow {
+        return SampleHostHybridBenchRow(
+            timestamp: SampleHostBenchHelpers.iso8601(timestamp),
+            iteration: iter,
+            seed: iter,
+            stride: chosenStride,
+            mutationSeed: mutationSeed,
+            signature: signature,
+            prompt: "",
+            auditCodeCount: 0,
+            permitMode: "paused-by-thermal-gate",
+            routerVersion: "n/a",
+            routerPredictedRoute: "n/a",
+            routerProbability: 0,
+            firstTriedLLM: "none",
+            firstTriedStatus: "paused-by-thermal-gate",
+            firstTriedBody: "",
+            firstTriedDurationMs: 0,
+            fallbackTriedLLM: nil,
+            fallbackStatus: nil,
+            fallbackBody: nil,
+            fallbackDurationMs: nil,
+            actualRoute: "paused-\(reason)",
+            routerHit: false,
+            totalDurationSeconds: 0,
+            errorMessage: nil,
+            dispatchPolicy: nil,
+            dispatchTaken: nil,
+            draftOnly: nil,
+            llmSkipped: true,
+            postLLMPermitMode: nil,
+            postLLMAuditCodeCount: nil,
+            postLLMShifted: nil,
+            permitPredictBlockProb: nil,
+            permitPredictClass: nil,
+            permitPredictAgreement: nil,
+            permitPredictDetailedAgreement: nil,
+            routerOverridden: true,
+            lengthPredicted: nil,
+            lengthError: nil,
+            latencyPredictedMs: nil,
+            latencyErrorMs: nil,
+            verbosityProbability: nil,
+            verbosityCorrect: nil,
+            thermalState: thermalRaw,
+            batteryLevel: batteryRaw,
+            lowPowerMode: lowPower,
+            hourOfDay: hourOfDay,
+            smokeMode: smokeMode.rawValue,
+            targetLayer: layerProfile?.layerIndex,
+            targetLayerName: layerProfile?.layerName,
+            anomalyFlags: [
+                "thermal-gate-paused:\(reason)",
+                "cooldown:\(cooldownLadderLabel)",
+                "cooldown-streak:\(cooldownStreak)",
+            ],
+            pressureProfile: pressureProfile,
+            adversarialKind: adversarialKind?.rawValue,
+            driftSigma: nil,
+            pauseSkipped: true)
+    }
+}
