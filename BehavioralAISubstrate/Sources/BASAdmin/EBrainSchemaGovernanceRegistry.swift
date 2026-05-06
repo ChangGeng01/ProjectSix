@@ -1451,6 +1451,16 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "MeshSyncFrameMergeReport",
             versionedType: BASMeshSyncFrameMergeReport.self,
             tests: ["schema.mesh_sync_frame_merge_report.current", "schema.mesh_sync_frame_merge_report.backward"]
+        ),
+        // M807 (chapter 三百二〇) — Phase F (附录 X) 1st code cut:
+        // typed CoreML prediction frame for cross-instance ML
+        // head adapter (BASCoreMLLayerHead lives in
+        // BASAppleAdapters). chapter 一百七十七 vision typed
+        // CoreML-tier conformer.
+        entry(
+            "CoreMLPredictionFrame",
+            versionedType: BASCoreMLPredictionFrame.self,
+            tests: ["schema.coreml_prediction_frame.current", "schema.coreml_prediction_frame.backward"]
         )
     ]
 

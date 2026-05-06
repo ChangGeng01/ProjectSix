@@ -568,7 +568,11 @@ struct BASEBrainSchemaGovernanceRegistryTests {
             "MeshSyncFrame":
                 BASMeshSyncFrame.currentSchemaVersion,
             "MeshSyncFrameMergeReport":
-                BASMeshSyncFrameMergeReport.currentSchemaVersion
+                BASMeshSyncFrameMergeReport.currentSchemaVersion,
+            // M807 (chapter 三百二〇) — Phase F (附录 X) 1st code cut:
+            // typed CoreML prediction frame.
+            "CoreMLPredictionFrame":
+                BASCoreMLPredictionFrame.currentSchemaVersion
         ]
 
         #expect(actualVersions == expectedVersions)

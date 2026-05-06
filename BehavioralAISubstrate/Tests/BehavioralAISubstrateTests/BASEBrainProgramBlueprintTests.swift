@@ -416,7 +416,10 @@ struct BASEBrainProgramBlueprintTests {
             // M805 (chapter 三百一八) — Phase Epsilon 5th code cut:
             // typed cross-instance mesh sync frame + merge report.
             "MeshSyncFrame",
-            "MeshSyncFrameMergeReport"
+            "MeshSyncFrameMergeReport",
+            // M807 (chapter 三百二〇) — Phase F (附录 X) 1st code cut:
+            // typed CoreML prediction frame.
+            "CoreMLPredictionFrame"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)
