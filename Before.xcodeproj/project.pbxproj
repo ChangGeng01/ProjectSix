@@ -77,6 +77,7 @@
 		240ABCD224444789012345FFE8 /* SampleHostBenchCoreMLBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 240FEDCDD3456701006DEEFF8FE4 /* SampleHostBenchCoreMLBundle.swift */; };
 		242ABCD335555890123456FFE9 /* SampleHostBenchPostLLMObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 242FEDCEE4567701005EFEFFA9FE5 /* SampleHostBenchPostLLMObserver.swift */; };
 		243ABCD446666901234567FFEA /* SampleHostBenchRegressionResiduals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 243FEDCFF5678701004FEFEFEAFE6 /* SampleHostBenchRegressionResiduals.swift */; };
+		244ABCD557777012345678FFEB /* SampleHostBenchLLMDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244FEDC006789701003EDEDFFBFE7 /* SampleHostBenchLLMDispatcher.swift */; };
 		241ABCD010101AAAA0101010101 /* SampleHostBenchChecksum.swift in Sources */ = {isa = PBXBuildFile; fileRef = 241FEDC111111BBBB1111111111 /* SampleHostBenchChecksum.swift */; };
 		241ABCD020202AAAA0202020202 /* SampleHostBenchThermalGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 241FEDC121212BBBB1212121212 /* SampleHostBenchThermalGate.swift */; };
 		241ABCD030303AAAA0303030303 /* SampleHostBenchAnomalyWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 241FEDC131313BBBB1313131313 /* SampleHostBenchAnomalyWatcher.swift */; };
@@ -916,6 +917,7 @@
 		240FEDCDD3456701006DEEFF8FE4 /* SampleHostBenchCoreMLBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchCoreMLBundle.swift; sourceTree = "<group>"; };
 		242FEDCEE4567701005EFEFFA9FE5 /* SampleHostBenchPostLLMObserver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchPostLLMObserver.swift; sourceTree = "<group>"; };
 		243FEDCFF5678701004FEFEFEAFE6 /* SampleHostBenchRegressionResiduals.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchRegressionResiduals.swift; sourceTree = "<group>"; };
+		244FEDC006789701003EDEDFFBFE7 /* SampleHostBenchLLMDispatcher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchLLMDispatcher.swift; sourceTree = "<group>"; };
 		241FEDC111111BBBB1111111111 /* SampleHostBenchChecksum.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchChecksum.swift; sourceTree = "<group>"; };
 		241FEDC121212BBBB1212121212 /* SampleHostBenchThermalGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchThermalGate.swift; sourceTree = "<group>"; };
 		241FEDC131313BBBB1313131313 /* SampleHostBenchAnomalyWatcher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchAnomalyWatcher.swift; sourceTree = "<group>"; };
@@ -1140,6 +1142,7 @@
 				240FEDCDD3456701006DEEFF8FE4 /* SampleHostBenchCoreMLBundle.swift */,
 				242FEDCEE4567701005EFEFFA9FE5 /* SampleHostBenchPostLLMObserver.swift */,
 				243FEDCFF5678701004FEFEFEAFE6 /* SampleHostBenchRegressionResiduals.swift */,
+				244FEDC006789701003EDEDFFBFE7 /* SampleHostBenchLLMDispatcher.swift */,
 				241FEDC111111BBBB1111111111 /* SampleHostBenchChecksum.swift */,
 				241FEDC121212BBBB1212121212 /* SampleHostBenchThermalGate.swift */,
 				241FEDC131313BBBB1313131313 /* SampleHostBenchAnomalyWatcher.swift */,
@@ -1992,6 +1995,7 @@
 				240ABCD224444789012345FFE8 /* SampleHostBenchCoreMLBundle.swift in Sources */,
 				242ABCD335555890123456FFE9 /* SampleHostBenchPostLLMObserver.swift in Sources */,
 				243ABCD446666901234567FFEA /* SampleHostBenchRegressionResiduals.swift in Sources */,
+				244ABCD557777012345678FFEB /* SampleHostBenchLLMDispatcher.swift in Sources */,
 				241ABCD010101AAAA0101010101 /* SampleHostBenchChecksum.swift in Sources */,
 				241ABCD020202AAAA0202020202 /* SampleHostBenchThermalGate.swift in Sources */,
 				241ABCD030303AAAA0303030303 /* SampleHostBenchAnomalyWatcher.swift in Sources */,

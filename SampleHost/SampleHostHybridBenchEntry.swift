@@ -404,347 +404,39 @@ extension SampleHostModel {
                 let lengthPredicted = coreML.lengthPredicted
                 let latencyPredictedMs = coreML.latencyPredictedMs
 
-                // Call chosen LLM
-                var firstTriedLLM = routerRoute.rawValue
-                var firstStatus = "ok"
-                var firstBody = ""
-                var firstDurationMs: Double = 0
-                var fallbackLLM: String?
-                var fallbackStatus: String?
-                var fallbackBody: String?
-                var fallbackDurationMs: Double?
-                var actualRoute = ""
-                var routerHit = true
-                // M666 chapter 一百八十五 — B1 (CRITICAL):
-                // routerOverridden=true means substrate bypassed
-                // router prediction (skip / bothLLMs / localOnly).
-                // Default false; set true in the override branches
-                // below. routerHits/Misses counters now tally only
-                // when overridden==false, so `genuine router
-                // accuracy` analysis filters by this field.
-                var routerOverridden: Bool = false
-                var errorMessage: String?
-                var dispatchTaken: String = dispatchPolicy.rawValue
-                var llmSkipped: Bool = false
-                var draftOnlyFlag: Bool = false
+                // M826 chapter 二百四十四 — LLM dispatch logic
+                // (~340 LOC of switch-on-dispatchPolicy with 6
+                // branches: .skipsLLM canned / .bothLLMs dual /
+                // .localOnly Gemma-only / .singleLLM uncertain-zone
+                // dual-LLM longer-pick / .singleLLM confident with
+                // fallback / .draftOnly variant) extracted to typed
+                // value bundle + extension method. chapter 一百
+                // 七十八 / M628 + chapter 一百八十五 / M666 (B1 fix)
+                // + chapter 一百九十五 / M735 timeout doctrine in
+                // `SampleHostBenchLLMDispatcher`.
+                let dispatchResult = await self.dispatchLLMs(
+                    dispatchPolicy: dispatchPolicy,
+                    routerRoute: routerRoute,
+                    routerConfidence: routerConfidence,
+                    prompt: prompt,
+                    timeoutSeconds: llmTimeoutCaptured,
+                    generation: myGen)
+                let firstTriedLLM = dispatchResult.firstTriedLLM
+                let firstStatus = dispatchResult.firstStatus
+                let firstBody = dispatchResult.firstBody
+                let firstDurationMs = dispatchResult.firstDurationMs
+                let fallbackLLM = dispatchResult.fallbackLLM
+                let fallbackStatus = dispatchResult.fallbackStatus
+                let fallbackBody = dispatchResult.fallbackBody
+                let fallbackDurationMs = dispatchResult.fallbackDurationMs
+                let actualRoute = dispatchResult.actualRoute
+                let routerHit = dispatchResult.routerHit
+                let routerOverridden = dispatchResult.routerOverridden
+                let errorMessage = dispatchResult.errorMessage
+                let dispatchTaken = dispatchResult.dispatchTaken
+                let llmSkipped = dispatchResult.llmSkipped
+                let draftOnlyFlag = dispatchResult.draftOnlyFlag
 
-                let firstStart = Date()
-
-                // M628 — substrate-skip path: when permit is
-                // .block / .replace / .delay, do NOT call LLM.
-                // Return canned response. This is THE 真实 path
-                // for "substrate decides we shouldn't ask LLM".
-                if dispatchPolicy.skipsLLM {
-                    let canned = dispatchPolicy.cannedResponse ?? ""
-                    firstTriedLLM = "none-substrate-skip"
-                    firstBody = canned
-                    firstStatus = "ok-substrate-skip"
-                    // M671 chapter 一百八十五 — B11 (MEDIUM) fix:
-                    // skip-path duration is meaningless (just the
-                    // canned-string assignment latency). Set to 0
-                    // explicitly so JSONL analysis can grep
-                    // `firstTriedDurationMs == 0 && llmSkipped` to
-                    // identify skip rows cleanly.
-                    firstDurationMs = 0
-                    actualRoute = "skipped-by-substrate-\(dispatchPolicy.rawValue.dropFirst("skip-".count))"
-                    llmSkipped = true
-                    dispatchTaken = dispatchPolicy.rawValue
-                    // M666 chapter 一百八十五 — B1 (CRITICAL):
-                    // skip path bypasses router; mark overridden
-                    // so router-accuracy analysis filters this
-                    // row out. Pre-fix: routerHits += 1 here
-                    // contaminated genuine router-hit signal.
-                    routerOverridden = true
-                    switch dispatchPolicy {
-                    case .skipBlock:
-                        applyIfActive(myGen) { self.hybridBenchSubstrateSkipBlock += 1 }
-                    case .skipReplace:
-                        applyIfActive(myGen) { self.hybridBenchSubstrateSkipReplace += 1 }
-                    case .skipDelay:
-                        applyIfActive(myGen) { self.hybridBenchSubstrateSkipDelay += 1 }
-                    default: break
-                    }
-                } else if dispatchPolicy == .bothLLMs {
-                    // M628 — substrate explicitly wants both LLMs
-                    // (compare / escalate). Force dual-call
-                    // regardless of router prediction.
-                    var afmBodyMaybe: String?
-                    var gemmaBodyMaybe: String?
-                    var afmErr: Error?
-                    var gemmaErr: Error?
-                    let afmStart = Date()
-                    do {
-                        // M746 chapter 一百九十八 — bothLLMs path
-                        // also gets per-iter timeout protection.
-                        afmBodyMaybe = try await self.callAFMWithTimeout(
-                            prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch {
-                        afmErr = error
-                        self.recordTimeoutIfApplicable(
-                            error, generation: myGen)
-                    }
-                    let afmMs = Date().timeIntervalSince(afmStart) * 1000
-                    let gemmaStart = Date()
-                    do {
-                        gemmaBodyMaybe = try await self.callGemmaWithTimeout(
-                            prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch {
-                        gemmaErr = error
-                        self.recordTimeoutIfApplicable(
-                            error, generation: myGen)
-                    }
-                    let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
-
-                    firstTriedLLM = "afm"
-                    firstBody = afmBodyMaybe ?? ""
-                    firstStatus = afmErr == nil ? "ok" : "afm-error"
-                    firstDurationMs = afmMs
-                    if let g = gemmaBodyMaybe {
-                        fallbackLLM = "gemma"
-                        fallbackBody = g
-                        fallbackStatus = gemmaErr == nil ? "ok-substrate-both" : "gemma-error"
-                    }
-                    fallbackDurationMs = gemmaMs
-                    let bothFailed =
-                        afmBodyMaybe == nil && gemmaBodyMaybe == nil
-                    actualRoute = bothFailed
-                        ? "substrate-both-failed"
-                        : "substrate-both-\(dispatchPolicy.rawValue)"
-                    if bothFailed {
-                        applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
-                        // M666 — substrate forced both LLMs;
-                        // routerHits/Misses doesn't apply.
-                        routerHit = false
-                    } else {
-                        if afmBodyMaybe != nil {
-                            applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
-                        }
-                        if gemmaBodyMaybe != nil {
-                            applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
-                        }
-                    }
-                    if afmErr != nil { errorMessage = "afm: \(afmErr!)" }
-                    if gemmaErr != nil {
-                        errorMessage = (errorMessage ?? "") + " gemma: \(gemmaErr!)"
-                    }
-                    // M666 chapter 一百八十五 — B1: bothLLMs
-                    // overrides router prediction. Don't pollute
-                    // routerHits/Misses with these rows.
-                    routerOverridden = true
-                    applyIfActive(myGen) { self.hybridBenchSubstrateBothLLMs += 1 }
-                } else if dispatchPolicy == .localOnly {
-                    // M628 — substrate flagged no-cloud. Force
-                    // Gemma path, never AFM. M666 chapter 一百
-                    // 八十五 B1 fix: localOnly is substrate
-                    // override; don't tally routerHits/Misses.
-                    // M746 chapter 一百九十八 — apply timeout.
-                    do {
-                        firstBody = try await self.callGemmaWithTimeout(
-                            prompt: prompt, seconds: llmTimeoutCaptured)
-                        firstTriedLLM = "gemma"
-                        firstStatus = "ok-substrate-local-only"
-                        firstDurationMs =
-                            Date().timeIntervalSince(firstStart) * 1000
-                        actualRoute = "local-only-gemma-ok"
-                        applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
-                    } catch {
-                        // M780 chapter 二百七 — record timeout count.
-                        self.recordTimeoutIfApplicable(
-                            error, generation: myGen)
-                        firstTriedLLM = "gemma"
-                        firstStatus = "gemma-error"
-                        firstDurationMs =
-                            Date().timeIntervalSince(firstStart) * 1000
-                        errorMessage = "gemma local-only: \(error)"
-                        actualRoute = "local-only-gemma-failed"
-                        applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
-                        routerHit = false
-                    }
-                    routerOverridden = true
-                    applyIfActive(myGen) { self.hybridBenchSubstrateLocalOnly += 1 }
-                } else {
-                    // M628 — `.singleLLM` or `.draftOnly` falls
-                    // through to original router-driven logic.
-                    // For `.draftOnly` we additionally tag the
-                    // row so downstream UI can flag the output
-                    // as not-yet-committed.
-                    if dispatchPolicy == .draftOnly {
-                        draftOnlyFlag = true
-                        applyIfActive(myGen) { self.hybridBenchSubstrateDraftOnly += 1 }
-                    }
-                    if routerConfidence == .uncertain {
-                    // v0.2 — uncertain zone: call BOTH LLMs, pick
-                    // longer body (simple heuristic, will swap to
-                    // ShadowEvaluator-based picker in chapter 一百八十).
-                    var afmBodyMaybe: String?
-                    var gemmaBodyMaybe: String?
-                    var afmErr: Error?
-                    var gemmaErr: Error?
-                    let afmStart = Date()
-                    do {
-                        // M746 chapter 一百九十八 — uncertain-zone
-                        // dual-call also wrapped with timeout.
-                        afmBodyMaybe = try await self.callAFMWithTimeout(
-                            prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch {
-                        afmErr = error
-                        self.recordTimeoutIfApplicable(
-                            error, generation: myGen)
-                    }
-                    let afmMs = Date().timeIntervalSince(afmStart) * 1000
-                    let gemmaStart = Date()
-                    do {
-                        gemmaBodyMaybe = try await self.callGemmaWithTimeout(
-                            prompt: prompt, seconds: llmTimeoutCaptured)
-                    } catch {
-                        gemmaErr = error
-                        self.recordTimeoutIfApplicable(
-                            error, generation: myGen)
-                    }
-                    let gemmaMs = Date().timeIntervalSince(gemmaStart) * 1000
-
-                    // Pick longer non-empty body (simple heuristic)
-                    let pickedAFM: Bool
-                    if let a = afmBodyMaybe, let g = gemmaBodyMaybe {
-                        pickedAFM = a.count >= g.count
-                    } else if afmBodyMaybe != nil {
-                        pickedAFM = true
-                    } else if gemmaBodyMaybe != nil {
-                        pickedAFM = false
-                    } else {
-                        pickedAFM = true  // both failed
-                    }
-                    if pickedAFM {
-                        firstTriedLLM = "afm"
-                        firstBody = afmBodyMaybe ?? ""
-                        firstStatus = afmErr == nil ? "ok" : "afm-error"
-                        firstDurationMs = afmMs
-                        if let other = gemmaBodyMaybe {
-                            fallbackLLM = "gemma"
-                            fallbackBody = other
-                            fallbackStatus = "ok-uncertain-side"
-                        }
-                        fallbackDurationMs = gemmaMs
-                        actualRoute = "uncertain-both-pick-afm"
-                    } else {
-                        firstTriedLLM = "gemma"
-                        firstBody = gemmaBodyMaybe ?? ""
-                        firstStatus = gemmaErr == nil ? "ok" : "gemma-error"
-                        firstDurationMs = gemmaMs
-                        if let other = afmBodyMaybe {
-                            fallbackLLM = "afm"
-                            fallbackBody = other
-                            fallbackStatus = "ok-uncertain-side"
-                        }
-                        fallbackDurationMs = afmMs
-                        actualRoute = "uncertain-both-pick-gemma"
-                    }
-                    let bothFailed =
-                        afmBodyMaybe == nil && gemmaBodyMaybe == nil
-                    if afmBodyMaybe != nil && gemmaBodyMaybe == nil {
-                        applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
-                    } else if gemmaBodyMaybe != nil && afmBodyMaybe == nil {
-                        applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
-                    } else if bothFailed {
-                        applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
-                        // M627 review #6: actualRoute lied as
-                        // "uncertain-both-pick-afm" when both bodies
-                        // are empty. Correct semantic:
-                        actualRoute = "uncertain-both-failed"
-                    } else {
-                        // Both succeeded (best case)
-                        if pickedAFM {
-                            applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
-                        } else {
-                            applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
-                        }
-                    }
-                    if afmErr != nil { errorMessage = "afm: \(afmErr!)" }
-                    if gemmaErr != nil {
-                        errorMessage = (errorMessage ?? "") + " gemma: \(gemmaErr!)"
-                    }
-                    // M627 review #5: only count router-hit when
-                    // at least one body returned. Both-failed
-                    // increments routerMisses instead.
-                    if bothFailed {
-                        applyIfActive(myGen) { self.hybridBenchRouterMisses += 1 }
-                        routerHit = false
-                    } else {
-                        applyIfActive(myGen) { self.hybridBenchRouterHits += 1 }
-                    }
-                } else {
-                    // Confident — original single-LLM-with-fallback path
-                    // M735 chapter 一百九十五 — wrap with timeout
-                    // for 10h hang resistance.
-                    do {
-                        if routerRoute == .afm {
-                            firstBody = try await self.callAFMWithTimeout(
-                                prompt: prompt,
-                                seconds: llmTimeoutCaptured)
-                        } else {
-                            firstBody = try await self.callGemmaWithTimeout(
-                                prompt: prompt,
-                                seconds: llmTimeoutCaptured)
-                        }
-                        firstDurationMs =
-                            Date().timeIntervalSince(firstStart) * 1000
-                        actualRoute = "\(routerRoute.rawValue)-predicted-ok"
-                        if routerRoute == .afm {
-                            applyIfActive(myGen) { self.hybridBenchAFMOk += 1 }
-                        } else {
-                            applyIfActive(myGen) { self.hybridBenchGemmaOk += 1 }
-                        }
-                        applyIfActive(myGen) { self.hybridBenchRouterHits += 1 }
-                    } catch {
-                        // M780 chapter 二百七 — record timeout count.
-                        self.recordTimeoutIfApplicable(
-                            error, generation: myGen)
-                        firstStatus = "\(routerRoute.rawValue)-error"
-                        firstDurationMs =
-                            Date().timeIntervalSince(firstStart) * 1000
-                        errorMessage = "first: \(error)"
-                        routerHit = false
-                        applyIfActive(myGen) { self.hybridBenchRouterMisses += 1 }
-                        let fbStart = Date()
-                        do {
-                            let other: String
-                            if routerRoute == .afm {
-                                other = try await self.callGemmaWithTimeout(
-                                    prompt: prompt,
-                                    seconds: llmTimeoutCaptured)
-                                fallbackLLM = "gemma"
-                                fallbackStatus = "ok"
-                                fallbackBody = other
-                                actualRoute = "afm-fallback-to-gemma-ok"
-                                applyIfActive(myGen) { self.hybridBenchAFMFallbackToGemmaOk += 1 }
-                            } else {
-                                other = try await self.callAFMWithTimeout(
-                                    prompt: prompt,
-                                    seconds: llmTimeoutCaptured)
-                                fallbackLLM = "afm"
-                                fallbackStatus = "ok"
-                                fallbackBody = other
-                                actualRoute = "gemma-fallback-to-afm-ok"
-                                applyIfActive(myGen) { self.hybridBenchGemmaFallbackToAFMOk += 1 }
-                            }
-                            fallbackDurationMs =
-                                Date().timeIntervalSince(fbStart) * 1000
-                        } catch {
-                            // M780 chapter 二百七 — fallback timeout
-                            self.recordTimeoutIfApplicable(
-                                error, generation: myGen)
-                            fallbackLLM = routerRoute == .afm ? "gemma" : "afm"
-                            fallbackStatus = "error"
-                            errorMessage = (errorMessage ?? "") + " fb: \(error)"
-                            actualRoute = "both-failed"
-                            applyIfActive(myGen) { self.hybridBenchBothFailed += 1 }
-                            fallbackDurationMs =
-                                Date().timeIntervalSince(fbStart) * 1000
-                        }
-                    }
-                }
-                }
-                // M628 — close of outer else for .singleLLM/.draftOnly
 
                 // M824 chapter 二百四十二 — CLOSED LOOP post-LLM
                 // observation extracted to typed value bundle +
