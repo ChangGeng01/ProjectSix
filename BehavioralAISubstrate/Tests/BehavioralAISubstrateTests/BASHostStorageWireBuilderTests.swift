@@ -346,6 +346,105 @@ final class BASHostStorageWireBuilderTests: XCTestCase {
         XCTAssertTrue(codes.contains("vault-url-provided:yes"))
     }
 
+    // MARK: - Ticket lifecycle factory (chapter 三百〇七 / M794)
+
+    func testLifecycleLegacyInMemoryProducesInMemoryCoordinator()
+        async throws
+    {
+        let coord = try await BASHostStorageWireBuilder
+            .makeTicketLifecycleCoordinator(
+                options: .legacyInMemory)
+        // Legacy mode: coordinator has nil storage; assert by
+        // verifying coordinator works for in-memory operations
+        // (no persistence behavior needed).
+        let initialCount = await coord.count()
+        XCTAssertEqual(
+            initialCount, 0,
+            "fresh in-memory coordinator starts at zero tickets")
+    }
+
+    func testLifecycleSQLiteRequiredWithoutURLThrows() async {
+        let options = BASHostStorageOptions(
+            preference: .sqliteRequired,
+            ticketLifecycleURL: nil)
+        do {
+            _ = try await BASHostStorageWireBuilder
+                .makeTicketLifecycleCoordinator(options: options)
+            XCTFail("expected throw for .sqliteRequired + nil URL")
+        } catch let wireError as BASHostStorageWireError {
+            XCTAssertEqual(
+                wireError,
+                .missingSQLiteURL(
+                    component: "ticket-lifecycle"))
+        } catch {
+            XCTFail("expected BASHostStorageWireError, got " +
+                "\(type(of: error))")
+        }
+    }
+
+    func testLifecycleSQLiteWhenURLProvidedCreatesFile()
+        async throws
+    {
+        let url = tempRoot.appendingPathComponent(
+            "lifecycle.sqlite")
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            ticketLifecycleURL: url)
+        let coord = try await BASHostStorageWireBuilder
+            .makeTicketLifecycleCoordinator(options: options)
+        // Verify SQLite file exists on disk
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: url.path),
+            "SQLite lifecycle database file must be created on disk")
+        let initialCount = await coord.count()
+        XCTAssertEqual(
+            initialCount, 0,
+            "fresh SQLite coordinator starts at zero tickets " +
+            "after restore (empty file)")
+    }
+
+    func testLifecycleSQLiteWhenURLProvidedWithoutURLFallsBack()
+        async throws
+    {
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            ticketLifecycleURL: nil)
+        let coord = try await BASHostStorageWireBuilder
+            .makeTicketLifecycleCoordinator(options: options)
+        // Falls back to in-memory; coordinator constructed
+        // successfully (graceful, doesn't throw).
+        let initialCount = await coord.count()
+        XCTAssertEqual(initialCount, 0)
+    }
+
+    func testLifecycleReasonCodesForLegacyMode() {
+        let codes = BASHostStorageWireBuilder
+            .ticketLifecycleWireReasonCodes(
+                options: .legacyInMemory)
+        XCTAssertTrue(
+            codes.contains("ticket-lifecycle-wire:in-memory"))
+        XCTAssertTrue(
+            codes.contains(
+                "ticket-lifecycle-preference:in-memory-default"))
+        XCTAssertTrue(
+            codes.contains(
+                "ticket-lifecycle-url-provided:no"))
+    }
+
+    func testLifecycleReasonCodesForSQLiteConfigured() {
+        let url = URL(fileURLWithPath: "/tmp/lc.sqlite")
+        let options = BASHostStorageOptions(
+            preference: .sqliteWhenURLProvided,
+            ticketLifecycleURL: url)
+        let codes = BASHostStorageWireBuilder
+            .ticketLifecycleWireReasonCodes(options: options)
+        XCTAssertTrue(
+            codes.contains("ticket-lifecycle-wire:sqlite"))
+        XCTAssertTrue(
+            codes.contains(
+                "ticket-lifecycle-url-provided:yes"))
+    }
+
     // MARK: - Cross-session SQLite persistence (atom store)
 
     func testSQLiteStorePersistsAcrossWireBuilds() async throws {

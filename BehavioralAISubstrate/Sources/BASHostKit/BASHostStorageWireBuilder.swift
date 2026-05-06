@@ -207,4 +207,70 @@ public enum BASHostStorageWireBuilder {
                 ? "yes" : "no")
         ]
     }
+
+    // MARK: - L13 Ticket lifecycle factory (chapter 三百〇七 / M794)
+
+    /// Construct an `BASUpdateTicketLifecycleCoordinator` from
+    /// typed storage options。Same ADR-014 resolution rules as
+    /// atom store factory:
+    ///
+    /// - `.inMemoryDefault` → returns coordinator with `storage:
+    ///   nil` (legacy in-memory)
+    /// - `.sqliteWhenURLProvided` + URL → returns SQLite-backed
+    ///   coordinator via `BASUpdateTicketLifecycleCoordinator
+    ///   .sqliteBacked(databaseURL:)`
+    /// - `.sqliteWhenURLProvided` + nil URL → returns in-memory
+    /// - `.sqliteRequired` + URL → SQLite-backed
+    /// - `.sqliteRequired` + nil URL → throws .missingSQLiteURL
+    ///
+    /// Wraps the existing `sqliteBacked(databaseURL:)` factory
+    /// (chapter 二百五十 / M737) with typed-options dispatch.
+    /// The underlying factory runs `restore()` inline so the
+    /// returned coordinator reflects on-disk state.
+    public static func makeTicketLifecycleCoordinator(
+        options: BASHostStorageOptions,
+        clock: @escaping @Sendable () -> Date = { .now },
+        auditSink: BASUpdateTicketLifecycleCoordinator.AuditSink?
+            = nil
+    ) async throws -> BASUpdateTicketLifecycleCoordinator {
+        if options.shouldUseSQLiteTicketLifecycle {
+            guard let url = options.effectiveTicketLifecycleURL
+            else {
+                throw BASHostStorageWireError.missingSQLiteURL(
+                    component: "ticket-lifecycle")
+            }
+            do {
+                return try await
+                    BASUpdateTicketLifecycleCoordinator
+                        .sqliteBacked(
+                            databaseURL: url,
+                            clock: clock,
+                            auditSink: auditSink)
+            } catch {
+                throw BASHostStorageWireError.storageInitFailed(
+                    component: "ticket-lifecycle",
+                    message: "\(error)")
+            }
+        }
+        return BASUpdateTicketLifecycleCoordinator(
+            clock: clock,
+            auditSink: auditSink,
+            storage: nil)
+    }
+
+    /// Helper:emit reason codes for ticket lifecycle wire path。
+    public static func ticketLifecycleWireReasonCodes(
+        options: BASHostStorageOptions
+    ) -> [String] {
+        let willUseSQLite = options.shouldUseSQLiteTicketLifecycle
+        return [
+            "ticket-lifecycle-wire:" +
+            (willUseSQLite ? "sqlite" : "in-memory"),
+            "ticket-lifecycle-preference:" +
+            "\(options.preference.rawValue)",
+            "ticket-lifecycle-url-provided:" +
+            (options.effectiveTicketLifecycleURL != nil
+                ? "yes" : "no")
+        ]
+    }
 }
