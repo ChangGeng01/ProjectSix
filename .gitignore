@@ -14,3 +14,8 @@ build/
 
 # Local bundled model assets
 Before/Resources/Models/*.litertlm
+
+# Python bytecode (chapter 二百十三 cleanup)
+scripts/__pycache__/
+**/__pycache__/
+*.pyc
