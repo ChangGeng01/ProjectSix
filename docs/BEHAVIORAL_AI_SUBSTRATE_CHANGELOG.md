@@ -1870,3 +1870,42 @@ Lives in **BASHostKit** (not BASEvaluation) because `BASHostRuntime` lives in BA
 Test impact: BAS XCTest 3118 → **3127** (+9 chapter 二百六十七 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
 
 Stage 5 progress: **2/5 chapters shipped** (二百六十六 ✓ protocol + no-op / 二百六十七 ✓ substrate-driven conformer / 二百六十八 ML-backed pending — needs real bench data / 二百六十九 bench loop integration pending / 二百七十 meridian expansion pending — multi-month).
+
+## 2026-05-07 — chapter 二百六十九 (M750) SampleHost bench loop adopts `BASShadowEvaluating` via DI — Stage 5 Step 3 of 5
+
+附录 V Stage 5 third chapter wires the bench loop's post-LLM observer to use the BAS-side `BASShadowEvaluating` protocol. Pre-chapter 二百六十九 SampleHost's `observePostLLM(...)` was hardcoded substrate-reaudit; post-chapter 二百六十九 the new `observePostLLMViaEvaluator(_:...)` accepts any protocol conformer — substrate-driven (chapter 二百六十七), no-op (chapter 二百六十六), ML-backed (chapter 二百六十八+, deferred), or host-supplied experiment variants.
+
+The legacy `observePostLLM(...)` path is preserved verbatim — bench-loop call site at `SampleHostHybridBenchEntry.swift:445` continues to work byte-equal. The new injection point is purely additive; hosts that want it call `observePostLLMViaEvaluator` instead.
+
+- **M750** modify `SampleHost/SampleHostBenchPostLLMObserver.swift`:
+  - `import BASEvaluation` (for `BASShadowEvaluating` + `BASShadowEvaluationResult`).
+  - **NEW** `SampleHostBenchPostLLMObservation.from(_:prePermitMode:)` static factory translates `BASShadowEvaluationResult` → `SampleHostBenchPostLLMObservation`. `.skipped` results map to `.skipped` observations (preserves the legacy guard pattern at lines 99-101).
+  - **NEW** `SampleHostModel.observePostLLMViaEvaluator(evaluator:prompt:firstBody:fallbackBody:llmSkipped:prePermitMode:sessionRef:turnRef:generation:)` extension method. Body-resolution rule preserved from chapter 一百八十七 / M685 fix B4 (observe whichever body has content). Counter-mutation side effect (`hybridBenchPostLLMShifted`) gated on `applyIfActive(generation)` — same staleness defense as legacy path.
+- **Doctrine separation**: BAS-side evaluator is **observability only** (`BASShadowEvaluating` contract); SampleHost-side wrapper applies the counter-mutation side effect. The protocol seam respects 红线 7 cleanly — observability and decision are typed-distinct.
+- **8 fix-pin tests** in `SampleHostBenchPostLLMObserverShadowEvaluatorTests.swift` (~265 LOC):
+  - empty body skips evaluator + counter unchanged
+  - llmSkipped path skips evaluator
+  - shifted result increments counter
+  - non-shifted result does NOT increment counter
+  - `.from(_:)` translation handles `.skipped`
+  - `.from(_:)` propagates non-skip fields
+  - `BASNoOpShadowEvaluator` wires correctly (always returns `.skipped`)
+  - **stale generation drops counter increment** (observability-only invariant pin)
+- **xcodeproj registration**: 4-entry pattern (PBXBuildFile / PBXFileReference / group / sources build phase) for the new test file. Compile-pass verified on iPhone 17 simulator; 128 → 136 SampleHost iOS tests; all green.
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3: bench loop never mutates production state via the evaluator. The new path delegates observability to the protocol; the counter-mutation side effect is host-side and stays behind `applyIfActive(generation)`.
+- 红线 7 watcher-only-hint: the BAS-side evaluator is the watcher; the host decides whether to record the hint (counter mutation) or not.
+- chapter 一百七十八 / M630 closed-loop substrate-is-arbiter doctrine: substrate is THE arbiter — the new protocol-driven path preserves this contract via `BASSubstrateReauditShadowEvaluator` as default conformer.
+- chapter 一百八十五 / M676 fix B6: 4K-char body cap. The BAS-side evaluator (chapter 二百六十七) carries this; the SampleHost wrapper inherits via the protocol.
+- chapter 一百八十七 / M685 fix B4: body-resolution rule preserved (observe `firstBody` if non-empty, else `fallbackBody`).
+- chapter 一百八十八 / M691: off-MainActor via `Task.detached` — still happens inside the BAS-side evaluator; the SampleHost wrapper is `@MainActor` for `applyIfActive` access but delegates the heavy work.
+
+**Backward compatibility**: legacy `observePostLLM(...)` byte-equal to pre-chapter-二百六十九; bench loop call sites unchanged.
+
+Test impact:
+- BAS XCTest: 3127 unchanged.
+- SampleHost iOS XCTest: 128 → **136** (+8 chapter 二百六十九 fix-pins).
+- 0 failures, 0 doctrine red lines broken, 0 regressions.
+
+Stage 5 progress: **3/5 chapters shipped** (二百六十六 ✓ / 二百六十七 ✓ / 二百六十九 ✓ — wired out-of-order before 二百六十八 because 二百六十九 is doctrine-clean / 二百六十八 ML-backed pending — needs real bench data / 二百七十 meridian expansion pending — multi-month).
