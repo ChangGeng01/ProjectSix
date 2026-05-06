@@ -25850,3 +25850,250 @@ Per NEW ADR-006: `.rawLLM` SmokeMode bypasses substrate's permit gate for OBSERV
 92 SampleHost tests pass / 1969 全栈 / 0 failures. iPhone PID 55952. Auto-verify monitor restarted; expects ≥ 50 LLM fires at 3 min after next bench start.
 
 **Chapter 192-208 = 17 chapters / 73 milestones in this session**.
+
+## 二百七十五-三百一四、 next-gen architecture rebirth (40 commits / 2026-05-07)
+
+User instruction: **"整体 底层 架构 next gen"** + chosen scope **"1+2+4 + 彻底激发 神经网络 coreml"** + budget **"Multi-month systemic"**. Branch: `next-gen-architecture-2026-05-07`.
+
+5 phases shipped across 41 commits in one continuous autonomous-mode session. Every commit independently revertable. 0 failures across all 41 commits. Branch was up by 40 commits at v9 manifesto authoring (chapter 三百一四) + 1 more for honesty board entry (chapter 三百一五).
+
+### 序、 phase shape
+
+附录 W master plan structured the rebirth as 5 phases with explicit doctrine binding:
+
+| Phase | Goal | Chapters | Cuts | Scope |
+|---|---|---|---|---|
+| α (Alpha) | Structural foundation | 275-298 | 24 | 0-behavior-change file split |
+| β (Beta) | Per-layer concurrency contract | 299-301 | 3 | typed primitives + ADR-013 |
+| γ (Gamma) | OPT-IN → PROD storage migration | 302-309 | 8 | doctrine + 4 factories + bundle |
+| δ (Delta) | CoreML mesh production foundation | 310-313 | 4 | registry + rules + cascade + map |
+| ε (Epsilon) | Doctrine v9 manifesto + honesty | 314-315 | 2 | doc-only |
+
+### 一、 Phase Alpha — 5/5 god files closed (chapters 275-298)
+
+Pre-Phase-Alpha snapshot:
+
+| File | LOC |
+|---|---|
+| `BASOrchestration/EBrainCognitionPlaneCore.swift` | 5,347 |
+| `BASMemory/MemoryCore.swift` | 3,316 |
+| `BASHostKit/HostKitCore.swift` | 4,770 |
+| `QinaoSampleHost/main.swift` | 8,224 |
+| `Tests/.../BASHostKitTests.swift` | 5,626 |
+| **Total** | **27,283** |
+
+Post-Phase-Alpha snapshot:
+
+| File | After | Δ |
+|---|---|---|
+| `EBrainCognitionPlaneCore.swift` | 69 | -98.7% |
+| `MemoryCore.swift` | 524 | -84.2% |
+| `HostKitCore.swift` | 787 | -83.5% |
+| `main.swift` | 1,441 | -82.5% |
+| `BASHostKitTests.swift` | 3,393 | -39.7% |
+| **Total** | **6,214** | **-77.2%** |
+
+24 cuts across 24 chapters. Each cut: extract one type cluster to a new file → run `swift build` → run `swift test` → BAS XCTest 3194 unchanged → 1 commit. 21 new module/extension files created. Module DAG unchanged. Doctrine D actor matrix preserved (chapter 二百一一).
+
+### 二、 Phase Beta foundation — 17 typed primitives (chapters 299-301) + ADR-013
+
+3 chapters shipping per-layer typed concurrency contract:
+
+**chapter 299 (M786)** — `BASLayerActor` protocol contract:
+- `BASLayerActorInput / BASLayerActorOutput / BASLayerActorStatus (8-case)` / `BASLayerInferenceConfidence (4-case)` / `BASLayerActorError (5-case)`
+- `BASLayerActor` actor protocol with `layerID + process(input:) async throws -> output`
+- 18 tests
+
+**chapter 300 (M787)** — Budget slice + ML head slot:
+- `BASLayerSlice (per-call budget) / BASLayerMLHeadKind (5-case cascade tier)`
+- `BASLayerMLHead protocol` + `BASLayerInferenceInput / BASLayerInferenceOutput`
+- 20 tests
+
+**chapter 301 (M788)** — Kill switch + error boundary (FINAL Phase Beta foundation):
+- `BASLayerKillSwitchID (14-case bijective with BASMotherboardLayer14)`
+- `BASLayerKillSwitchReason (8-case) / BASLayerKillSwitchState`
+- `BASLayerErrorFallthroughStrategy (5-case) / BASLayerErrorBoundaryReport`
+- `.from(error:capturedAt:)` derive helper enforces 4 doctrine pins:
+  - L1 wake error → abortTurn (不变量 #1)
+  - L11 / L14 errors → sovereignEscalate (单提交口)
+  - .quarantine → sovereignEscalate (BR-014)
+  - others → gracefulSkip
+- 18 tests
+
+Total Phase Beta foundation: 17 typed primitives + ADR-013 + +56 tests (3194 → 3250).
+
+### 三、 Phase Gamma — usable end-to-end (chapters 302-309) + ADR-014
+
+8 chapters wiring OPT-IN → PROD storage migration via typed config + factories:
+
+**chapter 302 (M789)** — ADR-013 + ADR-014 doctrine documents (doc-only).
+
+**chapter 303 (M790)** — `BASHostStorageOptions` typed config primitive:
+- 3-case `BASHostStoragePreference (inMemoryDefault / sqliteWhenURLProvided / sqliteRequired)`
+- `BASHostStorageRoot` (4-URL derivation from one root)
+- `BASHostStorageOptions` with 4 optional URLs + preference + unifiedRoot
+- `BASHostStorageWireReport` for audit emission
+- 21 tests
+
+**chapter 304 (M791)** — Wire `storageOptions` into `BASHostConfiguration`:
+- `decodeIfPresent` fallback to `.legacyInMemory` for backward-compat
+- 9 integration tests
+
+**chapter 305 (M792)** — `BASHostStorageWireBuilder.makeAtomStore`:
+- 12 integration tests asserting real disk file creation
+
+**chapter 306 (M793)** — `makeVaultStorage` factory:
+- 7 integration tests
+
+**chapter 307 (M794)** — `makeTicketLifecycleCoordinator` factory:
+- 6 integration tests
+
+**chapter 308 (M795)** — `makeAuditLedgerStorage` factory:
+- 7 integration tests
+
+**chapter 309 (M796)** — `makeBundle` 4-component bundle assembly:
+- `BASHostStorageWireBundle` value type
+- 4 integration tests including `testBundleSQLiteEverywhereWithUnifiedRoot` asserting all 4 SQLite files exist on disk
+
+Phase Gamma is now usable end-to-end:
+
+```swift
+let options = BASHostStorageOptions(
+    preference: .sqliteWhenURLProvided,
+    unifiedRoot: BASHostStorageRoot(rootURL: docsDir))
+let bundle = try await BASHostStorageWireBuilder.makeBundle(
+    options: options)
+// bundle.atomStore / bundle.vault / bundle.ticketLifecycle / bundle.auditLedger
+// bundle.wireReport.reasonCodes → audit trail
+```
+
+ADR-014 backward-compat is preserved: `.legacyInMemory` returns in-memory across all 4 components.
+
+Total Phase Gamma: 21 typed primitives + ADR-014 + +66 tests (3250 → 3316).
+
+### 四、 Phase Delta foundation — 14-layer mesh (chapters 310-313)
+
+4 chapters shipping the substrate-side machinery for chapter 一百七十七 vision § "Core ML mesh × 14 层":
+
+**chapter 310 (M797)** — `BASLayerMLHeadRegistry` actor:
+- `BASLayerMLHeadSlot` typed slot record
+- 3-case `BASLayerMLHeadRegistrationError`
+- Single-writer/multi-reader concurrency via actor isolation
+- 18 tests
+
+**chapter 311 (M798)** — `BASRulesBasedLayerMLHead` rules-tier wrapper:
+- Generic Sendable closure → `BASLayerMLHead` conformer
+- `BASRulesBasedLayerMLHeadFactory` 3 helpers (constant / fallthrough / keyword)
+- 12 tests including cascade fallthrough simulation
+
+**chapter 312 (M799)** — `BASLayerCascadeRunner` cascading inference dispatcher:
+- 4-case `BASLayerCascadeOutcome`
+- `BASLayerCascadeAttempt` audit trail entry
+- `BASLayerCascadeResult` typed runner output
+- Confidence ordering helper (.unknown < .low < .medium < .high)
+- 16 tests including walk-priority + fallthrough + caller-error rethrow
+
+**chapter 313 (M800)** — `BAS14LayerMeshMap.canonical` 41-slot inventory:
+- `BAS14LayerMeshSlot` typed slot record
+- 5 cascading tier priority constants (rules=0 < coreml=10 < mlx=20 < AFM=30 < external=40)
+- 41 canonical slots across 12 layers (L2/L3 = 0 model-layer heads)
+- 17 tests pinning per-layer counts + role uniqueness + kind-tier consistency
+
+Total Phase Delta foundation: 27 typed primitives + 63 tests (3316 → 3379).
+
+End-to-end Phase Delta usability TODAY (without real .mlpackage):
+
+```swift
+// 1. Construct registry
+let registry = BASLayerMLHeadRegistry()
+
+// 2. Populate with rules-tier wrappers per canonical slot
+for slot in BAS14LayerMeshMap.canonical {
+    let head = BASRulesBasedLayerMLHeadFactory.makeKeywordMatcher(
+        headID: "rules.\(slot.layerID.rawValue).\(slot.headRole)",
+        layerIDPin: slot.layerID,
+        keywords: ["urgent"])  // toy logic
+    try await registry.register(
+        head: head, layerID: slot.layerID,
+        priority: slot.priority)
+}
+
+// 3. Run cascade from any layer actor
+let result = try await BASLayerCascadeRunner.run(
+    input: input, registry: registry, layerID: .l4)
+// result.outcome / result.matchedHeadID / result.triedHeads
+```
+
+### 五、 Phase Epsilon — v9 manifesto (chapter 314)
+
+`docs/QINAO_MANIFESTO_V9_DOCTRINE.md` — Per-Layer Mesh Architecture doctrine.
+
+**v9 promise**: every layer is layer-isolated + typed-actor-contracted + budget-sliceable + individually-killable + ML-head-slot-equipped.
+
+**v5 doctrine triple satisfied**:
+- Typed primitives: 27 across 4 phase foundations
+- Measurement: BAS 3194 → 3379 (+185 tests)
+- Regression gate: anti-drift 3-site enforced for every typed schema
+
+**v9 explicitly does NOT promise**:
+- Real .mlpackage adapters (chapter 一百七十七 P0 pending)
+- Default substrate consuming SQLite (opt-in via preference)
+- Layer actors fully wired (chapter 三百一四+ follow-on)
+- Cross-instance mesh sync (no doctrine yet)
+
+These are explicit non-promises. Honest scope.
+
+**v9 alignment with v1-v8**: strengthens v3 (anti-magic-number) + v4 (single-source-of-truth) + v5 (doctrine triple). Does NOT contradict v1/v2/v6/v7/v8.
+
+### 六、 Cumulative test growth
+
+```
+Pre-Phase-Alpha:    BAS XCTest 3194  Qinao XCTest 1442
+Post-Phase-Alpha:   BAS 3194  (file-org: 0 test delta)
+Post-Phase-Beta:    BAS 3250  (+56 from 3 foundation chapters)
+Post-Phase-Gamma:   BAS 3316  (+66 from 8 chapters: 21 + 9 + 12 + 7 + 6 + 7 + 4 = 66)
+Post-Phase-Delta:   BAS 3379  (+63 from 4 foundation chapters: 18 + 12 + 16 + 17 = 63)
+Post-Phase-Epsilon: BAS 3379  (doc-only: 0 test delta)
+```
+
+**Total session: BAS 3194 → 3379 (+185 tests across 16 chapters)**
+**Qinao 1442 unchanged across all 41 commits**
+**0 failures across all 41 commits**
+**4 boundary checks ✓ clean throughout**
+
+### 七、 Doctrine pins held throughout entire session
+
+| Doctrine | Source | How preserved |
+|---|---|---|
+| 不变量 #1 (先醒再答) | base | every chapter pure additive or 0-behavior-change refactor |
+| 不变量 #2 (神经不掌权) | base | new typed primitives are hint-class only |
+| 不变量 #3 (私有经验不进权重) | base | no weight-mutation paths added |
+| 红线 7 (watcher hint only) | chapter 一百三十 | observability boundary preserved |
+| 红线 10 (主品牌不默认恐怖) | chapter 一百二十一 | no public API surface changes |
+| 单提交口 | chapter 一百八十九 | L11/L14 verdict authority untouched |
+| Anti-magic-number | chapter 一百八十五 | typed enums for all thresholds |
+| Single-source-of-truth | chapter 二百一一 | every type one file; Phase Alpha 5/5 god files closed |
+| Anti-drift 3-site | chapter 一百九十二 | governance + 2 tests synced per chapter |
+| ADR-006 (.rawLLM observability only) | chapter 二百〇八 | preserved (no live bench data feeding permit) |
+| ADR-013 (Per-layer concurrency) | chapter 三百〇二 | NEW — encodes Phase Beta foundation |
+| ADR-014 (OPT-IN → PROD migration) | chapter 三百〇二 | NEW — gates Phase Gamma cuts |
+
+### 八、 What remains pending
+
+**Honest scope acknowledgement** (matching v9 §8):
+
+1. Chapter 一百七十七 P0 work — real `.mlpackage` adapters (ChengluPreflight v0 / Memory / Shadow). Phase Delta foundation provides the substrate-side mesh; the binaries are external work.
+
+2. Substrate consumer wire-up — `BASHostRuntime` / `EBrainRuntimeCoordinator` initialization paths could consume `BASHostStorageOptions` to make SQLite default. Currently opt-in via factory call.
+
+3. Layer actor concrete implementations — `BASLayerActor` protocol exists; concrete `actor MyL4Actor: BASLayerActor` implementations could be shipped per layer.
+
+4. Production deployment validation — real iPhone user runs verifying the new substrate path doesn't regress vs pre-rebirth.
+
+5. Cross-instance / multi-host mesh sync — each runtime owns its own registry; no doctrine yet for sharing slot bindings across instances.
+
+These were explicit non-promises in v9. Each is still real work to do — just outside this autonomous-mode session's safe scope.
+
+### 九、 一句话总结
+
+**chapters 二百七十五-三百一五 (40 commits + 1 honesty board chapter)**: in one continuous autonomous-mode session, the substrate's next-gen architecture rebirth shipped 5 phases — Alpha closed all 5 god files (-77.2% LOC) with 0 behavior change, Beta foundation shipped 17 typed primitives for per-layer concurrency contract + ADR-013, Gamma shipped 21 typed primitives + 4 storage factories + bundle assembly + ADR-014 making OPT-IN → PROD migration usable end-to-end with 1 line of host code, Delta foundation shipped 27 typed primitives for 14-layer × ML head mesh including registry actor + rules-tier wrapper + cascading inference dispatcher + canonical 41-slot map (chapter 一百七十七 vision typed encoding), Epsilon shipped v9 manifesto encoding the per-layer mesh architecture doctrine + honesty board entry. **BAS XCTest 3194 → 3379 (+185 tests across 16 new-foundation chapters)**, **Qinao XCTest 1442 unchanged**, **0 failures across all 41 commits**, **4 boundary checks ✓ clean throughout**. All commits independently revertable on branch `next-gen-architecture-2026-05-07`. Doctrine pins held: 不变量 #1/#2/#3 全保 / 红线 7/10 全保 / 单提交口 不变 / anti-magic-number / single-source-of-truth / anti-drift 3-site / ADR-006 preserved + ADR-013/014 added. Honest non-promises: chapter 一百七十七 P0 .mlpackage adapters / substrate consumer wire-up / layer actor concrete implementations / production deployment validation / cross-instance mesh sync — all explicit external work.
