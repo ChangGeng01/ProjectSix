@@ -880,19 +880,10 @@ final class SampleHostModel: ObservableObject {
                 var status = "ok"
                 var errorMessage: String?
                 do {
-                    // Map stake to risk level (combinatorial)
-                    let riskLevel: BASHostRiskLevel
-                    switch signature.stake {
-                    case "low", "modest":
-                        riskLevel = .low
-                    case "high", "very-high":
-                        riskLevel = .medium
-                    case "irreversible",
-                         "non-reversible-after-act":
-                        riskLevel = .high
-                    default:
-                        riskLevel = .medium
-                    }
+                    // M802 chapter 二百二十一 — single-source risk
+                    // derive (was 11-LOC inline switch; now 1-line).
+                    let riskLevel = SampleHostBenchRiskDerivation
+                        .riskLevel(signatureStake: signature.stake)
                     let result = try runtime.startSession(
                         BASHostSessionRequest(
                             kind: .interactive,
@@ -1168,14 +1159,10 @@ final class SampleHostModel: ObservableObject {
                 var afmStatus: String = "skipped"
                 var afmDurationMs: Double = 0
                 var errorMessage: String?
-                let riskLevel: BASHostRiskLevel
-                switch signature.stake {
-                case "low", "modest":         riskLevel = .low
-                case "high", "very-high":     riskLevel = .medium
-                case "irreversible",
-                     "non-reversible-after-act": riskLevel = .high
-                default:                      riskLevel = .medium
-                }
+                // M802 chapter 二百二十一 — single-source risk
+                // derive (was 7-LOC inline switch; now 1-line).
+                let riskLevel = SampleHostBenchRiskDerivation
+                    .riskLevel(signatureStake: signature.stake)
                 do {
                     let result = try runtime.startSession(
                         BASHostSessionRequest(
@@ -1884,22 +1871,13 @@ extension SampleHostModel {
                 let t0 = Date()
                 var auditCount = 0
                 var permitMode = "unknown"
-                let riskLevel: BASHostRiskLevel
                 // M774 chapter 二百五 — benign mode forces low risk.
-                // Even though benign signature has stake="low" already,
-                // explicit override is doctrine-clearer + future-proof
-                // against signature drift.
-                if smokeMode == .benign {
-                    riskLevel = .low
-                } else {
-                    switch signature.stake {
-                    case "low", "modest": riskLevel = .low
-                    case "high", "very-high": riskLevel = .medium
-                    case "irreversible", "non-reversible-after-act":
-                        riskLevel = .high
-                    default: riskLevel = .medium
-                    }
-                }
+                // M802 chapter 二百二十一 — single-source derive
+                // (was 14-LOC inline switch + override; now 1-line).
+                let riskLevel = SampleHostBenchRiskDerivation
+                    .riskLevel(
+                        signatureStake: signature.stake,
+                        smokeMode: smokeMode)
                 do {
                     // M691 chapter 一百八十八 — B3-extended (HIGH):
                     // run substrate.startSession off-MainActor via

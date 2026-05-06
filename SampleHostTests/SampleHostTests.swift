@@ -2570,6 +2570,75 @@ final class SampleHostTests: XCTestCase {
         XCTAssertEqual(decoded, row)
     }
 
+    // MARK: - chapter 二百二十一 / M802 — risk-level derive
+
+    func testRiskDerivationStakeMappingBaseline() {
+        // chapter 一百四十七 baseline mapping (no .benign override)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: "low"),
+            .low)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: "modest"),
+            .low)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: "high"),
+            .medium)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: "very-high"),
+            .medium)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: "irreversible"),
+            .high)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(
+                signatureStake: "non-reversible-after-act"),
+            .high)
+    }
+
+    func testRiskDerivationDefaultsToMedium() {
+        // Unknown / future stakes → .medium (defensive)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: "future-bracket"),
+            .medium)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: ""),
+            .medium)
+        XCTAssertEqual(
+            SampleHostBenchRiskDerivation.riskLevel(signatureStake: "unknown"),
+            .medium)
+    }
+
+    func testRiskDerivationBenignOverridesStake() {
+        // chapter 二百五 / M774: .benign smokeMode forces .low even
+        // when the signature stake would have been higher.
+        for stake in ["low", "modest", "high", "very-high",
+                      "irreversible", "non-reversible-after-act",
+                      "future-bracket", ""] {
+            XCTAssertEqual(
+                SampleHostBenchRiskDerivation.riskLevel(
+                    signatureStake: stake, smokeMode: .benign),
+                .low,
+                ".benign must force .low for stake=\(stake)")
+        }
+    }
+
+    func testRiskDerivationNonBenignModesPreserveStakeMapping() {
+        // Non-.benign modes preserve baseline mapping
+        for mode in [HybridBenchConfig.SmokeMode.canonical,
+                     .fourteenLayer, .heavyTailed, .rawLLM] {
+            XCTAssertEqual(
+                SampleHostBenchRiskDerivation.riskLevel(
+                    signatureStake: "high", smokeMode: mode),
+                .medium,
+                "mode=\(mode) must preserve high → .medium")
+            XCTAssertEqual(
+                SampleHostBenchRiskDerivation.riskLevel(
+                    signatureStake: "irreversible", smokeMode: mode),
+                .high,
+                "mode=\(mode) must preserve irreversible → .high")
+        }
+    }
+
     func testPausedRowBuilderTimestampStableAcrossInjection() {
         // Doctrine: timestamp arg defaults to Date() but tests
         // inject a fixed Date so JSONL byte-equality is checkable.
