@@ -294,6 +294,13 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
     public var hostConstitutionVault: BASHostConstitutionVault?
     public var hostVersionTree: BASHostVersionTree?
     public var hostForgetRequest: BASForgetRequest?
+    /// chapter 三百〇四 / M791 — Phase Gamma 2nd code cut: typed
+    /// storage configuration. Defaults to `.legacyInMemory` to
+    /// preserve pre-Phase-Gamma behavior for callers that don't
+    /// explicitly opt in (ADR-014 backward-compat guardrail #1).
+    /// Decode path uses `decodeIfPresent` so existing on-disk
+    /// configs without this field still load.
+    public var storageOptions: BASHostStorageOptions
 
     private enum CodingKeys: String, CodingKey {
         case runtimeProfileID
@@ -312,6 +319,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         case hostConstitutionVault
         case hostVersionTree
         case hostForgetRequest
+        case storageOptions
     }
 
     public init(
@@ -330,7 +338,8 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         hostConstitution: BASHostConstitution? = nil,
         hostConstitutionVault: BASHostConstitutionVault? = nil,
         hostVersionTree: BASHostVersionTree? = nil,
-        hostForgetRequest: BASForgetRequest? = nil
+        hostForgetRequest: BASForgetRequest? = nil,
+        storageOptions: BASHostStorageOptions = .legacyInMemory
     ) {
         self.runtimeProfileID = runtimeProfileID
         self.policyProfileID = policyProfileID
@@ -348,6 +357,7 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         self.hostConstitutionVault = hostConstitutionVault
         self.hostVersionTree = hostVersionTree
         self.hostForgetRequest = hostForgetRequest
+        self.storageOptions = storageOptions
     }
 
     public init(from decoder: Decoder) throws {
@@ -376,7 +386,14 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
             hostConstitution: try container.decodeIfPresent(BASHostConstitution.self, forKey: .hostConstitution),
             hostConstitutionVault: try container.decodeIfPresent(BASHostConstitutionVault.self, forKey: .hostConstitutionVault),
             hostVersionTree: try container.decodeIfPresent(BASHostVersionTree.self, forKey: .hostVersionTree),
-            hostForgetRequest: try container.decodeIfPresent(BASForgetRequest.self, forKey: .hostForgetRequest)
+            hostForgetRequest: try container.decodeIfPresent(BASForgetRequest.self, forKey: .hostForgetRequest),
+            // chapter 三百〇四 / M791 — Phase Gamma 2nd code cut.
+            // ADR-014 backward-compat: existing on-disk configs
+            // without `storageOptions` field default to
+            // `.legacyInMemory` (pre-Phase-Gamma behavior).
+            storageOptions: try container.decodeIfPresent(
+                BASHostStorageOptions.self,
+                forKey: .storageOptions) ?? .legacyInMemory
         )
     }
 
@@ -398,6 +415,10 @@ public struct BASHostConfiguration: Codable, Equatable, Sendable {
         try container.encodeIfPresent(hostConstitutionVault, forKey: .hostConstitutionVault)
         try container.encodeIfPresent(hostVersionTree, forKey: .hostVersionTree)
         try container.encodeIfPresent(hostForgetRequest, forKey: .hostForgetRequest)
+        // chapter 三百〇四 / M791 — Phase Gamma 2nd code cut.
+        // Encoded unconditionally (storageOptions has explicit
+        // default in init; .legacyInMemory always round-trips).
+        try container.encode(storageOptions, forKey: .storageOptions)
     }
 
     public var controlPlaneIssues: [ControlPlaneIssue] {
