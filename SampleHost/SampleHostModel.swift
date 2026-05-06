@@ -40,20 +40,20 @@ import BASOrgan
 
 @MainActor
 final class SampleHostModel: ObservableObject {
-    @Published private(set) var result: BASHostSessionResult
-    @Published private(set) var lastError: String?
-    @Published private(set) var benchIsRunning: Bool = false
-    @Published private(set) var benchIterationsCompleted: Int = 0
-    @Published private(set) var benchAuditCodesTotal: Int = 0
-    @Published private(set) var benchStartTime: Date?
-    @Published private(set) var benchLastError: String?
-    @Published private(set) var benchOutputPath: String = ""
+    @Published var result: BASHostSessionResult
+    @Published var lastError: String?
+    @Published var benchIsRunning: Bool = false
+    @Published var benchIterationsCompleted: Int = 0
+    @Published var benchAuditCodesTotal: Int = 0
+    @Published var benchStartTime: Date?
+    @Published var benchLastError: String?
+    @Published var benchOutputPath: String = ""
     // M609 chapter 一百七十六 §176.13 — direct AFM test (foreground UI invocation)
-    @Published private(set) var afmTestStatus: String = "idle"
-    @Published private(set) var afmTestOutput: String = ""
-    @Published private(set) var afmTestPrompt: String = "Suggest one calming evening habit in one sentence."
-    @Published private(set) var afmTestDurationMs: Double = 0
-    @Published private(set) var afmIsRunning: Bool = false
+    @Published var afmTestStatus: String = "idle"
+    @Published var afmTestOutput: String = ""
+    @Published var afmTestPrompt: String = "Suggest one calming evening habit in one sentence."
+    @Published var afmTestDurationMs: Double = 0
+    @Published var afmIsRunning: Bool = false
 
     // M610 chapter 一百七十六 §176.14 — long-running AFM bench
     // (8h default per user request; full flexible config: every numeric
@@ -70,14 +70,14 @@ final class SampleHostModel: ObservableObject {
     // substrate routing for AFM cost-saving).
     @Published var afmBenchSkipBlocked: Bool = false
     @Published var afmBenchAFMTimeoutSec: Int = 30
-    @Published private(set) var afmBenchIsRunning: Bool = false
-    @Published private(set) var afmBenchIterations: Int = 0
-    @Published private(set) var afmBenchAFMSuccessCount: Int = 0
-    @Published private(set) var afmBenchAFMSkippedCount: Int = 0
-    @Published private(set) var afmBenchAFMErrorCount: Int = 0
-    @Published private(set) var afmBenchOutputPath: String = ""
-    @Published private(set) var afmBenchStartTime: Date?
-    @Published private(set) var afmBenchLastError: String?
+    @Published var afmBenchIsRunning: Bool = false
+    @Published var afmBenchIterations: Int = 0
+    @Published var afmBenchAFMSuccessCount: Int = 0
+    @Published var afmBenchAFMSkippedCount: Int = 0
+    @Published var afmBenchAFMErrorCount: Int = 0
+    @Published var afmBenchOutputPath: String = ""
+    @Published var afmBenchStartTime: Date?
+    @Published var afmBenchLastError: String?
     private var afmBenchTask: Task<Void, Never>?
 
     // M619 chapter 一百七十七 §177 — Hybrid AFM + Gemma bench with
@@ -116,7 +116,7 @@ final class SampleHostModel: ObservableObject {
     /// (Gemma cold-start can be ~30s; AFM normal is sub-2s).
     @Published var hybridBenchLLMTimeoutSeconds: Double = 60.0
     /// M735 — track per-iter timeout fires for live dashboard.
-    @Published private(set) var hybridBenchLLMTimeoutCount: Int = 0
+    @Published var hybridBenchLLMTimeoutCount: Int = 0
     /// M740 chapter 一百九十七 — opt-in pause on `.serious` thermal.
     /// Chapter 一百九十六 iPhone 17e smoke: 91% of 12-min substrate-
     /// only run at `.serious` thermal. For 10h, operator on hot
@@ -144,42 +144,42 @@ final class SampleHostModel: ObservableObject {
     /// M744 — cooling sleep duration in seconds. Range [5, 60].
     @Published var hybridBenchCoolingSleepSeconds: Double = 10.0
     /// M744 — track cooling sleep fires for live dashboard.
-    @Published private(set) var hybridBenchCoolingSleepCount: Int = 0
+    @Published var hybridBenchCoolingSleepCount: Int = 0
     /// M745 chapter 一百九十八 — live thermal state surface for
     /// dashboard widget. Updated per-iter from
     /// `SampleHostBenchThermalGate.currentDeviceState()`. Lets
     /// operator see current thermal in real time during 10h
     /// instead of grepping JSONL post-hoc.
-    @Published private(set) var hybridBenchLastThermalRaw: String = "unknown"
+    @Published var hybridBenchLastThermalRaw: String = "unknown"
     /// M745 — count of iters spent at each thermal level.
     /// Lets dashboard show "% at serious", etc.
-    @Published private(set) var hybridBenchThermalNominalIters: Int = 0
-    @Published private(set) var hybridBenchThermalFairIters: Int = 0
-    @Published private(set) var hybridBenchThermalSeriousIters: Int = 0
-    @Published private(set) var hybridBenchThermalCriticalIters: Int = 0
-    @Published private(set) var hybridBenchIsRunning: Bool = false
-    @Published private(set) var hybridBenchIterations: Int = 0
-    @Published private(set) var hybridBenchAFMOk: Int = 0
-    @Published private(set) var hybridBenchGemmaOk: Int = 0
-    @Published private(set) var hybridBenchAFMFallbackToGemmaOk: Int = 0
-    @Published private(set) var hybridBenchGemmaFallbackToAFMOk: Int = 0
-    @Published private(set) var hybridBenchBothFailed: Int = 0
-    @Published private(set) var hybridBenchRouterHits: Int = 0
-    @Published private(set) var hybridBenchRouterMisses: Int = 0
+    @Published var hybridBenchThermalNominalIters: Int = 0
+    @Published var hybridBenchThermalFairIters: Int = 0
+    @Published var hybridBenchThermalSeriousIters: Int = 0
+    @Published var hybridBenchThermalCriticalIters: Int = 0
+    @Published var hybridBenchIsRunning: Bool = false
+    @Published var hybridBenchIterations: Int = 0
+    @Published var hybridBenchAFMOk: Int = 0
+    @Published var hybridBenchGemmaOk: Int = 0
+    @Published var hybridBenchAFMFallbackToGemmaOk: Int = 0
+    @Published var hybridBenchGemmaFallbackToAFMOk: Int = 0
+    @Published var hybridBenchBothFailed: Int = 0
+    @Published var hybridBenchRouterHits: Int = 0
+    @Published var hybridBenchRouterMisses: Int = 0
     // M628 chapter 一百七十八 — dispatch policy live counters.
     // Tracks how often substrate's permit mode causes LLM skip /
     // both-call / local-only / draft-only path. UI surfaces these
     // so user sees substrate-LLM coupling in real time.
-    @Published private(set) var hybridBenchSubstrateSkipBlock: Int = 0
-    @Published private(set) var hybridBenchSubstrateSkipReplace: Int = 0
-    @Published private(set) var hybridBenchSubstrateSkipDelay: Int = 0
-    @Published private(set) var hybridBenchSubstrateBothLLMs: Int = 0
-    @Published private(set) var hybridBenchSubstrateLocalOnly: Int = 0
-    @Published private(set) var hybridBenchSubstrateDraftOnly: Int = 0
+    @Published var hybridBenchSubstrateSkipBlock: Int = 0
+    @Published var hybridBenchSubstrateSkipReplace: Int = 0
+    @Published var hybridBenchSubstrateSkipDelay: Int = 0
+    @Published var hybridBenchSubstrateBothLLMs: Int = 0
+    @Published var hybridBenchSubstrateLocalOnly: Int = 0
+    @Published var hybridBenchSubstrateDraftOnly: Int = 0
     // M630 chapter 一百七十八 — closed-loop tracking. How often
     // post-LLM substrate observation shifts permit mode (i.e.
     // LLM produced something that would have been blocked).
-    @Published private(set) var hybridBenchPostLLMShifted: Int = 0
+    @Published var hybridBenchPostLLMShifted: Int = 0
 
     /// M676 chapter 一百八十六 — B15 (MEDIUM) fix:
     /// counter partition sanity — sum of all per-iter outcome
@@ -221,8 +221,8 @@ final class SampleHostModel: ObservableObject {
     // How often ChengluPermitPredict's class matches substrate's
     // actual .block decision. High agreement = model is a faithful
     // policy cache; disagreement = doctrine drift signal.
-    @Published private(set) var hybridBenchPermitPredictHits: Int = 0
-    @Published private(set) var hybridBenchPermitPredictMisses: Int = 0
+    @Published var hybridBenchPermitPredictHits: Int = 0
+    @Published var hybridBenchPermitPredictMisses: Int = 0
     // M642 chapter 一百八十 — running mean absolute error of
     // Length + Latency regression heads vs actual LLM outputs.
     // Updated per-iter when LLM body returns; nil samples skipped.
@@ -238,47 +238,47 @@ final class SampleHostModel: ObservableObject {
     // Backward compat: JSONL row never had Sum/Count fields
     // (those were @Published runtime-only), so retiring them
     // doesn't break analysis tooling.
-    @Published private(set) var hybridBenchLengthMAECount: Int = 0
-    @Published private(set) var hybridBenchLengthMAERunning: Double = 0
-    @Published private(set) var hybridBenchLatencyMAECount: Int = 0
-    @Published private(set) var hybridBenchLatencyMAERunningMs: Double = 0
+    @Published var hybridBenchLengthMAECount: Int = 0
+    @Published var hybridBenchLengthMAERunning: Double = 0
+    @Published var hybridBenchLatencyMAECount: Int = 0
+    @Published var hybridBenchLatencyMAERunningMs: Double = 0
     // M661 chapter 一百八十三 — 5th head agreement counters.
-    @Published private(set) var hybridBenchVerbosityCorrect: Int = 0
-    @Published private(set) var hybridBenchVerbosityWrong: Int = 0
-    @Published private(set) var hybridBenchOutputPath: String = ""
-    @Published private(set) var hybridBenchStartTime: Date?
-    @Published private(set) var hybridBenchLastError: String?
+    @Published var hybridBenchVerbosityCorrect: Int = 0
+    @Published var hybridBenchVerbosityWrong: Int = 0
+    @Published var hybridBenchOutputPath: String = ""
+    @Published var hybridBenchStartTime: Date?
+    @Published var hybridBenchLastError: String?
     // M727 chapter 一百九十三 — live anomaly counters surfaced
     // for the dashboard widget. Updated per-iter from
     // SampleHostBenchAnomalyWatcher.snapshot(). Distinct from
     // anomalyFlags-on-row (which is per-iter) — these are
     // cumulative for the whole bench.
-    @Published private(set) var hybridBenchStuckSubstrateCount: Int = 0
-    @Published private(set) var hybridBenchStuckLLMCount: Int = 0
-    @Published private(set) var hybridBenchPauseSkippedCount: Int = 0
-    @Published private(set) var hybridBenchAdversarialFiredCount: Int = 0
-    @Published private(set) var hybridBenchDriftAlarmCount: Int = 0
+    @Published var hybridBenchStuckSubstrateCount: Int = 0
+    @Published var hybridBenchStuckLLMCount: Int = 0
+    @Published var hybridBenchPauseSkippedCount: Int = 0
+    @Published var hybridBenchAdversarialFiredCount: Int = 0
+    @Published var hybridBenchDriftAlarmCount: Int = 0
     /// M726 chapter 一百九十三 — resume snapshot from a previous
     /// (possibly crashed) bench. Populated by `loadResumableCheckpoint()`
     /// at app launch. nil = no checkpoint or last bench finished
     /// cleanly. UI banner offers `clearResumableCheckpoint()` or
     /// allows starting a new bench (which auto-clears the stale
     /// checkpoint via fresh write).
-    @Published private(set) var hybridBenchResumableCheckpoint:
+    @Published var hybridBenchResumableCheckpoint:
         SampleHostBenchCheckpoint?
-    @Published private(set) var hybridGemmaLoadStatus: String = "idle"
-    @Published private(set) var hybridSinglePromptStatus: String = "idle"
-    @Published private(set) var hybridSinglePromptOutput: String = ""
-    @Published private(set) var hybridSinglePromptRoute: String = ""
-    @Published private(set) var hybridSinglePromptProb: Double = 0
+    @Published var hybridGemmaLoadStatus: String = "idle"
+    @Published var hybridSinglePromptStatus: String = "idle"
+    @Published var hybridSinglePromptOutput: String = ""
+    @Published var hybridSinglePromptRoute: String = ""
+    @Published var hybridSinglePromptProb: Double = 0
     // M659 chapter 一百八十三 — single-prompt inline all-head
     // predictions. Populated when runHybridSinglePrompt fires;
     // surface 5 head outputs alongside the LLM body so user sees
     // meridian network predictions BEFORE waiting for LLM.
-    @Published private(set) var hybridSinglePromptBlockProb: Double?
-    @Published private(set) var hybridSinglePromptLengthChars: Double?
-    @Published private(set) var hybridSinglePromptLatencyMs: Double?
-    @Published private(set) var hybridSinglePromptVerbosityProb: Double?
+    @Published var hybridSinglePromptBlockProb: Double?
+    @Published var hybridSinglePromptLengthChars: Double?
+    @Published var hybridSinglePromptLatencyMs: Double?
+    @Published var hybridSinglePromptVerbosityProb: Double?
     private var hybridBenchTask: Task<Void, Never>?
     // M627 chapter 177 deep-review fix #3 — Stop→Start race.
     // Each start bumps generation + captures myGen. Old task at
@@ -314,16 +314,20 @@ final class SampleHostModel: ObservableObject {
     }
 
     #if canImport(BASMLXAdapter)
-    private var gemmaAdapter: MLXOrganAdapter?
+    // M815 chapter 二百三十三 — promoted from `private var` to
+    // module-internal so the extracted LLM helpers extension file
+    // (SampleHostLLMHelpers.swift) can access the gemma adapter
+    // cache without requiring a same-file declaration.
+    var gemmaAdapter: MLXOrganAdapter?
     // M627 chapter 177 deep-review fix #2 — gate concurrent loads
     // via in-flight Task. Two callGemma invocations during await
     // suspension would both start loading the 4-bit model + LoRA
     // (~3.4 GB, hundreds of MB resident wasted). Now they share.
-    private var gemmaLoadInFlight: Task<MLXOrganAdapter, Error>?
+    var gemmaLoadInFlight: Task<MLXOrganAdapter, Error>?
     // M627 deep-review fix #4 — track LoRA load success separately
     // from adapter init so a failed LoRA load doesn't poison the
     // session: status tells the truth + future calls can retry.
-    private var gemmaLoraLoaded: Bool = false
+    var gemmaLoraLoaded: Bool = false
     #endif
 
     private var benchTask: Task<Void, Never>?
@@ -1012,194 +1016,14 @@ extension SampleHostModel {
         }
     }
 
-    /// M780 chapter 二百七 — DEEP-REVIEW FIX C2 helper.
-    /// Increment timeoutCount via applyIfActive when error is a
-    /// LLM-timeout. Stale-generation tasks see no-op. Called from
-    /// every bench-loop catch where callAFMWithTimeout /
-    /// callGemmaWithTimeout might have thrown.
-    @MainActor
-    fileprivate func recordTimeoutIfApplicable(
-        _ error: Error, generation: Int
-    ) {
-        if case SampleHostBenchLLMTimeoutError.timeoutExceeded = error {
-            applyIfActive(generation) {
-                self.hybridBenchLLMTimeoutCount += 1
-            }
-        }
-    }
+    // M815 chapter 二百三十三 — 6 LLM helpers (recordTimeoutIf-
+    // Applicable / callAFMWithTimeout / callGemmaWithTimeout /
+    // callAFM / callGemma / ensureGemmaAdapter) extracted to
+    // dedicated extension file `SampleHostLLMHelpers.swift`.
+    // Access barriers promoted (private(set) → @Published var
+    // for status surface; private var → internal var for gemma
+    // adapter cache) so the extension can reach state directly.
 
-    /// M735 chapter 一百九十五 — wrap callAFM with per-iter
-    /// timeout. Bench loop uses this in the .singleLLM confident
-    /// path so a hung AFM call (~30s+) doesn't freeze the whole
-    /// 10h run; it bails after `seconds` and lets the fallback
-    /// path try Gemma.
-    ///
-    /// Doctrine: TIMEOUT IS BAIL-OUT, not session-killer. Throws
-    /// `SampleHostBenchLLMTimeoutError.timeoutExceeded` so the
-    /// bench-loop catch can record a clean failure. `hybridBenchLLMTimeoutCount`
-    /// is incremented so the dashboard shows live timeout rate.
-    @MainActor
-    fileprivate func callAFMWithTimeout(
-        prompt: String, seconds: Double
-    ) async throws -> String {
-        let llmTask = Task { [weak self] () async throws -> String in
-            guard let self else {
-                throw NSError(domain: "model-deinit", code: -1)
-            }
-            return try await self.callAFM(prompt: prompt)
-        }
-        let timeoutTask = Task {
-            try? await Task.sleep(
-                nanoseconds: UInt64(max(0.001, seconds) * 1_000_000_000))
-            llmTask.cancel()
-        }
-        do {
-            let body = try await llmTask.value
-            timeoutTask.cancel()
-            return body
-        } catch {
-            timeoutTask.cancel()
-            if llmTask.isCancelled {
-                // M780 chapter 二百七 — DEEP-REVIEW FIX C2:
-                // counter mutation moved to bench-loop catch
-                // wrapped in applyIfActive(myGen). Helper is
-                // pure error path; caller handles state.
-                throw SampleHostBenchLLMTimeoutError
-                    .timeoutExceeded(seconds: seconds)
-            }
-            throw error
-        }
-    }
-
-    /// M735 chapter 一百九十五 — Gemma equivalent of
-    /// `callAFMWithTimeout`. Same doctrine.
-    @MainActor
-    fileprivate func callGemmaWithTimeout(
-        prompt: String, seconds: Double
-    ) async throws -> String {
-        let llmTask = Task { [weak self] () async throws -> String in
-            guard let self else {
-                throw NSError(domain: "model-deinit", code: -1)
-            }
-            return try await self.callGemma(prompt: prompt)
-        }
-        let timeoutTask = Task {
-            try? await Task.sleep(
-                nanoseconds: UInt64(max(0.001, seconds) * 1_000_000_000))
-            llmTask.cancel()
-        }
-        do {
-            let body = try await llmTask.value
-            timeoutTask.cancel()
-            return body
-        } catch {
-            timeoutTask.cancel()
-            if llmTask.isCancelled {
-                // M780 chapter 二百七 — DEEP-REVIEW FIX C2:
-                // counter mutation moved to bench-loop catch
-                // wrapped in applyIfActive(myGen). Helper is
-                // pure error path; caller handles state.
-                throw SampleHostBenchLLMTimeoutError
-                    .timeoutExceeded(seconds: seconds)
-            }
-            throw error
-        }
-    }
-
-    /// Call AFM with a prompt. Throws on error/guardrail.
-    private func callAFM(prompt: String) async throws -> String {
-        #if canImport(FoundationModels)
-        if #available(iOS 26.0, macOS 26.0, *) {
-            let session = LanguageModelSession()
-            let response = try await session.respond(to: prompt)
-            return response.content
-        }
-        #endif
-        throw NSError(domain: "AFMUnavailable", code: -1)
-    }
-
-    /// Call Gemma 4 E2B (MLX) with a prompt. Lazy-loads on first
-    /// call + applies LoRA M247 chat-template adapter (chapter 176
-    /// §176.10 — 3.6× better convergence + learned [RISK]/[NEEDS_PERMIT]
-    /// markers). Throws on error.
-    ///
-    /// M627 deep-review fix #2 + #4: load is gated through a single
-    /// in-flight Task so concurrent callers share, and LoRA load
-    /// status is tracked separately from adapter readiness so a
-    /// failed LoRA doesn't poison subsequent retries.
-    private func callGemma(prompt: String) async throws -> String {
-        #if canImport(BASMLXAdapter)
-        let adapter = try await ensureGemmaAdapter()
-        let request = BASOrganRequest(
-            requestID: "hybrid-prompt",
-            role: .scout,
-            preset: .scout,
-            instruction: prompt)
-        let draft = try await adapter.draft(request)
-        return draft.body
-        #else
-        throw NSError(
-            domain: "GemmaUnavailable",
-            code: -3,
-            userInfo: [NSLocalizedDescriptionKey: "BASMLXAdapter not built"])
-        #endif
-    }
-
-    #if canImport(BASMLXAdapter)
-    /// Singleton-load gate — concurrent callers share one in-flight
-    /// Task instead of racing on `if gemmaAdapter == nil` (review #2).
-    private func ensureGemmaAdapter() async throws -> MLXOrganAdapter {
-        if let existing = gemmaAdapter { return existing }
-        if let inFlight = gemmaLoadInFlight {
-            return try await inFlight.value
-        }
-        let task = Task { [weak self] () throws -> MLXOrganAdapter in
-            // Off-actor work — we don't capture self's actor here.
-            let adapter = MLXOrganAdapter(
-                model: MLXModelCatalog.gemma4_E2B_4bit)
-            try await adapter.loadModel()
-            await MainActor.run { [weak self] in
-                self?.hybridGemmaLoadStatus = "model loaded, loading LoRA M247…"
-            }
-            // v0.3 — load LoRA M247 adapter from app bundle
-            var loraOK = false
-            if let loraURL = Bundle.main.url(
-                forResource: "qinao_curriculum_lora_m247",
-                withExtension: "safetensors")
-            {
-                do {
-                    try await adapter.loadAdapter(from: loraURL)
-                    loraOK = true
-                } catch {
-                    // Non-fatal — bare Gemma still works (review #4)
-                    await MainActor.run { [weak self] in
-                        self?.hybridGemmaLoadStatus =
-                            "lora-load-failed: \(error)"
-                    }
-                }
-            }
-            try await adapter.prewarm()
-            await MainActor.run { [weak self] in
-                self?.gemmaLoraLoaded = loraOK
-                self?.hybridGemmaLoadStatus = loraOK
-                    ? "ready (with LoRA M247)"
-                    : "ready (bare Gemma, NO LoRA)"
-            }
-            return adapter
-        }
-        gemmaLoadInFlight = task
-        hybridGemmaLoadStatus = "loading model…"
-        do {
-            let adapter = try await task.value
-            gemmaAdapter = adapter
-            gemmaLoadInFlight = nil
-            return adapter
-        } catch {
-            gemmaLoadInFlight = nil  // Allow retry next call
-            throw error
-        }
-    }
-    #endif
 
     /// Update prompt text for single-prompt hybrid test.
     /// (Reuses afmTestPrompt setter.)
