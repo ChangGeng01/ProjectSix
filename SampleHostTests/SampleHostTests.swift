@@ -1591,6 +1591,29 @@ final class SampleHostTests: XCTestCase {
         XCTAssertFalse(m.hybridBenchPauseOnSerious)
     }
 
+    /// M766 chapter 二百四 — workflowProfile flex defaults
+    /// .reflective (chapter 178+ baseline). Operator picks .primary
+    /// for LLM-data accumulation runs.
+    @MainActor
+    func testFreshModelWorkflowProfileReflectiveByDefault() {
+        let m = SampleHostModel()
+        XCTAssertEqual(
+            m.hybridBenchWorkflowProfile,
+            .reflective)
+    }
+
+    /// M766 — workflowProfile is settable to all 3 cases.
+    @MainActor
+    func testWorkflowProfileSettableToAllCases() {
+        let m = SampleHostModel()
+        m.hybridBenchWorkflowProfile = .primary
+        XCTAssertEqual(m.hybridBenchWorkflowProfile, .primary)
+        m.hybridBenchWorkflowProfile = .comparative
+        XCTAssertEqual(m.hybridBenchWorkflowProfile, .comparative)
+        m.hybridBenchWorkflowProfile = .reflective
+        XCTAssertEqual(m.hybridBenchWorkflowProfile, .reflective)
+    }
+
     // MARK: - chapter 一百九十八 / M744-M747 — cooling + thermal widget
 
     /// M744 — cooling settings have sane defaults.

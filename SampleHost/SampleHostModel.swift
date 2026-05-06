@@ -477,6 +477,17 @@ final class SampleHostModel: ObservableObject {
     /// device can flip true so `.serious` triggers pause in
     /// addition to `.critical`. Default false to preserve doctrine.
     @Published var hybridBenchPauseOnSerious: Bool = false
+    /// M766 chapter 二百四 — workflowProfile flex picker.
+    /// Pre-this-batch bench hardcoded `.reflective` which caused
+    /// 100% substrate-skip across BOTH heavy-tailed (4h51m, 113K
+    /// iters) AND canonical (45min, 41K iters) iPhone runs —
+    /// substrate's reflective workflow always routes to .delay
+    /// regardless of stake. For LLM-data accumulation, `.primary`
+    /// gives faster decisions = more `.answer` permits = AFM/Gemma
+    /// fires. Default `.reflective` preserves chapter 178+ doctrine
+    /// baseline; operator picks `.primary` for training-data runs.
+    @Published var hybridBenchWorkflowProfile:
+        BASHostWorkflowProfile = .reflective
     /// M744 chapter 一百九十八 — active cooling sleep period.
     /// Every N iters where the device is at `.serious` or worse,
     /// inject a 10-second cooling sleep. 0 = disabled (default).
@@ -2700,6 +2711,7 @@ extension SampleHostModel {
         let pauseOnSeriousCaptured = self.hybridBenchPauseOnSerious
         let coolingEveryNCaptured = self.hybridBenchCoolingEveryNIters
         let coolingSleepSecondsCaptured = self.hybridBenchCoolingSleepSeconds
+        let workflowProfileCaptured = self.hybridBenchWorkflowProfile
         let anomalyWatcher = SampleHostBenchAnomalyWatcher(
             windowSize: anomalyWindowCaptured)
         // M721 chapter 一百九十二 — drift monitor on length-MAE
@@ -2942,9 +2954,13 @@ extension SampleHostModel {
                     // Pre-fix: every iter blocked main thread for
                     // substrate eval (~50-100ms). Post-fix:
                     // background thread. UI stays responsive.
+                    // M767 chapter 二百四 — workflowProfile from
+                    // @Published flex (captured at start). Default
+                    // .reflective (chapter 178+ baseline); .primary
+                    // for LLM-data accumulation runs.
                     let request = BASHostSessionRequest(
                         kind: .interactive,
-                        workflowProfile: .reflective,
+                        workflowProfile: workflowProfileCaptured,
                         surface: .application,
                         prompt: prompt,
                         riskLevel: riskLevel)
@@ -3433,9 +3449,10 @@ extension SampleHostModel {
                         "Original: \(prompt)\n\nResponse: \(truncatedBody)"
                     // M691 chapter 一百八十八 — B3-extended:
                     // post-LLM substrate observation also off-main.
+                    // M767 chapter 二百四 — workflowProfile from flex.
                     let observeRequest = BASHostSessionRequest(
                         kind: .interactive,
-                        workflowProfile: .reflective,
+                        workflowProfile: workflowProfileCaptured,
                         surface: .application,
                         prompt: observeText,
                         riskLevel: riskLevel)

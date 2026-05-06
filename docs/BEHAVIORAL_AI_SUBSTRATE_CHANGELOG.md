@@ -1230,3 +1230,13 @@ Full stack 1953 + 1 parity gate + 7 analysis tools (replay / validate / analyze-
 - **M764** +4 architectural invariant tests (schema version monotonic / SmokeMode stable / DispatchPolicy stable / Checkpoint shape stable). Future chapters cannot silently break these.
 
 SampleHost tests 76 → **80**; full stack **1957 + 1 parity gate + 7 analysis tools + CI workflow + size guard, 0 failures**. Doctrine ADR-004: guardrails ship now; extraction is chapter 204+ candidate.
+
+## 2026-05-06 — chapter 二百四 (M766-M770) workflowProfile flex picker — 真根因 fix
+
+- **M766** `@Published hybridBenchWorkflowProfile: BASHostWorkflowProfile = .reflective` — chapter 178+ hardcoded `.reflective` was true root cause of 100% substrate-skip across heavy-tailed (113K iters / 4h51m) AND canonical (41K iters / 45min) iPhone runs. Default reflective preserves baseline; operator picks `.primary` for LLM-data accumulation runs.
+- **M767** bench loop captures + uses workflowProfile at 2 sites (substrate routing pre-LLM + post-LLM observation).
+- **M768** UI SegmentedPicker between Pause-on-serious + Cool every. Disabled mid-bench.
+- **M769** +2 fix-pin tests (default reflective + all-3-settable).
+- **M770** Build Release iPhone 17e + deployed PID 55449.
+
+SampleHost tests 80 → **82**; full stack **1959 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. Two prior bench runs archived: heavy-tailed 175MB / canonical 65MB substrate-stress data.

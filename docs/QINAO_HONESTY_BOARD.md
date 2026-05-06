@@ -25528,3 +25528,71 @@ ADR-004 explicitly defers extraction to chapter 204+. CI now catches regressions
 ### 203.9 一句话总结
 
 **Chapter 二百三 (M761-M765)**: respond to "完全 底层 架构 进化" by picking architectural guardrails over churn refactor (10-15 hr big-bang refactor → 2 hr guardrail layer; doctrine ADR-004). NEW `.github/workflows/test.yml` (5 parallel jobs: BAS XCTest 419 / Qinao XCTest 1442 / SampleHost 80 / 4 boundary scripts + parity gate / pytest fuzz; runs on every push). NEW `scripts/check_god_files.sh` (size guard with legacy-aware limits — 3 warns / 0 errors current state; future commits cannot grow files past limit). NEW `docs/ARCHITECTURE_DECISION_RECORDS.md` (5 ADRs + 8-red-line doctrine summary; future chapters cite/contradict ADRs explicitly). 4 NEW invariant tests pin schema version monotonic + SmokeMode/DispatchPolicy case stability + Checkpoint Codable shape. **80 SampleHost tests pass; full stack 1957 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**. Doctrine: legacy god files (HostKitCore 4770 / EBrainCognitionPlaneCore 5347 / MemoryCore 3316) are flagged WARN not ERROR — extraction is chapter 204+ candidate, but CI now prevents NEW god files from sprouting. Architecture is now **regression-protected**, not "fully evolved" (still 🟡 architecture-grade per 9-attribute audit).
+
+## 二百四、 workflowProfile flex picker — 真根因 fix (M766-M770 / 2026-05-06)
+
+User trail: chapter 196 heavy-tailed iPhone smoke + chapter 200 prep canonical iPhone smoke BOTH yielded 100% substrate-skip / 0 LLM calls. Root cause traced not to smokeMode but to **hardcoded `workflowProfile: .reflective`** in bench loop.
+
+### 204.1 真根因
+
+bench loop hardcoded:
+```swift
+BASHostSessionRequest(
+    kind: .interactive,
+    workflowProfile: .reflective,  ← hardcoded since chapter 178
+    ...
+)
+```
+
+`.reflective` workflow doctrine: substrate gives itself extra time before deciding → routes to `.delay` even on `.low` risk requests. Effect across both modes:
+
+| Mode | Iters | LLM calls | substrate-skip |
+|---|---|---|---|
+| heavy-tailed (chapter 196 finding) | 113K (4h51m) | 0 | 100% (block 55% / delay 44%) |
+| canonical (chapter 200 prep) | 41K (45min) | 0 | 100% (delay 77% / block 23%) |
+
+Both modes hit 0% LLM-fire. Canonical was better behaved (delay-heavy not block-heavy) but still 0 trainable rows.
+
+### 204.2 M766-M768 — Flex picker
+
+`@Published hybridBenchWorkflowProfile: BASHostWorkflowProfile = .reflective` added to model. `BASHostWorkflowProfile` has 3 CaseIterable cases: `primary` / `comparative` / `reflective`.
+
+Bench loop captures + uses at start (2 sites: substrate routing + post-LLM observation). Default `.reflective` preserves chapter 178+ doctrine baseline.
+
+UI SegmentedPicker added — operator picks pre-tap, disabled mid-bench.
+
+### 204.3 Hypothesis to test (next bench)
+
+`.primary` workflow doctrine: substrate makes quick decisions. Hypothesis: `.low` stake → `.primary` workflow → `.answer` permit → AFM/Gemma fires. Should produce ~30-40% LLM calls (proportional to low/modest stake distribution in catalog).
+
+Will verify on next iPhone bench.
+
+### 204.4 Tests + verification
+
+| Test | Pin |
+|---|---|
+| `testFreshModelWorkflowProfileReflectiveByDefault` | Default = .reflective (chapter 178+ baseline) |
+| `testWorkflowProfileSettableToAllCases` | All 3 cases settable |
+
+SampleHost tests: 80 → **82** (+2 chapter 204).
+
+Build Release for iPhone 17e: TEST BUILD SUCCEEDED. Deployed PID 55449.
+
+### 204.5 Files modified
+
+| File | Change |
+|---|---|
+| `SampleHost/SampleHostModel.swift` | M766 +`@Published hybridBenchWorkflowProfile`; M767 bench loop captures + uses (2 sites) |
+| `SampleHost/SampleHostView.swift` | M768 SegmentedPicker between Pause-on-serious + Cool every |
+| `SampleHostTests/SampleHostTests.swift` | +2 fix-pin tests |
+
+### 204.6 Bench data archives accumulating
+
+| Run | Path | Size | Note |
+|---|---|---|---|
+| heavy-tailed 4h51m | iphone-bench-runs/2026-05-06-heavy-tailed-4h33m/ | 175 MB / 13 files / 106K rows | substrate-stress validation; 0 LLM |
+| canonical 45min reflective | iphone-bench-runs/2026-05-06-canonical-45m-reflective/ | 65 MB / 5 files / 41K rows | confirmed reflective hardcode is root cause |
+
+### 204.7 一句话总结
+
+**Chapter 二百四 (M766-M770)**: iPhone bench data accumulation hypothesis chase. Chapter 196 + chapter 200-prep BOTH yielded 100% substrate-skip (heavy-tailed: block-heavy / canonical: delay-heavy), 0 LLM calls. Root cause traced: bench loop hardcoded `workflowProfile: .reflective` since chapter 178 — substrate's reflective workflow always routes to .delay regardless of stake. Chapter 204 ships `@Published hybridBenchWorkflowProfile: BASHostWorkflowProfile = .reflective` flex + UI SegmentedPicker (primary / comparative / reflective). Default reflective preserves chapter 178+ doctrine; operator picks `.primary` for LLM-data runs (hypothesis: ~30-40% LLM-fire rate proportional to low/modest stakes). Bench loop captures + uses at 2 sites (substrate routing + post-LLM observation). +2 fix-pin tests / 82 SampleHost / 1959 全栈 / 0 failures. iPhone 17e build deployed PID 55449. Both prior bench runs archived (heavy-tailed 175MB + canonical 65MB) — substrate-stress data even without LLM responses. Next bench: tap `.primary` workflow + canonical mode + Start → expect first real LLM-data accumulation.

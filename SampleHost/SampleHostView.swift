@@ -663,6 +663,30 @@ struct SampleHostView: View {
                         .font(.caption)
                 }
                 .disabled(model.hybridBenchIsRunning)
+                // M768 chapter 二百四 — workflowProfile picker.
+                // Pre-this-batch hardcoded `.reflective`. Chapter 196
+                // (heavy-tailed 4h51m) + chapter 204 prep
+                // (canonical 45min) BOTH yielded 100% substrate-skip
+                // / 0 LLM calls because reflective always routes
+                // to .delay. Operator picks `.primary` for LLM-data
+                // accumulation runs; default `.reflective` keeps
+                // chapter 178+ doctrine baseline.
+                HStack {
+                    Text("Workflow:").font(.caption)
+                    Picker("", selection: Binding(
+                        get: { model.hybridBenchWorkflowProfile },
+                        set: { model.hybridBenchWorkflowProfile = $0 }
+                    )) {
+                        Text("primary")
+                            .tag(BASHostWorkflowProfile.primary)
+                        Text("comparative")
+                            .tag(BASHostWorkflowProfile.comparative)
+                        Text("reflective")
+                            .tag(BASHostWorkflowProfile.reflective)
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(model.hybridBenchIsRunning)
+                }
                 // M744 chapter 一百九十八 — active cooling sleep
                 // every N iters when device is at .serious or worse.
                 // 0 = disabled (default). 1000 = ~once every 55s
