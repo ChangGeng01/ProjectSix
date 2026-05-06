@@ -1351,3 +1351,43 @@ SampleHost tests 92 still pass; full stack **3007 BAS + 128 Qinao + 1 parity gat
 Test impact: BAS XCTest 3007 → **3021** (+14 chapter 二百四十九 fix-pins); SampleHost iOS 128 unchanged; 0 failures, 0 doctrine red lines broken, 0 regressions.
 
 附录 V Stage 0 progress: **2/3 chapters shipped** (二百四十八 ✓ memory atoms / 二百四十九 ✓ host constitution / 二百五十 ticket lifecycle SQLite production wire pending).
+
+## 2026-05-07 — chapter 二百五十 (M737) `BASUpdateTicketLifecycleCoordinator.sqliteBacked` factory — Stage 0 Step 3 of 3
+
+附录 V Stage 0 third + final persistence primitive — **L13 ticket lifecycle production wire**. Pre-chapter 二百五十 the substrate already shipped:
+- chapter 二百六十八 / M268 — coordinator's optional `storage:` init param
+- chapter 二百六十八 / M270 — `BASUpdateTicketLifecycleSQLiteStorage` SQLite adapter
+- chapter 二百九十八 / M283 — `BASUnifiedStorageLocator` for canonical paths
+
+What was missing: a **factory helper** combining the three. Without it, every host had to write the same 4-line SQLite-backed coordinator construction. Stage 0 closes that gap — hosts now call **one line** to get a SQLite-backed coordinator with disk state pre-loaded.
+
+- **M737** NEW `BehavioralAISubstrate/Sources/BASHostKit/BASUpdateTicketLifecycleSQLiteFactory.swift` (~120 LOC). Two static factory variants on `BASUpdateTicketLifecycleCoordinator`:
+  - `sqliteBacked(storageRoot:clock:auditSink:)` — uses unified-locator layout (`<root>/lifecycle.sqlite`); idempotently creates root directory; calls `restore()` inline.
+  - `sqliteBacked(databaseURL:clock:auditSink:)` — explicit URL escape hatch for hosts wanting non-canonical layout.
+- Both variants are `async throws static` — they construct the storage adapter, build the coordinator, and call `restore()` so the returned coordinator already reflects every prior ticket.
+- `clock:` and `auditSink:` arguments thread unchanged into the underlying coordinator (chapter 二百六十五 / M265 audit hook integration intact).
+- Lives in BASHostKit (alongside chapter 二百六十七 / M267 auto-flow extension) because BASObservability cannot reach `BASEBrainTurnResult` without a cycle.
+- 7 fix-pin integration tests in `BASUpdateTicketLifecycleSQLiteFactoryTests.swift` (~210 LOC):
+  - empty fresh-root → empty coordinator
+  - **THE KEY TEST** — cross-session ticket continuity: submit + advance 2 tickets in session A, drop coord, build factory at same root in session B, verify both tickets restored at correct state with full transition history
+  - explicit-URL overload persists + restores
+  - custom clock seam reaches transition timestamps
+  - `auditSink:` reaches terminal `.distilled` transition
+  - unified-locator places file at canonical `<root>/lifecycle.sqlite`
+  - `ensureRootDirectory` side effect creates nested root paths
+
+**Doctrine pins maintained**:
+- 不变量 #1 / #2 / #3 unchanged (factory is plumbing).
+- chapter 二百十一 single-source-of-truth: storage protocol + coordinator + canonical-path locator each stay in their existing modules; this file is convenience-only — no contract definition lives here.
+- chapter 一百九十一 M91 SQLite idiom remains the storage substrate; this is the production-wire convenience layer, not a new persistence primitive.
+
+**附录 V Stage 0 fully closed** (3/3 chapters):
+- 二百四十八 ✓ L8 memory atoms (`BASSQLiteMemoryAtomStore`)
+- 二百四十九 ✓ L5 host constitution (`BASHostConstitutionSQLiteStorage`)
+- 二百五十 ✓ L13 ticket lifecycle production-wire factory ← **THIS COMMIT**
+
+Cross-session continuity is no longer a paper promise — every Stage 0 storage primitive has a one-line construction site, real DB-backed round-trip tests, and idempotent restore semantics. Hosts that opt in get (a) atoms persisted across reboots, (b) host vault persisted across reboots, (c) tickets persisted across reboots, (d) all three sharing the unified-storage-root convention.
+
+Test impact: BAS XCTest 3021 → **3028** (+7 chapter 二百五十 fix-pins); SampleHost iOS 128 unchanged; 0 failures, 0 doctrine red lines broken, 0 regressions.
+
+Stage 1 (Memory Importance Loop, chapters 二百五十一-二百五十三) is next. Stage 1 is fully in-doctrine, no doctrine evolution needed — just chip away at the Gap #4 closed loop (L8 retrieval usage tracker → importance scorer → tier promotion/demotion).
