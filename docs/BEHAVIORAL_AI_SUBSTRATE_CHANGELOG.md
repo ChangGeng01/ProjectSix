@@ -1280,3 +1280,34 @@ SampleHost tests 89 still pass; full stack **1966 + 1 parity gate + 7 analysis t
 - **M789** Build + deploy iPhone PID 55952.
 
 SampleHost tests 89 → **92**; full stack **1969 + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**.
+
+## 2026-05-07 — chapter 二百四十八 (M735) `BASSQLiteMemoryAtomStore` — Stage 0 持续学习闭环 foundation
+
+附录 V Stage 0 Step 1 of 3 — **L8 cross-session memory persistence**. Pre-chapter 二百四十八 the only `BASMemoryAtomStore` conformer was `BASInMemoryMemoryAtomStore` (actor backed by `[String: BASGovernedMemory] = [:]`). Every session boot lost every atom. The 6-stage / ~25-chapter "持续学习 + 闭环护城河" roadmap (附录 V) opens with three persistence chapters; this is the first.
+
+- **M735** NEW `BehavioralAISubstrate/Sources/BASMemory/BASSQLiteMemoryAtomStore.swift` (~520 LOC). `public actor BASSQLiteMemoryAtomStore: BASMemoryAtomStore` mirroring `BASInMemoryMemoryAtomStore` byte-for-byte:
+  - Same protocol surface (`atom(forID:) / updateTier / updateGovernanceStatus / remove`)
+  - Same convenience exposes (`count`, `allIDs`)
+  - Plus `admit(_:)` for post-init admission and `allAtoms()` for full enumeration
+- Schema (version 1): single `memory_atoms` table with `atom_id` PK + structural mirror columns (kind / scope / sensitivity / tier / governance_status / created_at_ms / last_updated_at_ms) + `payload_json` Codable blob. Two indices (tier, governance_status). `payload_json` is the source of truth on read; structural columns let future SQL filter without parsing JSON.
+- Reuses chapter 一百九十一 M91 + chapter 二百六十八 M270 SQLite idiom: `import SQLite3` system framework (no new package deps), WAL journal mode + `synchronous=NORMAL`, transient bind destructor, schema-version pragma verified on every open. Idempotent boot (`initial:` only seeds when DB is empty — existing data is canonical).
+- Actor-isolated `OpaquePointer` via `nonisolated(unsafe)` storage (deinit-safe per actor lifetime invariant).
+- 17 fix-pin tests in `BASSQLiteMemoryAtomStoreTests.swift` (~370 LOC):
+  - empty init, miss returns nil, admit round-trip, updateTier mutates + persists, updateGovernanceStatus mutates + persists, remove returns prior value + real DELETE
+  - **cross-session persistence** (THE KEY TEST): close → reopen → 2 atoms both fetched byte-equal
+  - tier mutation survives reopen, forget cascade survives reopen
+  - 3 miss-returns-nil/false guards, re-admit upsert (replace by ID)
+  - initial-seed-only-when-empty (idempotent boot — existing data wins)
+  - allIDs reflects admitted set, allAtoms returned in insertion order, schema version pin
+- All 3007 BAS tests green (+17 from chapter 二百四十七's 2990); all 128 SampleHost iOS tests still green; 0 regressions; 0 doctrine red lines broken.
+
+**Doctrine pins maintained**:
+- 不变量 #1 先醒再答: storage doesn't change runtime ordering
+- 不变量 #2 神经不掌权: persistence is plumbing, never a permit gate (L11 single commit mouth unchanged)
+- 不变量 #3 私有经验不进权重: SQLite payload is the same `BASGovernedMemory` data the in-memory actor would carry — persisting it does not feed L2 base weights
+- chapter 一百二 五级删除 doctrine: `remove(forID:)` issues a real `DELETE` (not a tombstone); host-vault revocation cascade + sovereign warrant remain in their respective layers
+- chapter 二百十一 single-source-of-truth: protocol contract stays in `BASMemoryAtomStore.swift`; this file is the second conformer (no contract duplication)
+
+**Production wiring deferred**: hosts that want SQLite-backed memory pass a `BASSQLiteMemoryAtomStore(databaseURL:)` to whatever consumer they build. Hooking `BASMemoryMutationWriter` into `EBrainRuntimeCoordinator` is its own substantial chapter (no existing memory-mutation pipeline runs through the coordinator yet) and stays on the附录 V Stage 0 backlog.
+
+SampleHost tests 92 still pass; full stack **3007 BAS + 128 Qinao + 1 parity gate + 7 analysis tools + CI + size guard, 0 failures**.
