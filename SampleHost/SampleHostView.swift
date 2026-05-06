@@ -56,11 +56,11 @@ struct SampleHostView: View {
 
                     benchPanel
 
-                    afmTestPanel
+                    SampleHostAFMTestPanel(model: model)
 
                     afmBenchPanel
 
-                    hybridTestPanel
+                    SampleHostHybridTestPanel(model: model)
 
                     hybridBenchPanel
 
@@ -317,164 +317,11 @@ struct SampleHostView: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    // MARK: - M609 chapter 一百七十六 §176.13 — AFM direct foreground test panel
-
-    private var afmTestPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("AFM (Apple Foundation Models) direct test")
-                    .font(.headline)
-                Spacer()
-                Button(model.afmIsRunning ? "Running…" : "Run AFM") {
-                    model.runAFMTestNow()
-                }
-                .buttonStyle(.bordered)
-                .tint(.purple)
-                .disabled(model.afmIsRunning)
-            }
-
-            Text(
-                "Bypasses BAS substrate (which has L2 organ stubbed). " +
-                "Calls FoundationModels.LanguageModelSession directly " +
-                "from foreground UI — only path that satisfies macOS 26 " +
-                "/ iOS 26 modelmanagerd's foreground-only policy. " +
-                "Requires Apple Intelligence enabled."
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-
-            HStack {
-                Text("Prompt:").font(.caption.bold())
-                Spacer()
-            }
-            TextField("AFM prompt", text: Binding(
-                get: { model.afmTestPrompt },
-                set: { model.updateAFMTestPrompt($0) }
-            ))
-            .font(.caption)
-            .textFieldStyle(.roundedBorder)
-            .disabled(model.afmIsRunning)
-
-            Text("Status: \(model.afmTestStatus)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(model.afmTestStatus.hasPrefix("ok") ? .green : (model.afmTestStatus.hasPrefix("error") ? .red : .secondary))
-
-            if !model.afmTestOutput.isEmpty {
-                Text("Response:")
-                    .font(.caption.bold())
-                Text(model.afmTestOutput)
-                    .font(.caption.monospaced())
-                    .padding(8)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-                    .textSelection(.enabled)
-            }
-        }
-        .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    // MARK: - M620 chapter 一百七十七 §177 — Hybrid AFM+Gemma router panels
-
-    private var hybridTestPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Hybrid AFM⇄Gemma router test")
-                    .font(.headline)
-                Spacer()
-                Button("Run Hybrid") {
-                    model.runHybridSinglePrompt()
-                }
-                .buttonStyle(.bordered)
-                .tint(.cyan)
-            }
-
-            Text(
-                "ChengluPreflight v0 (CoreML 3 KB, 88.5% test acc) " +
-                "predicts AFM-success vs Gemma-fallback for the " +
-                "current prompt, calls predicted LLM, falls back " +
-                "on error so user sees no error (chapter 一百七十七)."
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-
-            HStack {
-                Text("Status:").font(.caption.bold())
-                Spacer()
-                if model.hybridGemmaLoadStatus != "idle" {
-                    Text("Gemma: \(model.hybridGemmaLoadStatus)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.purple)
-                }
-            }
-            Text(model.hybridSinglePromptStatus)
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.cyan)
-
-            if !model.hybridSinglePromptRoute.isEmpty {
-                Text("Router: \(model.hybridSinglePromptRoute) (afm prob \(String(format: "%.3f", model.hybridSinglePromptProb)))")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.indigo)
-            }
-
-            // M659 chapter 一百八十三 — inline meridian predictions.
-            // Visible AFTER predict (before LLM completes if slow)
-            // so user sees full 5-head output without waiting for
-            // bench. Each line is a separate head's prediction;
-            // missing head shows nothing (graceful degradation).
-            if model.hybridSinglePromptBlockProb != nil
-                || model.hybridSinglePromptLengthChars != nil
-                || model.hybridSinglePromptLatencyMs != nil
-            {
-                Divider().padding(.vertical, 2)
-                Text("📡 Meridian (predictions before LLM)")
-                    .font(.caption.bold())
-                    .foregroundStyle(.purple)
-                if let p = model.hybridSinglePromptBlockProb {
-                    Text(String(
-                        format: "  PermitPredict: block=%.3f (%@)",
-                        p,
-                        p >= 0.5 ? "would-block" : "non-block"))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                if let len = model.hybridSinglePromptLengthChars {
-                    Text(String(
-                        format: "  Length predicted: %.0f chars",
-                        len))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                if let ms = model.hybridSinglePromptLatencyMs {
-                    Text(String(
-                        format: "  Latency predicted: %.0f ms",
-                        ms))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                if let vp = model.hybridSinglePromptVerbosityProb {
-                    Text(String(
-                        format: "  Verbosity: %.3f (%@)",
-                        vp,
-                        vp >= 0.5 ? "long >1500" : "short ≤1500"))
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if !model.hybridSinglePromptOutput.isEmpty {
-                Text("Output:").font(.caption.bold())
-                Text(model.hybridSinglePromptOutput)
-                    .font(.caption.monospaced())
-                    .padding(8)
-                    .background(.regularMaterial,
-                                in: RoundedRectangle(cornerRadius: 6))
-                    .textSelection(.enabled)
-            }
-        }
-        .padding(12)
-        .background(.thinMaterial,
-                    in: RoundedRectangle(cornerRadius: 12))
-    }
+    // M805 chapter 二百二十四 — `afmTestPanel` + `hybridTestPanel`
+    // extracted to dedicated standalone SwiftUI structs in
+    // `SampleHostTestPanels.swift`. View body composes via
+    // `SampleHostAFMTestPanel(model: model)` + `SampleHostHybrid-
+    // TestPanel(model: model)`.
 
     private var hybridBenchPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
