@@ -51,7 +51,7 @@ struct SampleHostView: View {
                     // to start fresh or treat the existing JSONL as
                     // continuing data. UI is hint-only — no auto-resume.
                     if let cp = model.hybridBenchResumableCheckpoint {
-                        resumeBannerPanel(cp)
+                        SampleHostResumeBannerPanel(model: model, checkpoint: cp)
                     }
 
                     SampleHostBenchPanel(model: model)
@@ -204,64 +204,10 @@ struct SampleHostView: View {
         }
     }
 
-    // MARK: - M726 chapter 一百九十三 — resume banner
-
-    @ViewBuilder
-    private func resumeBannerPanel(
-        _ cp: SampleHostBenchCheckpoint
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("⚠️ Previous bench did not finish cleanly")
-                    .font(.headline)
-                    .foregroundStyle(.orange)
-                Spacer()
-                // M748 chapter 一百九十九 — actual Resume button.
-                // Restores smokeMode / duration / mutation /
-                // stride from checkpoint, clears banner, starts
-                // bench. Counter state NOT restored (fresh).
-                Button("Resume Settings") {
-                    Task { await model.resumeBenchFromCheckpoint() }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .tint(.orange)
-                Button("Dismiss") {
-                    Task { await model.clearResumableCheckpoint() }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-            Text("Last known state:")
-                .font(.caption.bold())
-            Text("• iter \(cp.iter) of "
-                + "\(String(format: "%.1f", cp.durationHours))h target "
-                + "(\(cp.smokeMode))")
-                .font(.caption.monospacedDigit())
-            Text("• AFM ok \(cp.afmOk) / Gemma ok \(cp.gemmaOk) / "
-                + "both-failed \(cp.bothFailed)")
-                .font(.caption.monospacedDigit())
-            if cp.stuckSubstrates > 0 || cp.stuckLLMs > 0 {
-                Text("• stuck-substrates \(cp.stuckSubstrates) / "
-                    + "stuck-LLMs \(cp.stuckLLMs)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.orange)
-            }
-            Text("• last update: \(cp.lastUpdatedIso)")
-                .font(.caption2.monospaced())
-                .foregroundStyle(.secondary)
-            Text("Starting a new bench will overwrite the checkpoint.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .background(.orange.opacity(0.1),
-                    in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(.orange.opacity(0.5), lineWidth: 1)
-        )
-    }
+    // M809 chapter 二百二十八 — `resumeBannerPanel` extracted to
+    // dedicated standalone struct in `SampleHostResumeBannerPanel
+    // .swift`. View body composes via
+    // `SampleHostResumeBannerPanel(model: model, checkpoint: cp)`.
 
     // M807 chapter 二百二十六 — `benchPanel` + 2 status helpers
     // extracted to `SampleHostBenchPanel.swift` standalone struct.
