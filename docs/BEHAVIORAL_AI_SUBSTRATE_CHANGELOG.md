@@ -1512,3 +1512,30 @@ Test impact: BAS XCTest 3061 → **3070** (+9 chapter 二百五十三 fix-pins);
 - Stage 0 ✓ Foundation: Persistence (chapters 二百四十八-二百五十)
 - Stage 1 ✓ Memory Importance Loop (chapters 二百五十一-二百五十三) ← **JUST CLOSED**
 - Stage 2 — Counter-Host Gate Auto-Wire (chapters 二百五十四-二百五十五) is next.
+
+## 2026-05-07 — chapter 二百五十四 (M741) Counter-Host gate resolver-driven auto-flow — Stage 2 Step 1 of 2
+
+附录 V Stage 2 (Counter-Host Gate Auto-Wire) opens. Pre-chapter 二百五十四 the gate-aware variant `approveForDistillationWithCounterHostCheck(...)` shipped in chapter 一百三十一 / M514, but the audit at 附录 V identified it as having **0 production callers**. The chapter 一百三十 doctrine ("不变量 #3 加固 — 不通过宿主自证循环塑造宿主") was schema-wired but not load-bearing because no code called the gate.
+
+The fix: a **resolver pattern** — hosts wire one closure that derives a `BASCounterHostCheck?` from a lifecycle entry; promotion calls invoke the resolver per ticket, then the gate fires uniformly.
+
+- **M741** NEW `BehavioralAISubstrate/Sources/BASHostKit/BASUpdateTicketLifecycleCounterHostAutoFlow.swift` (~75 LOC):
+  - `typealias BASUpdateTicketLifecycleCoordinator.CounterHostCheckResolver = @Sendable (BASUpdateTicketLifecycleEntry) async -> BASCounterHostCheck?`
+  - `approveForDistillationResolvingCounterHost(ticketID:sovereignVerdictRef:resolver:)` — fetch entry, invoke resolver, delegate to chapter 一百三十一 gated promotion. Returns `BASCounterHostGateOutcome` (`.passed` / `.passedWithSovereignOverride` / `.blocked`).
+  - Throws `LifecycleError.unknownTicket` if the ticketID is absent.
+- 6 fix-pin tests in `BASUpdateTicketLifecycleCounterHostAutoFlowTests.swift` (~190 LOC):
+  - resolver returns nil → `.passed`
+  - `.genuineHostPattern` → `.passed`
+  - **doctrine-load-bearing**: `.systemInducedDrift` + non-empty verdictRef → `.passedWithSovereignOverride`
+  - **doctrine-load-bearing**: `.systemInducedDrift` + empty verdictRef → `.blocked` + ticket marked `.rejected` with `counter-host-gate:blocked-no-sovereign-override` reason code
+  - unknown ticketID throws
+  - resolver receives the actual entry (signature verification)
+
+**Doctrine pins maintained**:
+- 不变量 #3 加固 (now load-bearing): "私有经验不进权重 + 不通过宿主自证循环塑造宿主". With a resolver wired, the gate is the default flow; bypassing it is now an explicit `approveForDistillation(...)` call rather than the easy default.
+- 红线 7 watcher-only-hint: nil resolver → gate passes through unchanged. Hint surface preserved.
+- chapter 一百三十一 single-source-of-truth: this file is convenience — the gate's actual logic stays in `BASUpdateTicketLifecycleCounterHostGate.swift`.
+
+Test impact: BAS XCTest 3070 → **3076** (+6 chapter 二百五十四 fix-pins); SampleHost iOS 128 unchanged; 0 failures.
+
+Stage 2 progress: **1/2 chapters shipped** (二百五十四 ✓ resolver auto-flow / 二百五十五 sovereign-override audit emission pending).
