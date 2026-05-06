@@ -2096,66 +2096,8 @@ extension SampleHostModel {
     // BenchBounds` typed enum (single-source-of-truth per chapter
     // 二百十一 doctrine).
 
-    /// M726 chapter 一百九十三 — resume detector. Read latest
-    /// checkpoint from disk; if it exists AND `lastUpdatedIso`
-    /// is within the last 24 hours, surface it for UI prompt.
-    /// Stale checkpoints (> 24h old) are auto-cleared.
-    /// Doctrine: resume PROMPTS user, never auto-restarts. The
-    /// checkpoint contains stride / smokeMode / iter — UI banner
-    /// shows "previous bench reached iter N before crash" so the
-    /// operator decides whether to start fresh or carry forward.
-    func loadResumableCheckpoint() async {
-        let cp = await SampleHostBenchCheckpointStore.shared.read()
-        guard let cp = cp else {
-            hybridBenchResumableCheckpoint = nil
-            return
-        }
-        // Parse lastUpdatedIso — if older than 24h, auto-clear
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        let fallback = ISO8601DateFormatter()
-        let last = formatter.date(from: cp.lastUpdatedIso)
-            ?? fallback.date(from: cp.lastUpdatedIso)
-        let cutoff = Date().addingTimeInterval(-24 * 3600)
-        if let last = last, last < cutoff {
-            await SampleHostBenchCheckpointStore.shared.clear()
-            hybridBenchResumableCheckpoint = nil
-            return
-        }
-        hybridBenchResumableCheckpoint = cp
-    }
-
-    /// M726 — UI button: dismiss resume banner without starting.
-    /// Clears checkpoint from disk so a future launch sees clean state.
-    func clearResumableCheckpoint() async {
-        await SampleHostBenchCheckpointStore.shared.clear()
-        hybridBenchResumableCheckpoint = nil
-    }
-
-    /// M748 chapter 一百九十九 — restore config from checkpoint
-    /// then start a fresh bench. "Resume" semantic: same smokeMode /
-    /// duration / mutation count / stride as the crashed bench.
-    /// Counter state DOES NOT restore (too risky — would corrupt
-    /// the new bench's anomaly windows + Welford running means).
-    /// New bench writes new JSONL shards; old shards remain on
-    /// disk for replay. Banner clears.
-    ///
-    /// Doctrine: "resume settings, fresh state". Operator carrying
-    /// forward thoughtfully-tuned settings without re-typing them.
-    func resumeBenchFromCheckpoint() async {
-        guard let cp = hybridBenchResumableCheckpoint else { return }
-        // Restore typed settings
-        if let mode = HybridBenchConfig.SmokeMode(
-            rawValue: cp.smokeMode)
-        {
-            hybridBenchSmokeMode = mode
-        }
-        updateHybridBenchDurationHours(cp.durationHours)
-        updateHybridBenchMutationCount(cp.mutationSeedCount)
-        updateHybridBenchStrideCSV(cp.strideCSV)
-        // Clear banner (settings now restored)
-        await clearResumableCheckpoint()
-        // Start fresh bench with restored settings
-        startHybridBench()
-    }
+    // M817 chapter 二百三十五 — 3 checkpoint lifecycle methods
+    // (loadResumableCheckpoint / clearResumableCheckpoint /
+    // resumeBenchFromCheckpoint) extracted to dedicated extension
+    // file `SampleHostCheckpointLifecycle.swift`.
 }
