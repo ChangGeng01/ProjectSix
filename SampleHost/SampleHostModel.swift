@@ -18,59 +18,11 @@ import BASOrgan
 // dedicated file `SampleHostLegacyBenchRunner.swift` (alongside
 // the legacy `SampleHostBenchRunner` actor).
 
-// MARK: - M574 (chapter 一百四十九) — Combinatorial prompt generator
-// inlined for SampleHost iOS target (which can't depend on QinaoLoop
-// module without Xcode project surgery). Mirrors
-// QinaoExtendedPromptCorpus exactly: 6 typed dimensions = 8 × 10 × 6 ×
-// 7 × 4 × 3 = 40,320 unique prompts.
-
-enum SampleHostPromptTone: String, CaseIterable {
-    case anxious, authoritative, vulnerable, agentic
-    case confused, grieving, curious, angry
-}
-
-enum SampleHostPromptDomain: String, CaseIterable {
-    case financial, medical, relational, work, parenting
-    case identity, ethical, existential, trauma, creative
-}
-
-enum SampleHostPromptStake: String, CaseIterable {
-    case low, modest, high
-    case veryHigh = "very-high"
-    case irreversible
-    case nonReversibleAfterAct = "non-reversible-after-act"
-}
-
-enum SampleHostPromptTimeframe: String, CaseIterable {
-    case minutes, hours, days, weeks, months, lifetime
-    case pastUnresolved = "past-unresolved"
-}
-
-enum SampleHostPromptConfidant: String, CaseIterable {
-    case friend, expert, stranger
-    case decisionSystem = "decision-system"
-}
-
-enum SampleHostPromptAskShape: String, CaseIterable {
-    case narrative
-    case decisionTree = "decision-tree"
-    case singleAction = "single-action"
-}
-
-struct SampleHostPromptSignature: Sendable, Equatable, Codable, Hashable {
-    let tone: String
-    let domain: String
-    let stake: String
-    let timeframe: String
-    let confidant: String
-    let askShape: String
-}
-
-struct SampleHostGeneratedPrompt: Sendable, Equatable {
-    let signature: SampleHostPromptSignature
-    let prompt: String
-    let seed: Int
-}
+// M799 chapter 二百十八 — 6 prompt dimension enums +
+// `SampleHostPromptSignature` + `SampleHostGeneratedPrompt`
+// extracted to dedicated file `SampleHostPromptTypes.swift`
+// (single-source-of-truth for combinatorial prompt-space schema
+// per chapter 二百十一 doctrine).
 
 // M793 chapter 二百十二 — `SampleHostBenchPromptCatalog` extracted
 // to dedicated file `SampleHostBenchPromptCatalog.swift`.
