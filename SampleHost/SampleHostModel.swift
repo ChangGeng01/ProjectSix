@@ -29,55 +29,10 @@ import BASOrgan
 // Coprime stride 5041 + 5-variant mutation alphabet doctrine
 // preserved verbatim. Bench loop callers unchanged.
 
-enum SampleHostBenchHelpers {
-    /// Chapter 一百五十 fix for defect #8 (devicectl 20MB cap during
-    /// active write): rotate JSONL files at 15MB so each individual
-    /// file stays well below 20MB cap. Pulls during active write get
-    /// the most recent rotated-out file complete; only the active file
-    /// is potentially truncated. After bench finishes, all rotated
-    /// files + final file pull cleanly.
-    static let rotationByteThreshold: Int64 = 15 * 1024 * 1024
-
-    static func iso8601(_ date: Date) -> String {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.string(from: date)
-    }
-
-    static func encode(_ row: SampleHostBenchRow) throws -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(row)
-        return String(data: data, encoding: .utf8) ?? "{}"
-    }
-
-    static func documentsDirectory() -> URL {
-        FileManager.default.urls(
-            for: .documentDirectory,
-            in: .userDomainMask).first!
-    }
-
-    static func benchOutputDir() -> URL {
-        let dir = documentsDirectory()
-            .appendingPathComponent(
-                "iphone-bench", isDirectory: true)
-        try? FileManager.default.createDirectory(
-            at: dir, withIntermediateDirectories: true)
-        return dir
-    }
-
-    static func benchOutputURL(rotationIndex: Int = 0) -> URL {
-        let dir = benchOutputDir()
-        if rotationIndex == 0 {
-            return dir.appendingPathComponent(
-                "iterations.jsonl", isDirectory: false)
-        } else {
-            return dir.appendingPathComponent(
-                "iterations.\(rotationIndex).jsonl",
-                isDirectory: false)
-        }
-    }
-}
+// M800 chapter 二百十九 — `SampleHostBenchHelpers` foundation
+// enum extracted to dedicated file `SampleHostBenchHelpers.swift`.
+// Other carve-out files extend this enum; original definition
+// owns the file (chapter 二百十一 single-source-of-truth).
 
 // M798 chapter 二百十七 — `SampleHostBenchRunner` actor extracted
 // to dedicated file `SampleHostLegacyBenchRunner.swift` (alongside
@@ -1338,12 +1293,10 @@ final class SampleHostModel: ObservableObject {
 // dedicated file `SampleHostBenchJSONLRunners.swift` (alongside
 // the symmetric hybrid runner).
 
-// Pure gcd helper (no external dep)
-private func gcd(_ a: Int, _ b: Int) -> Int {
-    var (x, y) = (abs(a), abs(b))
-    while y != 0 { (x, y) = (y, x % y) }
-    return x
-}
+// M800 chapter 二百十九 — `gcd(_:_:)` pure helper extracted to
+// dedicated file `SampleHostBenchHelpers.swift` (promoted from
+// `private` to module-internal so cross-file callers share the
+// doctrine without duplicating).
 
 // MARK: - M619 chapter 一百七十七 §177 — Hybrid bench row + runner
 
