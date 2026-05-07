@@ -39,14 +39,24 @@ public struct BASHostRuntime: Sendable {
     public let dependencies: BASHostDependencySet
     public let vitalMonitor: (any BASVitalMonitorServicing)?
 
+    /// Optional CoreML mesh registry (chapter 三百二三 / M810 —
+    /// Phase F 附录 X 4th code cut)。When wired,hosts can call
+    /// `runMeshCascade(input:layerID:)` (extension method in
+    /// `BASHostRuntimeMeshHook.swift`) to consult the chapter
+    /// 三百二〇/三百二一 mesh。Default `nil` preserves 0 behavior
+    /// change for existing call sites。
+    public let meshRegistry: BASLayerMLHeadRegistry?
+
     public init(
         configuration: BASHostConfiguration,
         dependencies: BASHostDependencySet = BASHostDependencySet(),
-        vitalMonitor: (any BASVitalMonitorServicing)? = nil
+        vitalMonitor: (any BASVitalMonitorServicing)? = nil,
+        meshRegistry: BASLayerMLHeadRegistry? = nil
     ) {
         self.configuration = configuration
         self.dependencies = dependencies
         self.vitalMonitor = vitalMonitor
+        self.meshRegistry = meshRegistry
     }
 
     public func stageHostConstitutionChange(
