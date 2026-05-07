@@ -62,7 +62,12 @@
 
 import Foundation
 import BASHostKit
-import BASEvaluation
+// chapter 三百四〇 / M827 — `BASEvaluation` symbols
+// (`BASShadowEvaluating` / `BASShadowEvaluationResult` etc) are
+// re-exported by `BASHostKit` via `@_exported`,so a separate
+// `import BASEvaluation` here violates the host import boundary
+// without adding any reachable symbols。Removed per
+// `scripts/check_qinao_import_boundaries.sh` doctrine。
 
 /// Typed post-LLM observation result.
 struct SampleHostBenchPostLLMObservation: Sendable, Equatable {

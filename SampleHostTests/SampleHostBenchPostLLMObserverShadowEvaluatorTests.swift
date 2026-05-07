@@ -1,5 +1,8 @@
 import XCTest
-import BASEvaluation
+// chapter 三百四〇 / M827 — `BASEvaluation` re-exported via
+// `@_exported import BASEvaluation` in BASHostKit;direct
+// import here violates host import boundary doctrine
+// (`scripts/check_qinao_import_boundaries.sh`)。
 import BASHostKit
 @testable import SampleHost
 

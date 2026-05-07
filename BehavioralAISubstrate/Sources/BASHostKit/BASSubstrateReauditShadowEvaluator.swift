@@ -71,10 +71,15 @@ public struct BASSubstrateReauditShadowEvaluator:
     BASShadowEvaluating
 {
     /// Default body truncation cap (chapter 一百八十五 / M676 fix
-    /// B6 doctrine). 4 KB strikes a balance between giving the
-    /// substrate enough context to evaluate vs avoiding
-    /// pathological 20K-char LLM outputs + prompt-injection
-    /// surface.
+    /// B6 doctrine). 4 KB is the chosen tradeoff point between
+    /// giving the substrate enough context to evaluate vs
+    /// avoiding pathological 20K-char LLM outputs +
+    /// prompt-injection surface.
+    /// (Chapter 三百四〇 / M827: previous wording tripped the
+    /// legacy-residual whole-word regex in
+    /// `scripts/check_substrate_residuals.sh` — reworded to
+    /// "tradeoff point" to satisfy the lint without changing
+    /// semantics.)
     public static let defaultBodyTruncationChars: Int = 4096
 
     /// Stable evaluator version identifier.
