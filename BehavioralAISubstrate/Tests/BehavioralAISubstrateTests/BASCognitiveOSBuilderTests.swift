@@ -270,6 +270,92 @@ final class BASCognitiveOSBuilderTests: XCTestCase {
         XCTAssertFalse(oneEnabled.isEmpty)
     }
 
+    // MARK: - M889 query API (chapter 三百九〇)
+
+    func testEmptyBundleSnapshotIsAllZero() async throws {
+        let bundle = BASCognitiveOSBundle.empty
+        let snap = await bundle.snapshot()
+        XCTAssertEqual(snap.eventCount, 0)
+        XCTAssertEqual(snap.stateCount, 0)
+        XCTAssertEqual(snap.graphNodeCount, 0)
+        XCTAssertEqual(snap.graphEdgeCount, 0)
+        XCTAssertEqual(snap.populatedSlotCount, 0)
+    }
+
+    func testSnapshotReportsActualPrimitiveCounts()
+        async throws
+    {
+        let bundle = try BASCognitiveOSBuilder.build(
+            options: BASCognitiveOSBundleOptions(
+                enableEventLog: true,
+                enableUserState: true,
+                enableKnowledgeGraph: true))
+        // Empty stores → all zeros except slot count
+        let snap = await bundle.snapshot()
+        XCTAssertEqual(snap.eventCount, 0)
+        XCTAssertEqual(snap.stateCount, 0)
+        XCTAssertEqual(snap.graphNodeCount, 0)
+        XCTAssertEqual(snap.graphEdgeCount, 0)
+        XCTAssertEqual(snap.populatedSlotCount, 3)
+    }
+
+    func testDetectComplexityLoopsEmptyGraph() async throws {
+        let bundle = try BASCognitiveOSBuilder.build(
+            options: BASCognitiveOSBundleOptions(
+                enableKnowledgeGraph: true))
+        let loops = await bundle.detectComplexityLoops()
+        XCTAssertTrue(loops.isEmpty,
+            "Empty graph must return empty loop list")
+    }
+
+    func testDetectComplexityLoopsNoGraphConfigured()
+        async
+    {
+        let bundle = BASCognitiveOSBundle.empty
+        let loops = await bundle.detectComplexityLoops()
+        XCTAssertTrue(loops.isEmpty,
+            "Bundle without graph wired returns empty list,not nil")
+    }
+
+    func testDetectComplexityLoopsFindsDelaysCycle()
+        async throws
+    {
+        let bundle = try BASCognitiveOSBuilder.build(
+            options: BASCognitiveOSBundleOptions(
+                enableKnowledgeGraph: true))
+        let graph = try XCTUnwrap(bundle.knowledgeGraph)
+
+        // Build a 2-node cycle:project ⇄ event with delays edge
+        await graph.upsert(node: BASKnowledgeNode(
+            nodeID: "project:foo",
+            kind: .project, label: "foo",
+            createdAtMs: 0))
+        await graph.upsert(node: BASKnowledgeNode(
+            nodeID: "ev1",
+            kind: .event, label: "e1",
+            createdAtMs: 0))
+        try await graph.insert(edge: BASKnowledgeEdge(
+            edgeID: "e1",
+            fromNodeID: "project:foo",
+            toNodeID: "ev1",
+            kind: .delays,
+            createdAtMs: 0))
+        try await graph.insert(edge: BASKnowledgeEdge(
+            edgeID: "e2",
+            fromNodeID: "ev1",
+            toNodeID: "project:foo",
+            kind: .causes,
+            createdAtMs: 0))
+
+        let loops = await bundle.detectComplexityLoops()
+        XCTAssertFalse(loops.isEmpty,
+            "Cycle containing delays edge must be detected")
+        XCTAssertTrue(
+            loops.first?.containsEdgeKind(.delays) ?? false,
+            "Returned cycles must include delays edges per " +
+            "user-vision §10 doctrine")
+    }
+
     // MARK: - Equatable options pin
 
     func testOptionsAllDisabledEquatable() {

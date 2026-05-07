@@ -71,6 +71,14 @@ final class SampleHostChengluStressCognitiveOSObserver {
         static let projectNames: [String] = [
             "alpha", "beta", "gamma", "delta",
         ]
+
+        /// Chapter 三百九〇 / M887 evolution:thermal pressure
+        /// re-sample interval (iters)。ProcessInfo.thermalState
+        /// is a coarse OS signal that doesn't change per-iter,
+        /// so we re-read every N iters to amortize syscall cost。
+        /// 100 iter ≈ once per ~700ms at 147 iter/s thermal-hot
+        /// case observed on iPhone 17e。
+        static let thermalReadInterval: Int = 100
     }
 
     // MARK: - State
@@ -118,6 +126,17 @@ final class SampleHostChengluStressCognitiveOSObserver {
     /// which is incomparable with synthetic / replayed event
     /// timestamps。
     private var maxObservedEventTimestampMs: Int64 = 0
+
+    /// Chapter 三百九〇 / M887:cached thermal state,re-read
+    /// every `Constants.thermalReadInterval` iters。Maps to
+    /// `BASEventLogRiskBand` so events carry real-world thermal
+    /// pressure signal,not just hardcoded `succeeded → low /
+    /// failed → medium`。20-min iPhone run showed thermal envelope
+    /// drops throughput 1109 → 147 iter/s but observer events
+    /// reported `riskBand: low` throughout — substrate had no
+    /// surface for thermal pressure。M887 closes that gap。
+    private var cachedThermalRiskBand:
+        BASEventLogRiskBand = .low
 
     /// True when bundle has at least one populated primitive。
     var isEnabled: Bool {
@@ -198,6 +217,18 @@ final class SampleHostChengluStressCognitiveOSObserver {
     ) async {
         guard let log = bundle?.eventLog else { return }
 
+        // M887:re-sample thermal state every N iters (cheap to
+        // call,but not free)。Maps OS thermal pressure into the
+        // typed `BASEventLogRiskBand` so events carry the
+        // real-world signal that 20-min iPhone runs surfaced
+        // (throughput 1109 → 147 iter/s under thermal envelope
+        // but observer events all reported `riskBand: low`
+        // pre-M887)。
+        if index % Constants.thermalReadInterval == 0 {
+            cachedThermalRiskBand =
+                Self.thermalRiskBand()
+        }
+
         // M875: cycle through project names so H3 (mentions) +
         // H4 (sequential causes) + H7 (closing edges) fire
         let project = Constants.projectNames[
@@ -268,7 +299,12 @@ final class SampleHostChengluStressCognitiveOSObserver {
             sequenceNumber: 0,  // storage assigns
             source: "samplehost.chenglu-stress",
             turnRef: "iter-\(index)",
-            riskBand: succeeded ? .low : .medium,
+            // M887:risk band combines failure signal + thermal
+            // pressure。Failure overrides thermal (worst-case
+            // wins);on success,thermal state passes through。
+            riskBand: succeeded
+                ? cachedThermalRiskBand
+                : .medium,
             project: project,
             actions: actions,
             confidence: succeeded ? 1.0 : 0.0,
@@ -356,12 +392,17 @@ final class SampleHostChengluStressCognitiveOSObserver {
         // the observer (via `observeIteration` calling the log's
         // append),so it correctly bounds "what's been processed"
         // even when events use synthetic / replayed timestamps。
+        //
+        // M888 (chapter 三百九〇):pass the same log as
+        // `feedbackLog` so detected cycles become first-class
+        // events。Idempotent eventIDs ensure no duplicates。
         let preExtractHwm = maxObservedEventTimestampMs
         _ = await BASKnowledgeGraphEventExtractor.extract(
             from: log,
             sessionID: sessionID,
             into: graph,
-            sinceTimestampMs: scanSince)
+            sinceTimestampMs: scanSince,
+            feedbackLog: log)
         lastExtractHighWaterMs = preExtractHwm
 
         // Chapter 三百八八 / M879 fix:write the in-memory graph
@@ -421,5 +462,31 @@ final class SampleHostChengluStressCognitiveOSObserver {
         let formatted = String(
             format: "{\"latencyMs\":%.3f}", latencyMs)
         return formatted
+    }
+
+    /// Chapter 三百九〇 / M887:read OS thermal pressure +
+    /// map to typed `BASEventLogRiskBand`。`ProcessInfo.thermalState`
+    /// is platform-portable (iOS / macOS) and updates as the OS
+    /// detects sustained workload causing chip heating。Mapping:
+    ///   .nominal   → .low
+    ///   .fair      → .low
+    ///   .serious   → .medium
+    ///   .critical  → .high
+    /// `@unknown default` falls through to `.unknown` per Swift
+    /// 6 exhaustiveness handling — defensive against future Apple
+    /// thermal-state additions。
+    private static func thermalRiskBand()
+        -> BASEventLogRiskBand
+    {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal, .fair:
+            return .low
+        case .serious:
+            return .medium
+        case .critical:
+            return .high
+        @unknown default:
+            return .unknown
+        }
     }
 }

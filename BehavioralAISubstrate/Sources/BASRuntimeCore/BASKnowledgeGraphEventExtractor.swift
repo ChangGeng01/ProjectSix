@@ -144,6 +144,18 @@ public enum BASKnowledgeGraphEventExtractor {
     public static let closingEdgeAnchorCode: String =
         "knowledge-graph-extract:heuristic-7:closing-edge-synthesized"
 
+    /// Chapter 三百九〇 / M888:event log kind / source / action
+    /// constants for the cycle-detection feedback event。When
+    /// `feedbackLog` is supplied to `extract(...)` the extractor
+    /// emits a synthetic event for each H7 closing edge,making
+    /// detected complexity-addiction cycles first-class citizens
+    /// of the event log。Future replays + extractions then see
+    /// the cycle as part of session history。
+    public static let cycleFeedbackEventSource: String =
+        "knowledge-graph-extract:cycle-feedback"
+    public static let cycleFeedbackActionPrefix: String =
+        "cycle-detected:project:"
+
     // MARK: - Extract
 
     /// Walk a session's event log + populate the graph using
@@ -171,6 +183,16 @@ public enum BASKnowledgeGraphEventExtractor {
     ///     first 5 extracts)。Caller tracks the high-water-mark
     ///     across calls;default nil preserves M857 full-walk
     ///     semantics for back-compat。
+    ///   - feedbackLog: chapter 三百九〇 / M888 cycle-feedback
+    ///     mode。When non-nil,extractor writes a typed synthetic
+    ///     `internalSignal` event back to this log for each H7
+    ///     closing edge synthesized this run。The synthetic event
+    ///     uses a stable eventID derived from the closing edge
+    ///     ID,so re-extraction is idempotent (event log's
+    ///     duplicate-detection returns wasNew=false)。Default
+    ///     nil preserves M860 semantics (no feedback)。Pass the
+    ///     same log used as `eventLog` to enable closed-loop
+    ///     cognitive OS feedback。
     /// - Returns: typed result bundle
     public static func extract(
         from eventLog: any BASEventLogStorage,
@@ -179,7 +201,8 @@ public enum BASKnowledgeGraphEventExtractor {
         closingEdgeThreshold: Int =
             BASKnowledgeGraphEventExtractor
                 .closingEdgeDelaysThreshold,
-        sinceTimestampMs: Int64? = nil
+        sinceTimestampMs: Int64? = nil,
+        feedbackLog: (any BASEventLogStorage)? = nil
     ) async -> BASKnowledgeGraphEventExtractionResult {
         let events: [BASEventLogEntry]
         if let since = sinceTimestampMs {
@@ -435,6 +458,40 @@ public enum BASKnowledgeGraphEventExtractor {
                     // Defensive — endpoints exist by
                     // construction (project + firstEvent
                     // both inserted earlier in this run)
+                }
+
+                // M888 cycle-detection-as-event:emit a typed
+                // synthetic `internalSignal` event so the
+                // detected cycle becomes a first-class citizen
+                // of the event log。Stable eventID (derived from
+                // the closing edge ID) makes this idempotent —
+                // re-extraction returns wasNew=false,no
+                // duplicate cycle events accumulate。
+                if let feedback = feedbackLog {
+                    let cycleEventID =
+                        "cycle:\(closingEdgeID)"
+                    let cycleEvent = BASEventLogEntry(
+                        eventID: cycleEventID,
+                        timestampMs:
+                            events.last?.timestampMs ?? 0,
+                        kind: .internalSignal,
+                        sessionID: sessionID,
+                        sequenceNumber: 0,
+                        source:
+                            cycleFeedbackEventSource,
+                        project: project,
+                        actions: [
+                            "\(cycleFeedbackActionPrefix)" +
+                                project,
+                        ],
+                        confidence: closingEdgeWeight)
+                    do {
+                        _ = try await feedback.append(
+                            cycleEvent)
+                    } catch {
+                        // Silent — observation primitives
+                        // never disrupt the host turn loop
+                    }
                 }
             }
         }

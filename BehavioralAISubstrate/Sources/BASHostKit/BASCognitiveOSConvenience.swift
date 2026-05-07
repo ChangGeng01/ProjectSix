@@ -408,7 +408,10 @@ public actor BASCognitiveOSConvenience {
             from: log,
             sessionID: sessionID,
             into: graph,
-            sinceTimestampMs: scanSince)
+            sinceTimestampMs: scanSince,
+            // M888:close the cognitive OS feedback loop —
+            // detected cycles become first-class events
+            feedbackLog: log)
         lastGraphExtractHwm = preExtractHwm
 
         // chapter 三百八二 / M869 write-through: when the host

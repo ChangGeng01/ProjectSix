@@ -219,4 +219,70 @@ public struct BASCognitiveOSBundle: Sendable {
     public var isEmpty: Bool {
         populatedCount == 0
     }
+
+    // MARK: - M889 query API (chapter 三百九〇)
+
+    /// M889 typed snapshot of cognitive OS state at query time。
+    /// Hosts use this to pull current cognitive OS status for
+    /// observability / decision-making without manually poking
+    /// each primitive。All counts are async-fetched from the
+    /// underlying actor storage,so the snapshot is a coherent
+    /// point-in-time view (mod actor scheduling latency)。
+    public struct Snapshot:
+        Sendable, Equatable, Codable, Hashable
+    {
+        public let eventCount: Int
+        public let stateCount: Int
+        public let graphNodeCount: Int
+        public let graphEdgeCount: Int
+        /// Number of populated bundle slots (mirrors the
+        /// existing `populatedCount` property)。
+        public let populatedSlotCount: Int
+        public init(
+            eventCount: Int,
+            stateCount: Int,
+            graphNodeCount: Int,
+            graphEdgeCount: Int,
+            populatedSlotCount: Int
+        ) {
+            self.eventCount = eventCount
+            self.stateCount = stateCount
+            self.graphNodeCount = graphNodeCount
+            self.graphEdgeCount = graphEdgeCount
+            self.populatedSlotCount = populatedSlotCount
+        }
+    }
+
+    /// M889:fetch a typed point-in-time snapshot of cognitive
+    /// OS state。Async because the underlying primitives are
+    /// actors。Cheap (4 actor reads max);hosts can call per-
+    /// turn without overhead concerns。
+    public func snapshot() async -> Snapshot {
+        let events = await eventLog?.totalCount ?? 0
+        let states = await userStateStore?.totalCount ?? 0
+        let nodes = await knowledgeGraph?.nodeCount ?? 0
+        let edges = await knowledgeGraph?.edgeCount ?? 0
+        return Snapshot(
+            eventCount: events,
+            stateCount: states,
+            graphNodeCount: nodes,
+            graphEdgeCount: edges,
+            populatedSlotCount: populatedCount)
+    }
+
+    /// M889:detect user-vision §10 'complexity addiction'
+    /// loops in the current graph。Returns cycles that contain
+    /// at least one `delays` edge — those are the candidate
+    /// loops per user-vision §10 (anxiety → add tech → can't
+    /// finish → anxiety)。Returns empty when graph not wired
+    /// or no matching cycles found。
+    public func detectComplexityLoops()
+        async -> [BASKnowledgeCycle]
+    {
+        guard let graph = knowledgeGraph else { return [] }
+        return await graph.detectCycles(
+            filter: { cycle in
+                cycle.containsEdgeKind(.delays)
+            })
+    }
 }
