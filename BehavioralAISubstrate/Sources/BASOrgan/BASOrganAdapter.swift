@@ -131,6 +131,30 @@ public struct BASOrganRequest: Sendable, Equatable {
     public let stopSequences: [String]
     public let deadline: Date?
 
+    // MARK: - Chapter 三百六五 / M852 — G6 part 2: tool calling +
+    // guided generation fields
+
+    /// Optional tool descriptors the LLM may invoke。Adapters
+    /// translate to their LLM's tool-call API format
+    /// (AppleFoundation `LanguageModelSession.respond(to:tools:)`
+    /// on iOS 26;OpenAI-compatible function calling on cloud
+    /// adapters)。
+    ///
+    /// **Empty array (default)** = plain-text-only generation
+    /// (zero behavior change for hosts that haven't opted in to
+    /// tool calling — ADR-014 OPT-IN doctrine)。
+    public let tools: [BASTool]
+
+    /// Optional structured-output schema。When non-nil,LLM
+    /// output is constrained to match the JSON Schema fragment
+    /// in `outputSchema.propertiesJSON`。AFM iOS 26 maps to
+    /// `Generable` typed output;cloud adapters map to OpenAI's
+    /// `response_format: json_schema`。
+    ///
+    /// **nil (default)** = plain-text output (zero behavior
+    /// change vs pre-M852)。
+    public let outputSchema: BASGuidedGenerationSchema?
+
     public init(
         requestID: String,
         role: BASOrganRole,
@@ -139,7 +163,9 @@ public struct BASOrganRequest: Sendable, Equatable {
         context: [String] = [],
         maxOutputTokens: Int? = nil,
         stopSequences: [String] = [],
-        deadline: Date? = nil
+        deadline: Date? = nil,
+        tools: [BASTool] = [],
+        outputSchema: BASGuidedGenerationSchema? = nil
     ) {
         self.requestID = requestID
         self.role = role
@@ -149,6 +175,8 @@ public struct BASOrganRequest: Sendable, Equatable {
         self.maxOutputTokens = maxOutputTokens.map { max(0, $0) }
         self.stopSequences = stopSequences
         self.deadline = deadline
+        self.tools = tools
+        self.outputSchema = outputSchema
     }
 }
 
