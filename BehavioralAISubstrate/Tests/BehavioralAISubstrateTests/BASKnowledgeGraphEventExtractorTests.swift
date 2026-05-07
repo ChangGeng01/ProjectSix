@@ -842,17 +842,109 @@ final class BASKnowledgeGraphEventExtractorTests:
             from: "project:alpha")
         let outBeta = await graph.outgoing(
             from: "project:beta")
+        // M894 fix:closing edge ID is now stable per project
+        // (no firstEventID suffix)。toNodeID still points to
+        // the first event observed for that project — which is
+        // what we verify here。
         XCTAssertTrue(
             outAlpha.contains {
-                $0.edgeID == "h7-closing:project:alpha→alpha-1"
+                $0.edgeID == "h7-closing:project:alpha"
+                    && $0.toNodeID == "alpha-1"
             },
-            "Alpha closing edge fires + points to alpha-1 " +
-            "(first event for alpha)")
+            "Alpha closing edge fires (M894 stable edgeID) + " +
+            "points to alpha-1 (first event for alpha)")
         XCTAssertTrue(
             outBeta.contains {
-                $0.edgeID == "h7-closing:project:beta→beta-1"
+                $0.edgeID == "h7-closing:project:beta"
+                    && $0.toNodeID == "beta-1"
             },
-            "Beta closing edge fires + points to beta-1 " +
-            "(first event for beta)")
+            "Beta closing edge fires (M894 stable edgeID) + " +
+            "points to beta-1 (first event for beta)")
+    }
+
+    // MARK: - M894 graph edge stability across incremental extracts
+
+    func testM894ClosingEdgeIDStableAcrossIncrementalExtracts()
+        async throws
+    {
+        // M894 fix:closing edge ID = "h7-closing:project:<name>"
+        // is stable per project,NOT per (project, firstEvent)。
+        // Pre-M894 each incremental scan window saw a different
+        // firstEvent → different closingEdgeID → graph
+        // accumulated unbounded closing edges。Post-M894 the
+        // first extract's closing edge wins,subsequent extracts
+        // hit duplicateEdgeID + skip。
+        let log = BASInMemoryEventLogStorage()
+        // Window 1: events ts 1000-2000,delays cycle on alpha
+        _ = try await log.append(makeEvent(
+            eventID: "ev-w1-1",
+            timestampMs: 1_000,
+            project: "alpha",
+            actions: ["permit:answer"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-w1-2",
+            timestampMs: 1_500,
+            project: "alpha",
+            actions: ["skip:thermal"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-w1-3",
+            timestampMs: 2_000,
+            project: "alpha",
+            actions: ["skip:overload"]))
+        let graph = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph)
+        let edgeCountAfterW1 = await graph.edgeCount
+
+        // Window 2: more events with delays cycle on alpha,
+        // incremental extract → new firstEvent observed
+        _ = try await log.append(makeEvent(
+            eventID: "ev-w2-1",
+            timestampMs: 3_000,
+            project: "alpha",
+            actions: ["permit:answer"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-w2-2",
+            timestampMs: 3_500,
+            project: "alpha",
+            actions: ["skip:thermal"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-w2-3",
+            timestampMs: 4_000,
+            project: "alpha",
+            actions: ["skip:overload"]))
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph,
+            sinceTimestampMs: 2_500)
+        let edgeCountAfterW2 = await graph.edgeCount
+
+        // Pre-M894:graph would have 2 closing edges (one per
+        // window with different toNode)。Post-M894:graph has
+        // exactly 1 closing edge (first wins,second skipped
+        // via duplicateEdgeID)。
+        let outAlpha = await graph.outgoing(
+            from: "project:alpha")
+        let closingEdges = outAlpha.filter {
+            $0.edgeID.hasPrefix("h7-closing:")
+        }
+        XCTAssertEqual(closingEdges.count, 1,
+            "M894 pin:exactly one closing edge per project, " +
+            "not one per scan window。Pre-M894 this would be 2.")
+        XCTAssertEqual(
+            closingEdges.first?.edgeID,
+            "h7-closing:project:alpha",
+            "M894 stable edgeID format (no firstEventID suffix)")
+
+        // Edge count growth bounded by # of NEW non-closing
+        // edges across windows,NOT growing per window for
+        // closing edges
+        XCTAssertGreaterThan(
+            edgeCountAfterW2, edgeCountAfterW1,
+            "Window 2 added some new mentions/causes/delays " +
+            "edges from its 3 events")
     }
 }

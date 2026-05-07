@@ -437,8 +437,32 @@ public enum BASKnowledgeGraphEventExtractor {
                     projectToFirstEventID[project]
                 else { continue }
                 let projectNodeID = "project:\(project)"
+
+                // M894 fix (post-deep-audit round 6):closing
+                // edge ID is now stable per project,NOT per
+                // (project, firstEventID)。Pre-M894 the ID
+                // embedded firstEventID,which is local-per-
+                // extract,so each incremental scan window
+                // produced a DIFFERENT closingEdgeID → graph
+                // accumulated unbounded closing edges over
+                // long sessions (e.g. 100 extracts × 4 active
+                // projects = 400 closing edges all pointing to
+                // the same project node)。
+                //
+                // Post-M894 the edgeID is `h7-closing:project:
+                // <name>` — same project always produces same
+                // edgeID → duplicateEdgeID throws on second
+                // insert → caught + skipped (idempotent)。
+                // First-extract closing edge wins (its toNodeID
+                // is the first event seen for that project in
+                // its scan window);subsequent extracts no-op。
+                //
+                // M892 fixed the LOG feedback event eventID;
+                // M894 closes the matching gap on the GRAPH
+                // edge side。Both now stable per (sessionID,
+                // project) tuple semantics。
                 let closingEdgeID =
-                    "h7-closing:\(projectNodeID)→\(firstEventID)"
+                    "h7-closing:\(projectNodeID)"
                 let closingEdge = BASKnowledgeEdge(
                     edgeID: closingEdgeID,
                     fromNodeID: projectNodeID,
