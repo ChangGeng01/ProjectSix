@@ -221,6 +221,54 @@ public extension BASCoreMLLayerHead {
             dictionary: mlValues)
     }
 
+    /// Build an `MLDictionaryFeatureProvider` that wraps a single
+    /// `MLMultiArray(shape: [1, N])` Float32 input under the given
+    /// `featureKey`。This matches the input format produced by
+    /// CoreML models that were trained with sklearn / coremltools'
+    /// default `features` input convention (chapter 一百七十七 + 一百八十一
+    /// SampleHost `.mlpackage` files use this shape)。
+    ///
+    /// The values are extracted from the input dictionary in the
+    /// caller-supplied `orderedKeys` order — this MUST match the
+    /// training-time featurization order for the model to produce
+    /// correct predictions。
+    ///
+    /// - Parameters:
+    ///   - values: dictionary of feature names → numeric values
+    ///     (typically produced by `BASChengluFeatureEncoder.encode`)
+    ///   - orderedKeys: canonical order of dictionary keys to
+    ///     extract values from (length = N = expected MLMultiArray
+    ///     dim 1)
+    ///   - featureKey: input feature name expected by the model
+    ///     (typically `"features"` for sklearn-trained models)
+    /// - Returns: provider wrapping `[featureKey: MLMultiArray]`
+    /// - Throws: `BASCoreMLAdapterError.multiArrayConstructionFailed`
+    ///   if MLMultiArray init fails;rethrows provider init errors
+    static func makeMultiArrayFeatureProvider(
+        values: [String: Double],
+        orderedKeys: [String],
+        featureKey: String = "features"
+    ) throws -> MLFeatureProvider {
+        let n = orderedKeys.count
+        let shape: [NSNumber] = [1, NSNumber(value: n)]
+        guard let array = try? MLMultiArray(
+            shape: shape, dataType: .float32)
+        else {
+            throw BASCoreMLAdapterError
+                .multiArrayConstructionFailed(
+                    expectedShape: [1, n])
+        }
+        for (index, key) in orderedKeys.enumerated() {
+            let value = values[key] ?? 0
+            array[index] = NSNumber(value: Float(value))
+        }
+        let dict: [String: MLFeatureValue] = [
+            featureKey: MLFeatureValue(multiArray: array)
+        ]
+        return try MLDictionaryFeatureProvider(
+            dictionary: dict)
+    }
+
     /// Extract output feature names + Double values from an
     /// `MLFeatureProvider`。Skips non-numeric output features
     /// (returns 0 for those — caller's outputTransformer can
@@ -259,6 +307,14 @@ public extension BASCoreMLLayerHead {
 /// within the adapter's actor isolation boundary。
 private struct BASCoreMLModelBox: @unchecked Sendable {
     let model: MLModel
+}
+
+/// Typed error cases for CoreML adapter construction + inference
+/// (chapter 三百三二 / M819)。
+public enum BASCoreMLAdapterError: Error, Equatable, Sendable {
+    /// `MLMultiArray(shape:dataType:)` returned nil。Includes
+    /// the expected shape for diagnostic emission。
+    case multiArrayConstructionFailed(expectedShape: [Int])
 }
 
 #endif

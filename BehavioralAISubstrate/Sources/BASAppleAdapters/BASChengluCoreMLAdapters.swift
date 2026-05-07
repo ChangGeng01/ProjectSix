@@ -134,6 +134,38 @@ public enum BASChengluFeatureEncoder {
         mutationSeedCount
     }
 
+    /// Canonical ordered list of feature dictionary keys —
+    /// MUST match the training-time featurization order so real
+    /// `.mlpackage` models receive features in expected positions
+    /// (chapter 三百三二 / M819 — added to support real-MLModel
+    /// `MLMultiArray(shape: [1, 43])` input format)。
+    public static var canonicalKeyOrder: [String] {
+        var keys: [String] = []
+        keys.reserveCapacity(totalDimension)
+        for tone in tones {
+            keys.append("tone_\(tone)")
+        }
+        for domain in domains {
+            keys.append("domain_\(domain)")
+        }
+        for stake in stakes {
+            keys.append("stake_\(stake)")
+        }
+        for timeframe in timeframes {
+            keys.append("timeframe_\(timeframe)")
+        }
+        for confidant in confidants {
+            keys.append("confidant_\(confidant)")
+        }
+        for askShape in askShapes {
+            keys.append("askshape_\(askShape)")
+        }
+        for i in 0..<mutationSeedCount {
+            keys.append("mutation_seed_\(i)")
+        }
+        return keys
+    }
+
     /// Encode a `BASChengluPromptSignature` into a typed
     /// `BASCoreMLFeatureFrame` with 43 keys (one-hot)。
     /// Unknown categorical values produce all-zeros for that
@@ -282,16 +314,47 @@ public enum BASChengluPreflightAdapter {
     #if canImport(CoreML)
     /// Construct adapter bound to a real `MLModel`。Caller is
     /// responsible for loading the `.mlpackage` from app bundle。
+    ///
+    /// Real `.mlpackage` models trained via sklearn + coremltools
+    /// expect a single `features` input of shape `[1, 43]`
+    /// (Float32 MLMultiArray) — NOT 43 individual scalar feature
+    /// entries。Chapter 三百三二 / M819 fixed this by routing
+    /// real-model adapter construction through a custom
+    /// inference closure that uses
+    /// `BASCoreMLLayerHead.makeMultiArrayFeatureProvider(...)`。
     public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         model: MLModel
     ) -> BASCoreMLLayerHead {
         let outKey = outputKey
-        return BASCoreMLLayerHead.makeFromMLModel(
+        let modelBox = ChengluPreflightAdapterModelBox(
+            model: model)
+        let inferenceClosure:
+            @Sendable (BASCoreMLFeatureFrame) async throws
+                -> BASCoreMLPredictionFrame
+            = { frame in
+                let startTime = Date()
+                let provider = try BASCoreMLLayerHead
+                    .makeMultiArrayFeatureProvider(
+                        values: frame.featureValues,
+                        orderedKeys: BASChengluFeatureEncoder
+                            .canonicalKeyOrder,
+                        featureKey: "features")
+                let result = try modelBox.model.prediction(
+                    from: provider)
+                let scores = BASCoreMLLayerHead
+                    .extractScores(from: result)
+                let elapsed = Date()
+                    .timeIntervalSince(startTime) * 1000
+                return BASCoreMLPredictionFrame(
+                    scores: scores,
+                    modelDescription: "ChengluPreflight_v0",
+                    inferenceLatencyMs: elapsed)
+            }
+        return BASCoreMLLayerHead(
             headID: headID,
             layerIDPin: layerIDPin,
-            model: model,
             featureExtractor: bASChengluFeatureExtractor,
             outputTransformer: { frame, input in
                 let score = frame.scores[outKey] ?? 0
@@ -313,7 +376,17 @@ public enum BASChengluPreflightAdapter {
                     inferenceLatencyMs:
                         frame.inferenceLatencyMs)
             },
-            modelDescription: "ChengluPreflight_v0")
+            inferenceClosure: inferenceClosure)
+    }
+
+    /// Box wrapping non-Sendable `MLModel` for use inside the
+    /// adapter's Sendable inference closure。Safe because the
+    /// closure is only invoked from within the adapter actor's
+    /// isolation boundary。
+    private struct ChengluPreflightAdapterModelBox:
+        @unchecked Sendable
+    {
+        let model: MLModel
     }
     #endif
 }
