@@ -343,6 +343,34 @@ public actor BASKnowledgeGraph {
 
     public var edgeCount: Int { edgeIDIndex.count }
 
+    /// Enumerate all nodes ordered by `createdAtMs ASC, nodeID
+    /// ASC` for stable replay。Mirrors `BASSQLiteKnowledgeGraphStorage
+    /// .allNodes()` (M866) so callers (eg. M869 convenience write-
+    /// through) can read in-memory + write-through to storage with
+    /// matching ordering。
+    public func allNodes() -> [BASKnowledgeNode] {
+        nodes.values.sorted {
+            if $0.createdAtMs != $1.createdAtMs {
+                return $0.createdAtMs < $1.createdAtMs
+            }
+            return $0.nodeID < $1.nodeID
+        }
+    }
+
+    /// Enumerate all edges ordered by `createdAtMs ASC, edgeID
+    /// ASC` for stable replay。Mirrors
+    /// `BASSQLiteKnowledgeGraphStorage.allEdges()` (M866)。
+    public func allEdges() -> [BASKnowledgeEdge] {
+        outgoingEdges.values
+            .flatMap { $0 }
+            .sorted {
+                if $0.createdAtMs != $1.createdAtMs {
+                    return $0.createdAtMs < $1.createdAtMs
+                }
+                return $0.edgeID < $1.edgeID
+            }
+    }
+
     // MARK: - Cycle detection
 
     /// Detect directed cycles in the graph。Returns up to

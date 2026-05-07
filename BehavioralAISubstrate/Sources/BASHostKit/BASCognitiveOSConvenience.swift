@@ -166,6 +166,14 @@ public actor BASCognitiveOSConvenience {
     private let eventLog: (any BASEventLogStorage)?
     private let userStateStore: (any BASUserStateStorage)?
     private let knowledgeGraph: BASKnowledgeGraph?
+    /// Chapter 三百八二 / M869: optional SQLite write-through for
+    /// graph mutations。When set,after each `extractGraph()` fires,
+    /// the convenience walks the in-memory graph + idempotent-
+    /// appends every node + edge to storage。M866's append APIs
+    /// are idempotent on duplicate IDs,so repeated write-throughs
+    /// are no-ops on already-persisted nodes/edges。
+    private let knowledgeGraphStorage:
+        BASSQLiteKnowledgeGraphStorage?
     private let cadence: BASCognitiveOSConvenienceCadence
     private let sessionID: String
 
@@ -179,16 +187,27 @@ public actor BASCognitiveOSConvenience {
     /// Construct from bundle pieces。Pass nil for any primitive
     /// the caller does not want to feed。Empty (all-nil) is
     /// allowed — yields a no-op observer。
+    ///
+    /// Chapter 三百八二 / M869: `knowledgeGraphStorage` is the
+    /// optional SQLite write-through companion (M866)。When set
+    /// AND `knowledgeGraph` is also set,the convenience appends
+    /// every graph node + edge through to SQLite after each
+    /// graph extract。Hosts that don't pass the storage stay
+    /// in-memory only (M865 contract preserved)。
     public init(
         eventLog: (any BASEventLogStorage)? = nil,
         userStateStore: (any BASUserStateStorage)? = nil,
         knowledgeGraph: BASKnowledgeGraph? = nil,
+        knowledgeGraphStorage:
+            BASSQLiteKnowledgeGraphStorage? = nil,
         sessionID: String = UUID().uuidString,
         cadence: BASCognitiveOSConvenienceCadence = .default
     ) {
         self.eventLog = eventLog
         self.userStateStore = userStateStore
         self.knowledgeGraph = knowledgeGraph
+        self.knowledgeGraphStorage =
+            knowledgeGraphStorage
         self.sessionID = sessionID
         self.cadence = cadence
         self.currentState = .zero
@@ -322,6 +341,46 @@ public actor BASCognitiveOSConvenience {
             from: log,
             sessionID: sessionID,
             into: graph)
+
+        // chapter 三百八二 / M869 write-through: when the host
+        // wired `knowledgeGraphStorage`,append every node + edge
+        // through to SQLite。M866's append APIs are idempotent on
+        // duplicate IDs,so calling this on re-extraction is a
+        // no-op on already-persisted rows。Failures are silent
+        // per the M865 observer contract — storage errors must
+        // not disrupt the host turn loop。
+        if let storage = knowledgeGraphStorage {
+            await persistGraph(
+                graph: graph, storage: storage)
+        }
+
         return true
+    }
+
+    /// Walk the in-memory graph + write-through nodes + edges to
+    /// the SQLite storage companion。Idempotent on already-
+    /// persisted rows due to M866 append semantics。Errors are
+    /// silently dropped (chapter 一百九十一 row-by-row integrity)。
+    private func persistGraph(
+        graph: BASKnowledgeGraph,
+        storage: BASSQLiteKnowledgeGraphStorage
+    ) async {
+        let nodes = await graph.allNodes()
+        for node in nodes {
+            do {
+                _ = try await storage.appendNode(node)
+            } catch {
+                // Silent — observation primitives never disrupt
+                // host turn loop on storage failure
+            }
+        }
+        let edges = await graph.allEdges()
+        for edge in edges {
+            do {
+                _ = try await storage.appendEdge(edge)
+            } catch {
+                // Silent — same contract as appendNode above
+            }
+        }
     }
 }

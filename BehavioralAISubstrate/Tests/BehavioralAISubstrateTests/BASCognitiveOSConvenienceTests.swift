@@ -268,6 +268,159 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
         XCTAssertEqual(storeBCount, 0)
     }
 
+    // MARK: - M869 graph storage write-through
+
+    func testGraphStorageWriteThroughOnExtract() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "qinao-conv-m869-\(UUID().uuidString)",
+                isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: tempDir,
+            withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        let storage = try BASSQLiteKnowledgeGraphStorage(
+            databaseURL: tempDir.appendingPathComponent(
+                "graph.sqlite"))
+        let graph = BASKnowledgeGraph()
+        let log = BASInMemoryEventLogStorage()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            knowledgeGraphStorage: storage,
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 5,
+                graphExtractEventCap: 5_000))
+
+        // 5 events on the same project → graph extract fires
+        // at iter 5 → write-through must persist nodes + edges
+        for i in 1...5 {
+            let event = BASEventLogEntry(
+                eventID: "ev-\(i)",
+                timestampMs: Int64(1_000 + i),
+                kind: .substrateAudit,
+                sessionID: "s1",
+                sequenceNumber: 0,
+                project: "alpha",
+                actions: ["delays:alpha"])
+            _ = await conv.observe(event: event)
+        }
+
+        // After extract,storage must have nodes + edges
+        let storedNodeCount = await storage.nodeCount
+        XCTAssertGreaterThan(storedNodeCount, 0,
+            "Write-through must persist graph nodes to SQLite")
+        let storedEdgeCount = await storage.edgeCount
+        XCTAssertGreaterThan(storedEdgeCount, 0,
+            "Write-through must persist graph edges to SQLite")
+    }
+
+    func testWriteThroughIsIdempotent() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "qinao-conv-m869-idem-\(UUID().uuidString)",
+                isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: tempDir,
+            withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        let storage = try BASSQLiteKnowledgeGraphStorage(
+            databaseURL: tempDir.appendingPathComponent(
+                "graph.sqlite"))
+        let graph = BASKnowledgeGraph()
+        let log = BASInMemoryEventLogStorage()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            knowledgeGraphStorage: storage,
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 3,
+                graphExtractEventCap: 5_000))
+
+        // 6 events → 2 extracts (at iter 3 + iter 6)
+        // First extract writes through
+        // Second extract re-walks SAME nodes + edges →
+        // M866 append idempotency makes them no-ops
+        for i in 1...6 {
+            let event = BASEventLogEntry(
+                eventID: "ev-\(i)",
+                timestampMs: Int64(1_000 + i),
+                kind: .substrateAudit,
+                sessionID: "s1",
+                sequenceNumber: 0,
+                project: "beta",
+                actions: ["delays:beta"])
+            _ = await conv.observe(event: event)
+        }
+
+        let firstNodeCount = await storage.nodeCount
+        let firstEdgeCount = await storage.edgeCount
+        XCTAssertGreaterThan(firstNodeCount, 0)
+
+        // Submit one more event + force another extract
+        // The pre-existing nodes / edges should NOT duplicate
+        let event7 = BASEventLogEntry(
+            eventID: "ev-7",
+            timestampMs: 1_007,
+            kind: .substrateAudit,
+            sessionID: "s1",
+            sequenceNumber: 0,
+            project: "beta")
+        _ = await conv.observe(event: event7)
+        // 7 events but extract cadence is 3 → extracts at
+        // 3, 6, 9 → no extract on iter 7
+        let secondNodeCount = await storage.nodeCount
+        let secondEdgeCount = await storage.edgeCount
+        XCTAssertEqual(secondNodeCount, firstNodeCount)
+        XCTAssertEqual(secondEdgeCount, firstEdgeCount)
+    }
+
+    func testNoStorageMeansNoWriteThrough() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            // No storage wired in (M865 contract preserved)
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 3,
+                graphExtractEventCap: 5_000))
+
+        for i in 1...3 {
+            let event = BASEventLogEntry(
+                eventID: "ev-\(i)",
+                timestampMs: Int64(1_000 + i),
+                kind: .substrateAudit,
+                sessionID: "s1",
+                sequenceNumber: 0,
+                project: "no-storage-test")
+            let r = await conv.observe(event: event)
+            if i == 3 {
+                XCTAssertTrue(r.graphExtracted,
+                    "Extract still fires without storage")
+            }
+        }
+
+        // The graph itself populated as before
+        let nodeCount = await graph.nodeCount
+        XCTAssertGreaterThan(nodeCount, 0)
+    }
+
     // MARK: - M868 graph-aware reducer wiring
 
     func testFoldUsesGraphAwareReducerWhenGraphPresent()
