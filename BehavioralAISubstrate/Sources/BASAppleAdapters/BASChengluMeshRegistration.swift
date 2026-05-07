@@ -348,6 +348,16 @@ public extension BASChengluMeshRegistration {
     /// Build a Sendable inference closure from a real MLModel。
     /// Wraps model in unchecked-Sendable box (safe inside the
     /// registry actor's isolation domain at infer time)。
+    /// Build a Sendable inference closure from a real MLModel。
+    /// Uses chapter 三百三二's `makeMultiArrayFeatureProvider`
+    /// path with `BASChengluFeatureEncoder.canonicalKeyOrder`
+    /// because real shipped Chenglu `.mlpackage` files expect
+    /// a single `features: MLMultiArray(shape: [1, 43])` Float32
+    /// input — NOT 43 individual scalar feature entries
+    /// (chapter 三百三四 fix: prior implementation used the
+    /// per-key `makeFeatureProvider` which crashed with
+    /// "Feature features is required but not specified" on
+    /// every real `.mlpackage`)。
     private static func makeMLModelInferenceClosure(
         model: MLModel,
         description: String
@@ -358,8 +368,11 @@ public extension BASChengluMeshRegistration {
         return { frame in
             let startTime = Date()
             let provider = try BASCoreMLLayerHead
-                .makeFeatureProvider(
-                    from: frame.featureValues)
+                .makeMultiArrayFeatureProvider(
+                    values: frame.featureValues,
+                    orderedKeys: BASChengluFeatureEncoder
+                        .canonicalKeyOrder,
+                    featureKey: "features")
             let result = try modelBox.model.prediction(
                 from: provider)
             let scores = BASCoreMLLayerHead.extractScores(
