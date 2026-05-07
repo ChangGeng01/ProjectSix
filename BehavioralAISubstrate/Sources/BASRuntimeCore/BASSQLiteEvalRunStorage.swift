@@ -284,6 +284,95 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
         }
     }
 
+    @discardableResult
+    public func pruneRunsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int {
+        // M897 retention (chapter 三百九七):real DELETE per
+        // chapter 一百二 五级删除。Two-stage:remove reports
+        // first (cascade), then runs。Inside a single
+        // transaction so partial-prune state is impossible。
+        guard let db else {
+            throw StorageError.openFailed(
+                code: -1,
+                message: "db handle nil after init")
+        }
+        try Self.runExec(db: db, sql: "BEGIN TRANSACTION;")
+        do {
+            try Self.deleteOldReports(
+                db: db, cutoff: cutoff)
+            let removed = try Self.deleteOldRuns(
+                db: db, cutoff: cutoff)
+            try Self.runExec(db: db, sql: "COMMIT;")
+            return removed
+        } catch {
+            try? Self.runExec(db: db, sql: "ROLLBACK;")
+            throw error
+        }
+    }
+
+    fileprivate static func deleteOldReports(
+        db: OpaquePointer,
+        cutoff: Int64
+    ) throws {
+        // Remove reports whose baseline OR candidate run is
+        // older than cutoff (referential cleanup)
+        let sql = """
+            DELETE FROM eval_regression_report
+            WHERE baseline_run_id IN (
+                SELECT run_id FROM eval_run
+                WHERE timestamp_ms < ?
+            ) OR candidate_run_id IN (
+                SELECT run_id FROM eval_run
+                WHERE timestamp_ms < ?
+            )
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, cutoff)
+        sqlite3_bind_int64(stmt, 2, cutoff)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    fileprivate static func deleteOldRuns(
+        db: OpaquePointer,
+        cutoff: Int64
+    ) throws -> Int {
+        let sql = """
+            DELETE FROM eval_run
+            WHERE timestamp_ms < ?
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, cutoff)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        return Int(sqlite3_changes(db))
+    }
+
     // MARK: - Schema setup
 
     fileprivate static func ensureSchema(

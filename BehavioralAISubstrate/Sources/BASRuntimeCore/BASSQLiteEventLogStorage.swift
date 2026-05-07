@@ -232,6 +232,52 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         }
     }
 
+    @discardableResult
+    public func pruneEventsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int {
+        // M896 retention (chapter 三百九七):real DELETE per
+        // chapter 一百二 五级删除 + chapter 一百九十一 typed
+        // throw on error。Closes the audit-flagged "no
+        // retention strategy" gap for iPhone hosts running
+        // 8h+ sessions where 11+ GB of accumulated events
+        // would otherwise fill disk silently。
+        guard let db else {
+            throw StorageError.openFailed(
+                code: -1,
+                message: "db handle nil after init")
+        }
+        return try Self.pruneBefore(
+            db: db, cutoff: cutoff)
+    }
+
+    fileprivate static func pruneBefore(
+        db: OpaquePointer,
+        cutoff: Int64
+    ) throws -> Int {
+        let sql = """
+            DELETE FROM event_log
+            WHERE timestamp_ms < ?
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, cutoff)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        return Int(sqlite3_changes(db))
+    }
+
     // MARK: - Schema setup
 
     fileprivate static func ensureSchema(

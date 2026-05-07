@@ -286,6 +286,114 @@ final class BASEventLogTests: XCTestCase {
             "review for any production event_log databases on disk")
     }
 
+    // MARK: - M896 retention policy (chapter 三百九七)
+
+    func testM896InMemoryPruneRemovesOldEvents() async throws {
+        let log = BASInMemoryEventLogStorage()
+        for i in 0..<5 {
+            _ = try await log.append(BASEventLogEntry(
+                eventID: "e\(i)",
+                timestampMs: Int64(1_000 + i * 100),
+                kind: .substrateAudit,
+                sessionID: "s",
+                sequenceNumber: 0))
+        }
+        let countBefore = await log.totalCount
+        XCTAssertEqual(countBefore, 5)
+        // Cutoff at 1300 → remove e0 (1000), e1 (1100),
+        // e2 (1200) → 3 events removed
+        let removed = try await log.pruneEventsBefore(
+            timestampMs: 1_300)
+        XCTAssertEqual(removed, 3)
+        let countAfter = await log.totalCount
+        XCTAssertEqual(countAfter, 2)
+        // Surviving events (e3 + e4) still queryable
+        let survivors = await log.events(
+            forSession: "s")
+        XCTAssertEqual(
+            survivors.map { $0.eventID }, ["e3", "e4"])
+    }
+
+    func testM896InMemoryPruneIdempotentOnRePrune()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(BASEventLogEntry(
+            eventID: "e0",
+            timestampMs: 100,
+            kind: .substrateAudit,
+            sessionID: "s",
+            sequenceNumber: 0))
+        let first = try await log.pruneEventsBefore(
+            timestampMs: 50)
+        XCTAssertEqual(first, 0,
+            "No events older than cutoff → 0 removed")
+        let second = try await log.pruneEventsBefore(
+            timestampMs: 50)
+        XCTAssertEqual(second, 0, "Idempotent on re-prune")
+    }
+
+    func testM896SQLitePruneRemovesOldEvents()
+        async throws
+    {
+        let url = try XCTUnwrap(tempURL)
+        let log = try BASSQLiteEventLogStorage(
+            databaseURL: url)
+        for i in 0..<5 {
+            _ = try await log.append(BASEventLogEntry(
+                eventID: "e\(i)",
+                timestampMs: Int64(1_000 + i * 100),
+                kind: .substrateAudit,
+                sessionID: "s",
+                sequenceNumber: 0))
+        }
+        let removed = try await log.pruneEventsBefore(
+            timestampMs: 1_300)
+        XCTAssertEqual(removed, 3,
+            "SQLite prune removes 3 events (e0/e1/e2)")
+        let count = await log.totalCount
+        XCTAssertEqual(count, 2)
+    }
+
+    func testM896RetentionPolicyCutoffComputation() {
+        let policy = BASEventLogRetentionPolicy(
+            maxAgeSec: 3_600)  // 1h
+        let nowMs: Int64 = 10_000_000
+        let cutoff = policy.cutoff(nowMs: nowMs)
+        // 1h = 3600 sec = 3_600_000 ms
+        XCTAssertEqual(cutoff, 10_000_000 - 3_600_000)
+    }
+
+    func testM896RetentionPolicyZeroAgeMeansNoCutoff() {
+        let policy = BASEventLogRetentionPolicy(
+            maxAgeSec: 0)
+        XCTAssertEqual(
+            policy.cutoff(nowMs: 1_000_000), 0,
+            "maxAgeSec=0 means retain everything → cutoff=0")
+    }
+
+    func testM896RetentionPolicyPresets() {
+        XCTAssertEqual(
+            BASEventLogRetentionPolicy.last24Hours.maxAgeSec,
+            24 * 3600)
+        XCTAssertEqual(
+            BASEventLogRetentionPolicy.last24Hours
+                .pruneCadenceSec, 3600)
+        XCTAssertEqual(
+            BASEventLogRetentionPolicy.lastWeek.maxAgeSec,
+            7 * 24 * 3600)
+    }
+
+    func testM896RetentionPolicyMinCadenceClamp() {
+        // Pin:cadence < 60 sec gets clamped up to 60
+        // (prevents host from creating a tight loop that
+        // hammers the DB with prune calls)
+        let policy = BASEventLogRetentionPolicy(
+            maxAgeSec: 100,
+            pruneCadenceSec: 1)
+        XCTAssertEqual(policy.pruneCadenceSec, 60)
+    }
+
     // MARK: - BASEventReplayRunner
 
     func testReplaySessionFoldsEvents() async throws {

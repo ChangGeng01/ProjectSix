@@ -116,6 +116,17 @@ public protocol BASEvalRunStorage: Sendable {
 
     /// Total report count (all baseline-candidate pairs)。
     var totalReportCount: Int { get async }
+
+    /// Chapter 三百九七 / M897 retention:delete runs (and any
+    /// reports referencing them) with `timestampMs < cutoff`。
+    /// Returns count of runs removed。Reports may also be
+    /// removed transitively if they referenced pruned runs。
+    /// Mirrors M896 BASEventLogStorage.pruneEventsBefore semantics
+    /// (chapter 一百二 五级删除 — real DELETE,no tombstone)。
+    @discardableResult
+    func pruneRunsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int
 }
 
 // MARK: - In-memory conformer
@@ -228,6 +239,40 @@ public actor BASInMemoryEvalRunStorage: BASEvalRunStorage {
 
     public var totalReportCount: Int {
         reports.count
+    }
+
+    @discardableResult
+    public func pruneRunsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int {
+        // M897:identify runs to remove,then remove transitive
+        // reports referencing them
+        let oldRunIDs = Set(
+            runs.values
+                .filter { $0.timestampMs < cutoff }
+                .map { $0.runID })
+        guard !oldRunIDs.isEmpty else { return 0 }
+        let removedRunCount = oldRunIDs.count
+
+        for runID in oldRunIDs {
+            runs.removeValue(forKey: runID)
+        }
+        runInsertionOrder.removeAll {
+            oldRunIDs.contains($0)
+        }
+
+        // Cascade-remove any reports referencing pruned runs
+        let staleReportKeys = reports.keys.filter {
+            oldRunIDs.contains($0.baselineRunID)
+                || oldRunIDs.contains($0.candidateRunID)
+        }
+        for key in staleReportKeys {
+            reports.removeValue(forKey: key)
+        }
+        reportInsertionOrder.removeAll {
+            staleReportKeys.contains($0)
+        }
+        return removedRunCount
     }
 
     // MARK: - Internal key

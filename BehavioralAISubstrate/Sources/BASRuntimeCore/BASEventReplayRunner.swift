@@ -87,6 +87,32 @@ public struct BASEventReplayResult<State: Sendable>: Sendable {
 /// Stateless replay engine。Caller passes a typed reducer + initial
 /// state + replay range;runner reads events from the typed
 /// `BASEventLogStorage` and folds them sequentially。
+///
+/// ## Chapter 三百九七 / M898 doctrine pin — cycle-feedback events
+///
+/// M888 introduced synthetic cycle-feedback events (kind:
+/// `.internalSignal`,source:
+/// `knowledge-graph-extract:cycle-feedback`,action prefix:
+/// `cycle-detected:project:`)。The replay runner treats these
+/// events EXACTLY like any other event — they participate in
+/// the reducer fold the same as caller events。
+///
+/// **Determinism contract**: replays of the same event log
+/// (with identical event ordering by sequence number) produce
+/// identical final state,regardless of whether the log
+/// contains synthetic cycle events。This is intentional:
+///   - Cycle events have deterministic eventID (M892:stable
+///     per session+project)
+///   - Their content is reproducible from the same upstream
+///     events that triggered them (so on full re-extraction +
+///     replay,the same events reappear)
+///   - The reducer's behavior on `.internalSignal` events is
+///     deterministic (M842 reducer doesn't read external state)
+///
+/// **No special handling**: the replay runner does NOT filter
+/// out cycle events on replay (they ARE valid signal — a host
+/// that wants raw events only can pre-filter via a Codable
+/// kind check before passing to replay)。
 public enum BASEventReplayRunner {
 
     /// Default cap on `sinceTimestamp` replays when caller doesn't

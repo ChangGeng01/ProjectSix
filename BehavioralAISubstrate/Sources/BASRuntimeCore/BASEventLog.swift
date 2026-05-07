@@ -317,6 +317,78 @@ public protocol BASEventLogStorage: Sendable {
 
     /// Total event count (all sessions)。
     var totalCount: Int { get async }
+
+    /// Chapter 三百九七 / M896 retention policy:delete events
+    /// with `timestampMs < cutoff`。Returns count of rows
+    /// removed。Hosts call this periodically (e.g. once per
+    /// hour) to bound disk / memory growth on long-running
+    /// sessions。
+    ///
+    /// **Doctrine pin** (chapter 一百二 五级删除):this is real
+    /// DELETE,not tombstone。Per the existing event-log
+    /// append-only contract,events should not be deleted
+    /// during a host session — but for storage retention on
+    /// iPhone (where 8h × 600 iter/s = 11 GB without retention)
+    /// it's necessary。Hosts opt in;default behavior is
+    /// retain-everything。
+    ///
+    /// Idempotent on already-pruned cutoff (returns 0)。Older
+    /// events filtered out atomically (storage actor isolation
+    /// guarantees no concurrent reads see partial state)。
+    @discardableResult
+    func pruneEventsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int
+}
+
+// MARK: - Retention policy
+
+/// Typed retention policy hosts attach to a periodic prune
+/// scheduler。Chapter 三百九七 / M896 — closes the audit-flagged
+/// "no retention strategy" gap for long-running iPhone sessions。
+public struct BASEventLogRetentionPolicy:
+    Sendable, Equatable, Hashable
+{
+    /// Maximum age in seconds。Events older than `now - maxAgeSec`
+    /// are eligible for prune。0 = no age limit。
+    public let maxAgeSec: Int64
+
+    /// Optional override of the prune cadence。Hosts that want
+    /// to drive prune themselves can ignore this and call
+    /// `pruneEventsBefore(...)` on their own schedule。Default
+    /// 3600 sec (1 hour)。
+    public let pruneCadenceSec: Int64
+
+    public init(
+        maxAgeSec: Int64,
+        pruneCadenceSec: Int64 = 3_600
+    ) {
+        self.maxAgeSec = max(0, maxAgeSec)
+        self.pruneCadenceSec = max(60, pruneCadenceSec)
+    }
+
+    /// Common preset:keep last 24 hours,prune hourly。
+    /// Suitable for iPhone hosts running stress / observation
+    /// sessions but not long-term audit ledgers。
+    public static let last24Hours =
+        BASEventLogRetentionPolicy(
+            maxAgeSec: 24 * 3600,
+            pruneCadenceSec: 3600)
+
+    /// Common preset:keep last 7 days,prune every 6 hours。
+    public static let lastWeek =
+        BASEventLogRetentionPolicy(
+            maxAgeSec: 7 * 24 * 3600,
+            pruneCadenceSec: 6 * 3600)
+
+    /// Compute the cutoff timestamp for a host calling
+    /// `pruneEventsBefore(...)` at `nowMs`。Returns the
+    /// timestamp boundary;events with `timestampMs < cutoff`
+    /// should be pruned。
+    public func cutoff(nowMs: Int64) -> Int64 {
+        guard maxAgeSec > 0 else { return 0 }
+        return nowMs - (maxAgeSec * 1000)
+    }
 }
 
 // MARK: - In-memory conformer (default / test)
@@ -407,5 +479,25 @@ public actor BASInMemoryEventLogStorage: BASEventLogStorage {
 
     public var totalCount: Int {
         entries.count
+    }
+
+    @discardableResult
+    public func pruneEventsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int {
+        // M896 retention:filter-out events older than cutoff
+        let beforeCount = entries.count
+        entries.removeAll { $0.timestampMs < cutoff }
+        let removed = beforeCount - entries.count
+        if removed > 0 {
+            // Rebuild idIndex to match new entries set
+            idIndex = Set(entries.map { $0.eventID })
+            // Note:sessionSequenceCounters intentionally NOT
+            // reset。Sequence numbers continue monotonically
+            // from where they were,so future appends in the
+            // same session don't collide with already-emitted
+            // sequence numbers (preserved in audit downstream)。
+        }
+        return removed
     }
 }

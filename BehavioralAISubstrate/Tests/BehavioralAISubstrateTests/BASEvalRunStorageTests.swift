@@ -252,6 +252,58 @@ final class BASInMemoryEvalRunStorageTests: XCTestCase {
         XCTAssertEqual(results.map { $0.baselineRunID },
             ["b1", "b2", "b3"])
     }
+
+    // MARK: - M897 prune retention (chapter 三百九七)
+
+    func testM897PruneRemovesOldRunsAndCascadesReports()
+        async throws
+    {
+        let store = BASInMemoryEvalRunStorage()
+        // Old runs (timestamp < cutoff)
+        _ = try await store.append(makeRun(
+            runID: "old-1", timestampMs: 100))
+        _ = try await store.append(makeRun(
+            runID: "old-2", timestampMs: 200))
+        // New runs (timestamp >= cutoff)
+        _ = try await store.append(makeRun(
+            runID: "new-1", timestampMs: 1_500))
+        _ = try await store.append(makeRun(
+            runID: "new-2", timestampMs: 2_000))
+
+        // Reports referencing OLD runs (should cascade-delete)
+        _ = try await store.appendReport(
+            makeReport(
+                baselineRunID: "old-1",
+                candidateRunID: "old-2"),
+            timestampMs: 250)
+        // Report referencing OLD baseline + NEW candidate
+        // (should cascade because baseline is being pruned)
+        _ = try await store.appendReport(
+            makeReport(
+                baselineRunID: "old-1",
+                candidateRunID: "new-1"),
+            timestampMs: 1_500)
+        // Report referencing only NEW runs (should survive)
+        _ = try await store.appendReport(
+            makeReport(
+                baselineRunID: "new-1",
+                candidateRunID: "new-2"),
+            timestampMs: 2_000)
+
+        // Prune cutoff = 1000 → removes old-1 + old-2
+        let removed = try await store.pruneRunsBefore(
+            timestampMs: 1_000)
+        XCTAssertEqual(removed, 2,
+            "2 old runs removed (old-1 + old-2)")
+
+        let runCount = await store.totalRunCount
+        XCTAssertEqual(runCount, 2,
+            "2 new runs remain")
+        let reportCount = await store.totalReportCount
+        XCTAssertEqual(reportCount, 1,
+            "Only the all-new report (new-1, new-2) survives;" +
+            " 2 reports referencing pruned runs cascaded out")
+    }
 }
 
 // MARK: - SQLite tests
