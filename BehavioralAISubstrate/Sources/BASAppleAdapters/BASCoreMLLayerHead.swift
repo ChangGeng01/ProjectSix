@@ -167,6 +167,23 @@ public extension BASCoreMLLayerHead {
     /// Returns a freshly-constructed actor instance. Caller
     /// retains the result; closure capture of `MLModel` is
     /// handled via internal Sendable box.
+    ///
+    /// **DEPRECATED in chapter 三百三五 / M822**: this factory
+    /// uses the per-key `makeFeatureProvider` path which **does
+    /// NOT work** with the real shipped Chenglu `.mlpackage`
+    /// files (chapter 三百三二 / M819 reality check). All 5
+    /// chapter 三百二一 Chenglu adapters now construct their
+    /// own inferenceClosure directly via
+    /// `makeMultiArrayFeatureProvider(values:orderedKeys:
+    /// featureKey:)` and bypass this method entirely。
+    ///
+    /// Kept as deprecated public API for any external host that
+    /// already calls it AND knows their model expects per-key
+    /// scalar inputs。**For real Chenglu model integration use
+    /// the chapter 三百二一 adapter factories** (e.g.
+    /// `BASChengluPreflightAdapter.make(model:)`) — those route
+    /// through the correct MLMultiArray path。
+    @available(*, deprecated, message: "Per-key feature provider doesn't match real Chenglu .mlpackage shape. Use chapter 三百二一 Chenglu adapter factories (BASChengluPreflightAdapter.make(model:) etc.) which route through makeMultiArrayFeatureProvider. See chapter 三百三二 / M819 reality check.")
     static func makeFromMLModel(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
@@ -208,8 +225,23 @@ public extension BASCoreMLLayerHead {
     }
 
     /// Build an `MLDictionaryFeatureProvider` from a Sendable
-    /// `[String: Double]` dictionary。Helper exposed at the
-    /// type level so factory namespaces can reuse it。
+    /// `[String: Double]` dictionary,with one `MLFeatureValue
+    /// (double:)` per key。
+    ///
+    /// **Use case**:CoreML models trained to consume named
+    /// scalar features (one input port per feature)。Less common
+    /// than the MLMultiArray-batched shape produced by sklearn /
+    /// coremltools' default conversion path。
+    ///
+    /// **NOT compatible with real shipped Chenglu `.mlpackage`
+    /// files** (chapter 一百七十七+) — those expect a single
+    /// `features` MLMultiArray input。Use
+    /// `makeMultiArrayFeatureProvider(values:orderedKeys:
+    /// featureKey:)` for those。
+    ///
+    /// Kept public for hosts with custom CoreML models that DO
+    /// use per-key scalar inputs (legacy / non-sklearn-trained
+    /// models)。
     static func makeFeatureProvider(
         from values: [String: Double]
     ) throws -> MLFeatureProvider {
