@@ -1,0 +1,248 @@
+// MARK: - BASCognitiveOSCompletionDoctrine — chapter 三百八四 / M872
+//
+// ADR-016: codifies the cognitive OS substrate completion state
+// after the M859-M870 12-commit run。Replaces the floating audit
+// notes in commit messages with a typed,grep-able doctrine
+// surface that downstream code can pin against。
+//
+// ## Why this exists
+//
+// Pre-M872 the "what's done vs what's external" answer lived in
+// commit-message text + scattered TODO comments。Hosts wanting
+// to know whether G6 tool calling is ready couldn't query a
+// typed surface — they had to grep commits or read M858 audit
+// notes。M872 ships the typed enum so the answer is one
+// `BASCognitiveOSGap.allCases.first { $0.status == .external }`
+// query away。
+//
+// ## What this ships
+//
+//   - `BASCognitiveOSGap` typed enum naming each G1-G13 roadmap
+//     gap from chapter 三百五三 / M840
+//   - `BASCognitiveOSGapStatus` typed enum (.substrateClosed /
+//     .substrateClosedSDKBridgePending / .external)
+//   - `BASCognitiveOSCompletionDoctrine` namespace with typed
+//     queries (`status(of:)`, `closedGaps()`, `externalGaps()`)
+//
+// ## Doctrine pins held
+//
+// - 不变量 #1 / #2 / #3 全保 — doctrine is observation only
+// - chapter 二百一一 single-source-of-truth — ONE typed surface
+//   for completion state;commit messages defer to this file
+// - chapter 一百八十五 anti-magic-number — every gap has a typed
+//   case + named status,no inline strings in consumer code
+// - ADR-014 OPT-IN — doctrine names the contract;hosts that
+//   don't query stay unaffected
+// - ADR-016 (this file) — substrate completion is now
+//   programmatically queryable
+
+import Foundation
+
+// MARK: - Status
+
+/// Typed status of a cognitive OS gap per the M840 roadmap +
+/// M858 audit + M859-M870 closure run。
+public enum BASCognitiveOSGapStatus:
+    String, Sendable, Equatable, Hashable, CaseIterable, Codable
+{
+    /// Substrate work fully closed at this commit。Hosts can
+    /// opt in to the primitives via the bundle / builder /
+    /// convenience helpers shipped under M859+。
+    case substrateClosed = "substrate-closed"
+
+    /// Substrate work fully closed,but the iOS 26 SDK bridge
+    /// (e.g. FoundationModels Tool conformer) hasn't been wired
+    /// at the API call site yet。M870 emits a typed audit signal
+    /// (`afm-tools-dropped-no-sdk-bridge`) so this state is
+    /// LOUD,not silent。
+    case substrateClosedSDKBridgePending =
+        "substrate-closed-sdk-bridge-pending"
+
+    /// Genuinely external — cannot be done at substrate level。
+    /// Examples:Python training pipelines,physical device
+    /// validation,external toolchain conversions。
+    case external = "external"
+
+    /// Environmental (toolchain / Xcode-version) issue。Not
+    /// fixable at the substrate level — depends on toolchain
+    /// updates。
+    case environmental = "environmental"
+}
+
+// MARK: - Gap
+
+/// Typed enum naming each cognitive OS gap from M840 P1-P3
+/// roadmap。Extensible via String raw value (chapter 八十七
+/// raw value stability — bumping requires audit migration)。
+public enum BASCognitiveOSGap:
+    String, Sendable, Equatable, Hashable, CaseIterable, Codable
+{
+    // MARK: - P1 (foundation)
+
+    /// G1 — event-sourced event log + SQLite persistence
+    case g1EventLog = "g1-event-log"
+
+    /// G2 — BASUserState reducer + store + SQLite persistence
+    case g2UserState = "g2-user-state"
+
+    /// G3 — constitution gate (hardNoGo + softCaution +
+    /// restrictedDomains)
+    case g3ConstitutionGate = "g3-constitution-gate"
+
+    /// G4 — vector RAG end-to-end (in-memory + SQLite preload)
+    case g4VectorRAG = "g4-vector-rag"
+
+    /// G5 — layer actor factories (L2/L3/L5 M848 + L9/L10/L13
+    /// /L14 M855 + L7 M870)
+    case g5LayerFactories = "g5-layer-factories"
+
+    /// G6 — AFM typed tool calling primitives + outputSchema +
+    /// constitution gate
+    case g6AFMToolCalling = "g6-afm-tool-calling"
+
+    /// G7 — active verifier permit upgrade (decision logic +
+    /// composer)
+    case g7ActiveVerifier = "g7-active-verifier"
+
+    // MARK: - P2 (intelligence)
+
+    /// G8 — Mamba SSM integration (training pipeline external)
+    case g8MambaSSM = "g8-mamba-ssm"
+
+    /// G9 — knowledge graph + cycle detection + extractor
+    /// (heuristics 1-7) + SQLite persistence
+    case g9KnowledgeGraph = "g9-knowledge-graph"
+
+    /// G10 — cognitive OS layer actors (L9/L10/L13/L14 M855)
+    case g10LayerActors = "g10-layer-actors"
+
+    /// G11 — MLX → CoreML conversion pipeline
+    case g11MLXCoreML = "g11-mlx-coreml"
+
+    // MARK: - P3 (eval)
+
+    /// G12 — auto eval harness (typed primitives + SQLite
+    /// storage + orchestration actor + regression detection)
+    case g12AutoEval = "g12-auto-eval"
+
+    /// G13 — Mamba-2/3 frontier research (P3 deferred)
+    case g13MambaFrontier = "g13-mamba-frontier"
+}
+
+// MARK: - Completion doctrine
+
+/// ADR-016 typed query namespace。Single source of truth for
+/// cognitive OS completion state per chapter 三百八四 / M872。
+public enum BASCognitiveOSCompletionDoctrine {
+
+    /// Doctrine version。Bumped when a gap changes status (eg.
+    /// G6 transitions from `substrateClosedSDKBridgePending`
+    /// to `substrateClosed` once the SDK bridge ships)。
+    public static let doctrineVersion: String = "ADR-016.M872"
+
+    /// Query the typed status of a specific gap。
+    public static func status(
+        of gap: BASCognitiveOSGap
+    ) -> BASCognitiveOSGapStatus {
+        switch gap {
+        // P1 foundation — all closed at substrate level
+        case .g1EventLog,
+             .g2UserState,
+             .g3ConstitutionGate,
+             .g4VectorRAG,
+             .g5LayerFactories,
+             .g7ActiveVerifier:
+            return .substrateClosed
+
+        // G6 typed primitives shipped (M851/M852/M853);AFM
+        // SDK Tool conformer bridge pending iOS 26 stabilization。
+        // M870 makes the gap LOUD via audit suffix。
+        case .g6AFMToolCalling:
+            return .substrateClosedSDKBridgePending
+
+        // P2 intelligence
+        case .g9KnowledgeGraph,
+             .g10LayerActors:
+            return .substrateClosed
+
+        case .g8MambaSSM:
+            // Python training pipeline + GPU + corpus —
+            // genuinely external work,not substrate
+            return .external
+
+        case .g11MLXCoreML:
+            // External toolchain (mlx → coreml conversion CLI)
+            return .external
+
+        // P3 eval
+        case .g12AutoEval:
+            // M861 typed primitives + M863 SQLite persistence
+            // + M864 orchestration actor
+            return .substrateClosed
+
+        case .g13MambaFrontier:
+            // P3 research deferred per M840 roadmap
+            return .external
+        }
+    }
+
+    /// All gaps with `substrateClosed` status (hosts can opt in
+    /// today)。
+    public static func closedGaps() -> [BASCognitiveOSGap] {
+        BASCognitiveOSGap.allCases.filter {
+            status(of: $0) == .substrateClosed
+        }
+    }
+
+    /// All gaps with `substrateClosedSDKBridgePending` status —
+    /// substrate ready,SDK call site needs the bridge wired
+    /// when iOS 26 SDK stabilizes。
+    public static func sdkBridgePendingGaps()
+        -> [BASCognitiveOSGap]
+    {
+        BASCognitiveOSGap.allCases.filter {
+            status(of: $0)
+                == .substrateClosedSDKBridgePending
+        }
+    }
+
+    /// All genuinely external gaps (cannot be done at substrate
+    /// level — Python pipelines,external toolchain,device
+    /// validation)。
+    public static func externalGaps() -> [BASCognitiveOSGap] {
+        BASCognitiveOSGap.allCases.filter {
+            status(of: $0) == .external
+        }
+    }
+
+    /// All environmental gaps (toolchain / Xcode-version issues
+    /// not fixable at substrate level)。Currently empty — the
+    /// known BASMLXAdapter macros plugin issue is documented
+    /// inline in MLXLoRATrainer.swift but is not a "gap" in
+    /// the M840 roadmap sense (it's a build environment issue,
+    /// not an unshipped capability)。
+    public static func environmentalGaps()
+        -> [BASCognitiveOSGap]
+    {
+        BASCognitiveOSGap.allCases.filter {
+            status(of: $0) == .environmental
+        }
+    }
+
+    /// Closure ratio — fraction of P1-P3 gaps that are closed
+    /// at substrate level (counts substrateClosed +
+    /// substrateClosedSDKBridgePending toward closure since
+    /// those are substrate-tractable;counts external +
+    /// environmental against)。
+    public static func substrateClosureRatio() -> Double {
+        let total = Double(BASCognitiveOSGap.allCases.count)
+        guard total > 0 else { return 0 }
+        let closedCount = Double(
+            BASCognitiveOSGap.allCases.filter { gap in
+                let s = status(of: gap)
+                return s == .substrateClosed
+                    || s == .substrateClosedSDKBridgePending
+            }.count)
+        return closedCount / total
+    }
+}
