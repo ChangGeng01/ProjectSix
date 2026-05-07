@@ -21,9 +21,48 @@ struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
         hostContext: BASHostProfile,
         budget: BASBudgetFrame
     ) -> BASMemoryBundle {
-        let recordAtoms = projection.records.prefix(budget.retrievalDepth).map(memoryAtom(from:))
-        let eventAtoms = projection.recentEvents.prefix(max(0, budget.retrievalDepth - recordAtoms.count)).map(memoryAtom(from:))
+        // Chapter 三百五六 / M843 G3 Layer 3: filter retrieved
+        // candidates by `boundaryVeil.restrictedMemoryDomains[]`
+        // before mapping to atoms。Hosts without a constitution
+        // (or with empty restrictedMemoryDomains) see zero
+        // behavior change (ADR-014 OPT-IN doctrine)。
+        //
+        // Match shape: case-insensitive substring containment of
+        // any boundary entry in the candidate's `sourceType`
+        // (records) or first tag (events)。
+        let restrictedDomains = hostConstitution?
+            .boundaryVeil.restrictedMemoryDomains ?? []
+
+        let recordCandidates = projection.records
+            .prefix(budget.retrievalDepth)
+        let recordFiltered = BASConstitutionEnforcer
+            .filterMemoryDomains(
+                recordCandidates.map { record in
+                    (domain: record.sourceType,
+                     payload: record)
+                },
+                restrictedMemoryDomains: restrictedDomains)
+        let recordAtoms = recordFiltered.allowed
+            .map(memoryAtom(from:))
+
+        let eventCandidates = projection.recentEvents
+            .prefix(max(
+                0, budget.retrievalDepth - recordAtoms.count))
+        let eventFiltered = BASConstitutionEnforcer
+            .filterMemoryDomains(
+                eventCandidates.map { event in
+                    (domain: event.entrySourceID
+                        ?? event.kind.rawValue,
+                     payload: event)
+                },
+                restrictedMemoryDomains: restrictedDomains)
+        let eventAtoms = eventFiltered.allowed
+            .map(memoryAtom(from:))
+
         let atoms = Array(recordAtoms) + Array(eventAtoms)
+        let droppedReasonCodes =
+            recordFiltered.droppedReasonCodes
+            + eventFiltered.droppedReasonCodes
 
         return BASMemoryBundle(
             atoms: atoms,
@@ -34,6 +73,7 @@ struct BASHostRuntimeEBrainMemoryService: BASMemoryServicing {
                     + [currentBrain.boundaryMode.rawValue]
                     + currentBrain.riskFlags.map(\.rawValue)
                     + constitutionRetrievalTags()
+                    + droppedReasonCodes
             ),
             conflictRefs: atoms.filter(\.frozen).map(\.memoryID),
             activeHostVersion: hostContext.activeVersion,
