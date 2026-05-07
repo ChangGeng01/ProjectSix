@@ -89,13 +89,23 @@ final class BASChengluHostRuntimeBuilderTests: XCTestCase {
             .build(
                 configuration: makeMinimalConfiguration(),
                 chengluClosures: makeAllClosuresOptions())
-        // Runtime's meshRegistry must be the same reference as
-        // bundle.registry (single-source-of-truth doctrine).
-        // Actor identity check via ObjectIdentifier-equivalent
-        // by invoking same registry through runtime path:
+        // Runtime's meshRegistry must be the same actor
+        // instance as bundle.registry (single-source-of-truth
+        // doctrine)。
+        //
+        // Chapter 三百三七 / M824 fix: previous version only
+        // verified count + non-nil — a builder bug that
+        // accidentally created two registries with identical
+        // contents would have passed。This version uses Swift
+        // actor `===` identity to pin same-instance。
+        XCTAssertNotNil(bundle.runtime.meshRegistry)
+        XCTAssertTrue(
+            bundle.registry === bundle.runtime.meshRegistry,
+            "Bundle.registry and bundle.runtime.meshRegistry " +
+            "MUST be the same actor instance " +
+            "(single-source-of-truth doctrine — chapter 二百一一)")
         let totalCount = await bundle.registry.totalHeadCount
         XCTAssertEqual(totalCount, 8)
-        XCTAssertNotNil(bundle.runtime.meshRegistry)
     }
 
     // MARK: - Actor priority order

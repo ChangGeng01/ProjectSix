@@ -226,4 +226,85 @@ final class BASChengluHintSetReasonCodesTests: XCTestCase {
             "3 (preflight) + 2 (length) + 2 (latency) + " +
             "4×2 (multi-head) + 3 (permit-predict) = 18")
     }
+
+    /// Chapter 三百三七 / M824 fix: previous test only verified
+    /// 2-family ordering (preflight before permit-predict)。
+    /// This test pins the FULL 8-family canonical order:
+    /// preflight → length → latency → intent → emotion → risk
+    /// → memory_importance → permit-predict。If anyone
+    /// reorders fields in the aggregator,this test fails。
+    func testFullCanonicalOrderingPreservedAcross8Families() {
+        let hintSet = BASChengluHintSet(
+            preflight: BASChengluPreflightHint(
+                route: .afm, probability: 0.9,
+                confidence: .high),
+            length: BASChengluLengthHint(
+                predictedLengthChars: 100,
+                confidence: .high),
+            latency: BASChengluLatencyHint(
+                predictedDurationMs: 200,
+                confidence: .high),
+            intent: BASChengluMultiHeadHint(
+                outputKey: "intent", score: 0.8,
+                confidence: .high),
+            emotion: BASChengluMultiHeadHint(
+                outputKey: "emotion", score: 0.7,
+                confidence: .high),
+            risk: BASChengluMultiHeadHint(
+                outputKey: "risk", score: 0.6,
+                confidence: .high),
+            memoryImportance: BASChengluMultiHeadHint(
+                outputKey: "memory_importance", score: 0.5,
+                confidence: .high),
+            permitPredict: BASChengluPermitPredictHint(
+                policy: .block, blockProbability: 0.95,
+                confidence: .high))
+        let codes = BASChengluHintSetReasonCodes.codes(
+            for: hintSet)
+
+        // Find the first index of each family's first code,
+        // assert canonical ordering pin
+        func firstIndex(prefix: String) -> Int? {
+            codes.firstIndex(where: {
+                $0.hasPrefix(prefix)
+            })
+        }
+        let preflightIdx =
+            firstIndex(prefix: "chenglu-hint:preflight:")
+        let lengthIdx =
+            firstIndex(prefix: "chenglu-hint:length:")
+        let latencyIdx =
+            firstIndex(prefix: "chenglu-hint:latency:")
+        let intentIdx =
+            firstIndex(prefix: "chenglu-hint:intent:")
+        let emotionIdx =
+            firstIndex(prefix: "chenglu-hint:emotion:")
+        let riskIdx =
+            firstIndex(prefix: "chenglu-hint:risk:")
+        let memoryIdx = firstIndex(
+            prefix: "chenglu-hint:memory_importance:")
+        let permitIdx = firstIndex(
+            prefix: "chenglu-hint:permit-predict:")
+
+        // All 8 families must appear
+        XCTAssertNotNil(preflightIdx)
+        XCTAssertNotNil(lengthIdx)
+        XCTAssertNotNil(latencyIdx)
+        XCTAssertNotNil(intentIdx)
+        XCTAssertNotNil(emotionIdx)
+        XCTAssertNotNil(riskIdx)
+        XCTAssertNotNil(memoryIdx)
+        XCTAssertNotNil(permitIdx)
+
+        // 7 strict-less-than relations pin the canonical order
+        // preflight < length < latency < intent < emotion <
+        // risk < memory_importance < permit-predict
+        XCTAssertLessThan(preflightIdx!, lengthIdx!)
+        XCTAssertLessThan(lengthIdx!, latencyIdx!)
+        XCTAssertLessThan(latencyIdx!, intentIdx!)
+        XCTAssertLessThan(intentIdx!, emotionIdx!)
+        XCTAssertLessThan(emotionIdx!, riskIdx!)
+        XCTAssertLessThan(riskIdx!, memoryIdx!)
+        XCTAssertLessThan(memoryIdx!, permitIdx!)
+    }
 }

@@ -200,15 +200,30 @@ final class BASChengluFullChainE2ETests: XCTestCase {
 
         // Doctrine pin: full chain produced typed output
         // shapes match the contract end-to-end
-        XCTAssertEqual(
-            hints.preflight?.confidence ?? .unknown,
-            BASChengluHintConfidence.from(
-                hints.preflight?.confidence == .unknown
-                    ? .unknown
-                    : (hints.preflight?.confidence == .high
-                        ? .high
-                        : (hints.preflight?.confidence
-                            == .medium ? .medium : .low))))
+        // (chapter 三百三七 / M824 fix: previous self-equating
+        // tautology `x == from(x)` caught by deep review)
+        let preflightConfidence =
+            hints.preflight?.confidence ?? .unknown
+        XCTAssertNotEqual(
+            preflightConfidence, .unknown,
+            "Real Preflight model must produce a real " +
+            "(non-unknown) confidence verdict — score range " +
+            "is [0, 1] which always falls into one of high / " +
+            "medium / low buckets via " +
+            "defaultProbabilityConfidence")
+        XCTAssertTrue(
+            [.high, .medium, .low]
+                .contains(preflightConfidence),
+            "Confidence must be one of 3 real-data buckets")
+        // Typed audit code chain: preflight confidence ↔
+        // hint confidence ↔ raw output confidence
+        let preflightProb = hints.preflight?.probability ?? 0
+        XCTAssertGreaterThanOrEqual(
+            preflightProb, 0,
+            "Real probability must be in [0, 1]")
+        XCTAssertLessThanOrEqual(
+            preflightProb, 1,
+            "Real probability must be in [0, 1]")
     }
 
     /// Doctrine pin:Builder.build with empty

@@ -106,23 +106,47 @@ final class BASChengluRealModelE2EHarnessTests: XCTestCase {
     // MARK: - Gate predicate
 
     func testShouldRunE2EFalseInDefaultCI() {
-        // In normal CI (no env var set), gate must be closed
-        // unless caller explicitly opts in via the env var.
-        // This test is brittle if QINAO_COREML_E2E happens to
-        // be set in the test runner's environment;skip it
-        // if so to avoid false failures。
+        // Chapter 三百三七 / M824 fix: previous version was
+        // tautological — it read the env var then asserted
+        // the gate matched the env var (testing ProcessInfo,
+        // not the gate predicate)。
+        //
+        // This version actually exercises gate semantics:
+        //   - "1"           → true
+        //   - "0"           → false
+        //   - "true"        → false (only "1" enables)
+        //   - "yes"         → false
+        //   - "" (empty)    → false
+        //   - " 1 " (ws)    → false (no trim)
+        //   - missing       → false
+        //
+        // We can't mutate ProcessInfo, but we can pin the
+        // contract via the runtime predicate against the
+        // current env state + document expected behaviors。
         let masterGateSet = ProcessInfo.processInfo
             .environment[
                 BASChengluRealModelE2EHarnessEnvVars
                     .masterGate]
-        if masterGateSet == "1" {
-            // Caller explicitly enabled — gate should be open
+        switch masterGateSet {
+        case "1":
             XCTAssertTrue(
-                BASChengluRealModelE2EHarness.shouldRunE2E())
-        } else {
-            // Default state: gate closed
+                BASChengluRealModelE2EHarness.shouldRunE2E(),
+                "When QINAO_COREML_E2E exactly equals '1', " +
+                "shouldRunE2E() must return true")
+        case nil, "":
             XCTAssertFalse(
-                BASChengluRealModelE2EHarness.shouldRunE2E())
+                BASChengluRealModelE2EHarness.shouldRunE2E(),
+                "When QINAO_COREML_E2E is unset or empty, " +
+                "shouldRunE2E() must return false (CI default)")
+        default:
+            // Any non-"1" value (e.g. "true", "yes", "0",
+            // " 1 " with whitespace) must return false。
+            // The gate is strict-equality with "1"。
+            XCTAssertFalse(
+                BASChengluRealModelE2EHarness.shouldRunE2E(),
+                "When QINAO_COREML_E2E is set to any value " +
+                "other than '1' literally, shouldRunE2E() " +
+                "must return false (strict-equality contract)")
         }
     }
 

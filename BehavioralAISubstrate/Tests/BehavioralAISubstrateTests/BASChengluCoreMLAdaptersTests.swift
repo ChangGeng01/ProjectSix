@@ -259,26 +259,61 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
     func testMultiHeadAdapterUsesSpecifiedOutputKey()
         async throws
     {
-        let head = BASChengluMultiHeadAdapter.makeWithClosure(
-            headID: "test.multihead.intent",
-            layerIDPin: .l4,
-            outputKey: BASChengluMultiHeadAdapter.intentKey,
-            inferenceClosure: { _ in
-                BASCoreMLPredictionFrame(
-                    scores: [
-                        "intent": 0.85,
-                        "emotion": 0.20,
-                        "risk": 0.40,
-                        "memory_importance": 0.60
-                    ],
-                    inferenceLatencyMs: 0.3)
-            })
-        let output = try await head.infer(
+        // Chapter 三百三七 / M824 fix: previous version only
+        // checked reasonCode strings — would pass even if
+        // adapter ignored outputKey and always used "intent"。
+        // This version constructs TWO adapters with different
+        // outputKey values from the SAME inference closure
+        // (returns same multi-output frame),then asserts that
+        // each adapter's confidence + reason code reflects its
+        // specific outputKey's score。
+        let scores: [String: Double] = [
+            "intent": 0.95,            // → high confidence
+            "emotion": 0.50,           // → low (= midpoint)
+            "risk": 0.40,              // → medium
+            "memory_importance": 0.60  // → low
+        ]
+        let sharedClosure:
+            @Sendable (BASCoreMLFeatureFrame) async throws
+                -> BASCoreMLPredictionFrame = { _ in
+            BASCoreMLPredictionFrame(
+                scores: scores,
+                inferenceLatencyMs: 0.3)
+        }
+        let intentHead = BASChengluMultiHeadAdapter
+            .makeWithClosure(
+                headID: "intent-head",
+                layerIDPin: .l4,
+                outputKey: "intent",
+                inferenceClosure: sharedClosure)
+        let emotionHead = BASChengluMultiHeadAdapter
+            .makeWithClosure(
+                headID: "emotion-head",
+                layerIDPin: .l4,
+                outputKey: "emotion",
+                inferenceClosure: sharedClosure)
+
+        let intentOutput = try await intentHead.infer(
             input: makeInput(layerID: .l4))
-        // Multi-head reasonCodes must include output key
-        XCTAssertTrue(output.reasonCodes.contains(
+        let emotionOutput = try await emotionHead.infer(
+            input: makeInput(layerID: .l4))
+
+        // Different outputKeys must produce DIFFERENT
+        // confidence + reason codes from same inference frame
+        XCTAssertNotEqual(
+            intentOutput.confidence,
+            emotionOutput.confidence,
+            "Different outputKey values against the same " +
+            "inference frame must produce DIFFERENT confidence " +
+            "outcomes (intent=0.95→.high vs emotion=0.50→.low)")
+        XCTAssertEqual(intentOutput.confidence, .high)
+        XCTAssertEqual(emotionOutput.confidence, .low)
+        XCTAssertTrue(intentOutput.reasonCodes.contains(
             "coreml-output-key:intent"))
-        XCTAssertTrue(output.reasonCodes.contains(
+        XCTAssertTrue(emotionOutput.reasonCodes.contains(
+            "coreml-output-key:emotion"))
+        // Original assertions preserved for backward compat:
+        XCTAssertTrue(intentOutput.reasonCodes.contains(
             "coreml-head:chenglu-multihead"))
     }
 

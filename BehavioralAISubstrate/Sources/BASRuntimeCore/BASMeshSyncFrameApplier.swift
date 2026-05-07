@@ -258,7 +258,20 @@ public enum BASMeshSyncFrameApplier {
         for diff in diffs {
             switch diff.conflict {
             case .identical:
+                // Chapter 三百三七 / M824 fix: deep review
+                // caught that `.identical` slots silently
+                // bumped `appliedCount`,conflating "would be
+                // applied" with "no change needed"。Hosts
+                // reading appliedCount couldn't distinguish。
+                //
+                // Fix: still bump appliedCount (preserves the
+                // schema contract — applied means converged
+                // state),BUT also emit an explicit reason
+                // code distinguishing this from real
+                // "applied-from-remote" cases。
                 appliedCount += 1
+                reasonCodes.append(
+                    "mesh-sync:no-change:\(diff.headID)")
             case .remoteHasUnknownHead:
                 skippedCount += 1
                 reasonCodes.append(
