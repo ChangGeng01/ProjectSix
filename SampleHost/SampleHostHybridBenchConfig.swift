@@ -104,6 +104,29 @@ struct HybridBenchConfig: Codable, Sendable, Equatable {
         ///   - 不变量 #2 (神经不掌权) held — substrate's
         ///     production decisions unchanged
         case rawLLM = "raw-llm"
+        /// Chapter 三百五二 / M839 — Gemma-only force mode (ADR-006
+        /// extension). Closes the chapter 三百五一 self-review
+        /// finding: `.rawLLM` 8h runs in practice route 99%+ to
+        /// AFM (router preflight strongly biased), so Gemma 8h
+        /// endurance is never validated。This mode forces
+        /// `dispatchPolicy = .localOnly` (Gemma-only path) so an
+        /// 8h run actually exercises Gemma sustained inference
+        /// for endurance + thermal characterization。
+        ///
+        /// Doctrine pin (same as .rawLLM, ADR-006):
+        ///   - substrate STILL runs (audit accumulates)
+        ///   - permitMode STILL recorded in row
+        ///   - dispatchPolicy is FORCED to .localOnly bypassing
+        ///     substrate's permit gate AND router prediction
+        ///   - Gemma (MLX local) fires per iter regardless of
+        ///     router probability — even when router predicts
+        ///     "afm" with prob 0.998, Gemma path is taken
+        ///   - Resulting data is OBSERVABILITY ONLY,never feeds
+        ///     production permit decisions or router retrain
+        ///     in a way that would distort production distribution
+        ///   - Red line 7 (HINT-ONLY observability) held
+        ///   - 不变量 #2 (神经不掌权) held
+        case forceGemma = "force-gemma"
     }
     var durationHours: Double
     var strideRotationCSV: String

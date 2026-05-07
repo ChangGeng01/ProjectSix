@@ -102,18 +102,35 @@ enum SampleHostHybridDispatchPolicy: String, Sendable {
     }
 
     /// Combined derive: chapter 一百七十八 permit-mode mapping +
-    /// chapter 二百八 (`.rawLLM`, ADR-006) bench-observability bypass.
+    /// chapter 二百八 (`.rawLLM`, ADR-006) bench-observability bypass +
+    /// chapter 三百五二 (`.forceGemma`, ADR-006 extension) Gemma-only
+    /// endurance bypass.
     ///
     /// `forceSingleLLM`: when `true`, returns `.singleLLM` regardless
     /// of `permitMode`. chapter 二百八 (`.rawLLM` smokeMode) sets
     /// this so AFM/Gemma always fire — bench OBSERVABILITY ONLY,
     /// data never feeds production permit decisions (ADR-006).
-    /// Default `false` preserves chapter 一百七十八 substrate-
-    /// authoritative behavior for non-`.rawLLM` smoke modes.
+    ///
+    /// `forceGemma`: when `true`, returns `.localOnly` regardless of
+    /// `permitMode` AND regardless of `forceSingleLLM`。chapter
+    /// 三百五二 (`.forceGemma` smokeMode) sets this so Gemma fires
+    /// every iter,enabling 8h Gemma endurance validation that
+    /// `.rawLLM` could not deliver (router preflight biased toward
+    /// AFM in practice → 99%+ AFM routes,Gemma 8h untested)。
+    /// Same ADR-006 doctrine: bench OBSERVABILITY ONLY。
+    ///
+    /// Precedence: `forceGemma` wins over `forceSingleLLM` if both
+    /// flags are set (caller error,but we defend by picking the
+    /// more specific override)。Default both `false` preserves
+    /// chapter 一百七十八 substrate-authoritative behavior。
     static func derive(
         permitMode: String,
-        forceSingleLLM: Bool = false
+        forceSingleLLM: Bool = false,
+        forceGemma: Bool = false
     ) -> Self {
+        if forceGemma {
+            return .localOnly
+        }
         if forceSingleLLM {
             return .singleLLM
         }

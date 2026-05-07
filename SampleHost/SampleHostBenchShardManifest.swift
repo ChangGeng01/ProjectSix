@@ -45,6 +45,90 @@ struct SampleHostBenchShardManifest: Codable, Sendable, Equatable {
     let driftSigmaThreshold: Double
     let mutationProbability: Double
     let checkpointEveryNIters: Int
+
+    // MARK: - Chapter 三百五二 / M839 additions
+    //
+    // Optional for backwards-compat: pre-M839 manifests (yesterday's
+    // 2h run, all the iphone-hybrid-bench/manifest.json files in the
+    // wild) decode with these as nil。Newer readers can still summarize
+    // legacy data by treating nil phase as `.completed`。
+
+    /// Phase at the moment manifest was written:
+    ///   - `"completed"` = clean 8h finish
+    ///   - `"cancelled"` = user pressed Stop mid-run
+    ///   - nil = legacy (pre-M839) manifest
+    let phase: String?
+
+    /// Chapter / M-number tag of the build that produced this run。
+    /// Helps cross-reference manifest data against commit SHAs。
+    /// nil = legacy manifest written before this field existed。
+    let buildChapter: String?
+
+    /// `true` if the run was cancelled mid-loop。Convenience for
+    /// quick filtering — same info as `phase == "cancelled"`。
+    /// nil = legacy manifest written before this field existed。
+    let cancelled: Bool?
+
+    /// Chapter 三百五二 / M839: explicit init with default-nil
+    /// values for the new fields。Lets pre-M839 call sites
+    /// continue working without naming the new fields,while
+    /// the M839 hybrid bench end-of-run path explicitly passes
+    /// `phase` / `buildChapter` / `cancelled`。
+    init(
+        benchID: String,
+        startTimeIso: String,
+        endTimeIso: String,
+        totalIters: Int,
+        totalShards: Int,
+        smokeMode: String,
+        durationHours: Double,
+        mutationSeedCount: Int,
+        strideCSV: String,
+        afmOk: Int,
+        gemmaOk: Int,
+        bothFailed: Int,
+        routerHits: Int,
+        routerMisses: Int,
+        stuckSubstrates: Int,
+        stuckLLMs: Int,
+        pauseSkipped: Int,
+        adversarialFired: Int,
+        driftAlarms: Int,
+        anomalyWindowSize: Int,
+        driftSigmaThreshold: Double,
+        mutationProbability: Double,
+        checkpointEveryNIters: Int,
+        phase: String? = nil,
+        buildChapter: String? = nil,
+        cancelled: Bool? = nil
+    ) {
+        self.benchID = benchID
+        self.startTimeIso = startTimeIso
+        self.endTimeIso = endTimeIso
+        self.totalIters = totalIters
+        self.totalShards = totalShards
+        self.smokeMode = smokeMode
+        self.durationHours = durationHours
+        self.mutationSeedCount = mutationSeedCount
+        self.strideCSV = strideCSV
+        self.afmOk = afmOk
+        self.gemmaOk = gemmaOk
+        self.bothFailed = bothFailed
+        self.routerHits = routerHits
+        self.routerMisses = routerMisses
+        self.stuckSubstrates = stuckSubstrates
+        self.stuckLLMs = stuckLLMs
+        self.pauseSkipped = pauseSkipped
+        self.adversarialFired = adversarialFired
+        self.driftAlarms = driftAlarms
+        self.anomalyWindowSize = anomalyWindowSize
+        self.driftSigmaThreshold = driftSigmaThreshold
+        self.mutationProbability = mutationProbability
+        self.checkpointEveryNIters = checkpointEveryNIters
+        self.phase = phase
+        self.buildChapter = buildChapter
+        self.cancelled = cancelled
+    }
 }
 
 actor SampleHostBenchShardManifestStore {

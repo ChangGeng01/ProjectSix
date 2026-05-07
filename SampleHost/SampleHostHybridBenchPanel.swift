@@ -49,8 +49,19 @@ struct SampleHostHybridBenchPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Hybrid 8h bench (router + AFM⇄Gemma fallback)")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Hybrid 8h bench (router + AFM⇄Gemma fallback)")
+                        .font(.headline)
+                    // Chapter 三百五二 / M839: surface the build
+                    // chapter tag so operator can verify which
+                    // version is on-device before launching an
+                    // 8h run。Closes the chapter 三百五一 finding
+                    // that "M838 fix not verified" — operator
+                    // can now read the tag from the UI directly。
+                    Text("build: \(SampleHostHybridBenchEntry.buildChapterTag)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
                 Spacer()
                 Button(model.hybridBenchIsRunning ? "Stop" : "Start") {
                     if model.hybridBenchIsRunning {
@@ -210,6 +221,19 @@ struct SampleHostHybridBenchPanel: View {
                         // used for production permit decisions.
                         Text("raw")
                             .tag(HybridBenchConfig.SmokeMode.rawLLM)
+                        // Chapter 三百五二 / M839 — force-Gemma mode
+                        // (ADR-006 extension)。Closes the chapter
+                        // 三百五一 self-review finding: 56-min
+                        // raw-llm 8h validation routed 99%+ to AFM
+                        // (router preflight biased) → Gemma 8h
+                        // endurance was never tested。 This mode
+                        // FORCES dispatchPolicy to .localOnly so
+                        // Gemma fires every iter,bypassing both
+                        // substrate permit gate AND router
+                        // prediction。Same ADR-006 doctrine pin:
+                        // observability ONLY,never permit。
+                        Text("Gemma")
+                            .tag(HybridBenchConfig.SmokeMode.forceGemma)
                     }
                     .pickerStyle(.segmented)
                     .disabled(model.hybridBenchIsRunning)

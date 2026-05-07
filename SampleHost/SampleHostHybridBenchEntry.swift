@@ -46,6 +46,20 @@ import BASHostKit
 import UIKit
 #endif
 
+// MARK: - Build chapter tag (chapter 三百五二 / M839)
+
+/// Single-source-of-truth for the build chapter tag used by:
+///   - The hybrid bench panel header (visible to operator)
+///   - The shard manifest's `buildChapter` field (persisted to disk)
+///
+/// Chapter 一百八十五 anti-magic-number: tag must match the M-number
+/// of the most recent commit that materially altered hybrid bench
+/// runtime behavior。Bump when shipping changes that affect data
+/// recorded in JSONL or aggregated in manifest。
+enum SampleHostHybridBenchEntry {
+    static let buildChapterTag: String = "M839"
+}
+
 extension SampleHostModel {
     func startHybridBench() {
         guard !hybridBenchIsRunning else { return }
@@ -119,6 +133,18 @@ extension SampleHostModel {
         hybridBenchStartTime = Date()
         hybridBenchOutputPath = SampleHostBenchHelpers
             .hybridBenchOutputDirURL().path
+
+        // Chapter 三百五一 / M838: keep screen on for the whole
+        // 8h hybrid bench。Without this, iOS auto-locks → app
+        // suspends → bench halts mid-iter (LLM token generation
+        // gets killed, substrate gate stalls)。Mirrors the
+        // SampleHostLegacyBenchEntry.swift:64 + chapter 三百五〇 /
+        // M837 SampleHostChengluStressRunner pattern。
+        // Restored in the matching block at end-of-run (~line 738)
+        // and in stopHybridBench()。
+        #if canImport(UIKit)
+        UIApplication.shared.isIdleTimerDisabled = true
+        #endif
 
         let runtime = self.runtime
         // M718 chapter 一百九十二 — anomaly watcher (fresh per-bench).
@@ -377,7 +403,8 @@ extension SampleHostModel {
                 let dispatchPolicy =
                     SampleHostHybridDispatchPolicy.derive(
                         permitMode: permitMode,
-                        forceSingleLLM: smokeMode == .rawLLM)
+                        forceSingleLLM: smokeMode == .rawLLM,
+                        forceGemma: smokeMode == .forceGemma)
 
                 // chapter 二百四十 — typed read-back of permit-
                 // predict + agreement (chapter 一百七十九 / M635 +
@@ -689,39 +716,65 @@ extension SampleHostModel {
             }
             await runner.close()
             // M733 chapter 一百九十四 — write shard manifest at
-            // clean-finish for fast replay summary.
-            if self.hybridBenchGeneration == myGen {
-                let outDir = SampleHostBenchHelpers
-                    .hybridBenchOutputDirURL()
-                let shardCount = sampleHostBenchCountShards(in: outDir)
-                let manifest = SampleHostBenchShardManifest(
-                    benchID: benchStartIso,
-                    startTimeIso: benchStartIso,
-                    endTimeIso: SampleHostBenchHelpers
-                        .iso8601(Date()),
-                    totalIters: iter,
-                    totalShards: shardCount,
-                    smokeMode: self.hybridBenchSmokeMode.rawValue,
-                    durationHours: durationHoursCaptured,
-                    mutationSeedCount: mutationCountCaptured,
-                    strideCSV: strideCSVCaptured,
-                    afmOk: self.hybridBenchAFMOk,
-                    gemmaOk: self.hybridBenchGemmaOk,
-                    bothFailed: self.hybridBenchBothFailed,
-                    routerHits: self.hybridBenchRouterHits,
-                    routerMisses: self.hybridBenchRouterMisses,
-                    stuckSubstrates: self.hybridBenchStuckSubstrateCount,
-                    stuckLLMs: self.hybridBenchStuckLLMCount,
-                    pauseSkipped: self.hybridBenchPauseSkippedCount,
-                    adversarialFired: self.hybridBenchAdversarialFiredCount,
-                    driftAlarms: self.hybridBenchDriftAlarmCount,
-                    anomalyWindowSize: anomalyWindowCaptured,
-                    driftSigmaThreshold: driftThresholdCaptured,
-                    mutationProbability: mutationProbCaptured,
-                    checkpointEveryNIters: checkpointEveryNCaptured)
-                try? await SampleHostBenchShardManifestStore
-                    .shared.write(manifest)
-            }
+            // bench end for fast replay summary。
+            //
+            // **Chapter 三百五二 / M839 fix**: manifest write is
+            // now OUTSIDE the gen guard so cancelled runs ALSO
+            // get a manifest written (with phase: "cancelled").
+            // Pre-M839 behavior: gen-guard skipped manifest on
+            // cancel → user pressed Stop → 56 min of bench data
+            // had no manifest summary,operator had to walk all
+            // JSONL rows to aggregate counts。
+            //
+            // The race-safety story (M779 chapter 二百七 origin):
+            // gen-guard prevents stale isRunning=false writes
+            // when a fast restart bumps generation。Manifest
+            // write doesn't have the same race because:
+            //   - Cancelled task's manifest write fires within
+            //     seconds of the cancel observation (mid-LLM call
+            //     finishes,loop sees Task.isCancelled,exits)
+            //   - New task's manifest write only fires at end of
+            //     ITS run (typically 8h later)
+            //   - So cancelled writes first,new task overwrites
+            //     8h later — manifest always reflects "last run
+            //     that finished",matching user intent。
+            let wasCancelled = Task.isCancelled
+            let manifestPhase: String =
+                wasCancelled ? "cancelled" : "completed"
+            let outDir = SampleHostBenchHelpers
+                .hybridBenchOutputDirURL()
+            let shardCount = sampleHostBenchCountShards(in: outDir)
+            let manifest = SampleHostBenchShardManifest(
+                benchID: benchStartIso,
+                startTimeIso: benchStartIso,
+                endTimeIso: SampleHostBenchHelpers
+                    .iso8601(Date()),
+                totalIters: iter,
+                totalShards: shardCount,
+                smokeMode: self.hybridBenchSmokeMode.rawValue,
+                durationHours: durationHoursCaptured,
+                mutationSeedCount: mutationCountCaptured,
+                strideCSV: strideCSVCaptured,
+                afmOk: self.hybridBenchAFMOk,
+                gemmaOk: self.hybridBenchGemmaOk,
+                bothFailed: self.hybridBenchBothFailed,
+                routerHits: self.hybridBenchRouterHits,
+                routerMisses: self.hybridBenchRouterMisses,
+                stuckSubstrates: self.hybridBenchStuckSubstrateCount,
+                stuckLLMs: self.hybridBenchStuckLLMCount,
+                pauseSkipped: self.hybridBenchPauseSkippedCount,
+                adversarialFired: self.hybridBenchAdversarialFiredCount,
+                driftAlarms: self.hybridBenchDriftAlarmCount,
+                anomalyWindowSize: anomalyWindowCaptured,
+                driftSigmaThreshold: driftThresholdCaptured,
+                mutationProbability: mutationProbCaptured,
+                checkpointEveryNIters: checkpointEveryNCaptured,
+                phase: manifestPhase,
+                buildChapter: SampleHostHybridBenchEntry
+                    .buildChapterTag,
+                cancelled: wasCancelled)
+            try? await SampleHostBenchShardManifestStore
+                .shared.write(manifest)
             // M722 chapter 一百九十二 — clean-finish checkpoint
             // wipe so a fresh launch does not see a stale snap.
             // (Crash-mid-bench leaves checkpoint untouched, which
@@ -736,6 +789,13 @@ extension SampleHostModel {
             if self.hybridBenchGeneration == myGen {
                 self.hybridBenchIsRunning = false
             }
+            // Chapter 三百五一 / M838: restore screen-lock。Pair
+            // with the `= true` set in startHybridBench()。
+            // Idempotent — `stopHybridBench()` may also restore,
+            // setting it false twice is harmless。
+            #if canImport(UIKit)
+            UIApplication.shared.isIdleTimerDisabled = false
+            #endif
         }
     }
 
@@ -757,6 +817,15 @@ extension SampleHostModel {
         hybridBenchTask?.cancel()
         hybridBenchTask = nil
         hybridBenchIsRunning = false
+        // Chapter 三百五一 / M838: restore screen-lock immediately
+        // on stop。The task's own restore (in defer-equivalent at
+        // ~line 738) also fires when it exits the loop,but
+        // setting it false here gives instant visual feedback +
+        // covers the case where task is mid-LLM-call and takes
+        // seconds to observe cancellation。Idempotent。
+        #if canImport(UIKit)
+        UIApplication.shared.isIdleTimerDisabled = false
+        #endif
     }
 
 }

@@ -48,6 +48,10 @@ struct SampleHostChengluStressPanel: View {
                 statsBlock
             }
 
+            if let savedPath = runner.lastSavedRelativePath {
+                savedPathBlock(savedPath)
+            }
+
             if !runner.progressLog.isEmpty {
                 logBlock
             }
@@ -88,10 +92,12 @@ struct SampleHostChengluStressPanel: View {
         HStack {
             Text("Duration:")
             Picker("", selection: $selectedDuration) {
-                Text("60s smoke").tag(60.0)
-                Text("5 min").tag(300.0)
-                Text("20 min").tag(1200.0)
-                Text("60 min").tag(3600.0)
+                Text("60s").tag(60.0)
+                Text("2m").tag(120.0)
+                Text("5m").tag(300.0)
+                Text("20m").tag(1200.0)
+                Text("60m").tag(3600.0)
+                Text("8h").tag(28800.0)
             }
             .pickerStyle(.segmented)
             .disabled(runner.isRunning)
@@ -171,6 +177,29 @@ struct SampleHostChengluStressPanel: View {
             Text(value).foregroundStyle(color)
                 .fontWeight(.semibold)
         }
+    }
+
+    /// Chapter 三百四九 / M836: surface the persisted JSON file
+    /// path so the result can be retrieved via `xcrun devicectl
+    /// device copy from`。
+    @ViewBuilder
+    private func savedPathBlock(
+        _ relativePath: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("💾 Saved (latest + history):")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text("Documents/\(relativePath)")
+                .font(.system(.caption2,
+                    design: .monospaced))
+                .textSelection(.enabled)
+                .foregroundStyle(.green)
+                .lineLimit(2)
+        }
+        .padding(8)
+        .background(.quaternary.opacity(0.5),
+            in: RoundedRectangle(cornerRadius: 8))
     }
 
     @ViewBuilder

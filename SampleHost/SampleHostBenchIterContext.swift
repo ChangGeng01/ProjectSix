@@ -144,7 +144,11 @@ struct SampleHostBenchIterContext: Sendable, Equatable {
                     pressureProfile = "heavy-tail-\(p.layerName)"
                 }
                 return p
-            case .canonical, .benign, .rawLLM:
+            case .canonical, .benign, .rawLLM, .forceGemma:
+                // Chapter 三百五二 / M839: `.forceGemma` uses
+                // canonical signature catalog like `.rawLLM` —
+                // smoke mode only changes dispatch policy not
+                // the prompt distribution。
                 return nil
             }
         }()

@@ -1,4 +1,5 @@
 // MARK: - SampleHostChengluStressRunner — chapter 三百三九 / M826
+//                                       + chapter 三百四九 / M836
 //
 // iPhone-side sustained stress runner for the附录 X Chenglu mesh
 // chain。Mirrors `BASChenglu20MinStressTests` (chapter 三百三八)
@@ -8,10 +9,28 @@
 //
 // Closes v9 §8 non-promise #4 (production deployment validation)
 // for opt-in real-iPhone testing。
+//
+// **Chapter 三百四九 / M836**: persist final run result as JSON
+// to `Documents/chenglu-stress-runs/` so the data survives after
+// the in-memory `@Published` state goes away (panel dismiss /
+// app background)。Two files written per run:
+//   - `latest.json` — overwritten each run for easy retrieval
+//   - `run-<ISO timestamp>.json` — append-only history
+//
+// Retrieval pattern (from a Mac with the device paired):
+//   xcrun devicectl device copy from \
+//     --device <UDID> \
+//     --domain-type appDataContainer \
+//     --domain-identifier com.changgeng.samplehost \
+//     --source Documents/chenglu-stress-runs/latest.json \
+//     --destination /tmp/latest.json
 
 import CoreML
 import Foundation
 import BASHostKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @MainActor
 final class SampleHostChengluStressRunner: ObservableObject {
@@ -39,6 +58,11 @@ final class SampleHostChengluStressRunner: ObservableObject {
     @Published private(set) var statusLine: String = "Idle"
     @Published private(set) var progressLog: [String] = []
 
+    /// Chapter 三百四九 / M836: relative file path under app's
+    /// Documents directory where the most recent finished run was
+    /// persisted。`nil` until at least one run has finished。
+    @Published private(set) var lastSavedRelativePath: String?
+
     private var stressTask: Task<Void, Never>?
 
     // MARK: - Doctrine constants
@@ -53,6 +77,19 @@ final class SampleHostChengluStressRunner: ObservableObject {
 
         /// Re-verify determinism baseline every N iterations。
         static let determinismCheckInterval: Int = 1000
+
+        /// Chapter 三百五〇 / M837: persist a checkpoint every
+        /// N seconds wall-clock during a run so a crash mid-8h
+        /// doesn't lose all data。
+        static let checkpointPersistIntervalSec: Double = 60
+
+        /// Chapter 三百五〇 / M837: capture per-minute throughput
+        /// + p99 sample for drift detection over long runs。
+        static let timeSeriesIntervalSec: Double = 60
+
+        /// Chapter 三百五〇 / M837: ring buffer size for
+        /// `recentAvgMs` window。
+        static let recentLatencyWindow: Int = 100
     }
 
     // MARK: - Public API
@@ -143,11 +180,29 @@ final class SampleHostChengluStressRunner: ObservableObject {
 
         // Step 4: sustained loop
         status = .running
+
+        // Chapter 三百五〇 / M837: keep screen on during run。
+        // Without this,iOS auto-locks → screen black → app
+        // suspends after a few seconds → ANE inference stalls。
+        // Restored in defer block at end-of-run。
+        #if canImport(UIKit)
+        UIApplication.shared.isIdleTimerDisabled = true
+        defer {
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        #endif
+
         var localIter: Int = 0
         var localFail: Int = 0
         var localMismatch: Int = 0
-        var latenciesMs: [Double] = []
-        latenciesMs.reserveCapacity(2_000_000)
+
+        // Chapter 三百五〇 / M837: replace `[Double]` (138MB at
+        // 17M samples for 8h run) with histogram + ring buffer。
+        //   - histogram: ~15KB,O(1) per record,O(K) for percentile
+        //   - ring buffer: 100 doubles for recentAvgMs window
+        var histogram = LatencyHistogram()
+        var recentRing = RecentLatencyRing(
+            capacity: Constants.recentLatencyWindow)
 
         let clock = ContinuousClock()
         let runStart = clock.now
@@ -160,6 +215,18 @@ final class SampleHostChengluStressRunner: ObservableObject {
         // 20-min stress with deterministic failure mode would
         // hide the failure pattern entirely。
         var failureBreakdown: [String: Int] = [:]
+
+        // Chapter 三百五〇 / M837: per-minute time series for
+        // drift detection over long runs。8h × 60min = 480 pts。
+        var perMinuteThroughput: [Double] = []
+        var perMinuteP99Ms: [Double] = []
+        var nextMinuteMarkSec: Double =
+            Constants.timeSeriesIntervalSec
+        var iterAtLastMark: Int = 0
+
+        // Chapter 三百五〇 / M837: periodic checkpoint persistence。
+        var nextCheckpointSec: Double =
+            Constants.checkpointPersistIntervalSec
 
         while clock.now < runDeadline {
             if Task.isCancelled { break }
@@ -192,11 +259,6 @@ final class SampleHostChengluStressRunner: ObservableObject {
                 localFail += 1
                 let errKey = "\(error)"
                 failureBreakdown[errKey, default: 0] += 1
-                // Chapter 三百四七 / M834: log first 3 + every
-                // 1000th + emit aggregated breakdown at end-of-
-                // run。Previous version only logged first 5
-                // → 20-min stress with deterministic failure
-                // mode hid the pattern entirely。
                 if localFail <= 3
                     || localFail % 1000 == 0
                 {
@@ -208,7 +270,8 @@ final class SampleHostChengluStressRunner: ObservableObject {
             let dur = iterStart.duration(to: clock.now)
             let iterMs = Double(dur.components.seconds) * 1000
                 + Double(dur.components.attoseconds) / 1e15
-            latenciesMs.append(iterMs)
+            histogram.record(iterMs)
+            recentRing.record(iterMs)
             localIter += 1
 
             // Per-100-iteration UI update
@@ -221,22 +284,72 @@ final class SampleHostChengluStressRunner: ObservableObject {
                     Double(elapsedDur.components.seconds)
                     + Double(elapsedDur.components.attoseconds)
                     / 1e18
-                let recentLat = latenciesMs.suffix(
-                    Constants.progressLogInterval)
-                let recentAvg = recentLat.reduce(0, +)
-                    / Double(recentLat.count)
                 self.iterations = localIter
                 self.failures = localFail
                 self.determinismMismatches = localMismatch
                 self.elapsedSeconds = elapsedSec
                 self.throughput =
                     Double(localIter) / elapsedSec
-                self.recentAvgMs = recentAvg
+                self.recentAvgMs = recentRing.avg
                 self.statusLine = String(
                     format: "iter %d / %.1fs / %.1f i/s / " +
                         "avg %.2fms",
                     localIter, elapsedSec, throughput,
-                    recentAvg)
+                    recentRing.avg)
+
+                // Per-minute time series capture
+                if elapsedSec >= nextMinuteMarkSec {
+                    let minuteIters =
+                        localIter - iterAtLastMark
+                    let minuteThroughput =
+                        Double(minuteIters)
+                        / Constants.timeSeriesIntervalSec
+                    perMinuteThroughput.append(
+                        minuteThroughput)
+                    perMinuteP99Ms.append(
+                        histogram.percentile(0.99))
+                    iterAtLastMark = localIter
+                    nextMinuteMarkSec +=
+                        Constants.timeSeriesIntervalSec
+                }
+
+                // Periodic checkpoint persistence
+                if elapsedSec >= nextCheckpointSec {
+                    let checkpoint = StressRunResult(
+                        schemaVersion: StressRunResult
+                            .currentSchemaVersion,
+                        buildChapter: "M837",
+                        phase: .checkpoint,
+                        timestamp: Date(),
+                        requestedDurationSeconds:
+                            durationSeconds,
+                        elapsedSeconds: elapsedSec,
+                        iterations: localIter,
+                        failures: localFail,
+                        determinismMismatches: localMismatch,
+                        throughput: throughput,
+                        p50Ms: histogram.percentile(0.50),
+                        p95Ms: histogram.percentile(0.95),
+                        p99Ms: histogram.percentile(0.99),
+                        recentAvgMs: recentRing.avg,
+                        baselineSignature: baselineSignature,
+                        registrationComplete: bundle
+                            .registrationReport.isComplete,
+                        missingMLModels: bundle
+                            .registrationReport
+                            .missingMLModels,
+                        failureBreakdown: failureBreakdown,
+                        progressLog: progressLog,
+                        perMinuteThroughput:
+                            perMinuteThroughput,
+                        perMinuteP99Ms: perMinuteP99Ms,
+                        device: StressRunResult.DeviceInfo
+                            .current(),
+                        cancelled: false)
+                    _ = try? Self.persistResult(checkpoint)
+                    nextCheckpointSec +=
+                        Constants.checkpointPersistIntervalSec
+                }
             }
         }
 
@@ -245,13 +358,9 @@ final class SampleHostChengluStressRunner: ObservableObject {
         let totalSec = Double(totalDur.components.seconds)
             + Double(totalDur.components.attoseconds) / 1e18
         let throughputFinal = Double(localIter) / totalSec
-        let sortedLat = latenciesMs.sorted()
-        let p50 = sortedLat.isEmpty ? 0
-            : sortedLat[sortedLat.count / 2]
-        let p95 = sortedLat.isEmpty ? 0
-            : sortedLat[Int(Double(sortedLat.count) * 0.95)]
-        let p99 = sortedLat.isEmpty ? 0
-            : sortedLat[Int(Double(sortedLat.count) * 0.99)]
+        let p50 = histogram.percentile(0.50)
+        let p95 = histogram.percentile(0.95)
+        let p99 = histogram.percentile(0.99)
 
         self.iterations = localIter
         self.failures = localFail
@@ -288,6 +397,49 @@ final class SampleHostChengluStressRunner: ObservableObject {
                     "(in \(sortedBreakdown.count - 10) types)")
             }
         }
+
+        // Chapter 三百四九 / M836 + 三百五〇 / M837: persist final
+        // run result as JSON。Once the panel dismisses,
+        // @Published state vanishes and run data is unrecoverable。
+        // Persistence keeps it for retrieval via
+        // `xcrun devicectl device copy from`。
+        let cancelled = Task.isCancelled
+        let result = StressRunResult(
+            schemaVersion: StressRunResult.currentSchemaVersion,
+            buildChapter: "M837",
+            phase: cancelled ? .cancelled : .final,
+            timestamp: Date(),
+            requestedDurationSeconds: durationSeconds,
+            elapsedSeconds: totalSec,
+            iterations: localIter,
+            failures: localFail,
+            determinismMismatches: localMismatch,
+            throughput: throughputFinal,
+            p50Ms: p50,
+            p95Ms: p95,
+            p99Ms: p99,
+            recentAvgMs: self.recentAvgMs,
+            baselineSignature: baselineSignature,
+            registrationComplete:
+                bundle.registrationReport.isComplete,
+            missingMLModels: bundle.registrationReport
+                .missingMLModels,
+            failureBreakdown: failureBreakdown,
+            progressLog: progressLog,
+            perMinuteThroughput: perMinuteThroughput,
+            perMinuteP99Ms: perMinuteP99Ms,
+            device: StressRunResult.DeviceInfo.current(),
+            cancelled: cancelled)
+        do {
+            let saved = try Self.persistResult(result)
+            self.lastSavedRelativePath = saved.relativePath
+            appendLog(
+                "💾 saved → " +
+                "Documents/\(saved.relativePath)")
+        } catch {
+            appendLog("⚠️ persist failed: \(error)")
+        }
+
         status = .finished
     }
 
@@ -411,6 +563,260 @@ final class SampleHostChengluStressRunner: ObservableObject {
             progressLog.removeFirst(
                 progressLog.count - 200)
         }
+    }
+
+    // MARK: - Persistence (chapter 三百四九 / M836)
+
+    /// Persist a finished run result to two locations:
+    ///   - `Documents/chenglu-stress-runs/latest.json`
+    ///     (overwritten each run — easy retrieval point)
+    ///   - `Documents/chenglu-stress-runs/run-<iso>.json`
+    ///     (append-only history)
+    ///
+    /// Returns the relative path (under Documents) of the
+    /// timestamped history file。Caller surfaces it via UI for
+    /// `xcrun devicectl device copy from` retrieval。
+    nonisolated static func persistResult(
+        _ result: StressRunResult
+    ) throws -> (
+        latestPath: URL,
+        historyPath: URL,
+        relativePath: String
+    ) {
+        let docs = try FileManager.default.url(
+            for: .documentDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true)
+        let dir = docs.appendingPathComponent(
+            "chenglu-stress-runs", isDirectory: true)
+        if !FileManager.default.fileExists(
+            atPath: dir.path)
+        {
+            try FileManager.default.createDirectory(
+                at: dir,
+                withIntermediateDirectories: true)
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [
+            .prettyPrinted, .sortedKeys
+        ]
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(result)
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [
+            .withInternetDateTime,
+            .withDashSeparatorInDate,
+            .withColonSeparatorInTime
+        ]
+        let stamp = isoFormatter
+            .string(from: result.timestamp)
+            .replacingOccurrences(of: ":", with: "-")
+        let historyName = "run-\(stamp).json"
+        let history = dir.appendingPathComponent(
+            historyName)
+        let latest = dir.appendingPathComponent(
+            "latest.json")
+        try data.write(to: history, options: .atomic)
+        try data.write(to: latest, options: .atomic)
+        return (
+            latestPath: latest,
+            historyPath: history,
+            relativePath:
+                "chenglu-stress-runs/\(historyName)")
+    }
+}
+
+// MARK: - StressRunResult (Codable, persisted to disk)
+
+/// Codable record of a stress run (checkpoint or final)。
+/// Schema-versioned for forward-compat。Schema 1.1.0 (chapter
+/// 三百五〇 / M837) added `phase`, `perMinuteThroughput`,
+/// `perMinuteP99Ms` for 8h drift detection + checkpoint support。
+struct StressRunResult: Codable, Equatable, Sendable {
+    static let currentSchemaVersion: String = "1.1.0"
+
+    /// Lifecycle phase at the moment this record was persisted。
+    /// `checkpoint` = mid-run periodic save (every 60s wall-clock)。
+    /// `final` = end-of-run normal completion。
+    /// `cancelled` = user-cancelled mid-run。
+    enum Phase: String, Codable, Sendable {
+        case checkpoint
+        case final
+        case cancelled
+    }
+
+    let schemaVersion: String
+    /// Chapter / M-number tag of the build that produced this
+    /// run。Helps cross-reference results against commit SHAs。
+    let buildChapter: String
+    let phase: Phase
+
+    let timestamp: Date
+    let requestedDurationSeconds: Double
+    let elapsedSeconds: Double
+
+    let iterations: Int
+    let failures: Int
+    let determinismMismatches: Int
+    let throughput: Double
+
+    let p50Ms: Double
+    let p95Ms: Double
+    let p99Ms: Double
+    let recentAvgMs: Double
+
+    let baselineSignature: String
+    let registrationComplete: Bool
+    let missingMLModels: [String]
+
+    let failureBreakdown: [String: Int]
+    let progressLog: [String]
+
+    /// Chapter 三百五〇 / M837: per-minute throughput sample
+    /// captured every `timeSeriesIntervalSec` wall-clock seconds。
+    /// 8h run yields up to 480 entries。Empty for runs shorter
+    /// than the first sample interval。
+    let perMinuteThroughput: [Double]
+
+    /// Chapter 三百五〇 / M837: per-minute p99 latency sample
+    /// (cumulative-up-to-this-minute,not a sliding window)。
+    /// Tracks drift in upper-tail latency over time。
+    let perMinuteP99Ms: [Double]
+
+    let device: DeviceInfo
+    let cancelled: Bool
+
+    struct DeviceInfo: Codable, Equatable, Sendable {
+        let model: String
+        let systemName: String
+        let systemVersion: String
+        let identifierForVendor: String?
+
+        @MainActor
+        static func current() -> DeviceInfo {
+            #if canImport(UIKit)
+            let device = UIDevice.current
+            return DeviceInfo(
+                model: device.model,
+                systemName: device.systemName,
+                systemVersion: device.systemVersion,
+                identifierForVendor: device
+                    .identifierForVendor?.uuidString)
+            #else
+            return DeviceInfo(
+                model: "unknown",
+                systemName: "unknown",
+                systemVersion: "unknown",
+                identifierForVendor: nil)
+            #endif
+        }
+    }
+}
+
+// MARK: - LatencyHistogram (chapter 三百五〇 / M837)
+
+/// O(1)-record / O(K)-percentile histogram for sustained-run
+/// latency tracking。Replaces the prior `[Double]` array which
+/// would consume ~138MB at 17M samples (8h × 600 i/s)。
+///
+/// **Bucket scheme**:
+///   - 0..999 = bucket [i*0.1, (i+1)*0.1) ms — 0.1ms resolution
+///     covering 0-100ms (typical Chenglu mesh sweep range)
+///   - 1000 = overflow ≥ 100ms (thermal throttle / GC pause /
+///     anomaly bucket — exact ms lost above 100ms)
+///
+/// **Memory**: 1001 × 8 bytes Int = 8KB total, regardless of
+/// sample count。
+struct LatencyHistogram: Sendable, Equatable {
+    /// Public for testability。`buckets[1000]` is the overflow
+    /// counter for ≥ 100ms samples。
+    private(set) var buckets: [Int]
+    private(set) var totalCount: Int = 0
+    private(set) var sumMs: Double = 0
+
+    static let bucketCount: Int = 1001
+    static let bucketWidthMs: Double = 0.1
+    static let maxResolvedMs: Double = 100.0
+
+    init() {
+        self.buckets = Array(
+            repeating: 0, count: Self.bucketCount)
+    }
+
+    mutating func record(_ ms: Double) {
+        let bucketIdx: Int
+        if ms < 0 {
+            bucketIdx = 0
+        } else if ms >= Self.maxResolvedMs {
+            bucketIdx = Self.bucketCount - 1
+        } else {
+            bucketIdx = Int(ms / Self.bucketWidthMs)
+        }
+        buckets[bucketIdx] += 1
+        totalCount += 1
+        sumMs += max(ms, 0)
+    }
+
+    var avgMs: Double {
+        totalCount > 0
+            ? sumMs / Double(totalCount)
+            : 0
+    }
+
+    /// Compute the percentile from cumulative bucket counts。
+    /// Returns the LOWER edge of the bucket containing the
+    /// percentile cutoff (consistent with sorted-array indexing
+    /// `sorted[Int(count * p)]`)。Overflow bucket returns
+    /// `maxResolvedMs` (e.g. 100.0) as the lower bound — caller
+    /// reads this as ">= 100ms"。
+    func percentile(_ p: Double) -> Double {
+        guard totalCount > 0 else { return 0 }
+        let target = Int(Double(totalCount) * p)
+        var cumulative = 0
+        for (idx, count) in buckets.enumerated() {
+            cumulative += count
+            if cumulative > target {
+                if idx == Self.bucketCount - 1 {
+                    return Self.maxResolvedMs
+                }
+                return Double(idx) * Self.bucketWidthMs
+            }
+        }
+        return Self.maxResolvedMs
+    }
+}
+
+// MARK: - RecentLatencyRing (chapter 三百五〇 / M837)
+
+/// Fixed-capacity ring buffer for the `recentAvgMs` window。
+/// Replaces `array.suffix(N).reduce(0,+)` which required keeping
+/// the full latency history in an Array。
+struct RecentLatencyRing: Sendable {
+    private var buffer: [Double]
+    private var head: Int = 0
+    private(set) var count: Int = 0
+
+    init(capacity: Int) {
+        precondition(capacity > 0,
+            "RecentLatencyRing capacity must be > 0")
+        self.buffer = Array(
+            repeating: 0, count: capacity)
+    }
+
+    mutating func record(_ ms: Double) {
+        buffer[head] = ms
+        head = (head + 1) % buffer.count
+        if count < buffer.count { count += 1 }
+    }
+
+    var avg: Double {
+        guard count > 0 else { return 0 }
+        let sum = buffer.prefix(count)
+            .reduce(0.0, +)
+        return sum / Double(count)
     }
 }
 
