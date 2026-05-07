@@ -17,6 +17,50 @@ struct BASHostRuntimeEBrainRiskService: BASRiskServicing {
     let tuning: BASEBrainRuntimeSynthesisPolicy
     let hostConstitution: BASHostConstitution?
 
+    // MARK: - Chapter 三百五七 / M844 — G3 Layer 1 (hardNoGo) helper
+
+    /// Pure-function helper: if `prompt` matches any
+    /// `boundaryVeil.hardNoGo[]` pattern,return a protective-block
+    /// permit。Otherwise return nil (caller continues normal risk →
+    /// mode mapping)。
+    ///
+    /// **Doctrine pin** (不变量 #2): constitution feeds the gate as
+    /// INPUT,never bypasses it。The decision still issues from
+    /// `gateAction` (the substrate L11 single commit mouth);
+    /// hardNoGo is one of the inputs `gateAction` considers,
+    /// alongside risk card / constitution signals / court signals。
+    ///
+    /// **ADR-014 OPT-IN**: hosts without a constitution (or with
+    /// empty hardNoGo[]) see zero behavior change — enforcer
+    /// returns .none for empty patterns,this returns nil,existing
+    /// risk-level mapping runs as before。
+    ///
+    /// **Static + extractable** so tests can exercise it without
+    /// constructing the full `BASHostRuntimeEBrainRiskService`
+    /// (which requires BASHostSessionRequest + BASHostCurrentBrain
+    /// + BASEBrainRuntimeSynthesisPolicy fixtures)。
+    static func hardNoGoEnforcedPermit(
+        prompt: String,
+        boundaryVeil: BASBoundaryVeil?,
+        constitutionReasonCodes: [String] = [],
+        courtReasonCodes: [String] = []
+    ) -> BASActionPermit? {
+        guard let veil = boundaryVeil else { return nil }
+        let match = BASConstitutionEnforcer
+            .evaluateInputAgainstHardNoGo(
+                input: prompt,
+                hardNoGo: veil.hardNoGo)
+        guard match.isMatch else { return nil }
+        return BASActionPermit.protectiveBlock(
+            reasonCodes: [
+                BASConstitutionReasonCode.hardNoGo(
+                    pattern: match.pattern),
+                "constitution.hardNoGo.match"
+            ]
+            + constitutionReasonCodes
+            + courtReasonCodes)
+    }
+
     func calibrateRisk(
         contextFrame: BASContextFrame,
         thoughtFrame: BASThoughtFrame,
@@ -150,6 +194,21 @@ struct BASHostRuntimeEBrainRiskService: BASRiskServicing {
         let courtSignals = courtSignals(thoughtFrame: thoughtFrame)
         let constitutionReasonCodes = constitutionSignals.reasonCodes
         let courtReasonCodes = courtSignals.reasonCodes
+
+        // Chapter 三百五七 / M844 — G3 Layer 1 (hardNoGo) wire-up.
+        // Pre-LLM input gate via testable static helper (chapter
+        // 二百一一 single-source-of-truth)。If user input matches any
+        // boundaryVeil.hardNoGo[] pattern,short-circuit to a
+        // protective-block permit before normal risk → mode mapping。
+        if let blockPermit = Self.hardNoGoEnforcedPermit(
+            prompt: request.prompt,
+            boundaryVeil: hostConstitution?.boundaryVeil,
+            constitutionReasonCodes: constitutionReasonCodes,
+            courtReasonCodes: courtReasonCodes)
+        {
+            return (card, blockPermit)
+        }
+
         let permit: BASActionPermit = switch card.riskLevel {
         case .low:
             BASActionPermit(
