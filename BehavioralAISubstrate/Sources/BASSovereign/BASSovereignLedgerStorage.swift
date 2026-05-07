@@ -182,9 +182,20 @@ public final class BASSovereignLedgerSQLiteStorage:
         try Self.runExec(
             db: handle,
             sql: "PRAGMA foreign_keys=ON;")
-        try Self.runExec(
-            db: handle,
-            sql: "PRAGMA user_version=\(Self.schemaVersion);")
+
+        // M886 backport (M882 audit fix):read user_version FIRST,
+        // branch 0 → write current,equal → accept,mismatch → throw。
+        let existingVersion = try Self.readUserVersion(
+            db: handle)
+        if existingVersion == 0 {
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA user_version=\(Self.schemaVersion);")
+        } else if existingVersion != Self.schemaVersion {
+            throw StorageError.schemaVersionMismatch(
+                found: existingVersion,
+                expected: Self.schemaVersion)
+        }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
     }
@@ -504,6 +515,23 @@ public final class BASSovereignLedgerSQLiteStorage:
     private static func verifySchemaVersion(
         db: OpaquePointer
     ) throws {
+        // M886 (M882 audit fix):version is now correctly written
+        // by the read-then-branch path in init,so verify simply
+        // re-reads + asserts equality。Pre-M886 the comment here
+        // claimed verify was authoritative,but the unconditional
+        // pragma overwrite made it tautological for upgraded DBs。
+        let version = try readUserVersion(db: db)
+        guard version == schemaVersion else {
+            throw StorageError.schemaVersionMismatch(
+                found: version, expected: schemaVersion)
+        }
+    }
+
+    /// M886 backport (M882 audit fix):read PRAGMA user_version
+    /// without setting。Returns 0 for fresh DBs。
+    fileprivate static func readUserVersion(
+        db: OpaquePointer
+    ) throws -> Int {
         var stmt: OpaquePointer?
         let sql = "PRAGMA user_version;"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK,
@@ -519,15 +547,7 @@ public final class BASSovereignLedgerSQLiteStorage:
                 sql: sql,
                 message: String(cString: sqlite3_errmsg(db)))
         }
-        let version = Int(sqlite3_column_int64(stmt, 0))
-        // user_version can be 0 on a brand-new DB if our
-        // `PRAGMA user_version=N;` set ran after CREATE TABLE — but
-        // we run it BEFORE ensureSchema, so by the time we verify it
-        // should be schemaVersion. Accept schemaVersion only.
-        guard version == schemaVersion else {
-            throw StorageError.schemaVersionMismatch(
-                found: version, expected: schemaVersion)
-        }
+        return Int(sqlite3_column_int64(stmt, 0))
     }
 
     // MARK: - Utility

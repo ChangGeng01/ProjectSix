@@ -112,6 +112,13 @@ final class SampleHostChengluStressCognitiveOSObserver {
     /// graph signal。
     private var lastExtractHighWaterMs: Int64?
 
+    /// M886 fix (post-deep-review):highest event.timestampMs
+    /// seen by `observeIteration(...)` so far。Used as the hwm
+    /// advance target after each extract instead of wall-clock,
+    /// which is incomparable with synthetic / replayed event
+    /// timestamps。
+    private var maxObservedEventTimestampMs: Int64 = 0
+
     /// True when bundle has at least one populated primitive。
     var isEnabled: Bool {
         bundle?.isEmpty == false
@@ -196,33 +203,41 @@ final class SampleHostChengluStressCognitiveOSObserver {
         let project = Constants.projectNames[
             index % Constants.projectNames.count]
 
-        // M880 fix (P1.2 audit):action labels MUST match the
-        // extractor heuristic patterns,not invent suffixes。
-        // BASKnowledgeGraphEventExtractor:
-        //   - H5 delays edge:`action.hasPrefix("skip:")`
-        //     (any suffix accepted — `skip:overload`,
-        //     `skip:thermal`,etc.)
-        //   - H6 contradicts edge:`action == "permit:block"`
-        //     OR `action == "permit:replace"` (EXACT,no suffix)
-        // Pre-M880 (chapter 三百八七):this code emitted
-        // `delays:<project>` and `permit:replace:<project>` —
-        // both INVALID per extractor pattern matching → 0
-        // delays + 0 contradicts edges across all M875-M879
-        // runs。The 662k edges seen in the iPhone 5min run were
-        // ALL mentions (H3) + causes (H4) since those fire on
-        // event.project alone,not on action labels。
+        // M880 fix (P1.2 audit) — action labels MUST match
+        // substrate consumer patterns, not invent suffixes。
         //
-        // Project context flows via `event.project`,not as
-        // action suffix。
+        // Two distinct consumers:
+        //   1. BASKnowledgeGraphEventExtractor (graph edges):
+        //      - H5 delays edge:`action.hasPrefix("skip:")`
+        //      - H6 contradicts edge:`action == "permit:block"`
+        //        OR `action == "permit:replace"` (EXACT)
+        //      - H3/H2 mentions/causes:fire on `event.project`,
+        //        no matching action needed
+        //   2. BASUserStateReducer (agentRouteHistory):
+        //      - `action.hasPrefix("dispatch:")` → suffix
+        //        prepended to state.agentRouteHistory
+        //
+        // Pre-M880:emitted `delays:<project>` /
+        // `permit:replace:<project>` → BOTH invalid for graph
+        // heuristics (had project suffix breaking exact match,
+        // wrong prefix for delays)。Post-M880 actions exercise
+        // BOTH consumers correctly。
+        //
+        // M886 deep-review note:`dispatch:` is NOT dead code —
+        // it feeds state.agentRouteHistory via M842 reducer
+        // (BASUserStateReducer.swift:149),not the graph
+        // extractor。This is intentional dual-purpose:graph
+        // edges via skip:/permit:* + state route history via
+        // dispatch: + project context via event.project。
         let actions: [String]
         if succeeded {
             switch index % 7 {
             case 0:
+                // Feeds M842 reducer's agentRouteHistory
                 actions = ["dispatch:\(project)"]
             case 1, 2:
-                // Note:`mentions` edges are emitted by H3
-                // automatically when project is set,no
-                // matching action prefix needed
+                // mentions edges fire from event.project alone
+                // (no matching action prefix needed)
                 actions = ["chenglu:sweep:ok"]
             default:
                 actions = ["chenglu:sweep:ok"]
@@ -230,16 +245,13 @@ final class SampleHostChengluStressCognitiveOSObserver {
         } else {
             switch index % 5 {
             case 0:
-                // M880 fix:`skip:` prefix matches H5 →
-                // delays edge fires。Suffix is descriptive
-                // free-form per extractor contract。
+                // skip: prefix → H5 delays edge
                 actions = ["skip:thermal-pressure"]
             case 1:
-                // M880 fix:exact `permit:replace` matches
-                // H6 → contradicts edge fires。No suffix。
+                // EXACT permit:replace → H6 contradicts edge
                 actions = ["permit:replace"]
             case 2:
-                // Exercise the other contradicts trigger
+                // EXACT permit:block → H6 contradicts edge
                 actions = ["permit:block"]
             default:
                 actions = ["chenglu:sweep:fail",
@@ -269,6 +281,11 @@ final class SampleHostChengluStressCognitiveOSObserver {
             // monotonic via local `eventCount` increment below。
         }
         eventCount += 1
+
+        // M886 fix:track max event timestamp for event-clock hwm
+        if entry.timestampMs > maxObservedEventTimestampMs {
+            maxObservedEventTimestampMs = entry.timestampMs
+        }
 
         // Per-100-iter state reducer fold (M842)
         if index > 0
@@ -332,19 +349,20 @@ final class SampleHostChengluStressCognitiveOSObserver {
         // to skip the boundary event already processed last call。
         let scanSince: Int64? =
             lastExtractHighWaterMs.map { $0 + 1 }
+
+        // M886 fix v2:use event-clock,not wall-clock,for the
+        // hwm advance target。`maxObservedEventTimestampMs`
+        // tracks the highest timestamp from events that ENTERED
+        // the observer (via `observeIteration` calling the log's
+        // append),so it correctly bounds "what's been processed"
+        // even when events use synthetic / replayed timestamps。
+        let preExtractHwm = maxObservedEventTimestampMs
         _ = await BASKnowledgeGraphEventExtractor.extract(
             from: log,
             sessionID: sessionID,
             into: graph,
             sinceTimestampMs: scanSince)
-
-        // Update high-water-mark to the newest event timestamp
-        // observed so the next extract starts past this batch。
-        // Use Date().timeIntervalSince1970 since each event was
-        // stamped at write time;this is approximate but bounded
-        // by the per-extract interval。
-        lastExtractHighWaterMs = Int64(
-            Date().timeIntervalSince1970 * 1000)
+        lastExtractHighWaterMs = preExtractHwm
 
         // Chapter 三百八八 / M879 fix:write the in-memory graph
         // through to the SQLite storage companion when wired。

@@ -201,6 +201,14 @@ public actor BASCognitiveOSConvenience {
     /// total-log-size)。
     private var lastGraphExtractHwm: Int64?
 
+    /// M886 fix (post-M885 deep review):highest event.timestampMs
+    /// seen by `observe(...)` so far。Used as the hwm advance
+    /// target after each `extractGraph()` call,instead of
+    /// wall-clock time (which is incomparable with synthetic /
+    /// replayed event timestamps)。Updated monotonically per
+    /// observe via `max(current, event.timestampMs)`。
+    private var maxObservedEventTimestampMs: Int64 = 0
+
     // MARK: - Init
 
     /// Construct from bundle pieces。Pass nil for any primitive
@@ -258,6 +266,15 @@ public actor BASCognitiveOSConvenience {
         // event" reading
         iterationIndex += 1
         let myIndex = iterationIndex
+
+        // M886 fix:track max event.timestampMs we've seen so we
+        // can advance the graph hwm in event-clock terms,not
+        // wall-clock terms。Wall-clock could be far ahead of
+        // synthetic / replayed event timestamps,causing the
+        // `since: hwm+1` filter to skip valid events。
+        if event.timestampMs > maxObservedEventTimestampMs {
+            maxObservedEventTimestampMs = event.timestampMs
+        }
 
         // 1. Event log append
         var didAppendEvent = false
@@ -374,19 +391,25 @@ public actor BASCognitiveOSConvenience {
         // large that a single extract walks millions of events)。
         let scanSince: Int64? =
             lastGraphExtractHwm.map { $0 + 1 }
+
+        // M886 (post-M885 deep-review fix v2):use the highest
+        // event timestamp we've observed so far as the hwm
+        // advance target,NOT wall-clock。Wall-clock can be far
+        // ahead of synthetic / replayed event timestamps,
+        // causing the next call's `since: hwm+1` filter to skip
+        // legitimate events。Event-clock guarantees:
+        //   - hwm advances monotonically with submitted events
+        //   - next extract picks up any event whose timestampMs
+        //     is strictly greater than this hwm
+        //   - no double-walk:events with timestampMs <= hwm
+        //     were already in this batch
+        let preExtractHwm = maxObservedEventTimestampMs
         _ = await BASKnowledgeGraphEventExtractor.extract(
             from: log,
             sessionID: sessionID,
             into: graph,
             sinceTimestampMs: scanSince)
-
-        // M881:advance high-water-mark for next call。Use
-        // current wall-clock since events are timestamped at
-        // append time。Bounded by `graphExtractInterval`,so
-        // even if the next iter is a long Task.sleep away,the
-        // hwm stays close to the extracted batch's tail。
-        lastGraphExtractHwm = Int64(
-            Date().timeIntervalSince1970 * 1000)
+        lastGraphExtractHwm = preExtractHwm
 
         // chapter 三百八二 / M869 write-through: when the host
         // wired `knowledgeGraphStorage`,append every node + edge

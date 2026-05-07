@@ -128,9 +128,19 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
-        try Self.runExec(
-            db: handle,
-            sql: "PRAGMA user_version=\(Self.schemaVersion);")
+
+        // M886 backport (M882 audit fix):read user_version FIRST。
+        let existingVersion = try Self.readUserVersion(
+            db: handle)
+        if existingVersion == 0 {
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA user_version=\(Self.schemaVersion);")
+        } else if existingVersion != Self.schemaVersion {
+            throw StorageError.schemaVersionMismatch(
+                found: existingVersion,
+                expected: Self.schemaVersion)
+        }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
     }
@@ -248,6 +258,18 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
     fileprivate static func verifySchemaVersion(
         db: OpaquePointer
     ) throws {
+        let found = try readUserVersion(db: db)
+        guard found == schemaVersion else {
+            throw StorageError.schemaVersionMismatch(
+                found: found, expected: schemaVersion)
+        }
+    }
+
+    /// M886 backport (M882 audit fix):read PRAGMA user_version
+    /// without setting。Returns 0 for fresh DBs。
+    fileprivate static func readUserVersion(
+        db: OpaquePointer
+    ) throws -> Int {
         let sql = "PRAGMA user_version;"
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
@@ -264,11 +286,7 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
                 sql: sql,
                 message: String(cString: sqlite3_errmsg(db)))
         }
-        let found = Int(sqlite3_column_int64(stmt, 0))
-        guard found == schemaVersion else {
-            throw StorageError.schemaVersionMismatch(
-                found: found, expected: schemaVersion)
-        }
+        return Int(sqlite3_column_int64(stmt, 0))
     }
 
     // MARK: - CRUD primitives
