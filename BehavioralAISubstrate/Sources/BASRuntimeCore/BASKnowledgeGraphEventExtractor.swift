@@ -125,6 +125,25 @@ public enum BASKnowledgeGraphEventExtractor {
     public static let reasonCodePrefix: String =
         "knowledge-graph-extract"
 
+    // MARK: - Heuristic 7 (M860): closing-edge synthesis
+
+    /// Default minimum delays-edge count per project to trigger
+    /// heuristic 7 closing-edge synthesis。Below this,extractor
+    /// does NOT synthesize the project → causes → first-event
+    /// edge (callers can still wire it manually if they want)。
+    /// Chapter 一百八十五 anti-magic-number — pinned typed
+    /// constant。
+    public static let closingEdgeDelaysThreshold: Int = 2
+
+    /// Edge weight for synthesized closing edges (heuristic 7)。
+    /// Lower than direct causes edges because the closing edge
+    /// is INFERRED,not directly observed in event actions。
+    public static let closingEdgeWeight: Double = 0.4
+
+    /// Reason code emitted when heuristic 7 fires (audit anchor)。
+    public static let closingEdgeAnchorCode: String =
+        "knowledge-graph-extract:heuristic-7:closing-edge-synthesized"
+
     // MARK: - Extract
 
     /// Walk a session's event log + populate the graph using
@@ -138,11 +157,19 @@ public enum BASKnowledgeGraphEventExtractor {
     ///   - eventLog: source event log conformer
     ///   - sessionID: session to extract events from
     ///   - graph: target graph to populate
+    ///   - closingEdgeThreshold: heuristic 7 trigger — minimum
+    ///     delays-edge count per project to synthesize the
+    ///     closing causes edge。Default
+    ///     `closingEdgeDelaysThreshold` (2)。Pass 0 to disable
+    ///     heuristic 7 entirely。
     /// - Returns: typed result bundle
     public static func extract(
         from eventLog: any BASEventLogStorage,
         sessionID: String,
-        into graph: BASKnowledgeGraph
+        into graph: BASKnowledgeGraph,
+        closingEdgeThreshold: Int =
+            BASKnowledgeGraphEventExtractor
+                .closingEdgeDelaysThreshold
     ) async -> BASKnowledgeGraphEventExtractionResult {
         let events = await eventLog.events(
             forSession: sessionID)
@@ -159,6 +186,13 @@ public enum BASKnowledgeGraphEventExtractor {
         var projectToLastEventID: [String: String] = [:]
         // Track project nodes we've ensured exist
         var ensuredProjects: Set<String> = []
+
+        // Heuristic 7 (M860): track FIRST event per project
+        // + count of delays edges per project for closing-edge
+        // synthesis。
+        var projectToFirstEventID: [String: String] = [:]
+        var projectToDelaysCount: [String: Int] = [:]
+        var closingEdgesSynthesized = 0
 
         for event in events {
             // Heuristic 1: each event → event node
@@ -208,6 +242,13 @@ public enum BASKnowledgeGraphEventExtractor {
                     // prevents repeat attempts;skip + continue
                 }
                 ensuredProjects.insert(projectNodeID)
+            }
+
+            // Heuristic 7 prep: record FIRST event per project
+            // (for synthesizing closing causes edge from project
+            // back to first event when delays threshold trips)
+            if projectToFirstEventID[project] == nil {
+                projectToFirstEventID[project] = event.eventID
             }
 
             // Heuristic 3: event → mentions → project
@@ -275,11 +316,19 @@ public enum BASKnowledgeGraphEventExtractor {
                 do {
                     try await graph.insert(edge: delaysEdge)
                     addedEdges += 1
+                    // Heuristic 7 prep: track delays count
+                    // for closing-edge synthesis
+                    projectToDelaysCount[
+                        project, default: 0] += 1
                     break  // one delays edge per event,not
                            // per skip-action
                 } catch BASKnowledgeGraphError
                     .duplicateEdgeID
                 {
+                    // Idempotent retry — still count toward
+                    // threshold so re-extraction is consistent
+                    projectToDelaysCount[
+                        project, default: 0] += 1
                     break
                 } catch {
                     break
@@ -316,6 +365,51 @@ public enum BASKnowledgeGraphEventExtractor {
             }
         }
 
+        // Heuristic 7 (M860): synthesize closing causes edge
+        // from project node → first event when delays-edge
+        // count exceeds threshold。This is the "loop closer" —
+        // turns a partial chain (events → delays → project)
+        // into a full cycle (events → delays → project →
+        // causes → first event) so the M856 cycle detector
+        // can find user-vision §10 'complexity addiction loop'
+        // without manual edge wiring。
+        //
+        // Pass `closingEdgeThreshold = 0` to disable this
+        // heuristic entirely (conservative replay mode)。
+        if closingEdgeThreshold > 0 {
+            for (project, delaysCount)
+                in projectToDelaysCount
+            where delaysCount >= closingEdgeThreshold
+            {
+                guard let firstEventID =
+                    projectToFirstEventID[project]
+                else { continue }
+                let projectNodeID = "project:\(project)"
+                let closingEdgeID =
+                    "h7-closing:\(projectNodeID)→\(firstEventID)"
+                let closingEdge = BASKnowledgeEdge(
+                    edgeID: closingEdgeID,
+                    fromNodeID: projectNodeID,
+                    toNodeID: firstEventID,
+                    kind: .causes,
+                    weight: closingEdgeWeight,
+                    createdAtMs: events.last?.timestampMs ?? 0)
+                do {
+                    try await graph.insert(edge: closingEdge)
+                    addedEdges += 1
+                    closingEdgesSynthesized += 1
+                } catch BASKnowledgeGraphError
+                    .duplicateEdgeID
+                {
+                    // Re-extraction; idempotent skip
+                } catch {
+                    // Defensive — endpoints exist by
+                    // construction (project + firstEvent
+                    // both inserted earlier in this run)
+                }
+            }
+        }
+
         reasonCodes.append(
             "\(reasonCodePrefix):nodes-added:\(addedNodes)")
         reasonCodes.append(
@@ -324,6 +418,13 @@ public enum BASKnowledgeGraphEventExtractor {
             reasonCodes.append(
                 "\(reasonCodePrefix):events-skipped:" +
                 "\(skippedEvents)")
+        }
+        if closingEdgesSynthesized > 0 {
+            reasonCodes.append(
+                "\(reasonCodePrefix):heuristic-7:" +
+                "closing-edges-synthesized:" +
+                "\(closingEdgesSynthesized)")
+            reasonCodes.append(closingEdgeAnchorCode)
         }
 
         return BASKnowledgeGraphEventExtractionResult(

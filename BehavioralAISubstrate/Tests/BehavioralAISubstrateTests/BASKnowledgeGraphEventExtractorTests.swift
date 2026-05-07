@@ -354,4 +354,311 @@ final class BASKnowledgeGraphEventExtractorTests:
                 .reasonCodePrefix,
             "knowledge-graph-extract")
     }
+
+    // MARK: - Heuristic 7 (M860): closing-edge synthesis
+
+    func testHeuristic7ClosingEdgeConstantsPin() {
+        XCTAssertEqual(
+            BASKnowledgeGraphEventExtractor
+                .closingEdgeDelaysThreshold, 2,
+            "Default threshold pin: 2 delays edges trigger " +
+            "closing-edge synthesis")
+        XCTAssertEqual(
+            BASKnowledgeGraphEventExtractor
+                .closingEdgeWeight, 0.4,
+            "Closing edge weight is lower than direct " +
+            "causes (inferred not observed)")
+    }
+
+    func testHeuristic7AnchorCodePin() {
+        XCTAssertEqual(
+            BASKnowledgeGraphEventExtractor
+                .closingEdgeAnchorCode,
+            "knowledge-graph-extract:heuristic-7:" +
+            "closing-edge-synthesized")
+    }
+
+    func testHeuristic7DoesNotFireOnSingleDelaysEdge()
+        async throws
+    {
+        // Below threshold → no closing edge synthesized
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(
+            eventID: "e1", project: "alpha"))
+        _ = try await log.append(makeEvent(
+            eventID: "e2",
+            timestampMs: 2_000,
+            project: "alpha",
+            actions: ["skip:thermal-pause"]))
+        let graph = BASKnowledgeGraph()
+        let result = await BASKnowledgeGraphEventExtractor
+            .extract(
+                from: log,
+                sessionID: "test-ssn",
+                into: graph)
+        // Closing edge ID would be
+        // "h7-closing:project:alpha→e1"
+        let outgoingFromProject = await graph.outgoing(
+            from: "project:alpha")
+        let hasClosingEdge = outgoingFromProject.contains {
+            $0.edgeID.hasPrefix("h7-closing:")
+        }
+        XCTAssertFalse(
+            hasClosingEdge,
+            "Single delays edge below threshold (2) → no " +
+            "closing edge synthesized")
+        XCTAssertFalse(
+            result.reasonCodes.contains(
+                BASKnowledgeGraphEventExtractor
+                    .closingEdgeAnchorCode))
+    }
+
+    func testHeuristic7FiresOnTwoDelaysEdges() async throws {
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(
+            eventID: "first-evt",
+            timestampMs: 1_000,
+            project: "alpha",
+            actions: ["permit:answer"]))
+        _ = try await log.append(makeEvent(
+            eventID: "skip-evt-1",
+            timestampMs: 2_000,
+            project: "alpha",
+            actions: ["skip:thermal-pause"]))
+        _ = try await log.append(makeEvent(
+            eventID: "skip-evt-2",
+            timestampMs: 3_000,
+            project: "alpha",
+            actions: ["skip:cooling"]))
+        let graph = BASKnowledgeGraph()
+        let result = await BASKnowledgeGraphEventExtractor
+            .extract(
+                from: log,
+                sessionID: "test-ssn",
+                into: graph)
+        // 2 delays edges met the threshold → closing edge
+        // synthesized from project:alpha → first-evt
+        let outgoingFromProject = await graph.outgoing(
+            from: "project:alpha")
+        let closingEdge = outgoingFromProject.first {
+            $0.edgeID.hasPrefix("h7-closing:")
+        }
+        XCTAssertNotNil(
+            closingEdge,
+            "2 delays edges triggers heuristic 7 closing edge")
+        XCTAssertEqual(
+            closingEdge?.toNodeID, "first-evt",
+            "Closing edge points from project to FIRST " +
+            "event of that project (deterministic)")
+        XCTAssertEqual(
+            closingEdge?.kind, .causes,
+            "Closing edge kind is causes")
+        XCTAssertEqual(
+            closingEdge?.weight,
+            BASKnowledgeGraphEventExtractor
+                .closingEdgeWeight,
+            "Closing edge weight uses dedicated typed constant")
+        // Anchor reason code emitted
+        XCTAssertTrue(
+            result.reasonCodes.contains(
+                BASKnowledgeGraphEventExtractor
+                    .closingEdgeAnchorCode))
+        XCTAssertTrue(
+            result.reasonCodes.contains(where: { code in
+                code.contains(
+                    "heuristic-7:closing-edges-synthesized:1")
+            }))
+    }
+
+    func testHeuristic7CycleDetectableWithoutManualEdge()
+        async throws
+    {
+        // **Architectural pin**: heuristic 7 closes the loop
+        // automatically so cycle detection finds the user-vision
+        // §10 'complexity addiction loop' WITHOUT manual closing
+        // edge wiring (vs M857 testEndToEndExtractPlusCycle
+        // Detection which required manual closing edge)。
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(
+            eventID: "anxiety-evt",
+            timestampMs: 1_000,
+            project: "stuck-project",
+            actions: ["permit:answer"]))
+        _ = try await log.append(makeEvent(
+            eventID: "tech-evt-1",
+            timestampMs: 2_000,
+            project: "stuck-project",
+            actions: ["skip:thermal-pause"]))
+        _ = try await log.append(makeEvent(
+            eventID: "tech-evt-2",
+            timestampMs: 3_000,
+            project: "stuck-project",
+            actions: ["skip:cooling"]))
+        let graph = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph)
+        // No manual closing edge — heuristic 7 must close
+        let cycles = await graph.detectCycles(
+            filter: { $0.containsEdgeKind(.delays) })
+        XCTAssertGreaterThanOrEqual(
+            cycles.count, 1,
+            "Heuristic 7 must close the loop so cycle " +
+            "detection finds user-vision §10 cycle WITHOUT " +
+            "manual edge wiring")
+    }
+
+    func testHeuristic7Disabled() async throws {
+        // Pass closingEdgeThreshold: 0 to disable heuristic 7
+        let log = BASInMemoryEventLogStorage()
+        for i in 0..<3 {
+            _ = try await log.append(makeEvent(
+                eventID: "e\(i)",
+                timestampMs: 1_000 + Int64(i),
+                project: "alpha",
+                actions: ["skip:thermal-pause"]))
+        }
+        let graph = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph,
+            closingEdgeThreshold: 0)
+        let outgoingFromProject = await graph.outgoing(
+            from: "project:alpha")
+        let hasClosingEdge = outgoingFromProject.contains {
+            $0.edgeID.hasPrefix("h7-closing:")
+        }
+        XCTAssertFalse(
+            hasClosingEdge,
+            "closingEdgeThreshold=0 disables heuristic 7 " +
+            "(conservative replay mode)")
+    }
+
+    func testHeuristic7CustomThreshold() async throws {
+        // Custom threshold = 3 → 3 delays edges needed
+        let log = BASInMemoryEventLogStorage()
+        for i in 0..<3 {
+            _ = try await log.append(makeEvent(
+                eventID: "e\(i)",
+                timestampMs: 1_000 + Int64(i),
+                project: "alpha",
+                actions: ["skip:thermal-pause"]))
+        }
+        // First, run with threshold=3 → should fire
+        let graphMet = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graphMet,
+            closingEdgeThreshold: 3)
+        let outgoingMet = await graphMet.outgoing(
+            from: "project:alpha")
+        XCTAssertTrue(
+            outgoingMet.contains {
+                $0.edgeID.hasPrefix("h7-closing:")
+            },
+            "3 delays + threshold=3 → fires")
+        // Same input + threshold=4 → should NOT fire
+        let graphUnmet = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graphUnmet,
+            closingEdgeThreshold: 4)
+        let outgoingUnmet = await graphUnmet.outgoing(
+            from: "project:alpha")
+        XCTAssertFalse(
+            outgoingUnmet.contains {
+                $0.edgeID.hasPrefix("h7-closing:")
+            },
+            "3 delays + threshold=4 → does not fire")
+    }
+
+    func testHeuristic7IsIdempotent() async throws {
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(
+            eventID: "e1", project: "alpha"))
+        _ = try await log.append(makeEvent(
+            eventID: "e2", timestampMs: 2_000,
+            project: "alpha",
+            actions: ["skip:a"]))
+        _ = try await log.append(makeEvent(
+            eventID: "e3", timestampMs: 3_000,
+            project: "alpha",
+            actions: ["skip:b"]))
+        let graph = BASKnowledgeGraph()
+        let first = await BASKnowledgeGraphEventExtractor
+            .extract(
+                from: log, sessionID: "test-ssn",
+                into: graph)
+        let second = await BASKnowledgeGraphEventExtractor
+            .extract(
+                from: log, sessionID: "test-ssn",
+                into: graph)
+        XCTAssertGreaterThan(
+            first.addedEdgeCount, 0)
+        XCTAssertEqual(
+            second.addedEdgeCount, 0,
+            "Re-extraction is idempotent — heuristic 7 " +
+            "closing edge has stable ID, duplicate skipped")
+    }
+
+    func testHeuristic7CrossProjectsIndependent()
+        async throws
+    {
+        // Two projects, each with 2 delays → both get
+        // closing edges
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(
+            eventID: "alpha-1",
+            timestampMs: 1_000,
+            project: "alpha"))
+        _ = try await log.append(makeEvent(
+            eventID: "beta-1",
+            timestampMs: 2_000,
+            project: "beta"))
+        _ = try await log.append(makeEvent(
+            eventID: "alpha-2",
+            timestampMs: 3_000,
+            project: "alpha",
+            actions: ["skip:a"]))
+        _ = try await log.append(makeEvent(
+            eventID: "beta-2",
+            timestampMs: 4_000,
+            project: "beta",
+            actions: ["skip:b"]))
+        _ = try await log.append(makeEvent(
+            eventID: "alpha-3",
+            timestampMs: 5_000,
+            project: "alpha",
+            actions: ["skip:c"]))
+        _ = try await log.append(makeEvent(
+            eventID: "beta-3",
+            timestampMs: 6_000,
+            project: "beta",
+            actions: ["skip:d"]))
+        let graph = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph)
+        let outAlpha = await graph.outgoing(
+            from: "project:alpha")
+        let outBeta = await graph.outgoing(
+            from: "project:beta")
+        XCTAssertTrue(
+            outAlpha.contains {
+                $0.edgeID == "h7-closing:project:alpha→alpha-1"
+            },
+            "Alpha closing edge fires + points to alpha-1 " +
+            "(first event for alpha)")
+        XCTAssertTrue(
+            outBeta.contains {
+                $0.edgeID == "h7-closing:project:beta→beta-1"
+            },
+            "Beta closing edge fires + points to beta-1 " +
+            "(first event for beta)")
+    }
 }
