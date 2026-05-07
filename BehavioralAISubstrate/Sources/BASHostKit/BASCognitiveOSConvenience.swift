@@ -276,11 +276,30 @@ public actor BASCognitiveOSConvenience {
         let newID = UUID().uuidString
         let nowMs = Int64(
             Date().timeIntervalSince1970 * 1000)
-        let next = BASUserStateReducer.reduce(
-            prior: currentState,
-            event: event,
-            newStateID: newID,
-            generatedAtMs: nowMs)
+
+        // chapter 三百八一 / M868 upgrade: when a knowledge graph
+        // is also wired into this convenience,fold via the M858
+        // graph-aware reducer (which adds a complexityAddiction
+        // bonus per delays-cycle on the event's project)。Hosts
+        // that did NOT wire a graph fall back to the M842 base
+        // reducer — preserves the M865 contract on graph-less
+        // setups (zero behavior change pin)。
+        let next: BASUserState
+        if let graph = knowledgeGraph {
+            next = await BASUserStateGraphAwareReducer.reduce(
+                prior: currentState,
+                event: event,
+                graph: graph,
+                newStateID: newID,
+                generatedAtMs: nowMs)
+        } else {
+            next = BASUserStateReducer.reduce(
+                prior: currentState,
+                event: event,
+                newStateID: newID,
+                generatedAtMs: nowMs)
+        }
+
         do {
             _ = try await store.append(
                 next, sessionID: sessionID)

@@ -268,6 +268,110 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
         XCTAssertEqual(storeBCount, 0)
     }
 
+    // MARK: - M868 graph-aware reducer wiring
+
+    func testFoldUsesGraphAwareReducerWhenGraphPresent()
+        async throws
+    {
+        // Pre-build a graph with a delays-cycle on
+        // "project:foo" so the graph-aware reducer fires on
+        // events tagged with project="foo"。
+        let graph = BASKnowledgeGraph()
+        try await graph.upsert(node: BASKnowledgeNode(
+            nodeID: "project:foo",
+            kind: .project,
+            label: "foo",
+            createdAtMs: 0))
+        try await graph.upsert(node: BASKnowledgeNode(
+            nodeID: "event-1",
+            kind: .event,
+            label: "ev1",
+            createdAtMs: 0))
+        try await graph.insert(edge: BASKnowledgeEdge(
+            edgeID: "e-delays",
+            fromNodeID: "project:foo",
+            toNodeID: "event-1",
+            kind: .delays,
+            createdAtMs: 0))
+        try await graph.insert(edge: BASKnowledgeEdge(
+            edgeID: "e-back",
+            fromNodeID: "event-1",
+            toNodeID: "project:foo",
+            kind: .causes,
+            createdAtMs: 0))
+
+        let log = BASInMemoryEventLogStorage()
+        let store = BASInMemoryUserStateStorage()
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: store,
+            knowledgeGraph: graph,
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 1,
+                graphExtractInterval: 100,
+                graphExtractEventCap: 5_000))
+
+        // First call → fold immediately (cadence 1)。Event tagged
+        // with project="foo" so the graph-aware reducer adds
+        // complexityAddiction bonus
+        let event = BASEventLogEntry(
+            eventID: "ev-foo",
+            timestampMs: 1_000,
+            kind: .substrateAudit,
+            sessionID: "s1",
+            sequenceNumber: 0,
+            project: "foo",
+            actions: ["delays:foo"])
+        let r = await conv.observe(event: event)
+        XCTAssertTrue(r.stateFolded)
+
+        // The folded state must reflect the cycle bonus —
+        // complexityAddictionScore > 0 because graph-aware
+        // reducer added 0.15 per delays-cycle (min capped at
+        // 0.45)
+        let rolling = await conv.rollingState
+        XCTAssertGreaterThan(
+            rolling.complexityAddictionScore, 0,
+            "Graph-aware reducer must add bonus when " +
+            "delays-cycle on the event's project is detected")
+    }
+
+    func testFoldUsesBaseReducerWhenGraphAbsent() async {
+        let log = BASInMemoryEventLogStorage()
+        let store = BASInMemoryUserStateStorage()
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: store,
+            // No graph wired in
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 1,
+                graphExtractInterval: 100,
+                graphExtractEventCap: 5_000))
+
+        let event = BASEventLogEntry(
+            eventID: "ev-bar",
+            timestampMs: 1_000,
+            kind: .substrateAudit,
+            sessionID: "s1",
+            sequenceNumber: 0,
+            project: "foo")  // project doesn't matter without graph
+        let r = await conv.observe(event: event)
+        XCTAssertTrue(r.stateFolded,
+            "Fold must still fire without a graph (M842 base " +
+            "reducer path)")
+
+        // Without a graph,no cycle bonus → score stays at
+        // base reducer's output (which is 0 for a clean event
+        // sequence with no prior state)
+        let rolling = await conv.rollingState
+        XCTAssertEqual(
+            rolling.complexityAddictionScore, 0,
+            "Base reducer must not add cycle bonus when no " +
+            "graph wired (M868 fallback pin)")
+    }
+
     // MARK: - Cadence value sanity
 
     func testDefaultCadenceMatchesM862SampleHostObserver() {
