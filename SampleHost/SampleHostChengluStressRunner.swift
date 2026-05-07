@@ -65,7 +65,17 @@ final class SampleHostChengluStressRunner: ObservableObject {
         progressLog.removeAll()
         appendLog("🚀 Starting Chenglu mesh stress run " +
             "(\(Int(durationSeconds))s)")
-        stressTask = Task {
+        // Chapter 三百四六 / M833 fix: `[weak self]` matches the
+        // SampleHost convention for long-running tasks (mirrors
+        // SampleHostHybridBenchEntry.swift:163 / SampleHostAFM
+        // BenchEntry.swift:68 / SampleHostLLMHelpers.swift:85)。
+        // Without weak capture, a 20-min stress run would keep
+        // the runner alive 20 min after the SwiftUI panel
+        // dismisses → memory + battery cost。Weak capture lets
+        // the runner deallocate cleanly when the parent
+        // @StateObject goes out of scope。
+        stressTask = Task { [weak self] in
+            guard let self else { return }
             await self.runStress(
                 durationSeconds: durationSeconds)
             self.stressTask = nil
@@ -115,7 +125,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
         }
 
         // Step 3: establish determinism baseline
-        let referenceInput: BASLayerInferenceInput
+        let referenceInput: BASHostMeshLayerInput
         let baselineSignature: String
         do {
             referenceInput = try makeReferenceInput()
@@ -148,7 +158,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
             if Task.isCancelled { break }
             let iterStart = clock.now
             do {
-                let input: BASLayerInferenceInput
+                let input: BASHostMeshLayerInput
                 if localIter
                     % Constants.determinismCheckInterval == 0
                     && localIter > 0
@@ -306,7 +316,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
 
     private func makeCyclingInput(
         iteration: Int
-    ) throws -> BASLayerInferenceInput {
+    ) throws -> BASHostMeshLayerInput {
         let tones = BASChengluFeatureEncoder.tones
         let domains = BASChengluFeatureEncoder.domains
         let stakes = BASChengluFeatureEncoder.stakes
@@ -326,21 +336,21 @@ final class SampleHostChengluStressRunner: ObservableObject {
             askShape: askShapes[
                 (iteration / 23) % askShapes.count],
             mutationSeed: iteration % 5)
-        return BASLayerInferenceInput(
+        return BASHostMeshLayerInput(
             layerID: .l1,
             featureRef: ref,
             confidenceFloor: .high)
     }
 
     private func makeReferenceInput() throws
-        -> BASLayerInferenceInput
+        -> BASHostMeshLayerInput
     {
         let ref = try BASChengluFeatureRefBuilder.build(
             tone: "anxious", domain: "medical",
             stake: "critical", timeframe: "today",
             confidant: "trusted-ai", askShape: "question",
             mutationSeed: 2)
-        return BASLayerInferenceInput(
+        return BASHostMeshLayerInput(
             layerID: .l1,
             featureRef: ref,
             confidenceFloor: .high)

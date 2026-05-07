@@ -79,3 +79,20 @@ public typealias BASHostShadowEvaluator = BASShadowEvaluating
 /// name,preserving facade-boundary intent at every reference。
 public typealias BASHostShadowEvaluation =
     BASShadowEvaluationResult
+
+// MARK: - Layer inference input facade (chapter 三百四六 / M833)
+
+/// Host-facing typealias for the BAS-side `BASLayerInferenceInput`
+/// (defined in `BASRuntimeCore`)。Hosts that drive the附录 X
+/// mesh consultation chain (canonical sweep / single cascade /
+/// builder bundle infer) reference this instead of the raw
+/// `BASLayerInferenceInput` type directly。
+///
+/// **At runtime**: identical to `BASLayerInferenceInput`。
+///
+/// **At code-touch level**: same facade pattern as
+/// `BASHostShadowEvaluator` — hosts name `BASHostMeshLayerInput`
+/// in their function signatures so the BASHostKit boundary is
+/// explicit at every reference site。
+public typealias BASHostMeshLayerInput =
+    BASLayerInferenceInput
