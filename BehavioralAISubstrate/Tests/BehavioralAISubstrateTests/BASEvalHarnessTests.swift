@@ -153,6 +153,71 @@ final class BASEvalHarnessTests: XCTestCase {
             try JSONEncoder().encode(runWithNaN))
     }
 
+    // M895 (post-deep-audit round 7) — tighter NaN edge case
+    // coverage based on test-pin completeness audit findings
+
+    func testM895FilteredRunRoundTripsThroughJSON()
+        throws
+    {
+        // Stronger pin:NaN-containing run must encode AND
+        // decode cleanly,with the surviving (finite) values
+        // round-tripping byte-equal。
+        let original = BASEvalRun(
+            runID: "r-nan",
+            timestampMs: 100,
+            metrics: [
+                .accuracy: .nan,
+                .latencyP95: 200.0,
+                .hallucinationRate: 0.02,
+            ],
+            buildChapter: "M895",
+            hostFingerprint: "test",
+            sampleCount: 10)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(
+            BASEvalRun.self, from: data)
+        XCTAssertEqual(decoded, original,
+            "Filtered run must round-trip byte-equal " +
+            "(NaN already filtered at construction,not " +
+            "introduced by encode/decode pipeline)")
+        XCTAssertEqual(decoded.metrics.count, 2,
+            "NaN entry must NOT have round-tripped back")
+    }
+
+    func testM895NegativeZeroIsFinitePassesFilter() {
+        // -0.0 and +0.0 are both finite per IEEE 754。
+        // Filter should pass both through。
+        let run = BASEvalRun(
+            runID: "r1",
+            timestampMs: 0,
+            metrics: [
+                .accuracy: -0.0,
+                .latencyP95: 0.0,
+            ],
+            buildChapter: "M895",
+            hostFingerprint: "test",
+            sampleCount: 1)
+        XCTAssertEqual(run.metrics.count, 2,
+            "Both signed zeros are finite,must pass filter")
+    }
+
+    func testM895SubnormalNumberPassesFilter() {
+        // Smallest positive double > 0 (subnormal range)
+        let subnormal = Double.leastNonzeroMagnitude
+        XCTAssertTrue(subnormal.isFinite,
+            "Subnormal must report isFinite (sanity)")
+        let run = BASEvalRun(
+            runID: "r1",
+            timestampMs: 0,
+            metrics: [.accuracy: subnormal],
+            buildChapter: "M895",
+            hostFingerprint: "test",
+            sampleCount: 1)
+        XCTAssertEqual(run.metrics.count, 1,
+            "Subnormal magnitudes are still finite → " +
+            "must pass M891 filter")
+    }
+
     func testRunCodableRoundTrip() throws {
         let run = BASEvalRun(
             runID: "test-run-1",
