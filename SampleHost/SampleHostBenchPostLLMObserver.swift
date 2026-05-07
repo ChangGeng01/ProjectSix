@@ -4,7 +4,7 @@
 // SampleHostHybridBenchEntry.swift bench loop body.
 //
 // chapter 二百六十九 / M750 — refactored to delegate to a
-// `BASShadowEvaluating` conformer (BAS-side protocol shipped in
+// `BASHostShadowEvaluator` conformer (BAS-side protocol shipped in
 // chapter 二百六十六 / M748; substrate-driven default conformer in
 // chapter 二百六十七 / M749). Default behaviour byte-equal to
 // pre-chapter-二百六十九 path; hosts can swap evaluators via
@@ -34,7 +34,7 @@
 // Post-chapter-二百六十九: `observePostLLM(...)` constructs a
 // `BASSubstrateReauditShadowEvaluator` internally + delegates.
 // `observePostLLMViaEvaluator(_:...)` accepts any
-// `BASShadowEvaluating` conformer for hosts that want to inject
+// `BASHostShadowEvaluator` conformer for hosts that want to inject
 // (tests, A/B experiments, future ML-backed evaluators per
 // chapter 二百六十八+). Default arg threads through so existing
 // call sites (chapter 二百四十二 line 445 in SampleHostHybridBenchEntry)
@@ -52,7 +52,7 @@
 //   - chapter 一百八十八 / M691: post-LLM substrate observation
 //     runs off-MainActor via Task.detached
 //   - chapter 二百四 / M767: workflowProfile from @Published flex
-//   - chapter 二百六十六 / M748: BAS-side BASShadowEvaluating
+//   - chapter 二百六十六 / M748: BAS-side BASHostShadowEvaluator
 //     protocol — observability-only contract
 //   - chapter 二百六十七 / M749: BASSubstrateReauditShadowEvaluator
 //     production conformer
@@ -63,7 +63,7 @@
 import Foundation
 import BASHostKit
 // chapter 三百四〇 / M827 — `BASEvaluation` symbols
-// (`BASShadowEvaluating` / `BASShadowEvaluationResult` etc) are
+// (`BASHostShadowEvaluator` / `BASHostShadowEvaluation` etc) are
 // re-exported by `BASHostKit` via `@_exported`,so a separate
 // `import BASEvaluation` here violates the host import boundary
 // without adding any reachable symbols。Removed per
@@ -90,7 +90,7 @@ struct SampleHostBenchPostLLMObservation: Sendable, Equatable {
         postLLMShifted: nil)
 
     /// chapter 二百六十九 / M750 — translate a BAS-side
-    /// `BASShadowEvaluationResult` into the SampleHost-side
+    /// `BASHostShadowEvaluation` into the SampleHost-side
     /// observation shape. The wrapper preserves byte-equal
     /// semantics with the pre-chapter-二百六十九 path:
     ///
@@ -102,7 +102,7 @@ struct SampleHostBenchPostLLMObservation: Sendable, Equatable {
     /// is applied separately by the caller (preserves the
     /// observability-only contract on the BAS-side evaluator).
     static func from(
-        _ result: BASShadowEvaluationResult,
+        _ result: BASHostShadowEvaluation,
         prePermitMode: String
     ) -> SampleHostBenchPostLLMObservation {
         // Skipped evaluator results map to skipped observation.
@@ -212,7 +212,7 @@ extension SampleHostModel {
     }
 
     /// chapter 二百六十九 / M750 — protocol-driven post-LLM
-    /// observation. Accepts any `BASShadowEvaluating` conformer
+    /// observation. Accepts any `BASHostShadowEvaluator` conformer
     /// — the substrate-driven default (chapter 二百六十七), the
     /// no-op test conformer (chapter 二百六十六), a future ML-
     /// backed evaluator (chapter 二百六十八+), or a host-supplied
@@ -229,7 +229,7 @@ extension SampleHostModel {
     ///     the BAS-side evaluator)
     @MainActor
     func observePostLLMViaEvaluator(
-        evaluator: any BASShadowEvaluating,
+        evaluator: any BASHostShadowEvaluator,
         prompt: String,
         firstBody: String,
         fallbackBody: String?,

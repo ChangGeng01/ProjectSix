@@ -12,7 +12,7 @@ import BASHostKit
 /// 附录 V Stage 5 Step 3 of 5. Pre-chapter 二百六十九 the bench
 /// loop's `observePostLLM(...)` was hardcoded substrate-reaudit.
 /// Post-chapter 二百六十九 the new `observePostLLMViaEvaluator(_:...)`
-/// accepts any `BASShadowEvaluating` conformer — substrate-driven
+/// accepts any `BASHostShadowEvaluator` conformer — substrate-driven
 /// (chapter 二百六十七), no-op (chapter 二百六十六), ML-backed
 /// (chapter 二百六十八+), or host-supplied experiment variants.
 ///
@@ -33,17 +33,17 @@ final class SampleHostBenchPostLLMObserverShadowEvaluatorTests:
 {
     // MARK: - Recording mock evaluator
 
-    private final class RecordingEvaluator: BASShadowEvaluating,
+    private final class RecordingEvaluator: BASHostShadowEvaluator,
         @unchecked Sendable
     {
         let evaluatorVersion: String
         private(set) nonisolated(unsafe) var calls = 0
         nonisolated(unsafe) var nextResult:
-            BASShadowEvaluationResult
+            BASHostShadowEvaluation
 
         init(
             evaluatorVersion: String = "recording-v1",
-            nextResult: BASShadowEvaluationResult = .skipped(
+            nextResult: BASHostShadowEvaluation = .skipped(
                 evaluatorVersion: "recording-v1")
         ) {
             self.evaluatorVersion = evaluatorVersion
@@ -56,7 +56,7 @@ final class SampleHostBenchPostLLMObserverShadowEvaluatorTests:
             prePermitMode: String,
             sessionRef: String,
             turnRef: String
-        ) async -> BASShadowEvaluationResult {
+        ) async -> BASHostShadowEvaluation {
             calls += 1
             return nextResult
         }
@@ -114,7 +114,7 @@ final class SampleHostBenchPostLLMObserverShadowEvaluatorTests:
     func testShiftedResultIncrementsCounter() async {
         let model = SampleHostModel()
         let evaluator = RecordingEvaluator(
-            nextResult: BASShadowEvaluationResult(
+            nextResult: BASHostShadowEvaluation(
                 postPermitMode: "block",
                 postAuditCodeCount: 7,
                 shifted: true,
@@ -152,7 +152,7 @@ final class SampleHostBenchPostLLMObserverShadowEvaluatorTests:
     {
         let model = SampleHostModel()
         let evaluator = RecordingEvaluator(
-            nextResult: BASShadowEvaluationResult(
+            nextResult: BASHostShadowEvaluation(
                 postPermitMode: "answer",
                 postAuditCodeCount: 3,
                 shifted: false,  // ← key
@@ -178,7 +178,7 @@ final class SampleHostBenchPostLLMObserverShadowEvaluatorTests:
     // MARK: - 5. .from(_:) translation handles skipped
 
     func testFromTranslationHandlesSkipped() {
-        let skipped = BASShadowEvaluationResult.skipped(
+        let skipped = BASHostShadowEvaluation.skipped(
             evaluatorVersion: "v1")
         let observation =
             SampleHostBenchPostLLMObservation.from(
@@ -191,7 +191,7 @@ final class SampleHostBenchPostLLMObserverShadowEvaluatorTests:
     // MARK: - 6. .from(_:) propagates non-skip fields
 
     func testFromTranslationPropagatesFields() {
-        let result = BASShadowEvaluationResult(
+        let result = BASHostShadowEvaluation(
             postPermitMode: "delay",
             postAuditCodeCount: 5,
             shifted: true,
@@ -238,7 +238,7 @@ final class SampleHostBenchPostLLMObserverShadowEvaluatorTests:
     func testStaleGenerationDoesNotIncrementCounter() async {
         let model = SampleHostModel()
         let evaluator = RecordingEvaluator(
-            nextResult: BASShadowEvaluationResult(
+            nextResult: BASHostShadowEvaluation(
                 postPermitMode: "block",
                 postAuditCodeCount: 2,
                 shifted: true,
