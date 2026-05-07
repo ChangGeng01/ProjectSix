@@ -394,11 +394,31 @@ public enum BASChengluPreflightAdapter {
 // MARK: - ChengluMultiHead adapter (shared encoder + 4 outputs)
 
 /// Factory namespace for `ChengluMultiHead_v0.mlpackage` (chapter
-/// 一百八十一)。Single MLModel produces 4 distinct output keys;
+/// 一百八十一)。Single MLModel produces multiple output keys;
 /// each output gets its own `BASCoreMLLayerHead` instance at a
 /// different canonical slot per附录 X §X.2 doctrine。
 ///
-/// Canonical output keys + slot mappings:
+/// **Honest reality (chapter 三百三三 / M820 reality check)**:
+/// the currently shipped `ChengluMultiHead_v0.mlpackage` model
+/// has output keys `afm_success_prob` / `block_prob` /
+/// `length_norm` / `latency_norm` / `verbosity_prob` (a
+/// CONSOLIDATED version of preflight + permit + length + latency
+/// + verbosity)。
+///
+/// The constants below (`intentKey`, `emotionKey`, `riskKey`,
+/// `memoryImportanceKey`) are **ASPIRATIONAL** — they encode
+/// chapter 一百七十七 vision for future trainings (ChengluMemory
+/// P1 + Shadow P3 etc.) but no currently shipped model emits
+/// these keys。Hosts that pass `outputKey: intentKey` to
+/// `make(model:)` against the shipped model will get all-zero
+/// scores for that key (because the dictionary lookup misses)。
+///
+/// **For currently shipped MultiHead consumption**, hosts should
+/// pass the real output keys directly via the `outputKey:`
+/// parameter (e.g. `"afm_success_prob"`) — `make(model:)` is
+/// generic over outputKey already。
+///
+/// Aspirational canonical mappings (附录 X §X.2):
 ///   - `intent` → L4.question-type
 ///   - `emotion` → L6.emotion-classifier
 ///   - `risk` → L11.risk-scorer
@@ -452,7 +472,9 @@ public enum BASChengluMultiHeadAdapter {
     /// Construct one head per output key bound to real `MLModel`。
     /// Same `MLModel` instance can be wrapped 4 times — each
     /// adapter picks a different `outputKey` from the same
-    /// inference output。
+    /// inference output。Real `.mlpackage` uses `features:
+    /// MLMultiArray(shape: [1, 43])` input format (chapter 三百三二
+    /// fix pattern)。
     public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
@@ -460,10 +482,34 @@ public enum BASChengluMultiHeadAdapter {
         model: MLModel
     ) -> BASCoreMLLayerHead {
         let outKey = outputKey
-        return BASCoreMLLayerHead.makeFromMLModel(
+        let modelBox = ChengluMultiHeadAdapterModelBox(
+            model: model)
+        let inferenceClosure:
+            @Sendable (BASCoreMLFeatureFrame) async throws
+                -> BASCoreMLPredictionFrame
+            = { frame in
+                let startTime = Date()
+                let provider = try BASCoreMLLayerHead
+                    .makeMultiArrayFeatureProvider(
+                        values: frame.featureValues,
+                        orderedKeys: BASChengluFeatureEncoder
+                            .canonicalKeyOrder,
+                        featureKey: "features")
+                let result = try modelBox.model.prediction(
+                    from: provider)
+                let scores = BASCoreMLLayerHead
+                    .extractScores(from: result)
+                let elapsed = Date()
+                    .timeIntervalSince(startTime) * 1000
+                return BASCoreMLPredictionFrame(
+                    scores: scores,
+                    modelDescription:
+                        "ChengluMultiHead_v0:\(outKey)",
+                    inferenceLatencyMs: elapsed)
+            }
+        return BASCoreMLLayerHead(
             headID: headID,
             layerIDPin: layerIDPin,
-            model: model,
             featureExtractor: bASChengluFeatureExtractor,
             outputTransformer: { frame, input in
                 let score = frame.scores[outKey] ?? 0
@@ -482,7 +528,13 @@ public enum BASChengluMultiHeadAdapter {
                     inferenceLatencyMs:
                         frame.inferenceLatencyMs)
             },
-            modelDescription: "ChengluMultiHead_v0:\(outKey)")
+            inferenceClosure: inferenceClosure)
+    }
+
+    private struct ChengluMultiHeadAdapterModelBox:
+        @unchecked Sendable
+    {
+        let model: MLModel
     }
     #endif
 }
@@ -532,16 +584,42 @@ public enum BASChengluPermitPredictAdapter {
     }
 
     #if canImport(CoreML)
+    /// Real `.mlpackage` uses `features: MLMultiArray(shape: [1, 43])`
+    /// input format (chapter 三百三二 fix pattern)。
     public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         model: MLModel
     ) -> BASCoreMLLayerHead {
         let outKey = outputKey
-        return BASCoreMLLayerHead.makeFromMLModel(
+        let modelBox = ChengluPermitPredictAdapterModelBox(
+            model: model)
+        let inferenceClosure:
+            @Sendable (BASCoreMLFeatureFrame) async throws
+                -> BASCoreMLPredictionFrame
+            = { frame in
+                let startTime = Date()
+                let provider = try BASCoreMLLayerHead
+                    .makeMultiArrayFeatureProvider(
+                        values: frame.featureValues,
+                        orderedKeys: BASChengluFeatureEncoder
+                            .canonicalKeyOrder,
+                        featureKey: "features")
+                let result = try modelBox.model.prediction(
+                    from: provider)
+                let scores = BASCoreMLLayerHead
+                    .extractScores(from: result)
+                let elapsed = Date()
+                    .timeIntervalSince(startTime) * 1000
+                return BASCoreMLPredictionFrame(
+                    scores: scores,
+                    modelDescription:
+                        "ChengluPermitPredict_v0",
+                    inferenceLatencyMs: elapsed)
+            }
+        return BASCoreMLLayerHead(
             headID: headID,
             layerIDPin: layerIDPin,
-            model: model,
             featureExtractor: bASChengluFeatureExtractor,
             outputTransformer: { frame, input in
                 let blockProb = frame.scores[outKey] ?? 0
@@ -564,7 +642,13 @@ public enum BASChengluPermitPredictAdapter {
                     inferenceLatencyMs:
                         frame.inferenceLatencyMs)
             },
-            modelDescription: "ChengluPermitPredict_v0")
+            inferenceClosure: inferenceClosure)
+    }
+
+    private struct ChengluPermitPredictAdapterModelBox:
+        @unchecked Sendable
+    {
+        let model: MLModel
     }
     #endif
 }
@@ -634,6 +718,8 @@ public enum BASChengluLengthHeadAdapter {
     }
 
     #if canImport(CoreML)
+    /// Real `.mlpackage` uses `features: MLMultiArray(shape: [1, 43])`
+    /// input format (chapter 三百三二 fix pattern)。
     public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
@@ -642,10 +728,33 @@ public enum BASChengluLengthHeadAdapter {
         let outKey = outputKey
         let minLen = minSensibleLength
         let maxLen = maxSensibleLength
-        return BASCoreMLLayerHead.makeFromMLModel(
+        let modelBox = ChengluLengthHeadAdapterModelBox(
+            model: model)
+        let inferenceClosure:
+            @Sendable (BASCoreMLFeatureFrame) async throws
+                -> BASCoreMLPredictionFrame
+            = { frame in
+                let startTime = Date()
+                let provider = try BASCoreMLLayerHead
+                    .makeMultiArrayFeatureProvider(
+                        values: frame.featureValues,
+                        orderedKeys: BASChengluFeatureEncoder
+                            .canonicalKeyOrder,
+                        featureKey: "features")
+                let result = try modelBox.model.prediction(
+                    from: provider)
+                let scores = BASCoreMLLayerHead
+                    .extractScores(from: result)
+                let elapsed = Date()
+                    .timeIntervalSince(startTime) * 1000
+                return BASCoreMLPredictionFrame(
+                    scores: scores,
+                    modelDescription: "ChengluLengthHead_v0",
+                    inferenceLatencyMs: elapsed)
+            }
+        return BASCoreMLLayerHead(
             headID: headID,
             layerIDPin: layerIDPin,
-            model: model,
             featureExtractor: bASChengluFeatureExtractor,
             outputTransformer: { frame, input in
                 let length = frame.scores[outKey] ?? 0
@@ -666,7 +775,13 @@ public enum BASChengluLengthHeadAdapter {
                     inferenceLatencyMs:
                         frame.inferenceLatencyMs)
             },
-            modelDescription: "ChengluLengthHead_v0")
+            inferenceClosure: inferenceClosure)
+    }
+
+    private struct ChengluLengthHeadAdapterModelBox:
+        @unchecked Sendable
+    {
+        let model: MLModel
     }
     #endif
 }
@@ -718,6 +833,8 @@ public enum BASChengluLatencyHeadAdapter {
     }
 
     #if canImport(CoreML)
+    /// Real `.mlpackage` uses `features: MLMultiArray(shape: [1, 43])`
+    /// input format (chapter 三百三二 fix pattern)。
     public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
@@ -726,10 +843,33 @@ public enum BASChengluLatencyHeadAdapter {
         let outKey = outputKey
         let minLat = minSensibleLatency
         let maxLat = maxSensibleLatency
-        return BASCoreMLLayerHead.makeFromMLModel(
+        let modelBox = ChengluLatencyHeadAdapterModelBox(
+            model: model)
+        let inferenceClosure:
+            @Sendable (BASCoreMLFeatureFrame) async throws
+                -> BASCoreMLPredictionFrame
+            = { frame in
+                let startTime = Date()
+                let provider = try BASCoreMLLayerHead
+                    .makeMultiArrayFeatureProvider(
+                        values: frame.featureValues,
+                        orderedKeys: BASChengluFeatureEncoder
+                            .canonicalKeyOrder,
+                        featureKey: "features")
+                let result = try modelBox.model.prediction(
+                    from: provider)
+                let scores = BASCoreMLLayerHead
+                    .extractScores(from: result)
+                let elapsed = Date()
+                    .timeIntervalSince(startTime) * 1000
+                return BASCoreMLPredictionFrame(
+                    scores: scores,
+                    modelDescription: "ChengluLatencyHead_v0",
+                    inferenceLatencyMs: elapsed)
+            }
+        return BASCoreMLLayerHead(
             headID: headID,
             layerIDPin: layerIDPin,
-            model: model,
             featureExtractor: bASChengluFeatureExtractor,
             outputTransformer: { frame, input in
                 let latency = frame.scores[outKey] ?? 0
@@ -750,7 +890,13 @@ public enum BASChengluLatencyHeadAdapter {
                     inferenceLatencyMs:
                         frame.inferenceLatencyMs)
             },
-            modelDescription: "ChengluLatencyHead_v0")
+            inferenceClosure: inferenceClosure)
+    }
+
+    private struct ChengluLatencyHeadAdapterModelBox:
+        @unchecked Sendable
+    {
+        let model: MLModel
     }
     #endif
 }

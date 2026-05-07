@@ -142,23 +142,44 @@ final class BASChengluRealModelE2EHarnessTests: XCTestCase {
         }
     }
 
-    // MARK: - Real-model E2E (gated)
+    // MARK: - Real-model E2E (gated) — shared helper
 
     #if canImport(CoreML)
 
-    func testRealPreflightModelLoadsAndPredicts() async throws {
+    /// Build typed input + verify result has scores。Reused by
+    /// every gated test below to avoid copy-paste drift。
+    private func runGatedHeadInference(
+        head: BASCoreMLLayerHead,
+        layerID: BASMotherboardLayer14
+    ) async throws -> BASLayerInferenceOutput {
+        let ref = try BASChengluFeatureRefBuilder.build(
+            tone: "anxious", domain: "medical",
+            stake: "critical", timeframe: "today",
+            confidant: "trusted-ai", askShape: "question",
+            mutationSeed: 2)
+        let input = BASLayerInferenceInput(
+            layerID: layerID,
+            featureRef: ref,
+            confidenceFloor: .high)
+        let output = try await head.infer(input: input)
+        XCTAssertEqual(output.layerID, layerID)
+        XCTAssertFalse(
+            output.scores.isEmpty,
+            "Real CoreML inference must populate scores")
+        return output
+    }
+
+    private func loadGatedModel(
+        at url: URL?, envVarName: String
+    ) throws -> MLModel {
         try XCTSkipUnless(
             BASChengluRealModelE2EHarness.shouldRunE2E(),
             "QINAO_COREML_E2E not set — skipping real-model " +
             "E2E test (this is the CI default path)")
-
-        guard let url = BASChengluRealModelE2EHarness
-            .preflightModelURL
-        else {
+        guard let url = url else {
             throw XCTSkip(
-                "QINAO_CHENGLU_PREFLIGHT_PATH not set — " +
-                "skipping (E2E gate is on but specific path " +
-                "missing)")
+                "\(envVarName) not set — skipping (E2E " +
+                "gate is on but specific path missing)")
         }
         guard BASChengluRealModelE2EHarness.packageExists(
             at: url)
@@ -166,45 +187,163 @@ final class BASChengluRealModelE2EHarnessTests: XCTestCase {
             throw XCTSkip(
                 "Path \(url.path) does not exist — skipping")
         }
+        return try BASChengluRealModelE2EHarness.loadMLModel(
+            at: url)
+    }
 
-        // Load real MLModel + verify it has required output key
-        let model = try BASChengluRealModelE2EHarness
-            .loadMLModel(at: url)
-        XCTAssertNotNil(model.modelDescription)
+    // MARK: - Per-adapter gated E2E tests
 
-        // Wire through chapter 三百二一 adapter using parametric
-        // closure (since we're calling adapter's MLModel-bound
-        // factory via internal makeFromMLModel path)。
+    func testRealPreflightModelLoadsAndPredicts() async throws {
+        let model = try loadGatedModel(
+            at: BASChengluRealModelE2EHarness.preflightModelURL,
+            envVarName: "QINAO_CHENGLU_PREFLIGHT_PATH")
         let head = BASChengluPreflightAdapter.make(
             headID: "real-preflight-e2e",
             layerIDPin: .l1,
             model: model)
-
-        // Build typed input from canonical signature
-        let ref = try BASChengluFeatureRefBuilder.build(
-            tone: "anxious", domain: "medical",
-            stake: "critical", timeframe: "today",
-            confidant: "trusted-ai", askShape: "question",
-            mutationSeed: 2)
-        let input = BASLayerInferenceInput(
-            layerID: .l1,
-            featureRef: ref,
-            confidenceFloor: .high)
-
-        // Real inference call — this is the chapter 三百二〇/三百二一
-        // production reality test
-        let output = try await head.infer(input: input)
-        XCTAssertEqual(output.layerID, .l1)
-        // Must have populated scores from real model
-        XCTAssertFalse(
-            output.scores.isEmpty,
-            "Real CoreML inference must populate scores")
-        // Recommended action should be either afm-route or gemma-route
+        let output = try await runGatedHeadInference(
+            head: head, layerID: .l1)
         XCTAssertTrue(
             output.recommendedAction == "afm-route"
             || output.recommendedAction == "gemma-route",
-            "Preflight adapter must produce typed routing " +
-            "decision from real MLModel output")
+            "Preflight must produce typed routing decision")
+    }
+
+    /// Real shipped output keys for `ChengluMultiHead_v0.mlpackage`
+    /// (chapter 一百八十一+)。These are the **actual** keys the
+    /// shipped model produces — DIFFERENT from chapter 三百二一's
+    /// `intent`/`emotion`/`risk`/`memory_importance` aspirational
+    /// placeholders。Honest reality:
+    ///
+    ///   - `afm_success_prob`   — sigmoid: AFM-vs-Gemma route
+    ///   - `block_prob`          — sigmoid: block-vs-delay policy
+    ///   - `length_norm`         — regression: normalized length
+    ///   - `latency_norm`        — regression: normalized latency
+    ///   - `verbosity_prob`      — sigmoid: verbosity hint (5th
+    ///                             output added in newer training)
+    ///
+    /// The附录 X §X.2 doctrine slot mappings (l4.question-type ←
+    /// MultiHead.intent etc.) remain ASPIRATIONAL — no currently
+    /// shipped model has those output keys。Doctrine slot wiring
+    /// for them lives in chapter 三百二一 forward-compat for
+    /// future trainings (chapter 一百七十七 ChengluMemory P1 etc.)。
+    private static let realShippedMultiHeadKeys: [String] = [
+        "afm_success_prob",
+        "block_prob",
+        "length_norm",
+        "latency_norm"
+    ]
+
+    func testRealMultiHeadShippedKeysPopulated() async throws {
+        let model = try loadGatedModel(
+            at: BASChengluRealModelE2EHarness.multiHeadModelURL,
+            envVarName: "QINAO_CHENGLU_MULTIHEAD_PATH")
+        // Use ANY outputKey for the wrapper — adapter populates
+        // ALL output keys in scores regardless。
+        let head = BASChengluMultiHeadAdapter.make(
+            headID: "real-multihead-shipped-keys-e2e",
+            layerIDPin: .l4,
+            outputKey: "afm_success_prob",
+            model: model)
+        let output = try await runGatedHeadInference(
+            head: head, layerID: .l4)
+        // Verify the 4 SHIPPED output keys are populated。The
+        // adapter's allOutputKeys (intent/emotion/risk/memory_
+        // importance) are aspirational — no currently shipped
+        // model has them。
+        for key in Self.realShippedMultiHeadKeys {
+            XCTAssertNotNil(
+                output.scores[key],
+                "Real ChengluMultiHead_v0 model must populate " +
+                "\(key) score (this is a SHIPPED output key)。" +
+                "Chapter 三百二一's intent/emotion/risk/memory_" +
+                "importance keys are ASPIRATIONAL — not in " +
+                "any shipped model。")
+        }
+    }
+
+    func testRealMultiHeadAspirationalKeysAreNil() async throws {
+        // Doctrine pin: confirm chapter 三百二一's aspirational
+        // keys ARE NOT in the currently shipped model。If this
+        // test starts failing,it means a new MultiHead model
+        // got shipped with those keys — at which point chapter
+        // 三百二一's slot mapping becomes real and this test's
+        // intent should flip。
+        let model = try loadGatedModel(
+            at: BASChengluRealModelE2EHarness.multiHeadModelURL,
+            envVarName: "QINAO_CHENGLU_MULTIHEAD_PATH")
+        let head = BASChengluMultiHeadAdapter.make(
+            headID: "real-multihead-aspirational-check-e2e",
+            layerIDPin: .l4,
+            outputKey: "afm_success_prob",
+            model: model)
+        let output = try await runGatedHeadInference(
+            head: head, layerID: .l4)
+        for key in BASChengluMultiHeadAdapter.allOutputKeys {
+            XCTAssertNil(
+                output.scores[key],
+                "Aspirational key \(key) must NOT be in " +
+                "currently shipped model。If this fails,a " +
+                "new model was shipped — flip chapter 三百二一 " +
+                "doctrine note from aspirational to real。")
+        }
+    }
+
+    func testRealPermitPredictModelLoadsAndPredicts()
+        async throws
+    {
+        let model = try loadGatedModel(
+            at: BASChengluRealModelE2EHarness
+                .permitPredictModelURL,
+            envVarName: "QINAO_CHENGLU_PERMIT_PREDICT_PATH")
+        let head = BASChengluPermitPredictAdapter.make(
+            headID: "real-permit-predict-e2e",
+            layerIDPin: .l11,
+            model: model)
+        let output = try await runGatedHeadInference(
+            head: head, layerID: .l11)
+        XCTAssertTrue(
+            output.recommendedAction == "block"
+            || output.recommendedAction == "delay",
+            "Permit-predict must produce typed policy hint")
+    }
+
+    func testRealLengthHeadModelLoadsAndPredicts() async throws
+    {
+        let model = try loadGatedModel(
+            at: BASChengluRealModelE2EHarness
+                .lengthHeadModelURL,
+            envVarName: "QINAO_CHENGLU_LENGTH_PATH")
+        let head = BASChengluLengthHeadAdapter.make(
+            headID: "real-length-e2e",
+            layerIDPin: .l12,
+            model: model)
+        let output = try await runGatedHeadInference(
+            head: head, layerID: .l12)
+        let predicted = output.scores[
+            BASChengluLengthHeadAdapter.outputKey] ?? -1
+        XCTAssertTrue(
+            predicted.isFinite,
+            "Length regression must produce finite prediction")
+    }
+
+    func testRealLatencyHeadModelLoadsAndPredicts() async throws
+    {
+        let model = try loadGatedModel(
+            at: BASChengluRealModelE2EHarness
+                .latencyHeadModelURL,
+            envVarName: "QINAO_CHENGLU_LATENCY_PATH")
+        let head = BASChengluLatencyHeadAdapter.make(
+            headID: "real-latency-e2e",
+            layerIDPin: .l1,
+            model: model)
+        let output = try await runGatedHeadInference(
+            head: head, layerID: .l1)
+        let predicted = output.scores[
+            BASChengluLatencyHeadAdapter.outputKey] ?? -1
+        XCTAssertTrue(
+            predicted.isFinite,
+            "Latency regression must produce finite prediction")
     }
 
     #endif
