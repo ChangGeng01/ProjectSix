@@ -419,7 +419,11 @@ struct BASEBrainProgramBlueprintTests {
             "MeshSyncFrameMergeReport",
             // M807 (chapter 三百二〇) — Phase F (附录 X) 1st code cut:
             // typed CoreML prediction frame.
-            "CoreMLPredictionFrame"
+            "CoreMLPredictionFrame",
+            // M808 (chapter 三百二一) — Phase F (附录 X) 2nd code cut:
+            // typed mesh registration report for canonical 8-slot
+            // Chenglu CoreML adapter assembly.
+            "ChengluMeshRegistrationReport"
         ]
 
         #expect(BASEBrainSchemaGovernanceRegistry.governedSchemas.count == expectedObjects.count)

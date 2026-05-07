@@ -80,3 +80,71 @@ public struct BASCoreMLPredictionFrame:
         self.inferenceLatencyMs = max(0, inferenceLatencyMs)
     }
 }
+
+// MARK: - Mesh registration report (chapter 三百二一 / M808)
+
+/// Typed report describing which Chenglu heads got registered into
+/// a `BASLayerMLHedRegistry` via `BASChengluMeshRegistration
+/// .assemble(...)` (lives in BASAppleAdapters)。
+///
+/// Lives in BASRuntimeCore (not BASAppleAdapters) so the schema
+/// governance registry + Codable round-trip tests can reference it
+/// without importing the Apple-platform-only target。
+///
+/// Hosts emit `reasonCodes` into audit trail for observability。
+public struct BASChengluMeshRegistrationReport:
+    BASSchemaVersioned, Sendable, Equatable, Codable
+{
+    public static let currentSchemaVersion = "1.0.0"
+
+    public var schemaVersion: String
+
+    /// Total heads registered (max 8 when all 5 models present)。
+    public var registeredHeadCount: Int
+
+    /// Per-layer count of registered heads (key = `layer.rawValue`)。
+    /// Unused layers absent from this map。
+    public var perLayerCounts: [String: Int]
+
+    /// Names of MLModels caller didn't pass (e.g. ["multiHead",
+    /// "lengthHead"] if those 2 weren't loaded)。Empty when all
+    /// 5 models present。
+    public var missingMLModels: [String]
+
+    /// Typed audit reason codes for emission into substrate
+    /// trace。Caller appends these to `BASLayerActorOutput
+    /// .reasonCodes` or audit ledger。
+    public var reasonCodes: [String]
+
+    public init(
+        schemaVersion: String
+            = BASChengluMeshRegistrationReport
+                .currentSchemaVersion,
+        registeredHeadCount: Int = 0,
+        perLayerCounts: [String: Int] = [:],
+        missingMLModels: [String] = [],
+        reasonCodes: [String] = []
+    ) {
+        self.schemaVersion = schemaVersion
+        self.registeredHeadCount = max(0, registeredHeadCount)
+        self.perLayerCounts = perLayerCounts
+        self.missingMLModels = missingMLModels
+            .map {
+                $0.trimmingCharacters(
+                    in: .whitespacesAndNewlines)
+            }
+            .filter { !$0.isEmpty }
+        self.reasonCodes = reasonCodes
+            .map {
+                $0.trimmingCharacters(
+                    in: .whitespacesAndNewlines)
+            }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Whether all 8 canonical slots got real CoreML heads
+    /// registered (per附录 X §X.2 doctrine)。
+    public var isComplete: Bool {
+        registeredHeadCount == 8
+    }
+}

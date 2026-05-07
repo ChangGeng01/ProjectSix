@@ -1461,6 +1461,17 @@ public enum BASEBrainSchemaGovernanceRegistry {
             "CoreMLPredictionFrame",
             versionedType: BASCoreMLPredictionFrame.self,
             tests: ["schema.coreml_prediction_frame.current", "schema.coreml_prediction_frame.backward"]
+        ),
+
+        // M808 (chapter 三百二一) — Phase F (附录 X) 2nd code cut:
+        // typed mesh registration report for canonical 8-slot
+        // Chenglu CoreML adapter assembly (BASChengluMeshRegistration
+        // .assemble(...) lives in BASAppleAdapters). chapter 一百
+        // 七十七 vision § "14 层 × CoreML head mapping" doctrine.
+        entry(
+            "ChengluMeshRegistrationReport",
+            versionedType: BASChengluMeshRegistrationReport.self,
+            tests: ["schema.chenglu_mesh_registration_report.current", "schema.chenglu_mesh_registration_report.backward"]
         )
     ]
 
