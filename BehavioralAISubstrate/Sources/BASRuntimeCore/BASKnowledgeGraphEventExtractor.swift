@@ -463,24 +463,36 @@ public enum BASKnowledgeGraphEventExtractor {
                 // M888 cycle-detection-as-event:emit a typed
                 // synthetic `internalSignal` event so the
                 // detected cycle becomes a first-class citizen
-                // of the event log。Stable eventID (derived from
-                // the closing edge ID) makes this idempotent —
-                // re-extraction returns wasNew=false,no
-                // duplicate cycle events accumulate。
+                // of the event log。
                 //
-                // M890 fix (post-deep-review):timestamp must be
-                // strictly GREATER than `events.last.timestampMs`,
-                // not equal。Pre-M890 it was equal,which meant
-                // observer's high-water-mark advance landed on
-                // events.last,next extract used `since: hwm+1`,
-                // and the cycle event (with timestamp == events
-                // .last) fell BELOW the scan window → silently
-                // lost from subsequent extracts。+1 ensures the
-                // cycle event lands at exactly hwm+1,inside the
-                // next extract's `>=` filter window。
+                // M890 fix:timestamp = events.last.timestampMs
+                // + 1 so the cycle event lands inside next
+                // extract's `since: hwm+1` scan window。
+                //
+                // M892 fix (post-deep-audit v3):eventID is now
+                // `cycle:<sessionID>:project:<name>` — ONE per
+                // session per project,not per closing-edge-ID。
+                // Pre-M892 the ID was `cycle:<closingEdgeID>`
+                // which embedded `firstEventID`。On incremental
+                // extracts the `projectToFirstEventID` map is
+                // local-per-extract,so each new scan window
+                // captured a DIFFERENT first-event,producing a
+                // DIFFERENT closing-edge-ID → DIFFERENT cycle-
+                // eventID → idempotent check passed → unbounded
+                // cycle event accumulation on long sessions
+                // (potentially 360k cycle events over a 100h
+                // run with 1000-event extract intervals)。
+                //
+                // Post-M892:same project in same session always
+                // gets the same cycle-eventID,so re-detection
+                // is a no-op append (wasNew=false)。The graph
+                // edge itself still uses closing-edge-ID with
+                // firstEvent (preserves graph topology accuracy);
+                // only the LOG event signal is collapsed to one
+                // per project per session。
                 if let feedback = feedbackLog {
                     let cycleEventID =
-                        "cycle:\(closingEdgeID)"
+                        "cycle:\(sessionID):project:\(project)"
                     let baseTimestamp =
                         events.last?.timestampMs ?? 0
                     let cycleEvent = BASEventLogEntry(

@@ -505,7 +505,7 @@ final class BASKnowledgeGraphEventExtractorTests:
         let events = await log.events(
             forSession: "test-ssn")
         let cycleEvent = events.first { $0.eventID
-            .hasPrefix("cycle:h7-closing:") }
+            .hasPrefix("cycle:") }
         XCTAssertNotNil(cycleEvent,
             "Cycle feedback event must be appended")
         XCTAssertEqual(cycleEvent?.kind, .internalSignal)
@@ -567,6 +567,101 @@ final class BASKnowledgeGraphEventExtractorTests:
             scanned.contains { $0.eventID == cycleEvent.eventID },
             "Cycle event with timestamp 2001 must fall " +
             "inside `>= 2001` scan window")
+    }
+
+    func testM892IncrementalExtractDoesNotEmitDuplicateCycleEvents()
+        async throws
+    {
+        // M892 fix:cycle eventID is `cycle:<sessionID>:project:
+        // <name>` — same project in same session always produces
+        // the same cycle-eventID,so re-detection across multiple
+        // incremental extracts is a no-op append (wasNew=false)。
+        //
+        // Pre-M892 the eventID embedded firstEventID,which is
+        // local-per-extract,so each scan window with the same
+        // project produced a DIFFERENT closing-edge-ID →
+        // DIFFERENT cycle-eventID → unbounded growth on long
+        // sessions。
+        let log = BASInMemoryEventLogStorage()
+
+        // Window 1:events 1-3 form a delays cycle on alpha
+        _ = try await log.append(makeEvent(
+            eventID: "ev-1",
+            timestampMs: 1_000,
+            project: "alpha",
+            actions: ["permit:answer"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-2",
+            timestampMs: 1_500,
+            project: "alpha",
+            actions: ["skip:thermal"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-3",
+            timestampMs: 2_000,
+            project: "alpha",
+            actions: ["skip:overload"]))
+
+        let graph = BASKnowledgeGraph()
+
+        // First extract:full walk (no since)
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph,
+            feedbackLog: log)
+        let count1 = await log.totalCount
+        XCTAssertEqual(count1, 4,
+            "3 events + 1 cycle event = 4")
+
+        // Window 2:add 3 more events,extract incrementally
+        // with `since: 2_500`。`projectToFirstEventID` re-
+        // initializes locally → captures a NEW firstEvent
+        // (ev-100) different from window 1's firstEvent (ev-1)。
+        // Pre-M892 this would emit a SECOND cycle event with
+        // different eventID。Post-M892 the eventID is stable
+        // per (sessionID, project) → idempotent append。
+        _ = try await log.append(makeEvent(
+            eventID: "ev-100",
+            timestampMs: 3_000,
+            project: "alpha",
+            actions: ["permit:answer"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-101",
+            timestampMs: 3_500,
+            project: "alpha",
+            actions: ["skip:thermal"]))
+        _ = try await log.append(makeEvent(
+            eventID: "ev-102",
+            timestampMs: 4_000,
+            project: "alpha",
+            actions: ["skip:overload"]))
+
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph,
+            sinceTimestampMs: 2_500,
+            feedbackLog: log)
+
+        let count2 = await log.totalCount
+        XCTAssertEqual(count2, 7,
+            "Window 2 added 3 real events + 0 new cycle " +
+            "events (idempotent on cycle:test-ssn:project:alpha) = 7。" +
+            "Pre-M892 this would have been 8 (one new cycle " +
+            "event per window) → unbounded growth。")
+
+        // Verify there's exactly ONE cycle event in the log
+        let allEvents = await log.events(
+            forSession: "test-ssn")
+        let cycleEvents = allEvents.filter {
+            $0.eventID.hasPrefix("cycle:")
+        }
+        XCTAssertEqual(cycleEvents.count, 1,
+            "Exactly one cycle event per (session, project)")
+        XCTAssertEqual(
+            cycleEvents.first?.eventID,
+            "cycle:test-ssn:project:alpha",
+            "M892 stable eventID format pin")
     }
 
     func testHeuristic7CycleDetectableWithoutManualEdge()
