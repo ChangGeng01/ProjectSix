@@ -312,6 +312,23 @@ final class SampleHostChengluStressCognitiveOSObserver {
         lastExtractHighWaterMs = Int64(
             Date().timeIntervalSince1970 * 1000)
 
+        // Chapter 三百八八 / M879 fix:write the in-memory graph
+        // through to the SQLite storage companion when wired。
+        // Pre-M879 the M862 observer extracted into in-memory
+        // graph but never persisted nodes / edges,so M878's
+        // SQLite path produced empty graph.sqlite even when
+        // the JSON cognitiveOS summary reported large counts。
+        // M866 append APIs are idempotent,so repeated walks are
+        // no-ops on already-persisted rows。
+        if let storage = bundle?.knowledgeGraphStorage {
+            for node in await graph.allNodes() {
+                _ = try? await storage.appendNode(node)
+            }
+            for edge in await graph.allEdges() {
+                _ = try? await storage.appendEdge(edge)
+            }
+        }
+
         graphNodeCount = await graph.nodeCount
         graphEdgeCount = await graph.edgeCount
     }
