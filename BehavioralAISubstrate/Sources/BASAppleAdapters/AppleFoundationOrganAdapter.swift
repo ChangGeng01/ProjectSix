@@ -124,12 +124,33 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
         let options = GenerationOptions(
             temperature: request.preset.temperature)
 
+        // Chapter 三百八三 / M870 — A1 G6 AFM tool wire transparency:
+        // pre-M870 this method silently dropped `request.tools[]` +
+        // `request.outputSchema`。Post-M870 we still drop them at
+        // the SDK call (the iOS 26 `respond(to:tools:)` real wire
+        // ships when the FoundationModels Tool bridge stabilizes),
+        // but we now emit a typed audit signal via the trace ID so
+        // downstream observers can detect the gap。Hosts that need
+        // tool calling today should route through a cloud adapter
+        // (which honors `tools[]`) until this bridge activates。
+        let toolGap =
+            !request.tools.isEmpty
+                || request.outputSchema != nil
         let prompt = Self.prompt(for: request)
         let response = try await session.respond(
             to: prompt,
             options: options)
 
         let body = response.content
+
+        // Post-fix: build the trace ID with the tools-dropped
+        // audit suffix when applicable (typed,grep-able)
+        let baseTrace = BASOrganDeterministicAdapter.digest(
+            for: request, providerID: descriptor.providerID)
+        let traceID = toolGap
+            ? "\(baseTrace)#afm-tools-dropped-no-sdk-bridge"
+            : baseTrace
+
         return BASOrganDraft(
             requestID: request.requestID,
             providerID: descriptor.providerID,
@@ -141,8 +162,7 @@ public actor AppleFoundationOrganAdapter: BASOrganAdapter {
             outputTokensEstimated: BASOrganDeterministicAdapter
                 .estimateTokens(from: [body]),
             producedAt: Date(),
-            traceID: BASOrganDeterministicAdapter.digest(
-                for: request, providerID: descriptor.providerID))
+            traceID: traceID)
     }
     #endif
 

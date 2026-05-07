@@ -237,19 +237,55 @@ public enum BASCognitiveOSLayerActorFactories {
                 killSwitchLookup: killSwitchLookup))
     }
 
-    // L7 actor factory deferred to M851 — depends on G6 AFM
-    // tool calling for structured planner output. Budget
-    // constants (l7AllocatedMs / l7HardCapMs) are pre-defined
-    // in BASCognitiveOSLayerBudgetDefaults so the M851 wire-up
-    // is a 1-method addition (no schema bump).
-
-    /// Build all 3 cognitive-OS-extended layer actors shipped
-    /// in M848 (L2 / L3 / L5)。Convenience for hosts that want
-    /// the full opt-in extended set wired in one call。
+    /// L7 (planner / problem decomposition) actor — chapter 三百
+    /// 八三 / M870。Layer-pinned reference actor for AFM-driven
+    /// structured generation (canonical roles:
+    /// `problem-decomposer`, `tool-call-planner`,
+    /// `subgoal-emitter`)。
     ///
-    /// L7 not included here — when M851 ships its factory,this
-    /// helper will be extended to return 4 actors。Tests pin
-    /// the M848 count at 3 to detect that future extension。
+    /// **Substrate-only**:this factory ships the wiring the same
+    /// way M848's L2 / L3 / L5 factories do — pure
+    /// `BASLayerReferenceActor` configured with the L7 budget。
+    /// Hosts compose L7 with G6 AFM tool calling primitives (M851
+    /// `BASTool` typed primitives + M852 organ request `tools[]` +
+    /// M853 outputSchema) by populating the L7 mesh slots' inference
+    /// closures to call into AFM `respond(to:tools:)` when the
+    /// adapter wire ships at the SDK layer。
+    ///
+    /// **Composition note (per pre-M870 audit)**:the AFM organ
+    /// adapter currently emits a typed audit code
+    /// `afm:tools:dropped:no-sdk-bridge` when a request carries
+    /// non-empty `tools[]` and the iOS 26 SDK bridge isn't yet
+    /// active。Hosts opt in to L7 + tools今天就可以,接收 audit
+    /// signal,然后在 SDK bridge 真正激活时换接 — 不需要 schema
+    /// bump。
+    public static func makeL7Actor(
+        registry: BASLayerMLHeadRegistry,
+        budgetOverride: BASLayerSlice? = nil,
+        killSwitchLookup:
+            @escaping @Sendable (BASLayerKillSwitchID)
+                -> BASLayerKillSwitchState?
+            = BASChengluLayerActorFactories
+                .noopKillSwitchLookup
+    ) -> BASLayerReferenceActor {
+        let budget = budgetOverride
+            ?? BASCognitiveOSLayerBudgetDefaults.budget(
+                for: .l7)!
+        return BASLayerReferenceActor(
+            config: BASLayerReferenceActorConfig(
+                layerID: .l7,
+                budget: budget,
+                registry: registry,
+                killSwitchLookup: killSwitchLookup))
+    }
+
+    /// Build all 4 cognitive-OS-extended layer actors (L2 / L3 /
+    /// L5 / L7) per chapter 三百八三 / M870。Convenience for hosts
+    /// that want the full opt-in extended set wired in one call。
+    ///
+    /// **Pre-M870**: returned 3 actors (L7 deferred)。**M870**:
+    /// extended to 4 with the L7 planner factory。Tests pin this
+    /// count + verify L7 layer ID on the 4th element。
     public static func makeAllCognitiveOSExtendedActors(
         registry: BASLayerMLHeadRegistry,
         killSwitchLookup:
@@ -266,6 +302,9 @@ public enum BASCognitiveOSLayerActorFactories {
                 registry: registry,
                 killSwitchLookup: killSwitchLookup),
             makeL5Actor(
+                registry: registry,
+                killSwitchLookup: killSwitchLookup),
+            makeL7Actor(
                 registry: registry,
                 killSwitchLookup: killSwitchLookup)
         ]

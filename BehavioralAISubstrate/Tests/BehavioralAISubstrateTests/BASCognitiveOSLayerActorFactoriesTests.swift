@@ -124,6 +124,17 @@ final class BASCognitiveOSLayerActorFactoriesTests:
         XCTAssertEqual(layerID, .l5)
     }
 
+    // MARK: - L7 (M870 — chapter 三百八三)
+
+    func testL7ActorIsPinnedToL7() async {
+        let actor = BASCognitiveOSLayerActorFactories
+            .makeL7Actor(registry: makeRegistry())
+        let layerID = await actor.layerID
+        XCTAssertEqual(
+            layerID, .l7,
+            "M870 L7 planner factory must pin to L7 layer")
+    }
+
     // Budget override correctness is covered by the typed
     // BASCognitiveOSLayerBudgetDefaults pin tests above + the
     // `BASLayerReferenceActorConfig.budget` field's mechanical
@@ -136,15 +147,14 @@ final class BASCognitiveOSLayerActorFactoriesTests:
 
     // MARK: - makeAllCognitiveOSExtendedActors
 
-    func testMakeAllReturnsThreeActorsInOrder() async {
+    func testMakeAllReturnsFourActorsInOrder() async {
         let actors = BASCognitiveOSLayerActorFactories
             .makeAllCognitiveOSExtendedActors(
                 registry: makeRegistry())
-        XCTAssertEqual(actors.count, 3,
-            "M848 ships 3 cognitive-OS-extended actors " +
-            "(L2 + L3 + L5). L7 deferred to M851. When " +
-            "M851 ships, this count bumps to 4 and this " +
-            "test catches the change.")
+        XCTAssertEqual(actors.count, 4,
+            "M870 ships 4 cognitive-OS-extended actors " +
+            "(L2 + L3 + L5 + L7). L7 added in chapter 三百" +
+            "八三 / M870 closure。Pre-M870 this count was 3。")
         let layerIDs = await withTaskGroup(
             of: BASMotherboardLayer14.self,
             returning: [BASMotherboardLayer14].self
@@ -159,12 +169,12 @@ final class BASCognitiveOSLayerActorFactoriesTests:
             return collected
         }
         // Order isn't guaranteed by TaskGroup but the SET
-        // should be exactly {L2, L3, L5}
+        // should be exactly {L2, L3, L5, L7}
         XCTAssertEqual(
             Set(layerIDs),
-            Set([.l2, .l3, .l5]),
+            Set([.l2, .l3, .l5, .l7]),
             "makeAllCognitiveOSExtendedActors must produce " +
-            "actors for L2 + L3 + L5")
+            "actors for L2 + L3 + L5 + L7 (M870 closure)")
     }
 
     // MARK: - cognitiveOSExtendedLayers / M848 set pins
