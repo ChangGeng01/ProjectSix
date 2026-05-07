@@ -524,7 +524,6 @@
 		F955E5F64B8623E3E4C28FC0 /* DecisionEvolutionWorkspaceSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 497D7CC3CDE61F7BCE40EB02 /* DecisionEvolutionWorkspaceSnapshotTests.swift */; };
 		F9BD2BED06676E7550F737F7 /* DecisionContextLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 167E5FF74A76B475CE75CC1F /* DecisionContextLifecycleTests.swift */; };
 		F9E1151C7529383382623872 /* TomorrowBoxDelayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 089FFE692CB2D08A060A21AC /* TomorrowBoxDelayTests.swift */; };
-		FA48CB3BFB2C48996835826B /* BASMLXAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = 9157955B9D0279CB329D3E7F /* BASMLXAdapter */; };
 		FA6CD0411FF0C7906E7A36A5 /* DecisionBrainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1C0C323D158521A815D9BE /* DecisionBrainState.swift */; };
 		FC0E461363A93C5121E51141 /* SupportInboxStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24184A62A2B7E01F7BEA869A /* SupportInboxStoreTests.swift */; };
 		FD5DE461606E818CE5229E43 /* OpenQuickCheckIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEDCB8C02350F6CC22C4DAAC /* OpenQuickCheckIntent.swift */; };
@@ -1045,7 +1044,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				24AB126F10A3A28E9051B751 /* BASHostKit in Frameworks */,
-				FA48CB3BFB2C48996835826B /* BASMLXAdapter in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1763,7 +1761,6 @@
 			name = SampleHost;
 			packageProductDependencies = (
 				B472957FD46CB58B0B54EFBF /* BASHostKit */,
-				9157955B9D0279CB329D3E7F /* BASMLXAdapter */,
 			);
 			productName = SampleHost;
 			productReference = 447B7BAA40D3536FE8A71BC4 /* SampleHost.app */;
@@ -3064,11 +3061,6 @@
 		459D4EA551298DA6B3E45C28 /* BASHostKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = BASHostKit;
-		};
-		9157955B9D0279CB329D3E7F /* BASMLXAdapter */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 61B7D071D6FD841E5139CB2E /* XCLocalSwiftPackageReference "BehavioralAISubstrate" */;
-			productName = BASMLXAdapter;
 		};
 		B472957FD46CB58B0B54EFBF /* BASHostKit */ = {
 			isa = XCSwiftPackageProductDependency;

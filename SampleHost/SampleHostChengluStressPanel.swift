@@ -37,6 +37,16 @@ struct SampleHostChengluStressPanel: View {
     /// without filesystem permission concerns)。
     @State private var cognitiveOSEnabled: Bool = false
 
+    /// Chapter 三百八七 / M878: optional SQLite persistence for
+    /// cognitive OS observer state。Default OFF keeps M862
+    /// contract (in-memory,vanishes on app dismiss)。When ON,
+    /// the four primitives write through to SQLite under
+    /// `Documents/cognitive-os-runs/<runID>/`,letting hosts
+    /// retrieve the full data loop via `xcrun devicectl device
+    /// copy from` after a long-running stress test。Disabled
+    /// when cognitive OS toggle itself is OFF。
+    @State private var cognitiveOSPersist: Bool = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -127,17 +137,36 @@ struct SampleHostChengluStressPanel: View {
 
     @ViewBuilder
     private var cognitiveOSToggle: some View {
-        Toggle(isOn: $cognitiveOSEnabled) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Cognitive OS observer (M862)")
-                    .font(.caption)
-                Text("Wires M859 builder → event log + state " +
-                    "+ graph during run。In-memory only。")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(isOn: $cognitiveOSEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Cognitive OS observer (M862)")
+                        .font(.caption)
+                    Text("Wires M859 builder → event log + " +
+                        "state + graph + auto eval during run")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .disabled(runner.isRunning)
+
+            // Chapter 三百八七 / M878: SQLite persistence
+            // sub-toggle (only meaningful when cognitive OS
+            // toggle itself is ON)
+            Toggle(isOn: $cognitiveOSPersist) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("↳ Persist to SQLite (M878)")
+                        .font(.caption)
+                    Text("Survives app dismiss。Pull via " +
+                        "devicectl device copy from。")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .disabled(runner.isRunning
+                || !cognitiveOSEnabled)
+            .padding(.leading, 16)
         }
-        .disabled(runner.isRunning)
     }
 
     @ViewBuilder
@@ -168,17 +197,65 @@ struct SampleHostChengluStressPanel: View {
         }
     }
 
-    /// Chapter 三百七五 / M862: assemble the cognitive OS bundle
-    /// options the panel chose。In-memory across all primitives
-    /// (no SQLite URLs — keeps toggle frictionless)。
+    /// Chapter 三百七五 / M862 + 三百八七 / M878: assemble the
+    /// cognitive OS bundle options the panel chose。Default
+    /// (M862) is in-memory across all primitives。M878 added
+    /// optional SQLite persistence wiring when the persist sub-
+    /// toggle is ON — files land under
+    /// `Documents/cognitive-os-runs/<runID>/`。
     private func cognitiveOSOptions()
         -> BASCognitiveOSBundleOptions
     {
         guard cognitiveOSEnabled else { return .allDisabled }
+
+        if cognitiveOSPersist,
+           let dir = Self.makeCognitiveOSPersistDir()
+        {
+            return BASCognitiveOSBundleOptions(
+                enableEventLog: true,
+                eventLogSQLiteURL:
+                    dir.appendingPathComponent(
+                        "events.sqlite"),
+                enableUserState: true,
+                userStateSQLiteURL:
+                    dir.appendingPathComponent(
+                        "state.sqlite"),
+                enableKnowledgeGraph: true,
+                knowledgeGraphSQLiteURL:
+                    dir.appendingPathComponent(
+                        "graph.sqlite"))
+        }
+
+        // M862 default path: in-memory
         return BASCognitiveOSBundleOptions(
             enableEventLog: true,
             enableUserState: true,
             enableKnowledgeGraph: true)
+    }
+
+    /// M878: ensure `Documents/cognitive-os-runs/<runID>/` exists
+    /// + return its URL。runID is timestamp-prefixed so each run
+    /// gets its own directory (no overwrite of prior data)。
+    /// Returns nil if Documents directory can't be resolved
+    /// (extremely unlikely on iOS,defensive)。
+    private static func makeCognitiveOSPersistDir() -> URL? {
+        guard let docs = try? FileManager.default.url(
+            for: .documentDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true)
+        else { return nil }
+        let stamp = ISO8601DateFormatter().string(
+            from: Date())
+            .replacingOccurrences(of: ":", with: "-")
+        let dir = docs
+            .appendingPathComponent(
+                "cognitive-os-runs", isDirectory: true)
+            .appendingPathComponent(
+                "run-\(stamp)", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true)
+        return dir
     }
 
     @ViewBuilder

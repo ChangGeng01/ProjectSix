@@ -162,6 +162,15 @@ public enum BASKnowledgeGraphEventExtractor {
     ///     closing causes edge。Default
     ///     `closingEdgeDelaysThreshold` (2)。Pass 0 to disable
     ///     heuristic 7 entirely。
+    ///   - sinceTimestampMs: chapter 三百八七 / M877 incremental
+    ///     mode。When non-nil,extractor reads only events with
+    ///     `timestampMs >= since` AND filters to the supplied
+    ///     `sessionID`。Closes the long-run cap problem
+    ///     (M862 observer's 5000-event extractEventCap means
+    ///     hosts running > 1h see ZERO graph updates after the
+    ///     first 5 extracts)。Caller tracks the high-water-mark
+    ///     across calls;default nil preserves M857 full-walk
+    ///     semantics for back-compat。
     /// - Returns: typed result bundle
     public static func extract(
         from eventLog: any BASEventLogStorage,
@@ -169,10 +178,30 @@ public enum BASKnowledgeGraphEventExtractor {
         into graph: BASKnowledgeGraph,
         closingEdgeThreshold: Int =
             BASKnowledgeGraphEventExtractor
-                .closingEdgeDelaysThreshold
+                .closingEdgeDelaysThreshold,
+        sinceTimestampMs: Int64? = nil
     ) async -> BASKnowledgeGraphEventExtractionResult {
-        let events = await eventLog.events(
-            forSession: sessionID)
+        let events: [BASEventLogEntry]
+        if let since = sinceTimestampMs {
+            // M877 incremental path: timestamp-bounded scan
+            // then session filter。Storage protocol's
+            // `events(sinceTimestampMs:limit:)` returns
+            // ALL sessions matching the timestamp range,so
+            // we filter session-side in-memory。Hosts that
+            // want SQL-level WHERE filtering can extend the
+            // protocol with a typed scoped-since method
+            // when needed (chapter 二百一一 — extend the
+            // existing protocol rather than fork)。
+            let unfiltered = await eventLog.events(
+                sinceTimestampMs: since,
+                limit: Int.max)
+            events = unfiltered.filter {
+                $0.sessionID == sessionID
+            }
+        } else {
+            events = await eventLog.events(
+                forSession: sessionID)
+        }
         var addedNodes = 0
         var addedEdges = 0
         var skippedEvents = 0

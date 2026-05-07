@@ -410,7 +410,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                     let checkpoint = StressRunResult(
                         schemaVersion: StressRunResult
                             .currentSchemaVersion,
-                        buildChapter: "M837",
+                        buildChapter: "M876",
                         phase: .checkpoint,
                         timestamp: Date(),
                         requestedDurationSeconds:
@@ -437,7 +437,20 @@ final class SampleHostChengluStressRunner: ObservableObject {
                         perMinuteP99Ms: perMinuteP99Ms,
                         device: StressRunResult.DeviceInfo
                             .current(),
-                        cancelled: false)
+                        cancelled: false,
+                        cognitiveOS:
+                            self.cognitiveOSEnabled
+                            ? StressRunResult
+                                .CognitiveOSSummary(
+                                eventCount: observer
+                                    .eventCount,
+                                stateCount: observer
+                                    .stateCount,
+                                graphNodeCount: observer
+                                    .graphNodeCount,
+                                graphEdgeCount: observer
+                                    .graphEdgeCount)
+                            : nil)
                     _ = try? Self.persistResult(checkpoint)
                     nextCheckpointSec +=
                         Constants.checkpointPersistIntervalSec
@@ -518,7 +531,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
         let cancelled = Task.isCancelled
         let result = StressRunResult(
             schemaVersion: StressRunResult.currentSchemaVersion,
-            buildChapter: "M837",
+            buildChapter: "M876",
             phase: cancelled ? .cancelled : .final,
             timestamp: Date(),
             requestedDurationSeconds: durationSeconds,
@@ -541,7 +554,17 @@ final class SampleHostChengluStressRunner: ObservableObject {
             perMinuteThroughput: perMinuteThroughput,
             perMinuteP99Ms: perMinuteP99Ms,
             device: StressRunResult.DeviceInfo.current(),
-            cancelled: cancelled)
+            cancelled: cancelled,
+            // M876: typed cognitive OS summary on every save
+            // when observer was wired (final + checkpoint paths
+            // share the same construction)
+            cognitiveOS: self.cognitiveOSEnabled
+                ? StressRunResult.CognitiveOSSummary(
+                    eventCount: observer.eventCount,
+                    stateCount: observer.stateCount,
+                    graphNodeCount: observer.graphNodeCount,
+                    graphEdgeCount: observer.graphEdgeCount)
+                : nil)
         do {
             let saved = try Self.persistResult(result)
             self.lastSavedRelativePath = saved.relativePath
@@ -747,8 +770,12 @@ final class SampleHostChengluStressRunner: ObservableObject {
 /// Schema-versioned for forward-compat。Schema 1.1.0 (chapter
 /// 三百五〇 / M837) added `phase`, `perMinuteThroughput`,
 /// `perMinuteP99Ms` for 8h drift detection + checkpoint support。
+/// Schema 1.2.0 (chapter 三百八七 / M876) added cognitiveOS field
+/// for typed cognitive OS observer metrics — pre-M876 these were
+/// only in the human-readable progressLog text。Field is nil
+/// when observer was disabled or not yet wired (M826/M837 hosts)。
 struct StressRunResult: Codable, Equatable, Sendable {
-    static let currentSchemaVersion: String = "1.1.0"
+    static let currentSchemaVersion: String = "1.2.0"
 
     /// Lifecycle phase at the moment this record was persisted。
     /// `checkpoint` = mid-run periodic save (every 60s wall-clock)。
@@ -800,6 +827,21 @@ struct StressRunResult: Codable, Equatable, Sendable {
 
     let device: DeviceInfo
     let cancelled: Bool
+
+    /// Chapter 三百八七 / M876: typed cognitive OS observer
+    /// metrics。Nil when observer disabled or wasn't wired
+    /// (preserves backward-compat with pre-M876 stress runs)。
+    let cognitiveOS: CognitiveOSSummary?
+
+    /// M876 typed snapshot of cognitive OS observer state at
+    /// end-of-run。Mirrors the runner's @Published cognitive OS
+    /// fields but is Codable for persistence。
+    struct CognitiveOSSummary: Codable, Equatable, Sendable {
+        let eventCount: Int
+        let stateCount: Int
+        let graphNodeCount: Int
+        let graphEdgeCount: Int
+    }
 
     struct DeviceInfo: Codable, Equatable, Sendable {
         let model: String
