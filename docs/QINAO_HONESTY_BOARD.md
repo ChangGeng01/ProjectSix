@@ -26211,11 +26211,11 @@ Post-chapter-三百二三:           BAS 3502 (+11)
 
   1. ✅ Real `.mlpackage` adapters bridged into mesh — chapter 三百二一 ships 5 concrete Chenglu wrappers + 8-slot canonical assembly
   2. ✅ Substrate consumer wire-up — chapter 三百二三 ships opt-in `BASHostRuntime` mesh hook
-  3. ⏳ Layer-specific reference actors — `BASLayerActor` protocol exists; concrete `actor MyL11Actor: BASLayerActor` implementations could be shipped per layer (deferred — Phase Gamma scope)
+  3. ✅ Layer-specific reference actor factories — chapter 三百二七 ships `BASChengluLayerActorFactories` with 6 per-layer factories + canonical default budgets + `makeAllChengluActors` convenience
   4. ⏳ Production deployment validation — real iPhone user runs verifying mesh consumption doesn't regress (deferred — external work)
   5. ⏳ Cross-instance / multi-host mesh sync transport — `BASMeshSyncFrame` schema-only at chapter 三百一九 (deferred — needs Phase Gamma doctrine first)
 
-**Closed: 2 of 5. Deferred: 3 of 5.**
+**Closed: 3 of 5. Deferred: 2 of 5 (both external).**
 
 ### 九、 Honest scope acknowledgement (附录 X §X.7)
 
