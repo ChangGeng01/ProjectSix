@@ -257,6 +257,19 @@ public struct BASCognitiveOSBundle: Sendable {
     /// OS state。Async because the underlying primitives are
     /// actors。Cheap (4 actor reads max);hosts can call per-
     /// turn without overhead concerns。
+    ///
+    /// **Atomicity caveat (M890 post-deep-review)**: the 4
+    /// counts are read SEQUENTIALLY across actor boundaries,not
+    /// atomically。Between `eventLog.totalCount` and
+    /// `knowledgeGraph.edgeCount`,observer code may append more
+    /// events / fold state / extract graph — the returned
+    /// snapshot is an APPROXIMATE point-in-time view,not a
+    /// transactional one。Hosts that need a strictly consistent
+    /// view (e.g. for invariant checks like
+    /// `events == graph_node_count`) should pause observation
+    /// before calling snapshot。For dashboards,UI tickers,
+    /// and per-turn observability the approximate view is
+    /// sufficient。
     public func snapshot() async -> Snapshot {
         let events = await eventLog?.totalCount ?? 0
         let states = await userStateStore?.totalCount ?? 0
@@ -276,11 +289,22 @@ public struct BASCognitiveOSBundle: Sendable {
     /// loops per user-vision §10 (anxiety → add tech → can't
     /// finish → anxiety)。Returns empty when graph not wired
     /// or no matching cycles found。
-    public func detectComplexityLoops()
-        async -> [BASKnowledgeCycle]
-    {
+    ///
+    /// M890 (post-deep-review):exposes `maxLength` + `maxCycles`
+    /// so hosts with dense graphs can pull more than the default
+    /// 32 cycles per call。Defaults match
+    /// `BASKnowledgeGraph.defaultMaxCycleLength` (8) +
+    /// `defaultMaxCyclesReturned` (32) for back-compat。
+    public func detectComplexityLoops(
+        maxLength: Int =
+            BASKnowledgeGraph.defaultMaxCycleLength,
+        maxCycles: Int =
+            BASKnowledgeGraph.defaultMaxCyclesReturned
+    ) async -> [BASKnowledgeCycle] {
         guard let graph = knowledgeGraph else { return [] }
         return await graph.detectCycles(
+            maxLength: maxLength,
+            maxCycles: maxCycles,
             filter: { cycle in
                 cycle.containsEdgeKind(.delays)
             })

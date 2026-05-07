@@ -467,13 +467,25 @@ public enum BASKnowledgeGraphEventExtractor {
                 // the closing edge ID) makes this idempotent —
                 // re-extraction returns wasNew=false,no
                 // duplicate cycle events accumulate。
+                //
+                // M890 fix (post-deep-review):timestamp must be
+                // strictly GREATER than `events.last.timestampMs`,
+                // not equal。Pre-M890 it was equal,which meant
+                // observer's high-water-mark advance landed on
+                // events.last,next extract used `since: hwm+1`,
+                // and the cycle event (with timestamp == events
+                // .last) fell BELOW the scan window → silently
+                // lost from subsequent extracts。+1 ensures the
+                // cycle event lands at exactly hwm+1,inside the
+                // next extract's `>=` filter window。
                 if let feedback = feedbackLog {
                     let cycleEventID =
                         "cycle:\(closingEdgeID)"
+                    let baseTimestamp =
+                        events.last?.timestampMs ?? 0
                     let cycleEvent = BASEventLogEntry(
                         eventID: cycleEventID,
-                        timestampMs:
-                            events.last?.timestampMs ?? 0,
+                        timestampMs: baseTimestamp + 1,
                         kind: .internalSignal,
                         sessionID: sessionID,
                         sequenceNumber: 0,

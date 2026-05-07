@@ -470,6 +470,105 @@ final class BASKnowledgeGraphEventExtractorTests:
             }))
     }
 
+    // MARK: - M888 / M890 cycle-feedback event
+
+    func testM888CycleEventEmittedToFeedbackLog()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(
+            eventID: "first-evt",
+            timestampMs: 1_000,
+            project: "alpha",
+            actions: ["permit:answer"]))
+        _ = try await log.append(makeEvent(
+            eventID: "skip-1",
+            timestampMs: 2_000,
+            project: "alpha",
+            actions: ["skip:thermal-pause"]))
+        _ = try await log.append(makeEvent(
+            eventID: "skip-2",
+            timestampMs: 3_000,
+            project: "alpha",
+            actions: ["skip:cooling"]))
+        let graph = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph,
+            feedbackLog: log)
+
+        // Event log must now contain the cycle event
+        let total = await log.totalCount
+        XCTAssertEqual(total, 4,
+            "3 input events + 1 cycle feedback event = 4")
+        let events = await log.events(
+            forSession: "test-ssn")
+        let cycleEvent = events.first { $0.eventID
+            .hasPrefix("cycle:h7-closing:") }
+        XCTAssertNotNil(cycleEvent,
+            "Cycle feedback event must be appended")
+        XCTAssertEqual(cycleEvent?.kind, .internalSignal)
+        XCTAssertEqual(cycleEvent?.project, "alpha")
+        XCTAssertEqual(
+            cycleEvent?.actions.first,
+            "cycle-detected:project:alpha")
+    }
+
+    func testM890CycleEventTimestampIncludedInNextScan()
+        async throws
+    {
+        // M890 fix:cycle event timestamp must be strictly
+        // greater than events.last.timestampMs so that the next
+        // incremental extract's `since: hwm+1` filter includes
+        // the cycle event in its scan window。Pre-M890 the
+        // timestamp equaled events.last → cycle event silently
+        // dropped from subsequent extracts。
+        let log = BASInMemoryEventLogStorage()
+        _ = try await log.append(makeEvent(
+            eventID: "evt-1",
+            timestampMs: 1_000,
+            project: "alpha",
+            actions: ["skip:overload"]))
+        _ = try await log.append(makeEvent(
+            eventID: "evt-2",
+            timestampMs: 2_000,
+            project: "alpha",
+            actions: ["skip:thermal"]))
+        let graph = BASKnowledgeGraph()
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: "test-ssn",
+            into: graph,
+            feedbackLog: log)
+
+        let events = await log.events(forSession: "test-ssn")
+        guard let cycleEvent = events.first(where: {
+            $0.eventID.hasPrefix("cycle:")
+        }) else {
+            XCTFail("Cycle event not emitted")
+            return
+        }
+        XCTAssertEqual(
+            cycleEvent.timestampMs, 2_001,
+            "M890 pin:cycle event timestamp must be " +
+            "events.last.timestampMs + 1 (=2001),NOT == " +
+            "events.last (=2000)。If pre-M890 logic regresses " +
+            "back to ==events.last,a hwm-advance to 2000 + " +
+            "scan-since 2001 would silently drop the cycle " +
+            "event from next extract。")
+
+        // Simulate next extract with `since: 2001`
+        // (i.e. events.last + 1) — must INCLUDE the cycle event
+        let scanSince: Int64 = 2_001
+        let scanned = await log.events(
+            sinceTimestampMs: scanSince, limit: Int.max)
+        XCTAssertTrue(
+            scanned.contains { $0.eventID == cycleEvent.eventID },
+            "Cycle event with timestamp 2001 must fall " +
+            "inside `>= 2001` scan window")
+    }
+
     func testHeuristic7CycleDetectableWithoutManualEdge()
         async throws
     {
