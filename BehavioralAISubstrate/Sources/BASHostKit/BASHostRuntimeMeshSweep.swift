@@ -178,8 +178,23 @@ public extension BASHostRuntime {
             guard let result = try await runMeshCascade(
                 input: layerInput, layerID: layer)
             else {
-                // Should not happen: hasMeshRegistry was true.
-                // Defensive bail-out preserves contract。
+                // Chapter 三百四七 / M834 fix: previous defensive
+                // bail-out returned partial result with NO
+                // reason code → host saw silent truncation。
+                // If `hasMeshRegistry` returned true at line 162
+                // but `runMeshCascade` returns nil here,that's
+                // an invariant violation (registry actor became
+                // invalid mid-sweep — should be impossible
+                // because BASHostRuntime.meshRegistry is a `let`
+                // and the actor is reference-stable)。
+                //
+                // Emit typed reason code so audit can detect
+                // this state if it ever occurs,instead of
+                // silent truncation。
+                aggregated.append(
+                    "mesh-sweep:partial-bail-out:" +
+                    "after-layer:\(layer.rawValue):" +
+                    "invariant-violated")
                 return BASHostMeshSweepResult(
                     layerEntries: entries,
                     aggregatedReasonCodes: aggregated)

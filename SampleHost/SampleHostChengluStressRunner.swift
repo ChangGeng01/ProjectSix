@@ -154,6 +154,13 @@ final class SampleHostChengluStressRunner: ObservableObject {
         let runDeadline = runStart.advanced(by:
             .seconds(Int(durationSeconds)))
 
+        // Chapter 三百四七 / M834 fix: aggregate failures by
+        // error description for end-of-run summary。Previous
+        // version logged first 5 then silently counted —
+        // 20-min stress with deterministic failure mode would
+        // hide the failure pattern entirely。
+        var failureBreakdown: [String: Int] = [:]
+
         while clock.now < runDeadline {
             if Task.isCancelled { break }
             let iterStart = clock.now
@@ -183,9 +190,19 @@ final class SampleHostChengluStressRunner: ObservableObject {
                 }
             } catch {
                 localFail += 1
-                if localFail < 5 {
+                let errKey = "\(error)"
+                failureBreakdown[errKey, default: 0] += 1
+                // Chapter 三百四七 / M834: log first 3 + every
+                // 1000th + emit aggregated breakdown at end-of-
+                // run。Previous version only logged first 5
+                // → 20-min stress with deterministic failure
+                // mode hid the pattern entirely。
+                if localFail <= 3
+                    || localFail % 1000 == 0
+                {
                     appendLog(
-                        "❌ failure @ \(localIter): \(error)")
+                        "❌ failure #\(localFail) @ iter " +
+                        "\(localIter): \(error)")
                 }
             }
             let dur = iterStart.duration(to: clock.now)
@@ -251,6 +268,26 @@ final class SampleHostChengluStressRunner: ObservableObject {
             localIter, totalSec, throughputFinal,
             p50, p95, p99, localFail, localMismatch)
         appendLog(self.statusLine)
+        // Chapter 三百四七 / M834: emit failure breakdown by
+        // error type at end-of-run for diagnostic context that
+        // first-3 + every-1000th sampling cannot capture。
+        if !failureBreakdown.isEmpty {
+            let sortedBreakdown = failureBreakdown.sorted {
+                $0.value > $1.value
+            }
+            for (errKey, count) in sortedBreakdown.prefix(10) {
+                appendLog(
+                    "  [breakdown] \(count)× \(errKey)")
+            }
+            if sortedBreakdown.count > 10 {
+                let remaining = sortedBreakdown
+                    .dropFirst(10)
+                    .reduce(0) { $0 + $1.value }
+                appendLog(
+                    "  [breakdown] +\(remaining) other " +
+                    "(in \(sortedBreakdown.count - 10) types)")
+            }
+        }
         status = .finished
     }
 

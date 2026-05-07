@@ -63,6 +63,39 @@ import CoreML
 ///   - the registration report from `BASChengluMeshRegistration`
 public struct BASChengluHostRuntimeBundle: Sendable {
 
+    /// **⚠️ Lifecycle gotcha (chapter 三百四七 / M834 doc fix)**:
+    ///
+    /// Hosts MUST retain this bundle (or its `actors` array) for
+    /// kill switches + per-layer budgets to remain active。
+    ///
+    /// Common footgun:
+    /// ```swift
+    /// let bundle = try await Builder.build(...)
+    /// let runtime = bundle.runtime  // ← destructure
+    /// // bundle drops here → actors deallocate → kill-switch
+    /// // lookups + budget tracking SILENTLY disappear,but
+    /// // runtime keeps working with a zombie meshRegistry
+    /// // (held alive by runtime's strong meshRegistry ref)
+    /// useRuntime(runtime)
+    /// ```
+    ///
+    /// Correct usage:
+    /// ```swift
+    /// let bundle = try await Builder.build(...)
+    /// useBundle(bundle)  // hold the whole bundle
+    /// // OR
+    /// let actors = bundle.actors  // hold actors explicitly
+    /// useRuntime(bundle.runtime, actors: actors)
+    /// ```
+    ///
+    /// `BASLayerReferenceActor` instances capture the `registry`
+    /// strongly via `BASLayerReferenceActorConfig`,but nothing
+    /// else holds them — drop the bundle's `actors` array and
+    /// the per-layer kill switches + budget tracking go away。
+    /// `runtime.meshRegistry` is a separate strong reference that
+    /// stays alive (head-cascade still works) but observability
+    /// + kill switches at the actor layer become inert。
+
     /// Populated registry holding 8 canonical Chenglu slots
     /// (or fewer if caller passed partial closures)。
     public let registry: BASLayerMLHeadRegistry

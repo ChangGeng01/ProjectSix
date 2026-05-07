@@ -285,7 +285,21 @@ public extension BASChengluMeshRegistration {
     /// `.mlpackage`。Caller loads MLModels from app bundle then
     /// passes references here。Missing MLModels (set to nil) are
     /// reported in the registration report's `missingMLModels`。
-    struct RegistrationOptions {
+    /// Chapter 三百四七 / M834 fix: explicit `@unchecked Sendable`
+    /// conformance。Real consequence of NOT having this:
+    /// `SampleHostChengluStressRunner.loadAndBuildOffActor()`
+    /// returns this struct from a `nonisolated static` context
+    /// then crosses an `await` boundary into
+    /// `BASChengluHostRuntimeBuilder.build(...)`。Under Swift 6
+    /// strict concurrency,a non-Sendable struct silently
+    /// auto-promotes to `@unchecked` at the cross,masking the
+    /// safety story。Mark explicit + document the contract:
+    /// MLModel reference itself is read-only post-load (Apple
+    /// docs confirm `MLModel.prediction(from:)` is thread-safe),
+    /// so the struct can safely cross actor boundaries。Same
+    /// pattern as the private `ChengluModelBox: @unchecked
+    /// Sendable` (line 390)。
+    struct RegistrationOptions: @unchecked Sendable {
         public let preflightModel: MLModel?
         public let multiHeadModel: MLModel?
         public let permitPredictModel: MLModel?
