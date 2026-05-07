@@ -26097,3 +26097,134 @@ These were explicit non-promises in v9. Each is still real work to do — just o
 ### 九、 一句话总结
 
 **chapters 二百七十五-三百一五 (40 commits + 1 honesty board chapter)**: in one continuous autonomous-mode session, the substrate's next-gen architecture rebirth shipped 5 phases — Alpha closed all 5 god files (-77.2% LOC) with 0 behavior change, Beta foundation shipped 17 typed primitives for per-layer concurrency contract + ADR-013, Gamma shipped 21 typed primitives + 4 storage factories + bundle assembly + ADR-014 making OPT-IN → PROD migration usable end-to-end with 1 line of host code, Delta foundation shipped 27 typed primitives for 14-layer × ML head mesh including registry actor + rules-tier wrapper + cascading inference dispatcher + canonical 41-slot map (chapter 一百七十七 vision typed encoding), Epsilon shipped v9 manifesto encoding the per-layer mesh architecture doctrine + honesty board entry. **BAS XCTest 3194 → 3379 (+185 tests across 16 new-foundation chapters)**, **Qinao XCTest 1442 unchanged**, **0 failures across all 41 commits**, **4 boundary checks ✓ clean throughout**. All commits independently revertable on branch `next-gen-architecture-2026-05-07`. Doctrine pins held: 不变量 #1/#2/#3 全保 / 红线 7/10 全保 / 单提交口 不变 / anti-magic-number / single-source-of-truth / anti-drift 3-site / ADR-006 preserved + ADR-013/014 added. Honest non-promises: chapter 一百七十七 P0 .mlpackage adapters / substrate consumer wire-up / layer actor concrete implementations / production deployment validation / cross-instance mesh sync — all explicit external work.
+
+## 二百八十、 Phase F (附录 X) — Chenglu CoreML mesh activation (4 commits / 2026-05-07)
+
+User instruction: **"全面 彻底 激发 神经网络 coreml 布满系统"** + scope **"先1后3"** (first bridge 5 existing `.mlpackage` files into typed mesh; new training deferred). Branch: `next-gen-architecture-2026-05-07`.
+
+附录 X (master plan §X) closes 2 of 5 v9 §8 non-promises by bridging the 5 real `.mlpackage` binaries already shipped in `SampleHost/` (chapter 一百七十七 work) into the typed `BASLayerMLHead` protocol + 14-layer canonical mesh registry shipped by Phase Beta + Delta + Epsilon foundation.
+
+### 序、 4-cut shape
+
+| Chapter | M | Cut | Scope | Tests |
+|---|---|---|---|---|
+| 三百二〇 | M807 | 1st | `BASCoreMLLayerHead` generic adapter + Sendable frames | +17 |
+| 三百二一 | M808 | 2nd | 5 concrete Chenglu adapters + 8-slot mesh assembly | +39 |
+| 三百二二 | M809 | 3rd | `BASChengluFeatureRefBuilder` + cascade integration tests | +17 |
+| 三百二三 | M810 | 4th | Opt-in `BASHostRuntime.runMeshCascade(...)` hook | +11 |
+
+### 一、 Chapter 三百二〇 — generic adapter (M807)
+
+`BASCoreMLLayerHead` actor in `BASAppleAdapters` wraps any `MLModel` into the chapter 三百 `BASLayerMLHead` protocol with kind `.coremlOnDevice`. Parametric closure init makes it testable without `.mlpackage` binaries. `BASCoreMLFeatureFrame` + `BASCoreMLPredictionFrame` value types live in `BASRuntimeCore` (cross-platform) so governance registry + Codable round-trip tests can reference them without importing Apple-platform-only target. `BASCoreMLLayerHeadFactory.defaultProbabilityConfidence(_:)` encodes chapter 一百七十七 v0.4 confidence boundaries (|score-0.5| > 0.20 = .high, > 0.10 = .medium, otherwise .low).
+
+### 二、 Chapter 三百二一 — 5 concrete Chenglu wrappers + 8-slot assembly (M808)
+
+5 factory namespaces in `BASAppleAdapters`:
+  - `BASChengluPreflightAdapter` (binary AFM-vs-Gemma router)
+  - `BASChengluMultiHeadAdapter` (4 outputs from shared encoder: intent / emotion / risk / memory_importance)
+  - `BASChengluPermitPredictAdapter` (block-vs-delay)
+  - `BASChengluLengthHeadAdapter` (response length regression)
+  - `BASChengluLatencyHeadAdapter` (response duration regression)
+
+Plus:
+  - `BASChengluPromptSignature` value type
+  - `BASChengluFeatureEncoder` namespace (canonical 43-dim one-hot encoder mirroring `chenglu_feature_schema.py`)
+  - `parseBASChengluSignature(from:)` pipe-separated parser
+  - `BASChengluMeshRegistration.assemble(into:options:)` host-facing API
+  - `BASChengluMeshRegistrationReport` (BASRuntimeCore — Sendable Codable typed report)
+
+8-slot canonical doctrine (附录 X §X.2):
+
+  | layer | role | source |
+  |---|---|---|
+  | l1 | wake-policy | ChengluPreflight |
+  | l1 | compute-cost-predictor | ChengluLatencyHead |
+  | l4 | question-type | ChengluMultiHead.intent |
+  | l6 | emotion-classifier | ChengluMultiHead.emotion |
+  | l8 | importance-scorer | ChengluMultiHead.memory_importance |
+  | l11 | risk-scorer | ChengluMultiHead.risk |
+  | l11 | safety-action-selector | ChengluPermitPredict |
+  | l12 | density-controller | ChengluLengthHead |
+
+8 of 41 canonical slots filled with real CoreML heads (~19.5% coverage). 33 slots remain rules-tier placeholders.
+
+### 三、 Chapter 三百二二 — featureRef builder + end-to-end cascade tests (M809)
+
+`BASChengluFeatureRefBuilder` is the formal inverse of `parseBASChengluSignature(from:)`. Round-trip invariant: `parse(build(sig)) == sig`. Throws on separator-in-field. First end-to-end cascade integration tests exercising:
+
+  ```
+  builder → parser → adapter feature extractor →
+  stub inference closure → output transformer →
+  layer cascade runner → typed cascade outcome
+  ```
+
+Validated cascade fires preflight at L1 (wake-policy slot), walks 2 L11 slots before matching at safety-action-selector, falls through when all heads return low confidence, returns `.noHeadsRegistered` for unpopulated layers.
+
+### 四、 Chapter 三百二三 — opt-in BASHostRuntime mesh hook (M810)
+
+`BASHostRuntime.meshRegistry: BASLayerMLHeadRegistry?` optional field (mirrors `vitalMonitor` pattern). `runMeshCascade(input:layerID:) async throws -> BASHostMeshConsultationResult?` extension method returns nil when no registry wired (preserving 0 default behavior change), otherwise dispatches to `BASLayerCascadeRunner.run(...)` and wraps result with canonical reason codes:
+
+  - `mesh-coreml:cascade:<outcome>` (head-matched / floor-met / fallen-through / no-heads-registered)
+  - `mesh-coreml:layer:<layerID>`
+  - `mesh-coreml:tried:<count>`
+  - `mesh-coreml:matched-head:<headID>` (when matched)
+
+Closes v9 §8 non-promise #2 (Substrate consumer wire-up: BASHostRuntime mesh consumption). Phase Gamma boundary held — this ships ONLY the opt-in side; default substrate path remains untouched per ADR-014 OPT-IN → PROD migration doctrine.
+
+### 五、 Anti-drift 3-site sync
+
+  - `EBrainSchemaGovernanceRegistry.swift` +2 entries (CoreMLPredictionFrame chapter 三百二〇 + ChengluMeshRegistrationReport chapter 三百二一)
+  - `BASEBrainProgramBlueprintTests.expectedObjects` +2 strings
+  - `BASEBrainSchemaGovernanceRegistryTests.expectedVersions` +2 mappings; count assertion 248 → 264 (corrects pre-existing drift from chapters 一百二十二+ + chapter 三百二〇's missed update)
+
+### 六、 Cumulative test growth
+
+```
+Pre-附录-X (post-Phase-Epsilon): BAS 3418 (after chapter 三百一九 +39 from M803-M805 mesh assembler/sync schema work)
+Post-chapter-三百二〇:           BAS 3435 (+17)
+Post-chapter-三百二一:           BAS 3474 (+39)
+Post-chapter-三百二二:           BAS 3491 (+17)
+Post-chapter-三百二三:           BAS 3502 (+11)
+```
+
+**附录 X total: BAS 3418 → 3502 (+84 tests across 4 chapters)**
+**Qinao 1442 unchanged across all 4 commits**
+**0 failures across all 4 commits**
+
+### 七、 Doctrine pins held throughout附录 X
+
+| Doctrine | Source | How preserved |
+|---|---|---|
+| 不变量 #1 (先醒再答) | base | mesh consultation is opt-in hint |
+| 不变量 #2 (神经不掌权) | base | permit/verdict paths untouched |
+| 不变量 #3 (私有经验不进权重) | base | no weight-mutation paths |
+| 红线 7 (watcher hint only) | chapter 一百三十 | `runMeshCascade` returns hint, host coordinator decides |
+| 红线 10 (主品牌不默认恐怖) | chapter 一百二十一 | no public API surface changes |
+| 单提交口 | chapter 一百八十九 | mesh result never replaces permit/verdict |
+| Anti-magic-number | chapter 一百八十五 | separator + prefix + raw outcomes typed-pinned |
+| Single-source-of-truth | chapter 二百一一 | builder ↔ parser sole entry/exit for featureRef |
+| Anti-drift 3-site | chapter 一百九十二 | governance + 2 tests synced per chapter |
+| ADR-013 (Per-layer concurrency) | chapter 三百〇二 | preserved (mesh is per-layer slot binding) |
+| ADR-014 (OPT-IN → PROD migration) | chapter 三百〇二 | held — Phase Gamma not touched |
+
+### 八、 v9 §8 non-promises status (post-附录 X)
+
+  1. ✅ Real `.mlpackage` adapters bridged into mesh — chapter 三百二一 ships 5 concrete Chenglu wrappers + 8-slot canonical assembly
+  2. ✅ Substrate consumer wire-up — chapter 三百二三 ships opt-in `BASHostRuntime` mesh hook
+  3. ⏳ Layer-specific reference actors — `BASLayerActor` protocol exists; concrete `actor MyL11Actor: BASLayerActor` implementations could be shipped per layer (deferred — Phase Gamma scope)
+  4. ⏳ Production deployment validation — real iPhone user runs verifying mesh consumption doesn't regress (deferred — external work)
+  5. ⏳ Cross-instance / multi-host mesh sync transport — `BASMeshSyncFrame` schema-only at chapter 三百一九 (deferred — needs Phase Gamma doctrine first)
+
+**Closed: 2 of 5. Deferred: 3 of 5.**
+
+### 九、 Honest scope acknowledgement (附录 X §X.7)
+
+After附录 X ships:
+  - 8 of 41 canonical slots filled with real CoreML (~19.5%)
+  - 33 slots remain rules-tier placeholders (need new training: ChengluMemory P1 + Shadow P3 future chapters)
+  - Substrate default path NOT consulting mesh (Phase Gamma boundary)
+  - No real `.mlpackage` binaries in BAS test target — tests use parametric closure init for cross-platform cleanliness
+
+### 十、 一句话总结
+
+**chapters 三百二〇-三百二三 (4 commits / 附录 X)**: in one continuous autonomous-mode session, Phase F shipped 4 cuts bridging chapter 一百七十七's 5 real `.mlpackage` files into the typed `BASLayerMLHead` protocol + 14-layer canonical mesh registry. Cut 1 (chapter 三百二〇) shipped `BASCoreMLLayerHead` generic adapter + Sendable frames. Cut 2 (chapter 三百二一) shipped 5 concrete Chenglu wrapper factories + `BASChengluMeshRegistration.assemble(into:options:)` host-facing API populating 8 canonical slots per附录 X §X.2 doctrine. Cut 3 (chapter 三百二二) shipped `BASChengluFeatureRefBuilder` + first end-to-end cascade integration tests proving the chain composes through `BASLayerCascadeRunner`. Cut 4 (chapter 三百二三) shipped opt-in `BASHostRuntime.runMeshCascade(...)` hook closing v9 §8 non-promise #2 (Substrate consumer wire-up). **BAS XCTest 3418 → 3502 (+84 tests across 4 chapters)**, **Qinao XCTest 1442 unchanged**, **0 failures across all 4 commits**. Doctrine pins held: 不变量 #1/#2/#3 全保 / 红线 7/10 全保 / 单提交口 不变 / anti-magic-number / single-source-of-truth / anti-drift 3-site / ADR-006/013/014 preserved. Closes 2 of 5 v9 §8 non-promises (#1 .mlpackage adapters bridged + #2 substrate consumer wire-up). Honest residuals: 33 of 41 slots rules-tier (need ChengluMemory P1 / Shadow P3 training), Phase Gamma default-behavior mutation (#3), production deployment validation (#4), cross-instance mesh sync transport (#5) — all explicit external work.
