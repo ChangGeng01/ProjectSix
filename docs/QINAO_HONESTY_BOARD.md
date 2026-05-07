@@ -26098,13 +26098,13 @@ These were explicit non-promises in v9. Each is still real work to do — just o
 
 **chapters 二百七十五-三百一五 (40 commits + 1 honesty board chapter)**: in one continuous autonomous-mode session, the substrate's next-gen architecture rebirth shipped 5 phases — Alpha closed all 5 god files (-77.2% LOC) with 0 behavior change, Beta foundation shipped 17 typed primitives for per-layer concurrency contract + ADR-013, Gamma shipped 21 typed primitives + 4 storage factories + bundle assembly + ADR-014 making OPT-IN → PROD migration usable end-to-end with 1 line of host code, Delta foundation shipped 27 typed primitives for 14-layer × ML head mesh including registry actor + rules-tier wrapper + cascading inference dispatcher + canonical 41-slot map (chapter 一百七十七 vision typed encoding), Epsilon shipped v9 manifesto encoding the per-layer mesh architecture doctrine + honesty board entry. **BAS XCTest 3194 → 3379 (+185 tests across 16 new-foundation chapters)**, **Qinao XCTest 1442 unchanged**, **0 failures across all 41 commits**, **4 boundary checks ✓ clean throughout**. All commits independently revertable on branch `next-gen-architecture-2026-05-07`. Doctrine pins held: 不变量 #1/#2/#3 全保 / 红线 7/10 全保 / 单提交口 不变 / anti-magic-number / single-source-of-truth / anti-drift 3-site / ADR-006 preserved + ADR-013/014 added. Honest non-promises: chapter 一百七十七 P0 .mlpackage adapters / substrate consumer wire-up / layer actor concrete implementations / production deployment validation / cross-instance mesh sync — all explicit external work.
 
-## 二百八十、 Phase F (附录 X) — Chenglu CoreML mesh activation (4 commits / 2026-05-07)
+## 二百八十、 Phase F (附录 X) — Chenglu CoreML mesh activation (11 commits / 2026-05-07)
 
 User instruction: **"全面 彻底 激发 神经网络 coreml 布满系统"** + scope **"先1后3"** (first bridge 5 existing `.mlpackage` files into typed mesh; new training deferred). Branch: `next-gen-architecture-2026-05-07`.
 
-附录 X (master plan §X) closes 2 of 5 v9 §8 non-promises by bridging the 5 real `.mlpackage` binaries already shipped in `SampleHost/` (chapter 一百七十七 work) into the typed `BASLayerMLHead` protocol + 14-layer canonical mesh registry shipped by Phase Beta + Delta + Epsilon foundation.
+附录 X (master plan §X) closes 3 of 5 v9 §8 non-promises by bridging the 5 real `.mlpackage` binaries already shipped in `SampleHost/` (chapter 一百七十七 work) into the typed `BASLayerMLHead` protocol + 14-layer canonical mesh registry shipped by Phase Beta + Delta + Epsilon foundation.
 
-### 序、 4-cut shape
+### 序、 11-chapter shape
 
 | Chapter | M | Cut | Scope | Tests |
 |---|---|---|---|---|
@@ -26112,6 +26112,13 @@ User instruction: **"全面 彻底 激发 神经网络 coreml 布满系统"** + 
 | 三百二一 | M808 | 2nd | 5 concrete Chenglu adapters + 8-slot mesh assembly | +39 |
 | 三百二二 | M809 | 3rd | `BASChengluFeatureRefBuilder` + cascade integration tests | +17 |
 | 三百二三 | M810 | 4th | Opt-in `BASHostRuntime.runMeshCascade(...)` hook | +11 |
+| 三百二四 | M811 | docs | Honesty board entry (this section) | 0 |
+| 三百二五 | M812 | 5th | Multi-layer sweep API + Chenglu canonical sweep | +11 |
+| 三百二六 | M813 | 6th | `BASChengluSweepInterpreter` typed hints | +15 |
+| 三百二七 | M814 | 7th | `BASChengluLayerActorFactories` (closes #3) | +14 |
+| 三百二八 | M815 | docs | v9 §8 #3 closure sync | 0 |
+| 三百二九 | M816 | 8th | `BASChengluHostRuntimeBuilder` crown integration | +8 |
+| 三百三〇 | M817 | 9th | `BASChengluHintSetReasonCodes` audit emission | +14 |
 
 ### 一、 Chapter 三百二〇 — generic adapter (M807)
 
@@ -26185,11 +26192,18 @@ Post-chapter-三百二〇:           BAS 3435 (+17)
 Post-chapter-三百二一:           BAS 3474 (+39)
 Post-chapter-三百二二:           BAS 3491 (+17)
 Post-chapter-三百二三:           BAS 3502 (+11)
+Post-chapter-三百二四:           BAS 3502 (docs only)
+Post-chapter-三百二五:           BAS 3513 (+11)
+Post-chapter-三百二六:           BAS 3528 (+15)
+Post-chapter-三百二七:           BAS 3542 (+14)
+Post-chapter-三百二八:           BAS 3542 (docs only)
+Post-chapter-三百二九:           BAS 3550 (+8)
+Post-chapter-三百三〇:           BAS 3564 (+14)
 ```
 
-**附录 X total: BAS 3418 → 3502 (+84 tests across 4 chapters)**
-**Qinao 1442 unchanged across all 4 commits**
-**0 failures across all 4 commits**
+**附录 X total: BAS 3418 → 3564 (+146 tests across 11 chapters)**
+**Qinao 1442 unchanged across all 11 commits**
+**0 failures across all 11 commits**
 
 ### 七、 Doctrine pins held throughout附录 X
 
@@ -26227,4 +26241,42 @@ After附录 X ships:
 
 ### 十、 一句话总结
 
-**chapters 三百二〇-三百二三 (4 commits / 附录 X)**: in one continuous autonomous-mode session, Phase F shipped 4 cuts bridging chapter 一百七十七's 5 real `.mlpackage` files into the typed `BASLayerMLHead` protocol + 14-layer canonical mesh registry. Cut 1 (chapter 三百二〇) shipped `BASCoreMLLayerHead` generic adapter + Sendable frames. Cut 2 (chapter 三百二一) shipped 5 concrete Chenglu wrapper factories + `BASChengluMeshRegistration.assemble(into:options:)` host-facing API populating 8 canonical slots per附录 X §X.2 doctrine. Cut 3 (chapter 三百二二) shipped `BASChengluFeatureRefBuilder` + first end-to-end cascade integration tests proving the chain composes through `BASLayerCascadeRunner`. Cut 4 (chapter 三百二三) shipped opt-in `BASHostRuntime.runMeshCascade(...)` hook closing v9 §8 non-promise #2 (Substrate consumer wire-up). **BAS XCTest 3418 → 3502 (+84 tests across 4 chapters)**, **Qinao XCTest 1442 unchanged**, **0 failures across all 4 commits**. Doctrine pins held: 不变量 #1/#2/#3 全保 / 红线 7/10 全保 / 单提交口 不变 / anti-magic-number / single-source-of-truth / anti-drift 3-site / ADR-006/013/014 preserved. Closes 2 of 5 v9 §8 non-promises (#1 .mlpackage adapters bridged + #2 substrate consumer wire-up). Honest residuals: 33 of 41 slots rules-tier (need ChengluMemory P1 / Shadow P3 training), Phase Gamma default-behavior mutation (#3), production deployment validation (#4), cross-instance mesh sync transport (#5) — all explicit external work.
+**chapters 三百二〇-三百三〇 (11 commits / 附录 X)**: in one continuous autonomous-mode session, Phase F shipped 9 code cuts + 2 docs cuts bridging chapter 一百七十七's 5 real `.mlpackage` files into the typed `BASLayerMLHead` protocol + 14-layer canonical mesh registry, plus a complete typed pipeline composition layer. Cuts 1-4 (chapters 三百二〇-三百二三) shipped the foundation: `BASCoreMLLayerHead` generic adapter + 5 concrete Chenglu wrappers + 8-slot canonical mesh assembly + `BASChengluFeatureRefBuilder` + opt-in `BASHostRuntime` mesh hook. Cuts 5-9 (chapters 三百二五-三百三〇) shipped the composition layer: multi-layer sweep + Chenglu canonical sweep + typed sweep interpreter + 6-layer pre-configured actor factories + crown one-call builder + audit emission helper. Plus 2 docs cuts (三百二四 + 三百二八) capturing v9 §8 non-promise closures into the honesty board. **BAS XCTest 3418 → 3564 (+146 tests across 11 chapters)**, **Qinao XCTest 1442 unchanged**, **0 failures across all 11 commits**. Doctrine pins held: 不变量 #1/#2/#3 全保 / 红线 7/10 全保 / 单提交口 不变 / anti-magic-number / single-source-of-truth / anti-drift 3-site / ADR-006/013/014 preserved. Closes **3 of 5** v9 §8 non-promises (#1 .mlpackage adapters bridged + #2 substrate consumer wire-up + #3 layer-specific reference actor factories). Honest residuals: 33 of 41 slots rules-tier (need ChengluMemory P1 / Shadow P3 training — multi-day Python pipeline), production deployment validation (#4 — external work), cross-instance mesh sync transport (#5 — needs Phase Gamma doctrine first) — all explicit external work.
+
+### 十一、 Final附录 X API surface (post-chapter-三百三〇)
+
+Hosts opting into the附录 X mesh now have a complete typed pipeline:
+
+```swift
+// Crown integration (chapter 三百二九):
+let bundle = try await BASChengluHostRuntimeBuilder.build(
+    configuration: hostConfig,
+    chengluClosures: chengluInferenceClosures)
+
+// Build typed input (chapter 三百二二):
+let input = BASLayerInferenceInput(
+    layerID: .l1,
+    featureRef: try BASChengluFeatureRefBuilder.build(
+        from: signature),
+    confidenceFloor: .high)
+
+// Sweep (chapter 三百二五):
+let sweep = try await bundle.runtime
+    .runChengluCanonicalSweep(input: input)
+
+// Interpret (chapter 三百二六):
+let hints = BASChengluSweepInterpreter.interpret(sweep)
+
+// Emit audit (chapter 三百二三 + 三百三〇):
+let auditCodes =
+    sweep.aggregatedReasonCodes
+    + BASChengluHintSetReasonCodes.codes(for: hints)
+// auditCodes is fully kebab-case + grep-friendly + audit-ready
+
+// Read typed hints:
+if hints.preflight?.route == .afm { /* AFM path */ }
+if let length = hints.length?.predictedLengthChars,
+   length > 1000 { /* long answer expected */ }
+```
+
+11 chapters of typed primitives + composition + audit emission, all with 0 default behavior change for non-opting-in hosts.
