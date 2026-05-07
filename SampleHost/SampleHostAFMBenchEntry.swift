@@ -46,7 +46,15 @@ extension SampleHostModel {
         let rotationPeriod = max(1, afmBenchRotationPeriodIter)
         let mutationCount = max(1, min(5, afmBenchMutationSeedCount))
         let rotationBytes = max(1, afmBenchJSONLRotationMB) * 1024 * 1024
-        let afmTimeoutSec = max(5, min(120, afmBenchAFMTimeoutSec))
+        // Chapter 三百四一 / M828: removed unused
+        // `let afmTimeoutSec = max(5, min(120, afmBenchAFMTimeoutSec))`
+        // — variable was declared but never wired through to the
+        // AFM call site (`try await session.respond(to: prompt)`)。
+        // The timeout enforcement is a separate honest gap;the
+        // setting `afmBenchAFMTimeoutSec` exists in UI but is
+        // currently inert until plumbed via `withTimeout(...)`
+        // wrapper around the AFM call。Tracked as backlog,not
+        // a chapter 三百四一 fix scope。
         let skipBlocked = afmBenchSkipBlocked
 
         afmBenchIsRunning = true

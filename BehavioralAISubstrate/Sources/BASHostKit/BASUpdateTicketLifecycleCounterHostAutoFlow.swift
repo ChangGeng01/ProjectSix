@@ -81,7 +81,13 @@ public extension BASUpdateTicketLifecycleCoordinator {
         sovereignVerdictRef: String,
         resolver: CounterHostCheckResolver
     ) async throws -> BASCounterHostGateOutcome {
-        guard let entry = await self.entry(ticketID: ticketID)
+        // Chapter 三百四一 / M828 fix: this extension is on
+        // `BASUpdateTicketLifecycleCoordinator` actor itself,
+        // so `self.entry(...)` is same-isolation-domain — no
+        // `await` needed。Previous version emitted compiler
+        // warning "no 'async' operations occur within 'await'
+        // expression"。
+        guard let entry = self.entry(ticketID: ticketID)
         else {
             throw LifecycleError.unknownTicket(id: ticketID)
         }
