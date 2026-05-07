@@ -128,6 +128,16 @@ public actor BASSQLiteEventLogStorage: BASEventLogStorage {
         try Self.runExec(db: handle, sql: "PRAGMA journal_mode=WAL;")
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
+        // M891 fix (post-deep-audit):tighter auto-checkpoint to
+        // bound WAL growth on long-running iPhone sessions。
+        // Default 1000 pages × 4KB ≈ 4MB before checkpoint。
+        // 200 pages ≈ 800KB → checkpoint fires more often,
+        // bounds disk pressure for high-frequency event logs
+        // (8h iPhone runs at 600 iter/s could otherwise grow
+        // WAL to GBs uncompacted)。
+        try Self.runExec(
+            db: handle,
+            sql: "PRAGMA wal_autocheckpoint=200;")
 
         // M886 backport (M882 audit fix):read user_version FIRST。
         let existingVersion = try Self.readUserVersion(

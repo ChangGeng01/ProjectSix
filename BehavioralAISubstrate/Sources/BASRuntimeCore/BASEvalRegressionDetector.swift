@@ -90,11 +90,21 @@ public struct BASEvalRegressionResult:
         toleranceUsed: Double
     ) {
         self.metric = metric
-        self.baselineValue = baselineValue
-        self.candidateValue = candidateValue
+        // M891 fix:non-finite Doubles → nil。Same rationale as
+        // BASEvalRun.metrics filter — JSON encode would reject,
+        // arithmetic produces undefined。
+        self.baselineValue = baselineValue.flatMap {
+            $0.isFinite ? $0 : nil
+        }
+        self.candidateValue = candidateValue.flatMap {
+            $0.isFinite ? $0 : nil
+        }
         self.verdict = verdict
-        self.relativeDelta = relativeDelta
-        self.toleranceUsed = toleranceUsed
+        self.relativeDelta = relativeDelta.flatMap {
+            $0.isFinite ? $0 : nil
+        }
+        self.toleranceUsed = toleranceUsed.isFinite
+            ? toleranceUsed : 0
     }
 }
 

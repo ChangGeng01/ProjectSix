@@ -132,6 +132,11 @@ public actor BASSQLiteKnowledgeGraphStorage {
             db: handle, sql: "PRAGMA journal_mode=WAL;")
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
+        // M891 fix:tighter auto-checkpoint (200 pages ≈ 800KB)
+        // bounds WAL growth on long-running stress runs。
+        try Self.runExec(
+            db: handle,
+            sql: "PRAGMA wal_autocheckpoint=200;")
 
         // M882 fix (P2.5 audit):read user_version FIRST before
         // overwriting it。Pre-M882 the unconditional `PRAGMA
@@ -616,7 +621,21 @@ public actor BASSQLiteKnowledgeGraphStorage {
         defer { sqlite3_finalize(stmt) }
         var out: [BASKnowledgeNode] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            out.append(try buildNode(stmt: stmt))
+            // M891 fix (post-deep-audit):per-row corruption
+            // tolerance — pre-M891 a single bad node row threw
+            // out of fetchAllNodes,then `try?` in `allNodes()`
+            // swallowed the throw + returned `[]` → preload
+            // silently lost ALL nodes,not just the corrupt one。
+            // Post-M891 the bad row is skipped + good rows
+            // are preserved per chapter 一百九十一 row-by-row
+            // integrity doctrine。
+            do {
+                out.append(try buildNode(stmt: stmt))
+            } catch {
+                // Skip corrupt row;continue with remaining。
+                // Caller can detect via storage.nodeCount vs
+                // returned-array count if needed。
+            }
         }
         return out
     }
@@ -762,7 +781,13 @@ public actor BASSQLiteKnowledgeGraphStorage {
         defer { sqlite3_finalize(stmt) }
         var out: [BASKnowledgeEdge] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            out.append(try buildEdge(stmt: stmt))
+            // M891 fix:per-row corruption tolerance (same as
+            // fetchAllNodes — see that comment for rationale)。
+            do {
+                out.append(try buildEdge(stmt: stmt))
+            } catch {
+                // Skip corrupt row;continue with remaining。
+            }
         }
         return out
     }

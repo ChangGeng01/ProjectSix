@@ -89,6 +89,70 @@ final class BASEvalHarnessTests: XCTestCase {
 
     // MARK: - BASEvalRun: Codable round-trip
 
+    // MARK: - M891 (post-deep-audit) NaN/Infinity validation
+
+    func testM891NaNMetricFilteredAtConstruction() {
+        let run = BASEvalRun(
+            runID: "r1",
+            timestampMs: 100,
+            metrics: [
+                .accuracy: 0.95,
+                .latencyP95: .nan,
+                .hallucinationRate: .infinity,
+                .failureRate: -.infinity,
+                .driftScore: 0.5,
+            ],
+            buildChapter: "M891-test",
+            hostFingerprint: "test",
+            sampleCount: 10)
+
+        // Non-finite values silently dropped at construction
+        // (chapter 一百九十一 substrate-boundary integrity:
+        // safer than crash on encode or undefined comparison)
+        XCTAssertEqual(run.metrics.count, 2,
+            "NaN + Inf + -Inf must be filtered;only " +
+            "finite values (accuracy + driftScore) survive")
+        XCTAssertNotNil(run.metrics[.accuracy])
+        XCTAssertNotNil(run.metrics[.driftScore])
+        XCTAssertNil(run.metrics[.latencyP95])
+        XCTAssertNil(run.metrics[.hallucinationRate])
+        XCTAssertNil(run.metrics[.failureRate])
+    }
+
+    func testM891CleanRunCodableRoundTripStillWorks()
+        throws
+    {
+        // Pin:M891 filter doesn't break valid runs。
+        let run = BASEvalRun(
+            runID: "r1",
+            timestampMs: 100,
+            metrics: [.accuracy: 0.95, .latencyP95: 200],
+            buildChapter: "M891",
+            hostFingerprint: "test",
+            sampleCount: 100)
+        let data = try JSONEncoder().encode(run)
+        let decoded = try JSONDecoder().decode(
+            BASEvalRun.self, from: data)
+        XCTAssertEqual(decoded, run)
+    }
+
+    func testM891NaNRunSerializableAfterFilter() throws {
+        // Pin:a run constructed with NaN values must
+        // serialize cleanly (NaN got filtered → JSON encode
+        // doesn't crash)。Pre-M891 this would throw
+        // encodeFailed during storage.append。
+        let runWithNaN = BASEvalRun(
+            runID: "r-nan",
+            timestampMs: 100,
+            metrics: [.accuracy: .nan, .latencyP95: 200],
+            buildChapter: "M891",
+            hostFingerprint: "test",
+            sampleCount: 10)
+        // Encode must succeed (NaN was filtered)
+        XCTAssertNoThrow(
+            try JSONEncoder().encode(runWithNaN))
+    }
+
     func testRunCodableRoundTrip() throws {
         let run = BASEvalRun(
             runID: "test-run-1",

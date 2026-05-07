@@ -88,7 +88,23 @@ public struct BASEvalRun: Sendable, Equatable, Codable, Hashable {
     ) {
         self.runID = runID
         self.timestampMs = timestampMs
-        self.metrics = metrics
+        // M891 fix (post-deep-audit):reject non-finite Double
+        // values at construction time to prevent downstream
+        // failures。Pre-M891 a host could pass `Double.nan` or
+        // `Double.infinity` — those values:
+        //   - JSONEncoder rejects on serialize → storage append
+        //     throws encodeFailed (crash-equivalent for callers
+        //     that don't catch)
+        //   - Regression detector arithmetic propagates NaN →
+        //     verdict classification becomes undefined
+        //   - SQLite stored as text would round-trip but compare
+        //     unpredictably
+        // Safer to filter at the substrate boundary。Non-finite
+        // values are silently dropped + logged via the metrics
+        // dictionary (the metric key just doesn't appear)。
+        self.metrics = metrics.filter { _, value in
+            value.isFinite
+        }
         self.buildChapter = buildChapter
         self.hostFingerprint = hostFingerprint
         self.sampleCount = sampleCount
