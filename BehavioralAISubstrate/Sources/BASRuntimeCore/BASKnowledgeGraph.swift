@@ -442,7 +442,12 @@ public actor BASKnowledgeGraph {
     }
 
     /// Canonical key for cycle dedup: rotate so the
-    /// lexicographically-smallest nodeID is first,then join。
+    /// lexicographically-smallest nodeID is first,then join
+    /// nodeIDs + edgeKinds together so cycles with same node
+    /// sequence but different edge kinds are kept distinct
+    /// (eg. when two parallel edges connect the same pair with
+    /// different kinds — both cycles are interesting separately
+    /// for filtering by edge kind)。
     private func canonicalCycleKey(
         _ cycle: BASKnowledgeCycle
     ) -> String {
@@ -454,10 +459,24 @@ public actor BASKnowledgeGraph {
                 minIndex = idx
             }
         }
-        // Rotate
-        let rotated =
+        // Rotate nodes AND edge kinds together (same offset
+        // because both arrays are parallel by construction:
+        // nodeIDs[i] → edgeKinds[i] points to nodeIDs[i+1])
+        let rotatedNodes =
             Array(cycle.nodeIDs[minIndex...])
             + Array(cycle.nodeIDs[..<minIndex])
-        return rotated.joined(separator: "→")
+        let rotatedKinds: [BASKnowledgeEdgeKind]
+        if cycle.edgeKinds.count == cycle.nodeIDs.count {
+            rotatedKinds =
+                Array(cycle.edgeKinds[minIndex...])
+                + Array(cycle.edgeKinds[..<minIndex])
+        } else {
+            rotatedKinds = cycle.edgeKinds
+        }
+        let nodePart = rotatedNodes.joined(separator: "→")
+        let kindPart = rotatedKinds
+            .map { $0.rawValue }
+            .joined(separator: "|")
+        return "\(nodePart)::\(kindPart)"
     }
 }
