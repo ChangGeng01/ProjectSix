@@ -61,6 +61,7 @@
 		224ABCD22EEE456789CDEFEDB /* SampleHostTestPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 224FEDCEEDDC123210FEDCBA1 /* SampleHostTestPanels.swift */; };
 		339ABCD11AAA1B2C3D4E5F011 /* SampleHostChengluStressRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339FEDCDD22B3344556677F011 /* SampleHostChengluStressRunner.swift */; };
 		339ABCD22BBB1B2C3D4E5F022 /* SampleHostChengluStressPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339FEDCDD22B3344556677F022 /* SampleHostChengluStressPanel.swift */; };
+		345ABCD11AAA5C6D7E8F0099 /* SampleHostChengluStressCognitiveOSObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 345FEDCDD77B3344556677A099 /* SampleHostChengluStressCognitiveOSObserver.swift */; };
 		342ABCD33CCC1B2C3D4E5F033 /* SampleHostAFMTimeoutWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342FEDCDD33B3344556677F033 /* SampleHostAFMTimeoutWrapper.swift */; };
 		225ABCD33DDD56789ABCDEFFC /* SampleHostAFMBenchPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 225FEDCFFCCB234321FEDC9AB /* SampleHostAFMBenchPanel.swift */; };
 		226ABCD44CCC678901CDEEFFD /* SampleHostBenchPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 226FEDCEEDDC345432EDDCBAA1 /* SampleHostBenchPanel.swift */; };
@@ -370,6 +371,7 @@
 		333AF091FF826F50D4D9367A /* SampleHostBenchPostLLMObserverShadowEvaluatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C53BFBC431E25B5618B50E86 /* SampleHostBenchPostLLMObserverShadowEvaluatorTests.swift */; };
 		342ABCD44DDD2B3C4D5E6F044 /* SampleHostAFMTimeoutWrapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342FEDCDD44C3344556677F044 /* SampleHostAFMTimeoutWrapperTests.swift */; };
 		343ABCD55EEE3B4D5E6F7A055 /* SampleHostChengluStressRunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343FEDCDD55D3344556677A055 /* SampleHostChengluStressRunnerTests.swift */; };
+		346ABCD22BBB5C6D7E8F0100 /* SampleHostCognitiveOSStressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346FEDCDD77C3344556677A100 /* SampleHostCognitiveOSStressTests.swift */; };
 		344ABCD66FFF4C5E6F7B8C066 /* SampleHostStressRunInfraTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 344FEDCDD66E3344556677B066 /* SampleHostStressRunInfraTests.swift */; };
 		A3DD8273DFC2EB5D3E86FC60 /* BASHostKit in Frameworks */ = {isa = PBXBuildFile; productRef = 459D4EA551298DA6B3E45C28 /* BASHostKit */; };
 		A4B068D6281F83631F485E33 /* QuickBufferDurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC1B3E111B5D1197CEB7CDA /* QuickBufferDurationTests.swift */; };
@@ -657,6 +659,7 @@
 		C53BFBC431E25B5618B50E86 /* SampleHostBenchPostLLMObserverShadowEvaluatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHostBenchPostLLMObserverShadowEvaluatorTests.swift; sourceTree = "<group>"; };
 		342FEDCDD44C3344556677F044 /* SampleHostAFMTimeoutWrapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHostAFMTimeoutWrapperTests.swift; sourceTree = "<group>"; };
 		343FEDCDD55D3344556677A055 /* SampleHostChengluStressRunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHostChengluStressRunnerTests.swift; sourceTree = "<group>"; };
+		346FEDCDD77C3344556677A100 /* SampleHostCognitiveOSStressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHostCognitiveOSStressTests.swift; sourceTree = "<group>"; };
 		344FEDCDD66E3344556677B066 /* SampleHostStressRunInfraTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleHostStressRunInfraTests.swift; sourceTree = "<group>"; };
 		2976E20A58302839AFB3FF14 /* DecisionEvolutionReleaseSummaryBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecisionEvolutionReleaseSummaryBuilder.swift; sourceTree = "<group>"; };
 		29B2D56D159527FCF85EB5E4 /* SharedProtectedStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedProtectedStateStore.swift; sourceTree = "<group>"; };
@@ -914,6 +917,7 @@
 		224FEDCEEDDC123210FEDCBA1 /* SampleHostTestPanels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostTestPanels.swift; sourceTree = "<group>"; };
 		339FEDCDD22B3344556677F011 /* SampleHostChengluStressRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostChengluStressRunner.swift; sourceTree = "<group>"; };
 		339FEDCDD22B3344556677F022 /* SampleHostChengluStressPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostChengluStressPanel.swift; sourceTree = "<group>"; };
+		345FEDCDD77B3344556677A099 /* SampleHostChengluStressCognitiveOSObserver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostChengluStressCognitiveOSObserver.swift; sourceTree = "<group>"; };
 		342FEDCDD33B3344556677F033 /* SampleHostAFMTimeoutWrapper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostAFMTimeoutWrapper.swift; sourceTree = "<group>"; };
 		225FEDCFFCCB234321FEDC9AB /* SampleHostAFMBenchPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostAFMBenchPanel.swift; sourceTree = "<group>"; };
 		226FEDCEEDDC345432EDDCBAA1 /* SampleHostBenchPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchPanel.swift; sourceTree = "<group>"; };
@@ -1144,6 +1148,7 @@
 				224FEDCEEDDC123210FEDCBA1 /* SampleHostTestPanels.swift */,
 				339FEDCDD22B3344556677F011 /* SampleHostChengluStressRunner.swift */,
 				339FEDCDD22B3344556677F022 /* SampleHostChengluStressPanel.swift */,
+				345FEDCDD77B3344556677A099 /* SampleHostChengluStressCognitiveOSObserver.swift */,
 				342FEDCDD33B3344556677F033 /* SampleHostAFMTimeoutWrapper.swift */,
 				225FEDCFFCCB234321FEDC9AB /* SampleHostAFMBenchPanel.swift */,
 				226FEDCEEDDC345432EDDCBAA1 /* SampleHostBenchPanel.swift */,
@@ -1601,6 +1606,7 @@
 				C53BFBC431E25B5618B50E86 /* SampleHostBenchPostLLMObserverShadowEvaluatorTests.swift */,
 				342FEDCDD44C3344556677F044 /* SampleHostAFMTimeoutWrapperTests.swift */,
 				343FEDCDD55D3344556677A055 /* SampleHostChengluStressRunnerTests.swift */,
+				346FEDCDD77C3344556677A100 /* SampleHostCognitiveOSStressTests.swift */,
 				344FEDCDD66E3344556677B066 /* SampleHostStressRunInfraTests.swift */,
 			);
 			path = SampleHostTests;
@@ -2006,6 +2012,7 @@
 				224ABCD22EEE456789CDEFEDB /* SampleHostTestPanels.swift in Sources */,
 				339ABCD11AAA1B2C3D4E5F011 /* SampleHostChengluStressRunner.swift in Sources */,
 				339ABCD22BBB1B2C3D4E5F022 /* SampleHostChengluStressPanel.swift in Sources */,
+				345ABCD11AAA5C6D7E8F0099 /* SampleHostChengluStressCognitiveOSObserver.swift in Sources */,
 				342ABCD33CCC1B2C3D4E5F033 /* SampleHostAFMTimeoutWrapper.swift in Sources */,
 				225ABCD33DDD56789ABCDEFFC /* SampleHostAFMBenchPanel.swift in Sources */,
 				226ABCD44CCC678901CDEEFFD /* SampleHostBenchPanel.swift in Sources */,
@@ -2461,6 +2468,7 @@
 				333AF091FF826F50D4D9367A /* SampleHostBenchPostLLMObserverShadowEvaluatorTests.swift in Sources */,
 				342ABCD44DDD2B3C4D5E6F044 /* SampleHostAFMTimeoutWrapperTests.swift in Sources */,
 				343ABCD55EEE3B4D5E6F7A055 /* SampleHostChengluStressRunnerTests.swift in Sources */,
+				346ABCD22BBB5C6D7E8F0100 /* SampleHostCognitiveOSStressTests.swift in Sources */,
 				344ABCD66FFF4C5E6F7B8C066 /* SampleHostStressRunInfraTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

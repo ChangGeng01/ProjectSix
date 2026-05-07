@@ -1,5 +1,6 @@
 // MARK: - SampleHostChengluStressRunner — chapter 三百三九 / M826
 //                                       + chapter 三百四九 / M836
+//                                       + chapter 三百七五 / M862
 //
 // iPhone-side sustained stress runner for the附录 X Chenglu mesh
 // chain。Mirrors `BASChenglu20MinStressTests` (chapter 三百三八)
@@ -24,6 +25,14 @@
 //     --domain-identifier com.changgeng.samplehost \
 //     --source Documents/chenglu-stress-runs/latest.json \
 //     --destination /tmp/latest.json
+//
+// **Chapter 三百七五 / M862**: opt-in cognitive OS integration via
+// `SampleHostChengluStressCognitiveOSObserver`。Default
+// `.allDisabled` options preserve M826 / M837 behavior pin (zero
+// behavior change)。When opted in, observer appends one event log
+// entry per iter, folds state every 100 iter, extracts knowledge
+// graph every 1000 iter — exercises the full G1/G2/G9 data loop
+// in a real iPhone code path。
 
 import CoreML
 import Foundation
@@ -63,6 +72,14 @@ final class SampleHostChengluStressRunner: ObservableObject {
     /// persisted。`nil` until at least one run has finished。
     @Published private(set) var lastSavedRelativePath: String?
 
+    /// Chapter 三百七五 / M862: cognitive OS observer stats。Zero
+    /// when observer is disabled (default M826 / M837 behavior pin)。
+    @Published private(set) var cognitiveOSEnabled: Bool = false
+    @Published private(set) var cognitiveOSEventCount: Int = 0
+    @Published private(set) var cognitiveOSStateCount: Int = 0
+    @Published private(set) var cognitiveOSGraphNodeCount: Int = 0
+    @Published private(set) var cognitiveOSGraphEdgeCount: Int = 0
+
     private var stressTask: Task<Void, Never>?
 
     // MARK: - Doctrine constants
@@ -94,14 +111,35 @@ final class SampleHostChengluStressRunner: ObservableObject {
 
     // MARK: - Public API
 
-    func start(durationSeconds: Double =
-        Constants.defaultDurationSeconds)
-    {
+    /// Start a stress run。
+    ///
+    /// - Parameters:
+    ///   - durationSeconds: total run length。Default 1200s (20 min)。
+    ///   - cognitiveOSOptions: chapter 三百七五 / M862 opt-in。
+    ///     Default `.allDisabled` preserves M826 / M837 behavior
+    ///     (zero observer overhead, zero stat surfacing)。Pass
+    ///     non-default options to wire event log + state store +
+    ///     knowledge graph observation alongside the stress loop。
+    func start(
+        durationSeconds: Double =
+            Constants.defaultDurationSeconds,
+        cognitiveOSOptions: BASCognitiveOSBundleOptions =
+            .allDisabled
+    ) {
         guard stressTask == nil else { return }
         status = .loadingModels
         progressLog.removeAll()
+        cognitiveOSEnabled =
+            cognitiveOSOptions != .allDisabled
+        cognitiveOSEventCount = 0
+        cognitiveOSStateCount = 0
+        cognitiveOSGraphNodeCount = 0
+        cognitiveOSGraphEdgeCount = 0
         appendLog("🚀 Starting Chenglu mesh stress run " +
-            "(\(Int(durationSeconds))s)")
+            "(\(Int(durationSeconds))s)" +
+            (cognitiveOSEnabled
+                ? " + cognitive OS observer"
+                : ""))
         // Chapter 三百四六 / M833 fix: `[weak self]` matches the
         // SampleHost convention for long-running tasks (mirrors
         // SampleHostHybridBenchEntry.swift:163 / SampleHostAFM
@@ -114,7 +152,8 @@ final class SampleHostChengluStressRunner: ObservableObject {
         stressTask = Task { [weak self] in
             guard let self else { return }
             await self.runStress(
-                durationSeconds: durationSeconds)
+                durationSeconds: durationSeconds,
+                cognitiveOSOptions: cognitiveOSOptions)
             self.stressTask = nil
         }
     }
@@ -129,8 +168,34 @@ final class SampleHostChengluStressRunner: ObservableObject {
     // MARK: - Internal stress loop
 
     private func runStress(
-        durationSeconds: Double
+        durationSeconds: Double,
+        cognitiveOSOptions: BASCognitiveOSBundleOptions =
+            .allDisabled
     ) async {
+        // Chapter 三百七五 / M862: build the cognitive OS observer
+        // first。Default `.allDisabled` produces a no-op observer
+        // (zero behavior change pin)。If construction throws
+        // (SQLite open failure),fall through to disabled — the
+        // stress run itself is unaffected。
+        let observer:
+            SampleHostChengluStressCognitiveOSObserver
+        do {
+            observer =
+                try SampleHostChengluStressCognitiveOSObserver(
+                    options: cognitiveOSOptions)
+            if observer.isEnabled {
+                appendLog(
+                    "🧠 Cognitive OS observer wired " +
+                    "(event log + state + graph as configured)")
+            }
+        } catch {
+            appendLog(
+                "⚠️ Cognitive OS observer disabled " +
+                "(construction error: \(error))")
+            observer = SampleHostChengluStressCognitiveOSObserver
+                .disabled()
+        }
+
         // Steps 1+2 run off main actor to avoid Sendable
         // crossings with MLModel refs (Swift 6 strict
         // concurrency)。Bundle is Sendable so it can return
@@ -231,6 +296,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
         while clock.now < runDeadline {
             if Task.isCancelled { break }
             let iterStart = clock.now
+            var iterSucceeded = true
             do {
                 let input: BASHostMeshLayerInput
                 if localIter
@@ -257,6 +323,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                 }
             } catch {
                 localFail += 1
+                iterSucceeded = false
                 let errKey = "\(error)"
                 failureBreakdown[errKey, default: 0] += 1
                 if localFail <= 3
@@ -272,6 +339,18 @@ final class SampleHostChengluStressRunner: ObservableObject {
                 + Double(dur.components.attoseconds) / 1e15
             histogram.record(iterMs)
             recentRing.record(iterMs)
+
+            // Chapter 三百七五 / M862: feed the cognitive OS
+            // observer。No-op when observer disabled (default)。
+            // Observer never throws — failures count silently
+            // against its own counters。
+            if observer.isEnabled {
+                await observer.observeIteration(
+                    index: localIter,
+                    latencyMs: iterMs,
+                    succeeded: iterSucceeded)
+            }
+
             localIter += 1
 
             // Per-100-iteration UI update
@@ -296,6 +375,19 @@ final class SampleHostChengluStressRunner: ObservableObject {
                         "avg %.2fms",
                     localIter, elapsedSec, throughput,
                     recentRing.avg)
+
+                // Chapter 三百七五 / M862: surface cognitive OS
+                // stats to UI on the same per-100-iter cadence。
+                if observer.isEnabled {
+                    self.cognitiveOSEventCount =
+                        observer.eventCount
+                    self.cognitiveOSStateCount =
+                        observer.stateCount
+                    self.cognitiveOSGraphNodeCount =
+                        observer.graphNodeCount
+                    self.cognitiveOSGraphEdgeCount =
+                        observer.graphEdgeCount
+                }
 
                 // Per-minute time series capture
                 if elapsedSec >= nextMinuteMarkSec {
@@ -396,6 +488,26 @@ final class SampleHostChengluStressRunner: ObservableObject {
                     "  [breakdown] +\(remaining) other " +
                     "(in \(sortedBreakdown.count - 10) types)")
             }
+        }
+
+        // Chapter 三百七五 / M862: final cognitive OS stat refresh
+        // + summary log line。Storage actor walks may have lagged
+        // the local counters during the stress loop — refreshStats
+        // pulls authoritative counts。
+        if observer.isEnabled {
+            await observer.refreshStats()
+            self.cognitiveOSEventCount = observer.eventCount
+            self.cognitiveOSStateCount = observer.stateCount
+            self.cognitiveOSGraphNodeCount =
+                observer.graphNodeCount
+            self.cognitiveOSGraphEdgeCount =
+                observer.graphEdgeCount
+            appendLog(
+                "🧠 cognitive OS: " +
+                "\(observer.eventCount) events / " +
+                "\(observer.stateCount) states / " +
+                "\(observer.graphNodeCount) graph nodes / " +
+                "\(observer.graphEdgeCount) graph edges")
         }
 
         // Chapter 三百四九 / M836 + 三百五〇 / M837: persist final

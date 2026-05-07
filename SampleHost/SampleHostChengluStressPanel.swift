@@ -1,9 +1,15 @@
 // MARK: - SampleHostChengluStressPanel — chapter 三百三九 / M826
+//                                     + chapter 三百七五 / M862
 //
 // SwiftUI panel that drives `SampleHostChengluStressRunner` for
 // the附录 X Chenglu mesh on real iPhone hardware。Closes v9 §8
 // non-promise #4 (production deployment validation) for opt-in
 // real-iPhone stress testing。
+//
+// Chapter 三百七五 / M862 adds an opt-in cognitive OS toggle that
+// wires the M859 builder into the stress run for live G1/G2/G9
+// data loop exercise。Default unchecked — preserves M826 / M837
+// stress runner contract。
 //
 // Doctrine pins:
 //   - 不变量 #1/#2/#3 全保 — stress runner is read-only,no
@@ -13,14 +19,23 @@
 //     loads .mlmodelc via Bundle + passes through builder
 //   - chapter 三百三八 (M825) Mac stress test pattern — same
 //     determinism / latency / failure tracking on iPhone
+//   - chapter 三百七五 (M862) cognitive OS toggle — default OFF
 
 import SwiftUI
+import BASHostKit
 
 struct SampleHostChengluStressPanel: View {
     @StateObject private var runner =
         SampleHostChengluStressRunner()
 
     @State private var selectedDuration: Double = 1200
+
+    /// Chapter 三百七五 / M862: opt-in cognitive OS toggle。
+    /// Default OFF preserves M826 / M837 contract。When ON,
+    /// builds in-memory event log + state store + knowledge
+    /// graph (no SQLite — keeps the toggle a one-tap experience
+    /// without filesystem permission concerns)。
+    @State private var cognitiveOSEnabled: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -40,12 +55,18 @@ struct SampleHostChengluStressPanel: View {
 
             durationPicker
 
+            cognitiveOSToggle
+
             controlButtons
 
             if runner.iterations > 0
                 || runner.status == .running
             {
                 statsBlock
+            }
+
+            if runner.cognitiveOSEnabled {
+                cognitiveOSStatsBlock
             }
 
             if let savedPath = runner.lastSavedRelativePath {
@@ -105,12 +126,28 @@ struct SampleHostChengluStressPanel: View {
     }
 
     @ViewBuilder
+    private var cognitiveOSToggle: some View {
+        Toggle(isOn: $cognitiveOSEnabled) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Cognitive OS observer (M862)")
+                    .font(.caption)
+                Text("Wires M859 builder → event log + state " +
+                    "+ graph during run。In-memory only。")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .disabled(runner.isRunning)
+    }
+
+    @ViewBuilder
     private var controlButtons: some View {
         HStack {
             if !runner.isRunning {
                 Button {
                     runner.start(
-                        durationSeconds: selectedDuration)
+                        durationSeconds: selectedDuration,
+                        cognitiveOSOptions: cognitiveOSOptions())
                 } label: {
                     Label(
                         "Run \(Int(selectedDuration))s stress",
@@ -129,6 +166,19 @@ struct SampleHostChengluStressPanel: View {
                 .buttonStyle(.bordered)
             }
         }
+    }
+
+    /// Chapter 三百七五 / M862: assemble the cognitive OS bundle
+    /// options the panel chose。In-memory across all primitives
+    /// (no SQLite URLs — keeps toggle frictionless)。
+    private func cognitiveOSOptions()
+        -> BASCognitiveOSBundleOptions
+    {
+        guard cognitiveOSEnabled else { return .allDisabled }
+        return BASCognitiveOSBundleOptions(
+            enableEventLog: true,
+            enableUserState: true,
+            enableKnowledgeGraph: true)
     }
 
     @ViewBuilder
@@ -177,6 +227,30 @@ struct SampleHostChengluStressPanel: View {
             Text(value).foregroundStyle(color)
                 .fontWeight(.semibold)
         }
+    }
+
+    /// Chapter 三百七五 / M862: surface cognitive OS observer
+    /// stats during + after a run。Hidden by default;visible only
+    /// when the toggle was on at start of run。
+    @ViewBuilder
+    private var cognitiveOSStatsBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("🧠 Cognitive OS observer (M862)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            statLine("Events appended",
+                "\(runner.cognitiveOSEventCount)")
+            statLine("State folds",
+                "\(runner.cognitiveOSStateCount)")
+            statLine("Graph nodes",
+                "\(runner.cognitiveOSGraphNodeCount)")
+            statLine("Graph edges",
+                "\(runner.cognitiveOSGraphEdgeCount)")
+        }
+        .font(.system(.caption, design: .monospaced))
+        .padding(8)
+        .background(.quaternary,
+            in: RoundedRectangle(cornerRadius: 8))
     }
 
     /// Chapter 三百四九 / M836: surface the persisted JSON file
