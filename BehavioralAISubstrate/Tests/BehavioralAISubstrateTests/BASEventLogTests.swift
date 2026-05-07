@@ -12,7 +12,6 @@
 //     per-session order
 
 import XCTest
-@testable import BASMemory
 @testable import BASRuntimeCore
 
 final class BASEventLogTests: XCTestCase {
