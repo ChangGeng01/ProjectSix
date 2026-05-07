@@ -147,82 +147,31 @@ public actor BASCoreMLLayerHead: BASLayerMLHead {
     }
 }
 
-// MARK: - MLModel-bound convenience init (Apple platforms only)
+// MARK: - MLModel-bound feature-provider helpers (Apple platforms only)
 
 #if canImport(CoreML)
 
 public extension BASCoreMLLayerHead {
 
-    /// Convenience static factory bound to a real `MLModel`。
-    /// Wraps the model reference inside an unchecked-Sendable
-    /// box so the inference closure can call `model.prediction
-    /// (from:)` from actor isolation。
-    ///
-    /// Caller is responsible for loading the `MLModel` from the
-    /// app bundle (e.g. `try MLModel(contentsOf: bundleURL)`).
-    /// This adapter does NOT bundle `.mlpackage` resources in
-    /// BAS test target — that stays in host's app bundle per
-    /// chapter 一百七十七 doctrine。
-    ///
-    /// Returns a freshly-constructed actor instance. Caller
-    /// retains the result; closure capture of `MLModel` is
-    /// handled via internal Sendable box.
-    ///
-    /// **DEPRECATED in chapter 三百三五 / M822**: this factory
-    /// uses the per-key `makeFeatureProvider` path which **does
-    /// NOT work** with the real shipped Chenglu `.mlpackage`
-    /// files (chapter 三百三二 / M819 reality check). All 5
-    /// chapter 三百二一 Chenglu adapters now construct their
-    /// own inferenceClosure directly via
-    /// `makeMultiArrayFeatureProvider(values:orderedKeys:
-    /// featureKey:)` and bypass this method entirely。
-    ///
-    /// Kept as deprecated public API for any external host that
-    /// already calls it AND knows their model expects per-key
-    /// scalar inputs。**For real Chenglu model integration use
-    /// the chapter 三百二一 adapter factories** (e.g.
-    /// `BASChengluPreflightAdapter.make(model:)`) — those route
-    /// through the correct MLMultiArray path。
-    @available(*, deprecated, message: "Per-key feature provider doesn't match real Chenglu .mlpackage shape. Use chapter 三百二一 Chenglu adapter factories (BASChengluPreflightAdapter.make(model:) etc.) which route through makeMultiArrayFeatureProvider. See chapter 三百三二 / M819 reality check.")
-    static func makeFromMLModel(
-        headID: String,
-        layerIDPin: BASMotherboardLayer14,
-        model: MLModel,
-        featureExtractor:
-            @escaping @Sendable (BASLayerInferenceInput)
-                -> BASCoreMLFeatureFrame,
-        outputTransformer:
-            @escaping @Sendable
-                (BASCoreMLPredictionFrame, BASLayerInferenceInput)
-                    -> BASLayerInferenceOutput,
-        modelDescription: String = ""
-    ) -> BASCoreMLLayerHead {
-        let modelBox = BASCoreMLModelBox(model: model)
-        let inferenceClosure:
-            @Sendable (BASCoreMLFeatureFrame) async throws
-                -> BASCoreMLPredictionFrame = { frame in
-            let startTime = Date()
-            let provider = try BASCoreMLLayerHead
-                .makeFeatureProvider(
-                    from: frame.featureValues)
-            let result = try modelBox.model.prediction(
-                from: provider)
-            let scores = BASCoreMLLayerHead.extractScores(
-                from: result)
-            let elapsed = Date()
-                .timeIntervalSince(startTime) * 1000
-            return BASCoreMLPredictionFrame(
-                scores: scores,
-                modelDescription: modelDescription,
-                inferenceLatencyMs: elapsed)
-        }
-        return BASCoreMLLayerHead(
-            headID: headID,
-            layerIDPin: layerIDPin,
-            featureExtractor: featureExtractor,
-            outputTransformer: outputTransformer,
-            inferenceClosure: inferenceClosure)
-    }
+    // chapter 三百四八 / M835 — `makeFromMLModel` removed。Was
+    // marked `@available(*, deprecated, ...)` in chapter 三百三五 /
+    // M822 with 0 production callers (only the chapter 三百二一
+    // Chenglu adapters used it,and chapter 三百三二 / M819 reality
+    // check rewrote all 5 to bypass it via direct inferenceClosure
+    // construction)。Removal closes the v9 §8 backlog HIGH #3 item
+    // raised in chapter 三百四七 / M834 audit。
+    //
+    // **Migration path** for any external host that called it:
+    //   - For Chenglu `.mlpackage` integrations → use the chapter
+    //     三百二一 adapter factories
+    //     (`BASChengluPreflightAdapter.make(model:)` etc.),which
+    //     route through `makeMultiArrayFeatureProvider` (the only
+    //     correct shape for sklearn-trained Chenglu models)
+    //   - For genuinely per-key models → call the parametric
+    //     `BASCoreMLLayerHead(...)` initializer directly,passing
+    //     a custom `inferenceClosure` that calls
+    //     `makeFeatureProvider(from:)` + `model.prediction(from:)`
+    //     yourself (recipe in `BASChengluCoreMLAdapters.swift`)
 
     /// Build an `MLDictionaryFeatureProvider` from a Sendable
     /// `[String: Double]` dictionary,with one `MLFeatureValue
@@ -334,12 +283,12 @@ public extension BASCoreMLLayerHead {
     }
 }
 
-/// Box wrapping non-Sendable `MLModel` for use inside Sendable
-/// closures。Safe because the closure is only invoked from
-/// within the adapter's actor isolation boundary。
-private struct BASCoreMLModelBox: @unchecked Sendable {
-    let model: MLModel
-}
+// Chapter 三百四八 / M835: `BASCoreMLModelBox` removed alongside
+// `makeFromMLModel`。Was a private struct used only by the
+// removed factory。Each Chenglu adapter in
+// `BASChengluCoreMLAdapters.swift` defines its own private box
+// (5 separate `@unchecked Sendable` boxes,one per adapter)
+// so the removal is non-breaking。
 
 /// Typed error cases for CoreML adapter construction + inference
 /// (chapter 三百三二 / M819)。

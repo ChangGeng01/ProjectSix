@@ -278,4 +278,113 @@ final class BASHostRuntimeMeshHookTests: XCTestCase {
         XCTAssertTrue(codes.contains(
             "mesh-coreml:tried:1"))
     }
+
+    // MARK: - chapter 三百四八 / M835 — runMeshCascadeRequired tests
+
+    /// `runMeshCascadeRequired` throws typed error when no
+    /// registry wired (replaces silent nil with explicit
+    /// invariant signal)。
+    func testRunMeshCascadeRequiredThrowsWhenNoRegistry()
+        async
+    {
+        let runtime = BASHostRuntime(
+            configuration: makeMinimalConfiguration())
+        let input = BASLayerInferenceInput(
+            layerID: .l1,
+            featureRef:
+                "anxious|medical|critical|today|trusted-ai|" +
+                "question|2",
+            confidenceFloor: .high)
+        do {
+            _ = try await runtime.runMeshCascadeRequired(
+                input: input, layerID: .l1)
+            XCTFail(
+                "runMeshCascadeRequired must throw when no " +
+                "registry is wired (typed error contract)")
+        } catch let error as BASHostMeshError {
+            XCTAssertEqual(
+                error,
+                .noRegistryWired(attemptedLayer: .l1),
+                "Typed error must carry the attempted layer " +
+                "for diagnostic context")
+        } catch {
+            XCTFail(
+                "Expected BASHostMeshError, got: " +
+                "\(type(of: error))")
+        }
+    }
+
+    /// `runMeshCascadeRequired` returns non-Optional result when
+    /// registry IS wired — same cascade output as the Optional
+    /// variant,but the type signature documents the
+    /// pre-checked invariant。
+    func testRunMeshCascadeRequiredReturnsResultWhenWired()
+        async throws
+    {
+        let registry = try await makePopulatedRegistry()
+        let runtime = BASHostRuntime(
+            configuration: makeMinimalConfiguration(),
+            meshRegistry: registry)
+        let ref = try BASChengluFeatureRefBuilder.build(
+            tone: "anxious", domain: "medical",
+            stake: "critical", timeframe: "today",
+            confidant: "trusted-ai", askShape: "question",
+            mutationSeed: 2)
+        let input = BASLayerInferenceInput(
+            layerID: .l1,
+            featureRef: ref,
+            confidenceFloor: .high)
+        let result = try await runtime.runMeshCascadeRequired(
+            input: input, layerID: .l1)
+        XCTAssertEqual(
+            result.cascadeResult.matchedHeadID,
+            "chenglu.l1.wake-policy",
+            "Required variant must return same cascade match " +
+            "as Optional variant when wired")
+    }
+
+    /// Optional and Required variants must produce identical
+    /// results when registry is wired (composition invariant)。
+    func testRunMeshCascadeOptionalAndRequiredIdentical()
+        async throws
+    {
+        let registry = try await makePopulatedRegistry()
+        let runtime = BASHostRuntime(
+            configuration: makeMinimalConfiguration(),
+            meshRegistry: registry)
+        let ref = try BASChengluFeatureRefBuilder.build(
+            tone: "anxious", domain: "medical",
+            stake: "critical", timeframe: "today",
+            confidant: "trusted-ai", askShape: "question",
+            mutationSeed: 2)
+        let input = BASLayerInferenceInput(
+            layerID: .l1,
+            featureRef: ref,
+            confidenceFloor: .high)
+        let optionalResult = try await runtime.runMeshCascade(
+            input: input, layerID: .l1)
+        let requiredResult = try await runtime
+            .runMeshCascadeRequired(
+                input: input, layerID: .l1)
+        XCTAssertNotNil(optionalResult)
+        XCTAssertEqual(optionalResult, requiredResult,
+            "Optional and Required variants must produce " +
+            "identical results when registry is wired")
+    }
+
+    /// `BASHostMeshError` is Equatable + Sendable + carries layer
+    /// for diagnostics — pin the shape to prevent drift。
+    func testBASHostMeshErrorEquatable() {
+        let error1 = BASHostMeshError.noRegistryWired(
+            attemptedLayer: .l4)
+        let error2 = BASHostMeshError.noRegistryWired(
+            attemptedLayer: .l4)
+        let error3 = BASHostMeshError.noRegistryWired(
+            attemptedLayer: .l11)
+        XCTAssertEqual(error1, error2,
+            "Same layer → equal errors")
+        XCTAssertNotEqual(error1, error3,
+            "Different layers → distinct errors (so callers " +
+            "can pattern-match on layer)")
+    }
 }

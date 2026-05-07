@@ -123,6 +123,20 @@ public enum BASHostMeshReasonCodes {
     }
 }
 
+// MARK: - Typed errors (chapter 三百四八 / M835)
+
+/// Typed error cases for mesh consultation。Lets hot-path callers
+/// distinguish "registry not wired" from cascade-runner failures
+/// (bad head, infer-throw, etc.)。
+public enum BASHostMeshError: Error, Equatable, Sendable {
+    /// `runMeshCascadeRequired(...)` was called on a runtime that
+    /// has no mesh registry wired。The non-Optional contract makes
+    /// this an explicit invariant violation rather than a silent
+    /// nil return。Carries the layer the caller attempted for
+    /// diagnostic context。
+    case noRegistryWired(attemptedLayer: BASMotherboardLayer14)
+}
+
 // MARK: - BASHostRuntime extension
 
 public extension BASHostRuntime {
@@ -135,6 +149,17 @@ public extension BASHostRuntime {
     /// behavior change vs pre-chapter 三百二三 BASHostRuntime
     /// instances.** Existing call sites that don't pass a registry
     /// see exactly the same execution profile as before。
+    ///
+    /// **Hot-path tip (chapter 三百四八 / M835)**: the nil-bail
+    /// is synchronous (no `await` is reached when registry is nil),
+    /// so the async hop is cheap in modern Swift。But for tight
+    /// inference loops where `meshRegistry` is statically known,
+    /// pre-checking `hasMeshRegistry` once at construction time +
+    /// skipping the call is still the cleanest pattern。If the
+    /// caller has already verified `hasMeshRegistry == true`,
+    /// prefer `runMeshCascadeRequired(...)` which returns a
+    /// non-Optional result and throws `BASHostMeshError.
+    /// noRegistryWired` if the precondition is violated。
     ///
     /// Hosts that want mesh consultation:
     ///   1. Construct + populate a registry (chapter 三百二一
@@ -154,7 +179,49 @@ public extension BASHostRuntime {
         input: BASLayerInferenceInput,
         layerID: BASMotherboardLayer14
     ) async throws -> BASHostMeshConsultationResult? {
-        guard let registry = meshRegistry else { return nil }
+        // Sync fast-path:bail before any `await` when no registry
+        // wired。Modern Swift's async machinery makes this nearly
+        // free,but the explicit guard keeps the intent legible
+        // (chapter 三百四八 / M835 HIGH #4 backlog item)。
+        guard hasMeshRegistry else { return nil }
+        return try await runMeshCascadeRequired(
+            input: input, layerID: layerID)
+    }
+
+    /// Non-Optional variant of `runMeshCascade` for hot-path
+    /// callers that have already verified `hasMeshRegistry == true`。
+    /// Throws `BASHostMeshError.noRegistryWired` if the precondition
+    /// is violated — explicit invariant failure beats silent nil。
+    ///
+    /// **When to use this instead of `runMeshCascade`**:
+    ///   - Tight inference loops where the registry presence is
+    ///     a static invariant (host pre-checks at construction)
+    ///   - Code paths where a nil result indicates a programmer
+    ///     error rather than an opt-in toggle
+    ///
+    /// Otherwise prefer `runMeshCascade(...)` — its Optional
+    /// signature is the canonical opt-in API per chapter 三百二三
+    /// (M810) doctrine。
+    ///
+    /// Chapter 三百四八 / M835 — closes the backlog item raised
+    /// in chapter 三百四七 / M834 audit (HIGH #4 async-when-nil
+    /// cost / API clarity)。
+    ///
+    /// - Parameters:
+    ///   - input: typed inference input
+    ///   - layerID: which canonical layer's slots to walk
+    /// - Returns: typed cascade result + reason codes
+    /// - Throws: `BASHostMeshError.noRegistryWired(attemptedLayer:)`
+    ///   if no registry is wired;else re-throws cascade runner
+    ///   errors
+    func runMeshCascadeRequired(
+        input: BASLayerInferenceInput,
+        layerID: BASMotherboardLayer14
+    ) async throws -> BASHostMeshConsultationResult {
+        guard let registry = meshRegistry else {
+            throw BASHostMeshError.noRegistryWired(
+                attemptedLayer: layerID)
+        }
         let cascade = try await BASLayerCascadeRunner.run(
             input: input,
             registry: registry,
@@ -166,7 +233,15 @@ public extension BASHostRuntime {
     }
 
     /// Convenience predicate: does this runtime have a wired
-    /// mesh registry?
+    /// mesh registry? Cheap stored-property check — safe to call
+    /// at every host turn boundary。
+    ///
+    /// Chapter 三百四八 / M835: marked `@inlinable` so cross-module
+    /// callers (SampleHost / Before / Widget / Watch) can elide
+    /// the call entirely when used as a guard expression。Body is
+    /// a single nil-comparison on a `let` property,so the inlined
+    /// expansion is zero-cost。
+    @inlinable
     var hasMeshRegistry: Bool {
         meshRegistry != nil
     }

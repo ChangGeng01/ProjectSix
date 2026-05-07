@@ -193,7 +193,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
     // MARK: - BASChengluPreflightAdapter
 
     func testPreflightAdapterAFMRouteOnHighScore() async throws {
-        let head = BASChengluPreflightAdapter.makeWithClosure(
+        let head = BASChengluPreflightAdapter.make(
             headID: "test.preflight",
             layerIDPin: .l1,
             inferenceClosure: makeStubClosure(
@@ -210,7 +210,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
     }
 
     func testPreflightAdapterGemmaRouteOnLowScore() async throws {
-        let head = BASChengluPreflightAdapter.makeWithClosure(
+        let head = BASChengluPreflightAdapter.make(
             headID: "test.preflight",
             layerIDPin: .l1,
             inferenceClosure: makeStubClosure(
@@ -227,7 +227,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         async throws
     {
         // |0.55 - 0.5| = 0.05, which is < 0.10 threshold → low
-        let head = BASChengluPreflightAdapter.makeWithClosure(
+        let head = BASChengluPreflightAdapter.make(
             headID: "test.preflight",
             layerIDPin: .l1,
             inferenceClosure: makeStubClosure(
@@ -281,13 +281,13 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
                 inferenceLatencyMs: 0.3)
         }
         let intentHead = BASChengluMultiHeadAdapter
-            .makeWithClosure(
+            .make(
                 headID: "intent-head",
                 layerIDPin: .l4,
                 outputKey: "intent",
                 inferenceClosure: sharedClosure)
         let emotionHead = BASChengluMultiHeadAdapter
-            .makeWithClosure(
+            .make(
                 headID: "emotion-head",
                 layerIDPin: .l4,
                 outputKey: "emotion",
@@ -323,7 +323,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         async throws
     {
         let head = BASChengluPermitPredictAdapter
-            .makeWithClosure(
+            .make(
                 headID: "test.permitpredict",
                 layerIDPin: .l11,
                 inferenceClosure: makeStubClosure(
@@ -342,7 +342,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         async throws
     {
         let head = BASChengluPermitPredictAdapter
-            .makeWithClosure(
+            .make(
                 headID: "test.permitpredict",
                 layerIDPin: .l11,
                 inferenceClosure: makeStubClosure(
@@ -360,7 +360,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
     // MARK: - BASChengluLengthHeadAdapter
 
     func testLengthHeadAdapterRegressionOutput() async throws {
-        let head = BASChengluLengthHeadAdapter.makeWithClosure(
+        let head = BASChengluLengthHeadAdapter.make(
             headID: "test.length",
             layerIDPin: .l12,
             inferenceClosure: makeStubClosure(
@@ -381,7 +381,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         async throws
     {
         // length = 75000 > maxSensible 50000 → .low
-        let head = BASChengluLengthHeadAdapter.makeWithClosure(
+        let head = BASChengluLengthHeadAdapter.make(
             headID: "test.length",
             layerIDPin: .l12,
             inferenceClosure: makeStubClosure(
@@ -396,7 +396,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
     // MARK: - BASChengluLatencyHeadAdapter
 
     func testLatencyHeadAdapterRegressionOutput() async throws {
-        let head = BASChengluLatencyHeadAdapter.makeWithClosure(
+        let head = BASChengluLatencyHeadAdapter.make(
             headID: "test.latency",
             layerIDPin: .l1,
             inferenceClosure: makeStubClosure(
@@ -414,7 +414,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
     func testLatencyHeadAdapterNegativeScoreLowConfidence()
         async throws
     {
-        let head = BASChengluLatencyHeadAdapter.makeWithClosure(
+        let head = BASChengluLatencyHeadAdapter.make(
             headID: "test.latency",
             layerIDPin: .l1,
             inferenceClosure: makeStubClosure(
@@ -476,7 +476,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         // its canonical layer。`layerIDPin` is nonisolated so
         // accessible synchronously。
         let preflightHead = BASChengluPreflightAdapter
-            .makeWithClosure(
+            .make(
                 headID: "p", layerIDPin: .l1,
                 inferenceClosure: makeStubClosure(
                     score: 0.5,
@@ -485,7 +485,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         XCTAssertEqual(preflightHead.layerIDPin, .l1)
 
         let multiHeadIntent = BASChengluMultiHeadAdapter
-            .makeWithClosure(
+            .make(
                 headID: "mh1", layerIDPin: .l4,
                 outputKey: BASChengluMultiHeadAdapter
                     .intentKey,
@@ -494,7 +494,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         XCTAssertEqual(multiHeadIntent.layerIDPin, .l4)
 
         let permitPredict = BASChengluPermitPredictAdapter
-            .makeWithClosure(
+            .make(
                 headID: "pp", layerIDPin: .l11,
                 inferenceClosure: makeStubClosure(
                     score: 0.5,
@@ -503,7 +503,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         XCTAssertEqual(permitPredict.layerIDPin, .l11)
 
         let length = BASChengluLengthHeadAdapter
-            .makeWithClosure(
+            .make(
                 headID: "len", layerIDPin: .l12,
                 inferenceClosure: makeStubClosure(
                     score: 100,
@@ -512,7 +512,7 @@ final class BASChengluCoreMLAdaptersTests: XCTestCase {
         XCTAssertEqual(length.layerIDPin, .l12)
 
         let latency = BASChengluLatencyHeadAdapter
-            .makeWithClosure(
+            .make(
                 headID: "lat", layerIDPin: .l1,
                 inferenceClosure: makeStubClosure(
                     score: 1000,

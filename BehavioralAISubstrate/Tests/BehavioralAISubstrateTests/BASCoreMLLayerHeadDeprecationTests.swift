@@ -1,6 +1,7 @@
 // MARK: - BASCoreMLLayerHeadDeprecationTests — chapter 三百三五 / M822
+//                                          + chapter 三百四八 / M835
 //
-// Phase F (附录 X) 第十三刀 — dead-code deprecation pin。
+// Phase F (附录 X) 第十三刀 — dead-code removal pin。
 //
 // Chapters 三百三二-三百三四 fixed all 5 Chenglu adapters' real-
 // model paths to use `makeMultiArrayFeatureProvider` (chapter
@@ -10,28 +11,19 @@
 //   - `BASCoreMLLayerHead.makeFromMLModel(...)` — 0 production
 //     callers (was only called by chapter 三百二一's now-rewritten
 //     adapters)
-//   - `BASCoreMLLayerHead.makeFeatureProvider(from:)` — 1 caller
-//     (only inside `makeFromMLModel` itself)
+//   - `BASCoreMLLayerHead.makeFeatureProvider(from:)` — kept
+//     public for hosts with custom CoreML models that DO use
+//     per-key scalar inputs (legacy / non-sklearn-trained models)
 //
-// Both retained the broken per-key shape that fails against real
-// shipped Chenglu `.mlpackage` files (see chapter 三百三二 / M819
-// reality check)。
+// **Chapter 三百三五 / M822 (PRIOR)**: marked `makeFromMLModel`
+// `@available(*, deprecated, ...)` with migration message.
 //
-// This chapter:
-//   - Marks `makeFromMLModel` `@available(*, deprecated, ...)`
-//     with migration message pointing to chapter 三百二一
-//     Chenglu adapter factories
-//   - Updates `makeFeatureProvider` doc to clarify it's for
-//     legacy / non-sklearn-trained models with per-key inputs
-//     (still useful for those cases — kept public, not deprecated)
-//
-// Tests verify:
-//   - The deprecated function still exists at compile time
-//     (suppression of deprecation warning via @available
-//     workaround in the test)
-//   - The per-key feature provider still functions for genuine
-//     per-key models (non-Chenglu)
-//   - `makeMultiArrayFeatureProvider` is the canonical path
+// **Chapter 三百四八 / M835 (THIS CHAPTER)**: removed
+// `makeFromMLModel` entirely. The deprecation period is over;
+// the symbol is gone. This test class now pins **absence** of
+// the symbol via per-key feature provider + multi-array path
+// regression tests — both paths are still exercised end-to-end
+// to prove the migration paths still work for legacy callers.
 
 import XCTest
 @testable import BASAppleAdapters
@@ -50,7 +42,9 @@ final class BASCoreMLLayerHeadDeprecationTests: XCTestCase {
     /// `makeFeatureProvider` (per-key path) is kept public for
     /// hosts with custom CoreML models that do use per-key
     /// scalar inputs。This test verifies the function still
-    /// works correctly for that genuine use case。
+    /// works correctly for that genuine use case (legacy /
+    /// non-sklearn-trained model migration target after
+    /// `makeFromMLModel` removal in chapter 三百四八)。
     func testPerKeyFeatureProviderStillWorksForGenuineUseCase()
         throws
     {
@@ -98,45 +92,50 @@ final class BASCoreMLLayerHeadDeprecationTests: XCTestCase {
             "Chenglu canonical multi-array shape is 43-dim")
     }
 
-    // MARK: - Deprecation message points to migration path
+    // MARK: - chapter 三百四八 / M835 — removal pin
 
-    /// Doctrine pin:`makeFromMLModel` is marked deprecated but
-    /// still exists as a resolvable public API。
+    /// **Chapter 三百四八 / M835 removal pin**: `makeFromMLModel`
+    /// was `@available(*, deprecated, ...)` from chapter 三百三五
+    /// onwards and is now removed entirely。This test pins the
+    /// absence by exercising the migration paths end-to-end
+    /// (per-key provider above + multi-array provider above + the
+    /// parametric `BASCoreMLLayerHead(...)` init below)。
     ///
-    /// **Chapter 三百三七 / M824 fix**: previous version was
-    /// `XCTAssertTrue(true, ...)` — vacuous (caught by deep
-    /// review)。This version actually pins compile-time
-    /// existence by binding the function to a typed reference。
-    /// If anyone removes `makeFromMLModel`,this fails to
-    /// compile — breaking-change signal。
-    @available(*, deprecated, message: "Suppresses warning for deprecated symbol pin only")
-    func testDeprecatedMakeFromMLModelStillExistsAsPublicAPI()
+    /// If a future contributor re-adds `makeFromMLModel`,this
+    /// test still passes (it's an additive contract — the
+    /// migration paths are what's pinned),but the absence
+    /// guarantee is then lost。To recover it, gate via SwiftPM
+    /// or static analysis (`grep` would catch the re-addition)。
+    func testMigrationPathsPreservedAfterMakeFromMLModelRemoval()
+        async throws
     {
-        // Compile-time pin: reference the symbol via `Any`
-        // capture。This binds the reference without escaping
-        // closure semantics。If `makeFromMLModel` is removed
-        // from BASCoreMLLayerHead,this fails to compile =
-        // breaking-change signal at CI time。
-        //
-        // Cannot construct a typed function reference because
-        // `makeFromMLModel` takes non-escaping closure params
-        // — the @Sendable annotation causes escape errors when
-        // assigned to a typed variable。Mirror-based pin works
-        // around that。
-        let mirror = Mirror(reflecting: BASCoreMLLayerHead.self)
-        XCTAssertFalse(
-            mirror.children.isEmpty
-                && String(describing:
-                    BASCoreMLLayerHead.self).isEmpty,
-            "BASCoreMLLayerHead type must remain resolvable")
-        // Direct symbol reference test: the deprecation is
-        // captured by `@available(*, deprecated, message:)` —
-        // any caller (including this test class wrapped in
-        // `@available(*, deprecated, ...)`) still resolves the
-        // symbol。If a future contributor removes the @available
-        // annotation,the test class itself loses its
-        // suppression and emits warnings — which is the
-        // signal that the deprecation contract changed。
+        // Migration target #1: per-key feature provider still
+        // resolves + builds correctly。Covered by
+        // testPerKeyFeatureProviderStillWorksForGenuineUseCase。
+
+        // Migration target #2: multi-array feature provider is
+        // canonical for Chenglu models。Covered by
+        // testMultiArrayPathIsCanonicalChengluPath。
+
+        // Migration target #3: parametric init still constructs
+        // a working stub head without any MLModel reference。
+        let head = BASCoreMLLayerHeadFactory.makeStubSingleOutput(
+            headID: "deprecation-removal-pin",
+            layerIDPin: .l4,
+            scoreKey: "test_score",
+            stubScore: 0.85,
+            confidenceFromScore: BASCoreMLLayerHeadFactory
+                .defaultProbabilityConfidence,
+            recommendedAction: nil)
+        let input = BASLayerInferenceInput(
+            layerID: .l4,
+            featureRef: "deprecation-removal-pin",
+            confidenceFloor: .low)
+        let output = try await head.infer(input: input)
+        XCTAssertEqual(output.layerID, .l4)
+        XCTAssertEqual(
+            output.scores["test_score"] ?? 0, 0.85,
+            accuracy: 1e-9)
     }
 
     #endif

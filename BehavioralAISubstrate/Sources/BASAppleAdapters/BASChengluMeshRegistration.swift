@@ -120,45 +120,42 @@ public enum BASChengluMeshRegistration {
         into registry: BASLayerMLHeadRegistry,
         options: ClosureRegistrationOptions
     ) async throws -> BASChengluMeshRegistrationReport {
-        var perLayer: [String: Int] = [:]
+        // Chapter 三百四八 / M835: tally + register ritual now
+        // routes through `BASLayerMLHeadRegistrar` to share with
+        // `BAS14LayerMeshAssembler` (eliminates pattern drift
+        // per MEDIUM #8 backlog item)。`missing` stays local
+        // because it tracks which optional closures the caller
+        // omitted — independent of registrar tally state。
+        var registrar = BASLayerMLHeadRegistrar()
         var missing: [String] = []
-        var registered = 0
+        let priority = BAS14LayerMeshMap
+            .coremlOnDeviceTierPriority
 
         // L1.wake-policy ← Preflight
         if let preflight = options.preflightClosure {
-            let head = BASChengluPreflightAdapter
-                .makeWithClosure(
-                    headID: canonicalHeadID(
-                        layer: .l1, role: "wake-policy"),
-                    layerIDPin: .l1,
-                    inferenceClosure: preflight)
-            try await registry.register(
-                head: head, layerID: .l1,
-                priority: BAS14LayerMeshMap
-                    .coremlOnDeviceTierPriority)
-            perLayer[BASMotherboardLayer14.l1.rawValue,
-                default: 0] += 1
-            registered += 1
+            let head = BASChengluPreflightAdapter.make(
+                headID: canonicalHeadID(
+                    layer: .l1, role: "wake-policy"),
+                layerIDPin: .l1,
+                inferenceClosure: preflight)
+            try await registrar.register(
+                head: head, into: registry,
+                layerID: .l1, priority: priority)
         } else {
             missing.append("preflight")
         }
 
         // L1.compute-cost-predictor ← LatencyHead
         if let latency = options.latencyHeadClosure {
-            let head = BASChengluLatencyHeadAdapter
-                .makeWithClosure(
-                    headID: canonicalHeadID(
-                        layer: .l1,
-                        role: "compute-cost-predictor"),
-                    layerIDPin: .l1,
-                    inferenceClosure: latency)
-            try await registry.register(
-                head: head, layerID: .l1,
-                priority: BAS14LayerMeshMap
-                    .coremlOnDeviceTierPriority)
-            perLayer[BASMotherboardLayer14.l1.rawValue,
-                default: 0] += 1
-            registered += 1
+            let head = BASChengluLatencyHeadAdapter.make(
+                headID: canonicalHeadID(
+                    layer: .l1,
+                    role: "compute-cost-predictor"),
+                layerIDPin: .l1,
+                inferenceClosure: latency)
+            try await registrar.register(
+                head: head, into: registry,
+                layerID: .l1, priority: priority)
         } else {
             missing.append("latencyHead")
         }
@@ -178,19 +175,15 @@ public enum BASChengluMeshRegistration {
                     BASChengluMultiHeadAdapter.riskKey)
             ]
             for (layer, role, outputKey) in multiHeadSlots {
-                let head = BASChengluMultiHeadAdapter
-                    .makeWithClosure(
-                        headID: canonicalHeadID(
-                            layer: layer, role: role),
-                        layerIDPin: layer,
-                        outputKey: outputKey,
-                        inferenceClosure: multiHead)
-                try await registry.register(
-                    head: head, layerID: layer,
-                    priority: BAS14LayerMeshMap
-                        .coremlOnDeviceTierPriority)
-                perLayer[layer.rawValue, default: 0] += 1
-                registered += 1
+                let head = BASChengluMultiHeadAdapter.make(
+                    headID: canonicalHeadID(
+                        layer: layer, role: role),
+                    layerIDPin: layer,
+                    outputKey: outputKey,
+                    inferenceClosure: multiHead)
+                try await registrar.register(
+                    head: head, into: registry,
+                    layerID: layer, priority: priority)
             }
         } else {
             missing.append("multiHead")
@@ -198,51 +191,43 @@ public enum BASChengluMeshRegistration {
 
         // L11.safety-action-selector ← PermitPredict
         if let permit = options.permitPredictClosure {
-            let head = BASChengluPermitPredictAdapter
-                .makeWithClosure(
-                    headID: canonicalHeadID(
-                        layer: .l11,
-                        role: "safety-action-selector"),
-                    layerIDPin: .l11,
-                    inferenceClosure: permit)
-            try await registry.register(
-                head: head, layerID: .l11,
-                priority: BAS14LayerMeshMap
-                    .coremlOnDeviceTierPriority)
-            perLayer[BASMotherboardLayer14.l11.rawValue,
-                default: 0] += 1
-            registered += 1
+            let head = BASChengluPermitPredictAdapter.make(
+                headID: canonicalHeadID(
+                    layer: .l11,
+                    role: "safety-action-selector"),
+                layerIDPin: .l11,
+                inferenceClosure: permit)
+            try await registrar.register(
+                head: head, into: registry,
+                layerID: .l11, priority: priority)
         } else {
             missing.append("permitPredict")
         }
 
         // L12.density-controller ← LengthHead
         if let length = options.lengthHeadClosure {
-            let head = BASChengluLengthHeadAdapter
-                .makeWithClosure(
-                    headID: canonicalHeadID(
-                        layer: .l12,
-                        role: "density-controller"),
-                    layerIDPin: .l12,
-                    inferenceClosure: length)
-            try await registry.register(
-                head: head, layerID: .l12,
-                priority: BAS14LayerMeshMap
-                    .coremlOnDeviceTierPriority)
-            perLayer[BASMotherboardLayer14.l12.rawValue,
-                default: 0] += 1
-            registered += 1
+            let head = BASChengluLengthHeadAdapter.make(
+                headID: canonicalHeadID(
+                    layer: .l12,
+                    role: "density-controller"),
+                layerIDPin: .l12,
+                inferenceClosure: length)
+            try await registrar.register(
+                head: head, into: registry,
+                layerID: .l12, priority: priority)
         } else {
             missing.append("lengthHead")
         }
 
+        let perLayerByRawValue =
+            registrar.perLayerCountsByRawValue
         let reasonCodes = makeReasonCodes(
-            registered: registered,
+            registered: registrar.registeredHeadCount,
             missing: missing,
-            perLayerCounts: perLayer)
+            perLayerCounts: perLayerByRawValue)
         return BASChengluMeshRegistrationReport(
-            registeredHeadCount: registered,
-            perLayerCounts: perLayer,
+            registeredHeadCount: registrar.registeredHeadCount,
+            perLayerCounts: perLayerByRawValue,
             missingMLModels: missing,
             reasonCodes: reasonCodes)
     }

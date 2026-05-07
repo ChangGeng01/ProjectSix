@@ -103,29 +103,35 @@ public enum BAS14LayerMeshAssembler {
         -> (registry: BASLayerMLHeadRegistry,
             report: BAS14LayerMeshAssemblyReport)
     {
+        // Chapter 三百四八 / M835: registration loop now goes
+        // through `BASLayerMLHeadRegistrar` to share the tally
+        // ritual with `BASChengluMeshRegistration` (eliminates
+        // drift risk per MEDIUM #8 backlog item).
         let registry = BASLayerMLHeadRegistry()
-        var perLayerCounts:
-            [BASMotherboardLayer14: Int] = [:]
+        var registrar = BASLayerMLHeadRegistrar()
 
         for slot in BAS14LayerMeshMap.canonical {
-            // Build canonical headID from slot.layerID + slot.headRole
             let headID = "rules.\(slot.layerID.rawValue)." +
                 slot.headRole
             let head = BASRulesBasedLayerMLHeadFactory
                 .makeAlwaysFallthrough(
                     headID: headID,
                     layerIDPin: slot.layerID)
-            try await registry.register(
+            try await registrar.register(
                 head: head,
+                into: registry,
                 layerID: slot.layerID,
                 priority: slot.priority)
-            perLayerCounts[slot.layerID, default: 0] += 1
         }
 
+        // Cross-check registrar count vs registry's own count —
+        // belt-and-suspenders: registrar only counts what it
+        // successfully delegated;`registry.totalHeadCount` is
+        // the actor's authoritative count。Both should match。
         let registeredCount = await registry.totalHeadCount
         let report = BAS14LayerMeshAssemblyReport(
             registeredHeadCount: registeredCount,
-            perLayerCounts: perLayerCounts,
+            perLayerCounts: registrar.perLayerCounts,
             totalCanonicalSlots:
                 BAS14LayerMeshMap.totalSlotCount)
         return (registry, report)

@@ -112,7 +112,7 @@ public enum BASChengluMemoryAspirationalAdapter {
     /// without `MLModel`)。Tests use this path with stub
     /// closures since no real `ChengluMemory_v0.mlpackage`
     /// exists today。
-    public static func makeWithClosure(
+    public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         outputKey: String,

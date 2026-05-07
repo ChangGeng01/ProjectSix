@@ -62,7 +62,7 @@ final class BASChengluMemoryAspirationalAdapterTests: XCTestCase
 
     func testMakeWithClosureReturnsHeadAtCorrectLayer() {
         let head = BASChengluMemoryAspirationalAdapter
-            .makeWithClosure(
+            .make(
                 headID: "test-memory-head",
                 layerIDPin: .l8,
                 outputKey: BASChengluMemoryAspirationalAdapter
@@ -81,7 +81,7 @@ final class BASChengluMemoryAspirationalAdapterTests: XCTestCase
         async throws
     {
         let head = BASChengluMemoryAspirationalAdapter
-            .makeWithClosure(
+            .make(
                 headID: "memory-test",
                 layerIDPin: .l8,
                 outputKey: BASChengluMemoryAspirationalAdapter

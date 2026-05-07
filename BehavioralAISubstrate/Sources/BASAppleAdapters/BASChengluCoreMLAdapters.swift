@@ -276,7 +276,7 @@ public enum BASChengluPreflightAdapter {
 
     /// Construct adapter from parametric closure (testable
     /// without `MLModel`)。
-    public static func makeWithClosure(
+    public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         inferenceClosure:
@@ -435,7 +435,7 @@ public enum BASChengluMultiHeadAdapter {
     ]
 
     /// Construct one head per output key (testable variant)。
-    public static func makeWithClosure(
+    public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         outputKey: String,
@@ -547,7 +547,7 @@ public enum BASChengluPermitPredictAdapter {
 
     public static let outputKey = "block_probability"
 
-    public static func makeWithClosure(
+    public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         inferenceClosure:
@@ -681,7 +681,7 @@ public enum BASChengluLengthHeadAdapter {
     public static let minSensibleLength: Double = 0
     public static let maxSensibleLength: Double = 50_000
 
-    public static func makeWithClosure(
+    public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         inferenceClosure:
@@ -796,7 +796,7 @@ public enum BASChengluLatencyHeadAdapter {
     public static let minSensibleLatency: Double = 0
     public static let maxSensibleLatency: Double = 60_000
 
-    public static func makeWithClosure(
+    public static func make(
         headID: String,
         layerIDPin: BASMotherboardLayer14,
         inferenceClosure:
