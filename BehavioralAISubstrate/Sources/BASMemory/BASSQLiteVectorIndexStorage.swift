@@ -309,8 +309,12 @@ public actor BASSQLiteVectorIndexStorage {
             stmt, 3,
             entry.normalizedEmbedding.providerVersion)
         // Bind blob — SQLITE_TRANSIENT copies into SQLite-owned
-        // memory so `blob` Data can deinit immediately after
-        blob.withUnsafeBytes { rawBuf in
+        // memory so `blob` Data can deinit immediately after。
+        // sqlite3_bind_blob returns Int32 (SQLITE_OK / error),
+        // which we discard via the leading `_ =` since the
+        // subsequent sqlite3_step check surfaces any actual
+        // failure path。
+        _ = blob.withUnsafeBytes { rawBuf in
             sqlite3_bind_blob(
                 stmt, 4,
                 rawBuf.baseAddress,

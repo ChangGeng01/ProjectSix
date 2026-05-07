@@ -103,35 +103,34 @@ final class BASCognitiveOSLayerActorFactoriesTests:
 
     // MARK: - Per-layer factory pins
 
-    func testL2ActorIsPinnedToL2() async {
+    // Note: layerID is `nonisolated let` on BASLayerReferenceActor
+    // (chapter 三百一六),so accessing it doesn't require `await`。
+
+    func testL2ActorIsPinnedToL2() {
         let actor = BASCognitiveOSLayerActorFactories
             .makeL2Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
-        XCTAssertEqual(layerID, .l2)
+        XCTAssertEqual(actor.layerID, .l2)
     }
 
-    func testL3ActorIsPinnedToL3() async {
+    func testL3ActorIsPinnedToL3() {
         let actor = BASCognitiveOSLayerActorFactories
             .makeL3Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
-        XCTAssertEqual(layerID, .l3)
+        XCTAssertEqual(actor.layerID, .l3)
     }
 
-    func testL5ActorIsPinnedToL5() async {
+    func testL5ActorIsPinnedToL5() {
         let actor = BASCognitiveOSLayerActorFactories
             .makeL5Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
-        XCTAssertEqual(layerID, .l5)
+        XCTAssertEqual(actor.layerID, .l5)
     }
 
     // MARK: - L7 (M870 — chapter 三百八三)
 
-    func testL7ActorIsPinnedToL7() async {
+    func testL7ActorIsPinnedToL7() {
         let actor = BASCognitiveOSLayerActorFactories
             .makeL7Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
         XCTAssertEqual(
-            layerID, .l7,
+            actor.layerID, .l7,
             "M870 L7 planner factory must pin to L7 layer")
     }
 
@@ -147,7 +146,7 @@ final class BASCognitiveOSLayerActorFactoriesTests:
 
     // MARK: - makeAllCognitiveOSExtendedActors
 
-    func testMakeAllReturnsFourActorsInOrder() async {
+    func testMakeAllReturnsFourActorsInOrder() {
         let actors = BASCognitiveOSLayerActorFactories
             .makeAllCognitiveOSExtendedActors(
                 registry: makeRegistry())
@@ -155,21 +154,8 @@ final class BASCognitiveOSLayerActorFactoriesTests:
             "M870 ships 4 cognitive-OS-extended actors " +
             "(L2 + L3 + L5 + L7). L7 added in chapter 三百" +
             "八三 / M870 closure。Pre-M870 this count was 3。")
-        let layerIDs = await withTaskGroup(
-            of: BASMotherboardLayer14.self,
-            returning: [BASMotherboardLayer14].self
-        ) { group in
-            for actor in actors {
-                group.addTask { await actor.layerID }
-            }
-            var collected: [BASMotherboardLayer14] = []
-            for await id in group {
-                collected.append(id)
-            }
-            return collected
-        }
-        // Order isn't guaranteed by TaskGroup but the SET
-        // should be exactly {L2, L3, L5, L7}
+        // layerID is `nonisolated let` — synchronous access OK
+        let layerIDs = actors.map { $0.layerID }
         XCTAssertEqual(
             Set(layerIDs),
             Set([.l2, .l3, .l5, .l7]),

@@ -174,6 +174,14 @@ public actor BASCognitiveOSConvenience {
     /// are no-ops on already-persisted nodes/edges。
     private let knowledgeGraphStorage:
         BASSQLiteKnowledgeGraphStorage?
+    /// Post-M872 deep-review fix:optional callback fired when a
+    /// graph write-through fails。Without this,storage failures
+    /// were silently swallowed and the in-memory graph could
+    /// drift out of sync with SQLite without any host signal。
+    /// Default nil preserves the M865/M869 silent-fail contract
+    /// — hosts opt in to error visibility by passing a callback。
+    private let onPersistError:
+        (@Sendable (String, Error) -> Void)?
     private let cadence: BASCognitiveOSConvenienceCadence
     private let sessionID: String
 
@@ -201,7 +209,9 @@ public actor BASCognitiveOSConvenience {
         knowledgeGraphStorage:
             BASSQLiteKnowledgeGraphStorage? = nil,
         sessionID: String = UUID().uuidString,
-        cadence: BASCognitiveOSConvenienceCadence = .default
+        cadence: BASCognitiveOSConvenienceCadence = .default,
+        onPersistError:
+            (@Sendable (String, Error) -> Void)? = nil
     ) {
         self.eventLog = eventLog
         self.userStateStore = userStateStore
@@ -210,6 +220,7 @@ public actor BASCognitiveOSConvenience {
             knowledgeGraphStorage
         self.sessionID = sessionID
         self.cadence = cadence
+        self.onPersistError = onPersistError
         self.currentState = .zero
     }
 
@@ -360,7 +371,9 @@ public actor BASCognitiveOSConvenience {
     /// Walk the in-memory graph + write-through nodes + edges to
     /// the SQLite storage companion。Idempotent on already-
     /// persisted rows due to M866 append semantics。Errors are
-    /// silently dropped (chapter 一百九十一 row-by-row integrity)。
+    /// reported via the optional `onPersistError` callback (post-
+    /// M872 deep review fix) but never thrown — observation
+    /// primitives never disrupt the host turn loop。
     private func persistGraph(
         graph: BASKnowledgeGraph,
         storage: BASSQLiteKnowledgeGraphStorage
@@ -370,7 +383,8 @@ public actor BASCognitiveOSConvenience {
             do {
                 _ = try await storage.appendNode(node)
             } catch {
-                // Silent — observation primitives never disrupt
+                onPersistError?(node.nodeID, error)
+                // Continue — observation primitives never disrupt
                 // host turn loop on storage failure
             }
         }
@@ -379,7 +393,8 @@ public actor BASCognitiveOSConvenience {
             do {
                 _ = try await storage.appendEdge(edge)
             } catch {
-                // Silent — same contract as appendNode above
+                onPersistError?(edge.edgeID, error)
+                // Continue — same contract as appendNode above
             }
         }
     }

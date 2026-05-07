@@ -187,18 +187,50 @@ public actor BASSQLiteKnowledgeGraphStorage {
     /// row was deleted。Mirrors graph actor semantics —
     /// `BASKnowledgeGraph.remove(nodeID:)` cascades incident
     /// edges,so this storage method does the same。
+    ///
+    /// Uses a prepared statement for the cascade DELETE rather
+    /// than inline string interpolation。Per chapter 二百四十八
+    /// M735 SQLite idiom — every external string flows through
+    /// a parameter bind,never through string interpolation。
     @discardableResult
     public func removeNode(
         _ nodeID: String
     ) async throws -> Bool {
         guard let db else { return false }
         // Delete incident edges first (referential consistency)
-        try Self.runExec(db: db, sql: """
-            DELETE FROM knowledge_edge
-            WHERE from_node_id = '\(escape(nodeID))'
-               OR to_node_id = '\(escape(nodeID))';
-            """)
+        try Self.deleteIncidentEdges(db: db, nodeID: nodeID)
         return try Self.deleteNode(db: db, nodeID: nodeID)
+    }
+
+    /// Cascade-DELETE every edge incident to `nodeID` (either
+    /// `from_node_id` OR `to_node_id`)。Prepared statement
+    /// forecloses any SQL injection surface — caller-supplied
+    /// nodeID flows through `bindText` only。
+    fileprivate static func deleteIncidentEdges(
+        db: OpaquePointer,
+        nodeID: String
+    ) throws {
+        let sql = """
+            DELETE FROM knowledge_edge
+            WHERE from_node_id = ? OR to_node_id = ?
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, nodeID)
+        bindText(stmt, 2, nodeID)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
     }
 
     public var nodeCount: Int {
@@ -274,12 +306,13 @@ public actor BASSQLiteKnowledgeGraphStorage {
         let nodes = await allNodes()
         var nodesLoaded = 0
         for node in nodes {
-            do {
-                try await graph.upsert(node: node)
-                nodesLoaded += 1
-            } catch {
-                onCorruptNode?(node.nodeID, error)
-            }
+            // upsert doesn't throw — node insertion is
+            // idempotent by design (overwrites by nodeID)。
+            // The onCorruptNode callback is reserved for future
+            // schema-version-mismatch decoder paths。
+            _ = onCorruptNode
+            await graph.upsert(node: node)
+            nodesLoaded += 1
         }
 
         let edges = await allEdges()
@@ -771,14 +804,8 @@ public actor BASSQLiteKnowledgeGraphStorage {
         return String(cString: cstr)
     }
 
-    /// SQL-escape a single-quote in a string for inline use。
-    /// Used only by `removeNode` cascade DELETE which constructs
-    /// the WHERE clause inline (no prepared statement)。Caller-
-    /// supplied nodeID is hashed/UUID-ish so collision risk is
-    /// negligible,but we still escape defensively。
-    private nonisolated func escape(
-        _ s: String
-    ) -> String {
-        s.replacingOccurrences(of: "'", with: "''")
-    }
+    // (`escape` helper removed — `deleteIncidentEdges` now uses
+    // a prepared statement,so no inline string interpolation
+    // path remains in this file。chapter 二百四十八 M735 idiom
+    // upheld:every external string flows through bindText)
 }

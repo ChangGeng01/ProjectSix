@@ -97,7 +97,10 @@ final class BASSovereignAuditLedgerTests: XCTestCase {
     func testAppendAcceptsCallerSignatureWhenItMatchesLedgerComputation() async throws {
         // A caller that wants to pre-sign can do so; the ledger will accept
         // iff the signature matches what it would have computed itself.
-        let ledger = makeLedger(seed: "paired-seed")
+        // (The `ledger` instance below was unused — replaced with `_` to
+        // silence the unused-binding warning while preserving the seeded
+        // construction call as documentation.)
+        _ = makeLedger(seed: "paired-seed")
         let other = BASSovereignAuditLedger.withSeed("paired-seed")
 
         var draft = makeEntry(auditID: "a-001")

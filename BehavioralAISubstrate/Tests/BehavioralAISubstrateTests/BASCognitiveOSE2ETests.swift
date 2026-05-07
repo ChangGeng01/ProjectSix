@@ -41,7 +41,6 @@ import XCTest
 @testable import BASMemory
 @testable import BASRuntimeCore
 
-@MainActor
 final class BASCognitiveOSE2ETests: XCTestCase {
 
     private var tempDir: URL!

@@ -159,7 +159,9 @@ public actor BASSovereignCleanRebootCoordinator {
         //      can't execute on it.
         //   3. "rollback from v0 where v0 is bad" surfaces
         //      noKnownGoodAncestor — no trustworthy target at all.
-        let walkStart = try await versionTree.node(currentHostVersionID)
+        // node(_:) is non-throwing (returns Node?);ancestors(of:)
+        // throws — keep `try` only on the latter
+        let walkStart = await versionTree.node(currentHostVersionID)
         let walkAncestors =
             try await versionTree.ancestors(of: currentHostVersionID)
         let walk: [BASSovereignHostVersionTree.Node] =

@@ -189,13 +189,19 @@ public actor BASAutoEvalRunner {
         customTolerances: [BASEvalMetric: Double] = [:]
     ) async throws -> BASAutoEvalCycleResult {
 
-        // Step 1: persist the candidate (idempotent)
-        _ = try await storage.append(candidate)
-
-        // Step 2: baseline lookup per typed mode
+        // Step 1: baseline lookup BEFORE persisting candidate
+        // so the storage's `latestRun(for...)` doesn't return
+        // the candidate itself。This lets us delegate the
+        // predicate filtering to the storage's indexed query
+        // (chapter 三百七六 M863 indexes) instead of pulling
+        // every run into memory and filtering manually
+        // (post-M872 deep review fix)。
         let baseline =
             try await fetchBaseline(
                 for: candidate, mode: baselineMode)
+
+        // Step 2: persist the candidate (idempotent)
+        _ = try await storage.append(candidate)
 
         // Step 3: noBaseline short-circuit
         guard let baseline else {
@@ -275,39 +281,35 @@ public actor BASAutoEvalRunner {
     /// Look up the baseline per the typed mode。Returns nil for
     /// `.skipBaselineLookup` and for any mode that finds no
     /// matching prior run。
+    ///
+    /// Delegates the per-mode predicate filtering to the storage
+    /// protocol methods (`latestRun(forBuildChapter:)` /
+    /// `latestRun(forHostFingerprint:)`) rather than fetching all
+    /// runs into memory then filtering。SQLite-backed storage
+    /// honors the indexed scan (chapter 三百七六 M863 added the
+    /// `(build_chapter, timestamp_ms)` + `(host_fingerprint,
+    /// timestamp_ms)` indexes specifically for this lookup)。
+    ///
+    /// Self-comparison guard:if the candidate happens to be the
+    /// latest match (e.g. it was just appended in the same submit
+    /// cycle),return nil so `submit(...)` emits `.noBaseline`
+    /// rather than a meaningless self-compare report。
     private func fetchBaseline(
         for candidate: BASEvalRun,
         mode: BASAutoEvalBaselineMode
     ) async throws -> BASEvalRun? {
         switch mode {
         case .latestForBuildChapter:
-            // Look up the most recent run for the same build
-            // chapter,then exclude the candidate itself if it
-            // happens to be the latest (which is normal — we
-            // just appended it)
-            let candidates =
-                await storage.runs(
-                    sinceTimestampMs: 0,
-                    limit: Int.max)
-            return candidates
-                .filter {
-                    $0.buildChapter == candidate.buildChapter
-                    && $0.runID != candidate.runID
-                }
-                .max { $0.timestampMs < $1.timestampMs }
+            let latest = await storage.latestRun(
+                forBuildChapter: candidate.buildChapter)
+            return latest?.runID == candidate.runID
+                ? nil : latest
 
         case .latestForHostFingerprint:
-            let candidates =
-                await storage.runs(
-                    sinceTimestampMs: 0,
-                    limit: Int.max)
-            return candidates
-                .filter {
-                    $0.hostFingerprint
-                        == candidate.hostFingerprint
-                    && $0.runID != candidate.runID
-                }
-                .max { $0.timestampMs < $1.timestampMs }
+            let latest = await storage.latestRun(
+                forHostFingerprint: candidate.hostFingerprint)
+            return latest?.runID == candidate.runID
+                ? nil : latest
 
         case .explicitRunID(let runID):
             return await storage.run(forID: runID)

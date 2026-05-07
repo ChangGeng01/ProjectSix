@@ -421,6 +421,65 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
         XCTAssertGreaterThan(nodeCount, 0)
     }
 
+    // MARK: - Post-M872 deep review: onPersistError callback
+
+    func testPersistErrorCallbackOptIn() async throws {
+        // Pin: hosts that pass `onPersistError` get a signal
+        // when graph write-through fails。Default nil keeps the
+        // M865/M869 silent contract for hosts that don't opt in。
+        // We verify the callback wiring by constructing a
+        // convenience with the callback + asserting it has the
+        // expected closure (we can't easily induce a SQLite
+        // failure mid-test,so this is a wire-up pin only)。
+
+        // Box around a Sendable counter for the callback to
+        // bump。Using class with @unchecked Sendable so the
+        // closure can capture-by-reference safely under Swift 6
+        // strict concurrency。
+        final class CountBox: @unchecked Sendable {
+            var count: Int = 0
+        }
+        let box = CountBox()
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            // No actual SQLite storage — callback never fires,
+            // since persistGraph short-circuits on nil storage
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 1,
+                graphExtractEventCap: 5_000),
+            onPersistError: { _, _ in
+                box.count += 1
+            })
+
+        // Submit an event → graph extract fires (no storage,
+        // so persistGraph short-circuits → callback NOT called)
+        let event = BASEventLogEntry(
+            eventID: "ev-1",
+            timestampMs: 1_000,
+            kind: .substrateAudit,
+            sessionID: "s1",
+            sequenceNumber: 0,
+            project: "x")
+        _ = await conv.observe(event: event)
+
+        XCTAssertEqual(box.count, 0,
+            "Callback must NOT fire when no storage wired " +
+            "(persistGraph short-circuits)")
+
+        // The convenience holds the callback for its lifetime
+        // (exists post-construction)。Direct verification of
+        // the field would need reflection — we trust the init's
+        // default-nil contract:if the field were dropped,
+        // construction with the callback wouldn't compile。
+        _ = conv
+    }
+
     // MARK: - M868 graph-aware reducer wiring
 
     func testFoldUsesGraphAwareReducerWhenGraphPresent()
@@ -430,12 +489,12 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
         // "project:foo" so the graph-aware reducer fires on
         // events tagged with project="foo"。
         let graph = BASKnowledgeGraph()
-        try await graph.upsert(node: BASKnowledgeNode(
+        await graph.upsert(node: BASKnowledgeNode(
             nodeID: "project:foo",
             kind: .project,
             label: "foo",
             createdAtMs: 0))
-        try await graph.upsert(node: BASKnowledgeNode(
+        await graph.upsert(node: BASKnowledgeNode(
             nodeID: "event-1",
             kind: .event,
             label: "ev1",

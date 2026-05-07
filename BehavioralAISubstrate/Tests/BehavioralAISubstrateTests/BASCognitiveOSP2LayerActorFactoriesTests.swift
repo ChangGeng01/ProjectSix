@@ -91,32 +91,31 @@ final class BASCognitiveOSP2LayerActorFactoriesTests:
 
     // MARK: - Per-layer factory pins
 
-    func testL9ActorIsPinnedToL9() async {
+    // Note: layerID is `nonisolated let` on BASLayerReferenceActor
+    // (chapter 三百一六) — synchronous access without `await`。
+
+    func testL9ActorIsPinnedToL9() {
         let actor = BASCognitiveOSP2LayerActorFactories
             .makeL9Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
-        XCTAssertEqual(layerID, .l9)
+        XCTAssertEqual(actor.layerID, .l9)
     }
 
-    func testL10ActorIsPinnedToL10() async {
+    func testL10ActorIsPinnedToL10() {
         let actor = BASCognitiveOSP2LayerActorFactories
             .makeL10Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
-        XCTAssertEqual(layerID, .l10)
+        XCTAssertEqual(actor.layerID, .l10)
     }
 
-    func testL13ActorIsPinnedToL13() async {
+    func testL13ActorIsPinnedToL13() {
         let actor = BASCognitiveOSP2LayerActorFactories
             .makeL13Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
-        XCTAssertEqual(layerID, .l13)
+        XCTAssertEqual(actor.layerID, .l13)
     }
 
-    func testL14ActorIsPinnedToL14() async {
+    func testL14ActorIsPinnedToL14() {
         let actor = BASCognitiveOSP2LayerActorFactories
             .makeL14Actor(registry: makeRegistry())
-        let layerID = await actor.layerID
-        XCTAssertEqual(layerID, .l14)
+        XCTAssertEqual(actor.layerID, .l14)
     }
 
     // MARK: - makeAllP2Actors
