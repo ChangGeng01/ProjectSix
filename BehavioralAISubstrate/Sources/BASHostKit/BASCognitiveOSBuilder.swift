@@ -108,13 +108,24 @@ public enum BASCognitiveOSBuilder {
             vectorIndexStorage = nil
         }
 
-        // Knowledge graph (in-memory only — M856 doctrine,
-        // SQLite persistence deferred)
+        // Knowledge graph (in-memory) + optional SQLite backing
+        // (M866 closes M856 deferred persistence work — same
+        // sibling pattern as vector index)
         let knowledgeGraph: BASKnowledgeGraph?
+        let knowledgeGraphStorage:
+            BASSQLiteKnowledgeGraphStorage?
         if options.enableKnowledgeGraph {
             knowledgeGraph = BASKnowledgeGraph()
+            if let url = options.knowledgeGraphSQLiteURL {
+                knowledgeGraphStorage =
+                    try BASSQLiteKnowledgeGraphStorage(
+                        databaseURL: url)
+            } else {
+                knowledgeGraphStorage = nil
+            }
         } else {
             knowledgeGraph = nil
+            knowledgeGraphStorage = nil
         }
 
         return BASCognitiveOSBundle(
@@ -122,6 +133,7 @@ public enum BASCognitiveOSBuilder {
             userStateStore: userStateStore,
             vectorIndex: vectorIndex,
             vectorIndexStorage: vectorIndexStorage,
-            knowledgeGraph: knowledgeGraph)
+            knowledgeGraph: knowledgeGraph,
+            knowledgeGraphStorage: knowledgeGraphStorage)
     }
 }

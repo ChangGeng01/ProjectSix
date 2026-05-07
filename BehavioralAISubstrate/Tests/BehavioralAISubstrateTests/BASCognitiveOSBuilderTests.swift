@@ -144,6 +144,25 @@ final class BASCognitiveOSBuilderTests: XCTestCase {
             options: BASCognitiveOSBundleOptions(
                 enableKnowledgeGraph: true))
         XCTAssertNotNil(bundle.knowledgeGraph)
+        XCTAssertNil(
+            bundle.knowledgeGraphStorage,
+            "No SQLite URL → no persistence sibling (M866)")
+    }
+
+    func testEnableKnowledgeGraphWithSQLitePersistence()
+        throws
+    {
+        let url = try XCTUnwrap(tempDir)
+            .appendingPathComponent("graph.sqlite")
+        let bundle = try BASCognitiveOSBuilder.build(
+            options: BASCognitiveOSBundleOptions(
+                enableKnowledgeGraph: true,
+                knowledgeGraphSQLiteURL: url))
+        XCTAssertNotNil(bundle.knowledgeGraph)
+        XCTAssertNotNil(
+            bundle.knowledgeGraphStorage,
+            "SQLite URL → both knowledge graph + storage " +
+            "primitives populated for preload pattern (M866)")
     }
 
     // MARK: - Cross-primitive composition
@@ -164,18 +183,23 @@ final class BASCognitiveOSBuilderTests: XCTestCase {
                 vectorIndexSQLiteURL:
                     url.appendingPathComponent(
                         "vectors.sqlite"),
-                enableKnowledgeGraph: true))
+                enableKnowledgeGraph: true,
+                knowledgeGraphSQLiteURL:
+                    url.appendingPathComponent(
+                        "graph.sqlite")))
         XCTAssertEqual(
-            bundle.populatedCount, 5,
-            "All 5 primitive slots populated " +
+            bundle.populatedCount, 6,
+            "All 6 primitive slots populated " +
             "(event log + user state + vector index + " +
-            "vector storage + knowledge graph)")
+            "vector storage + knowledge graph + " +
+            "knowledge graph storage — M866 added the 6th slot)")
         XCTAssertFalse(bundle.isEmpty)
         XCTAssertNotNil(bundle.eventLog)
         XCTAssertNotNil(bundle.userStateStore)
         XCTAssertNotNil(bundle.vectorIndex)
         XCTAssertNotNil(bundle.vectorIndexStorage)
         XCTAssertNotNil(bundle.knowledgeGraph)
+        XCTAssertNotNil(bundle.knowledgeGraphStorage)
     }
 
     func testEnableTwoPrimitivesProducesTwo() throws {

@@ -72,12 +72,20 @@ public struct BASCognitiveOSBundleOptions: Sendable, Equatable {
     /// Optional SQLite URL for persistent vector index storage。
     public let vectorIndexSQLiteURL: URL?
 
-    // MARK: - Knowledge graph (G9, M856)
+    // MARK: - Knowledge graph (G9, M856 + M866)
 
     /// When true,builder constructs an in-memory knowledge graph。
-    /// (No SQLite-backed graph in M859 — graph is in-memory-only
-    /// per M856 doctrine。Persistence is a future commit。)
     public let enableKnowledgeGraph: Bool
+
+    /// Optional SQLite URL for persistent knowledge graph storage
+    /// (M866)。If nil (default) when `enableKnowledgeGraph == true`,
+    /// builder constructs an in-memory `BASKnowledgeGraph` only,
+    /// no persistence companion。If a URL is supplied,builder also
+    /// constructs `BASSQLiteKnowledgeGraphStorage` and surfaces it
+    /// as `bundle.knowledgeGraphStorage`。Caller calls
+    /// `storage.preload(into: graph)` at session start to restore
+    /// the graph from disk + write-throughs after each insert。
+    public let knowledgeGraphSQLiteURL: URL?
 
     public init(
         enableEventLog: Bool = false,
@@ -86,7 +94,8 @@ public struct BASCognitiveOSBundleOptions: Sendable, Equatable {
         userStateSQLiteURL: URL? = nil,
         enableVectorIndex: Bool = false,
         vectorIndexSQLiteURL: URL? = nil,
-        enableKnowledgeGraph: Bool = false
+        enableKnowledgeGraph: Bool = false,
+        knowledgeGraphSQLiteURL: URL? = nil
     ) {
         self.enableEventLog = enableEventLog
         self.eventLogSQLiteURL = eventLogSQLiteURL
@@ -95,6 +104,8 @@ public struct BASCognitiveOSBundleOptions: Sendable, Equatable {
         self.enableVectorIndex = enableVectorIndex
         self.vectorIndexSQLiteURL = vectorIndexSQLiteURL
         self.enableKnowledgeGraph = enableKnowledgeGraph
+        self.knowledgeGraphSQLiteURL =
+            knowledgeGraphSQLiteURL
     }
 
     /// Default options:everything disabled (ADR-014 OPT-IN
@@ -153,8 +164,19 @@ public struct BASCognitiveOSBundle: Sendable {
     public let vectorIndexStorage:
         BASSQLiteVectorIndexStorage?
 
-    /// Knowledge graph (G9, M856)。In-memory only。
+    /// Knowledge graph (G9, M856)。In-memory by design;
+    /// `knowledgeGraphStorage` companion is the SQLite-backed
+    /// persistence (M866)。
     public let knowledgeGraph: BASKnowledgeGraph?
+
+    /// Optional SQLite-backed knowledge graph storage (G9, M866)。
+    /// Only populated when caller passed
+    /// `options.knowledgeGraphSQLiteURL`。Caller calls
+    /// `knowledgeGraphStorage.preload(into: knowledgeGraph)` at
+    /// session start to restore graph from disk,then write-throughs
+    /// for every node + edge insert。
+    public let knowledgeGraphStorage:
+        BASSQLiteKnowledgeGraphStorage?
 
     public init(
         eventLog: (any BASEventLogStorage)? = nil,
@@ -162,13 +184,17 @@ public struct BASCognitiveOSBundle: Sendable {
         vectorIndex: BASVectorIndex? = nil,
         vectorIndexStorage:
             BASSQLiteVectorIndexStorage? = nil,
-        knowledgeGraph: BASKnowledgeGraph? = nil
+        knowledgeGraph: BASKnowledgeGraph? = nil,
+        knowledgeGraphStorage:
+            BASSQLiteKnowledgeGraphStorage? = nil
     ) {
         self.eventLog = eventLog
         self.userStateStore = userStateStore
         self.vectorIndex = vectorIndex
         self.vectorIndexStorage = vectorIndexStorage
         self.knowledgeGraph = knowledgeGraph
+        self.knowledgeGraphStorage =
+            knowledgeGraphStorage
     }
 
     /// Empty bundle convenience。Used by builder when caller
@@ -185,6 +211,7 @@ public struct BASCognitiveOSBundle: Sendable {
         if vectorIndex != nil { count += 1 }
         if vectorIndexStorage != nil { count += 1 }
         if knowledgeGraph != nil { count += 1 }
+        if knowledgeGraphStorage != nil { count += 1 }
         return count
     }
 
