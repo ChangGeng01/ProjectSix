@@ -6,7 +6,7 @@ import UIKit
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
-#if canImport(BASMLXAdapter)
+#if SAMPLEHOST_HAS_MLX
 import BASMLXAdapter
 import BASOrgan
 #endif
@@ -313,7 +313,7 @@ final class SampleHostModel: ObservableObject {
         mutate()
     }
 
-    #if canImport(BASMLXAdapter)
+    #if SAMPLEHOST_HAS_MLX
     // M815 chapter 二百三十三 — promoted from `private var` to
     // module-internal so the extracted LLM helpers extension file
     // (SampleHostLLMHelpers.swift) can access the gemma adapter

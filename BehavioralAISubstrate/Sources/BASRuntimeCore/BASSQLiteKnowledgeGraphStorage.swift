@@ -88,6 +88,16 @@ public actor BASSQLiteKnowledgeGraphStorage {
         case encodeFailed(id: String, message: String)
         case decodeFailed(id: String, message: String)
         case corruptedRow(id: String, reason: String)
+        /// M884 (P3.6 audit fix):edge insert attempted with
+        /// `from_node_id` OR `to_node_id` not present in the
+        /// `knowledge_node` table。Pre-M884 the storage allowed
+        /// dangling edges,which preload then silently dropped
+        /// (in-memory `BASKnowledgeGraph.insert(edge:)` requires
+        /// both endpoints exist) → storage.edgeCount diverged
+        /// from in-memory edgeCount post-preload。
+        case danglingEdgeEndpoint(
+            edgeID: String,
+            missingNodeID: String)
     }
 
     public static let schemaVersion: Int = 1
@@ -122,11 +132,53 @@ public actor BASSQLiteKnowledgeGraphStorage {
             db: handle, sql: "PRAGMA journal_mode=WAL;")
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
-        try Self.runExec(
-            db: handle,
-            sql: "PRAGMA user_version=\(Self.schemaVersion);")
+
+        // M882 fix (P2.5 audit):read user_version FIRST before
+        // overwriting it。Pre-M882 the unconditional `PRAGMA
+        // user_version=N` overwrote any existing value,silently
+        // upgrading old databases (or downgrading future ones)
+        // and making `verifySchemaVersion` a no-op since it ran
+        // AFTER the overwrite。Post-M882:
+        //   existing == 0 → fresh DB,set to current schema
+        //   existing == current → accept (no-op write)
+        //   existing != current → throw schemaVersionMismatch
+        let existingVersion = try Self.readUserVersion(
+            db: handle)
+        if existingVersion == 0 {
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA user_version=\(Self.schemaVersion);")
+        } else if existingVersion != Self.schemaVersion {
+            throw StorageError.schemaVersionMismatch(
+                found: existingVersion,
+                expected: Self.schemaVersion)
+        }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
+    }
+
+    /// M882 helper:read `PRAGMA user_version` without setting
+    /// it。Returns 0 for a freshly-created SQLite file。
+    fileprivate static func readUserVersion(
+        db: OpaquePointer
+    ) throws -> Int {
+        let sql = "PRAGMA user_version;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        return Int(sqlite3_column_int64(stmt, 0))
     }
 
     deinit {
@@ -244,6 +296,14 @@ public actor BASSQLiteKnowledgeGraphStorage {
     // MARK: - Edge CRUD
 
     /// Idempotent on duplicate edgeID。
+    ///
+    /// M884 (P3.6 audit fix):validates both endpoints exist in
+    /// `knowledge_node` before insert。Pre-M884 dangling edges
+    /// could persist (no FK constraint),then silently drop on
+    /// preload because in-memory `BASKnowledgeGraph.insert(edge:)`
+    /// throws `nodeNotFound` for unknown endpoints。Post-M884 the
+    /// storage rejects dangling edges with a typed error,keeping
+    /// storage + in-memory edgeCount consistent。
     @discardableResult
     public func appendEdge(
         _ edge: BASKnowledgeEdge
@@ -257,6 +317,24 @@ public actor BASSQLiteKnowledgeGraphStorage {
             db: db, edgeID: edge.edgeID) != nil
         {
             return false
+        }
+        // M884 endpoint validation:both ends must exist as
+        // nodes。Use fetchNode (already-implemented) for the
+        // existence check rather than COUNT(*) to keep the
+        // pattern consistent with M866's idiom。
+        if try Self.fetchNode(
+            db: db, nodeID: edge.fromNodeID) == nil
+        {
+            throw StorageError.danglingEdgeEndpoint(
+                edgeID: edge.edgeID,
+                missingNodeID: edge.fromNodeID)
+        }
+        if try Self.fetchNode(
+            db: db, nodeID: edge.toNodeID) == nil
+        {
+            throw StorageError.danglingEdgeEndpoint(
+                edgeID: edge.edgeID,
+                missingNodeID: edge.toNodeID)
         }
         try Self.insertEdge(db: db, edge: edge)
         return true

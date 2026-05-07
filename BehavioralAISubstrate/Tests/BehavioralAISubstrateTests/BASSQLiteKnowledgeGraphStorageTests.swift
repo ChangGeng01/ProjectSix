@@ -172,6 +172,10 @@ final class BASSQLiteKnowledgeGraphStorageTests: XCTestCase {
 
     func testAppendEdgeIdempotent() async throws {
         let storage = try makeStorage()
+        // M884 (P3.6 audit fix):endpoints must exist before
+        // edge insert,or storage throws danglingEdgeEndpoint
+        try await storage.appendNode(makeNode(id: "a"))
+        try await storage.appendNode(makeNode(id: "b"))
         let edge = makeEdge(id: "e1", from: "a", to: "b")
         let first = try await storage.appendEdge(edge)
         let second = try await storage.appendEdge(edge)
@@ -181,6 +185,9 @@ final class BASSQLiteKnowledgeGraphStorageTests: XCTestCase {
 
     func testAllEdgesOrderedByCreatedAt() async throws {
         let storage = try makeStorage()
+        // M884:nodes must exist before edges
+        try await storage.appendNode(makeNode(id: "a"))
+        try await storage.appendNode(makeNode(id: "b"))
         try await storage.appendEdge(makeEdge(
             id: "e3", from: "a", to: "b",
             createdAtMs: 300))
@@ -194,6 +201,46 @@ final class BASSQLiteKnowledgeGraphStorageTests: XCTestCase {
         let all = await storage.allEdges()
         XCTAssertEqual(all.map { $0.edgeID },
             ["e1", "e2", "e3"])
+    }
+
+    // MARK: - M884 endpoint validation
+
+    func testAppendEdgeRejectsDanglingFromEndpoint()
+        async throws
+    {
+        let storage = try makeStorage()
+        try await storage.appendNode(makeNode(id: "b"))
+        // node "a" not appended → from endpoint dangling
+        do {
+            _ = try await storage.appendEdge(
+                makeEdge(id: "e1", from: "a", to: "b"))
+            XCTFail("Expected danglingEdgeEndpoint error")
+        } catch BASSQLiteKnowledgeGraphStorage.StorageError
+            .danglingEdgeEndpoint(let edgeID, let missing)
+        {
+            XCTAssertEqual(edgeID, "e1")
+            XCTAssertEqual(missing, "a",
+                "Missing-node ID must point to the actual " +
+                "missing endpoint,not just any node")
+        }
+    }
+
+    func testAppendEdgeRejectsDanglingToEndpoint()
+        async throws
+    {
+        let storage = try makeStorage()
+        try await storage.appendNode(makeNode(id: "a"))
+        // node "b" not appended → to endpoint dangling
+        do {
+            _ = try await storage.appendEdge(
+                makeEdge(id: "e1", from: "a", to: "b"))
+            XCTFail("Expected danglingEdgeEndpoint error")
+        } catch BASSQLiteKnowledgeGraphStorage.StorageError
+            .danglingEdgeEndpoint(let edgeID, let missing)
+        {
+            XCTAssertEqual(edgeID, "e1")
+            XCTAssertEqual(missing, "b")
+        }
     }
 
     // MARK: - Remove cascade

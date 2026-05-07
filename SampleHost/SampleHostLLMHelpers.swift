@@ -44,7 +44,7 @@ import BASHostKit
 #if canImport(BASOrgan)
 import BASOrgan
 #endif
-#if canImport(BASMLXAdapter)
+#if SAMPLEHOST_HAS_MLX
 import BASMLXAdapter
 #endif
 #if canImport(FoundationModels)
@@ -168,7 +168,7 @@ extension SampleHostModel {
     /// status is tracked separately from adapter readiness so a
     /// failed LoRA doesn't poison subsequent retries.
     func callGemma(prompt: String) async throws -> String {
-        #if canImport(BASMLXAdapter)
+        #if SAMPLEHOST_HAS_MLX
         let adapter = try await ensureGemmaAdapter()
         let request = BASOrganRequest(
             requestID: "hybrid-prompt",
@@ -185,7 +185,7 @@ extension SampleHostModel {
         #endif
     }
 
-    #if canImport(BASMLXAdapter)
+    #if SAMPLEHOST_HAS_MLX
     /// Singleton-load gate — concurrent callers share one in-flight
     /// Task instead of racing on `if gemmaAdapter == nil` (review #2).
     func ensureGemmaAdapter() async throws -> MLXOrganAdapter {

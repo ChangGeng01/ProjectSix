@@ -184,12 +184,19 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
         XCTAssertEqual(r10.iterationIndex, 10)
     }
 
-    // MARK: - Graph extract event cap
+    // MARK: - M881 incremental graph extract (post-P2.4 audit)
 
-    func testGraphExtractSkippedBeyondCap() async {
+    func testGraphExtractContinuesPastFormerCap() async {
+        // M881 (post-M872 deep review):pre-M881 the convenience
+        // helper PERMANENTLY DISABLED graph extract once total
+        // log size exceeded `graphExtractEventCap`。Post-M881 the
+        // cap field still exists but extracts use incremental
+        // mode (`sinceTimestampMs`),so a host that submits more
+        // events than the cap continues to get graph extracts。
+        // This test pins the new contract:extract fires every
+        // iter (cadence 1) for all 10 iters,not just the first 5。
         let log = BASInMemoryEventLogStorage()
         let graph = BASKnowledgeGraph()
-        // Custom cadence: extract at every iter, cap at 5
         let conv = BASCognitiveOSConvenience(
             eventLog: log,
             knowledgeGraph: graph,
@@ -199,18 +206,18 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
                 graphExtractInterval: 1,
                 graphExtractEventCap: 5))
 
-        // Submit 10 events — extract should skip on 6th onwards
         var extractedCount = 0
         for i in 0..<10 {
             let r = await conv.observe(
-                event: makeEvent(index: i))
+                event: makeEvent(
+                    index: i, sessionID: "s1"))
             if r.graphExtracted { extractedCount += 1 }
         }
 
-        XCTAssertGreaterThan(extractedCount, 0,
-            "Graph extract must fire at least once below cap")
-        XCTAssertLessThan(extractedCount, 10,
-            "Graph extract must skip at least once above cap")
+        XCTAssertEqual(extractedCount, 10,
+            "M881:incremental extract fires every iter " +
+            "regardless of total log size (cap is now batch-" +
+            "size,not total-size)")
     }
 
     // MARK: - Iteration index reporting

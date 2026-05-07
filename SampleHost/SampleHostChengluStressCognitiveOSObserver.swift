@@ -93,6 +93,16 @@ final class SampleHostChengluStressCognitiveOSObserver {
     private(set) var graphNodeCount: Int = 0
     private(set) var graphEdgeCount: Int = 0
 
+    /// Chapter 三百八八 / M883 (P2.3 audit fix):counter of
+    /// failed graph SQLite write-through attempts。Pre-M883 the
+    /// `try?` swallow in `extractGraph()` made the JSON / UI
+    /// report 331,947 graph nodes while disk had 0 — the
+    /// "looks-good-in-memory,silent-on-disk" bug the audit
+    /// flagged。Post-M883 hosts read this counter (surfaced via
+    /// the @Published stress runner field) to see whether
+    /// SQLite mutation actually succeeded。
+    private(set) var graphPersistFailures: Int = 0
+
     /// Chapter 三百八七 / M877: high-water-mark timestamp of the
     /// most-recent event observed by `extractGraph()`。Nil before
     /// the first extract;subsequent extracts pass `since: hwm+1`
@@ -181,35 +191,59 @@ final class SampleHostChengluStressCognitiveOSObserver {
     ) async {
         guard let log = bundle?.eventLog else { return }
 
-        // M875: cycle through project names so H1 (mentions) +
-        // H2 (sequential causes) + H7 (closing edges) fire
+        // M875: cycle through project names so H3 (mentions) +
+        // H4 (sequential causes) + H7 (closing edges) fire
         let project = Constants.projectNames[
             index % Constants.projectNames.count]
 
-        // M875: action variation by iter % cycle so all edge
-        // kinds get exercised
-        // - succeeded → dispatch / mentions
-        // - failed → delays / permit:replace
+        // M880 fix (P1.2 audit):action labels MUST match the
+        // extractor heuristic patterns,not invent suffixes。
+        // BASKnowledgeGraphEventExtractor:
+        //   - H5 delays edge:`action.hasPrefix("skip:")`
+        //     (any suffix accepted — `skip:overload`,
+        //     `skip:thermal`,etc.)
+        //   - H6 contradicts edge:`action == "permit:block"`
+        //     OR `action == "permit:replace"` (EXACT,no suffix)
+        // Pre-M880 (chapter 三百八七):this code emitted
+        // `delays:<project>` and `permit:replace:<project>` —
+        // both INVALID per extractor pattern matching → 0
+        // delays + 0 contradicts edges across all M875-M879
+        // runs。The 662k edges seen in the iPhone 5min run were
+        // ALL mentions (H3) + causes (H4) since those fire on
+        // event.project alone,not on action labels。
+        //
+        // Project context flows via `event.project`,not as
+        // action suffix。
         let actions: [String]
         if succeeded {
             switch index % 7 {
             case 0:
                 actions = ["dispatch:\(project)"]
             case 1, 2:
-                actions = ["mentions:\(project)"]
+                // Note:`mentions` edges are emitted by H3
+                // automatically when project is set,no
+                // matching action prefix needed
+                actions = ["chenglu:sweep:ok"]
             default:
-                actions = ["chenglu:sweep:ok",
-                          "mentions:\(project)"]
+                actions = ["chenglu:sweep:ok"]
             }
         } else {
             switch index % 5 {
             case 0:
-                actions = ["delays:\(project)"]
+                // M880 fix:`skip:` prefix matches H5 →
+                // delays edge fires。Suffix is descriptive
+                // free-form per extractor contract。
+                actions = ["skip:thermal-pressure"]
             case 1:
-                actions = ["permit:replace:\(project)"]
+                // M880 fix:exact `permit:replace` matches
+                // H6 → contradicts edge fires。No suffix。
+                actions = ["permit:replace"]
+            case 2:
+                // Exercise the other contradicts trigger
+                actions = ["permit:block"]
             default:
                 actions = ["chenglu:sweep:fail",
-                          "delays:\(project)"]
+                          "skip:overload"]
             }
         }
 
@@ -320,12 +354,25 @@ final class SampleHostChengluStressCognitiveOSObserver {
         // the JSON cognitiveOS summary reported large counts。
         // M866 append APIs are idempotent,so repeated walks are
         // no-ops on already-persisted rows。
+        //
+        // M883 fix (P2.3 audit):count persist failures + expose
+        // them via `graphPersistFailures`。Pre-M883 errors were
+        // silently swallowed via `try?`,letting JSON/UI report
+        // huge graph counts while disk could be empty or partial。
         if let storage = bundle?.knowledgeGraphStorage {
             for node in await graph.allNodes() {
-                _ = try? await storage.appendNode(node)
+                do {
+                    _ = try await storage.appendNode(node)
+                } catch {
+                    graphPersistFailures += 1
+                }
             }
             for edge in await graph.allEdges() {
-                _ = try? await storage.appendEdge(edge)
+                do {
+                    _ = try await storage.appendEdge(edge)
+                } catch {
+                    graphPersistFailures += 1
+                }
             }
         }
 

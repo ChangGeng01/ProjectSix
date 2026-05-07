@@ -123,11 +123,48 @@ public actor BASSQLiteEvalRunStorage: BASEvalRunStorage {
             db: handle, sql: "PRAGMA journal_mode=WAL;")
         try Self.runExec(
             db: handle, sql: "PRAGMA synchronous=NORMAL;")
-        try Self.runExec(
-            db: handle,
-            sql: "PRAGMA user_version=\(Self.schemaVersion);")
+
+        // M882 fix (P2.5 audit):read user_version FIRST,branch
+        // on:0 → write current,equal → accept,mismatch → throw。
+        // Pre-M882 the unconditional pragma write made the
+        // verify check a no-op。Same pattern as M866 fix.
+        let existingVersion = try Self.readUserVersion(
+            db: handle)
+        if existingVersion == 0 {
+            try Self.runExec(
+                db: handle,
+                sql: "PRAGMA user_version=\(Self.schemaVersion);")
+        } else if existingVersion != Self.schemaVersion {
+            throw StorageError.schemaVersionMismatch(
+                found: existingVersion,
+                expected: Self.schemaVersion)
+        }
         try Self.ensureSchema(db: handle)
         try Self.verifySchemaVersion(db: handle)
+    }
+
+    /// M882 helper:read `PRAGMA user_version` without setting
+    /// it。Returns 0 for a freshly-created SQLite file。
+    fileprivate static func readUserVersion(
+        db: OpaquePointer
+    ) throws -> Int {
+        let sql = "PRAGMA user_version;"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw StorageError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw StorageError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        return Int(sqlite3_column_int64(stmt, 0))
     }
 
     deinit {

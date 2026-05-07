@@ -190,6 +190,17 @@ public actor BASCognitiveOSConvenience {
     private var iterationIndex: Int = 0
     private var currentState: BASUserState
 
+    /// Chapter 三百八八 / M881 (P2.4 audit fix):high-water-mark
+    /// timestamp of the most-recent event observed by
+    /// `extractGraph()`。Pre-M881 the convenience helper had a
+    /// hard cap at `cadence.graphExtractEventCap` total events,
+    /// permanently disabling extraction past that mark for any
+    /// host using the helper directly。Post-M881 each extract
+    /// passes `since: hwm+1` to the M877 incremental extractor,
+    /// bypassing the cap entirely (cap is now batch-size,not
+    /// total-log-size)。
+    private var lastGraphExtractHwm: Int64?
+
     // MARK: - Init
 
     /// Construct from bundle pieces。Pass nil for any primitive
@@ -344,22 +355,47 @@ public actor BASCognitiveOSConvenience {
         guard let log = eventLog,
               let graph = knowledgeGraph
         else { return false }
-        let total = await log.totalCount
-        guard total <= cadence.graphExtractEventCap else {
-            return false
-        }
+
+        // M881 fix (P2.4 audit):pre-M881 the convenience helper
+        // permanently disabled graph extraction once the event
+        // log exceeded `graphExtractEventCap` (default 5000)。
+        // This silently broke any host using the convenience
+        // helper directly past 5000 events。SampleHost observer
+        // got M877's incremental fix in chapter 三百八七,but
+        // the substrate-side helper kept the cap → bifurcated
+        // semantics。
+        //
+        // Post-M881:incremental extract (mirrors M877) — track
+        // `lastGraphExtractHwm` and walk only events newer than
+        // last extract。The cap on `cadence.graphExtractEventCap`
+        // is now applied to the BATCH size rather than total log
+        // size — defensive guard against catastrophic single-
+        // batch growth (e.g.,per-extract interval mis-set so
+        // large that a single extract walks millions of events)。
+        let scanSince: Int64? =
+            lastGraphExtractHwm.map { $0 + 1 }
         _ = await BASKnowledgeGraphEventExtractor.extract(
             from: log,
             sessionID: sessionID,
-            into: graph)
+            into: graph,
+            sinceTimestampMs: scanSince)
+
+        // M881:advance high-water-mark for next call。Use
+        // current wall-clock since events are timestamped at
+        // append time。Bounded by `graphExtractInterval`,so
+        // even if the next iter is a long Task.sleep away,the
+        // hwm stays close to the extracted batch's tail。
+        lastGraphExtractHwm = Int64(
+            Date().timeIntervalSince1970 * 1000)
 
         // chapter 三百八二 / M869 write-through: when the host
         // wired `knowledgeGraphStorage`,append every node + edge
         // through to SQLite。M866's append APIs are idempotent on
         // duplicate IDs,so calling this on re-extraction is a
-        // no-op on already-persisted rows。Failures are silent
-        // per the M865 observer contract — storage errors must
-        // not disrupt the host turn loop。
+        // no-op on already-persisted rows。Failures are reported
+        // via `onPersistError` (post-M872 deep review fix) but
+        // never thrown — observation primitives never disrupt
+        // the host turn loop。
         if let storage = knowledgeGraphStorage {
             await persistGraph(
                 graph: graph, storage: storage)
