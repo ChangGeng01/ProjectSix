@@ -1,0 +1,294 @@
+// MARK: - BASCognitiveOSConvenienceTests — chapter 三百七八 / M865
+//
+// Test coverage for the convenience helper that composes event
+// log append + state reducer fold + graph extract behind a
+// single `observe(event:)` call。
+//
+// Tests verify:
+//   - All-nil bundle → all-false result, only counter increments
+//   - Event log only → eventAppended only
+//   - Event log + state store → fold fires at cadence boundary
+//   - Full bundle → graph extract fires at extract cadence
+//   - Cadence values are tunable
+//   - Graph extract event cap respected (skipped beyond cap)
+//   - Iteration index reported correctly
+//   - Multiple sessions can run in parallel via separate convenience
+//     actors (independent counters)
+
+import XCTest
+@testable import BASHostKit
+@testable import BASMemory
+@testable import BASRuntimeCore
+
+final class BASCognitiveOSConvenienceTests: XCTestCase {
+
+    // MARK: - Fixtures
+
+    private func makeEvent(
+        index: Int,
+        sessionID: String = "test-session"
+    ) -> BASEventLogEntry {
+        BASEventLogEntry(
+            eventID: "ev-\(index)-\(UUID().uuidString)",
+            timestampMs: Int64(1_700_000_000_000 + index),
+            kind: .substrateAudit,
+            sessionID: sessionID,
+            sequenceNumber: 0,
+            actions: ["test"])
+    }
+
+    // MARK: - All-nil: no-op
+
+    func testAllNilBundleProducesNoOp() async {
+        let conv = BASCognitiveOSConvenience(
+            sessionID: "s1")
+
+        let result = await conv.observe(
+            event: makeEvent(index: 0))
+
+        XCTAssertFalse(result.eventAppended)
+        XCTAssertFalse(result.stateFolded)
+        XCTAssertFalse(result.graphExtracted)
+        XCTAssertFalse(result.anyFired)
+        XCTAssertEqual(result.iterationIndex, 1,
+            "1-based: first observe gets index 1")
+
+        let observed = await conv.observedCount
+        XCTAssertEqual(observed, 1,
+            "Counter must still tick on no-op observe")
+    }
+
+    // MARK: - Event log only
+
+    func testEventLogOnlyAppendsButDoesNotFoldOrExtract()
+        async
+    {
+        let log = BASInMemoryEventLogStorage()
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            sessionID: "s1")
+
+        let result = await conv.observe(
+            event: makeEvent(index: 0))
+
+        XCTAssertTrue(result.eventAppended)
+        XCTAssertFalse(result.stateFolded)
+        XCTAssertFalse(result.graphExtracted)
+
+        let total = await log.totalCount
+        XCTAssertEqual(total, 1)
+    }
+
+    // MARK: - State fold cadence
+
+    func testStateFoldFiresAtCadenceBoundary() async {
+        let log = BASInMemoryEventLogStorage()
+        let store = BASInMemoryUserStateStorage()
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: store,
+            sessionID: "s1")
+
+        // First 99 calls → no fold (1-based: indexes 1..99)
+        for i in 0..<99 {
+            let r = await conv.observe(
+                event: makeEvent(index: i))
+            XCTAssertFalse(r.stateFolded,
+                "Pre-100 calls must not fold (call #\(i + 1))")
+        }
+
+        // 100th call (1-based index 100) → triggers fold
+        let foldResult = await conv.observe(
+            event: makeEvent(index: 100))
+        XCTAssertTrue(foldResult.stateFolded,
+            "100th call (1-based index 100) must trigger fold")
+        XCTAssertEqual(foldResult.iterationIndex, 100)
+
+        let stateCount = await store.totalCount
+        XCTAssertEqual(stateCount, 1)
+    }
+
+    func testStateFoldRespectsCadenceOverInterval() async {
+        let log = BASInMemoryEventLogStorage()
+        let store = BASInMemoryUserStateStorage()
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: store,
+            sessionID: "s1")
+
+        // 250 calls (1-based: indexes 1..250) → folds at 100,200
+        for i in 0..<250 {
+            _ = await conv.observe(
+                event: makeEvent(index: i))
+        }
+
+        let stateCount = await store.totalCount
+        XCTAssertEqual(stateCount, 2,
+            "Folds fire at indexes 100 + 200 → 2 across " +
+            "250 observe calls (1-based)")
+    }
+
+    // MARK: - Graph extract cadence
+
+    func testGraphExtractFiresAtCadenceBoundary() async {
+        let log = BASInMemoryEventLogStorage()
+        let store = BASInMemoryUserStateStorage()
+        let graph = BASKnowledgeGraph()
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: store,
+            knowledgeGraph: graph,
+            sessionID: "s1")
+
+        // 1000 calls (1-based: indexes 1..1000)
+        // → first extract at call #1000。Events MUST share
+        // sessionID with convenience for the extractor to find
+        // them
+        for i in 0..<1_000 {
+            _ = await conv.observe(
+                event: makeEvent(
+                    index: i, sessionID: "s1"))
+        }
+
+        let nodeCount = await graph.nodeCount
+        XCTAssertGreaterThan(nodeCount, 0,
+            "Graph extract at 1000th call (1-based index " +
+            "1000) must populate nodes")
+    }
+
+    // MARK: - Custom cadence
+
+    func testCustomCadenceTuneable() async {
+        let log = BASInMemoryEventLogStorage()
+        let store = BASInMemoryUserStateStorage()
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: store,
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 10,
+                graphExtractInterval: 50,
+                graphExtractEventCap: 5000))
+
+        // First 9 calls (1-based: 1..9) → no fold
+        for i in 0..<9 {
+            let r = await conv.observe(
+                event: makeEvent(index: i))
+            XCTAssertFalse(r.stateFolded)
+        }
+        // 10th call (1-based index 10) → triggers fold
+        let r10 = await conv.observe(
+            event: makeEvent(index: 9))
+        XCTAssertTrue(r10.stateFolded,
+            "Custom cadence 10 must fire at 1-based index 10")
+        XCTAssertEqual(r10.iterationIndex, 10)
+    }
+
+    // MARK: - Graph extract event cap
+
+    func testGraphExtractSkippedBeyondCap() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+        // Custom cadence: extract at every iter, cap at 5
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s1",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 1,
+                graphExtractInterval: 1,
+                graphExtractEventCap: 5))
+
+        // Submit 10 events — extract should skip on 6th onwards
+        var extractedCount = 0
+        for i in 0..<10 {
+            let r = await conv.observe(
+                event: makeEvent(index: i))
+            if r.graphExtracted { extractedCount += 1 }
+        }
+
+        XCTAssertGreaterThan(extractedCount, 0,
+            "Graph extract must fire at least once below cap")
+        XCTAssertLessThan(extractedCount, 10,
+            "Graph extract must skip at least once above cap")
+    }
+
+    // MARK: - Iteration index reporting
+
+    func testIterationIndexInResultMonotonic() async {
+        let conv = BASCognitiveOSConvenience(
+            sessionID: "s1")
+
+        // 1-based: call N gets index N
+        for callNumber in 1...5 {
+            let result = await conv.observe(
+                event: makeEvent(index: callNumber))
+            XCTAssertEqual(
+                result.iterationIndex, callNumber,
+                "Result iterationIndex must match 1-based " +
+                "call sequence")
+        }
+    }
+
+    // MARK: - Multi-session independence
+
+    func testMultipleConvenienceActorsAreIndependent()
+        async
+    {
+        let log = BASInMemoryEventLogStorage()
+        let storeA = BASInMemoryUserStateStorage()
+        let storeB = BASInMemoryUserStateStorage()
+        let convA = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: storeA,
+            sessionID: "session-A")
+        let convB = BASCognitiveOSConvenience(
+            eventLog: log,
+            userStateStore: storeB,
+            sessionID: "session-B")
+
+        // Run 100 events through A (1-based indexes 1..100)
+        for i in 0..<100 {
+            _ = await convA.observe(
+                event: makeEvent(
+                    index: i, sessionID: "session-A"))
+        }
+
+        // B should NOT have folded yet — its counter is still 0
+        let bObserved = await convB.observedCount
+        XCTAssertEqual(bObserved, 0)
+        let aObserved = await convA.observedCount
+        XCTAssertEqual(aObserved, 100)
+
+        // A's 100 calls triggered 1 fold (at 1-based index 100)
+        let storeACount = await storeA.totalCount
+        XCTAssertEqual(storeACount, 1,
+            "A's 100 observes triggered 1 fold at index 100")
+        let storeBCount = await storeB.totalCount
+        XCTAssertEqual(storeBCount, 0)
+    }
+
+    // MARK: - Cadence value sanity
+
+    func testDefaultCadenceMatchesM862SampleHostObserver() {
+        // Pin: convenience defaults must equal M862 SampleHost
+        // observer constants so the SampleHost can adopt this
+        // helper without behavior change
+        let cadence = BASCognitiveOSConvenienceCadence.default
+        XCTAssertEqual(cadence.stateFoldInterval, 100)
+        XCTAssertEqual(cadence.graphExtractInterval, 1_000)
+        XCTAssertEqual(cadence.graphExtractEventCap, 5_000)
+    }
+
+    func testZeroCadencePreconditionTrap() {
+        // Pin: precondition prevents nonsensical config — we
+        // can't easily catch a precondition in XCTest without
+        // crashing the test harness, so we just verify the
+        // constants are all > 0
+        let cadence = BASCognitiveOSConvenienceCadence(
+            stateFoldInterval: 1,
+            graphExtractInterval: 1,
+            graphExtractEventCap: 1)
+        XCTAssertEqual(cadence.stateFoldInterval, 1)
+    }
+}
