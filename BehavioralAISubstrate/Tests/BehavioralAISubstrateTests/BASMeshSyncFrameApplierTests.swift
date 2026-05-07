@@ -282,6 +282,71 @@ final class BASMeshSyncFrameApplierTests: XCTestCase {
             "mesh-sync:diff-count:0"))
     }
 
+    // MARK: - Defense-in-depth (chapter 三百四三 / M830)
+
+    /// Chapter 三百四三 / M830: deep review (chapter 三百三七)
+    /// Agent 2 flagged remoteSlotMap as collapsing cross-layer
+    /// headID collisions silently when a malformed remote frame
+    /// has the same headID under two different layerIDs。I
+    /// downgraded to FP because no transport currently exists
+    /// to deliver malformed remote frames。
+    ///
+    /// This test pins the CURRENT behavior (last-wins on
+    /// duplicate headID) so future contributors who add
+    /// transport-side validation (or change the dedup policy)
+    /// catch the behavior shift at test time。
+    ///
+    /// **Doctrine note**: this is observable defense-in-depth,
+    /// not bug-fix。Current behavior is acceptable because
+    /// `BASMeshSyncFrame.slotsByLayer` is a typed dict keyed by
+    /// layerID; the actor that produces the frame
+    /// (a remote instance's `BASLayerMLHeadRegistry`) enforces
+    /// uniqueness by construction。A malformed frame is only
+    /// possible if the transport layer (which doesn't exist
+    /// yet) accepts untrusted data without validation。
+    func testDiffMalformedRemoteSameHeadIDAcrossLayers()
+        async throws
+    {
+        let registry = BASLayerMLHeadRegistry()
+        // Local has the headID under L4
+        let head = makeStubHead(headID: "h1", layerID: .l4)
+        try await registry.register(
+            head: head, layerID: .l4, priority: 10)
+        // Remote frame has SAME headID under L4 AND L11
+        // (malformed: real production sources can't produce
+        // this because BASLayerMLHeadRegistry.register rejects
+        // duplicates,but the SyncFrame schema doesn't enforce
+        // cross-layer uniqueness)
+        let frame = makeRemoteFrame(slotsByLayer: [
+            BASMotherboardLayer14.l4.rawValue: [
+                makeSlot(headID: "h1", layerID: .l4,
+                    priority: 10, enabled: true)
+            ],
+            BASMotherboardLayer14.l11.rawValue: [
+                makeSlot(headID: "h1", layerID: .l11,
+                    priority: 99, enabled: false)
+            ]
+        ])
+        let diffs = await BASMeshSyncFrameApplier.diff(
+            local: registry, remote: frame)
+        // Current behavior: last-wins。The remoteSlotMap has
+        // a single key "h1" so only ONE diff entry returned
+        // (vs ideal: 2 entries with cross-layer-conflict
+        // classification)。This test pins current behavior
+        // so a future fix that adds the cross-layer-conflict
+        // case fails this test → forcing the contributor to
+        // update assertion + emit reason code。
+        XCTAssertEqual(diffs.count, 1,
+            "Current behavior: cross-layer headID collision " +
+            "silently dedupes via Dictionary last-wins。If " +
+            "this assertion fails,a future chapter has " +
+            "added defense — update the test to verify the " +
+            "new typed conflict classification + reason " +
+            "code emission per the chapter 三百三七 deep " +
+            "review Agent 2 finding (medium-priority " +
+            "defense-in-depth)。")
+    }
+
     // MARK: - Stable ordering
 
     func testDiffStableLexicographicOrdering() async throws {
