@@ -230,6 +230,17 @@ public struct BASEvalRegressionReport:
 /// state。
 public enum BASEvalRegressionDetector {
 
+    /// M893 (chapter 三百九四) — baseline-near-zero threshold
+    /// for the comparison-magnitude calculation。Below this,the
+    /// detector treats baseline as effectively zero + uses
+    /// absolute delta against tolerance instead of relative
+    /// (avoids numerically unbounded relativeDelta values when
+    /// baseline is tiny but non-zero)。1e-9 is below typical
+    /// metric noise floors (e.g. accuracy resolution ~1e-3,
+    /// latency resolution ~1e-3 ms) so legitimate near-zero
+    /// metrics fall outside the epsilon band。
+    public static let baselineNearZeroEpsilon: Double = 1e-9
+
     /// Compare a candidate run against a baseline run + emit a
     /// per-metric verdict report。
     ///
@@ -315,15 +326,32 @@ public enum BASEvalRegressionDetector {
             }
 
             // Both present → compute delta + classify
+            // M893 (post-deep-audit round 5):tiny-baseline
+            // epsilon guard。Pre-M893 a baseline of 1e-9 with
+            // candidate of 1.0 produced relativeDelta = ~1e9,
+            // technically correct but numerically misleading
+            // in dashboards (verdict still classified correctly,
+            // but the magnitude was unbounded)。The epsilon is
+            // chapter 一百八十五 anti-magic-number — pinned
+            // typed constant used only for the bv-near-zero
+            // branch decision,not the actual division。
             let absoluteDelta = cv - bv
+            let baselineNearZero =
+                abs(bv) < BASEvalRegressionDetector
+                    .baselineNearZeroEpsilon
             let relativeDelta: Double? =
-                bv != 0 ? absoluteDelta / abs(bv) : nil
+                baselineNearZero
+                ? nil
+                : absoluteDelta / abs(bv)
 
-            // Within tolerance band → noChange (use absolute
-            // when baseline is zero, else relative)
+            // Within tolerance band → noChange。When baseline
+            // is near-zero,fall back to absolute delta against
+            // tolerance (treats tolerance as an absolute bound
+            // in that regime)。
             let comparisonMagnitude: Double =
-                bv != 0 ? abs(absoluteDelta / bv) :
-                          abs(absoluteDelta)
+                baselineNearZero
+                ? abs(absoluteDelta)
+                : abs(absoluteDelta / bv)
 
             if comparisonMagnitude <= tolerance {
                 results[metric] = BASEvalRegressionResult(

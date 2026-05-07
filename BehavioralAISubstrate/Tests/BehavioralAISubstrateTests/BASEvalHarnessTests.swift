@@ -342,6 +342,58 @@ final class BASEvalHarnessTests: XCTestCase {
             "5% delta within 10% custom tolerance → noChange")
     }
 
+    // MARK: - M893 baseline-near-zero epsilon guard
+
+    func testM893TinyBaselineUsesAbsoluteDelta() {
+        // Pre-M893:baseline 1e-12 + candidate 1.0 → relative
+        // delta ~1e12 (numerically unbounded,misleading in
+        // dashboards)。Post-M893:baseline below epsilon (1e-9)
+        // is treated as effectively zero,comparison uses
+        // absolute delta — verdict still classified correctly,
+        // but relativeDelta is nil。
+        let baseline = makeRun(metrics: [.accuracy: 1e-12])
+        let candidate = makeRun(metrics: [.accuracy: 1.0])
+        let report = BASEvalRegressionDetector.compare(
+            baseline: baseline,
+            candidate: candidate)
+
+        let result = report.results[.accuracy]
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.verdict, .improved,
+            "Verdict still correct (huge improvement)")
+        XCTAssertNil(result?.relativeDelta,
+            "Relative delta is nil for near-zero baseline " +
+            "(would be unbounded otherwise)")
+    }
+
+    func testM893NormalBaselineStillUsesRelativeDelta() {
+        // Pin:M893 epsilon guard only kicks in for tiny
+        // baselines。Normal baselines (like 0.9) keep using
+        // relative delta as before。
+        let baseline = makeRun(metrics: [.accuracy: 0.9])
+        let candidate = makeRun(metrics: [.accuracy: 0.95])
+        let report = BASEvalRegressionDetector.compare(
+            baseline: baseline,
+            candidate: candidate)
+
+        let result = report.results[.accuracy]
+        XCTAssertNotNil(result?.relativeDelta,
+            "Normal baselines use relative delta")
+        // (cv - bv) / |bv| = 0.05 / 0.9 ≈ 0.0556
+        XCTAssertEqual(
+            result?.relativeDelta ?? 0, 0.0556,
+            accuracy: 0.001)
+    }
+
+    func testM893EpsilonConstantPin() {
+        // chapter 一百八十五 anti-magic-number pin:epsilon
+        // is a typed named constant,not inline magic
+        XCTAssertEqual(
+            BASEvalRegressionDetector.baselineNearZeroEpsilon,
+            1e-9,
+            "Epsilon is below typical metric noise floors")
+    }
+
     func testTighterToleranceCatchesSmallerRegression() {
         let baseline = makeRun(metrics: [.accuracy: 0.900])
         let candidate = makeRun(metrics: [.accuracy: 0.898])

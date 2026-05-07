@@ -436,6 +436,16 @@ public actor BASKnowledgeGraph {
         guard cycles.count < maxCycles else { return }
         guard path.count <= maxLength else { return }
         for edge in outgoingEdges[current] ?? [] {
+            // M893 doctrine pin (chapter 三百九四,post-deep-audit
+            // round 5):self-loops (A → A,path.count == 1) are
+            // INTENTIONALLY excluded — user-vision §10 'complexity
+            // addiction loop' is a multi-step pattern (anxiety →
+            // tech → unfinished → anxiety),not a single-node
+            // self-reference。Hosts wanting self-loop detection
+            // should query `outgoing(from:)` directly + filter
+            // for `edge.toNodeID == nodeID`。The `>= 2` guard is
+            // load-bearing for the user-vision doctrine,not
+            // accidental。
             if edge.toNodeID == start && path.count >= 2 {
                 // Cycle closes at start
                 let cycle = BASKnowledgeCycle(
