@@ -59,6 +59,8 @@
 		222ABCD00FFE234567ABCFEDC /* SampleHostHybridBenchSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222FEDCEED01098765EEDFCBA /* SampleHostHybridBenchSettings.swift */; };
 		223ABCD11FFF345678BCDFFEC /* SampleHostAFMBenchSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223FEDCFFE12109876FFEFEDC /* SampleHostAFMBenchSettings.swift */; };
 		224ABCD22EEE456789CDEFEDB /* SampleHostTestPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 224FEDCEEDDC123210FEDCBA1 /* SampleHostTestPanels.swift */; };
+		339ABCD11AAA1B2C3D4E5F011 /* SampleHostChengluStressRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339FEDCDD22B3344556677F011 /* SampleHostChengluStressRunner.swift */; };
+		339ABCD22BBB1B2C3D4E5F022 /* SampleHostChengluStressPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 339FEDCDD22B3344556677F022 /* SampleHostChengluStressPanel.swift */; };
 		225ABCD33DDD56789ABCDEFFC /* SampleHostAFMBenchPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 225FEDCFFCCB234321FEDC9AB /* SampleHostAFMBenchPanel.swift */; };
 		226ABCD44CCC678901CDEEFFD /* SampleHostBenchPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 226FEDCEEDDC345432EDDCBAA1 /* SampleHostBenchPanel.swift */; };
 		227ABCD55BBB7890123EFFFEED /* SampleHostHybridBenchPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227FEDCDDCBA456543DCBA9CFE /* SampleHostHybridBenchPanel.swift */; };
@@ -903,6 +905,8 @@
 		222FEDCEED01098765EEDFCBA /* SampleHostHybridBenchSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostHybridBenchSettings.swift; sourceTree = "<group>"; };
 		223FEDCFFE12109876FFEFEDC /* SampleHostAFMBenchSettings.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostAFMBenchSettings.swift; sourceTree = "<group>"; };
 		224FEDCEEDDC123210FEDCBA1 /* SampleHostTestPanels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostTestPanels.swift; sourceTree = "<group>"; };
+		339FEDCDD22B3344556677F011 /* SampleHostChengluStressRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostChengluStressRunner.swift; sourceTree = "<group>"; };
+		339FEDCDD22B3344556677F022 /* SampleHostChengluStressPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostChengluStressPanel.swift; sourceTree = "<group>"; };
 		225FEDCFFCCB234321FEDC9AB /* SampleHostAFMBenchPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostAFMBenchPanel.swift; sourceTree = "<group>"; };
 		226FEDCEEDDC345432EDDCBAA1 /* SampleHostBenchPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostBenchPanel.swift; sourceTree = "<group>"; };
 		227FEDCDDCBA456543DCBA9CFE /* SampleHostHybridBenchPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SampleHostHybridBenchPanel.swift; sourceTree = "<group>"; };
@@ -1130,6 +1134,8 @@
 				222FEDCEED01098765EEDFCBA /* SampleHostHybridBenchSettings.swift */,
 				223FEDCFFE12109876FFEFEDC /* SampleHostAFMBenchSettings.swift */,
 				224FEDCEEDDC123210FEDCBA1 /* SampleHostTestPanels.swift */,
+				339FEDCDD22B3344556677F011 /* SampleHostChengluStressRunner.swift */,
+				339FEDCDD22B3344556677F022 /* SampleHostChengluStressPanel.swift */,
 				225FEDCFFCCB234321FEDC9AB /* SampleHostAFMBenchPanel.swift */,
 				226FEDCEEDDC345432EDDCBAA1 /* SampleHostBenchPanel.swift */,
 				227FEDCDDCBA456543DCBA9CFE /* SampleHostHybridBenchPanel.swift */,
@@ -1986,6 +1992,8 @@
 				222ABCD00FFE234567ABCFEDC /* SampleHostHybridBenchSettings.swift in Sources */,
 				223ABCD11FFF345678BCDFFEC /* SampleHostAFMBenchSettings.swift in Sources */,
 				224ABCD22EEE456789CDEFEDB /* SampleHostTestPanels.swift in Sources */,
+				339ABCD11AAA1B2C3D4E5F011 /* SampleHostChengluStressRunner.swift in Sources */,
+				339ABCD22BBB1B2C3D4E5F022 /* SampleHostChengluStressPanel.swift in Sources */,
 				225ABCD33DDD56789ABCDEFFC /* SampleHostAFMBenchPanel.swift in Sources */,
 				226ABCD44CCC678901CDEEFFD /* SampleHostBenchPanel.swift in Sources */,
 				227ABCD55BBB7890123EFFFEED /* SampleHostHybridBenchPanel.swift in Sources */,

@@ -46,6 +46,10 @@ struct SampleHostView: View {
 
                     SampleHostHybridTestPanel(model: model)
 
+                    // Chapter 三百三九 (M826) — 附录 X Chenglu
+                    // mesh stress on real iPhone
+                    SampleHostChengluStressPanel()
+
                     SampleHostHybridBenchPanel(model: model)
 
                     SampleHostActiveSessionPanel(model: model)
