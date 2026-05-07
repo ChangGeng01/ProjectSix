@@ -46,15 +46,12 @@ extension SampleHostModel {
         let rotationPeriod = max(1, afmBenchRotationPeriodIter)
         let mutationCount = max(1, min(5, afmBenchMutationSeedCount))
         let rotationBytes = max(1, afmBenchJSONLRotationMB) * 1024 * 1024
-        // Chapter 三百四一 / M828: removed unused
-        // `let afmTimeoutSec = max(5, min(120, afmBenchAFMTimeoutSec))`
-        // — variable was declared but never wired through to the
-        // AFM call site (`try await session.respond(to: prompt)`)。
-        // The timeout enforcement is a separate honest gap;the
-        // setting `afmBenchAFMTimeoutSec` exists in UI but is
-        // currently inert until plumbed via `withTimeout(...)`
-        // wrapper around the AFM call。Tracked as backlog,not
-        // a chapter 三百四一 fix scope。
+        // Chapter 三百四二 / M829: AFM timeout enforcement now
+        // wired via `withTimeout(...)` (chapter 三百四一 / M828
+        // backlog item closed)。UI setting clamped to [5, 120]s
+        // and propagated to the bench loop's AFM call site。
+        let afmTimeoutSec = TimeInterval(
+            max(5, min(120, afmBenchAFMTimeoutSec)))
         let skipBlocked = afmBenchSkipBlocked
 
         afmBenchIsRunning = true
@@ -128,12 +125,43 @@ extension SampleHostModel {
                     if #available(iOS 26.0, macOS 26.0, *) {
                         let afmStarted = Date()
                         do {
-                            let session = LanguageModelSession()
-                            let response = try await session
-                                .respond(to: prompt)
-                            afmBody = response.content
+                            // Chapter 三百四二 / M829: AFM timeout
+                            // enforcement via withTimeout wrapper。
+                            // afmTimeoutSec is captured from the
+                            // outer let (clamped [5, 120]s) and
+                            // bounds AFM session.respond
+                            // execution time。On timeout, throws
+                            // AFMTimeoutError → caught below。
+                            // Extract `.content` (Sendable String)
+                            // inside the task body since the
+                            // raw `Response<String>` type is not
+                            // Sendable per Apple's API contract。
+                            let content: String =
+                                try await withTimeout(
+                                    seconds: afmTimeoutSec
+                                ) {
+                                    let session =
+                                        LanguageModelSession()
+                                    let response =
+                                        try await session
+                                            .respond(to: prompt)
+                                    return response.content
+                                }
+                            afmBody = content
                             afmStatus = "ok"
                             self?.afmBenchAFMSuccessCount += 1
+                        } catch let timeoutErr
+                            as AFMTimeoutError
+                        {
+                            // Chapter 三百四二 / M829: typed
+                            // timeout-status emission for audit
+                            // distinction from generic AFM errors。
+                            afmStatus = "afm-timeout"
+                            errorMessage = (errorMessage ?? "")
+                                + "afm-timeout-after-" +
+                                String(format: "%.1fs",
+                                    timeoutErr.timeoutSeconds)
+                            self?.afmBenchAFMErrorCount += 1
                         } catch {
                             afmStatus = "afm-error"
                             errorMessage = (errorMessage ?? "")
