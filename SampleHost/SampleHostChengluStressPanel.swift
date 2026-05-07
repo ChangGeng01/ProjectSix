@@ -129,6 +129,11 @@ struct SampleHostChengluStressPanel: View {
                 Text("20m").tag(1200.0)
                 Text("60m").tag(3600.0)
                 Text("8h").tag(28800.0)
+                // Chapter 三百九八 / M899:10h preset。Lands
+                // between 8h validation + a future 24h endurance
+                // mark。At iPhone 17e thermal-hot ~150 iter/s
+                // sustained,10h ≈ 5.4M iters。
+                Text("10h").tag(36000.0)
             }
             .pickerStyle(.segmented)
             .disabled(runner.isRunning)

@@ -127,6 +127,21 @@ final class SampleHostChengluStressCognitiveOSObserver {
     /// timestamps。
     private var maxObservedEventTimestampMs: Int64 = 0
 
+    /// Chapter 三百九八 / M899 perf fix:track count of
+    /// already-persisted nodes/edges so write-through walks only
+    /// NEW elements,not all。Pre-M899 the observer's
+    /// `extractGraph()` walked `graph.allNodes()` (full array,
+    /// e.g. 5M nodes after a 10h run) on EVERY extract,calling
+    /// idempotent append per element → O(N) SQLite queries per
+    /// extract → ~5M queries / 7s extract interval → backpressure
+    /// → throughput collapse around the 1-hour mark。Post-M899
+    /// each extract walks only `graph.nodeCount -
+    /// lastPersistedNodeCount` new elements (the suffix of the
+    /// sorted-by-createdAtMs allNodes array)。Bounded per-extract
+    /// work,O(1) amortized per added node。
+    private var lastPersistedNodeCount: Int = 0
+    private var lastPersistedEdgeCount: Int = 0
+
     /// Chapter 三百九〇 / M887:cached thermal state,re-read
     /// every `Constants.thermalReadInterval` iters。Maps to
     /// `BASEventLogRiskBand` so events carry real-world thermal
@@ -405,33 +420,63 @@ final class SampleHostChengluStressCognitiveOSObserver {
             feedbackLog: log)
         lastExtractHighWaterMs = preExtractHwm
 
-        // Chapter 三百八八 / M879 fix:write the in-memory graph
-        // through to the SQLite storage companion when wired。
-        // Pre-M879 the M862 observer extracted into in-memory
-        // graph but never persisted nodes / edges,so M878's
-        // SQLite path produced empty graph.sqlite even when
-        // the JSON cognitiveOS summary reported large counts。
-        // M866 append APIs are idempotent,so repeated walks are
-        // no-ops on already-persisted rows。
+        // M879 + M899 graph SQLite write-through。M879 added the
+        // basic write-through;M899 added delta-only walk so a
+        // 10h run doesn't collapse on backpressure。
         //
-        // M883 fix (P2.3 audit):count persist failures + expose
-        // them via `graphPersistFailures`。Pre-M883 errors were
-        // silently swallowed via `try?`,letting JSON/UI report
-        // huge graph counts while disk could be empty or partial。
+        // Pre-M899 every extract walked ALL graph.allNodes() →
+        // O(total-graph-size) SQLite queries per extract → at
+        // 5M+ nodes after several hours,each extract took
+        // longer than the extract cadence → unbounded queue
+        // growth + throughput collapse。
+        //
+        // Post-M899:track `lastPersistedNodeCount` +
+        // `lastPersistedEdgeCount`。Walk only the SUFFIX of
+        // allNodes/allEdges that's been added since last
+        // persist (sorted by createdAtMs ASC,so suffix = newest
+        // N items)。Bounded per-extract work proportional to
+        // graphExtractInterval (1000 events ≈ 1000-2000 new
+        // graph elements at most),not total graph size。
+        //
+        // M866 append APIs are still idempotent,so even if the
+        // count tracking drifts (e.g. on observer restart),the
+        // worst case is replaying same nodes which become
+        // wasNew=false no-ops。Counter is rebuildable from
+        // storage.nodeCount on cold start。
+        //
+        // M883 persist-failure counter still active — exposed via
+        // `graphPersistFailures` for hosts that need disk-write
+        // visibility。
         if let storage = bundle?.knowledgeGraphStorage {
-            for node in await graph.allNodes() {
-                do {
-                    _ = try await storage.appendNode(node)
-                } catch {
-                    graphPersistFailures += 1
+            let currentNodeCount = await graph.nodeCount
+            if currentNodeCount > lastPersistedNodeCount {
+                let allNodes = await graph.allNodes()
+                let newCount =
+                    currentNodeCount - lastPersistedNodeCount
+                let newNodes = allNodes.suffix(newCount)
+                for node in newNodes {
+                    do {
+                        _ = try await storage.appendNode(node)
+                    } catch {
+                        graphPersistFailures += 1
+                    }
                 }
+                lastPersistedNodeCount = currentNodeCount
             }
-            for edge in await graph.allEdges() {
-                do {
-                    _ = try await storage.appendEdge(edge)
-                } catch {
-                    graphPersistFailures += 1
+            let currentEdgeCount = await graph.edgeCount
+            if currentEdgeCount > lastPersistedEdgeCount {
+                let allEdges = await graph.allEdges()
+                let newCount =
+                    currentEdgeCount - lastPersistedEdgeCount
+                let newEdges = allEdges.suffix(newCount)
+                for edge in newEdges {
+                    do {
+                        _ = try await storage.appendEdge(edge)
+                    } catch {
+                        graphPersistFailures += 1
+                    }
                 }
+                lastPersistedEdgeCount = currentEdgeCount
             }
         }
 
