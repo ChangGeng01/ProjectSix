@@ -179,4 +179,87 @@ final class BASPermitEscalationLedgerTests: XCTestCase {
                 .ledgerReasonCodePrefix,
             "permit-escalation-ledger")
     }
+
+    // MARK: - chapter 四百四 v2 / M970 — build helper
+
+    func testBuildHelperProducesFullChainLedger() {
+        let initial = makePermit(mode: .answer)
+        let afterA = makePermit(mode: .answer)
+        let afterB = makePermit(mode: .delay)
+        let afterC = makePermit(mode: .delay)
+        let afterD = makePermit(mode: .escalate)
+        let afterE = makePermit(mode: .escalate)
+        let ledger = BASPermitEscalationLedger.build(
+            initialPermit: initial,
+            afterAbyssal: afterA,
+            afterAssertionCeiling: afterB,
+            afterAssertionCeilingReasonCodes:
+                ["assertion-cap-fired"],
+            afterKunlun: afterC,
+            afterCthulhuAssertionCeiling: afterD,
+            afterCthulhuAssertionCeilingReasonCodes:
+                ["cthulhu-cap"],
+            afterCthulhuEscalation: afterE)
+        XCTAssertEqual(ledger.records.count, 5)
+        XCTAssertEqual(ledger.finalPermit.mode, .escalate)
+        XCTAssertTrue(
+            ledger.aggregateReasonCodes.contains(
+                "assertion-ceiling:assertion-cap-fired"))
+        XCTAssertTrue(
+            ledger.aggregateReasonCodes.contains(
+                "cthulhu-assertion-ceiling:cthulhu-cap"))
+    }
+
+    func testBuildHelperWithIdentityChainHasZeroFired() {
+        let permit = makePermit(mode: .answer)
+        let ledger = BASPermitEscalationLedger.build(
+            initialPermit: permit,
+            afterAbyssal: permit,
+            afterAssertionCeiling: permit,
+            afterKunlun: permit,
+            afterCthulhuAssertionCeiling: permit,
+            afterCthulhuEscalation: permit)
+        XCTAssertEqual(ledger.firedStageCount, 0,
+            "M970:identity chain has 0 fired stages")
+        XCTAssertEqual(ledger.finalPermit.mode, permit.mode)
+    }
+
+    func testBuildHelperRecordsCanonicalStageOrder() {
+        let permit = makePermit()
+        let ledger = BASPermitEscalationLedger.build(
+            initialPermit: permit,
+            afterAbyssal: permit,
+            afterAssertionCeiling: permit,
+            afterKunlun: permit,
+            afterCthulhuAssertionCeiling: permit,
+            afterCthulhuEscalation: permit)
+        let stages = ledger.records.map { $0.stage }
+        XCTAssertEqual(stages, [
+            .abyssal,
+            .assertionCeiling,
+            .kunlun,
+            .cthulhuAssertionCeiling,
+            .cthulhuEscalation
+        ])
+    }
+
+    func testBuildHelperByteStableForSameInputs() {
+        let permit = makePermit()
+        let l1 = BASPermitEscalationLedger.build(
+            initialPermit: permit,
+            afterAbyssal: permit,
+            afterAssertionCeiling: permit,
+            afterKunlun: permit,
+            afterCthulhuAssertionCeiling: permit,
+            afterCthulhuEscalation: permit)
+        let l2 = BASPermitEscalationLedger.build(
+            initialPermit: permit,
+            afterAbyssal: permit,
+            afterAssertionCeiling: permit,
+            afterKunlun: permit,
+            afterCthulhuAssertionCeiling: permit,
+            afterCthulhuEscalation: permit)
+        XCTAssertEqual(l1, l2,
+            "M970:M892 byte-stable build helper")
+    }
 }

@@ -183,4 +183,68 @@ public struct BASPermitEscalationLedger:
             initialPermit: initialPermit,
             records: records + [record])
     }
+
+    // MARK: - chapter 四百四 v2 / M970 — typed builder helper
+
+    /// Pure-function builder:given the canonical 6-permit
+    /// chain (initial + 5 escalation outputs) + per-stage
+    /// reason codes,produce a fully-populated ledger。
+    ///
+    /// V1 runTurn's escalation seams (L1005 / L1057 / L1069 /
+    /// L1178 / L1397 / L1437) can call this helper after each
+    /// escalation module returns to record the transition,
+    /// without touching var-rebind state。Future V2 actor
+    /// stages adopt this pattern natively。
+    ///
+    /// Stages are recorded in canonical order:
+    /// `[.abyssal, .assertionCeiling, .kunlun,
+    ///   .cthulhuAssertionCeiling, .cthulhuEscalation]` per
+    /// chapter 四百三 entropy audit。
+    public static func build(
+        initialPermit: BASActionPermit,
+        afterAbyssal: BASActionPermit,
+        afterAbyssalReasonCodes: [String] = [],
+        afterAssertionCeiling: BASActionPermit,
+        afterAssertionCeilingReasonCodes: [String] = [],
+        afterKunlun: BASActionPermit,
+        afterKunlunReasonCodes: [String] = [],
+        afterCthulhuAssertionCeiling: BASActionPermit,
+        afterCthulhuAssertionCeilingReasonCodes: [String] = [],
+        afterCthulhuEscalation: BASActionPermit,
+        afterCthulhuEscalationReasonCodes: [String] = []
+    ) -> BASPermitEscalationLedger {
+        let records: [BASPermitEscalationStageRecord] = [
+            BASPermitEscalationStageRecord(
+                stage: .abyssal,
+                inputPermit: initialPermit,
+                outputPermit: afterAbyssal,
+                reasonCodes: afterAbyssalReasonCodes),
+            BASPermitEscalationStageRecord(
+                stage: .assertionCeiling,
+                inputPermit: afterAbyssal,
+                outputPermit: afterAssertionCeiling,
+                reasonCodes:
+                    afterAssertionCeilingReasonCodes),
+            BASPermitEscalationStageRecord(
+                stage: .kunlun,
+                inputPermit: afterAssertionCeiling,
+                outputPermit: afterKunlun,
+                reasonCodes: afterKunlunReasonCodes),
+            BASPermitEscalationStageRecord(
+                stage: .cthulhuAssertionCeiling,
+                inputPermit: afterKunlun,
+                outputPermit: afterCthulhuAssertionCeiling,
+                reasonCodes:
+                    afterCthulhuAssertionCeilingReasonCodes),
+            BASPermitEscalationStageRecord(
+                stage: .cthulhuEscalation,
+                inputPermit: afterCthulhuAssertionCeiling,
+                outputPermit: afterCthulhuEscalation,
+                reasonCodes:
+                    afterCthulhuEscalationReasonCodes)
+        ]
+        return BASPermitEscalationLedger(
+            initialPermit: initialPermit,
+            records: records)
+    }
 }
