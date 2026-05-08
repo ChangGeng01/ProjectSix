@@ -109,6 +109,19 @@ final class SampleHostChengluStressRunner: ObservableObject {
         /// Re-verify determinism baseline every N iterations。
         static let determinismCheckInterval: Int = 1000
 
+        /// Chapter 三百九九 / M909:duration threshold (seconds)
+        /// above which the runner auto-selects `.slowOnHot` for
+        /// the cognitive OS observer。Pre-M909 this was hardcoded
+        /// at 3600 (1h),which excluded 30-45 min runs that
+        /// experience the same thermal envelope。Post-M909 the
+        /// threshold is the same as `defaultDurationSeconds`(1200,
+        /// 20 min)— iPhone 17e thermal envelope onset is
+        /// typically 10-15 min,so any run >= the default
+        /// duration benefits from `.slowOnHot`。Hosts that want
+        /// a different threshold can fork this constant。
+        static let thermalAutoSensitivityThresholdSec: Double =
+            1200
+
         /// Chapter 三百五〇 / M837: persist a checkpoint every
         /// N seconds wall-clock during a run so a crash mid-8h
         /// doesn't lose all data。
@@ -198,15 +211,18 @@ final class SampleHostChengluStressRunner: ObservableObject {
         // stress run itself is unaffected。
         //
         // Chapter 三百九九 / M905:auto-select thermal sensitivity
-        // based on requested run duration。Runs >= 1h (3600s)
-        // default to `.slowOnHot` — they're the ones that
-        // experience the thermal envelope where the policy
-        // matters。Shorter runs stay `.ignoreThermal` so the
-        // sub-1h runs the M826/M887 contract was tuned against
-        // see no behavior change。
+        // based on requested run duration。
+        // M909 hardening:threshold lowered from 3600s (1h) to
+        // 1200s (20 min,= defaultDurationSeconds)。iPhone 17e
+        // thermal envelope onset is typically 10-15 min,so
+        // shorter runs at the default duration also benefit
+        // from `.slowOnHot`。Threshold extracted as named
+        // constant `thermalAutoSensitivityThresholdSec` (chapter
+        // 一百八十五 anti-magic-number)。
         let thermalSensitivity:
             BASCognitiveOSThermalSensitivity =
-            (durationSeconds >= 3600)
+            (durationSeconds >=
+                Constants.thermalAutoSensitivityThresholdSec)
                 ? .slowOnHot
                 : .ignoreThermal
         let observer:
@@ -220,7 +236,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                 appendLog(
                     "🧠 Cognitive OS observer wired " +
                     "(event log + state + graph as configured;" +
-                    " thermal=\(thermalSensitivity))")
+                    " thermal=\(thermalSensitivity.rawValue))")
             }
         } catch {
             appendLog(
@@ -438,7 +454,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                     self.cognitiveOSGraphEdgeCount =
                         observer.graphEdgeCount
                     self.cognitiveOSThermalSensitivity =
-                        String(describing: thermalSensitivity)
+                        thermalSensitivity.rawValue
                     self.cognitiveOSThermalSkippedExtracts =
                         observer.thermalSkippedExtracts
                     self.cognitiveOSThermalSlowedExtracts =
@@ -621,7 +637,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
             self.cognitiveOSGraphEdgeCount =
                 observer.graphEdgeCount
             self.cognitiveOSThermalSensitivity =
-                String(describing: thermalSensitivity)
+                thermalSensitivity.rawValue
             self.cognitiveOSThermalSkippedExtracts =
                 observer.thermalSkippedExtracts
             self.cognitiveOSThermalSlowedExtracts =
@@ -634,7 +650,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                 "\(observer.graphEdgeCount) graph edges")
             appendLog(
                 "🌡️ thermal policy: " +
-                "\(thermalSensitivity) / " +
+                "\(thermalSensitivity.rawValue) / " +
                 "skipped=\(observer.thermalSkippedExtracts) / " +
                 "slowed=\(observer.thermalSlowedExtracts)")
         }
@@ -696,7 +712,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                         thermalRiskBand:
                             perMinuteCognitiveThermalRiskBand),
                     thermalSensitivity:
-                        String(describing: thermalSensitivity),
+                        thermalSensitivity.rawValue,
                     thermalSkippedExtracts:
                         observer.thermalSkippedExtracts,
                     thermalSlowedExtracts:

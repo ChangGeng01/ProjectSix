@@ -78,6 +78,12 @@ final class SampleHostChengluStressCognitiveOSObserver {
         /// so we re-read every N iters to amortize syscall cost。
         /// 100 iter ≈ once per ~700ms at 147 iter/s thermal-hot
         /// case observed on iPhone 17e。
+        ///
+        /// **M909 invariant (must hold)**:
+        ///   `thermalReadInterval <= graphExtractInterval`
+        /// Otherwise the M905 thermal policy decision lags the
+        /// extract cadence — we'd extract on stale thermal data。
+        /// Enforced via `precondition` in the observer init。
         static let thermalReadInterval: Int = 100
 
         /// Chapter 三百九九 / M905:slowdown multiplier applied to
@@ -228,9 +234,24 @@ final class SampleHostChengluStressCognitiveOSObserver {
         sessionID: String = UUID().uuidString,
         thermalSensitivity:
             BASCognitiveOSThermalSensitivity = .ignoreThermal,
-        thermalRiskBandSampler: (
+        thermalRiskBandSampler injectedSampler: (
             @MainActor () -> BASEventLogRiskBand)? = nil
     ) throws {
+        // M909 invariant pin:thermal sample cadence must not
+        // exceed graph extract cadence,otherwise policy
+        // decisions lag the extract events they're meant to
+        // gate。Fail-fast at construction so a future config
+        // change is caught immediately,not silently in a 10h
+        // run。Safe to precondition here:Constants are typed
+        // doctrine values,never user-supplied。
+        precondition(
+            Constants.thermalReadInterval
+                <= Constants.graphExtractInterval,
+            "M909 invariant violated: thermalReadInterval " +
+            "(\(Constants.thermalReadInterval)) must be <= " +
+            "graphExtractInterval " +
+            "(\(Constants.graphExtractInterval))。Otherwise " +
+            "thermal policy decisions lag the extract cadence。")
         if options == .allDisabled {
             self.bundle = nil
         } else {
@@ -240,8 +261,13 @@ final class SampleHostChengluStressCognitiveOSObserver {
         self.sessionID = sessionID
         self.currentState = .zero
         self.thermalSensitivity = thermalSensitivity
+        // M909 readability fix:parameter renamed to
+        // `injectedSampler` to disambiguate from the property
+        // name (`thermalRiskBandSampler`)。Pre-M909 the same
+        // name was used for both,relying on `self.` prefix to
+        // resolve — readable but a code-review hazard。
         self.thermalRiskBandSampler =
-            thermalRiskBandSampler ?? {
+            injectedSampler ?? {
                 Self.thermalRiskBand()
             }
     }

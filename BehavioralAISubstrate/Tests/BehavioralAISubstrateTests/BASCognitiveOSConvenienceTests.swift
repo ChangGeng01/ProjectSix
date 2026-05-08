@@ -967,6 +967,125 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
     }
 }
 
+// MARK: - M908 hardening regression tests
+
+extension BASCognitiveOSConvenienceTests {
+
+    /// M908 cold-start fix:first observe under non-ignore
+    /// sensitivity samples thermal IMMEDIATELY,not after 99
+    /// events。Pre-M908 a phone booting into `.serious` would
+    /// extract 99 times under wrong-thermal assumption。
+    func testM908ColdStartSamplesOnFirstObserve() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-coldstart",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 1,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .skipOnCritical,
+                thermalSlowdownMultiplier: 4,
+                // M908 critical: even with sample interval 100,
+                // the cold-start fix MUST sample on iter 1
+                thermalSampleInterval: 100),
+            thermalSampler: { .critical })
+
+        // Single observe call — under .skipOnCritical with
+        // .critical thermal,extract MUST be skipped
+        _ = await conv.observe(
+            event: makeEvent(
+                index: 0, sessionID: "s-coldstart"))
+
+        let skipped = await conv.thermalSkippedExtractCount
+        XCTAssertEqual(skipped, 1,
+            "M908 cold-start: first observe under " +
+            ".skipOnCritical with .critical thermal MUST " +
+            "skip the extract (sampler invoked on iter 1)。" +
+            "Pre-M908 this was 0 because cached state was " +
+            ".nominal until iter 100")
+
+        let thermal = await conv.lastObservedThermalState
+        XCTAssertEqual(thermal, .critical,
+            "Cached thermal state must reflect first sample")
+    }
+
+    /// M908 overflow guard:misconfigured very large
+    /// `graphExtractInterval × thermalSlowdownMultiplier`
+    /// must clamp to Int.max instead of trapping。
+    /// Substrate primitive must NEVER trap (不变量 #1)。
+    func testM908SlowdownOverflowGuardClampsSafely() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        // Configure interval × multiplier to overflow Int64
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-overflow",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: Int.max / 2,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .slowOnHot,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .serious })
+
+        // Drive observes across the natural fire boundary
+        // (Int.max/2)— policy decision must NOT trap on
+        // the multiplier overflow path
+        for i in 0..<10 {
+            _ = await conv.observe(
+                event: makeEvent(
+                    index: i, sessionID: "s-overflow"))
+        }
+        // No assertion needed — survival of the loop is the
+        // pin。Pre-M908 this would have trapped on
+        // multiplication overflow inside the predicate。
+    }
+
+    /// M908 fail-closed for `.skipOnCritical` `@unknown default`:
+    /// future thermal states (e.g. `.catastrophic` if Apple ever
+    /// adds one) MUST be treated as skip-worthy under
+    /// `.skipOnCritical`,not fail-open。
+    /// (Cannot exercise `@unknown default` directly without an
+    /// unknown enum case — this test pins the policy intent via
+    /// behavior on `.critical` which the same code path handles。)
+    func testM908SkipOnCriticalSemanticsPin() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-skip-pin",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 5,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .skipOnCritical,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .critical })
+
+        for i in 0..<20 {
+            _ = await conv.observe(
+                event: makeEvent(
+                    index: i, sessionID: "s-skip-pin"))
+        }
+        let skipped = await conv.thermalSkippedExtractCount
+        // Natural fires at iter 5/10/15/20 → 4 fires,all
+        // skipped under .skipOnCritical + .critical
+        XCTAssertEqual(skipped, 4,
+            "M908: .skipOnCritical with .critical must " +
+            "skip every natural fire")
+    }
+}
+
 // MARK: - Test helpers
 
 /// Sendable atomic counter for verifying thermal sampler invocation。
