@@ -766,9 +766,7 @@ public struct BASEBrainRuntimeCoordinator {
         let derivedTurnID = frameContext.turnID
         let contextFrame = rawContextFrame
             .withDerivedPresenceObservationBundle(
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         var decomposeFrame = decomposeService.decompose(
             contextFrame: contextFrame,
@@ -794,9 +792,7 @@ public struct BASEBrainRuntimeCoordinator {
         // with the L14 audit record and with L6 on the same turn.
         decomposeFrame = decomposeFrame
             .withDerivedDecompositionObservationBundle(
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         let rawMemoryBundle = memoryService.retrieve(
             decomposeFrame: decomposeFrame,
@@ -903,9 +899,7 @@ public struct BASEBrainRuntimeCoordinator {
         // surface joins them by that key.
         thoughtFrame = thoughtFrame
             .withDerivedWorldPriorObservationBundle(
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         var (triScores, mergedChoice) = triSelfService.mergeChoice(
             thoughtFrame: thoughtFrame,
@@ -946,9 +940,7 @@ public struct BASEBrainRuntimeCoordinator {
         // L14 audit record and with L6 / L7 / L9 on the same turn.
         thoughtFrame = thoughtFrame
             .withDerivedTribunalObservationBundle(
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         let riskService = self.riskService
         let rawRiskDecisionPackage = riskService.buildRiskDecisionPackage(
@@ -1453,9 +1445,7 @@ public struct BASEBrainRuntimeCoordinator {
         // audit surface joins them by that key.
         thoughtFrame = thoughtFrame
             .withDerivedRiskObservationBundle(
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         let hostGateValue = hostProfileService.applyHostGate(
             profile: hostContext,
@@ -1512,9 +1502,7 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame = thoughtFrame
             .withDerivedSoftHandObservationBundle(
                 renderedOutput: renderedOutput,
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
         let rawTickets = evolutionService.buildTickets(
             thoughtFrame: thoughtFrame,
             output: renderedOutput,
@@ -1546,9 +1534,7 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame = thoughtFrame
             .withDerivedUpdateTicketObservationBundle(
                 updateTickets: updateTickets,
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         // M60 — L1 灯芯层 main-chain wiring. Derive the per-turn
         // kernel observation bundle from `routedBudget` (the single
@@ -1565,9 +1551,7 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame = thoughtFrame
             .withDerivedLeaseLifeObservationBundle(
                 budgetFrame: routedBudget,
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         // M61 — L5 宿纹层 main-chain wiring. Derive the per-turn
         // host-constitution governance observation bundle from the
@@ -1584,9 +1568,7 @@ public struct BASEBrainRuntimeCoordinator {
                 constitution: hostConstitution,
                 versionTree: hostVersionTree,
                 forgetRequest: hostForgetRequest,
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         let auditFindings = budgetFindings + memoryFindings + loopFindings + riskFindings + evolutionFindings
         let killSwitches = recommendedKillSwitches(for: auditFindings)
@@ -1618,9 +1600,7 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame = thoughtFrame
             .withDerivedThoughtFoldObservationBundle(
                 fold: thoughtFold,
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         // M63 — L8 海马层 main-chain wiring. Derive the per-turn
         // hippocampal memory observation bundle from the normalized
@@ -1637,9 +1617,7 @@ public struct BASEBrainRuntimeCoordinator {
         thoughtFrame = thoughtFrame
             .withDerivedHippocampalMemoryObservationBundle(
                 memoryBundle: memoryBundle,
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         // M64 — L2 神经器官层 main-chain wiring. Derive the per-turn
         // neural-organ-registry observation bundle from the
@@ -1657,9 +1635,7 @@ public struct BASEBrainRuntimeCoordinator {
         // sovereign verdict on the same turn.
         thoughtFrame = thoughtFrame
             .withDerivedNeuralOrganObservationBundle(
-                turnID: derivedTurnID,
-                sessionID: derivedSessionID,
-                emittedAt: request.recordedAt)
+                frameContext: frameContext)
 
         let runtimeTrace = buildRuntimeTrace(
             request: request,
