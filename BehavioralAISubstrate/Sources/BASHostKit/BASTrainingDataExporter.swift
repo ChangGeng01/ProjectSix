@@ -132,6 +132,18 @@ public struct BASTrainingDataExportFilter:
 
 /// Typed Codable record representing one event in the exported
 /// training corpus。One JSONL line per datum。
+///
+/// ## M925 (chapter 四百):labels extension
+///
+/// Pre-M925 the datum carried the event + optional state context
+/// only。M922's `BASMambaTrainingObjective` exposed 5 training
+/// objectives but `availableObjectivesToday()` returned only 3
+/// because the corpus didn't carry permit-verdict or cycle-
+/// closing labels。Post-M925 the optional `labels` field
+/// (`BASTrainingLabels`) carries those。Hosts populate via the
+/// new `BASTrainingLabelEnricher` protocol passed to the M903
+/// exporter。Default nil = no labels (matches pre-M925
+/// behavior,zero migration cost)。
 public struct BASTrainingDatum: Codable, Equatable, Sendable {
     /// The full event log entry。
     public let event: BASEventLogEntry
@@ -151,17 +163,86 @@ public struct BASTrainingDatum: Codable, Equatable, Sendable {
     /// epoch)。Useful for tracking when a corpus was generated。
     public let exportedAtMs: Int64
 
+    /// M925:optional supervised-learning labels for the
+    /// permit-verdict + cycle-closing training objectives。
+    /// Populated when the exporter is given a
+    /// `BASTrainingLabelEnricher` AND the host's enricher
+    /// resolves labels for this datum's event。Nil for
+    /// pre-M925 corpora + for hosts that don't pass an
+    /// enricher。
+    public let labels: BASTrainingLabels?
+
     public init(
         event: BASEventLogEntry,
         stateBefore: BASUserState? = nil,
         stateAfter: BASUserState? = nil,
-        exportedAtMs: Int64
+        exportedAtMs: Int64,
+        labels: BASTrainingLabels? = nil
     ) {
         self.event = event
         self.stateBefore = stateBefore
         self.stateAfter = stateAfter
         self.exportedAtMs = exportedAtMs
+        self.labels = labels
     }
+}
+
+// MARK: - M925 supervised-learning labels
+
+/// Typed Codable bundle of supervised-learning labels for the
+/// M922 training objectives whose labels weren't in the
+/// pre-M925 export。Populated per-datum by a host-supplied
+/// `BASTrainingLabelEnricher`。
+public struct BASTrainingLabels:
+    Codable, Equatable, Sendable, Hashable
+{
+    /// L11 commit-mouth permit verdict for the event's
+    /// session state at the time the event was processed。
+    /// Raw values are `"allow"` / `"softCaution"` /
+    /// `"hardNoGo"`(matches `BASChengluPermitMode` rawValue
+    /// cases)。Nil when the host's enricher couldn't resolve
+    /// the verdict for this event。
+    public let permitVerdict: String?
+
+    /// True iff the M857 graph extractor's heuristic 7
+    /// closing-edge synthesis fired immediately after this
+    /// event in its session。Direct supervised signal for the
+    /// `cycleClosingTrigger` training objective (M922)。Nil
+    /// when the host's enricher couldn't determine cycle
+    /// closure for this event (e.g. session has fewer events
+    /// than heuristic 7's threshold)。
+    public let cycleClosingTriggered: Bool?
+
+    public init(
+        permitVerdict: String? = nil,
+        cycleClosingTriggered: Bool? = nil
+    ) {
+        self.permitVerdict = permitVerdict
+        self.cycleClosingTriggered = cycleClosingTriggered
+    }
+}
+
+/// M925:typed protocol hosts implement to enrich each
+/// training datum with supervised labels at export time。
+/// The enricher receives the datum + the prior events
+/// in the same session (newest-first window) so it can
+/// compute heuristic-based labels (e.g. running M857
+/// extractor on the prior events to determine if heuristic
+/// 7 fires at this event)。
+///
+/// Default-arg-free because labels are host-domain-specific
+/// (different L11 implementations,different cycle thresholds)
+/// and the substrate doesn't prescribe a universal enricher。
+public protocol BASTrainingLabelEnricher: Sendable {
+    /// Compute labels for one event in the export sequence。
+    /// `priorEvents` contains the events from the same session
+    /// emitted BEFORE this one,newest-last (chronological)。
+    /// Returns nil to indicate "no labels available for this
+    /// datum" (results in `BASTrainingDatum.labels = nil`)。
+    func labels(
+        for event: BASEventLogEntry,
+        priorEventsInSession: [BASEventLogEntry]
+    ) async -> BASTrainingLabels?
 }
 
 // MARK: - Export summary
@@ -247,17 +328,25 @@ public actor BASTrainingDataExporter {
     private let eventLog: any BASEventLogStorage
     private let userStateStore: (any BASUserStateStorage)?
     private let pageSize: Int
+    /// M925:optional host-supplied label enricher。When
+    /// non-nil,each emitted datum gets enriched with
+    /// supervised labels via the enricher。Default nil =
+    /// no labels (zero behavior change vs pre-M925 export)。
+    private let labelEnricher: (any BASTrainingLabelEnricher)?
 
     public init(
         eventLog: any BASEventLogStorage,
         userStateStore: (any BASUserStateStorage)? = nil,
-        pageSize: Int = BASTrainingDataExporter.defaultPageSize
+        pageSize: Int = BASTrainingDataExporter.defaultPageSize,
+        labelEnricher:
+            (any BASTrainingLabelEnricher)? = nil
     ) {
         precondition(pageSize > 0,
             "pageSize must be > 0")
         self.eventLog = eventLog
         self.userStateStore = userStateStore
         self.pageSize = pageSize
+        self.labelEnricher = labelEnricher
     }
 
     /// Export the filtered event corpus as JSONL to `url`。
@@ -294,6 +383,9 @@ public actor BASTrainingDataExporter {
         // M906:reset per-export so consecutive exportToJSONL
         // calls on the same actor see fresh counts。
         stateContextMissingCount = 0
+        // M925:reset per-export so consecutive calls don't
+        // leak history into each other's enricher windows。
+        perSessionEventHistory = [:]
 
         // Atomic temp-file-rename pattern。
         let tempURL = url.appendingPathExtension("tmp")
@@ -591,44 +683,82 @@ public actor BASTrainingDataExporter {
     /// of `exportToJSONL`。
     private var stateContextMissingCount: Int = 0
 
+    /// M925:cache of prior-events-in-session windows used by
+    /// the label enricher。Per-session sliding window so the
+    /// enricher can run heuristics requiring history (e.g.
+    /// M857 heuristic 7 needs the prior delays-edge count
+    /// per project)。Reset per-export at the start of
+    /// `exportToJSONL`。
+    private var perSessionEventHistory:
+        [String: [BASEventLogEntry]] = [:]
+
+    /// M925:upper bound on per-session history retained for
+    /// the enricher。The enricher receives at most this many
+    /// prior events per call。Bounds memory on long-running
+    /// sessions while preserving enough history for heuristic
+    /// 7 to fire (closingEdgeDelaysThreshold = 2)。
+    public static let defaultLabelHistoryWindow: Int = 1_000
+
     private func makeDatum(
         event: BASEventLogEntry,
         includeStateContext: Bool,
         exportedAtMs: Int64
     ) async -> BASTrainingDatum {
-        guard includeStateContext,
-              let store = userStateStore
-        else {
-            return BASTrainingDatum(
-                event: event,
-                stateBefore: nil,
-                stateAfter: nil,
-                exportedAtMs: exportedAtMs)
-        }
         let stateBefore: BASUserState?
-        if let id = event.stateBeforeID {
-            let resolved = await store.state(forID: id)
-            if resolved == nil {
-                stateContextMissingCount += 1
+        let stateAfter: BASUserState?
+        if includeStateContext,
+           let store = userStateStore
+        {
+            if let id = event.stateBeforeID {
+                let resolved = await store.state(forID: id)
+                if resolved == nil {
+                    stateContextMissingCount += 1
+                }
+                stateBefore = resolved
+            } else {
+                stateBefore = nil
             }
-            stateBefore = resolved
+            if let id = event.stateAfterID {
+                let resolved = await store.state(forID: id)
+                if resolved == nil {
+                    stateContextMissingCount += 1
+                }
+                stateAfter = resolved
+            } else {
+                stateAfter = nil
+            }
         } else {
             stateBefore = nil
-        }
-        let stateAfter: BASUserState?
-        if let id = event.stateAfterID {
-            let resolved = await store.state(forID: id)
-            if resolved == nil {
-                stateContextMissingCount += 1
-            }
-            stateAfter = resolved
-        } else {
             stateAfter = nil
         }
+
+        // M925:invoke the label enricher (if configured)
+        // with the prior-events-in-session window。Update the
+        // window with the current event AFTER the enricher
+        // sees it (so the enricher receives "events strictly
+        // before this one,newest-last")。
+        var labels: BASTrainingLabels? = nil
+        if let enricher = labelEnricher {
+            let priorEvents = perSessionEventHistory[
+                event.sessionID, default: []]
+            labels = await enricher.labels(
+                for: event,
+                priorEventsInSession: priorEvents)
+            // Bound history window
+            var window = priorEvents
+            window.append(event)
+            let cap = Self.defaultLabelHistoryWindow
+            if window.count > cap {
+                window = Array(window.suffix(cap))
+            }
+            perSessionEventHistory[event.sessionID] = window
+        }
+
         return BASTrainingDatum(
             event: event,
             stateBefore: stateBefore,
             stateAfter: stateAfter,
-            exportedAtMs: exportedAtMs)
+            exportedAtMs: exportedAtMs,
+            labels: labels)
     }
 }

@@ -214,4 +214,85 @@ public enum BASFoundationModelsToolBridge {
     ) -> Bool {
         traceID.hasSuffix(auditTraceSuffix)
     }
+
+    // MARK: - M924 typed audit event emission
+
+    /// chapter 四百 / M924:typed action prefix on the audit
+    /// event so cognitive OS observers can filter for it via
+    /// the existing event log pipeline。Pinned for downstream
+    /// parsers (M903 export consumers,M898 replay runners)。
+    public static let auditEventActionPrefix: String =
+        "afm:tools:dropped"
+
+    /// chapter 四百 / M924:typed source tag on the audit
+    /// event。Mirrors the M870 trace suffix for cross-reference
+    /// between trace-ID grep and event-log queries。
+    public static let auditEventSource: String =
+        "afm-bridge:audit"
+
+    /// M924 factory:given a bridge-resolution result,produce
+    /// a typed `BASEventLogEntry` describing the drop。Hosts /
+    /// adapters call this and append to their event log so the
+    /// drop signal lives in the cognitive OS event stream,not
+    /// just in the trace ID suffix。
+    ///
+    /// Returns nil when the status doesn't represent a drop
+    /// (`.bridgedRuntimeSchema` / `.bridgedCompiledGenerable`)
+    /// — only `.audited` produces an audit event。
+    ///
+    /// - Parameters:
+    ///   - status: result of `resolve(...)` for the request
+    ///   - request: the originating BASOrganRequest (for
+    ///     sessionID + project context)
+    ///   - timestampMs: wall-clock at the audit emit moment
+    ///     (caller-supplied for replay determinism)
+    public static func makeAuditEvent(
+        for status: BASFoundationModelsToolBridgeStatus,
+        request: BASOrganRequest,
+        timestampMs: Int64,
+        sessionID: String
+    ) -> BASEventLogEntry? {
+        // Only audit-mode resolutions emit an event;bridged
+        // resolutions DID attach the tools[],so there's
+        // nothing to audit。
+        let traceID: String
+        switch status {
+        case .audited(let id):
+            // Empty tools[] case: trace ID has no audit
+            // suffix → nothing was dropped → no event。
+            if !id.hasSuffix(auditTraceSuffix) {
+                return nil
+            }
+            traceID = id
+        case .bridgedRuntimeSchema, .bridgedCompiledGenerable:
+            return nil
+        }
+
+        // Encode the dropped tool count + names into the
+        // payload so consumers can correlate with the request。
+        let toolCount = request.tools.count
+        let toolNames = request.tools
+            .map(\.name)
+            .joined(separator: ",")
+        let payload = "{\"toolCount\":\(toolCount)," +
+            "\"toolNames\":\"\(toolNames)\"," +
+            "\"traceID\":\"\(traceID)\"}"
+
+        return BASEventLogEntry(
+            eventID: "afm-bridge-audit-" +
+                "\(request.requestID)",
+            timestampMs: timestampMs,
+            kind: .substrateAudit,
+            sessionID: sessionID,
+            sequenceNumber: 0,  // storage assigns
+            source: auditEventSource,
+            turnRef: request.requestID,
+            riskBand: .medium,  // tool-drop is non-trivial
+            actions: [
+                "\(auditEventActionPrefix):" +
+                "\(toolCount)"
+            ],
+            confidence: 1.0,
+            payloadJson: payload)
+    }
 }
