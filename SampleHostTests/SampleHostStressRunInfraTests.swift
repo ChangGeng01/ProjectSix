@@ -287,7 +287,8 @@ final class SampleHostStressRunInfraTests: XCTestCase {
             perMinuteThroughput: [600.0, 601.5, 599.8],
             perMinuteP99Ms: [17.5, 17.8, 18.1],
             device: device,
-            cancelled: false)
+            cancelled: false,
+            cognitiveOS: nil)
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -348,15 +349,18 @@ final class SampleHostStressRunInfraTests: XCTestCase {
     }
 
     // MARK: - StressRunResult — schemaVersion pin
-
-    func testStressRunResultCurrentSchemaVersionIs110() {
-        XCTAssertEqual(
-            StressRunResult.currentSchemaVersion, "1.1.0",
-            "Schema version pin: bump triggers explicit " +
-            "review of backwards-compat for any persisted " +
-            "JSON files in the wild (chapter 三百四九 1.0.0 " +
-            "→ chapter 三百五〇 1.1.0)")
-    }
+    //
+    // Schema history (latest at top):
+    //   - 1.3.0 (chapter 三百九九 / M901):per-minute cognitive OS
+    //     time series + thermal-risk-band history
+    //   - 1.2.0 (chapter 三百八七 / M876):typed cognitiveOS
+    //     CognitiveOSSummary field
+    //   - 1.1.0 (chapter 三百五〇 / M837):perMinuteThroughput +
+    //     perMinuteP99Ms + phase + checkpoint persistence
+    //   - 1.0.0 (chapter 三百四九 / M836):initial schema
+    //
+    // The version pin lives in `testM901SchemaVersionIs130`
+    // below — kept in the M901 test cluster for cohesion。
 
     // MARK: - chapter 三百五二 / M839 — build chapter tag
 
@@ -524,5 +528,196 @@ final class SampleHostStressRunInfraTests: XCTestCase {
         XCTAssertEqual(policy, .skipBlock,
             "Default derive must honor substrate permit — " +
             "chapter 一百七十八 baseline preserved")
+    }
+
+    // MARK: - M901 — schema 1.3.0 cognitive OS time series
+
+    /// Pin: schema version is the LATEST schema version。
+    /// Updated each time a new field is added。
+    /// History:
+    ///   - 1.3.0 (M901)added timeSeries
+    ///   - 1.4.0 (M905)added thermal sensitivity + counters
+    func testCurrentSchemaVersionMatchesLatestField() {
+        XCTAssertEqual(
+            StressRunResult.currentSchemaVersion, "1.4.0",
+            "Schema version pin must match the most-recent " +
+            "field addition (M905 → 1.4.0)")
+    }
+
+    /// Pin: pre-M901 callers that don't pass `timeSeries:` get
+    /// nil (back-compat preserved)。
+    func testM901CognitiveOSSummaryDefaultsTimeSeriesNil() {
+        let s = StressRunResult.CognitiveOSSummary(
+            eventCount: 100,
+            stateCount: 1,
+            graphNodeCount: 10,
+            graphEdgeCount: 20)
+        XCTAssertNil(s.timeSeries,
+            "M901 init must default timeSeries to nil for " +
+            "pre-M901 caller compat")
+    }
+
+    /// Pin: Codable round-trip of CognitiveOSSummary with full
+    /// time series preserves all arrays。
+    func testM901CognitiveOSTimeSeriesRoundTrip() throws {
+        let series = StressRunResult.CognitiveOSTimeSeries(
+            eventCount: [1000, 2000, 3000],
+            stateCount: [10, 20, 30],
+            graphNodeCount: [5, 10, 15],
+            graphEdgeCount: [4, 8, 12],
+            thermalRiskBand: ["low", "medium", "high"])
+        let summary = StressRunResult.CognitiveOSSummary(
+            eventCount: 3000,
+            stateCount: 30,
+            graphNodeCount: 15,
+            graphEdgeCount: 12,
+            timeSeries: series)
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(summary)
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(
+            StressRunResult.CognitiveOSSummary.self,
+            from: data)
+
+        XCTAssertEqual(decoded, summary,
+            "M901 CognitiveOSSummary with timeSeries must " +
+            "round-trip through Codable")
+        XCTAssertEqual(
+            decoded.timeSeries?.thermalRiskBand,
+            ["low", "medium", "high"])
+    }
+
+    /// Pin: Codable round-trip of pre-M901 CognitiveOSSummary
+    /// JSON (no timeSeries field) decodes with timeSeries=nil。
+    func testM901CognitiveOSSummaryDecodesPreM901JSON() throws
+    {
+        // Pre-M901 JSON shape: just the 4 counter fields,no
+        // timeSeries key
+        let preM901JSON = """
+        {
+          "eventCount": 1500,
+          "stateCount": 15,
+          "graphNodeCount": 75,
+          "graphEdgeCount": 150
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(
+            StressRunResult.CognitiveOSSummary.self,
+            from: preM901JSON)
+
+        XCTAssertEqual(decoded.eventCount, 1500)
+        XCTAssertEqual(decoded.stateCount, 15)
+        XCTAssertEqual(decoded.graphNodeCount, 75)
+        XCTAssertEqual(decoded.graphEdgeCount, 150)
+        XCTAssertNil(decoded.timeSeries,
+            "M901 must decode pre-M901 JSON with " +
+            "timeSeries=nil (back-compat with M876 schema 1.2.0)")
+    }
+
+    /// Pin: time series array lengths can be empty (run shorter
+    /// than first minute mark)。
+    func testM901TimeSeriesEmptyArraysValid() throws {
+        let series = StressRunResult.CognitiveOSTimeSeries(
+            eventCount: [],
+            stateCount: [],
+            graphNodeCount: [],
+            graphEdgeCount: [],
+            thermalRiskBand: [])
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(series)
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(
+            StressRunResult.CognitiveOSTimeSeries.self,
+            from: data)
+
+        XCTAssertEqual(decoded.eventCount, [])
+        XCTAssertEqual(decoded.thermalRiskBand, [])
+    }
+
+    /// Pin: thermal risk band values match
+    /// `BASEventLogRiskBand.rawValue` strings exactly。
+    func testM901ThermalRiskBandValuesMatchSubstrateEnum() {
+        let series = StressRunResult.CognitiveOSTimeSeries(
+            eventCount: [],
+            stateCount: [],
+            graphNodeCount: [],
+            graphEdgeCount: [],
+            thermalRiskBand: ["low", "medium", "high",
+                              "unknown"])
+        XCTAssertEqual(series.thermalRiskBand.count, 4,
+            "All 4 BASEventLogRiskBand cases representable " +
+            "as M901 thermal-band strings")
+    }
+
+    // MARK: - M905 — thermal sensitivity + counters
+
+    /// Pin: pre-M905 callers (no thermal fields) get nil for
+    /// all 3 new optionals。
+    func testM905CognitiveOSSummaryDefaultsThermalFieldsNil() {
+        let s = StressRunResult.CognitiveOSSummary(
+            eventCount: 100,
+            stateCount: 1,
+            graphNodeCount: 10,
+            graphEdgeCount: 20)
+        XCTAssertNil(s.thermalSensitivity)
+        XCTAssertNil(s.thermalSkippedExtracts)
+        XCTAssertNil(s.thermalSlowedExtracts)
+    }
+
+    /// Pin: M905 thermal fields round-trip through Codable。
+    func testM905ThermalFieldsRoundTrip() throws {
+        let summary = StressRunResult.CognitiveOSSummary(
+            eventCount: 1_000_000,
+            stateCount: 10_000,
+            graphNodeCount: 5_000,
+            graphEdgeCount: 8_000,
+            timeSeries: nil,
+            thermalSensitivity: "slowOnHot",
+            thermalSkippedExtracts: 432,
+            thermalSlowedExtracts: 18)
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(summary)
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(
+            StressRunResult.CognitiveOSSummary.self,
+            from: data)
+
+        XCTAssertEqual(decoded, summary)
+        XCTAssertEqual(
+            decoded.thermalSensitivity, "slowOnHot")
+        XCTAssertEqual(decoded.thermalSkippedExtracts, 432)
+        XCTAssertEqual(decoded.thermalSlowedExtracts, 18)
+    }
+
+    /// Pin: pre-M905 JSON (no thermal fields) decodes with
+    /// nil thermal fields (back-compat preserved)。
+    func testM905DecodesPreM905JSONWithoutThermalFields()
+        throws
+    {
+        let preM905JSON = """
+        {
+          "eventCount": 500,
+          "stateCount": 5,
+          "graphNodeCount": 25,
+          "graphEdgeCount": 50
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(
+            StressRunResult.CognitiveOSSummary.self,
+            from: preM905JSON)
+
+        XCTAssertEqual(decoded.eventCount, 500)
+        XCTAssertNil(decoded.thermalSensitivity,
+            "Pre-M905 JSON must decode with " +
+            "thermalSensitivity=nil")
+        XCTAssertNil(decoded.thermalSkippedExtracts)
+        XCTAssertNil(decoded.thermalSlowedExtracts)
     }
 }

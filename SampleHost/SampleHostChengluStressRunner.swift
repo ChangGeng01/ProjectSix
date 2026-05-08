@@ -80,6 +80,20 @@ final class SampleHostChengluStressRunner: ObservableObject {
     @Published private(set) var cognitiveOSGraphNodeCount: Int = 0
     @Published private(set) var cognitiveOSGraphEdgeCount: Int = 0
 
+    /// Chapter 三百九九 / M905:thermal-aware cadence telemetry。
+    /// Surfaces policy + counters to the panel so the user can
+    /// SEE during a 1h+ run that thermal pressure is being
+    /// throttled。Pre-M905 panels never showed thermal effect。
+    /// Empty string (instead of nil) when observer is disabled,
+    /// matching the @Published-default-value pattern of the
+    /// other cognitiveOS* fields above。
+    @Published private(set) var
+        cognitiveOSThermalSensitivity: String = ""
+    @Published private(set) var
+        cognitiveOSThermalSkippedExtracts: Int = 0
+    @Published private(set) var
+        cognitiveOSThermalSlowedExtracts: Int = 0
+
     private var stressTask: Task<Void, Never>?
 
     // MARK: - Doctrine constants
@@ -135,6 +149,11 @@ final class SampleHostChengluStressRunner: ObservableObject {
         cognitiveOSStateCount = 0
         cognitiveOSGraphNodeCount = 0
         cognitiveOSGraphEdgeCount = 0
+        // M905:reset thermal-aware cadence telemetry for the
+        // new run (so a previous run's counters don't leak)
+        cognitiveOSThermalSensitivity = ""
+        cognitiveOSThermalSkippedExtracts = 0
+        cognitiveOSThermalSlowedExtracts = 0
         appendLog("🚀 Starting Chenglu mesh stress run " +
             "(\(Int(durationSeconds))s)" +
             (cognitiveOSEnabled
@@ -177,16 +196,31 @@ final class SampleHostChengluStressRunner: ObservableObject {
         // (zero behavior change pin)。If construction throws
         // (SQLite open failure),fall through to disabled — the
         // stress run itself is unaffected。
+        //
+        // Chapter 三百九九 / M905:auto-select thermal sensitivity
+        // based on requested run duration。Runs >= 1h (3600s)
+        // default to `.slowOnHot` — they're the ones that
+        // experience the thermal envelope where the policy
+        // matters。Shorter runs stay `.ignoreThermal` so the
+        // sub-1h runs the M826/M887 contract was tuned against
+        // see no behavior change。
+        let thermalSensitivity:
+            BASCognitiveOSThermalSensitivity =
+            (durationSeconds >= 3600)
+                ? .slowOnHot
+                : .ignoreThermal
         let observer:
             SampleHostChengluStressCognitiveOSObserver
         do {
             observer =
                 try SampleHostChengluStressCognitiveOSObserver(
-                    options: cognitiveOSOptions)
+                    options: cognitiveOSOptions,
+                    thermalSensitivity: thermalSensitivity)
             if observer.isEnabled {
                 appendLog(
                     "🧠 Cognitive OS observer wired " +
-                    "(event log + state + graph as configured)")
+                    "(event log + state + graph as configured;" +
+                    " thermal=\(thermalSensitivity))")
             }
         } catch {
             appendLog(
@@ -289,6 +323,19 @@ final class SampleHostChengluStressRunner: ObservableObject {
             Constants.timeSeriesIntervalSec
         var iterAtLastMark: Int = 0
 
+        // Chapter 三百九九 / M901: per-minute time series of
+        // cognitive OS counters + thermal risk band。Captured at
+        // the same minute mark cadence。10h iPhone run drove this:
+        // pre-M901 the JSON only had final snapshot,no way to
+        // plot graph growth or thermal pressure timeline。Arrays
+        // are appended in lock-step with `perMinuteThroughput`
+        // so consumers can correlate by index。
+        var perMinuteCognitiveEventCount: [Int] = []
+        var perMinuteCognitiveStateCount: [Int] = []
+        var perMinuteCognitiveGraphNodeCount: [Int] = []
+        var perMinuteCognitiveGraphEdgeCount: [Int] = []
+        var perMinuteCognitiveThermalRiskBand: [String] = []
+
         // Chapter 三百五〇 / M837: periodic checkpoint persistence。
         var nextCheckpointSec: Double =
             Constants.checkpointPersistIntervalSec
@@ -378,6 +425,9 @@ final class SampleHostChengluStressRunner: ObservableObject {
 
                 // Chapter 三百七五 / M862: surface cognitive OS
                 // stats to UI on the same per-100-iter cadence。
+                // Chapter 三百九九 / M905: also surface thermal
+                // policy + counters so the user can WATCH the
+                // policy fire during a 1h+ run。
                 if observer.isEnabled {
                     self.cognitiveOSEventCount =
                         observer.eventCount
@@ -387,6 +437,12 @@ final class SampleHostChengluStressRunner: ObservableObject {
                         observer.graphNodeCount
                     self.cognitiveOSGraphEdgeCount =
                         observer.graphEdgeCount
+                    self.cognitiveOSThermalSensitivity =
+                        String(describing: thermalSensitivity)
+                    self.cognitiveOSThermalSkippedExtracts =
+                        observer.thermalSkippedExtracts
+                    self.cognitiveOSThermalSlowedExtracts =
+                        observer.thermalSlowedExtracts
                 }
 
                 // Per-minute time series capture
@@ -403,6 +459,27 @@ final class SampleHostChengluStressRunner: ObservableObject {
                     iterAtLastMark = localIter
                     nextMinuteMarkSec +=
                         Constants.timeSeriesIntervalSec
+
+                    // M901: capture cognitive OS counters +
+                    // thermal risk band on the SAME minute mark
+                    // so consumers can correlate by array index。
+                    // No-op silently when observer disabled —
+                    // arrays grow from index 0 only when wired,
+                    // preserving M826/M837 contract for hosts
+                    // that don't enable the cognitive OS。
+                    if observer.isEnabled {
+                        perMinuteCognitiveEventCount.append(
+                            observer.eventCount)
+                        perMinuteCognitiveStateCount.append(
+                            observer.stateCount)
+                        perMinuteCognitiveGraphNodeCount.append(
+                            observer.graphNodeCount)
+                        perMinuteCognitiveGraphEdgeCount.append(
+                            observer.graphEdgeCount)
+                        perMinuteCognitiveThermalRiskBand.append(
+                            observer.currentThermalRiskBand
+                                .rawValue)
+                    }
                 }
 
                 // Periodic checkpoint persistence
@@ -410,7 +487,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                     let checkpoint = StressRunResult(
                         schemaVersion: StressRunResult
                             .currentSchemaVersion,
-                        buildChapter: "M876",
+                        buildChapter: "M905",
                         phase: .checkpoint,
                         timestamp: Date(),
                         requestedDurationSeconds:
@@ -449,7 +526,33 @@ final class SampleHostChengluStressRunner: ObservableObject {
                                 graphNodeCount: observer
                                     .graphNodeCount,
                                 graphEdgeCount: observer
-                                    .graphEdgeCount)
+                                    .graphEdgeCount,
+                                // M901:include the per-minute
+                                // time series accumulated so far
+                                timeSeries: StressRunResult
+                                    .CognitiveOSTimeSeries(
+                                    eventCount:
+                                        perMinuteCognitiveEventCount,
+                                    stateCount:
+                                        perMinuteCognitiveStateCount,
+                                    graphNodeCount:
+                                        perMinuteCognitiveGraphNodeCount,
+                                    graphEdgeCount:
+                                        perMinuteCognitiveGraphEdgeCount,
+                                    thermalRiskBand:
+                                        perMinuteCognitiveThermalRiskBand),
+                                // M905:thermal-aware cadence
+                                // policy + counters。Snapshot at
+                                // checkpoint time so analysis
+                                // tools can plot the policy
+                                // effect over the run。
+                                thermalSensitivity:
+                                    String(describing:
+                                        thermalSensitivity),
+                                thermalSkippedExtracts:
+                                    observer.thermalSkippedExtracts,
+                                thermalSlowedExtracts:
+                                    observer.thermalSlowedExtracts)
                             : nil)
                     _ = try? Self.persistResult(checkpoint)
                     nextCheckpointSec +=
@@ -507,6 +610,8 @@ final class SampleHostChengluStressRunner: ObservableObject {
         // + summary log line。Storage actor walks may have lagged
         // the local counters during the stress loop — refreshStats
         // pulls authoritative counts。
+        // Chapter 三百九九 / M905:final stats also include thermal
+        // counters so the post-run JSON + UI agree。
         if observer.isEnabled {
             await observer.refreshStats()
             self.cognitiveOSEventCount = observer.eventCount
@@ -515,12 +620,23 @@ final class SampleHostChengluStressRunner: ObservableObject {
                 observer.graphNodeCount
             self.cognitiveOSGraphEdgeCount =
                 observer.graphEdgeCount
+            self.cognitiveOSThermalSensitivity =
+                String(describing: thermalSensitivity)
+            self.cognitiveOSThermalSkippedExtracts =
+                observer.thermalSkippedExtracts
+            self.cognitiveOSThermalSlowedExtracts =
+                observer.thermalSlowedExtracts
             appendLog(
                 "🧠 cognitive OS: " +
                 "\(observer.eventCount) events / " +
                 "\(observer.stateCount) states / " +
                 "\(observer.graphNodeCount) graph nodes / " +
                 "\(observer.graphEdgeCount) graph edges")
+            appendLog(
+                "🌡️ thermal policy: " +
+                "\(thermalSensitivity) / " +
+                "skipped=\(observer.thermalSkippedExtracts) / " +
+                "slowed=\(observer.thermalSlowedExtracts)")
         }
 
         // Chapter 三百四九 / M836 + 三百五〇 / M837: persist final
@@ -531,7 +647,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
         let cancelled = Task.isCancelled
         let result = StressRunResult(
             schemaVersion: StressRunResult.currentSchemaVersion,
-            buildChapter: "M876",
+            buildChapter: "M905",
             phase: cancelled ? .cancelled : .final,
             timestamp: Date(),
             requestedDurationSeconds: durationSeconds,
@@ -557,13 +673,34 @@ final class SampleHostChengluStressRunner: ObservableObject {
             cancelled: cancelled,
             // M876: typed cognitive OS summary on every save
             // when observer was wired (final + checkpoint paths
-            // share the same construction)
+            // share the same construction)。M901:final path
+            // also writes the full per-minute time series。
+            // M905:final path also writes thermal policy +
+            // counters。
             cognitiveOS: self.cognitiveOSEnabled
                 ? StressRunResult.CognitiveOSSummary(
                     eventCount: observer.eventCount,
                     stateCount: observer.stateCount,
                     graphNodeCount: observer.graphNodeCount,
-                    graphEdgeCount: observer.graphEdgeCount)
+                    graphEdgeCount: observer.graphEdgeCount,
+                    timeSeries: StressRunResult
+                        .CognitiveOSTimeSeries(
+                        eventCount:
+                            perMinuteCognitiveEventCount,
+                        stateCount:
+                            perMinuteCognitiveStateCount,
+                        graphNodeCount:
+                            perMinuteCognitiveGraphNodeCount,
+                        graphEdgeCount:
+                            perMinuteCognitiveGraphEdgeCount,
+                        thermalRiskBand:
+                            perMinuteCognitiveThermalRiskBand),
+                    thermalSensitivity:
+                        String(describing: thermalSensitivity),
+                    thermalSkippedExtracts:
+                        observer.thermalSkippedExtracts,
+                    thermalSlowedExtracts:
+                        observer.thermalSlowedExtracts)
                 : nil)
         do {
             let saved = try Self.persistResult(result)
@@ -774,8 +911,20 @@ final class SampleHostChengluStressRunner: ObservableObject {
 /// for typed cognitive OS observer metrics — pre-M876 these were
 /// only in the human-readable progressLog text。Field is nil
 /// when observer was disabled or not yet wired (M826/M837 hosts)。
+/// Schema 1.3.0 (chapter 三百九九 / M901)added per-minute cognitive
+/// OS time-series + thermal-risk-band history,driven by 10h
+/// iPhone observation that spent 98.13% of events in `.serious`
+/// thermal — pre-M901 the JSON only had final snapshot,no way
+/// to plot graph-growth or thermal pressure over time。Optional
+/// for back-compat:pre-M901 records decode with timeSeries=nil。
+/// Schema 1.4.0 (chapter 三百九九 / M905)added thermal sensitivity
+/// policy name + skipped/slowed extract counters captured at
+/// run-end so the next 10h run validates that `.slowOnHot`
+/// actually fires under thermal pressure (instead of the silent
+/// 0-edge gap the 10h run produced)。Optional for back-compat:
+/// pre-M905 records decode with all 3 thermal fields nil。
 struct StressRunResult: Codable, Equatable, Sendable {
-    static let currentSchemaVersion: String = "1.2.0"
+    static let currentSchemaVersion: String = "1.4.0"
 
     /// Lifecycle phase at the moment this record was persisted。
     /// `checkpoint` = mid-run periodic save (every 60s wall-clock)。
@@ -836,11 +985,94 @@ struct StressRunResult: Codable, Equatable, Sendable {
     /// M876 typed snapshot of cognitive OS observer state at
     /// end-of-run。Mirrors the runner's @Published cognitive OS
     /// fields but is Codable for persistence。
+    /// Chapter 三百九九 / M901:extended with optional `timeSeries`
+    /// holding per-minute samples of the same counters,plus
+    /// thermal-risk-band history。Optional for back-compat:
+    /// pre-M901 records decode with timeSeries=nil。
+    /// Chapter 三百九九 / M905:extended with optional thermal
+    /// telemetry counters (`thermalSkippedExtracts` /
+    /// `thermalSlowedExtracts`)。Captures policy-effect counts
+    /// from M905 thermal-aware cadence so the next 10h run can
+    /// validate the policy actually fires under thermal load。
+    /// Optional for back-compat:pre-M905 records decode with
+    /// nil for both counters。
     struct CognitiveOSSummary: Codable, Equatable, Sendable {
         let eventCount: Int
         let stateCount: Int
         let graphNodeCount: Int
         let graphEdgeCount: Int
+        /// M901 per-minute time series of cognitive OS counters
+        /// + thermal risk band。Captured at the same minute
+        /// mark cadence as `perMinuteThroughput`(every
+        /// `Constants.timeSeriesIntervalSec` wall-clock seconds)。
+        /// Nil for runs that pre-date M901 schema 1.3.0 OR for
+        /// runs where the observer was disabled。
+        let timeSeries: CognitiveOSTimeSeries?
+
+        /// M905 thermal sensitivity policy that was active for
+        /// this run。Raw enum case name string;values are
+        /// `"ignoreThermal"` / `"slowOnHot"` / `"skipOnCritical"`。
+        /// Nil for pre-M905 runs。
+        let thermalSensitivity: String?
+
+        /// M905 count of graph extracts SKIPPED because the
+        /// thermal-sensitivity policy gated them out。Nil for
+        /// pre-M905 runs;0 for post-M905 runs where policy
+        /// never fired (cool device or `.ignoreThermal`)。
+        let thermalSkippedExtracts: Int?
+
+        /// M905 count of graph extracts that fired on the
+        /// SLOWED cadence (interval × multiplier) when
+        /// `.slowOnHot` was active and thermal was hot。Nil for
+        /// pre-M905 runs;0 for runs where the slowed-cadence
+        /// path never fired。
+        let thermalSlowedExtracts: Int?
+
+        /// M901 / M905 back-compat init — every new optional
+        /// defaults to nil so pre-existing call sites keep
+        /// working without modification。
+        init(
+            eventCount: Int,
+            stateCount: Int,
+            graphNodeCount: Int,
+            graphEdgeCount: Int,
+            timeSeries: CognitiveOSTimeSeries? = nil,
+            thermalSensitivity: String? = nil,
+            thermalSkippedExtracts: Int? = nil,
+            thermalSlowedExtracts: Int? = nil
+        ) {
+            self.eventCount = eventCount
+            self.stateCount = stateCount
+            self.graphNodeCount = graphNodeCount
+            self.graphEdgeCount = graphEdgeCount
+            self.timeSeries = timeSeries
+            self.thermalSensitivity = thermalSensitivity
+            self.thermalSkippedExtracts =
+                thermalSkippedExtracts
+            self.thermalSlowedExtracts = thermalSlowedExtracts
+        }
+    }
+
+    /// M901 typed per-minute time-series of cognitive OS counters。
+    /// Each array has the SAME length as `perMinuteThroughput`
+    /// (one entry per minute mark — index i is minute i+1)。
+    /// Counts are CUMULATIVE (count at end of minute i),so callers
+    /// derive per-minute rate by diffing adjacent entries。
+    struct CognitiveOSTimeSeries: Codable, Equatable, Sendable {
+        /// Cumulative event-log append count at the minute mark。
+        let eventCount: [Int]
+        /// Cumulative state reducer fold count at the minute mark。
+        let stateCount: [Int]
+        /// Cumulative knowledge-graph node count at the minute
+        /// mark (cap at most-recent extract pass)。
+        let graphNodeCount: [Int]
+        /// Cumulative knowledge-graph edge count at the minute
+        /// mark (cap at most-recent extract pass)。
+        let graphEdgeCount: [Int]
+        /// `BASEventLogRiskBand.rawValue` at the minute mark。
+        /// Mirrors M887 cached thermal risk band。Values are
+        /// `"low"` / `"medium"` / `"high"` / `"unknown"`。
+        let thermalRiskBand: [String]
     }
 
     struct DeviceInfo: Codable, Equatable, Sendable {

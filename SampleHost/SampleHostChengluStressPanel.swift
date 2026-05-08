@@ -314,10 +314,13 @@ struct SampleHostChengluStressPanel: View {
     /// Chapter 三百七五 / M862: surface cognitive OS observer
     /// stats during + after a run。Hidden by default;visible only
     /// when the toggle was on at start of run。
+    /// Chapter 三百九九 / M905:also shows thermal-aware cadence
+    /// policy + counters so user can WATCH the policy effect
+    /// during a 1h+ run。
     @ViewBuilder
     private var cognitiveOSStatsBlock: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("🧠 Cognitive OS observer (M862)")
+            Text("🧠 Cognitive OS observer (M862 + M905)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             statLine("Events appended",
@@ -328,6 +331,18 @@ struct SampleHostChengluStressPanel: View {
                 "\(runner.cognitiveOSGraphNodeCount)")
             statLine("Graph edges",
                 "\(runner.cognitiveOSGraphEdgeCount)")
+            // M905 thermal-aware cadence telemetry — only show
+            // when there's a non-empty policy name to avoid
+            // visual noise on `.allDisabled` runs。
+            if !runner.cognitiveOSThermalSensitivity.isEmpty {
+                Divider()
+                statLine("🌡️ Thermal policy",
+                    runner.cognitiveOSThermalSensitivity)
+                statLine("Extracts skipped",
+                    "\(runner.cognitiveOSThermalSkippedExtracts)")
+                statLine("Slowed-cadence extracts",
+                    "\(runner.cognitiveOSThermalSlowedExtracts)")
+            }
         }
         .font(.system(.caption, design: .monospaced))
         .padding(8)

@@ -205,4 +205,131 @@ final class SampleHostCognitiveOSStressTests: XCTestCase {
             "cognitiveOSEnabled must flip on opt-in start")
         runner.cancel()
     }
+
+    // MARK: - M905 thermal-aware cadence
+
+    /// Pin: default observer construction uses `.ignoreThermal`
+    /// so M826/M887 contract is preserved。Build with full
+    /// in-memory bundle and 0 events observed → the policy
+    /// surface itself is exercised but no work is gated。
+    func testM905DefaultThermalSensitivityIsIgnoreThermal()
+        throws
+    {
+        let observer =
+            try SampleHostChengluStressCognitiveOSObserver(
+                options: BASCognitiveOSBundleOptions(
+                    enableEventLog: true))
+        XCTAssertEqual(observer.thermalSkippedExtracts, 0)
+        XCTAssertEqual(observer.thermalSlowedExtracts, 0)
+        XCTAssertTrue(observer.isEnabled)
+    }
+
+    /// Pin: `.slowOnHot` with cool device → behavior identical
+    /// to `.ignoreThermal`(extracts fire on every interval)。
+    func testM905SlowOnHotCoolDeviceFiresEveryInterval()
+        async throws
+    {
+        let observer =
+            try SampleHostChengluStressCognitiveOSObserver(
+                options: BASCognitiveOSBundleOptions(
+                    enableEventLog: true,
+                    enableKnowledgeGraph: true),
+                thermalSensitivity: .slowOnHot,
+                thermalRiskBandSampler: { .low })
+
+        // Drive 2500 iters。With graphExtractInterval=1000 +
+        // cool device,extracts should fire at iter 1000 and
+        // iter 2000 → 0 thermal-skipped,0 thermal-slowed
+        for i in 1...2500 {
+            await observer.observeIteration(
+                index: i, latencyMs: 1.0, succeeded: true)
+        }
+        XCTAssertEqual(observer.thermalSkippedExtracts, 0,
+            "Cool device must not skip any extracts under " +
+            ".slowOnHot")
+        XCTAssertEqual(observer.thermalSlowedExtracts, 0,
+            "Cool device must not register slowed-cadence " +
+            "extracts (only hot device counts those)")
+    }
+
+    /// Pin: `.slowOnHot` with hot device (medium risk band) →
+    /// extracts fire only at slowed cadence (interval × 4)。
+    func testM905SlowOnHotHotDeviceUsesSlowedCadence()
+        async throws
+    {
+        let observer =
+            try SampleHostChengluStressCognitiveOSObserver(
+                options: BASCognitiveOSBundleOptions(
+                    enableEventLog: true,
+                    enableKnowledgeGraph: true),
+                thermalSensitivity: .slowOnHot,
+                thermalRiskBandSampler: { .medium })
+
+        // Drive 5000 iters。With graphExtractInterval=1000 +
+        // hot device + multiplier 4,slowed interval = 4000。
+        // Natural fires at 1000/2000/3000/4000/5000:
+        //   - iter 1000: hot,% 4000 != 0 → SKIP
+        //   - iter 2000: hot,% 4000 != 0 → SKIP
+        //   - iter 3000: hot,% 4000 != 0 → SKIP
+        //   - iter 4000: hot,% 4000 == 0 → FIRE (slowed)
+        //   - iter 5000: hot,% 4000 != 0 → SKIP
+        for i in 1...5000 {
+            await observer.observeIteration(
+                index: i, latencyMs: 1.0, succeeded: true)
+        }
+        XCTAssertEqual(observer.thermalSkippedExtracts, 4,
+            "M905 .slowOnHot must skip 4 extracts (iter " +
+            "1000/2000/3000/5000) on hot device")
+        XCTAssertEqual(observer.thermalSlowedExtracts, 1,
+            "M905 .slowOnHot must record 1 slowed fire " +
+            "(iter 4000)")
+    }
+
+    /// Pin: `.skipOnCritical` with critical device → all
+    /// extracts skipped。
+    func testM905SkipOnCriticalSuppressesAllExtracts()
+        async throws
+    {
+        let observer =
+            try SampleHostChengluStressCognitiveOSObserver(
+                options: BASCognitiveOSBundleOptions(
+                    enableEventLog: true,
+                    enableKnowledgeGraph: true),
+                thermalSensitivity: .skipOnCritical,
+                thermalRiskBandSampler: { .high })
+
+        // 3000 iters → natural fires at iter 1000/2000/3000。
+        // All gated out by .skipOnCritical on .high band。
+        for i in 1...3000 {
+            await observer.observeIteration(
+                index: i, latencyMs: 1.0, succeeded: true)
+        }
+        XCTAssertEqual(observer.thermalSkippedExtracts, 3,
+            "M905 .skipOnCritical must skip ALL 3 extracts " +
+            "under .high (=critical) thermal")
+        XCTAssertEqual(observer.thermalSlowedExtracts, 0,
+            ".skipOnCritical does not use slowed cadence")
+    }
+
+    /// Pin: `.skipOnCritical` with serious thermal (medium band)
+    /// → extracts fire normally (only critical is gated)。
+    func testM905SkipOnCriticalSeriousFiresNormally()
+        async throws
+    {
+        let observer =
+            try SampleHostChengluStressCognitiveOSObserver(
+                options: BASCognitiveOSBundleOptions(
+                    enableEventLog: true,
+                    enableKnowledgeGraph: true),
+                thermalSensitivity: .skipOnCritical,
+                thermalRiskBandSampler: { .medium })
+
+        for i in 1...3000 {
+            await observer.observeIteration(
+                index: i, latencyMs: 1.0, succeeded: true)
+        }
+        XCTAssertEqual(observer.thermalSkippedExtracts, 0,
+            "M905 .skipOnCritical must NOT skip on .medium " +
+            "(=serious) thermal — only .high is gated")
+    }
 }

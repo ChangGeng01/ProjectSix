@@ -79,6 +79,17 @@ final class SampleHostChengluStressCognitiveOSObserver {
         /// 100 iter ≈ once per ~700ms at 147 iter/s thermal-hot
         /// case observed on iPhone 17e。
         static let thermalReadInterval: Int = 100
+
+        /// Chapter 三百九九 / M905:slowdown multiplier applied to
+        /// `graphExtractInterval` when `.slowOnHot` thermal
+        /// sensitivity is active AND cached risk band is
+        /// `.medium` (=`.serious`) or `.high` (=`.critical`)。
+        /// Default 4 matches M900 substrate primitive default。
+        /// At 1000 iter normal interval × 4 multiplier = 4000
+        /// iter slowed interval under thermal load,giving
+        /// ANE / CPU back to the chenglu mesh path during the
+        /// 98%-`.serious` thermal envelope the 10h run revealed。
+        static let thermalSlowdownMultiplier: Int = 4
     }
 
     // MARK: - State
@@ -153,9 +164,50 @@ final class SampleHostChengluStressCognitiveOSObserver {
     private var cachedThermalRiskBand:
         BASEventLogRiskBand = .low
 
+    /// Chapter 三百九九 / M905:thermal sensitivity policy。
+    /// Default `.ignoreThermal` preserves M826 / M887 contract
+    /// (zero behavior change for hosts that don't opt in)。Hosts
+    /// running 1h+ stress should pass `.slowOnHot` so graph
+    /// extraction backs off when the iPhone hits `.serious`
+    /// thermal — 10h run showed device spent 98.13% there but
+    /// the observer kept extracting at full cadence anyway,
+    /// burning ANE cycles that the chenglu mesh needed。
+    private let thermalSensitivity:
+        BASCognitiveOSThermalSensitivity
+
+    /// Chapter 三百九九 / M905:test-injection seam mirroring the
+    /// M900 substrate primitive's `thermalSampler` closure。
+    /// Default reads `ProcessInfo.processInfo.thermalState` via
+    /// `Self.thermalRiskBand()`。Tests inject a closure to pin
+    /// thermal state for deterministic verification of the
+    /// `.slowOnHot` / `.skipOnCritical` decision paths without
+    /// requiring real device thermal pressure。
+    private let thermalRiskBandSampler:
+        @MainActor () -> BASEventLogRiskBand
+
+    /// Chapter 三百九九 / M905 telemetry — extracts SKIPPED by
+    /// thermal-sensitivity gating。Hosts surface this via the
+    /// runner UI / JSON so the `.slowOnHot` policy effect is
+    /// observable in 1h+ runs。
+    private(set) var thermalSkippedExtracts: Int = 0
+
+    /// Chapter 三百九九 / M905 telemetry — extracts that fired on
+    /// the SLOWED cadence (every interval × multiplier iters)
+    /// when `.slowOnHot` was active and thermal was hot。
+    private(set) var thermalSlowedExtracts: Int = 0
+
     /// True when bundle has at least one populated primitive。
     var isEnabled: Bool {
         bundle?.isEmpty == false
+    }
+
+    /// Chapter 三百九九 / M901:expose the cached thermal risk
+    /// band so the runner can capture it in the per-minute time
+    /// series。Read-only — observer is the sole owner of the
+    /// underlying state。Returns `.low` when M887 sampling has
+    /// not yet fired (initial state)。
+    var currentThermalRiskBand: BASEventLogRiskBand {
+        cachedThermalRiskBand
     }
 
     // MARK: - Init
@@ -163,9 +215,21 @@ final class SampleHostChengluStressCognitiveOSObserver {
     /// Construct from M859 options。Throws on SQLite open / schema
     /// errors。Pass `.allDisabled` for the no-op observer
     /// (preserves M826 / M837 stress runner contract)。
+    ///
+    /// Chapter 三百九九 / M905:`thermalSensitivity` defaults to
+    /// `.ignoreThermal` — back-compat with all M826-M899 hosts。
+    /// 1h+ stress runs should pass `.slowOnHot` so graph
+    /// extraction backs off under the `.serious` thermal envelope
+    /// the 10h iPhone run revealed (98% of events were there)。
+    /// `thermalRiskBandSampler` is a test-injection seam — leave
+    /// as default in production code。
     init(
         options: BASCognitiveOSBundleOptions,
-        sessionID: String = UUID().uuidString
+        sessionID: String = UUID().uuidString,
+        thermalSensitivity:
+            BASCognitiveOSThermalSensitivity = .ignoreThermal,
+        thermalRiskBandSampler: (
+            @MainActor () -> BASEventLogRiskBand)? = nil
     ) throws {
         if options == .allDisabled {
             self.bundle = nil
@@ -175,6 +239,11 @@ final class SampleHostChengluStressCognitiveOSObserver {
         }
         self.sessionID = sessionID
         self.currentState = .zero
+        self.thermalSensitivity = thermalSensitivity
+        self.thermalRiskBandSampler =
+            thermalRiskBandSampler ?? {
+                Self.thermalRiskBand()
+            }
     }
 
     /// No-op convenience for callers that want the default
@@ -208,6 +277,10 @@ final class SampleHostChengluStressCognitiveOSObserver {
         self.bundle = nil
         self.sessionID = "noop"
         self.currentState = .zero
+        self.thermalSensitivity = .ignoreThermal
+        self.thermalRiskBandSampler = {
+            Self.thermalRiskBand()
+        }
     }
 
     // MARK: - Observe (per-iter / per-N-iter)
@@ -239,9 +312,13 @@ final class SampleHostChengluStressCognitiveOSObserver {
         // (throughput 1109 → 147 iter/s under thermal envelope
         // but observer events all reported `riskBand: low`
         // pre-M887)。
+        // M905 (chapter 三百九九):sample via the injected closure
+        // so tests can pin thermal state without device pressure。
+        // Default closure reads `Self.thermalRiskBand()`,
+        // preserving M887 production semantics。
         if index % Constants.thermalReadInterval == 0 {
             cachedThermalRiskBand =
-                Self.thermalRiskBand()
+                thermalRiskBandSampler()
         }
 
         // M875: cycle through project names so H3 (mentions) +
@@ -345,11 +422,61 @@ final class SampleHostChengluStressCognitiveOSObserver {
             await foldState(from: entry)
         }
 
-        // Per-1000-iter graph extract (M857 + M860)
+        // Per-1000-iter graph extract (M857 + M860),M905
+        // thermal-aware gating layered on top:
+        //   - `.ignoreThermal`:fire on every interval boundary
+        //     (M826/M887 contract preserved)
+        //   - `.slowOnHot`:when cached riskBand is `.medium` or
+        //     `.high`,only fire when index ALSO matches the
+        //     slowed cadence (interval × thermalSlowdownMultiplier)
+        //   - `.skipOnCritical`:when cached riskBand is `.high`,
+        //     skip extraction entirely (state fold continues)
         if index > 0
             && index % Constants.graphExtractInterval == 0
         {
-            await extractGraph()
+            if shouldExtractUnderThermalPolicy(
+                atIndex: index)
+            {
+                await extractGraph()
+            } else {
+                thermalSkippedExtracts += 1
+            }
+        }
+    }
+
+    /// M905 typed predicate gating extractGraph based on the
+    /// configured thermal sensitivity + the M887 cached risk band。
+    /// Mirrors `BASCognitiveOSConvenience.shouldExtractUnderThermal`
+    /// (chapter 三百九九 substrate primitive)— see that doc for
+    /// the full sensitivity matrix。
+    private func shouldExtractUnderThermalPolicy(
+        atIndex index: Int
+    ) -> Bool {
+        switch thermalSensitivity {
+        case .ignoreThermal:
+            return true
+        case .slowOnHot:
+            switch cachedThermalRiskBand {
+            case .medium, .high:
+                let slowedInterval =
+                    Constants.graphExtractInterval
+                    * Constants.thermalSlowdownMultiplier
+                if index % slowedInterval == 0 {
+                    thermalSlowedExtracts += 1
+                    return true
+                } else {
+                    return false
+                }
+            case .low, .unknown:
+                return true
+            }
+        case .skipOnCritical:
+            switch cachedThermalRiskBand {
+            case .high:
+                return false
+            case .low, .medium, .unknown:
+                return true
+            }
         }
     }
 
