@@ -16,13 +16,13 @@ final class BASCognitiveOSCompletionDoctrineTests:
     // MARK: - Doctrine version pin
 
     func testDoctrineVersionPin() {
-        // M940 bump:LLM Extraction Engine MVP shipped
-        // (M928-M939, 12 typed primitives) + M940
-        // deep-review fixes (7 HIGH issues hardened)。
+        // M952 bump:Phase 1 of next-next-gen architecture sweep
+        // (chapter 四百二) shipped — memory event-sourced
+        // unification via M941-M952 (12 commits)。
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M940",
+            "ADR-016.M952",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
             "stability doctrine")

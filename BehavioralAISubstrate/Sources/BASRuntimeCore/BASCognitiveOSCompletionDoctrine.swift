@@ -168,7 +168,19 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// engine is host-orchestration-class, slots into
     /// existing `BASNeuralCoreServicing` via M933 typed
     /// parallel protocol。
-    public static let doctrineVersion: String = "ADR-016.M940"
+    /// M952 bump:Phase 1 of next-next-gen architecture sweep
+    /// (chapter 四百二) shipped — memory event-sourced unification
+    /// (M941-M952)。Folds BASMemoryAtom storage into BASEventLog
+    /// as the canonical source-of-truth via typed payload +
+    /// pure-function reducer + event-sourced atom store conformer
+    /// + mutation event emitter + knowledge graph memory-event
+    /// extension + storage wire builder integration + coordinator
+    /// optional fields。Closes the 双 source-of-truth gap surfaced
+    /// by the 3-Explore-agent architecture audit。No G-status
+    /// change — Phase 1 is substrate-side machinery,not a roadmap
+    /// gap closure。Phase 2 (chapter 四百三) + Phase 3 (chapter 四百四)
+    /// follow per `wild-rolling-meerkat.md` plan。
+    public static let doctrineVersion: String = "ADR-016.M952"
 
     /// Query the typed status of a specific gap。
     public static func status(
