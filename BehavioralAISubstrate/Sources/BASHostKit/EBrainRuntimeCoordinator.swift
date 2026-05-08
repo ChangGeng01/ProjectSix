@@ -753,13 +753,17 @@ public struct BASEBrainRuntimeCoordinator {
         // `sessionID` / `turnID` formula that `buildRuntimeTrace`
         // emits downstream. This keeps L6 observations
         // coherent-by-construction with the L14 audit record.
-        let derivedSessionID = [
-            request.hostID,
-            rawContextFrame.taskType.rawValue,
-            routedBudget.runMode.rawValue
-        ].joined(separator: "|")
-        let derivedTurnID =
-            "\(derivedSessionID)#\(request.recordedAt.timeIntervalSinceReferenceDate)"
+        // M956 chapter 四百三 系统熵 第四刀:replace inline derivation
+        // with the M954 BASFrameContext factory。Single-source pin
+        // is now compile-time enforced — the formula lives in
+        // `BASFrameContext.init(hostID:taskTypeRaw:runModeRaw:
+        // recordedAt:)` (chapter 二百一一)。Byte-equal output per
+        // M954's verbatim-pin test。
+        let frameContext = request.makeFrameContext(
+            rawContextFrame: rawContextFrame,
+            routedBudget: routedBudget)
+        let derivedSessionID = frameContext.sessionID
+        let derivedTurnID = frameContext.turnID
         let contextFrame = rawContextFrame
             .withDerivedPresenceObservationBundle(
                 turnID: derivedTurnID,
