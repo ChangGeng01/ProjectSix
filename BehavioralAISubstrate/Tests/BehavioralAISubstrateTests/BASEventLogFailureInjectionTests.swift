@@ -152,9 +152,13 @@ final class BASEventLogFailureInjectionTests: XCTestCase {
                 events[base + 1].actions.first?
                     .hasPrefix("add-tech:") ?? false,
                 "Cycle \(cycle) tech event has add-tech action")
-            XCTAssertEqual(
-                events[base + 2].actions, ["delay-marker"],
-                "Cycle \(cycle) ends with delay marker")
+            // M907 fix:delay marker now carries skip:* prefix
+            // so heuristic 5 (delays edge) actually fires。
+            XCTAssertTrue(
+                events[base + 2].actions.contains(
+                    "skip:delay-marker"),
+                "Cycle \(cycle) ends with skip:delay-marker " +
+                "(M907 heuristic-5 alignment)")
         }
     }
 

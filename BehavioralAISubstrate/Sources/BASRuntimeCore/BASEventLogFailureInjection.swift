@@ -229,6 +229,17 @@ public enum BASEventLogFailureInjection {
         sessionID: String,
         startingAtMs: Int64
     ) -> [BASEventLogEntry] {
+        // M907 fix:heuristic 6 in M857 graph extractor fires
+        // `.contradicts` edges ONLY on actions that EXACTLY
+        // equal `permit:block` or `permit:replace` (extractor
+        // BASKnowledgeGraphEventExtractor.swift:392-394)。
+        // Pre-M907 the failed event emitted `outcome:fail` which
+        // matched no heuristic — scenario produced 0 contradicts
+        // edges,exactly the data-poverty gap M902 was meant to
+        // close。Post-M907 the failed event includes
+        // `permit:block` (the canonical "blocked / contradicted"
+        // action) so heuristic 6 fires。Caller's failedAction
+        // is preserved as a separate action for trace context。
         let failed = BASEventLogEntry(
             eventID: deterministicID(
                 sessionID: sessionID,
@@ -241,8 +252,14 @@ public enum BASEventLogFailureInjection {
             source: "fault-injection:contradiction",
             riskBand: .high,
             project: project,
-            actions: [failedAction, "outcome:fail"],
+            actions: [failedAction,
+                      "permit:block",
+                      "outcome:fail"],
             confidence: 0.90)
+        // M907:retry event uses `permit:replace` — also a valid
+        // heuristic 6 trigger,representing the "alternative
+        // permit was chosen instead" semantics that the user
+        // vision §10 contradiction loop captures。
         let retry = BASEventLogEntry(
             eventID: deterministicID(
                 sessionID: sessionID,
@@ -255,7 +272,9 @@ public enum BASEventLogFailureInjection {
             source: "fault-injection:contradiction",
             riskBand: .medium,
             project: project,
-            actions: [retryAction, "outcome:retry"],
+            actions: [retryAction,
+                      "permit:replace",
+                      "outcome:retry"],
             confidence: 0.75)
         return [failed, retry]
     }
@@ -350,9 +369,20 @@ public enum BASEventLogFailureInjection {
                 actions: ["add-tech:\(action)"],
                 confidence: 0.85))
             ts += 1_000
-            // delay marker (encodes the explicit "delay
-            // happened" event so heuristic 3 fires on
-            // repeated `delay-marker` action across cycles)
+            // M907 fix:heuristic 5 fires `.delays` edges on
+            // `skip:*` action prefixes (extractor
+            // BASKnowledgeGraphEventExtractor.swift:357)。
+            // Pre-M907 the action `["delay-marker"]` matched no
+            // heuristic → zero `.delays` edges → heuristic 7
+            // closing-edge synthesis never fired → cycle
+            // detection never fired → the documented
+            // "complexity addiction loop → cycle detected"
+            // composition was structurally false。Post-M907 the
+            // action `["skip:delay-marker"]` triggers heuristic 5
+            // per cycle iteration → projectToDelaysCount accrues
+            // → with cycleDepth >= 2,closingEdgeDelaysThreshold
+            // (= 2) trips → heuristic 7 synthesizes closing edge
+            // → cycle is detectable on extractor pass。
             out.append(BASEventLogEntry(
                 eventID: deterministicID(
                     sessionID: sessionID,
@@ -365,9 +395,15 @@ public enum BASEventLogFailureInjection {
                 source: "fault-injection:complexity-loop",
                 riskBand: .high,
                 project: project,
-                actions: ["delay-marker"],
+                actions: ["skip:delay-marker",
+                          "delay-marker"],
                 confidence: 0.70))
-            ts += intervalMs
+            // M907:enforce intervalMs >= inner-cycle span
+            // (3000ms = 1000 + 1000 + 1000) so timestamps stay
+            // monotonic across cycles。Pre-M907 a caller passing
+            // intervalMs=100 would produce non-monotonic
+            // timestamps,breaking M877 incremental scan。
+            ts += max(intervalMs, 3_000)
         }
         return out
     }
@@ -380,16 +416,32 @@ public enum BASEventLogFailureInjection {
     /// IDs across runs (chapter 三百九二 / M892 replay
     /// determinism doctrine)。Output stays under 64 chars to
     /// stay friendly to UUID-shaped storage columns。
+    ///
+    /// ## M907 fix:length-prefixed encoding
+    ///
+    /// Pre-M907 used `"\(sessionID)|\(tag)|\(index)"` as the
+    /// hash input。If `sessionID` or `tag` contained `|` (and
+    /// `tag` does — line 210 embeds caller-supplied `action`),
+    /// the input space could alias:
+    ///   ("a|b","c",1) and ("a","b|c",1) → same hash → same
+    ///   eventID → second `append` returns wasNew=false →
+    ///   silent event loss。
+    /// Post-M907 each component carries its UTF-8 byte length
+    /// as a prefix,so two components cannot alias regardless
+    /// of content。
     private static func deterministicID(
         sessionID: String,
         tag: String,
         index: Int
     ) -> String {
-        // Use a simple FNV-1a folded hash of the inputs。
-        // chapter 三百九二 / M892 doctrine:eventIDs should be
-        // stable across replays。Avoiding UUID() — it would
-        // re-roll on each call and break replay determinism。
-        let combined = "\(sessionID)|\(tag)|\(index)"
+        // Length-prefixed encoding prevents `|`-injection
+        // collisions:
+        //   "12:sessionLikeID7:tag-foo:42"
+        //   not    "sessionLikeID|tag-foo|42"
+        let combined =
+            "\(sessionID.utf8.count):\(sessionID)" +
+            "\(tag.utf8.count):\(tag)" +
+            "\(index)"
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in combined.utf8 {
             hash ^= UInt64(byte)

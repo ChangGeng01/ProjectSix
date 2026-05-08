@@ -98,11 +98,13 @@ final class BASCognitiveOSPipelineIntegrationTests: XCTestCase {
 
     // MARK: - M902 → M857 (contradiction triggers heuristic 4)
 
-    /// Pin: injecting a `contradiction` scenario produces a
-    /// graph with `contradicts` or `causes` edges connecting
-    /// the failed action to the retry action。
-    func testContradictionInjectionTriggersGraphEdges() async
-        throws
+    /// Pin: M907 fix — injecting a `contradiction` scenario
+    /// produces SPECIFICALLY `.contradicts` edges (heuristic 6)。
+    /// Pre-M907 the scenario's actions matched no heuristic →
+    /// 0 contradicts edges → scenario silently failed its
+    /// stated purpose。Audit caught this。
+    func testContradictionInjectionTriggersContradictsEdges()
+        async throws
     {
         let log = BASInMemoryEventLogStorage()
         let graph = BASKnowledgeGraph()
@@ -124,11 +126,55 @@ final class BASCognitiveOSPipelineIntegrationTests: XCTestCase {
                 sessionID: sessionID,
                 into: graph)
 
-        XCTAssertGreaterThan(result.addedNodeCount, 0,
-            "Contradiction scenario must produce at least " +
-            "one new graph node (project + action nodes)")
-        XCTAssertGreaterThan(result.addedEdgeCount, 0,
-            "Contradiction scenario must produce edges")
+        XCTAssertGreaterThan(result.addedNodeCount, 0)
+        XCTAssertGreaterThan(result.addedEdgeCount, 0)
+
+        // M907 audit fix:specifically assert .contradicts
+        // edges exist。Pre-M907 the count was 0,but the loose
+        // "addedEdgeCount > 0" assertion masked the bug because
+        // mentions/causes edges were still added。
+        let edges = await graph.allEdges()
+        let contradictsEdges = edges.filter {
+            $0.kind == .contradicts
+        }
+        XCTAssertGreaterThan(contradictsEdges.count, 0,
+            "M907:contradiction scenario MUST produce at " +
+            "least one .contradicts edge (heuristic 6)。" +
+            "Pre-M907 this was silently 0,defeating the " +
+            "scenario's stated purpose")
+    }
+
+    /// Pin: M907 fix — `.complexityAddictionLoop` produces
+    /// SPECIFICALLY `.delays` edges (heuristic 5) AND ENOUGH
+    /// of them to trip heuristic 7 closing-edge synthesis on
+    /// cycleDepth >= 2。
+    func testComplexityLoopProducesDelaysEdges() async throws {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+        let sessionID = "M904-complexity"
+
+        let events = BASEventLogFailureInjection.generate(
+            scenario: .complexityAddictionLoop(
+                project: "P-vision-10",
+                techActions: ["framework:react",
+                              "framework:vue"],
+                cycleDepth: 4,
+                intervalMs: 30_000),
+            sessionID: sessionID,
+            startingAtMs: 0)
+        _ = try await appendAll(events, to: log)
+
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: sessionID,
+            into: graph)
+
+        let edges = await graph.allEdges()
+        let delaysEdges = edges.filter { $0.kind == .delays }
+        XCTAssertGreaterThanOrEqual(delaysEdges.count, 4,
+            "M907:complexity loop with cycleDepth=4 must " +
+            "produce at least 4 .delays edges (one per " +
+            "cycle's skip:delay-marker event)")
     }
 
     // MARK: - M902 → M903 round-trip
