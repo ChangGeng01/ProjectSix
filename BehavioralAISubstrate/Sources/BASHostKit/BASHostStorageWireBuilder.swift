@@ -111,8 +111,28 @@ public enum BASHostStorageWireBuilder {
     ///   `.storageInitFailed` if SQLite init fails.
     public static func makeAtomStore(
         options: BASHostStorageOptions,
-        initial: [BASGovernedMemory] = []
+        initial: [BASGovernedMemory] = [],
+        eventSourcedSessionID: String =
+            "host.event-sourced-atom-store"
     ) throws -> any BASMemoryAtomStore {
+        // chapter 四百二 / M947 — event-sourced opt-in branch
+        if options.useEventSourcedAtomStore {
+            let eventLog = try makeEventLog(options: options)
+            let store = BASEventSourcedMemoryAtomStore(
+                eventLog: eventLog,
+                sessionID: eventSourcedSessionID)
+            // Seed initial atoms by emitting admit events
+            // (preserves typed contract — every atom-state change
+            // flows through the event log)。
+            if !initial.isEmpty {
+                Task.detached {
+                    for atom in initial {
+                        try? await store.admit(atom)
+                    }
+                }
+            }
+            return store
+        }
         if options.shouldUseSQLiteAtomStore {
             guard let url = options.effectiveAtomStoreURL else {
                 // Only reachable under .sqliteRequired with no URL.
@@ -133,6 +153,55 @@ public enum BASHostStorageWireBuilder {
             }
         }
         return BASInMemoryMemoryAtomStore(initial: initial)
+    }
+
+    // MARK: - chapter 四百二 / M947 event log factory
+
+    /// Construct an `any BASEventLogStorage` from typed storage
+    /// options。Same ADR-014 resolution rules:
+    ///
+    /// - `.inMemoryDefault` preference → in-memory log
+    /// - `.sqliteWhenURLProvided` + URL → SQLite-backed log
+    /// - `.sqliteWhenURLProvided` + nil URL → in-memory log
+    /// - `.sqliteRequired` + URL → SQLite-backed log
+    /// - `.sqliteRequired` + nil URL → throws .missingSQLiteURL
+    public static func makeEventLog(
+        options: BASHostStorageOptions
+    ) throws -> any BASEventLogStorage {
+        if options.shouldUseSQLiteEventLog {
+            guard let url = options.effectiveEventLogURL else {
+                throw BASHostStorageWireError.missingSQLiteURL(
+                    component: "event-log")
+            }
+            do {
+                return try BASSQLiteEventLogStorage(
+                    databaseURL: url)
+            } catch {
+                throw BASHostStorageWireError.storageInitFailed(
+                    component: "event-log",
+                    message: "\(error)")
+            }
+        }
+        return BASInMemoryEventLogStorage()
+    }
+
+    /// Helper:emit reason codes for event-log wire path。
+    public static func eventLogWireReasonCodes(
+        options: BASHostStorageOptions
+    ) -> [String] {
+        let willUseSQLite = options.shouldUseSQLiteEventLog
+        return [
+            "event-log-wire:" +
+            (willUseSQLite ? "sqlite" : "in-memory"),
+            "event-log-preference:" +
+            "\(options.preference.rawValue)",
+            "event-log-url-provided:" +
+            (options.effectiveEventLogURL != nil
+                ? "yes" : "no"),
+            "event-sourced-atom-store:" +
+            (options.useEventSourcedAtomStore
+                ? "enabled" : "disabled")
+        ]
     }
 
     /// Helper:emit reason codes for which atom store path fired。
@@ -355,10 +424,34 @@ public enum BASHostStorageWireBuilder {
         ticketLifecycleClock: @escaping @Sendable () -> Date
             = { .now },
         ticketLifecycleAuditSink:
-            BASUpdateTicketLifecycleCoordinator.AuditSink? = nil
+            BASUpdateTicketLifecycleCoordinator.AuditSink? = nil,
+        eventSourcedSessionID: String =
+            "host.event-sourced-atom-store"
     ) async throws -> BASHostStorageWireBundle {
-        let atomStore = try makeAtomStore(
-            options: options, initial: atomStoreInitial)
+        // chapter 四百二 / M947:if event-sourced atom store is
+        // requested,construct one event log and pass it through
+        // to both the atom store factory + the bundle's eventLog
+        // field。Same eventLog instance avoids double-write paths。
+        var sharedEventLog: (any BASEventLogStorage)? = nil
+        let atomStore: any BASMemoryAtomStore
+        if options.useEventSourcedAtomStore {
+            let log = try makeEventLog(options: options)
+            sharedEventLog = log
+            let store = BASEventSourcedMemoryAtomStore(
+                eventLog: log,
+                sessionID: eventSourcedSessionID)
+            if !atomStoreInitial.isEmpty {
+                Task.detached {
+                    for atom in atomStoreInitial {
+                        try? await store.admit(atom)
+                    }
+                }
+            }
+            atomStore = store
+        } else {
+            atomStore = try makeAtomStore(
+                options: options, initial: atomStoreInitial)
+        }
         let vault = try makeVaultStorage(options: options)
         let lifecycle = try await makeTicketLifecycleCoordinator(
             options: options,
@@ -373,7 +466,8 @@ public enum BASHostStorageWireBuilder {
             vault: vault,
             ticketLifecycle: lifecycle,
             auditLedger: auditLedger,
-            wireReport: report)
+            wireReport: report,
+            eventLog: sharedEventLog)
     }
 }
 
@@ -406,18 +500,24 @@ public struct BASHostStorageWireBundle {
     public let ticketLifecycle: BASUpdateTicketLifecycleCoordinator
     public let auditLedger: (any BASSovereignLedgerStorage)?
     public let wireReport: BASHostStorageWireReport
+    /// chapter 四百二 / M947:event log surface added when host
+    /// opts into event-sourced atom storage。Nil when
+    /// `useEventSourcedAtomStore == false` (legacy path)。
+    public let eventLog: (any BASEventLogStorage)?
 
     public init(
         atomStore: any BASMemoryAtomStore,
         vault: BASHostConstitutionSQLiteStorage?,
         ticketLifecycle: BASUpdateTicketLifecycleCoordinator,
         auditLedger: (any BASSovereignLedgerStorage)?,
-        wireReport: BASHostStorageWireReport
+        wireReport: BASHostStorageWireReport,
+        eventLog: (any BASEventLogStorage)? = nil
     ) {
         self.atomStore = atomStore
         self.vault = vault
         self.ticketLifecycle = ticketLifecycle
         self.auditLedger = auditLedger
         self.wireReport = wireReport
+        self.eventLog = eventLog
     }
 }

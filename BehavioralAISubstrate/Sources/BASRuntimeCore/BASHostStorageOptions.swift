@@ -131,6 +131,13 @@ public struct BASHostStorageRoot:
     public var auditLedgerURL: URL {
         rootURL.appendingPathComponent("audit-ledger.sqlite")
     }
+
+    /// chapter 四百二 / M947:event log SQLite database file URL。
+    /// Used by event-sourced atom store + future event-sourced
+    /// state projections。
+    public var eventLogURL: URL {
+        rootURL.appendingPathComponent("event-log.sqlite")
+    }
 }
 
 // MARK: - Storage options bundle
@@ -181,6 +188,20 @@ public struct BASHostStorageOptions:
     /// ledger (or fail if `preference == .sqliteRequired`).
     public var auditLedgerURL: URL?
 
+    /// chapter 四百二 / M947:typed flag to opt into event-sourced
+    /// atom storage。When true,`BASHostStorageWireBuilder
+    /// .makeAtomStore` returns a `BASEventSourcedMemoryAtomStore`
+    /// instead of `BASInMemoryMemoryAtomStore` /
+    /// `BASSQLiteMemoryAtomStore`。Default false preserves
+    /// pre-Phase-1 behavior (legacy direct-store path)。
+    public var useEventSourcedAtomStore: Bool
+
+    /// chapter 四百二 / M947:event log SQLite URL。Nil = use
+    /// in-memory event log (or fail if `preference ==
+    /// .sqliteRequired`)。Mirrors the existing per-component URL
+    /// fields'。
+    public var eventLogURL: URL?
+
     public init(
         schemaVersion: String
             = BASHostStorageOptions.currentSchemaVersion,
@@ -189,7 +210,9 @@ public struct BASHostStorageOptions:
         atomStoreURL: URL? = nil,
         vaultURL: URL? = nil,
         ticketLifecycleURL: URL? = nil,
-        auditLedgerURL: URL? = nil
+        auditLedgerURL: URL? = nil,
+        useEventSourcedAtomStore: Bool = false,
+        eventLogURL: URL? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.preference = preference
@@ -198,6 +221,8 @@ public struct BASHostStorageOptions:
         self.vaultURL = vaultURL
         self.ticketLifecycleURL = ticketLifecycleURL
         self.auditLedgerURL = auditLedgerURL
+        self.useEventSourcedAtomStore = useEventSourcedAtomStore
+        self.eventLogURL = eventLogURL
     }
 }
 
@@ -227,6 +252,24 @@ public extension BASHostStorageOptions {
     /// Resolve effective `auditLedgerURL` honoring `unifiedRoot`.
     var effectiveAuditLedgerURL: URL? {
         auditLedgerURL ?? unifiedRoot?.auditLedgerURL
+    }
+
+    /// chapter 四百二 / M947:resolve effective `eventLogURL`
+    /// honoring `unifiedRoot`。Returns nil when neither explicit
+    /// URL nor unified root is set。
+    var effectiveEventLogURL: URL? {
+        eventLogURL ?? unifiedRoot?.eventLogURL
+    }
+
+    /// Whether SQLite-backed event log should be used given
+    /// preference + URL availability。Mirrors atom-store pattern。
+    var shouldUseSQLiteEventLog: Bool {
+        switch preference {
+        case .inMemoryDefault: return false
+        case .sqliteWhenURLProvided:
+            return effectiveEventLogURL != nil
+        case .sqliteRequired: return true
+        }
     }
 
     /// Whether SQLite-backed atom store should be used given
