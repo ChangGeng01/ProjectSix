@@ -677,4 +677,300 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
             graphExtractEventCap: 1)
         XCTAssertEqual(cadence.stateFoldInterval, 1)
     }
+
+    // MARK: - M900 thermal-aware cadence
+
+    /// Pin: default cadence has `.ignoreThermal` to preserve M865
+    /// back-compat — hosts that don't opt in see zero behavior
+    /// change。
+    func testM900DefaultCadenceIgnoresThermal() {
+        let c = BASCognitiveOSConvenienceCadence.default
+        XCTAssertEqual(c.thermalSensitivity, .ignoreThermal)
+        XCTAssertEqual(
+            c.thermalSlowdownMultiplier,
+            BASCognitiveOSConvenienceCadence
+                .defaultThermalSlowdownMultiplier)
+        XCTAssertEqual(
+            c.thermalSampleInterval,
+            BASCognitiveOSConvenienceCadence
+                .defaultThermalSampleInterval)
+    }
+
+    /// Pin: `.thermalAwareLongRun` preset uses `.slowOnHot` with
+    /// the default 4× slowdown — recommended for 1h+ stress runs。
+    func testM900ThermalAwareLongRunPreset() {
+        let c = BASCognitiveOSConvenienceCadence
+            .thermalAwareLongRun
+        XCTAssertEqual(c.thermalSensitivity, .slowOnHot)
+        XCTAssertEqual(c.thermalSlowdownMultiplier, 4)
+        XCTAssertEqual(c.stateFoldInterval, 100)
+        XCTAssertEqual(c.graphExtractInterval, 1_000)
+    }
+
+    /// Pin: `.thermalProtectedLongRun` preset uses
+    /// `.skipOnCritical` — strict thermal floor。
+    func testM900ThermalProtectedLongRunPreset() {
+        let c = BASCognitiveOSConvenienceCadence
+            .thermalProtectedLongRun
+        XCTAssertEqual(c.thermalSensitivity, .skipOnCritical)
+    }
+
+    /// Pin: `.ignoreThermal` mode never invokes the thermal
+    /// sampler — hot path stays free of ProcessInfo syscalls。
+    func testM900IgnoreThermalSkipsSampler() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+        let samplerCalls = TestThermalCallCounter()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-ignore",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 10,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .ignoreThermal,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: {
+                Task { await samplerCalls.tick() }
+                return .nominal
+            })
+
+        for i in 0..<30 {
+            _ = await conv.observe(
+                event: makeEvent(index: i, sessionID: "s-ignore"))
+        }
+
+        // Brief settle for any in-flight sampler tasks (none expected)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        let count = await samplerCalls.value
+        XCTAssertEqual(count, 0,
+            "M900 .ignoreThermal must not invoke sampler — " +
+            "preserves M865 zero-syscall hot path")
+    }
+
+    /// Pin: `.slowOnHot` with cool device → behavior identical to
+    /// `.ignoreThermal`(extract every graphExtractInterval)。
+    func testM900SlowOnHotCoolDeviceFiresEveryInterval() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-cool",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 10,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .slowOnHot,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .nominal })
+
+        var fires = 0
+        for i in 0..<50 {
+            let r = await conv.observe(
+                event: makeEvent(index: i, sessionID: "s-cool"))
+            if r.graphExtracted { fires += 1 }
+        }
+        // 50 events / 10 interval = 5 fires (at 10/20/30/40/50)
+        XCTAssertEqual(fires, 5,
+            "M900 .slowOnHot with .nominal thermal must use " +
+            "normal cadence (every 10 events)")
+        let skipped = await conv.thermalSkippedExtractCount
+        XCTAssertEqual(skipped, 0,
+            "No thermal-skip when cool")
+        let slowed = await conv.thermalSlowedExtractCount
+        XCTAssertEqual(slowed, 0,
+            "No slowed extract when cool")
+    }
+
+    /// Pin: `.slowOnHot` with hot device → extract fires only at
+    /// multiples of `graphExtractInterval × thermalSlowdownMultiplier`。
+    func testM900SlowOnHotHotDeviceUsesSlowedCadence() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-hot",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 10,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .slowOnHot,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .serious })
+
+        var fires = 0
+        var skips = 0
+        for i in 0..<50 {
+            let r = await conv.observe(
+                event: makeEvent(index: i, sessionID: "s-hot"))
+            if r.graphExtracted { fires += 1 }
+            else if i > 0 && (i + 1) % 10 == 0 {
+                // Natural fire point gated out by thermal — counted
+                skips += 1
+            }
+        }
+        // 50 events: natural fire points at iter 10/20/30/40/50。
+        // Slowed cadence is 10 × 4 = 40,so only iter 40 fires。
+        XCTAssertEqual(fires, 1,
+            "M900 .slowOnHot with .serious must fire only at " +
+            "multiples of (10 × 4) = 40 → 1 fire across 50 events")
+        let skipped = await conv.thermalSkippedExtractCount
+        XCTAssertEqual(skipped, 4,
+            "M900 must record 4 thermal-gated skips (iter " +
+            "10/20/30/50 are natural fires gated by thermal)")
+        let slowed = await conv.thermalSlowedExtractCount
+        XCTAssertEqual(slowed, 1,
+            "M900 must record 1 slowed-cadence fire (iter 40)")
+    }
+
+    /// Pin: `.slowOnHot` with `.critical` device → same as
+    /// `.serious`(both treated as hot)。
+    func testM900SlowOnHotCriticalTreatedAsHot() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-crit-slow",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 10,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .slowOnHot,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .critical })
+
+        var fires = 0
+        for i in 0..<50 {
+            let r = await conv.observe(
+                event: makeEvent(
+                    index: i, sessionID: "s-crit-slow"))
+            if r.graphExtracted { fires += 1 }
+        }
+        XCTAssertEqual(fires, 1,
+            "M900 .slowOnHot must treat .critical same as " +
+            ".serious — 1 fire at slowed cadence (iter 40)")
+    }
+
+    /// Pin: `.skipOnCritical` with `.critical` device → never
+    /// fires graph extract (state fold continues unchanged)。
+    func testM900SkipOnCriticalSuppressesAllExtracts() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-crit-skip",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 10,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .skipOnCritical,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .critical })
+
+        var fires = 0
+        for i in 0..<50 {
+            let r = await conv.observe(
+                event: makeEvent(
+                    index: i, sessionID: "s-crit-skip"))
+            if r.graphExtracted { fires += 1 }
+        }
+        XCTAssertEqual(fires, 0,
+            "M900 .skipOnCritical must skip ALL extracts under " +
+            ".critical thermal")
+        let skipped = await conv.thermalSkippedExtractCount
+        XCTAssertEqual(skipped, 5,
+            "M900 must record 5 thermal-gated skips " +
+            "(iter 10/20/30/40/50)")
+    }
+
+    /// Pin: `.skipOnCritical` with `.serious` device → fires
+    /// normally (only `.critical` is gated)。
+    func testM900SkipOnCriticalSeriousFiresNormally() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-serious",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 10,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .skipOnCritical,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .serious })
+
+        var fires = 0
+        for i in 0..<50 {
+            let r = await conv.observe(
+                event: makeEvent(
+                    index: i, sessionID: "s-serious"))
+            if r.graphExtracted { fires += 1 }
+        }
+        XCTAssertEqual(fires, 5,
+            "M900 .skipOnCritical with .serious must fire " +
+            "normally (only .critical is gated)")
+        let skipped = await conv.thermalSkippedExtractCount
+        XCTAssertEqual(skipped, 0,
+            "No thermal-skip on .serious in .skipOnCritical mode")
+    }
+
+    /// Pin: cached thermal state surfaces via
+    /// `lastObservedThermalState` for host UI / logging。
+    func testM900CachedThermalStateSurfaced() async {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+
+        let conv = BASCognitiveOSConvenience(
+            eventLog: log,
+            knowledgeGraph: graph,
+            sessionID: "s-cache",
+            cadence: BASCognitiveOSConvenienceCadence(
+                stateFoldInterval: 100,
+                graphExtractInterval: 5,
+                graphExtractEventCap: 5_000,
+                thermalSensitivity: .slowOnHot,
+                thermalSlowdownMultiplier: 4,
+                thermalSampleInterval: 1),
+            thermalSampler: { .serious })
+
+        // Initially nominal (init default)
+        let initial = await conv.lastObservedThermalState
+        XCTAssertEqual(initial, .nominal)
+
+        // Observe enough events to trigger sampling
+        for i in 0..<6 {
+            _ = await conv.observe(
+                event: makeEvent(index: i, sessionID: "s-cache"))
+        }
+        let after = await conv.lastObservedThermalState
+        XCTAssertEqual(after, .serious,
+            "M900 cachedThermalState must reflect sampler value " +
+            "after sampling cadence reached")
+    }
+}
+
+// MARK: - Test helpers
+
+/// Sendable atomic counter for verifying thermal sampler invocation。
+private actor TestThermalCallCounter {
+    private(set) var value: Int = 0
+    func tick() { value += 1 }
 }

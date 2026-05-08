@@ -56,6 +56,28 @@ import BASRuntimeCore
 
 // MARK: - Cadence
 
+/// Chapter 三百九九 / M900 typed thermal sensitivity policy。
+/// 10h iPhone run revealed device spent 98.13% of events in
+/// `.serious` thermal state — convenience cadence had NO surface
+/// to respond to thermal pressure。Hosts now opt in to
+/// thermal-aware adaptation:
+///
+///   - `.ignoreThermal`:always run on schedule (M865 default
+///     behavior;preserves back-compat)
+///   - `.slowOnHot`:multiply graph-extract interval by 4x when
+///     device is `.serious` or `.critical` (gives ANE / CPU
+///     back to chenglu mesh path under thermal load)
+///   - `.skipOnCritical`:skip graph extract entirely when
+///     device is `.critical` (emergency thermal protection;
+///     state fold continues since it's cheap)
+public enum BASCognitiveOSThermalSensitivity:
+    Sendable, Equatable, Hashable
+{
+    case ignoreThermal
+    case slowOnHot
+    case skipOnCritical
+}
+
 /// Typed Sendable struct holding the convenience helper's cadence。
 /// Defaults mirror M862 SampleHost observer values (1 / 100 / 1000)。
 public struct BASCognitiveOSConvenienceCadence:
@@ -75,12 +97,40 @@ public struct BASCognitiveOSConvenienceCadence:
     /// (matches M862 observer cap)。
     public let graphExtractEventCap: Int
 
+    /// M900 thermal sensitivity policy。Default `.ignoreThermal`
+    /// preserves M865 back-compat (no behavior change for hosts
+    /// that don't opt in)。
+    public let thermalSensitivity:
+        BASCognitiveOSThermalSensitivity
+
+    /// M900 multiplier applied to graphExtractInterval when
+    /// thermal state is `.serious` or `.critical` AND
+    /// thermalSensitivity is `.slowOnHot`。Default 4 (extract
+    /// fires 4x less often under thermal pressure)。
+    public let thermalSlowdownMultiplier: Int
+
+    /// M900 cadence at which the actor re-samples
+    /// `ProcessInfo.thermalState` (in `observe(...)` calls)。
+    /// Default 100 — re-sample at the same cadence as state-fold,
+    /// keeps the ProcessInfo polling rate ~1Hz at typical event
+    /// throughput while avoiding hot-path syscall on every event。
+    /// Ignored when `thermalSensitivity == .ignoreThermal` (no
+    /// sampling at all in that mode — preserves M865 zero-syscall
+    /// hot path)。
+    public let thermalSampleInterval: Int
+
     public init(
         stateFoldInterval: Int = Self.defaultStateFoldInterval,
         graphExtractInterval: Int =
             Self.defaultGraphExtractInterval,
         graphExtractEventCap: Int =
-            Self.defaultGraphExtractEventCap
+            Self.defaultGraphExtractEventCap,
+        thermalSensitivity:
+            BASCognitiveOSThermalSensitivity = .ignoreThermal,
+        thermalSlowdownMultiplier: Int =
+            Self.defaultThermalSlowdownMultiplier,
+        thermalSampleInterval: Int =
+            Self.defaultThermalSampleInterval
     ) {
         precondition(stateFoldInterval > 0,
             "stateFoldInterval must be > 0")
@@ -88,19 +138,68 @@ public struct BASCognitiveOSConvenienceCadence:
             "graphExtractInterval must be > 0")
         precondition(graphExtractEventCap > 0,
             "graphExtractEventCap must be > 0")
+        precondition(thermalSlowdownMultiplier >= 1,
+            "thermalSlowdownMultiplier must be >= 1 " +
+            "(1 = no slowdown, > 1 = N× longer interval)")
+        precondition(thermalSampleInterval > 0,
+            "thermalSampleInterval must be > 0")
         self.stateFoldInterval = stateFoldInterval
         self.graphExtractInterval = graphExtractInterval
         self.graphExtractEventCap = graphExtractEventCap
+        self.thermalSensitivity = thermalSensitivity
+        self.thermalSlowdownMultiplier =
+            thermalSlowdownMultiplier
+        self.thermalSampleInterval = thermalSampleInterval
     }
 
     /// chapter 一百八十五 anti-magic-number — typed defaults
     public static let defaultStateFoldInterval: Int = 100
     public static let defaultGraphExtractInterval: Int = 1_000
     public static let defaultGraphExtractEventCap: Int = 5_000
+    public static let defaultThermalSlowdownMultiplier: Int = 4
+    public static let defaultThermalSampleInterval: Int = 100
 
-    /// Default cadence (1 / 100 / 1000 / 5000)。
+    /// Default cadence (1 / 100 / 1000 / 5000 / ignoreThermal)。
     public static let `default` =
         BASCognitiveOSConvenienceCadence()
+
+    /// M900 preset:thermal-aware cadence suitable for long
+    /// iPhone runs。Slows graph extract 4x under thermal
+    /// pressure。Recommended for 1h+ stress runs based on the
+    /// 10h iPhone observation that device spent 98% in
+    /// `.serious` thermal。
+    public static let thermalAwareLongRun =
+        BASCognitiveOSConvenienceCadence(
+            stateFoldInterval:
+                defaultStateFoldInterval,
+            graphExtractInterval:
+                defaultGraphExtractInterval,
+            graphExtractEventCap:
+                defaultGraphExtractEventCap,
+            thermalSensitivity: .slowOnHot,
+            thermalSlowdownMultiplier:
+                defaultThermalSlowdownMultiplier,
+            thermalSampleInterval:
+                defaultThermalSampleInterval)
+
+    /// M900 preset:emergency thermal protection cadence — skips
+    /// graph extract entirely when device is `.critical`。State
+    /// fold continues unchanged (cheap)。Suitable for hosts that
+    /// want strict thermal floor without slowing down normal
+    /// operation。
+    public static let thermalProtectedLongRun =
+        BASCognitiveOSConvenienceCadence(
+            stateFoldInterval:
+                defaultStateFoldInterval,
+            graphExtractInterval:
+                defaultGraphExtractInterval,
+            graphExtractEventCap:
+                defaultGraphExtractEventCap,
+            thermalSensitivity: .skipOnCritical,
+            thermalSlowdownMultiplier:
+                defaultThermalSlowdownMultiplier,
+            thermalSampleInterval:
+                defaultThermalSampleInterval)
 }
 
 // MARK: - Result
@@ -182,6 +281,15 @@ public actor BASCognitiveOSConvenience {
     /// — hosts opt in to error visibility by passing a callback。
     private let onPersistError:
         (@Sendable (String, Error) -> Void)?
+    /// M900 thermal sampler injection seam。Default reads
+    /// `ProcessInfo.processInfo.thermalState` directly。Hosts AND
+    /// tests can inject a closure to replay recorded thermal data
+    /// or pin a thermal state for deterministic tests。Closure is
+    /// only invoked when sensitivity is NOT `.ignoreThermal` AND
+    /// the sampling cadence has been reached,so no hot-path cost
+    /// in the default `.ignoreThermal` mode。
+    private let thermalSampler:
+        @Sendable () -> ProcessInfo.ThermalState
     private let cadence: BASCognitiveOSConvenienceCadence
     private let sessionID: String
 
@@ -209,6 +317,29 @@ public actor BASCognitiveOSConvenience {
     /// observe via `max(current, event.timestampMs)`。
     private var maxObservedEventTimestampMs: Int64 = 0
 
+    /// M900 cached thermal state。Re-sampled every
+    /// `cadence.thermalSampleInterval` calls when sensitivity is
+    /// not `.ignoreThermal`。Default `.nominal` ensures fail-open
+    /// behavior on init (no slowdown / skip until first sample)。
+    private var cachedThermalState: ProcessInfo.ThermalState =
+        .nominal
+
+    /// M900 sampling counter — increments per `observe(...)` call
+    /// when thermal sensitivity is active。Reset every
+    /// `cadence.thermalSampleInterval` calls。
+    private var thermalSampleCounter: Int = 0
+
+    /// M900 telemetry — number of graph extracts the actor SKIPPED
+    /// because thermal sensitivity policy gated them out。Hosts
+    /// surface this to UI / logs to validate that the policy is
+    /// actually firing on hot devices。
+    private var thermalSkippedExtracts: Int = 0
+
+    /// M900 telemetry — number of graph extracts that fell on the
+    /// SLOWED cadence (every interval × multiplier events) when
+    /// `.slowOnHot` was active and thermal was hot。
+    private var thermalSlowedExtracts: Int = 0
+
     // MARK: - Init
 
     /// Construct from bundle pieces。Pass nil for any primitive
@@ -230,7 +361,9 @@ public actor BASCognitiveOSConvenience {
         sessionID: String = UUID().uuidString,
         cadence: BASCognitiveOSConvenienceCadence = .default,
         onPersistError:
-            (@Sendable (String, Error) -> Void)? = nil
+            (@Sendable (String, Error) -> Void)? = nil,
+        thermalSampler: (
+            @Sendable () -> ProcessInfo.ThermalState)? = nil
     ) {
         self.eventLog = eventLog
         self.userStateStore = userStateStore
@@ -240,6 +373,9 @@ public actor BASCognitiveOSConvenience {
         self.sessionID = sessionID
         self.cadence = cadence
         self.onPersistError = onPersistError
+        self.thermalSampler = thermalSampler ?? {
+            ProcessInfo.processInfo.thermalState
+        }
         self.currentState = .zero
     }
 
@@ -298,12 +434,24 @@ public actor BASCognitiveOSConvenience {
         }
 
         // 3. Graph extract (every Mth call,1-based)
+        // M900:thermal-aware gating。The natural fire point is
+        // still `myIndex % graphExtractInterval == 0`(preserves
+        // M865 cadence semantics)。What changes is whether we
+        // ACTUALLY fire on each natural point,based on the
+        // sensitivity policy + cached thermal state。
         var didExtractGraph = false
         if myIndex % cadence.graphExtractInterval == 0
             && knowledgeGraph != nil
             && eventLog != nil
         {
-            didExtractGraph = await extractGraph()
+            let thermal = sampleThermalIfDue()
+            if shouldExtractUnderThermal(
+                thermal: thermal, atIndex: myIndex)
+            {
+                didExtractGraph = await extractGraph()
+            } else {
+                thermalSkippedExtracts += 1
+            }
         }
 
         return BASCognitiveOSConvenienceResult(
@@ -325,7 +473,108 @@ public actor BASCognitiveOSConvenience {
         currentState
     }
 
+    /// M900 most-recent cached thermal state。Hosts surface this
+    /// to UI / logs。Returns `.nominal` when sensitivity is
+    /// `.ignoreThermal` (no sampling occurs in that mode)。
+    public var lastObservedThermalState:
+        ProcessInfo.ThermalState
+    {
+        cachedThermalState
+    }
+
+    /// M900 telemetry: number of graph extracts SKIPPED due to
+    /// thermal-sensitivity policy gating them out。
+    public var thermalSkippedExtractCount: Int {
+        thermalSkippedExtracts
+    }
+
+    /// M900 telemetry: number of graph extracts that fired on
+    /// the SLOWED cadence (every interval × multiplier events)
+    /// when `.slowOnHot` was active and thermal was hot。
+    public var thermalSlowedExtractCount: Int {
+        thermalSlowedExtracts
+    }
+
     // MARK: - Private helpers
+
+    /// M900 thermal sampling。Only re-samples when sensitivity is
+    /// active AND sample counter has reached the threshold,so the
+    /// hot path stays free of ProcessInfo syscalls in the
+    /// `.ignoreThermal` case (preserves M865 zero-syscall pin)。
+    private func sampleThermalIfDue() ->
+        ProcessInfo.ThermalState
+    {
+        // Fast path:`.ignoreThermal` never samples — cached
+        // state stays at init default `.nominal`,decision logic
+        // ignores it anyway。
+        if cadence.thermalSensitivity == .ignoreThermal {
+            return cachedThermalState
+        }
+        thermalSampleCounter += 1
+        if thermalSampleCounter >= cadence.thermalSampleInterval {
+            thermalSampleCounter = 0
+            cachedThermalState = thermalSampler()
+        }
+        return cachedThermalState
+    }
+
+    /// M900 typed predicate:given a thermal state and the current
+    /// iteration index,return whether `extractGraph()` should
+    /// fire under the configured sensitivity policy。
+    ///
+    /// The natural cadence gate (`myIndex % graphExtractInterval
+    /// == 0`)is checked by `observe(...)` BEFORE this is called,
+    /// so this function only decides whether the natural fire
+    /// point is suppressed by thermal pressure。
+    ///
+    /// Semantics:
+    ///   - `.ignoreThermal`:always true (M865 contract preserved)
+    ///   - `.slowOnHot` + thermal `.serious`/`.critical`:fire only
+    ///     when iteration index is ALSO a multiple of
+    ///     `graphExtractInterval × thermalSlowdownMultiplier` (so
+    ///     the effective cadence is N× slower under thermal load)
+    ///   - `.slowOnHot` + thermal `.nominal`/`.fair`:always fire
+    ///     (normal cadence)
+    ///   - `.skipOnCritical` + thermal `.critical`:always skip
+    ///   - `.skipOnCritical` + thermal `.serious`/lower:always fire
+    private func shouldExtractUnderThermal(
+        thermal: ProcessInfo.ThermalState,
+        atIndex myIndex: Int
+    ) -> Bool {
+        switch cadence.thermalSensitivity {
+        case .ignoreThermal:
+            return true
+        case .slowOnHot:
+            switch thermal {
+            case .serious, .critical:
+                let slowedInterval =
+                    cadence.graphExtractInterval
+                    * cadence.thermalSlowdownMultiplier
+                if myIndex % slowedInterval == 0 {
+                    thermalSlowedExtracts += 1
+                    return true
+                } else {
+                    return false
+                }
+            case .nominal, .fair:
+                return true
+            @unknown default:
+                // Defensive:treat unknown future state as cool
+                // (fail-open),preserves throughput on new
+                // ProcessInfo enum values。
+                return true
+            }
+        case .skipOnCritical:
+            switch thermal {
+            case .critical:
+                return false
+            case .nominal, .fair, .serious:
+                return true
+            @unknown default:
+                return true
+            }
+        }
+    }
 
     private func foldState(
         from event: BASEventLogEntry
