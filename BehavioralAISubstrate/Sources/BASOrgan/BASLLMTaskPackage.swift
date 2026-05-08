@@ -78,6 +78,15 @@ public struct BASLLMRawInput:
         kind: String =
             BASLLMTaskPackageDefaults.kind
     ) {
+        // M940 audit fix:empty sessionID corrupts the
+        // event log's per-session keying (M841 doctrine);
+        // empty prompt has no LLM call to make。Catch at
+        // construction so callers get a clear error rather
+        // than silent downstream corruption。
+        precondition(!sessionID.isEmpty,
+            "BASLLMRawInput.sessionID must be non-empty")
+        precondition(!prompt.isEmpty,
+            "BASLLMRawInput.prompt must be non-empty")
         self.prompt = prompt
         self.sessionID = sessionID
         self.surface = surface

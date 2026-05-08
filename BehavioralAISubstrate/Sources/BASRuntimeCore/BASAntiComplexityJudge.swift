@@ -182,10 +182,22 @@ public enum BASAntiComplexityJudge {
     public static func assess(
         text: String
     ) -> BASScopeCreepAssessment {
+        // M940 audit fix:iterate `BASScopeCreepSignal
+        // .allCases` (CaseIterable order is the declaration
+        // order — DETERMINISTIC) instead of the
+        // `signalPhrases` Dictionary (Swift Dictionary
+        // iteration is NON-DETERMINISTIC across executions
+        // due to hash randomization)。Pre-M940 the same
+        // input could produce different `flaggedPhrases`
+        // arrays across builds when `maxFlaggedPhrases (8)`
+        // capped the output mid-iteration。Post-M940 the
+        // output is byte-stable across runs (M892 replay
+        // determinism doctrine)。
         let lowercased = text.lowercased()
         var signalHits: [BASScopeCreepSignal: Int] = [:]
         var flaggedPhrases: [String] = []
-        for (signal, phrases) in signalPhrases {
+        for signal in BASScopeCreepSignal.allCases {
+            let phrases = signalPhrases[signal] ?? []
             var hitCount = 0
             for phrase in phrases {
                 let count = lowercased.components(

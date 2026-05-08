@@ -156,7 +156,19 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// strategy taxonomy via `BASFoundationModelsToolBridge`
     /// (M916) but stays at `substrateClosedSDKBridgePending`
     /// until the iOS 26 SDK Tool conformer bridge stabilizes。
-    public static let doctrineVersion: String = "ADR-016.M918"
+    /// M940 bump:LLM Extraction Engine MVP shipped
+    /// (M928-M939) — 12 typed primitives covering the full
+    /// 6-module orchestration plus 4 vision-deferred items
+    /// (model routing / prompt cache / anti-complexity judge
+    /// / training-corpus sublimator)。M940 deep-review fixes
+    /// hardened 7 HIGH issues (NaN guards, event-ID
+    /// collision, verifier approved-from-stages,
+    /// datumID disambiguator, deterministic dict iteration,
+    /// role/preset parametrization)。No G-status change —
+    /// engine is host-orchestration-class, slots into
+    /// existing `BASNeuralCoreServicing` via M933 typed
+    /// parallel protocol。
+    public static let doctrineVersion: String = "ADR-016.M940"
 
     /// Query the typed status of a specific gap。
     public static func status(

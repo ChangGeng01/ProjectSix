@@ -199,11 +199,30 @@ public actor BASTrainingExampleSublimator {
     /// trait list sizes)。
     public static let defaultFlushThreshold: Int = 50
 
+    /// M940:internal buffer entry pairing a submission
+    /// with its monotonic submission-counter snapshot,used
+    /// as the datumID disambiguator on flush。
+    private struct BufferedSubmission: Sendable {
+        let submission: BASTrainingExampleSubmission
+        let submissionIndex: UInt64
+    }
+
     private let flushThreshold: Int
-    private var buffer: [BASTrainingExampleSubmission] = []
+    private var buffer: [BufferedSubmission] = []
     private(set) var totalSubmissions: Int = 0
     private(set) var totalFlushes: Int = 0
     private(set) var totalRowsEmitted: Int = 0
+    /// M940 audit fix:per-actor-instance monotonic
+    /// submission counter used as a disambiguator in the
+    /// deterministic datumID。Pre-M940 two submissions with
+    /// IDENTICAL `(inputText, score, sessionID)` produced
+    /// the same datumID → silently merged into one training
+    /// row at corpus-write time。Post-M940 each submission
+    /// carries its own datumID via this counter,so legitimate
+    /// duplicates are preserved。Replay determinism (M892)
+    /// preserved per-instance — same submission order on a
+    /// fresh sublimator → same counter values → same IDs。
+    private var submissionCounter: UInt64 = 0
 
     public init(
         flushThreshold: Int =
@@ -229,7 +248,10 @@ public actor BASTrainingExampleSublimator {
         report: BASTrainingExampleSublimationReport,
         trigger: BASTrainingExampleSublimationTrigger
     )? {
-        buffer.append(submission)
+        submissionCounter += 1
+        buffer.append(BufferedSubmission(
+            submission: submission,
+            submissionIndex: submissionCounter))
         totalSubmissions += 1
         if buffer.count >= flushThreshold {
             return performFlush(
@@ -252,7 +274,10 @@ public actor BASTrainingExampleSublimator {
         trigger: BASTrainingExampleSublimationTrigger
     )? {
         for submission in batch {
-            buffer.append(submission)
+            submissionCounter += 1
+            buffer.append(BufferedSubmission(
+                submission: submission,
+                submissionIndex: submissionCounter))
             totalSubmissions += 1
         }
         if buffer.count >= flushThreshold {
@@ -299,12 +324,15 @@ public actor BASTrainingExampleSublimator {
         let nowMs = flushedAtMs
             ?? Int64(
                 Date().timeIntervalSince1970 * 1_000)
-        let rows = buffer.map { submission in
-            project(submission, sublimatedAtMs: nowMs)
+        let rows = buffer.map { buffered in
+            project(
+                buffered.submission,
+                submissionIndex: buffered.submissionIndex,
+                sublimatedAtMs: nowMs)
         }
         let perSession = Dictionary(
             grouping: buffer,
-            by: { $0.sourceSessionID })
+            by: { $0.submission.sourceSessionID })
             .mapValues { $0.count }
         let meanScore: Double
         if rows.isEmpty {
@@ -332,17 +360,32 @@ public actor BASTrainingExampleSublimator {
 
     /// Pure function:project one submission into a typed
     /// `BASMambaTrainingDatum`。Datum ID is deterministic
-    /// from `(inputText, score, sourceSessionID)` per
-    /// chapter 三百九二 / M892 replay determinism。
+    /// from `(inputText, score, sourceSessionID,
+    /// submissionIndex)` per chapter 三百九二 / M892 replay
+    /// determinism。
+    ///
+    /// ## M940 audit fix:submissionIndex disambiguator
+    ///
+    /// Pre-M940 datumID was hashed from `(inputText, score,
+    /// sessionID)` only。Two legitimate-duplicate submissions
+    /// (same input+score+session) produced the same datumID
+    /// → silent dedup at training-corpus write time。Post-M940
+    /// the per-submission monotonic counter disambiguates,
+    /// so two duplicates produce two distinct datumIDs。
+    /// Replay determinism preserved on a fresh sublimator
+    /// processing the same submission sequence in the same
+    /// order。
     private nonisolated func project(
         _ submission: BASTrainingExampleSubmission,
+        submissionIndex: UInt64,
         sublimatedAtMs: Int64
     ) -> BASMambaTrainingDatum {
         let cand = submission.candidate
         let datumID = Self.deterministicDatumID(
             inputText: cand.inputText,
             score: cand.score,
-            sessionID: submission.sourceSessionID)
+            sessionID: submission.sourceSessionID,
+            submissionIndex: submissionIndex)
         return BASMambaTrainingDatum(
             datumID: datumID,
             inputText: cand.inputText,
@@ -356,16 +399,19 @@ public actor BASTrainingExampleSublimator {
     }
 
     /// FNV-1a length-prefixed deterministic datum ID。
-    /// chapter 三百九二 / M892 + M907 doctrine。
+    /// chapter 三百九二 / M892 + M907 doctrine。M940:added
+    /// submissionIndex disambiguator。
     private static func deterministicDatumID(
         inputText: String,
         score: Double,
-        sessionID: String
+        sessionID: String,
+        submissionIndex: UInt64
     ) -> String {
         let combined =
             "\(inputText.utf8.count):\(inputText)" +
             "\(sessionID.utf8.count):\(sessionID)" +
-            "\(score)"
+            "\(score)" +
+            ":\(submissionIndex)"
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in combined.utf8 {
             hash ^= UInt64(byte)

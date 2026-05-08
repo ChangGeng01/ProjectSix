@@ -16,13 +16,13 @@ final class BASCognitiveOSCompletionDoctrineTests:
     // MARK: - Doctrine version pin
 
     func testDoctrineVersionPin() {
-        // M918 bump:G8 + G11 transitioned from `.external`
-        // to `.externalSubstrateContractTyped`,G6 gained
-        // explicit BASFoundationModelsToolBridge taxonomy。
+        // M940 bump:LLM Extraction Engine MVP shipped
+        // (M928-M939, 12 typed primitives) + M940
+        // deep-review fixes (7 HIGH issues hardened)。
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M918",
+            "ADR-016.M940",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
             "stability doctrine")

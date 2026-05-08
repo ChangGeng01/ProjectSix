@@ -73,6 +73,12 @@ public struct BASMemoryUpdateCandidate:
         content: String,
         confidence: Double
     ) {
+        // M940 audit fix:NaN comparisons return false →
+        // `confidence >= 0` would trip the precondition
+        // anyway,but Inf would silently slip。Pin
+        // explicitly to finite + [0,1]。
+        precondition(confidence.isFinite,
+            "confidence must be finite (no NaN/Inf)")
         precondition(confidence >= 0 && confidence <= 1,
             "confidence must be in [0, 1]")
         self.kind = kind
@@ -177,6 +183,9 @@ public struct BASTrainingExampleCandidate:
         badAnswerTraits: [String],
         score: Double
     ) {
+        // M940 audit fix:NaN/Inf guard before range check
+        precondition(score.isFinite,
+            "score must be finite (no NaN/Inf)")
         precondition(score >= 0 && score <= 1,
             "score must be in [0, 1]")
         self.inputText = inputText
@@ -248,6 +257,15 @@ public struct BASLLMExtractionByproducts:
         trainingExamples: [BASTrainingExampleCandidate] = [],
         extractedAtMs: Int64
     ) {
+        // M940 audit fix:bulk NaN/Inf + range guard on
+        // confidenceScores values (parser policies that
+        // pipe raw LLM JSON could leak NaN otherwise)。
+        for (_, value) in confidenceScores {
+            precondition(value.isFinite,
+                "confidenceScores value must be finite")
+            precondition(value >= 0 && value <= 1,
+                "confidenceScores value must be in [0, 1]")
+        }
         self.finalAnswer = finalAnswer
         self.structuredConclusion = structuredConclusion
         self.memoryUpdates = memoryUpdates

@@ -375,12 +375,22 @@ extension BASLLMModelRouter {
                 reasonCodes: ["router:production-quality"])
         }
 
-        // Default → medium
+        // Default → medium。
+        // M940 audit fix:`available.first` is non-
+        // deterministic on a Set (insertion-order-
+        // independent)。Sort by rawValue for byte-stable
+        // fallback selection (chapter 三百九二 / M892
+        // replay determinism)。
+        let fallback: BASLLMModelClass
+        if available.contains(.medium) {
+            fallback = .medium
+        } else {
+            fallback = available
+                .sorted { $0.rawValue < $1.rawValue }
+                .first ?? .small
+        }
         return BASLLMModelRoutingDecision(
-            chosenModelClass:
-                available.contains(.medium)
-                    ? .medium
-                    : (available.first ?? .small),
+            chosenModelClass: fallback,
             reasoningLevel: .medium,
             fallbackModelClass: nil,
             reasonCodes: ["router:default"])

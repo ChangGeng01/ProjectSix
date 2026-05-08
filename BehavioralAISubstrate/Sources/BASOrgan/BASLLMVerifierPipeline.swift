@@ -444,10 +444,20 @@ extension BASLLMVerifierPipeline {
     /// Produce a `BASLLMEngineVerifierCallback` suitable for
     /// injecting into the M932 engine's `verifier` slot。
     /// Maps the typed `BASLLMVerifierReport` onto M932's
-    /// typed `BASLLMVerifierFeedback` shape:
-    ///   - `amendedAnswer = report.finalRecommendedAnswer`
-    ///   - `counterArguments = report.aggregatedCounterArguments`
-    ///   - `confidenceScores = ["overall": overallConfidence]`
+    /// typed `BASLLMVerifierFeedback` shape。
+    ///
+    /// ## M940 audit fix:`approved` now reflects per-stage
+    /// outcomes
+    ///
+    /// Pre-M940 `approved` was hardcoded `true` regardless
+    /// of which stages failed。A pipeline where 3 of 4
+    /// stages threw still reported "approved",hiding failure
+    /// from downstream gates。Post-M940:
+    ///   - approved = true iff every WIRED stage's
+    ///     `succeeded == true`
+    ///   - failure-stage names appended to counterArguments
+    ///     as `"verifier-stage-failed:<stage>"` so downstream
+    ///     consumers can grep
     public nonisolated func makeEngineVerifierCallback()
         -> BASLLMEngineVerifierCallback
     {
@@ -455,15 +465,29 @@ extension BASLLMVerifierPipeline {
             let report = await verify(
                 draft: draft,
                 taskPackage: taskPackage)
+            // M940:approved iff all wired stages succeeded
+            let allSucceeded = report.perStage.values
+                .allSatisfy { $0.succeeded }
+            // M940:append failure-stage names so downstream
+            // can detect partial failure even when other
+            // stages produced output
+            var counterArgs =
+                report.aggregatedCounterArguments
+            for (stage, outcome) in report.perStage {
+                if !outcome.succeeded {
+                    counterArgs.append(
+                        "verifier-stage-failed:" +
+                        stage.rawValue)
+                }
+            }
             return BASLLMVerifierFeedback(
-                approved: true,
+                approved: allSucceeded,
                 amendedAnswer:
                     report.finalRecommendedAnswer
                         != draft.body
                     ? report.finalRecommendedAnswer
                     : nil,
-                counterArguments:
-                    report.aggregatedCounterArguments,
+                counterArguments: counterArgs,
                 confidenceScores: [
                     "overall": report.overallConfidence
                 ])

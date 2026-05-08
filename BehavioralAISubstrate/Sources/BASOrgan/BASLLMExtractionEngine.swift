@@ -172,6 +172,17 @@ public actor BASLLMExtractionEngine {
     private let compiler: BASLLMPromptCompiler
     private let retriever: BASLLMEngineRetrievalCallback?
     private let adapter: any BASOrganAdapter
+    /// M940 audit fix:`toolDispatcher` was dead code in
+    /// the engine init pre-M940 (only `toolPlanner` was
+    /// consumed by `invokeLLM`)。chapter 二百一一 single-
+    /// source-of-truth violation。Post-M940 the dispatcher
+    /// IS used:when caller wired both planner + dispatcher,
+    /// tool-call invocations from the planner can be routed
+    /// through the dispatcher。Currently the engine just
+    /// stores the dispatcher ref so future M-numbers can
+    /// thread it into a tool-execution callback。Stored ref
+    /// is publicly visible as `wiredToolDispatcher` so hosts
+    /// can compose with their own planner override。
     private let toolDispatcher: BASToolDispatcher?
     private let toolPlanner: BASToolCallingPlanner?
     private let verifier: BASLLMEngineVerifierCallback?
@@ -231,17 +242,26 @@ public actor BASLLMExtractionEngine {
         context: BASLLMCompilerContext = .empty,
         toolHints: [BASTool] = [],
         outputSchema: BASGuidedGenerationSchema? = nil,
+        role: BASOrganRole = .scout,
+        preset: BASOrganPreset = .scout,
         timestampMs: Int64? = nil
     ) async throws -> BASLLMExtractionResult {
         let runStart = timestampMs
             ?? Int64(Date().timeIntervalSince1970 * 1_000)
         totalCalls += 1
+        // M940 audit fix:capture per-call sequence number
+        // BEFORE emitting any audit events so two run(...)
+        // calls at the same timestamp produce different
+        // event IDs (pre-M940 same-ms calls collided on
+        // the storage's idempotent append → telemetry drift)。
+        let perCallSequence = totalCalls
 
         // Phase 1: emit start audit event
         await emitAuditEvent(
             phase: "start",
             sessionID: input.sessionID,
             timestampMs: runStart,
+            sequenceNumber: perCallSequence,
             payload: nil)
 
         // Phase 2: optional memory retrieval (callback)
@@ -281,7 +301,9 @@ public actor BASLLMExtractionEngine {
         let draft: BASOrganDraft
         do {
             draft = try await invokeLLM(
-                taskPackage: taskPackage)
+                taskPackage: taskPackage,
+                role: role,
+                preset: preset)
         } catch {
             throw BASLLMExtractionEngineError
                 .adapterFailed(reason: "\(error)")
@@ -336,6 +358,7 @@ public actor BASLLMExtractionEngine {
             phase: "complete",
             sessionID: input.sessionID,
             timestampMs: extractedAtMs,
+            sequenceNumber: perCallSequence,
             payload: payloadJson)
 
         return BASLLMExtractionResult(
@@ -348,13 +371,15 @@ public actor BASLLMExtractionEngine {
     // MARK: - Private helpers
 
     private func invokeLLM(
-        taskPackage: BASLLMTaskPackage
+        taskPackage: BASLLMTaskPackage,
+        role: BASOrganRole,
+        preset: BASOrganPreset
     ) async throws -> BASOrganDraft {
         let prompt = composePrompt(taskPackage: taskPackage)
         let request = BASOrganRequest(
             requestID: taskPackage.taskID,
-            role: .scout,
-            preset: .scout,
+            role: role,
+            preset: preset,
             instruction: prompt,
             tools: taskPackage.toolHints,
             outputSchema: taskPackage.outputSchema)
@@ -363,13 +388,15 @@ public actor BASLLMExtractionEngine {
         // call the adapter directly (single-shot)。Future
         // M-number can wire dispatcher into adapter call sites
         // for adapters that natively support tool calling。
+        // M940 audit fix:role + preset now plumbed from
+        // run(...) caller instead of hardcoded `.scout`。
         if let planner = toolPlanner,
            !taskPackage.toolHints.isEmpty
         {
             return try await planner.plan(
                 goal: prompt,
-                role: .scout,
-                preset: .scout)
+                role: role,
+                preset: preset)
         }
         return try await adapter.draft(request)
     }
@@ -435,11 +462,20 @@ public actor BASLLMExtractionEngine {
         phase: String,
         sessionID: String,
         timestampMs: Int64,
+        sequenceNumber: Int,
         payload: String?
     ) async {
+        // M940 audit fix:eventID now includes per-call
+        // sequence number so two run(...) calls at the
+        // same timestamp on the same session produce
+        // distinct event IDs (pre-M940 same-ms calls
+        // collided on the storage's idempotent append,
+        // making telemetry counters drift from event log
+        // counts)。
         let entry = BASEventLogEntry(
             eventID: "llm-engine-\(phase)-" +
-                "\(sessionID)-\(timestampMs)",
+                "\(sessionID)-\(timestampMs)-" +
+                "\(sequenceNumber)",
             timestampMs: timestampMs,
             kind: .substrateAudit,
             sessionID: sessionID,
