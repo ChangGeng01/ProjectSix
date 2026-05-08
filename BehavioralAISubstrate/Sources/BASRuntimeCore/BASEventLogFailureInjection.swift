@@ -291,6 +291,19 @@ public enum BASEventLogFailureInjection {
         var out: [BASEventLogEntry] = []
         out.reserveCapacity(eventCount)
         for i in 0..<eventCount {
+            // M911 fix:pre-M911 the thermal-spike scenario
+            // emitted actions `["thermal:\(band)", "iter:\(i)"]`
+            // — neither matched ANY M857 graph-extractor
+            // heuristic。The riskBand field was set on the
+            // entry but the extractor doesn't read riskBand
+            // for edge synthesis,so the scenario produced
+            // ZERO heuristic-specific edges,reducing it to
+            // generic event-stream filler。
+            // Post-M911 every event also carries
+            // `skip:thermal-throttle` so heuristic 5 fires
+            // `.delays` edges。This makes the scenario actually
+            // exercise a unique detection path,closing the
+            // M902 audit-finding gap that M907 left open。
             out.append(BASEventLogEntry(
                 eventID: deterministicID(
                     sessionID: sessionID,
@@ -305,6 +318,7 @@ public enum BASEventLogFailureInjection {
                 project: project,
                 actions: [
                     "thermal:\(thermalBand.rawValue)",
+                    "skip:thermal-throttle",
                     "iter:\(i)"
                 ],
                 confidence: 0.95))
@@ -322,8 +336,25 @@ public enum BASEventLogFailureInjection {
     ) -> [BASEventLogEntry] {
         precondition(!techActions.isEmpty,
             "complexity loop needs at least 1 tech action")
-        precondition(cycleDepth >= 1,
-            "complexity cycle depth must be >= 1")
+        // M911 fix:cycleDepth must be >= 2 to actually
+        // synthesize a closing edge via heuristic 7 (which
+        // requires `closingEdgeDelaysThreshold = 2` distinct
+        // delays edges per project)。Pre-M911 cycleDepth=1
+        // silently produced ONE delays edge but no closing
+        // edge → no cycle → the documented "cycle detected"
+        // semantic was structurally false。Tightening the
+        // precondition matches the documented intent。
+        precondition(cycleDepth >= 2,
+            "complexity cycle depth must be >= 2 to trigger " +
+            "heuristic-7 closing-edge synthesis (threshold 2)")
+        // M911 fix:replace silent `max(intervalMs, 3_000)`
+        // clamp with explicit precondition。Pre-M911 a caller
+        // passing intervalMs=100 silently got 3000,which
+        // surprises tests verifying tight-spaced event
+        // distributions。Fail-fast is friendlier。
+        precondition(intervalMs >= 3_000,
+            "intervalMs must be >= 3000 (inner-cycle 3s span);" +
+            " caller passed \(intervalMs)")
         // Each cycle iteration:
         //   1. anxiety event (intent: "anxious")
         //   2. tech-add event (one of techActions,rotating)
@@ -398,12 +429,10 @@ public enum BASEventLogFailureInjection {
                 actions: ["skip:delay-marker",
                           "delay-marker"],
                 confidence: 0.70))
-            // M907:enforce intervalMs >= inner-cycle span
-            // (3000ms = 1000 + 1000 + 1000) so timestamps stay
-            // monotonic across cycles。Pre-M907 a caller passing
-            // intervalMs=100 would produce non-monotonic
-            // timestamps,breaking M877 incremental scan。
-            ts += max(intervalMs, 3_000)
+            // M911:precondition above guarantees intervalMs
+            // >= 3_000,so timestamps stay monotonic across
+            // cycles without the silent `max` clamp。
+            ts += intervalMs
         }
         return out
     }

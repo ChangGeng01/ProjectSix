@@ -263,7 +263,7 @@ final class BASEventLogFailureInjectionTests: XCTestCase {
                 project: "p",
                 techActions: ["a"],
                 cycleDepth: 2,
-                intervalMs: 1_000)
+                intervalMs: 3_000)
         ]
         for scenario in scenarios {
             let events = BASEventLogFailureInjection.generate(

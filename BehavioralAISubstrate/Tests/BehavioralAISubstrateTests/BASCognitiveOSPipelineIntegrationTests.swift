@@ -148,6 +148,9 @@ final class BASCognitiveOSPipelineIntegrationTests: XCTestCase {
     /// SPECIFICALLY `.delays` edges (heuristic 5) AND ENOUGH
     /// of them to trip heuristic 7 closing-edge synthesis on
     /// cycleDepth >= 2。
+    /// M911 hardening:assert exact count + heuristic 7 closing
+    /// edge synthesizes (the docstring claim "cycle detected"
+    /// must be empirically verified)。
     func testComplexityLoopProducesDelaysEdges() async throws {
         let log = BASInMemoryEventLogStorage()
         let graph = BASKnowledgeGraph()
@@ -171,10 +174,89 @@ final class BASCognitiveOSPipelineIntegrationTests: XCTestCase {
 
         let edges = await graph.allEdges()
         let delaysEdges = edges.filter { $0.kind == .delays }
-        XCTAssertGreaterThanOrEqual(delaysEdges.count, 4,
-            "M907:complexity loop with cycleDepth=4 must " +
-            "produce at least 4 .delays edges (one per " +
-            "cycle's skip:delay-marker event)")
+        XCTAssertEqual(delaysEdges.count, 4,
+            "M911 tightened pin:complexity loop with " +
+            "cycleDepth=4 must produce EXACTLY 4 .delays " +
+            "edges (one per cycle's skip:delay-marker event)。" +
+            "Looser >= would miss over-emission regressions")
+    }
+
+    /// M911:pin that heuristic 7 closing-edge synthesis fires
+    /// when delaysCount per project crosses the threshold (=2)。
+    /// The "complexity addiction loop → cycle detected" claim
+    /// in M902's docstring is structurally verified here:
+    ///   - M911 cycleDepth=4 → 4 delays edges per project
+    ///   - Heuristic 7 threshold is 2
+    ///   - Therefore at least 1 closing-edge .causes edge
+    ///     (project → first-event) MUST exist
+    func testComplexityLoopProducesHeuristic7ClosingEdge()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+        let sessionID = "M911-heuristic7"
+
+        let events = BASEventLogFailureInjection.generate(
+            scenario: .complexityAddictionLoop(
+                project: "P-cycle",
+                techActions: ["framework:swiftui"],
+                cycleDepth: 3,
+                intervalMs: 30_000),
+            sessionID: sessionID,
+            startingAtMs: 1_000_000)
+        _ = try await appendAll(events, to: log)
+
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: sessionID,
+            into: graph)
+
+        let edges = await graph.allEdges()
+        // Heuristic 7 closing edges are `.causes` edges where
+        // fromNode is the project node and the reason code
+        // marks them as closing-edge synthesis (M894 reason
+        // code prefix)。
+        let projectNodeID = "project:P-cycle"
+        let closingEdges = edges.filter { edge in
+            edge.kind == .causes
+                && edge.fromNodeID == projectNodeID
+        }
+        XCTAssertGreaterThan(closingEdges.count, 0,
+            "M911:cycleDepth=3 (4 delays edges) must trip " +
+            "heuristic 7 closing-edge synthesis (threshold=2)。" +
+            "Pre-M911 this assertion never existed — the " +
+            "doctrine claim 'cycle detected' was unverified")
+    }
+
+    /// M911:`.thermalSpike` was previously a no-op heuristic-
+    /// wise (audit found it triggered no unique detection path)。
+    /// Post-M911 each thermal-spike event carries
+    /// `skip:thermal-throttle` so heuristic 5 fires per event。
+    func testThermalSpikeProducesDelaysEdges() async throws {
+        let log = BASInMemoryEventLogStorage()
+        let graph = BASKnowledgeGraph()
+        let sessionID = "M911-thermal"
+
+        let events = BASEventLogFailureInjection.generate(
+            scenario: .thermalSpike(
+                eventCount: 5,
+                thermalBand: .high,
+                project: "P-thermal-ts"),
+            sessionID: sessionID,
+            startingAtMs: 0)
+        _ = try await appendAll(events, to: log)
+
+        _ = await BASKnowledgeGraphEventExtractor.extract(
+            from: log,
+            sessionID: sessionID,
+            into: graph)
+
+        let edges = await graph.allEdges()
+        let delaysEdges = edges.filter { $0.kind == .delays }
+        XCTAssertEqual(delaysEdges.count, 5,
+            "M911:thermal spike of 5 events must produce 5 " +
+            ".delays edges (one per skip:thermal-throttle " +
+            "action firing heuristic 5)")
     }
 
     // MARK: - M902 → M903 round-trip
