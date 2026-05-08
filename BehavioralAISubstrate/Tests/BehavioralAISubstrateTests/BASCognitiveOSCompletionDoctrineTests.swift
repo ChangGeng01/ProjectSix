@@ -16,13 +16,16 @@ final class BASCognitiveOSCompletionDoctrineTests:
     // MARK: - Doctrine version pin
 
     func testDoctrineVersionPin() {
-        // M952 bump:Phase 1 of next-next-gen architecture sweep
-        // (chapter 四百二) shipped — memory event-sourced
-        // unification via M941-M952 (12 commits)。
+        // M969 bump:Phase 2 entropy chapter 四百三 + chapter
+        // 四百四 v1 close-out。 V2 actor delegation skeleton
+        // + composition-entropy ledger + threading entropy
+        // collapse + naming bridge + bundle protocol + 9 typed
+        // primitives shipped。 ADR-014 OPT-IN held;V1
+        // byte-equality preserved across 4700+ BAS tests。
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M952",
+            "ADR-016.M969",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
             "stability doctrine")

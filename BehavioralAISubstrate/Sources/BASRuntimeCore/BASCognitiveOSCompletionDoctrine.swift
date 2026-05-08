@@ -180,7 +180,20 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// change — Phase 1 is substrate-side machinery,not a roadmap
     /// gap closure。Phase 2 (chapter 四百三) + Phase 3 (chapter 四百四)
     /// follow per `wild-rolling-meerkat.md` plan。
-    public static let doctrineVersion: String = "ADR-016.M952"
+    /// M969 bump:Phase 2 entropy reductions complete v1。
+    /// chapter 四百三 (M953-M962, 10 commits): threading +
+    /// derivation drift + reducer shape + naming + duplication
+    /// entropy attacked via 9 typed primitives + 12 1-arg
+    /// overloads collapsing 36→12 arg-slots in runTurn。
+    /// chapter 四百四 v1 (M963-M969, 7 commits): V2 actor
+    /// scaffolding + composition-entropy ledger + V2 envelope
+    /// payload struct + V2 actor delegation skeleton。 V2
+    /// actor is usable today via delegation;native stage
+    /// rewrites + 19 more bundle protocol adoptions + permit
+    /// fold function ship under v2+。 ADR-014 OPT-IN held
+    /// throughout;V1 runTurn byte-equality preserved (4700+
+    /// BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M969"
 
     /// Query the typed status of a specific gap。
     public static func status(

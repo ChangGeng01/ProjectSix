@@ -16,11 +16,16 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
     // MARK: - Doctrine version bump
 
     func testDoctrineVersionPin() {
+        // M969 bump:Phase 2 chapter 四百四 v1 close-out
+        // updates ADR-016 doctrine version。 Phase 1
+        // (chapter 四百二 / M941-M952) closure remains
+        // valid;the version simply tracks the latest
+        // architecture sweep milestone。
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M952",
-            "M952:doctrine version must reflect Phase 1 close")
+            "ADR-016.M969",
+            "M969:doctrine version reflects chapter 四百四 v1 close")
     }
 
     // MARK: - M-number range matches chapter 四百二
