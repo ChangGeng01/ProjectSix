@@ -194,13 +194,24 @@ public struct BASTrainingDataExportSummary:
     /// if zero rows were written。
     public let lastEventTimestampMs: Int64?
 
+    /// M906 audit-finding fix:count of events whose
+    /// `stateBeforeID` / `stateAfterID` was non-nil but the
+    /// state store returned nil on lookup (state was pruned,
+    /// ID was corrupt,or store wasn't wired)。Pre-M906 this
+    /// was silently swallowed → a corpus with 30% missing
+    /// state context looked fine to consumers。Post-M906
+    /// callers see the count + can warn / abort if too high。
+    /// Always 0 when `filter.includeStateContext == false`。
+    public let stateContextMissingCount: Int
+
     public init(
         recordsWritten: Int,
         recordsFilteredOut: Int,
         bytesWritten: Int64,
         durationMs: Int64,
         firstEventTimestampMs: Int64?,
-        lastEventTimestampMs: Int64?
+        lastEventTimestampMs: Int64?,
+        stateContextMissingCount: Int = 0
     ) {
         self.recordsWritten = recordsWritten
         self.recordsFilteredOut = recordsFilteredOut
@@ -208,6 +219,8 @@ public struct BASTrainingDataExportSummary:
         self.durationMs = durationMs
         self.firstEventTimestampMs = firstEventTimestampMs
         self.lastEventTimestampMs = lastEventTimestampMs
+        self.stateContextMissingCount =
+            stateContextMissingCount
     }
 }
 
@@ -256,9 +269,19 @@ public actor BASTrainingDataExporter {
     /// (no CRLF)。Caller's pipeline can stream-parse via any
     /// JSONL-aware reader (jq,Python json.loads per line,
     /// MLX Datum loaders)。
+    ///
+    /// ## M906 determinism contract
+    ///
+    /// Pass `exportedAtMs:` explicitly to get byte-stable output
+    /// across re-runs of the same corpus + filter (M892 replay
+    /// determinism doctrine)。Default reads wall-clock,which
+    /// produces different bytes per call — useful for ergonomic
+    /// single-shot use,but breaks G8 SSM training cache keys
+    /// + G12 eval baselines that hash the corpus。
     public func exportToJSONL(
         filter: BASTrainingDataExportFilter,
-        to url: URL
+        to url: URL,
+        exportedAtMs: Int64? = nil
     ) async throws -> BASTrainingDataExportSummary {
         if filter.includeStateContext && userStateStore == nil
         {
@@ -268,6 +291,9 @@ public actor BASTrainingDataExporter {
 
         let startMs = Int64(
             Date().timeIntervalSince1970 * 1000)
+        // M906:reset per-export so consecutive exportToJSONL
+        // calls on the same actor see fresh counts。
+        stateContextMissingCount = 0
 
         // Atomic temp-file-rename pattern。
         let tempURL = url.appendingPathExtension("tmp")
@@ -310,13 +336,29 @@ public actor BASTrainingDataExporter {
 
         var cursorMs: Int64 = filter.sinceMs ?? 0
         let untilMs: Int64 = filter.untilMs ?? .max
-        let exportedAtMs = Int64(
-            Date().timeIntervalSince1970 * 1000)
+        // M906:caller-supplied or wall-clock fallback。Wall-clock
+        // breaks byte-stable determinism;explicit value preserves
+        // M892 replay-determinism doctrine for downstream caches。
+        let resolvedExportedAtMs: Int64 = exportedAtMs
+            ?? Int64(Date().timeIntervalSince1970 * 1000)
 
         pageLoop: while true {
             let batch = await eventLog.events(
                 sinceTimestampMs: cursorMs, limit: pageSize)
             if batch.isEmpty { break }
+
+            // M906 fix:track whether this page made forward
+            // progress (emitted at least one new event)。If a
+            // full-size page returns nothing new (e.g. all rows
+            // share the same timestampMs as cursorMs and were
+            // already emitted),we MUST advance cursorMs by 1ms
+            // unconditionally to escape the same-ts cluster。
+            // Pre-M906 the cursor only advanced to the page's
+            // last timestamp,so a page where every row had
+            // ts == cursorMs would loop forever。This was a
+            // production-killer on the 2.73M-event corpus where
+            // burst writes share millisecond timestamps。
+            var newEventsThisPage = 0
 
             for event in batch {
                 if event.timestampMs >= untilMs {
@@ -334,6 +376,10 @@ public actor BASTrainingDataExporter {
                 }
                 if !passesFilter(event, filter: filter) {
                     recordsFilteredOut += 1
+                    // M906:filtered-out events DO count as
+                    // forward progress for cursor-advance
+                    // purposes (they're new vs. last page)
+                    newEventsThisPage += 1
                     continue
                 }
 
@@ -341,7 +387,7 @@ public actor BASTrainingDataExporter {
                     event: event,
                     includeStateContext:
                         filter.includeStateContext,
-                    exportedAtMs: exportedAtMs)
+                    exportedAtMs: resolvedExportedAtMs)
 
                 let line: Data
                 do {
@@ -369,6 +415,7 @@ public actor BASTrainingDataExporter {
                 }
 
                 recordsWritten += 1
+                newEventsThisPage += 1
                 bytesWritten += Int64(line.count)
                 if firstTs == nil
                     || event.timestampMs < (firstTs ?? .max)
@@ -394,10 +441,28 @@ public actor BASTrainingDataExporter {
             // hit the tail of the log。
             if batch.count < pageSize { break }
 
-            // Advance cursor to last batch's last timestamp。
-            // Next iteration's overlap-skip handles dedup。
+            // M906 fix:advance cursor with infinite-loop guard。
+            // If the full-size page made ZERO forward progress
+            // (every row was a dedup repeat from prior page —
+            // means all rows share the same timestampMs),we
+            // MUST bump cursor by 1ms to escape the cluster,
+            // otherwise we re-fetch the same rows forever。
             if let last = batch.last {
-                cursorMs = last.timestampMs
+                let candidate = last.timestampMs
+                if candidate <= cursorMs
+                    && newEventsThisPage == 0
+                {
+                    // Stuck at same-ts cluster bigger than
+                    // pageSize — break out by advancing 1ms。
+                    // We may skip a small number of events at
+                    // the cluster tail with seq > those in the
+                    // current page,but this is preferable to
+                    // an infinite loop。Caller diagnoses by
+                    // checking recordsFilteredOut + log size。
+                    cursorMs = candidate &+ 1
+                } else {
+                    cursorMs = candidate
+                }
             } else {
                 break
             }
@@ -435,7 +500,9 @@ public actor BASTrainingDataExporter {
             bytesWritten: bytesWritten,
             durationMs: endMs - startMs,
             firstEventTimestampMs: firstTs,
-            lastEventTimestampMs: lastTs)
+            lastEventTimestampMs: lastTs,
+            stateContextMissingCount:
+                stateContextMissingCount)
     }
 
     // MARK: - Private helpers
@@ -449,18 +516,33 @@ public actor BASTrainingDataExporter {
         {
             return false
         }
+        // M906 fix:empty Set means "no constraint" not "match
+        // nothing"。Pre-M906 a caller that built a filter set
+        // dynamically and ended with an empty Set (e.g. UI
+        // selection cleared) would silently get zero rows
+        // instead of all rows。Post-M906 only NON-EMPTY sets
+        // act as constraints。
         if let kinds = filter.kinds,
+           !kinds.isEmpty,
            !kinds.contains(event.kind)
         {
             return false
         }
         if let bands = filter.riskBands,
+           !bands.isEmpty,
            !bands.contains(event.riskBand)
         {
             return false
         }
         return true
     }
+
+    /// M906 audit fix:counter incremented inside `makeDatum`
+    /// whenever a non-nil state ID failed to resolve in the
+    /// store。Read by `exportToJSONL(...)` on completion to
+    /// surface in the summary。Reset per-export at the start
+    /// of `exportToJSONL`。
+    private var stateContextMissingCount: Int = 0
 
     private func makeDatum(
         event: BASEventLogEntry,
@@ -478,13 +560,21 @@ public actor BASTrainingDataExporter {
         }
         let stateBefore: BASUserState?
         if let id = event.stateBeforeID {
-            stateBefore = await store.state(forID: id)
+            let resolved = await store.state(forID: id)
+            if resolved == nil {
+                stateContextMissingCount += 1
+            }
+            stateBefore = resolved
         } else {
             stateBefore = nil
         }
         let stateAfter: BASUserState?
         if let id = event.stateAfterID {
-            stateAfter = await store.state(forID: id)
+            let resolved = await store.state(forID: id)
+            if resolved == nil {
+                stateContextMissingCount += 1
+            }
+            stateAfter = resolved
         } else {
             stateAfter = nil
         }

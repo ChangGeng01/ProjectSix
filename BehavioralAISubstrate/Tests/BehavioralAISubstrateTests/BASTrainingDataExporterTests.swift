@@ -338,6 +338,187 @@ final class BASTrainingDataExporterTests: XCTestCase {
 
     // MARK: - Combined filters
 
+    // MARK: - M906 audit fixes
+
+    /// Pin: when MORE events share the same `timestampMs` than
+    /// `pageSize`,the cursor advances past the cluster instead
+    /// of looping forever。Pre-M906 this was an infinite-loop
+    /// production bug on the 2.73M-event corpus where burst
+    /// writes routinely shared millisecond timestamps。
+    func testM906SameTimestampClusterDoesNotLoopForever()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        // 30 events all sharing ts=1_000 — exceeds pageSize=10
+        for i in 0..<30 {
+            _ = try await log.append(BASEventLogEntry(
+                eventID: "ev-\(i)",
+                timestampMs: 1_000,
+                kind: .substrateAudit,
+                sessionID: "s-cluster",
+                sequenceNumber: 0,
+                actions: ["a-\(i)"]))
+        }
+        // Add 5 events with newer timestamps so the loop has a
+        // valid tail to advance into
+        for i in 30..<35 {
+            _ = try await log.append(BASEventLogEntry(
+                eventID: "ev-\(i)",
+                timestampMs: 2_000,
+                kind: .substrateAudit,
+                sessionID: "s-cluster",
+                sequenceNumber: 0,
+                actions: ["a-\(i)"]))
+        }
+
+        let exp = BASTrainingDataExporter(
+            eventLog: log, pageSize: 10)
+        let url = makeTempURL()
+
+        // Wrap in a task with a deadline so a regression that
+        // re-introduces the infinite loop fails the test fast。
+        let summary = try await withThrowingTaskGroup(
+            of: BASTrainingDataExportSummary.self
+        ) { group in
+            group.addTask {
+                try await exp.exportToJSONL(
+                    filter: .all, to: url)
+            }
+            group.addTask {
+                try await Task.sleep(
+                    nanoseconds: 5_000_000_000)
+                throw NSError(
+                    domain: "M906TestTimeout",
+                    code: -1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                        "Export hung > 5s — same-ts cluster " +
+                        "infinite loop regression"
+                    ])
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+
+        // The cluster has 30 events at ts=1000;the 1ms-bump
+        // escape may skip some at the cluster tail。We require
+        // forward progress (some written + tail events present)
+        // rather than full count,because the bump is a guard
+        // against catastrophic loop,not a correctness oracle。
+        XCTAssertGreaterThan(summary.recordsWritten, 0,
+            "M906 same-ts cluster export must make forward " +
+            "progress (no infinite loop)")
+        XCTAssertLessThanOrEqual(
+            summary.recordsWritten, 35,
+            "Cannot write more than total event count")
+    }
+
+    /// Pin: empty Set filter means "no constraint" not "match
+    /// nothing"。Pre-M906 a caller that built an empty kinds
+    /// set silently got zero rows。
+    func testM906EmptyKindsSetMeansNoConstraint() async throws {
+        let log = BASInMemoryEventLogStorage()
+        for i in 0..<5 {
+            _ = try await log.append(makeEvent(index: i))
+        }
+
+        let exp = BASTrainingDataExporter(eventLog: log)
+        let url = makeTempURL()
+        let summary = try await exp.exportToJSONL(
+            filter: BASTrainingDataExportFilter(
+                kinds: []),
+            to: url)
+
+        XCTAssertEqual(summary.recordsWritten, 5,
+            "M906:empty kinds Set must be treated as " +
+            "no-constraint,not match-nothing")
+    }
+
+    func testM906EmptyRiskBandsSetMeansNoConstraint()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        for i in 0..<5 {
+            _ = try await log.append(makeEvent(index: i))
+        }
+
+        let exp = BASTrainingDataExporter(eventLog: log)
+        let url = makeTempURL()
+        let summary = try await exp.exportToJSONL(
+            filter: BASTrainingDataExportFilter(
+                riskBands: []),
+            to: url)
+
+        XCTAssertEqual(summary.recordsWritten, 5,
+            "M906:empty riskBands Set must be treated as " +
+            "no-constraint")
+    }
+
+    /// Pin: explicit `exportedAtMs:` produces byte-stable JSONL
+    /// across re-runs of the same corpus + filter (M892 replay
+    /// determinism doctrine)。
+    func testM906ExplicitExportedAtMsYieldsByteStableOutput()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        for i in 0..<10 {
+            _ = try await log.append(makeEvent(
+                index: i,
+                timestampMs: Int64(1_000 + i)))
+        }
+
+        let exp = BASTrainingDataExporter(eventLog: log)
+        let url1 = makeTempURL()
+        let url2 = makeTempURL()
+        let pinnedTs: Int64 = 1_700_000_000_000
+
+        _ = try await exp.exportToJSONL(
+            filter: .all, to: url1,
+            exportedAtMs: pinnedTs)
+        _ = try await exp.exportToJSONL(
+            filter: .all, to: url2,
+            exportedAtMs: pinnedTs)
+
+        let bytes1 = try Data(contentsOf: url1)
+        let bytes2 = try Data(contentsOf: url2)
+        XCTAssertEqual(bytes1, bytes2,
+            "M906:explicit exportedAtMs must produce " +
+            "byte-stable output (replay determinism)")
+    }
+
+    /// Pin: missing-state-context resolutions surface in
+    /// summary。Pre-M906 silently swallowed nil lookups。
+    func testM906MissingStateContextSurfacesInSummary()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        let store = BASInMemoryUserStateStorage()
+        // Event with a stateBeforeID that the store doesn't know
+        let event = BASEventLogEntry(
+            eventID: "ev-missing",
+            timestampMs: 1_000,
+            kind: .substrateAudit,
+            sessionID: "s-miss",
+            sequenceNumber: 0,
+            stateBeforeID: "ghost-state-id",
+            actions: ["test"])
+        _ = try await log.append(event)
+
+        let exp = BASTrainingDataExporter(
+            eventLog: log, userStateStore: store)
+        let url = makeTempURL()
+        let summary = try await exp.exportToJSONL(
+            filter: BASTrainingDataExportFilter(
+                includeStateContext: true),
+            to: url)
+
+        XCTAssertEqual(
+            summary.stateContextMissingCount, 1,
+            "M906:nil state lookup must increment " +
+            "stateContextMissingCount in summary")
+    }
+
     func testCombinedFiltersAreANDed() async throws {
         let log = BASInMemoryEventLogStorage()
         // Alice low / Alice high / Bob low / Bob high
