@@ -211,3 +211,29 @@ public enum BASMemoryAtomReducer {
         atoms[payload.atomID] = atom
     }
 }
+
+// MARK: - chapter 四百三 / M955 — BASEventReducer conformance
+//
+// Phase 2 entropy 第三刀:formalize the existing M942 reducer
+// shape against the typed `BASEventReducer<State>` protocol。
+// Conformance lives in this file (not a separate extension
+// file) because Swift 6 requires Sendable conformance to be
+// declared in the same module/file as the enum to avoid
+// retroactive `@unchecked Sendable` annotations。
+
+extension BASMemoryAtomReducer: BASEventReducer {
+
+    /// State type:`[String: BASGovernedMemory]` projection map
+    /// keyed by atom UUID string (M942 contract)。
+    public typealias State = [String: BASGovernedMemory]
+
+    /// `BASEventReducer` conformance — wraps the existing M942
+    /// `reducerStep(prior:event:)` static function so callers
+    /// can route through the typed protocol。
+    public static func reduceStep(
+        prior: [String: BASGovernedMemory],
+        event: BASEventLogEntry
+    ) -> [String: BASGovernedMemory]? {
+        reducerStep(prior: prior, event: event)
+    }
+}
