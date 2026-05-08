@@ -74,17 +74,24 @@ public enum BASCognitiveOSThermalSensitivity:
     String, Sendable, Equatable, Hashable, CaseIterable,
     Codable
 {
-    case ignoreThermal
-    case slowOnHot
-    case skipOnCritical
+    // M913 hardening:explicit raw values lock the wire format
+    // independent of the Swift case identifier。Pre-M913 raw
+    // values were auto-derived from case names — a future PR
+    // renaming `slowOnHot → throttleOnHot` would silently
+    // change all schema 1.4.0 JSON files written from that
+    // commit forward,breaking downstream parsers with no
+    // compile error。Post-M913 the wire format is pinned;
+    // renaming the case identifier requires explicitly
+    // updating the rawValue string,catching the schema
+    // implication at PR time。
+    case ignoreThermal = "ignoreThermal"
+    case slowOnHot = "slowOnHot"
+    case skipOnCritical = "skipOnCritical"
 
-    // M909 hardening:explicit `String, RawRepresentable`
+    // M909 + M913 hardening:explicit `String, RawRepresentable`
     // conformance replaces the M905 `String(describing:)`
-    // serialization,which was fragile across Swift toolchain
-    // versions。Now the case→string mapping is part of the
-    // public API and stable across Swift releases。Use
-    // `.rawValue` for serialization:`"ignoreThermal"` /
-    // `"slowOnHot"` / `"skipOnCritical"`。
+    // serialization。Use `.rawValue` for serialization:
+    // `"ignoreThermal"` / `"slowOnHot"` / `"skipOnCritical"`。
 }
 
 /// Typed Sendable struct holding the convenience helper's cadence。
@@ -458,6 +465,14 @@ public actor BASCognitiveOSConvenience {
         // predicate so the predicate stays pure (chapter 二百一一
         // single-source-of-truth)。Side-effects belong here in
         // the orchestrator,not in the decision function。
+        // M912 (audit-the-fix):counter increment moved AFTER
+        // `extractGraph()` returns,gated on success。Pre-M912
+        // a future refactor adding e.g. an empty-batch short-
+        // circuit (returning false) would silently inflate
+        // `thermalSlowedExtracts` because the increment ran
+        // before the extract attempted。Post-M912 the counter
+        // semantics ("extracts that fired on slowed cadence")
+        // matches the implementation observably。
         var didExtractGraph = false
         if myIndex % cadence.graphExtractInterval == 0
             && knowledgeGraph != nil
@@ -466,13 +481,16 @@ public actor BASCognitiveOSConvenience {
             let thermal = sampleThermalIfDue()
             let decision = thermalExtractionDecision(
                 thermal: thermal, atIndex: myIndex)
-            if decision.shouldFire {
-                if decision.isSlowedFire {
+            switch decision {
+            case .skip:
+                thermalSkippedExtracts += 1
+            case .fireNormal:
+                didExtractGraph = await extractGraph()
+            case .fireSlowed:
+                didExtractGraph = await extractGraph()
+                if didExtractGraph {
                     thermalSlowedExtracts += 1
                 }
-                didExtractGraph = await extractGraph()
-            } else {
-                thermalSkippedExtracts += 1
             }
         }
 
@@ -560,22 +578,25 @@ public actor BASCognitiveOSConvenience {
         return cachedThermalState
     }
 
-    /// M908:typed pure decision struct returned from the
-    /// thermal-extraction policy。Splits the `should-fire` answer
-    /// from the `is-slowed-cadence` flag so the orchestrator
-    /// can advance counters correctly without mutating from the
-    /// predicate (M908 audit fix:chapter 二百一一 single-source-
-    /// of-truth — predicates must be pure)。
-    private struct ThermalExtractionDecision {
-        let shouldFire: Bool
-        let isSlowedFire: Bool
+    /// M912 hardening:replace M908's `ThermalExtractionDecision`
+    /// struct with an enum to remove the impossible state
+    /// `(shouldFire: false, isSlowedFire: true)`。Each case
+    /// carries exactly the information a caller needs;the type
+    /// system enforces the invariant "slowed implies fire"。
+    private enum ThermalExtractionDecision {
+        /// Skip the extract (thermal-gated)
+        case skip
+        /// Fire on the normal cadence (thermal not relevant)
+        case fireNormal
+        /// Fire on the slowed cadence (thermal is hot AND
+        /// slowdown boundary reached)
+        case fireSlowed
     }
 
-    /// M900 + M908 typed pure decision:given a thermal state
-    /// and the current iteration index,return whether
-    /// `extractGraph()` should fire under the configured
-    /// sensitivity policy AND whether the fire counts as a
-    /// slowed-cadence fire (vs. a normal fire)。
+    /// M900 + M908 + M912 typed pure decision:given a thermal
+    /// state and the current iteration index,return one of
+    /// `.skip` / `.fireNormal` / `.fireSlowed` under the
+    /// configured sensitivity policy。
     ///
     /// The natural cadence gate (`myIndex % graphExtractInterval
     /// == 0`)is checked by `observe(...)` BEFORE this is called,
@@ -583,73 +604,74 @@ public actor BASCognitiveOSConvenience {
     /// point is suppressed by thermal pressure。
     ///
     /// Semantics:
-    ///   - `.ignoreThermal`:always fire,not slowed
-    ///   - `.slowOnHot` + thermal hot:fire only on slowed cadence
-    ///     boundary (with overflow guard via `multipliedReporting
-    ///     Overflow`),flagged as slowed
-    ///   - `.slowOnHot` + thermal cool:always fire,not slowed
-    ///   - `.skipOnCritical` + thermal critical:never fire
-    ///   - `.skipOnCritical` + thermal lower:always fire
+    ///   - `.ignoreThermal`:always `.fireNormal`
+    ///   - `.slowOnHot` + thermal hot:`.fireSlowed` if on slowed
+    ///     cadence boundary,else `.skip`
+    ///   - `.slowOnHot` + thermal cool:`.fireNormal`
+    ///   - `.skipOnCritical` + thermal critical:`.skip`
+    ///   - `.skipOnCritical` + thermal lower:`.fireNormal`
+    ///
+    /// ## M912 fail-closed for both unknown defaults
+    ///
+    /// Pre-M912 `.slowOnHot` `@unknown default` returned
+    /// `.fireNormal`(fail-open),meaning a future thermal state
+    /// above `.critical`(if Apple ever adds one)would extract
+    /// at FULL cadence — opposite of policy intent。Post-M912
+    /// `.slowOnHot` `@unknown default` falls through to the hot
+    /// path (treats unknown as hot for slowdown purposes),
+    /// matching the policy's "give CPU back to chenglu mesh
+    /// under thermal load" semantic。
     private func thermalExtractionDecision(
         thermal: ProcessInfo.ThermalState,
         atIndex myIndex: Int
     ) -> ThermalExtractionDecision {
         switch cadence.thermalSensitivity {
         case .ignoreThermal:
-            return ThermalExtractionDecision(
-                shouldFire: true, isSlowedFire: false)
+            return .fireNormal
         case .slowOnHot:
             switch thermal {
             case .serious, .critical:
-                // M908 overflow guard:if interval × multiplier
-                // would trap (e.g. caller misconfigured very
-                // large values),clamp to Int.max。Substrate
-                // primitive must NEVER trap and disrupt the
-                // host turn loop (不变量 #1)。
-                let (raw, ovf) =
-                    cadence.graphExtractInterval
-                        .multipliedReportingOverflow(
-                            by: cadence
-                                .thermalSlowdownMultiplier)
-                let slowedInterval = ovf ? Int.max : raw
-                if myIndex % slowedInterval == 0 {
-                    return ThermalExtractionDecision(
-                        shouldFire: true,
-                        isSlowedFire: true)
-                } else {
-                    return ThermalExtractionDecision(
-                        shouldFire: false,
-                        isSlowedFire: false)
-                }
+                return slowOnHotHotDecision(atIndex: myIndex)
             case .nominal, .fair:
-                return ThermalExtractionDecision(
-                    shouldFire: true, isSlowedFire: false)
+                return .fireNormal
             @unknown default:
-                // Fail-open for unknown future states:treat
-                // as cool (preserves throughput on Apple
-                // adding a new thermal state above .critical)
-                return ThermalExtractionDecision(
-                    shouldFire: true, isSlowedFire: false)
+                // M912 fail-CLOSED:future-hotter states should
+                // slow MORE,not run at full cadence。Pre-M912
+                // fail-open masked the policy intent。
+                return slowOnHotHotDecision(atIndex: myIndex)
             }
         case .skipOnCritical:
             switch thermal {
             case .critical:
-                return ThermalExtractionDecision(
-                    shouldFire: false, isSlowedFire: false)
+                return .skip
             case .nominal, .fair, .serious:
-                return ThermalExtractionDecision(
-                    shouldFire: true, isSlowedFire: false)
+                return .fireNormal
             @unknown default:
-                // M908 fail-CLOSED for `.skipOnCritical` on
-                // unknown states:if Apple adds a new state
-                // above `.critical`,err on the side of
-                // protection (the policy's whole purpose is
-                // strict thermal floor)。Pre-M908 fail-open
-                // would silently let extracts through above
-                // critical,defeating the policy's intent。
-                return ThermalExtractionDecision(
-                    shouldFire: false, isSlowedFire: false)
+                // M908 fail-CLOSED for `.skipOnCritical`
+                // unknowns:strict thermal floor。
+                return .skip
             }
+        }
+    }
+
+    /// M912 helper:the hot-path decision for `.slowOnHot`,
+    /// extracted so both `.serious/.critical` and `@unknown
+    /// default` (a future hotter state) share the same logic。
+    /// Includes the M908 multiplication-overflow guard。
+    private func slowOnHotHotDecision(
+        atIndex myIndex: Int
+    ) -> ThermalExtractionDecision {
+        // M908 overflow guard:if interval × multiplier would
+        // trap,clamp to Int.max。Substrate primitive must
+        // NEVER trap (不变量 #1)。
+        let (raw, ovf) = cadence.graphExtractInterval
+            .multipliedReportingOverflow(
+                by: cadence.thermalSlowdownMultiplier)
+        let slowedInterval = ovf ? Int.max : raw
+        if myIndex % slowedInterval == 0 {
+            return .fireSlowed
+        } else {
+            return .skip
         }
     }
 

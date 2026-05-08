@@ -563,8 +563,7 @@ final class SampleHostChengluStressRunner: ObservableObject {
                                 // tools can plot the policy
                                 // effect over the run。
                                 thermalSensitivity:
-                                    String(describing:
-                                        thermalSensitivity),
+                                    thermalSensitivity.rawValue,
                                 thermalSkippedExtracts:
                                     observer.thermalSkippedExtracts,
                                 thermalSlowedExtracts:

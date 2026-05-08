@@ -967,6 +967,60 @@ final class BASCognitiveOSConvenienceTests: XCTestCase {
     }
 }
 
+// MARK: - M913 enum-contract pin tests
+
+extension BASCognitiveOSConvenienceTests {
+
+    /// M913:explicit raw values lock the wire format。Pin
+    /// each case → string mapping so a future PR renaming a
+    /// case identifier (without updating the rawValue) gets
+    /// caught at test time,not silently in schema 1.4.0 JSON。
+    func testM913ThermalSensitivityRawValuesPinned() {
+        XCTAssertEqual(
+            BASCognitiveOSThermalSensitivity
+                .ignoreThermal.rawValue,
+            "ignoreThermal")
+        XCTAssertEqual(
+            BASCognitiveOSThermalSensitivity
+                .slowOnHot.rawValue,
+            "slowOnHot")
+        XCTAssertEqual(
+            BASCognitiveOSThermalSensitivity
+                .skipOnCritical.rawValue,
+            "skipOnCritical")
+    }
+
+    /// M913:CaseIterable contract — exactly 3 cases。
+    func testM913ThermalSensitivityHasExactlyThreeCases() {
+        XCTAssertEqual(
+            BASCognitiveOSThermalSensitivity.allCases.count, 3)
+    }
+
+    /// M913:Codable round-trip — encoding and decoding via
+    /// JSONEncoder/Decoder produces stable JSON strings。
+    func testM913ThermalSensitivityCodableRoundTrip()
+        throws
+    {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        for sensitivity in
+            BASCognitiveOSThermalSensitivity.allCases
+        {
+            let data = try encoder.encode(sensitivity)
+            let decoded = try decoder.decode(
+                BASCognitiveOSThermalSensitivity.self,
+                from: data)
+            XCTAssertEqual(decoded, sensitivity)
+            // Verify the JSON shape is a quoted string
+            // matching rawValue
+            let json = String(data: data, encoding: .utf8)!
+            XCTAssertEqual(
+                json, "\"\(sensitivity.rawValue)\"",
+                "M913:JSON encoding must be quoted rawValue")
+        }
+    }
+}
+
 // MARK: - M908 hardening regression tests
 
 extension BASCognitiveOSConvenienceTests {
@@ -1013,39 +1067,52 @@ extension BASCognitiveOSConvenienceTests {
             "Cached thermal state must reflect first sample")
     }
 
-    /// M908 overflow guard:misconfigured very large
-    /// `graphExtractInterval × thermalSlowdownMultiplier`
-    /// must clamp to Int.max instead of trapping。
-    /// Substrate primitive must NEVER trap (不变量 #1)。
-    func testM908SlowdownOverflowGuardClampsSafely() async {
+    /// M912 (audit-the-fix):the M908 overflow test was a no-op
+    /// because `graphExtractInterval = Int.max/2` made the
+    /// natural-fire gate (`myIndex % interval == 0`) never
+    /// fire across small iter counts → the overflow code path
+    /// was never exercised。
+    ///
+    /// Post-M912 the test uses `graphExtractInterval = 2` +
+    /// `thermalSlowdownMultiplier = Int.max` so:
+    ///   - iter 2 hits the natural-fire gate (2 % 2 == 0)
+    ///   - inside, slowOnHotHotDecision computes
+    ///     `2 × Int.max` → overflow → clamps to Int.max
+    ///   - `iter 2 % Int.max != 0` → returns `.skip`
+    ///   - thermalSkippedExtracts increments
+    /// Pre-M912 this exact config would have trapped at
+    /// `2 × Int.max`,killing the host loop。
+    func testM912SlowdownOverflowGuardClampsSafely() async {
         let log = BASInMemoryEventLogStorage()
         let graph = BASKnowledgeGraph()
 
-        // Configure interval × multiplier to overflow Int64
         let conv = BASCognitiveOSConvenience(
             eventLog: log,
             knowledgeGraph: graph,
             sessionID: "s-overflow",
             cadence: BASCognitiveOSConvenienceCadence(
                 stateFoldInterval: 100,
-                graphExtractInterval: Int.max / 2,
+                graphExtractInterval: 2,
                 graphExtractEventCap: 5_000,
                 thermalSensitivity: .slowOnHot,
-                thermalSlowdownMultiplier: 4,
+                thermalSlowdownMultiplier: Int.max,
                 thermalSampleInterval: 1),
             thermalSampler: { .serious })
 
-        // Drive observes across the natural fire boundary
-        // (Int.max/2)— policy decision must NOT trap on
-        // the multiplier overflow path
-        for i in 0..<10 {
+        // Iterations 1..6: natural fires at iter 2/4/6 (3 total)
+        // Each of those hits slowOnHotHotDecision → overflow
+        // path → slowedInterval = Int.max → iter % Int.max != 0
+        // → returns .skip → thermalSkippedExtracts += 1
+        for i in 0..<6 {
             _ = await conv.observe(
                 event: makeEvent(
                     index: i, sessionID: "s-overflow"))
         }
-        // No assertion needed — survival of the loop is the
-        // pin。Pre-M908 this would have trapped on
-        // multiplication overflow inside the predicate。
+        let skipped = await conv.thermalSkippedExtractCount
+        XCTAssertEqual(skipped, 3,
+            "M912:3 natural fires at iter 2/4/6 must each " +
+            "exercise the overflow guard and skip。Pre-M912 " +
+            "the test trapped or never entered this path")
     }
 
     /// M908 fail-closed for `.skipOnCritical` `@unknown default`:
