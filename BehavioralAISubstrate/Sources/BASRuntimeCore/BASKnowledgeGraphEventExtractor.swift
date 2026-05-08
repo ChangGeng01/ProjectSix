@@ -156,6 +156,47 @@ public enum BASKnowledgeGraphEventExtractor {
     public static let cycleFeedbackActionPrefix: String =
         "cycle-detected:project:"
 
+    // MARK: - chapter 四百二 / M945 — memory-atom event constants
+
+    /// Discriminator action tag the extractor matches on to
+    /// recognize memory-atom events。Mirrors the value pinned in
+    /// `BASEventLogEntry.memoryAtomEventActionTag` (M941)。
+    /// Defined here to avoid a `BASRuntimeCore → BASMemory`
+    /// dependency cycle (BASMemory imports BASRuntimeCore for
+    /// the typed events,but the extractor lives in
+    /// BASRuntimeCore;the discriminator string is the typed
+    /// boundary)。
+    public static let memoryAtomEventActionTag: String =
+        "memory-atom-event"
+
+    /// Node weight for synthesized atom nodes。Matches the
+    /// existing `mentionsEdgeWeight` magnitude band。
+    public static let memoryAtomNodeWeight: Double = 0.6
+
+    /// Edge weight for `causes` edges between sequential
+    /// memory-atom events on the SAME atom (e.g. admit then
+    /// tier-change)。Slightly LOWER than the regular
+    /// `sequentialCausesEdgeWeight` because memory-atom events
+    /// are substrate-internal,not user-driven。
+    public static let memoryAtomCausesEdgeWeight: Double = 0.4
+
+    /// Edge weight for `mentions` edges from a memory-atom
+    /// event → atom node。Higher than regular mentions
+    /// because the relationship is direct (the event IS the
+    /// atom mutation)。
+    public static let memoryAtomTouchesEdgeWeight: Double = 0.5
+
+    /// Edge weight reserved for future chapters that record
+    /// atom decay → event。Typed slot per chapter 一百八十五;
+    /// not yet wired in M945 (kept as constant for forward-
+    /// compat doctrine pin)。
+    public static let memoryAtomDecayEdgeWeight: Double = 0.3
+
+    /// Reason code emitted when memory-atom extraction fires
+    /// (audit anchor)。
+    public static let memoryAtomReasonCodePrefix: String =
+        "knowledge-graph-extract:memory-atom"
+
     // MARK: - Extract
 
     /// Walk a session's event log + populate the graph using
@@ -239,6 +280,13 @@ public enum BASKnowledgeGraphEventExtractor {
         // Track project nodes we've ensured exist
         var ensuredProjects: Set<String> = []
 
+        // chapter 四百二 / M945 — track per-atom last event for
+        // memory-atom causes edges (sequential events touching
+        // the same atom)。
+        var atomToLastEventID: [String: String] = [:]
+        var ensuredAtoms: Set<String> = []
+        var memoryAtomEventsExtracted = 0
+
         // Heuristic 7 (M860): track FIRST event per project
         // + count of delays edges per project for closing-edge
         // synthesis。
@@ -265,6 +313,87 @@ public enum BASKnowledgeGraphEventExtractor {
             } catch {
                 skippedEvents += 1
                 continue
+            }
+
+            // chapter 四百二 / M945 — memory-atom event branch。
+            // Recognized by discriminator action tag (kept as a
+            // typed String constant in BASRuntimeCore to avoid
+            // importing BASMemory)。AtomID surfaces in
+            // `event.memoryRefs.first` per M941 contract。
+            if event.actions.contains(
+                memoryAtomEventActionTag),
+               let atomID = event.memoryRefs.first,
+               !atomID.isEmpty
+            {
+                memoryAtomEventsExtracted += 1
+                let atomNodeID = "atom:\(atomID)"
+                if !ensuredAtoms.contains(atomNodeID) {
+                    let atomNode = BASKnowledgeNode(
+                        nodeID: atomNodeID,
+                        kind: .atom,
+                        label: atomID,
+                        createdAtMs: event.timestampMs)
+                    do {
+                        try await graph.insert(node: atomNode)
+                        addedNodes += 1
+                    } catch BASKnowledgeGraphError
+                        .duplicateNodeID
+                    {
+                        // re-extraction;idempotent skip
+                    } catch {
+                        // skip + continue
+                    }
+                    ensuredAtoms.insert(atomNodeID)
+                }
+                // Mentions edge: event → atom (the event IS the
+                // atom mutation,so this records the touch)
+                let touchEdgeID =
+                    "mentions:\(event.eventID)→\(atomNodeID)"
+                let touchEdge = BASKnowledgeEdge(
+                    edgeID: touchEdgeID,
+                    fromNodeID: event.eventID,
+                    toNodeID: atomNodeID,
+                    kind: .mentions,
+                    weight: memoryAtomTouchesEdgeWeight,
+                    createdAtMs: event.timestampMs)
+                do {
+                    try await graph.insert(edge: touchEdge)
+                    addedEdges += 1
+                } catch BASKnowledgeGraphError
+                    .duplicateEdgeID
+                {
+                    // re-extraction;idempotent skip
+                } catch {
+                    // skip
+                }
+                // Causes edge: prior event touching same atom →
+                // this event。Builds the atom-history chain。
+                if let priorID =
+                    atomToLastEventID[atomID]
+                {
+                    let causesEdgeID =
+                        "causes:\(priorID)→\(event.eventID)"
+                    let causesEdge = BASKnowledgeEdge(
+                        edgeID: causesEdgeID,
+                        fromNodeID: priorID,
+                        toNodeID: event.eventID,
+                        kind: .causes,
+                        weight:
+                            memoryAtomCausesEdgeWeight,
+                        createdAtMs: event.timestampMs)
+                    do {
+                        try await graph.insert(
+                            edge: causesEdge)
+                        addedEdges += 1
+                    } catch BASKnowledgeGraphError
+                        .duplicateEdgeID
+                    {
+                        // idempotent
+                    } catch {
+                        // skip
+                    }
+                }
+                atomToLastEventID[atomID] = event.eventID
             }
 
             // Heuristics 2-6 require project tag
@@ -559,6 +688,12 @@ public enum BASKnowledgeGraphEventExtractor {
                 "closing-edges-synthesized:" +
                 "\(closingEdgesSynthesized)")
             reasonCodes.append(closingEdgeAnchorCode)
+        }
+        if memoryAtomEventsExtracted > 0 {
+            reasonCodes.append(
+                "\(memoryAtomReasonCodePrefix):" +
+                "events-extracted:" +
+                "\(memoryAtomEventsExtracted)")
         }
 
         return BASKnowledgeGraphEventExtractionResult(
