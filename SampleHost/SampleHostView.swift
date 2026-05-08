@@ -50,6 +50,11 @@ struct SampleHostView: View {
                     // mesh stress on real iPhone
                     SampleHostChengluStressPanel()
 
+                    // Chapter 四百一 (M934) — LLM Extraction
+                    // Engine demo (M932 engine + M920 mock,
+                    // surfaces all 9 byproducts in UI)
+                    SampleHostLLMExtractionDemoView()
+
                     SampleHostHybridBenchPanel(model: model)
 
                     SampleHostActiveSessionPanel(model: model)
