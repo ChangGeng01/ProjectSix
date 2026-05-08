@@ -638,6 +638,20 @@ public struct BASEBrainRuntimeCoordinator {
     public static let layerReconciliationBudgetCeiling:
         Double = 1.0
 
+    /// chapter 四百二 / M948:optional event log surface for hosts
+    /// that opt into event-sourced atom storage。Default nil
+    /// preserves byte-equal pre-Phase-1 behavior。
+    public let memoryEventLog: (any BASEventLogStorage)?
+
+    /// chapter 四百二 / M948:optional mutation event emitter
+    /// hosts can use to bridge `BASMemoryMutationWriter` outcomes
+    /// into the typed event log。Default nil preserves byte-equal
+    /// pre-Phase-1 behavior。Per-turn `runTurn` is unchanged in
+    /// Phase 1;Phase 2 (chapter 四百三) collapses the per-call
+    /// emit-then-write step into one routine。
+    public let memoryMutationEventEmitter:
+        BASMemoryMutationEventEmitter?
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -655,7 +669,10 @@ public struct BASEBrainRuntimeCoordinator {
         hostConstitution: BASHostConstitution? = nil,
         hostConstitutionVault: BASHostConstitutionVault? = nil,
         hostVersionTree: BASHostVersionTree? = nil,
-        hostForgetRequest: BASForgetRequest? = nil
+        hostForgetRequest: BASForgetRequest? = nil,
+        memoryEventLog: (any BASEventLogStorage)? = nil,
+        memoryMutationEventEmitter:
+            BASMemoryMutationEventEmitter? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -674,6 +691,9 @@ public struct BASEBrainRuntimeCoordinator {
         self.hostConstitutionVault = hostConstitutionVault
         self.hostVersionTree = hostVersionTree
         self.hostForgetRequest = hostForgetRequest
+        self.memoryEventLog = memoryEventLog
+        self.memoryMutationEventEmitter =
+            memoryMutationEventEmitter
     }
 
     public func runTurn(
