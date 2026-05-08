@@ -63,6 +63,17 @@ public enum BASCognitiveOSGapStatus:
     /// validation,external toolchain conversions。
     case external = "external"
 
+    /// Chapter 四百 / M917+M918:external work,but typed
+    /// substrate-side contract exists (input schema +
+    /// validator + typed result type)。The external work
+    /// (Python training pipeline / coreml conversion CLI)
+    /// honors the typed contract rather than guessing the
+    /// substrate's expected I/O shape。Reduces drift between
+    /// external + substrate without the substrate doing the
+    /// external work itself。
+    case externalSubstrateContractTyped =
+        "external-substrate-contract-typed"
+
     /// Environmental (toolchain / Xcode-version) issue。Not
     /// fixable at the substrate level — depends on toolchain
     /// updates。
@@ -138,7 +149,14 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// Doctrine version。Bumped when a gap changes status (eg.
     /// G6 transitions from `substrateClosedSDKBridgePending`
     /// to `substrateClosed` once the SDK bridge ships)。
-    public static let doctrineVersion: String = "ADR-016.M872"
+    /// M918 bump:G8 + G11 transitioned from `external` to
+    /// `externalSubstrateContractTyped` (substrate-side typed
+    /// contracts shipped — `BASMambaTrainingCorpusSchema` +
+    /// `BASCoreMLConversionContract`)。G6 gained an explicit
+    /// strategy taxonomy via `BASFoundationModelsToolBridge`
+    /// (M916) but stays at `substrateClosedSDKBridgePending`
+    /// until the iOS 26 SDK Tool conformer bridge stabilizes。
+    public static let doctrineVersion: String = "ADR-016.M918"
 
     /// Query the typed status of a specific gap。
     public static func status(
@@ -166,13 +184,22 @@ public enum BASCognitiveOSCompletionDoctrine {
             return .substrateClosed
 
         case .g8MambaSSM:
-            // Python training pipeline + GPU + corpus —
-            // genuinely external work,not substrate
-            return .external
+            // M917:typed substrate-side input contract
+            // shipped (BASMambaTrainingCorpusSchema +
+            // BASMambaTrainingValidator)。Python training
+            // pipeline + GPU + corpus still external,but now
+            // honors the typed contract instead of guessing
+            // the substrate's I/O shape。
+            return .externalSubstrateContractTyped
 
         case .g11MLXCoreML:
-            // External toolchain (mlx → coreml conversion CLI)
-            return .external
+            // M918:typed substrate-side conversion contract
+            // shipped (BASCoreMLConversionContract +
+            // input/output/parity Codable specs +
+            // validator)。MLX → CoreML CLI driver still
+            // external,but now reads + emits the typed
+            // contract on both ends。
+            return .externalSubstrateContractTyped
 
         // P3 eval
         case .g12AutoEval:
@@ -209,9 +236,25 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// All genuinely external gaps (cannot be done at substrate
     /// level — Python pipelines,external toolchain,device
     /// validation)。
+    /// M918:returns only `.external` status,not the M917+M918
+    /// typed-contract flavor。Use `externalContractTypedGaps()`
+    /// for that subset。
     public static func externalGaps() -> [BASCognitiveOSGap] {
         BASCognitiveOSGap.allCases.filter {
             status(of: $0) == .external
+        }
+    }
+
+    /// M918:all gaps with `externalSubstrateContractTyped`
+    /// status — external work,but with substrate-side typed
+    /// contract shipped。Currently G8 (Mamba SSM training) +
+    /// G11 (MLX→CoreML conversion)。
+    public static func externalContractTypedGaps()
+        -> [BASCognitiveOSGap]
+    {
+        BASCognitiveOSGap.allCases.filter {
+            status(of: $0)
+                == .externalSubstrateContractTyped
         }
     }
 
@@ -231,9 +274,13 @@ public enum BASCognitiveOSCompletionDoctrine {
 
     /// Closure ratio — fraction of P1-P3 gaps that are closed
     /// at substrate level (counts substrateClosed +
-    /// substrateClosedSDKBridgePending toward closure since
-    /// those are substrate-tractable;counts external +
-    /// environmental against)。
+    /// substrateClosedSDKBridgePending +
+    /// externalSubstrateContractTyped toward closure since
+    /// those are all substrate-tractable;counts pure
+    /// `external` + `environmental` against)。
+    /// M918 update:typed-contract external gaps now count
+    /// toward closure since the substrate-side surface IS
+    /// shipped (only the Python / CLI external work remains)。
     public static func substrateClosureRatio() -> Double {
         let total = Double(BASCognitiveOSGap.allCases.count)
         guard total > 0 else { return 0 }
@@ -242,6 +289,7 @@ public enum BASCognitiveOSCompletionDoctrine {
                 let s = status(of: gap)
                 return s == .substrateClosed
                     || s == .substrateClosedSDKBridgePending
+                    || s == .externalSubstrateContractTyped
             }.count)
         return closedCount / total
     }

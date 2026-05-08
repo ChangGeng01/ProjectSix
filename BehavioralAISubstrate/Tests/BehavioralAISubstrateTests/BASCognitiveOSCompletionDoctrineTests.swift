@@ -16,10 +16,13 @@ final class BASCognitiveOSCompletionDoctrineTests:
     // MARK: - Doctrine version pin
 
     func testDoctrineVersionPin() {
+        // M918 bump:G8 + G11 transitioned from `.external`
+        // to `.externalSubstrateContractTyped`,G6 gained
+        // explicit BASFoundationModelsToolBridge taxonomy。
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M872",
+            "ADR-016.M918",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
             "stability doctrine")
@@ -68,18 +71,24 @@ final class BASCognitiveOSCompletionDoctrineTests:
                 .status(of: .g10LayerActors),
             .substrateClosed,
             "G10 closed by M855")
+        // M917+M918:G8 + G11 transitioned from `.external`
+        // to `.externalSubstrateContractTyped` because the
+        // substrate-side typed contracts shipped (Mamba
+        // training corpus schema + CoreML conversion contract)。
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .status(of: .g8MambaSSM),
-            .external,
-            "G8 needs Python training pipeline + GPU " +
-            "+ corpus — genuinely external")
+            .externalSubstrateContractTyped,
+            "G8 still external (Python training pipeline + " +
+            "GPU + corpus) but now has typed substrate-side " +
+            "contract via M917 BASMambaTrainingCorpusSchema")
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .status(of: .g11MLXCoreML),
-            .external,
-            "G11 needs external toolchain (mlx → coreml " +
-            "conversion CLI)")
+            .externalSubstrateContractTyped,
+            "G11 still external (mlx → coreml CLI driver) " +
+            "but now has typed substrate-side contract via " +
+            "M918 BASCoreMLConversionContract")
     }
 
     func testG12IsSubstrateClosed() {
@@ -129,17 +138,33 @@ final class BASCognitiveOSCompletionDoctrineTests:
     }
 
     func testExternalGapsListMatchesExpected() {
+        // M918:`.external` (pure) now narrows to G13 only。
+        // G8 + G11 moved to `.externalSubstrateContractTyped`。
         let external = BASCognitiveOSCompletionDoctrine
             .externalGaps()
         let expected: Set<BASCognitiveOSGap> = [
-            .g8MambaSSM,
-            .g11MLXCoreML,
             .g13MambaFrontier,
         ]
         XCTAssertEqual(Set(external), expected,
-            "External gaps:G8 SSM training + G11 MLX→CoreML " +
-            "conversion + G13 Mamba frontier research")
-        XCTAssertEqual(external.count, 3)
+            "Pure-external gaps after M918:only G13 " +
+            "frontier research (no substrate-side contract)")
+        XCTAssertEqual(external.count, 1)
+    }
+
+    /// M918:G8 + G11 now have typed substrate-side contracts
+    /// shipped。Tests pin the new typed-contract aggregate。
+    func testExternalContractTypedGapsListMatchesExpected() {
+        let typed = BASCognitiveOSCompletionDoctrine
+            .externalContractTypedGaps()
+        let expected: Set<BASCognitiveOSGap> = [
+            .g8MambaSSM,
+            .g11MLXCoreML,
+        ]
+        XCTAssertEqual(Set(typed), expected,
+            "Typed-contract external gaps:G8 (M917 " +
+            "MambaTrainingCorpusSchema) + G11 (M918 " +
+            "CoreMLConversionContract)")
+        XCTAssertEqual(typed.count, 2)
     }
 
     func testEnvironmentalGapsListIsEmpty() {
@@ -152,15 +177,17 @@ final class BASCognitiveOSCompletionDoctrineTests:
             "an unshipped roadmap capability")
     }
 
-    func testSubstrateClosureRatioIsTenOfThirteen() {
-        // 9 substrateClosed + 1 substrateClosedSDKBridgePending
-        // = 10 substrate-tractable / 13 total = 0.769...
+    func testSubstrateClosureRatioIsTwelveOfThirteen() {
+        // M918:9 substrateClosed + 1 SDK-bridge-pending +
+        // 2 typed-contract-external (G8 + G11) = 12 substrate-
+        // tractable / 13 total = 0.923...
         let ratio = BASCognitiveOSCompletionDoctrine
             .substrateClosureRatio()
         XCTAssertEqual(
-            ratio, 10.0 / 13.0, accuracy: 0.0001,
-            "Substrate closure ratio: 10/13 ≈ 76.9% " +
-            "(9 closed + 1 SDK-bridge-pending) / 13 total")
+            ratio, 12.0 / 13.0, accuracy: 0.0001,
+            "Substrate closure ratio post-M918: 12/13 ≈ " +
+            "92.3% (9 closed + 1 SDK-bridge-pending + 2 " +
+            "typed-contract-external) / 13 total")
     }
 
     // MARK: - Lint guards
