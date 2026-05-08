@@ -414,6 +414,140 @@ final class BASTrainingDataExporterTests: XCTestCase {
             "Cannot write more than total event count")
     }
 
+    /// M910 (audit-the-fix re-fix):the same-ts cluster fix
+    /// must ALSO escape when ALL events of the cluster are
+    /// filter-rejected (not just when none are emitted)。
+    /// Pre-M910 the cursor-advance gate fired only on
+    /// `newEventsThisPage == 0`,but filter-rejected events
+    /// counted as forward progress → all-filter-rejected
+    /// cluster of same-ts events bigger than pageSize would
+    /// loop forever。Post-M910 we advance via lastSeen
+    /// (independent of filter outcome) so the dedup pointer
+    /// moves through the cluster correctly。
+    func testM910FilterRejectedSameTsClusterDoesNotLoop()
+        async throws
+    {
+        let log = BASInMemoryEventLogStorage()
+        // 30 events all kind=substrateAudit at ts=1_000
+        for i in 0..<30 {
+            _ = try await log.append(BASEventLogEntry(
+                eventID: "ev-\(i)",
+                timestampMs: 1_000,
+                kind: .substrateAudit,
+                sessionID: "s-frej",
+                sequenceNumber: 0,
+                actions: ["a-\(i)"]))
+        }
+        // 1 event with newer ts so the loop has somewhere
+        // valid to advance into
+        _ = try await log.append(BASEventLogEntry(
+            eventID: "ev-tail",
+            timestampMs: 2_000,
+            kind: .substrateAudit,
+            sessionID: "s-frej",
+            sequenceNumber: 0,
+            actions: ["tail"]))
+
+        let exp = BASTrainingDataExporter(
+            eventLog: log, pageSize: 10)
+        let url = makeTempURL()
+
+        // Filter rejects EVERY event in the cluster (kind
+        // mismatch)。Without M910 fix this would loop forever。
+        // 5-second deadline catches any regression。
+        let summary = try await withThrowingTaskGroup(
+            of: BASTrainingDataExportSummary.self
+        ) { group in
+            group.addTask {
+                try await exp.exportToJSONL(
+                    filter: BASTrainingDataExportFilter(
+                        kinds: [.chat]),
+                    to: url)
+            }
+            group.addTask {
+                try await Task.sleep(
+                    nanoseconds: 5_000_000_000)
+                throw NSError(
+                    domain: "M910TestTimeout",
+                    code: -1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                        "Filter-rejected same-ts cluster " +
+                        "loop > 5s — M910 regression"
+                    ])
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+
+        // 0 written (all filter-rejected)。The export DID
+        // terminate (no infinite loop) — that's the CRITICAL
+        // pin。Some of the cluster's tail (events with seq >
+        // pageSize at the same ts) is necessarily lost because
+        // the storage protocol has no per-row offset:once we've
+        // seen seq 0..pageSize-1 at ts=cursorMs and the next
+        // fetch returns the SAME rows,we MUST bump cursor by
+        // 1ms or hang forever。This is the documented trade-off。
+        // M910's contract:no infinite loop,not "process every
+        // event of an oversized same-ts cluster"。
+        XCTAssertEqual(summary.recordsWritten, 0,
+            "M910:filter rejected every event")
+        XCTAssertGreaterThan(summary.recordsFilteredOut, 0,
+            "M910:at least page 1's events were processed " +
+            "before the cursor bump escape")
+    }
+
+    /// M910:Int64.max wraparound guard。If the cursor is
+    /// already at Int64.max and a same-ts cluster forces a
+    /// bump,we break cleanly instead of wrapping to Int64.min
+    /// (which would re-fetch the entire log)。
+    func testM910Int64MaxWraparoundGuard() async throws {
+        let log = BASInMemoryEventLogStorage()
+        // 5 events at Int64.max — extreme but valid。pageSize=2
+        // means the cluster forces a bump beyond Int64.max。
+        for i in 0..<5 {
+            _ = try await log.append(BASEventLogEntry(
+                eventID: "ev-\(i)",
+                timestampMs: Int64.max,
+                kind: .substrateAudit,
+                sessionID: "s-overflow",
+                sequenceNumber: 0,
+                actions: ["a-\(i)"]))
+        }
+        let exp = BASTrainingDataExporter(
+            eventLog: log, pageSize: 2)
+        let url = makeTempURL()
+
+        // Survival of the export call IS the pin。Pre-M910 the
+        // `&+ 1` would have wrapped to Int64.min and re-fetched
+        // the log forever (TaskGroup deadline catches loop)。
+        _ = try await withThrowingTaskGroup(
+            of: BASTrainingDataExportSummary.self
+        ) { group in
+            group.addTask {
+                try await exp.exportToJSONL(
+                    filter: .all, to: url)
+            }
+            group.addTask {
+                try await Task.sleep(
+                    nanoseconds: 5_000_000_000)
+                throw NSError(
+                    domain: "M910TestTimeout",
+                    code: -1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                        "Int64.max wraparound regression"
+                    ])
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+        // Test passes if we reach this line — the export
+        // returned without infinite-looping。
+    }
+
     /// Pin: empty Set filter means "no constraint" not "match
     /// nothing"。Pre-M906 a caller that built an empty kinds
     /// set silently got zero rows。

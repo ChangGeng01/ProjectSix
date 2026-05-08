@@ -331,14 +331,41 @@ public actor BASTrainingDataExporter {
         var bytesWritten: Int64 = 0
         var firstTs: Int64? = nil
         var lastTs: Int64? = nil
-        var lastEmittedTs: Int64 = .min
-        var lastEmittedSeq: Int64 = .min
+
+        // M910 (audit-the-fix re-fix):track the LAST-SEEN
+        // (ts, seq) for dedup purposes,not last-EMITTED。
+        //
+        // M906 used `lastEmittedTs/Seq` which only advanced on
+        // writes,not on filter-rejects。An all-filter-rejected
+        // same-ts cluster bigger than pageSize would re-fetch
+        // forever:
+        //   - Page N filter-rejects 10 same-ts events;
+        //     lastEmitted unchanged (no writes)
+        //   - Page N+1 fetches `>= cursor`,gets the SAME 10
+        //     events,each passes dedup (lastEmittedTs still
+        //     stale),each filter-rejects again,
+        //     newEventsThisPage = 10 → cursor doesn't bump
+        //   - Repeat forever
+        // Post-M910 we advance `lastSeenTs/Seq` on EVERY event
+        // that passes dedup,whether it's emitted or filter-
+        // rejected,so the dedup pointer moves through the
+        // cluster regardless of filter outcome。Then the cursor-
+        // bump escape can correctly fire on a stuck page。
+        var lastSeenTs: Int64 = .min
+        var lastSeenSeq: Int64 = .min
 
         var cursorMs: Int64 = filter.sinceMs ?? 0
         let untilMs: Int64 = filter.untilMs ?? .max
         // M906:caller-supplied or wall-clock fallback。Wall-clock
         // breaks byte-stable determinism;explicit value preserves
         // M892 replay-determinism doctrine for downstream caches。
+        // M910 hardening:precondition guards against
+        // arithmetically-impossible exportedAtMs values。
+        if let pinned = exportedAtMs {
+            precondition(pinned >= 0,
+                "exportedAtMs must be non-negative; " +
+                "caller passed \(pinned)")
+        }
         let resolvedExportedAtMs: Int64 = exportedAtMs
             ?? Int64(Date().timeIntervalSince1970 * 1000)
 
@@ -347,39 +374,38 @@ public actor BASTrainingDataExporter {
                 sinceTimestampMs: cursorMs, limit: pageSize)
             if batch.isEmpty { break }
 
-            // M906 fix:track whether this page made forward
-            // progress (emitted at least one new event)。If a
-            // full-size page returns nothing new (e.g. all rows
-            // share the same timestampMs as cursorMs and were
-            // already emitted),we MUST advance cursorMs by 1ms
-            // unconditionally to escape the same-ts cluster。
-            // Pre-M906 the cursor only advanced to the page's
-            // last timestamp,so a page where every row had
-            // ts == cursorMs would loop forever。This was a
-            // production-killer on the 2.73M-event corpus where
-            // burst writes share millisecond timestamps。
-            var newEventsThisPage = 0
+            // M910:track WRITES this page (not "events seen")
+            // so the cursor-bump escape correctly fires when a
+            // full-size page makes no FORWARD progress (every
+            // row was a dedup repeat,regardless of filter)。
+            var advancedThisPage = 0
 
             for event in batch {
                 if event.timestampMs >= untilMs {
                     break pageLoop
                 }
-                // Skip events already emitted in prior page
-                // overlap (cursor advances by max ts of prior
-                // batch,so next batch may include re-fetched
-                // tail rows)。
-                if event.timestampMs < lastEmittedTs ||
-                    (event.timestampMs == lastEmittedTs
-                     && event.sequenceNumber <= lastEmittedSeq)
+                // M910:dedup uses lastSeenTs/Seq which advance
+                // on EVERY event that we've already processed
+                // (emitted or filter-rejected),so an all-
+                // filter-rejected same-ts cluster correctly
+                // signals "no new events this page" once we've
+                // walked the entire cluster。
+                if event.timestampMs < lastSeenTs ||
+                    (event.timestampMs == lastSeenTs
+                     && event.sequenceNumber <= lastSeenSeq)
                 {
                     continue
                 }
+                // Past this point the event is NEW vs. prior
+                // pages,so it counts as forward progress for
+                // cursor advancement regardless of filter
+                // outcome。
+                advancedThisPage += 1
+                lastSeenTs = event.timestampMs
+                lastSeenSeq = event.sequenceNumber
+
                 if !passesFilter(event, filter: filter) {
                     recordsFilteredOut += 1
-                    // M906:filtered-out events DO count as
-                    // forward progress for cursor-advance
-                    // purposes (they're new vs. last page)
-                    newEventsThisPage += 1
                     continue
                 }
 
@@ -415,7 +441,6 @@ public actor BASTrainingDataExporter {
                 }
 
                 recordsWritten += 1
-                newEventsThisPage += 1
                 bytesWritten += Int64(line.count)
                 if firstTs == nil
                     || event.timestampMs < (firstTs ?? .max)
@@ -427,8 +452,6 @@ public actor BASTrainingDataExporter {
                 {
                     lastTs = event.timestampMs
                 }
-                lastEmittedTs = event.timestampMs
-                lastEmittedSeq = event.sequenceNumber
 
                 if let cap = filter.limit,
                    recordsWritten >= cap
@@ -441,25 +464,49 @@ public actor BASTrainingDataExporter {
             // hit the tail of the log。
             if batch.count < pageSize { break }
 
-            // M906 fix:advance cursor with infinite-loop guard。
-            // If the full-size page made ZERO forward progress
-            // (every row was a dedup repeat from prior page —
-            // means all rows share the same timestampMs),we
-            // MUST bump cursor by 1ms to escape the cluster,
-            // otherwise we re-fetch the same rows forever。
+            // M906/M910:advance cursor with infinite-loop guard。
+            // If a full-size page made zero forward progress
+            // (every row was a dedup repeat from prior page,
+            // i.e. all rows share the same timestampMs as the
+            // cursor),we MUST bump cursor by 1ms to escape the
+            // cluster — otherwise we re-fetch the same rows
+            // forever。
+            //
+            // ## Documented trade-off
+            //
+            // The storage protocol's `events(sinceTimestampMs:
+            // limit:)` has NO per-row offset。So when a same-ts
+            // cluster is bigger than pageSize,we walk the
+            // FIRST `pageSize` rows of the cluster and then
+            // bump past `cursorMs` — necessarily LOSING the
+            // cluster's tail (rows with seq >= pageSize at the
+            // same ts)。This is preferable to an infinite loop
+            // but it IS a corpus-completeness gap。Hosts that
+            // need full coverage of pathological clusters
+            // should:
+            //   1. configure a pageSize >= max-expected-cluster-
+            //      size,or
+            //   2. extend the storage protocol with a
+            //      `(ts, seq)` cursor in a future M-number
+            //
+            // M910 wraparound fix:use `addingReportingOverflow`
+            // instead of `&+`。If the cursor is already at
+            // Int64.max,wrapping to Int64.min would re-fetch
+            // the entire log forever。Instead we break out
+            // cleanly。
             if let last = batch.last {
                 let candidate = last.timestampMs
                 if candidate <= cursorMs
-                    && newEventsThisPage == 0
+                    && advancedThisPage == 0
                 {
-                    // Stuck at same-ts cluster bigger than
-                    // pageSize — break out by advancing 1ms。
-                    // We may skip a small number of events at
-                    // the cluster tail with seq > those in the
-                    // current page,but this is preferable to
-                    // an infinite loop。Caller diagnoses by
-                    // checking recordsFilteredOut + log size。
-                    cursorMs = candidate &+ 1
+                    let (next, ovf) = candidate
+                        .addingReportingOverflow(1)
+                    if ovf {
+                        // At Int64.max — no further events
+                        // possible,exit cleanly。
+                        break
+                    }
+                    cursorMs = next
                 } else {
                     cursorMs = candidate
                 }
