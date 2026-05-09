@@ -52,6 +52,7 @@
 //     into V2 by wrapping
 
 import Foundation
+import BASOrchestration
 import BASRuntimeCore
 
 /// V2 runtime engine actor wrapping V1 `BASEBrainRuntimeCoordinator`
@@ -90,13 +91,25 @@ public actor BASTurnRuntimeEngine {
     /// V2 runTurn:delegates to V1 coordinator,then emits a
     /// `.complete` audit envelope on the wired event log
     /// (when present)。Byte-equal to V1's result。
+    ///
+    /// chapter 四百六 / M989:`auditProjections` parameter
+    /// added。 Hosts pre-build the M976
+    /// `BASRuntimeAuditProjectionsBundle` (5 namespace slots
+    /// for kunlun / abyssal / cthulhu / tribunal /
+    /// riskCalibration) and pass it here。 The V2 actor
+    /// surfaces the bundle's `populatedSlotCount` in the
+    /// `.complete` envelope payload for downstream audit
+    /// consumers。
     public func runTurn(
         _ request: BASEBrainTurnRequest,
+        auditProjections:
+            BASRuntimeAuditProjectionsBundle? = nil,
         timestampMsOverride: Int64? = nil
     ) async -> BASEBrainTurnResult {
         let result = coordinator.runTurn(request)
         await emitCompleteEnvelope(
             for: result,
+            auditProjections: auditProjections,
             timestampMsOverride: timestampMsOverride)
         return result
     }
@@ -105,6 +118,8 @@ public actor BASTurnRuntimeEngine {
 
     private func emitCompleteEnvelope(
         for result: BASEBrainTurnResult,
+        auditProjections:
+            BASRuntimeAuditProjectionsBundle?,
         timestampMsOverride: Int64?
     ) async {
         guard let log = eventLog else { return }
@@ -112,6 +127,8 @@ public actor BASTurnRuntimeEngine {
         let nextSeq = sequenceCounter
         sequenceCounter += 1
 
+        let projectionsCount =
+            auditProjections?.populatedSlotCount ?? 0
         let summary = BASRuntimeAuditEmissionSummary(
             traceID: result.runtimeTrace.sessionID,
             verdictLevelRaw:
@@ -123,7 +140,9 @@ public actor BASTurnRuntimeEngine {
             auditID:
                 result.sovereignAuditEntry?
                     .auditID ?? "unassigned",
-            runMode: result.budgetFrame.runMode.rawValue)
+            runMode: result.budgetFrame.runMode.rawValue,
+            auditProjectionsPopulatedSlotCount:
+                projectionsCount)
 
         let turnID =
             result.sovereignAuditEntry?.turnID ??

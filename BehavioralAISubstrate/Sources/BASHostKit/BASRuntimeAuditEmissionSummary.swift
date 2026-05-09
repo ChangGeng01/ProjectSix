@@ -80,6 +80,12 @@ public struct BASRuntimeAuditEmissionSummary:
     /// `BASEBrainRunMode.rawValue`)。
     public let runMode: String
 
+    /// chapter 四百六 / M989 — count of populated audit-
+    /// projection slots across the V2 aggregator bundle (kunlun
+    /// + abyssal + cthulhu + tribunal + riskCalibration)。 0
+    /// when no aggregator was supplied or all namespaces empty。
+    public let auditProjectionsPopulatedSlotCount: Int
+
     // MARK: - Init
 
     public init(
@@ -88,7 +94,8 @@ public struct BASRuntimeAuditEmissionSummary:
         permitModeRaw: String,
         ticketCount: Int,
         auditID: String,
-        runMode: String
+        runMode: String,
+        auditProjectionsPopulatedSlotCount: Int = 0
     ) {
         self.traceID = traceID
         self.verdictLevelRaw = verdictLevelRaw
@@ -96,6 +103,8 @@ public struct BASRuntimeAuditEmissionSummary:
         self.ticketCount = max(0, ticketCount)
         self.auditID = auditID
         self.runMode = runMode
+        self.auditProjectionsPopulatedSlotCount =
+            max(0, auditProjectionsPopulatedSlotCount)
     }
 
     // MARK: - Stable JSON encoding
