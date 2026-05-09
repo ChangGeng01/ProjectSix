@@ -102,6 +102,14 @@ public struct BASRuntimeAuditEmissionSummary:
     public let failedStageCount: Int
     public let totalStageDurationMs: Int
 
+    /// chapter 四百九 / M1008 — V2 stage plan summary from
+    /// the M1006 BASTurnRuntimeStagePlan + M1007 validation。
+    /// 0 fields when no plan supplied (V1 delegation path)。
+    /// Audit consumers grep `stagePlanIsCanonical == false`
+    /// to filter turns running degraded plan variants。
+    public let stagePlanStepCount: Int
+    public let stagePlanIsCanonical: Bool
+
     // MARK: - Init
 
     public init(
@@ -115,7 +123,9 @@ public struct BASRuntimeAuditEmissionSummary:
         permitEscalationFiredStageCount: Int = 0,
         stageCount: Int = 0,
         failedStageCount: Int = 0,
-        totalStageDurationMs: Int = 0
+        totalStageDurationMs: Int = 0,
+        stagePlanStepCount: Int = 0,
+        stagePlanIsCanonical: Bool = false
     ) {
         self.traceID = traceID
         self.verdictLevelRaw = verdictLevelRaw
@@ -131,6 +141,8 @@ public struct BASRuntimeAuditEmissionSummary:
         self.failedStageCount = max(0, failedStageCount)
         self.totalStageDurationMs =
             max(0, totalStageDurationMs)
+        self.stagePlanStepCount = max(0, stagePlanStepCount)
+        self.stagePlanIsCanonical = stagePlanIsCanonical
     }
 
     // MARK: - Stable JSON encoding
@@ -166,7 +178,9 @@ public struct BASRuntimeAuditEmissionSummary:
         permitEscalationLedger:
             BASPermitEscalationLedger? = nil,
         stageLedger:
-            BASTurnRuntimeStageLedger? = nil
+            BASTurnRuntimeStageLedger? = nil,
+        stagePlan:
+            BASTurnRuntimeStagePlan? = nil
     ) -> BASRuntimeAuditEmissionSummary {
         BASRuntimeAuditEmissionSummary(
             traceID: result.runtimeTrace.sessionID,
@@ -190,6 +204,10 @@ public struct BASRuntimeAuditEmissionSummary:
             failedStageCount:
                 stageLedger?.failedStageCount ?? 0,
             totalStageDurationMs:
-                stageLedger?.totalDurationMs ?? 0)
+                stageLedger?.totalDurationMs ?? 0,
+            stagePlanStepCount:
+                stagePlan?.stepCount ?? 0,
+            stagePlanIsCanonical:
+                stagePlan?.isCanonical ?? false)
     }
 }

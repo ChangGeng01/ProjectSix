@@ -124,6 +124,8 @@ public actor BASTurnRuntimeEngine {
             BASPermitEscalationLedger? = nil,
         stageLedger:
             BASTurnRuntimeStageLedger? = nil,
+        stagePlan:
+            BASTurnRuntimeStagePlan? = nil,
         timestampMsOverride: Int64? = nil
     ) async -> BASEBrainTurnResult {
         let result = coordinator.runTurn(request)
@@ -140,6 +142,9 @@ public actor BASTurnRuntimeEngine {
         // chapter 四百八 / M1004: optional stageLedger (M1003
         // typed) param threads stageCount/failedStageCount/
         // totalStageDurationMs into the payload。
+        // chapter 四百九 / M1008: optional stagePlan (M1006
+        // typed) param threads stagePlanStepCount/
+        // stagePlanIsCanonical into the payload。
         await emitStartEnvelope(
             for: result,
             timestampMsOverride: timestampMsOverride)
@@ -148,6 +153,7 @@ public actor BASTurnRuntimeEngine {
             auditProjections: auditProjections,
             permitEscalationLedger: permitEscalationLedger,
             stageLedger: stageLedger,
+            stagePlan: stagePlan,
             timestampMsOverride: timestampMsOverride)
         return result
     }
@@ -184,6 +190,7 @@ public actor BASTurnRuntimeEngine {
         permitEscalationLedger:
             BASPermitEscalationLedger?,
         stageLedger: BASTurnRuntimeStageLedger?,
+        stagePlan: BASTurnRuntimeStagePlan?,
         timestampMsOverride: Int64?
     ) async {
         guard let log = eventLog else { return }
@@ -191,15 +198,16 @@ public actor BASTurnRuntimeEngine {
         let nextSeq = sequenceCounter
         sequenceCounter += 1
 
-        // chapter 四百六 / M993 + M996 + M1004 — typed factory
-        // call collapses summary construction + threads permit
-        // escalation ledger + stage ledger metrics into the
-        // .complete envelope payload。
+        // chapter 四百六 / M993 + M996 + M1004 + M1008 — typed
+        // factory call collapses summary construction + threads
+        // permit escalation ledger + stage ledger + stage plan
+        // metrics into the .complete envelope payload。
         let summary = BASRuntimeAuditEmissionSummary.from(
             result: result,
             auditProjections: auditProjections,
             permitEscalationLedger: permitEscalationLedger,
-            stageLedger: stageLedger)
+            stageLedger: stageLedger,
+            stagePlan: stagePlan)
 
         let turnID =
             result.sovereignAuditEntry?.turnID ??
