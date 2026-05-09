@@ -48,7 +48,7 @@ import Foundation
 /// metrics。 Future V2 actor's `.complete` envelope payload
 /// surfaces these for audit consumers。
 public struct BASParallelStageDispatchSummary:
-    Codable, Equatable, Sendable
+    Codable, Equatable, Hashable, Sendable
 {
 
     // MARK: - Storage

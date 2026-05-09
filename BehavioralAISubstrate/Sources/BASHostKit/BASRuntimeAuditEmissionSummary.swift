@@ -110,6 +110,17 @@ public struct BASRuntimeAuditEmissionSummary:
     public let stagePlanStepCount: Int
     public let stagePlanIsCanonical: Bool
 
+    /// chapter 四百十六 / M1034 — per-parallel-group dispatch
+    /// summaries derived from the M1003 stage ledger via
+    /// the M1032 .parallelDispatchSummaries() extension。
+    /// Empty array when no stage ledger supplied (V1
+    /// delegation path) OR when ledger has no fan-out
+    /// records。 Audit consumers grep this for fan-out
+    /// performance:max-of-N stage durations dominate fan-
+    /// out wall-clock,sum-of-N is cost-accounting。
+    public let parallelDispatchSummaries:
+        [BASParallelStageDispatchSummary]
+
     // MARK: - Init
 
     public init(
@@ -125,7 +136,9 @@ public struct BASRuntimeAuditEmissionSummary:
         failedStageCount: Int = 0,
         totalStageDurationMs: Int = 0,
         stagePlanStepCount: Int = 0,
-        stagePlanIsCanonical: Bool = false
+        stagePlanIsCanonical: Bool = false,
+        parallelDispatchSummaries:
+            [BASParallelStageDispatchSummary] = []
     ) {
         self.traceID = traceID
         self.verdictLevelRaw = verdictLevelRaw
@@ -143,6 +156,8 @@ public struct BASRuntimeAuditEmissionSummary:
             max(0, totalStageDurationMs)
         self.stagePlanStepCount = max(0, stagePlanStepCount)
         self.stagePlanIsCanonical = stagePlanIsCanonical
+        self.parallelDispatchSummaries =
+            parallelDispatchSummaries
     }
 
     // MARK: - Stable JSON encoding
@@ -208,6 +223,9 @@ public struct BASRuntimeAuditEmissionSummary:
             stagePlanStepCount:
                 stagePlan?.stepCount ?? 0,
             stagePlanIsCanonical:
-                stagePlan?.isCanonical ?? false)
+                stagePlan?.isCanonical ?? false,
+            parallelDispatchSummaries:
+                stageLedger?
+                    .parallelDispatchSummaries() ?? [])
     }
 }
