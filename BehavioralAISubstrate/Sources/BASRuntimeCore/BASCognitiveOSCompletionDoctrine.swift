@@ -198,12 +198,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ADR-014 OPT-IN held throughout;V1 runTurn byte-
     /// equality preserved (4780+ BAS tests pass)。No
     /// G-status change。
-    /// M990 bump:Phase 2 entropy chapter 四百六 entry。
-    /// V2 actor adopts the 5-slot audit projections aggregator
-    /// (M976/M979) via optional `auditProjections:` param。
-    /// Chapter 四百六 OPEN at M989-M990。 ADR-014 OPT-IN held;
-    /// V1 byte-equality preserved。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M990"
+    /// M992 bump:Phase 2 entropy chapter 四百六 v1 close-out
+    /// — V2 LIFECYCLE COMPREHENSIVE milestone。 Chapter 四百六
+    /// v1 (M989-M992,4 commits) ships:V2 actor adopts the
+    /// 5-slot audit projections aggregator + emits paired
+    /// .start + .complete envelopes per turn + audit
+    /// projections slot count flows into .complete payload。
+    /// V2 actor's audit channel comprehensive。 Future v2+
+    /// ships native V2 stage rewrites + permit fold function
+    /// + V1↔V2 stress sweep + parallel DAG。 ADR-014 OPT-IN
+    /// held;V1 byte-equality preserved (4800+ BAS tests
+    /// pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M992"
 
     /// Query the typed status of a specific gap。
     public static func status(

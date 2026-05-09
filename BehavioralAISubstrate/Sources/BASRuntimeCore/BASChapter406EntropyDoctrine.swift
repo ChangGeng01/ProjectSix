@@ -15,8 +15,19 @@ public enum BASChapter406EntropyDoctrine {
     /// First M-number。
     public static let mNumberFirst: Int = 989
 
-    /// Last M-number shipped。
-    public static let mNumberLast: Int = 990
+    /// Last M-number shipped。Chapter v1 closes at M992 with
+    /// V2 actor lifecycle channel comprehensive (start +
+    /// complete envelopes paired + audit projections threaded
+    /// through .complete payload)。
+    public static let mNumberLast: Int = 992
+
+    /// `v1` milestone:V2 actor lifecycle channel comprehensive
+    /// at M992。 Both .start and .complete envelopes ship per
+    /// turn;audit consumers can pair lifecycle events via
+    /// shared turnID + sequence ordering invariant。
+    public static let v1MilestoneMNumber: Int = 992
+    public static let v1MilestoneStatus: String =
+        "chapter-406-v1-v2-lifecycle-comprehensive"
 
     /// Per-commit-刀 ledger。
     public static let knives:
@@ -26,14 +37,21 @@ public enum BASChapter406EntropyDoctrine {
             "V2 actor adopts BASRuntimeAuditProjectionsBundle " +
             "via auditProjections: param + envelope payload"),
         (990, "第二刀",
-            "chapter 四百六 entry doctrine + ADR-016 bump")
+            "chapter 四百六 entry doctrine + ADR-016 bump"),
+        (991, "第三刀",
+            "V2 actor emits .start + .complete envelope pair " +
+            "(both shared turnID,sequence-ordered)"),
+        (992, "第四刀",
+            "chapter 四百六 v1 close-out + ADR-016 bump " +
+            "(V2 lifecycle channel comprehensive)")
     ]
 
-    /// Entropy classes attacked。
+    /// Entropy classes attacked at v1 milestone。
     public static let entropyClassesAttacked: [String] = [
-        "v2-actor-scaffolding-entropy",   // M989
+        "v2-actor-scaffolding-entropy",     // M989
         "audit-projection-payload-entropy", // M989
-        "doctrine-pin-entropy"            // M990
+        "doctrine-pin-entropy",             // M990 / M992
+        "v2-lifecycle-channel-entropy"      // M991 paired
     ]
 
     /// Doctrine pins held。
@@ -61,13 +79,18 @@ public enum BASChapter406EntropyDoctrine {
 
     /// Human-readable summary。
     public static let summary: String =
-        "Phase 2 entropy chapter 四百六 OPEN at M989。 First " +
-        "2 cuts ship (1) V2 actor adopts the M976/M979 5-slot" +
-        " BASRuntimeAuditProjectionsBundle aggregator via" +
-        " auditProjections: param threading slot count into" +
-        " the .complete envelope payload,(2) chapter entry" +
-        " doctrine + ADR-016 bump。 Future cuts continue" +
-        " V2 actor enrichment + permit fold function +" +
-        " V1↔V2 stress sweep + parallel DAG。 ADR-014 OPT-IN" +
-        " held;V1 byte-equality preserved。"
+        "Phase 2 entropy chapter 四百六 v1 closes at M992 — " +
+        "V2 LIFECYCLE COMPREHENSIVE milestone。 4 cuts ship" +
+        " (M989-M992):(1) V2 actor adopts M976/M979 5-slot" +
+        " BASRuntimeAuditProjectionsBundle aggregator,(2)" +
+        " chapter entry doctrine,(3) V2 emits paired" +
+        " .start + .complete envelopes per turn (shared" +
+        " turnID,sequence-ordered),(4) chapter v1 close-out" +
+        " + ADR-016 bump。 V2 actor's audit channel is now" +
+        " comprehensive — full lifecycle pair per turn with" +
+        " typed payload incorporating audit-projection slot" +
+        " counts。 Future v2+ ships native V2 stage rewrites" +
+        " + permit fold function + V1↔V2 stress sweep +" +
+        " parallel DAG。 ADR-014 OPT-IN held;V1 byte-" +
+        "equality preserved (4800+ BAS tests pass)。"
 }
