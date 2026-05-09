@@ -156,13 +156,25 @@ public struct BASSoftHandObservation:
 }
 
 /// A bundle of soft-hand observations emitted in one turn.
+/// chapter 四百五 / M986:adopts `BASBundleProtocol`。
 public struct BASSoftHandObservationBundle:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASSoftHandObservation]
     public let emittedAt: Date
+
+    /// chapter 四百五 / M986:`BASBundleProtocol` synthesized
+    /// accessors。Stable bundleID derived from turnID。
+    public var bundleID: String {
+        "soft-hand-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
+
 
     public init(
         turnID: String,

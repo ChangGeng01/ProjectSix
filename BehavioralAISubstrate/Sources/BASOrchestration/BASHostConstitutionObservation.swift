@@ -150,13 +150,25 @@ public struct BASHostConstitutionObservation:
 }
 
 /// A bundle of L5 observations emitted in one turn.
+/// chapter 四百五 / M986:adopts `BASBundleProtocol`。
 public struct BASHostConstitutionObservationBundle:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASHostConstitutionObservation]
     public let emittedAt: Date
+
+    /// chapter 四百五 / M986:`BASBundleProtocol` synthesized
+    /// accessors。Stable bundleID derived from turnID。
+    public var bundleID: String {
+        "host-constitution-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
+
 
     public init(
         turnID: String,

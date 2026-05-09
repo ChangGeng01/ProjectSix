@@ -121,13 +121,25 @@ public struct BASUpdateTicketObservation:
 }
 
 /// A bundle of update-ticket observations emitted in one turn.
+/// chapter 四百五 / M986:adopts `BASBundleProtocol`。
 public struct BASUpdateTicketObservationBundle:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASUpdateTicketObservation]
     public let emittedAt: Date
+
+    /// chapter 四百五 / M986:`BASBundleProtocol` synthesized
+    /// accessors。Stable bundleID derived from turnID。
+    public var bundleID: String {
+        "update-ticket-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
+
 
     public init(
         turnID: String,
