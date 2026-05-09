@@ -363,7 +363,20 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// via these primitives。 ADR-014 OPT-IN held;V1 byte-
     /// equality preserved (5220+ BAS tests pass)。No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1053"
+    /// M1057 bump:Phase 2 entropy chapter 四百二十一 v1 close-
+    /// out — V2 PHASE 2 CLOSE-OUT milestone。 Phase 2 entropy
+    /// work (chapters 四百三-四百二十一,105 commits across
+    /// M953-M1057) closes here。 Substrate-side typed
+    /// scaffolding COMPLETE:M1054 BASV2FoundationsRegistry
+    /// (12 V2 foundations) + M1055 BASPhase2EntropyClosure
+    /// Doctrine + M1056 BASADR018PendingDoctrine (4 deferred
+    /// production items)。 Production-side wiring (real actor
+    /// services for parallel dispatch / stress sweep / permit
+    /// fold / native stage rewrites) tracked under separate
+    /// ADR-018-pending roadmap。 ADR-014 OPT-IN held;V1
+    /// byte-equality preserved (5250+ BAS tests pass)。No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1057"
 
     /// Query the typed status of a specific gap。
     public static func status(
