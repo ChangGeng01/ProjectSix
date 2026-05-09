@@ -180,22 +180,20 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// change — Phase 1 is substrate-side machinery,not a roadmap
     /// gap closure。Phase 2 (chapter 四百三) + Phase 3 (chapter 四百四)
     /// follow per `wild-rolling-meerkat.md` plan。
-    /// M980 bump:Phase 2 entropy chapter 四百四 v4 close-out
-    /// — AUDIT-PROJECTION COMPREHENSIVE milestone。 chapter
-    /// 四百三 (M953-M962, 10 commits) + chapter 四百四 v1
-    /// (M963-M969, 7 commits) + v2 (M970-M974, 5 commits) +
-    /// v3 (M975-M977, 3 commits) + v4 (M978-M980, 3 commits)。
-    /// v4 adds the 5th audit-projection namespace bundle
-    /// (`BASRiskCalibrationProjections`) + aggregator
-    /// extended to 5 slots + chapter doctrine bump。 ALL 67
-    /// V1 runTurn `*ForAudit` locals now have a typed
-    /// namespace home;V2 actor stages thread ONE 5-slot
-    /// aggregate bundle through the audit pipeline。 Native
-    /// V2 stage rewrites + permit fold function + V1↔V2
-    /// stress sweep ship in chapter 四百五+。 ADR-014 OPT-IN
-    /// held throughout;V1 runTurn byte-equality preserved
-    /// (4740+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M980"
+    /// M983 bump:Phase 2 entropy chapter 四百五 entry —
+    /// continues bundle-protocol-adoption pattern。 chapter
+    /// 四百三 (M953-M962, 10 commits) + chapter 四百四 v1+v2+v3+v4
+    /// (M963-M980, 18 commits) + chapter 四百五 entry
+    /// (M981-M983, 3 commits)。 chapter 四百五 ships
+    /// `BASBundleIDProtocol` typed superset for timestamp-less
+    /// bundles + 2 concrete adoptions (BASStepBundle +
+    /// BASLearningExportBundle) + chapter entry doctrine。
+    /// 18 more bundle types planned for future adoption +
+    /// V2 actor stage rewrites + permit fold function +
+    /// V1↔V2 stress sweep。 ADR-014 OPT-IN held throughout;
+    /// V1 runTurn byte-equality preserved (4750+ BAS tests
+    /// pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M983"
 
     /// Query the typed status of a specific gap。
     public static func status(
