@@ -143,13 +143,23 @@ public struct BASLeaseLifeObservation:
 }
 
 /// A bundle of L1 observations emitted in one turn.
+/// chapter 四百五 / M985:adopts `BASBundleProtocol` (6th of
+/// 18+ concrete bundles)。
 public struct BASLeaseLifeObservationBundle:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASLeaseLifeObservation]
     public let emittedAt: Date
+
+    public var bundleID: String {
+        "lease-life-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
 
     public init(
         turnID: String,

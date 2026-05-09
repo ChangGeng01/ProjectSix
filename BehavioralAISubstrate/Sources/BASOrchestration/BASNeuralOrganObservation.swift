@@ -1,4 +1,5 @@
 import Foundation
+import BASRuntimeCore
 
 // MARK: - Neural organ registry observation primitives
 //
@@ -143,13 +144,23 @@ public struct BASNeuralOrganObservation:
 }
 
 /// A bundle of L2 neural organ observations emitted in one turn.
+/// chapter 四百五 / M985:adopts `BASBundleProtocol` (7th of
+/// 18+ concrete bundles)。
 public struct BASNeuralOrganObservationBundle:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASNeuralOrganObservation]
     public let emittedAt: Date
+
+    public var bundleID: String {
+        "neural-organ-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
 
     public init(
         turnID: String,

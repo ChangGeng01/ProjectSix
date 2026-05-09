@@ -123,13 +123,27 @@ public struct BASTribunalObservation: Sendable, Equatable, Codable {
 }
 
 /// A bundle of tribunal observations emitted in one turn.
+/// chapter 四百五 / M985:adopts `BASBundleProtocol` via
+/// synthesized bundleID + schemaVersion + recordedAt accessors。
+/// 系统熵 reduction protocol-adoption pattern (5th of 18+
+/// concrete bundles)。
 public struct BASTribunalObservationBundle:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASTribunalObservation]
     public let emittedAt: Date
+
+    /// chapter 四百五 / M985:`BASBundleProtocol` synthesized
+    /// accessors。
+    public var bundleID: String {
+        "tribunal-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
 
     public init(
         turnID: String,
