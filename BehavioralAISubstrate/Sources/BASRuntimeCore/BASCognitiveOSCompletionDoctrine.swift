@@ -313,7 +313,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// envelope payload via these primitives。 ADR-014 OPT-IN
     /// held;V1 byte-equality preserved (5090+ BAS tests pass)。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1033"
+    /// M1037 bump:Phase 2 entropy chapter 四百十六 v1 close-
+    /// out — V2 PARALLEL SUMMARY ENVELOPE INTEGRATION
+    /// milestone。 V2 actor's .complete envelope payload now
+    /// natively threads parallel dispatch summaries via the
+    /// M1034 typed slot,M1035 aggregate accessors,and M1036
+    /// per-group ledger accessors。 Audit consumers grep
+    /// dashboard fan-out wall-clock dominance + cost
+    /// accounting per group。 ADR-014 OPT-IN held;V1 byte-
+    /// equality preserved (5110+ BAS tests pass)。No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M1037"
 
     /// Query the typed status of a specific gap。
     public static func status(

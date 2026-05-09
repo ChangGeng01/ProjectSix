@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1033",
-            "M1033:doctrine version reflects chapter 四百十五 v1 V2 PARALLEL DISPATCH SUMMARY FOUNDATION")
+            "ADR-016.M1037",
+            "M1037:doctrine version reflects chapter 四百十六 v1 V2 PARALLEL SUMMARY ENVELOPE INTEGRATION")
     }
 
     // MARK: - M-number range matches chapter 四百二
