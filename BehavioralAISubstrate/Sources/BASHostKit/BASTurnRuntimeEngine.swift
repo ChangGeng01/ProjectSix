@@ -107,6 +107,16 @@ public actor BASTurnRuntimeEngine {
         timestampMsOverride: Int64? = nil
     ) async -> BASEBrainTurnResult {
         let result = coordinator.runTurn(request)
+        // chapter 四百六 / M991: V2 actor now emits BOTH .start
+        // and .complete lifecycle envelopes per turn。 Both fire
+        // post-V1 so they share the V1-derived sessionID/turnID
+        // (audit-consistent;sacrifices "start fires before V1"
+        // semantics for ID-coherence which audit consumers
+        // prioritize)。 Sequence numbers preserve start-before-
+        // complete ordering。
+        await emitStartEnvelope(
+            for: result,
+            timestampMsOverride: timestampMsOverride)
         await emitCompleteEnvelope(
             for: result,
             auditProjections: auditProjections,
@@ -115,6 +125,35 @@ public actor BASTurnRuntimeEngine {
     }
 
     // MARK: - Audit emission
+
+    private func emitStartEnvelope(
+        for result: BASEBrainTurnResult,
+        timestampMsOverride: Int64?
+    ) async {
+        guard let log = eventLog else { return }
+        let timestampMs = timestampMsOverride ?? clockMs()
+        let nextSeq = sequenceCounter
+        sequenceCounter += 1
+        let turnID =
+            result.sovereignAuditEntry?.turnID ??
+            result.runtimeTrace.sessionID
+        let envelope = BASTurnRuntimeAuditEnvelope.start(
+            turnID: turnID,
+            sessionID: result.runtimeTrace.sessionID,
+            timestampMs: timestampMs,
+            sequenceNumber: nextSeq)
+        let entry = BASEventLogEntry(
+            eventID: eventIDFactory(),
+            timestampMs: envelope.timestampMs,
+            kind: .substrateAudit,
+            sessionID: envelope.sessionID,
+            sequenceNumber: 0,
+            source: "turn-runtime-engine",
+            turnRef: envelope.turnID,
+            actions: ["turn-start"],
+            payloadJson: envelope.payloadJson)
+        _ = try? await log.append(entry)
+    }
 
     private func emitCompleteEnvelope(
         for result: BASEBrainTurnResult,
