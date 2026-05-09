@@ -353,7 +353,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// drift on dashboards。 ADR-014 OPT-IN held;V1 byte-
     /// equality preserved (5200+ BAS tests pass)。No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1049"
+    /// M1053 bump:Phase 2 entropy chapter 四百二十 v1 close-
+    /// out — V2 SUMMARY DIGEST FOUNDATION milestone。 Summary
+    /// -digest scaffolding now has THREE typed primitives:
+    /// M1050 typed digest value (algo + digest + producedAt)
+    /// + M1051 SHA256 from-summary factory + M1052 content-
+    /// equality .matches(_:) ignoring producedAt。 Future
+    /// V1↔V2 stress harnesses verify summary byte-equality
+    /// via these primitives。 ADR-014 OPT-IN held;V1 byte-
+    /// equality preserved (5220+ BAS tests pass)。No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M1053"
 
     /// Query the typed status of a specific gap。
     public static func status(
