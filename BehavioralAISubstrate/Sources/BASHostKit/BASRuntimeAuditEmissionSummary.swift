@@ -129,6 +129,16 @@ public struct BASRuntimeAuditEmissionSummary:
     /// turns。
     public let stageLedgerIsComplete: Bool
 
+    /// chapter 四百十九 / M1046 — count of plan-ledger
+    /// coherence issues detected this turn,via M1044
+    /// `.canonicalCoherence(ledger:).coherenceIssues()`。
+    /// 0 when no stage ledger supplied (V1 delegation path),
+    /// or when the ledger fully matches the canonical plan。
+    /// Audit consumers grep `planLedgerCoherenceIssueCount > 0`
+    /// to filter turns drifting from the canonical execution
+    /// plan。
+    public let planLedgerCoherenceIssueCount: Int
+
     // MARK: - Init
 
     public init(
@@ -147,7 +157,8 @@ public struct BASRuntimeAuditEmissionSummary:
         stagePlanIsCanonical: Bool = false,
         parallelDispatchSummaries:
             [BASParallelStageDispatchSummary] = [],
-        stageLedgerIsComplete: Bool = false
+        stageLedgerIsComplete: Bool = false,
+        planLedgerCoherenceIssueCount: Int = 0
     ) {
         self.traceID = traceID
         self.verdictLevelRaw = verdictLevelRaw
@@ -168,6 +179,8 @@ public struct BASRuntimeAuditEmissionSummary:
         self.parallelDispatchSummaries =
             parallelDispatchSummaries
         self.stageLedgerIsComplete = stageLedgerIsComplete
+        self.planLedgerCoherenceIssueCount =
+            max(0, planLedgerCoherenceIssueCount)
     }
 
     // MARK: - Stable JSON encoding
@@ -238,6 +251,12 @@ public struct BASRuntimeAuditEmissionSummary:
                 stageLedger?
                     .parallelDispatchSummaries() ?? [],
             stageLedgerIsComplete:
-                stageLedger?.isComplete ?? false)
+                stageLedger?.isComplete ?? false,
+            planLedgerCoherenceIssueCount:
+                stageLedger.map {
+                    BASTurnRuntimePlanLedgerCoherence
+                        .canonicalCoherence(ledger: $0)
+                        .coherenceIssues().count
+                } ?? 0)
     }
 }
