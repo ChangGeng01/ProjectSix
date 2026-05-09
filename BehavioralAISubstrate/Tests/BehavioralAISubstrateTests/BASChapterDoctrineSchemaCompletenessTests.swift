@@ -427,6 +427,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter424EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter424EntropyDoctrine
+                    .summary),
+            // M1073 self-extension
+            check("四百二十五",
+                tag: BASChapter425EntropyDoctrine.chapterTag,
+                first: BASChapter425EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter425EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter425EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter425EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter425EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter425EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter425EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter425EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -498,7 +517,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter423EntropyDoctrine.mNumberLast),
             // M1069 self-extension
             ("424", BASChapter424EntropyDoctrine.mNumberFirst,
-             BASChapter424EntropyDoctrine.mNumberLast)
+             BASChapter424EntropyDoctrine.mNumberLast),
+            // M1073 self-extension
+            ("425", BASChapter425EntropyDoctrine.mNumberFirst,
+             BASChapter425EntropyDoctrine.mNumberLast)
             ]
         for i in 1..<ranges.count {
             XCTAssertEqual(

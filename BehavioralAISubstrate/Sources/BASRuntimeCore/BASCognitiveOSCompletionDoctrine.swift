@@ -407,7 +407,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// drift at PR-time)。 ADR-014 OPT-IN held;V1 byte-
     /// equality preserved (5330+ BAS tests pass)。No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1069"
+    /// M1073 bump:Phase 2 entropy chapter 四百二十五 v1 close-
+    /// out — V2 REAL EXECUTOR FOUNDATION milestone。 FIRST
+    /// chapter to ship REAL working production logic (not
+    /// just typed scaffolding):M1070 BASPermitEscalation
+    /// FoldExecutor (REAL 5-step async fold) + M1072
+    /// BASParallelStageDispatchExecutor (REAL async let
+    /// 2-way + 4-way fan-out)。 ADR-018 PARTIAL RATIFICATION:
+    /// permitEscalationFold + parallelDispatchDriver both
+    /// flipped from .pending to .shipped。 2 of 4 ADR-018
+    /// items now done。 ADR-014 OPT-IN held;V1 byte-equality
+    /// preserved (5340+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1073"
 
     /// Query the typed status of a specific gap。
     public static func status(

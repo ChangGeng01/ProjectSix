@@ -38,17 +38,12 @@ final class BASADR018PendingDoctrineTests: XCTestCase {
             "must match Phase 2 close-out reference")
     }
 
-    // MARK: - 3 items pending after M1071 ratification
+    // MARK: - 2 items pending after M1073 ratification
 
-    func testThreeItemsPendingAfterM1071Ratification() {
-        // M1071 partial ratification:permitEscalationFold
-        // shipped via BASPermitEscalationFoldExecutor
-        // (chapter 四百二十五 / M1070)。 Other 3 still
-        // pending。
-        XCTAssertEqual(
-            BASADR018PendingDoctrine.status(
-                of: .parallelDispatchDriver),
-            .pending)
+    func testTwoItemsPendingAfterM1073Ratification() {
+        // M1071:permitEscalationFold shipped (M1070)。
+        // M1073:parallelDispatchDriver shipped (M1072)。
+        // Other 2 still pending。
         XCTAssertEqual(
             BASADR018PendingDoctrine.status(
                 of: .stressSweepHarness),
@@ -70,25 +65,39 @@ final class BASADR018PendingDoctrineTests: XCTestCase {
                 chapterTag: "chapter 四百二十五"))
     }
 
-    // MARK: - pendingItems() returns 3 after M1071
+    // MARK: - parallelDispatchDriver shipped at M1072
 
-    func testPendingItemsReturnsThreeAfterM1071() {
+    func testParallelDispatchDriverShippedAtM1072() {
+        XCTAssertEqual(
+            BASADR018PendingDoctrine.status(
+                of: .parallelDispatchDriver),
+            .shipped(
+                mNumber: 1072,
+                chapterTag: "chapter 四百二十五"))
+    }
+
+    // MARK: - pendingItems() returns 2 after M1073
+
+    func testPendingItemsReturnsTwoAfterM1073() {
         XCTAssertEqual(
             BASADR018PendingDoctrine.pendingItems().count,
-            3,
-            "M1071 ratification:permitEscalationFold " +
-            "shipped → 3 items pending")
+            2,
+            "M1073 ratification:permitEscalationFold + " +
+            "parallelDispatchDriver shipped → 2 items pending")
         XCTAssertFalse(
             BASADR018PendingDoctrine.pendingItems()
                 .contains(.permitEscalationFold))
+        XCTAssertFalse(
+            BASADR018PendingDoctrine.pendingItems()
+                .contains(.parallelDispatchDriver))
     }
 
-    // MARK: - hasPendingWork still true (3 of 4 remain)
+    // MARK: - hasPendingWork still true (2 of 4 remain)
 
-    func testHasPendingWorkTrueAfterM1071() {
+    func testHasPendingWorkTrueAfterM1073() {
         XCTAssertTrue(
             BASADR018PendingDoctrine.hasPendingWork,
-            "3 of 4 items still pending after M1071")
+            "2 of 4 items still pending after M1073")
     }
 
     // MARK: - Codable round-trip
