@@ -95,6 +95,13 @@ public struct BASRuntimeAuditEmissionSummary:
     /// composition entropy chain ran live。
     public let permitEscalationFiredStageCount: Int
 
+    /// chapter 四百八 / M1004 — V2 stage execution metrics
+    /// from the M1003 BASTurnRuntimeStageLedger。 0 fields
+    /// when no stage ledger supplied (V1 delegation path)。
+    public let stageCount: Int
+    public let failedStageCount: Int
+    public let totalStageDurationMs: Int
+
     // MARK: - Init
 
     public init(
@@ -105,7 +112,10 @@ public struct BASRuntimeAuditEmissionSummary:
         auditID: String,
         runMode: String,
         auditProjectionsPopulatedSlotCount: Int = 0,
-        permitEscalationFiredStageCount: Int = 0
+        permitEscalationFiredStageCount: Int = 0,
+        stageCount: Int = 0,
+        failedStageCount: Int = 0,
+        totalStageDurationMs: Int = 0
     ) {
         self.traceID = traceID
         self.verdictLevelRaw = verdictLevelRaw
@@ -117,6 +127,10 @@ public struct BASRuntimeAuditEmissionSummary:
             max(0, auditProjectionsPopulatedSlotCount)
         self.permitEscalationFiredStageCount =
             max(0, permitEscalationFiredStageCount)
+        self.stageCount = max(0, stageCount)
+        self.failedStageCount = max(0, failedStageCount)
+        self.totalStageDurationMs =
+            max(0, totalStageDurationMs)
     }
 
     // MARK: - Stable JSON encoding
@@ -150,7 +164,9 @@ public struct BASRuntimeAuditEmissionSummary:
         auditProjections:
             BASRuntimeAuditProjectionsBundle? = nil,
         permitEscalationLedger:
-            BASPermitEscalationLedger? = nil
+            BASPermitEscalationLedger? = nil,
+        stageLedger:
+            BASTurnRuntimeStageLedger? = nil
     ) -> BASRuntimeAuditEmissionSummary {
         BASRuntimeAuditEmissionSummary(
             traceID: result.runtimeTrace.sessionID,
@@ -168,6 +184,12 @@ public struct BASRuntimeAuditEmissionSummary:
                 auditProjections?.populatedSlotCount ?? 0,
             permitEscalationFiredStageCount:
                 permitEscalationLedger?
-                    .firedStageCount ?? 0)
+                    .firedStageCount ?? 0,
+            stageCount:
+                stageLedger?.stageCount ?? 0,
+            failedStageCount:
+                stageLedger?.failedStageCount ?? 0,
+            totalStageDurationMs:
+                stageLedger?.totalDurationMs ?? 0)
     }
 }

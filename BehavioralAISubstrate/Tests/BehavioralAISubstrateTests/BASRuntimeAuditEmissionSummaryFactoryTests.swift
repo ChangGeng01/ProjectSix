@@ -14,12 +14,13 @@ final class BASRuntimeAuditEmissionSummaryFactoryTests:
     // MARK: - Factory surface
 
     func testFactoryAcceptsResultAndOptionalProjections() {
-        // Compile-time check (M996:signature now also takes
-        // optional permitEscalationLedger:)
+        // Compile-time check (M996+M1004:signature also takes
+        // permitEscalationLedger + stageLedger)
         let _: (
             BASEBrainTurnResult,
             BASRuntimeAuditProjectionsBundle?,
-            BASPolicy.BASPermitEscalationLedger?
+            BASPolicy.BASPermitEscalationLedger?,
+            BASTurnRuntimeStageLedger?
         ) -> BASRuntimeAuditEmissionSummary =
             BASRuntimeAuditEmissionSummary.from
         XCTAssertTrue(true)
