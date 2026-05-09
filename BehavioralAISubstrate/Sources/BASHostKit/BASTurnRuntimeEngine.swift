@@ -166,22 +166,11 @@ public actor BASTurnRuntimeEngine {
         let nextSeq = sequenceCounter
         sequenceCounter += 1
 
-        let projectionsCount =
-            auditProjections?.populatedSlotCount ?? 0
-        let summary = BASRuntimeAuditEmissionSummary(
-            traceID: result.runtimeTrace.sessionID,
-            verdictLevelRaw:
-                result.sovereignVerdict?
-                    .verdictLevel.rawValue ?? "unassigned",
-            permitModeRaw:
-                result.actionPermit.mode.rawValue,
-            ticketCount: result.updateTickets.count,
-            auditID:
-                result.sovereignAuditEntry?
-                    .auditID ?? "unassigned",
-            runMode: result.budgetFrame.runMode.rawValue,
-            auditProjectionsPopulatedSlotCount:
-                projectionsCount)
+        // chapter 四百六 / M993 — typed factory call collapses
+        // 12-line summary construction to 1 line。
+        let summary = BASRuntimeAuditEmissionSummary.from(
+            result: result,
+            auditProjections: auditProjections)
 
         let turnID =
             result.sovereignAuditEntry?.turnID ??

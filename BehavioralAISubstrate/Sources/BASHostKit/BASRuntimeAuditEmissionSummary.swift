@@ -46,6 +46,7 @@
 //   - ADR-014 OPT-IN — purely additive
 
 import Foundation
+import BASOrchestration
 
 /// Typed payload struct that V2 actor's complete-envelope
 /// serializes。Mirrors M932 LLM Engine's complete-event
@@ -124,5 +125,32 @@ public struct BASRuntimeAuditEmissionSummary:
             return nil
         }
         return String(data: data, encoding: .utf8)
+    }
+
+    // MARK: - chapter 四百六 / M993 — typed factory
+
+    /// Build a summary from a V1 `BASEBrainTurnResult` + an
+    /// optional `BASRuntimeAuditProjectionsBundle`。 Pure
+    /// function;same input → same summary (chapter 三百九二)。
+    /// V2 actor emission code drops from ~12 lines to 1 call。
+    public static func from(
+        result: BASEBrainTurnResult,
+        auditProjections:
+            BASRuntimeAuditProjectionsBundle? = nil
+    ) -> BASRuntimeAuditEmissionSummary {
+        BASRuntimeAuditEmissionSummary(
+            traceID: result.runtimeTrace.sessionID,
+            verdictLevelRaw:
+                result.sovereignVerdict?
+                    .verdictLevel.rawValue ?? "unassigned",
+            permitModeRaw:
+                result.actionPermit.mode.rawValue,
+            ticketCount: result.updateTickets.count,
+            auditID:
+                result.sovereignAuditEntry?
+                    .auditID ?? "unassigned",
+            runMode: result.budgetFrame.runMode.rawValue,
+            auditProjectionsPopulatedSlotCount:
+                auditProjections?.populatedSlotCount ?? 0)
     }
 }
