@@ -240,7 +240,19 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// Future v2+ ships native V2 stage rewrites consuming
     /// the foundations。 ADR-014 OPT-IN held;V1 byte-equality
     /// preserved (4870+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1005"
+    /// M1009 bump:Phase 2 entropy chapter 四百九 v1 close-out
+    /// — V2 STAGE PLAN FOUNDATION milestone。 V2 actor now
+    /// has SIX typed scaffolding foundations:configuration
+    /// (M998) + stage taxonomy (M1000) + stage execution
+    /// record+ledger (M1002+M1003) + permit ledger (M966) +
+    /// audit projections aggregator (M976/M979) + stage plan
+    /// + validation (M1006+M1007)。 V2 actor's runTurn signature
+    /// now accepts 5 typed optional scaffolding params。
+    /// Future v2+ ships native V2 stage rewrites consuming
+    /// all 6 typed foundations。 ADR-014 OPT-IN held;V1
+    /// byte-equality preserved (4900+ BAS tests pass)。No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1009"
 
     /// Query the typed status of a specific gap。
     public static func status(
