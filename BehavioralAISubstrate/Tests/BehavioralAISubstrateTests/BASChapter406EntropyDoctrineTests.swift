@@ -15,7 +15,7 @@ final class BASChapter406EntropyDoctrineTests: XCTestCase {
         XCTAssertEqual(
             BASChapter406EntropyDoctrine.mNumberFirst, 989)
         XCTAssertEqual(
-            BASChapter406EntropyDoctrine.mNumberLast, 992)
+            BASChapter406EntropyDoctrine.mNumberLast, 997)
     }
 
     func testV1MilestoneIsAtM992() {
@@ -27,15 +27,24 @@ final class BASChapter406EntropyDoctrineTests: XCTestCase {
             "chapter-406-v1-v2-lifecycle-comprehensive")
     }
 
-    func testKnivesLedgerCovers4CutsAtV1() {
+    func testV2MilestoneIsAtM997() {
         XCTAssertEqual(
-            BASChapter406EntropyDoctrine.knives.count, 4)
+            BASChapter406EntropyDoctrine.v2MilestoneMNumber,
+            997)
+        XCTAssertEqual(
+            BASChapter406EntropyDoctrine.v2MilestoneStatus,
+            "chapter-406-v2-v2-param-comprehensive")
+    }
+
+    func testKnivesLedgerCovers9CutsAtV2() {
+        XCTAssertEqual(
+            BASChapter406EntropyDoctrine.knives.count, 9)
     }
 
     func testKnivesLedgerCoversFullMRange() {
         let m = BASChapter406EntropyDoctrine
             .knives.map { $0.mNumber }
-        XCTAssertEqual(m, Array(989...992))
+        XCTAssertEqual(m, Array(989...997))
     }
 
     func testEntropyClassesNonEmpty() {

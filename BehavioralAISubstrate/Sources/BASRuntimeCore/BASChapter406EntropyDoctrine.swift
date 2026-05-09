@@ -15,11 +15,12 @@ public enum BASChapter406EntropyDoctrine {
     /// First M-number。
     public static let mNumberFirst: Int = 989
 
-    /// Last M-number shipped。Chapter v1 closes at M992 with
-    /// V2 actor lifecycle channel comprehensive (start +
-    /// complete envelopes paired + audit projections threaded
-    /// through .complete payload)。
-    public static let mNumberLast: Int = 992
+    /// Last M-number shipped。Chapter v2 closes at M997 with
+    /// V2 actor PARAM COMPREHENSIVE milestone:V2 actor's
+    /// runTurn accepts auditProjections + permitEscalationLedger
+    /// + timestampMsOverride params,with typed factory chain
+    /// collapsing emission boilerplate from 24→6 lines。
+    public static let mNumberLast: Int = 997
 
     /// `v1` milestone:V2 actor lifecycle channel comprehensive
     /// at M992。 Both .start and .complete envelopes ship per
@@ -28,6 +29,15 @@ public enum BASChapter406EntropyDoctrine {
     public static let v1MilestoneMNumber: Int = 992
     public static let v1MilestoneStatus: String =
         "chapter-406-v1-v2-lifecycle-comprehensive"
+
+    /// `v2` milestone:V2 actor PARAM COMPREHENSIVE at M997。
+    /// V2 actor's runTurn signature accepts auditProjections
+    /// (M976) + permitEscalationLedger (M966) + timestampMs
+    /// Override params。 Typed factory chain collapses emission
+    /// boilerplate from 24 → 6 lines (75% reduction)。
+    public static let v2MilestoneMNumber: Int = 997
+    public static let v2MilestoneStatus: String =
+        "chapter-406-v2-v2-param-comprehensive"
 
     /// Per-commit-刀 ledger。
     public static let knives:
@@ -43,15 +53,32 @@ public enum BASChapter406EntropyDoctrine {
             "(both shared turnID,sequence-ordered)"),
         (992, "第四刀",
             "chapter 四百六 v1 close-out + ADR-016 bump " +
-            "(V2 lifecycle channel comprehensive)")
+            "(V2 lifecycle channel comprehensive)"),
+        (993, "第五刀",
+            "BASRuntimeAuditEmissionSummary.from(...) typed " +
+            "factory (12 lines → 1 call)"),
+        (994, "第六刀",
+            "BASTurnRuntimeAuditEnvelope.eventLogActionTag " +
+            "typed accessor (anti-magic-number)"),
+        (995, "第七刀",
+            "BASEventLogEntry+TurnEnvelope extension + " +
+            "appendTurnEnvelope storage helper (24→6 lines)"),
+        (996, "第八刀",
+            "V2 actor accepts permitEscalationLedger param " +
+            "+ firedStageCount in .complete payload"),
+        (997, "第九刀",
+            "chapter 四百六 v2 close-out + ADR-016 bump " +
+            "(V2 PARAM COMPREHENSIVE milestone)")
     ]
 
-    /// Entropy classes attacked at v1 milestone。
+    /// Entropy classes attacked at v2 milestone。
     public static let entropyClassesAttacked: [String] = [
-        "v2-actor-scaffolding-entropy",     // M989
-        "audit-projection-payload-entropy", // M989
-        "doctrine-pin-entropy",             // M990 / M992
-        "v2-lifecycle-channel-entropy"      // M991 paired
+        "v2-actor-scaffolding-entropy",       // M989
+        "audit-projection-payload-entropy",   // M989
+        "doctrine-pin-entropy",               // M990/M992/M997
+        "v2-lifecycle-channel-entropy",       // M991 paired
+        "emission-boilerplate-entropy",       // M993/M994/M995
+        "permit-escalation-payload-entropy"   // M996
     ]
 
     /// Doctrine pins held。
@@ -79,18 +106,20 @@ public enum BASChapter406EntropyDoctrine {
 
     /// Human-readable summary。
     public static let summary: String =
-        "Phase 2 entropy chapter 四百六 v1 closes at M992 — " +
-        "V2 LIFECYCLE COMPREHENSIVE milestone。 4 cuts ship" +
-        " (M989-M992):(1) V2 actor adopts M976/M979 5-slot" +
-        " BASRuntimeAuditProjectionsBundle aggregator,(2)" +
-        " chapter entry doctrine,(3) V2 emits paired" +
-        " .start + .complete envelopes per turn (shared" +
-        " turnID,sequence-ordered),(4) chapter v1 close-out" +
-        " + ADR-016 bump。 V2 actor's audit channel is now" +
-        " comprehensive — full lifecycle pair per turn with" +
-        " typed payload incorporating audit-projection slot" +
-        " counts。 Future v2+ ships native V2 stage rewrites" +
-        " + permit fold function + V1↔V2 stress sweep +" +
+        "Phase 2 entropy chapter 四百六 v2 closes at M997 — " +
+        "V2 PARAM COMPREHENSIVE milestone。 9 cuts ship" +
+        " across v1+v2 (M989-M997)。 v1 (M989-M992):V2" +
+        " actor delegation + paired lifecycle envelopes +" +
+        " audit-projection bundle adoption。 v2 (M993-M997):" +
+        " typed factory chain (BASRuntimeAuditEmission" +
+        "Summary.from + BASTurnRuntimeAuditEnvelope" +
+        ".eventLogActionTag + BASEventLogEntry+TurnEnvelope" +
+        ") + permit escalation ledger param + chapter close-" +
+        "out。 V2 actor emission boilerplate reduced 24 → 6" +
+        " lines (75%)。 V2 runTurn signature now accepts:" +
+        " request + auditProjections + permitEscalation" +
+        "Ledger + timestampMsOverride。 Future v3+ ships" +
+        " native V2 stage rewrites + V1↔V2 stress sweep +" +
         " parallel DAG。 ADR-014 OPT-IN held;V1 byte-" +
-        "equality preserved (4800+ BAS tests pass)。"
+        "equality preserved (4825+ BAS tests pass)。"
 }

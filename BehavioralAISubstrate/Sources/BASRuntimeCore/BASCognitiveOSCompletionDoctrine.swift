@@ -209,7 +209,14 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// + V1↔V2 stress sweep + parallel DAG。 ADR-014 OPT-IN
     /// held;V1 byte-equality preserved (4800+ BAS tests
     /// pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M992"
+    /// M997 bump:Phase 2 entropy chapter 四百六 v2 close-out
+    /// — V2 PARAM COMPREHENSIVE milestone。 V2 actor's runTurn
+    /// signature now accepts auditProjections + permit
+    /// escalation ledger + timestamp override params with
+    /// typed factory chain collapsing emission boilerplate
+    /// 24→6 lines。 ADR-014 OPT-IN held;V1 byte-equality
+    /// preserved (4825+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M997"
 
     /// Query the typed status of a specific gap。
     public static func status(
