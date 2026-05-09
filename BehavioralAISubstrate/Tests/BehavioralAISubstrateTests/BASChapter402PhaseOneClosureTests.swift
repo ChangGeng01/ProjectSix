@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1017",
-            "M1017:doctrine version reflects chapter 四百十一 v1 V2 STRESS SWEEP INPUT FOUNDATION")
+            "ADR-016.M1021",
+            "M1021:doctrine version reflects chapter 四百十二 v1 V2 STRESS SWEEP PLAN FOUNDATION")
     }
 
     // MARK: - M-number range matches chapter 四百二
