@@ -22,9 +22,18 @@ public enum BASChapter405EntropyDoctrine {
     /// bundles。
     public static let mNumberFirst: Int = 981
 
-    /// Last M-number shipped at this commit。Chapter is OPEN
-    /// — future cuts bump this。
-    public static let mNumberLast: Int = 983
+    /// Last M-number shipped at this commit。Chapter v1 closes
+    /// at M988 with BUNDLE PROTOCOL COMPREHENSIVE milestone:
+    /// 20/20 concrete bundle types now conform to either
+    /// BASBundleProtocol (with timestamp) or BASBundleIDProtocol
+    /// (without timestamp)。Future v2+ ships V2 stage rewrites
+    /// + permit fold + V1↔V2 stress sweep。
+    public static let mNumberLast: Int = 988
+
+    /// `v1` milestone: BUNDLE PROTOCOL COMPREHENSIVE at M988。
+    public static let v1MilestoneMNumber: Int = 988
+    public static let v1MilestoneStatus: String =
+        "chapter-405-v1-bundle-protocol-comprehensive"
 
     /// Per-commit-刀 ledger。
     public static let knives:
@@ -37,13 +46,31 @@ public enum BASChapter405EntropyDoctrine {
             "BASStepBundle + BASLearningExportBundle " +
             "adopt BASBundleIDProtocol (1st batch)"),
         (983, "第三刀",
-            "chapter 四百五 entry doctrine + ADR-016 bump")
+            "chapter 四百五 entry doctrine + ADR-016 bump"),
+        (984, "第四刀",
+            "BASCounterfactualBundle + BASCritiqueBundle " +
+            "adopt BASBundleIDProtocol via candidateID"),
+        (985, "第五刀",
+            "3 observation bundles adopt BASBundleProtocol " +
+            "(Tribunal + LeaseLife + NeuralOrgan)"),
+        (986, "第六刀",
+            "6 more observation bundles adopt BASBundleProtocol " +
+            "(Candidate + HostConstitution + SoftHand + " +
+            "UpdateTicket + ThoughtFold + HippocampalMemory)"),
+        (987, "第七刀",
+            "Final 6 bundles adopt protocol (WorldPrior + " +
+            "Presence + Decomposition + ShadowTrial + Risk + " +
+            "RiskCalibration) — 20/20 COMPREHENSIVE"),
+        (988, "第八刀",
+            "chapter 四百五 v1 close-out + ADR-016 bump " +
+            "(BUNDLE PROTOCOL COMPREHENSIVE milestone)")
     ]
 
-    /// Entropy classes attacked at this milestone。
+    /// Entropy classes attacked at v1 milestone。
     public static let entropyClassesAttacked: [String] = [
-        "duplication-entropy",       // M981/M982 protocol
-        "doctrine-pin-entropy"       // M983
+        "duplication-entropy",            // M981/M982/M984-M987
+        "doctrine-pin-entropy",           // M983 / M988
+        "bundle-shape-divergence-entropy" // M981 dual-protocol
     ]
 
     /// Doctrine pins held。
@@ -61,11 +88,10 @@ public enum BASChapter405EntropyDoctrine {
         "系统熵 reduction"
     ]
 
-    /// Future-cuts roadmap。
+    /// Future-cuts roadmap (v2+ — bundle adoption complete,
+    /// remaining work attacks V2 actor + composition + parallel
+    /// DAG)。
     public static let plannedFutureCuts: [String] = [
-        "Continue BASBundleIDProtocol adoption: BASCounterfactualBundle",
-        "Continue: BASCritiqueBundle",
-        "Continue: 14 more *Bundle types",
         "Native V2 actor stage rewrites replacing V1 delegation",
         "BASPermitEscalationFold function (calls 5 escalation modules)",
         "V2 actor adopts BASRuntimeAuditProjectionsBundle in payload",
@@ -75,14 +101,18 @@ public enum BASChapter405EntropyDoctrine {
 
     /// Human-readable summary。
     public static let summary: String =
-        "Phase 2 entropy chapter 四百五 OPEN at M981。 First " +
-        "3 cuts ship (1) BASBundleIDProtocol typed superset" +
-        " for timestamp-less bundles,(2) BASStepBundle +" +
-        " BASLearningExportBundle adopt the protocol (1st" +
-        " batch of 18 timestamp-less concrete bundles),(3)" +
-        " chapter entry doctrine + ADR-016 bump。 Future" +
-        " cuts continue protocol adoption + V2 actor stage" +
-        " rewrites + permit fold function + V1↔V2 stress" +
-        " sweep。 ADR-014 OPT-IN held;V1 byte-equality" +
-        " preserved。"
+        "Phase 2 entropy chapter 四百五 v1 closes at M988 —" +
+        " BUNDLE PROTOCOL COMPREHENSIVE milestone。 8 cuts" +
+        " ship (M981-M988):(1) BASBundleIDProtocol typed" +
+        " superset for timestamp-less bundles,(2-7) 19" +
+        " concrete bundle adoptions across BASBundleProtocol" +
+        " + BASBundleIDProtocol surfaces (BASMemoryBundle" +
+        " (M964) + 19 here = 20 total),(8) chapter v1" +
+        " close-out + ADR-016 bump。 ALL 20 concrete bundle" +
+        " types now conform to a typed bundle protocol;" +
+        " cross-bundle protocol queries work uniformly。" +
+        " Future v2+ ships V2 actor stage rewrites + permit" +
+        " fold function + V1↔V2 stress sweep + parallel DAG。" +
+        " ADR-014 OPT-IN held;V1 byte-equality preserved" +
+        " (4780+ BAS tests pass)。"
 }

@@ -15,18 +15,29 @@ final class BASChapter405EntropyDoctrineTests: XCTestCase {
         XCTAssertEqual(
             BASChapter405EntropyDoctrine.mNumberFirst, 981)
         XCTAssertEqual(
-            BASChapter405EntropyDoctrine.mNumberLast, 983)
+            BASChapter405EntropyDoctrine.mNumberLast, 988,
+            "M988 v1 close-out (BUNDLE COMPREHENSIVE)")
     }
 
-    func testKnivesLedgerCovers3Cuts() {
+    func testV1MilestoneIsAtM988() {
         XCTAssertEqual(
-            BASChapter405EntropyDoctrine.knives.count, 3)
+            BASChapter405EntropyDoctrine.v1MilestoneMNumber,
+            988)
+        XCTAssertEqual(
+            BASChapter405EntropyDoctrine.v1MilestoneStatus,
+            "chapter-405-v1-bundle-protocol-comprehensive")
+    }
+
+    func testKnivesLedgerCovers8CutsAtV1() {
+        XCTAssertEqual(
+            BASChapter405EntropyDoctrine.knives.count, 8,
+            "M988 v1 close-out: 8 cuts ship in chapter 四百五 v1")
     }
 
     func testKnivesLedgerCoversFullMRange() {
         let m = BASChapter405EntropyDoctrine
             .knives.map { $0.mNumber }
-        XCTAssertEqual(m, [981, 982, 983])
+        XCTAssertEqual(m, Array(981...988))
     }
 
     func testEntropyClassesNonEmpty() {

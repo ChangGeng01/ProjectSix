@@ -180,20 +180,25 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// change — Phase 1 is substrate-side machinery,not a roadmap
     /// gap closure。Phase 2 (chapter 四百三) + Phase 3 (chapter 四百四)
     /// follow per `wild-rolling-meerkat.md` plan。
-    /// M983 bump:Phase 2 entropy chapter 四百五 entry —
-    /// continues bundle-protocol-adoption pattern。 chapter
+    /// M988 bump:Phase 2 entropy chapter 四百五 v1 close-out
+    /// — BUNDLE PROTOCOL COMPREHENSIVE milestone。 chapter
     /// 四百三 (M953-M962, 10 commits) + chapter 四百四 v1+v2+v3+v4
-    /// (M963-M980, 18 commits) + chapter 四百五 entry
-    /// (M981-M983, 3 commits)。 chapter 四百五 ships
-    /// `BASBundleIDProtocol` typed superset for timestamp-less
-    /// bundles + 2 concrete adoptions (BASStepBundle +
-    /// BASLearningExportBundle) + chapter entry doctrine。
-    /// 18 more bundle types planned for future adoption +
-    /// V2 actor stage rewrites + permit fold function +
-    /// V1↔V2 stress sweep。 ADR-014 OPT-IN held throughout;
-    /// V1 runTurn byte-equality preserved (4750+ BAS tests
-    /// pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M983"
+    /// (M963-M980, 18 commits) + chapter 四百五 v1
+    /// (M981-M988, 8 commits)。 chapter 四百五 v1 ships
+    /// `BASBundleIDProtocol` typed superset + 19 concrete
+    /// bundle adoptions across BASBundleProtocol +
+    /// BASBundleIDProtocol surfaces (combined with M964
+    /// BASMemoryBundle = 20/20 COMPREHENSIVE) + chapter v1
+    /// close-out doctrine。 Cross-bundle protocol queries
+    /// (count by bundleID,aggregate by recordedAt,filter
+    /// by schemaVersion) now work uniformly across ALL 20
+    /// concrete bundle types via typed existentials。 Future
+    /// v2+ ships V2 actor stage rewrites + permit fold
+    /// function + V1↔V2 stress sweep + parallel DAG。
+    /// ADR-014 OPT-IN held throughout;V1 runTurn byte-
+    /// equality preserved (4780+ BAS tests pass)。No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M988"
 
     /// Query the typed status of a specific gap。
     public static func status(
