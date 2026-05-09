@@ -54,7 +54,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "phase-2-runtime-rewrite"
 
     /// Chapter tags shipped during Phase 2,in chronological
-    /// order。
+    /// order。 M1066 extension:added chapters 四百二十二 +
+    /// 四百二十三 (post-M1057 follow-up chapters)。
     public static let chapterTagsShipped: [String] = [
         "chapter 四百三",       // M953-M962
         "chapter 四百四",       // M963-M980
@@ -74,19 +75,24 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百十八",     // M1042-M1045
         "chapter 四百十九",     // M1046-M1049
         "chapter 四百二十",     // M1050-M1053
-        "chapter 四百二十一"    // M1054-M1057
+        "chapter 四百二十一",   // M1054-M1057
+        "chapter 四百二十二",   // M1058-M1061 (M1066 extension)
+        "chapter 四百二十三"    // M1062-M1065 (M1066 extension)
     ]
 
     /// First M-number of Phase 2 entropy work。
     public static let mNumberFirst: Int = 953
 
-    /// Last M-number of Phase 2 entropy work (chapter
-    /// 四百二十一 close-out)。
-    public static let mNumberLast: Int = 1057
+    /// Last M-number of Phase 2 entropy work (M1066
+    /// extension:bumped from M1057 to M1065 to include
+    /// chapters 四百二十二 + 四百二十三)。
+    public static let mNumberLast: Int = 1065
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1057,inclusive)。
-    public static let commitsShipped: Int = 105
+    /// M1065,inclusive)。 M1066 extension:bumped from 105
+    /// to 113 to include chapters 四百二十二 (4 commits) +
+    /// 四百二十三 (4 commits)。
+    public static let commitsShipped: Int = 113
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

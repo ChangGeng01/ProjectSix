@@ -369,6 +369,45 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter421EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter421EntropyDoctrine
+                    .summary),
+            // M1067 extension:added chapters 四百二十二 +
+            // 四百二十三 to keep cross-cutting invariant in
+            // sync with the M1066 Phase 2 doctrine extension
+            check("四百二十二",
+                tag: BASChapter422EntropyDoctrine.chapterTag,
+                first: BASChapter422EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter422EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter422EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter422EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter422EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter422EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter422EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter422EntropyDoctrine
+                    .summary),
+            check("四百二十三",
+                tag: BASChapter423EntropyDoctrine.chapterTag,
+                first: BASChapter423EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter423EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter423EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter423EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter423EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter423EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter423EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter423EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -432,7 +471,12 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             ("420", BASChapter420EntropyDoctrine.mNumberFirst,
              BASChapter420EntropyDoctrine.mNumberLast),
             ("421", BASChapter421EntropyDoctrine.mNumberFirst,
-             BASChapter421EntropyDoctrine.mNumberLast)
+             BASChapter421EntropyDoctrine.mNumberLast),
+            // M1067 extension
+            ("422", BASChapter422EntropyDoctrine.mNumberFirst,
+             BASChapter422EntropyDoctrine.mNumberLast),
+            ("423", BASChapter423EntropyDoctrine.mNumberFirst,
+             BASChapter423EntropyDoctrine.mNumberLast)
             ]
         for i in 1..<ranges.count {
             XCTAssertEqual(
@@ -484,6 +528,19 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter421EntropyDoctrine.mNumberFirst,
             last: BASChapter421EntropyDoctrine.mNumberLast,
             tag: "四百二十一")
+        // M1067 extension:added chapters 四百二十二 + 四百二十三
+        verifyKnivesRange(
+            BASChapter422EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter422EntropyDoctrine.mNumberFirst,
+            last: BASChapter422EntropyDoctrine.mNumberLast,
+            tag: "四百二十二")
+        verifyKnivesRange(
+            BASChapter423EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter423EntropyDoctrine.mNumberFirst,
+            last: BASChapter423EntropyDoctrine.mNumberLast,
+            tag: "四百二十三")
     }
 
     // MARK: - Helpers
