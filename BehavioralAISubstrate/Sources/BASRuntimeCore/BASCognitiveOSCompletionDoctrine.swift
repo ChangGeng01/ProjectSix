@@ -333,7 +333,16 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// Mirrors M1007 stage-plan validation pattern。 ADR-014
     /// OPT-IN held;V1 byte-equality preserved (5140+ BAS
     /// tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1041"
+    /// M1045 bump:Phase 2 entropy chapter 四百十八 v1 close-
+    /// out — V2 PLAN-LEDGER COHERENCE FOUNDATION milestone。
+    /// Drift-detection scaffolding now has THREE typed
+    /// primitives:M1042 coherence-issue enum + M1043 typed
+    /// pair (plan+ledger) with .coherenceIssues() + M1044
+    /// canonical factory。 Future native V2 stages + V1↔V2
+    /// stress harnesses detect plan↔ledger drift via these。
+    /// ADR-014 OPT-IN held;V1 byte-equality preserved
+    /// (5170+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1045"
 
     /// Query the typed status of a specific gap。
     public static func status(
