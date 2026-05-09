@@ -323,7 +323,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// accounting per group。 ADR-014 OPT-IN held;V1 byte-
     /// equality preserved (5110+ BAS tests pass)。No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1037"
+    /// M1041 bump:Phase 2 entropy chapter 四百十七 v1 close-
+    /// out — V2 STAGE LEDGER VALIDATION FOUNDATION
+    /// milestone。 Stage-ledger validation now has THREE
+    /// typed primitives:M1038 validation surface (3 issue
+    /// cases) + M1039 completeness aggregates (isComplete
+    /// + missingStages + averageStageDurationMs) + M1040
+    /// envelope payload surfaces stageLedgerIsComplete。
+    /// Mirrors M1007 stage-plan validation pattern。 ADR-014
+    /// OPT-IN held;V1 byte-equality preserved (5140+ BAS
+    /// tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1041"
 
     /// Query the typed status of a specific gap。
     public static func status(
