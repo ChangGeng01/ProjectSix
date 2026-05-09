@@ -282,7 +282,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// byte-equality verdict。 ADR-014 OPT-IN held;V1 byte-
     /// equality preserved (4990+ BAS tests pass)。No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1021"
+    /// M1025 bump:Phase 2 entropy chapter 四百十三 v1 close-
+    /// out — V2 STRESS SWEEP VERDICT FOUNDATION milestone。
+    /// Stress-sweep scaffolding now has NINE typed primitives
+    /// (3 input + 3 plan + 3 verdict):M1014 dimension +
+    /// M1015 risk-bucket + M1016 fixture-cell + M1018 fixture-
+    /// set + M1019 canonical sets + M1020 filtering helpers
+    /// + M1022 verdict enum + M1023 fixture result pair +
+    /// M1024 sweep report aggregate。 Future v2+ ships the
+    /// async harness function consuming the 9 primitives。
+    /// ADR-014 OPT-IN held;V1 byte-equality preserved (5020+
+    /// BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1025"
 
     /// Query the typed status of a specific gap。
     public static func status(
