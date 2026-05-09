@@ -252,7 +252,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// all 6 typed foundations。 ADR-014 OPT-IN held;V1
     /// byte-equality preserved (4900+ BAS tests pass)。No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1009"
+    /// M1013 bump:Phase 2 entropy chapter 四百十 v1 close-out
+    /// — V2 PERMIT FOLD INPUT FOUNDATION milestone。 Permit-
+    /// fold scaffolding now has SEVEN typed primitives:M966
+    /// stage enum + M966 stage record + M966 ledger + M970
+    /// positional builder + M1010 step-result pair + M1010
+    /// tuple builder + M1011 canonical stage order + M1012
+    /// step-results bundle。 Future v2+ ships the actual fold
+    /// function consuming the 7 primitives。 ADR-014 OPT-IN
+    /// held;V1 byte-equality preserved (4920+ BAS tests pass)。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1013"
 
     /// Query the typed status of a specific gap。
     public static func status(
