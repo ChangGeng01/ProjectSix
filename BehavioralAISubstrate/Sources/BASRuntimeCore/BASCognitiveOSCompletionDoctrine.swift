@@ -386,7 +386,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// (4 new tests catching surface drift at PR-time)。
     /// ADR-014 OPT-IN held;V1 byte-equality preserved
     /// (5285+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1061"
+    /// M1065 bump:Phase 2 entropy chapter 四百二十三 v1 close-
+    /// out — V2 ROADMAP + OPS CONVENIENCE milestone。
+    /// Strengthens dev-facing convenience:M1062
+    /// BASRoadmapDoctrine typed aggregate over Phase 1 +
+    /// Phase 2 + ADR-018 (13 new tests) + M1063 BASV2Foundation
+    /// CustomStringConvertible + humanName accessor (7 new
+    /// tests) + M1064 BASRuntimeAuditEmissionSummary
+    /// .compactDigest() one-line log accessor (6 new tests)。
+    /// ADR-014 OPT-IN held;V1 byte-equality preserved
+    /// (5310+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1065"
 
     /// Query the typed status of a specific gap。
     public static func status(
