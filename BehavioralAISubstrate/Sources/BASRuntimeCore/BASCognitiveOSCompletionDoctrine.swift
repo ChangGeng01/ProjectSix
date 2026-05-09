@@ -303,7 +303,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// async-let parallel fan-outs (entryAA2 / dD2 / m1FourWay
     /// / o12Way)。 ADR-014 OPT-IN held;V1 byte-equality
     /// preserved (5050+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1029"
+    /// M1033 bump:Phase 2 entropy chapter 四百十五 v1 close-
+    /// out — V2 PARALLEL DISPATCH SUMMARY FOUNDATION
+    /// milestone。 Parallel-dispatch summary scaffolding now
+    /// has THREE typed primitives:M1030 summary value type
+    /// + M1031 from-records factory + M1032 ledger extension
+    /// returning all 4 group summaries。 Future V2 actor
+    /// stages plug summary derivation into the .complete
+    /// envelope payload via these primitives。 ADR-014 OPT-IN
+    /// held;V1 byte-equality preserved (5090+ BAS tests pass)。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1033"
 
     /// Query the typed status of a specific gap。
     public static func status(
