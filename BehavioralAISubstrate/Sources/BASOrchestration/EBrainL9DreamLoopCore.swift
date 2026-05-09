@@ -386,7 +386,13 @@ public struct BASCandidateFrontier: BASSchemaVersioned {
     }
 }
 
-public struct BASCounterfactualBundle: BASSchemaVersioned {
+/// chapter 四百五 / M984:adopts `BASBundleIDProtocol` via
+/// synthesized bundleID accessor (uses candidateID as identity)。
+/// 系统熵 reduction protocol-adoption pattern (3rd of 18+
+/// timestamp-less bundle conformances)。
+public struct BASCounterfactualBundle:
+    BASSchemaVersioned, BASBundleIDProtocol
+{
     public static let currentSchemaVersion = "1.0.0"
 
     public var schemaVersion: String
@@ -396,6 +402,14 @@ public struct BASCounterfactualBundle: BASSchemaVersioned {
     public var worstCase: String
     public var uncertainty: Double
     public var affectedDomains: [String]
+
+    /// chapter 四百五 / M984:`BASBundleIDProtocol`
+    /// conformance via synthesized accessor。Stable bundleID
+    /// derived from candidateID (the bundle's natural
+    /// identity field)。
+    public var bundleID: String {
+        "counterfactual-bundle:\(candidateID)"
+    }
 
     public init(
         schemaVersion: String = BASCounterfactualBundle.currentSchemaVersion,
@@ -416,7 +430,12 @@ public struct BASCounterfactualBundle: BASSchemaVersioned {
     }
 }
 
-public struct BASCritiqueBundle: BASSchemaVersioned {
+/// chapter 四百五 / M984:adopts `BASBundleIDProtocol` via
+/// synthesized bundleID accessor (uses candidateID as identity)。
+/// (4th of 18+ timestamp-less bundle conformances)。
+public struct BASCritiqueBundle:
+    BASSchemaVersioned, BASBundleIDProtocol
+{
     public static let currentSchemaVersion = "1.0.0"
 
     public var schemaVersion: String
@@ -426,6 +445,12 @@ public struct BASCritiqueBundle: BASSchemaVersioned {
     public var emotionalBias: Double
     public var boundaryConflict: Double
     public var critiqueStrength: Double
+
+    /// chapter 四百五 / M984:`BASBundleIDProtocol`
+    /// conformance via synthesized accessor。
+    public var bundleID: String {
+        "critique-bundle:\(candidateID)"
+    }
 
     public init(
         schemaVersion: String = BASCritiqueBundle.currentSchemaVersion,
