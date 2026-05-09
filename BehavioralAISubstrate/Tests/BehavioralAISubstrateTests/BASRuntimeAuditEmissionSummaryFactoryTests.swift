@@ -5,6 +5,7 @@ import Foundation
 import XCTest
 @testable import BASHostKit
 @testable import BASOrchestration
+@testable import BASPolicy
 
 final class BASRuntimeAuditEmissionSummaryFactoryTests:
     XCTestCase
@@ -13,10 +14,12 @@ final class BASRuntimeAuditEmissionSummaryFactoryTests:
     // MARK: - Factory surface
 
     func testFactoryAcceptsResultAndOptionalProjections() {
-        // Compile-time check
+        // Compile-time check (M996:signature now also takes
+        // optional permitEscalationLedger:)
         let _: (
             BASEBrainTurnResult,
-            BASRuntimeAuditProjectionsBundle?
+            BASRuntimeAuditProjectionsBundle?,
+            BASPolicy.BASPermitEscalationLedger?
         ) -> BASRuntimeAuditEmissionSummary =
             BASRuntimeAuditEmissionSummary.from
         XCTAssertTrue(true)

@@ -104,6 +104,8 @@ public actor BASTurnRuntimeEngine {
         _ request: BASEBrainTurnRequest,
         auditProjections:
             BASRuntimeAuditProjectionsBundle? = nil,
+        permitEscalationLedger:
+            BASPermitEscalationLedger? = nil,
         timestampMsOverride: Int64? = nil
     ) async -> BASEBrainTurnResult {
         let result = coordinator.runTurn(request)
@@ -114,12 +116,16 @@ public actor BASTurnRuntimeEngine {
         // semantics for ID-coherence which audit consumers
         // prioritize)。 Sequence numbers preserve start-before-
         // complete ordering。
+        // chapter 四百六 v2 / M996: optional permitEscalationLedger
+        // (M966 typed) param threads firedStageCount into the
+        // .complete envelope payload。
         await emitStartEnvelope(
             for: result,
             timestampMsOverride: timestampMsOverride)
         await emitCompleteEnvelope(
             for: result,
             auditProjections: auditProjections,
+            permitEscalationLedger: permitEscalationLedger,
             timestampMsOverride: timestampMsOverride)
         return result
     }
@@ -153,6 +159,8 @@ public actor BASTurnRuntimeEngine {
         for result: BASEBrainTurnResult,
         auditProjections:
             BASRuntimeAuditProjectionsBundle?,
+        permitEscalationLedger:
+            BASPermitEscalationLedger?,
         timestampMsOverride: Int64?
     ) async {
         guard let log = eventLog else { return }
@@ -160,11 +168,14 @@ public actor BASTurnRuntimeEngine {
         let nextSeq = sequenceCounter
         sequenceCounter += 1
 
-        // chapter 四百六 / M993 — typed factory call collapses
-        // 12-line summary construction to 1 line。
+        // chapter 四百六 / M993 + M996 — typed factory call
+        // collapses 12-line summary construction to 1 line +
+        // threads permit escalation ledger fired-stage count
+        // through the .complete envelope payload。
         let summary = BASRuntimeAuditEmissionSummary.from(
             result: result,
-            auditProjections: auditProjections)
+            auditProjections: auditProjections,
+            permitEscalationLedger: permitEscalationLedger)
 
         let turnID =
             result.sovereignAuditEntry?.turnID ??

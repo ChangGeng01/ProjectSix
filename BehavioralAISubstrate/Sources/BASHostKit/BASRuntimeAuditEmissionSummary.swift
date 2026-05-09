@@ -87,6 +87,14 @@ public struct BASRuntimeAuditEmissionSummary:
     /// when no aggregator was supplied or all namespaces empty。
     public let auditProjectionsPopulatedSlotCount: Int
 
+    /// chapter 四百六 v2 / M996 — count of escalation stages
+    /// that FIRED during the M384/M385/M406/M449/M450
+    /// permit-escalation chain。 0 when no permit ledger was
+    /// supplied OR when all 5 stages were identity-pass。
+    /// Audit consumers grep this to filter turns where the
+    /// composition entropy chain ran live。
+    public let permitEscalationFiredStageCount: Int
+
     // MARK: - Init
 
     public init(
@@ -96,7 +104,8 @@ public struct BASRuntimeAuditEmissionSummary:
         ticketCount: Int,
         auditID: String,
         runMode: String,
-        auditProjectionsPopulatedSlotCount: Int = 0
+        auditProjectionsPopulatedSlotCount: Int = 0,
+        permitEscalationFiredStageCount: Int = 0
     ) {
         self.traceID = traceID
         self.verdictLevelRaw = verdictLevelRaw
@@ -106,6 +115,8 @@ public struct BASRuntimeAuditEmissionSummary:
         self.runMode = runMode
         self.auditProjectionsPopulatedSlotCount =
             max(0, auditProjectionsPopulatedSlotCount)
+        self.permitEscalationFiredStageCount =
+            max(0, permitEscalationFiredStageCount)
     }
 
     // MARK: - Stable JSON encoding
@@ -130,13 +141,16 @@ public struct BASRuntimeAuditEmissionSummary:
     // MARK: - chapter 四百六 / M993 — typed factory
 
     /// Build a summary from a V1 `BASEBrainTurnResult` + an
-    /// optional `BASRuntimeAuditProjectionsBundle`。 Pure
-    /// function;same input → same summary (chapter 三百九二)。
-    /// V2 actor emission code drops from ~12 lines to 1 call。
+    /// optional `BASRuntimeAuditProjectionsBundle` + optional
+    /// `BASPermitEscalationLedger`。 Pure function;same input
+    /// → same summary (chapter 三百九二)。 V2 actor emission
+    /// code drops from ~12 lines to 1 call。
     public static func from(
         result: BASEBrainTurnResult,
         auditProjections:
-            BASRuntimeAuditProjectionsBundle? = nil
+            BASRuntimeAuditProjectionsBundle? = nil,
+        permitEscalationLedger:
+            BASPermitEscalationLedger? = nil
     ) -> BASRuntimeAuditEmissionSummary {
         BASRuntimeAuditEmissionSummary(
             traceID: result.runtimeTrace.sessionID,
@@ -151,6 +165,9 @@ public struct BASRuntimeAuditEmissionSummary:
                     .auditID ?? "unassigned",
             runMode: result.budgetFrame.runMode.rawValue,
             auditProjectionsPopulatedSlotCount:
-                auditProjections?.populatedSlotCount ?? 0)
+                auditProjections?.populatedSlotCount ?? 0,
+            permitEscalationFiredStageCount:
+                permitEscalationLedger?
+                    .firedStageCount ?? 0)
     }
 }
