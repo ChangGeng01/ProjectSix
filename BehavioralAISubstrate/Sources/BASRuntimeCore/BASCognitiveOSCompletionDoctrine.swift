@@ -342,7 +342,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// stress harnesses detect plan↔ledger drift via these。
     /// ADR-014 OPT-IN held;V1 byte-equality preserved
     /// (5170+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1045"
+    /// M1049 bump:Phase 2 entropy chapter 四百十九 v1 close-
+    /// out — V2 COHERENCE ENVELOPE INTEGRATION milestone。
+    /// Plan-ledger coherence now flows through the V2 actor's
+    /// audit envelope payload via 3 typed surfaces:M1046
+    /// typed Int slot (planLedgerCoherenceIssueCount) +
+    /// M1047 derived Bool (planLedgerIsCoherent) + M1048
+    /// coherence-pair accessors (coherenceIssueCount /
+    /// firstIssue)。 Audit consumers grep these to surface
+    /// drift on dashboards。 ADR-014 OPT-IN held;V1 byte-
+    /// equality preserved (5200+ BAS tests pass)。No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M1049"
 
     /// Query the typed status of a specific gap。
     public static func status(

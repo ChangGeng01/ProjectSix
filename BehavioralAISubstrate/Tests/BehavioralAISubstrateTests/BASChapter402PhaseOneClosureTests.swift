@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1045",
-            "M1045:doctrine version reflects chapter 四百十八 v1 V2 PLAN-LEDGER COHERENCE FOUNDATION")
+            "ADR-016.M1049",
+            "M1049:doctrine version reflects chapter 四百十九 v1 V2 COHERENCE ENVELOPE INTEGRATION")
     }
 
     // MARK: - M-number range matches chapter 四百二
