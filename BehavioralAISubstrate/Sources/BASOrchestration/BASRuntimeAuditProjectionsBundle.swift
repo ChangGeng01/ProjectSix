@@ -52,6 +52,11 @@ public struct BASRuntimeAuditProjectionsBundle:
     public let abyssal: BASAbyssalAuditProjections
     public let cthulhu: BASCthulhuAuditProjections
     public let tribunal: BASTribunalAuditProjections
+    /// chapter 四百四 v4 / M979 — 5th namespace slot:risk
+    /// calibration projections (BASRiskCard / decisionPackage
+    /// / permitBinding) per M978。
+    public let riskCalibration:
+        BASRiskCalibrationProjections
 
     // MARK: - Init
 
@@ -59,12 +64,15 @@ public struct BASRuntimeAuditProjectionsBundle:
         kunlun: BASKunlunAuditProjections = .none(),
         abyssal: BASAbyssalAuditProjections = .none(),
         cthulhu: BASCthulhuAuditProjections = .none(),
-        tribunal: BASTribunalAuditProjections = .none()
+        tribunal: BASTribunalAuditProjections = .none(),
+        riskCalibration: BASRiskCalibrationProjections
+            = .none()
     ) {
         self.kunlun = kunlun
         self.abyssal = abyssal
         self.cthulhu = cthulhu
         self.tribunal = tribunal
+        self.riskCalibration = riskCalibration
     }
 
     /// All-empty bundle for V2 actor early stages。
@@ -83,7 +91,8 @@ public struct BASRuntimeAuditProjectionsBundle:
             kunlun: kunlun,
             abyssal: abyssal,
             cthulhu: cthulhu,
-            tribunal: tribunal)
+            tribunal: tribunal,
+            riskCalibration: riskCalibration)
     }
 
     public func with(
@@ -93,7 +102,8 @@ public struct BASRuntimeAuditProjectionsBundle:
             kunlun: kunlun,
             abyssal: abyssal,
             cthulhu: cthulhu,
-            tribunal: tribunal)
+            tribunal: tribunal,
+            riskCalibration: riskCalibration)
     }
 
     public func with(
@@ -103,7 +113,8 @@ public struct BASRuntimeAuditProjectionsBundle:
             kunlun: kunlun,
             abyssal: abyssal,
             cthulhu: cthulhu,
-            tribunal: tribunal)
+            tribunal: tribunal,
+            riskCalibration: riskCalibration)
     }
 
     public func with(
@@ -113,26 +124,42 @@ public struct BASRuntimeAuditProjectionsBundle:
             kunlun: kunlun,
             abyssal: abyssal,
             cthulhu: cthulhu,
-            tribunal: tribunal)
+            tribunal: tribunal,
+            riskCalibration: riskCalibration)
+    }
+
+    /// chapter 四百四 v4 / M979 — `with(riskCalibration:)` for
+    /// the 5th namespace。
+    public func with(
+        riskCalibration: BASRiskCalibrationProjections
+    ) -> BASRuntimeAuditProjectionsBundle {
+        BASRuntimeAuditProjectionsBundle(
+            kunlun: kunlun,
+            abyssal: abyssal,
+            cthulhu: cthulhu,
+            tribunal: tribunal,
+            riskCalibration: riskCalibration)
     }
 
     // MARK: - Aggregate accessors
 
-    /// Total populated slots across all 4 namespaces (sum of
+    /// Total populated slots across all 5 namespaces (sum of
     /// per-namespace `populatedSlotCount`)。
     public var populatedSlotCount: Int {
         kunlun.populatedSlotCount
             + abyssal.populatedSlotCount
             + cthulhu.populatedSlotCount
             + tribunal.populatedSlotCount
+            + riskCalibration.populatedSlotCount
     }
 
-    /// `true` when any of the 4 namespaces has at least one
+    /// `true` when any of the 5 namespaces has at least one
     /// populated slot。
     public var hasAnyProjection: Bool {
         kunlun.hasAnyProjection
             || abyssal.hasAnyProjection
             || cthulhu.hasAnyProjection
             || tribunal.hasAnyProjection
+            || riskCalibration.hasAnyProjection
     }
 }

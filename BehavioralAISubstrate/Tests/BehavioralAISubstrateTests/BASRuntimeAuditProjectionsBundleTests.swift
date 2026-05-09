@@ -15,6 +15,7 @@ final class BASRuntimeAuditProjectionsBundleTests: XCTestCase {
         XCTAssertFalse(b.abyssal.hasAnyProjection)
         XCTAssertFalse(b.cthulhu.hasAnyProjection)
         XCTAssertFalse(b.tribunal.hasAnyProjection)
+        XCTAssertFalse(b.riskCalibration.hasAnyProjection)
     }
 
     func testNoneFactory() {
@@ -70,6 +71,25 @@ final class BASRuntimeAuditProjectionsBundleTests: XCTestCase {
             kunlun: BASKunlunAuditProjections(
                 readinessRef: "r"))
         XCTAssertTrue(b.hasAnyProjection)
+    }
+
+    // MARK: - 5th namespace (M979)
+
+    func testWithRiskCalibrationReturnsFreshBundle() {
+        let original = BASRuntimeAuditProjectionsBundle.none()
+        let updatedRisk = BASRiskCalibrationProjections(
+            riskCard: nil)  // empty but pinned
+        let updated = original.with(
+            riskCalibration: updatedRisk)
+        XCTAssertEqual(
+            updated.riskCalibration.populatedSlotCount, 0)
+    }
+
+    func testRiskCalibrationContributesToAggregate() {
+        let b = BASRuntimeAuditProjectionsBundle(
+            riskCalibration: BASRiskCalibrationProjections())
+        // All slots in the projections empty → 0
+        XCTAssertEqual(b.populatedSlotCount, 0)
     }
 
     // MARK: - Replay determinism
