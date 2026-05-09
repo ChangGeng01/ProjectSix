@@ -168,10 +168,25 @@ public struct BASRiskCalibrationStratumDelta:
 /// Versioned, signed, deploy-time-immutable calibration bundle.
 /// The L11 risk gate (chapter 二百六十四) accepts one bundle at
 /// a time and applies its strata deltas to base thresholds.
+/// chapter 四百五 / M987:adopts `BASBundleProtocol` via
+/// synthesized bundleID + producedAt mapping。 14th of 20+
+/// concrete bundle conformances。
 public struct BASRiskCalibrationBundle:
-    BASSchemaVersioned, Sendable, Equatable, Codable, Hashable
+    BASSchemaVersioned, BASBundleProtocol,
+    Sendable, Equatable, Codable, Hashable
 {
     public static let currentSchemaVersion = "1.0.0"
+
+    /// chapter 四百五 / M987:`BASBundleProtocol` synthesized
+    /// bundleID derived from bundleVersion (the bundle's
+    /// natural identity field)。
+    public var bundleID: String {
+        "risk-calibration-bundle:\(bundleVersion)"
+    }
+
+    /// chapter 四百五 / M987:`BASBundleProtocol.recordedAt`
+    /// maps to `producedAt`。
+    public var recordedAt: Date { producedAt }
 
     /// Magic version string for the "no calibration" baseline.
     /// L11 gates that have never received a bundle behave as if

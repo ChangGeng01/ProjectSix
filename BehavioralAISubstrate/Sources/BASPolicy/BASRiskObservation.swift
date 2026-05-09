@@ -97,14 +97,25 @@ public struct BASRiskObservation: Sendable, Equatable, Codable {
 }
 
 /// A bundle of risk observations emitted in one turn.
+/// chapter 四百五 / M987:adopts `BASBundleProtocol`。
 public struct BASRiskObservationBundle:
-    Sendable, Equatable, Codable
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASRiskObservation]
     public let emittedAt: Date
 
+
+    /// chapter 四百五 / M987:`BASBundleProtocol`
+    /// synthesized accessors。
+    public var bundleID: String {
+        "risk-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
     public init(
         turnID: String,
         sessionID: String,

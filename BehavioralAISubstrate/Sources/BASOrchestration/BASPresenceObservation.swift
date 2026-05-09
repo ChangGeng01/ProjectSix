@@ -85,13 +85,25 @@ public struct BASPresenceObservation: Sendable, Equatable, Codable {
 /// audit entry. The bundle is additive to the turn — callers may
 /// emit zero observations on a light turn without breaking any
 /// contract.
-public struct BASPresenceObservationBundle: Sendable, Equatable, Codable
+/// chapter 四百五 / M987:adopts `BASBundleProtocol`。
+public struct BASPresenceObservationBundle:
+    Sendable, Equatable, Codable, BASBundleProtocol
 {
     public let turnID: String
     public let sessionID: String
     public let observations: [BASPresenceObservation]
     public let emittedAt: Date
 
+
+    /// chapter 四百五 / M987:`BASBundleProtocol`
+    /// synthesized accessors。
+    public var bundleID: String {
+        "presence-observation-bundle:\(turnID)"
+    }
+
+    public var schemaVersion: String { "1.0.0" }
+
+    public var recordedAt: Date { emittedAt }
     public init(
         turnID: String,
         sessionID: String,
