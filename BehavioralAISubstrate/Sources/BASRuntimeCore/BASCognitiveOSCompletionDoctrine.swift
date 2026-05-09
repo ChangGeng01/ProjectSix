@@ -293,7 +293,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// async harness function consuming the 9 primitives。
     /// ADR-014 OPT-IN held;V1 byte-equality preserved (5020+
     /// BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1025"
+    /// M1029 bump:Phase 2 entropy chapter 四百十四 v1 close-
+    /// out — V2 PARALLEL DISPATCH FOUNDATION milestone。
+    /// Parallel-dispatch scaffolding now has THREE typed
+    /// primitives:M1026 cardinality + member-stage list per
+    /// group + M1027 BASParallelStageAssembleOrder generic +
+    /// M1028 inverse fromCanonicalOrder factory。 Critical
+    /// chapter 三百九二 byte-stability anchor for native V2
+    /// async-let parallel fan-outs (entryAA2 / dD2 / m1FourWay
+    /// / o12Way)。 ADR-014 OPT-IN held;V1 byte-equality
+    /// preserved (5050+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1029"
 
     /// Query the typed status of a specific gap。
     public static func status(
