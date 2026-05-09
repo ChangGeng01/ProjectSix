@@ -142,17 +142,11 @@ public actor BASTurnRuntimeEngine {
             sessionID: result.runtimeTrace.sessionID,
             timestampMs: timestampMs,
             sequenceNumber: nextSeq)
-        let entry = BASEventLogEntry(
-            eventID: eventIDFactory(),
-            timestampMs: envelope.timestampMs,
-            kind: .substrateAudit,
-            sessionID: envelope.sessionID,
-            sequenceNumber: 0,
-            source: "turn-runtime-engine",
-            turnRef: envelope.turnID,
-            actions: [envelope.eventLogActionTag],
-            payloadJson: envelope.payloadJson)
-        _ = try? await log.append(entry)
+        // chapter 四百六 v2 / M995 — typed extension collapses
+        // 9-line entry construction + append to 1 call。
+        await log.appendTurnEnvelope(
+            envelope,
+            eventID: eventIDFactory())
     }
 
     private func emitCompleteEnvelope(
@@ -181,17 +175,10 @@ public actor BASTurnRuntimeEngine {
             timestampMs: timestampMs,
             sequenceNumber: nextSeq,
             payloadJson: summary.payloadJson())
-
-        let entry = BASEventLogEntry(
-            eventID: eventIDFactory(),
-            timestampMs: envelope.timestampMs,
-            kind: .substrateAudit,
-            sessionID: envelope.sessionID,
-            sequenceNumber: 0,
-            source: "turn-runtime-engine",
-            turnRef: envelope.turnID,
-            actions: [envelope.eventLogActionTag],
-            payloadJson: envelope.payloadJson)
-        _ = try? await log.append(entry)
+        // chapter 四百六 v2 / M995 — typed extension collapses
+        // 9-line entry construction + append to 1 call。
+        await log.appendTurnEnvelope(
+            envelope,
+            eventID: eventIDFactory())
     }
 }
