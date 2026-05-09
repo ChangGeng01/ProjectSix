@@ -216,7 +216,12 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// typed factory chain collapsing emission boilerplate
     /// 24→6 lines。 ADR-014 OPT-IN held;V1 byte-equality
     /// preserved (4825+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M997"
+    /// M999 bump:Phase 2 entropy chapter 四百七 entry。 V2
+    /// actor's 4-arg init collapses to 1-arg via the typed
+    /// `BASTurnRuntimeEngineConfiguration` bundle (M998)。
+    /// Chapter 四百七 OPEN at M998-M999。 ADR-014 OPT-IN held;
+    /// V1 byte-equality preserved。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M999"
 
     /// Query the typed status of a specific gap。
     public static func status(
