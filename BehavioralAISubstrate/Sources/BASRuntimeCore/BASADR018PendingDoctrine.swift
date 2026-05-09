@@ -72,20 +72,25 @@ public enum BASADR018PendingDoctrine {
     public static let adrIdentifier: String =
         "ADR-018-pending"
 
-    /// Status of an ADR-018 pending item。 All 4 items
-    /// return `.pending` today;future ADR-018 ratification
-    /// flips items to `.shipped`。
+    /// Status of an ADR-018 pending item。
+    ///
+    /// M1056 baseline:all 4 items pending。
+    /// M1071 ratification:`permitEscalationFold` shipped at
+    /// chapter 四百二十五 / M1070 via
+    /// `BASPermitEscalationFoldExecutor` (real working
+    /// async fold executor with typed step closures)。
     public static func status(
         of item: BASADR018PendingItem
     ) -> BASADR018PendingItemStatus {
-        // M1056:all 4 items are pending — none has shipped。
         switch item {
         case .parallelDispatchDriver:
             return .pending
         case .stressSweepHarness:
             return .pending
         case .permitEscalationFold:
-            return .pending
+            return .shipped(
+                mNumber: 1070,
+                chapterTag: "chapter 四百二十五")
         case .nativeStageRewrites:
             return .pending
         }
