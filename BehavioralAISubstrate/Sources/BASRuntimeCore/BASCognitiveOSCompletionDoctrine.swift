@@ -376,7 +376,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ADR-018-pending roadmap。 ADR-014 OPT-IN held;V1
     /// byte-equality preserved (5250+ BAS tests pass)。No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1057"
+    /// M1061 bump:Phase 2 entropy chapter 四百二十二 v1 close-
+    /// out — V2 SUBSTRATE INTEGRITY milestone。 Strengthens
+    /// cross-cutting invariants:M1058 backfill chapter 四百三
+    /// schema + completeness invariant test (3 new tests +
+    /// 19 chapter round-trips) + M1059 full-payload integration
+    /// test (7 new tests / 16 envelope fields / 5-rerun SHA256
+    /// stability) + M1060 V2 actor signature freeze test
+    /// (4 new tests catching surface drift at PR-time)。
+    /// ADR-014 OPT-IN held;V1 byte-equality preserved
+    /// (5285+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1061"
 
     /// Query the typed status of a specific gap。
     public static func status(
