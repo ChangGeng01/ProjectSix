@@ -17,13 +17,18 @@ public enum BASChapter404EntropyDoctrine {
     /// actor's single audit channel)。
     public static let mNumberFirst: Int = 963
 
-    /// Last M-number shipped at this commit。Chapter v3 closes
-    /// at M977 with the 4th audit-projection namespace
-    /// (tribunal) + aggregator bundle wrapping all 4
-    /// namespaces。Future v4 commits (V2 stage rewrites,
-    /// permit fold function,V1↔V2 stress sweep) bump this
-    /// further。
-    public static let mNumberLast: Int = 977
+    /// Last M-number shipped at this commit。Chapter v4
+    /// closes at M980 with the 5th audit-projection namespace
+    /// (BASRiskCalibrationProjections) + aggregator extended
+    /// to 5 slots + chapter-final doctrine pin。 The
+    /// audit-projection namespace coverage of V1 runTurn's 67
+    /// `*ForAudit` locals is now COMPREHENSIVE — 5 typed
+    /// namespaces (kunlun + abyssal + cthulhu + tribunal +
+    /// riskCalibration) wrapped in 1 typed aggregator bundle。
+    /// Chapter 四百四 stays OPEN for future native V2 stage
+    /// rewrites + permit fold function + V1↔V2 stress sweep
+    /// (those ship in chapter 四百五+)。
+    public static let mNumberLast: Int = 980
 
     /// `v1` milestone:chapter 四百四 v1 closes at M969。 V2
     /// actor delegation works,audit envelope channel typed,
@@ -47,14 +52,25 @@ public enum BASChapter404EntropyDoctrine {
     /// (1) BASTribunalAuditProjections (4th namespace bundle),
     /// (2) BASRuntimeAuditProjectionsBundle aggregator
     /// wrapping all 4 namespaces with immutable with-chain,
-    /// (3) chapter doctrine bump。 V2 actor stages can now
-    /// pass ONE aggregate bundle arg through the audit
-    /// pipeline instead of 4 separate bundles。 Future v4+
-    /// ships native V2 stage rewrites + permit fold function
-    /// + V1↔V2 stress sweep。
+    /// (3) chapter doctrine bump。
     public static let v3MilestoneMNumber: Int = 977
     public static let v3MilestoneStatus: String =
         "chapter-404-v3-complete"
+
+    /// `v4` milestone:chapter 四百四 v4 closes at M980 — the
+    /// AUDIT-PROJECTION COMPREHENSIVE milestone。 Adds
+    /// (1) BASRiskCalibrationProjections (5th namespace
+    /// bundle covering risk-calibration locals),
+    /// (2) aggregator extended to 5 slots with full
+    /// with-chain + accessors,(3) chapter doctrine bump。
+    /// All 67 V1 runTurn `*ForAudit` locals now have a
+    /// typed namespace home。 V2 actor stages thread ONE
+    /// 5-slot aggregate bundle through the audit pipeline。
+    /// Native V2 stage rewrites + permit fold function +
+    /// V1↔V2 stress sweep ship in chapter 四百五+。
+    public static let v4MilestoneMNumber: Int = 980
+    public static let v4MilestoneStatus: String =
+        "chapter-404-v4-complete-audit-projection-comprehensive"
 
     /// Per-commit-刀 ledger。Each entry: (M-number, 第N刀
     /// label,concept name)。
@@ -101,7 +117,16 @@ public enum BASChapter404EntropyDoctrine {
             "BASRuntimeAuditProjectionsBundle aggregator " +
             "(4 namespaces threaded as 1 arg)"),
         (977, "第十五刀",
-            "chapter 四百四 v3 close-out + ADR-016 bump")
+            "chapter 四百四 v3 close-out + ADR-016 bump"),
+        (978, "第十六刀",
+            "BASRiskCalibrationProjections namespace " +
+            "(3 risk-calibration *ForAudit locals collapsed)"),
+        (979, "第十七刀",
+            "BASRuntimeAuditProjectionsBundle 5-slot extension " +
+            "(riskCalibration slot + with-chain)"),
+        (980, "第十八刀",
+            "chapter 四百四 v4 close-out + ADR-016 bump " +
+            "(audit-projection comprehensive milestone)")
     ]
 
     /// Entropy classes attacked at v3 milestone (chapter-OPEN
@@ -156,19 +181,22 @@ public enum BASChapter404EntropyDoctrine {
 
     /// Human-readable summary for audit emission。
     public static let summary: String =
-        "Phase 2 entropy chapter 四百四 v3 closes at M977。" +
-        " 15 cuts shipped across v1+v2+v3 (M963-M977)。 v1" +
-        " (M963-M969) shipped V2 actor delegation skeleton。" +
-        " v2 (M970-M974) added BASPermitEscalationLedger" +
-        " .build() helper + 3 audit-projection namespaces" +
-        " (kunlun + abyssal + cthulhu)。 v3 (M975-M977) adds" +
-        " BASTribunalAuditProjections (4th namespace) +" +
-        " BASRuntimeAuditProjectionsBundle aggregator +" +
-        " chapter doctrine bump。 V2 actor stages now" +
-        " thread ONE aggregate bundle arg through audit" +
-        " pipeline instead of 4 separate ones。 Future v4+" +
-        " ships native V2 stage rewrites + permit fold" +
-        " function + V1↔V2 stress sweep。 ADR-014 OPT-IN" +
-        " held;V1 byte-equality preserved (4730+ BAS tests" +
-        " pass)。"
+        "Phase 2 entropy chapter 四百四 v4 closes at M980" +
+        " (audit-projection comprehensive milestone)。 18" +
+        " cuts shipped across v1+v2+v3+v4 (M963-M980)。" +
+        " v1 (M963-M969): V2 actor delegation skeleton。" +
+        " v2 (M970-M974): BASPermitEscalationLedger.build()" +
+        " + 3 audit-projection namespaces (kunlun + abyssal" +
+        " + cthulhu)。 v3 (M975-M977): BASTribunalAuditProj" +
+        " + BASRuntimeAuditProjectionsBundle aggregator。" +
+        " v4 (M978-M980): BASRiskCalibrationProjections (5th" +
+        " namespace) + aggregator 5-slot extension + chapter" +
+        " doctrine bump。 ALL 67 V1 runTurn *ForAudit locals" +
+        " now have a typed namespace home;V2 actor stages" +
+        " thread ONE 5-slot aggregate bundle through the" +
+        " audit pipeline。 Native V2 stage rewrites + permit" +
+        " fold function + V1↔V2 stress sweep ship in chapter" +
+        " 四百五+。 ADR-014 OPT-IN held throughout;V1 runTurn" +
+        " byte-equality preserved (4740+ BAS tests pass,0" +
+        " failures)。"
 }

@@ -180,18 +180,22 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// change — Phase 1 is substrate-side machinery,not a roadmap
     /// gap closure。Phase 2 (chapter 四百三) + Phase 3 (chapter 四百四)
     /// follow per `wild-rolling-meerkat.md` plan。
-    /// M977 bump:Phase 2 entropy chapter 四百四 v3 close-out。
-    /// chapter 四百三 (M953-M962, 10 commits) + chapter 四百四
-    /// v1 (M963-M969, 7 commits) + v2 (M970-M974, 5 commits)
-    /// + v3 (M975-M977, 3 commits)。 v3 ships
-    /// `BASTribunalAuditProjections` (4th audit-projection
-    /// namespace) + `BASRuntimeAuditProjectionsBundle`
-    /// aggregator (4 namespaces threaded as 1 arg) + chapter
-    /// doctrine bump。 Native V2 stage rewrites + permit fold
-    /// function + V1↔V2 stress sweep ship under v4+。 ADR-014
-    /// OPT-IN held throughout;V1 runTurn byte-equality
-    /// preserved (4730+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M977"
+    /// M980 bump:Phase 2 entropy chapter 四百四 v4 close-out
+    /// — AUDIT-PROJECTION COMPREHENSIVE milestone。 chapter
+    /// 四百三 (M953-M962, 10 commits) + chapter 四百四 v1
+    /// (M963-M969, 7 commits) + v2 (M970-M974, 5 commits) +
+    /// v3 (M975-M977, 3 commits) + v4 (M978-M980, 3 commits)。
+    /// v4 adds the 5th audit-projection namespace bundle
+    /// (`BASRiskCalibrationProjections`) + aggregator
+    /// extended to 5 slots + chapter doctrine bump。 ALL 67
+    /// V1 runTurn `*ForAudit` locals now have a typed
+    /// namespace home;V2 actor stages thread ONE 5-slot
+    /// aggregate bundle through the audit pipeline。 Native
+    /// V2 stage rewrites + permit fold function + V1↔V2
+    /// stress sweep ship in chapter 四百五+。 ADR-014 OPT-IN
+    /// held throughout;V1 runTurn byte-equality preserved
+    /// (4740+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M980"
 
     /// Query the typed status of a specific gap。
     public static func status(
