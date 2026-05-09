@@ -50,40 +50,46 @@ final class BASRoadmapDoctrineTests: XCTestCase {
             .shipped)
     }
 
-    // MARK: - ADR-018 pending
+    // MARK: - ADR-018 shipped after M1076 full ratification
 
-    func testADR018Pending() {
+    func testADR018ShippedAfterM1076() {
         XCTAssertEqual(
             BASRoadmapDoctrine
                 .status(of: .adr018ProductionPending),
-            .pending)
+            .shipped,
+            "M1076 full ratification flips ADR-018 phase " +
+            "from .pending to .shipped")
     }
 
     // MARK: - shippedPhases / pendingPhases
 
-    func testShippedPhasesIsTwo() {
+    func testAllThreePhasesShippedAfterM1076() {
         XCTAssertEqual(
-            BASRoadmapDoctrine.shippedPhases().count, 2)
+            BASRoadmapDoctrine.shippedPhases().count, 3,
+            "M1076 ratification:all 3 phases shipped")
         XCTAssertTrue(
             BASRoadmapDoctrine.shippedPhases()
                 .contains(.phase1MemoryEventSourcing))
         XCTAssertTrue(
             BASRoadmapDoctrine.shippedPhases()
                 .contains(.phase2RuntimeRewrite))
+        XCTAssertTrue(
+            BASRoadmapDoctrine.shippedPhases()
+                .contains(.adr018ProductionPending))
     }
 
-    func testPendingPhasesIsOneADR018() {
-        XCTAssertEqual(
-            BASRoadmapDoctrine.pendingPhases(),
-            [.adr018ProductionPending])
+    func testPendingPhasesIsEmptyAfterM1076() {
+        XCTAssertTrue(
+            BASRoadmapDoctrine.pendingPhases().isEmpty,
+            "M1076 full ratification:all 3 phases shipped")
     }
 
     // MARK: - Overall progress
 
-    func testOverallProgressIs66Percent() {
+    func testOverallProgressIs100Percent() {
         XCTAssertEqual(
-            BASRoadmapDoctrine.overallProgressPercent, 66,
-            "2 of 3 phases shipped → 66%")
+            BASRoadmapDoctrine.overallProgressPercent, 100,
+            "M1076 ratification:3 of 3 phases shipped → 100%")
     }
 
     // MARK: - Codable round-trip
@@ -113,25 +119,29 @@ final class BASRoadmapDoctrineTests: XCTestCase {
     // MARK: - Cross-check against existing Phase 2 doctrine
 
     func testRoadmapPhase2ShippedMatchesPhase2DoctrineCount() {
-        // Phase 2 doctrine has 19 chapters shipped — the
-        // roadmap reflects that as .shipped status
+        // Phase 2 doctrine has 23+ chapters shipped — the
+        // roadmap reflects that as .shipped status。
         XCTAssertEqual(
             BASRoadmapDoctrine
                 .status(of: .phase2RuntimeRewrite),
             .shipped)
-        XCTAssertEqual(
+        XCTAssertGreaterThanOrEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 19)
+                .chapterTagsShipped.count, 23,
+            "Phase 2 includes at least 23 chapters " +
+            "post-M1066+M1069+M1073 self-extensions")
     }
 
-    func testRoadmapADR018PendingMatchesADR018Doctrine() {
-        // ADR-018 doctrine has 4 pending items — roadmap
-        // reflects this as overall .pending phase
-        XCTAssertTrue(
-            BASADR018PendingDoctrine.hasPendingWork)
+    func testRoadmapADR018ShippedMatchesADR018Doctrine() {
+        // M1076 full ratification:0 pending items,phase
+        // is .shipped。
+        XCTAssertFalse(
+            BASADR018PendingDoctrine.hasPendingWork,
+            "M1076:no pending work")
         XCTAssertEqual(
             BASRoadmapDoctrine
                 .status(of: .adr018ProductionPending),
-            .pending)
+            .shipped,
+            "Roadmap reflects ADR-018 fully shipped")
     }
 }

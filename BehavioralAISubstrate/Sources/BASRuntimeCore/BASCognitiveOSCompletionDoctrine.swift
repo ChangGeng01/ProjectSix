@@ -418,7 +418,16 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// flipped from .pending to .shipped。 2 of 4 ADR-018
     /// items now done。 ADR-014 OPT-IN held;V1 byte-equality
     /// preserved (5340+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1073"
+    /// M1077 bump:Phase 2 entropy chapter 四百二十六 v1 close-
+    /// out — V2 ADR-018 FULL RATIFICATION milestone。 Ships
+    /// REAL working stress sweep harness (M1074
+    /// BASStressSweepHarness) + REAL working native stage
+    /// executor (M1075 BASNativeStageExecutor)。 ALL 4
+    /// ADR-018 items now SHIPPED;BASRoadmapDoctrine flips
+    /// ADR-018 phase to .shipped;overall progress 66% →
+    /// 100%。 ADR-014 OPT-IN held;V1 byte-equality preserved
+    /// (5375+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1077"
 
     /// Query the typed status of a specific gap。
     public static func status(

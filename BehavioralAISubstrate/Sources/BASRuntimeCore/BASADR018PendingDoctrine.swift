@@ -77,12 +77,15 @@ public enum BASADR018PendingDoctrine {
     /// M1056 baseline:all 4 items pending。
     /// M1071 ratification:`permitEscalationFold` shipped at
     /// chapter 四百二十五 / M1070 via
-    /// `BASPermitEscalationFoldExecutor` (real working async
-    /// fold executor with typed step closures)。
+    /// `BASPermitEscalationFoldExecutor`。
     /// M1073 ratification:`parallelDispatchDriver` shipped
     /// at chapter 四百二十五 / M1072 via
-    /// `BASParallelStageDispatchExecutor` (real async let
-    /// 2-way + 4-way fan-out executor)。
+    /// `BASParallelStageDispatchExecutor`。
+    /// M1076 FULL RATIFICATION:`stressSweepHarness` shipped
+    /// at chapter 四百二十六 / M1074 via `BASStressSweepHarness`
+    /// + `nativeStageRewrites` shipped at chapter 四百二十六 /
+    /// M1075 via `BASNativeStageExecutor`。 ALL 4 ADR-018
+    /// items now SHIPPED。
     public static func status(
         of item: BASADR018PendingItem
     ) -> BASADR018PendingItemStatus {
@@ -92,13 +95,17 @@ public enum BASADR018PendingDoctrine {
                 mNumber: 1072,
                 chapterTag: "chapter 四百二十五")
         case .stressSweepHarness:
-            return .pending
+            return .shipped(
+                mNumber: 1074,
+                chapterTag: "chapter 四百二十六")
         case .permitEscalationFold:
             return .shipped(
                 mNumber: 1070,
                 chapterTag: "chapter 四百二十五")
         case .nativeStageRewrites:
-            return .pending
+            return .shipped(
+                mNumber: 1075,
+                chapterTag: "chapter 四百二十六")
         }
     }
 

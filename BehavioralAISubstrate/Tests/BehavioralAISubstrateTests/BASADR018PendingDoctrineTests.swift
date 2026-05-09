@@ -38,20 +38,19 @@ final class BASADR018PendingDoctrineTests: XCTestCase {
             "must match Phase 2 close-out reference")
     }
 
-    // MARK: - 2 items pending after M1073 ratification
+    // MARK: - ALL 4 items shipped after M1076 full ratification
 
-    func testTwoItemsPendingAfterM1073Ratification() {
-        // M1071:permitEscalationFold shipped (M1070)。
-        // M1073:parallelDispatchDriver shipped (M1072)。
-        // Other 2 still pending。
-        XCTAssertEqual(
-            BASADR018PendingDoctrine.status(
-                of: .stressSweepHarness),
-            .pending)
-        XCTAssertEqual(
-            BASADR018PendingDoctrine.status(
-                of: .nativeStageRewrites),
-            .pending)
+    func testAllFourItemsShippedAfterM1076Ratification() {
+        for item in BASADR018PendingItem.allCases {
+            switch BASADR018PendingDoctrine.status(of: item) {
+            case .shipped:
+                continue
+            case .pending:
+                XCTFail(
+                    "\(item.rawValue) must be .shipped " +
+                    "after M1076 full ratification")
+            }
+        }
     }
 
     // MARK: - permitEscalationFold shipped at M1070
@@ -76,28 +75,44 @@ final class BASADR018PendingDoctrineTests: XCTestCase {
                 chapterTag: "chapter 四百二十五"))
     }
 
-    // MARK: - pendingItems() returns 2 after M1073
+    // MARK: - stressSweepHarness shipped at M1074
 
-    func testPendingItemsReturnsTwoAfterM1073() {
+    func testStressSweepHarnessShippedAtM1074() {
         XCTAssertEqual(
-            BASADR018PendingDoctrine.pendingItems().count,
-            2,
-            "M1073 ratification:permitEscalationFold + " +
-            "parallelDispatchDriver shipped → 2 items pending")
-        XCTAssertFalse(
-            BASADR018PendingDoctrine.pendingItems()
-                .contains(.permitEscalationFold))
-        XCTAssertFalse(
-            BASADR018PendingDoctrine.pendingItems()
-                .contains(.parallelDispatchDriver))
+            BASADR018PendingDoctrine.status(
+                of: .stressSweepHarness),
+            .shipped(
+                mNumber: 1074,
+                chapterTag: "chapter 四百二十六"))
     }
 
-    // MARK: - hasPendingWork still true (2 of 4 remain)
+    // MARK: - nativeStageRewrites shipped at M1075
 
-    func testHasPendingWorkTrueAfterM1073() {
-        XCTAssertTrue(
+    func testNativeStageRewritesShippedAtM1075() {
+        XCTAssertEqual(
+            BASADR018PendingDoctrine.status(
+                of: .nativeStageRewrites),
+            .shipped(
+                mNumber: 1075,
+                chapterTag: "chapter 四百二十六"))
+    }
+
+    // MARK: - pendingItems() returns empty after M1076
+
+    func testPendingItemsReturnsEmptyAfterM1076() {
+        XCTAssertEqual(
+            BASADR018PendingDoctrine.pendingItems().count,
+            0,
+            "M1076 FULL ratification:all 4 items shipped" +
+            " → 0 items pending")
+    }
+
+    // MARK: - hasPendingWork now false
+
+    func testHasPendingWorkFalseAfterM1076() {
+        XCTAssertFalse(
             BASADR018PendingDoctrine.hasPendingWork,
-            "2 of 4 items still pending after M1073")
+            "ALL 4 ADR-018 items shipped after M1076")
     }
 
     // MARK: - Codable round-trip

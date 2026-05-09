@@ -79,22 +79,22 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百二十二",   // M1058-M1061 (M1066 extension)
         "chapter 四百二十三",   // M1062-M1065 (M1066 extension)
         "chapter 四百二十四",   // M1066-M1069 (M1069 self-extension)
-        "chapter 四百二十五"    // M1070-M1073 (M1073 self-extension)
+        "chapter 四百二十五",   // M1070-M1073 (M1073 self-extension)
+        "chapter 四百二十六"    // M1074-M1077 (M1077 self-extension)
     ]
 
     /// First M-number of Phase 2 entropy work。
     public static let mNumberFirst: Int = 953
 
     /// Last M-number of Phase 2 entropy work。 Bumped:
-    /// M1057 → M1065 (四百二十二+四百二十三) →
-    /// M1069 (四百二十四) → M1073 (四百二十五)。
-    public static let mNumberLast: Int = 1073
+    /// M1057 → M1065 → M1069 → M1073 → M1077。
+    public static let mNumberLast: Int = 1077
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1073,inclusive)。 Bumped:105 → 113 → 117 → 121
-    /// (M1073 self-extension to include chapter 四百二十五
+    /// M1077,inclusive)。 Bumped:105 → 113 → 117 → 121 →
+    /// 125 (M1077 self-extension to include chapter 四百二十六
     /// 4 commits)。
-    public static let commitsShipped: Int = 121
+    public static let commitsShipped: Int = 125
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

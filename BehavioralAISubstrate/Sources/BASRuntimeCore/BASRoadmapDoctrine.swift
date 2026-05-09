@@ -83,8 +83,14 @@ public enum BASRoadmapDoctrine {
     public static let roadmapTag: String =
         "next-next-gen-architecture-sweep"
 
-    /// Status of a roadmap phase。 Phase 1 + Phase 2
-    /// shipped at M1061;ADR-018 pending today。
+    /// Status of a roadmap phase。
+    ///
+    /// Phase 1 + Phase 2 shipped at M1061。
+    /// M1076 FULL ratification:ADR-018 all 4 items shipped
+    /// (permitEscalationFold M1070 + parallelDispatchDriver
+    /// M1072 + stressSweepHarness M1074 + nativeStageRewrites
+    /// M1075)。 adr018ProductionPending phase flips to
+    /// `.shipped`。 Roadmap is now 100% complete。
     public static func status(
         of phase: BASRoadmapPhase
     ) -> BASRoadmapPhaseStatus {
@@ -94,7 +100,7 @@ public enum BASRoadmapDoctrine {
         case .phase2RuntimeRewrite:
             return .shipped
         case .adr018ProductionPending:
-            return .pending
+            return .shipped
         }
     }
 
