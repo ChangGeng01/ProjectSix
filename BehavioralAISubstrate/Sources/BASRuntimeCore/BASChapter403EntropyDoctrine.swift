@@ -20,6 +20,13 @@ public enum BASChapter403EntropyDoctrine {
     public static let mNumberFirst: Int = 953
     public static let mNumberLast: Int = 962
 
+    /// `v1` milestone:chapter 四百三 entry close-out at M962。
+    /// Backfilled in chapter 四百二十二 / M1058 for full-schema
+    /// consistency with chapters 四百四-四百二十一。
+    public static let v1MilestoneMNumber: Int = 962
+    public static let v1MilestoneStatus: String =
+        "chapter-403-v1-entry-doctrine-pin"
+
     /// Per-commit-刀 ledger。Each entry: (M-number, 第N刀 label,
     /// concept name)。Locks doctrine state for downstream
     /// audits + greps。
@@ -58,6 +65,16 @@ public enum BASChapter403EntropyDoctrine {
         "duplication-entropy",      // M960
         "mutation-entropy",         // M961 setup
         "doctrine-pin-entropy"      // M962
+    ]
+
+    /// Future cuts roadmap (backfilled M1058 for schema
+    /// consistency)。 Documents the natural follow-on chapters
+    /// that built on chapter 四百三's typed primitives。
+    public static let plannedFutureCuts: [String] = [
+        "chapter 四百四 audit-projection comprehensive (M963-M980)",
+        "chapter 四百五 bundle-protocol comprehensive (M981-M988)",
+        "chapter 四百六 V2 lifecycle + V2 param comprehensive (M989-M997)",
+        "chapter 四百七-四百二十一 V2 FOUNDATION milestones (M998-M1057)"
     ]
 
     /// Doctrine pins this chapter preserves。Mirrors the
