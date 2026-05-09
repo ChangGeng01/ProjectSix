@@ -86,6 +86,22 @@ public actor BASTurnRuntimeEngine {
         self.clockMs = clockMs
     }
 
+    /// chapter 四百七 / M998 — convenience init taking the
+    /// typed `BASTurnRuntimeEngineConfiguration` bundle (M998)
+    /// instead of 4 separate params。 Hosts construct one
+    /// config + reuse across multiple actor instances or host
+    /// runtime restarts。
+    public init(
+        coordinator: BASEBrainRuntimeCoordinator,
+        configuration: BASTurnRuntimeEngineConfiguration
+    ) {
+        self.init(
+            coordinator: coordinator,
+            eventLog: configuration.eventLog,
+            eventIDFactory: configuration.eventIDFactory,
+            clockMs: configuration.clockMs)
+    }
+
     // MARK: - runTurn
 
     /// V2 runTurn:delegates to V1 coordinator,then emits a
