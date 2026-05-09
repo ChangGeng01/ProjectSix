@@ -39,15 +39,15 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
         }
         // Latest chapter must end at this M-number。 Today
         // chapter 四百二十三 is the latest with mNumberLast
-        // M1065;the doctrine version should be M1065 OR
+        // M1069;the doctrine version should be M1069 OR
         // any later M-number bumped by a NEW chapter that
         // we haven't yet listed in this test。
         XCTAssertGreaterThanOrEqual(
             docMNumber,
-            BASChapter423EntropyDoctrine.mNumberLast,
+            BASChapter424EntropyDoctrine.mNumberLast,
             "doctrineVersion M-suffix must be >= latest" +
             " known chapter mNumberLast (currently " +
-            "chapter 四百二十三 at M\(BASChapter423EntropyDoctrine.mNumberLast))")
+            "chapter 四百二十四 at M\(BASChapter424EntropyDoctrine.mNumberLast))")
     }
 
     // MARK: - Phase 2 doctrine ends at latest chapter
@@ -55,14 +55,14 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
     func testPhase2DoctrineEndsAtLatestChapter() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine.mNumberLast,
-            BASChapter423EntropyDoctrine.mNumberLast,
+            BASChapter424EntropyDoctrine.mNumberLast,
             "Phase 2 doctrine mNumberLast must equal " +
             "latest chapter's mNumberLast (chapter " +
-            "四百二十三 at M1065)")
+            "四百二十四 at M1069)")
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            BASChapter423EntropyDoctrine.chapterTag,
+            BASChapter424EntropyDoctrine.chapterTag,
             "Phase 2 doctrine last chapter tag must " +
             "equal latest chapter doctrine tag")
     }

@@ -396,7 +396,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// .compactDigest() one-line log accessor (6 new tests)。
     /// ADR-014 OPT-IN held;V1 byte-equality preserved
     /// (5310+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1065"
+    /// M1069 bump:Phase 2 entropy chapter 四百二十四 v1 close-
+    /// out — V2 DOCTRINE-CHAIN CONSISTENCY milestone。
+    /// Syncs the substrate's 4+ doctrine surfaces:M1066
+    /// Phase 2 doctrine extension (chapter count 19→21,
+    /// commits 105→113) + M1067 schema-completeness invariant
+    /// extended to all 21 chapters + M1068 cross-cutting
+    /// doctrine-chain consistency invariant (7 new tests
+    /// catching version/phase/chapter/roadmap/registry/ADR
+    /// drift at PR-time)。 ADR-014 OPT-IN held;V1 byte-
+    /// equality preserved (5330+ BAS tests pass)。No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M1069"
 
     /// Query the typed status of a specific gap。
     public static func status(

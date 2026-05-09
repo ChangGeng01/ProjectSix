@@ -408,6 +408,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter423EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter423EntropyDoctrine
+                    .summary),
+            // M1069 self-extension
+            check("四百二十四",
+                tag: BASChapter424EntropyDoctrine.chapterTag,
+                first: BASChapter424EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter424EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter424EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter424EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter424EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter424EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter424EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter424EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -476,7 +495,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             ("422", BASChapter422EntropyDoctrine.mNumberFirst,
              BASChapter422EntropyDoctrine.mNumberLast),
             ("423", BASChapter423EntropyDoctrine.mNumberFirst,
-             BASChapter423EntropyDoctrine.mNumberLast)
+             BASChapter423EntropyDoctrine.mNumberLast),
+            // M1069 self-extension
+            ("424", BASChapter424EntropyDoctrine.mNumberFirst,
+             BASChapter424EntropyDoctrine.mNumberLast)
             ]
         for i in 1..<ranges.count {
             XCTAssertEqual(
@@ -541,6 +563,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter423EntropyDoctrine.mNumberFirst,
             last: BASChapter423EntropyDoctrine.mNumberLast,
             tag: "四百二十三")
+        // M1069 self-extension
+        verifyKnivesRange(
+            BASChapter424EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter424EntropyDoctrine.mNumberFirst,
+            last: BASChapter424EntropyDoctrine.mNumberLast,
+            tag: "四百二十四")
     }
 
     // MARK: - Helpers

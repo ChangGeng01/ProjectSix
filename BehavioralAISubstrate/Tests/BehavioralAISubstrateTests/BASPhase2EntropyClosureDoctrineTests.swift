@@ -20,8 +20,8 @@ final class BASPhase2EntropyClosureDoctrineTests:
     func testNineteenChapterTagsShipped() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 21,
-            "M1066 extension:bumped from 19 to 21")
+                .chapterTagsShipped.count, 22,
+            "M1069 self-extension:bumped from 21 to 22")
     }
 
     func testFirstChapterIs403() {
@@ -31,12 +31,12 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs423() {
+    func testLastChapterIs424() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百二十三",
-            "M1066 extension:bumped from 四百二十一 to 四百二十三")
+            "chapter 四百二十四",
+            "M1069 self-extension:bumped from 四百二十三 to 四百二十四")
     }
 
     // MARK: - M-number range
@@ -47,20 +47,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
                 .mNumberFirst, 953)
     }
 
-    func testMNumberLastIs1065() {
+    func testMNumberLastIs1069() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .mNumberLast, 1065,
-            "M1066 extension:bumped from 1057 to 1065")
+                .mNumberLast, 1069,
+            "M1069 self-extension:bumped from 1065 to 1069")
     }
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped113() {
+    func testCommitsShipped117() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 113,
-            "M1066 extension:bumped from 105 to 113")
+                .commitsShipped, 117,
+            "M1069 self-extension:bumped from 113 to 117")
     }
 
     func testV2FoundationsCount12() {
