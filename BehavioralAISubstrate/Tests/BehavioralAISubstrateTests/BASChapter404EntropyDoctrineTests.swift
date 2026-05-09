@@ -15,8 +15,17 @@ final class BASChapter404EntropyDoctrineTests: XCTestCase {
         XCTAssertEqual(
             BASChapter404EntropyDoctrine.mNumberFirst, 963)
         XCTAssertEqual(
-            BASChapter404EntropyDoctrine.mNumberLast, 974,
-            "M974 v2 close-out bumps mNumberLast")
+            BASChapter404EntropyDoctrine.mNumberLast, 977,
+            "M977 v3 close-out bumps mNumberLast")
+    }
+
+    func testV3MilestoneIsAtM977() {
+        XCTAssertEqual(
+            BASChapter404EntropyDoctrine.v3MilestoneMNumber,
+            977)
+        XCTAssertEqual(
+            BASChapter404EntropyDoctrine.v3MilestoneStatus,
+            "chapter-404-v3-complete")
     }
 
     func testV1MilestoneIsAtM969() {
@@ -37,16 +46,16 @@ final class BASChapter404EntropyDoctrineTests: XCTestCase {
             "chapter-404-v2-complete")
     }
 
-    func testKnivesLedgerCovers12CutsAtV2() {
+    func testKnivesLedgerCovers15CutsAtV3() {
         XCTAssertEqual(
-            BASChapter404EntropyDoctrine.knives.count, 12,
-            "M974 v2 close-out: 12 cuts ship in chapter 四百四 v2")
+            BASChapter404EntropyDoctrine.knives.count, 15,
+            "M977 v3 close-out: 15 cuts ship in chapter 四百四 v3")
     }
 
     func testKnivesLedgerCoversFullMRange() {
         let mNumbers = BASChapter404EntropyDoctrine
             .knives.map { $0.mNumber }
-        XCTAssertEqual(mNumbers, Array(963...974))
+        XCTAssertEqual(mNumbers, Array(963...977))
     }
 
     func testEntropyClassesNonEmpty() {

@@ -180,20 +180,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// change — Phase 1 is substrate-side machinery,not a roadmap
     /// gap closure。Phase 2 (chapter 四百三) + Phase 3 (chapter 四百四)
     /// follow per `wild-rolling-meerkat.md` plan。
-    /// M974 bump:Phase 2 entropy chapter 四百四 v2 close-out。
+    /// M977 bump:Phase 2 entropy chapter 四百四 v3 close-out。
     /// chapter 四百三 (M953-M962, 10 commits) + chapter 四百四
-    /// v1 (M963-M969, 7 commits) + chapter 四百四 v2
-    /// (M970-M974, 5 commits)。 v2 ships
-    /// `BASPermitEscalationLedger.build()` helper +
-    /// BASKunlunAuditProjections + BASAbyssalAuditProjections
-    /// + BASCthulhuAuditProjections namespace structs collapsing
-    /// 67 V1 runTurn `*ForAudit` locals into 3 typed bundles
-    /// + chapter doctrine bump。 V2 actor usable today via
-    /// delegation;native stage rewrites + permit fold function
-    /// + V1↔V2 stress sweep ship under v3+。 ADR-014 OPT-IN
-    /// held throughout;V1 runTurn byte-equality preserved
-    /// (4700+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M974"
+    /// v1 (M963-M969, 7 commits) + v2 (M970-M974, 5 commits)
+    /// + v3 (M975-M977, 3 commits)。 v3 ships
+    /// `BASTribunalAuditProjections` (4th audit-projection
+    /// namespace) + `BASRuntimeAuditProjectionsBundle`
+    /// aggregator (4 namespaces threaded as 1 arg) + chapter
+    /// doctrine bump。 Native V2 stage rewrites + permit fold
+    /// function + V1↔V2 stress sweep ship under v4+。 ADR-014
+    /// OPT-IN held throughout;V1 runTurn byte-equality
+    /// preserved (4730+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M977"
 
     /// Query the typed status of a specific gap。
     public static func status(

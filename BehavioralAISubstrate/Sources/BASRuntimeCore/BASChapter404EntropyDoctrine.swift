@@ -17,12 +17,13 @@ public enum BASChapter404EntropyDoctrine {
     /// actor's single audit channel)。
     public static let mNumberFirst: Int = 963
 
-    /// Last M-number shipped at this commit。Chapter v2 closes
-    /// at M974 with audit-projection namespaces (kunlun /
-    /// abyssal / cthulhu) collapsing 67 *ForAudit locals into
-    /// 3 typed bundles。Future v3 commits (V2 stage rewrites,
-    /// bundle adoption expansion) bump this further。
-    public static let mNumberLast: Int = 974
+    /// Last M-number shipped at this commit。Chapter v3 closes
+    /// at M977 with the 4th audit-projection namespace
+    /// (tribunal) + aggregator bundle wrapping all 4
+    /// namespaces。Future v4 commits (V2 stage rewrites,
+    /// permit fold function,V1↔V2 stress sweep) bump this
+    /// further。
+    public static let mNumberLast: Int = 977
 
     /// `v1` milestone:chapter 四百四 v1 closes at M969。 V2
     /// actor delegation works,audit envelope channel typed,
@@ -38,11 +39,22 @@ public enum BASChapter404EntropyDoctrine {
     /// (BASKunlunAuditProjections + BASAbyssalAuditProjections
     /// + BASCthulhuAuditProjections) collapsing 67 *ForAudit
     /// locals into 3 typed bundles,(3) chapter doctrine bump。
-    /// Future v3+ ships native V2 stage rewrites + permit fold
-    /// function + V1↔V2 stress sweep。
     public static let v2MilestoneMNumber: Int = 974
     public static let v2MilestoneStatus: String =
         "chapter-404-v2-complete"
+
+    /// `v3` milestone:chapter 四百四 v3 closes at M977。 Adds
+    /// (1) BASTribunalAuditProjections (4th namespace bundle),
+    /// (2) BASRuntimeAuditProjectionsBundle aggregator
+    /// wrapping all 4 namespaces with immutable with-chain,
+    /// (3) chapter doctrine bump。 V2 actor stages can now
+    /// pass ONE aggregate bundle arg through the audit
+    /// pipeline instead of 4 separate bundles。 Future v4+
+    /// ships native V2 stage rewrites + permit fold function
+    /// + V1↔V2 stress sweep。
+    public static let v3MilestoneMNumber: Int = 977
+    public static let v3MilestoneStatus: String =
+        "chapter-404-v3-complete"
 
     /// Per-commit-刀 ledger。Each entry: (M-number, 第N刀
     /// label,concept name)。
@@ -81,18 +93,27 @@ public enum BASChapter404EntropyDoctrine {
             "BASCthulhuAuditProjections namespace " +
             "(4 cthulhu *ForAudit locals collapsed)"),
         (974, "第十二刀",
-            "chapter 四百四 v2 close-out + ADR-016 bump")
+            "chapter 四百四 v2 close-out + ADR-016 bump"),
+        (975, "第十三刀",
+            "BASTribunalAuditProjections namespace " +
+            "(3 tribunal *ForAudit locals collapsed)"),
+        (976, "第十四刀",
+            "BASRuntimeAuditProjectionsBundle aggregator " +
+            "(4 namespaces threaded as 1 arg)"),
+        (977, "第十五刀",
+            "chapter 四百四 v3 close-out + ADR-016 bump")
     ]
 
-    /// Entropy classes attacked at v2 milestone (chapter-OPEN
-    /// continues after v2 with v3+ cuts)。
+    /// Entropy classes attacked at v3 milestone (chapter-OPEN
+    /// continues after v3 with v4+ cuts)。
     public static let entropyClassesAttacked: [String] = [
         "audit-projection-entropy",     // M963 V2 envelope
         "duplication-entropy",          // M964 protocol adoption
-        "doctrine-pin-entropy",         // M965 / M969 / M974
+        "doctrine-pin-entropy",         // M965 / M969 / M974 / M977
         "composition-entropy",          // M966 ledger / M970 builder
         "v2-actor-scaffolding-entropy", // M967 / M968
-        "audit-projection-namespace-entropy" // M971/M972/M973
+        "audit-projection-namespace-entropy", // M971/M972/M973/M975
+        "audit-projection-aggregator-entropy" // M976
     ]
 
     /// Doctrine pins held。Mirrors chapter 四百三 list。
@@ -135,18 +156,19 @@ public enum BASChapter404EntropyDoctrine {
 
     /// Human-readable summary for audit emission。
     public static let summary: String =
-        "Phase 2 entropy chapter 四百四 v2 closes at M974。" +
-        " 12 cuts shipped across v1 + v2 (M963-M974)。 v1" +
-        " (M963-M969) shipped V2 actor delegation skeleton " +
-        "+ audit envelope channel + composition entropy" +
-        " ledger + first bundle protocol adoption。 v2" +
-        " (M970-M974) adds BASPermitEscalationLedger.build()" +
-        " helper + 3 audit-projection namespace structs" +
-        " (kunlun + abyssal + cthulhu) collapsing 67" +
-        " *ForAudit locals into 3 typed bundles + chapter" +
-        " doctrine bump。 V2 actor usable via delegation;" +
-        " native stage rewrites + permit fold function +" +
-        " V1↔V2 stress sweep ship under v3+。 ADR-014 OPT-IN" +
-        " held;V1 runTurn byte-equality preserved (4700+ BAS" +
-        " tests pass,0 failures)。"
+        "Phase 2 entropy chapter 四百四 v3 closes at M977。" +
+        " 15 cuts shipped across v1+v2+v3 (M963-M977)。 v1" +
+        " (M963-M969) shipped V2 actor delegation skeleton。" +
+        " v2 (M970-M974) added BASPermitEscalationLedger" +
+        " .build() helper + 3 audit-projection namespaces" +
+        " (kunlun + abyssal + cthulhu)。 v3 (M975-M977) adds" +
+        " BASTribunalAuditProjections (4th namespace) +" +
+        " BASRuntimeAuditProjectionsBundle aggregator +" +
+        " chapter doctrine bump。 V2 actor stages now" +
+        " thread ONE aggregate bundle arg through audit" +
+        " pipeline instead of 4 separate ones。 Future v4+" +
+        " ships native V2 stage rewrites + permit fold" +
+        " function + V1↔V2 stress sweep。 ADR-014 OPT-IN" +
+        " held;V1 byte-equality preserved (4730+ BAS tests" +
+        " pass)。"
 }
