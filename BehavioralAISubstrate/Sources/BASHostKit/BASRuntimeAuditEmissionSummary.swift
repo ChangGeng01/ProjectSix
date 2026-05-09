@@ -121,6 +121,14 @@ public struct BASRuntimeAuditEmissionSummary:
     public let parallelDispatchSummaries:
         [BASParallelStageDispatchSummary]
 
+    /// chapter 四百十七 / M1040 — `true` when the stage ledger
+    /// covered all M1000 canonical stages (M1039 .isComplete
+    /// accessor)。 `false` for V1 delegation path (no ledger)
+    /// AND for partial native V2 runs。 Audit consumers grep
+    /// `stageLedgerIsComplete == false` to filter incomplete
+    /// turns。
+    public let stageLedgerIsComplete: Bool
+
     // MARK: - Init
 
     public init(
@@ -138,7 +146,8 @@ public struct BASRuntimeAuditEmissionSummary:
         stagePlanStepCount: Int = 0,
         stagePlanIsCanonical: Bool = false,
         parallelDispatchSummaries:
-            [BASParallelStageDispatchSummary] = []
+            [BASParallelStageDispatchSummary] = [],
+        stageLedgerIsComplete: Bool = false
     ) {
         self.traceID = traceID
         self.verdictLevelRaw = verdictLevelRaw
@@ -158,6 +167,7 @@ public struct BASRuntimeAuditEmissionSummary:
         self.stagePlanIsCanonical = stagePlanIsCanonical
         self.parallelDispatchSummaries =
             parallelDispatchSummaries
+        self.stageLedgerIsComplete = stageLedgerIsComplete
     }
 
     // MARK: - Stable JSON encoding
@@ -226,6 +236,8 @@ public struct BASRuntimeAuditEmissionSummary:
                 stagePlan?.isCanonical ?? false,
             parallelDispatchSummaries:
                 stageLedger?
-                    .parallelDispatchSummaries() ?? [])
+                    .parallelDispatchSummaries() ?? [],
+            stageLedgerIsComplete:
+                stageLedger?.isComplete ?? false)
     }
 }
