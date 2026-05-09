@@ -144,4 +144,25 @@ public struct BASTurnRuntimeAuditEnvelope:
         "turn-\(phase.rawValue)-\(sessionID)-" +
         "\(timestampMs)-\(sequenceNumber)"
     }
+
+    // MARK: - chapter 四百六 v2 / M994 — typed action tag
+
+    /// chapter 一百八十五 anti-magic-number — typed prefix for
+    /// the canonical action tag this envelope appends to
+    /// `BASEventLogEntry.actions` when V2 actor writes it to
+    /// the event log。Pinned constant so audit consumers can
+    /// grep without assuming string format。
+    public static let eventLogActionTagPrefix: String = "turn-"
+
+    /// Canonical action tag string for this envelope's phase。
+    /// `.start` → `"turn-start"`,`.complete` → `"turn-complete"`。
+    /// V2 actor uses this accessor instead of inlining the
+    /// strings (chapter 一百八十五)。 Audit consumers grep these
+    /// tags to filter event-log entries for V2 lifecycle
+    /// events。
+    public var eventLogActionTag: String {
+        BASTurnRuntimeAuditEnvelope
+            .eventLogActionTagPrefix +
+            phase.rawValue
+    }
 }

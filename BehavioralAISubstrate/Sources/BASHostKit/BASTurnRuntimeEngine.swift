@@ -150,7 +150,7 @@ public actor BASTurnRuntimeEngine {
             sequenceNumber: 0,
             source: "turn-runtime-engine",
             turnRef: envelope.turnID,
-            actions: ["turn-start"],
+            actions: [envelope.eventLogActionTag],
             payloadJson: envelope.payloadJson)
         _ = try? await log.append(entry)
     }
@@ -190,7 +190,7 @@ public actor BASTurnRuntimeEngine {
             sequenceNumber: 0,
             source: "turn-runtime-engine",
             turnRef: envelope.turnID,
-            actions: ["turn-complete"],
+            actions: [envelope.eventLogActionTag],
             payloadJson: envelope.payloadJson)
         _ = try? await log.append(entry)
     }
