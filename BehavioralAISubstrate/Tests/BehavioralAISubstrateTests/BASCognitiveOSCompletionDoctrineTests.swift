@@ -25,7 +25,7 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M999",
+            "ADR-016.M1001",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
             "stability doctrine")

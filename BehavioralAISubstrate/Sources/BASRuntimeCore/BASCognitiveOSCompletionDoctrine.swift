@@ -221,7 +221,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// `BASTurnRuntimeEngineConfiguration` bundle (M998)。
     /// Chapter 四百七 OPEN at M998-M999。 ADR-014 OPT-IN held;
     /// V1 byte-equality preserved。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M999"
+    /// M1001 bump:Phase 2 entropy chapter 四百七 v1 close-out
+    /// — V2 ACTOR FOUR FOUNDATIONS milestone。 V2 actor's
+    /// scaffolding now complete across 4 typed foundations:
+    /// configuration bundle (M998) + stage taxonomy (M1000)
+    /// + permit ledger (M966) + audit projections aggregator
+    /// (M976/M979)。 Future v2+ ships native V2 stage rewrites
+    /// + permit fold function + V1↔V2 stress sweep + parallel
+    /// DAG adoption (chapter 四百八+)。 ADR-014 OPT-IN held;
+    /// V1 byte-equality preserved (4850+ BAS tests pass)。No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1001"
 
     /// Query the typed status of a specific gap。
     public static func status(
