@@ -278,7 +278,12 @@ public struct BASRetractionOrder: BASSchemaVersioned {
     }
 }
 
-public struct BASLearningExportBundle: BASSchemaVersioned {
+/// chapter 四百五 / M982:adopts `BASBundleIDProtocol` per
+/// 系统熵 reduction protocol-adoption pattern (2nd of 18
+/// timestamp-less bundle conformances)。
+public struct BASLearningExportBundle:
+    BASSchemaVersioned, BASBundleIDProtocol
+{
     public static let currentSchemaVersion = "1.0.0"
 
     public var schemaVersion: String

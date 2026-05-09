@@ -517,7 +517,11 @@ public struct BASComparePanel: BASSchemaVersioned,
 }
 
 /// L12 whitepaper §5.8 `StepBundle`.
+/// chapter 四百五 / M982:adopts `BASBundleIDProtocol` per
+/// 系统熵 reduction protocol-adoption pattern (1st of 18
+/// timestamp-less bundle conformances)。
 public struct BASStepBundle: BASSchemaVersioned,
+    BASBundleIDProtocol,
     Hashable, Sendable
 {
     public static let currentSchemaVersion = "1.0.0"
