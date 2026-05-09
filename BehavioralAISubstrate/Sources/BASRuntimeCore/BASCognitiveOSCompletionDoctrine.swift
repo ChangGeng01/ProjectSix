@@ -262,7 +262,16 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// function consuming the 7 primitives。 ADR-014 OPT-IN
     /// held;V1 byte-equality preserved (4920+ BAS tests pass)。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1013"
+    /// M1017 bump:Phase 2 entropy chapter 四百十一 v1 close-out
+    /// — V2 STRESS SWEEP INPUT FOUNDATION milestone。 Stress-
+    /// sweep scaffolding now has THREE typed primitives:
+    /// M1014 dimension enum + M1015 risk-bucket enum + M1016
+    /// fixture-cell key (6-slot cartesian-product identifier
+    /// + .label)。 Future v2+ ships the stress-sweep harness
+    /// consuming the 3 primitives。 ADR-014 OPT-IN held;V1
+    /// byte-equality preserved (4960+ BAS tests pass)。No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1017"
 
     /// Query the typed status of a specific gap。
     public static func status(
