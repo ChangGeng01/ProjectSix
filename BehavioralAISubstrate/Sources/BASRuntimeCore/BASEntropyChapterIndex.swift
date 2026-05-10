@@ -140,8 +140,10 @@ public struct BASEntropyChapterEntry:
 /// at M1092;future work could derive via macro。
 public enum BASEntropyChapterIndex {
 
-    /// Entries covering the 5 RADICAL EVOLUTION SWEEP
-    /// chapters shipped by chapter 四百三十 / M1095。
+    /// Entries covering the 7 RADICAL EVOLUTION SWEEP
+    /// chapters (M1092 shipped 5 entries;M1108 deep-
+    /// review extension added chapters 四百三十 + 四百三十三
+    /// for completeness)。
     /// (The 24 pre-RADICAL Phase 2 chapters live in
     /// per-chapter doctrines from chapters 四百三 through
     /// 四百二十六;this index focuses on the RADICAL
@@ -186,6 +188,17 @@ public enum BASEntropyChapterIndex {
                 "backfill — LOW-ENTROPY GENERIC " +
                 "PRIMITIVES"),
         BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十",
+            mNumberFirst: 1092,
+            mNumberLast: 1095,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "RADICAL EVOLUTION SWEEP Phase D " +
+                "backfill — CONSOLIDATION SCAFFOLDING"),
+        BASEntropyChapterEntry(
             chapterTag: "chapter 四百三十一",
             mNumberFirst: 1096,
             mNumberLast: 1099,
@@ -206,11 +219,24 @@ public enum BASEntropyChapterIndex {
             futureCutsCount: 5,
             summary:
                 "RADICAL EVOLUTION SWEEP Phase F entry " +
-                "— HARDWARE-AWARE SCHEDULER COMPOSITION")
+                "— HARDWARE-AWARE SCHEDULER COMPOSITION"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十三",
+            mNumberFirst: 1104,
+            mNumberLast: 1107,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "RADICAL EVOLUTION SWEEP final close-" +
+                "out — sidecar + cumulative sweep " +
+                "doctrine + ADR-016 → M1107 advance")
     ]
 
-    /// Number of RADICAL EVOLUTION chapters indexed (5
-    /// at M1092)。
+    /// Number of RADICAL EVOLUTION chapters indexed
+    /// (7 after M1108 extension covering all 6 phase
+    /// chapters + the chapter 四百三十三 final close-out)。
     public static var radicalEvolutionEntryCount: Int {
         return radicalEvolutionEntries.count
     }

@@ -148,7 +148,9 @@ public enum BASChapter428EntropyDoctrine {
             "BASEventLogTurnProjection typed bundle " +
             "for combined turn-scoped reads + chapter" +
             " 四百二十八 close-out doctrine + Phase 2" +
-            " + ADR-016.M1099 → ADR-016.M1107 bump")
+            " bump (commits 137 → 141, chapter count" +
+            " 27 → 28);ADR-016 held at M1103 (backfill" +
+            " chapter — chapter 432's M1103 still leads)")
     ]
 
     public static let entropyClassesAttacked: [String] = [
