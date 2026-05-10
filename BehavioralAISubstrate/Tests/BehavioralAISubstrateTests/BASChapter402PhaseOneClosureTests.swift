@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1103",
-            "M1103:doctrine version reflects chapter 四百三十二 v1 HARDWARE-AWARE SCHEDULER COMPOSITION")
+            "ADR-016.M1107",
+            "M1107:doctrine version reflects RADICAL EVOLUTION SWEEP final close-out at chapter 四百三十三")
     }
 
     // MARK: - M-number range matches chapter 四百二

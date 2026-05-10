@@ -86,7 +86,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百二十九",   // M1088-M1091 (RADICAL EVOLUTION SWEEP Phase C backfill)
         "chapter 四百三十",     // M1092-M1095 (RADICAL EVOLUTION SWEEP Phase D backfill)
         "chapter 四百三十一",   // M1096-M1099 (RADICAL EVOLUTION SWEEP Phase E)
-        "chapter 四百三十二"    // M1100-M1103 (RADICAL EVOLUTION SWEEP Phase F)
+        "chapter 四百三十二",   // M1100-M1103 (RADICAL EVOLUTION SWEEP Phase F)
+        "chapter 四百三十三"    // M1104-M1107 (RADICAL EVOLUTION SWEEP final close-out)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -94,21 +95,19 @@ public enum BASPhase2EntropyClosureDoctrine {
 
     /// Last M-number of Phase 2 entropy work。 Bumped:
     /// M1057 → M1065 → M1069 → M1073 → M1077 → M1083 →
-    /// M1099 → M1103 (RADICAL EVOLUTION SWEEP Phase F
-    /// entry)。 Chapters 四百二十八 + 四百二十九 + 四百三十
-    /// backfill the M1084-M1095 sub-range but do not
-    /// advance mNumberLast (1103 is still the high-water
-    /// mark from Phase F)。 M1078-M1079 reserved for
-    /// future post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1103
+    /// M1099 → M1103 → M1107 (RADICAL EVOLUTION SWEEP
+    /// final close-out at chapter 四百三十三)。
+    /// M1078-M1079 reserved for post-Phase-A follow-up。
+    public static let mNumberLast: Int = 1107
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1103,with M1078-M1079 reserved for post-Phase-A
+    /// M1107,with M1078-M1079 reserved for post-Phase-A
     /// follow-up)。
     /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
-    /// 137 → 141 → 145 → 149 (chapter 四百三十 backfill
-    /// adds 4 commits to the cumulative count)。
-    public static let commitsShipped: Int = 149
+    /// 137 → 141 → 145 → 149 → 153 (chapter 四百三十三
+    /// final close-out adds 4 commits to the cumulative
+    /// count)。
+    public static let commitsShipped: Int = 153
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -25,12 +25,12 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1103",
+            "ADR-016.M1107",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
-            "stability doctrine。 M1103 RADICAL EVOLUTION SWEEP" +
-            " Phase F:bumped from M1099 (HARDWARE-AWARE" +
-            " SCHEDULER COMPOSITION milestone)")
+            "stability doctrine。 M1107 RADICAL EVOLUTION SWEEP" +
+            " final close-out:bumped from M1103 (chapter" +
+            " 四百三十三 — sidecar + cumulative sweep doctrine)")
     }
 
     // MARK: - Per-gap status pins

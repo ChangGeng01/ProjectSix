@@ -581,6 +581,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter432EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter432EntropyDoctrine
+                    .summary),
+            // M1107 RADICAL EVOLUTION SWEEP final close-out
+            check("四百三十三",
+                tag: BASChapter433EntropyDoctrine.chapterTag,
+                first: BASChapter433EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter433EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter433EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter433EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter433EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter433EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter433EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter433EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -684,7 +703,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter431EntropyDoctrine.mNumberLast),
             // M1103 RADICAL EVOLUTION SWEEP Phase F
             ("432", BASChapter432EntropyDoctrine.mNumberFirst,
-             BASChapter432EntropyDoctrine.mNumberLast)
+             BASChapter432EntropyDoctrine.mNumberLast),
+            // M1107 RADICAL EVOLUTION SWEEP final close-out
+            ("433", BASChapter433EntropyDoctrine.mNumberFirst,
+             BASChapter433EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -782,6 +804,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter432EntropyDoctrine.mNumberFirst,
             last: BASChapter432EntropyDoctrine.mNumberLast,
             tag: "四百三十二")
+        // M1107 RADICAL EVOLUTION SWEEP final close-out
+        verifyKnivesRange(
+            BASChapter433EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter433EntropyDoctrine.mNumberFirst,
+            last: BASChapter433EntropyDoctrine.mNumberLast,
+            tag: "四百三十三")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

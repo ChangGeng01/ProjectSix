@@ -20,10 +20,10 @@ final class BASPhase2EntropyClosureDoctrineTests:
     func testNineteenChapterTagsShipped() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 30,
-            "M1095 RADICAL EVOLUTION SWEEP Phase D" +
-            " backfill:bumped from 29 to 30 (added" +
-            " chapter 四百三十)")
+                .chapterTagsShipped.count, 31,
+            "M1107 RADICAL EVOLUTION SWEEP final" +
+            " close-out:bumped from 30 to 31 (added" +
+            " chapter 四百三十三)")
     }
 
     func testFirstChapterIs403() {
@@ -33,13 +33,14 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs432() {
+    func testLastChapterIs433() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百三十二",
-            "M1103 RADICAL EVOLUTION SWEEP Phase F:" +
-            " bumped from 四百三十一 to 四百三十二")
+            "chapter 四百三十三",
+            "M1107 RADICAL EVOLUTION SWEEP final" +
+            " close-out:bumped from 四百三十二 to" +
+            " 四百三十三")
     }
 
     // MARK: - M-number range
@@ -50,23 +51,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
                 .mNumberFirst, 953)
     }
 
-    func testMNumberLastIs1103() {
+    func testMNumberLastIs1107() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .mNumberLast, 1103,
-            "M1103 RADICAL EVOLUTION SWEEP Phase F:" +
-            " bumped from 1099 to 1103 (M1084-M1095" +
-            " reserved gap for Phase B/C/D backfill)")
+                .mNumberLast, 1107,
+            "M1107 RADICAL EVOLUTION SWEEP final" +
+            " close-out:bumped from 1103 to 1107")
     }
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped149() {
+    func testCommitsShipped153() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 149,
-            "M1095 RADICAL EVOLUTION SWEEP Phase D" +
-            " backfill:bumped from 145 to 149" +
+                .commitsShipped, 153,
+            "M1107 RADICAL EVOLUTION SWEEP final" +
+            " close-out:bumped from 149 to 153" +
             " (M1078-M1079 reserved for post-Phase-A" +
             " follow-up)")
     }

@@ -470,7 +470,21 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// (byte-equal output)。 V1 byte-equality preserved
     /// (5,500+ BAS tests pass)。 No default-mode flip — that
     /// needs CI dual-mode evidence first。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1103"
+    /// M1107 bump:RADICAL EVOLUTION SWEEP final close-out
+    /// at chapter 四百三十三。 Ships
+    /// BASStagePlanAcceleratorHints sidecar (stage-keyed
+    /// dictionary mapping each BASTurnRuntimeStage to a
+    /// BASStageAcceleratorHint without modifying
+    /// BASTurnRuntimeStagePlan) + BASRadicalEvolutionSweep
+    /// ClosureDoctrine (single typed cumulative surface for
+    /// the entire 6-phase sweep arc:phaseA/B/C/D/E/F + 11
+    /// deferred destructive operations explicitly enumerated)。
+    /// Sweep total:28 commits across 7 chapters (4 phase +
+    /// 3 backfill chapters + this final close-out)。 ADR-014
+    /// OPT-IN preserved at every commit boundary。 V1
+    /// byte-equality preserved (5,700+ BAS tests pass)。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1107"
 
     /// Query the typed status of a specific gap。
     public static func status(
