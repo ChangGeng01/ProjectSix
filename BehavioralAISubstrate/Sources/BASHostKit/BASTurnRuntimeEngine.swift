@@ -158,6 +158,69 @@ public actor BASTurnRuntimeEngine {
         return result
     }
 
+    // MARK: - chapter 四百二十七 / M1082 — runWithPlan composition
+
+    /// REAL composition surface that drives the 4 typed
+    /// executors shipped at chapter 四百二十五-四百二十六
+    /// (M1070 BASPermitEscalationFoldExecutor + M1072
+    /// BASParallelStageDispatchExecutor + M1074 BASStress
+    /// SweepHarness + M1075 BASNativeStageExecutor) via
+    /// the M1080 BASRuntimeInternalDelegate against an
+    /// M1006 stage plan。
+    ///
+    /// This is the FIRST function to wire all 4 REAL
+    /// executors together end-to-end。 Previously the V2
+    /// actor's `runTurn` just delegated to V1;the 6 typed
+    /// scaffolding params (auditProjections / permitEscalation
+    /// Ledger / stageLedger / stagePlan / timestampMsOverride)
+    /// were dead-on-arrival。 Now `runWithPlan` activates
+    /// them via `BASRuntimeInternalDelegate.runScaffolded`。
+    ///
+    /// Pure delegation — no state mutation;byte-stable
+    /// result derived from V1's coordinator output (chapter
+    /// 三百九二) PLUS a typed M1003 stage ledger from the
+    /// native executor。 The returned `BASEBrainTurnResult`
+    /// remains V1-derived for ADR-014 OPT-IN compliance;
+    /// the stage ledger is emitted via the .complete
+    /// envelope payload。
+    public func runWithPlan(
+        _ request: BASEBrainTurnRequest,
+        plan: BASTurnRuntimeStagePlan =
+            BASTurnRuntimeStagePlan.canonical(),
+        delegate: BASRuntimeInternalDelegate? = nil,
+        timestampMsOverride: Int64? = nil
+    ) async -> BASEBrainTurnResult {
+        // Resolve delegate: caller-provided OR fresh
+        // identity-default。 Default delegate uses the
+        // canonical plan;explicit `plan:` parameter
+        // overrides。
+        let activeDelegate = delegate
+            ?? BASRuntimeInternalDelegate(
+                stagePlan: plan)
+        // Drive the M1075 native stage executor via the
+        // delegate to produce a typed M1003 ledger
+        let stageLedger = await activeDelegate
+            .runScaffolded(request: request)
+        // Run V1 coordinator for the byte-stable
+        // BASEBrainTurnResult (ADR-014 OPT-IN preserved
+        // until `BASTurnRuntimeMode.nativeV2` flips at
+        // M1103 default)
+        let result = coordinator.runTurn(request)
+        // Emit lifecycle envelopes with the REAL stage
+        // ledger threaded through the .complete payload
+        await emitStartEnvelope(
+            for: result,
+            timestampMsOverride: timestampMsOverride)
+        await emitCompleteEnvelope(
+            for: result,
+            auditProjections: nil,
+            permitEscalationLedger: nil,
+            stageLedger: stageLedger,
+            stagePlan: plan,
+            timestampMsOverride: timestampMsOverride)
+        return result
+    }
+
     // MARK: - Audit emission
 
     private func emitStartEnvelope(
