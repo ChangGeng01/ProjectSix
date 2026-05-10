@@ -457,6 +457,27 @@ public enum BASEntropyChapterIndex {
                 " tests prove construction + routing +" +
                 " global ordering + propagation +" +
                 " determinism。 ADR-016 → M1159 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十六",
+            mNumberFirst: 1160,
+            mNumberLast: 1163,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 17 entry — POST-" +
+                "RADICAL EVOLUTION SWEEP CLOSE-OUT" +
+                " meta-doctrine。 BASPostRadicalSweep" +
+                "Doctrine typed namespace summarizes" +
+                " cumulative achievement (Waves 1-17," +
+                " chapters 427-446,M1080-M1163,84" +
+                " commits) + 8 substrate-side" +
+                " achievements + 5 explicitly deferred" +
+                " items + 10 doctrine pins held" +
+                " throughout。 Anchor for future" +
+                " chapter narratives。 ADR-016 → M1163" +
+                " advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1159",
-            "M1159:doctrine version reflects POST-RADICAL Wave 16 federated event log multi-backend (chapter 四百四十五 4 cuts M1156-M1159)")
+            "ADR-016.M1163",
+            "M1163:doctrine version reflects POST-RADICAL Wave 17 POST-RADICAL EVOLUTION SWEEP close-out meta-doctrine (chapter 四百四十六 4 cuts M1160-M1163)。 Sweep complete")
     }
 
     // MARK: - M-number range matches chapter 四百二

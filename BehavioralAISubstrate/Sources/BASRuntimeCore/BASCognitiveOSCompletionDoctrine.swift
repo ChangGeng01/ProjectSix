@@ -706,7 +706,27 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// without parallel API。 V1 byte-equality
     /// preserved (5,960+ BAS tests pass)。 No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1159"
+    /// M1163 bump:POST-RADICAL EVOLUTION SWEEP Wave 17
+    /// — chapter 四百四十六 ships POST-RADICAL EVOLUTION
+    /// SWEEP CLOSE-OUT meta-doctrine。 4 cuts (M1160-
+    /// M1163):
+    /// (1) recon cumulative chapter range + commits,
+    /// (2) BASPostRadicalSweepDoctrine typed namespace
+    ///     summarizing 8 substrate-side achievements
+    ///     + 5 explicitly deferred items + 10 doctrine
+    ///     pins held throughout + range/wave/commit
+    ///     metrics,
+    /// (3) 9 pin tests
+    ///     (BASPostRadicalSweepDoctrineTests),
+    /// (4) chapter close-out + bumps。
+    /// Anchor for future chapter narratives — chapter
+    /// 447+ cites BASPostRadicalSweepDoctrine instead
+    /// of re-deriving from 13+ chapter doctrine files。
+    /// Closes the entire POST-RADICAL EVOLUTION SWEEP
+    /// (Waves 1-17,chapters 427-446,M1080-M1163,84
+    /// commits)。 V1 byte-equality preserved (5,970+
+    /// BAS tests pass)。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1163"
 
     /// Query the typed status of a specific gap。
     public static func status(

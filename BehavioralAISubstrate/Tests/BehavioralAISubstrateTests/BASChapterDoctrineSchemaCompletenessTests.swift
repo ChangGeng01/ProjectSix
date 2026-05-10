@@ -828,6 +828,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter445EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter445EntropyDoctrine
+                    .summary),
+            // M1163 POST-RADICAL Wave 17 (POST-RADICAL EVOLUTION SWEEP close-out)
+            check("四百四十六",
+                tag: BASChapter446EntropyDoctrine.chapterTag,
+                first: BASChapter446EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter446EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter446EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter446EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter446EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter446EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter446EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter446EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -970,7 +989,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter444EntropyDoctrine.mNumberLast),
             // M1159 POST-RADICAL Wave 16 (federated event log multi-backend)
             ("445", BASChapter445EntropyDoctrine.mNumberFirst,
-             BASChapter445EntropyDoctrine.mNumberLast)
+             BASChapter445EntropyDoctrine.mNumberLast),
+            // M1163 POST-RADICAL Wave 17 (POST-RADICAL EVOLUTION SWEEP close-out)
+            ("446", BASChapter446EntropyDoctrine.mNumberFirst,
+             BASChapter446EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -1159,6 +1181,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter445EntropyDoctrine.mNumberFirst,
             last: BASChapter445EntropyDoctrine.mNumberLast,
             tag: "四百四十五")
+        // M1163 POST-RADICAL Wave 17 (POST-RADICAL EVOLUTION SWEEP close-out)
+        verifyKnivesRange(
+            BASChapter446EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter446EntropyDoctrine.mNumberFirst,
+            last: BASChapter446EntropyDoctrine.mNumberLast,
+            tag: "四百四十六")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

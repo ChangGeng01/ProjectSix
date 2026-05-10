@@ -38,17 +38,18 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
                 "non-integer M-suffix")
         }
         // Latest chapter must end at this M-number。 Today
-        // chapter 四百四十五 is the latest with mNumberLast
-        // M1159 (POST-RADICAL Wave 16 — federated event
-        // log multi-backend);the doctrine version should
-        // be M1159 OR any later M-number bumped by a NEW
-        // chapter that we haven't yet listed in this test。
+        // chapter 四百四十六 is the latest with mNumberLast
+        // M1163 (POST-RADICAL Wave 17 — POST-RADICAL
+        // EVOLUTION SWEEP close-out meta-doctrine);the
+        // doctrine version should be M1163 OR any later
+        // M-number bumped by a NEW chapter that we haven't
+        // yet listed in this test。 Sweep complete。
         XCTAssertGreaterThanOrEqual(
             docMNumber,
-            BASChapter445EntropyDoctrine.mNumberLast,
+            BASChapter446EntropyDoctrine.mNumberLast,
             "doctrineVersion M-suffix must be >= latest" +
             " known chapter mNumberLast (currently " +
-            "chapter 四百四十五 at M\(BASChapter445EntropyDoctrine.mNumberLast))")
+            "chapter 四百四十六 at M\(BASChapter446EntropyDoctrine.mNumberLast))")
     }
 
     // MARK: - Phase 2 doctrine ends at latest chapter
@@ -56,14 +57,14 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
     func testPhase2DoctrineEndsAtLatestChapter() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine.mNumberLast,
-            BASChapter445EntropyDoctrine.mNumberLast,
+            BASChapter446EntropyDoctrine.mNumberLast,
             "Phase 2 doctrine mNumberLast must equal " +
             "latest chapter's mNumberLast (chapter " +
-            "四百四十五 at M1159)")
+            "四百四十六 at M1163)")
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            BASChapter445EntropyDoctrine.chapterTag,
+            BASChapter446EntropyDoctrine.chapterTag,
             "Phase 2 doctrine last chapter tag must " +
             "equal latest chapter doctrine tag")
     }
