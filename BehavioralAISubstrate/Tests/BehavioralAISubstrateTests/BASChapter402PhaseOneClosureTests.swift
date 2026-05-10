@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1099",
-            "M1099:doctrine version reflects chapter 四百三十一 v1 NATIVE APPLE SILICON FOUNDATION")
+            "ADR-016.M1103",
+            "M1103:doctrine version reflects chapter 四百三十二 v1 HARDWARE-AWARE SCHEDULER COMPOSITION")
     }
 
     // MARK: - M-number range matches chapter 四百二

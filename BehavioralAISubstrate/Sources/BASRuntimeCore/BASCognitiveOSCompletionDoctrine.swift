@@ -453,7 +453,24 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// yet;Phase F scheduler will be the first consumer。 V1
     /// byte-equality preserved (5,400+ BAS tests pass)。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1099"
+    /// M1103 bump:RADICAL EVOLUTION SWEEP chapter 四百三十二
+    /// v1 close-out — HARDWARE-AWARE SCHEDULER COMPOSITION
+    /// milestone。 First chapter where the V2 runtime engine
+    /// CONSUMES the Phase E BASMetalSubstrate primitives:
+    /// (1) BASTurnRuntimeEngineConfiguration grows 3 new
+    /// optional slots (runtimeMode + metalKernelRegistry +
+    /// aneCapability),(2) BASTurnRuntimeEngine wires them
+    /// into actor storage + per-call dispatch probe captures
+    /// the consumption,(3) BASHardwareAwareScheduler actor +
+    /// BASStageAcceleratorHint + BASStageAcceleratorAssignment
+    /// envelopes ship as the first scheduler primitive
+    /// reading M1097 capability + M1098 registry。 ADR-014
+    /// OPT-IN held — default config keeps engine in
+    /// .v1ByteEqual + nil registry + nil capability
+    /// (byte-equal output)。 V1 byte-equality preserved
+    /// (5,500+ BAS tests pass)。 No default-mode flip — that
+    /// needs CI dual-mode evidence first。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1103"
 
     /// Query the typed status of a specific gap。
     public static func status(

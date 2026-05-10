@@ -88,19 +88,35 @@ final class BASChapter431EntropyDoctrineTests: XCTestCase {
             "FOUNDATION)")
     }
 
-    // MARK: - Phase 2 doctrine cross-check
+    // MARK: - Phase 2 doctrine membership cross-check
 
-    func testChapter431IsLastInPhase2Doctrine() {
-        XCTAssertEqual(
-            BASChapter431EntropyDoctrine.chapterTag,
+    // Chapter 四百三十一 was Phase 2's terminal chapter at
+    // M1099 close-out。 Phase 2 has since been extended via
+    // chapter 四百三十二 (M1100+) so the doctrine's
+    // `chapterTagsShipped.last` no longer points at chapter
+    // 四百三十一。 What still holds:chapter 四百三十一 IS a
+    // member of Phase 2,and its M-range fits within Phase 2's
+    // overall range。
+    func testChapter431IsMemberOfPhase2Doctrine() {
+        XCTAssertTrue(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.last)
+                .chapterTagsShipped
+                .contains(
+                    BASChapter431EntropyDoctrine.chapterTag),
+            "chapter 四百三十一 must remain in Phase 2 chapter" +
+            " list across post-M1099 extensions")
     }
 
-    func testM1099MatchesPhase2DoctrineLastMNumber() {
-        XCTAssertEqual(
+    func testChapter431MNumberRangeFitsWithinPhase2() {
+        XCTAssertGreaterThanOrEqual(
+            BASChapter431EntropyDoctrine.mNumberFirst,
+            BASPhase2EntropyClosureDoctrine.mNumberFirst,
+            "M-first must be ≥ Phase 2 first")
+        XCTAssertLessThanOrEqual(
             BASChapter431EntropyDoctrine.mNumberLast,
-            BASPhase2EntropyClosureDoctrine.mNumberLast)
+            BASPhase2EntropyClosureDoctrine.mNumberLast,
+            "M-last must be ≤ Phase 2 last (extensions" +
+            " strictly grow the upper bound)")
     }
 
     // MARK: - Determinism

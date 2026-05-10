@@ -82,7 +82,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百二十五",   // M1070-M1073 (M1073 self-extension)
         "chapter 四百二十六",   // M1074-M1077 (M1077 self-extension)
         "chapter 四百二十七",   // M1080-M1083 (RADICAL EVOLUTION SWEEP Phase A)
-        "chapter 四百三十一"    // M1096-M1099 (RADICAL EVOLUTION SWEEP Phase E)
+        "chapter 四百三十一",   // M1096-M1099 (RADICAL EVOLUTION SWEEP Phase E)
+        "chapter 四百三十二"    // M1100-M1103 (RADICAL EVOLUTION SWEEP Phase F)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -90,18 +91,18 @@ public enum BASPhase2EntropyClosureDoctrine {
 
     /// Last M-number of Phase 2 entropy work。 Bumped:
     /// M1057 → M1065 → M1069 → M1073 → M1077 → M1083 →
-    /// M1099 (RADICAL EVOLUTION SWEEP Phase E entry)。
-    /// M1084-M1095 reserved for Phase B/C/D backfill
-    /// (chapters 四百二十八/四百二十九/四百三十)。
-    public static let mNumberLast: Int = 1099
+    /// M1099 → M1103 (RADICAL EVOLUTION SWEEP Phase F
+    /// entry)。 M1084-M1095 reserved for Phase B/C/D
+    /// backfill (chapters 四百二十八/四百二十九/四百三十)。
+    public static let mNumberLast: Int = 1103
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1099,with M1078-M1079 + M1084-M1095 reserved gaps
+    /// M1103,with M1078-M1079 + M1084-M1095 reserved gaps
     /// for Phase B/C/D backfill)。
-    /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133
-    /// (M1099 self-extension to include chapter 四百三十一
-    /// 4 commits)。
-    public static let commitsShipped: Int = 133
+    /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
+    /// 137 (M1103 self-extension to include chapter
+    /// 四百三十二 4 commits)。
+    public static let commitsShipped: Int = 137
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
