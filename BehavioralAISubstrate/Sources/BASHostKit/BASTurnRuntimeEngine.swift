@@ -120,6 +120,15 @@ public actor BASTurnRuntimeEngine {
     private var lastProbe: BASTurnRuntimePlanDispatchProbe =
         .unwired()
 
+    /// Most-recent `BASNativeStageDispatchLedger`
+    /// captured by `runWithPlan(...)` when the engine
+    /// dispatched through the routed path (chapter 437
+    /// M1126)。 `.empty` until the first routed call。
+    /// Surfaced via `lastNativeStageDispatchLedger()`
+    /// accessor for tests + audit consumers。
+    private var lastDispatchLedger:
+        BASNativeStageDispatchLedger = .empty
+
     /// Most-recent `BASTurnRuntimePlanAssignmentLedger`
     /// captured by `runWithPlan(...)`。 `.unwired` until
     /// the first scheduler-consuming call。 Surfaced via
@@ -192,6 +201,22 @@ public actor BASTurnRuntimeEngine {
         -> BASTurnRuntimePlanAssignmentLedger
     {
         return lastAssignmentLedger
+    }
+
+    // MARK: - chapter 四百三十七 / M1126 — dispatch ledger accessor
+
+    /// Returns the most-recent dispatch ledger captured
+    /// by `runWithPlan(...)` when it dispatched through
+    /// the routed delegate path (chapter 437 M1126
+    /// wiring)。 Returns `.empty` for runs where
+    /// assignments was empty (V1-fallback path) or no
+    /// `runWithPlan` call has occurred。 Used by tests +
+    /// audit consumers to verify scheduler decisions are
+    /// HONORED at execution time,not just captured。
+    public func lastNativeStageDispatchLedger()
+        -> BASNativeStageDispatchLedger
+    {
+        return lastDispatchLedger
     }
 
     // MARK: - Phase F dispatch probe accessor (M1101)
@@ -351,10 +376,31 @@ public actor BASTurnRuntimeEngine {
         let activeDelegate = delegate
             ?? BASRuntimeInternalDelegate(
                 stagePlan: plan)
-        // Drive the M1075 native stage executor via the
-        // delegate to produce a typed M1003 ledger
-        let stageLedger = await activeDelegate
-            .runScaffolded(request: request)
+        // chapter 四百三十七 / M1126 — routed dispatch:
+        // when the captured assignment ledger has at
+        // least one record (scheduler was consulted +
+        // produced decisions),dispatch through the
+        // M1125 routed delegate path。 Captures the
+        // dispatch ledger so audit consumers can prove
+        // decisions were HONORED at execution time。
+        // When assignment ledger is empty (no scheduler
+        // consultation),fall back to the M998
+        // unrouted path — V1 byte-equality preserved。
+        let stageLedger: BASTurnRuntimeStageLedger
+        if lastAssignmentLedger.recordCount > 0 {
+            let routedResult = await activeDelegate
+                .runScaffoldedWithAssignments(
+                    request: request,
+                    assignments: lastAssignmentLedger)
+            stageLedger = routedResult.stageLedger
+            lastDispatchLedger = routedResult
+                .dispatchLedger
+        } else {
+            // Unrouted path — empty dispatch ledger
+            stageLedger = await activeDelegate
+                .runScaffolded(request: request)
+            lastDispatchLedger = .empty
+        }
         // Run V1 coordinator for the byte-stable
         // BASEBrainTurnResult (ADR-014 OPT-IN preserved
         // until `BASTurnRuntimeMode.nativeV2` flips at

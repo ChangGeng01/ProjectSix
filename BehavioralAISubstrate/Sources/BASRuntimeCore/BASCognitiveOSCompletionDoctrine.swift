@@ -546,7 +546,24 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// executor honored X' is a verifiable end-to-end
     /// invariant。 V1 byte-equality preserved (5,770+
     /// BAS tests pass)。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1123"
+    /// M1127 bump:POST-RADICAL EVOLUTION SWEEP Wave 8
+    /// — chapter 四百三十七 ships END-TO-END ROUTED
+    /// DISPATCH。 4 cuts (M1124-M1127):
+    /// (1) recon delegate + executor topology,
+    /// (2) BASRuntimeInternalDelegate.runScaffoldedWith
+    ///     Assignments(...) bridges executor's routed
+    ///     path through delegate boundary,
+    /// (3) BASTurnRuntimeEngine.runWithPlan(...) branches
+    ///     on lastAssignmentLedger — non-empty → routed
+    ///     path → captures dispatch ledger,
+    /// (4) chapter close-out + Phase 2 + ADR-016 bumps。
+    /// First chapter where a single runWithPlan(...) call
+    /// produces TWO typed ledgers (assignments +
+    /// dispatch) proving end-to-end:scheduler decided
+    /// X → executor honored X for stage Y。 V1 byte-
+    /// equality preserved (5,790+ BAS tests pass)。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1127"
 
     /// Query the typed status of a specific gap。
     public static func status(

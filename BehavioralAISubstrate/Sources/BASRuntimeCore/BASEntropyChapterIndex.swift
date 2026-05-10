@@ -289,7 +289,23 @@ public enum BASEntropyChapterIndex {
                 " stage via RoutedStageExecutor closure +" +
                 " captures honored vs fall-through into" +
                 " BASNativeStageDispatchLedger。 ADR-016" +
-                " → M1123 advance")
+                " → M1123 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十七",
+            mNumberFirst: 1124,
+            mNumberLast: 1127,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 8 entry — END-TO-END" +
+                " routed dispatch。 BASRuntimeInternal" +
+                "Delegate.runScaffoldedWithAssignments" +
+                "(...) bridges executor's routed path +" +
+                " engine.runWithPlan(...) branches on" +
+                " assignment ledger + captures dispatch" +
+                " ledger。 ADR-016 → M1127 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

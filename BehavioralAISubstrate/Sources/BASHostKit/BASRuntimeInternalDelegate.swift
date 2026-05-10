@@ -140,4 +140,43 @@ public actor BASRuntimeInternalDelegate {
         BASTurnRuntimePlanLedgerCoherence(
             plan: stagePlan, ledger: ledger)
     }
+
+    // MARK: - chapter 四百三十七 / M1125 — routed execution
+
+    /// REAL ledger-driven dispatch entry point。 Walks the
+    /// delegate's stagePlan via M1121 `executePlanWith
+    /// Assignments(...)`,routing each stage through
+    /// `routedExecutor` when an assignment is registered,
+    /// `fallbackExecutor` otherwise。 Returns BOTH ledgers
+    /// (stage + dispatch) for end-to-end audit。
+    ///
+    /// This is the FIRST delegate entry that bridges the
+    /// chapter 435 `BASTurnRuntimePlanAssignmentLedger`
+    /// (decisions captured) with the chapter 436
+    /// `BASNativeStageDispatchLedger` (decisions honored)。
+    /// V1 byte-equality preserved when `assignments ==
+    /// .empty(turnID:)` — every stage falls through to
+    /// `fallbackExecutor`,equivalent to `runScaffolded(...)`。
+    public func runScaffoldedWithAssignments(
+        request: BASEBrainTurnRequest,
+        assignments:
+            BASTurnRuntimePlanAssignmentLedger,
+        routedExecutor:
+            @escaping BASNativeStageExecutor.RoutedStageExecutor =
+                { _, _, _ in 0 },
+        fallbackExecutor:
+            @escaping BASNativeStageExecutor.StageExecutor =
+                { _, _ in 0 }
+    ) async -> (
+        stageLedger: BASTurnRuntimeStageLedger,
+        dispatchLedger: BASNativeStageDispatchLedger
+    ) {
+        return await nativeStageExecutor
+            .executePlanWithAssignments(
+                stagePlan,
+                request: request,
+                assignments: assignments,
+                routedExecutor: routedExecutor,
+                fallbackExecutor: fallbackExecutor)
+    }
 }
