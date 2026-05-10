@@ -61,27 +61,43 @@ final class BASModuleConsolidationPolicyTests: XCTestCase {
                 .entryCount, 4)
     }
 
-    func testAllPendingMergeAtM1093() {
-        for entry in BASModuleConsolidationPolicy
-            .entries
-        {
-            XCTAssertEqual(
-                entry.status, .pendingMerge,
-                "All 4 candidates must be in" +
-                " .pendingMerge state at M1093 — actual" +
-                " merges are deferred to follow-up" +
-                " chapters under explicit user control")
-        }
+    func testM1110PostAuditStatusSplit() {
+        // M1110 deep-review audit found Qinao SDK
+        // imports BASChatCompletionsAdapter +
+        // BASMLXAdapter directly,so those flipped to
+        // .blocked。 leaseLife + worldPrior remain
+        // .pendingMerge (merges are mechanical)。
+        let chat = BASModuleConsolidationPolicy.entry(
+            for: .chatCompletionsAdapter)
+        XCTAssertEqual(chat?.status, .blocked,
+            "Qinao SampleHost/main.swift imports it")
+        XCTAssertNotNil(chat?.blockedReason)
+
+        let mlx = BASModuleConsolidationPolicy.entry(
+            for: .mlxAdapter)
+        XCTAssertEqual(mlx?.status, .blocked,
+            "8 Qinao SDK consumers")
+        XCTAssertNotNil(mlx?.blockedReason)
+
+        let lease = BASModuleConsolidationPolicy.entry(
+            for: .leaseLife)
+        XCTAssertEqual(lease?.status, .pendingMerge,
+            "merge into BASAppleAdapters is mechanical")
+
+        let world = BASModuleConsolidationPolicy.entry(
+            for: .worldPrior)
+        XCTAssertEqual(world?.status, .pendingMerge,
+            "merge into BASRuntimeCore is mechanical")
     }
 
     func testEntryForChatCompletionsAdapter() {
         let entry = BASModuleConsolidationPolicy.entry(
             for: .chatCompletionsAdapter)
         XCTAssertNotNil(entry)
-        XCTAssertEqual(entry?.status, .pendingMerge)
+        XCTAssertEqual(entry?.status, .blocked,
+            "M1110 audit flipped to blocked")
         XCTAssertNil(entry?.targetModule,
-            "chatCompletionsAdapter is DROPPED, not" +
-            " merged into a target module")
+            "chatCompletionsAdapter is DROP target, not merge")
         XCTAssertEqual(
             entry?.estimatedLOCDelta, -486)
     }
@@ -110,22 +126,28 @@ final class BASModuleConsolidationPolicyTests: XCTestCase {
 
     // MARK: - Pending merge candidates
 
-    func testAllFourPendingAtM1093() {
+    func testTwoPendingAfterM1110AuditSplit() {
         let pending = BASModuleConsolidationPolicy
             .pendingMergeCandidates
-        XCTAssertEqual(pending.count, 4)
+        XCTAssertEqual(pending.count, 2,
+            "M1110 audit:flipped chat + mlx to blocked;" +
+            " 2 leaf module merges remain pending")
+        XCTAssertTrue(pending.contains(.leaseLife))
+        XCTAssertTrue(pending.contains(.worldPrior))
     }
 
-    // MARK: - Cumulative LOC delta
+    // MARK: - Cumulative LOC delta (post-M1110 audit)
 
-    func testPendingLOCDeltaIsMinus1610() {
+    func testPendingLOCDeltaIsZero() {
         XCTAssertEqual(
             BASModuleConsolidationPolicy
                 .pendingLOCDelta,
-            -1610,
-            "Pending merges sum to -1,610 LOC: " +
-            "-486 (chatCompletions) + -1124 (mlx) + " +
-            "0 (leaseLife move) + 0 (worldPrior move)")
+            0,
+            "M1110 audit:after flipping chat + mlx to" +
+            " .blocked,only the 2 leaf module merges" +
+            " remain pending — both are MOVES not" +
+            " deletions (delta=0)。 The -1,610 LOC drop" +
+            " is now blocked behind Qinao migration")
     }
 
     // MARK: - Codable round-trip

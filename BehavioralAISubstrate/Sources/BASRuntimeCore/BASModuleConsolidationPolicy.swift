@@ -95,22 +95,45 @@ public enum BASModuleConsolidationCandidate:
 {
 
     /// Generic OpenAI-compatible HTTP organ provider。
-    /// ~486 LOC。 Qinao SDK vendors its own copy。
+    /// ~486 LOC。 **M1110 audit correction**:original
+    /// doctrine claimed "Qinao SDK vendors its own copy"
+    /// but parent Project06 audit found Qinao
+    /// SampleHost/main.swift directly imports this
+    /// module。 Drop is NOT safe without first migrating
+    /// QinaoSampleHost off this module (or vendoring
+    /// the source into Qinao SDK first)。
     case chatCompletionsAdapter =
         "BASChatCompletionsAdapter"
 
     /// MLX organ provider for Gemma weights。 ~1,124 LOC。
     /// ANE replacement path lives in BASMetalSubstrate
-    /// (Phase E)。
+    /// (Phase E)。 **M1110 audit correction**:Qinao SDK
+    /// HEAVILY consumes this module — 8 external
+    /// consumers found (QinaoMLXEndpoint + 5 SampleHost
+    /// extensions + main.swift + LLMHelpers + Model)。
+    /// Drop would catastrophically break Qinao SDK +
+    /// SampleHost。 Migration plan required first。
     case mlxAdapter = "BASMLXAdapter"
 
     /// Leaf module for thermal/pressure observation +
     /// breath scheduling。 ~1,309 LOC。 Planned merge
-    /// into BASAppleAdapters。
+    /// into BASAppleAdapters。 **M1110 audit**:20 Qinao
+    /// SDK test files import this module directly。
+    /// Merge target (BASAppleAdapters) is fine as the
+    /// new home;Qinao SDK needs mechanical
+    /// `import BASLeaseLife` → `import BASAppleAdapters`
+    /// swap (compile-time fast-fail catches every site)。
     case leaseLife = "BASLeaseLife"
 
     /// Leaf module for world-knowledge layer。 ~2,447 LOC。
-    /// Planned merge into BASRuntimeCore。
+    /// Planned merge into BASRuntimeCore。 **M1110 audit**:
+    /// 13 Qinao SDK consumers (5 source files + 8 test
+    /// files,including QinaoWorldPriorVault +
+    /// QinaoRuntime.swift)。 Merge target (BASRuntimeCore)
+    /// is fine architecturally (BASWorldPrior already
+    /// depends only on BASRuntimeCore so merging is a
+    /// strict subset)。 Qinao SDK needs `import
+    /// BASWorldPrior` → `import BASRuntimeCore` swap。
     case worldPrior = "BASWorldPrior"
 }
 
@@ -172,10 +195,15 @@ public struct BASModuleConsolidationEntry:
 // MARK: - Policy
 
 /// Single-source-of-truth typed policy for module
-/// consolidation。 At M1093 all 4 candidates are
-/// `.pendingMerge`;future chapters under explicit
-/// user control flip status to `.merged` after
-/// performing the actual operations。
+/// consolidation。 At M1093 all 4 candidates were
+/// `.pendingMerge`。 **M1110 audit correction**:flipped
+/// chatCompletionsAdapter + mlxAdapter to `.blocked`
+/// after parent Project06 audit found Qinao SDK
+/// directly imports both modules (not vendored as
+/// previously claimed)。 leaseLife + worldPrior remain
+/// `.pendingMerge` since their merges are mechanical
+/// import swaps (compile-time fast-fail catches every
+/// site)。
 public enum BASModuleConsolidationPolicy {
 
     public static let entries:
@@ -183,15 +211,26 @@ public enum BASModuleConsolidationPolicy {
     [
         BASModuleConsolidationEntry(
             candidate: .chatCompletionsAdapter,
-            status: .pendingMerge,
+            status: .blocked,
             targetModule: nil,  // dropped, not merged
-            blockedReason: nil,
+            blockedReason:
+                "M1110 audit:Qinao SampleHost/main.swift" +
+                " directly imports this module。 Drop" +
+                " requires either (a) migrating QinaoSampleHost" +
+                " off the BASChatCompletionsAdapter API or" +
+                " (b) vendoring the source into Qinao SDK first",
             estimatedLOCDelta: -486),
         BASModuleConsolidationEntry(
             candidate: .mlxAdapter,
-            status: .pendingMerge,
+            status: .blocked,
             targetModule: nil,  // dropped, not merged
-            blockedReason: nil,
+            blockedReason:
+                "M1110 audit:8 Qinao SDK consumers" +
+                " (QinaoMLXEndpoint + 5 SampleHost extensions" +
+                " + main.swift + LLMHelpers + Model)。 Drop" +
+                " would catastrophically break Qinao SDK +" +
+                " SampleHost。 Qinao migration plan required" +
+                " before drop is safe",
             estimatedLOCDelta: -1124),
         BASModuleConsolidationEntry(
             candidate: .leaseLife,
