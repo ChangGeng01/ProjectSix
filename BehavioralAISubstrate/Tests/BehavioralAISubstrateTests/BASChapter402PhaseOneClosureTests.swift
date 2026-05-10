@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1207",
-            "M1207:doctrine version reflects POST-SWEEP BIOMIMETIC chapter 7 (chapter 四百五十七 — STDP 4th plasticity rule completing the biomimetic rule quartet, chapters 447-457 ship continuous real-execution + biomimetic + adaptive + learning + persistence + orchestration + timing-window sequence)")
+            "ADR-016.M1215",
+            "M1215:doctrine version reflects POST-SWEEP BIOMIMETIC chapter 9 (chapter 四百五十九 — BASHierarchicalPredictiveCoding first multi-level adaptive primitive, chapters 447-459 ship continuous real-execution + biomimetic + adaptive + learning + persistence + orchestration + timing-window + GPU-acceleration + hierarchical-cortical-architecture sequence)")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -1056,6 +1056,44 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter457EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter457EntropyDoctrine
+                    .summary),
+            // M1211 POST-SWEEP BIOMIMETIC chapter 8 (GPU plasticity)
+            check("四百五十八",
+                tag: BASChapter458EntropyDoctrine.chapterTag,
+                first: BASChapter458EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter458EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter458EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter458EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter458EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter458EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter458EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter458EntropyDoctrine
+                    .summary),
+            // M1215 POST-SWEEP BIOMIMETIC chapter 9 (hierarchical predictive coding)
+            check("四百五十九",
+                tag: BASChapter459EntropyDoctrine.chapterTag,
+                first: BASChapter459EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter459EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter459EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter459EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter459EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter459EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter459EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter459EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1234,7 +1272,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter456EntropyDoctrine.mNumberLast),
             // M1207 POST-SWEEP BIOMIMETIC chapter 7 (STDP 4th plasticity rule)
             ("457", BASChapter457EntropyDoctrine.mNumberFirst,
-             BASChapter457EntropyDoctrine.mNumberLast)
+             BASChapter457EntropyDoctrine.mNumberLast),
+            // M1211 POST-SWEEP BIOMIMETIC chapter 8 (GPU plasticity)
+            ("458", BASChapter458EntropyDoctrine.mNumberFirst,
+             BASChapter458EntropyDoctrine.mNumberLast),
+            // M1215 POST-SWEEP BIOMIMETIC chapter 9 (hierarchical predictive coding)
+            ("459", BASChapter459EntropyDoctrine.mNumberFirst,
+             BASChapter459EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。

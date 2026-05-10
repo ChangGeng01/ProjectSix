@@ -849,7 +849,39 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// dependent),not just correlations (rate-based)。
     /// 「不够仿生」 6/10 → 7/10。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1207"
+    /// M1211 bump:POST-SWEEP BIOMIMETIC chapter 8 —
+    /// chapter 四百五十八 ships GPU-accelerated
+    /// plasticity update via runtime-compiled Metal
+    /// compute kernel。 Lazy Metal pipeline mirroring
+    /// chapter 451 Mamba GPU pattern;each (i,j) thread
+    /// owns one weight cell (no atomic contention);
+    /// scale CPU-side so all 4 rules share kernel。 9
+    /// PROOF tests verify GPU/CPU agreement byte-equal
+    /// within 1e-5 across all 4 rules + cross-path
+    /// mixing (CPU/GPU/CPU on same fold yields 3× Δ
+    /// proving shared hidden weight state)。 Plasticity
+    /// was the LAST CPU-only compute-heavy primitive;
+    /// chapter 458 closes the GPU gap。 「原生利用神经引擎」
+    /// 4/4 → 5/5。 V1 byte-equality preserved。 No
+    /// G-status change。
+    /// M1215 bump:POST-SWEEP BIOMIMETIC chapter 9 —
+    /// chapter 四百五十九 ships BASHierarchicalPredictive
+    /// Coding,substrate's FIRST multi-level adaptive
+    /// primitive。 N-layer stack where each layer
+    /// predicts the layer below + propagates only the
+    /// prediction error upward (canonical Rao &
+    /// Ballard 1999 / Friston free-energy
+    /// architecture)。 Equal-dim invariant keeps
+    /// cascade simple;custom Codable init enforces
+    /// invariant on DECODE。 Aggregate snapshot bundle
+    /// covers entire stack。 12 PROOF tests verify
+    /// cascade propagation,convergence,snapshot
+    /// round-trip,Codable invariant enforcement on
+    /// malformed JSON。 Top-layer error = irreducible
+    /// surprise signal。 「不够仿生」 7/10 → 8/10
+    /// (substrate now mirrors cortical hierarchies)。
+    /// V1 byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1215"
 
     /// Query the typed status of a specific gap。
     public static func status(

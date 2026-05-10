@@ -77,6 +77,7 @@
 // level weight learning)。
 
 import Foundation
+import Metal
 
 // MARK: - Typed rule enum
 
@@ -299,6 +300,17 @@ public enum BASPlasticityError:
     Error, Equatable, Sendable
 {
     case shapeMismatch(reason: String)
+
+    /// Metal device or compute pipeline could not be
+    /// constructed (simulator without Metal,watchOS,
+    /// etc)。 Thrown by `applyGPU(...)`。
+    /// chapter 458 / M1209。
+    case gpuUnavailable(reason: String)
+
+    /// Live GPU dispatch failed (command-buffer commit
+    /// error,buffer alloc failure,etc)。 Thrown by
+    /// `applyGPU(...)`。 chapter 458 / M1209。
+    case gpuDispatchFailure(reason: String)
 }
 
 // MARK: - Plasticity fold actor
@@ -321,6 +333,21 @@ public actor BASPlasticityFold {
     /// Number of `apply(...)` calls processed since
     /// most recent `reset()`。
     private var updatesProcessed: Int = 0
+
+    // MARK: - chapter 458 / M1209 — Lazy GPU pipeline
+
+    /// Metal device,lazily initialized on first
+    /// `applyGPU(...)` call。
+    private var metalDevice: (any MTLDevice)?
+
+    /// Metal command queue,paired with `metalDevice`。
+    private var metalCommandQueue: (any MTLCommandQueue)?
+
+    /// Compiled compute pipeline for the plasticity
+    /// outer-product + scale + accumulate kernel。
+    /// Lazy-built on first GPU call。
+    private var metalPipeline:
+        (any MTLComputePipelineState)?
 
     public init(shape: BASPlasticityFoldShape) {
         self.shape = shape
@@ -453,6 +480,282 @@ public actor BASPlasticityFold {
             output[j] = acc
         }
         return output
+    }
+
+    // MARK: - chapter 458 / M1209 — GPU plasticity update
+
+    /// GPU-accelerated plasticity update via a runtime-
+    /// compiled Metal compute kernel。 Each (i, j) cell
+    /// of the weight matrix gets its own thread。 Same
+    /// rule-selection semantics as CPU `apply(...)`:
+    /// scale = learningRate * rule-specific factor
+    /// (Hebbian:1;antiHebbian:-1;outcomeModulated:
+    /// outcome;STDP:amplitude(Δt))。
+    ///
+    /// Throws `.gpuUnavailable` if Metal device or
+    /// pipeline can't be built (simulator without Metal,
+    /// watchOS)。 Lazy-builds the pipeline on first call;
+    /// subsequent calls reuse the cached pipeline。
+    ///
+    /// Parallelism:O(preDim × postDim) threads each
+    /// doing O(1) work。 Significantly faster than CPU
+    /// for weight matrices >= ~64×64 on Apple Silicon。
+    public func applyGPU(
+        pre: [Float],
+        post: [Float],
+        outcome: Float = 0,
+        timingDelta: Float = 0
+    ) async throws -> BASPlasticityUpdate {
+        guard pre.count == shape.preDim else {
+            throw BASPlasticityError.shapeMismatch(
+                reason: "pre.count (\(pre.count)) must" +
+                " equal preDim (\(shape.preDim))")
+        }
+        guard post.count == shape.postDim else {
+            throw BASPlasticityError.shapeMismatch(
+                reason: "post.count (\(post.count))" +
+                " must equal postDim (\(shape.postDim))")
+        }
+        // Compute scale + stdpAmplitude CPU-side per
+        // the configured rule — identical to CPU path
+        // so GPU/CPU output is byte-equal within Float
+        // precision。
+        let scale: Float
+        var stdpAmplitude: Float = 0
+        switch shape.rule {
+        case .hebbian:
+            scale = shape.learningRate
+        case .antiHebbian:
+            scale = -shape.learningRate
+        case .outcomeModulatedHebbian:
+            scale = shape.learningRate * outcome
+        case .stdpTemporal:
+            let p = shape.stdpParams
+            if timingDelta > 0 {
+                stdpAmplitude =
+                    p.aPlus * expf(-timingDelta / p.tauPlus)
+            } else if timingDelta < 0 {
+                stdpAmplitude =
+                    -p.aMinus * expf(timingDelta / p.tauMinus)
+            } else {
+                stdpAmplitude = 0
+            }
+            scale = shape.learningRate * stdpAmplitude
+        }
+        // Lazy build Metal pipeline
+        try ensurePlasticityPipelineReady()
+        guard let device = metalDevice,
+              let queue = metalCommandQueue,
+              let pipeline = metalPipeline else {
+            throw BASPlasticityError.gpuUnavailable(
+                reason: "metal pipeline not ready")
+        }
+        // Allocate MTLBuffers (Float = 4 bytes each)
+        let preBytes = shape.preDim * 4
+        let postBytes = shape.postDim * 4
+        let wBytes = weights.count * 4
+        guard let preBuf = pre
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: preBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "alloc pre failed")
+        }
+        guard let postBuf = post
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: postBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "alloc post failed")
+        }
+        // Weights buffer:upload current state
+        // (kernel writes back the updated weights)
+        guard let wBuf = weights
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: wBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "alloc weights failed")
+        }
+        guard let dBuf = device.makeBuffer(
+            length: wBytes,
+            options: .storageModeShared)
+        else {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "alloc delta failed")
+        }
+        // scale + dims constants
+        var scaleVal: Float = scale
+        guard let scaleBuf = device.makeBuffer(
+            bytes: &scaleVal,
+            length: 4,
+            options: .storageModeShared)
+        else {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "alloc scale failed")
+        }
+        var dims: [UInt32] = [
+            UInt32(shape.preDim),
+            UInt32(shape.postDim)
+        ]
+        guard let dimsBuf = dims
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: 8,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "alloc dims failed")
+        }
+        // Dispatch
+        guard let cmdBuf = queue.makeCommandBuffer(),
+              let encoder = cmdBuf
+                .makeComputeCommandEncoder()
+        else {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "alloc command buffer/encoder failed")
+        }
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(preBuf, offset: 0, index: 0)
+        encoder.setBuffer(postBuf, offset: 0, index: 1)
+        encoder.setBuffer(wBuf, offset: 0, index: 2)
+        encoder.setBuffer(dBuf, offset: 0, index: 3)
+        encoder.setBuffer(scaleBuf, offset: 0, index: 4)
+        encoder.setBuffer(dimsBuf, offset: 0, index: 5)
+        let gridSize = MTLSize(
+            width: shape.preDim,
+            height: shape.postDim,
+            depth: 1)
+        let maxTgw = pipeline
+            .maxTotalThreadsPerThreadgroup
+        let tgWidth = min(shape.preDim, maxTgw)
+        let tgHeight = min(
+            shape.postDim, max(1, maxTgw / tgWidth))
+        let tgSize = MTLSize(
+            width: tgWidth, height: tgHeight, depth: 1)
+        encoder.dispatchThreads(
+            gridSize, threadsPerThreadgroup: tgSize)
+        encoder.endEncoding()
+        cmdBuf.commit()
+        _ = await cmdBuf.completed()
+        if let err = cmdBuf.error {
+            throw BASPlasticityError.gpuDispatchFailure(
+                reason: "command buffer error:" +
+                " \(err.localizedDescription)")
+        }
+        // Read back updated weights + delta
+        let updatedWeights = Array(
+            UnsafeBufferPointer<Float>(
+                start: wBuf.contents()
+                    .assumingMemoryBound(
+                        to: Float.self),
+                count: weights.count))
+        let delta = Array(
+            UnsafeBufferPointer<Float>(
+                start: dBuf.contents()
+                    .assumingMemoryBound(
+                        to: Float.self),
+                count: weights.count))
+        weights = updatedWeights
+        let currentIndex = updatesProcessed
+        updatesProcessed += 1
+        return BASPlasticityUpdate(
+            pre: pre,
+            post: post,
+            outcome: outcome,
+            weightDelta: delta,
+            updatedWeightSnapshot: weights,
+            updateIndex: currentIndex,
+            timingDelta: timingDelta,
+            stdpAmplitude: stdpAmplitude)
+    }
+
+    /// Lazy-build the Metal pipeline on first GPU call。
+    /// Subsequent calls are no-ops (pipeline cached)。
+    private func ensurePlasticityPipelineReady() throws {
+        guard metalDevice == nil else { return }
+        guard let dev = MTLCreateSystemDefaultDevice()
+        else {
+            throw BASPlasticityError.gpuUnavailable(
+                reason: "no default MTLDevice")
+        }
+        guard let queue = dev.makeCommandQueue() else {
+            throw BASPlasticityError.gpuUnavailable(
+                reason: "no MTLCommandQueue")
+        }
+        // Each thread handles ONE (i, j) cell of the
+        // outer-product。 Δ = scale · pre[i] · post[j];
+        // weights[i, j] += Δ。 No cross-thread atomic
+        // contention since each thread owns its own
+        // cell。 chapter 458 / M1209。
+        let source = """
+        #include <metal_stdlib>
+        using namespace metal;
+
+        kernel void plasticity_update(
+            device const float *pre        [[buffer(0)]],
+            device const float *post       [[buffer(1)]],
+            device float *weights          [[buffer(2)]],
+            device float *delta_out        [[buffer(3)]],
+            constant float &scale          [[buffer(4)]],
+            constant uint2 &dims           [[buffer(5)]],
+            uint2 gid [[thread_position_in_grid]])
+        {
+            const uint i = gid.x;
+            const uint j = gid.y;
+            const uint preDim  = dims.x;
+            const uint postDim = dims.y;
+            if (i >= preDim || j >= postDim) {
+                return;
+            }
+            const uint idx = i * postDim + j;
+            const float d = scale * pre[i] * post[j];
+            delta_out[idx] = d;
+            weights[idx] += d;
+        }
+        """
+        let library: any MTLLibrary
+        do {
+            library = try dev.makeLibrary(
+                source: source, options: nil)
+        } catch {
+            throw BASPlasticityError.gpuUnavailable(
+                reason: "shader compile failed:" +
+                " \(error.localizedDescription)")
+        }
+        guard let function = library.makeFunction(
+            name: "plasticity_update")
+        else {
+            throw BASPlasticityError.gpuUnavailable(
+                reason: "shader function" +
+                " 'plasticity_update' missing")
+        }
+        let pipe: any MTLComputePipelineState
+        do {
+            pipe = try dev.makeComputePipelineState(
+                function: function)
+        } catch {
+            throw BASPlasticityError.gpuUnavailable(
+                reason: "pipeline build failed:" +
+                " \(error.localizedDescription)")
+        }
+        self.metalDevice = dev
+        self.metalCommandQueue = queue
+        self.metalPipeline = pipe
     }
 
     // MARK: - chapter 455 / M1197 — snapshot persistence

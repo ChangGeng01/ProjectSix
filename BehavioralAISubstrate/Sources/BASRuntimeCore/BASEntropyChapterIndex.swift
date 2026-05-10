@@ -771,7 +771,62 @@ public enum BASEntropyChapterIndex {
                 " JSON defaulting + observer routing。" +
                 " Substrate now learns CAUSAL ORDERING" +
                 " not just correlations。 「不够仿生」" +
-                " 6/10 → 7/10。 ADR-016 → M1207")
+                " 6/10 → 7/10。 ADR-016 → M1207"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十八",
+            mNumberFirst: 1208,
+            mNumberLast: 1211,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 8 — GPU-" +
+                "accelerated plasticity update via" +
+                " runtime-compiled Metal compute kernel" +
+                " (mirrors chapter 451 Mamba GPU" +
+                " pattern)。 Each (i,j) thread owns one" +
+                " weight cell (no atomic contention);" +
+                " scale computed CPU-side so all 4 rules" +
+                " (Hebbian / antiHebbian / outcome-" +
+                "modulated / STDP) share one kernel。 9" +
+                " PROOF tests verify GPU/CPU agreement" +
+                " byte-equal within 1e-5 across all 4" +
+                " rules + cross-path mixing (CPU→GPU→CPU" +
+                " on same fold proves shared hidden" +
+                " weight state)。 Plasticity was LAST" +
+                " CPU-only compute-heavy primitive;" +
+                " GPU gap now closed。 「原生利用神经引擎」" +
+                " 4/4 → 5/5。 ADR-016 → M1211"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十九",
+            mNumberFirst: 1212,
+            mNumberLast: 1215,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 9 —" +
+                " substrate's FIRST multi-level adaptive" +
+                " primitive。 BASHierarchicalPredictive" +
+                "Coding actor maintains N-layer stack" +
+                " of probes;observe cascades error up" +
+                " the stack (layer K sees layer K-1's" +
+                " error,not raw input)。 Equal-dim" +
+                " invariant + custom Codable init" +
+                " ENFORCES invariant on DECODE" +
+                " (malformed JSON fails loudly)。" +
+                " Aggregate snapshot via chapter 455" +
+                " integration covers entire stack。 12" +
+                " PROOF tests verify cascade,convergence," +
+                " snapshot round-trip,invariant" +
+                " enforcement on malformed JSON。 Top-" +
+                "layer error = irreducible surprise" +
+                " signal。 Mirrors cortical hierarchies" +
+                " (Rao & Ballard 1999;Friston free-" +
+                "energy)。 「不够仿生」 7/10 → 8/10。" +
+                " ADR-016 → M1215")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
