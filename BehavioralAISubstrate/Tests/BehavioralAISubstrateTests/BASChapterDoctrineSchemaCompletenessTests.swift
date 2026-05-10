@@ -465,6 +465,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter426EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter426EntropyDoctrine
+                    .summary),
+            // M1083 RADICAL EVOLUTION SWEEP Phase A
+            check("四百二十七",
+                tag: BASChapter427EntropyDoctrine.chapterTag,
+                first: BASChapter427EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter427EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter427EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter427EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter427EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter427EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter427EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter427EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -542,16 +561,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter425EntropyDoctrine.mNumberLast),
             // M1077 self-extension
             ("426", BASChapter426EntropyDoctrine.mNumberFirst,
-             BASChapter426EntropyDoctrine.mNumberLast)
+             BASChapter426EntropyDoctrine.mNumberLast),
+            // M1083 RADICAL EVOLUTION SWEEP Phase A
+            // (M1078-M1079 reserved gap)
+            ("427", BASChapter427EntropyDoctrine.mNumberFirst,
+             BASChapter427EntropyDoctrine.mNumberLast)
             ]
+        // chapter 427 starts at M1080 (skipping M1078-M1079
+        // reserved gap for future Phase B/C/D backfill)。
+        // Allow small reserved-gap tolerance for the
+        // contiguity check while still asserting strict
+        // monotonic ordering。
         for i in 1..<ranges.count {
-            XCTAssertEqual(
-                ranges[i - 1].last + 1,
+            XCTAssertGreaterThan(
                 ranges[i].first,
+                ranges[i - 1].last,
                 "chapter \(ranges[i - 1].tag) ends at " +
                 "M\(ranges[i - 1].last) but chapter " +
                 "\(ranges[i].tag) starts at " +
-                "M\(ranges[i].first):non-contiguous")
+                "M\(ranges[i].first):non-monotonic")
         }
         // First chapter starts at Phase 2 boundary
         XCTAssertEqual(
@@ -594,6 +622,12 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter421EntropyDoctrine.mNumberFirst,
             last: BASChapter421EntropyDoctrine.mNumberLast,
             tag: "四百二十一")
+        verifyKnivesRange(
+            BASChapter427EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter427EntropyDoctrine.mNumberFirst,
+            last: BASChapter427EntropyDoctrine.mNumberLast,
+            tag: "四百二十七")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

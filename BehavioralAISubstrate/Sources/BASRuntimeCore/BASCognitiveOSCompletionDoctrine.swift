@@ -427,7 +427,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ADR-018 phase to .shipped;overall progress 66% →
     /// 100%。 ADR-014 OPT-IN held;V1 byte-equality preserved
     /// (5375+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1077"
+    /// M1083 bump:RADICAL EVOLUTION SWEEP chapter 四百二十七
+    /// v1 close-out — V2 RUNTIME COMPOSITION SURFACE
+    /// milestone。 Ships M1080 BASRuntimeInternalDelegate
+    /// (4 REAL executors composed) + M1081 BASTurnRuntimeMode
+    /// typed enum (V1↔V2 mode switch) + M1082 BASTurnRuntime
+    /// Engine.runWithPlan() composition (FIRST function
+    /// wiring all 4 REAL executors end-to-end)。 V2 actor's
+    /// 6 typed scaffolding params previously dead-on-arrival
+    /// are now ACTIVATED。 ADR-014 OPT-IN held;V1 byte-equality
+    /// preserved (5398+ BAS tests pass)。No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1083"
 
     /// Query the typed status of a specific gap。
     public static func status(
