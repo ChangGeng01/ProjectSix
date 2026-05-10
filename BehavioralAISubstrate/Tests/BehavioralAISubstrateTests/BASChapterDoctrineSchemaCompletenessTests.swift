@@ -1037,6 +1037,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter456EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter456EntropyDoctrine
+                    .summary),
+            // M1207 POST-SWEEP BIOMIMETIC chapter 7 (STDP 4th plasticity rule)
+            check("四百五十七",
+                tag: BASChapter457EntropyDoctrine.chapterTag,
+                first: BASChapter457EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter457EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter457EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter457EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter457EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter457EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter457EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter457EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1212,7 +1231,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter455EntropyDoctrine.mNumberLast),
             // M1203 POST-SWEEP BIOMIMETIC chapter 6 (turn observer orchestrator)
             ("456", BASChapter456EntropyDoctrine.mNumberFirst,
-             BASChapter456EntropyDoctrine.mNumberLast)
+             BASChapter456EntropyDoctrine.mNumberLast),
+            // M1207 POST-SWEEP BIOMIMETIC chapter 7 (STDP 4th plasticity rule)
+            ("457", BASChapter457EntropyDoctrine.mNumberFirst,
+             BASChapter457EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。

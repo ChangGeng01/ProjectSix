@@ -96,6 +96,70 @@ public enum BASPlasticityRule:
     /// gating of plasticity。
     case outcomeModulatedHebbian =
         "outcome-modulated-hebbian"
+
+    /// Spike-Timing-Dependent Plasticity (STDP):
+    /// W += α · amplitude(Δt) · (pre ⊗ post),where
+    /// amplitude(Δt) follows the canonical asymmetric
+    /// exponential window (Bi & Poo 1998;Markram et
+    /// al 1997):
+    ///
+    ///   amplitude(Δt) =  A_+ · exp(-Δt / τ_+)   when Δt > 0  (LTP)
+    ///   amplitude(Δt) = -A_- · exp( Δt / τ_-)   when Δt < 0  (LTD)
+    ///   amplitude(Δt) =  0                      when Δt = 0  (no causal info)
+    ///
+    /// Δt is the time difference t_post - t_pre。
+    /// Positive Δt (pre fires BEFORE post) → causal →
+    /// LTP。 Negative Δt (post fires BEFORE pre) →
+    /// anti-causal → LTD。 |Δt| larger → amplitude
+    /// decays exponentially toward 0。
+    ///
+    /// Params (A_+,A_-,τ_+,τ_-) live in
+    /// `BASPlasticityFoldShape.stdpParams`。 chapter
+    /// 457 / M1205。
+    case stdpTemporal = "stdp-temporal"
+}
+
+// MARK: - STDP params
+
+/// Typed STDP curve parameters。 chapter 457 / M1205。
+/// Defaults match canonical Bi & Poo 1998 values:
+/// A_+ = A_- = 1.0,τ_+ = τ_- = 20 ms。 Asymmetric
+/// values shift the LTP/LTD balance (e.g. A_+ > A_-
+/// biases toward potentiation;τ_- > τ_+ widens the
+/// LTD window relative to LTP)。
+public struct BASPlasticitySTDPParams:
+    Equatable, Hashable, Sendable, Codable
+{
+
+    /// Potentiation amplitude A_+ (for Δt > 0)。
+    /// Clamped to >= 0。
+    public let aPlus: Float
+
+    /// Depression amplitude A_- (for Δt < 0)。
+    /// Clamped to >= 0。 The rule applies the
+    /// sign internally (amplitude is negative for
+    /// LTD);A_- is stored as a non-negative magnitude。
+    public let aMinus: Float
+
+    /// Potentiation time constant τ_+ in the same
+    /// timing unit Δt is measured in (typically ms)。
+    /// Clamped to >= 1e-6 to avoid divide-by-zero。
+    public let tauPlus: Float
+
+    /// Depression time constant τ_-。 Clamped >= 1e-6。
+    public let tauMinus: Float
+
+    public init(
+        aPlus: Float = 1.0,
+        aMinus: Float = 1.0,
+        tauPlus: Float = 20.0,
+        tauMinus: Float = 20.0
+    ) {
+        self.aPlus = max(0, aPlus)
+        self.aMinus = max(0, aMinus)
+        self.tauPlus = max(1e-6, tauPlus)
+        self.tauMinus = max(1e-6, tauMinus)
+    }
 }
 
 // MARK: - Typed shape
@@ -119,16 +183,53 @@ public struct BASPlasticityFoldShape:
     /// `apply(...)`。
     public let rule: BASPlasticityRule
 
+    /// STDP curve parameters (used only when rule is
+    /// `.stdpTemporal`;ignored for hebbian /
+    /// antiHebbian / outcomeModulatedHebbian)。
+    /// Defaults to canonical Bi & Poo 1998 values。
+    /// chapter 457 / M1205。
+    public let stdpParams: BASPlasticitySTDPParams
+
     public init(
         preDim: Int,
         postDim: Int,
         learningRate: Float = 0.01,
-        rule: BASPlasticityRule = .hebbian
+        rule: BASPlasticityRule = .hebbian,
+        stdpParams: BASPlasticitySTDPParams =
+            BASPlasticitySTDPParams()
     ) {
         self.preDim = max(1, preDim)
         self.postDim = max(1, postDim)
         self.learningRate = max(0, learningRate)
         self.rule = rule
+        self.stdpParams = stdpParams
+    }
+
+    // Custom Codable init handles snapshots encoded
+    // before stdpParams field existed — defaults the
+    // missing key to canonical Bi & Poo values。
+    // chapter 457 / M1205 backward-compat。
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(
+            keyedBy: CodingKeys.self)
+        let p = try c.decode(
+            Int.self, forKey: .preDim)
+        let q = try c.decode(
+            Int.self, forKey: .postDim)
+        let alpha = try c.decode(
+            Float.self, forKey: .learningRate)
+        let r = try c.decode(
+            BASPlasticityRule.self, forKey: .rule)
+        let stdp = try c.decodeIfPresent(
+            BASPlasticitySTDPParams.self,
+            forKey: .stdpParams)
+            ?? BASPlasticitySTDPParams()
+        self.init(
+            preDim: p,
+            postDim: q,
+            learningRate: alpha,
+            rule: r,
+            stdpParams: stdp)
     }
 }
 
@@ -146,8 +247,18 @@ public struct BASPlasticityUpdate:
 
     /// Outcome scalar (used only by
     /// outcomeModulatedHebbian rule;ignored by
-    /// hebbian / antiHebbian)。
+    /// hebbian / antiHebbian / stdpTemporal)。
     public let outcome: Float
+
+    /// Spike-timing delta Δt = t_post - t_pre used by
+    /// `.stdpTemporal` rule;ignored by the other 3
+    /// rules。 chapter 457 / M1205。
+    public let timingDelta: Float
+
+    /// STDP amplitude factor applied this update。
+    /// 0 for non-STDP rules。 Positive for LTP (Δt > 0),
+    /// negative for LTD (Δt < 0)。 chapter 457 / M1205。
+    public let stdpAmplitude: Float
 
     /// Per-element weight delta applied this update
     /// (post-rule)。 Length = preDim × postDim。
@@ -166,11 +277,15 @@ public struct BASPlasticityUpdate:
         outcome: Float,
         weightDelta: [Float],
         updatedWeightSnapshot: [Float],
-        updateIndex: Int
+        updateIndex: Int,
+        timingDelta: Float = 0,
+        stdpAmplitude: Float = 0
     ) {
         self.pre = pre
         self.post = post
         self.outcome = outcome
+        self.timingDelta = timingDelta
+        self.stdpAmplitude = stdpAmplitude
         self.weightDelta = weightDelta
         self.updatedWeightSnapshot =
             updatedWeightSnapshot
@@ -231,13 +346,19 @@ public actor BASPlasticityFold {
     }
 
     /// Apply one plasticity update with the typed
-    /// (pre, post, outcome) bundle。 Computes the rule-
-    /// specific weight delta,mutates the internal
-    /// weight matrix,returns a typed result snapshot。
+    /// (pre, post, outcome [, timingDelta]) bundle。
+    /// Computes the rule-specific weight delta,mutates
+    /// the internal weight matrix,returns a typed
+    /// result snapshot。
+    ///
+    /// `timingDelta` carries Δt = t_post - t_pre for
+    /// `.stdpTemporal` rule。 Ignored by the other 3
+    /// rules。 chapter 457 / M1205。
     public func apply(
         pre: [Float],
         post: [Float],
-        outcome: Float = 0
+        outcome: Float = 0,
+        timingDelta: Float = 0
     ) throws -> BASPlasticityUpdate {
         guard pre.count == shape.preDim else {
             throw BASPlasticityError.shapeMismatch(
@@ -250,8 +371,11 @@ public actor BASPlasticityFold {
                 " must equal postDim (\(shape.postDim))")
         }
         // Determine the per-update scale factor based
-        // on the configured rule
+        // on the configured rule。 stdpAmplitude is
+        // recorded into the update bundle for audit;
+        // 0 for non-STDP rules。
         let scale: Float
+        var stdpAmplitude: Float = 0
         switch shape.rule {
         case .hebbian:
             scale = shape.learningRate
@@ -259,6 +383,23 @@ public actor BASPlasticityFold {
             scale = -shape.learningRate
         case .outcomeModulatedHebbian:
             scale = shape.learningRate * outcome
+        case .stdpTemporal:
+            // STDP amplitude follows asymmetric
+            // exponential window:
+            //   Δt > 0 → +A_+ · exp(-Δt / τ_+) (LTP)
+            //   Δt < 0 → -A_- · exp( Δt / τ_-) (LTD)
+            //   Δt = 0 → 0 (no causal info)
+            let p = shape.stdpParams
+            if timingDelta > 0 {
+                stdpAmplitude =
+                    p.aPlus * expf(-timingDelta / p.tauPlus)
+            } else if timingDelta < 0 {
+                stdpAmplitude =
+                    -p.aMinus * expf(timingDelta / p.tauMinus)
+            } else {
+                stdpAmplitude = 0
+            }
+            scale = shape.learningRate * stdpAmplitude
         }
         // Compute weight delta = scale · (pre ⊗ post)
         // Δ[i, j] = scale * pre[i] * post[j]
@@ -283,7 +424,9 @@ public actor BASPlasticityFold {
             outcome: outcome,
             weightDelta: delta,
             updatedWeightSnapshot: weights,
-            updateIndex: currentIndex)
+            updateIndex: currentIndex,
+            timingDelta: timingDelta,
+            stdpAmplitude: stdpAmplitude)
     }
 
     /// Forward-pass over the current weights:

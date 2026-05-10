@@ -831,7 +831,25 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ~50% → ~58% (hosts integrate biomimetic state
     /// with one actor injection instead of three)。
     /// V1 byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1203"
+    /// M1207 bump:POST-SWEEP BIOMIMETIC chapter 7 —
+    /// chapter 四百五十七 ships canonical Spike-Timing-
+    /// Dependent Plasticity (STDP) as 4th rule case
+    /// under the same BASPlasticityFold actor。
+    /// BASPlasticitySTDPParams typed (A_+,A_-,τ_+,
+    /// τ_-) bundle with Bi & Poo 1998 defaults +
+    /// chapter 一百八十五 clamps + Codable backward-
+    /// compat (legacy snapshots default to canonical
+    /// params)。 amplitude(Δt) follows asymmetric
+    /// exponential window:LTP for Δt > 0,LTD for
+    /// Δt < 0,zero at Δt = 0。 16 PROOF tests verify
+    /// LTP / LTD / exponential decay / asymmetric A
+    /// + τ bias / non-STDP-rule-ignore-timingDelta /
+    /// observer routing / Codable backward-compat。
+    /// Substrate now learns CAUSAL ORDERING (timing-
+    /// dependent),not just correlations (rate-based)。
+    /// 「不够仿生」 6/10 → 7/10。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1207"
 
     /// Query the typed status of a specific gap。
     public static func status(

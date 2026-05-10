@@ -121,15 +121,23 @@ public struct BASBiomimeticTurnSignal:
     /// (_:) with this vector。
     public let predictiveObservation: [Float]?
 
-    /// Plasticity update bundle (pre/post/outcome)。
-    /// When non-nil AND the observer's `plasticity`
-    /// primitive is populated,observer dispatches
-    /// fold.apply(pre:post:outcome:)。 Outcome scalar
-    /// defaults to 0 (outcome-modulated rule freezes
-    /// learning at 0 → safe default)。
+    /// Plasticity update bundle (pre/post/outcome/
+    /// timingDelta)。 When non-nil AND the observer's
+    /// `plasticity` primitive is populated,observer
+    /// dispatches fold.apply(pre:post:outcome:
+    /// timingDelta:)。 outcome defaults to 0 (outcome-
+    /// modulated rule freezes learning at 0 → safe
+    /// default)。 timingDelta defaults to 0 (STDP
+    /// rule produces zero amplitude → safe default
+    /// for non-STDP rules ignoring it)。
     public let plasticityPre: [Float]?
     public let plasticityPost: [Float]?
     public let plasticityOutcome: Float
+
+    /// Δt = t_post - t_pre for `.stdpTemporal` plasticity
+    /// rule。 Ignored by the other 3 rules。 chapter
+    /// 457 / M1205。
+    public let plasticityTimingDelta: Float
 
     /// Mamba selective-scan inputs。 When non-nil AND
     /// the observer's `mamba` primitive is populated,
@@ -141,12 +149,14 @@ public struct BASBiomimeticTurnSignal:
         plasticityPre: [Float]? = nil,
         plasticityPost: [Float]? = nil,
         plasticityOutcome: Float = 0,
+        plasticityTimingDelta: Float = 0,
         mambaInputs: BASMambaSSMScanInputs? = nil
     ) {
         self.predictiveObservation = predictiveObservation
         self.plasticityPre = plasticityPre
         self.plasticityPost = plasticityPost
         self.plasticityOutcome = plasticityOutcome
+        self.plasticityTimingDelta = plasticityTimingDelta
         self.mambaInputs = mambaInputs
     }
 
@@ -296,7 +306,9 @@ public actor BASBiomimeticTurnObserver {
             plasticityResult = try await fold.apply(
                 pre: pre,
                 post: post,
-                outcome: signal.plasticityOutcome)
+                outcome: signal.plasticityOutcome,
+                timingDelta:
+                    signal.plasticityTimingDelta)
         }
         // Mamba dispatch
         if let state = mamba,

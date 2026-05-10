@@ -743,7 +743,35 @@ public enum BASEntropyChapterIndex {
                 " integrate biomimetic state with one" +
                 " actor injection instead of three。" +
                 " 「不够灵活」 ~50% → ~58%。" +
-                " ADR-016 → M1203")
+                " ADR-016 → M1203"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十七",
+            mNumberFirst: 1204,
+            mNumberLast: 1207,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 7 — 4th" +
+                " plasticity rule completing the" +
+                " biomimetic rule quartet。 Canonical" +
+                " Spike-Timing-Dependent Plasticity" +
+                " (Bi & Poo 1998 + Markram et al 1997)" +
+                " as .stdpTemporal case under SAME" +
+                " BASPlasticityFold actor。" +
+                " BASPlasticitySTDPParams typed (A_+,A_-," +
+                "τ_+,τ_-) bundle with chapter 一百八十五" +
+                " clamps + Codable backward-compat." +
+                " amplitude(Δt) follows asymmetric" +
+                " exponential window:LTP for Δt > 0," +
+                " LTD for Δt < 0,zero at Δt = 0。 16" +
+                " PROOF tests including 4× A bias + 20×" +
+                " τ window-widening proofs + legacy" +
+                " JSON defaulting + observer routing。" +
+                " Substrate now learns CAUSAL ORDERING" +
+                " not just correlations。 「不够仿生」" +
+                " 6/10 → 7/10。 ADR-016 → M1207")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

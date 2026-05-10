@@ -33,11 +33,12 @@ final class BASPlasticityFoldTests: XCTestCase {
             "negative learning rate clamps to 0")
     }
 
-    func testRuleEnumHasThreeCases() {
+    func testRuleEnumHasFourCases() {
         XCTAssertEqual(
-            BASPlasticityRule.allCases.count, 3,
-            "3 plasticity rules: hebbian +" +
-            " antiHebbian + outcomeModulatedHebbian")
+            BASPlasticityRule.allCases.count, 4,
+            "4 plasticity rules: hebbian +" +
+            " antiHebbian + outcomeModulatedHebbian" +
+            " + stdpTemporal (chapter 457)")
     }
 
     // MARK: - Hebbian rule
