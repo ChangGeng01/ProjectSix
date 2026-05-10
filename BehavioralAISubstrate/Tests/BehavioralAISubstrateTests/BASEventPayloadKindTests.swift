@@ -5,15 +5,42 @@ import XCTest
 
 final class BASEventPayloadKindTests: XCTestCase {
 
-    // MARK: - 4 cases shipped
+    // MARK: - 7 cases shipped (across chapters 428/439/441/444)
 
-    func testFivePayloadKindsShipped() {
+    func testSevenPayloadKindsShipped() {
         XCTAssertEqual(
-            BASEventPayloadKind.allCases.count, 5,
-            "M1132 chapter 四百三十九 (Wave 10):bumped" +
-            " from 4 to 5 (added .nativeStageDispatch" +
-            " for chapter 436 dispatch ledger event-log" +
-            " emission)")
+            BASEventPayloadKind.allCases.count, 7,
+            "Cases evolved across chapters:M1084 chapter" +
+            " 四百二十八 shipped 4 (memoryAtom +" +
+            " turnLifecycle + parallelStage +" +
+            " permitEscalation),M1132 chapter 四百三十九" +
+            " bumped to 5 (added .nativeStageDispatch)," +
+            " M1140 chapter 四百四十一 bumped to 6 (added" +
+            " .planAssignment),M1153 chapter 四百四十四" +
+            " bumped to 7 (added .nativeStagePerStep)")
+    }
+
+    /// Each of the 7 typed cases MUST be reachable via
+    /// allCases (the test above pins count;this test
+    /// pins specific case presence by raw value)。
+    func testAllSevenCasesByRawValuePresent() {
+        let raws = Set(
+            BASEventPayloadKind.allCases.map {
+                $0.rawValue
+            })
+        let expected: Set<String> = [
+            "memory-atom-event",
+            "turn-lifecycle-event",
+            "parallel-stage-event",
+            "permit-escalation-event",
+            "native-stage-dispatch-event",
+            "plan-assignment-event",
+            "native-stage-per-step-event"
+        ]
+        XCTAssertEqual(raws, expected,
+            "allCases must contain exactly the 7 typed" +
+            " payload-kind rawvalues — drift catches" +
+            " any rawvalue rename or case deletion")
     }
 
     // MARK: - Raw values byte-stable + match action tags

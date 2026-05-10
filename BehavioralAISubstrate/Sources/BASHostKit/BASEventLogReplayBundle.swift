@@ -7,10 +7,11 @@
 // turn-scoped `BASEventLogTurnProjection` (which only
 // covers the original 4 payload kinds);this bundle is
 // stream-scoped + carries the 2 new kinds shipped at
-// chapters 439 + 441 (nativeStageDispatch +
-// planAssignment) so downstream replay consumers (G8
-// SSM training,causal graph extraction,distributed
-// audit) read once and consume each of 6 kinds directly。
+// chapters 439 + 441 + 444 (nativeStageDispatch +
+// planAssignment + nativeStagePerStep) so downstream
+// replay consumers (G8 SSM training,causal graph
+// extraction,distributed audit) read once and consume
+// each of 7 kinds directly。
 //
 // ## Why this exists (system entropy framing)
 //

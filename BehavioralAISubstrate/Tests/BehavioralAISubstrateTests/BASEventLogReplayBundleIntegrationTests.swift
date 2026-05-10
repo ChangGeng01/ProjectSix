@@ -8,25 +8,28 @@ import XCTest
 @testable import BASPolicy
 @testable import BASMetalSubstrate
 
-/// Replay-rebuild integration test for the full 6-kind
-/// unified event log surface that Waves 11/12 (chapters
-/// 440-441) completed。 Proves the substrate-side
-/// claim:write mixed-kind entries to BASInMemoryEvent
-/// LogStorage,project via BASEventLogProjectors,verify
-/// each typed payload round-trips byte-equal across
-/// ALL 6 kinds with cross-kind isolation。 Without this
-/// integration test the per-kind unit tests don't prove
-/// the kinds compose together on the same stream
-/// without cross-talk。
+/// Replay-rebuild integration test for the full 7-kind
+/// unified event log surface (originally 6-kind at
+/// chapter 442 ship after Waves 11/12; chapter 444
+/// added .nativeStagePerStep bringing it to 7;Round 3
+/// polish updated all canonical bundle tests to cover
+/// the 7th kind)。 Proves the substrate-side claim:
+/// write mixed-kind entries to BASInMemoryEventLogStorage,
+/// project via BASEventLogProjectors, verify each typed
+/// payload round-trips byte-equal across ALL 7 kinds
+/// with cross-kind isolation。 Without this integration
+/// test the per-kind unit tests don't prove the kinds
+/// compose together on the same stream without cross-
+/// talk。
 ///
 /// Coverage:
 ///   - Per-kind round-trip:write 1 entry of each kind →
 ///     fetch via storage → project → verify exact
 ///     byte-equal payload returned
-///   - Cross-kind isolation:write 6 entries of mixed
+///   - Cross-kind isolation:write 7 entries of mixed
 ///     kinds → each projector returns ONLY its own kind
 ///   - Bundle aggregate:single
-///     `projectAllPayloadKinds(...)` call returns all 6
+///     `projectAllPayloadKinds(...)` call returns all 7
 ///     populated lists from one input
 ///   - Sequence ordering:write entries with explicit
 ///     out-of-order sequenceNumber → projector returns
@@ -102,6 +105,26 @@ final class BASEventLogReplayBundleIntegrationTests:
             recordCount: 0,
             acceleratedRecordCount: 0,
             uniqueStageCount: 0)
+    }
+
+    /// Round 3 fix:add helper for the 7th kind so
+    /// cross-isolation + bundle aggregate tests can
+    /// cover all 7 payload kinds (previously only 6
+    /// — chapter 444 added the 7th kind but didn't
+    /// retroactively extend the canonical bundle tests
+    /// in this file)。
+    private func makeNativeStagePerStepPayload(
+        turnID: String = "t-perstep"
+    ) -> BASNativeStagePerStepEventPayload {
+        return BASNativeStagePerStepEventPayload(
+            turnID: turnID,
+            stageRawValue: "stage-x",
+            stepSequenceIndex: 0,
+            selectedBackingKindRawValue: "cpu-bytes",
+            selectedKernelKeyDescriptor: "",
+            durationMs: 1,
+            honoredAssignment: false,
+            assignmentRationaleRawValue: "")
     }
 
     // MARK: - Single-kind round-trip via storage
@@ -211,11 +234,16 @@ final class BASEventLogReplayBundleIntegrationTests:
         XCTAssertEqual(projected.first, payload)
     }
 
-    // MARK: - Cross-kind isolation
+    // MARK: - Cross-kind isolation (Round 3 fix: 6→7 kinds)
 
-    func testProjectorIsolationAcrossAll6Kinds() async throws {
+    /// Cross-kind isolation across ALL 7 typed payload
+    /// kinds (previously 6 — Round 3 fix extends to 7
+    /// after chapter 444 added .nativeStagePerStep)。
+    /// Each projector returns ONLY its own kind even
+    /// when 7 mixed-kind entries share a stream。
+    func testProjectorIsolationAcrossAll7Kinds() async throws {
         let storage = BASInMemoryEventLogStorage()
-        // Append one entry of each of the 6 kinds in order
+        // Append one entry of each of the 7 kinds in order
         let memPayload = makeMemoryAtomPayload(
             atomID: "iso-atom")
         _ = try await storage.append(
@@ -264,10 +292,20 @@ final class BASEventLogReplayBundleIntegrationTests:
                 timestampMs: 150,
                 sessionID: "session-iso",
                 payload: assignPayload))
+        // 7th kind added by Round 3 fix:nativeStagePerStep
+        let perStepPayload =
+            makeNativeStagePerStepPayload(
+                turnID: "iso-turn")
+        _ = try await storage.append(
+            BASEventLogEntry.nativeStagePerStepEvent(
+                eventID: "iso-perstep",
+                timestampMs: 160,
+                sessionID: "session-iso",
+                payload: perStepPayload))
         let events = await storage.events(
             forSession: "session-iso")
-        XCTAssertEqual(events.count, 6,
-            "all 6 entries persisted to storage")
+        XCTAssertEqual(events.count, 7,
+            "all 7 entries persisted to storage")
         // Each projector must return ONLY its own kind
         XCTAssertEqual(
             BASEventLogProjectors
@@ -293,10 +331,18 @@ final class BASEventLogReplayBundleIntegrationTests:
             BASEventLogProjectors
                 .projectPlanAssignmentEvents(events),
             [assignPayload])
+        XCTAssertEqual(
+            BASEventLogProjectors
+                .projectNativeStagePerStepEvents(events),
+            [perStepPayload])
     }
 
     // MARK: - Bundle aggregate
 
+    /// Round 3 fix:bundle aggregate test now covers
+    /// ALL 7 typed payload kinds (previously 6 — chapter
+    /// 444 added .nativeStagePerStep without
+    /// retroactively extending this test)。
     func testProjectAllPayloadKindsBundleFromMixedStream() async throws {
         let storage = BASInMemoryEventLogStorage()
         let memPayload = makeMemoryAtomPayload()
@@ -305,6 +351,8 @@ final class BASEventLogReplayBundleIntegrationTests:
         let permitPayload = makePermitEscalationPayload()
         let dispPayload = makeNativeStageDispatchPayload()
         let assignPayload = makePlanAssignmentPayload()
+        let perStepPayload =
+            makeNativeStagePerStepPayload()
         for (idx, entry) in [
             BASEventLogEntry.memoryAtomEvent(
                 eventID: "bundle-mem",
@@ -335,7 +383,12 @@ final class BASEventLogReplayBundleIntegrationTests:
                 eventID: "bundle-assign",
                 timestampMs: 150,
                 sessionID: "session-bundle",
-                payload: assignPayload)
+                payload: assignPayload),
+            BASEventLogEntry.nativeStagePerStepEvent(
+                eventID: "bundle-perstep",
+                timestampMs: 160,
+                sessionID: "session-bundle",
+                payload: perStepPayload)
         ].enumerated() {
             _ = try await storage.append(entry)
             XCTAssertGreaterThanOrEqual(idx, 0)
@@ -359,8 +412,11 @@ final class BASEventLogReplayBundleIntegrationTests:
         XCTAssertEqual(
             bundle.planAssignmentEvents,
             [assignPayload])
-        XCTAssertEqual(bundle.totalEventCount, 6,
-            "bundle aggregates all 6 kinds")
+        XCTAssertEqual(
+            bundle.nativeStagePerStepEvents,
+            [perStepPayload])
+        XCTAssertEqual(bundle.totalEventCount, 7,
+            "bundle aggregates all 7 kinds")
     }
 
     // MARK: - perKindEventCount aggregate map
@@ -412,6 +468,15 @@ final class BASEventLogReplayBundleIntegrationTests:
                 timestampMs: 150,
                 sessionID: "s",
                 payload: makePlanAssignmentPayload()))
+        // Round 3 fix:append the 7th kind too so this
+        // test covers ALL 7 perKindEventCount keys
+        _ = try await storage.append(
+            BASEventLogEntry.nativeStagePerStepEvent(
+                eventID: "e8",
+                timestampMs: 160,
+                sessionID: "s",
+                payload:
+                    makeNativeStagePerStepPayload()))
         let events = await storage.events(
             forSession: "s")
         let bundle = BASEventLogProjectors
@@ -435,7 +500,39 @@ final class BASEventLogReplayBundleIntegrationTests:
         XCTAssertEqual(
             map[BASEventPayloadKind
                 .planAssignment.rawValue], 1)
-        XCTAssertEqual(bundle.totalEventCount, 7)
+        XCTAssertEqual(
+            map[BASEventPayloadKind
+                .nativeStagePerStep.rawValue], 1,
+            "Round 3 fix:7th kind included in" +
+            " perKindEventCount validation")
+        XCTAssertEqual(bundle.totalEventCount, 8,
+            "2 memoryAtom + 1 of each other 6 kinds = 8")
+    }
+
+    // MARK: - Round 3 fix: 7th kind single-round-trip
+
+    /// 7th kind (nativeStagePerStep) round-trip via
+    /// storage — sibling of the 6 existing per-kind
+    /// round-trip tests。 Chapter 444 added the kind
+    /// but didn't add its sibling round-trip test in
+    /// this canonical file (only in the per-step-only
+    /// tests file)。 Round 3 closes the symmetry gap。
+    func testNativeStagePerStepRoundTripThroughStorage() async throws {
+        let storage = BASInMemoryEventLogStorage()
+        let payload = makeNativeStagePerStepPayload()
+        let entry = BASEventLogEntry
+            .nativeStagePerStepEvent(
+                eventID: "e-perstep-1",
+                timestampMs: 700,
+                sessionID: "session-replay",
+                payload: payload)
+        _ = try await storage.append(entry)
+        let events = await storage.events(
+            forSession: "session-replay")
+        let projected = BASEventLogProjectors
+            .projectNativeStagePerStepEvents(events)
+        XCTAssertEqual(projected.count, 1)
+        XCTAssertEqual(projected.first, payload)
     }
 
     // MARK: - Sequence-number ordering

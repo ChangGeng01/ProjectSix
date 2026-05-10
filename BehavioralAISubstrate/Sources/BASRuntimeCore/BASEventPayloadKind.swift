@@ -58,7 +58,8 @@
 //   - chapter 一百八十五 — anti-magic-number (typed enum,
 //     not raw String matching scattered across consumers)
 //   - chapter 二百一一 — single source-of-truth (one
-//     discriminator;all 4 payload kinds reference it)
+//     discriminator;all 7 payload kinds reference it
+//     after chapters 439/441/444 extended from 4 → 7)
 //   - chapter 三百九二 — replay-determinism (rawvalues
 //     pinned;byte-stable across processes)
 //   - 不变量 #1/#2/#3 — V1 byte-equality preserved
