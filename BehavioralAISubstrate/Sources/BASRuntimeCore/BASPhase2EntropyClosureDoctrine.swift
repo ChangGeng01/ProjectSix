@@ -102,7 +102,9 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百四十五",   // M1156-M1159 (POST-RADICAL Wave 16 — federated event log multi-backend)
         "chapter 四百四十六",   // M1160-M1163 (POST-RADICAL Wave 17 — POST-RADICAL EVOLUTION SWEEP close-out meta-doctrine)
         "chapter 四百四十七",   // M1164-M1167 (POST-SWEEP REAL EXECUTION FOLLOW-THROUGH chapter 1 — first real GPU kernel)
-        "chapter 四百四十八"    // M1168-M1171 (POST-SWEEP REAL EXECUTION chapter 2 — first MPSGraph: real GPU rmsNorm)
+        "chapter 四百四十八",   // M1168-M1171 (POST-SWEEP REAL EXECUTION chapter 2 — first MPSGraph: real GPU rmsNorm)
+        "chapter 四百四十九",   // M1172-M1175 (POST-SWEEP REAL EXECUTION chapter 3 — real GPU rotaryEmbedding, completes 3/3 kernel triad)
+        "chapter 四百五十"      // M1176-M1179 (POST-SWEEP BIOMIMETIC chapter 1 — BASMambaSSMState first biomimetic primitive)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -113,22 +115,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1099 → M1103 → M1107 → M1109 → M1115 → M1119 →
     /// M1123 → M1127 → M1131 → M1135 → M1139 → M1143 →
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
-    /// M1171 (chapter 四百四十八 POST-SWEEP REAL
-    /// EXECUTION chapter 2 — first MPSGraph: real GPU
-    /// rmsNorm)。 M1078-M1079 reserved for post-Phase-A
-    /// follow-up。
-    public static let mNumberLast: Int = 1171
+    /// M1171 → M1175 → M1179 (chapter 四百五十 POST-
+    /// SWEEP BIOMIMETIC chapter 1 — first
+    /// BASMambaSSMState primitive)。 M1078-M1079
+    /// reserved for post-Phase-A follow-up。
+    public static let mNumberLast: Int = 1179
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1171,with M1078-M1079 reserved for post-Phase-A
-    /// follow-up)。
-    /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
-    /// 137 → 141 → 145 → 149 → 153 → 155 → 161 → 165 →
-    /// 169 → 173 → 177 → 181 → 185 → 189 → 193 → 197 →
-    /// 201 → 205 → 209 → 213 → 217 (chapter 四百四十八
-    /// 4 cuts:M1168 recon + M1169 MPSGraph rmsNorm +
-    /// M1170 PROOF tests + M1171 close-out)。
-    public static let commitsShipped: Int = 217
+    /// M1179)。 Bumped through chapter 450:213 → 217 →
+    /// 221 → 225 (chapters 448 + 449 + 450 each 4 cuts)。
+    public static let commitsShipped: Int = 225
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

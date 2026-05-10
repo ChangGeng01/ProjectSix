@@ -758,7 +758,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// close-out。 「原生利用神经引擎」 progress 1/3 → 2/3
     /// GPU kernels。 V1 byte-equality preserved。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1171"
+    /// M1175 bump:POST-SWEEP REAL EXECUTION chapter 3
+    /// — chapter 四百四十九 ships THIRD real GPU kernel
+    /// (rotaryEmbedding via MPSGraph)。 「原生利用神经引
+    /// 擎」 progress 2/3 → 3/3 GPU kernel triad complete。
+    /// M1179 bump:POST-SWEEP BIOMIMETIC chapter 1 —
+    /// chapter 四百五十 ships substrate's FIRST stateful
+    /// + selective-gated primitive BASMambaSSMState
+    /// (recurrent hidden state across calls + input-
+    /// dependent Δ/B/C selective gating)。 「不够仿生」
+    /// critique 0/10 → 4/10。 V1 byte-equality preserved。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1179"
 
     /// Query the typed status of a specific gap。
     public static func status(

@@ -25,14 +25,13 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1171",
-            "Doctrine version pin: bumping requires explicit " +
-            "audit migration per chapter 八十七 raw value " +
-            "stability doctrine。 M1171 POST-SWEEP REAL " +
-            "EXECUTION chapter 2:bumped from M1167 " +
-            "(chapter 四百四十八 ships 4 cuts M1168-M1171 — " +
-            "second real GPU kernel via MPSGraph, " +
-            "first MPSGraph usage in substrate)")
+            "ADR-016.M1179",
+            "Doctrine version pin。 M1179 POST-SWEEP " +
+            "BIOMIMETIC chapter 1:bumped through chapters " +
+            "448 + 449 + 450 — second + third real GPU " +
+            "kernels (rmsNorm + rotaryEmbedding) plus " +
+            "BASMambaSSMState first stateful + selective-" +
+            "gated substrate primitive")
     }
 
     // MARK: - Per-gap status pins

@@ -561,7 +561,47 @@ public enum BASEntropyChapterIndex {
                 " PROOF tests verify GPU output within" +
                 " 1e-4 absolute tolerance of CPU" +
                 " reference。 「原生利用神经引擎」 progress" +
-                " 1/3 → 2/3。 ADR-016 → M1171 advance")
+                " 1/3 → 2/3。 ADR-016 → M1171 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十九",
+            mNumberFirst: 1172,
+            mNumberLast: 1175,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION chapter 3 —" +
+                " THIRD + FINAL real GPU kernel" +
+                " (rotaryEmbedding via MPSGraph)。 All" +
+                " 3 chapter 431 CPU-stub kernels now" +
+                " have real GPU-dispatching siblings。" +
+                " 「原生利用神经引擎」 2/3 → 3/3 COMPLETE。" +
+                " 4 PROOF tests verify identity + 90°" +
+                " known result + GPU/CPU agreement" +
+                " within 1e-5。 ADR-016 → M1175 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十",
+            mNumberFirst: 1176,
+            mNumberLast: 1179,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 1 —" +
+                " FIRST substrate-level stateful +" +
+                " selective-gated primitive。" +
+                " BASMambaSSMState actor maintains" +
+                " continuous hidden state across" +
+                " selectiveScan() calls。 CPU baseline" +
+                " canonical Mamba update: dA=exp(Δ·A)" +
+                " + h=dA·h+dB·x + y=sum_n(C·h)。 9" +
+                " PROOF tests including state-persists" +
+                " + Δ=0-freezes (selective gating) +" +
+                " multi-batch independence + multi-step" +
+                " == sequential。 「不够仿生」 0/10 →" +
+                " 4/10。 ADR-016 → M1179")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
