@@ -72,52 +72,84 @@ final class BASPostRadicalSweepDoctrineTests:
     func testMNumberRangePinned() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.mNumberFirst,
-            1080,
+            BASSweepDoctrineExpectations
+                .sweepMNumberFirst,
             "RADICAL EVOLUTION SWEEP Phase A starts at" +
-            " M1080")
+            " M\(BASSweepDoctrineExpectations.sweepMNumberFirst)")
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.mNumberLast,
-            1163,
+            BASSweepDoctrineExpectations
+                .sweepMNumberLast,
             "Wave 17 close-out chapter 446 ends at" +
-            " M1163")
+            " M\(BASSweepDoctrineExpectations.sweepMNumberLast)")
+        // Span is fully derivable from first+last —
+        // assert against the derivation, not against
+        // a literal duplicate
+        let expectedSpan =
+            BASSweepDoctrineExpectations
+                .sweepMNumberLast
+            - BASSweepDoctrineExpectations
+                .sweepMNumberFirst
+            + 1
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.mNumberSpan,
-            84, "M1080-M1163 inclusive = 84 M-numbers")
+            expectedSpan,
+            "mNumberSpan must equal" +
+            " (mNumberLast - mNumberFirst + 1) —" +
+            " derivation,not a magic constant")
     }
 
     func testWaveRangePinned() {
+        // First wave is 1 (numbering starts there per
+        // chapter 三百九二 replay-determinism)。 The "1"
+        // here is the FIRST-INDEX convention,not a
+        // drift-pin;left as literal。
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
                 .firstWaveNumber, 1)
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
-                .lastWaveNumber, 17)
+                .lastWaveNumber,
+            BASSweepDoctrineExpectations
+                .sweepWaveCount)
         XCTAssertEqual(
-            BASPostRadicalSweepDoctrine.waveCount, 17)
+            BASPostRadicalSweepDoctrine.waveCount,
+            BASSweepDoctrineExpectations
+                .sweepWaveCount)
     }
 
-    // MARK: - Counts
+    // MARK: - Counts (anti-magic-number: named via
+    //         BASSweepDoctrineExpectations namespace)
 
     func testChapterCountPinned() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.chapterCount,
-            20,
-            "chapters 427-446 inclusive = 20 chapters")
+            BASSweepDoctrineExpectations
+                .sweepChapterCount,
+            "chapter count must match named expected" +
+            " constant (chapters 427-446 inclusive)")
+        // Cross-mirror via index (preferred over
+        // any literal pin):both sources MUST agree
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
-                .chapterTagsShipped.count, 20,
-            "chapterTagsShipped count matches" +
-            " chapterCount accessor")
+                .chapterTagsShipped.count,
+            BASEntropyChapterIndex
+                .radicalEvolutionEntries.count,
+            "chapterTagsShipped count must equal" +
+            " BASEntropyChapterIndex.radicalEvolutionEntries" +
+            ".count — both source-of-truth surfaces" +
+            " for the same fact")
     }
 
     func testCommitsShippedPinned() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.commitsShipped,
-            84,
-            "RADICAL Phases A-F (24 commits at M1080-" +
-            "M1107) + RADICAL final cuts (M1108-M1115) +" +
-            " POST-RADICAL Waves 5-16 (M1110-M1159) +" +
-            " chapter 446 close-out (4 cuts) ≈ 84")
+            BASSweepDoctrineExpectations
+                .sweepCommitsShipped,
+            "commits must match named expected constant" +
+            " (sum of per-chapter knives — see" +
+            " BASSweepDoctrineExpectations doc-comment" +
+            " for derivation)")
     }
 
     // MARK: - whatsShipped + whatsDeferred + pins
@@ -126,14 +158,16 @@ final class BASPostRadicalSweepDoctrineTests:
         // Exact-count assertion (chapter 二百一一
         // single-source-of-truth):if any future commit
         // adds a 9th achievement,this test fails until
-        // the count is explicitly bumped — preventing
-        // silent doctrine drift。
+        // the named constant is explicitly bumped —
+        // preventing silent doctrine drift。
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
-                .whatsShipped.count, 8,
-            "Sweep must list EXACTLY 8 substrate-side" +
-            " achievements;adding a 9th requires" +
-            " explicit count bump to prevent silent" +
+                .whatsShipped.count,
+            BASSweepDoctrineExpectations
+                .whatsShippedCount,
+            "whatsShipped count must match named" +
+            " expected;adding an item requires" +
+            " explicit constant bump to prevent silent" +
             " doctrine drift")
         // Spot-check key narrative anchors
         let joined = BASPostRadicalSweepDoctrine
@@ -154,10 +188,12 @@ final class BASPostRadicalSweepDoctrineTests:
     func testWhatsDeferredPopulated() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
-                .whatsDeferred.count, 5,
-            "Sweep must explicitly defer EXACTLY 5" +
-            " items with reasons;adding a 6th deferral" +
-            " requires explicit count bump")
+                .whatsDeferred.count,
+            BASSweepDoctrineExpectations
+                .whatsDeferredCount,
+            "whatsDeferred count must match named" +
+            " expected;adding a deferral requires" +
+            " explicit constant bump")
         // Each entry must have non-empty reason
         for (item, reason) in
             BASPostRadicalSweepDoctrine.whatsDeferred
@@ -172,10 +208,12 @@ final class BASPostRadicalSweepDoctrineTests:
     func testPinsHeldThroughoutPopulated() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine
-                .pinsHeldThroughout.count, 10,
-            "Sweep must list EXACTLY 10 doctrine pins" +
-            " held at every commit boundary;adding an" +
-            " 11th requires explicit count bump")
+                .pinsHeldThroughout.count,
+            BASSweepDoctrineExpectations
+                .pinsHeldThroughoutCount,
+            "pinsHeldThroughout count must match named" +
+            " expected;adding a pin requires explicit" +
+            " constant bump")
         let joined = BASPostRadicalSweepDoctrine
             .pinsHeldThroughout.joined(
                 separator: " | ")
@@ -194,15 +232,32 @@ final class BASPostRadicalSweepDoctrineTests:
 
     // MARK: - Cross-mirror invariants (chapter 446 polish)
 
-    /// Exact chapter count — RADICAL chapters 427-433
-    /// (7 chapters) + POST-RADICAL chapters 434-446
-    /// (13 chapters) = 20 chapters total。
-    func testChapterCountIsExactly20() {
+    /// Chapter count cross-mirror via index — preferred
+    /// over a literal pin because the index is an
+    /// independent typed surface that must agree with
+    /// the SWEEP doctrine。 Drift in EITHER source
+    /// fails this test。 (Replaces previous magic-number
+    /// `count, 20` per chapter 一百八十五 anti-magic-
+    /// number doctrine。)
+    func testChapterCountMatchesIndex() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.chapterCount,
-            20,
-            "Sweep covers chapters 427-446 inclusive =" +
-            " 20 chapters。 Drift fails this test")
+            BASEntropyChapterIndex
+                .radicalEvolutionEntries.count,
+            "Sweep chapterCount must equal" +
+            " BASEntropyChapterIndex.radicalEvolutionEntries" +
+            ".count — independent typed surfaces must" +
+            " agree")
+        // Named-constant pin as second source-of-truth
+        // for the same fact (catches the case where
+        // BOTH surfaces drift in lockstep,which the
+        // cross-mirror above can't detect)。
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.chapterCount,
+            BASSweepDoctrineExpectations
+                .sweepChapterCount,
+            "Sweep chapterCount must match named" +
+            " expected constant")
     }
 
     /// SWEEP commitsShipped MUST equal the radical-
@@ -224,15 +279,19 @@ final class BASPostRadicalSweepDoctrineTests:
             " ledgers across radicalEvolutionEntries")
     }
 
-    /// SWEEP commitsShipped at M1163 = 84。
-    func testCommitsShippedIsExactly84() {
+    /// SWEEP commitsShipped matches named expected。
+    /// (Replaces previous magic-number `count, 84` per
+    /// chapter 一百八十五 anti-magic-number doctrine —
+    /// see BASSweepDoctrineExpectations doc-comment for
+    /// the 84 derivation。)
+    func testCommitsShippedMatchesExpected() {
         XCTAssertEqual(
             BASPostRadicalSweepDoctrine.commitsShipped,
-            84,
-            "Sweep ships 84 commits at M1163 close-out:" +
-            " RADICAL Phases A-F (24) + chapter 433" +
-            " final close-out (6) + chapter 434 (6) +" +
-            " chapters 435-446 (12 × 4 = 48) = 84")
+            BASSweepDoctrineExpectations
+                .sweepCommitsShipped,
+            "commitsShipped must match named expected" +
+            " constant — derivation in" +
+            " BASSweepDoctrineExpectations doc-comment")
     }
 
     /// SWEEP chapterTagsShipped MUST be a contiguous
@@ -300,26 +359,24 @@ final class BASPostRadicalSweepDoctrineTests:
             "Sweep mNumberLast must equal chapter 446's")
     }
 
-    /// Wave ↔ chapter accounting:17 waves spread
-    /// across 20 chapters。 The 3-chapter gap accounts
-    /// for:
-    ///   - Wave 3 spans chapters 429 + 430 (-1 chapter)
-    ///   - Wave 4 spans chapters 431 + 432 (-1 chapter)
-    ///   - chapter 433 is RADICAL final close-out,
-    ///     unassigned to any wave (-1 chapter)
-    /// → 20 - 17 = 3 chapters absorbed by wave
-    ///   distribution。 If this invariant breaks,the
-    ///   sweep narrative drifted。
+    /// Wave ↔ chapter accounting invariant — uses
+    /// named expected (see
+    /// BASSweepDoctrineExpectations.sweepChapterMinusWaveDelta
+    /// doc-comment for the 3-slot derivation:Wave 3 +
+    /// Wave 4 each span 2 chapters + chapter 433 is
+    /// unassigned)。 Replaces previous magic-number `3`
+    /// per chapter 一百八十五 anti-magic-number doctrine。
     func testWaveChapterAccountingInvariant() {
         let chapterMinusWaveDelta =
             BASPostRadicalSweepDoctrine.chapterCount -
             BASPostRadicalSweepDoctrine.waveCount
         XCTAssertEqual(
-            chapterMinusWaveDelta, 3,
-            "Sweep chapter count - wave count must" +
-            " equal 3 (Wave 3 spans 2 chapters + Wave 4" +
-            " spans 2 chapters + chapter 433 is" +
-            " unassigned RADICAL close-out)")
+            chapterMinusWaveDelta,
+            BASSweepDoctrineExpectations
+                .sweepChapterMinusWaveDelta,
+            "chapter-wave delta must match named" +
+            " expected;derivation in" +
+            " BASSweepDoctrineExpectations doc-comment")
     }
 
     /// Every chapter listed in
@@ -642,11 +699,30 @@ final class BASPostRadicalSweepDoctrineTests:
             .citationExampleSummary
         XCTAssertFalse(example.isEmpty,
             "citationExampleSummary must be non-empty")
-        XCTAssertGreaterThan(
-            example.count, 50,
-            "citationExampleSummary should be a" +
-            " substantial template (> 50 chars);got" +
-            " length=\(example.count)")
+        // Substantial-template floor:the example must
+        // be longer than any single one of its 5 cited
+        // field values。 Derivation:if even the
+        // longest cited field (lastChapterTag,e.g.
+        // "chapter 四百四十六") would fit alone in the
+        // example,it would mean the template structure
+        // wasn't being applied。 The floor is the sum
+        // of cited values' lengths,not a magic 50。
+        let citedFieldsTotalLength =
+            BASPostRadicalSweepDoctrine.sweepTag.count
+            + BASPostRadicalSweepDoctrine
+                .lastChapterTag.count
+            + String(BASPostRadicalSweepDoctrine
+                .mNumberLast).count
+            + String(BASPostRadicalSweepDoctrine
+                .commitsShipped).count
+            + String(BASPostRadicalSweepDoctrine
+                .pinsHeldThroughout.count).count
+        XCTAssertGreaterThanOrEqual(
+            example.count,
+            citedFieldsTotalLength,
+            "citationExampleSummary must be at least" +
+            " as long as the sum of its 5 cited field" +
+            " values (derivation, not a magic floor)")
     }
 
     // MARK: - Deep-review fix 3: narrative content pins
@@ -654,17 +730,21 @@ final class BASPostRadicalSweepDoctrineTests:
     // for-item replacement;pin SPECIFIC anchor content
     // for every item in whatsShipped + whatsDeferred)
 
-    /// Each of the 8 substrate-side achievements in
-    /// `whatsShipped` MUST contain its specific anchor
-    /// phrase。 Count-only assertion (already tested)
-    /// would silently pass if someone replaced item N
-    /// with completely different content。 This test
-    /// catches semantic drift。
-    func testWhatsShippedContainsAll8SpecificAnchors() {
+    /// Each substrate-side achievement in `whatsShipped`
+    /// MUST contain its specific anchor phrase。 Count-
+    /// only assertion (already tested) would silently
+    /// pass if someone replaced item N with completely
+    /// different content。 This test catches semantic
+    /// drift。 (Renamed from `…All8SpecificAnchors`
+    /// per chapter 一百八十五 anti-magic-number — the
+    /// count is implicit in requiredAnchors.count + the
+    /// cross-mirror assertion below。)
+    func testWhatsShippedContainsAllSpecificAnchors() {
         let joined = BASPostRadicalSweepDoctrine
             .whatsShipped.joined(separator: " ||| ")
-        // 8 specific anchors (one per achievement
-        // item)。 Drift in any anchor → fail loudly。
+        // Specific anchors,one per achievement item。
+        // Array size IS the source-of-truth count;
+        // cross-mirror against doctrine.count below。
         let requiredAnchors: [String] = [
             "autonomy COMPLETE",            // item 1
             "Replay surface COMPLETE",      // item 2
@@ -693,11 +773,13 @@ final class BASPostRadicalSweepDoctrineTests:
             " or whatsShipped fell out of sync")
     }
 
-    /// Each of the 5 deferred items in `whatsDeferred`
-    /// MUST contain its specific anchor phrase。
-    /// Catches item-for-item replacement that
-    /// count-only assertions miss。
-    func testWhatsDeferredContainsAll5SpecificAnchors() {
+    /// Each deferred item in `whatsDeferred` MUST
+    /// contain its specific anchor phrase。 Catches
+    /// item-for-item replacement that count-only
+    /// assertions miss。 (Renamed from
+    /// `…All5SpecificAnchors` per chapter 一百八十五
+    /// anti-magic-number。)
+    func testWhatsDeferredContainsAllSpecificAnchors() {
         let joinedItems = BASPostRadicalSweepDoctrine
             .whatsDeferred
             .map { $0.item }

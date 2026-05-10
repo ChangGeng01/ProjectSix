@@ -5,17 +5,31 @@ import XCTest
 
 final class BASEntropyChapterIndexTests: XCTestCase {
 
-    // MARK: - 7 RADICAL EVOLUTION entries (after M1108 extension)
+    // MARK: - RADICAL EVOLUTION entry count
+    // (uses named expected constant per chapter 一百八十五
+    // anti-magic-number doctrine; cross-mirrors against
+    // BASPostRadicalSweepDoctrine as second source-of-
+    // truth)
 
-    func testTwentyRadicalEvolutionEntries() {
+    func testRadicalEvolutionEntryCountMatchesExpected() {
         XCTAssertEqual(
             BASEntropyChapterIndex
-                .radicalEvolutionEntryCount, 20,
-            "M1163 POST-RADICAL Wave 17:bumped from" +
-            " 19 to 20 (added chapter 446 — POST-" +
-            "RADICAL EVOLUTION SWEEP close-out meta-" +
-            "doctrine)。 Sweep complete:chapters" +
-            " 427-446 / Waves 1-17")
+                .radicalEvolutionEntryCount,
+            BASSweepDoctrineExpectations
+                .sweepChapterCount,
+            "radicalEvolutionEntryCount must match" +
+            " named expected — drift means index" +
+            " doctrine fell out of sync with the SWEEP" +
+            " narrative")
+        // Cross-mirror:second source-of-truth is the
+        // SWEEP doctrine's own chapter count
+        XCTAssertEqual(
+            BASEntropyChapterIndex
+                .radicalEvolutionEntryCount,
+            BASPostRadicalSweepDoctrine.chapterCount,
+            "radicalEvolutionEntryCount must equal" +
+            " BASPostRadicalSweepDoctrine.chapterCount" +
+            " — independent typed surfaces must agree")
     }
 
     // MARK: - Entry shape
@@ -121,28 +135,42 @@ final class BASEntropyChapterIndexTests: XCTestCase {
             "M1109 also resolves to chapter 四百三十三")
     }
 
-    // MARK: - Aggregates
+    // MARK: - Aggregates (named expected + cross-mirror)
 
-    func testTotalKnivesCount() {
+    func testTotalKnivesCountMatchesExpected() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.totalKnivesCount, 84,
-            "6 phase × 4 + 433's 6 + 434's 6 + 435's" +
-            " 4 + 436's 4 + 437's 4 + 438's 4 + 439's" +
-            " 4 + 440's 4 + 441's 4 + 442's 4 + 443's" +
-            " 4 + 444's 4 + 445's 4 + 446's 4 = 84。" +
-            " M1163 Wave 17 bumped from 80 to 84")
+            BASEntropyChapterIndex.totalKnivesCount,
+            BASSweepDoctrineExpectations
+                .sweepCommitsShipped,
+            "totalKnivesCount must equal named expected" +
+            " constant — derivation in" +
+            " BASSweepDoctrineExpectations doc-comment")
+        // Cross-mirror with SWEEP doctrine
+        XCTAssertEqual(
+            BASEntropyChapterIndex.totalKnivesCount,
+            BASPostRadicalSweepDoctrine.commitsShipped,
+            "totalKnivesCount must equal" +
+            " BASPostRadicalSweepDoctrine.commitsShipped" +
+            " — independent typed surfaces must agree")
     }
 
-    func testEarliestMNumberIs1080() {
+    func testEarliestMNumberMatchesExpected() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.earliestMNumber, 1080)
+            BASEntropyChapterIndex.earliestMNumber,
+            BASSweepDoctrineExpectations
+                .sweepMNumberFirst,
+            "earliestMNumber must equal sweep" +
+            " mNumberFirst (named constant)")
     }
 
-    func testLatestMNumberIs1163() {
+    func testLatestMNumberMatchesExpected() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.latestMNumber, 1163,
-            "M1163 POST-RADICAL Wave 17 bumped" +
-            " latestMNumber from 1159 → 1163 (chapter" +
+            BASEntropyChapterIndex.latestMNumber,
+            BASSweepDoctrineExpectations
+                .sweepMNumberLast,
+            "M\(BASSweepDoctrineExpectations.sweepMNumberLast)" +
+            " POST-RADICAL Wave 17 latestMNumber pin" +
+            " (chapter" +
             " 446 covers M1160-M1163)。 Sweep complete")
     }
 
@@ -200,10 +228,19 @@ final class BASEntropyChapterIndexTests: XCTestCase {
 
     // MARK: - M1111 Wave 2 STAGE 1 — phase2Entries (31 entries)
 
-    func testPhase2EntryCountIs44() {
+    func testPhase2EntryCountMatchesExpected() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.phase2EntryCount, 44,
-            "M1163 POST-RADICAL Wave 17:complete Phase" +
+            BASEntropyChapterIndex.phase2EntryCount,
+            BASSweepDoctrineExpectations
+                .phase2ChapterCount,
+            "phase2EntryCount must match named expected" +
+            " constant — see BASSweepDoctrineExpectations" +
+            ".phase2ChapterCount doc-comment。 Originally" +
+            " a magic 44;refactored per chapter 一百八十五" +
+            "。 Detail:complete Phase 2 mirror covers" +
+            " (24 pre-RADICAL + 20 sweep) chapters。" +
+            " Original message context:M1163 POST-" +
+            "RADICAL Wave 17 complete Phase" +
             " 2 mirror covers all 44 chapters (24 pre-" +
             "RADICAL + 7 RADICAL + 434/435/436/437/438/" +
             "439/440/441/442/443/444/445/446)。 Sweep" +

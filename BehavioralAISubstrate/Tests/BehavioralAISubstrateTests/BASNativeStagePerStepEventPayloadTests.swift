@@ -324,10 +324,14 @@ final class BASNativeStagePerStepEventPayloadTests:
 
     func testAllPayloadKindsCount() {
         XCTAssertEqual(
-            BASEventPayloadKind.allCases.count, 7,
-            "M1153 POST-RADICAL Wave 15:bumped from" +
-            " 6 to 7 payload kinds (added" +
-            " nativeStagePerStep)")
+            BASEventPayloadKind.allCases.count,
+            BASSweepDoctrineExpectations
+                .eventPayloadKindCount,
+            "BASEventPayloadKind.allCases.count must" +
+            " equal named expected — see" +
+            " BASSweepDoctrineExpectations" +
+            ".eventPayloadKindCount doc-comment for" +
+            " the per-chapter evolution")
     }
 
     // MARK: - Bundle 7-kind aggregate

@@ -5,25 +5,30 @@ import XCTest
 
 final class BASEventPayloadKindTests: XCTestCase {
 
-    // MARK: - 7 cases shipped (across chapters 428/439/441/444)
+    // MARK: - Case count + raw-value presence
+    // (uses named expected constant per chapter 一百八十五
+    // anti-magic-number doctrine)
 
-    func testSevenPayloadKindsShipped() {
+    func testPayloadKindCountMatchesExpected() {
         XCTAssertEqual(
-            BASEventPayloadKind.allCases.count, 7,
-            "Cases evolved across chapters:M1084 chapter" +
-            " 四百二十八 shipped 4 (memoryAtom +" +
-            " turnLifecycle + parallelStage +" +
-            " permitEscalation),M1132 chapter 四百三十九" +
-            " bumped to 5 (added .nativeStageDispatch)," +
-            " M1140 chapter 四百四十一 bumped to 6 (added" +
-            " .planAssignment),M1153 chapter 四百四十四" +
-            " bumped to 7 (added .nativeStagePerStep)")
+            BASEventPayloadKind.allCases.count,
+            BASSweepDoctrineExpectations
+                .eventPayloadKindCount,
+            "BASEventPayloadKind.allCases.count must" +
+            " equal the named expected constant —" +
+            " see BASSweepDoctrineExpectations" +
+            ".eventPayloadKindCount doc-comment for the" +
+            " 4 → 5 → 6 → 7 evolution across chapters" +
+            " 428/439/441/444")
     }
 
-    /// Each of the 7 typed cases MUST be reachable via
-    /// allCases (the test above pins count;this test
-    /// pins specific case presence by raw value)。
-    func testAllSevenCasesByRawValuePresent() {
+    /// Each typed case MUST be reachable via allCases
+    /// (the count test above pins the total;this test
+    /// pins specific case presence by raw value)。 The
+    /// expected set IS the source-of-truth for "which
+    /// raw values exist" — array literal,not magic
+    /// number。
+    func testAllCasesByRawValuePresent() {
         let raws = Set(
             BASEventPayloadKind.allCases.map {
                 $0.rawValue
@@ -38,9 +43,20 @@ final class BASEventPayloadKindTests: XCTestCase {
             "native-stage-per-step-event"
         ]
         XCTAssertEqual(raws, expected,
-            "allCases must contain exactly the 7 typed" +
+            "allCases must contain exactly the typed" +
             " payload-kind rawvalues — drift catches" +
             " any rawvalue rename or case deletion")
+        // Cross-mirror:expected set size IS the
+        // declared count (catches case where someone
+        // adds a kind to both lists in lockstep but
+        // forgets to bump the named constant)
+        XCTAssertEqual(
+            expected.count,
+            BASSweepDoctrineExpectations
+                .eventPayloadKindCount,
+            "expected raw-value set size must match" +
+            " named constant — second source-of-truth" +
+            " cross-mirror")
     }
 
     // MARK: - Raw values byte-stable + match action tags
