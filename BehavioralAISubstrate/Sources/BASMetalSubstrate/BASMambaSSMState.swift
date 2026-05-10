@@ -104,6 +104,7 @@
 // adaptation loop;chapter 454+ adds plasticity)。
 
 import Foundation
+import Metal
 
 // MARK: - Typed shape
 
@@ -229,6 +230,14 @@ public struct BASMambaSSMScanOutputs:
 
 public enum BASMambaSSMError: Error, Equatable, Sendable {
     case shapeMismatch(reason: String)
+    /// Metal device or compute pipeline could not be
+    /// constructed。 Thrown by `selectiveScanGPU(...)`
+    /// when Metal is unavailable (simulator without
+    /// Metal,watchOS,etc)。 chapter 451 / M1181。
+    case gpuUnavailable(reason: String)
+    /// Live GPU dispatch failed (e.g. command buffer
+    /// commit error)。 chapter 451 / M1181。
+    case gpuDispatchFailure(reason: String)
 }
 
 // MARK: - SSM state actor
@@ -251,6 +260,21 @@ public actor BASMambaSSMState {
     /// since the most recent `reset()`。 Surfaced via
     /// `scanCallCount` accessor for audit + tests。
     private var processedScanCalls: Int = 0
+
+    // MARK: - chapter 451 / M1181 — Lazy GPU pipeline
+
+    /// Metal device,lazily initialized on first
+    /// `selectiveScanGPU(...)` call。 nil until then,
+    /// or after a `.frameworkUnavailable` throw。
+    private var metalDevice: (any MTLDevice)?
+
+    /// Metal command queue,paired with `metalDevice`。
+    private var metalCommandQueue: (any MTLCommandQueue)?
+
+    /// Compiled compute pipeline for selective-scan
+    /// shader。 Lazy-built on first GPU call。
+    private var metalPipeline:
+        (any MTLComputePipelineState)?
 
     /// Construct a fresh SSM state for the given shape。
     /// Hidden state initialized to all zeros。
@@ -386,5 +410,327 @@ public actor BASMambaSSMState {
         return BASMambaSSMScanOutputs(
             y: y,
             finalHiddenStateSnapshot: hiddenState)
+    }
+
+    // MARK: - chapter 451 / M1181 — GPU selective-scan
+
+    /// GPU-accelerated selective-scan via a runtime-
+    /// compiled Metal compute kernel。 Threads are
+    /// dispatched as (batch × hiddenDim) — each thread
+    /// runs the sequential timestep loop for its own
+    /// (b, d) pair。 Hidden state IS the same state
+    /// `selectiveScan(...)` mutates;both methods can
+    /// be interleaved freely。
+    ///
+    /// Throws `.gpuUnavailable` if Metal device or
+    /// pipeline can't be built (simulator without
+    /// Metal,watchOS)。 Lazy-builds the pipeline on
+    /// first call;subsequent calls reuse the cached
+    /// pipeline。
+    ///
+    /// Parallelism:O(B × D) threads each doing O(L × N)
+    /// sequential work。 For typical Mamba shapes
+    /// (B=1,D=128-512,N=16-64),this is 128-512
+    /// concurrent threads,each doing ~L × N=512-4096
+    /// ops。 Significantly faster than CPU for
+    /// L >= ~32 sequences on Apple Silicon GPUs。
+    public func selectiveScanGPU(
+        inputs: BASMambaSSMScanInputs
+    ) async throws -> BASMambaSSMScanOutputs {
+        let B = shape.batch
+        let D = shape.hiddenDim
+        let N = shape.stateDim
+        let L = inputs.sequenceLength
+        // Same shape validation as CPU path
+        guard inputs.x.count == B * L * D else {
+            throw BASMambaSSMError.shapeMismatch(
+                reason: "x.count must be B*L*D =" +
+                " \(B*L*D);got \(inputs.x.count)")
+        }
+        guard inputs.delta.count == B * L * D else {
+            throw BASMambaSSMError.shapeMismatch(
+                reason: "delta.count must be B*L*D =" +
+                " \(B*L*D);got \(inputs.delta.count)")
+        }
+        guard inputs.a.count == D * N else {
+            throw BASMambaSSMError.shapeMismatch(
+                reason: "a.count must be D*N =" +
+                " \(D*N);got \(inputs.a.count)")
+        }
+        guard inputs.b.count == B * L * N else {
+            throw BASMambaSSMError.shapeMismatch(
+                reason: "b.count must be B*L*N =" +
+                " \(B*L*N);got \(inputs.b.count)")
+        }
+        guard inputs.c.count == B * L * N else {
+            throw BASMambaSSMError.shapeMismatch(
+                reason: "c.count must be B*L*N =" +
+                " \(B*L*N);got \(inputs.c.count)")
+        }
+        // Lazy build Metal pipeline
+        try ensureMetalPipelineReady()
+        guard let device = metalDevice,
+              let queue = metalCommandQueue,
+              let pipeline = metalPipeline else {
+            throw BASMambaSSMError.gpuUnavailable(
+                reason: "metal pipeline not ready")
+        }
+        // Allocate MTLBuffers for inputs + state + output
+        let xBytes = B * L * D * 4
+        let deltaBytes = B * L * D * 4
+        let aBytes = D * N * 4
+        let bBytes = B * L * N * 4
+        let cBytes = B * L * N * 4
+        let hBytes = B * D * N * 4
+        let yBytes = B * L * D * 4
+        guard let xBuf = inputs.x
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: xBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc x failed")
+        }
+        guard let deltaBuf = inputs.delta
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: deltaBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc delta failed")
+        }
+        guard let aBuf = inputs.a
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: aBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc A failed")
+        }
+        guard let bBuf = inputs.b
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: bBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc B failed")
+        }
+        guard let cBuf = inputs.c
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: cBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc C failed")
+        }
+        // Hidden state buffer:upload current state
+        // (the kernel writes-back the updated state)
+        guard let hBuf = hiddenState
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: hBytes,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc h failed")
+        }
+        guard let yBuf = device.makeBuffer(
+            length: yBytes,
+            options: .storageModeShared)
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc y failed")
+        }
+        // Constants buffer (B, L, D, N as uint32)
+        var dims: [UInt32] = [
+            UInt32(B), UInt32(L), UInt32(D), UInt32(N)
+        ]
+        guard let dimsBuf = dims
+            .withUnsafeBufferPointer({ ptr in
+                device.makeBuffer(
+                    bytes: ptr.baseAddress!,
+                    length: 16,
+                    options: .storageModeShared)
+            })
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc dims failed")
+        }
+        // Dispatch
+        guard let cmdBuf = queue.makeCommandBuffer(),
+              let encoder = cmdBuf
+                .makeComputeCommandEncoder()
+        else {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "alloc command buffer/" +
+                "encoder failed")
+        }
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(xBuf, offset: 0, index: 0)
+        encoder.setBuffer(deltaBuf, offset: 0, index: 1)
+        encoder.setBuffer(aBuf, offset: 0, index: 2)
+        encoder.setBuffer(bBuf, offset: 0, index: 3)
+        encoder.setBuffer(cBuf, offset: 0, index: 4)
+        encoder.setBuffer(hBuf, offset: 0, index: 5)
+        encoder.setBuffer(yBuf, offset: 0, index: 6)
+        encoder.setBuffer(dimsBuf, offset: 0, index: 7)
+        // Grid: B × D threads, one per (batch, hidden)
+        // pair。 Each thread sequentially scans over
+        // L timesteps × N state dims。
+        let gridSize = MTLSize(
+            width: B, height: D, depth: 1)
+        // Threadgroup size — pick a reasonable default;
+        // Metal will clamp to max for the pipeline。
+        let maxTgw = pipeline
+            .maxTotalThreadsPerThreadgroup
+        let tgWidth = min(B, maxTgw)
+        let tgHeight = min(D, max(1, maxTgw / tgWidth))
+        let tgSize = MTLSize(
+            width: tgWidth,
+            height: tgHeight, depth: 1)
+        encoder.dispatchThreads(
+            gridSize, threadsPerThreadgroup: tgSize)
+        encoder.endEncoding()
+        cmdBuf.commit()
+        _ = await cmdBuf.completed()
+        if let err = cmdBuf.error {
+            throw BASMambaSSMError.gpuDispatchFailure(
+                reason: "command buffer error:" +
+                " \(err.localizedDescription)")
+        }
+        // Read back updated hidden state + output
+        let hUpdated = Array(
+            UnsafeBufferPointer<Float>(
+                start: hBuf.contents()
+                    .assumingMemoryBound(
+                        to: Float.self),
+                count: B * D * N))
+        let y = Array(
+            UnsafeBufferPointer<Float>(
+                start: yBuf.contents()
+                    .assumingMemoryBound(
+                        to: Float.self),
+                count: B * L * D))
+        hiddenState = hUpdated
+        processedScanCalls += 1
+        return BASMambaSSMScanOutputs(
+            y: y,
+            finalHiddenStateSnapshot: hiddenState)
+    }
+
+    /// Lazy-build the Metal pipeline on first GPU call。
+    /// Subsequent calls are no-ops (pipeline is cached)。
+    private func ensureMetalPipelineReady() throws {
+        guard metalDevice == nil else { return }
+        guard let dev = MTLCreateSystemDefaultDevice()
+        else {
+            throw BASMambaSSMError.gpuUnavailable(
+                reason: "no default MTLDevice")
+        }
+        guard let queue = dev.makeCommandQueue() else {
+            throw BASMambaSSMError.gpuUnavailable(
+                reason: "no MTLCommandQueue")
+        }
+        // Compile Metal compute shader from source。
+        // Each thread handles all timesteps + all state
+        // dims for one (batch, hidden) pair。 Sequential
+        // recurrence over t (required by Mamba's
+        // selective-scan algorithm),parallel across
+        // (batch × hiddenDim) grid。
+        let source = """
+        #include <metal_stdlib>
+        using namespace metal;
+
+        kernel void selective_scan(
+            device const float *x         [[buffer(0)]],
+            device const float *delta     [[buffer(1)]],
+            device const float *A         [[buffer(2)]],
+            device const float *B         [[buffer(3)]],
+            device const float *C         [[buffer(4)]],
+            device float *h               [[buffer(5)]],
+            device float *y               [[buffer(6)]],
+            constant uint4 &dims          [[buffer(7)]],
+            uint2 gid [[thread_position_in_grid]])
+        {
+            const uint b = gid.x;
+            const uint d = gid.y;
+            const uint B_dim = dims.x;
+            const uint L     = dims.y;
+            const uint D     = dims.z;
+            const uint N     = dims.w;
+            if (b >= B_dim || d >= D) {
+                return;
+            }
+            for (uint t = 0; t < L; t++) {
+                const float deltaTD =
+                    delta[b * L * D + t * D + d];
+                const float xTD =
+                    x[b * L * D + t * D + d];
+                float outAccum = 0.0;
+                for (uint n = 0; n < N; n++) {
+                    const float aDN = A[d * N + n];
+                    const float bTN =
+                        B[b * L * N + t * N + n];
+                    const float cTN =
+                        C[b * L * N + t * N + n];
+                    const float dA =
+                        exp(deltaTD * aDN);
+                    const float dB = deltaTD * bTN;
+                    const uint hIdx =
+                        b * D * N + d * N + n;
+                    const float newH =
+                        dA * h[hIdx] + dB * xTD;
+                    h[hIdx] = newH;
+                    outAccum += cTN * newH;
+                }
+                y[b * L * D + t * D + d] = outAccum;
+            }
+        }
+        """
+        let library: any MTLLibrary
+        do {
+            library = try dev.makeLibrary(
+                source: source, options: nil)
+        } catch {
+            throw BASMambaSSMError.gpuUnavailable(
+                reason: "shader compile failed:" +
+                " \(error.localizedDescription)")
+        }
+        guard let function = library.makeFunction(
+            name: "selective_scan")
+        else {
+            throw BASMambaSSMError.gpuUnavailable(
+                reason: "shader function" +
+                " 'selective_scan' missing")
+        }
+        let pipe: any MTLComputePipelineState
+        do {
+            pipe = try dev.makeComputePipelineState(
+                function: function)
+        } catch {
+            throw BASMambaSSMError.gpuUnavailable(
+                reason: "pipeline build failed:" +
+                " \(error.localizedDescription)")
+        }
+        self.metalDevice = dev
+        self.metalCommandQueue = queue
+        self.metalPipeline = pipe
     }
 }

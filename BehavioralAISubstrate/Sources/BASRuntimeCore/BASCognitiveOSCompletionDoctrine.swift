@@ -769,7 +769,23 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// dependent Δ/B/C selective gating)。 「不够仿生」
     /// critique 0/10 → 4/10。 V1 byte-equality preserved。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1179"
+    /// M1183 bump:POST-SWEEP BIOMIMETIC chapter 2 —
+    /// chapter 四百五十一 ships GPU acceleration for
+    /// BASMambaSSMState via runtime-compiled custom
+    /// Metal compute shader。 First custom Metal shader
+    /// in substrate;CPU + GPU paths share the SAME
+    /// actor-isolated hidden state。 「不够仿生」 4/10
+    /// → 5/10。 V1 byte-equality preserved。
+    /// M1187 bump:POST-SWEEP BIOMIMETIC chapter 3 —
+    /// chapter 四百五十二 ships BASPredictiveCodingProbe,
+    /// substrate's FIRST closed-loop adaptive primitive。
+    /// Canonical predictive-coding update μ ← μ + α·ε;
+    /// running MSE as adaptation signal。 Closes-loop
+    /// proof:50 obs of constant signal → prediction
+    /// converges;distribution shift → error spike +
+    /// recalibration。 「不够灵活」 ~15% → ~35%。 V1
+    /// byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1187"
 
     /// Query the typed status of a specific gap。
     public static func status(

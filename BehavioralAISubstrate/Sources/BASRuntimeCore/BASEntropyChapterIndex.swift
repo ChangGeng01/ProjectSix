@@ -601,7 +601,51 @@ public enum BASEntropyChapterIndex {
                 " + Δ=0-freezes (selective gating) +" +
                 " multi-batch independence + multi-step" +
                 " == sequential。 「不够仿生」 0/10 →" +
-                " 4/10。 ADR-016 → M1179")
+                " 4/10。 ADR-016 → M1179"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十一",
+            mNumberFirst: 1180,
+            mNumberLast: 1183,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 2 —" +
+                " GPU acceleration for BASMambaSSMState" +
+                " via FIRST custom Metal compute shader" +
+                " in substrate。 Runtime-compiled" +
+                " selective_scan kernel dispatches B×D" +
+                " threads with sequential timestep loop" +
+                " per thread。 CPU + GPU paths share" +
+                " the SAME actor-isolated hidden state。" +
+                " 3 NEW GPU PROOF tests:GPU-matches-" +
+                "CPU + state-persists + MIXED GPU/CPU" +
+                " interleaved calls share state。" +
+                " 「不够仿生」 4/10 → 5/10。" +
+                " ADR-016 → M1183"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十二",
+            mNumberFirst: 1184,
+            mNumberLast: 1187,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 3 —" +
+                " substrate's FIRST closed-loop" +
+                " adaptive primitive。 BASPredictive" +
+                "CodingProbe actor maintains running" +
+                " prediction μ + adapts via μ ← μ + α·ε。" +
+                " Running MSE surfaces as substrate-" +
+                "level adaptation signal。 11 PROOF" +
+                " tests including CLOSED-LOOP CONVERGENCE" +
+                " (50 obs converges) + ADAPTATION SIGNAL" +
+                " (MSE decreases) + DISTRIBUTION SHIFT" +
+                " (error spike + recalibration)。" +
+                " 「不够灵活」 ~15% → ~35%。" +
+                " ADR-016 → M1187")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -311,4 +311,213 @@ final class BASMambaSSMStateTests: XCTestCase {
             XCTFail("wrong error type: \(error)")
         }
     }
+
+    // MARK: - chapter 451 / M1182 — GPU selective-scan
+
+    /// Try to construct a working GPU state actor by
+    /// running a no-op single-step scan to trigger
+    /// lazy pipeline init。 If Metal is unavailable
+    /// (simulator without Metal),return nil + the
+    /// caller skips the test。
+    private func makeGPUReadyActor(
+        shape: BASMambaSSMShape
+    ) async throws -> BASMambaSSMState? {
+        let actor = BASMambaSSMState(shape: shape)
+        // Tiny warm-up to trigger Metal pipeline lazy
+        // init。 If Metal unavailable this throws
+        // .gpuUnavailable cleanly。
+        let tinyScan = BASMambaSSMScanInputs(
+            x: Array(
+                repeating: 0,
+                count: shape.batch * 1 *
+                    shape.hiddenDim),
+            delta: Array(
+                repeating: 0,
+                count: shape.batch * 1 *
+                    shape.hiddenDim),
+            a: Array(
+                repeating: -1,
+                count: shape.hiddenDim *
+                    shape.stateDim),
+            b: Array(
+                repeating: 0,
+                count: shape.batch * 1 *
+                    shape.stateDim),
+            c: Array(
+                repeating: 0,
+                count: shape.batch * 1 *
+                    shape.stateDim),
+            sequenceLength: 1)
+        do {
+            _ = try await actor.selectiveScanGPU(
+                inputs: tinyScan)
+            // reset so the warm-up doesn't pollute
+            // the test's expected initial state
+            await actor.reset()
+            return actor
+        } catch BASMambaSSMError
+            .gpuUnavailable(let reason)
+        {
+            try XCTSkipIf(true,
+                "Metal/GPU unavailable: \(reason)")
+            return nil
+        }
+    }
+
+    /// GPU and CPU paths MUST produce equivalent state
+    /// + output for the same inputs。 Run side-by-side
+    /// scans on two separate actors;verify both
+    /// converge to byte-equal-within-tolerance final
+    /// state + output sequence。
+    func testGPUOutputMatchesCPUOutput() async throws {
+        let shape = BASMambaSSMShape(
+            batch: 2, hiddenDim: 4, stateDim: 3)
+        guard let gpuActor =
+            try await makeGPUReadyActor(shape: shape)
+        else {
+            return  // skipped
+        }
+        let cpuActor = BASMambaSSMState(shape: shape)
+        // Realistic-ish input
+        let L = 5
+        var xValues: [Float] = []
+        var deltaValues: [Float] = []
+        var bValues: [Float] = []
+        var cValues: [Float] = []
+        // B=2, L=5, D=4 → 40 floats for x + delta
+        for i in 0..<(2 * L * 4) {
+            xValues.append(Float(i % 7) * 0.1 - 0.3)
+            deltaValues.append(0.2 +
+                Float(i % 3) * 0.1)
+        }
+        // B=2, L=5, N=3 → 30 floats for B + C
+        for i in 0..<(2 * L * 3) {
+            bValues.append(0.5 +
+                Float(i % 5) * 0.05)
+            cValues.append(1.0 -
+                Float(i % 4) * 0.1)
+        }
+        // A: D=4, N=3 → 12 floats (negative, common in
+        // Mamba so exp(Δ·A) ∈ (0,1))
+        let aValues: [Float] = [
+            -1.0, -0.5, -0.25,
+            -0.75, -1.5, -0.1,
+            -0.3, -2.0, -1.25,
+            -0.4, -0.6, -1.75
+        ]
+        let inputs = BASMambaSSMScanInputs(
+            x: xValues, delta: deltaValues,
+            a: aValues, b: bValues, c: cValues,
+            sequenceLength: L)
+        let gpuOut = try await gpuActor
+            .selectiveScanGPU(inputs: inputs)
+        let cpuOut = try await cpuActor
+            .selectiveScan(inputs: inputs)
+        XCTAssertEqual(
+            gpuOut.y.count, cpuOut.y.count)
+        for i in 0..<cpuOut.y.count {
+            XCTAssertEqual(
+                gpuOut.y[i], cpuOut.y[i],
+                accuracy: 1e-4,
+                "y[\(i)] GPU=\(gpuOut.y[i])" +
+                " CPU=\(cpuOut.y[i])")
+        }
+        XCTAssertEqual(
+            gpuOut.finalHiddenStateSnapshot.count,
+            cpuOut.finalHiddenStateSnapshot.count)
+        for i in 0..<cpuOut
+            .finalHiddenStateSnapshot.count
+        {
+            XCTAssertEqual(
+                gpuOut.finalHiddenStateSnapshot[i],
+                cpuOut.finalHiddenStateSnapshot[i],
+                accuracy: 1e-4,
+                "h[\(i)] GPU=\(gpuOut.finalHiddenStateSnapshot[i])" +
+                " CPU=\(cpuOut.finalHiddenStateSnapshot[i])")
+        }
+    }
+
+    /// GPU path preserves state persistence across
+    /// calls — same biomimetic property as CPU path。
+    func testGPUStatePersistsAcrossCalls() async throws {
+        let shape = BASMambaSSMShape(
+            batch: 1, hiddenDim: 1, stateDim: 1)
+        guard let actor =
+            try await makeGPUReadyActor(shape: shape)
+        else {
+            return
+        }
+        // First GPU scan:h = 0 → 3.0 (canonical setup)
+        let scan1 = BASMambaSSMScanInputs(
+            x: [2.0], delta: [0.5], a: [-1.0],
+            b: [3.0], c: [4.0], sequenceLength: 1)
+        let out1 = try await actor.selectiveScanGPU(
+            inputs: scan1)
+        XCTAssertEqual(
+            out1.finalHiddenStateSnapshot[0],
+            3.0, accuracy: 1e-4)
+        // Second GPU scan x=0 + Δ=1.0:state must decay
+        let scan2 = BASMambaSSMScanInputs(
+            x: [0.0], delta: [1.0], a: [-1.0],
+            b: [1.0], c: [1.0], sequenceLength: 1)
+        let out2 = try await actor.selectiveScanGPU(
+            inputs: scan2)
+        let expectedH2 = expf(-1.0) * 3.0
+        XCTAssertEqual(
+            out2.finalHiddenStateSnapshot[0],
+            expectedH2, accuracy: 1e-4,
+            "GPU state must persist + decay properly")
+    }
+
+    /// **MIXED GPU/CPU INTERLEAVED CALLS** — same
+    /// actor's hidden state is shared by both paths。
+    /// Run CPU scan,then GPU scan,then CPU scan and
+    /// verify state continues evolving correctly。
+    /// This proves the GPU is reading-+-writing the
+    /// SAME state as the CPU path,not a parallel
+    /// copy。
+    func testMixedGPUCPUCallsShareState() async throws {
+        let shape = BASMambaSSMShape(
+            batch: 1, hiddenDim: 1, stateDim: 1)
+        guard let actor =
+            try await makeGPUReadyActor(shape: shape)
+        else {
+            return
+        }
+        // CPU scan: h = 0 → 3.0
+        let scan = BASMambaSSMScanInputs(
+            x: [2.0], delta: [0.5], a: [-1.0],
+            b: [3.0], c: [4.0], sequenceLength: 1)
+        let cpuOut = try await actor.selectiveScan(
+            inputs: scan)
+        let stateAfterCPU =
+            cpuOut.finalHiddenStateSnapshot[0]
+        XCTAssertEqual(
+            stateAfterCPU, 3.0, accuracy: 1e-4)
+        // GPU scan: h = 3.0 → exp(-1)*3 + 1*1*0 = exp(-1)*3
+        let scan2 = BASMambaSSMScanInputs(
+            x: [0.0], delta: [1.0], a: [-1.0],
+            b: [1.0], c: [1.0], sequenceLength: 1)
+        let gpuOut = try await actor.selectiveScanGPU(
+            inputs: scan2)
+        let stateAfterGPU =
+            gpuOut.finalHiddenStateSnapshot[0]
+        XCTAssertEqual(
+            stateAfterGPU,
+            expf(-1.0) * stateAfterCPU,
+            accuracy: 1e-4,
+            "GPU scan must read state from CPU scan's" +
+            " final state (shared hidden state proof)")
+        // CPU scan again continues from GPU state
+        let cpuOut2 = try await actor.selectiveScan(
+            inputs: scan2)
+        let stateAfterCPU2 =
+            cpuOut2.finalHiddenStateSnapshot[0]
+        XCTAssertEqual(
+            stateAfterCPU2,
+            expf(-1.0) * stateAfterGPU,
+            accuracy: 1e-4,
+            "CPU scan must read state from GPU scan's" +
+            " final state (mixed calls share state)")
+    }
 }
