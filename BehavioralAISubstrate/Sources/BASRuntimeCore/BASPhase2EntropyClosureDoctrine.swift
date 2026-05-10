@@ -83,6 +83,7 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百二十六",   // M1074-M1077 (M1077 self-extension)
         "chapter 四百二十七",   // M1080-M1083 (RADICAL EVOLUTION SWEEP Phase A)
         "chapter 四百二十八",   // M1084-M1087 (RADICAL EVOLUTION SWEEP Phase B backfill)
+        "chapter 四百二十九",   // M1088-M1091 (RADICAL EVOLUTION SWEEP Phase C backfill)
         "chapter 四百三十一",   // M1096-M1099 (RADICAL EVOLUTION SWEEP Phase E)
         "chapter 四百三十二"    // M1100-M1103 (RADICAL EVOLUTION SWEEP Phase F)
     ]
@@ -93,21 +94,20 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// Last M-number of Phase 2 entropy work。 Bumped:
     /// M1057 → M1065 → M1069 → M1073 → M1077 → M1083 →
     /// M1099 → M1103 (RADICAL EVOLUTION SWEEP Phase F
-    /// entry)。 M1088-M1095 reserved for Phase C/D
-    /// backfill (chapters 四百二十九/四百三十)。
-    /// chapter 四百二十八 backfilled the M1084-M1087 gap
-    /// at chapterTagsShipped extension but did not
-    /// advance mNumberLast (1103 is still the high-water
-    /// mark from Phase F)。
+    /// entry)。 M1092-M1095 still reserved for Phase D
+    /// backfill (chapter 四百三十)。 Chapters 四百二十八
+    /// + 四百二十九 backfill the M1084-M1091 sub-range
+    /// but do not advance mNumberLast (1103 is still
+    /// the high-water mark from Phase F)。
     public static let mNumberLast: Int = 1103
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1103,with M1078-M1079 + M1088-M1095 reserved
-    /// gaps for Phase C/D backfill)。
+    /// M1103,with M1078-M1079 + M1092-M1095 reserved
+    /// gaps for Phase D backfill)。
     /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
-    /// 137 → 141 (chapter 四百二十八 backfill adds 4
-    /// commits to the cumulative count)。
-    public static let commitsShipped: Int = 141
+    /// 137 → 141 → 145 (chapter 四百二十九 backfill
+    /// adds 4 commits to the cumulative count)。
+    public static let commitsShipped: Int = 145
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
