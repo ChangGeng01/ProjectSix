@@ -54,6 +54,7 @@
 import Foundation
 import BASOrchestration
 import BASRuntimeCore
+import BASMetalSubstrate
 
 /// V2 runtime engine actor wrapping V1 `BASEBrainRuntimeCoordinator`
 /// + adding the M963 lifecycle audit channel。
@@ -66,9 +67,41 @@ public actor BASTurnRuntimeEngine {
     private let eventIDFactory: @Sendable () -> String
     private let clockMs: @Sendable () -> Int64
 
+    // MARK: - Phase F wiring (M1101)
+
+    /// Runtime mode from M1100 configuration bundle。
+    /// Dispatched on by `runWithPlan(...)` to choose the
+    /// V1-byte-equal vs native-V2 vs stress-sweep-dual
+    /// path。 At M1101 only `.v1ByteEqual` is wired into
+    /// behavior;the other modes carry forward but still
+    /// fall through to the V1 path until the M1102
+    /// scheduler + M1103 dual-mode harness ship。
+    private let runtimeMode: BASTurnRuntimeMode
+
+    /// Optional kernel dispatch table from M1100
+    /// configuration。 Captured into the dispatch probe
+    /// every `runWithPlan` call so audit consumers see
+    /// "registry of N kernels was visible at dispatch"。
+    private let metalKernelRegistry:
+        BASMetalKernelRegistry?
+
+    /// Optional ANE capability snapshot from M1100
+    /// configuration。 Captured into the dispatch probe;
+    /// future M1102 scheduler reads it to make routing
+    /// decisions。
+    private let aneCapability: BASANECapability?
+
     // MARK: - Mutable state (actor-isolated)
 
     private var sequenceCounter: Int = 0
+
+    /// Most-recent `BASTurnRuntimePlanDispatchProbe`
+    /// captured by `runWithPlan(...)`。 `unwired()` until
+    /// the first `runWithPlan` call。 Surfaced via the
+    /// `lastPlanDispatchProbe()` accessor for tests + the
+    /// M1102 scheduler + audit consumers。
+    private var lastProbe: BASTurnRuntimePlanDispatchProbe =
+        .unwired()
 
     // MARK: - Init
 
@@ -78,12 +111,19 @@ public actor BASTurnRuntimeEngine {
         eventIDFactory: @escaping @Sendable () -> String =
             { UUID().uuidString },
         clockMs: @escaping @Sendable () -> Int64 =
-            { Int64(Date().timeIntervalSince1970 * 1000) }
+            { Int64(Date().timeIntervalSince1970 * 1000) },
+        runtimeMode: BASTurnRuntimeMode = .v1ByteEqual,
+        metalKernelRegistry:
+            BASMetalKernelRegistry? = nil,
+        aneCapability: BASANECapability? = nil
     ) {
         self.coordinator = coordinator
         self.eventLog = eventLog
         self.eventIDFactory = eventIDFactory
         self.clockMs = clockMs
+        self.runtimeMode = runtimeMode
+        self.metalKernelRegistry = metalKernelRegistry
+        self.aneCapability = aneCapability
     }
 
     /// chapter 四百七 / M998 — convenience init taking the
@@ -91,6 +131,11 @@ public actor BASTurnRuntimeEngine {
     /// instead of 4 separate params。 Hosts construct one
     /// config + reuse across multiple actor instances or host
     /// runtime restarts。
+    ///
+    /// chapter 四百三十二 / M1101 extension:bundle now also
+    /// carries `runtimeMode` + `metalKernelRegistry` +
+    /// `aneCapability`,which the engine threads into its
+    /// dispatch probe + dispatch path。
     public init(
         coordinator: BASEBrainRuntimeCoordinator,
         configuration: BASTurnRuntimeEngineConfiguration
@@ -99,7 +144,50 @@ public actor BASTurnRuntimeEngine {
             coordinator: coordinator,
             eventLog: configuration.eventLog,
             eventIDFactory: configuration.eventIDFactory,
-            clockMs: configuration.clockMs)
+            clockMs: configuration.clockMs,
+            runtimeMode: configuration.runtimeMode,
+            metalKernelRegistry:
+                configuration.metalKernelRegistry,
+            aneCapability: configuration.aneCapability)
+    }
+
+    // MARK: - Phase F dispatch probe accessor (M1101)
+
+    /// Returns the most-recent probe captured by
+    /// `runWithPlan(...)`。 Returns `.unwired()` until the
+    /// first call。 Used by tests + audit consumers + the
+    /// M1102 hardware-aware scheduler to verify the M1100
+    /// configuration slots are actually consulted at
+    /// dispatch time。
+    public func lastPlanDispatchProbe()
+        -> BASTurnRuntimePlanDispatchProbe
+    {
+        return lastProbe
+    }
+
+    /// Build a probe from the current engine state without
+    /// requiring a `runWithPlan` call first。 Reads live
+    /// kernel registry count + capability accelerator
+    /// priority。 Used by the M1102 scheduler at scheduling
+    /// time。
+    public func currentDispatchProbe() async
+        -> BASTurnRuntimePlanDispatchProbe
+    {
+        let registryCount: Int
+        if let registry = metalKernelRegistry {
+            registryCount = await registry.kernelCount
+        } else {
+            registryCount = 0
+        }
+        let priority = aneCapability?
+            .acceleratorPriority ?? .gpuOnly
+        let supportedCount = aneCapability?
+            .supportedOps.count ?? 0
+        return BASTurnRuntimePlanDispatchProbe(
+            runtimeMode: runtimeMode,
+            kernelRegistryCount: registryCount,
+            aneAcceleratorPriority: priority,
+            aneSupportedOpCount: supportedCount)
     }
 
     // MARK: - runTurn
@@ -190,6 +278,13 @@ public actor BASTurnRuntimeEngine {
         delegate: BASRuntimeInternalDelegate? = nil,
         timestampMsOverride: Int64? = nil
     ) async -> BASEBrainTurnResult {
+        // chapter 四百三十二 / M1101 — capture the dispatch
+        // probe FIRST so the wiring is observable even on
+        // paths where downstream work fails partway through。
+        // The probe reads live registry count + capability
+        // priority,proving the M1100 configuration slots
+        // are CONSULTED at dispatch time (not just stored)。
+        lastProbe = await currentDispatchProbe()
         // Resolve delegate: caller-provided OR fresh
         // identity-default。 Default delegate uses the
         // canonical plan;explicit `plan:` parameter
