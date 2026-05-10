@@ -638,6 +638,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter435EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter435EntropyDoctrine
+                    .summary),
+            // M1123 POST-RADICAL Wave 7 (first ledger-driven dispatch)
+            check("四百三十六",
+                tag: BASChapter436EntropyDoctrine.chapterTag,
+                first: BASChapter436EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter436EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter436EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter436EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter436EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter436EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter436EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter436EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -750,7 +769,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter434EntropyDoctrine.mNumberLast),
             // M1119 POST-RADICAL Wave 6 (first scheduler consumption)
             ("435", BASChapter435EntropyDoctrine.mNumberFirst,
-             BASChapter435EntropyDoctrine.mNumberLast)
+             BASChapter435EntropyDoctrine.mNumberLast),
+            // M1123 POST-RADICAL Wave 7 (first ledger-driven dispatch)
+            ("436", BASChapter436EntropyDoctrine.mNumberFirst,
+             BASChapter436EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -869,6 +891,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter435EntropyDoctrine.mNumberFirst,
             last: BASChapter435EntropyDoctrine.mNumberLast,
             tag: "四百三十五")
+        // M1123 POST-RADICAL Wave 7 (first ledger-driven dispatch)
+        verifyKnivesRange(
+            BASChapter436EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter436EntropyDoctrine.mNumberFirst,
+            last: BASChapter436EntropyDoctrine.mNumberLast,
+            tag: "四百三十六")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

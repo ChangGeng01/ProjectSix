@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1119",
-            "M1119:doctrine version reflects POST-RADICAL Wave 6 first scheduler consumption (chapter 四百三十五 4 cuts M1116-M1119)")
+            "ADR-016.M1123",
+            "M1123:doctrine version reflects POST-RADICAL Wave 7 first ledger-driven dispatch (chapter 四百三十六 4 cuts M1120-M1123)")
     }
 
     // MARK: - M-number range matches chapter 四百二

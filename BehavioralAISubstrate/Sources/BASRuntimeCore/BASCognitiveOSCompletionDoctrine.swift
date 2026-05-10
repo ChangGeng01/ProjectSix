@@ -530,7 +530,23 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// (was a typed primitive without caller pre-M1116)。
     /// V1 byte-equality preserved (5,720+ BAS tests pass)。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1119"
+    /// M1123 bump:POST-RADICAL EVOLUTION SWEEP Wave 7
+    /// — chapter 四百三十六 ships FIRST LEDGER-DRIVEN
+    /// DISPATCH。 4 cuts (M1120-M1123):
+    /// (1) BASNativeStageDispatchLedger typed evidence
+    ///     (records + 4 typed aggregates),
+    /// (2) BASNativeStageExecutor.executePlanWith
+    ///     Assignments(...) + RoutedStageExecutor
+    ///     closure — scheduler decisions actually
+    ///     drive stage routing,
+    /// (3) 11 tests proving end-to-end ledger
+    ///     consumption,
+    /// (4) chapter close-out + Phase 2 + ADR-016 bumps。
+    /// First chapter where 'scheduler decided X →
+    /// executor honored X' is a verifiable end-to-end
+    /// invariant。 V1 byte-equality preserved (5,770+
+    /// BAS tests pass)。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1123"
 
     /// Query the typed status of a specific gap。
     public static func status(
