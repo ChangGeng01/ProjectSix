@@ -679,7 +679,7 @@ public enum BASCognitiveOSCompletionDoctrine {
     ///     Codable + factory + projector + 7th
     ///     BASEventPayloadKind case + EXTENDED
     ///     BASEventLogReplayBundle to 7 fields,
-    /// (3) 13 pin tests
+    /// (3) 12 pin tests
     ///     (BASNativeStagePerStepEventPayloadTests),
     /// (4) chapter close-out + bumps。
     /// First chapter where unified event log carries
@@ -689,7 +689,24 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// events (5-10x volume) — hosts opt-in directly。
     /// V1 byte-equality preserved (5,940+ BAS tests
     /// pass)。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1155"
+    /// M1159 bump:POST-RADICAL EVOLUTION SWEEP Wave 16
+    /// — chapter 四百四十五 ships FEDERATED EVENT LOG
+    /// MULTI-BACKEND。 4 cuts (M1156-M1159):
+    /// (1) recon shape + design,
+    /// (2) BASFederatedEventLogStorage actor +
+    ///     BASFederatedEventLogStorageError typed error
+    ///     conforming to BASEventLogStorage protocol,
+    /// (3) 15 integration tests
+    ///     (BASFederatedEventLogStorageTests),
+    /// (4) chapter close-out + bumps。
+    /// First chapter where typed federation over N
+    /// storage backends ships as a drop-in
+    /// BASEventLogStorage conformer — chapter 443
+    /// projectAcrossAllSessions(from:) accepts it
+    /// without parallel API。 V1 byte-equality
+    /// preserved (5,960+ BAS tests pass)。 No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M1159"
 
     /// Query the typed status of a specific gap。
     public static func status(

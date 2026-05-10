@@ -437,6 +437,26 @@ public enum BASEntropyChapterIndex {
                 " causal-graph extraction。 Engine does" +
                 " NOT auto-emit per-step events;hosts" +
                 " opt-in directly。 ADR-016 → M1155 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十五",
+            mNumberFirst: 1156,
+            mNumberLast: 1159,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 16 entry — FEDERATED" +
+                " EVENT LOG MULTI-BACKEND。 BASFederated" +
+                "EventLogStorage actor wraps N backend" +
+                " conformers + presents them as ONE" +
+                " unified event log via the existing" +
+                " BASEventLogStorage protocol。 Chapter" +
+                " 443 projectAcrossAllSessions(from:)" +
+                " accepts it as drop-in。 15 integration" +
+                " tests prove construction + routing +" +
+                " global ordering + propagation +" +
+                " determinism。 ADR-016 → M1159 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

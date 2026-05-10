@@ -98,7 +98,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百四十一",   // M1140-M1143 (POST-RADICAL Wave 12 — plan-assignment event type)
         "chapter 四百四十二",   // M1144-M1147 (POST-RADICAL Wave 13 — replay-rebuild integration)
         "chapter 四百四十三",   // M1148-M1151 (POST-RADICAL Wave 14 — cross-session replay assembly)
-        "chapter 四百四十四"    // M1152-M1155 (POST-RADICAL Wave 15 — per-stage event payload)
+        "chapter 四百四十四",   // M1152-M1155 (POST-RADICAL Wave 15 — per-stage event payload)
+        "chapter 四百四十五"    // M1156-M1159 (POST-RADICAL Wave 16 — federated event log multi-backend)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -108,22 +109,22 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1057 → M1065 → M1069 → M1073 → M1077 → M1083 →
     /// M1099 → M1103 → M1107 → M1109 → M1115 → M1119 →
     /// M1123 → M1127 → M1131 → M1135 → M1139 → M1143 →
-    /// M1147 → M1151 → M1155 (chapter 四百四十四 POST-
-    /// RADICAL Wave 15 — per-stage event payload
-    /// chapter)。 M1078-M1079 reserved for post-Phase-A
-    /// follow-up。
-    public static let mNumberLast: Int = 1155
+    /// M1147 → M1151 → M1155 → M1159 (chapter 四百四十五
+    /// POST-RADICAL Wave 16 — federated event log
+    /// multi-backend chapter)。 M1078-M1079 reserved
+    /// for post-Phase-A follow-up。
+    public static let mNumberLast: Int = 1159
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1155,with M1078-M1079 reserved for post-Phase-A
+    /// M1159,with M1078-M1079 reserved for post-Phase-A
     /// follow-up)。
     /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
     /// 137 → 141 → 145 → 149 → 153 → 155 → 161 → 165 →
     /// 169 → 173 → 177 → 181 → 185 → 189 → 193 → 197 →
-    /// 201 (chapter 四百四十四 4 cuts:M1152 recon +
-    /// M1153 typed payload + M1154 tests + M1155 close-
-    /// out)。
-    public static let commitsShipped: Int = 201
+    /// 201 → 205 (chapter 四百四十五 4 cuts:M1156 recon
+    /// + M1157 federated actor + M1158 tests + M1159
+    /// close-out)。
+    public static let commitsShipped: Int = 205
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
