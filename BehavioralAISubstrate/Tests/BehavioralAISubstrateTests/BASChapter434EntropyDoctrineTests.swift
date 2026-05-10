@@ -50,12 +50,23 @@ final class BASChapter434EntropyDoctrineTests: XCTestCase {
             "chapter 434 starts contiguous to chapter 433")
     }
 
-    func testIsLastInPhase2Doctrine() {
-        XCTAssertEqual(
-            BASChapter434EntropyDoctrine.chapterTag,
+    // M1119 POST-RADICAL Wave 6 extension: chapter 435
+    // is now terminal。 Chapter 434 remains a Phase 2
+    // member but no longer last。
+    func testIsMemberOfPhase2Doctrine() {
+        XCTAssertTrue(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.last)
-        XCTAssertEqual(
+                .chapterTagsShipped
+                .contains(
+                    BASChapter434EntropyDoctrine.chapterTag),
+            "chapter 四百三十四 must remain in Phase 2")
+    }
+
+    func testMNumberRangeFitsWithinPhase2() {
+        XCTAssertGreaterThanOrEqual(
+            BASChapter434EntropyDoctrine.mNumberFirst,
+            BASPhase2EntropyClosureDoctrine.mNumberFirst)
+        XCTAssertLessThanOrEqual(
             BASChapter434EntropyDoctrine.mNumberLast,
             BASPhase2EntropyClosureDoctrine.mNumberLast)
     }

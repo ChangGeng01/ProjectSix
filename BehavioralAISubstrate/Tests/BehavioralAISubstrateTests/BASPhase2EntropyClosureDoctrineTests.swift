@@ -20,10 +20,10 @@ final class BASPhase2EntropyClosureDoctrineTests:
     func testNineteenChapterTagsShipped() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 32,
-            "M1115 POST-RADICAL safety substrate:" +
-            " bumped from 31 to 32 (added chapter" +
-            " 四百三十四)")
+                .chapterTagsShipped.count, 33,
+            "M1119 POST-RADICAL Wave 6 (first scheduler" +
+            " consumption):bumped from 32 to 33 (added" +
+            " chapter 四百三十五)")
     }
 
     func testFirstChapterIs403() {
@@ -33,13 +33,13 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs434() {
+    func testLastChapterIs435() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百三十四",
-            "M1115 POST-RADICAL safety substrate:" +
-            " bumped from 四百三十三 to 四百三十四")
+            "chapter 四百三十五",
+            "M1119 POST-RADICAL Wave 6:bumped from" +
+            " 四百三十四 to 四百三十五")
     }
 
     // MARK: - M-number range
@@ -50,24 +50,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
                 .mNumberFirst, 953)
     }
 
-    func testMNumberLastIs1115() {
+    func testMNumberLastIs1119() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .mNumberLast, 1115,
-            "M1115 POST-RADICAL safety substrate:" +
-            " bumped from 1109 to 1115 (chapter 434" +
-            " covers M1110-M1115)")
+                .mNumberLast, 1119,
+            "M1119 POST-RADICAL Wave 6:bumped from" +
+            " 1115 to 1119 (chapter 435 covers" +
+            " M1116-M1119)")
     }
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped161() {
+    func testCommitsShipped165() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 161,
-            "M1115 POST-RADICAL safety substrate:" +
-            " bumped from 155 to 161 (chapter 434 ships" +
-            " 6 cuts M1110-M1115)")
+                .commitsShipped, 165,
+            "M1119 POST-RADICAL Wave 6:bumped from" +
+            " 161 to 165 (chapter 435 ships 4 cuts" +
+            " M1116-M1119)")
     }
 
     func testV2FoundationsCount12() {

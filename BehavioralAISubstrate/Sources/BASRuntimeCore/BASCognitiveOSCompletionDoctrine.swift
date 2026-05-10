@@ -514,7 +514,23 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// (4-6) chapter close-out + Phase 2 + ADR-016 bumps。
     /// No destructive ops。 V1 byte-equality preserved
     /// (5,710+ BAS tests pass)。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1115"
+    /// M1119 bump:POST-RADICAL EVOLUTION SWEEP Wave 6
+    /// — chapter 四百三十五 ships FIRST PRODUCTION
+    /// SCHEDULER CONSUMPTION。 4 cuts (M1116-M1119):
+    /// (1) BASTurnRuntimeEngineConfiguration.stagePlanHints
+    ///     optional slot,
+    /// (2) BASTurnRuntimeEngine wires hints + lazy
+    ///     scheduler + lastAssignmentLedger;runWithPlan
+    ///     calls scheduler.assign(...) per stage step,
+    /// (3) BASTurnRuntimePlanAssignmentLedger typed
+    ///     evidence surface,
+    /// (4) chapter close-out + Phase 2 + ADR-016 bumps。
+    /// First chapter where the substrate genuinely
+    /// CONSULTS the scheduler in production runtime path
+    /// (was a typed primitive without caller pre-M1116)。
+    /// V1 byte-equality preserved (5,720+ BAS tests pass)。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1119"
 
     /// Query the typed status of a specific gap。
     public static func status(

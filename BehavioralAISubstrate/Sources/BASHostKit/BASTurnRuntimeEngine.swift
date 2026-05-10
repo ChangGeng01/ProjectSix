@@ -91,6 +91,23 @@ public actor BASTurnRuntimeEngine {
     /// decisions。
     private let aneCapability: BASANECapability?
 
+    // MARK: - chapter 四百三十五 / M1117 — scheduler integration
+
+    /// Optional per-stage hint sidecar (M1104)。 When
+    /// non-nil AND `metalKernelRegistry` + `aneCapability`
+    /// are also non-nil,`runWithPlan(...)` consults
+    /// `BASHardwareAwareScheduler` for each plan stage
+    /// step that has a hint registered。
+    private let stagePlanHints:
+        BASStagePlanAcceleratorHints?
+
+    /// Lazily-instantiated scheduler。 Created on first
+    /// scheduler-consuming `runWithPlan(...)` call when
+    /// all 3 prerequisites (hints + registry + capability)
+    /// are present。 Reused across calls。
+    private var scheduler:
+        BASHardwareAwareScheduler?
+
     // MARK: - Mutable state (actor-isolated)
 
     private var sequenceCounter: Int = 0
@@ -102,6 +119,13 @@ public actor BASTurnRuntimeEngine {
     /// M1102 scheduler + audit consumers。
     private var lastProbe: BASTurnRuntimePlanDispatchProbe =
         .unwired()
+
+    /// Most-recent `BASTurnRuntimePlanAssignmentLedger`
+    /// captured by `runWithPlan(...)`。 `.unwired` until
+    /// the first scheduler-consuming call。 Surfaced via
+    /// `lastPlanAssignmentLedger()` for audit + tests。
+    private var lastAssignmentLedger:
+        BASTurnRuntimePlanAssignmentLedger = .unwired
 
     // MARK: - Init
 
@@ -115,7 +139,9 @@ public actor BASTurnRuntimeEngine {
         runtimeMode: BASTurnRuntimeMode = .v1ByteEqual,
         metalKernelRegistry:
             BASMetalKernelRegistry? = nil,
-        aneCapability: BASANECapability? = nil
+        aneCapability: BASANECapability? = nil,
+        stagePlanHints:
+            BASStagePlanAcceleratorHints? = nil
     ) {
         self.coordinator = coordinator
         self.eventLog = eventLog
@@ -124,6 +150,7 @@ public actor BASTurnRuntimeEngine {
         self.runtimeMode = runtimeMode
         self.metalKernelRegistry = metalKernelRegistry
         self.aneCapability = aneCapability
+        self.stagePlanHints = stagePlanHints
     }
 
     /// chapter 四百七 / M998 — convenience init taking the
@@ -148,7 +175,23 @@ public actor BASTurnRuntimeEngine {
             runtimeMode: configuration.runtimeMode,
             metalKernelRegistry:
                 configuration.metalKernelRegistry,
-            aneCapability: configuration.aneCapability)
+            aneCapability: configuration.aneCapability,
+            stagePlanHints:
+                configuration.stagePlanHints)
+    }
+
+    // MARK: - chapter 四百三十五 / M1117 — assignment ledger accessor
+
+    /// Returns the most-recent assignment ledger captured
+    /// by `runWithPlan(...)`。 Returns `.unwired` until
+    /// the first scheduler-consuming call。 Used by tests
+    /// + audit consumers to verify the M1102 BASHardware
+    /// AwareScheduler is genuinely being consulted at
+    /// dispatch time。
+    public func lastPlanAssignmentLedger()
+        -> BASTurnRuntimePlanAssignmentLedger
+    {
+        return lastAssignmentLedger
     }
 
     // MARK: - Phase F dispatch probe accessor (M1101)
@@ -285,6 +328,22 @@ public actor BASTurnRuntimeEngine {
         // priority,proving the M1100 configuration slots
         // are CONSULTED at dispatch time (not just stored)。
         lastProbe = await currentDispatchProbe()
+        // chapter 四百三十五 / M1117 — consult scheduler if
+        // all 3 prerequisites (hints + registry + capability)
+        // are present。 Captures per-stage assignments into
+        // `lastAssignmentLedger` so audit consumers see the
+        // M1102 BASHardwareAwareScheduler decisions made
+        // for this turn。 Pure observation — V1 dispatch
+        // path is untouched (ADR-014 OPT-IN preserved)。
+        let turnIDForLedger =
+            request.hostID + ":" +
+            String(Int(
+                request.recordedAt
+                    .timeIntervalSince1970))
+        lastAssignmentLedger = await
+            captureSchedulerAssignmentsIfWired(
+                plan: plan,
+                turnID: turnIDForLedger)
         // Resolve delegate: caller-provided OR fresh
         // identity-default。 Default delegate uses the
         // canonical plan;explicit `plan:` parameter
@@ -381,5 +440,68 @@ public actor BASTurnRuntimeEngine {
         await log.appendTurnEnvelope(
             envelope,
             eventID: eventIDFactory())
+    }
+
+    // MARK: - chapter 四百三十五 / M1117 — scheduler consultation
+
+    /// Consult `BASHardwareAwareScheduler` for each plan
+    /// stage step that has a hint registered in the
+    /// configuration's sidecar。 Returns `.empty(turnID:)`
+    /// when any of the 3 prerequisites (hints + registry
+    /// + capability) is absent — V1 byte-equal path is
+    /// fully preserved。
+    ///
+    /// Lazily constructs the scheduler on first
+    /// scheduler-consuming call;reuses the same
+    /// scheduler instance for subsequent calls。 Pure
+    /// observation — no V1 dispatch path mutation。
+    private func captureSchedulerAssignmentsIfWired(
+        plan: BASTurnRuntimeStagePlan,
+        turnID: String
+    ) async -> BASTurnRuntimePlanAssignmentLedger {
+        // Prerequisite check — all 3 must be wired
+        guard let hints = stagePlanHints,
+              let registry = metalKernelRegistry,
+              let capability = aneCapability
+        else {
+            return .empty(turnID: turnID)
+        }
+        // Resolve / create scheduler (lazy)
+        if scheduler == nil {
+            scheduler = BASHardwareAwareScheduler(
+                registry: registry)
+        }
+        guard let activeScheduler = scheduler else {
+            return .empty(turnID: turnID)
+        }
+        // Walk each plan step's stages,consulting the
+        // scheduler for each stage that has a hint
+        var ledger = BASTurnRuntimePlanAssignmentLedger
+            .empty(turnID: turnID)
+        var sequenceIndex = 0
+        for step in plan.steps {
+            for stage in step.stages {
+                guard let hint = hints.hint(
+                    for: stage)
+                else {
+                    continue
+                }
+                let assignment =
+                    await activeScheduler.assign(
+                        hint: hint,
+                        capability: capability,
+                        thermal: capability
+                            .thermalSnapshot)
+                let record =
+                    BASTurnRuntimeStageAssignmentRecord(
+                        stageRawValue: stage.rawValue,
+                        hint: hint,
+                        assignment: assignment,
+                        sequenceIndex: sequenceIndex)
+                ledger = ledger.appending(record)
+                sequenceIndex += 1
+            }
+        }
+        return ledger
     }
 }

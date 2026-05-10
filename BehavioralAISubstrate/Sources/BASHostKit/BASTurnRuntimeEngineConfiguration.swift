@@ -112,6 +112,18 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
     /// current thermal state。
     public let aneCapability: BASANECapability?
 
+    // MARK: - Slots (M1116 chapter 四百三十五 — scheduler integration)
+
+    /// Optional per-stage accelerator-hint sidecar
+    /// (M1104)。 When non-nil AND `metalKernelRegistry`
+    /// + `aneCapability` are also non-nil,`runWithPlan(...)`
+    /// consults `BASHardwareAwareScheduler` for each plan
+    /// stage step that has a hint registered。 When nil,
+    /// scheduler is not consulted (V1 byte-equal default
+    /// behavior preserved)。
+    public let stagePlanHints:
+        BASStagePlanAcceleratorHints?
+
     // MARK: - Init
 
     public init(
@@ -123,7 +135,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
         runtimeMode: BASTurnRuntimeMode = .v1ByteEqual,
         metalKernelRegistry:
             BASMetalKernelRegistry? = nil,
-        aneCapability: BASANECapability? = nil
+        aneCapability: BASANECapability? = nil,
+        stagePlanHints:
+            BASStagePlanAcceleratorHints? = nil
     ) {
         self.eventLog = eventLog
         self.eventIDFactory = eventIDFactory
@@ -131,6 +145,7 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
         self.runtimeMode = runtimeMode
         self.metalKernelRegistry = metalKernelRegistry
         self.aneCapability = aneCapability
+        self.stagePlanHints = stagePlanHints
     }
 
     /// Default config: no event log,UUID factory,system clock,
@@ -155,7 +170,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             clockMs: clockMs,
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
-            aneCapability: aneCapability)
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints)
     }
 
     public func with(
@@ -168,7 +184,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             clockMs: clockMs,
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
-            aneCapability: aneCapability)
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints)
     }
 
     public func with(
@@ -180,7 +197,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             clockMs: clockMs,
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
-            aneCapability: aneCapability)
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints)
     }
 
     // MARK: - Immutable updates (M1100 Phase F)
@@ -194,7 +212,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             clockMs: clockMs,
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
-            aneCapability: aneCapability)
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints)
     }
 
     public func with(
@@ -206,7 +225,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             clockMs: clockMs,
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
-            aneCapability: aneCapability)
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints)
     }
 
     public func with(
@@ -218,6 +238,23 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             clockMs: clockMs,
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
-            aneCapability: aneCapability)
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints)
+    }
+
+    /// chapter 四百三十五 / M1116 — immutable updater for
+    /// the optional per-stage accelerator-hint sidecar。
+    public func with(
+        stagePlanHints:
+            BASStagePlanAcceleratorHints?
+    ) -> BASTurnRuntimeEngineConfiguration {
+        BASTurnRuntimeEngineConfiguration(
+            eventLog: eventLog,
+            eventIDFactory: eventIDFactory,
+            clockMs: clockMs,
+            runtimeMode: runtimeMode,
+            metalKernelRegistry: metalKernelRegistry,
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints)
     }
 }

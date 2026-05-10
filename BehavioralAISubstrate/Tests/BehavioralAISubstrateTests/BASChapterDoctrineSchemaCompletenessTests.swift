@@ -619,6 +619,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter434EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter434EntropyDoctrine
+                    .summary),
+            // M1119 POST-RADICAL Wave 6 (first scheduler consumption)
+            check("四百三十五",
+                tag: BASChapter435EntropyDoctrine.chapterTag,
+                first: BASChapter435EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter435EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter435EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter435EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter435EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter435EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter435EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter435EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -728,7 +747,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter433EntropyDoctrine.mNumberLast),
             // M1115 POST-RADICAL safety substrate
             ("434", BASChapter434EntropyDoctrine.mNumberFirst,
-             BASChapter434EntropyDoctrine.mNumberLast)
+             BASChapter434EntropyDoctrine.mNumberLast),
+            // M1119 POST-RADICAL Wave 6 (first scheduler consumption)
+            ("435", BASChapter435EntropyDoctrine.mNumberFirst,
+             BASChapter435EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -840,6 +862,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter434EntropyDoctrine.mNumberFirst,
             last: BASChapter434EntropyDoctrine.mNumberLast,
             tag: "四百三十四")
+        // M1119 POST-RADICAL Wave 6 (first scheduler consumption)
+        verifyKnivesRange(
+            BASChapter435EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter435EntropyDoctrine.mNumberFirst,
+            last: BASChapter435EntropyDoctrine.mNumberLast,
+            tag: "四百三十五")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

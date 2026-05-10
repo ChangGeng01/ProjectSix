@@ -256,7 +256,23 @@ public enum BASEntropyChapterIndex {
                 " BASStressSweepCanonical60Driver" +
                 " (typed 60-fixture set + identity/" +
                 "divergence stub runners) + ADR-016 →" +
-                " M1115 advance")
+                " M1115 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十五",
+            mNumberFirst: 1116,
+            mNumberLast: 1119,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 6 entry — FIRST" +
+                " production scheduler consumption。" +
+                " BASTurnRuntimeEngine.runWithPlan(...)" +
+                " now calls scheduler.assign(...) per" +
+                " stage step + captures decisions into" +
+                " typed BASTurnRuntimePlanAssignmentLedger。" +
+                " ADR-016 → M1119 advance")
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed
