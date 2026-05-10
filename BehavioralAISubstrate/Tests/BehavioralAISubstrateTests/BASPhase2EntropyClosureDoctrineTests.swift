@@ -20,10 +20,10 @@ final class BASPhase2EntropyClosureDoctrineTests:
     func testNineteenChapterTagsShipped() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 29,
-            "M1091 RADICAL EVOLUTION SWEEP Phase C" +
-            " backfill:bumped from 28 to 29 (added" +
-            " chapter 四百二十九)")
+                .chapterTagsShipped.count, 30,
+            "M1095 RADICAL EVOLUTION SWEEP Phase D" +
+            " backfill:bumped from 29 to 30 (added" +
+            " chapter 四百三十)")
     }
 
     func testFirstChapterIs403() {
@@ -61,13 +61,14 @@ final class BASPhase2EntropyClosureDoctrineTests:
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped145() {
+    func testCommitsShipped149() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 145,
-            "M1091 RADICAL EVOLUTION SWEEP Phase C" +
-            " backfill:bumped from 141 to 145" +
-            " (M1078-M1079 + M1092-M1095 reserved gaps)")
+                .commitsShipped, 149,
+            "M1095 RADICAL EVOLUTION SWEEP Phase D" +
+            " backfill:bumped from 145 to 149" +
+            " (M1078-M1079 reserved for post-Phase-A" +
+            " follow-up)")
     }
 
     func testV2FoundationsCount12() {
