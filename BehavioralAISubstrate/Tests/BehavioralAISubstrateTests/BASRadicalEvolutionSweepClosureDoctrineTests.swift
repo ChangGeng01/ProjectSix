@@ -42,10 +42,13 @@ final class BASRadicalEvolutionSweepClosureDoctrineTests:
                 .sweepEntryMNumber, 1080)
     }
 
-    func testSweepCloseOutMNumberIs1107() {
+    func testSweepCloseOutMNumberIs1109() {
         XCTAssertEqual(
             BASRadicalEvolutionSweepClosureDoctrine
-                .sweepCloseOutMNumber, 1107)
+                .sweepCloseOutMNumber, 1109,
+            "M1109 deep-review remediation round 2:" +
+            " bumped from 1107 to 1109 (chapter 433" +
+            " self-extension covers M1108 + M1109)")
     }
 
     // MARK: - Sweep directive pin
@@ -103,11 +106,14 @@ final class BASRadicalEvolutionSweepClosureDoctrineTests:
 
     // MARK: - Cumulative metrics
 
-    func testCumulativeCommitsCountIs28() {
+    func testCumulativeCommitsCountIs30() {
         XCTAssertEqual(
             BASRadicalEvolutionSweepClosureDoctrine
-                .cumulativeCommitsCount, 28,
-            "6 phase chapters × 4 + 1 close-out × 4 = 28")
+                .cumulativeCommitsCount, 30,
+            "6 phase chapters × 4 + chapter 433's 6 cuts" +
+            " (4 original + 2 deep-review remediations" +
+            " M1108 + M1109) = 30。 M1109 self-extension" +
+            " bumped from 28 to 30")
     }
 
     func testCumulativeTestCountApprox() {
@@ -192,9 +198,11 @@ final class BASRadicalEvolutionSweepClosureDoctrineTests:
                 .cumulativeSummary
         XCTAssertFalse(summary.isEmpty)
         XCTAssertTrue(
-            summary.contains("M1107"),
+            summary.contains("M1109"),
             "summary must reference the sweep's" +
-            " final close-out M-number")
+            " final close-out M-number (bumped from" +
+            " M1107 to M1109 by deep-review remediation" +
+            " round 2)")
         XCTAssertTrue(
             summary.contains(
                 "NATIVE APPLE SILICON FOUNDATION"),

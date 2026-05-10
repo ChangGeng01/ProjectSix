@@ -15,9 +15,14 @@
 //      moved)
 //   4. Merge BASWorldPrior → BASRuntimeCore (2,447 LOC
 //      moved)
-//   5. Collapse 22 BASChapter*EntropyDoctrine.swift +
-//      22 test files into one BASEntropyChapterIndex
-//      data table (~1,280 LOC delete)
+//   5. Collapse the 24 non-RADICAL BASChapter*Entropy
+//      Doctrine.swift files (chapters 403-426) + 24
+//      test files into one BASEntropyChapterIndex data
+//      table (~1,280 LOC delete)。 (Original plan said
+//      "22" but the count drifted as Phase 2 grew;the
+//      RADICAL chapters 427-433 survive as index
+//      entries instead of being deleted。 M1109 deep-
+//      review correction。)
 //
 // In autonomous mode the actual deletion + merge
 // operations are too destructive — they would touch
@@ -56,8 +61,11 @@
 //     Sources/BASAppleAdapters/LeaseLife/
 //   - git mv Sources/BASWorldPrior/*.swift
 //     Sources/BASRuntimeCore/WorldPrior/
-//   - Delete 22 BASChapter*EntropyDoctrine.swift +
-//     22 test files
+//   - Delete the 24 non-RADICAL BASChapter*Entropy
+//     Doctrine.swift files (chapters 403-426) + 24
+//     test files (M1109 deep-review correction:
+//     original "22" was stale before the RADICAL sweep
+//     extended Phase 2)
 //   - Update all `import BASChatCompletionsAdapter` /
 //     `import BASMLXAdapter` / `import BASLeaseLife` /
 //     `import BASWorldPrior` consumers
@@ -173,9 +181,13 @@ public enum BASChapter430EntropyDoctrine {
         "git mv Sources/BASWorldPrior/*.swift " +
         "Sources/BASRuntimeCore/WorldPrior/ — needs" +
         " explicit user confirmation",
-        "Delete 22 BASChapter*EntropyDoctrine.swift +" +
-        " 22 test files once consumers migrate to" +
-        " BASEntropyChapterIndex"
+        "Delete 24 non-RADICAL BASChapter*EntropyDoctrine" +
+        ".swift files (chapters 403-426) + 24 test" +
+        " files once BASEntropyChapterIndex extends to" +
+        " cover them (today the index covers only the 7" +
+        " RADICAL chapters 427-433);M1109 deep-review" +
+        " correction:original '22' was stale before" +
+        " the RADICAL sweep extended Phase 2"
     ]
 
     public static let summary: String =
@@ -199,5 +211,5 @@ public enum BASChapter430EntropyDoctrine {
         " LOC consolidation) but those require explicit" +
         " user confirmation per autonomous-mode" +
         " constraints。 V1 byte-equality preserved" +
-        " (5,500+ BAS tests pass)。"
+        " (5,700+ BAS tests pass)。"
 }

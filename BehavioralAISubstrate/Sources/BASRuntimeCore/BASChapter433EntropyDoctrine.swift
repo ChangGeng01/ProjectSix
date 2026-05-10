@@ -76,14 +76,21 @@ public enum BASChapter433EntropyDoctrine {
     public static let chapterTag: String =
         "chapter 四百三十三"
     public static let mNumberFirst: Int = 1104
-    public static let mNumberLast: Int = 1107
+    /// Bumped from M1107 → M1109 by the M1109 deep-
+    /// review remediation round 2:M1108 + M1109
+    /// shipped as the 5th + 6th cuts (additional
+    /// remediations after the M1107 close-out exposed
+    /// stale doctrine claims)。 Self-extension pattern
+    /// matches chapter 四百二十一's M1057 close-out。
+    public static let mNumberLast: Int = 1109
 
     /// `v1` milestone:RADICAL EVOLUTION SWEEP FINAL
-    /// CLOSE-OUT at M1107。 Ships the sidecar that
-    /// makes the M1102 scheduler primitive consumable
-    /// at the plan level + the cumulative typed
-    /// closure doctrine for the entire sweep arc。
-    public static let v1MilestoneMNumber: Int = 1107
+    /// CLOSE-OUT at M1109 (bumped from M1107 by M1109
+    /// self-extension)。 Ships the sidecar + cumulative
+    /// closure doctrine + 2 deep-review remediation
+    /// rounds that fixed doctrine self-contradictions
+    /// the close-out exposed。
+    public static let v1MilestoneMNumber: Int = 1109
     public static let v1MilestoneStatus: String =
         "chapter-433-v1-radical-evolution-sweep-final-closeout"
 
@@ -111,15 +118,37 @@ public enum BASChapter433EntropyDoctrine {
             "chapter 四百三十三 close-out + Phase 2 bump" +
             " (commits 149 → 153, chapter count 30 → 31)" +
             " + ADR-016.M1103 → ADR-016.M1107 advance" +
-            " (chapter 四百三十三 is NOT a backfill —" +
-            " advances the high-water mark)")
+            " (chapter 四百三十三 advances the high-water" +
+            " mark — first non-backfill chapter since" +
+            " Phase F)"),
+        (1108, "第五刀",
+            "Deep-review remediation round 1 — fixed" +
+            " chapter 428's M1087 knife text claim (was" +
+            " 'M1099 → M1107 bump',corrected to 'held" +
+            " at M1103') + extended BASEntropyChapterIndex" +
+            " from 5 → 7 RADICAL chapters (chapters 430" +
+            " + 433 added once both doctrines existed)。" +
+            " ADR-016 held at M1107。"),
+        (1109, "第六刀",
+            "Deep-review remediation round 2 — chapter" +
+            " 433 self-extension to cover M1108 + M1109" +
+            " inside the chapter doctrine system" +
+            " (mNumberLast 1107 → 1109,knives 4 → 6)" +
+            " + Phase 2 bump (commits 153 → 155)" +
+            " + ADR-016.M1107 → ADR-016.M1109 advance" +
+            " + fixed 7 stale '5,4XX+/5,5XX+ BAS tests'" +
+            " claims to '5,700+'  + fixed '22 chapter" +
+            " doctrines' deletion claim to '31'" +
+            " (reality after sweep)。 Closes the loop")
     ]
 
     public static let entropyClassesAttacked: [String] = [
-        "stage-plan-hint-injection-entropy", // M1104
-        "compatibility-pin-entropy",          // M1105
-        "missing-cumulative-sweep-doctrine-entropy", // M1106
-        "doctrine-pin-entropy"                // M1107
+        "stage-plan-hint-injection-entropy",        // M1104
+        "compatibility-pin-entropy",                // M1105
+        "missing-cumulative-sweep-doctrine-entropy",// M1106
+        "doctrine-pin-entropy",                     // M1107
+        "doctrine-self-contradiction-entropy",      // M1108
+        "doctrine-stale-claim-entropy"              // M1109
     ]
 
     public static let pinHeld: [String] = [
@@ -132,8 +161,10 @@ public enum BASChapter433EntropyDoctrine {
         "chapter 三百九二",
         "ADR-014 OPT-IN preserved (sidecar additive;" +
         " no BASTurnRuntimeStagePlan modification)",
-        "ADR-016 (advanced M1103 → M1107 — final" +
-        " RADICAL EVOLUTION SWEEP close-out)",
+        "ADR-016 (advanced M1103 → M1107 → M1109 —" +
+        " M1107 was the original close-out advance;" +
+        " M1109 is the deep-review remediation advance" +
+        " covering the M1108-M1109 self-extension)",
         "系统熵 reduction",
         "RADICAL EVOLUTION SWEEP final close-out"
     ]
@@ -158,25 +189,28 @@ public enum BASChapter433EntropyDoctrine {
 
     public static let summary: String =
         "RADICAL EVOLUTION SWEEP final close-out at" +
-        " chapter 四百三十三 / M1107。 4 cuts ship" +
-        " (M1104-M1107):" +
-        "(1) BASStagePlanAcceleratorHints sidecar" +
-        " (stage-keyed dictionary + immutable updaters" +
-        " + plan-coverage helpers)," +
-        "(2) Sidecar tests proving empty / lookup /" +
-        " update / coverage / Codable round-trip," +
-        "(3) BASRadicalEvolutionSweepClosureDoctrine —" +
-        " single typed cumulative surface for the" +
-        " entire sweep arc (6 phases + 11 deferred" +
-        " operations)," +
-        "(4) chapter 四百三十三 close-out + Phase 2" +
-        " final bump + ADR-016.M1103 → ADR-016.M1107" +
-        " advance。 Sweep total:28 commits across 7" +
-        " chapters (6 phase chapters + this close-out)。" +
+        " chapter 四百三十三 / M1109 (bumped from M1107" +
+        " by M1109 self-extension)。 6 cuts ship" +
+        " (M1104-M1109):" +
+        "(1) BASStagePlanAcceleratorHints sidecar," +
+        "(2) Sidecar tests," +
+        "(3) BASRadicalEvolutionSweepClosureDoctrine," +
+        "(4) chapter 四百三十三 close-out + ADR-016" +
+        " advance to M1107," +
+        "(5) Deep-review remediation round 1 (chapter" +
+        " 428 ADR-016 knife text fix + index" +
+        " extension to 7 chapters)," +
+        "(6) Deep-review remediation round 2 (chapter" +
+        " 433 self-extension to cover M1108+M1109" +
+        " inside the chapter doctrine system + 7 stale" +
+        " test-count claims fixed + '22 chapter" +
+        " doctrines' deletion claim corrected to '31'" +
+        " + ADR-016.M1107 → ADR-016.M1109 advance)。" +
+        " Sweep total:30 commits across 7 chapters。" +
         " ADR-014 OPT-IN preserved at every commit" +
         " boundary。 V1 byte-equality preserved (5,700+" +
         " BAS tests pass)。 11 destructive operations" +
         " enumerated in deferredOperations require" +
         " explicit user confirmation per autonomous-" +
-        " mode constraints。"
+        " mode constraints。 Loop closed (完全 闭环)。"
 }

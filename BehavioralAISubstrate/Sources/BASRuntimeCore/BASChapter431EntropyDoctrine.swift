@@ -161,5 +161,5 @@ public enum BASChapter431EntropyDoctrine {
         " OPT-IN held — no V1 hot path consumes" +
         " BASMetalSubstrate yet;Phase F scheduler will" +
         " be the first consumer。 V1 byte-equality" +
-        " preserved (5,400+ BAS tests pass)。"
+        " preserved (5,700+ BAS tests pass)。"
 }

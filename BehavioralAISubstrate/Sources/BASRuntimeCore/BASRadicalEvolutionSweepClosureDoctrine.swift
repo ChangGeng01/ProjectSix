@@ -3,9 +3,10 @@
 //
 // Cumulative typed close-out doctrine for the entire
 // RADICAL EVOLUTION SWEEP arc。 Pins what shipped across
-// the 6 chapters spanning M1080-M1107 and sets the
-// boundary for what's been deferred under explicit
-// user control。
+// the 7 chapters spanning M1080-M1109 (M1109 extended
+// the original M1107 close-out via deep-review
+// remediation rounds) and sets the boundary for
+// what's been deferred under explicit user control。
 //
 // ## Why this exists (system entropy framing)
 //
@@ -47,10 +48,12 @@
 //       * `sweepDirective: String` (user's original
 //         directive)
 //       * `sweepEntryMNumber: Int` (M1080)
-//       * `sweepCloseOutMNumber: Int` (M1107)
+//       * `sweepCloseOutMNumber: Int` (M1109 after
+//         M1109 self-extension;was M1107 originally)
 //       * `phaseEntries: [BASRadicalEvolutionSweepEntry]`
-//       * `cumulativeCommitsCount: Int` (28 = 6
-//         chapters × 4 commits + chapter 433 4 commits)
+//       * `cumulativeCommitsCount: Int` (30 after
+//         M1109 self-extension = 6 phase chapters × 4
+//         + chapter 433's 6 cuts;was 28 originally)
 //       * `cumulativeTestCount: Int` (~5,700)
 //       * `deferredOperations: [String]` (10 items)
 //       * `cumulativeSummary: String`
@@ -69,9 +72,11 @@
 //     not commitment authority)
 //   - ADR-014 OPT-IN — every shipped phase preserves
 //     OPT-IN compliance
-//   - ADR-016 — bumped M1099 → M1103 → M1107 across
-//     the sweep
-//   - RADICAL EVOLUTION SWEEP — closes at M1107
+//   - ADR-016 — bumped M1099 → M1103 → M1107 → M1109
+//     across the sweep (M1109 = deep-review remediation
+//     advance covering M1108-M1109 self-extension)
+//   - RADICAL EVOLUTION SWEEP — closes at M1109 (was
+//     M1107;extended via M1109 self-extension)
 
 import Foundation
 
@@ -138,8 +143,10 @@ public enum BASRadicalEvolutionSweepClosureDoctrine {
     public static let sweepEntryMNumber: Int = 1080
 
     /// Last M-number of the sweep (chapter 四百三十三
-    /// close-out)。
-    public static let sweepCloseOutMNumber: Int = 1107
+    /// close-out)。 Bumped from M1107 → M1109 by the
+    /// M1109 deep-review remediation round 2 (chapter
+    /// 433 self-extension covered M1108 + M1109)。
+    public static let sweepCloseOutMNumber: Int = 1109
 
     /// Per-phase entries in chronological order (chapter
     /// 三百九二 deterministic ordering)。
@@ -220,9 +227,12 @@ public enum BASRadicalEvolutionSweepClosureDoctrine {
     ]
 
     /// Total commits shipped across the 6 sweep
-    /// chapters + the chapter 四百三十三 close-out (4
-    /// commits per chapter × 7 chapters = 28)。
-    public static let cumulativeCommitsCount: Int = 28
+    /// chapters + the chapter 四百三十三 close-out。
+    /// 6 phase chapters × 4 commits + chapter 433's
+    /// 6 cuts (4 original + 2 deep-review remediations
+    /// at M1108 + M1109) = 30。 Bumped from 28 → 30 by
+    /// the M1109 deep-review remediation round 2。
+    public static let cumulativeCommitsCount: Int = 30
 
     /// Approximate total test count after the sweep
     /// (~5,700 BAS tests pass)。 Pinned for
@@ -238,8 +248,14 @@ public enum BASRadicalEvolutionSweepClosureDoctrine {
         "Drop BASMLXAdapter library + target",
         "Merge BASLeaseLife → BASAppleAdapters",
         "Merge BASWorldPrior → BASRuntimeCore",
-        "Delete 22 BASChapter*EntropyDoctrine.swift +" +
-        " 22 test files",
+        "Delete 24 non-RADICAL BASChapter*EntropyDoctrine" +
+        ".swift files + 24 test files (chapters 403-426" +
+        " — the RADICAL chapters 427-433 survive as" +
+        " BASEntropyChapterIndex entries)。 Reality after" +
+        " M1109:31 chapter doctrine .swift files exist;" +
+        " 7 are RADICAL (covered by index);24 are" +
+        " pre-sweep (would need index extension before" +
+        " safe deletion)",
         "Delete BASRuntimeAuditEmissionSummary +" +
         " BASTurnRuntimeStageLedger +" +
         " BASPermitEscalationLedger (post-Phase-B" +
@@ -267,19 +283,24 @@ public enum BASRadicalEvolutionSweepClosureDoctrine {
     /// Cumulative summary suitable for top-level docs +
     /// release notes。
     public static let cumulativeSummary: String =
-        "RADICAL EVOLUTION SWEEP closes at M1107 across" +
+        "RADICAL EVOLUTION SWEEP closes at M1109 across" +
         " 6 phase chapters (四百二十七 / 四百二十八 /" +
         " 四百二十九 / 四百三十 / 四百三十一 / 四百三十二)" +
-        " plus chapter 四百三十三 close-out。 28 commits" +
-        " shipped。 Substrate now has:" +
+        " plus chapter 四百三十三 close-out (extended" +
+        " through M1109 by the 2 deep-review remediation" +
+        " rounds)。 30 commits shipped。 Substrate now" +
+        " has:" +
         " (A) typed V2 runtime composition wiring all 4" +
         " ADR-018 executors;" +
         " (B) unified event log payload-kinds backbone;" +
         " (C) 4 low-entropy generic primitives + 2" +
         " observation protocols;" +
         " (D) consolidation scaffolding for the deferred" +
-        " 4 module deletions + 22 chapter doctrine" +
-        " collapse;" +
+        " 4 module deletions + 31-chapter doctrine" +
+        " collapse target (BASEntropyChapterIndex covers" +
+        " 7 RADICAL chapters;the 24 non-RADICAL pre-" +
+        "sweep chapters need index extension before" +
+        " their .swift files can be safely dropped);" +
         " (E) NATIVE APPLE SILICON FOUNDATION (Metal +" +
         " MPS + MPSGraph + Accelerate + CoreML linked at" +
         " substrate level);" +
@@ -287,7 +308,8 @@ public enum BASRadicalEvolutionSweepClosureDoctrine {
         " foundation primitives via typed configuration" +
         " + dispatch probe + cost-based routing。" +
         " ADR-014 OPT-IN preserved at every commit" +
-        " boundary。 V1 byte-equality preserved (~5,700" +
+        " boundary。 V1 byte-equality preserved (5,706+" +
         " BAS tests pass)。 11 destructive operations" +
-        " explicitly deferred under user control."
+        " explicitly deferred under user control。 Loop" +
+        " closed (完全 闭环)."
 }

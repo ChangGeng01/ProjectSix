@@ -95,19 +95,20 @@ public enum BASPhase2EntropyClosureDoctrine {
 
     /// Last M-number of Phase 2 entropy work。 Bumped:
     /// M1057 → M1065 → M1069 → M1073 → M1077 → M1083 →
-    /// M1099 → M1103 → M1107 (RADICAL EVOLUTION SWEEP
-    /// final close-out at chapter 四百三十三)。
+    /// M1099 → M1103 → M1107 → M1109 (chapter 四百三十三
+    /// self-extension to cover M1108-M1109 deep-review
+    /// remediations inside the chapter doctrine system)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1107
+    public static let mNumberLast: Int = 1109
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1107,with M1078-M1079 reserved for post-Phase-A
+    /// M1109,with M1078-M1079 reserved for post-Phase-A
     /// follow-up)。
     /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
-    /// 137 → 141 → 145 → 149 → 153 (chapter 四百三十三
-    /// final close-out adds 4 commits to the cumulative
-    /// count)。
-    public static let commitsShipped: Int = 153
+    /// 137 → 141 → 145 → 149 → 153 → 155 (M1108 + M1109
+    /// deep-review remediations land as 5th + 6th cuts
+    /// of chapter 四百三十三)。
+    public static let commitsShipped: Int = 155
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

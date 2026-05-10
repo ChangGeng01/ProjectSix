@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1107",
-            "M1107:doctrine version reflects RADICAL EVOLUTION SWEEP final close-out at chapter 四百三十三")
+            "ADR-016.M1109",
+            "M1109:doctrine version reflects RADICAL EVOLUTION SWEEP deep-review remediation round 2 (chapter 四百三十三 self-extension covering M1108 + M1109)")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -104,23 +104,33 @@ final class BASEntropyChapterIndexTests: XCTestCase {
 
     func testEntryForMNumberInChapter433Range() {
         // M1108 extension:chapter 433 entries now
-        // resolve to the typed entry
+        // resolve to the typed entry。
+        // M1109 self-extension bumped the upper bound
+        // from 1107 → 1109 to cover M1108-M1109.
         let entry = BASEntropyChapterIndex.entry(
-            forMNumber: 1106)
+            forMNumber: 1108)
         XCTAssertEqual(
             entry?.chapterTag,
             "chapter 四百三十三",
-            "M1106 lives in chapter 四百三十三's M1104-M1107" +
-            " range (added by M1108 deep-review extension)")
+            "M1108 lives in chapter 四百三十三's M1104-M1109" +
+            " range (M1109 self-extension covers M1108)")
+        let entry2 = BASEntropyChapterIndex.entry(
+            forMNumber: 1109)
+        XCTAssertEqual(
+            entry2?.chapterTag,
+            "chapter 四百三十三",
+            "M1109 also resolves to chapter 四百三十三")
     }
 
     // MARK: - Aggregates
 
     func testTotalKnivesCount() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.totalKnivesCount, 28,
-            "7 chapters × 4 knives each = 28 (after" +
-            " M1108 extension to cover chapters 430 + 433)")
+            BASEntropyChapterIndex.totalKnivesCount, 30,
+            "6 phase chapters × 4 + chapter 433's 6 cuts" +
+            " (4 original + 2 deep-review remediations" +
+            " M1108 + M1109) = 30。 M1109 self-extension" +
+            " bumped from 28 to 30")
     }
 
     func testEarliestMNumberIs1080() {
@@ -128,12 +138,13 @@ final class BASEntropyChapterIndexTests: XCTestCase {
             BASEntropyChapterIndex.earliestMNumber, 1080)
     }
 
-    func testLatestMNumberIs1107() {
+    func testLatestMNumberIs1109() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.latestMNumber, 1107,
-            "M1108 deep-review extension bumped" +
-            " latestMNumber from 1103 → 1107 once" +
-            " chapter 433 entry was added")
+            BASEntropyChapterIndex.latestMNumber, 1109,
+            "M1109 self-extension bumped chapter 433" +
+            " entry's mNumberLast from 1107 to 1109" +
+            " (covering M1108-M1109 deep-review" +
+            " remediation cuts)")
     }
 
     // MARK: - Mirroring chapter doctrines

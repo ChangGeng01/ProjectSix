@@ -23,11 +23,16 @@
 //   - plannedFutureCuts: [String]
 //   - summary: String
 //
-// 29 files × ~120 LOC each = ~3,500 LOC of doctrine
-// scaffolding。 The original Phase D plan called for
-// collapsing all 29 into a single data table file
-// (~120 LOC),deleting 22 of the per-chapter `.swift`
-// files (the post-Phase-1 Phase 2 chapters)。
+// 31 files × ~120 LOC each = ~3,700 LOC of doctrine
+// scaffolding (count current as of M1109)。 The original
+// Phase D plan called for collapsing all of them into a
+// single data table file (~120 LOC),with the 24 non-
+// RADICAL chapter doctrines (chapters 403-426) being
+// deletion targets and the 7 RADICAL chapters (427-433)
+// surviving as `BASEntropyChapterIndex` entries。
+// (Original plan said "22 doctrines" but the count
+// drifted as Phase 2 grew through chapters 427-433 —
+// M1109 deep-review correction。)
 //
 // In autonomous mode that deletion is too risky:
 //
@@ -223,15 +228,17 @@ public enum BASEntropyChapterIndex {
         BASEntropyChapterEntry(
             chapterTag: "chapter 四百三十三",
             mNumberFirst: 1104,
-            mNumberLast: 1107,
-            knivesCount: 4,
-            entropyClassesCount: 4,
+            mNumberLast: 1109,
+            knivesCount: 6,
+            entropyClassesCount: 6,
             pinsCount: 11,
             futureCutsCount: 4,
             summary:
                 "RADICAL EVOLUTION SWEEP final close-" +
                 "out — sidecar + cumulative sweep " +
-                "doctrine + ADR-016 → M1107 advance")
+                "doctrine + 2 deep-review remediation " +
+                "rounds (M1108 + M1109) + ADR-016 → " +
+                "M1107 → M1109 advance。 Loop closed")
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

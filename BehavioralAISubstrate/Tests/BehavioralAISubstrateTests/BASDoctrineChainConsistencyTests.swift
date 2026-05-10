@@ -39,9 +39,10 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
         }
         // Latest chapter must end at this M-number。 Today
         // chapter 四百三十三 is the latest with mNumberLast
-        // M1107;the doctrine version should be M1107 OR
-        // any later M-number bumped by a NEW chapter that
-        // we haven't yet listed in this test。
+        // M1109 (M1109 self-extension);the doctrine
+        // version should be M1109 OR any later M-number
+        // bumped by a NEW chapter that we haven't yet
+        // listed in this test。
         XCTAssertGreaterThanOrEqual(
             docMNumber,
             BASChapter433EntropyDoctrine.mNumberLast,
@@ -58,7 +59,7 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
             BASChapter433EntropyDoctrine.mNumberLast,
             "Phase 2 doctrine mNumberLast must equal " +
             "latest chapter's mNumberLast (chapter " +
-            "四百三十三 at M1107)")
+            "四百三十三 at M1109 after self-extension)")
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,

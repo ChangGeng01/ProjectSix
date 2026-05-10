@@ -484,7 +484,21 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// OPT-IN preserved at every commit boundary。 V1
     /// byte-equality preserved (5,700+ BAS tests pass)。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1107"
+    /// M1109 bump:RADICAL EVOLUTION SWEEP deep-review
+    /// remediation round 2。 Chapter 四百三十三 self-extends
+    /// to cover M1108 (round 1 — fixed chapter 428's stale
+    /// ADR-016 knife text + extended index from 5 → 7
+    /// chapters) + M1109 (round 2 — fixed 7 stale
+    /// '5,4XX+/5,5XX+ tests pass' claims to '5,700+',
+    /// fixed '22 chapter doctrines' deletion claim to '31',
+    /// brought M1108-M1109 inside the chapter doctrine
+    /// system instead of letting them hover outside)。
+    /// Sweep total:30 commits across 7 chapters (chapter
+    /// 433 now has 6 cuts instead of 4)。 ADR-014 OPT-IN
+    /// preserved at every commit boundary。 V1 byte-equality
+    /// preserved (5,706+ BAS tests pass)。 No G-status
+    /// change。 Loop closed (完全 闭环)。
+    public static let doctrineVersion: String = "ADR-016.M1109"
 
     /// Query the typed status of a specific gap。
     public static func status(

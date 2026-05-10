@@ -215,6 +215,6 @@ public enum BASChapter428EntropyDoctrine {
         "Original plan called for ledger deletions " +
         "(~1,210 LOC) but those are deferred to a " +
         "follow-up chapter under explicit user control。 " +
-        "V1 byte-equality preserved (5,500+ BAS tests " +
+        "V1 byte-equality preserved (5,700+ BAS tests " +
         "pass)。"
 }

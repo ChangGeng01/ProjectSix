@@ -176,5 +176,5 @@ public enum BASChapter429EntropyDoctrine {
         " file migration (~−270 LOC consolidation)" +
         " but those land in follow-up chapters under" +
         " explicit user control。 V1 byte-equality" +
-        " preserved (5,500+ BAS tests pass)。"
+        " preserved (5,700+ BAS tests pass)。"
 }

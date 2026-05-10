@@ -51,24 +51,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
                 .mNumberFirst, 953)
     }
 
-    func testMNumberLastIs1107() {
+    func testMNumberLastIs1109() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .mNumberLast, 1107,
-            "M1107 RADICAL EVOLUTION SWEEP final" +
-            " close-out:bumped from 1103 to 1107")
+                .mNumberLast, 1109,
+            "M1109 deep-review remediation round 2:" +
+            " bumped from 1107 to 1109 (chapter 433" +
+            " self-extension covers M1108 + M1109)")
     }
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped153() {
+    func testCommitsShipped155() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 153,
-            "M1107 RADICAL EVOLUTION SWEEP final" +
-            " close-out:bumped from 149 to 153" +
-            " (M1078-M1079 reserved for post-Phase-A" +
-            " follow-up)")
+                .commitsShipped, 155,
+            "M1109 deep-review remediation round 2:" +
+            " bumped from 153 to 155 (M1108 + M1109" +
+            " deep-review remediations land as 5th +" +
+            " 6th cuts of chapter 四百三十三)")
     }
 
     func testV2FoundationsCount12() {

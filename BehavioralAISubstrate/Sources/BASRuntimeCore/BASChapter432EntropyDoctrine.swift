@@ -205,7 +205,7 @@ public enum BASChapter432EntropyDoctrine {
         "preserved — no V1 hot path consumes the " +
         "scheduler yet;default config keeps engine in " +
         "v1ByteEqual mode with nil registry + nil " +
-        "capability。 V1 byte-equality preserved (5,500+ " +
+        "capability。 V1 byte-equality preserved (5,700+ " +
         "BAS tests pass)。 No default-mode flip — that " +
         "needs CI dual-mode evidence first。"
 }
