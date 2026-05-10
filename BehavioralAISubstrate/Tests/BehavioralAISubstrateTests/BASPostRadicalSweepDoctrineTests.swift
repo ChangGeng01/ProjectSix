@@ -570,4 +570,82 @@ final class BASPostRadicalSweepDoctrineTests:
             " POST-RADICAL last M — RADICAL sweep is" +
             " a strict prefix of POST-RADICAL sweep")
     }
+
+    // MARK: - Polish pass 5 — citation example pin
+
+    /// Pin the `citationExampleSummary` template
+    /// against silent drift。 The string is the
+    /// in-codebase demonstration of the citation
+    /// pattern chapter 447+ doctrines should copy。
+    /// Embeds 5 typed accessors (sweepTag /
+    /// lastChapterTag / mNumberLast / commitsShipped /
+    /// pinsHeldThroughout.count) so if ANY of those
+    /// drifts the example stays in sync (because the
+    /// string is interpolated at static init time
+    /// using the doctrine's own constants)。
+    ///
+    /// This test catches the case where a future edit
+    /// deletes one of the cited accessors or renames it
+    /// — the example becomes stale and the citation
+    /// pattern's promised IN-CODEBASE DEMONSTRATION
+    /// breaks silently。 By pinning specific substrings
+    /// the test forces explicit acknowledgment of
+    /// drift。
+    func testCitationExampleFieldsExist() {
+        let example = BASPostRadicalSweepDoctrine
+            .citationExampleSummary
+        // Each cited field's expected substring must be
+        // present in the interpolated example。
+        XCTAssertTrue(
+            example.contains(
+                "sweep=" +
+                BASPostRadicalSweepDoctrine.sweepTag),
+            "citationExampleSummary must cite sweepTag" +
+            " verbatim;got: \(example)")
+        XCTAssertTrue(
+            example.contains(
+                "lastChapter=" +
+                BASPostRadicalSweepDoctrine
+                    .lastChapterTag),
+            "citationExampleSummary must cite" +
+            " lastChapterTag verbatim;got: \(example)")
+        XCTAssertTrue(
+            example.contains(
+                "lastM=M" +
+                String(BASPostRadicalSweepDoctrine
+                    .mNumberLast)),
+            "citationExampleSummary must cite" +
+            " mNumberLast verbatim;got: \(example)")
+        XCTAssertTrue(
+            example.contains(
+                "commits=" +
+                String(BASPostRadicalSweepDoctrine
+                    .commitsShipped)),
+            "citationExampleSummary must cite" +
+            " commitsShipped verbatim;got: \(example)")
+        XCTAssertTrue(
+            example.contains(
+                "pinsHeld=" +
+                String(BASPostRadicalSweepDoctrine
+                    .pinsHeldThroughout.count)),
+            "citationExampleSummary must cite" +
+            " pinsHeldThroughout.count verbatim;got:" +
+            " \(example)")
+    }
+
+    /// citationExampleSummary must be non-empty +
+    /// non-degenerate (not just punctuation)。 Cheap
+    /// sanity check independent of the field-by-field
+    /// test。
+    func testCitationExampleIsNonDegenerate() {
+        let example = BASPostRadicalSweepDoctrine
+            .citationExampleSummary
+        XCTAssertFalse(example.isEmpty,
+            "citationExampleSummary must be non-empty")
+        XCTAssertGreaterThan(
+            example.count, 50,
+            "citationExampleSummary should be a" +
+            " substantial template (> 50 chars);got" +
+            " length=\(example.count)")
+    }
 }

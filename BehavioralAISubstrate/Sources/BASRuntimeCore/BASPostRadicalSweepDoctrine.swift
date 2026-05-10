@@ -416,6 +416,52 @@ public enum BASPostRadicalSweepDoctrine {
         return mNumberLast - mNumberFirst + 1
     }
 
+    // MARK: - Citation pattern (chapter 446 polish)
+
+    /// Concrete worked example of how chapter 447+
+    /// doctrines should CITE this sweep instead of
+    /// re-deriving cumulative state from 20+ per-chapter
+    /// doctrine files。
+    ///
+    /// **Why this property exists**:without an
+    /// in-codebase example,"chapter 447+ can cite
+    /// BASPostRadicalSweepDoctrine" is a structural
+    /// readiness claim with no demonstrated usage。
+    /// This constant + the
+    /// `testCitationExampleFieldsExist` pin makes the
+    /// citation pattern concrete and grep-able。
+    ///
+    /// **Template chapter 447+ doctrines can copy**:
+    ///
+    /// ```swift
+    /// // chapter 447+ doctrine doc-comment:
+    /// // Prior state at sweep close-out:
+    /// //   - Sweep: BASPostRadicalSweepDoctrine
+    /// //     .sweepTag (\(sweepTag))
+    /// //   - Last chapter shipped:
+    /// //     BASPostRadicalSweepDoctrine
+    /// //     .lastChapterTag
+    /// //   - Last M-number:
+    /// //     BASPostRadicalSweepDoctrine.mNumberLast
+    /// //   - Total commits:
+    /// //     BASPostRadicalSweepDoctrine.commitsShipped
+    /// //   - Pins held throughout:
+    /// //     BASPostRadicalSweepDoctrine
+    /// //     .pinsHeldThroughout (10 pins)
+    /// ```
+    ///
+    /// Future chapter 447+ MUST NOT silently fork the
+    /// sweep narrative — cite via these typed accessors
+    /// so any sweep-level claim drift is caught by the
+    /// existing 27 cross-mirror tests in
+    /// `BASPostRadicalSweepDoctrineTests`。
+    public static let citationExampleSummary: String =
+        "Prior state at SWEEP close-out:" +
+        " sweep=\(sweepTag),lastChapter=\(lastChapterTag)," +
+        " lastM=M\(mNumberLast)," +
+        " commits=\(commitsShipped)," +
+        " pinsHeld=\(pinsHeldThroughout.count)"
+
     // MARK: - Summary
 
     public static let summary: String =
