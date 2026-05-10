@@ -306,6 +306,24 @@ public enum BASEntropyChapterIndex {
                 " engine.runWithPlan(...) branches on" +
                 " assignment ledger + captures dispatch" +
                 " ledger。 ADR-016 → M1127 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十八",
+            mNumberFirst: 1128,
+            mNumberLast: 1131,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 9 entry — HOST-SIDE" +
+                " INJECTION。 BASTurnRuntimeEngine" +
+                "Configuration gains routedStageExecutor" +
+                " + fallbackStageExecutor optional slots;" +
+                " engine threads them through to delegate" +
+                " automatically。 Substrate-side end-to-end" +
+                " is now COMPLETE — Qinao SDK can wire" +
+                " real backend dispatch via single config" +
+                " slot。 ADR-016 → M1131 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

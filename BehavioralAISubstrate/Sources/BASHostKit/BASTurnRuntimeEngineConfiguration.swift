@@ -124,6 +124,36 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
     public let stagePlanHints:
         BASStagePlanAcceleratorHints?
 
+    // MARK: - Slots (M1128 chapter 四百三十八 — host injection)
+
+    /// Optional Sendable closure invoked per-stage when
+    /// the engine routes through the chapter 437 ledger-
+    /// driven dispatch path (M1126 +
+    /// `runScaffoldedWithAssignments`)。 Receives the
+    /// stage,its `BASStageAcceleratorAssignment`,and
+    /// the request — caller routes closure body to the
+    /// chosen backing (mlxArray → BASMLXAdapter,
+    /// mlMultiArray → CoreML inference,metalBuffer →
+    /// BASMetalKernelRegistry,etc)。 When nil,engine
+    /// falls back to a no-op closure (substrate has no
+    /// way to know what host wants to do per stage)。
+    /// Hosts wire this once at config construction;
+    /// engine threads it through delegate boundary
+    /// without per-call surface change。
+    public let routedStageExecutor:
+        BASNativeStageExecutor.RoutedStageExecutor?
+
+    /// Optional Sendable closure invoked per-stage when
+    /// the engine's routed dispatch path encounters a
+    /// stage with NO assignment registered (i.e. the
+    /// `stagePlanHints` sidecar didn't cover this stage)。
+    /// When nil,engine falls back to a no-op closure。
+    /// Hosts use this for the V1-mirror baseline that
+    /// runs when scheduler decisions are absent for a
+    /// given stage。
+    public let fallbackStageExecutor:
+        BASNativeStageExecutor.StageExecutor?
+
     // MARK: - Init
 
     public init(
@@ -137,7 +167,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             BASMetalKernelRegistry? = nil,
         aneCapability: BASANECapability? = nil,
         stagePlanHints:
-            BASStagePlanAcceleratorHints? = nil
+            BASStagePlanAcceleratorHints? = nil,
+        routedStageExecutor:
+            BASNativeStageExecutor.RoutedStageExecutor? = nil,
+        fallbackStageExecutor:
+            BASNativeStageExecutor.StageExecutor? = nil
     ) {
         self.eventLog = eventLog
         self.eventIDFactory = eventIDFactory
@@ -146,6 +180,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
         self.metalKernelRegistry = metalKernelRegistry
         self.aneCapability = aneCapability
         self.stagePlanHints = stagePlanHints
+        self.routedStageExecutor = routedStageExecutor
+        self.fallbackStageExecutor = fallbackStageExecutor
     }
 
     /// Default config: no event log,UUID factory,system clock,
@@ -171,7 +207,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
             aneCapability: aneCapability,
-            stagePlanHints: stagePlanHints)
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
     }
 
     public func with(
@@ -185,7 +223,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
             aneCapability: aneCapability,
-            stagePlanHints: stagePlanHints)
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
     }
 
     public func with(
@@ -198,7 +238,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
             aneCapability: aneCapability,
-            stagePlanHints: stagePlanHints)
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
     }
 
     // MARK: - Immutable updates (M1100 Phase F)
@@ -213,7 +255,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
             aneCapability: aneCapability,
-            stagePlanHints: stagePlanHints)
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
     }
 
     public func with(
@@ -226,7 +270,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
             aneCapability: aneCapability,
-            stagePlanHints: stagePlanHints)
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
     }
 
     public func with(
@@ -239,7 +285,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
             aneCapability: aneCapability,
-            stagePlanHints: stagePlanHints)
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
     }
 
     /// chapter 四百三十五 / M1116 — immutable updater for
@@ -255,6 +303,52 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             runtimeMode: runtimeMode,
             metalKernelRegistry: metalKernelRegistry,
             aneCapability: aneCapability,
-            stagePlanHints: stagePlanHints)
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
+    }
+
+    // MARK: - Immutable updates (M1128 chapter 四百三十八 — host injection)
+
+    /// chapter 四百三十八 / M1128 — immutable updater for
+    /// the host-provided routed stage executor closure。
+    /// Hosts use this to wire mlxArray → BASMLXAdapter,
+    /// mlMultiArray → CoreML, metalBuffer →
+    /// BASMetalKernelRegistry, etc。
+    public func with(
+        routedStageExecutor:
+            BASNativeStageExecutor.RoutedStageExecutor?
+    ) -> BASTurnRuntimeEngineConfiguration {
+        BASTurnRuntimeEngineConfiguration(
+            eventLog: eventLog,
+            eventIDFactory: eventIDFactory,
+            clockMs: clockMs,
+            runtimeMode: runtimeMode,
+            metalKernelRegistry: metalKernelRegistry,
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
+    }
+
+    /// chapter 四百三十八 / M1128 — immutable updater for
+    /// the host-provided fallback stage executor closure。
+    /// Hosts use this for the V1-mirror baseline path that
+    /// runs when scheduler decisions are absent for a
+    /// given stage。
+    public func with(
+        fallbackStageExecutor:
+            BASNativeStageExecutor.StageExecutor?
+    ) -> BASTurnRuntimeEngineConfiguration {
+        BASTurnRuntimeEngineConfiguration(
+            eventLog: eventLog,
+            eventIDFactory: eventIDFactory,
+            clockMs: clockMs,
+            runtimeMode: runtimeMode,
+            metalKernelRegistry: metalKernelRegistry,
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor)
     }
 }

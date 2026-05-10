@@ -108,6 +108,21 @@ public actor BASTurnRuntimeEngine {
     private var scheduler:
         BASHardwareAwareScheduler?
 
+    /// chapter 四百三十八 / M1128 — host-provided routed
+    /// stage executor closure。 Threaded through to
+    /// `delegate.runScaffoldedWithAssignments(...)` when
+    /// engine takes the routed path。 nil → no-op default。
+    private let routedStageExecutor:
+        BASNativeStageExecutor.RoutedStageExecutor?
+
+    /// chapter 四百三十八 / M1128 — host-provided fallback
+    /// stage executor closure。 Threaded through to
+    /// `delegate.runScaffoldedWithAssignments(...)` when
+    /// engine takes the routed path AND a stage has no
+    /// assignment registered。 nil → no-op default。
+    private let fallbackStageExecutor:
+        BASNativeStageExecutor.StageExecutor?
+
     // MARK: - Mutable state (actor-isolated)
 
     private var sequenceCounter: Int = 0
@@ -150,7 +165,11 @@ public actor BASTurnRuntimeEngine {
             BASMetalKernelRegistry? = nil,
         aneCapability: BASANECapability? = nil,
         stagePlanHints:
-            BASStagePlanAcceleratorHints? = nil
+            BASStagePlanAcceleratorHints? = nil,
+        routedStageExecutor:
+            BASNativeStageExecutor.RoutedStageExecutor? = nil,
+        fallbackStageExecutor:
+            BASNativeStageExecutor.StageExecutor? = nil
     ) {
         self.coordinator = coordinator
         self.eventLog = eventLog
@@ -160,6 +179,8 @@ public actor BASTurnRuntimeEngine {
         self.metalKernelRegistry = metalKernelRegistry
         self.aneCapability = aneCapability
         self.stagePlanHints = stagePlanHints
+        self.routedStageExecutor = routedStageExecutor
+        self.fallbackStageExecutor = fallbackStageExecutor
     }
 
     /// chapter 四百七 / M998 — convenience init taking the
@@ -186,7 +207,11 @@ public actor BASTurnRuntimeEngine {
                 configuration.metalKernelRegistry,
             aneCapability: configuration.aneCapability,
             stagePlanHints:
-                configuration.stagePlanHints)
+                configuration.stagePlanHints,
+            routedStageExecutor:
+                configuration.routedStageExecutor,
+            fallbackStageExecutor:
+                configuration.fallbackStageExecutor)
     }
 
     // MARK: - chapter 四百三十五 / M1117 — assignment ledger accessor
@@ -388,10 +413,21 @@ public actor BASTurnRuntimeEngine {
         // unrouted path — V1 byte-equality preserved。
         let stageLedger: BASTurnRuntimeStageLedger
         if lastAssignmentLedger.recordCount > 0 {
+            // chapter 四百三十八 / M1129 — thread host-
+            // provided routed + fallback closures through
+            // delegate boundary。 nil → no-op defaults
+            // preserve V1 byte-equality for hosts that
+            // haven't wired real backends yet。
+            let routed = routedStageExecutor
+                ?? { _, _, _ in 0 }
+            let fallback = fallbackStageExecutor
+                ?? { _, _ in 0 }
             let routedResult = await activeDelegate
                 .runScaffoldedWithAssignments(
                     request: request,
-                    assignments: lastAssignmentLedger)
+                    assignments: lastAssignmentLedger,
+                    routedExecutor: routed,
+                    fallbackExecutor: fallback)
             stageLedger = routedResult.stageLedger
             lastDispatchLedger = routedResult
                 .dispatchLedger

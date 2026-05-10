@@ -7,13 +7,13 @@ final class BASEntropyChapterIndexTests: XCTestCase {
 
     // MARK: - 7 RADICAL EVOLUTION entries (after M1108 extension)
 
-    func testElevenRadicalEvolutionEntries() {
+    func testTwelveRadicalEvolutionEntries() {
         XCTAssertEqual(
             BASEntropyChapterIndex
-                .radicalEvolutionEntryCount, 11,
-            "M1127 POST-RADICAL Wave 8:bumped from" +
-            " 10 to 11 (added chapter 437 — end-to-end" +
-            " routed dispatch)")
+                .radicalEvolutionEntryCount, 12,
+            "M1131 POST-RADICAL Wave 9:bumped from" +
+            " 11 to 12 (added chapter 438 — host-side" +
+            " injection)")
     }
 
     // MARK: - Entry shape
@@ -123,10 +123,10 @@ final class BASEntropyChapterIndexTests: XCTestCase {
 
     func testTotalKnivesCount() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.totalKnivesCount, 48,
+            BASEntropyChapterIndex.totalKnivesCount, 52,
             "6 phase × 4 + 433's 6 + 434's 6 + 435's" +
-            " 4 + 436's 4 + 437's 4 = 48。 M1127 Wave" +
-            " 8 bumped from 44 to 48")
+            " 4 + 436's 4 + 437's 4 + 438's 4 = 52。" +
+            " M1131 Wave 9 bumped from 48 to 52")
     }
 
     func testEarliestMNumberIs1080() {
@@ -134,12 +134,12 @@ final class BASEntropyChapterIndexTests: XCTestCase {
             BASEntropyChapterIndex.earliestMNumber, 1080)
     }
 
-    func testLatestMNumberIs1127() {
+    func testLatestMNumberIs1131() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.latestMNumber, 1127,
-            "M1127 POST-RADICAL Wave 8 bumped" +
-            " latestMNumber from 1123 → 1127 (chapter" +
-            " 437 covers M1124-M1127)")
+            BASEntropyChapterIndex.latestMNumber, 1131,
+            "M1131 POST-RADICAL Wave 9 bumped" +
+            " latestMNumber from 1127 → 1131 (chapter" +
+            " 438 covers M1128-M1131)")
     }
 
     // MARK: - Mirroring chapter doctrines
@@ -196,12 +196,12 @@ final class BASEntropyChapterIndexTests: XCTestCase {
 
     // MARK: - M1111 Wave 2 STAGE 1 — phase2Entries (31 entries)
 
-    func testPhase2EntryCountIs35() {
+    func testPhase2EntryCountIs36() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.phase2EntryCount, 35,
-            "M1127 POST-RADICAL Wave 8:complete Phase" +
-            " 2 mirror covers all 35 chapters (24 pre-" +
-            "RADICAL + 7 RADICAL + 434 + 435 + 436 + 437)")
+            BASEntropyChapterIndex.phase2EntryCount, 36,
+            "M1131 POST-RADICAL Wave 9:complete Phase" +
+            " 2 mirror covers all 36 chapters (24 pre-" +
+            "RADICAL + 7 RADICAL + 434/435/436/437/438)")
         XCTAssertEqual(
             BASEntropyChapterIndex
                 .phase2Entries.count,

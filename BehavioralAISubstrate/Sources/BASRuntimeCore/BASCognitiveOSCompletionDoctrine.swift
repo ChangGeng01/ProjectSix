@@ -563,7 +563,22 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// X → executor honored X for stage Y。 V1 byte-
     /// equality preserved (5,790+ BAS tests pass)。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1127"
+    /// M1131 bump:POST-RADICAL EVOLUTION SWEEP Wave 9
+    /// — chapter 四百三十八 ships HOST-SIDE INJECTION。
+    /// 4 cuts (M1128-M1131):
+    /// (1) BASTurnRuntimeEngineConfiguration 2 new
+    ///     optional slots (routedStageExecutor +
+    ///     fallbackStageExecutor),
+    /// (2) BASTurnRuntimeEngine threading,
+    /// (3) 7 host-injection tests,
+    /// (4) chapter close-out + Phase 2 + ADR-016 bumps。
+    /// First chapter where Qinao SDK can wire mlxArray →
+    /// BASMLXAdapter dispatch via a single config slot。
+    /// Substrate-side end-to-end is now COMPLETE;
+    /// remaining "更硬核" gap is purely host-side。 V1
+    /// byte-equality preserved (5,800+ BAS tests pass)。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1131"
 
     /// Query the typed status of a specific gap。
     public static func status(
