@@ -57,14 +57,14 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
     func testPhase2DoctrineEndsAtLatestChapter() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine.mNumberLast,
-            BASChapter447EntropyDoctrine.mNumberLast,
+            BASChapter448EntropyDoctrine.mNumberLast,
             "Phase 2 doctrine mNumberLast must equal " +
             "latest chapter's mNumberLast (chapter " +
-            "四百四十七 at M\(BASChapter447EntropyDoctrine.mNumberLast))")
+            "四百四十八 at M\(BASChapter448EntropyDoctrine.mNumberLast))")
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            BASChapter447EntropyDoctrine.chapterTag,
+            BASChapter448EntropyDoctrine.chapterTag,
             "Phase 2 doctrine last chapter tag must " +
             "equal latest chapter doctrine tag")
     }

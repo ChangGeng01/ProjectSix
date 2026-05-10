@@ -540,7 +540,28 @@ public enum BASEntropyChapterIndex {
                 " non-square shapes + GPU/CPU" +
                 " agreement。 「原生利用神经引擎」 first" +
                 " truthful endpoint。 ADR-016 → M1167" +
-                " advance")
+                " advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十八",
+            mNumberFirst: 1168,
+            mNumberLast: 1171,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION chapter 2 —" +
+                " SECOND REAL GPU KERNEL via MPSGraph。" +
+                " BASMPSGraphRMSNormKernel actor composes" +
+                " 6-op graph (sq+reduceMean+add+sqrt+" +
+                "div+mul) and dispatches through graph." +
+                "run(...)。 First MPSGraph usage in" +
+                " substrate;establishes pattern for" +
+                " future arbitrary-op GPU kernels。 4" +
+                " PROOF tests verify GPU output within" +
+                " 1e-4 absolute tolerance of CPU" +
+                " reference。 「原生利用神经引擎」 progress" +
+                " 1/3 → 2/3。 ADR-016 → M1171 advance")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

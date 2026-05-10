@@ -101,7 +101,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百四十四",   // M1152-M1155 (POST-RADICAL Wave 15 — per-stage event payload)
         "chapter 四百四十五",   // M1156-M1159 (POST-RADICAL Wave 16 — federated event log multi-backend)
         "chapter 四百四十六",   // M1160-M1163 (POST-RADICAL Wave 17 — POST-RADICAL EVOLUTION SWEEP close-out meta-doctrine)
-        "chapter 四百四十七"    // M1164-M1167 (POST-SWEEP REAL EXECUTION FOLLOW-THROUGH chapter 1 — first real GPU kernel)
+        "chapter 四百四十七",   // M1164-M1167 (POST-SWEEP REAL EXECUTION FOLLOW-THROUGH chapter 1 — first real GPU kernel)
+        "chapter 四百四十八"    // M1168-M1171 (POST-SWEEP REAL EXECUTION chapter 2 — first MPSGraph: real GPU rmsNorm)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -111,23 +112,23 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1057 → M1065 → M1069 → M1073 → M1077 → M1083 →
     /// M1099 → M1103 → M1107 → M1109 → M1115 → M1119 →
     /// M1123 → M1127 → M1131 → M1135 → M1139 → M1143 →
-    /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167
-    /// (chapter 四百四十七 POST-SWEEP REAL EXECUTION
-    /// FOLLOW-THROUGH chapter 1 — first real GPU kernel
-    /// dispatch)。 M1078-M1079 reserved for post-Phase-A
+    /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
+    /// M1171 (chapter 四百四十八 POST-SWEEP REAL
+    /// EXECUTION chapter 2 — first MPSGraph: real GPU
+    /// rmsNorm)。 M1078-M1079 reserved for post-Phase-A
     /// follow-up。
-    public static let mNumberLast: Int = 1167
+    public static let mNumberLast: Int = 1171
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1167,with M1078-M1079 reserved for post-Phase-A
+    /// M1171,with M1078-M1079 reserved for post-Phase-A
     /// follow-up)。
     /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
     /// 137 → 141 → 145 → 149 → 153 → 155 → 161 → 165 →
     /// 169 → 173 → 177 → 181 → 185 → 189 → 193 → 197 →
-    /// 201 → 205 → 209 → 213 (chapter 四百四十七 4 cuts:
-    /// M1164 audit recon + M1165 real MPS kernel +
-    /// M1166 GPU dispatch tests + M1167 close-out)。
-    public static let commitsShipped: Int = 213
+    /// 201 → 205 → 209 → 213 → 217 (chapter 四百四十八
+    /// 4 cuts:M1168 recon + M1169 MPSGraph rmsNorm +
+    /// M1170 PROOF tests + M1171 close-out)。
+    public static let commitsShipped: Int = 217
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

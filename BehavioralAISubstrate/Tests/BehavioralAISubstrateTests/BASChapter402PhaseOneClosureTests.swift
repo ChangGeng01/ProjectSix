@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1167",
-            "M1167:doctrine version reflects POST-SWEEP REAL EXECUTION FOLLOW-THROUGH chapter 1 (chapter 四百四十七 4 cuts M1164-M1167 — first real GPU kernel dispatch via BASMPSGraphMatMulKernel)")
+            "ADR-016.M1171",
+            "M1171:doctrine version reflects POST-SWEEP REAL EXECUTION chapter 2 (chapter 四百四十八 4 cuts M1168-M1171 — second real GPU kernel via MPSGraph rmsNorm)")
     }
 
     // MARK: - M-number range matches chapter 四百二

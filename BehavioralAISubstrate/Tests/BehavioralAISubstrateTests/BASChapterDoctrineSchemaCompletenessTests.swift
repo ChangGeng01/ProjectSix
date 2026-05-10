@@ -866,6 +866,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter447EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter447EntropyDoctrine
+                    .summary),
+            // M1171 POST-SWEEP REAL EXECUTION chapter 2
+            check("四百四十八",
+                tag: BASChapter448EntropyDoctrine.chapterTag,
+                first: BASChapter448EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter448EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter448EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter448EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter448EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter448EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter448EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter448EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1014,7 +1033,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter446EntropyDoctrine.mNumberLast),
             // M1167 POST-SWEEP REAL EXECUTION FOLLOW-THROUGH chapter 1
             ("447", BASChapter447EntropyDoctrine.mNumberFirst,
-             BASChapter447EntropyDoctrine.mNumberLast)
+             BASChapter447EntropyDoctrine.mNumberLast),
+            // M1171 POST-SWEEP REAL EXECUTION chapter 2
+            ("448", BASChapter448EntropyDoctrine.mNumberFirst,
+             BASChapter448EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -1217,6 +1239,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter447EntropyDoctrine.mNumberFirst,
             last: BASChapter447EntropyDoctrine.mNumberLast,
             tag: "四百四十七")
+        // M1171 POST-SWEEP REAL EXECUTION chapter 2
+        verifyKnivesRange(
+            BASChapter448EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter448EntropyDoctrine.mNumberFirst,
+            last: BASChapter448EntropyDoctrine.mNumberLast,
+            tag: "四百四十八")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

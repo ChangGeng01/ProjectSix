@@ -748,7 +748,17 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// directive moves from 0% → has-first-truthful-
     /// endpoint。 V1 byte-equality preserved。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1167"
+    /// M1171 bump:POST-SWEEP REAL EXECUTION chapter 2
+    /// — chapter 四百四十八 ships SECOND real GPU kernel
+    /// (rmsNorm via MPSGraph,first MPSGraph usage in
+    /// substrate)。 4 cuts:(1) recon + design,(2)
+    /// BASMPSGraphRMSNormKernel actor with 6-op graph,
+    /// (3) 4 PROOF tests (1e-4 absolute tolerance for
+    /// sqrt-amplified FMA reordering),(4) chapter
+    /// close-out。 「原生利用神经引擎」 progress 1/3 → 2/3
+    /// GPU kernels。 V1 byte-equality preserved。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1171"
 
     /// Query the typed status of a specific gap。
     public static func status(
