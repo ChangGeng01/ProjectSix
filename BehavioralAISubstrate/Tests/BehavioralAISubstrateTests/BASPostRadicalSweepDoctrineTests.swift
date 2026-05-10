@@ -505,4 +505,69 @@ final class BASPostRadicalSweepDoctrineTests:
             " the WHY anchored inside the WHAT。 Got:" +
             " summary='\(BASPostRadicalSweepDoctrine.summary)'")
     }
+
+    // MARK: - Polish pass 4 cross-mirror invariants
+    // (cross-mirror against pre-existing RADICAL-only
+    // closure doctrine BASRadicalEvolutionSweepClosureDoctrine)
+
+    /// Both the pre-existing RADICAL-only closure
+    /// doctrine and the new POST-RADICAL umbrella
+    /// doctrine reference the SAME 2026-05-10 trigger
+    /// directive (the Chinese 「目前整体底层架构需要全面
+    /// 进化升华...」 anchor)。 If either drifts the
+    /// other's narrative breaks — pin both directions。
+    func testTriggerDirectiveMatchesPreexistingRadicalDoctrine() {
+        XCTAssertEqual(
+            BASRadicalEvolutionSweepClosureDoctrine
+                .sweepDirective,
+            BASPostRadicalSweepDoctrine
+                .triggerDirective,
+            "BASRadicalEvolutionSweepClosureDoctrine" +
+            ".sweepDirective MUST equal" +
+            " BASPostRadicalSweepDoctrine" +
+            ".triggerDirective verbatim — both" +
+            " reference the same 2026-05-10 directive。" +
+            " Drift means one doctrine's verbatim copy" +
+            " went stale")
+    }
+
+    /// RADICAL-only doctrine's sweepEntryMNumber MUST
+    /// equal POST-RADICAL sweep's mNumberFirst — both
+    /// pin the same M1080 entry (chapter 427 Phase A
+    /// start)。
+    func testRadicalSweepEntryMatchesPostRadicalFirstM() {
+        XCTAssertEqual(
+            BASRadicalEvolutionSweepClosureDoctrine
+                .sweepEntryMNumber,
+            BASPostRadicalSweepDoctrine.mNumberFirst,
+            "RADICAL doctrine sweepEntryMNumber" +
+            " (\(BASRadicalEvolutionSweepClosureDoctrine.sweepEntryMNumber))" +
+            " MUST equal POST-RADICAL sweep mNumberFirst" +
+            " (\(BASPostRadicalSweepDoctrine.mNumberFirst))" +
+            " — both anchor chapter 427's M1080 entry")
+    }
+
+    /// RADICAL-only doctrine's sweepCloseOutMNumber
+    /// (M1109,chapter 433 final close-out + 2 deep-
+    /// review remediations) MUST be a member of the
+    /// POST-RADICAL sweep's M-range [mNumberFirst,
+    /// mNumberLast]。 If the POST-RADICAL sweep ever
+    /// shrinks below M1109 (or RADICAL grows past
+    /// POST-RADICAL),this test fails — the chain
+    /// broke。
+    func testRadicalCloseOutCoveredByPostRadicalRange() {
+        XCTAssertGreaterThanOrEqual(
+            BASRadicalEvolutionSweepClosureDoctrine
+                .sweepCloseOutMNumber,
+            BASPostRadicalSweepDoctrine.mNumberFirst,
+            "RADICAL close-out M-number must be >= " +
+            " POST-RADICAL first M")
+        XCTAssertLessThanOrEqual(
+            BASRadicalEvolutionSweepClosureDoctrine
+                .sweepCloseOutMNumber,
+            BASPostRadicalSweepDoctrine.mNumberLast,
+            "RADICAL close-out M-number must be <= " +
+            " POST-RADICAL last M — RADICAL sweep is" +
+            " a strict prefix of POST-RADICAL sweep")
+    }
 }
