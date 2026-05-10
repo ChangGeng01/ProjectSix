@@ -376,6 +376,26 @@ public enum BASEntropyChapterIndex {
                 " replay surface COMPLETE — full routed-" +
                 "dispatch story event-replayable from one" +
                 " canonical stream。 ADR-016 → M1143 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十二",
+            mNumberFirst: 1144,
+            mNumberLast: 1147,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 13 entry — REPLAY-" +
+                "REBUILD INTEGRATION。 BASEventLogReplay" +
+                "Bundle typed Sendable + Equatable +" +
+                " Hashable struct aggregates all 6" +
+                " projector outputs;13 round-trip" +
+                " integration tests prove byte-equal" +
+                " round-trip through real BASInMemoryEvent" +
+                "LogStorage + cross-kind isolation +" +
+                " sequenceNumber ordering preservation。" +
+                " Replay surface is PROVEN end-to-end。" +
+                " ADR-016 → M1147 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

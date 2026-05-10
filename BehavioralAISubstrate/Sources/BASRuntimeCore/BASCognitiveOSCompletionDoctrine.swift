@@ -629,7 +629,27 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ONE canonical event log。 V1 byte-equality
     /// preserved (5,900+ BAS tests pass)。 No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1143"
+    /// M1147 bump:POST-RADICAL EVOLUTION SWEEP Wave 13
+    /// — chapter 四百四十二 ships REPLAY-REBUILD
+    /// INTEGRATION。 4 cuts (M1144-M1147):
+    /// (1) recon BASEventLogStorage + BASInMemoryEventLog
+    ///     Storage + 6 payload-kind factories,
+    /// (2) BASEventLogReplayBundle typed Sendable +
+    ///     Equatable + Hashable struct aggregating all 6
+    ///     projector outputs + totalEventCount +
+    ///     perKindEventCount + .empty + NEW
+    ///     BASEventLogProjectors.projectAllPayloadKinds(_:)
+    ///     pure factory,
+    /// (3) 13 round-trip integration tests
+    ///     (BASEventLogReplayBundleIntegrationTests),
+    /// (4) chapter close-out + bumps。
+    /// First chapter where 6-kind event-log replay surface
+    /// is PROVEN end-to-end through real BASInMemoryEvent
+    /// LogStorage round-trip + a typed bundle replay
+    /// consumers consume as a single source-of-truth。
+    /// V1 byte-equality preserved (5,920+ BAS tests
+    /// pass)。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1147"
 
     /// Query the typed status of a specific gap。
     public static func status(
