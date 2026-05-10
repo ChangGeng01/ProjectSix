@@ -238,7 +238,25 @@ public enum BASEntropyChapterIndex {
                 "out — sidecar + cumulative sweep " +
                 "doctrine + 2 deep-review remediation " +
                 "rounds (M1108 + M1109) + ADR-016 → " +
-                "M1107 → M1109 advance。 Loop closed")
+                "M1107 → M1109 advance。 Loop closed"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十四",
+            mNumberFirst: 1110,
+            mNumberLast: 1115,
+            knivesCount: 6,
+            entropyClassesCount: 6,
+            pinsCount: 11,
+            futureCutsCount: 6,
+            summary:
+                "POST-RADICAL safety substrate +" +
+                " canonical60 driver — external" +
+                " consumer audit (Qinao SDK reality" +
+                " reflected) + BASEntropyChapterIndex" +
+                " extended to 31 chapters +" +
+                " BASStressSweepCanonical60Driver" +
+                " (typed 60-fixture set + identity/" +
+                "divergence stub runners) + ADR-016 →" +
+                " M1115 advance")
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed
@@ -246,6 +264,346 @@ public enum BASEntropyChapterIndex {
     /// chapters + the chapter 四百三十三 final close-out)。
     public static var radicalEvolutionEntryCount: Int {
         return radicalEvolutionEntries.count
+    }
+
+    /// **M1111 — Wave 2 STAGE 1 extension**:complete
+    /// 31-entry mirror covering ALL Phase 2 chapters
+    /// (chapters 四百三 through 四百三十三)。 This is the
+    /// single source-of-truth that makes the per-chapter
+    /// `BASChapter*EntropyDoctrine.swift` files
+    /// deletable in a future cleanup chapter without
+    /// losing any chapter summary。
+    ///
+    /// 24 pre-RADICAL chapters (403-426) + 7 RADICAL
+    /// chapters (427-433) = 31 entries。 Hand-maintained
+    /// at M1111 with field values cross-checked against
+    /// the corresponding chapter doctrine `.swift` files
+    /// via grep audit。
+    public static let phase2Entries:
+        [BASEntropyChapterEntry] =
+        prePhase2RadicalEntries +
+        radicalEvolutionEntries
+
+    /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
+    /// 403-426)。 Hand-maintained — pinsCount /
+    /// futureCutsCount /knivesCount values cross-checked
+    /// against the corresponding chapter doctrine files。
+    private static let prePhase2RadicalEntries:
+        [BASEntropyChapterEntry] =
+    [
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三",
+            mNumberFirst: 953,
+            mNumberLast: 962,
+            knivesCount: 10,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-403-v1-entry-doctrine-pin —" +
+                " Phase 2 entry chapter,V2 RUNTIME REWRITE" +
+                " architectural baseline"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四",
+            mNumberFirst: 963,
+            mNumberLast: 980,
+            knivesCount: 18,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 10,
+            summary:
+                "chapter-404-v1-complete — V2 actor" +
+                " delegation skeleton + composition-" +
+                "entropy ledger + threading entropy" +
+                " collapse + naming bridge + bundle" +
+                " protocol + 9 typed primitives"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五",
+            mNumberFirst: 981,
+            mNumberLast: 988,
+            knivesCount: 8,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "chapter-405-v1-bundle-protocol-" +
+                "comprehensive — BASBundleProtocol" +
+                " + 9 BAS*Bundle conformer migrations"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六",
+            mNumberFirst: 989,
+            mNumberLast: 997,
+            knivesCount: 9,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-406-v1-v2-lifecycle-" +
+                "comprehensive — V2 actor lifecycle" +
+                " envelope (start + complete) + audit" +
+                " emission summary"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七",
+            mNumberFirst: 998,
+            mNumberLast: 1001,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-407-v1-v2-actor-four-" +
+                "foundations — BASTurnRuntimeEngine" +
+                "Configuration + 4-foundation V2 init"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八",
+            mNumberFirst: 1002,
+            mNumberLast: 1005,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-408-v1-v2-stage-execution-" +
+                "foundation — BASTurnRuntimeStageRecord" +
+                " + BASTurnRuntimeStageLedger M1003"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九",
+            mNumberFirst: 1006,
+            mNumberLast: 1009,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-409-v1-v2-stage-plan-" +
+                "foundation — BASTurnRuntimeStagePlan" +
+                " + BASTurnRuntimeStageStep M1006"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十",
+            mNumberFirst: 1010,
+            mNumberLast: 1013,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-410-v1-v2-permit-fold-input-" +
+                "foundation — BASPermitEscalationFoldInput"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十一",
+            mNumberFirst: 1014,
+            mNumberLast: 1017,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-411-v1-v2-stress-sweep-input-" +
+                "foundation — BASStressSweepInput primitive"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十二",
+            mNumberFirst: 1018,
+            mNumberLast: 1021,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-412-v1-v2-stress-sweep-plan-" +
+                "foundation — BASStressSweepFixturePlan"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十三",
+            mNumberFirst: 1022,
+            mNumberLast: 1025,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-413-v1-v2-stress-sweep-verdict-" +
+                "foundation — BASStressSweepVerdict typed"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十四",
+            mNumberFirst: 1026,
+            mNumberLast: 1029,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-414-v1-v2-parallel-dispatch-" +
+                "foundation — BASParallelStageDispatch" +
+                "Input + ParallelGroup discriminator"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十五",
+            mNumberFirst: 1030,
+            mNumberLast: 1033,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-415-v1-v2-parallel-dispatch-" +
+                "summary-foundation — BASParallelStage" +
+                "DispatchSummary + envelope integration"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十六",
+            mNumberFirst: 1034,
+            mNumberLast: 1037,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-416-v1-v2-parallel-summary-" +
+                "envelope-integration — payload threading"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十七",
+            mNumberFirst: 1038,
+            mNumberLast: 1041,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-417-v1-v2-stage-ledger-" +
+                "validation-foundation — typed ledger" +
+                " invariant validation"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十八",
+            mNumberFirst: 1042,
+            mNumberLast: 1045,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-418-v1-v2-plan-ledger-coherence-" +
+                "foundation — BASTurnRuntimePlanLedger" +
+                "Coherence projection"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百十九",
+            mNumberFirst: 1046,
+            mNumberLast: 1049,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-419-v1-v2-coherence-envelope-" +
+                "integration — coherence threading into" +
+                " complete envelope"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十",
+            mNumberFirst: 1050,
+            mNumberLast: 1053,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-420-v1-v2-summary-digest-" +
+                "foundation — typed digest accessor over" +
+                " BASRuntimeAuditEmissionSummary"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十一",
+            mNumberFirst: 1054,
+            mNumberLast: 1057,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "chapter-421-v1-v2-phase-2-close-out — " +
+                "Phase 2 entropy closure doctrine + 19-" +
+                "chapter ledger pin (later self-extended)"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十二",
+            mNumberFirst: 1058,
+            mNumberLast: 1061,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "chapter-422-v1-v2-substrate-integrity — " +
+                "schema-completeness invariant test pin"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十三",
+            mNumberFirst: 1062,
+            mNumberLast: 1065,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 3,
+            summary:
+                "chapter-423-v1-v2-roadmap-ops-" +
+                "convenience — BASRoadmapDoctrine" +
+                " convenience accessors"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十四",
+            mNumberFirst: 1066,
+            mNumberLast: 1069,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 11,
+            futureCutsCount: 3,
+            summary:
+                "chapter-424-v1-v2-doctrine-chain-" +
+                "consistency — BASDoctrineChain" +
+                "ConsistencyTests cross-cutting invariant"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十五",
+            mNumberFirst: 1070,
+            mNumberLast: 1073,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 12,
+            futureCutsCount: 4,
+            summary:
+                "chapter-425-v1-v2-real-executor-" +
+                "foundation — BASPermitEscalationFold" +
+                "Executor + BASParallelStageDispatch" +
+                "Executor real-actor versions"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百二十六",
+            mNumberFirst: 1074,
+            mNumberLast: 1077,
+            knivesCount: 4,
+            entropyClassesCount: 0,
+            pinsCount: 13,
+            futureCutsCount: 3,
+            summary:
+                "chapter-426-v1-v2-adr018-full-" +
+                "ratification — BASStressSweepHarness" +
+                " + BASNativeStageExecutor — ADR-018" +
+                " 4/4 ratified")
+    ]
+
+    /// Total Phase 2 entry count (after M1111 extension)。
+    public static var phase2EntryCount: Int {
+        return phase2Entries.count
+    }
+
+    /// Look up an entry by chapter tag across the
+    /// COMPLETE 31-entry Phase 2 mirror (M1111
+    /// extension)。 Returns nil if no match。
+    public static func phase2Entry(
+        forTag tag: String
+    ) -> BASEntropyChapterEntry? {
+        return phase2Entries.first {
+            $0.chapterTag == tag
+        }
+    }
+
+    /// Look up an entry covering the given M-number
+    /// across the COMPLETE 31-entry Phase 2 mirror。
+    public static func phase2Entry(
+        forMNumber m: Int
+    ) -> BASEntropyChapterEntry? {
+        return phase2Entries.first {
+            m >= $0.mNumberFirst && m <= $0.mNumberLast
+        }
     }
 
     // MARK: - Accessors

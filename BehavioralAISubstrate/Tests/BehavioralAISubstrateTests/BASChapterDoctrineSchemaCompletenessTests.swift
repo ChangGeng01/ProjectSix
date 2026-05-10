@@ -600,6 +600,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter433EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter433EntropyDoctrine
+                    .summary),
+            // M1115 POST-RADICAL safety substrate
+            check("四百三十四",
+                tag: BASChapter434EntropyDoctrine.chapterTag,
+                first: BASChapter434EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter434EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter434EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter434EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter434EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter434EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter434EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter434EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -706,7 +725,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter432EntropyDoctrine.mNumberLast),
             // M1107 RADICAL EVOLUTION SWEEP final close-out
             ("433", BASChapter433EntropyDoctrine.mNumberFirst,
-             BASChapter433EntropyDoctrine.mNumberLast)
+             BASChapter433EntropyDoctrine.mNumberLast),
+            // M1115 POST-RADICAL safety substrate
+            ("434", BASChapter434EntropyDoctrine.mNumberFirst,
+             BASChapter434EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -811,6 +833,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter433EntropyDoctrine.mNumberFirst,
             last: BASChapter433EntropyDoctrine.mNumberLast,
             tag: "四百三十三")
+        // M1115 POST-RADICAL safety substrate
+        verifyKnivesRange(
+            BASChapter434EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter434EntropyDoctrine.mNumberFirst,
+            last: BASChapter434EntropyDoctrine.mNumberLast,
+            tag: "四百三十四")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

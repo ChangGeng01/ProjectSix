@@ -20,10 +20,10 @@ final class BASPhase2EntropyClosureDoctrineTests:
     func testNineteenChapterTagsShipped() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 31,
-            "M1107 RADICAL EVOLUTION SWEEP final" +
-            " close-out:bumped from 30 to 31 (added" +
-            " chapter 四百三十三)")
+                .chapterTagsShipped.count, 32,
+            "M1115 POST-RADICAL safety substrate:" +
+            " bumped from 31 to 32 (added chapter" +
+            " 四百三十四)")
     }
 
     func testFirstChapterIs403() {
@@ -33,14 +33,13 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs433() {
+    func testLastChapterIs434() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百三十三",
-            "M1107 RADICAL EVOLUTION SWEEP final" +
-            " close-out:bumped from 四百三十二 to" +
-            " 四百三十三")
+            "chapter 四百三十四",
+            "M1115 POST-RADICAL safety substrate:" +
+            " bumped from 四百三十三 to 四百三十四")
     }
 
     // MARK: - M-number range
@@ -51,25 +50,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
                 .mNumberFirst, 953)
     }
 
-    func testMNumberLastIs1109() {
+    func testMNumberLastIs1115() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .mNumberLast, 1109,
-            "M1109 deep-review remediation round 2:" +
-            " bumped from 1107 to 1109 (chapter 433" +
-            " self-extension covers M1108 + M1109)")
+                .mNumberLast, 1115,
+            "M1115 POST-RADICAL safety substrate:" +
+            " bumped from 1109 to 1115 (chapter 434" +
+            " covers M1110-M1115)")
     }
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped155() {
+    func testCommitsShipped161() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 155,
-            "M1109 deep-review remediation round 2:" +
-            " bumped from 153 to 155 (M1108 + M1109" +
-            " deep-review remediations land as 5th +" +
-            " 6th cuts of chapter 四百三十三)")
+                .commitsShipped, 161,
+            "M1115 POST-RADICAL safety substrate:" +
+            " bumped from 155 to 161 (chapter 434 ships" +
+            " 6 cuts M1110-M1115)")
     }
 
     func testV2FoundationsCount12() {

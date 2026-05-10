@@ -70,12 +70,24 @@ final class BASChapter433EntropyDoctrineTests: XCTestCase {
             " for M1109)")
     }
 
-    func testIsLastInPhase2Doctrine() {
-        XCTAssertEqual(
-            BASChapter433EntropyDoctrine.chapterTag,
+    // M1115 POST-RADICAL extension: chapter 四百三十四 is
+    // now the terminal chapter。 Chapter 433 remains a
+    // Phase 2 member but no longer the last。
+    func testIsMemberOfPhase2Doctrine() {
+        XCTAssertTrue(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.last)
-        XCTAssertEqual(
+                .chapterTagsShipped
+                .contains(
+                    BASChapter433EntropyDoctrine.chapterTag),
+            "chapter 四百三十三 must remain in Phase 2" +
+            " chapter list across post-M1109 extensions")
+    }
+
+    func testMNumberRangeFitsWithinPhase2() {
+        XCTAssertGreaterThanOrEqual(
+            BASChapter433EntropyDoctrine.mNumberFirst,
+            BASPhase2EntropyClosureDoctrine.mNumberFirst)
+        XCTAssertLessThanOrEqual(
             BASChapter433EntropyDoctrine.mNumberLast,
             BASPhase2EntropyClosureDoctrine.mNumberLast)
     }

@@ -7,16 +7,13 @@ final class BASEntropyChapterIndexTests: XCTestCase {
 
     // MARK: - 7 RADICAL EVOLUTION entries (after M1108 extension)
 
-    func testSevenRadicalEvolutionEntries() {
+    func testEightRadicalEvolutionEntries() {
         XCTAssertEqual(
             BASEntropyChapterIndex
-                .radicalEvolutionEntryCount, 7,
-            "M1108 deep-review extension:index covers" +
-            " all 7 RADICAL EVOLUTION SWEEP chapters" +
-            " (4 phase chapters: 427/428/429/430/431/432" +
-            " + 1 final close-out: 433)。 M1092 shipped 5" +
-            " entries;430 + 433 added at M1108 once both" +
-            " chapter doctrines existed。")
+                .radicalEvolutionEntryCount, 8,
+            "M1115 POST-RADICAL extension:bumped from" +
+            " 7 to 8 (added chapter 434 — POST-RADICAL" +
+            " safety substrate)")
     }
 
     // MARK: - Entry shape
@@ -126,11 +123,10 @@ final class BASEntropyChapterIndexTests: XCTestCase {
 
     func testTotalKnivesCount() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.totalKnivesCount, 30,
+            BASEntropyChapterIndex.totalKnivesCount, 36,
             "6 phase chapters × 4 + chapter 433's 6 cuts" +
-            " (4 original + 2 deep-review remediations" +
-            " M1108 + M1109) = 30。 M1109 self-extension" +
-            " bumped from 28 to 30")
+            " + chapter 434's 6 cuts = 36。 M1115" +
+            " POST-RADICAL extension bumped from 30 to 36")
     }
 
     func testEarliestMNumberIs1080() {
@@ -138,13 +134,12 @@ final class BASEntropyChapterIndexTests: XCTestCase {
             BASEntropyChapterIndex.earliestMNumber, 1080)
     }
 
-    func testLatestMNumberIs1109() {
+    func testLatestMNumberIs1115() {
         XCTAssertEqual(
-            BASEntropyChapterIndex.latestMNumber, 1109,
-            "M1109 self-extension bumped chapter 433" +
-            " entry's mNumberLast from 1107 to 1109" +
-            " (covering M1108-M1109 deep-review" +
-            " remediation cuts)")
+            BASEntropyChapterIndex.latestMNumber, 1115,
+            "M1115 POST-RADICAL extension bumped" +
+            " latestMNumber from 1109 → 1115 (chapter" +
+            " 434 covers M1110-M1115)")
     }
 
     // MARK: - Mirroring chapter doctrines
@@ -197,6 +192,133 @@ final class BASEntropyChapterIndexTests: XCTestCase {
         XCTAssertEqual(
             entry?.mNumberLast,
             BASChapter433EntropyDoctrine.mNumberLast)
+    }
+
+    // MARK: - M1111 Wave 2 STAGE 1 — phase2Entries (31 entries)
+
+    func testPhase2EntryCountIs32() {
+        XCTAssertEqual(
+            BASEntropyChapterIndex.phase2EntryCount, 32,
+            "M1115 POST-RADICAL extension:complete" +
+            " Phase 2 mirror covers all 32 chapters" +
+            " (24 pre-RADICAL + 7 RADICAL + chapter 434)")
+        XCTAssertEqual(
+            BASEntropyChapterIndex
+                .phase2Entries.count,
+            BASPhase2EntropyClosureDoctrine
+                .chapterTagsShipped.count,
+            "phase2Entries count must equal Phase 2" +
+            " doctrine's chapterTagsShipped count")
+    }
+
+    func testPhase2EntriesChronological() {
+        let entries = BASEntropyChapterIndex
+            .phase2Entries
+        for i in 1..<entries.count {
+            XCTAssertGreaterThanOrEqual(
+                entries[i].mNumberFirst,
+                entries[i-1].mNumberFirst,
+                "phase2Entries must be in chronological" +
+                " M-number order")
+        }
+    }
+
+    func testPhase2EntryForChapter403() {
+        let entry = BASEntropyChapterIndex.phase2Entry(
+            forTag: "chapter 四百三")
+        XCTAssertNotNil(entry)
+        XCTAssertEqual(entry?.mNumberFirst, 953)
+        XCTAssertEqual(entry?.mNumberLast, 962)
+    }
+
+    func testPhase2EntryForChapter426() {
+        let entry = BASEntropyChapterIndex.phase2Entry(
+            forTag: "chapter 四百二十六")
+        XCTAssertNotNil(entry)
+        XCTAssertEqual(entry?.mNumberFirst, 1074)
+        XCTAssertEqual(entry?.mNumberLast, 1077)
+    }
+
+    func testPhase2EntryForChapter433() {
+        let entry = BASEntropyChapterIndex.phase2Entry(
+            forTag: "chapter 四百三十三")
+        XCTAssertNotNil(entry)
+        XCTAssertEqual(entry?.mNumberFirst, 1104)
+        XCTAssertEqual(entry?.mNumberLast, 1109)
+    }
+
+    func testPhase2EntryForMNumberInPreRadicalRange() {
+        // M955 lives in chapter 四百三 (M953-M962)
+        let entry = BASEntropyChapterIndex.phase2Entry(
+            forMNumber: 955)
+        XCTAssertEqual(
+            entry?.chapterTag, "chapter 四百三")
+    }
+
+    func testPhase2EntryForMNumberInRadicalRange() {
+        // M1102 lives in chapter 四百三十二 (M1100-M1103)
+        let entry = BASEntropyChapterIndex.phase2Entry(
+            forMNumber: 1102)
+        XCTAssertEqual(
+            entry?.chapterTag, "chapter 四百三十二")
+    }
+
+    func testPhase2EntryForMNumberOutsidePhase2() {
+        // M940 is pre-Phase 2 (Phase 1 chapter 四百二
+        // territory)
+        let entry = BASEntropyChapterIndex.phase2Entry(
+            forMNumber: 940)
+        XCTAssertNil(entry,
+            "M940 is outside Phase 2 (M953+)")
+    }
+
+    func testEveryPhase2DoctrineChapterHasIndexEntry() {
+        // Cross-mirror check: every chapter tag in the
+        // Phase 2 closure doctrine must have a
+        // corresponding entry in the index。
+        for tag in BASPhase2EntropyClosureDoctrine
+            .chapterTagsShipped
+        {
+            let entry = BASEntropyChapterIndex
+                .phase2Entry(forTag: tag)
+            XCTAssertNotNil(entry,
+                "Phase 2 chapter \(tag) must have index" +
+                " entry — required for future doctrine" +
+                " cleanup deletion")
+        }
+    }
+
+    func testIndexMirrorsAllPreRadicalDoctrineMRanges() {
+        // Spot-check 4 pre-RADICAL chapters whose
+        // doctrine .swift files I cross-checked at M1111
+        XCTAssertEqual(
+            BASEntropyChapterIndex.phase2Entry(
+                forTag: BASChapter403EntropyDoctrine
+                    .chapterTag)?.mNumberFirst,
+            BASChapter403EntropyDoctrine.mNumberFirst)
+        XCTAssertEqual(
+            BASEntropyChapterIndex.phase2Entry(
+                forTag: BASChapter410EntropyDoctrine
+                    .chapterTag)?.mNumberLast,
+            BASChapter410EntropyDoctrine.mNumberLast)
+        XCTAssertEqual(
+            BASEntropyChapterIndex.phase2Entry(
+                forTag: BASChapter421EntropyDoctrine
+                    .chapterTag)?.mNumberLast,
+            BASChapter421EntropyDoctrine.mNumberLast)
+        XCTAssertEqual(
+            BASEntropyChapterIndex.phase2Entry(
+                forTag: BASChapter426EntropyDoctrine
+                    .chapterTag)?.mNumberLast,
+            BASChapter426EntropyDoctrine.mNumberLast)
+    }
+
+    // MARK: - Determinism
+
+    func testPhase2EntriesAreDeterministic() {
+        let a = BASEntropyChapterIndex.phase2Entries
+        let b = BASEntropyChapterIndex.phase2Entries
+        XCTAssertEqual(a, b)
     }
 
     // MARK: - Codable round-trip

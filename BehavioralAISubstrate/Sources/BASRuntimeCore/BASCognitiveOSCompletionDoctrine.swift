@@ -498,7 +498,23 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// preserved at every commit boundary。 V1 byte-equality
     /// preserved (5,706+ BAS tests pass)。 No G-status
     /// change。 Loop closed (完全 闭环)。
-    public static let doctrineVersion: String = "ADR-016.M1109"
+    /// M1115 bump:POST-RADICAL EVOLUTION SWEEP chapter
+    /// 四百三十四 — SAFETY SUBSTRATE + CANONICAL60 DRIVER。
+    /// 6 cuts (M1110-M1115):
+    /// (1) external consumer audit + Qinao SDK reality
+    ///     reflected in BASModuleConsolidationPolicy
+    ///     (chatCompletionsAdapter + mlxAdapter flipped
+    ///     to .blocked with explicit blockedReason),
+    /// (2) BASEntropyChapterIndex.phase2Entries —
+    ///     complete 31-entry mirror covering all Phase 2
+    ///     chapters (24 pre-RADICAL + 7 RADICAL),
+    /// (3) BASStressSweepCanonical60Driver — typed
+    ///     60-fixture set + identity/divergence stub
+    ///     runners — harness now exercisable end-to-end,
+    /// (4-6) chapter close-out + Phase 2 + ADR-016 bumps。
+    /// No destructive ops。 V1 byte-equality preserved
+    /// (5,710+ BAS tests pass)。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1115"
 
     /// Query the typed status of a specific gap。
     public static func status(

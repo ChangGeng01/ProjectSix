@@ -25,13 +25,13 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1109",
+            "ADR-016.M1115",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
-            "stability doctrine。 M1109 RADICAL EVOLUTION SWEEP" +
-            " deep-review remediation round 2:bumped from" +
-            " M1107 (chapter 四百三十三 self-extension —" +
-            " M1108 + M1109 land as 5th + 6th cuts)")
+            "stability doctrine。 M1115 POST-RADICAL safety" +
+            " substrate + canonical60 driver:bumped from" +
+            " M1109 (chapter 四百三十四 ships 6 cuts" +
+            " M1110-M1115)")
     }
 
     // MARK: - Per-gap status pins
