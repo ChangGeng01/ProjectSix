@@ -417,6 +417,26 @@ public enum BASEntropyChapterIndex {
                 " offers complete typed API for distributed" +
                 " consumers without boilerplate。 ADR-016" +
                 " → M1151 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十四",
+            mNumberFirst: 1152,
+            mNumberLast: 1155,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 15 entry — PER-STAGE" +
+                " EVENT PAYLOAD。 BASNativeStagePerStepEvent" +
+                "Payload typed Codable + 8 fields +" +
+                " factory bridging from chapter 439" +
+                " per-turn record + 7th BASEventPayloadKind" +
+                " case + EXTENDED BASEventLogReplayBundle" +
+                " to 7 fields。 Sibling of chapter 439" +
+                " per-turn dispatch event for fine-grained" +
+                " causal-graph extraction。 Engine does" +
+                " NOT auto-emit per-step events;hosts" +
+                " opt-in directly。 ADR-016 → M1155 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

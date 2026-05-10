@@ -121,6 +121,19 @@ public enum BASEventPayloadKind:
     /// from event stream alone — full routed-dispatch
     /// surface (capture → honor) becomes event-replayable。
     case planAssignment = "plan-assignment-event"
+
+    /// M1153 native-stage per-step payload (chapter
+    /// 四百四十四 — POST-RADICAL Wave 15)。 Sibling of
+    /// `nativeStageDispatch` (per-turn aggregate);
+    /// `nativeStagePerStep` carries ONE stage step's
+    /// dispatch outcome per event entry。 Enables
+    /// fine-grained causal-graph extraction at the
+    /// stage level without unbundling the per-turn
+    /// payload。 OPT-IN — engine does not auto-emit
+    /// per-step events;hosts opt in directly via
+    /// `BASEventLogEntry.nativeStagePerStepEvent(...)`。
+    case nativeStagePerStep =
+        "native-stage-per-step-event"
 }
 
 // MARK: - BASEventLogEntry accessor

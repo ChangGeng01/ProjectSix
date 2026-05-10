@@ -38,17 +38,17 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
                 "non-integer M-suffix")
         }
         // Latest chapter must end at this M-number。 Today
-        // chapter 四百四十三 is the latest with mNumberLast
-        // M1151 (POST-RADICAL Wave 14 — cross-session
-        // replay assembly);the doctrine version should be
-        // M1151 OR any later M-number bumped by a NEW
-        // chapter that we haven't yet listed in this test。
+        // chapter 四百四十四 is the latest with mNumberLast
+        // M1155 (POST-RADICAL Wave 15 — per-stage event
+        // payload);the doctrine version should be M1155
+        // OR any later M-number bumped by a NEW chapter
+        // that we haven't yet listed in this test。
         XCTAssertGreaterThanOrEqual(
             docMNumber,
-            BASChapter443EntropyDoctrine.mNumberLast,
+            BASChapter444EntropyDoctrine.mNumberLast,
             "doctrineVersion M-suffix must be >= latest" +
             " known chapter mNumberLast (currently " +
-            "chapter 四百四十三 at M\(BASChapter443EntropyDoctrine.mNumberLast))")
+            "chapter 四百四十四 at M\(BASChapter444EntropyDoctrine.mNumberLast))")
     }
 
     // MARK: - Phase 2 doctrine ends at latest chapter
@@ -56,14 +56,14 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
     func testPhase2DoctrineEndsAtLatestChapter() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine.mNumberLast,
-            BASChapter443EntropyDoctrine.mNumberLast,
+            BASChapter444EntropyDoctrine.mNumberLast,
             "Phase 2 doctrine mNumberLast must equal " +
             "latest chapter's mNumberLast (chapter " +
-            "四百四十三 at M1151)")
+            "四百四十四 at M1155)")
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            BASChapter443EntropyDoctrine.chapterTag,
+            BASChapter444EntropyDoctrine.chapterTag,
             "Phase 2 doctrine last chapter tag must " +
             "equal latest chapter doctrine tag")
     }

@@ -671,7 +671,25 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// composing bundles deterministically。 V1 byte-
     /// equality preserved (5,930+ BAS tests pass)。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1151"
+    /// M1155 bump:POST-RADICAL EVOLUTION SWEEP Wave 15
+    /// — chapter 四百四十四 ships PER-STAGE EVENT
+    /// PAYLOAD。 4 cuts (M1152-M1155):
+    /// (1) recon shape + design,
+    /// (2) BASNativeStagePerStepEventPayload typed
+    ///     Codable + factory + projector + 7th
+    ///     BASEventPayloadKind case + EXTENDED
+    ///     BASEventLogReplayBundle to 7 fields,
+    /// (3) 13 pin tests
+    ///     (BASNativeStagePerStepEventPayloadTests),
+    /// (4) chapter close-out + bumps。
+    /// First chapter where unified event log carries
+    /// 7 typed payload kinds with a sibling per-stage
+    /// granularity option for fine-grained causal-graph
+    /// extraction。 Engine does NOT auto-emit per-step
+    /// events (5-10x volume) — hosts opt-in directly。
+    /// V1 byte-equality preserved (5,940+ BAS tests
+    /// pass)。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1155"
 
     /// Query the typed status of a specific gap。
     public static func status(

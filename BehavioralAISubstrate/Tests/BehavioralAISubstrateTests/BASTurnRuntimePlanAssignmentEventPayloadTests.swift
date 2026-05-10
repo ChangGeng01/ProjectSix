@@ -296,14 +296,16 @@ final class BASTurnRuntimePlanAssignmentEventPayloadTests:
     }
 
     func testAllPayloadKindsCount() {
-        // After M1140,unified event log carries 6
+        // After M1153,unified event log carries 7
         // typed payload kinds:
         //   memoryAtom / turnLifecycle / permitEscalation
-        //   parallelStage / nativeStageDispatch / planAssignment
+        //   parallelStage / nativeStageDispatch /
+        //   planAssignment / nativeStagePerStep
         XCTAssertEqual(
-            BASEventPayloadKind.allCases.count, 6,
-            "M1140 POST-RADICAL Wave 12:bumped from" +
-            " 5 to 6 payload kinds")
+            BASEventPayloadKind.allCases.count, 7,
+            "M1153 POST-RADICAL Wave 15:bumped from" +
+            " 6 to 7 payload kinds (added" +
+            " nativeStagePerStep)")
     }
 
     // MARK: - Determinism

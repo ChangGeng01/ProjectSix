@@ -126,6 +126,13 @@ public struct BASEventLogReplayBundle:
     public let planAssignmentEvents:
         [BASTurnRuntimePlanAssignmentEventPayload]
 
+    /// M1153 chapter 四百四十四 per-step dispatch events
+    /// (one entry per stage step,sibling of the per-
+    /// turn nativeStageDispatchEvents)。 Empty unless
+    /// the host opted in via direct emission。
+    public let nativeStagePerStepEvents:
+        [BASNativeStagePerStepEventPayload]
+
     public init(
         memoryAtomEvents: [BASMemoryAtomEventPayload],
         turnLifecycleEvents: [BASTurnLifecycleEventPayload],
@@ -135,7 +142,9 @@ public struct BASEventLogReplayBundle:
         nativeStageDispatchEvents:
             [BASNativeStageDispatchEventPayload],
         planAssignmentEvents:
-            [BASTurnRuntimePlanAssignmentEventPayload]
+            [BASTurnRuntimePlanAssignmentEventPayload],
+        nativeStagePerStepEvents:
+            [BASNativeStagePerStepEventPayload] = []
     ) {
         self.memoryAtomEvents = memoryAtomEvents
         self.turnLifecycleEvents = turnLifecycleEvents
@@ -144,11 +153,13 @@ public struct BASEventLogReplayBundle:
         self.nativeStageDispatchEvents =
             nativeStageDispatchEvents
         self.planAssignmentEvents = planAssignmentEvents
+        self.nativeStagePerStepEvents =
+            nativeStagePerStepEvents
     }
 
     /// Empty bundle for an event log slice that contained
     /// no typed-payload entries (e.g. only legacy
-    /// pre-typed events,or a fresh storage)。 All 6
+    /// pre-typed events,or a fresh storage)。 All 7
     /// arrays empty。
     public static let empty: BASEventLogReplayBundle =
         BASEventLogReplayBundle(
@@ -157,9 +168,10 @@ public struct BASEventLogReplayBundle:
             parallelStageEvents: [],
             permitEscalationEvents: [],
             nativeStageDispatchEvents: [],
-            planAssignmentEvents: [])
+            planAssignmentEvents: [],
+            nativeStagePerStepEvents: [])
 
-    /// Total event count across all 6 typed payload
+    /// Total event count across all 7 typed payload
     /// kinds。 Cheap sanity assertion for tests + replay
     /// consumers that want to verify the bundle is
     /// fully populated。
@@ -170,11 +182,12 @@ public struct BASEventLogReplayBundle:
             + permitEscalationEvents.count
             + nativeStageDispatchEvents.count
             + planAssignmentEvents.count
+            + nativeStagePerStepEvents.count
     }
 
     /// Per-kind event count map。 Useful for replay
     /// audit logs that want to print a breakdown without
-    /// hand-coding 6 lines。 Keys match
+    /// hand-coding 7 lines。 Keys match
     /// `BASEventPayloadKind.rawValue` for easy matching
     /// against the discriminator action tag。
     public var perKindEventCount: [String: Int] {
@@ -191,7 +204,10 @@ public struct BASEventLogReplayBundle:
                 .nativeStageDispatch.rawValue:
                 nativeStageDispatchEvents.count,
             BASEventPayloadKind.planAssignment.rawValue:
-                planAssignmentEvents.count
+                planAssignmentEvents.count,
+            BASEventPayloadKind
+                .nativeStagePerStep.rawValue:
+                nativeStagePerStepEvents.count
         ]
     }
 
@@ -237,7 +253,10 @@ public struct BASEventLogReplayBundle:
                     other.nativeStageDispatchEvents,
             planAssignmentEvents:
                 planAssignmentEvents +
-                    other.planAssignmentEvents)
+                    other.planAssignmentEvents,
+            nativeStagePerStepEvents:
+                nativeStagePerStepEvents +
+                    other.nativeStagePerStepEvents)
     }
 
     /// Combine an arbitrary list of bundles into one。
@@ -293,7 +312,9 @@ extension BASEventLogProjectors {
             nativeStageDispatchEvents:
                 projectNativeStageDispatchEvents(entries),
             planAssignmentEvents:
-                projectPlanAssignmentEvents(entries))
+                projectPlanAssignmentEvents(entries),
+            nativeStagePerStepEvents:
+                projectNativeStagePerStepEvents(entries))
     }
 
     // MARK: - chapter 四百四十三 / M1149 — cross-session factory
