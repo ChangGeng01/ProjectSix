@@ -25,12 +25,12 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1131",
+            "ADR-016.M1135",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
-            "stability doctrine。 M1131 POST-RADICAL Wave 9:" +
-            "bumped from M1127 (chapter 四百三十八 ships 4" +
-            " cuts M1128-M1131 — host-side injection)")
+            "stability doctrine。 M1135 POST-RADICAL Wave 10:" +
+            "bumped from M1131 (chapter 四百三十九 ships 4" +
+            " cuts M1132-M1135 — dispatch ↔ event log bridge)")
     }
 
     // MARK: - Per-gap status pins

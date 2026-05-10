@@ -97,6 +97,17 @@ public enum BASEventPayloadKind:
     /// per-fan-out result summary so downstream replay
     /// can rebuild the stage ledger from events。
     case parallelStage = "parallel-stage-event"
+
+    /// M1132 native-stage dispatch payload (chapter
+    /// 四百三十九 — POST-RADICAL Wave 10)。 Encodes the
+    /// chapter 436 BASNativeStageDispatchLedger as a
+    /// typed event so the unified event log carries
+    /// proof of which stages honored their scheduler
+    /// assignment and which fell through to the
+    /// fallback path。 Future replay can rebuild the
+    /// dispatch ledger from event stream alone。
+    case nativeStageDispatch =
+        "native-stage-dispatch-event"
 }
 
 // MARK: - BASEventLogEntry accessor

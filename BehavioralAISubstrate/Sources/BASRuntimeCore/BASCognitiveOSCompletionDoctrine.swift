@@ -578,7 +578,24 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// remaining "更硬核" gap is purely host-side。 V1
     /// byte-equality preserved (5,800+ BAS tests pass)。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1131"
+    /// M1135 bump:POST-RADICAL EVOLUTION SWEEP Wave 10
+    /// — chapter 四百三十九 ships DISPATCH ↔ EVENT LOG
+    /// BRIDGE。 4 cuts (M1132-M1135):
+    /// (1) BASEventPayloadKind 5th case + typed
+    ///     BASNativeStageDispatchEventPayload struct,
+    /// (2) BASEventLogEntry factory + reverse accessor
+    ///     + BASEventLogProjectors projector,
+    /// (3) 13 tests proving end-to-end round-trip,
+    /// (4) chapter close-out + bumps。
+    /// First chapter where the substrate has ZERO
+    /// blackbox actor state for runtime decisions —
+    /// every choice surfaces through 5 typed event-log
+    /// payload kinds (memoryAtom + turnLifecycle +
+    /// parallelStage + permitEscalation +
+    /// nativeStageDispatch)。 V1 byte-equality
+    /// preserved (5,830+ BAS tests pass)。 No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M1135"
 
     /// Query the typed status of a specific gap。
     public static func status(

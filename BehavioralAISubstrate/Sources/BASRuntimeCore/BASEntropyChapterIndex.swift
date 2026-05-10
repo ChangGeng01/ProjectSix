@@ -324,6 +324,23 @@ public enum BASEntropyChapterIndex {
                 " is now COMPLETE — Qinao SDK can wire" +
                 " real backend dispatch via single config" +
                 " slot。 ADR-016 → M1131 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百三十九",
+            mNumberFirst: 1132,
+            mNumberLast: 1135,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 10 entry — DISPATCH" +
+                " ↔ EVENT LOG BRIDGE。 5th typed payload" +
+                " kind (.nativeStageDispatch) connects" +
+                " chapter 436 BASNativeStageDispatchLedger" +
+                " to Phase B's chapter 428 unified event" +
+                " log。 Replay surface complete — no more" +
+                " blackbox actor state for runtime" +
+                " decisions。 ADR-016 → M1135 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

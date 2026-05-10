@@ -695,6 +695,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter438EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter438EntropyDoctrine
+                    .summary),
+            // M1135 POST-RADICAL Wave 10 (dispatch ↔ event log bridge)
+            check("四百三十九",
+                tag: BASChapter439EntropyDoctrine.chapterTag,
+                first: BASChapter439EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter439EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter439EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter439EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter439EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter439EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter439EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter439EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -816,7 +835,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter437EntropyDoctrine.mNumberLast),
             // M1131 POST-RADICAL Wave 9 (host-side injection)
             ("438", BASChapter438EntropyDoctrine.mNumberFirst,
-             BASChapter438EntropyDoctrine.mNumberLast)
+             BASChapter438EntropyDoctrine.mNumberLast),
+            // M1135 POST-RADICAL Wave 10 (dispatch ↔ event log bridge)
+            ("439", BASChapter439EntropyDoctrine.mNumberFirst,
+             BASChapter439EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -956,6 +978,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter438EntropyDoctrine.mNumberFirst,
             last: BASChapter438EntropyDoctrine.mNumberLast,
             tag: "四百三十八")
+        // M1135 POST-RADICAL Wave 10 (dispatch ↔ event log bridge)
+        verifyKnivesRange(
+            BASChapter439EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter439EntropyDoctrine.mNumberFirst,
+            last: BASChapter439EntropyDoctrine.mNumberLast,
+            tag: "四百三十九")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

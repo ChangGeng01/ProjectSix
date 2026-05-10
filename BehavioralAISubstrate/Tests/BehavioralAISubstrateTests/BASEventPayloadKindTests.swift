@@ -7,12 +7,13 @@ final class BASEventPayloadKindTests: XCTestCase {
 
     // MARK: - 4 cases shipped
 
-    func testFourPayloadKindsShipped() {
+    func testFivePayloadKindsShipped() {
         XCTAssertEqual(
-            BASEventPayloadKind.allCases.count, 4,
-            "M1084 ships 4 payload kinds:memoryAtom" +
-            " / turnLifecycle / permitEscalation /" +
-            " parallelStage")
+            BASEventPayloadKind.allCases.count, 5,
+            "M1132 chapter 四百三十九 (Wave 10):bumped" +
+            " from 4 to 5 (added .nativeStageDispatch" +
+            " for chapter 436 dispatch ledger event-log" +
+            " emission)")
     }
 
     // MARK: - Raw values byte-stable + match action tags
@@ -43,6 +44,13 @@ final class BASEventPayloadKindTests: XCTestCase {
         XCTAssertEqual(
             BASEventPayloadKind.parallelStage.rawValue,
             "parallel-stage-event")
+    }
+
+    func testNativeStageDispatchRawValue() {
+        XCTAssertEqual(
+            BASEventPayloadKind
+                .nativeStageDispatch.rawValue,
+            "native-stage-dispatch-event")
     }
 
     // MARK: - Codable round-trip

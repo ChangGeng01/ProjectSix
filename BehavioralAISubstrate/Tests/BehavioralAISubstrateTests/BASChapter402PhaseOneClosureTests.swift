@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1131",
-            "M1131:doctrine version reflects POST-RADICAL Wave 9 host-side injection (chapter 四百三十八 4 cuts M1128-M1131)")
+            "ADR-016.M1135",
+            "M1135:doctrine version reflects POST-RADICAL Wave 10 dispatch ↔ event log bridge (chapter 四百三十九 4 cuts M1132-M1135)")
     }
 
     // MARK: - M-number range matches chapter 四百二
