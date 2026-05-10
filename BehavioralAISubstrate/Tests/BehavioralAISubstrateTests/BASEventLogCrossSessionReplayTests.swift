@@ -428,4 +428,99 @@ final class BASEventLogCrossSessionReplayTests:
         XCTAssertEqual(r1.memoryAtomEvents.count, 2,
             "combining preserves duplicates per input")
     }
+
+    // MARK: - Polish pass 3 — algebraic invariants
+
+    /// `merging(_:)` is ASSOCIATIVE:for all bundles
+    /// A, B, C the identity
+    ///     `(A.merging(B)).merging(C) == A.merging(B.merging(C))`
+    /// holds。 Pins the property against future
+    /// implementation changes (e.g. if merging ever
+    /// added cross-bundle de-duplication or sorting,
+    /// associativity could silently break)。 Currently
+    /// associativity follows trivially from merge being
+    /// per-kind concatenation,but the test makes the
+    /// property explicit so a regression fails loudly。
+    func testMergingIsAssociative() {
+        let a = BASEventLogReplayBundle(
+            memoryAtomEvents: [
+                makeMemoryAtomPayload(atomID: "a")
+            ],
+            turnLifecycleEvents: [
+                makeTurnLifecyclePayload(
+                    turnID: "tA")
+            ],
+            parallelStageEvents: [],
+            permitEscalationEvents: [],
+            nativeStageDispatchEvents: [],
+            planAssignmentEvents: [
+                makePlanAssignmentPayload(
+                    turnID: "tA")
+            ])
+        let b = BASEventLogReplayBundle(
+            memoryAtomEvents: [
+                makeMemoryAtomPayload(atomID: "b1"),
+                makeMemoryAtomPayload(atomID: "b2")
+            ],
+            turnLifecycleEvents: [],
+            parallelStageEvents: [],
+            permitEscalationEvents: [],
+            nativeStageDispatchEvents: [],
+            planAssignmentEvents: [])
+        let c = BASEventLogReplayBundle(
+            memoryAtomEvents: [],
+            turnLifecycleEvents: [
+                makeTurnLifecyclePayload(
+                    turnID: "tC")
+            ],
+            parallelStageEvents: [],
+            permitEscalationEvents: [],
+            nativeStageDispatchEvents: [],
+            planAssignmentEvents: [
+                makePlanAssignmentPayload(
+                    turnID: "tC")
+            ])
+        let leftAssociated =
+            a.merging(b).merging(c)
+        let rightAssociated =
+            a.merging(b.merging(c))
+        XCTAssertEqual(
+            leftAssociated, rightAssociated,
+            "merging(_:) must be associative — " +
+            "(A⊕B)⊕C must equal A⊕(B⊕C)。 If this" +
+            " test fails the merge implementation has" +
+            " drifted from pure concatenation")
+    }
+
+    /// `.empty` is the IDENTITY element for
+    /// `merging(_:)` on both sides:
+    ///     `A.merging(.empty) == A`
+    ///     `.empty.merging(A) == A`
+    /// Already implicitly tested by
+    /// `testMergingWithEmptyIsIdentity`,but pinning
+    /// both directions explicitly as the algebraic-law
+    /// statement reads cleaner at the test name level
+    /// and protects against asymmetric regressions。
+    func testMergingHasEmptyIdentityBothSides() {
+        let bundle = BASEventLogReplayBundle(
+            memoryAtomEvents: [
+                makeMemoryAtomPayload(atomID: "x")
+            ],
+            turnLifecycleEvents: [],
+            parallelStageEvents: [],
+            permitEscalationEvents: [],
+            nativeStageDispatchEvents: [],
+            planAssignmentEvents: [
+                makePlanAssignmentPayload(
+                    turnID: "tX")
+            ])
+        XCTAssertEqual(
+            bundle.merging(.empty), bundle,
+            "right identity: A⊕empty == A")
+        XCTAssertEqual(
+            BASEventLogReplayBundle.empty
+                .merging(bundle),
+            bundle,
+            "left identity: empty⊕A == A")
+    }
 }
