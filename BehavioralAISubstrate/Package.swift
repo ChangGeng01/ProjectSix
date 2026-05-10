@@ -208,7 +208,15 @@ let package = Package(
                 // paper §5.4). The schema lives in BASWorldPrior;
                 // host kit imports it to type the audit entry's
                 // optional parameter.
-                "BASWorldPrior"
+                "BASWorldPrior",
+                // M1100 — Phase F entry。 BASTurnRuntimeEngine
+                // Configuration grows optional `metalKernelRegistry`
+                // + `aneCapability` slots so callers can wire
+                // BASMetalSubstrate primitives into the runtime
+                // composition path。 BASHardwareAwareScheduler
+                // (M1102) consumes the same primitives via
+                // injection。
+                "BASMetalSubstrate"
             ]
         ),
         .testTarget(name: "BehavioralAISubstrateTests", dependencies: [
