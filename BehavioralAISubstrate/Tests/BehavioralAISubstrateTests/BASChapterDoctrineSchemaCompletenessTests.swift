@@ -485,6 +485,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                     .plannedFutureCuts.count,
                 summary: BASChapter427EntropyDoctrine
                     .summary),
+            // M1087 RADICAL EVOLUTION SWEEP Phase B backfill
+            check("四百二十八",
+                tag: BASChapter428EntropyDoctrine.chapterTag,
+                first: BASChapter428EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter428EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter428EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter428EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter428EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter428EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter428EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter428EntropyDoctrine
+                    .summary),
             // M1099 RADICAL EVOLUTION SWEEP Phase E
             // (M1084-M1095 reserved gap for Phase B/C/D
             // backfill — chapters 四百二十八/四百二十九/四百三十)
@@ -606,9 +625,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             // (M1078-M1079 reserved gap)
             ("427", BASChapter427EntropyDoctrine.mNumberFirst,
              BASChapter427EntropyDoctrine.mNumberLast),
+            // M1087 RADICAL EVOLUTION SWEEP Phase B
+            // backfill (chapter 428 fills the M1084-M1087
+            // slot of the prior reserved gap)
+            ("428", BASChapter428EntropyDoctrine.mNumberFirst,
+             BASChapter428EntropyDoctrine.mNumberLast),
             // M1099 RADICAL EVOLUTION SWEEP Phase E
-            // (M1084-M1095 reserved gap for Phase B/C/D
-            // backfill)
+            // (M1088-M1095 still reserved for Phase C/D)
             ("431", BASChapter431EntropyDoctrine.mNumberFirst,
              BASChapter431EntropyDoctrine.mNumberLast),
             // M1103 RADICAL EVOLUTION SWEEP Phase F
@@ -676,6 +699,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter427EntropyDoctrine.mNumberFirst,
             last: BASChapter427EntropyDoctrine.mNumberLast,
             tag: "四百二十七")
+        // M1087 RADICAL EVOLUTION SWEEP Phase B backfill
+        verifyKnivesRange(
+            BASChapter428EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter428EntropyDoctrine.mNumberFirst,
+            last: BASChapter428EntropyDoctrine.mNumberLast,
+            tag: "四百二十八")
         // M1099 RADICAL EVOLUTION SWEEP Phase E
         verifyKnivesRange(
             BASChapter431EntropyDoctrine.knives.map {
