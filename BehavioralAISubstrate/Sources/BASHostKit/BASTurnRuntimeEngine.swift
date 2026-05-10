@@ -144,6 +144,15 @@ public actor BASTurnRuntimeEngine {
     private var lastDispatchLedger:
         BASNativeStageDispatchLedger = .empty
 
+    /// chapter 四百四十 / M1137 — eventID of the most-
+    /// recent `BASNativeStageDispatchEventPayload` the
+    /// engine emitted to the configured event log,or
+    /// nil if the engine has never emitted one (either
+    /// because `eventLog` is nil OR the routed
+    /// dispatch path hasn't fired)。 Surfaced via
+    /// `lastEmittedDispatchEventID()` for tests + audit。
+    private var lastEmittedDispatchEventID: String? = nil
+
     /// Most-recent `BASTurnRuntimePlanAssignmentLedger`
     /// captured by `runWithPlan(...)`。 `.unwired` until
     /// the first scheduler-consuming call。 Surfaced via
@@ -242,6 +251,23 @@ public actor BASTurnRuntimeEngine {
         -> BASNativeStageDispatchLedger
     {
         return lastDispatchLedger
+    }
+
+    // MARK: - chapter 四百四十 / M1137 — emitted event ID accessor
+
+    /// Returns the eventID of the most-recent
+    /// `BASNativeStageDispatchEventPayload` the engine
+    /// auto-emitted to the configured event log。
+    /// Returns nil when `eventLog` is nil (no emission
+    /// happens) OR when no `runWithPlan(...)` call has
+    /// ever taken the routed path (lastDispatchLedger
+    /// stays empty,emission gate skips)。 Used by
+    /// tests + audit consumers to verify dispatch
+    /// event emission fires end-to-end。
+    public func lastEmittedNativeStageDispatchEventID()
+        -> String?
+    {
+        return lastEmittedDispatchEventID
     }
 
     // MARK: - Phase F dispatch probe accessor (M1101)
@@ -454,6 +480,17 @@ public actor BASTurnRuntimeEngine {
             stageLedger: stageLedger,
             stagePlan: plan,
             timestampMsOverride: timestampMsOverride)
+        // chapter 四百四十 / M1137 — auto-emit dispatch
+        // event payload to the configured event log when
+        // (1) eventLog is wired AND (2) the routed
+        // dispatch path actually fired (executionCount
+        // > 0)。 Connects chapter 439 typed payload to
+        // chapter 437 routed dispatch through the
+        // unified event log。 V1 byte-equality preserved
+        // when eventLog == nil OR ledger empty。
+        await emitNativeStageDispatchEventIfNeeded(
+            for: result,
+            timestampMsOverride: timestampMsOverride)
         return result
     }
 
@@ -585,5 +622,52 @@ public actor BASTurnRuntimeEngine {
             }
         }
         return ledger
+    }
+
+    // MARK: - chapter 四百四十 / M1137 — auto-emit helper
+
+    /// Emit a `BASNativeStageDispatchEventPayload` to
+    /// the configured event log when:
+    ///   1. `eventLog` is wired (non-nil)
+    ///   2. `lastDispatchLedger.executionCount > 0`
+    ///      (routed dispatch fired,not just empty
+    ///      fallback)
+    ///
+    /// When either condition fails,helper is a no-op
+    /// and `lastEmittedDispatchEventID` stays nil
+    /// (engine took the V1-fallback path or has no
+    /// event log to emit to)。 Pure additive
+    /// observability — V1 byte-equality preserved。
+    private func emitNativeStageDispatchEventIfNeeded(
+        for result: BASEBrainTurnResult,
+        timestampMsOverride: Int64?
+    ) async {
+        guard let log = eventLog else { return }
+        guard lastDispatchLedger.executionCount > 0
+        else { return }
+        let timestampMs = timestampMsOverride ?? clockMs()
+        let nextSeq = sequenceCounter
+        sequenceCounter += 1
+        let turnID =
+            result.sovereignAuditEntry?.turnID ??
+            result.runtimeTrace.sessionID
+        let payload = BASNativeStageDispatchEventPayload
+            .from(
+                ledger: lastDispatchLedger,
+                turnID: turnID)
+        let eventID = eventIDFactory()
+        let entry = BASEventLogEntry
+            .nativeStageDispatchEvent(
+                eventID: eventID,
+                timestampMs: timestampMs,
+                sessionID: result.runtimeTrace.sessionID,
+                sequenceNumber: Int64(nextSeq),
+                payload: payload)
+        // BASEventLogStorage.append is async throws —
+        // swallow any storage failure here。 Audit
+        // emission is hint-only (红线 7);failure to
+        // emit must not break runtime correctness。
+        _ = try? await log.append(entry)
+        lastEmittedDispatchEventID = eventID
     }
 }

@@ -595,7 +595,21 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// nativeStageDispatch)。 V1 byte-equality
     /// preserved (5,830+ BAS tests pass)。 No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M1135"
+    /// M1139 bump:POST-RADICAL EVOLUTION SWEEP Wave 11
+    /// — chapter 四百四十 ships DISPATCH AUTO-EMIT。 4
+    /// cuts (M1136-M1139):
+    /// (1) recon BASEventLogStorage.append signature,
+    /// (2) BASTurnRuntimeEngine wiring +
+    ///     emitNativeStageDispatchEventIfNeeded helper +
+    ///     lastEmittedDispatchEventID tracking field,
+    /// (3) 5 compile-pin + guard-logic tests,
+    /// (4) chapter close-out + bumps。
+    /// First chapter where substrate-side autonomy is
+    /// COMPLETE — hosts only need to wire the event
+    /// log,everything else flows through automatically。
+    /// V1 byte-equality preserved (5,850+ BAS tests
+    /// pass)。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1139"
 
     /// Query the typed status of a specific gap。
     public static func status(

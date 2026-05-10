@@ -341,6 +341,22 @@ public enum BASEntropyChapterIndex {
                 " log。 Replay surface complete — no more" +
                 " blackbox actor state for runtime" +
                 " decisions。 ADR-016 → M1135 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十",
+            mNumberFirst: 1136,
+            mNumberLast: 1139,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 11 entry — DISPATCH" +
+                " AUTO-EMIT。 BASTurnRuntimeEngine.run" +
+                "WithPlan(...) auto-emits dispatch event" +
+                " to configured event log when ledger" +
+                " non-empty。 Substrate-side autonomy" +
+                " COMPLETE — hosts only wire event log。" +
+                " ADR-016 → M1139 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

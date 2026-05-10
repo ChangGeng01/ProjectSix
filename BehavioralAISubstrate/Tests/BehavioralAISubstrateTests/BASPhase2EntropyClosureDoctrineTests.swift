@@ -20,10 +20,10 @@ final class BASPhase2EntropyClosureDoctrineTests:
     func testNineteenChapterTagsShipped() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 37,
-            "M1135 POST-RADICAL Wave 10 (dispatch ↔" +
-            " event log bridge):bumped from 36 to 37" +
-            " (added chapter 四百三十九)")
+                .chapterTagsShipped.count, 38,
+            "M1139 POST-RADICAL Wave 11 (dispatch" +
+            " auto-emit):bumped from 37 to 38 (added" +
+            " chapter 四百四十)")
     }
 
     func testFirstChapterIs403() {
@@ -33,13 +33,13 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs439() {
+    func testLastChapterIs440() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百三十九",
-            "M1135 POST-RADICAL Wave 10:bumped from" +
-            " 四百三十八 to 四百三十九")
+            "chapter 四百四十",
+            "M1139 POST-RADICAL Wave 11:bumped from" +
+            " 四百三十九 to 四百四十")
     }
 
     // MARK: - M-number range
@@ -50,24 +50,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
                 .mNumberFirst, 953)
     }
 
-    func testMNumberLastIs1135() {
+    func testMNumberLastIs1139() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .mNumberLast, 1135,
-            "M1135 POST-RADICAL Wave 10:bumped from" +
-            " 1131 to 1135 (chapter 439 covers" +
-            " M1132-M1135)")
+                .mNumberLast, 1139,
+            "M1139 POST-RADICAL Wave 11:bumped from" +
+            " 1135 to 1139 (chapter 440 covers" +
+            " M1136-M1139)")
     }
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped181() {
+    func testCommitsShipped185() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 181,
-            "M1135 POST-RADICAL Wave 10:bumped from" +
-            " 177 to 181 (chapter 439 ships 4 cuts" +
-            " M1132-M1135)")
+                .commitsShipped, 185,
+            "M1139 POST-RADICAL Wave 11:bumped from" +
+            " 181 to 185 (chapter 440 ships 4 cuts" +
+            " M1136-M1139)")
     }
 
     func testV2FoundationsCount12() {

@@ -93,7 +93,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百三十六",   // M1120-M1123 (POST-RADICAL Wave 7 — first ledger-driven dispatch)
         "chapter 四百三十七",   // M1124-M1127 (POST-RADICAL Wave 8 — end-to-end routed dispatch)
         "chapter 四百三十八",   // M1128-M1131 (POST-RADICAL Wave 9 — host-side injection)
-        "chapter 四百三十九"    // M1132-M1135 (POST-RADICAL Wave 10 — dispatch ↔ event log bridge)
+        "chapter 四百三十九",   // M1132-M1135 (POST-RADICAL Wave 10 — dispatch ↔ event log bridge)
+        "chapter 四百四十"      // M1136-M1139 (POST-RADICAL Wave 11 — dispatch auto-emit)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -102,21 +103,21 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// Last M-number of Phase 2 entropy work。 Bumped:
     /// M1057 → M1065 → M1069 → M1073 → M1077 → M1083 →
     /// M1099 → M1103 → M1107 → M1109 → M1115 → M1119 →
-    /// M1123 → M1127 → M1131 → M1135 (chapter 四百三十九
-    /// POST-RADICAL Wave 10 — dispatch ↔ event log
-    /// bridge chapter)。 M1078-M1079 reserved for
+    /// M1123 → M1127 → M1131 → M1135 → M1139 (chapter
+    /// 四百四十 POST-RADICAL Wave 11 — dispatch auto-
+    /// emit chapter)。 M1078-M1079 reserved for
     /// post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1135
+    public static let mNumberLast: Int = 1139
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1135,with M1078-M1079 reserved for post-Phase-A
+    /// M1139,with M1078-M1079 reserved for post-Phase-A
     /// follow-up)。
     /// Bumped:105 → 113 → 117 → 121 → 125 → 129 → 133 →
     /// 137 → 141 → 145 → 149 → 153 → 155 → 161 → 165 →
-    /// 169 → 173 → 177 → 181 (chapter 四百三十九 4 cuts:
-    /// M1132 payload kind + M1133 factory/projector +
-    /// M1134 tests + M1135 close-out)。
-    public static let commitsShipped: Int = 181
+    /// 169 → 173 → 177 → 181 → 185 (chapter 四百四十 4
+    /// cuts:M1136 recon + M1137 engine wiring + M1138
+    /// tests + M1139 close-out)。
+    public static let commitsShipped: Int = 185
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
