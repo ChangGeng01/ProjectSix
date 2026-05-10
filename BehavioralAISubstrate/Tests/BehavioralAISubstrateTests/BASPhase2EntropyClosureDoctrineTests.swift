@@ -20,9 +20,9 @@ final class BASPhase2EntropyClosureDoctrineTests:
     func testNineteenChapterTagsShipped() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .chapterTagsShipped.count, 25,
-            "M1083 RADICAL EVOLUTION SWEEP Phase A:" +
-            " bumped from 24 to 25")
+                .chapterTagsShipped.count, 26,
+            "M1099 RADICAL EVOLUTION SWEEP Phase E:" +
+            " bumped from 25 to 26")
     }
 
     func testFirstChapterIs403() {
@@ -32,13 +32,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs427() {
+    func testLastChapterIs431() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百二十七",
-            "M1083 RADICAL EVOLUTION SWEEP Phase A:" +
-            " bumped from 四百二十六 to 四百二十七")
+            "chapter 四百三十一",
+            "M1099 RADICAL EVOLUTION SWEEP Phase E:" +
+            " bumped from 四百二十七 to 四百三十一" +
+            " (Phase B/C/D backfill at chapters" +
+            " 四百二十八-四百三十 reserved)")
     }
 
     // MARK: - M-number range
@@ -49,23 +51,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
                 .mNumberFirst, 953)
     }
 
-    func testMNumberLastIs1083() {
+    func testMNumberLastIs1099() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .mNumberLast, 1083,
-            "M1083 RADICAL EVOLUTION SWEEP Phase A:" +
-            " bumped from 1077 to 1083")
+                .mNumberLast, 1099,
+            "M1099 RADICAL EVOLUTION SWEEP Phase E:" +
+            " bumped from 1083 to 1099 (M1084-M1095" +
+            " reserved gap for Phase B/C/D backfill)")
     }
 
     // MARK: - Cumulative metrics
 
-    func testCommitsShipped129() {
+    func testCommitsShipped133() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
-                .commitsShipped, 129,
-            "M1083 RADICAL EVOLUTION SWEEP Phase A:" +
-            " bumped from 125 to 129 (M1078-M1079" +
-            " reserved gap)")
+                .commitsShipped, 133,
+            "M1099 RADICAL EVOLUTION SWEEP Phase E:" +
+            " bumped from 129 to 133 (M1078-M1079" +
+            " + M1084-M1095 reserved gaps)")
     }
 
     func testV2FoundationsCount12() {

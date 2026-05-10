@@ -437,7 +437,23 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// 6 typed scaffolding params previously dead-on-arrival
     /// are now ACTIVATED。 ADR-014 OPT-IN held;V1 byte-equality
     /// preserved (5398+ BAS tests pass)。No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1083"
+    /// M1099 bump:RADICAL EVOLUTION SWEEP chapter 四百三十一
+    /// v1 close-out — NATIVE APPLE SILICON FOUNDATION
+    /// milestone。 Ships BASMetalSubstrate as the FIRST
+    /// substrate module to link Metal / MPS / MPSGraph /
+    /// Accelerate / CoreML at link-time + ship typed tensor
+    /// primitives (BASTensor / BASTensorShape /
+    /// BASTensorDescriptor) + ANE introspection
+    /// (BASANECapability / BASNeuralOp /
+    /// BASANECapabilityProbe actor) + unified kernel registry
+    /// (BASMetalKernelRegistry actor + BASMetalKernel
+    /// protocol) + 3 reference CPU kernels (BASMatMulKernel /
+    /// BASRMSNormKernel / BASRotaryEmbeddingKernel)。 ADR-014
+    /// OPT-IN held — no V1 hot path consumes BASMetalSubstrate
+    /// yet;Phase F scheduler will be the first consumer。 V1
+    /// byte-equality preserved (5,400+ BAS tests pass)。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1099"
 
     /// Query the typed status of a specific gap。
     public static func status(

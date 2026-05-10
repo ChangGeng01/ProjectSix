@@ -25,10 +25,12 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1083",
+            "ADR-016.M1099",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
-            "stability doctrine")
+            "stability doctrine。 M1099 RADICAL EVOLUTION SWEEP" +
+            " Phase E:bumped from M1083 (NATIVE APPLE SILICON" +
+            " FOUNDATION milestone)")
     }
 
     // MARK: - Per-gap status pins
