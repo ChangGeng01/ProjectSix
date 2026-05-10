@@ -294,13 +294,15 @@ final class BASPostRadicalSweepDoctrineTests:
             " BASSweepDoctrineExpectations doc-comment")
     }
 
-    /// SWEEP chapterTagsShipped MUST be a contiguous
-    /// suffix of BASPhase2EntropyClosureDoctrine
-    /// .chapterTagsShipped。 If a future Phase 2
-    /// chapter is appended without bumping the SWEEP
-    /// doctrine,this test fails — the SWEEP claim is
-    /// stale。
-    func testChapterTagsShippedMirrorsPhase2DoctrineTail() {
+    /// SWEEP chapterTagsShipped MUST appear as a
+    /// CONTIGUOUS SLICE inside
+    /// BASPhase2EntropyClosureDoctrine.chapterTagsShipped。
+    /// Originally was a suffix invariant;reframed to
+    /// contiguous-slice at chapter 447 ship — SWEEP
+    /// stayed frozen at chapter 446 but Phase 2
+    /// extended to chapter 447+,so SWEEP is now a
+    /// middle slice (not a suffix)。
+    func testChapterTagsShippedAppearsContiguouslyInPhase2() {
         let phase2 = BASPhase2EntropyClosureDoctrine
             .chapterTagsShipped
         let sweep = BASPostRadicalSweepDoctrine
@@ -309,15 +311,31 @@ final class BASPostRadicalSweepDoctrineTests:
             phase2.count, sweep.count,
             "Phase 2 must contain at least the sweep" +
             " chapters")
-        let suffix = Array(
-            phase2.suffix(sweep.count))
-        XCTAssertEqual(suffix, sweep,
+        guard let firstSweepIdx = phase2.firstIndex(
+            of: sweep[0])
+        else {
+            XCTFail(
+                "sweep firstChapterTag (\(sweep[0]))" +
+                " not found in Phase 2 — drift means" +
+                " Phase 2 lost a sweep chapter")
+            return
+        }
+        let endIdx = firstSweepIdx + sweep.count
+        guard endIdx <= phase2.count else {
+            XCTFail(
+                "sweep slice would overflow Phase 2" +
+                " end")
+            return
+        }
+        let sweepSliceInPhase2 = Array(
+            phase2[firstSweepIdx..<endIdx])
+        XCTAssertEqual(sweepSliceInPhase2, sweep,
             "BASPostRadicalSweepDoctrine.chapterTagsShipped" +
-            " must be a CONTIGUOUS SUFFIX of" +
+            " must appear as a CONTIGUOUS SLICE inside" +
             " BASPhase2EntropyClosureDoctrine" +
-            ".chapterTagsShipped — drift means SWEEP" +
-            " doctrine wasn't bumped after Phase 2 added" +
-            " a new chapter")
+            ".chapterTagsShipped (not necessarily as a" +
+            " suffix — chapter 447+ extends Phase 2" +
+            " past SWEEP boundary)")
     }
 
     /// SWEEP firstChapterTag must equal the actual
@@ -462,23 +480,25 @@ final class BASPostRadicalSweepDoctrineTests:
 
     // MARK: - Polish pass 2 cross-mirror invariants
 
-    /// Phase 2 doctrine's mNumberLast MUST equal the
-    /// sweep doctrine's mNumberLast — both track the
-    /// latest chapter shipped。 If a future Phase 2
-    /// chapter ships without bumping the SWEEP doctrine
-    /// (or vice versa),this test fails — the chain
-    /// has drifted。
-    func testPhase2DoctrineMNumberLastMatchesSweepMNumberLast() {
-        XCTAssertEqual(
+    /// Phase 2 doctrine's mNumberLast MUST be >= the
+    /// SWEEP doctrine's mNumberLast — Phase 2 is an
+    /// ongoing umbrella;SWEEP was a 17-wave snapshot
+    /// that closed at chapter 446。 chapter 447 onward
+    /// extends Phase 2 but NOT SWEEP (SWEEP intentionally
+    /// stays frozen as historical anchor)。 Loosened
+    /// from `==` to `>=` at chapter 447 ship。
+    func testPhase2MNumberLastIsAtLeastSweepMNumberLast() {
+        XCTAssertGreaterThanOrEqual(
             BASPhase2EntropyClosureDoctrine
                 .mNumberLast,
             BASPostRadicalSweepDoctrine.mNumberLast,
             "BASPhase2EntropyClosureDoctrine.mNumberLast" +
             " (\(BASPhase2EntropyClosureDoctrine.mNumberLast))" +
-            " must equal BASPostRadicalSweepDoctrine" +
+            " must be >= BASPostRadicalSweepDoctrine" +
             ".mNumberLast" +
             " (\(BASPostRadicalSweepDoctrine.mNumberLast))" +
-            " — both track the latest chapter shipped")
+            " — SWEEP is a frozen prefix of Phase 2's" +
+            " ongoing range")
     }
 
     /// Per-entry M-range cross-mirror:every sweep

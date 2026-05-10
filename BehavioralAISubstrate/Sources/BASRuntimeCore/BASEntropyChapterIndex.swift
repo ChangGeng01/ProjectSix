@@ -499,11 +499,49 @@ public enum BASEntropyChapterIndex {
     /// chapters (427-433) = 31 entries。 Hand-maintained
     /// at M1111 with field values cross-checked against
     /// the corresponding chapter doctrine `.swift` files
-    /// via grep audit。
+    /// via grep audit。 chapter 447 onward extends via
+    /// `postSweepRealExecutionEntries` — keeping SWEEP
+    /// chapter 446 frozen as the SWEEP narrative
+    /// snapshot。
     public static let phase2Entries:
         [BASEntropyChapterEntry] =
         prePhase2RadicalEntries +
-        radicalEvolutionEntries
+        radicalEvolutionEntries +
+        postSweepRealExecutionEntries
+
+    /// POST-SWEEP REAL EXECUTION FOLLOW-THROUGH entries
+    /// (chapter 447 onward)。 Chapter 446 closed the
+    /// SWEEP narrative as a discrete 17-wave snapshot;
+    /// chapter 447 opens the next chapter sequence
+    /// focused on real compute (vs scaffolding)。
+    /// SWEEP doctrine intentionally stays frozen at
+    /// chapter 446 so its narrative remains a historical
+    /// anchor。
+    public static let postSweepRealExecutionEntries:
+        [BASEntropyChapterEntry] =
+    [
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十七",
+            mNumberFirst: 1164,
+            mNumberLast: 1167,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION FOLLOW-" +
+                "THROUGH chapter 1 — FIRST REAL GPU" +
+                " KERNEL EXECUTION。 BASMPSGraphMatMul" +
+                "Kernel actor wraps MTLDevice +" +
+                " MPSMatrixMultiplication;input bytes" +
+                " actually flow CPU → MTLBuffer → GPU" +
+                " shaders → MTLBuffer → CPU。 4 PROOF" +
+                " tests verify byte-equal output +" +
+                " non-square shapes + GPU/CPU" +
+                " agreement。 「原生利用神经引擎」 first" +
+                " truthful endpoint。 ADR-016 → M1167" +
+                " advance")
+    ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
     /// 403-426)。 Hand-maintained — pinsCount /

@@ -25,13 +25,14 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1163",
+            "ADR-016.M1167",
             "Doctrine version pin: bumping requires explicit " +
             "audit migration per chapter 八十七 raw value " +
-            "stability doctrine。 M1163 POST-RADICAL Wave 17:" +
-            "bumped from M1159 (chapter 四百四十六 ships 4" +
-            " cuts M1160-M1163 — POST-RADICAL EVOLUTION SWEEP" +
-            " close-out meta-doctrine)。 Sweep complete")
+            "stability doctrine。 M1167 POST-SWEEP REAL " +
+            "EXECUTION FOLLOW-THROUGH chapter 1:bumped from " +
+            "M1163 (chapter 四百四十七 ships 4 cuts M1164-M1167 " +
+            "— first real GPU kernel dispatch via " +
+            "BASMPSGraphMatMulKernel)")
     }
 
     // MARK: - Per-gap status pins

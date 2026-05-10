@@ -726,7 +726,29 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// (Waves 1-17,chapters 427-446,M1080-M1163,84
     /// commits)。 V1 byte-equality preserved (5,970+
     /// BAS tests pass)。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1163"
+    /// M1167 bump:POST-SWEEP REAL EXECUTION FOLLOW-
+    /// THROUGH chapter 1 — chapter 四百四十七 ships
+    /// FIRST REAL GPU KERNEL EXECUTION。 Triggered by
+    /// 2026-05-11 user audit revealing the SWEEP
+    /// shipped scaffolding + audit + 0 real ANE
+    /// leverage。 4 cuts (M1164-M1167):
+    /// (1) audit recon (0 MPSGraph calls + 3 CPU-stub
+    ///     "Metal kernels"),
+    /// (2) BASMPSGraphMatMulKernel actor wrapping
+    ///     MTLDevice + MPSMatrixMultiplication with
+    ///     real CPU→MTLBuffer→GPU→MTLBuffer→CPU dispatch,
+    /// (3) 4 PROOF tests verifying byte-equal output +
+    ///     non-square shapes + GPU/CPU agreement,
+    /// (4) chapter close-out + bumps。 SWEEP doctrine
+    ///     STAYS frozen at chapter 446;chapter 447
+    ///     opens post-sweep real-execution narrative。
+    /// First time in substrate history that input bytes
+    /// actually flow through Apple Silicon GPU and
+    /// return byte-equal output。 「原生利用神经引擎」
+    /// directive moves from 0% → has-first-truthful-
+    /// endpoint。 V1 byte-equality preserved。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1167"
 
     /// Query the typed status of a specific gap。
     public static func status(

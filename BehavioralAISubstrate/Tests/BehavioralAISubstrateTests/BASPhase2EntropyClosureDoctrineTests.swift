@@ -27,7 +27,7 @@ final class BASPhase2EntropyClosureDoctrineTests:
             " expected (derivation in" +
             " BASSweepDoctrineExpectations" +
             ".phase2ChapterCount doc-comment:24 pre-" +
-            "RADICAL + 20 sweep = 44)")
+            "RADICAL + 20 sweep + N post-sweep)")
     }
 
     func testFirstChapterIs403() {
@@ -37,13 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs446() {
+    func testLastChapterIs447() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百四十六",
-            "M1163 POST-RADICAL Wave 17:bumped from" +
-            " 四百四十五 to 四百四十六。 Sweep complete")
+            "chapter 四百四十七",
+            "M1167 POST-SWEEP REAL EXECUTION FOLLOW-" +
+            "THROUGH chapter 1:bumped past sweep" +
+            " close-out (chapter 446) to 四百四十七" +
+            " (first real GPU kernel execution)")
     }
 
     // MARK: - M-number range
@@ -58,15 +60,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             " expected (chapter 四百三 entry M953)")
     }
 
-    func testMNumberLastMatchesSweepLast() {
+    func testMNumberLastMatchesPhase2Expected() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .mNumberLast,
             BASSweepDoctrineExpectations
+                .phase2MNumberLast,
+            "Phase 2 mNumberLast must equal named" +
+            " expected (Phase 2 is ongoing umbrella;" +
+            " SWEEP stayed frozen at chapter 446)")
+        XCTAssertGreaterThanOrEqual(
+            BASPhase2EntropyClosureDoctrine
+                .mNumberLast,
+            BASSweepDoctrineExpectations
                 .sweepMNumberLast,
-            "Phase 2 mNumberLast must equal sweep" +
-            " mNumberLast (named expected) — Phase 2" +
-            " always ends at sweep close-out")
+            "Phase 2 must >= SWEEP (SWEEP is a frozen" +
+            " prefix of ongoing Phase 2)")
     }
 
     // MARK: - Cumulative metrics (named expected)
@@ -78,9 +87,9 @@ final class BASPhase2EntropyClosureDoctrineTests:
             BASSweepDoctrineExpectations
                 .phase2CommitsShipped,
             "Phase 2 commitsShipped must equal named" +
-            " expected (125 pre-RADICAL + 84 sweep)" +
-            " = 209 — see doc-comment in" +
-            " BASSweepDoctrineExpectations")
+            " expected (125 pre-RADICAL + 84 sweep +" +
+            " 4 post-sweep = 213 at M1167) — see" +
+            " doc-comment in BASSweepDoctrineExpectations")
     }
 
     func testV2FoundationsCount12() {

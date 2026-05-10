@@ -108,16 +108,25 @@ public enum BASSweepDoctrineExpectations {
 
     // MARK: - Phase 2 + Index consistency
 
-    /// Phase 2 doctrine ships 44 chapters (chapters 403-
-    /// 446 inclusive)。 Derivation:
+    /// Phase 2 doctrine current chapter count (grows
+    /// as POST-SWEEP REAL EXECUTION FOLLOW-THROUGH
+    /// adds chapters)。 Derivation:
     ///   - Pre-RADICAL Phase 2: chapters 403-426 = 24
     ///   - RADICAL sweep:       chapters 427-446 = 20
-    ///   = 44
-    public static let phase2ChapterCount: Int = 44
+    ///   - POST-SWEEP:          chapters 447-?       = (grows)
+    /// At M1167:24 + 20 + 1 = 45
+    public static let phase2ChapterCount: Int = 45
 
     /// Phase 2 commits shipped = pre-RADICAL Phase 2
-    /// commits + sweep commits = 125 + 84 = 209
-    public static let phase2CommitsShipped: Int = 209
+    /// commits + sweep commits + post-sweep commits。
+    /// At M1167:125 + 84 + 4 = 213
+    public static let phase2CommitsShipped: Int = 213
+
+    /// Phase 2 mNumberLast (grows past sweep)。
+    /// At M1167:1167 (chapter 447 ends here)。 SWEEP
+    /// doctrine stays frozen at sweepMNumberLast=1163;
+    /// Phase 2 is an ongoing umbrella so this advances。
+    public static let phase2MNumberLast: Int = 1167
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
