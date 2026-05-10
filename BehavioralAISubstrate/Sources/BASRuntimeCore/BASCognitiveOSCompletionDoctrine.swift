@@ -649,7 +649,29 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// consumers consume as a single source-of-truth。
     /// V1 byte-equality preserved (5,920+ BAS tests
     /// pass)。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1147"
+    /// M1151 bump:POST-RADICAL EVOLUTION SWEEP Wave 14
+    /// — chapter 四百四十三 ships CROSS-SESSION REPLAY
+    /// ASSEMBLY。 4 cuts (M1148-M1151):
+    /// (1) recon BASEventLogStorage cross-session API
+    ///     + design merge semantics,
+    /// (2) BASEventLogReplayBundle.merging(_:) instance
+    ///     method + .combining(_:) static factory + NEW
+    ///     BASEventLogProjectors.projectAcrossAllSessions(
+    ///     from:sinceTimestampMs:limit:) async factory
+    ///     pulling events globally-time-ordered from
+    ///     storage,
+    /// (3) 14 cross-session integration tests
+    ///     (BASEventLogCrossSessionReplayTests),
+    /// (4) chapter close-out + bumps。
+    /// First chapter where the 6-kind replay surface
+    /// offers a complete typed API for distributed
+    /// consumers (G8 SSM training,causal graph
+    /// extraction,distributed audit) — pulling events
+    /// across all sessions directly from storage +
+    /// composing bundles deterministically。 V1 byte-
+    /// equality preserved (5,930+ BAS tests pass)。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1151"
 
     /// Query the typed status of a specific gap。
     public static func status(

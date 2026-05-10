@@ -194,6 +194,72 @@ public struct BASEventLogReplayBundle:
                 planAssignmentEvents.count
         ]
     }
+
+    // MARK: - chapter 四百四十三 / M1149 — bundle composition
+
+    /// Returns a NEW bundle whose 6 typed arrays are
+    /// the concatenation of `self` and `other` (per
+    /// kind,in input order)。 Immutable update;does
+    /// NOT mutate either operand。
+    ///
+    /// Use this when accumulating replay events across
+    /// multiple sessions or storage backends:fetch one
+    /// session,build a bundle,fetch the next,merge,
+    /// etc。 Per-kind events keep the order they had in
+    /// each source bundle (which is sequenceNumber-
+    /// sorted within each source session via the M1145
+    /// projector pattern)。
+    ///
+    /// Note:cross-session events do NOT get re-sorted
+    /// — sequenceNumber is per-session-monotonic only,
+    /// not globally。 For globally-time-ordered output,
+    /// pass entries to `projectAcrossAllSessions(from:
+    /// sinceTimestampMs:limit:)` which uses storage's
+    /// `(timestampMs ASC, sequenceNumber ASC)` global
+    /// ordering before projection (M1149)。
+    public func merging(
+        _ other: BASEventLogReplayBundle
+    ) -> BASEventLogReplayBundle {
+        return BASEventLogReplayBundle(
+            memoryAtomEvents:
+                memoryAtomEvents + other.memoryAtomEvents,
+            turnLifecycleEvents:
+                turnLifecycleEvents +
+                    other.turnLifecycleEvents,
+            parallelStageEvents:
+                parallelStageEvents +
+                    other.parallelStageEvents,
+            permitEscalationEvents:
+                permitEscalationEvents +
+                    other.permitEscalationEvents,
+            nativeStageDispatchEvents:
+                nativeStageDispatchEvents +
+                    other.nativeStageDispatchEvents,
+            planAssignmentEvents:
+                planAssignmentEvents +
+                    other.planAssignmentEvents)
+    }
+
+    /// Combine an arbitrary list of bundles into one。
+    /// Equivalent to `bundles.reduce(.empty) { $0
+    /// .merging($1) }` but spelled out so the intent
+    /// is obvious at the call site。 Empty input
+    /// returns `.empty`。 Single-element input returns
+    /// the input bundle (no copy needed but typed
+    /// signature returns a fresh value)。
+    ///
+    /// Determinism (chapter 三百九二):output is
+    /// deterministic in input bundle order — same
+    /// inputs in same order yield byte-equal output。
+    public static func combining(
+        _ bundles: [BASEventLogReplayBundle]
+    ) -> BASEventLogReplayBundle {
+        return bundles.reduce(
+            BASEventLogReplayBundle.empty
+        ) { acc, b in
+            acc.merging(b)
+        }
+    }
 }
 
 // MARK: - Projector extension
@@ -228,5 +294,43 @@ extension BASEventLogProjectors {
                 projectNativeStageDispatchEvents(entries),
             planAssignmentEvents:
                 projectPlanAssignmentEvents(entries))
+    }
+
+    // MARK: - chapter 四百四十三 / M1149 — cross-session factory
+
+    /// Async factory that pulls events ACROSS ALL
+    /// sessions from a `BASEventLogStorage` and projects
+    /// the 6-kind bundle in one call。 Uses the
+    /// protocol's `events(sinceTimestampMs:limit:)`
+    /// global accessor (chapter 四百二 / M941),which
+    /// returns events sorted by `(timestampMs ASC,
+    /// sequenceNumber ASC)` — globally time-ordered
+    /// across sessions。
+    ///
+    /// Use this when replay consumers (G8 SSM training,
+    /// causal graph extraction,distributed audit) need
+    /// the full event log without filtering by session
+    /// — e.g. the host runs multiple concurrent
+    /// sessions and downstream wants a unified replay。
+    ///
+    /// `since: 0` (default) means "all-time";callers
+    /// scope to a window via `since: cutoffMs`。
+    /// `limit: Int.max` (default) means "everything";
+    /// callers cap memory via `limit: maxRecords`。
+    ///
+    /// Determinism (chapter 三百九二):output is
+    /// deterministic for a given storage state at
+    /// call time。 Concurrent appends during the call
+    /// may or may not be reflected (storage actor
+    /// isolation determines snapshot semantics)。
+    public static func projectAcrossAllSessions(
+        from storage: any BASEventLogStorage,
+        sinceTimestampMs since: Int64 = 0,
+        limit: Int = Int.max
+    ) async -> BASEventLogReplayBundle {
+        let entries = await storage.events(
+            sinceTimestampMs: since,
+            limit: limit)
+        return projectAllPayloadKinds(entries)
     }
 }

@@ -396,6 +396,27 @@ public enum BASEntropyChapterIndex {
                 " sequenceNumber ordering preservation。" +
                 " Replay surface is PROVEN end-to-end。" +
                 " ADR-016 → M1147 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十三",
+            mNumberFirst: 1148,
+            mNumberLast: 1151,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 14 entry — CROSS-" +
+                "SESSION REPLAY ASSEMBLY。 BASEventLog" +
+                "ReplayBundle.merging(_:) + .combining(_:)" +
+                " typed composition + BASEventLogProjectors" +
+                ".projectAcrossAllSessions(from:" +
+                "sinceTimestampMs:limit:) async factory" +
+                " pulling events globally-time-ordered" +
+                " from storage。 14 cross-session" +
+                " integration tests。 Replay surface" +
+                " offers complete typed API for distributed" +
+                " consumers without boilerplate。 ADR-016" +
+                " → M1151 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

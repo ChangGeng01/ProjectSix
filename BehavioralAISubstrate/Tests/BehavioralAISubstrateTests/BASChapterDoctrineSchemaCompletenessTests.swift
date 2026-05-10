@@ -771,6 +771,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter442EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter442EntropyDoctrine
+                    .summary),
+            // M1151 POST-RADICAL Wave 14 (cross-session replay assembly)
+            check("四百四十三",
+                tag: BASChapter443EntropyDoctrine.chapterTag,
+                first: BASChapter443EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter443EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter443EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter443EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter443EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter443EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter443EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter443EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -904,7 +923,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter441EntropyDoctrine.mNumberLast),
             // M1147 POST-RADICAL Wave 13 (replay-rebuild integration)
             ("442", BASChapter442EntropyDoctrine.mNumberFirst,
-             BASChapter442EntropyDoctrine.mNumberLast)
+             BASChapter442EntropyDoctrine.mNumberLast),
+            // M1151 POST-RADICAL Wave 14 (cross-session replay assembly)
+            ("443", BASChapter443EntropyDoctrine.mNumberFirst,
+             BASChapter443EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -1072,6 +1094,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter442EntropyDoctrine.mNumberFirst,
             last: BASChapter442EntropyDoctrine.mNumberLast,
             tag: "四百四十二")
+        // M1151 POST-RADICAL Wave 14 (cross-session replay assembly)
+        verifyKnivesRange(
+            BASChapter443EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter443EntropyDoctrine.mNumberFirst,
+            last: BASChapter443EntropyDoctrine.mNumberLast,
+            tag: "四百四十三")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {
