@@ -357,6 +357,25 @@ public enum BASEntropyChapterIndex {
                 " non-empty。 Substrate-side autonomy" +
                 " COMPLETE — hosts only wire event log。" +
                 " ADR-016 → M1139 advance"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百四十一",
+            mNumberFirst: 1140,
+            mNumberLast: 1143,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 4,
+            summary:
+                "POST-RADICAL Wave 12 entry — PLAN-" +
+                "ASSIGNMENT EVENT TYPE。 6th typed event" +
+                " payload kind on the unified event log;" +
+                " engine auto-emits captured scheduler" +
+                " decisions after dispatch event so" +
+                " capture → honor temporal order is" +
+                " replay-deterministic。 Substrate-side" +
+                " replay surface COMPLETE — full routed-" +
+                "dispatch story event-replayable from one" +
+                " canonical stream。 ADR-016 → M1143 advance"),
     ]
 
     /// Number of RADICAL EVOLUTION chapters indexed

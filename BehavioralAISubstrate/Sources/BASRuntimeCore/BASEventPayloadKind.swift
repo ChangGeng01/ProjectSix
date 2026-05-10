@@ -108,6 +108,19 @@ public enum BASEventPayloadKind:
     /// dispatch ledger from event stream alone。
     case nativeStageDispatch =
         "native-stage-dispatch-event"
+
+    /// M1140 plan-assignment payload (chapter 四百四十一
+    /// — POST-RADICAL Wave 12)。 Encodes the chapter 435
+    /// BASTurnRuntimePlanAssignmentLedger as a typed
+    /// event so the unified event log carries proof of
+    /// which stages were CONSULTED by the M1102
+    /// BASHardwareAwareScheduler at probe time (the
+    /// upstream surface;sibling to nativeStageDispatch
+    /// which carries the downstream HONOR outcomes)。
+    /// Future replay can rebuild the assignment ledger
+    /// from event stream alone — full routed-dispatch
+    /// surface (capture → honor) becomes event-replayable。
+    case planAssignment = "plan-assignment-event"
 }
 
 // MARK: - BASEventLogEntry accessor

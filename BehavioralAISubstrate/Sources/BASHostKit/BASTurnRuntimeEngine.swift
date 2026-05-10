@@ -153,6 +153,18 @@ public actor BASTurnRuntimeEngine {
     /// `lastEmittedDispatchEventID()` for tests + audit。
     private var lastEmittedDispatchEventID: String? = nil
 
+    /// chapter 四百四十一 / M1141 — eventID of the most-
+    /// recent `BASTurnRuntimePlanAssignmentEventPayload`
+    /// the engine auto-emitted to the configured event
+    /// log,or nil if the engine has never emitted one
+    /// (either because `eventLog` is nil OR no
+    /// `runWithPlan(...)` call has captured a non-empty
+    /// assignment ledger)。 Surfaced via
+    /// `lastEmittedPlanAssignmentEventID()` for tests
+    /// + audit。
+    private var lastEmittedPlanAssignmentEventID:
+        String? = nil
+
     /// Most-recent `BASTurnRuntimePlanAssignmentLedger`
     /// captured by `runWithPlan(...)`。 `.unwired` until
     /// the first scheduler-consuming call。 Surfaced via
@@ -268,6 +280,24 @@ public actor BASTurnRuntimeEngine {
         -> String?
     {
         return lastEmittedDispatchEventID
+    }
+
+    // MARK: - chapter 四百四十一 / M1141 — emitted plan-assignment event ID accessor
+
+    /// Returns the eventID of the most-recent
+    /// `BASTurnRuntimePlanAssignmentEventPayload` the
+    /// engine auto-emitted to the configured event log。
+    /// Returns nil when `eventLog` is nil (no emission
+    /// happens) OR when no `runWithPlan(...)` call has
+    /// ever captured a non-empty assignment ledger
+    /// (lastAssignmentLedger.recordCount stays 0,
+    /// emission gate skips)。 Used by tests + audit
+    /// consumers to verify plan-assignment event
+    /// emission fires end-to-end。
+    public func lastEmittedPlanAssignmentEventIDValue()
+        -> String?
+    {
+        return lastEmittedPlanAssignmentEventID
     }
 
     // MARK: - Phase F dispatch probe accessor (M1101)
@@ -491,6 +521,17 @@ public actor BASTurnRuntimeEngine {
         await emitNativeStageDispatchEventIfNeeded(
             for: result,
             timestampMsOverride: timestampMsOverride)
+        // chapter 四百四十一 / M1141 — auto-emit plan-
+        // assignment event payload (sibling of dispatch
+        // auto-emit;upstream half of the routed surface)。
+        // Gated on (1) eventLog wired AND (2)
+        // lastAssignmentLedger has at least one record
+        // (scheduler was consulted with all 3 prerequisites)。
+        // V1 byte-equality preserved when eventLog == nil
+        // OR ledger empty。
+        await emitPlanAssignmentEventIfNeeded(
+            for: result,
+            timestampMsOverride: timestampMsOverride)
         return result
     }
 
@@ -669,5 +710,49 @@ public actor BASTurnRuntimeEngine {
         // emit must not break runtime correctness。
         _ = try? await log.append(entry)
         lastEmittedDispatchEventID = eventID
+    }
+
+    // MARK: - chapter 四百四十一 / M1141 — plan-assignment auto-emit helper
+
+    /// Emit a `BASTurnRuntimePlanAssignmentEventPayload`
+    /// to the configured event log when:
+    ///   1. `eventLog` is wired (non-nil)
+    ///   2. `lastAssignmentLedger.recordCount > 0`
+    ///      (scheduler was consulted with all 3
+    ///      prerequisites — hints + registry +
+    ///      capability — and produced decisions)
+    ///
+    /// When either condition fails,helper is a no-op
+    /// and `lastEmittedPlanAssignmentEventID` stays nil
+    /// (engine took the V1-fallback path or has no
+    /// event log to emit to)。 Pure additive
+    /// observability — V1 byte-equality preserved。
+    private func emitPlanAssignmentEventIfNeeded(
+        for result: BASEBrainTurnResult,
+        timestampMsOverride: Int64?
+    ) async {
+        guard let log = eventLog else { return }
+        guard lastAssignmentLedger.recordCount > 0
+        else { return }
+        let timestampMs = timestampMsOverride ?? clockMs()
+        let nextSeq = sequenceCounter
+        sequenceCounter += 1
+        let payload =
+            BASTurnRuntimePlanAssignmentEventPayload
+                .from(ledger: lastAssignmentLedger)
+        let eventID = eventIDFactory()
+        let entry = BASEventLogEntry
+            .planAssignmentEvent(
+                eventID: eventID,
+                timestampMs: timestampMs,
+                sessionID: result.runtimeTrace.sessionID,
+                sequenceNumber: Int64(nextSeq),
+                payload: payload)
+        // BASEventLogStorage.append is async throws —
+        // swallow any storage failure here。 Audit
+        // emission is hint-only (红线 7);failure to
+        // emit must not break runtime correctness。
+        _ = try? await log.append(entry)
+        lastEmittedPlanAssignmentEventID = eventID
     }
 }

@@ -609,7 +609,27 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// log,everything else flows through automatically。
     /// V1 byte-equality preserved (5,850+ BAS tests
     /// pass)。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1139"
+    /// M1143 bump:POST-RADICAL EVOLUTION SWEEP Wave 12
+    /// — chapter 四百四十一 ships PLAN-ASSIGNMENT EVENT
+    /// TYPE。 4 cuts (M1140-M1143):
+    /// (1) BASTurnRuntimePlanAssignmentEventPayload typed
+    ///     Codable payload + 7-field record mirror +
+    ///     .from(ledger:) factory + BASEventLogEntry
+    ///     factory + reverse accessor + projector + 6th
+    ///     BASEventPayloadKind case (planAssignment),
+    /// (2) BASTurnRuntimeEngine wiring +
+    ///     emitPlanAssignmentEventIfNeeded helper +
+    ///     lastEmittedPlanAssignmentEventID tracking
+    ///     field + accessor,
+    /// (3) 16 pin tests (12 payload + 4 engine accessor),
+    /// (4) chapter close-out + bumps。
+    /// First chapter where substrate-side replay surface
+    /// is COMPLETE — 6 typed payload kinds carry the FULL
+    /// routed-dispatch story (capture → honor) through
+    /// ONE canonical event log。 V1 byte-equality
+    /// preserved (5,900+ BAS tests pass)。 No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M1143"
 
     /// Query the typed status of a specific gap。
     public static func status(
