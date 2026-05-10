@@ -528,4 +528,111 @@ final class BASEventLogReplayBundleIntegrationTests:
         XCTAssertEqual(b1, b2,
             "chapter 三百九二 — same input → same bundle")
     }
+
+    // MARK: - Deep-review fix 1: Codable + keys-by-name
+
+    /// Bundle now conforms to Codable (deep-review fix
+    /// 1)。 Wire-transport for distributed audit / G8
+    /// SSM training / cross-process replay requires
+    /// serializing the typed bundle across boundaries。
+    /// Pin Codable round-trip via sortedKeys JSON。
+    func testBundleCodableRoundTrip() async throws {
+        let storage = BASInMemoryEventLogStorage()
+        // Populate bundle with one of each of 6 kinds
+        // (skip nativeStagePerStep here — covered in
+        // testBundleCarries7KindsAcrossPerKindMap)
+        _ = try await storage.append(
+            BASEventLogEntry.memoryAtomEvent(
+                eventID: "c-mem",
+                timestampMs: 100,
+                sessionID: "s",
+                payload: makeMemoryAtomPayload()))
+        _ = try await storage.append(
+            BASEventLogEntry.turnLifecycleEvent(
+                eventID: "c-life",
+                timestampMs: 110,
+                sessionID: "s",
+                payload: makeTurnLifecyclePayload()))
+        _ = try await storage.append(
+            BASEventLogEntry.parallelStageEvent(
+                eventID: "c-par",
+                timestampMs: 120,
+                sessionID: "s",
+                payload: makeParallelStagePayload()))
+        _ = try await storage.append(
+            BASEventLogEntry.permitEscalationEvent(
+                eventID: "c-permit",
+                timestampMs: 130,
+                sessionID: "s",
+                payload: makePermitEscalationPayload()))
+        _ = try await storage.append(
+            BASEventLogEntry.nativeStageDispatchEvent(
+                eventID: "c-disp",
+                timestampMs: 140,
+                sessionID: "s",
+                payload: makeNativeStageDispatchPayload()))
+        _ = try await storage.append(
+            BASEventLogEntry.planAssignmentEvent(
+                eventID: "c-assign",
+                timestampMs: 150,
+                sessionID: "s",
+                payload: makePlanAssignmentPayload()))
+        let events = await storage.events(
+            forSession: "s")
+        let original = BASEventLogProjectors
+            .projectAllPayloadKinds(events)
+        // Codable round-trip with sortedKeys
+        // (replay-determinism per chapter 三百九二)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(original)
+        let decoded = try JSONDecoder().decode(
+            BASEventLogReplayBundle.self, from: data)
+        XCTAssertEqual(decoded, original,
+            "bundle Codable round-trip must preserve" +
+            " all 7 typed array fields byte-equal")
+        XCTAssertEqual(
+            decoded.totalEventCount,
+            original.totalEventCount,
+            "totalEventCount preserved across Codable")
+        XCTAssertEqual(
+            decoded.perKindEventCount,
+            original.perKindEventCount,
+            "perKindEventCount preserved across Codable")
+    }
+
+    /// Empty bundle Codable round-trips to itself。
+    func testEmptyBundleCodableRoundTrip() throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(
+            BASEventLogReplayBundle.empty)
+        let decoded = try JSONDecoder().decode(
+            BASEventLogReplayBundle.self, from: data)
+        XCTAssertEqual(
+            decoded, BASEventLogReplayBundle.empty)
+    }
+
+    // MARK: - Deep-review fix 1: perKindEventCount all-7-keys-by-name
+
+    /// `perKindEventCount` MUST contain all 7 typed
+    /// payload kind raw values as keys — not just have
+    /// count == 7。 A future refactor that drops one
+    /// key from the dictionary would still satisfy
+    /// "count == 7" if it added another key, but
+    /// downstream consumers iterating per-kind would
+    /// silently miss the dropped kind。
+    func testPerKindEventCountContainsAll7KindRawValuesByName() {
+        let map = BASEventLogReplayBundle.empty
+            .perKindEventCount
+        XCTAssertEqual(map.count, 7)
+        for kind in BASEventPayloadKind.allCases {
+            XCTAssertNotNil(
+                map[kind.rawValue],
+                "perKindEventCount MUST contain key" +
+                " '\(kind.rawValue)' (kind=\(kind))" +
+                " — caller iteration over the map" +
+                " contract requires all 7 keys present")
+        }
+    }
 }

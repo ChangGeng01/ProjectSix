@@ -354,4 +354,158 @@ final class BASFederatedEventLogStorageTests:
             "chapter 三百九二 — same backend state →" +
             " same federated read")
     }
+
+    // MARK: - Deep-review fix 2: concurrent appends + error propagation
+
+    /// Concurrent appends from N tasks MUST all
+    /// succeed without data loss。 actor-isolation on
+    /// `BASFederatedEventLogStorage` guarantees
+    /// append serialization;this test exercises that
+    /// guarantee under stress (100 concurrent appends)
+    /// and verifies all 100 events are visible
+    /// post-flush。 Catches race conditions in primary
+    /// backend resolution OR sequenceNumber assignment
+    /// IF the actor isolation contract ever breaks。
+    func testConcurrentAppendsAreSerializedAndComplete() async throws {
+        let primary = BASInMemoryEventLogStorage()
+        let federated = BASFederatedEventLogStorage(
+            backends: [primary])
+        let appendCount = 100
+        // Pre-build entries OUTSIDE the task group so
+        // closures don't capture `self`(Sendable
+        // safety) — entries are value-type Sendable
+        // BASEventLogEntry instances。
+        var entries: [BASEventLogEntry] = []
+        for i in 0..<appendCount {
+            entries.append(
+                makeMemoryAtomEntry(
+                    eventID: "concurrent-\(i)",
+                    timestampMs: Int64(
+                        1_000_000 + i),
+                    sessionID: "stress",
+                    atomID: "atom-\(i)"))
+        }
+        // Spawn N concurrent appends + await all。
+        await withTaskGroup(of: Void.self) { group in
+            for entry in entries {
+                group.addTask {
+                    _ = try? await federated.append(
+                        entry)
+                }
+            }
+        }
+        // After all task-group sub-tasks complete,
+        // total count MUST equal appendCount。 If
+        // actor isolation broke we'd see duplicate
+        // sequenceNumbers OR dropped events。
+        let total = await federated.totalCount
+        XCTAssertEqual(total, appendCount,
+            "actor isolation must serialize \(appendCount)" +
+            " concurrent appends without data loss" +
+            " (got \(total)/\(appendCount))")
+        // sequenceNumber assignment MUST be monotonic
+        // across all appends (primary-only routing)。
+        let events = await federated.events(
+            forSession: "stress")
+        XCTAssertEqual(events.count, appendCount)
+        let seqs = events.map { $0.sequenceNumber }
+        XCTAssertEqual(seqs, seqs.sorted(),
+            "sequenceNumbers must be monotonic across" +
+            " concurrent appends (proves actor lock" +
+            " serializes seq assignment correctly)")
+    }
+
+    /// Append throws when primary backend throws。
+    /// Currently BASInMemoryEventLogStorage never
+    /// throws on append,so we use a test-only
+    /// throwing-mock conformer。 Pins the error-
+    /// propagation contract:federation does NOT
+    /// swallow primary throws — caller sees the same
+    /// exception they would from calling primary
+    /// directly。
+    func testAppendPropagatesPrimaryBackendError() async {
+        let throwing =
+            ThrowingTestEventLogStorage()
+        let federated = BASFederatedEventLogStorage(
+            backends: [throwing])
+        let entry = makeMemoryAtomEntry(
+            eventID: "throws", timestampMs: 100,
+            sessionID: "s", atomID: "x")
+        do {
+            _ = try await federated.append(entry)
+            XCTFail(
+                "expected primary backend's throw to" +
+                " propagate;federation must not" +
+                " swallow it")
+        } catch let e as
+            ThrowingTestEventLogStorageError
+        {
+            XCTAssertEqual(e, .alwaysThrows,
+                "received the primary's specific" +
+                " typed error verbatim")
+        } catch {
+            XCTFail(
+                "received wrong error type: \(error)" +
+                " — expected" +
+                " ThrowingTestEventLogStorageError" +
+                ".alwaysThrows")
+        }
+    }
+
+    // MARK: - Deep-review fix 2: protocol witness compile pin
+
+    /// Compile-time witness:
+    /// `BASFederatedEventLogStorage : BASEventLogStorage`。
+    /// Drift in the protocol shape OR the actor's
+    /// conformance breaks compilation at this line。
+    /// Provides an explicit IS-A guard sibling to the
+    /// existing testFederatedConformsToProtocolForProjector
+    /// which exercises the conformance through
+    /// projectAcrossAllSessions(from:)。
+    func testFederatedStorageProtocolWitness() {
+        let _: (any BASEventLogStorage.Type) =
+            BASFederatedEventLogStorage.self
+        XCTAssertTrue(true,
+            "BASFederatedEventLogStorage statically" +
+            " conforms to BASEventLogStorage protocol")
+    }
+}
+
+// MARK: - Throwing test-only storage conformer
+
+/// Test-only `BASEventLogStorage` conformer that
+/// always throws on append。 Used by the deep-review
+/// fix 2 error-propagation test to exercise the path
+/// where primary backend fails — production
+/// conformers (in-memory + SQLite) don't naturally
+/// throw on append so a mock is required。
+private enum ThrowingTestEventLogStorageError: Error {
+    case alwaysThrows
+}
+
+private actor ThrowingTestEventLogStorage:
+    BASEventLogStorage
+{
+    func append(
+        _ entry: BASEventLogEntry
+    ) async throws -> (
+        wasNew: Bool, assignedSequenceNumber: Int64)
+    {
+        throw ThrowingTestEventLogStorageError
+            .alwaysThrows
+    }
+
+    func events(
+        forSession sessionID: String
+    ) async -> [BASEventLogEntry] { [] }
+
+    func events(
+        sinceTimestampMs since: Int64, limit: Int
+    ) async -> [BASEventLogEntry] { [] }
+
+    var totalCount: Int { 0 }
+
+    func pruneEventsBefore(
+        timestampMs cutoff: Int64
+    ) async throws -> Int { 0 }
 }

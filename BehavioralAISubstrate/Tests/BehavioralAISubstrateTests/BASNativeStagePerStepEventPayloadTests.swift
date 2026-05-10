@@ -55,6 +55,37 @@ final class BASNativeStagePerStepEventPayloadTests:
             "negative duration clamped to 0")
     }
 
+    // MARK: - Deep-review fix 3: default-param path coverage
+
+    /// `.from(record:turnID:stepSequenceIndex:)` with
+    /// the default `assignmentRationaleRawValue`
+    /// parameter omitted MUST set the rationale to `""`
+    /// (empty string)。 The default-param path is the
+    /// most-common call site (callers without a
+    /// rationale value at hand);pin it explicitly so
+    /// a future signature change isn't masked by the
+    /// other tests that pass an explicit rationale。
+    func testFromRecordWithDefaultRationaleIsEmptyString() {
+        let perTurn = BASNativeStageDispatchEventRecord(
+            stageRawValue: "stage-default",
+            selectedBackingKindRawValue: "cpu-bytes",
+            selectedKernelKeyDescriptor: "",
+            durationMs: 1,
+            honoredAssignment: false)
+        let perStep =
+            BASNativeStagePerStepEventPayload.from(
+                record: perTurn,
+                turnID: "t-default",
+                stepSequenceIndex: 0)
+            // assignmentRationaleRawValue omitted →
+            // default `""` from the factory signature
+        XCTAssertEqual(
+            perStep.assignmentRationaleRawValue, "",
+            "default-param factory path must set" +
+            " assignmentRationaleRawValue to \"\"" +
+            " when caller omits the argument")
+    }
+
     // MARK: - .from(record:turnID:stepSequenceIndex:...) factory
 
     func testFromPerTurnRecordPreservesFields() {
@@ -109,6 +140,58 @@ final class BASNativeStagePerStepEventPayloadTests:
         XCTAssertEqual(decoded, original,
             "chapter 三百九二 — payload byte-stable across" +
             " encode/decode")
+    }
+
+    /// Deep-review fix 4:per-field round-trip
+    /// assertions for clearer error messages when
+    /// drift occurs。 The Equatable-based round-trip
+    /// (testCodableRoundTrip) catches drift but only
+    /// reports "decoded != original" without saying
+    /// WHICH field drifted。 This test fails with a
+    /// specific field-name message,easier to diagnose。
+    func testCodableRoundTripPreservesAllEightFields() throws {
+        let original =
+            BASNativeStagePerStepEventPayload(
+                turnID: "t-per-field",
+                stageRawValue: "stage-alpha",
+                stepSequenceIndex: 11,
+                selectedBackingKindRawValue: "metal-buffer",
+                selectedKernelKeyDescriptor: "k.alpha",
+                durationMs: 42,
+                honoredAssignment: true,
+                assignmentRationaleRawValue:
+                    "ane-supported")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(original)
+        let d = try JSONDecoder().decode(
+            BASNativeStagePerStepEventPayload.self,
+            from: data)
+        // Per-field assertions (8 fields total) —
+        // clearer failure messages than struct equality
+        XCTAssertEqual(d.turnID, original.turnID,
+            "field 1/8 turnID drift")
+        XCTAssertEqual(d.stageRawValue,
+            original.stageRawValue,
+            "field 2/8 stageRawValue drift")
+        XCTAssertEqual(d.stepSequenceIndex,
+            original.stepSequenceIndex,
+            "field 3/8 stepSequenceIndex drift")
+        XCTAssertEqual(d.selectedBackingKindRawValue,
+            original.selectedBackingKindRawValue,
+            "field 4/8 selectedBackingKindRawValue drift")
+        XCTAssertEqual(d.selectedKernelKeyDescriptor,
+            original.selectedKernelKeyDescriptor,
+            "field 5/8 selectedKernelKeyDescriptor drift")
+        XCTAssertEqual(d.durationMs,
+            original.durationMs,
+            "field 6/8 durationMs drift")
+        XCTAssertEqual(d.honoredAssignment,
+            original.honoredAssignment,
+            "field 7/8 honoredAssignment drift")
+        XCTAssertEqual(d.assignmentRationaleRawValue,
+            original.assignmentRationaleRawValue,
+            "field 8/8 assignmentRationaleRawValue drift")
     }
 
     // MARK: - BASEventLogEntry factory + reverse accessor

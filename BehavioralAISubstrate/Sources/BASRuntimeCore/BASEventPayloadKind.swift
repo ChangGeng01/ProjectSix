@@ -1,11 +1,15 @@
 // MARK: - BASEventPayloadKind — chapter 四百二十八 / M1084
+// (extended chapters 439 + 441 + 444 to 7 kinds)
 // 系统熵 reduction
 //
 // RADICAL EVOLUTION SWEEP Phase B entry。 Single typed
-// discriminator naming the 4 payload kinds the unified
-// event log carries。 Cheap filter scan key for callers
-// that need to pluck only-this-kind events out of the
-// stream without decoding `payloadJson`。
+// discriminator naming the 7 payload kinds the unified
+// event log carries (originally 4 at M1084; extended
+// to 5 by chapter 439 M1132 nativeStageDispatch; to 6
+// by chapter 441 M1140 planAssignment; to 7 by chapter
+// 444 M1153 nativeStagePerStep)。 Cheap filter scan key
+// for callers that need to pluck only-this-kind events
+// out of the stream without decoding `payloadJson`。
 //
 // ## Why this exists (system entropy framing)
 //
@@ -66,10 +70,11 @@
 
 import Foundation
 
-/// Typed discriminator naming the 4 payload kinds the
-/// unified event log carries。 Cheap filter scan key for
-/// callers that need to pluck only-this-kind events
-/// without decoding `payloadJson`。
+/// Typed discriminator naming the 7 payload kinds the
+/// unified event log carries (originally 4 at chapter
+/// 428 M1084;extended to 7 across chapters 439/441/444)。
+/// Cheap filter scan key for callers that need to pluck
+/// only-this-kind events without decoding `payloadJson`。
 public enum BASEventPayloadKind:
     String, Codable, Equatable, Hashable, Sendable, CaseIterable
 {

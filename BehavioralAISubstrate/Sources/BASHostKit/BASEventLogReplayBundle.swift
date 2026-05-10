@@ -90,7 +90,7 @@ import BASPolicy
 /// extractor,distributed audit) read once and consume
 /// each kind directly without re-filtering。
 public struct BASEventLogReplayBundle:
-    Equatable, Sendable, Hashable
+    Equatable, Sendable, Hashable, Codable
 {
 
     /// M941 chapter 四百二 memory-atom mutation events
@@ -133,6 +133,15 @@ public struct BASEventLogReplayBundle:
     public let nativeStagePerStepEvents:
         [BASNativeStagePerStepEventPayload]
 
+    /// Construct the 7-kind bundle。
+    ///
+    /// **`nativeStagePerStepEvents` default**:Defaults
+    /// to `[]` for backward compatibility with chapter
+    /// 442 pre-`nativeStagePerStep`-kind call sites
+    /// (which constructed the bundle with 6 arguments
+    /// before chapter 444 added the 7th kind)。 New
+    /// call sites should pass an explicit value when
+    /// they have per-step data on hand。
     public init(
         memoryAtomEvents: [BASMemoryAtomEventPayload],
         turnLifecycleEvents: [BASTurnLifecycleEventPayload],

@@ -648,4 +648,79 @@ final class BASPostRadicalSweepDoctrineTests:
             " substantial template (> 50 chars);got" +
             " length=\(example.count)")
     }
+
+    // MARK: - Deep-review fix 3: narrative content pins
+    // (audit-driven:count assertions don't catch item-
+    // for-item replacement;pin SPECIFIC anchor content
+    // for every item in whatsShipped + whatsDeferred)
+
+    /// Each of the 8 substrate-side achievements in
+    /// `whatsShipped` MUST contain its specific anchor
+    /// phrase。 Count-only assertion (already tested)
+    /// would silently pass if someone replaced item N
+    /// with completely different content。 This test
+    /// catches semantic drift。
+    func testWhatsShippedContainsAll8SpecificAnchors() {
+        let joined = BASPostRadicalSweepDoctrine
+            .whatsShipped.joined(separator: " ||| ")
+        // 8 specific anchors (one per achievement
+        // item)。 Drift in any anchor → fail loudly。
+        let requiredAnchors: [String] = [
+            "autonomy COMPLETE",            // item 1
+            "Replay surface COMPLETE",      // item 2
+            "Apple Silicon foundation",     // item 3
+            "Hardware-aware scheduler",     // item 4
+            "End-to-end routed dispatch",   // item 5
+            "V2 FOUNDATION milestones",     // item 6
+            "Phase 2 entropy chapter",      // item 7
+            "ADR-016 substrate completion"  // item 8
+        ]
+        for anchor in requiredAnchors {
+            XCTAssertTrue(
+                joined.contains(anchor),
+                "whatsShipped MUST contain anchor" +
+                " '\(anchor)' — semantic drift detected")
+        }
+        // Verify count still matches the anchor count
+        // (catches the case where someone adds a 9th
+        // achievement without bumping the test)
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine
+                .whatsShipped.count,
+            requiredAnchors.count,
+            "anchor list count must match whatsShipped" +
+            " count;drift means either anchor list" +
+            " or whatsShipped fell out of sync")
+    }
+
+    /// Each of the 5 deferred items in `whatsDeferred`
+    /// MUST contain its specific anchor phrase。
+    /// Catches item-for-item replacement that
+    /// count-only assertions miss。
+    func testWhatsDeferredContainsAll5SpecificAnchors() {
+        let joinedItems = BASPostRadicalSweepDoctrine
+            .whatsDeferred
+            .map { $0.item }
+            .joined(separator: " ||| ")
+        let requiredAnchors: [String] = [
+            "V1 runTurn 2,540 LOC monolith",
+            "V2 default mode flip",
+            "Drop 4 dead-weight modules",
+            "Delete 24 pre-RADICAL chapter doctrine",
+            "host-side reference RoutedStage"
+        ]
+        for anchor in requiredAnchors {
+            XCTAssertTrue(
+                joinedItems.contains(anchor),
+                "whatsDeferred MUST contain item" +
+                " anchor '\(anchor)' — semantic drift" +
+                " detected")
+        }
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine
+                .whatsDeferred.count,
+            requiredAnchors.count,
+            "anchor list count must match whatsDeferred" +
+            " count")
+    }
 }
