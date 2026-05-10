@@ -37,7 +37,18 @@ let package = Package(
         // providers skip this library.
         .library(
             name: "BASMLXAdapter",
-            targets: ["BASMLXAdapter"])
+            targets: ["BASMLXAdapter"]),
+        // M1096 — RADICAL EVOLUTION SWEEP Phase E entry。
+        // BASMetalSubstrate ships native Apple Silicon
+        // primitives:typed BASTensor (with discriminated
+        // backing across MLX/CoreML/Metal),BASANECapability
+        // introspection,BASMetalKernelRegistry actor,
+        // and reference MPSGraph kernels (MatMul / RMSNorm
+        // / RotaryEmbedding)。 First module to touch
+        // MTLDevice + MPSGraph directly。
+        .library(
+            name: "BASMetalSubstrate",
+            targets: ["BASMetalSubstrate"])
     ],
     dependencies: [
         // M224 — vendor freeze. All MLX / HuggingFace dependencies
@@ -89,6 +100,46 @@ let package = Package(
         .target(
             name: "BASChatCompletionsAdapter",
             dependencies: ["BASRuntimeCore", "BASOrgan"]),
+        // M1096 — RADICAL EVOLUTION SWEEP Phase E entry。
+        // BASMetalSubstrate ships native Apple Silicon
+        // primitives:typed BASTensor (with discriminated
+        // backing across MLX/CoreML/Metal),BASANECapability
+        // introspection,BASMetalKernelRegistry actor,
+        // and reference MPSGraph kernels (MatMul / RMSNorm
+        // / RotaryEmbedding)。 First module to touch
+        // MTLDevice + MPSGraph directly。
+        //
+        // Frameworks linked:
+        //   - Metal           — MTLDevice / MTLCommandQueue / MTLBuffer
+        //   - MetalPerformanceShaders      — MPSImage / MPSMatrix kernels
+        //   - MetalPerformanceShadersGraph — MPSGraph executable build
+        //   - Accelerate      — vDSP / BNNS fallback paths
+        //   - CoreML          — MLMultiArray bridge for ANE dispatch
+        //
+        // watchOS has no Metal; framework links are gated by
+        // platform inside source files via `#if canImport(Metal)`。
+        // The target itself compiles as a thin schema-only stub
+        // on watchOS so BASRuntimeCore consumers stay portable。
+        .target(
+            name: "BASMetalSubstrate",
+            dependencies: ["BASRuntimeCore"],
+            linkerSettings: [
+                .linkedFramework(
+                    "Metal",
+                    .when(platforms: [.iOS, .macOS])),
+                .linkedFramework(
+                    "MetalPerformanceShaders",
+                    .when(platforms: [.iOS, .macOS])),
+                .linkedFramework(
+                    "MetalPerformanceShadersGraph",
+                    .when(platforms: [.iOS, .macOS])),
+                .linkedFramework(
+                    "Accelerate",
+                    .when(platforms: [.iOS, .macOS])),
+                .linkedFramework(
+                    "CoreML",
+                    .when(platforms: [.iOS, .macOS]))
+            ]),
         // M220 — MLX organ adapter. Loads quantized Gemma weights
         // from Hugging Face and runs on-device inference via
         // mlx-swift-lm. Implementation behind
@@ -175,7 +226,8 @@ let package = Package(
             "BASAdmin",
             "BASAppleAdapters",
             "BASChatCompletionsAdapter",
-            "BASMLXAdapter"
+            "BASMLXAdapter",
+            "BASMetalSubstrate"
         ])
     ]
 )
