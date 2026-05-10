@@ -1,0 +1,163 @@
+// MARK: - BASANECapabilityProbeTests — chapter 四百三十一 / M1097
+
+import XCTest
+@testable import BASMetalSubstrate
+
+final class BASANECapabilityProbeTests: XCTestCase {
+
+    // MARK: - Default reader returns conservative
+
+    func testDefaultReaderReturnsConservative() async {
+        let probe = BASANECapabilityProbe()
+        let cap = await probe.capability(
+            forThermal: .nominal)
+        XCTAssertEqual(cap.acceleratorPriority, .gpuOnly,
+            "default conservative reader must return" +
+            " gpu-only priority")
+        XCTAssertTrue(cap.supportedOps.isEmpty)
+        XCTAssertEqual(cap.thermalSnapshot, .nominal)
+    }
+
+    // MARK: - Cache returns same snapshot for same key
+
+    func testCacheReturnsSameSnapshotForSameThermal() async {
+        let probe = BASANECapabilityProbe()
+        let c1 = await probe.capability(
+            forThermal: .nominal)
+        let c2 = await probe.capability(
+            forThermal: .nominal)
+        XCTAssertEqual(c1, c2,
+            "repeated reads at same thermal must return" +
+            " same snapshot (chapter 三百九二)")
+    }
+
+    // MARK: - Cache invalidates on thermal change
+
+    func testCacheInvalidatesOnThermalChange() async {
+        let probe = BASANECapabilityProbe(reader: { thermal in
+            switch thermal {
+            case .nominal:
+                return BASANECapability(
+                    maxBatchSize: 8,
+                    supportedOps: [.matMul],
+                    estimatedLatencyMs: 0.5,
+                    memoryFootprintMB: 2048,
+                    acceleratorPriority: .aneFirst,
+                    thermalSnapshot: .nominal)
+            case .serious:
+                return BASANECapability(
+                    maxBatchSize: 1,
+                    supportedOps: [],
+                    estimatedLatencyMs: 5.0,
+                    memoryFootprintMB: 256,
+                    acceleratorPriority: .gpuOnly,
+                    thermalSnapshot: .serious)
+            default:
+                return BASANECapability.cpuOnlyFallback(
+                    thermalSnapshot: thermal)
+            }
+        })
+        let nominal = await probe.capability(
+            forThermal: .nominal)
+        let serious = await probe.capability(
+            forThermal: .serious)
+        XCTAssertEqual(nominal.acceleratorPriority, .aneFirst)
+        XCTAssertEqual(serious.acceleratorPriority, .gpuOnly,
+            "thermal transition must re-probe + return" +
+            " degraded capability")
+    }
+
+    // MARK: - Invalidate forces re-probe
+
+    func testInvalidateForcesReprobe() async {
+        let counter = AsyncProbeCounter()
+        let probe = BASANECapabilityProbe(reader: { thermal in
+            Task {
+                await counter.increment()
+            }
+            return BASANECapability.conservative(
+                thermalSnapshot: thermal)
+        })
+        _ = await probe.capability(forThermal: .nominal)
+        _ = await probe.capability(forThermal: .nominal)
+        // wait one async tick so the counter task can run
+        await Task.yield()
+        let countBeforeInvalidate = await counter.value
+        await probe.invalidate()
+        _ = await probe.capability(forThermal: .nominal)
+        await Task.yield()
+        let countAfterInvalidate = await counter.value
+        XCTAssertGreaterThan(
+            countAfterInvalidate, countBeforeInvalidate,
+            "invalidate must force the next read to re-" +
+            "invoke the reader closure")
+    }
+
+    // MARK: - Test introspection accessors
+
+    func testThermalKeyForTestsReflectsLastRead() async {
+        let probe = BASANECapabilityProbe()
+        let beforeKey = await probe.thermalKeyForTests
+        XCTAssertNil(beforeKey, "no read yet → no cached key")
+        _ = await probe.capability(forThermal: .fair)
+        let afterKey = await probe.thermalKeyForTests
+        XCTAssertEqual(afterKey, .fair)
+    }
+
+    func testSnapshotForTestsReflectsLastRead() async {
+        let probe = BASANECapabilityProbe()
+        let beforeSnap = await probe.snapshotForTests
+        XCTAssertNil(beforeSnap)
+        let read = await probe.capability(
+            forThermal: .nominal)
+        let afterSnap = await probe.snapshotForTests
+        XCTAssertEqual(afterSnap, read)
+    }
+
+    // MARK: - Custom reader can return aneFirst
+
+    func testCustomReaderCanReturnANEFirst() async {
+        let probe = BASANECapabilityProbe(reader: { _ in
+            BASANECapability.nominalAppleSilicon()
+        })
+        let cap = await probe.capability(
+            forThermal: .nominal)
+        XCTAssertEqual(
+            cap.acceleratorPriority, .aneFirst)
+        XCTAssertEqual(cap.supportedOps.count, 7)
+    }
+
+    // MARK: - currentCapability uses live thermal
+
+    func testCurrentCapabilityReadsLiveThermalState() async {
+        let probe = BASANECapabilityProbe()
+        let cap = await probe.currentCapability()
+        let liveThermal = BASCapabilityThermalSnapshot
+            .current()
+        XCTAssertEqual(cap.thermalSnapshot, liveThermal)
+    }
+
+    // MARK: - Determinism
+
+    func testProbeIsDeterministicForFixedReader() async {
+        let p1 = BASANECapabilityProbe(reader: { _ in
+            BASANECapability.nominalAppleSilicon()
+        })
+        let p2 = BASANECapabilityProbe(reader: { _ in
+            BASANECapability.nominalAppleSilicon()
+        })
+        let r1 = await p1.capability(forThermal: .nominal)
+        let r2 = await p2.capability(forThermal: .nominal)
+        XCTAssertEqual(r1, r2)
+    }
+}
+
+// MARK: - Test helper
+
+/// Async-safe counter for probe-invocation tests。
+private actor AsyncProbeCounter {
+    private(set) var value: Int = 0
+    func increment() {
+        value += 1
+    }
+}
