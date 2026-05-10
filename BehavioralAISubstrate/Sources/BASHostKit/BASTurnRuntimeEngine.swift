@@ -123,6 +123,25 @@ public actor BASTurnRuntimeEngine {
     private let fallbackStageExecutor:
         BASNativeStageExecutor.StageExecutor?
 
+    // MARK: - Slot (M1221 chapter 四百六十一 — biomimetic observer)
+
+    /// Optional substrate-side biomimetic observer
+    /// invoked once per `runWithPlan(...)` call after
+    /// the turn fully completes。 nil → no call made
+    /// → V1 byte-equality preserved。 chapter 461 /
+    /// M1221 — closes integration debt surfaced by
+    /// chapter 459 self-audit。
+    private let biomimeticTurnObserver:
+        BASBiomimeticTurnObserver?
+
+    /// Optional Sendable closure mapping the completed
+    /// turn result into a typed observer signal。 nil
+    /// → empty signal (turn-counter-only) when
+    /// observer is non-nil。 chapter 461 / M1221。
+    private let biomimeticTurnSignalBuilder:
+        (@Sendable (BASEBrainTurnResult)
+            -> BASBiomimeticTurnSignal)?
+
     // MARK: - Mutable state (actor-isolated)
 
     private var sequenceCounter: Int = 0
@@ -190,7 +209,12 @@ public actor BASTurnRuntimeEngine {
         routedStageExecutor:
             BASNativeStageExecutor.RoutedStageExecutor? = nil,
         fallbackStageExecutor:
-            BASNativeStageExecutor.StageExecutor? = nil
+            BASNativeStageExecutor.StageExecutor? = nil,
+        biomimeticTurnObserver:
+            BASBiomimeticTurnObserver? = nil,
+        biomimeticTurnSignalBuilder:
+            (@Sendable (BASEBrainTurnResult)
+                -> BASBiomimeticTurnSignal)? = nil
     ) {
         self.coordinator = coordinator
         self.eventLog = eventLog
@@ -202,6 +226,10 @@ public actor BASTurnRuntimeEngine {
         self.stagePlanHints = stagePlanHints
         self.routedStageExecutor = routedStageExecutor
         self.fallbackStageExecutor = fallbackStageExecutor
+        self.biomimeticTurnObserver =
+            biomimeticTurnObserver
+        self.biomimeticTurnSignalBuilder =
+            biomimeticTurnSignalBuilder
     }
 
     /// chapter 四百七 / M998 — convenience init taking the
@@ -232,7 +260,12 @@ public actor BASTurnRuntimeEngine {
             routedStageExecutor:
                 configuration.routedStageExecutor,
             fallbackStageExecutor:
-                configuration.fallbackStageExecutor)
+                configuration.fallbackStageExecutor,
+            biomimeticTurnObserver:
+                configuration.biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                configuration
+                    .biomimeticTurnSignalBuilder)
     }
 
     // MARK: - chapter 四百三十五 / M1117 — assignment ledger accessor
@@ -532,6 +565,20 @@ public actor BASTurnRuntimeEngine {
         await emitPlanAssignmentEventIfNeeded(
             for: result,
             timestampMsOverride: timestampMsOverride)
+        // chapter 461 / M1221 — biomimetic turn observer
+        // hook (closes integration debt surfaced by
+        // chapter 459 self-audit)。 Fires AFTER all
+        // existing emits + ledger captures + V1 result
+        // is produced。 Errors from observer are
+        // SWALLOWED (the observer is observation/
+        // audit,not commitment authority — 红线 7)。
+        // ADR-014 OPT-IN:nil → no call → V1 byte-
+        // equality preserved。
+        if let observer = biomimeticTurnObserver {
+            let signal = biomimeticTurnSignalBuilder?(
+                result) ?? BASBiomimeticTurnSignal()
+            _ = try? await observer.observe(signal)
+        }
         return result
     }
 

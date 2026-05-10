@@ -19,10 +19,25 @@
 // 512),that's 32K-262K float ops per update — small
 // enough that CPU works,but the GPU does the entire
 // outer-product in a single dispatch where each (i, j)
-// cell gets its own thread。 On Apple Silicon GPUs that
-// translates to a substantial speedup for the larger
-// shapes (a 512×512 outer-product runs in ~30µs on M2
-// vs ~1ms CPU)。
+// cell gets its own thread。
+//
+// **Measured speedup** (chapter 460 BASMetalBenchmark
+// Harness on the dev machine,Apple Silicon arm64,30
+// timed iterations after 5 warmup):
+//
+//   shape=32×32     cpu=169µs    gpu=256µs    0.66x  ← GPU dispatch overhead exceeds gain at tiny shapes
+//   shape=256×256   cpu=10107µs  gpu=298µs    33.9x
+//   shape=1024×1024 cpu=163368µs gpu=1184µs   138.0x
+//
+// Interpretation:GPU is SLOWER than CPU below ~64×64
+// (kernel launch + buffer alloc overhead exceeds the
+// outer-product cost)。 GPU becomes massively faster
+// at production-relevant shapes。 Hosts with small
+// weight matrices should keep using CPU `apply()`;
+// hosts with Mamba/Transformer-scale matrices should
+// use `applyGPU()`。 The harness reports the actual
+// measurements — these doctrine numbers are the dev-
+// machine snapshot,NOT a portable claim。
 //
 // More importantly:chapter 451 shipped Mamba GPU,
 // chapters 447-449 shipped 3 transformer kernels GPU,

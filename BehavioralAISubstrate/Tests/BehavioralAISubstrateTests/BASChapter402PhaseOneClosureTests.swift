@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1215",
-            "M1215:doctrine version reflects POST-SWEEP BIOMIMETIC chapter 9 (chapter 四百五十九 — BASHierarchicalPredictiveCoding first multi-level adaptive primitive, chapters 447-459 ship continuous real-execution + biomimetic + adaptive + learning + persistence + orchestration + timing-window + GPU-acceleration + hierarchical-cortical-architecture sequence)")
+            "ADR-016.M1223",
+            "M1223:doctrine version reflects DEBT REPAYMENT 2 (chapter 四百六十一 — first real wire from BASTurnRuntimeEngine to BASBiomimeticTurnObserver, chapters 447-461 ship continuous real-execution + biomimetic build-out + DEBT REPAYMENT closing benchmark gap + integration gap)")
     }
 
     // MARK: - M-number range matches chapter 四百二

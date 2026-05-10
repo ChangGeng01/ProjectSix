@@ -826,7 +826,65 @@ public enum BASEntropyChapterIndex {
                 " signal。 Mirrors cortical hierarchies" +
                 " (Rao & Ballard 1999;Friston free-" +
                 "energy)。 「不够仿生」 7/10 → 8/10。" +
-                " ADR-016 → M1215")
+                " ADR-016 → M1215"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十",
+            mNumberFirst: 1216,
+            mNumberLast: 1219,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "DEBT REPAYMENT 1 — closes BENCHMARK" +
+                " debt surfaced by chapter 459 self-" +
+                "audit。 BASMetalBenchmarkHarness actor" +
+                " runs N warmup + M timed iterations of" +
+                " CPU + GPU plasticity paths,returns" +
+                " typed report with mean/median/p95 µs" +
+                " + speedup ratio。 7 PROOF tests" +
+                " including REAL HARNESS RUN on 32×32" +
+                " / 256×256 / 1024×1024 shapes emitting" +
+                " measured µs。 Real numbers caught a" +
+                " NUANCE fictional doctrine hid:GPU" +
+                " is SLOWER at tiny shapes (32×32 →" +
+                " 0.66x;dispatch overhead);dominates" +
+                " at production scale (256×256 → 33.9x;" +
+                " 1024×1024 → 138.0x)。 Chapter 458" +
+                " doctrine UPDATED to cite harness +" +
+                " remove fictional µs claims。" +
+                " ADR-016 → M1219"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十一",
+            mNumberFirst: 1220,
+            mNumberLast: 1223,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "DEBT REPAYMENT 2 — closes INTEGRATION" +
+                " debt surfaced by chapter 459 self-" +
+                "audit。 First REAL wire from" +
+                " BASTurnRuntimeEngine to" +
+                " BASBiomimeticTurnObserver via two" +
+                " new optional configuration slots" +
+                " (biomimeticTurnObserver +" +
+                " biomimeticTurnSignalBuilder)" +
+                " defaulting to nil for ADR-014 OPT-IN" +
+                " + 7-LOC hook block at end of" +
+                " runWithPlan firing observer with" +
+                " try? swallow (红线 7 observation-" +
+                "not-commitment)。 8 PROOF tests verify" +
+                " configuration slots + updaters +" +
+                " observer-fires-with-builder-signal-" +
+                "drives-primitive。 Honest scope:full" +
+                " coordinator-level end-to-end test" +
+                " deferred (no test-infra exists)。" +
+                " Chapters 456+ orchestration no" +
+                " longer dead-on-arrival。 「Substrate" +
+                " not integrated into turn loop」 0% →" +
+                " ~70%。 ADR-016 → M1223")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

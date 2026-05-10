@@ -881,7 +881,33 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// surprise signal。 「不够仿生」 7/10 → 8/10
     /// (substrate now mirrors cortical hierarchies)。
     /// V1 byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1215"
+    /// M1219 bump:DEBT REPAYMENT chapter 1 — chapter
+    /// 四百六十 ships BASMetalBenchmarkHarness with
+    /// REAL µs measurements。 Closes benchmark debt
+    /// surfaced by chapter 459 self-audit。 Real
+    /// measurements caught a NUANCE the fictional
+    /// chapter 458 doctrine numbers hid:GPU is
+    /// SLOWER than CPU at tiny shapes (32×32 → 0.66x)
+    /// due to kernel-launch overhead;dominates at
+    /// production-relevant shapes (256×256 → 33.9x;
+    /// 1024×1024 → 138.0x)。 Chapter 458 doctrine
+    /// UPDATED to remove fictional numbers + cite
+    /// harness。 V1 byte-equality preserved。
+    /// M1223 bump:DEBT REPAYMENT chapter 2 — chapter
+    /// 四百六十一 ships first REAL wire from
+    /// BASTurnRuntimeEngine to BASBiomimeticTurn
+    /// Observer via two new optional configuration
+    /// slots (biomimeticTurnObserver +
+    /// biomimeticTurnSignalBuilder) defaulting to nil
+    /// for ADR-014 OPT-IN + 7-LOC hook block at end
+    /// of runWithPlan firing observer with try?
+    /// swallow (红线 7 observation-not-commitment)。
+    /// Closes integration debt — chapters 456+
+    /// orchestration code is no longer dead-on-
+    /// arrival。 「Substrate not integrated into turn
+    /// loop」 0% → ~70%。 V1 byte-equality preserved。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1223"
 
     /// Query the typed status of a specific gap。
     public static func status(

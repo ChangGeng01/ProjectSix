@@ -154,6 +154,36 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
     public let fallbackStageExecutor:
         BASNativeStageExecutor.StageExecutor?
 
+    // MARK: - Slots (M1221 chapter 四百六十一 — biomimetic observer hook)
+
+    /// Optional substrate-side biomimetic observer
+    /// invoked once per `runWithPlan(...)` call after
+    /// the turn has fully completed (lifecycle envelopes
+    /// emitted,dispatch ledger captured)。 ADR-014 OPT-
+    /// IN:nil → no observer call → V1 byte-equality
+    /// preserved。 When non-nil,observer.observe is
+    /// called with the typed signal produced by
+    /// `biomimeticTurnSignalBuilder` (or empty signal
+    /// if no builder is wired)。
+    /// chapter 461 / M1221 — closes integration debt
+    /// surfaced by chapter 459 self-audit。
+    public let biomimeticTurnObserver:
+        BASBiomimeticTurnObserver?
+
+    /// Optional Sendable closure mapping a completed
+    /// turn result into a typed `BASBiomimeticTurnSignal`
+    /// that drives the observer's primitives。 When nil,
+    /// observer (if present) gets an empty signal
+    /// (turn-counter-only — useful for audit + cross-
+    /// turn snapshot bookkeeping without driving any
+    /// primitive)。 Hosts wiring real bio-data
+    /// (embeddings,attention patterns,outcome
+    /// signals) install a builder here。
+    /// chapter 461 / M1221。
+    public let biomimeticTurnSignalBuilder:
+        (@Sendable (BASEBrainTurnResult)
+            -> BASBiomimeticTurnSignal)?
+
     // MARK: - Init
 
     public init(
@@ -171,7 +201,12 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
         routedStageExecutor:
             BASNativeStageExecutor.RoutedStageExecutor? = nil,
         fallbackStageExecutor:
-            BASNativeStageExecutor.StageExecutor? = nil
+            BASNativeStageExecutor.StageExecutor? = nil,
+        biomimeticTurnObserver:
+            BASBiomimeticTurnObserver? = nil,
+        biomimeticTurnSignalBuilder:
+            (@Sendable (BASEBrainTurnResult)
+                -> BASBiomimeticTurnSignal)? = nil
     ) {
         self.eventLog = eventLog
         self.eventIDFactory = eventIDFactory
@@ -182,6 +217,10 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
         self.stagePlanHints = stagePlanHints
         self.routedStageExecutor = routedStageExecutor
         self.fallbackStageExecutor = fallbackStageExecutor
+        self.biomimeticTurnObserver =
+            biomimeticTurnObserver
+        self.biomimeticTurnSignalBuilder =
+            biomimeticTurnSignalBuilder
     }
 
     /// Default config: no event log,UUID factory,system clock,
@@ -209,7 +248,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     public func with(
@@ -225,7 +268,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     public func with(
@@ -240,7 +287,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     // MARK: - Immutable updates (M1100 Phase F)
@@ -257,7 +308,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     public func with(
@@ -272,7 +327,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     public func with(
@@ -287,7 +346,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     /// chapter 四百三十五 / M1116 — immutable updater for
@@ -305,7 +368,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     // MARK: - Immutable updates (M1128 chapter 四百三十八 — host injection)
@@ -328,7 +395,11 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 
     /// chapter 四百三十八 / M1128 — immutable updater for
@@ -349,6 +420,57 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             aneCapability: aneCapability,
             stagePlanHints: stagePlanHints,
             routedStageExecutor: routedStageExecutor,
-            fallbackStageExecutor: fallbackStageExecutor)
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
+    }
+
+    // MARK: - Immutable updates (M1221 chapter 四百六十一 — biomimetic observer)
+
+    /// chapter 461 / M1221 — immutable updater for the
+    /// optional substrate-side biomimetic observer。
+    public func with(
+        biomimeticTurnObserver:
+            BASBiomimeticTurnObserver?
+    ) -> BASTurnRuntimeEngineConfiguration {
+        BASTurnRuntimeEngineConfiguration(
+            eventLog: eventLog,
+            eventIDFactory: eventIDFactory,
+            clockMs: clockMs,
+            runtimeMode: runtimeMode,
+            metalKernelRegistry: metalKernelRegistry,
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
+    }
+
+    /// chapter 461 / M1221 — immutable updater for the
+    /// optional turn-result → biomimetic-signal builder。
+    public func with(
+        biomimeticTurnSignalBuilder:
+            (@Sendable (BASEBrainTurnResult)
+                -> BASBiomimeticTurnSignal)?
+    ) -> BASTurnRuntimeEngineConfiguration {
+        BASTurnRuntimeEngineConfiguration(
+            eventLog: eventLog,
+            eventIDFactory: eventIDFactory,
+            clockMs: clockMs,
+            runtimeMode: runtimeMode,
+            metalKernelRegistry: metalKernelRegistry,
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder)
     }
 }

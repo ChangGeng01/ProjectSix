@@ -1094,6 +1094,44 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter459EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter459EntropyDoctrine
+                    .summary),
+            // M1219 DEBT REPAYMENT 1 (benchmark harness)
+            check("四百六十",
+                tag: BASChapter460EntropyDoctrine.chapterTag,
+                first: BASChapter460EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter460EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter460EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter460EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter460EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter460EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter460EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter460EntropyDoctrine
+                    .summary),
+            // M1223 DEBT REPAYMENT 2 (real wire from engine to observer)
+            check("四百六十一",
+                tag: BASChapter461EntropyDoctrine.chapterTag,
+                first: BASChapter461EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter461EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter461EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter461EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter461EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter461EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter461EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter461EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1278,7 +1316,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter458EntropyDoctrine.mNumberLast),
             // M1215 POST-SWEEP BIOMIMETIC chapter 9 (hierarchical predictive coding)
             ("459", BASChapter459EntropyDoctrine.mNumberFirst,
-             BASChapter459EntropyDoctrine.mNumberLast)
+             BASChapter459EntropyDoctrine.mNumberLast),
+            // M1219 DEBT REPAYMENT 1 (benchmark harness)
+            ("460", BASChapter460EntropyDoctrine.mNumberFirst,
+             BASChapter460EntropyDoctrine.mNumberLast),
+            // M1223 DEBT REPAYMENT 2 (real engine→observer wire)
+            ("461", BASChapter461EntropyDoctrine.mNumberFirst,
+             BASChapter461EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。

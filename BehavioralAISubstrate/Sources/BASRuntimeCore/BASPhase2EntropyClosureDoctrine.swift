@@ -113,7 +113,9 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百五十六",   // M1200-M1203 (POST-SWEEP BIOMIMETIC chapter 6 — BASBiomimeticTurnObserver first cross-primitive orchestrator)
         "chapter 四百五十七",   // M1204-M1207 (POST-SWEEP BIOMIMETIC chapter 7 — STDP 4th timing-dependent plasticity rule)
         "chapter 四百五十八",   // M1208-M1211 (POST-SWEEP BIOMIMETIC chapter 8 — GPU-accelerated plasticity update)
-        "chapter 四百五十九"    // M1212-M1215 (POST-SWEEP BIOMIMETIC chapter 9 — BASHierarchicalPredictiveCoding multi-level adaptive primitive)
+        "chapter 四百五十九",   // M1212-M1215 (POST-SWEEP BIOMIMETIC chapter 9 — BASHierarchicalPredictiveCoding multi-level adaptive primitive)
+        "chapter 四百六十",     // M1216-M1219 (DEBT REPAYMENT 1 — BASMetalBenchmarkHarness with REAL µs measurements + chapter 458 doctrine corrected)
+        "chapter 四百六十一"    // M1220-M1223 (DEBT REPAYMENT 2 — first real wire from BASTurnRuntimeEngine to BASBiomimeticTurnObserver via 2 config slots + 7-LOC hook)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -125,17 +127,18 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1123 → M1127 → M1131 → M1135 → M1139 → M1143 →
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
     /// M1187 → M1191 → M1195 → M1199 → M1203 → M1207 →
-    /// M1211 → M1215 (chapter 四百五十九 POST-SWEEP
-    /// BIOMIMETIC chapter 9 — BASHierarchicalPredictive
-    /// Coding multi-level adaptive primitive)。
+    /// M1211 → M1215 → M1219 → M1223 (chapter 四百
+    /// 六十一 DEBT REPAYMENT 2 — first real wire from
+    /// BASTurnRuntimeEngine to BASBiomimeticTurn
+    /// Observer via 2 config slots + 7-LOC hook block)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1215
+    public static let mNumberLast: Int = 1223
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1215)。 Bumped through chapter 459:213 → ... →
+    /// M1223)。 Bumped through chapter 461:213 → ... →
     /// 233 → 237 → 241 → 245 → 249 → 253 → 257 → 261
-    /// (chapters 453-459 each 4 cuts)。
-    public static let commitsShipped: Int = 261
+    /// → 265 → 269 (chapters 453-461 each 4 cuts)。
+    public static let commitsShipped: Int = 269
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
