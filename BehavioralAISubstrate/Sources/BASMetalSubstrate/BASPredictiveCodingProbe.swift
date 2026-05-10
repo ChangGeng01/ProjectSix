@@ -116,7 +116,7 @@ import Foundation
 /// Typed shape descriptor for a
 /// `BASPredictiveCodingProbe` instance。
 public struct BASPredictiveCodingProbeShape:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Feature dimension of the prediction + observation
@@ -342,5 +342,52 @@ public actor BASPredictiveCodingProbe {
             updatedPrediction: updatedPrediction,
             runningMSE: mse,
             observationIndex: currentIndex)
+    }
+
+    // MARK: - chapter 455 / M1197 — snapshot persistence
+
+    /// Capture an immutable snapshot of the probe's
+    /// current state。 Safe to encode/persist
+    /// (Codable via BASPredictiveCodingSnapshot)。
+    public func exportSnapshot()
+        -> BASPredictiveCodingSnapshot
+    {
+        return BASPredictiveCodingSnapshot(
+            shape: shape,
+            prediction: prediction,
+            observationsProcessed:
+                observationsProcessed,
+            sumSquaredError: sumSquaredError)
+    }
+
+    /// Restore probe state from a previously-exported
+    /// snapshot。 Throws `.shapeMismatch` if the
+    /// snapshot's shape doesn't match the probe's
+    /// shape,or if `prediction.count` doesn't match
+    /// `shape.dim`。 Validation happens BEFORE any
+    /// mutation — failure leaves probe state untouched。
+    public func importSnapshot(
+        _ snapshot: BASPredictiveCodingSnapshot
+    ) throws {
+        guard snapshot.shape == shape else {
+            throw BASBiomimeticSnapshotError
+                .shapeMismatch(
+                    reason: "snapshot.shape" +
+                    " (\(snapshot.shape)) !=" +
+                    " probe.shape (\(shape))")
+        }
+        guard snapshot.prediction.count == shape.dim
+        else {
+            throw BASBiomimeticSnapshotError
+                .shapeMismatch(
+                    reason:
+                    "snapshot.prediction.count" +
+                    " (\(snapshot.prediction.count))" +
+                    " != shape.dim (\(shape.dim))")
+        }
+        prediction = snapshot.prediction
+        observationsProcessed =
+            snapshot.observationsProcessed
+        sumSquaredError = snapshot.sumSquaredError
     }
 }

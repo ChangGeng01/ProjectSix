@@ -101,7 +101,7 @@ public enum BASPlasticityRule:
 // MARK: - Typed shape
 
 public struct BASPlasticityFoldShape:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Pre-synaptic feature dim P。 Clamped to >= 1。
@@ -310,5 +310,52 @@ public actor BASPlasticityFold {
             output[j] = acc
         }
         return output
+    }
+
+    // MARK: - chapter 455 / M1197 — snapshot persistence
+
+    /// Capture an immutable snapshot of the fold's
+    /// current weight matrix + update counter。 Safe
+    /// to encode/persist (Codable via
+    /// BASPlasticitySnapshot)。
+    public func exportSnapshot()
+        -> BASPlasticitySnapshot
+    {
+        return BASPlasticitySnapshot(
+            shape: shape,
+            weights: weights,
+            updatesProcessed: updatesProcessed)
+    }
+
+    /// Restore fold state from a previously-exported
+    /// snapshot。 Throws `.shapeMismatch` if the
+    /// snapshot's shape doesn't match the fold's
+    /// shape,or if `weights.count` doesn't match
+    /// `preDim × postDim`。 Validation happens BEFORE
+    /// any mutation — failure leaves fold state
+    /// untouched。
+    public func importSnapshot(
+        _ snapshot: BASPlasticitySnapshot
+    ) throws {
+        guard snapshot.shape == shape else {
+            throw BASBiomimeticSnapshotError
+                .shapeMismatch(
+                    reason: "snapshot.shape" +
+                    " (\(snapshot.shape)) !=" +
+                    " fold.shape (\(shape))")
+        }
+        let expectedSize =
+            shape.preDim * shape.postDim
+        guard snapshot.weights.count == expectedSize
+        else {
+            throw BASBiomimeticSnapshotError
+                .shapeMismatch(
+                    reason:
+                    "snapshot.weights.count" +
+                    " (\(snapshot.weights.count))" +
+                    " != expected (\(expectedSize))")
+        }
+        weights = snapshot.weights
+        updatesProcessed = snapshot.updatesProcessed
     }
 }

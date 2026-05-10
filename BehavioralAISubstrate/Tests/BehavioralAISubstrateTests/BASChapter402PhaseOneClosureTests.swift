@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1195",
-            "M1195:doctrine version reflects POST-SWEEP BIOMIMETIC chapter 4 (chapter 四百五十四 — BASPlasticityFold substrate's first learning primitive, chapters 447-454 ship continuous real-execution + biomimetic + adaptive + learning sequence)")
+            "ADR-016.M1199",
+            "M1199:doctrine version reflects POST-SWEEP BIOMIMETIC chapter 5 (chapter 四百五十五 — BASBiomimeticStateSnapshot cross-turn / cross-session persistence for 3 biomimetic primitives, chapters 447-455 ship continuous real-execution + biomimetic + adaptive + learning + persistence sequence)")
     }
 
     // MARK: - M-number range matches chapter 四百二

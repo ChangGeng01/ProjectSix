@@ -37,14 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs454() {
+    func testLastChapterIs455() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百五十四",
-            "M1195 POST-SWEEP BIOMIMETIC chapter 4:" +
-            " bumped to 四百五十四 (BASPlasticityFold" +
-            " first substrate learning primitive)")
+            "chapter 四百五十五",
+            "M1199 POST-SWEEP BIOMIMETIC chapter 5:" +
+            " bumped to 四百五十五 (BASBiomimeticState" +
+            "Snapshot cross-turn persistence for 3" +
+            " biomimetic primitives)")
     }
 
     // MARK: - M-number range

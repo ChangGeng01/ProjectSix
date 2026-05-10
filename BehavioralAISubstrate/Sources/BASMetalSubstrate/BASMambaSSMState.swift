@@ -113,7 +113,7 @@ import Metal
 /// to >= 1 to prevent zero-sized state degenerate
 /// cases。
 public struct BASMambaSSMShape:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Batch dimension B。 Number of independent state
@@ -633,6 +633,53 @@ public actor BASMambaSSMState {
         return BASMambaSSMScanOutputs(
             y: y,
             finalHiddenStateSnapshot: hiddenState)
+    }
+
+    // MARK: - chapter 455 / M1197 — snapshot persistence
+
+    /// Capture an immutable snapshot of the actor's
+    /// current state。 Safe to encode/persist
+    /// (Codable via BASMambaSSMSnapshot)。
+    public func exportSnapshot() -> BASMambaSSMSnapshot {
+        return BASMambaSSMSnapshot(
+            shape: shape,
+            hiddenState: hiddenState,
+            processedScanCalls: processedScanCalls)
+    }
+
+    /// Restore actor state from a previously-exported
+    /// snapshot。 Throws `.shapeMismatch` if the
+    /// snapshot's shape doesn't match the actor's
+    /// shape,or if `hiddenState.count` doesn't match
+    /// the expected B × D × N flat length。 Validation
+    /// happens BEFORE any mutation — failure leaves
+    /// the actor's state untouched。
+    public func importSnapshot(
+        _ snapshot: BASMambaSSMSnapshot
+    ) throws {
+        guard snapshot.shape == shape else {
+            throw BASBiomimeticSnapshotError
+                .shapeMismatch(
+                    reason: "snapshot.shape" +
+                    " (\(snapshot.shape)) !=" +
+                    " actor.shape (\(shape))")
+        }
+        let expectedSize = shape.batch
+            * shape.hiddenDim * shape.stateDim
+        guard snapshot.hiddenState.count
+            == expectedSize else {
+            throw BASBiomimeticSnapshotError
+                .shapeMismatch(
+                    reason:
+                    "snapshot.hiddenState.count" +
+                    " (\(snapshot.hiddenState.count))" +
+                    " != expected (\(expectedSize))")
+        }
+        // Direct mutation of private actor state:safe
+        // because this method lives inside the actor
+        // body (not an extension)。
+        hiddenState = snapshot.hiddenState
+        processedScanCalls = snapshot.processedScanCalls
     }
 
     /// Lazy-build the Metal pipeline on first GPU call。

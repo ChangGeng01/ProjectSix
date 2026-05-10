@@ -685,7 +685,34 @@ public enum BASEntropyChapterIndex {
                 " LEARNS ASSOCIATION (10 repeated pre/" +
                 "post pairs → forward query produces" +
                 " the learned association)。 「不够灵活」" +
-                " ~35% → ~50%。 ADR-016 → M1195")
+                " ~35% → ~50%。 ADR-016 → M1195"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十五",
+            mNumberFirst: 1196,
+            mNumberLast: 1199,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 12,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 5 —" +
+                " cross-turn / cross-session state" +
+                " persistence for ALL 3 biomimetic" +
+                " primitives。 Codable snapshot bundles" +
+                " (BASMambaSSMSnapshot +" +
+                " BASPredictiveCodingSnapshot +" +
+                " BASPlasticitySnapshot) + aggregate" +
+                " BASBiomimeticStateSnapshot + in-actor" +
+                " exportSnapshot/importSnapshot methods" +
+                " (validate shape + flat-length before" +
+                " mutating;fail-fast)。 20 PROOF tests" +
+                " including 3 CHECKPOINT-RESTORE-" +
+                "EVOLUTION-PARITY proofs:restored" +
+                " state's subsequent trajectory byte-" +
+                "equals a never-corrupted reference" +
+                " actor's trajectory。 「不够仿生」 5/10 →" +
+                " 6/10 (substrate REMEMBERS across host" +
+                " restarts)。 ADR-016 → M1199")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

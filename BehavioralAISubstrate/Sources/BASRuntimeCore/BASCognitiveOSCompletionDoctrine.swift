@@ -800,7 +800,22 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// has BOTH closed-loop adaptation (chapter 452)
     /// AND substrate-level learning (chapter 454)。 V1
     /// byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1195"
+    /// M1199 bump:POST-SWEEP BIOMIMETIC chapter 5 —
+    /// chapter 四百五十五 ships BASBiomimeticState
+    /// Snapshot,cross-turn / cross-session persistence
+    /// for ALL 3 biomimetic primitives (Mamba SSM +
+    /// predictive-coding probe + plasticity fold)。
+    /// Codable snapshot bundles + in-actor export/
+    /// import methods + 20 PROOF tests including 3
+    /// CHECKPOINT-RESTORE-EVOLUTION-PARITY proofs that
+    /// restored state's subsequent trajectory byte-
+    /// equals a never-corrupted reference actor's
+    /// trajectory。 「不够仿生」 5/10 → 6/10 (substrate
+    /// now REMEMBERS adaptive state across host
+    /// restarts — biology survives sleep,substrate
+    /// survives process termination)。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1199"
 
     /// Query the typed status of a specific gap。
     public static func status(

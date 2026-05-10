@@ -999,6 +999,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter454EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter454EntropyDoctrine
+                    .summary),
+            // M1199 POST-SWEEP BIOMIMETIC chapter 5 (state persistence)
+            check("四百五十五",
+                tag: BASChapter455EntropyDoctrine.chapterTag,
+                first: BASChapter455EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter455EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter455EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter455EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter455EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter455EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter455EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter455EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1168,7 +1187,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter453EntropyDoctrine.mNumberLast),
             // M1195 POST-SWEEP BIOMIMETIC chapter 4 (learning)
             ("454", BASChapter454EntropyDoctrine.mNumberFirst,
-             BASChapter454EntropyDoctrine.mNumberLast)
+             BASChapter454EntropyDoctrine.mNumberLast),
+            // M1199 POST-SWEEP BIOMIMETIC chapter 5 (state persistence)
+            ("455", BASChapter455EntropyDoctrine.mNumberFirst,
+             BASChapter455EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
