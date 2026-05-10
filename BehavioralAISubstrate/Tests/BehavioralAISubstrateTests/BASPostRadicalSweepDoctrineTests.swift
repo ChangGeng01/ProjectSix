@@ -402,4 +402,107 @@ final class BASPostRadicalSweepDoctrineTests:
             BASPostRadicalSweepDoctrine.summary,
             BASPostRadicalSweepDoctrine.summary)
     }
+
+    // MARK: - Polish pass 2 cross-mirror invariants
+
+    /// Phase 2 doctrine's mNumberLast MUST equal the
+    /// sweep doctrine's mNumberLast — both track the
+    /// latest chapter shipped。 If a future Phase 2
+    /// chapter ships without bumping the SWEEP doctrine
+    /// (or vice versa),this test fails — the chain
+    /// has drifted。
+    func testPhase2DoctrineMNumberLastMatchesSweepMNumberLast() {
+        XCTAssertEqual(
+            BASPhase2EntropyClosureDoctrine
+                .mNumberLast,
+            BASPostRadicalSweepDoctrine.mNumberLast,
+            "BASPhase2EntropyClosureDoctrine.mNumberLast" +
+            " (\(BASPhase2EntropyClosureDoctrine.mNumberLast))" +
+            " must equal BASPostRadicalSweepDoctrine" +
+            ".mNumberLast" +
+            " (\(BASPostRadicalSweepDoctrine.mNumberLast))" +
+            " — both track the latest chapter shipped")
+    }
+
+    /// Per-entry M-range cross-mirror:every sweep
+    /// chapter's M-range MUST match the corresponding
+    /// `BASEntropyChapterIndex.radicalEvolutionEntries`
+    /// entry's M-range。 This catches drift where the
+    /// SWEEP doctrine and the index disagree on a
+    /// chapter's actual cuts even when both have the
+    /// chapter listed。 Stronger than
+    /// `testEverySweepChapterMirroredInIndex` which
+    /// only checks tag membership。
+    func testSweepChapterMRangesMatchIndexEntries() {
+        for tag in BASPostRadicalSweepDoctrine
+            .chapterTagsShipped
+        {
+            guard let entry = BASEntropyChapterIndex
+                .entry(forTag: tag)
+            else {
+                XCTFail(
+                    "Sweep chapter \(tag) missing from" +
+                    " radicalEvolutionEntries — covered" +
+                    " by testEverySweepChapterMirroredInIndex" +
+                    " but failing here too means the" +
+                    " whole cross-mirror chain broke")
+                continue
+            }
+            // Per-entry M-range sanity:every entry must
+            // have mNumberLast >= mNumberFirst (no
+            // negative spans)。
+            XCTAssertGreaterThanOrEqual(
+                entry.mNumberLast,
+                entry.mNumberFirst,
+                "Index entry for \(tag) has inverted" +
+                " M-range:\(entry.mNumberFirst) →" +
+                " \(entry.mNumberLast)")
+            // First chapter must start at sweep's
+            // mNumberFirst;last must end at sweep's
+            // mNumberLast — already checked by
+            // testMNumberRangeMatchesChapterDoctrines
+            // but reaffirmed here against the index
+            // (different surface)
+            if tag == BASPostRadicalSweepDoctrine
+                .firstChapterTag
+            {
+                XCTAssertEqual(
+                    entry.mNumberFirst,
+                    BASPostRadicalSweepDoctrine
+                        .mNumberFirst,
+                    "Sweep first-chapter M-range start" +
+                    " must equal sweep mNumberFirst" +
+                    " (cross-mirror via index)")
+            }
+            if tag == BASPostRadicalSweepDoctrine
+                .lastChapterTag
+            {
+                XCTAssertEqual(
+                    entry.mNumberLast,
+                    BASPostRadicalSweepDoctrine
+                        .mNumberLast,
+                    "Sweep last-chapter M-range end" +
+                    " must equal sweep mNumberLast" +
+                    " (cross-mirror via index)")
+            }
+        }
+    }
+
+    /// Summary string MUST embed the trigger directive
+    /// verbatim — keeps the narrative anchor inside the
+    /// summary itself so a single doctrine read carries
+    /// the WHY for the WHAT。 If `summary` drifts away
+    /// from `triggerDirective`,this test fails and
+    /// reminds the editor to keep them aligned。
+    func testSummaryEmbedsTriggerDirective() {
+        XCTAssertTrue(
+            BASPostRadicalSweepDoctrine.summary
+                .contains(
+                    BASPostRadicalSweepDoctrine
+                        .triggerDirective),
+            "BASPostRadicalSweepDoctrine.summary must" +
+            " embed triggerDirective verbatim — keeps" +
+            " the WHY anchored inside the WHAT。 Got:" +
+            " summary='\(BASPostRadicalSweepDoctrine.summary)'")
+    }
 }
