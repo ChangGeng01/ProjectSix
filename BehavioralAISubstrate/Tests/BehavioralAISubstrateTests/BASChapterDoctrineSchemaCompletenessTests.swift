@@ -1018,6 +1018,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter455EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter455EntropyDoctrine
+                    .summary),
+            // M1203 POST-SWEEP BIOMIMETIC chapter 6 (turn observer orchestrator)
+            check("四百五十六",
+                tag: BASChapter456EntropyDoctrine.chapterTag,
+                first: BASChapter456EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter456EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter456EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter456EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter456EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter456EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter456EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter456EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1190,7 +1209,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter454EntropyDoctrine.mNumberLast),
             // M1199 POST-SWEEP BIOMIMETIC chapter 5 (state persistence)
             ("455", BASChapter455EntropyDoctrine.mNumberFirst,
-             BASChapter455EntropyDoctrine.mNumberLast)
+             BASChapter455EntropyDoctrine.mNumberLast),
+            // M1203 POST-SWEEP BIOMIMETIC chapter 6 (turn observer orchestrator)
+            ("456", BASChapter456EntropyDoctrine.mNumberFirst,
+             BASChapter456EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。

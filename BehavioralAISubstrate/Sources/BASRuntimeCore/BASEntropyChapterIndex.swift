@@ -712,7 +712,38 @@ public enum BASEntropyChapterIndex {
                 "equals a never-corrupted reference" +
                 " actor's trajectory。 「不够仿生」 5/10 →" +
                 " 6/10 (substrate REMEMBERS across host" +
-                " restarts)。 ADR-016 → M1199")
+                " restarts)。 ADR-016 → M1199"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十六",
+            mNumberFirst: 1200,
+            mNumberLast: 1203,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 6 —" +
+                " substrate's FIRST cross-primitive" +
+                " orchestrator。 BASBiomimeticTurn" +
+                "Observer bundles the 3 biomimetic" +
+                " primitives + chapter 455 snapshot" +
+                " value-type behind ONE actor + ONE" +
+                " typed observe(_:) entry。 Optional" +
+                " primitive slots;observe dispatches" +
+                " to populated ones + skips nil。" +
+                " exportAggregate/importAggregate" +
+                " integrate chapter 455 snapshot with" +
+                " 2 boundary clamps:unpopulated-slot" +
+                " silently ignored,populated-with-nil-" +
+                "snapshot untouched。 15 PROOF tests" +
+                " including OBSERVER-LEVEL CHECKPOINT-" +
+                "RESTORE-EVOLUTION-PARITY (byte-equal" +
+                " trajectory after corruption + restore" +
+                " at orchestrator level)。 Hosts" +
+                " integrate biomimetic state with one" +
+                " actor injection instead of three。" +
+                " 「不够灵活」 ~50% → ~58%。" +
+                " ADR-016 → M1203")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

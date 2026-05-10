@@ -25,13 +25,13 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1199",
-            "Doctrine version pin。 M1199 POST-SWEEP " +
-            "BIOMIMETIC chapter 5:bumped through chapters " +
-            "453 + 454 + 455 — attention quartet + first " +
-            "learning primitive + cross-turn / cross-" +
-            "session persistence for 3 biomimetic " +
-            "primitives via BASBiomimeticStateSnapshot")
+            "ADR-016.M1203",
+            "Doctrine version pin。 M1203 POST-SWEEP " +
+            "BIOMIMETIC chapter 6:bumped through chapters " +
+            "453 + 454 + 455 + 456 — attention quartet + " +
+            "first learning primitive + cross-turn " +
+            "persistence + first cross-primitive " +
+            "orchestrator (BASBiomimeticTurnObserver)")
     }
 
     // MARK: - Per-gap status pins

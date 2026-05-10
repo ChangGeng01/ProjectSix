@@ -815,7 +815,23 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// restarts — biology survives sleep,substrate
     /// survives process termination)。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1199"
+    /// M1203 bump:POST-SWEEP BIOMIMETIC chapter 6 —
+    /// chapter 四百五十六 ships BASBiomimeticTurn
+    /// Observer,substrate's FIRST cross-primitive
+    /// orchestrator bundling the 3 biomimetic
+    /// primitives + chapter 455 snapshot value-type
+    /// behind ONE actor + ONE typed observe(_:) entry。
+    /// 15 PROOF tests including OBSERVER-LEVEL
+    /// CHECKPOINT-RESTORE-EVOLUTION-PARITY (byte-equal
+    /// trajectory after corruption + restore at
+    /// orchestrator level)。 Aggregate snapshot import
+    /// has TWO boundary clamps:unpopulated-slot
+    /// silently ignored,populated-primitive-with-nil-
+    /// snapshot-slot left untouched。 「不够灵活」
+    /// ~50% → ~58% (hosts integrate biomimetic state
+    /// with one actor injection instead of three)。
+    /// V1 byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1203"
 
     /// Query the typed status of a specific gap。
     public static func status(
