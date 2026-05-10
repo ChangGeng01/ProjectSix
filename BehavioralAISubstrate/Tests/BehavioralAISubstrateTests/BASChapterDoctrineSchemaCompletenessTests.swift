@@ -961,6 +961,44 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter452EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter452EntropyDoctrine
+                    .summary),
+            // M1191 POST-SWEEP REAL EXECUTION (attention)
+            check("四百五十三",
+                tag: BASChapter453EntropyDoctrine.chapterTag,
+                first: BASChapter453EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter453EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter453EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter453EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter453EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter453EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter453EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter453EntropyDoctrine
+                    .summary),
+            // M1195 POST-SWEEP BIOMIMETIC chapter 4 (learning)
+            check("四百五十四",
+                tag: BASChapter454EntropyDoctrine.chapterTag,
+                first: BASChapter454EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter454EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter454EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter454EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter454EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter454EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter454EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter454EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1124,7 +1162,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter451EntropyDoctrine.mNumberLast),
             // M1187 POST-SWEEP BIOMIMETIC chapter 3 (adaptive)
             ("452", BASChapter452EntropyDoctrine.mNumberFirst,
-             BASChapter452EntropyDoctrine.mNumberLast)
+             BASChapter452EntropyDoctrine.mNumberLast),
+            // M1191 POST-SWEEP REAL EXECUTION (attention)
+            ("453", BASChapter453EntropyDoctrine.mNumberFirst,
+             BASChapter453EntropyDoctrine.mNumberLast),
+            // M1195 POST-SWEEP BIOMIMETIC chapter 4 (learning)
+            ("454", BASChapter454EntropyDoctrine.mNumberFirst,
+             BASChapter454EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -1362,6 +1406,20 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             first: BASChapter452EntropyDoctrine.mNumberFirst,
             last: BASChapter452EntropyDoctrine.mNumberLast,
             tag: "四百五十二")
+        // M1191 POST-SWEEP REAL EXECUTION (attention)
+        verifyKnivesRange(
+            BASChapter453EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter453EntropyDoctrine.mNumberFirst,
+            last: BASChapter453EntropyDoctrine.mNumberLast,
+            tag: "四百五十三")
+        // M1195 POST-SWEEP BIOMIMETIC chapter 4 (learning)
+        verifyKnivesRange(
+            BASChapter454EntropyDoctrine.knives.map {
+                $0.mNumber },
+            first: BASChapter454EntropyDoctrine.mNumberFirst,
+            last: BASChapter454EntropyDoctrine.mNumberLast,
+            tag: "四百五十四")
         // M1067 extension:added chapters 四百二十二 + 四百二十三
         verifyKnivesRange(
             BASChapter422EntropyDoctrine.knives.map {

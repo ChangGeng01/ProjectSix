@@ -25,12 +25,12 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1187",
-            "Doctrine version pin。 M1187 POST-SWEEP " +
-            "BIOMIMETIC chapter 3:bumped through chapters " +
-            "451 + 452 — Mamba GPU acceleration via " +
-            "custom Metal shader + BASPredictiveCodingProbe " +
-            "substrate's first closed-loop adaptive primitive")
+            "ADR-016.M1195",
+            "Doctrine version pin。 M1195 POST-SWEEP " +
+            "BIOMIMETIC chapter 4:bumped through chapters " +
+            "453 + 454 — attention closes transformer " +
+            "kernel quartet + BASPlasticityFold substrate's " +
+            "first learning primitive")
     }
 
     // MARK: - Per-gap status pins

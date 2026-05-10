@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1187",
-            "M1187:doctrine version reflects POST-SWEEP BIOMIMETIC chapter 3 (chapter 四百五十二 — BASPredictiveCodingProbe substrate's first closed-loop adaptive primitive, chapters 447-452 ship continuous real-execution + biomimetic + adaptive sequence)")
+            "ADR-016.M1195",
+            "M1195:doctrine version reflects POST-SWEEP BIOMIMETIC chapter 4 (chapter 四百五十四 — BASPlasticityFold substrate's first learning primitive, chapters 447-454 ship continuous real-execution + biomimetic + adaptive + learning sequence)")
     }
 
     // MARK: - M-number range matches chapter 四百二

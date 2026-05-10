@@ -645,7 +645,47 @@ public enum BASEntropyChapterIndex {
                 " (MSE decreases) + DISTRIBUTION SHIFT" +
                 " (error spike + recalibration)。" +
                 " 「不够灵活」 ~15% → ~35%。" +
-                " ADR-016 → M1187")
+                " ADR-016 → M1187"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十三",
+            mNumberFirst: 1188,
+            mNumberLast: 1191,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP REAL EXECUTION chapter —" +
+                " adds attention (4th transformer kernel)" +
+                " to the matMul + rmsNorm + rotaryEmbed" +
+                "ding triad。 CPU softmax via row-wise" +
+                " max-shift numerical stability;GPU" +
+                " composes transpose + matMul + softMax" +
+                " in one MPSGraph executable。 5 PROOF" +
+                " tests (identity + uniform-K +" +
+                " dominant-K + GPU/CPU agreement)。" +
+                " 「原生利用神经引擎」 3/3 → 4/4。" +
+                " ADR-016 → M1191"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百五十四",
+            mNumberFirst: 1192,
+            mNumberLast: 1195,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-SWEEP BIOMIMETIC chapter 4 —" +
+                " substrate's FIRST learning primitive。" +
+                " BASPlasticityFold actor maintains" +
+                " weight matrix W across apply() calls" +
+                " via 3 selectable rules (Hebbian +" +
+                " antiHebbian + outcomeModulatedHebbian)。" +
+                " 12 PROOF tests including HEBBIAN" +
+                " LEARNS ASSOCIATION (10 repeated pre/" +
+                "post pairs → forward query produces" +
+                " the learned association)。 「不够灵活」" +
+                " ~35% → ~50%。 ADR-016 → M1195")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

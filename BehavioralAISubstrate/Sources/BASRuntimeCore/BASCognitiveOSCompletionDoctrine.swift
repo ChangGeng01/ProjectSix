@@ -785,7 +785,22 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// converges;distribution shift → error spike +
     /// recalibration。 「不够灵活」 ~15% → ~35%。 V1
     /// byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1187"
+    /// M1191 bump:POST-SWEEP REAL EXECUTION chapter
+    /// — chapter 四百五十三 adds 4th transformer kernel
+    /// (attention via MPSGraph) — substrate now has
+    /// every primitive a modern attention block needs。
+    /// 「原生利用神经引擎」 3/3 → 4/4。
+    /// M1195 bump:POST-SWEEP BIOMIMETIC chapter 4 —
+    /// chapter 四百五十四 ships BASPlasticityFold,
+    /// substrate's FIRST learning primitive (3-rule
+    /// enum:Hebbian + antiHebbian + outcomeModulated
+    /// Hebbian)。 testHebbianLearnsAssociation proves
+    /// substrate learns from repeated (pre,post)
+    /// pairs。 「不够灵活」 ~35% → ~50%。 Substrate now
+    /// has BOTH closed-loop adaptation (chapter 452)
+    /// AND substrate-level learning (chapter 454)。 V1
+    /// byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1195"
 
     /// Query the typed status of a specific gap。
     public static func status(
