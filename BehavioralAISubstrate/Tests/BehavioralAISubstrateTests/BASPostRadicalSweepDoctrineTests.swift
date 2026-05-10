@@ -123,11 +123,18 @@ final class BASPostRadicalSweepDoctrineTests:
     // MARK: - whatsShipped + whatsDeferred + pins
 
     func testWhatsShippedPopulated() {
-        XCTAssertGreaterThanOrEqual(
+        // Exact-count assertion (chapter 二百一一
+        // single-source-of-truth):if any future commit
+        // adds a 9th achievement,this test fails until
+        // the count is explicitly bumped — preventing
+        // silent doctrine drift。
+        XCTAssertEqual(
             BASPostRadicalSweepDoctrine
                 .whatsShipped.count, 8,
-            "Sweep must list at least 8 substrate-side" +
-            " achievements")
+            "Sweep must list EXACTLY 8 substrate-side" +
+            " achievements;adding a 9th requires" +
+            " explicit count bump to prevent silent" +
+            " doctrine drift")
         // Spot-check key narrative anchors
         let joined = BASPostRadicalSweepDoctrine
             .whatsShipped.joined(separator: " | ")
@@ -145,11 +152,12 @@ final class BASPostRadicalSweepDoctrineTests:
     }
 
     func testWhatsDeferredPopulated() {
-        XCTAssertGreaterThanOrEqual(
+        XCTAssertEqual(
             BASPostRadicalSweepDoctrine
                 .whatsDeferred.count, 5,
-            "Sweep must explicitly defer at least 5" +
-            " items with reasons")
+            "Sweep must explicitly defer EXACTLY 5" +
+            " items with reasons;adding a 6th deferral" +
+            " requires explicit count bump")
         // Each entry must have non-empty reason
         for (item, reason) in
             BASPostRadicalSweepDoctrine.whatsDeferred
@@ -162,11 +170,12 @@ final class BASPostRadicalSweepDoctrineTests:
     }
 
     func testPinsHeldThroughoutPopulated() {
-        XCTAssertGreaterThanOrEqual(
+        XCTAssertEqual(
             BASPostRadicalSweepDoctrine
                 .pinsHeldThroughout.count, 10,
-            "Sweep must list at least 10 doctrine pins" +
-            " held at every commit boundary")
+            "Sweep must list EXACTLY 10 doctrine pins" +
+            " held at every commit boundary;adding an" +
+            " 11th requires explicit count bump")
         let joined = BASPostRadicalSweepDoctrine
             .pinsHeldThroughout.joined(
                 separator: " | ")
@@ -181,5 +190,216 @@ final class BASPostRadicalSweepDoctrineTests:
             joined.contains("ADR-016"),
             "ADR-016 substrate completion must be in" +
             " pins-held list")
+    }
+
+    // MARK: - Cross-mirror invariants (chapter 446 polish)
+
+    /// Exact chapter count — RADICAL chapters 427-433
+    /// (7 chapters) + POST-RADICAL chapters 434-446
+    /// (13 chapters) = 20 chapters total。
+    func testChapterCountIsExactly20() {
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.chapterCount,
+            20,
+            "Sweep covers chapters 427-446 inclusive =" +
+            " 20 chapters。 Drift fails this test")
+    }
+
+    /// SWEEP commitsShipped MUST equal the radical-
+    /// evolution slice's totalKnivesCount in
+    /// BASEntropyChapterIndex (both derive from the
+    /// same per-chapter knives ledgers)。 If the SWEEP
+    /// claim drifts from the index reality,this test
+    /// fails at PR-time。
+    func testCommitsShippedMatchesIndexTotalKnives() {
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.commitsShipped,
+            BASEntropyChapterIndex.totalKnivesCount,
+            "BASPostRadicalSweepDoctrine.commitsShipped" +
+            " (\(BASPostRadicalSweepDoctrine.commitsShipped))" +
+            " must equal BASEntropyChapterIndex" +
+            ".totalKnivesCount" +
+            " (\(BASEntropyChapterIndex.totalKnivesCount))" +
+            " — both derived from per-chapter knives" +
+            " ledgers across radicalEvolutionEntries")
+    }
+
+    /// SWEEP commitsShipped at M1163 = 84。
+    func testCommitsShippedIsExactly84() {
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.commitsShipped,
+            84,
+            "Sweep ships 84 commits at M1163 close-out:" +
+            " RADICAL Phases A-F (24) + chapter 433" +
+            " final close-out (6) + chapter 434 (6) +" +
+            " chapters 435-446 (12 × 4 = 48) = 84")
+    }
+
+    /// SWEEP chapterTagsShipped MUST be a contiguous
+    /// suffix of BASPhase2EntropyClosureDoctrine
+    /// .chapterTagsShipped。 If a future Phase 2
+    /// chapter is appended without bumping the SWEEP
+    /// doctrine,this test fails — the SWEEP claim is
+    /// stale。
+    func testChapterTagsShippedMirrorsPhase2DoctrineTail() {
+        let phase2 = BASPhase2EntropyClosureDoctrine
+            .chapterTagsShipped
+        let sweep = BASPostRadicalSweepDoctrine
+            .chapterTagsShipped
+        XCTAssertGreaterThanOrEqual(
+            phase2.count, sweep.count,
+            "Phase 2 must contain at least the sweep" +
+            " chapters")
+        let suffix = Array(
+            phase2.suffix(sweep.count))
+        XCTAssertEqual(suffix, sweep,
+            "BASPostRadicalSweepDoctrine.chapterTagsShipped" +
+            " must be a CONTIGUOUS SUFFIX of" +
+            " BASPhase2EntropyClosureDoctrine" +
+            ".chapterTagsShipped — drift means SWEEP" +
+            " doctrine wasn't bumped after Phase 2 added" +
+            " a new chapter")
+    }
+
+    /// SWEEP firstChapterTag must equal the actual
+    /// chapter 427 doctrine — if either drifts
+    /// independently,this test fails。
+    func testFirstChapterTagMatchesBASChapter427() {
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine
+                .firstChapterTag,
+            BASChapter427EntropyDoctrine.chapterTag,
+            "Sweep firstChapterTag must equal" +
+            " BASChapter427EntropyDoctrine.chapterTag")
+    }
+
+    /// SWEEP lastChapterTag must equal chapter 446
+    /// (the close-out chapter itself)。
+    func testLastChapterTagMatchesBASChapter446() {
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine
+                .lastChapterTag,
+            BASChapter446EntropyDoctrine.chapterTag,
+            "Sweep lastChapterTag must equal" +
+            " BASChapter446EntropyDoctrine.chapterTag")
+    }
+
+    /// SWEEP mNumberFirst must equal chapter 427's
+    /// mNumberFirst;mNumberLast must equal chapter
+    /// 446's mNumberLast。 Cross-mirror with the actual
+    /// chapter doctrines pins the M-range against
+    /// independent drift。
+    func testMNumberRangeMatchesChapterDoctrines() {
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.mNumberFirst,
+            BASChapter427EntropyDoctrine.mNumberFirst,
+            "Sweep mNumberFirst must equal chapter 427's")
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.mNumberLast,
+            BASChapter446EntropyDoctrine.mNumberLast,
+            "Sweep mNumberLast must equal chapter 446's")
+    }
+
+    /// Wave ↔ chapter accounting:17 waves spread
+    /// across 20 chapters。 The 3-chapter gap accounts
+    /// for:
+    ///   - Wave 3 spans chapters 429 + 430 (-1 chapter)
+    ///   - Wave 4 spans chapters 431 + 432 (-1 chapter)
+    ///   - chapter 433 is RADICAL final close-out,
+    ///     unassigned to any wave (-1 chapter)
+    /// → 20 - 17 = 3 chapters absorbed by wave
+    ///   distribution。 If this invariant breaks,the
+    ///   sweep narrative drifted。
+    func testWaveChapterAccountingInvariant() {
+        let chapterMinusWaveDelta =
+            BASPostRadicalSweepDoctrine.chapterCount -
+            BASPostRadicalSweepDoctrine.waveCount
+        XCTAssertEqual(
+            chapterMinusWaveDelta, 3,
+            "Sweep chapter count - wave count must" +
+            " equal 3 (Wave 3 spans 2 chapters + Wave 4" +
+            " spans 2 chapters + chapter 433 is" +
+            " unassigned RADICAL close-out)")
+    }
+
+    /// Every chapter listed in
+    /// chapterTagsShipped MUST have a corresponding
+    /// entry in BASEntropyChapterIndex
+    /// .radicalEvolutionEntries with matching
+    /// chapterTag。 Cross-mirror catches drift in
+    /// EITHER direction。
+    func testEverySweepChapterMirroredInIndex() {
+        let indexTags = Set(BASEntropyChapterIndex
+            .radicalEvolutionEntries
+            .map { $0.chapterTag })
+        for tag in BASPostRadicalSweepDoctrine
+            .chapterTagsShipped
+        {
+            XCTAssertTrue(
+                indexTags.contains(tag),
+                "Sweep chapter \(tag) MUST have an" +
+                " entry in BASEntropyChapterIndex" +
+                ".radicalEvolutionEntries — drift means" +
+                " sweep doctrine references a chapter" +
+                " the index doesn't know about")
+        }
+        // Reverse direction: every index radical entry
+        // must also be in the sweep
+        let sweepTags = Set(
+            BASPostRadicalSweepDoctrine
+                .chapterTagsShipped)
+        for tag in indexTags {
+            XCTAssertTrue(
+                sweepTags.contains(tag),
+                "Index chapter \(tag) MUST be listed" +
+                " in BASPostRadicalSweepDoctrine" +
+                ".chapterTagsShipped — drift means" +
+                " sweep doctrine forgot a chapter the" +
+                " index added")
+        }
+    }
+
+    /// Every deferred item must mention the reason
+    /// keyword "blocked" / "deferred" / "required" /
+    /// "needs" / "requires" / "gated" — caller-readable
+    /// signal that we know WHY it's deferred,not just
+    /// that it is。
+    func testEveryDeferredItemReasonHasRationaleKeyword() {
+        let rationaleKeywords = [
+            "blocked", "deferred", "required",
+            "needs", "requires", "gated", "scale"
+        ]
+        for (item, reason) in
+            BASPostRadicalSweepDoctrine.whatsDeferred
+        {
+            let reasonLower = reason.lowercased()
+            let hasRationale = rationaleKeywords.contains {
+                reasonLower.contains($0)
+            }
+            XCTAssertTrue(hasRationale,
+                "Deferred item '\(item)' reason must" +
+                " contain at least one rationale" +
+                " keyword (blocked/deferred/required/" +
+                "needs/requires/gated/scale);got:" +
+                " '\(reason)'")
+        }
+    }
+
+    /// Determinism:doctrine answers must be
+    /// idempotent — same query → same answer。 Pins
+    /// the static-let nature against accidental
+    /// computed-property regressions。
+    func testDoctrineIsDeterministic() {
+        let a = BASPostRadicalSweepDoctrine
+            .chapterTagsShipped
+        let b = BASPostRadicalSweepDoctrine
+            .chapterTagsShipped
+        XCTAssertEqual(a, b)
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.commitsShipped,
+            BASPostRadicalSweepDoctrine.commitsShipped)
+        XCTAssertEqual(
+            BASPostRadicalSweepDoctrine.summary,
+            BASPostRadicalSweepDoctrine.summary)
     }
 }

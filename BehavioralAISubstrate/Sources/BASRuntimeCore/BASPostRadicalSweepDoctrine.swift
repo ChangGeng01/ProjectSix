@@ -147,20 +147,47 @@ public enum BASPostRadicalSweepDoctrine {
     public static let lastWaveNumber: Int = 17
 
     /// Chronological list of chapter tags shipped by
-    /// the sweep。 Each tag mirrors a `BASChapter*EntropyDoctrine`。
+    /// the sweep。 Each tag mirrors a
+    /// `BASChapter*EntropyDoctrine`。
+    ///
+    /// **Wave ↔ chapter accounting** (17 waves over 20
+    /// chapters,3-chapter gap explained):
+    ///
+    ///   - **RADICAL Waves 1-2** are 1:1 with chapters
+    ///     427-428 (Phase A → Wave 1, Phase B backfill
+    ///     → Wave 2)
+    ///   - **RADICAL Wave 3** spans chapters 429 + 430
+    ///     (Phase C backfill + Phase D backfill,both
+    ///     happened in Wave 3) → -1 chapter slot
+    ///   - **RADICAL Wave 4** spans chapters 431 + 432
+    ///     (Phase E + Phase F,both happened in Wave 4)
+    ///     → -1 chapter slot
+    ///   - **RADICAL final close-out chapter 433** is
+    ///     not assigned to any numbered wave (it's the
+    ///     consolidation of Waves 1-4 + 2 deep-review
+    ///     remediations) → -1 chapter slot
+    ///   - **POST-RADICAL Waves 5-17** are 1:1 with
+    ///     chapters 434-446 (13 waves,13 chapters)
+    ///
+    /// Net:20 chapters - 3 absorbed by wave
+    /// distribution = 17 waves。 The
+    /// `testWaveChapterAccountingInvariant` test pins
+    /// this 3-chapter delta。
     public static let chapterTagsShipped: [String] = [
-        // RADICAL EVOLUTION SWEEP (Waves 1-4, chapters
-        // 427-433) — original 2026-05-10 plan
+        // RADICAL EVOLUTION SWEEP (Waves 1-4 + final
+        // close-out chapter, chapters 427-433) —
+        // original 2026-05-10 plan
         "chapter 四百二十七",     // Wave 1 / Phase A
         "chapter 四百二十八",     // Wave 2 / Phase B backfill
         "chapter 四百二十九",     // Wave 3 / Phase C backfill
-        "chapter 四百三十",       // Wave 3 / Phase D backfill
+        "chapter 四百三十",       // Wave 3 / Phase D backfill (shares Wave 3 with 429)
         "chapter 四百三十一",     // Wave 4 / Phase E
-        "chapter 四百三十二",     // Wave 4 / Phase F
-        "chapter 四百三十三",     // RADICAL final close-out
+        "chapter 四百三十二",     // Wave 4 / Phase F (shares Wave 4 with 431)
+        "chapter 四百三十三",     // RADICAL final close-out (no wave;
+                                   //  consolidates Waves 1-4 + remediations)
         // POST-RADICAL EVOLUTION SWEEP (Waves 5-17,
         // chapters 434-446) — additive substrate-side
-        // extensions
+        // extensions, 1:1 wave-to-chapter mapping
         "chapter 四百三十四",     // Wave 5 — safety substrate + canonical60 driver
         "chapter 四百三十五",     // Wave 6 — first scheduler consumption
         "chapter 四百三十六",     // Wave 7 — first ledger-driven dispatch
@@ -179,7 +206,27 @@ public enum BASPostRadicalSweepDoctrine {
     // MARK: - Cumulative metrics
 
     /// Total commits shipped by the sweep across all
-    /// chapters。 Bumped each chapter close-out。
+    /// chapters。 Equals
+    /// `BASEntropyChapterIndex.totalKnivesCount` (both
+    /// derived from per-chapter knives ledgers across
+    /// `radicalEvolutionEntries`)。 Cross-mirror
+    /// invariant pinned by
+    /// `testCommitsShippedMatchesIndexTotalKnives`。
+    ///
+    /// Derivation at M1163 close-out:
+    ///   - RADICAL Phases A-F (chapters 427-432):
+    ///     6 chapters × 4 cuts = 24
+    ///   - chapter 433 RADICAL final close-out:
+    ///     6 cuts (Wave 1-4 close-out + 2 deep-review
+    ///     remediations covering M1108-M1109)
+    ///   - chapter 434 POST-RADICAL safety substrate +
+    ///     canonical60 driver:6 cuts (M1110-M1115,
+    ///     larger than the standard 4-cut chapter to
+    ///     accommodate the M1110 doctrine correction
+    ///     + M1111 deep-review extensions)
+    ///   - chapters 435-446 POST-RADICAL Waves 6-17:
+    ///     12 chapters × 4 cuts = 48
+    ///   - Total:24 + 6 + 6 + 48 = **84**
     public static let commitsShipped: Int = 84
 
     // MARK: - What's shipped (achievements)
