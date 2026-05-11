@@ -1957,7 +1957,124 @@ public enum BASChapterDoctrineRegistry {
                 " live for chapters 479-494 bulk fold" +
                 " work。 V1 byte-equality preserved" +
                 " (full test suite 6.7K+ tests still" +
-                " green)。")
+                " green)。"),
+
+        // chapter 479 — Phase B missing MPSGraph kernels
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十九",
+            mNumberFirst: 1292,
+            mNumberLast: 1295,
+            v1MilestoneMNumber: 1295,
+            v1MilestoneStatus:
+                "chapter-479-phase-b-mpsgraph-kernels-7-of-8-coverage",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1292,
+                    knife: "第一刀",
+                    concept:
+                        "BASMPSGraphSoftmaxKernel via" +
+                        " `graph.softMax(with:axis:name:)`。" +
+                        " 5-of-8 BASNeuralOp coverage。" +
+                        " 5 PROOF tests:uniform input" +
+                        " yields uniform output;" +
+                        " dominant element approximation;" +
+                        " row-wise independence;sum-to-1" +
+                        " invariant;execution-nanos" +
+                        " contract。"),
+                BASChapterKnife(
+                    mNumber: 1293,
+                    knife: "第二刀",
+                    concept:
+                        "BASMPSGraphLayerNormKernel via" +
+                        " composed mean-centering +" +
+                        " variance + rsqrt + scale +" +
+                        " shift。 6-of-8 BASNeuralOp" +
+                        " coverage。 5 PROOF tests:" +
+                        " identity gamma+beta;beta" +
+                        " shift;row mean = beta mean" +
+                        " invariant;rank-2 shape pin;" +
+                        " execution-nanos contract。"),
+                BASChapterKnife(
+                    mNumber: 1294,
+                    knife: "第三刀",
+                    concept:
+                        "BASMPSGraphConv2DKernel via" +
+                        " `graph.convolution2D(...)`" +
+                        " with MPSGraphConvolution2DOp" +
+                        "Descriptor (NHWC + HWIO + valid" +
+                        " padding + stride 1)。 7-of-8" +
+                        " BASNeuralOp coverage。 4 PROOF" +
+                        " tests:1x1 identity preserves" +
+                        " input;2x2 ones-kernel sum;" +
+                        " rank-4 shape validation;" +
+                        " execution-nanos contract。"),
+                BASChapterKnife(
+                    mNumber: 1295,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 479 close-out + Phase" +
+                        " 2 bump (chapter 76→77," +
+                        " mNumberLast 1291→1295," +
+                        " commits 337→341) + ADR-016" +
+                        ".M1291 → M1295。 Cross-doctrine" +
+                        " sync + frozen hash refresh。" +
+                        " Only ssmScan (Mamba SSM)" +
+                        " missing — deferred to Tier 2" +
+                        " chapter 496。")
+            ],
+            entropyClassesAttacked: [
+                "missing-softmax-kernel-entropy",
+                "missing-layernorm-kernel-entropy",
+                "missing-conv2d-kernel-entropy",
+                "neural-op-coverage-incomplete-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (numerical correctness" +
+                " within IEEE Float32 tolerance proven" +
+                " across 14 new PROOF tests)",
+                "chapter 四百七十七 plannedFutureCuts" +
+                " honored (3 missing kernels addressed)",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1291 → M1295)",
+                "系统熵 reduction",
+                "REAL HOT-PATH ATTACK to 100% Phase B" +
+                " complete"
+            ],
+            plannedFutureCuts: [
+                "chapter 480+:Phase C MPSGraph executable" +
+                " caching + ANE live binding default flip",
+                "chapter 481-488:Phase D-F 88 sprawl" +
+                " type migrations",
+                "chapter 489-491:Phase G-H production" +
+                " wire-in + KV cache + default mode flip",
+                "chapter 492-494:Phase I V1 monolith" +
+                " fold + DELETION + Tier 1 achievement",
+                "chapter 496:Tier 2 BASMPSGraphSSMScan" +
+                "Kernel closes 8-of-8 coverage"
+            ],
+            summary:
+                "REAL HOT-PATH ATTACK to 100% Phase B —" +
+                " 3 missing MPSGraph kernels shipped。" +
+                " 4 cuts (M1292-M1295)。 Cut 1 — softmax" +
+                " kernel (5-of-8)。 Cut 2 — layerNorm" +
+                " kernel (6-of-8)。 Cut 3 — conv2D" +
+                " kernel (7-of-8)。 Cut 4 — chapter" +
+                " close-out。 ADR-016 → M1295。 Only" +
+                " ssmScan deferred to Tier 2 — every" +
+                " other BASNeuralOp has numerical-" +
+                "correctness PROOF。 87.5% native op" +
+                " coverage achieved。 14 new PROOF tests" +
+                " covering uniform inputs + dominant" +
+                " elements + row-wise independence +" +
+                " sum-to-1 invariants + identity kernels" +
+                " + sum kernels。 V1 byte-equality" +
+                " preserved (additive kernel additions)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

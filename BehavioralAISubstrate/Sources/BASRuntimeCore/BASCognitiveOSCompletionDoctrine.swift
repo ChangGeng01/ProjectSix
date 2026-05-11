@@ -1092,7 +1092,19 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// mechanical V1 fold lands。 ADR-014 OPT-IN
     /// preserved。 V1 byte-equality preserved (full
     /// suite still green)。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1291"
+    /// M1295 bump:Phase B missing MPSGraph kernels —
+    /// chapter 四百七十九 brings BASNeuralOp coverage
+    /// from 4-of-8 to 7-of-8 (87.5%)。 3 new GPU kernels:
+    /// (1) M1292 BASMPSGraphSoftmaxKernel via
+    /// graph.softMax(with:axis:) + 5 PROOF tests;
+    /// (2) M1293 BASMPSGraphLayerNormKernel composing
+    /// mean-centering + variance + rsqrt + scale + shift
+    /// + 5 PROOF tests;(3) M1294 BASMPSGraphConv2DKernel
+    /// with NHWC + HWIO + valid padding + 4 PROOF tests。
+    /// (4) M1295 close-out。 Only ssmScan deferred to
+    /// Tier 2 chapter 496。 ADR-014 OPT-IN preserved。 V1
+    /// byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1295"
 
     /// Query the typed status of a specific gap。
     public static func status(

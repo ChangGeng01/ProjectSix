@@ -25,24 +25,23 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1291",
-            "Doctrine version pin。 M1291 chapter 四百" +
-            "七十八 V1 fold PILOT:bumped through" +
-            " chapters 453-478 — biomimetic build-out" +
-            " (453-459) + debt repayment (460-462) +" +
-            " doctrine-collapse Phases 1-3 (463-466) +" +
-            " auto-checkpoint (467) + recovery loop" +
-            " (468) + BCM (469) + hier slot (470) +" +
-            " Mamba bench (471) + bundle proj (472) +" +
-            " self-audit cleanup (473) + ANE live +" +
-            " registry dispatch + e2e (474) + MPSGraph" +
-            " numerical PROOF (475) + RMSNorm +" +
-            " RotaryEmbedding + first BASBundle (476)" +
-            " + attention PROOF closes 4-of-4 +" +
-            " honest re-scoring + second BASBundle" +
-            " (477) + V1 fold PILOT trio + coordinator" +
-            " splice + stress-sweep regression guard" +
-            " 300-turn-run 0-divergence (478)")
+            "ADR-016.M1295",
+            "Doctrine version pin。 M1295 chapter 四百" +
+            "七十九 Phase B 3 missing MPSGraph kernels:" +
+            " bumped through chapters 453-479 —" +
+            " biomimetic build-out (453-459) + debt" +
+            " repayment (460-462) + doctrine-collapse" +
+            " (463-466) + auto-checkpoint (467) +" +
+            " recovery loop (468) + BCM (469) + hier" +
+            " slot (470) + Mamba bench (471) + bundle" +
+            " proj (472) + self-audit cleanup (473) +" +
+            " ANE live + registry dispatch + e2e (474)" +
+            " + MPSGraph numerical PROOF (475) +" +
+            " RMSNorm + RotaryEmbedding + first" +
+            " BASBundle (476) + attention PROOF + honest" +
+            " re-scoring (477) + V1 fold PILOT (478) +" +
+            " softmax + layerNorm + conv2D kernels" +
+            " 7-of-8 coverage (479)")
     }
 
     // MARK: - Per-gap status pins

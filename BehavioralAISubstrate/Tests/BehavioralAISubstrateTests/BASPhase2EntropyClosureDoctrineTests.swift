@@ -37,17 +37,16 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs478() {
+    func testLastChapterIs479() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百七十八",
-            "M1291 chapter 四百七十八 V1 fold PILOT:" +
-            " bumped to 四百七十八 (BASTurnAuditProjections" +
-            "KunlunTrio first V1 fold extraction +" +
-            " coordinator splice + BASTurnRuntimeFull" +
-            "SummaryStressSweepRunner regression guard" +
-            " with 300-turn-run 0-divergence PROOF)")
+            "chapter 四百七十九",
+            "M1295 chapter 四百七十九 Phase B 3 missing" +
+            " MPSGraph kernels:bumped to 四百七十九" +
+            " (softmax + layerNorm + conv2D kernels" +
+            " bring BASNeuralOp coverage 4-of-8 →" +
+            " 7-of-8)")
     }
 
     // MARK: - M-number range

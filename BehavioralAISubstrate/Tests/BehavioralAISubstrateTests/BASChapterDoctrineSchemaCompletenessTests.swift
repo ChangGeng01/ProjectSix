@@ -1283,7 +1283,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百七十八")!)
+                            "chapter 四百七十八")!),
+            // M1295 Phase B 3 missing MPSGraph kernels
+            checkRegistry("四百七十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1603,6 +1609,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百七十八")!
+                .mNumberLast),
+            // M1295 Phase B chapter 479
+            ("479",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

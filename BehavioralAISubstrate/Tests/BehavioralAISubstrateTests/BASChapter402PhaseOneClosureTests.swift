@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1291",
-            "M1291:doctrine version reflects chapter 四百七十八 V1 fold PILOT — BASTurnAuditProjectionsKunlunTrio extracts 3 ForAudit declarations + coordinator splice + BASTurnRuntimeFullSummaryStressSweepRunner regression guard with 300-turn-run 0-divergence PROOF. Phase A of REAL HOT-PATH ATTACK to 100% sealed. ADR-014 OPT-IN preserved; V1 byte-equality preserved")
+            "ADR-016.M1295",
+            "M1295:doctrine version reflects chapter 四百七十九 Phase B — 3 missing MPSGraph kernels (softmax M1292 + layerNorm M1293 + conv2D M1294) bring BASNeuralOp coverage 4-of-8 → 7-of-8 (87.5%). Only ssmScan deferred to Tier 2 chapter 496. ADR-014 OPT-IN preserved; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

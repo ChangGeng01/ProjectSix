@@ -96,10 +96,11 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// inline chapters 464-467 + 468-472 + chapter 473
     /// SELF-AUDIT CLEANUP + chapters 474-477 REAL
     /// HOT-PATH ATTACK phases 1-4 + chapter 478 V1
-    /// fold PILOT)。 Re-captured at chapter 478 close-
-    /// out — hash moves because chapter 478's own
-    /// record is now part of the canonical registry
-    /// JSON。
+    /// fold PILOT + chapter 479 Phase B 3 missing
+    /// MPSGraph kernels)。 Re-captured at chapter 479
+    /// close-out — hash moves because chapter 479's
+    /// own record is now part of the canonical
+    /// registry JSON。
     static let frozenFullRegistrySha256: String =
-        "70cffcbc27d7ca9ea125a15eae3cb0bfe67f35ce42fe6726b3d61b6e0f43817f"
+        "5273c1f049a48e03ab24ea6780e4f1f47a245016b7d9fd781bb5b3bc9b31970b"
 }

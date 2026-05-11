@@ -1215,7 +1215,23 @@ public enum BASEntropyChapterIndex {
                 "Runner closes chapter 434 deferral +" +
                 " canonical60 PROOF with 300-turn-run" +
                 " 0-divergence verification。 Cut 4 —" +
-                " chapter close-out。 ADR-016 → M1291。")
+                " chapter close-out。 ADR-016 → M1291。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十九",
+            mNumberFirst: 1292, mNumberLast: 1295,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK to 100%" +
+                " Phase B — 3 missing MPSGraph kernels" +
+                " shipped。 BASNeuralOp coverage:" +
+                " 4-of-8 → 7-of-8 (87.5%)。 Cut 1 —" +
+                " BASMPSGraphSoftmaxKernel + 5 PROOF" +
+                " tests。 Cut 2 — BASMPSGraphLayerNorm" +
+                "Kernel + 5 PROOF tests。 Cut 3 —" +
+                " BASMPSGraphConv2DKernel + 4 PROOF" +
+                " tests。 Cut 4 — chapter close-out。" +
+                " ADR-016 → M1295。 Only ssmScan" +
+                " (Mamba SSM) deferred to Tier 2。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
