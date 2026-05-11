@@ -7,7 +7,9 @@ import BASPolicy
 import BASRuntimeCore
 import BASWorldPrior
 
-public struct BASTurnAuditProjectionsKunlunHexaTwo: Sendable {
+public struct BASTurnAuditProjectionsKunlunHexaTwo:
+    Hashable, Sendable
+{
     public let hostJadeRegister: BASHostJadeRegister
     public let jadeMirrorDraft: BASJadeMirrorDraft
     public let kunlunUnnamableSet: BASKunlunUnnamableSet?
