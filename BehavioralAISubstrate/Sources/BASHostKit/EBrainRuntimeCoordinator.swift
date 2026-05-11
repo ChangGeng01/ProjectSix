@@ -1976,58 +1976,45 @@ public struct BASEBrainRuntimeCoordinator {
         // misleading audit codes. Deferred with criteria: wire
         // when a per-turn ascent context or unknown-distance
         // projection is added upstream.
-        let kunlunAxisViewForAudit = BASKunlunAxisView(
-            worldRef: kunlunAxisForAudit.worldAnchorRef,
-            centerlinePriors: kunlunAxisForAudit.centerlineRules,
-            deviationPatterns: kunlunDeviationCodes,
-            scaleLadders: ["personal", "civilizational"],
-            orderConstraints: kunlunAxisForAudit.centerlineRules)
-        let kunlunTianmenWarrantForAudit:
-            BASKunlunTianmenWarrant? =
-        {
-            // Only mint the warrant when readiness is true AND a
-            // sovereign warrant exists (the L14 substrate produced
-            // the actual authorization). Otherwise a warrant
-            // synthesized here would be doctrinally misleading.
-            guard kunlunHeavenGateReadinessForAudit.isReady,
-                let firstWarrant = sovereignWarrants.first
-            else { return nil }
-            return BASKunlunTianmenWarrant(
-                warrantID:
-                    "tianmen-warrant-\(firstWarrant.warrantID)",
-                actionRef:
-                    "permit-\(boundActionPermit.mode.rawValue)",
-                gateRef: kunlunHeavenGateForAudit.gateID,
-                sovereignBasis: firstWarrant.warrantID,
-                jadeCanonSealRef: kunlunJadeSealForAudit.sealID,
-                riverOriginRef: kunlunRiverTraceForAudit.traceID,
-                passScope: .scoped,
-                expiry: "")
-        }()
-        let kunlunGateDenialWritForAudit:
-            BASKunlunGateDenialWrit? =
-        {
-            // Only mint the denial when readiness is FALSE. A
-            // denial absent reason codes is doctrinally
-            // forbidden (该断时断), which the helper's
-            // `evaluateReadiness` enforces by emitting reason
-            // codes whenever isReady is false.
-            guard !kunlunHeavenGateReadinessForAudit.isReady,
-                !kunlunHeavenGateReadinessForAudit
-                    .reasonCodes.isEmpty
-            else { return nil }
-            return BASKunlunGateDenialWrit(
-                writID: "tianmen-writ-\(runtimeTrace.sessionID)",
-                sourceRef: thoughtFrame.candidates.first?
-                    .candidateID ?? "no-candidate",
-                deniedDomain:
-                    "domain-\(boundActionPermit.mode.rawValue)",
-                reasonCodes:
-                    kunlunHeavenGateReadinessForAudit.reasonCodes,
-                returnPathRef:
-                    "rollback-\(runtimeTrace.sessionID)",
-                humanExplanationStub: "")
-        }()
+        // chapter 四百九十四 / M1353-M1354 — Tianmen trio fold。
+        // 3 ForAudit declarations + ~56 LOC of inline construction
+        // logic (axisView + tianmenWarrant + gateDenialWrit
+        // mutual-exclusion guards) collapsed into a single typed
+        // factory call。 M424 chapter 一百一 mutual-exclusivity
+        // invariant preserved (该断时断 — denials carry typed
+        // reason codes)。 V1 byte-equality required。
+        let kunlunTianmenTrioForAudit =
+            BASTurnAuditProjectionsKunlunTianmenTrio.compute(
+                sessionID: runtimeTrace.sessionID,
+                permitMode: boundActionPermit.mode,
+                primaryCandidateID:
+                    thoughtFrame.candidates.first?
+                        .candidateID ?? "no-candidate",
+                worldAnchorRef:
+                    kunlunAxisForAudit.worldAnchorRef,
+                centerlineRules:
+                    kunlunAxisForAudit.centerlineRules,
+                deviationCodes: kunlunDeviationCodes,
+                heavenGateID:
+                    kunlunHeavenGateForAudit.gateID,
+                heavenGateIsReady:
+                    kunlunHeavenGateReadinessForAudit
+                        .isReady,
+                heavenGateReasonCodes:
+                    kunlunHeavenGateReadinessForAudit
+                        .reasonCodes,
+                firstSovereignWarrantID: sovereignWarrants
+                    .first?.warrantID,
+                jadeCanonSealRef:
+                    kunlunJadeSealForAudit.sealID,
+                riverOriginRef:
+                    kunlunRiverTraceForAudit.traceID)
+        let kunlunAxisViewForAudit = kunlunTianmenTrioForAudit
+            .axisView
+        let kunlunTianmenWarrantForAudit =
+            kunlunTianmenTrioForAudit.tianmenWarrant
+        let kunlunGateDenialWritForAudit =
+            kunlunTianmenTrioForAudit.gateDenialWrit
         // M436 (chapter 一百四) — derive the per-turn 14-layer
         // reconciliation report + verdict from all 13 cognitive
         // bundles in scope (L1..L13). Pre-fix this engine
