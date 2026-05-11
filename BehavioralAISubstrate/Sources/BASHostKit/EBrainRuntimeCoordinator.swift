@@ -1255,38 +1255,29 @@ public struct BASEBrainRuntimeCoordinator {
         let ascentLeaseForAudit = kunlunTrioForAudit.ascentLease
         let axisDeviationForAudit = kunlunTrioForAudit.axisDeviation
         let gatePressureForAudit = kunlunTrioForAudit.gatePressure
-        let yaochiMemoryLayerForAudit = BASKunlunLayerProjections
-            .YaochiMemoryLayer.derive(
-                from: routedBudget.runMode,
+        // chapter 四百八十五 / M1317 — V1 fold cluster A
+        // continuation。 6 declarations folded via hexa factory。
+        let kunlunHexaForAudit = BASTurnAuditProjectionsKunlunHexa
+            .compute(
+                runMode: routedBudget.runMode,
+                riskLevel: boundRiskCard.riskLevel,
+                permit: boundActionPermit,
+                candidates: thoughtFrame.candidates,
                 turnID: derivedTurnID)
-        let tianhengProfileForAudit = BASKunlunLayerProjections
-            .TianhengProfile.derive(
-                from: boundRiskCard.riskLevel,
-                permitMode: boundActionPermit.mode,
-                turnID: derivedTurnID)
-        let jadePermitGradeForAudit = BASKunlunLayerProjections
-            .JadePermitGrade.derive(
-                from: boundActionPermit,
-                turnID: derivedTurnID)
+        let yaochiMemoryLayerForAudit = kunlunHexaForAudit
+            .yaochiMemoryLayer
+        let tianhengProfileForAudit = kunlunHexaForAudit
+            .tianhengProfile
+        let jadePermitGradeForAudit = kunlunHexaForAudit
+            .jadePermitGrade
         // M486-M490 (chapter 一百二十六) — L9 dream-loop + L3
         // fold-page + L13 refinement production wires. Derive
         // per-candidate ascent + rest + return + refinement
         // schemas; one casket per turn.
-        let ascentBranchesForAudit = thoughtFrame.candidates
-            .map { candidate in
-                BASKunlunLayerProjections.AscentBranch.derive(
-                    from: candidate, turnID: derivedTurnID)
-            }
-        let restStepsForAudit = thoughtFrame.candidates
-            .compactMap { candidate in
-                BASKunlunLayerProjections.RestStep.derive(
-                    from: candidate, turnID: derivedTurnID)
-            }
-        let returnPathsForAudit = thoughtFrame.candidates
-            .map { candidate in
-                BASKunlunLayerProjections.ReturnPath.derive(
-                    from: candidate, turnID: derivedTurnID)
-            }
+        let ascentBranchesForAudit = kunlunHexaForAudit
+            .ascentBranches
+        let restStepsForAudit = kunlunHexaForAudit.restSteps
+        let returnPathsForAudit = kunlunHexaForAudit.returnPaths
         let jadeCasketForAudit = BASKunlunLayerProjections
             .JadeCasketSnapshot.derive(
                 turnID: derivedTurnID,
