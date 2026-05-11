@@ -37,16 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs508() {
+    func testLastChapterIs509() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百八",
-            "M1412 chapter 五百八 — Tier C ADR-019" +
-            " IMPLEMENTATION COMPLETE。 4 of 4 typed" +
-            " shape-specific generic primitives" +
-            " shipped + BASTierCAchievementDoctrine。" +
-            " 49 typed surfaces cumulative")
+            "chapter 五百九",
+            "M1416 chapter 五百九 — Tier C migration" +
+            " adapters。 2 of 4 typed pure-function" +
+            " adapters shipped + 3-layer doctrine bump。" +
+            " 51 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

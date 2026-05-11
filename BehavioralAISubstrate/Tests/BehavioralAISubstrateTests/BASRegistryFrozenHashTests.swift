@@ -107,10 +107,11 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 508 close-out。 Chapter
-    /// 508:Tier C IMPLEMENTATION COMPLETE — 4 of 4
-    /// typed shape-specific generic primitives shipped
-    /// + BASTierCAchievementDoctrine milestone。
+    /// Re-captured at chapter 509 close-out。 Chapter
+    /// 509:Tier C migration adapters — 2 of 4 typed
+    /// pure-function adapters shipped (BASRiskObservation
+    /// CardAdapter + BASInspectionBundleFrameAdapter) +
+    /// 3-layer doctrine accounting bump。
     static let frozenFullRegistrySha256: String =
-        "439c88f35714f26368f0dcc4ff2df64c4059a3d00ade1615cd4fd59173fa47c7"
+        "19bdb2f42c7ca4a8ab2337607934f3b2d4a7a8eccf0343616cc3a5a595803be2"
 }

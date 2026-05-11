@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1412",
-            "M1412:doctrine version reflects chapter 五百八 — Tier C ADR-019 IMPLEMENTATION COMPLETE。 4 of 4 typed shape-specific generic primitives shipped (BASInspectionFrame + BASRiskObservationCard + BASArbitrationObservationFrame + BASGovernanceCard) + BASTierCAchievementDoctrine milestone。 49 typed surfaces cumulative。 Combined Tier C completion = 50% (primitives 4/4 + migrations 0/4 honest deferral)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1416",
+            "M1416:doctrine version reflects chapter 五百九 — Tier C migration adapters。 BASRiskObservationCardAdapter (M1413) + BASInspectionBundleFrameAdapter (M1414) + 3-layer doctrine accounting bump (M1415)。 2 of 4 typed pure-function adapters shipped。 51 typed surfaces cumulative。 Combined Tier C completion = 50% (3-layer: 6/12)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

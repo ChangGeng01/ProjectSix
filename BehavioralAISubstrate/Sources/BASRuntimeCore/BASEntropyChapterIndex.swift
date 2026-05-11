@@ -1540,7 +1540,22 @@ public enum BASEntropyChapterIndex {
                 " milestone。 49 typed surfaces" +
                 " cumulative。 ADR-016 → M1412。 Combined" +
                 " Tier C completion = 50% (primitives" +
-                " 4/4 + migrations 0/4 honest deferral)。")
+                " 4/4 + migrations 0/4 honest deferral)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九",
+            mNumberFirst: 1413, mNumberLast: 1416,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier C migration adapters:" +
+                " BASRiskObservationCardAdapter +" +
+                " BASInspectionBundleFrameAdapter (2 of" +
+                " 4 typed pure-function adapters)。" +
+                " BASTierCAchievementDoctrine bumped to" +
+                " HONEST 3-layer accounting (primitives" +
+                " + adapters + migrations)。 51 typed" +
+                " surfaces cumulative。 ADR-016 → M1416。" +
+                " Combined Tier C completion = 50%" +
+                " (3-layer:6/12)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

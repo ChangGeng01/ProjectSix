@@ -162,7 +162,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百五",       // M1397-M1400 (unified end-of-turn audit emission — M1400 milestone)
         "chapter 五百六",       // M1401-M1404 (cluster B fold continues — 2 trio bundles, 6 derives consolidated)
         "chapter 五百七",       // M1405-M1408 (Tier C ADR-019 implementation entry — 2 primitives shipped)
-        "chapter 五百八"        // M1409-M1412 (Tier C ADR-019 IMPLEMENTATION COMPLETE — 4/4 primitives)
+        "chapter 五百八",       // M1409-M1412 (Tier C ADR-019 IMPLEMENTATION COMPLETE — 4/4 primitives)
+        "chapter 五百九"        // M1413-M1416 (Tier C migration adapters — 2/4 shipped)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -179,16 +180,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1412
+    public static let mNumberLast: Int = 1416
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1412)。 Bumped through chapter 508:453 → 457。
-    /// Chapter 508:Tier C ADR-019 IMPLEMENTATION
-    /// COMPLETE — M1409 BASArbitrationObservationFrame
-    /// + M1410 BASGovernanceCard + M1411 BASTierC
-    /// AchievementDoctrine + M1412 close-out。 4 of 4
-    /// Tier C primitives shipped。
-    public static let commitsShipped: Int = 457
+    /// M1416)。 Bumped through chapter 509:457 → 461。
+    /// Chapter 509:Tier C migration adapters — M1413
+    /// BASRiskObservationCardAdapter + M1414 BASInspect
+    /// ionBundleFrameAdapter + M1415 doctrine 3-layer
+    /// bump + M1416 close-out。 2 of 4 typed adapters
+    /// shipped。
+    public static let commitsShipped: Int = 461
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

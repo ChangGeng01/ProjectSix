@@ -4337,6 +4337,105 @@ public enum BASChapterDoctrineRegistry {
                 " follow-up arc)。 49 typed surfaces" +
                 " cumulative。 ADR-016 → M1412。 ADR-014" +
                 " OPT-IN preserved。 V1 byte-equality" +
+                " untouched。"),
+
+        // chapter 509 — Tier C migration adapters
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九",
+            mNumberFirst: 1413,
+            mNumberLast: 1416,
+            v1MilestoneMNumber: 1416,
+            v1MilestoneStatus:
+                "chapter-509-tier-c-migration-adapters",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1413, knife: "第一刀",
+                    concept: "NEW BASRiskObservation" +
+                        "CardAdapter — 1st Tier C" +
+                        " typed migration adapter。" +
+                        " Pure-function read-only" +
+                        " converter from BASRisk" +
+                        "Observation (BASPolicy) →" +
+                        " BASRiskObservationCard<Kind," +
+                        " Body>。 NEW BASRiskObservation" +
+                        "CardBody typed wrapper for" +
+                        " content + intentID。 50 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1414, knife: "第二刀",
+                    concept: "NEW BASInspectionBundle" +
+                        "FrameAdapter — 2nd Tier C" +
+                        " typed migration adapter。" +
+                        " Pure-function read-only" +
+                        " converter from BASInspection" +
+                        "Bundle (BASObservability) →" +
+                        " BASInspectionFrame<Body>。" +
+                        " NEW BASInspectionBundleFrame" +
+                        "Body Hashable-compatible" +
+                        " summary wrapper。 51 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1415, knife: "第三刀",
+                    concept: "BASTierCAchievement" +
+                        "Doctrine bumped to HONEST" +
+                        " 3-layer accounting:primitives" +
+                        " + adapters + migrations。" +
+                        " Captures the typed-adapter" +
+                        " intermediate stage between" +
+                        " 'primitive exists' and" +
+                        " 'migration complete'。 NEW" +
+                        " typedAdaptersShipped field;" +
+                        " combinedCompletionRatio" +
+                        " updated to (target × 3)" +
+                        " denominator。"),
+                BASChapterKnife(
+                    mNumber: 1416, knife: "第四刀",
+                    concept: "Chapter 509 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1416。 Tier C migration" +
+                        " adapter scope:2 of 4" +
+                        " adapters shipped (Inspection" +
+                        " + RiskObservation);Arbitration" +
+                        " + Governance adapters deferred" +
+                        " until concrete consumers" +
+                        " emerge。")
+            ],
+            entropyClassesAttacked: [
+                "risk-observation-no-typed-card-path",
+                "inspection-bundle-no-typed-frame-path",
+                "tier-c-2-layer-accounting-incomplete",
+                "adapter-vs-migration-conflation"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1416",
+                "tier-c-adapters-2-of-4-shipped",
+                "tier-c-3-layer-accounting",
+                "v1-byte-equality-preserved"
+            ],
+            plannedFutureCuts: [
+                "future arc — BASArbitrationFrame +" +
+                " BASGovernanceBundle adapters (gated" +
+                " on concrete consumer demand)",
+                "future arc — actual migration of" +
+                " existing types to consume the" +
+                " primitives directly",
+                "future arc — production wire-in (host" +
+                " CI lane gated)"
+            ],
+            summary: "Tier C migration adapter push:" +
+                " 2 of 4 typed pure-function adapters" +
+                " shipped — BASRiskObservationCardAdapter" +
+                " (M1413) + BASInspectionBundleFrame" +
+                "Adapter (M1414)。 Each is read-only" +
+                " (does NOT modify the existing type)。" +
+                " BASTierCAchievementDoctrine bumped to" +
+                " HONEST 3-layer accounting (primitives" +
+                " + adapters + migrations) — combined" +
+                " 6/12 = 50%。 51 typed surfaces" +
+                " cumulative。 ADR-016 → M1416。 ADR-014" +
+                " OPT-IN preserved。 V1 byte-equality" +
                 " untouched。")
     ]
 
