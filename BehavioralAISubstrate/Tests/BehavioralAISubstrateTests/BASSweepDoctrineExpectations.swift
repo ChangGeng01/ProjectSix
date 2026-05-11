@@ -114,22 +114,24 @@ public enum BASSweepDoctrineExpectations {
     ///   - Pre-RADICAL Phase 2: chapters 403-426 = 24
     ///   - RADICAL sweep:       chapters 427-446 = 20
     ///   - POST-SWEEP:          chapters 447+      = (grows)
-    /// At M1283:24 + 20 + 30 = 74 (chapter 476 REAL
-    /// HOT-PATH ATTACK phase 3 added)
-    public static let phase2ChapterCount: Int = 74
+    /// At M1287:24 + 20 + 31 = 75 (chapter 477 REAL
+    /// HOT-PATH ATTACK phase 4 final session close-
+    /// out added)
+    public static let phase2ChapterCount: Int = 75
 
-    /// Phase 2 commits shipped。 At M1283:
-    /// 125 + 84 + 120 = 329 (chapter 476 REAL
-    /// HOT-PATH ATTACK phase 3 = 4 cuts = 120)
-    public static let phase2CommitsShipped: Int = 329
+    /// Phase 2 commits shipped。 At M1287:
+    /// 125 + 84 + 124 = 333 (chapter 477 REAL
+    /// HOT-PATH ATTACK phase 4 = 4 cuts = 124)
+    public static let phase2CommitsShipped: Int = 333
 
-    /// Phase 2 mNumberLast。 At M1283:chapter 476
-    /// REAL HOT-PATH ATTACK phase 3 ends here
-    /// (RMSNorm + RotaryEmbedding numerical PROOF +
-    /// first real BASBundle<Item> typealias migration
-    /// + chapter close-out shipped as M1280-M1283)。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1283
+    /// Phase 2 mNumberLast。 At M1287:chapter 477
+    /// REAL HOT-PATH ATTACK phase 4 final session
+    /// close-out ends here (attention numerical PROOF
+    /// + honest re-scoring doctrine + second
+    /// BASBundle migration + chapter close-out
+    /// shipped as M1284-M1287)。 SWEEP stays frozen
+    /// at 1163。
+    public static let phase2MNumberLast: Int = 1287
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

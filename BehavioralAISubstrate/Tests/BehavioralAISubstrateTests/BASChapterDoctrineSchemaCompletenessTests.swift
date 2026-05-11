@@ -1265,7 +1265,17 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百七十六")!)
+                            "chapter 四百七十六")!),
+            // M1287 POST-PHASE-3 REAL HOT-PATH ATTACK
+            // phase 4 final session close-out
+            // (attention numerical PROOF closes 4-of-4
+            // MPSGraph + honest re-scoring doctrine +
+            // second BASBundle migration)
+            checkRegistry("四百七十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1568,6 +1578,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百七十六")!
+                .mNumberLast),
+            // M1287 POST-PHASE-3 REAL HOT-PATH ATTACK
+            // phase 4 final session close-out
+            ("477",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

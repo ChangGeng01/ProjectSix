@@ -25,22 +25,23 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1283",
-            "Doctrine version pin。 M1283 POST-PHASE-3 " +
-            "chapter 四百七十六 REAL HOT-PATH ATTACK " +
-            "phase 3:bumped through chapters 453-476" +
-            " — biomimetic build-out (453-459) + " +
-            "functional debt repayment (460-462) + " +
-            "doctrine-collapse Phases 1-3 (463-466) + " +
-            "auto-checkpoint (467) + recovery loop " +
-            "(468) + BCM (469) + hier slot (470) + " +
-            "Mamba bench (471) + bundle proj (472) + " +
-            "self-audit cleanup with 8 honest fixes" +
-            " (473) + REAL HOT-PATH ATTACK phases 1-3" +
-            " ANE live + registry dispatch + e2e (474)" +
-            " + MPSGraph numerical correctness (475) +" +
-            " RMSNorm + RotaryEmbedding numerical PROOF" +
-            " + first real BASBundle migration (476)")
+            "ADR-016.M1287",
+            "Doctrine version pin。 M1287 POST-PHASE-3 " +
+            "chapter 四百七十七 REAL HOT-PATH ATTACK " +
+            "phase 4 final session close-out:bumped" +
+            " through chapters 453-477 — biomimetic" +
+            " build-out (453-459) + functional debt" +
+            " repayment (460-462) + doctrine-collapse" +
+            " Phases 1-3 (463-466) + auto-checkpoint" +
+            " (467) + recovery loop (468) + BCM (469)" +
+            " + hier slot (470) + Mamba bench (471)" +
+            " + bundle proj (472) + self-audit cleanup" +
+            " (473) + ANE live + registry dispatch +" +
+            " e2e (474) + MPSGraph numerical PROOF (475)" +
+            " + RMSNorm + RotaryEmbedding PROOF + first" +
+            " BASBundle migration (476) + attention" +
+            " PROOF closes 4-of-4 + honest re-scoring" +
+            " + second BASBundle migration (477)")
     }
 
     // MARK: - Per-gap status pins

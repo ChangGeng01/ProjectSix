@@ -1177,7 +1177,28 @@ public enum BASEntropyChapterIndex {
                 " BASKernelDispatchOutcomeBundle real" +
                 " adoption。 Cut 3 — RotaryEmbedding" +
                 " kernel correctness。 Cut 4 — chapter" +
-                " close-out。 ADR-016 → M1283。")
+                " close-out。 ADR-016 → M1283。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十七",
+            mNumberFirst: 1284, mNumberLast: 1287,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 4 —" +
+                " final session close-out。 Cut 1 —" +
+                " attention kernel numerical PROOF" +
+                " (4-of-4 MPSGraph coverage now" +
+                " complete)。 Cut 2 —" +
+                " BASRealHotPathAttackEvaluation" +
+                "Doctrine honest re-scoring of 6" +
+                " user-stated directives (11/60 →" +
+                " 28/60 = +17 points net progress)。" +
+                " Cut 3 — BASMPSGraphKernelCoverage" +
+                "Bundle second real BASBundle<Item>" +
+                " migration (pattern scales)。 Cut 4" +
+                " — chapter close-out。 ADR-016 →" +
+                " M1287。 4-chapter arc sealed (16" +
+                " commits / V1 byte-equality" +
+                " preserved throughout)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

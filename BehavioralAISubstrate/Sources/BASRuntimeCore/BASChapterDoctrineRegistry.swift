@@ -1676,7 +1676,151 @@ public enum BASChapterDoctrineRegistry {
                 " PROOF。 First production-grade bundle" +
                 " adoption demonstrates the chapter 429" +
                 " generic primitive is real,not just" +
-                " a scaffolding tag。")
+                " a scaffolding tag。"),
+
+        // chapter 477 — REAL HOT-PATH ATTACK phase 4 (final session close-out)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十七",
+            mNumberFirst: 1284,
+            mNumberLast: 1287,
+            v1MilestoneMNumber: 1287,
+            v1MilestoneStatus:
+                "chapter-477-v1-hot-path-attack-phase-4-session-close-out",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1284,
+                    knife: "第一刀",
+                    concept:
+                        "BASMPSGraphAttentionIntegration" +
+                        "Tests closes 4-of-4 MPSGraph" +
+                        " kernel numerical-correctness" +
+                        " PROOF coverage。 Every kernel" +
+                        " registered at chapters 447+" +
+                        " now has a PROVEN evaluate()" +
+                        " path with hand-verified" +
+                        " outputs:matMul (M1277) +" +
+                        " rmsNorm (M1280) +" +
+                        " rotaryEmbedding (M1282) +" +
+                        " attention (M1284)。"),
+                BASChapterKnife(
+                    mNumber: 1285,
+                    knife: "第二刀",
+                    concept:
+                        "BASRealHotPathAttackEvaluation" +
+                        "Doctrine honest re-scoring of" +
+                        " the 6 user-stated directives" +
+                        " after 4 chapters of REAL" +
+                        " HOT-PATH ATTACK work。 Baseline" +
+                        " 11/60 (~1.83) → current 28/60" +
+                        " (~4.67) = +17 points net" +
+                        " progress。 Every directive" +
+                        " documents:current score +" +
+                        " concrete evidence + open-" +
+                        "scope acknowledgment。 No" +
+                        " sandbagging,no marketing。"),
+                BASChapterKnife(
+                    mNumber: 1286,
+                    knife: "第三刀",
+                    concept:
+                        "BASMPSGraphKernelCoverageBundle" +
+                        " — second real BASBundle<Item>" +
+                        " migration in the substrate" +
+                        " (sibling of M1281)。 Proves" +
+                        " the chapter 429 generic" +
+                        " primitive carries production" +
+                        " payload across multiple" +
+                        " domains。 Canonical chapter" +
+                        " 477 snapshot pins 4-of-4" +
+                        " MPSGraph coverage with 19" +
+                        " total test cases。"),
+                BASChapterKnife(
+                    mNumber: 1287,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 477 final session" +
+                        " close-out + Phase 2 bump" +
+                        " (chapter 74→75, mNumberLast" +
+                        " 1283→1287, commits 329→333)" +
+                        " + ADR-016.M1283 → M1287。" +
+                        " Cross-doctrine sync of 6" +
+                        " mirror tests + 1 registry-" +
+                        "frozen-hash refresh。 4-chapter" +
+                        " REAL HOT-PATH ATTACK arc" +
+                        " (chapters 474-477 / M1272-" +
+                        "M1287 / 16 commits) sealed。" +
+                        " ADR-014 OPT-IN preserved" +
+                        " throughout。 V1 byte-equality" +
+                        " preserved。")
+            ],
+            entropyClassesAttacked: [
+                "incomplete-kernel-correctness-coverage",
+                "unscored-directive-progress-entropy",
+                "single-adoption-can-be-one-off-entropy",
+                "session-close-out-honest-account-gap"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (4-of-4 numerical" +
+                " correctness + Codable round-trip" +
+                " + replay-determinism PROVEN)",
+                "chapter 四百二十九 (2 real generic" +
+                " adoptions — pattern scales)",
+                "chapter 四百七十三 (anti-drift via" +
+                " regression guard on every score" +
+                " delta)",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1283 → M1287)",
+                "系统熵 reduction",
+                "POST-PHASE-3 REAL hot-path attack" +
+                " sealed (4 chapters / 16 commits)"
+            ],
+            plannedFutureCuts: [
+                "chapter 478+:V1 monolith fold pilot" +
+                " — extract first 3 ForAudit" +
+                " declarations at coordinator lines" +
+                " 1219-1235 into a typed helper file。" +
+                " Stress-sweep dual mode CI gate" +
+                " required before merge。",
+                "chapter 479+:wire BASKernelDispatch" +
+                "OutcomeBundle into BASNativeStage" +
+                "Executor.executePlanWithAssignments" +
+                " as observable audit surface",
+                "chapter 480+:second wave of sprawl" +
+                " type migrations (target 5 more" +
+                " BASBundle adoptions to demonstrate" +
+                " pattern at scale)",
+                "chapter 481+:real-device CI lane" +
+                " for ANE-aneFirst gated tests on" +
+                " physical M-series silicon",
+                "chapter 482+:host integration wire-" +
+                "in (EBrainHostRuntimeSynthesis opts" +
+                " into BASANELiveReader.live() +" +
+                " BASKernelRegistryDispatchExecutor)"
+            ],
+            summary:
+                "REAL HOT-PATH ATTACK phase 4 — final" +
+                " session close-out。 4 cuts (M1284-" +
+                "M1287)。 Cut 1 — attention kernel" +
+                " numerical PROOF (4-of-4 MPSGraph" +
+                " coverage complete)。 Cut 2 — honest" +
+                " 6-directive re-scoring doctrine" +
+                " (11/60 → 28/60 = +17 points)。 Cut" +
+                " 3 — second real BASBundle migration" +
+                " proves pattern scales beyond a" +
+                " one-off。 Cut 4 — chapter close-" +
+                "out。 ADR-016 → M1287。 4-chapter" +
+                " REAL HOT-PATH ATTACK arc sealed:" +
+                " 16 commits / 4 chapters / 17-point" +
+                " directive progress / V1 byte-" +
+                "equality preserved throughout。" +
+                " Plan complete。 Next session opens" +
+                " chapter 478+ with V1 monolith fold" +
+                " pilot。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

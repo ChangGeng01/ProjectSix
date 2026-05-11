@@ -1066,7 +1066,20 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// '低熵复杂系统 1/10' gap with substantive evidence,
     /// not scaffolding)。 ADR-014 OPT-IN preserved。 V1
     /// byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1283"
+    /// M1287 bump:REAL HOT-PATH ATTACK phase 4 final
+    /// session close-out — chapter 四百七十七 ships:
+    /// (1) M1284 attention kernel numerical PROOF closes
+    /// 4-of-4 MPSGraph coverage;(2) M1285
+    /// BASRealHotPathAttackEvaluationDoctrine — honest
+    /// 6-directive re-scoring (baseline 11/60 → current
+    /// 28/60 = +17 points);(3) M1286
+    /// BASMPSGraphKernelCoverageBundle — second
+    /// BASBundle<Item> migration proves pattern scales;
+    /// (4) M1287 close-out。 4-chapter REAL HOT-PATH
+    /// ATTACK arc sealed (chapters 474-477 / 16 commits)。
+    /// ADR-014 OPT-IN preserved。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1287"
 
     /// Query the typed status of a specific gap。
     public static func status(
