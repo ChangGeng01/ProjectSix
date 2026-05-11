@@ -2504,7 +2504,60 @@ public enum BASChapterDoctrineRegistry {
                 " 12-of-18 declarations (67%)。 2 new" +
                 " bundle factories shipped。 V1 byte-" +
                 "equality preserved via stress-sweep" +
-                " regression guard。 ADR-016 → M1319。")
+                " regression guard。 ADR-016 → M1319。"),
+
+        // chapter 486 — cluster A FULL + cluster B start
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十六",
+            mNumberFirst: 1320,
+            mNumberLast: 1323,
+            v1MilestoneMNumber: 1323,
+            v1MilestoneStatus:
+                "chapter-486-cluster-a-full-plus-cluster-b-start",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1320, knife: "第一刀",
+                    concept: "BASTurnAuditProjections" +
+                        "KunlunHexaTwo — cluster A FINAL" +
+                        " 6 declarations folded。 Cluster" +
+                        " A: 18-of-18 (100%)。"),
+                BASChapterKnife(
+                    mNumber: 1321, knife: "第二刀",
+                    concept: "Coordinator splice for" +
+                        " hexaTwo bundle。 V1 monolith" +
+                        " continues shrinking。"),
+                BASChapterKnife(
+                    mNumber: 1322, knife: "第三刀",
+                    concept: "BASTurnAuditProjections" +
+                        "CthulhuPenta — cluster B start" +
+                        " (5 Cthulhu late projections)。" +
+                        " Cluster B: 0 → 5 declarations。"),
+                BASChapterKnife(
+                    mNumber: 1323, knife: "第四刀",
+                    concept: "Chapter 486 close-out。" +
+                        " ADR-016 → M1323。")
+            ],
+            entropyClassesAttacked: [
+                "cluster-a-incomplete",
+                "cluster-b-untouched",
+                "monolith-shrinkage-stalled",
+                "fold-pattern-not-completed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "chapter 一百八十五",
+                "chapter 二百一一", "chapter 三百九二",
+                "ADR-014 OPT-IN", "ADR-016 → M1323"
+            ],
+            plannedFutureCuts: [
+                "chapter 487+ — cluster B 完整 fold",
+                "chapter 488+ — Permit fold (6 rebinds)",
+                "chapter 489+ — V1 monolith DELETION"
+            ],
+            summary: "V1 fold cluster A 100% (18-of-18)" +
+                " + cluster B start (5 of remaining)。" +
+                " 5 bundle factories cumulative。 ADR-" +
+                "016 → M1323。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
