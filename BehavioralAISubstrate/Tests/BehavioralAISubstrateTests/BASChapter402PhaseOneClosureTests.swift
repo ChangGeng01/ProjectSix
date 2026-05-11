@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1339",
-            "M1339:doctrine version reflects chapter 四百九十 — TIER 1 SEALED at 45/60 substrate-internal achievement。 17 chapters / 68 commits / M1272-M1339。 BASTier1AchievementDoctrine pins per-directive evidence。 V1 byte-equality preserved")
+            "ADR-016.M1343",
+            "M1343:doctrine version reflects chapter 四百九十一 — cluster B 87.5% folded (21/24 declarations)。 9 bundle factories cumulative。 Post-Tier-1 incremental progress。 ADR-014 OPT-IN preserved; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

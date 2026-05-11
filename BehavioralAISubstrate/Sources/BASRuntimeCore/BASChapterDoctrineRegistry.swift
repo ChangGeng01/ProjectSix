@@ -2785,7 +2785,59 @@ public enum BASChapterDoctrineRegistry {
                 " 17 chapters)。 ADR-016 → M1339。" +
                 " Honest 25% gap (Production wire-in +" +
                 " V1 deletion + Tier 2 external blockers)" +
-                " explicitly acknowledged for follow-up。")
+                " explicitly acknowledged for follow-up。"),
+
+        // chapter 491 — cluster B 87.5% (post-Tier-1)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十一",
+            mNumberFirst: 1340,
+            mNumberLast: 1343,
+            v1MilestoneMNumber: 1343,
+            v1MilestoneStatus:
+                "chapter-491-cluster-b-21-of-24",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1340, knife: "第一刀",
+                    concept: "BASTurnAuditProjections" +
+                        "LateClusterD — 3 more cluster" +
+                        " B declarations folded" +
+                        " (unknownReserve +" +
+                        " forbiddenCandidates +" +
+                        " forbiddenAggregate)。"),
+                BASChapterKnife(
+                    mNumber: 1341, knife: "第二刀",
+                    concept: "Coordinator splice for" +
+                        " late cluster D trio。" +
+                        " Cluster B: 18 → 21 folded" +
+                        " (87.5%)。"),
+                BASChapterKnife(
+                    mNumber: 1342, knife: "第三刀",
+                    concept: "Doctrine sync。"),
+                BASChapterKnife(
+                    mNumber: 1343, knife: "第四刀",
+                    concept: "Chapter 491 close-out。" +
+                        " ADR-016 → M1343。 9 bundle" +
+                        " factories cumulative。")
+            ],
+            entropyClassesAttacked: [
+                "cluster-b-near-finish",
+                "post-tier-1-progress-stalled"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1343"
+            ],
+            plannedFutureCuts: [
+                "chapter 492+ — cluster B final 3" +
+                " declarations + downstream",
+                "chapter 493+ — Permit fold",
+                "chapter 494+ — V1 deletion"
+            ],
+            summary: "Cluster B 21 declarations folded" +
+                " (87.5%)。 9 bundle factories cumulative。" +
+                " ADR-016 → M1343。 Post-Tier-1" +
+                " incremental fold progress。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
