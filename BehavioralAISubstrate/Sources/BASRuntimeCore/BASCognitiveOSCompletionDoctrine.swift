@@ -907,7 +907,22 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// arrival。 「Substrate not integrated into turn
     /// loop」 0% → ~70%。 V1 byte-equality preserved。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1223"
+    /// M1227 bump:DEBT REPAYMENT chapter 3 — chapter
+    /// 四百六十二 closes the LAST 30% of chapter 461
+    /// integration debt。 NEW BASCoordinatorTestStubs
+    /// .swift factory wires all 10 service protocols
+    /// + returns ready-to-use BASEBrainRuntime
+    /// Coordinator。 3 new end-to-end PROOF tests in
+    /// BASTurnRuntimeEngineBiomimeticHookTests verify
+    /// the chapter 461 hook fires per REAL turn through
+    /// engine.runWithPlan + real coordinator + delegate
+    /// dispatch + lifecycle emits。 Integration debt
+    /// 70% → 100%。 All 3 debts from chapter 459 self-
+    /// audit now CLOSED (SampleHost iOS build +
+    /// benchmark fictional numbers + substrate
+    /// integration)。 V1 byte-equality preserved
+    /// through end-to-end test。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1227"
 
     /// Query the typed status of a specific gap。
     public static func status(

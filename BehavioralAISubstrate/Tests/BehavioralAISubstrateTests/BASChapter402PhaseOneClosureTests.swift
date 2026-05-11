@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1223",
-            "M1223:doctrine version reflects DEBT REPAYMENT 2 (chapter 四百六十一 — first real wire from BASTurnRuntimeEngine to BASBiomimeticTurnObserver, chapters 447-461 ship continuous real-execution + biomimetic build-out + DEBT REPAYMENT closing benchmark gap + integration gap)")
+            "ADR-016.M1227",
+            "M1227:doctrine version reflects DEBT REPAYMENT 3 (chapter 四百六十二 — mock-coordinator infra closes last 30% of integration debt via 3 e2e PROOF tests through real engine.runWithPlan, chapters 447-462 ship biomimetic build-out + benchmark + integration wire + integration e2e PROOF — all 3 chapter 459 debts now CLOSED)")
     }
 
     // MARK: - M-number range matches chapter 四百二

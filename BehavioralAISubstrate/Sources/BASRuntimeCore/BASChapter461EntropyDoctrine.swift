@@ -79,33 +79,24 @@
 //     commits 265→269) + ADR-016.M1219 → M1223 +
 //     postSweepRealExecutionEntries entry
 //
-// ## Honest scope acknowledgment
+// ## Honest scope acknowledgment (UPDATED by chapter 462)
 //
-// Full end-to-end "real turn fires observer" via
-// `engine.runWithPlan(...)` requires constructing a
-// real `BASEBrainRuntimeCoordinator` with all 10
-// services。 No test-infra for that exists in the BAS
-// test target — every other engine-related test
-// (BASTurnRuntimeEngineRunWithPlanTests etc.) tests
-// the DELEGATE directly,not the engine。 Chapter 461
-// PROOF tests verify what's testable at THIS layer:
+// Chapter 461 originally deferred full end-to-end
+// `engine.runWithPlan(...)` verification because no
+// test-friendly coordinator factory existed。 Chapter
+// 462 (M1224-M1227) closes that deferral by shipping
+// `BASCoordinatorTestStubs.makeStub()` + 3 end-to-end
+// PROOF tests added to
+// `BASTurnRuntimeEngineBiomimeticHookTests`:
 //
-//   1. Configuration slots exist + default to nil
-//   2. Configuration immutable updaters thread the
-//      slots correctly
-//   3. The observer + signal-builder pipeline used
-//      by the engine's hook block produces the
-//      expected primitive-side state (verified
-//      against the SAME observer + builder closure
-//      shape the engine uses)
+//   - `testEndToEndEngineRunWithPlanFiresObserver`
+//   - `testEndToEndMultipleRunsIncrementLinearly`
+//   - `testEndToEndV1ByteEqualityWithAndWithoutObserver`
 //
-// Full coordinator-level test is deferred to whenever
-// a test-friendly coordinator factory exists
-// (separate infra concern;not chapter 461's debt)。
-// The engine's 7-LOC hook block is straightforward
-// `if let observer = ... { ... await observer.observe
-// (signal) }` so the simulation tests cover the
-// entire functional surface。
+// Integration debt status:0% → 70% (chapter 461) →
+// 100% (chapter 462)。 The wire EXISTS,FIRES per real
+// turn,and PRESERVES V1 byte-equality through the
+// real coordinator path。
 //
 // ## Doctrine pins held
 //

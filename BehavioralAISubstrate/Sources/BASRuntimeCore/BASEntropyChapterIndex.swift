@@ -884,7 +884,34 @@ public enum BASEntropyChapterIndex {
                 " Chapters 456+ orchestration no" +
                 " longer dead-on-arrival。 「Substrate" +
                 " not integrated into turn loop」 0% →" +
-                " ~70%。 ADR-016 → M1223")
+                " ~70%。 ADR-016 → M1223"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十二",
+            mNumberFirst: 1224,
+            mNumberLast: 1227,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "DEBT REPAYMENT 3 — closes LAST 30%" +
+                " of chapter 461 integration debt by" +
+                " shipping reusable stub-coordinator" +
+                " factory + 3 end-to-end PROOF tests" +
+                " through REAL engine.runWithPlan。 NEW" +
+                " BASCoordinatorTestStubs.swift" +
+                " factory wires all 10 service protocols" +
+                " + returns ready-to-use" +
+                " BASEBrainRuntimeCoordinator。 3 new" +
+                " e2e tests verify observer fires per" +
+                " real turn,5 runs increment counter" +
+                " linearly,V1 byte-equality preserved" +
+                " end-to-end (红线 7 verified through" +
+                " real coordinator path,not just" +
+                " simulated)。 Integration debt 70% →" +
+                " 100%。 All 3 debts from chapter 459" +
+                " self-audit now CLOSED。 ADR-016 →" +
+                " M1227")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

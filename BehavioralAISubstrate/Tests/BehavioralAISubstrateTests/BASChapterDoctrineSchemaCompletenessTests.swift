@@ -1132,6 +1132,25 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter461EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter461EntropyDoctrine
+                    .summary),
+            // M1227 DEBT REPAYMENT 3 (mock-coordinator infra + e2e tests)
+            check("四百六十二",
+                tag: BASChapter462EntropyDoctrine.chapterTag,
+                first: BASChapter462EntropyDoctrine
+                    .mNumberFirst,
+                last: BASChapter462EntropyDoctrine
+                    .mNumberLast,
+                v1: BASChapter462EntropyDoctrine
+                    .v1MilestoneMNumber,
+                v1Status: BASChapter462EntropyDoctrine
+                    .v1MilestoneStatus,
+                knives: BASChapter462EntropyDoctrine
+                    .knives.count,
+                pins: BASChapter462EntropyDoctrine
+                    .pinHeld.count,
+                future: BASChapter462EntropyDoctrine
+                    .plannedFutureCuts.count,
+                summary: BASChapter462EntropyDoctrine
                     .summary)
         ]
         XCTAssertEqual(
@@ -1322,7 +1341,10 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter460EntropyDoctrine.mNumberLast),
             // M1223 DEBT REPAYMENT 2 (real engine→observer wire)
             ("461", BASChapter461EntropyDoctrine.mNumberFirst,
-             BASChapter461EntropyDoctrine.mNumberLast)
+             BASChapter461EntropyDoctrine.mNumberLast),
+            // M1227 DEBT REPAYMENT 3 (mock-coordinator + e2e tests)
+            ("462", BASChapter462EntropyDoctrine.mNumberFirst,
+             BASChapter462EntropyDoctrine.mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
