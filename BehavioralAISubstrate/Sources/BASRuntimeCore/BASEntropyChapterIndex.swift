@@ -1256,9 +1256,16 @@ public enum BASEntropyChapterIndex {
             pinsCount: 10, futureCutsCount: 3,
             summary: "5-of-5 primitive coverage" +
                 " (1st BASPermit) + cross-turn KV" +
-                " cache substrate surface" +
-                " (BASTransformerKVCacheSession +" +
-                " BASKVCacheRegistry)。 ADR-016 → M1307。")
+                " cache substrate surface。 ADR-016 → M1307。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十三",
+            mNumberFirst: 1308, mNumberLast: 1311,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "9 batched typealias adoptions" +
+                " (3 BASBundle + 3 BASResult + 3 BASCard)" +
+                " bring cumulative adoption count to" +
+                " 16。 ADR-016 → M1311。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

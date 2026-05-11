@@ -117,18 +117,16 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 80
+    public static let phase2ChapterCount: Int = 81
 
-    /// Phase 2 commits shipped。 At M1307:
-    /// 125 + 84 + 144 = 353 (chapter 482 = 4 cuts)
-    public static let phase2CommitsShipped: Int = 353
+    /// Phase 2 commits shipped。 At M1311:
+    /// 125 + 84 + 148 = 357 (chapter 483 = 4 cuts)
+    public static let phase2CommitsShipped: Int = 357
 
-    /// Phase 2 mNumberLast。 At M1307:chapter 482
-    /// ends here (BASKernelDispatchPermit +
-    /// BASTransformerKVCacheSession + BASKVCacheRegistry
-    /// shipped as M1304-M1306 + close-out M1307)。
+    /// Phase 2 mNumberLast。 At M1311:chapter 483
+    /// ends here (9 batched typealias adoptions)。
     /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1307
+    public static let phase2MNumberLast: Int = 1311
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

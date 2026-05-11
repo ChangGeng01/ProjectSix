@@ -2316,7 +2316,69 @@ public enum BASChapterDoctrineRegistry {
             summary: "5-of-5 primitive coverage achieved" +
                 " + cross-turn KV cache substrate surface" +
                 " shipped。 4 cuts (M1304-M1307)。 V1" +
-                " byte-equality preserved。 ADR-016 → M1307。")
+                " byte-equality preserved。 ADR-016 → M1307。"),
+
+        // chapter 483 — batched adoption growth: 6 typealiases
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十三",
+            mNumberFirst: 1308,
+            mNumberLast: 1311,
+            v1MilestoneMNumber: 1311,
+            v1MilestoneStatus:
+                "chapter-483-batched-9-typealias-adoptions",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1308, knife: "第一刀",
+                    concept: "3 batched BASBundle" +
+                        " adoptions:KernelKeyRegistry +" +
+                        " TensorBackingKindObservation +" +
+                        " NeuralOpInvocation。"),
+                BASChapterKnife(
+                    mNumber: 1309, knife: "第二刀",
+                    concept: "3 batched BASResult" +
+                        " adoptions:KernelRegistryDispatch" +
+                        " + ANECapabilityProbe +" +
+                        " SchedulerAssignment。"),
+                BASChapterKnife(
+                    mNumber: 1310, knife: "第三刀",
+                    concept: "3 batched BASCard" +
+                        " adoptions:TensorBackingKind +" +
+                        " AcceleratorPriority +" +
+                        " ThermalSnapshot。"),
+                BASChapterKnife(
+                    mNumber: 1311, knife: "第四刀",
+                    concept: "Chapter 483 close-out。" +
+                        " Cumulative adoptions: 14" +
+                        " across 5 primitives" +
+                        " (BASBundle ×6 + BASResult ×4" +
+                        " + BASCard ×4 + BASFrameEnvelope" +
+                        " ×1 + BASPermit ×1) - wait" +
+                        " 16 total。 ADR-016 → M1311。")
+            ],
+            entropyClassesAttacked: [
+                "adoption-pattern-rate-too-slow",
+                "primitive-diversity-uneven",
+                "scattered-sprawl-not-batched",
+                "type-count-progress-untracked"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "chapter 一百八十五",
+                "chapter 二百一一", "chapter 三百九二",
+                "chapter 四百二十九 batched adoption pattern",
+                "ADR-014 OPT-IN", "ADR-016 → M1311"
+            ],
+            plannedFutureCuts: [
+                "chapter 484+ — production wire-in",
+                "chapter 485+ — default mode flip prep",
+                "chapter 486+ — V1 fold + deletion"
+            ],
+            summary: "9 batched typealias adoptions" +
+                " (3 BASBundle + 3 BASResult + 3 BASCard)" +
+                " bring cumulative cross-substrate" +
+                " generic-primitive adoption count to" +
+                " 16。 V1 byte-equality preserved。" +
+                " ADR-016 → M1311。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -100,5 +100,5 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// chapter 480's record is now part of canonical
     /// registry JSON。
     static let frozenFullRegistrySha256: String =
-        "eabd54dbf7e2bc4738049a06f4632786b9eeac765a56ea44c2a99829a6266e59"
+        "21f8a4b8f87eede8e14036da871e33a60e0e10e432569f976845b45265437d0b"
 }

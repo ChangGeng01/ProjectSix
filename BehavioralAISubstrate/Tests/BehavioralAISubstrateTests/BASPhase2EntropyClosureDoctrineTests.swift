@@ -37,14 +37,13 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs482() {
+    func testLastChapterIs483() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百八十二",
-            "M1307 chapter 四百八十二:bumped to" +
-            " 四百八十二 (5-of-5 primitive coverage" +
-            " + cross-turn KV cache substrate surface)")
+            "chapter 四百八十三",
+            "M1311 chapter 四百八十三:9 batched" +
+            " typealias adoptions across 3 primitives")
     }
 
     // MARK: - M-number range
