@@ -3447,7 +3447,86 @@ public enum BASChapterDoctrineRegistry {
                 " 最激进 advanced by typed advisory but" +
                 " actual production routing wire-in" +
                 " honestly deferred。 ADR-014 OPT-IN +" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+
+        // chapter 499 — 更极致/低熵 substantive adoptions
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十九",
+            mNumberFirst: 1373,
+            mNumberLast: 1376,
+            v1MilestoneMNumber: 1376,
+            v1MilestoneStatus:
+                "chapter-499-substantive-low-entropy-adoptions",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1373, knife: "第一刀",
+                    concept: "NEW BASKernelDispatch" +
+                        "StatisticsBundle — 7th BASBundle" +
+                        "<Item> adoption。 Aggregates" +
+                        " per-(op,success) dispatch" +
+                        " counts。 Real scheduler-tuning" +
+                        " surface。 23 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1374, knife: "第二刀",
+                    concept: "NEW BASMPSGraphCacheReport" +
+                        "Result — 5th BASResult<Body>" +
+                        " adoption。 Combines hits +" +
+                        " misses + latency in one Codable" +
+                        " audit surface for end-of-turn" +
+                        " emission。 24 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1375, knife: "第三刀",
+                    concept: "NEW BASKernelDispatch" +
+                        "AttemptCard — 4th BASCard<Kind," +
+                        "Body> adoption。 Typed kind" +
+                        " enum classifies per-call" +
+                        " outcome (success/dataType/" +
+                        "shapeMismatch/framework/device" +
+                        " failure)。 25 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1376, knife: "第四刀",
+                    concept: "Chapter 499 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1376。 更极致 7→9 + 低熵复" +
+                        "杂系统 8→9 substantive progress" +
+                        " via 3 typed adoptions answering" +
+                        " real scheduler/audit/per-call" +
+                        " questions (not count-padding)。")
+            ],
+            entropyClassesAttacked: [
+                "dispatch-statistics-untyped-aggregate",
+                "cache-latency-audit-emission-untyped",
+                "per-call-outcome-untyped-classification",
+                "tier-c-blocked-but-other-migrations-possible"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1376",
+                "substantive-adoption-not-count-padding",
+                "tier-c-honestly-deferred"
+            ],
+            plannedFutureCuts: [
+                "chapter 500 — 最创新/原生利用神经引擎" +
+                " push (more typed ANE-aware surfaces)",
+                "chapter 501 — Tier 1 honest doctrine" +
+                " bump with all evidence accumulated",
+                "Tier C ADR-019 implementation gated on" +
+                " explicit user approval"
+            ],
+            summary: "更极致/低熵复杂系统 substantive" +
+                " push:3 NEW typed primitive adoptions" +
+                " (1 BASBundle + 1 BASResult + 1 BASCard)" +
+                " each answering a real audit/scheduler" +
+                " question。 25 typed surfaces cumulative。" +
+                " ADR-016 → M1376。 Tier C ADR-019 scope" +
+                " honestly deferred (user approval gated)" +
+                " — other primitive migrations continue。" +
+                " ADR-014 OPT-IN + V1 byte-equality" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

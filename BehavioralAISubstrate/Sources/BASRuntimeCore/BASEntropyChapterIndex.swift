@@ -1402,7 +1402,19 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative。 ADR-016" +
                 " → M1372。 更硬核 latency observability" +
                 " closed;最激进 typed OPT-IN advisory" +
-                " shipped (routing wire-in deferred)。")
+                " shipped (routing wire-in deferred)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十九",
+            mNumberFirst: 1373, mNumberLast: 1376,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 8, futureCutsCount: 3,
+            summary: "更极致/低熵 substantive push:" +
+                " BASKernelDispatchStatisticsBundle +" +
+                " BASMPSGraphCacheReportResult +" +
+                " BASKernelDispatchAttemptCard (1+1+1" +
+                " primitive adoptions)。 25 typed" +
+                " surfaces cumulative。 ADR-016 → M1376。" +
+                " Tier C ADR scope honestly deferred。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

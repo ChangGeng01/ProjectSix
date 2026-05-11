@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1372",
-            "M1372:doctrine version reflects chapter 四百九十八 — Tier 1 honest closure push starts。 3 new typed surfaces:BASMPSGraphKernelBuildLatencyResult + BASEBrainHostRuntimeModeAdvisory + BASKernelEvaluateLatencyProbe。 22 typed surfaces cumulative。 更硬核 latency observability closed;最激进 typed OPT-IN advisory shipped (routing wire-in deferred)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1376",
+            "M1376:doctrine version reflects chapter 四百九十九 — 更极致/低熵 substantive push。 3 NEW typed primitive adoptions:BASKernelDispatchStatisticsBundle + BASMPSGraphCacheReportResult + BASKernelDispatchAttemptCard。 25 typed surfaces cumulative。 Tier C ADR-019 scope honestly deferred (user approval gated)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

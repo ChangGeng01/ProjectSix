@@ -1403,7 +1403,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百九十八")!)
+                            "chapter 四百九十八")!),
+            // M1376 更极致/低熵 substantive 3-adoption push
+            checkRegistry("四百九十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百九十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1883,6 +1889,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百九十八")!
+                .mNumberLast),
+            // M1376 chapter 499 — 更极致/低熵 substantive
+            ("499",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
