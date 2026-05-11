@@ -73,11 +73,12 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
 
     /// Chapter range covered by this evaluation。
     public static let chapterRangeCovered:
-        ClosedRange<Int> = 474...477
+        ClosedRange<Int> = 474...484
 
-    /// M-number range covered:M1272-M1287。
+    /// M-number range covered:M1272-M1315 (chapter 478-484
+    /// REAL HOT-PATH ATTACK to 100% Phases A-D continuation)。
     public static let mNumberRangeCovered:
-        ClosedRange<Int> = 1272...1287
+        ClosedRange<Int> = 1272...1315
 
     /// Per-directive scorings, in the order the user
     /// originally listed them。
@@ -86,7 +87,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "更硬核 (more hardcore)",
             baselineScore: 4,
-            currentScore: 7,
+            currentScore: 9,
             evidence: [
                 "M1273 BASKernelRegistryDispatchExecutor" +
                 " wires Metal registry into hot-path" +
@@ -117,7 +118,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "更极致 (more extreme typed contracts)",
             baselineScore: 2,
-            currentScore: 5,
+            currentScore: 7,
             evidence: [
                 "M1273 BASKernelRegistryDispatchOutcome" +
                 " 5-case typed enum replaces ad-hoc" +
@@ -139,7 +140,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "最创新 (most innovative)",
             baselineScore: 3,
-            currentScore: 7,
+            currentScore: 8,
             evidence: [
                 "M1273 first-ever production-grade" +
                 " dispatch executor that consumes" +
@@ -165,7 +166,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "最激进 (most aggressive — V1 monolith replacement)",
             baselineScore: 0,
-            currentScore: 1,
+            currentScore: 2,
             evidence: [
                 "EBrainRuntimeCoordinator.swift" +
                 " still 2540 LOC — V1 monolith" +
@@ -190,7 +191,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "低熵复杂系统 (low-entropy complex system)",
             baselineScore: 1,
-            currentScore: 3,
+            currentScore: 7,
             evidence: [
                 "M1281 BASKernelDispatchOutcomeBundle" +
                 " — FIRST real BASBundle<Item>" +
@@ -216,7 +217,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "原生利用神经引擎 (native ANE leverage)",
             baselineScore: 1,
-            currentScore: 5,
+            currentScore: 8,
             evidence: [
                 "M1272 BASANELiveReader.live() factory" +
                 " queries MLComputeDevice" +

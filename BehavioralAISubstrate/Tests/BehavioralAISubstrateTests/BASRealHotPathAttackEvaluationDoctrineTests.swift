@@ -24,22 +24,22 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
 
     // MARK: - Chapter range covered
 
-    func testChapterRangeCoveredIs474To477() {
+    func testChapterRangeCoveredIs474To484() {
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
                 .chapterRangeCovered.lowerBound, 474)
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
-                .chapterRangeCovered.upperBound, 477)
+                .chapterRangeCovered.upperBound, 484)
     }
 
-    func testMNumberRangeCoveredIs1272To1287() {
+    func testMNumberRangeCoveredIs1272To1315() {
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
                 .mNumberRangeCovered.lowerBound, 1272)
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
-                .mNumberRangeCovered.upperBound, 1287)
+                .mNumberRangeCovered.upperBound, 1315)
     }
 
     // MARK: - Every directive has positive delta
@@ -89,15 +89,15 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
     }
 
     func testCurrentAggregateReflectsShippedWork() {
-        // 7 + 5 + 7 + 1 + 3 + 5 = 28 / 6 ≈ 4.67
+        // chapter 484 post-update:9 + 7 + 8 + 2 + 7 + 8 = 41
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
-                .currentAggregate, 28,
-            "chapter 477 current sum")
+                .currentAggregate, 41,
+            "chapter 484 current sum (post-update)")
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
                 .currentAverage,
-            28.0 / 6.0, accuracy: 0.01)
+            41.0 / 6.0, accuracy: 0.01)
     }
 
     func testNetProgressIsPositive() {
@@ -105,9 +105,9 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
             .currentAggregate
             - BASRealHotPathAttackEvaluationDoctrine
                 .baselineAggregate
-        XCTAssertEqual(net, 17,
-            "net progress = 28 - 11 = 17 points across" +
-            " 6 directives over 4 chapters")
+        XCTAssertEqual(net, 30,
+            "net progress = 41 - 11 = 30 points across" +
+            " 6 directives over 11 chapters (474-484)")
     }
 
     // MARK: - Every directive has stillOpen scope ack
@@ -147,21 +147,20 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
                 $0.directiveName.starts(with: "更硬核")
             }
         XCTAssertNotNil(hardcore)
-        XCTAssertEqual(hardcore?.currentScore, 7,
-            "更硬核 score 7/10 reflects 4-of-4 MPSGraph" +
-            " kernels having numerical PROOF (matMul" +
-            " M1277 + rmsNorm M1280 + rotaryEmbedding" +
-            " M1282 + attention M1284)")
+        XCTAssertEqual(hardcore?.currentScore, 9,
+            "更硬核 score 9/10 post-chapter-484 reflects" +
+            " 7-of-8 MPSGraph kernels + cache observation" +
+            " + dispatch latency benchmark")
     }
 
-    func testAggressiveScoreReflectsV1MonolithUntouched() {
+    func testAggressiveScoreReflectsV1MonolithLargelyUntouched() {
         let aggressive = BASRealHotPathAttackEvaluationDoctrine
             .scorings.first {
                 $0.directiveName.starts(with: "最激进")
             }
-        XCTAssertEqual(aggressive?.currentScore, 1,
+        XCTAssertEqual(aggressive?.currentScore, 2,
             "最激进 stays low — V1 monolith 2540 LOC" +
-            " genuinely untouched in chapters 474-477。" +
-            " Honest accounting,not sandbagging。")
+            " mostly untouched (only 3-projection PILOT" +
+            " fold via M1289)。 Honest accounting。")
     }
 }
