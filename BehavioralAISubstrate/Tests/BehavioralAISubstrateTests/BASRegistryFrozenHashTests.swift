@@ -102,11 +102,11 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// 496 Tier 2 entry + 497 REAL HOT-PATH ATTACK
     /// SEALED + 498 Tier 1 honest closure push +
     /// 499 更极致/低熵 + 500 最创新/原生神经引擎 +
-    /// 501 Tier 1 honest SEAL at 52/60)。 Re-captured
-    /// at chapter 501 close-out — Tier 1 substrate-
-    /// internal CEILING reached。 HONEST: 8-point gap
-    /// to 60/60 typed-attributed via BASTier1Honest
-    /// ClosureMilestoneDoctrine.externalBlockerReasons。
+    /// 501 Tier 1 honest SEAL at 52/60 + 502 wire-in
+    /// push)。 Re-captured at chapter 502 close-out。
+    /// Chapter 502:typed surfaces from chapter 498-501
+    /// now CONSUMED by real substrate code (KV cache
+    /// policy + probe bundle + registry snapshot)。
     static let frozenFullRegistrySha256: String =
-        "60e45d625d8a0e71207974fac0510603a83417166d73b77801578505b30e9b0e"
+        "9b6458609b86abf95b5841da895f1c7ef666ef32e7506f8f007a0b9e09c46b4c"
 }

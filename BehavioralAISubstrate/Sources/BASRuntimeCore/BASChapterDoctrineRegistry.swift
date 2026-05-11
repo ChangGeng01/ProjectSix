@@ -3695,7 +3695,93 @@ public enum BASChapterDoctrineRegistry {
                 " tested)。 ADR-014 OPT-IN preserved" +
                 " every commit。 V1 byte-equality" +
                 " preserved across stress-sweep dual-mode" +
-                " canonical60 throughout closure push。")
+                " canonical60 throughout closure push。"),
+
+        // chapter 502 — wire-in push:typed surfaces → consumed
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二",
+            mNumberFirst: 1385,
+            mNumberLast: 1388,
+            v1MilestoneMNumber: 1388,
+            v1MilestoneStatus:
+                "chapter-502-typed-surface-wire-in-push",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1385, knife: "第一刀",
+                    concept: "Wire M1379 BASKVCache" +
+                        "InvalidationPolicy into" +
+                        " BASKVCacheRegistry — typed" +
+                        " init parameter + accessor。" +
+                        " Default `.explicitOnly`" +
+                        " preserves chapter 482" +
+                        " behavior。 First REAL substrate" +
+                        " consumption of a previously-" +
+                        "typed-only surface。"),
+                BASChapterKnife(
+                    mNumber: 1386, knife: "第二刀",
+                    concept: "NEW BASKernelEvaluateLatency" +
+                        "ProbeBundle — 8th BASBundle" +
+                        "<Item> adoption aggregating" +
+                        " M1369 result bodies。 PROBE" +
+                        " WIRE-IN PROOF test executes 3" +
+                        " real probe runs + asserts" +
+                        " aggregates compose correctly。" +
+                        " 32 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1387, knife: "第三刀",
+                    concept: "NEW BASKVCacheRegistry" +
+                        "ObservationSnapshot + actor" +
+                        " snapshot(recordedAtMs:) method。" +
+                        " Real consumption of M1379" +
+                        " policy enum + M1385 wire-in。" +
+                        " 33 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1388, knife: "第四刀",
+                    concept: "Chapter 502 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1388。 Wire-in push:3 of the" +
+                        " 31 chapter-501-shipped typed" +
+                        " surfaces now CONSUMED by real" +
+                        " substrate code (not just" +
+                        " typed declarations)。")
+            ],
+            entropyClassesAttacked: [
+                "typed-surface-declared-but-not-consumed",
+                "kv-cache-invalidation-policy-untyped-at-construction",
+                "kernel-latency-probe-no-typed-aggregator",
+                "registry-snapshot-untyped-emission"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1388",
+                "typed-surface-consumption-proven",
+                "registry-wire-in-default-preserves-behavior",
+                "v1-byte-equality-preserved"
+            ],
+            plannedFutureCuts: [
+                "future arc — actual LRU/TTL invalidation" +
+                " implementation in BASKVCacheRegistry" +
+                " (gated on memory-pressure use case)",
+                "future arc — production wire-in for" +
+                " thermal-aware kernel routing decisions",
+                "future arc — V1 monolith deletion +" +
+                " default mode flip (host CI lane)"
+            ],
+            summary: "Wire-in push:typed surfaces from" +
+                " chapter 498-501 now CONSUMED by real" +
+                " substrate code。 BASKVCacheRegistry" +
+                " consumes M1379 policy + M1385 init" +
+                " wire-in。 BASKernelEvaluateLatencyProbe" +
+                " Bundle aggregates M1369 result bodies。" +
+                " BASKVCacheRegistryObservationSnapshot" +
+                " emits typed snapshots。 33 typed" +
+                " surfaces cumulative。 ADR-016 → M1388。" +
+                " Step BEYOND typed-surface-only into" +
+                " actual substrate behavior connection。" +
+                " ADR-014 OPT-IN preserved (default init" +
+                " paths preserved)。 V1 byte-equality" +
+                " untouched。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

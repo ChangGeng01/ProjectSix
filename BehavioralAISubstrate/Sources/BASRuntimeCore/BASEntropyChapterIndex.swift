@@ -1441,7 +1441,21 @@ public enum BASEntropyChapterIndex {
                 " surfaces cumulative。 ADR-016 → M1383。" +
                 " 8-point gap to 60/60 typed-attributed" +
                 " to 7 external blockers (NO silent" +
-                " under-delivery drift invariant tested)。")
+                " under-delivery drift invariant tested)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二",
+            mNumberFirst: 1385, mNumberLast: 1388,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Wire-in push:typed surfaces from" +
+                " chapter 498-501 now CONSUMED。 BASKV" +
+                "CacheRegistry wires M1379 policy" +
+                " (M1385);BASKernelEvaluateLatencyProbe" +
+                "Bundle (M1386) aggregates M1369 bodies;" +
+                " BASKVCacheRegistryObservationSnapshot" +
+                " (M1387) emits typed snapshots。 33" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1388。 Step BEYOND typed-surface-only。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

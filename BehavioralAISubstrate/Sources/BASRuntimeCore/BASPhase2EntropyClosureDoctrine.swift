@@ -155,7 +155,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百九十八",   // M1369-M1372 (Tier 1 honest closure push starts)
         "chapter 四百九十九",   // M1373-M1376 (更极致/低熵 substantive 3 adoptions)
         "chapter 五百",         // M1377-M1380 (最创新/原生神经引擎 — 3 typed policy surfaces)
-        "chapter 五百一"        // M1381-M1383 (Tier 1 honest SEAL at 52/60)
+        "chapter 五百一",       // M1381-M1383 (Tier 1 honest SEAL at 52/60)
+        "chapter 五百二"        // M1385-M1388 (wire-in push:typed surfaces consumed)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -172,14 +173,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1383
+    public static let mNumberLast: Int = 1388
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1383)。 Bumped through chapter 501:426 → 429。
-    /// Chapter 501:Tier 1 honest closure SEALED at
-    /// 52/60 (~87%) — substrate-internal honest ceiling
-    /// reached。
-    public static let commitsShipped: Int = 429
+    /// M1388)。 Bumped through chapter 502:429 → 433。
+    /// Chapter 502:wire-in push — 3 previously-typed-
+    /// only surfaces (M1379 policy + M1369 result body
+    /// + M1371 probe) now CONSUMED by real substrate
+    /// code via M1385 + M1386 + M1387。
+    public static let commitsShipped: Int = 433
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

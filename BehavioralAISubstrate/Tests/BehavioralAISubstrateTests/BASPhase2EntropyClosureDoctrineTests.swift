@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs501() {
+    func testLastChapterIs502() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百一",
-            "M1383 chapter 五百一:Tier 1 substrate-" +
-            "internal honest CLOSURE SEALED at 52/60" +
-            " (~87%)。 31 typed surfaces cumulative。" +
-            " 8-point gap to 60/60 typed-attributed to" +
-            " 7 external blockers (NO silent under-" +
-            "delivery drift)")
+            "chapter 五百二",
+            "M1388 chapter 五百二:wire-in push —" +
+            " typed surfaces from chapter 498-501 now" +
+            " CONSUMED by real substrate code (M1385" +
+            " KV cache policy wire-in + M1386 probe" +
+            " bundle + M1387 registry snapshot)。 33" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range
