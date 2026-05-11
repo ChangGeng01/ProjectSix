@@ -1120,7 +1120,28 @@ public enum BASEntropyChapterIndex {
                 " (25.85x GPU speedup measured);Python" +
                 " scripts committed;chapter 466 prose" +
                 " honestly revised。 Branch ready for" +
-                " merge review。 ADR-016 → M1271")
+                " merge review。 ADR-016 → M1271"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十四",
+            mNumberFirst: 1272, mNumberLast: 1275,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 1 —" +
+                " first chapter that substantively" +
+                " closes 3 of the 6 directives scored" +
+                " ≤4/10 at chapter 473 deep review。" +
+                " Cut 1 — BASANELiveReader factory" +
+                " (ANE 1/10 gap)。 Cut 2 —" +
+                " BASKernelRegistryDispatchExecutor" +
+                " factory (MPSGraph 4/10 gap)。 Cut 3 —" +
+                " end-to-end integration PROOF of" +
+                " hint→scheduler→assignment→executor→" +
+                "registry→kernel chain。 Cut 4 —" +
+                " chapter close-out。 ADR-016 → M1275。" +
+                " V1 byte-equality preserved via ADR-" +
+                "014 OPT-IN — all new surfaces are" +
+                " additive factories;hosts opt in to" +
+                " activate。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

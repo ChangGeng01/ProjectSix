@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1271",
-            "M1271:doctrine version reflects POST-PHASE-3 chapter 四百七十三 SELF-AUDIT CLEANUP (frozen SHA256 anti-drift PROOF replaces circular byte-mirror + BCM 5th observer slot wired + E2E hierarchical/BCM tests + 472 legacy-JSON Codable PROOF + production-scale Mamba B=2 D=64 N=16 L=128 benchmark with measured 25.85x GPU speedup + honest prose revision + Python extractor/forwarder scripts committed)")
+            "ADR-016.M1275",
+            "M1275:doctrine version reflects POST-PHASE-3 chapter 四百七十四 REAL HOT-PATH ATTACK phase 1 (BASANELiveReader factory closes ANE 1/10 + BASKernelRegistryDispatchExecutor closes MPSGraph 4/10 + end-to-end integration PROOF of hint→scheduler→assignment→executor→registry→kernel chain). ADR-014 OPT-IN preserved; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

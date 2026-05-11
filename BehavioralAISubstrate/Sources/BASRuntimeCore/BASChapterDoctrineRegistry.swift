@@ -1257,7 +1257,168 @@ public enum BASChapterDoctrineRegistry {
                 " now ready for merge review with" +
                 " honest doctrine prose + comprehensive" +
                 " PROOF coverage。 ADR-016 → M1271。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+
+        // chapter 474 — REAL HOT-PATH ATTACK phase 1 entry
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十四",
+            mNumberFirst: 1272,
+            mNumberLast: 1275,
+            v1MilestoneMNumber: 1275,
+            v1MilestoneStatus:
+                "chapter-474-v1-hot-path-attack-phase-1-entry",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1272,
+                    knife: "第一刀",
+                    concept:
+                        "BASANELiveReader closes the" +
+                        " chapter 473 deep-review '原生" +
+                        "利用神经引擎 1/10' gap。 NEW" +
+                        " Sources/BASMetalSubstrate/" +
+                        "BASANELiveReader.swift with a" +
+                        " `.live()` factory that queries" +
+                        " MLComputeDevice.allComputeDevices" +
+                        " (iOS 17+/macOS 14+) + falls" +
+                        " back to .conservative on" +
+                        " simulator + watchOS。 Adopts" +
+                        " thermal-state-aware derating。" +
+                        " 7 tests PROOF including a real-" +
+                        "device-gated assertion via" +
+                        " XCTSkipUnless。"),
+                BASChapterKnife(
+                    mNumber: 1273,
+                    knife: "第二刀",
+                    concept:
+                        "BASKernelRegistryDispatchExecutor" +
+                        " closes the '更硬核 (MPSGraph)" +
+                        " 4/10' gap。 NEW Sources/" +
+                        "BASHostKit/BASKernelRegistry" +
+                        "DispatchExecutor.swift with a" +
+                        " makeRoutedExecutor factory" +
+                        " that dispatches through" +
+                        " BASMetalKernelRegistry when" +
+                        " the scheduler's assignment" +
+                        " carries a kernel key + the" +
+                        " kernel is registered + inputs" +
+                        " buildable。 Typed outcome enum" +
+                        " with 5 cases (dispatched +" +
+                        " 4 fallback paths) lets tests" +
+                        " + observability pin which" +
+                        " path fired。 7 PROOF tests" +
+                        " covering all 5 outcomes +" +
+                        " replay-determinism。"),
+                BASChapterKnife(
+                    mNumber: 1274,
+                    knife: "第三刀",
+                    concept:
+                        "End-to-end integration PROOF" +
+                        " of the FULL hot-path chain:" +
+                        " hint → scheduler → assignment" +
+                        " → executor → registry →" +
+                        " kernel.evaluate。 NEW Tests/" +
+                        "BehavioralAISubstrateTests/" +
+                        "BASKernelDispatchEndToEnd" +
+                        "IntegrationTests.swift。 4-stage" +
+                        " plan walking stageA/C/J/K" +
+                        " with EchoKernels registered" +
+                        " under (op, float32," +
+                        " metalBuffer)。 PROOF that:" +
+                        " 1) scheduler returns non-nil" +
+                        " kernel keys when registry +" +
+                        " capability align;" +
+                        " 2) executor routes every" +
+                        " stage through dispatched" +
+                        " path;" +
+                        " 3) replay-determinism holds" +
+                        " across 2 repeat runs。 Before" +
+                        " M1274 NO test exercised this" +
+                        " full chain — the gap chapter" +
+                        " 473 review surfaced is now" +
+                        " closed with PROOF。"),
+                BASChapterKnife(
+                    mNumber: 1275,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 474 close-out + Phase" +
+                        " 2 bump (chapter 71→72," +
+                        " mNumberLast 1271→1275," +
+                        " commits 317→321) + ADR-016" +
+                        ".M1271 → M1275。 Cross-doctrine" +
+                        " sync of 6 mirror tests + 1" +
+                        " registry-frozen-hash refresh。" +
+                        " ADR-014 OPT-IN preserved at" +
+                        " every commit boundary — V1" +
+                        " hot path untouched, V2 path" +
+                        " additive only。")
+            ],
+            entropyClassesAttacked: [
+                "default-conservative-ane-probe-entropy",
+                "kernel-registry-deadend-entropy",
+                "missing-end-to-end-chain-proof-entropy",
+                "scaffold-without-production-caller-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (replay-determinism" +
+                " proven via repeat-run outcome" +
+                " sequence equality)",
+                "ADR-014 OPT-IN preserved (probe" +
+                " default still .conservative;" +
+                " executor opt-in via factory)",
+                "ADR-016 (advanced M1271 → M1275)",
+                "系统熵 reduction",
+                "POST-PHASE-3 REAL hot-path attack —" +
+                " 3 of 6 chapter-473 deep-review" +
+                " directives now substantively addressed"
+            ],
+            plannedFutureCuts: [
+                "chapter 475+:wire .nativeV2 opt-in" +
+                " into EBrainHostRuntimeSynthesis (V1" +
+                " sole production caller) + SampleHost" +
+                " toggle + canonical60 dual-mode CI" +
+                " gate",
+                "chapter 476+:flip default mode from" +
+                " .v1ByteEqual → .nativeV2 once" +
+                " stress-sweep dual proves equivalence" +
+                " + migrate 30% sprawl types",
+                "chapter 477+:fold V1 monolith — 148" +
+                " ForAudit shadow locals + 6 permit-" +
+                "rebind sites + parallel-seam routing",
+                "chapter 478+:write input builders" +
+                " for canonical stages so MPSGraph" +
+                " kernels see real tensors (replace" +
+                " EchoKernel test fixtures with" +
+                " production kernels)",
+                "chapter 479+:real-device CI lane" +
+                " executing the ANE-aneFirst gated" +
+                " tests nightly on M-series silicon"
+            ],
+            summary:
+                "REAL HOT-PATH ATTACK phase 1 — first" +
+                " chapter that substantively closes 3" +
+                " of the 6 directives the chapter 473" +
+                " deep-review scored ≤4/10。 4 cuts" +
+                " (M1272-M1275)。 Cut 1 — ANE live" +
+                " MLComputeDevice binding behind opt-" +
+                "in factory (was 1/10 → now 5+/10" +
+                " once hosts opt in)。 Cut 2 — registry-" +
+                "dispatch executor factory wires" +
+                " selectedKernelKey → registry dispatch" +
+                " with 5 typed outcomes (was 4/10 →" +
+                " now 6+/10)。 Cut 3 — end-to-end" +
+                " integration PROOF of the full chain" +
+                " (no chain test existed before)。 Cut" +
+                " 4 — chapter close-out + cross-" +
+                "doctrine sync。 ADR-016 → M1275。 V1" +
+                " byte-equality preserved。 Branch on" +
+                " trajectory toward chapter 477's" +
+                " default-mode flip。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

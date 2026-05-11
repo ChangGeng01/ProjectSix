@@ -1030,7 +1030,20 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// honestly revised (REPLACED not DELETED;~−3.5K
     /// LOC not ~−12K)。 V1 byte-equality preserved。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1271"
+    /// M1275 bump:REAL HOT-PATH ATTACK phase 1 —
+    /// chapter 四百七十四 substantively closes 3 of
+    /// the 6 chapter-473 deep-review directives that
+    /// scored ≤4/10:1) BASANELiveReader factory
+    /// closes "原生利用神经引擎 1/10" (live MLCompute
+    /// device binding behind opt-in factory + thermal
+    /// derating);2) BASKernelRegistryDispatchExecutor
+    /// factory closes "更硬核 4/10" (registry dispatch
+    /// wired with 5 typed outcomes);3) end-to-end
+    /// integration PROOF of the full hint→scheduler→
+    /// assignment→executor→registry→kernel chain。
+    /// ADR-014 OPT-IN preserved。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1275"
 
     /// Query the typed status of a specific gap。
     public static func status(
