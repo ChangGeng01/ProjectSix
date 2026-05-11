@@ -1720,19 +1720,15 @@ public struct BASEBrainRuntimeCoordinator {
         // forbidden) targeting the quarantine source. Aggregate
         // returns nil when there are no quarantines this turn,
         // and the audit-entry builder elides both seal codes.
-        let synthesizedSealsForAudit = quarantineRecords.map { record in
-            BASSealEnvelope(
-                sealID: "seal.\(record.quarantineID)",
-                targetRefs: [record.sourceRef],
-                sealReason: record.reasonCodes
-                    .joined(separator: ","),
-                accessPolicy: .sovereignOnly,
-                revealConditions: [],
-                lineageCutRefs: [],
-                auditRef: record.quarantineID)
-        }
-        let sealAggregateForAudit = BASOldSealSealingProtocol
-            .aggregate(synthesizedSealsForAudit)
+        // chapter 四百八十八 / M1329 — lifecycle quartet fold
+        let lifecycleQuartetForAudit =
+            BASTurnAuditProjectionsLifecycleQuartet.compute(
+                quarantineRecords: quarantineRecords,
+                updateTickets: updateTickets)
+        let synthesizedSealsForAudit = lifecycleQuartetForAudit
+            .synthesizedSeals
+        let sealAggregateForAudit = lifecycleQuartetForAudit
+            .sealAggregate
         // M305 — synthesize an L13 lifecycle session per fresh
         // UpdateTicket on this turn. All start at `.proposed`
         // (the typed entry point of the 8-stage state machine);
@@ -1740,16 +1736,10 @@ public struct BASEBrainRuntimeCoordinator {
         // primitives' job, not this projection. The aggregate
         // is nil for turns that produced zero tickets, so the
         // audit-entry builder elides the lifecycle.* codes.
-        let lifecycleSessionsForAudit = updateTickets.map {
-            ticket in
-            BASEvolutionLifecycleSession(
-                candidateID: ticket.ticketID,
-                currentStage: .proposed,
-                history: [])
-        }
-        let lifecycleAggregateForAudit =
-            BASEvolutionLifecycleSession.aggregate(
-                lifecycleSessionsForAudit)
+        let lifecycleSessionsForAudit = lifecycleQuartetForAudit
+            .lifecycleSessions
+        let lifecycleAggregateForAudit = lifecycleQuartetForAudit
+            .lifecycleAggregate
         // M316 — derive narrative distortion projection from
         // final risk + permit. Stays at zero on most axes
         // (M316.derive only populates forcedClosure +
