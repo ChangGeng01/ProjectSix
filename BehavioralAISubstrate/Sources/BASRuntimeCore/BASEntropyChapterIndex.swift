@@ -1496,7 +1496,21 @@ public enum BASEntropyChapterIndex {
                 " BASBundle for multi-turn replay。 42" +
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M1400。 Substrate audit-emission" +
-                " architecture COMPLETE。")
+                " architecture COMPLETE。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六",
+            mNumberFirst: 1401, mNumberLast: 1404,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Cluster B fold continues:" +
+                " BASTurnAuditProjectionsAbyssalThermal" +
+                "Trio + BASTurnAuditProjectionsGateSide" +
+                "DeriveTrio consolidate 6 ForAudit/" +
+                "ForGate derives。 44 typed surfaces" +
+                " cumulative。 ADR-016 → M1404。 V1" +
+                " byte-equality preserved via shadow-" +
+                "rebinding + stress-sweep dual-mode" +
+                " regression guard。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

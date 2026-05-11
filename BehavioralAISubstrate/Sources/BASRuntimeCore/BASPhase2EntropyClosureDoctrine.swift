@@ -159,7 +159,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百二",       // M1385-M1388 (wire-in push:typed surfaces consumed)
         "chapter 五百三",       // M1389-M1392 (observer wire-ins:3 more typed surfaces consumed)
         "chapter 五百四",       // M1393-M1396 (bundle aggregator wire-ins:9th + 10th BASBundle)
-        "chapter 五百五"        // M1397-M1400 (unified end-of-turn audit emission — M1400 milestone)
+        "chapter 五百五",       // M1397-M1400 (unified end-of-turn audit emission — M1400 milestone)
+        "chapter 五百六"        // M1401-M1404 (cluster B fold continues — 2 trio bundles, 6 derives consolidated)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -176,16 +177,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1400
+    public static let mNumberLast: Int = 1404
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1400)。 Bumped through chapter 505:441 → 445。
-    /// Chapter 505:unified end-of-turn audit emission
-    /// (M1400 milestone) — M1397 record + M1398 emitter
-    /// + M1399 batch bundle (11th BASBundle) + M1400
-    /// close-out。 4-pipeline composition architecture
-    /// COMPLETE。
-    public static let commitsShipped: Int = 445
+    /// M1404)。 Bumped through chapter 506:445 → 449。
+    /// Chapter 506:cluster B fold continues — M1401
+    /// abyssal+thermal trio + M1402 splice + M1403
+    /// gate-side derive trio + M1404 close-out。 6
+    /// ForAudit/ForGate derives consolidated into 2
+    /// typed factory bundles。
+    public static let commitsShipped: Int = 449
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

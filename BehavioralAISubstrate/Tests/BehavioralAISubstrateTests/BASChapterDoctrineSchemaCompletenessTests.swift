@@ -1445,7 +1445,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百五")!)
+                            "chapter 五百五")!),
+            // M1404 chapter 506 — cluster B fold continues
+            checkRegistry("五百六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1981,6 +1987,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百五")!
+                .mNumberLast),
+            // M1404 chapter 506 — cluster B fold continues
+            ("506",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

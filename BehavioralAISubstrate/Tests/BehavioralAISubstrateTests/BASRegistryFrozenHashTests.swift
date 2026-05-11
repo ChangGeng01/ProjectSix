@@ -105,11 +105,11 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// 501 Tier 1 honest SEAL at 52/60 + 502 wire-in
     /// push + 503 observer wire-ins + 504 bundle
     /// aggregator wire-ins + 505 unified audit emission
-    /// M1400 MILESTONE)。 Re-captured at chapter 505
-    /// close-out。 Chapter 505:M1400 milestone reached
-    /// via M1397 record + M1398 emitter + M1399 11th
-    /// BASBundle — 4-pipeline unified audit emission
-    /// architecture complete。
+    /// M1400 MILESTONE + 506 cluster B fold continues)。
+    /// Re-captured at chapter 506 close-out。 Chapter
+    /// 506:2 typed factory bundles consolidate 6
+    /// ForAudit/ForGate derives (abyssal+thermal trio
+    /// + gate-side derive trio)。
     static let frozenFullRegistrySha256: String =
-        "e391fc32f2059a9cbdc5f9e65afe6dabdc92a3c11b66c6a2640471873e9142eb"
+        "fb4fbc47328ce4826559d04925431cd6e1b4004aa5e917e3a79601c34f9bc87b"
 }

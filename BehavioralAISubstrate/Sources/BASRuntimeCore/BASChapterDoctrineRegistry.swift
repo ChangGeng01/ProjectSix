@@ -4050,7 +4050,94 @@ public enum BASChapterDoctrineRegistry {
                 " the 7-chapter wire-in arc (chapters" +
                 " 498-505)。 Substrate audit-emission" +
                 " architecture COMPLETE for production" +
-                " host opt-in consumption。")
+                " host opt-in consumption。"),
+
+        // chapter 506 — cluster B fold continues
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六",
+            mNumberFirst: 1401,
+            mNumberLast: 1404,
+            v1MilestoneMNumber: 1404,
+            v1MilestoneStatus:
+                "chapter-506-cluster-b-fold-continues",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1401, knife: "第一刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "AbyssalThermalTrio — folds" +
+                        " abyssalRunModeForAudit +" +
+                        " abyssBudgetForAudit +" +
+                        " memoryTemperatureLayerForAudit" +
+                        " (3 ForAudit derives) into one" +
+                        " typed factory。 43 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1402, knife: "第二刀",
+                    concept: "Splice abyssal+thermal" +
+                        " trio into V1 coordinator (lines" +
+                        " 1169-1185) via shadow-rebinding。" +
+                        " 17-line block collapses to 13" +
+                        " lines。 Stress-sweep dual-mode" +
+                        " regression-guard 0 divergences。"),
+                BASChapterKnife(
+                    mNumber: 1403, knife: "第三刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "GateSideDeriveTrio + V1 splice。" +
+                        " Folds 3 ForGate derives" +
+                        " (abyssalPressure + humanAnchor" +
+                        "Signal + unknownReserve) — all" +
+                        " INDEPENDENT,safe to" +
+                        " consolidate via shadow-" +
+                        "rebinding。 28-line block" +
+                        " collapses to 24 lines。 44" +
+                        " typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1404, knife: "第四刀",
+                    concept: "Chapter 506 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1404。 Cluster B fold continues" +
+                        " — 6 more ForAudit/ForGate" +
+                        " derive sites consolidated into" +
+                        " 2 typed factory bundles。" +
+                        " HONEST: declaration count up" +
+                        " by 2 due to shadow-rebinding;" +
+                        " inline-construction LOC down" +
+                        " by ~22 lines net。")
+            ],
+            entropyClassesAttacked: [
+                "inline-derive-trio-cluster-b-residual",
+                "abyssal-thermal-derive-three-separate-decls",
+                "gate-side-derive-trio-untyped-consolidation",
+                "cluster-b-fold-trajectory-stalled"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1404",
+                "shadow-rebinding-byte-equality-preserved",
+                "stress-sweep-300-turn-0-divergence",
+                "honest-loc-vs-decl-accounting"
+            ],
+            plannedFutureCuts: [
+                "chapter 507+ — continue cluster B fold" +
+                " (more independent derive groups)",
+                "future arc — production-side wire-in" +
+                " (host CI lane required)",
+                "future arc — Tier C ADR-019" +
+                " (user approval gated)"
+            ],
+            summary: "Cluster B fold continues:2 NEW" +
+                " typed factory bundles consolidate 6" +
+                " ForAudit/ForGate derives (abyssal+" +
+                "thermal trio + gate-side derive trio)。" +
+                " 44 typed surfaces cumulative。 ADR-016" +
+                " → M1404。 V1 byte-equality preserved" +
+                " via shadow-rebinding pattern + stress-" +
+                "sweep dual-mode regression guard。 Honest" +
+                " LOC vs declaration accounting:inline-" +
+                "construction LOC drops ~22 lines while" +
+                " declaration count rises +2 (shadow" +
+                " rebindings counted)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
