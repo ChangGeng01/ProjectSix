@@ -5,23 +5,49 @@ import XCTest
 
 final class BASANECapabilityProbeTests: XCTestCase {
 
-    // MARK: - Default reader returns conservative
+    // MARK: - Explicit conservative reader returns conservative
 
-    func testDefaultReaderReturnsConservative() async {
-        let probe = BASANECapabilityProbe()
+    /// chapter 四百八十 / M1296:default flipped to live
+    /// binding。 Tests that need explicit conservative
+    /// behavior must opt in via the static factory。
+    func testExplicitConservativeReaderReturnsGpuOnly()
+        async
+    {
+        let probe = BASANECapabilityProbe(
+            reader: BASANECapabilityProbe
+                .conservativeReader())
         let cap = await probe.capability(
             forThermal: .nominal)
         XCTAssertEqual(cap.acceleratorPriority, .gpuOnly,
-            "default conservative reader must return" +
+            "explicit conservative reader must return" +
             " gpu-only priority")
         XCTAssertTrue(cap.supportedOps.isEmpty)
         XCTAssertEqual(cap.thermalSnapshot, .nominal)
     }
 
+    /// chapter 四百八十 / M1296:default reader now uses
+    /// live binding on iOS 17+ / macOS 14+。 On simulator
+    /// without MLComputeDevice support OR on older OS,
+    /// falls back to conservative。 Test asserts the
+    /// thermal snapshot flows through regardless of
+    /// underlying reader。
+    func testDefaultReaderProducesCapabilityWithExpectedThermal()
+        async
+    {
+        let probe = BASANECapabilityProbe()
+        let cap = await probe.capability(
+            forThermal: .nominal)
+        XCTAssertEqual(cap.thermalSnapshot, .nominal,
+            "default reader (live or conservative) must" +
+            " echo input thermal into capability")
+    }
+
     // MARK: - Cache returns same snapshot for same key
 
     func testCacheReturnsSameSnapshotForSameThermal() async {
-        let probe = BASANECapabilityProbe()
+        let probe = BASANECapabilityProbe(
+            reader: BASANECapabilityProbe
+                .conservativeReader())
         let c1 = await probe.capability(
             forThermal: .nominal)
         let c2 = await probe.capability(

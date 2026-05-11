@@ -73,16 +73,49 @@ public actor BASANECapabilityProbe {
     private var cachedSnapshot: BASANECapability?
     private var cachedThermalKey: BASCapabilityThermalSnapshot?
 
-    /// Build a probe with an injected reader。 Defaults to
-    /// `.conservative` so simulator + watchOS builds work
-    /// without live ANE binding。
+    /// Build a probe with an injected reader。
+    ///
+    /// chapter 四百八十 / M1296 — default flipped to live
+    /// binding。 On iOS 17+ / macOS 14+ the default reader
+    /// queries `MLComputeDevice.allComputeDevices` via
+    /// `BASANELiveReader.live()`。 On older platforms
+    /// (or when CoreML import fails) the default falls
+    /// back to `.conservative` automatically — preserved
+    /// for tests + simulator builds via
+    /// `.conservativeReader` static factory。
     public init(
-        reader: @escaping CapabilityReader = {
-            BASANECapability.conservative(
-                thermalSnapshot: $0)
-        }
+        reader: @escaping CapabilityReader =
+            BASANECapabilityProbe.defaultReader()
     ) {
         self.reader = reader
+    }
+
+    /// chapter 四百八十 / M1296 — typed factory producing
+    /// the default reader。 On iOS 17+ / macOS 14+ returns
+    /// `BASANELiveReader.live()`;otherwise falls back to
+    /// the conservative reader。 Hosts that want explicit
+    /// conservative behavior in tests + simulators
+    /// construct via `BASANECapabilityProbe(reader:
+    /// BASANECapabilityProbe.conservativeReader())`。
+    public static func defaultReader() -> CapabilityReader {
+        if #available(iOS 17.0, macOS 14.0, *) {
+            return BASANELiveReader.live()
+        }
+        return conservativeReader()
+    }
+
+    /// Explicit conservative reader factory for tests +
+    /// simulator builds that want deterministic
+    /// `.gpuOnly` priority regardless of underlying
+    /// device。 Mirrors chapter 478 ADR-014 OPT-IN
+    /// pattern — callers opt out of the live default。
+    public static func conservativeReader()
+        -> CapabilityReader
+    {
+        return { thermal in
+            BASANECapability.conservative(
+                thermalSnapshot: thermal)
+        }
     }
 
     // MARK: - Capability accessors
