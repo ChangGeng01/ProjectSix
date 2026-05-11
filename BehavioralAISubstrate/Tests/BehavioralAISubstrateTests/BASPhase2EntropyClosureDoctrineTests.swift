@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs497() {
+    func testLastChapterIs498() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百九十七",
-            "M1368 chapter 四百九十七:REAL HOT-PATH" +
-            " ATTACK SEALED at honest 47/60 (~78%)。" +
-            " ADR-019 typed proposal + Tier 2 doctrine" +
-            " + Seal doctrine。 19 typed surfaces" +
-            " cumulative。 13-point gap to 60/60" +
-            " typed-attributed via 6 external blockers")
+            "chapter 四百九十八",
+            "M1372 chapter 四百九十八:Tier 1 honest" +
+            " closure push starts — 3 new typed" +
+            " surfaces:BASMPSGraphKernelBuildLatency" +
+            "Result + BASEBrainHostRuntimeModeAdvisory" +
+            " + BASKernelEvaluateLatencyProbe。 22" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range

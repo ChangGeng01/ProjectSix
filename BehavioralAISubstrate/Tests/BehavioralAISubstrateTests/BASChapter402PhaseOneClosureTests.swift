@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1368",
-            "M1368:doctrine version reflects chapter 四百九十七 — REAL HOT-PATH ATTACK SEALED。 ADR-019 typed proposal + BASTier2AchievementDoctrine + BASRealHotPathAttackSealDoctrine。 Final aggregate 47/60 (~78%) with 13-point gap typed-attributed to 6 external blockers。 19 typed surfaces cumulative。 ADR-014 OPT-IN preserved every commit。 V1 byte-equality preserved")
+            "ADR-016.M1372",
+            "M1372:doctrine version reflects chapter 四百九十八 — Tier 1 honest closure push starts。 3 new typed surfaces:BASMPSGraphKernelBuildLatencyResult + BASEBrainHostRuntimeModeAdvisory + BASKernelEvaluateLatencyProbe。 22 typed surfaces cumulative。 更硬核 latency observability closed;最激进 typed OPT-IN advisory shipped (routing wire-in deferred)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

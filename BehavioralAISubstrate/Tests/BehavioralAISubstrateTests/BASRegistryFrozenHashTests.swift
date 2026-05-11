@@ -100,11 +100,12 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// Kunlun fold + 494 Tianmen trio + gate-side
     /// axis-protocol reuse + 495 permit pipeline +
     /// 496 Tier 2 entry + 497 REAL HOT-PATH ATTACK
-    /// SEALED)。 Re-captured at chapter 497 close-out。
-    /// HONEST FINAL: arc 474-497 sealed at 47/60 (~78%)
-    /// with 13-point gap typed-attributed via 6 external
-    /// blockers (BASRealHotPathAttackSealDoctrine
-    /// .externalBlockers)。
+    /// SEALED + 498 Tier 1 honest closure push)。
+    /// Re-captured at chapter 498 close-out。 HONEST
+    /// SCOPE: ch 498 ships 3 typed surfaces toward
+    /// Tier 1 honest closure;production wire-in still
+    /// deferred per BASEBrainHostRuntimeModeAdvisory
+    /// Doctrine.advisoryHonoredInProduction = false。
     static let frozenFullRegistrySha256: String =
-        "6253c2ee2fdfb946fb7821cbc2553f0440977082f0e2501f76bb91dbe63b91f7"
+        "e83243a4acb84321223dbba21e23675794526a39d691b0f75c48b418e02148dd"
 }

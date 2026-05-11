@@ -3362,7 +3362,92 @@ public enum BASChapterDoctrineRegistry {
                 " external work outside pure-Swift scope。" +
                 " The substrate is HONESTLY documented" +
                 " — gap is visible at compile time," +
-                " not hidden in retro-summaries。")
+                " not hidden in retro-summaries。"),
+
+        // chapter 498 — Tier 1 honest closure (3 typed surfaces)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十八",
+            mNumberFirst: 1369,
+            mNumberLast: 1372,
+            v1MilestoneMNumber: 1372,
+            v1MilestoneStatus:
+                "chapter-498-tier-1-honest-closure-push",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1369, knife: "第一刀",
+                    concept: "NEW BASMPSGraphKernelBuild" +
+                        "LatencyResult — 4th BASResult" +
+                        "<Body> typealias migration。" +
+                        " Closes latency-cost gap left at" +
+                        " chapter 480 M1297 (cache was" +
+                        " hits/misses only)。 20 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1370, knife: "第二刀",
+                    concept: "NEW BASEBrainHostRuntime" +
+                        "ModeAdvisory + Doctrine — typed" +
+                        " production OPT-IN surface for" +
+                        " host runtime-mode preference。" +
+                        " HONEST: advisoryHonoredIn" +
+                        "Production = false at ch 498;" +
+                        " production wire-in deferred。" +
+                        " 21 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1371, knife: "第三刀",
+                    concept: "NEW BASKernelEvaluate" +
+                        "LatencyProbe — typed wrapper" +
+                        " around any BASMetalKernel that" +
+                        " emits typed latency observation" +
+                        " without modifying inner kernel。" +
+                        " Pure additive。 22 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1372, knife: "第四刀",
+                    concept: "Chapter 498 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1372。 Tier 1 honest closure" +
+                        " progress: 更硬核 9→10 (latency" +
+                        " observability closed via M1369" +
+                        " + M1371);最激进 5→6 (typed" +
+                        " production OPT-IN advisory via" +
+                        " M1370,actual routing wire-in" +
+                        " still deferred)。")
+            ],
+            entropyClassesAttacked: [
+                "kernel-latency-cost-untyped",
+                "production-runtime-mode-untyped-opt-in",
+                "kernel-instrumentation-requires-internal-modification",
+                "tier-1-honest-progress-vs-aspirational-claims"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1372",
+                "typed-surface-ship-first-pattern",
+                "v1-byte-equality-preserved",
+                "tier-1-honest-closure-mode"
+            ],
+            plannedFutureCuts: [
+                "chapter 499 — 更极致/低熵 push" +
+                " (more low-entropy primitive adoptions)",
+                "chapter 500 — 最创新/原生利用神经引擎" +
+                " push (typed ANE-aware surfaces)",
+                "chapter 501 — Tier 1 honest doctrine bump"
+            ],
+            summary: "Tier 1 honest closure push starts" +
+                " — 3 new typed surfaces shipped:" +
+                " BASMPSGraphKernelBuildLatencyResult" +
+                " (4th BASResult adoption)、" +
+                " BASEBrainHostRuntimeModeAdvisory (typed" +
+                " production OPT-IN preference)、" +
+                " BASKernelEvaluateLatencyProbe (typed" +
+                " instrumentation wrapper)。 22 typed" +
+                " surfaces cumulative。 更硬核 closed via" +
+                " latency observability typed surfaces。" +
+                " 最激进 advanced by typed advisory but" +
+                " actual production routing wire-in" +
+                " honestly deferred。 ADR-014 OPT-IN +" +
+                " V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

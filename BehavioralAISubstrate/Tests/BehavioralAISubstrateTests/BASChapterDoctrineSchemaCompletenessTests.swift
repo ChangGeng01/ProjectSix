@@ -1397,7 +1397,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百九十七")!)
+                            "chapter 四百九十七")!),
+            // M1372 Tier 1 honest closure push starts
+            checkRegistry("四百九十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百九十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1869,6 +1875,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百九十七")!
+                .mNumberLast),
+            // M1372 chapter 498 — Tier 1 honest closure starts
+            ("498",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -1389,7 +1389,20 @@ public enum BASEntropyChapterIndex {
                 " Final aggregate 47/60 (~78%)。 13-" +
                 " point gap to 60/60 typed via 6" +
                 " external blockers。 19 typed surfaces" +
-                " cumulative。 ADR-016 → M1368。")
+                " cumulative。 ADR-016 → M1368。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十八",
+            mNumberFirst: 1369, mNumberLast: 1372,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier 1 honest closure push:" +
+                " BASMPSGraphKernelBuildLatencyResult +" +
+                " BASEBrainHostRuntimeModeAdvisory +" +
+                " BASKernelEvaluateLatencyProbe。 22" +
+                " typed surfaces cumulative。 ADR-016" +
+                " → M1372。 更硬核 latency observability" +
+                " closed;最激进 typed OPT-IN advisory" +
+                " shipped (routing wire-in deferred)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

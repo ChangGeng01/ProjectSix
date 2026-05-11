@@ -151,7 +151,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百九十四",   // M1353-M1356 (Tianmen trio + gate-side axis reuse)
         "chapter 四百九十五",   // M1357-M1360 (permit pipeline typed-surface ship)
         "chapter 四百九十六",   // M1361-M1364 (Tier 2 entry — ssmScan stub + coverage)
-        "chapter 四百九十七"    // M1365-M1368 (REAL HOT-PATH ATTACK sealed)
+        "chapter 四百九十七",   // M1365-M1368 (REAL HOT-PATH ATTACK sealed)
+        "chapter 四百九十八"    // M1369-M1372 (Tier 1 honest closure push starts)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -168,12 +169,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1368
+    public static let mNumberLast: Int = 1372
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1368)。 Bumped through chapter 497:410 → 414。
-    /// REAL HOT-PATH ATTACK arc SEALED at chapter 497。
-    public static let commitsShipped: Int = 414
+    /// M1372)。 Bumped through chapter 498:414 → 418。
+    /// Chapter 498:Tier 1 honest closure push starts
+    /// (3 new typed surfaces:build-latency result +
+    /// runtime-mode advisory + kernel latency probe)。
+    public static let commitsShipped: Int = 418
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
