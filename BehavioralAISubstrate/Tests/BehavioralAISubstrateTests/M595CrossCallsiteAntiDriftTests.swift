@@ -138,33 +138,47 @@ final class M595CrossCallsiteAntiDriftTests: XCTestCase {
             """)
     }
 
-    /// Pin: gate-side `kunlunMatchedForGate` MUST use 3-predicate
-    /// evaluation, NOT risk-level lookup. Regression guard against
+    /// Pin: gate-side AND audit-side MUST share the 3-predicate
+    /// evaluation via the typed factory。 Regression guard against
     /// chapter 一百六十六 finding (M583 partial fix at chapter 一百
-    /// 五十七 only updated audit-side).
+    /// 五十七 only updated audit-side)。
     ///
-    /// This pin checks the source contains `respectsHostBoundaryForGate`
-    /// or equivalent predicate variable indicating substrate-state
-    /// evaluation. If someone re-introduces a switch-based lookup
-    /// for `kunlunMatchedForGate`, this test fails.
+    /// Chapter 四百九十四 / M1355 structural strengthening:
+    /// BOTH sites now call BASTurnAuditProjectionsKunlunAxisProtocol
+    /// .compute(...) — there is no longer a separate
+    /// `respectsHostBoundaryForGate` local。 The predicate semantics
+    /// live INSIDE the factory,which makes drift structurally
+    /// impossible (single source-of-truth)。
+    ///
+    /// The test now verifies BOTH sites use the shared factory
+    /// (≥2 calls to .compute on the audit-protocol bundle)。
     func testGateSideUses3PredicateEvaluation() throws {
         let source = try readCoordinatorSource()
+        // Audit-side factory call
         XCTAssertTrue(
-            source.contains("respectsHostBoundaryForGate"),
+            source.contains(
+                "BASTurnAuditProjectionsKunlunAxisProtocol"),
             """
-            Gate-side `kunlunMatchedForGate` must use
-            3-predicate substrate-state evaluation
-            (M583 chapter 一百五十七 + M595 chapter 一百六十六).
-            Expected `respectsHostBoundaryForGate` predicate
-            variable. Source missing this — risk-level lookup
-            may have been re-introduced.
+            Coordinator missing
+            BASTurnAuditProjectionsKunlunAxisProtocol factory
+            reference。 Chapter 493 audit-side fold may have
+            been reverted (M583 chapter 一百五十七 predicate
+            evaluation must run via the shared factory)。
             """)
-        XCTAssertTrue(
-            source.contains("permitModeCooperativeForGate"),
+        // Both sites pass quarantineRecordsIsEmpty (gate=true
+        // pre-quarantine, audit=quarantineRecords.isEmpty)
+        let factoryCallCount = source.components(
+            separatedBy: "BASTurnAuditProjectionsKunlunAxis" +
+                "Protocol.compute")
+            .count - 1
+        XCTAssertGreaterThanOrEqual(
+            factoryCallCount, 2,
             """
-            Gate-side missing `permitModeCooperativeForGate`
-            predicate. M595 cross-site drift fix may have been
-            reverted.
+            Expected ≥2 calls to BASTurnAuditProjectionsKunlun
+            AxisProtocol.compute (1 gate-side ~M1355 +
+            1 audit-side ~M1349)。 Found \(factoryCallCount)。
+            M595 cross-site drift fix relies on SHARED factory
+            ownership of the 3-predicate evaluation。
             """)
     }
 

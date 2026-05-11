@@ -97,10 +97,12 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// 474-477 REAL HOT-PATH ATTACK + 478 V1 fold PILOT
     /// + 479 Phase B + 480 Phase C + 481-491 cluster
     /// A/B folds + 492 surface trio + 493 downstream
-    /// Kunlun fold)。 Re-captured at chapter 493 close-
-    /// out。 Honest accounting per chapter 492 +
-    /// 493 records:8 of 66 cluster B declarations
-    /// folded this chapter;~52 remain。
+    /// Kunlun fold + 494 Tianmen trio + gate-side
+    /// axis-protocol reuse)。 Re-captured at chapter
+    /// 494 close-out。 Honest accounting per chapter
+    /// 492 scope correction:cluster B inline-
+    /// construction LOC continues to shrink even as
+    /// declaration count grew slightly。
     static let frozenFullRegistrySha256: String =
-        "651ded2622847918f7ce16d48d0bf0bdec8ddb788731697e38bdef981ab95177"
+        "24c3a1bf60a83df241dc88aae3e4ed851fccbce4cfcb2c376b5716e6e04a363c"
 }

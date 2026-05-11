@@ -2997,7 +2997,97 @@ public enum BASChapterDoctrineRegistry {
                 " Coordinator monolith reduced by ~100" +
                 " lines net。 Honest accounting: ~52 of" +
                 " 66 cluster B declarations still remain;" +
-                " fold trajectory continues chapter 494+。")
+                " fold trajectory continues chapter 494+。"),
+
+        // chapter 494 — Tianmen trio + gate-side axis reuse
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十四",
+            mNumberFirst: 1353,
+            mNumberLast: 1356,
+            v1MilestoneMNumber: 1356,
+            v1MilestoneStatus:
+                "chapter-494-tianmen-trio-gate-side-reuse",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1353, knife: "第一刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "KunlunTianmenTrio — folds" +
+                        " kunlunAxisViewForAudit +" +
+                        " kunlunTianmenWarrantForAudit? +" +
+                        " kunlunGateDenialWritForAudit?" +
+                        " (3 declarations + ~56 LOC of" +
+                        " inline construction logic)。" +
+                        " Mutual-exclusivity invariant" +
+                        " preserved (该断时断 — denials" +
+                        " carry typed reason codes)。" +
+                        " 13 bundle factories cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1354, knife: "第二刀",
+                    concept: "Splice Tianmen trio into" +
+                        " V1 coordinator — 52-line block" +
+                        " collapses to 33-line factory" +
+                        " call + 3 alias bindings。 V1" +
+                        " byte-equality preserved。"),
+                BASChapterKnife(
+                    mNumber: 1355, knife: "第三刀",
+                    concept: "REUSE chapter 493 axis-" +
+                        "protocol factory at GATE-side" +
+                        " (M595 cross-site drift bug" +
+                        " fixed by single-factory" +
+                        " ownership now)。 -50 LOC net" +
+                        " (89 → 39 line collapse)。" +
+                        " Gate-side passes" +
+                        " quarantineRecordsIsEmpty:true" +
+                        " (runs before quarantineRecords" +
+                        " computation)。"),
+                BASChapterKnife(
+                    mNumber: 1356, knife: "第四刀",
+                    concept: "Chapter 494 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1356。 ~104 V1 LOC net" +
+                        " reduction across 4 cuts。" +
+                        " Cluster B fold trajectory" +
+                        " continues:M595 cross-site" +
+                        " duplication of axis-protocol" +
+                        " logic ELIMINATED。")
+            ],
+            entropyClassesAttacked: [
+                "tianmen-trio-inline-construction-entropy",
+                "kunlun-mutual-exclusivity-implicit-entropy",
+                "M595-cross-site-factory-duplication",
+                "audit-vs-gate-semantic-drift-risk"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1356",
+                "stress-sweep-dual-mode-300-turn-0-divergence",
+                "tianmen-mutual-exclusivity-invariant",
+                "M595-cross-site-drift-eliminated"
+            ],
+            plannedFutureCuts: [
+                "chapter 495+ — Permit fold (6" +
+                " boundActionPermit rebinds at" +
+                " escalation pipeline)",
+                "chapter 496+ — V1 deletion +" +
+                " Tier 2 stretch",
+                "chapter 497+ — Tier 2 close-out"
+            ],
+            summary: "Tianmen trio (axisView +" +
+                " tianmenWarrant + gateDenialWrit) folded" +
+                " into typed factory。 Chapter 493's axis-" +
+                " protocol factory REUSED at gate-side —" +
+                " M595 cross-site drift bug eliminated by" +
+                " single-factory ownership。 13 bundle" +
+                " factories cumulative。 ADR-016 → M1356。" +
+                " V1 byte-equality preserved across" +
+                " stress-sweep dual-mode。 Coordinator" +
+                " monolith reduced by ~104 LOC net across" +
+                " 4 cuts。 Honest accounting: cluster B" +
+                " inline-construction LOC continues to" +
+                " shrink even though declaration count" +
+                " grew slightly (per chapter 492 scope" +
+                " correction)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -1340,7 +1340,19 @@ public enum BASEntropyChapterIndex {
                 " seal/river。 8 ForAudit declarations" +
                 " folded + ~100 V1 LOC reduction。 12" +
                 " bundle factories cumulative。 ADR-016" +
-                " → M1352。 V1 byte-equality preserved。")
+                " → M1352。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十四",
+            mNumberFirst: 1353, mNumberLast: 1356,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tianmen trio fold +" +
+                " M595 cross-site drift elimination" +
+                " (gate-side reuses axis-protocol" +
+                " factory)。 ~104 V1 LOC reduction。" +
+                " 13 bundle factories cumulative。" +
+                " ADR-016 → M1356。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
