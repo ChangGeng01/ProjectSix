@@ -25,13 +25,13 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1227",
-            "Doctrine version pin。 M1227 DEBT " +
-            "REPAYMENT 3:bumped through chapters " +
-            "453-462 — biomimetic build-out (453-459) " +
-            "+ benchmark debt closed (460) + integration " +
-            "wire (461) + integration e2e PROOF via " +
-            "mock-coordinator infra (462)")
+            "ADR-016.M1231",
+            "Doctrine version pin。 M1231 STRUCTURAL " +
+            "DEBT REPAYMENT 1:bumped through chapters " +
+            "453-463 — biomimetic build-out (453-459) " +
+            "+ functional debt repayment (460-462) + " +
+            "doctrine-collapse Phase 1 (463 — typed " +
+            "Record + Registry covering 453-462)")
     }
 
     // MARK: - Per-gap status pins

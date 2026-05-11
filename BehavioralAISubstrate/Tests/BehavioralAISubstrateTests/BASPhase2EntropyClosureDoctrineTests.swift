@@ -37,16 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs462() {
+    func testLastChapterIs463() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百六十二",
-            "M1227 DEBT REPAYMENT 3:bumped to 四百" +
-            "六十二 (mock-coordinator infra closes" +
-            " last 30% of chapter 461 integration debt" +
-            " via 3 e2e PROOF tests through real" +
-            " engine.runWithPlan)")
+            "chapter 四百六十三",
+            "M1231 STRUCTURAL DEBT REPAYMENT 1:" +
+            "bumped to 四百六十三 (doctrine-collapse" +
+            " Phase 1 — typed Record + Registry" +
+            " covering chapters 453-462)")
     }
 
     // MARK: - M-number range

@@ -911,7 +911,33 @@ public enum BASEntropyChapterIndex {
                 " simulated)。 Integration debt 70% →" +
                 " 100%。 All 3 debts from chapter 459" +
                 " self-audit now CLOSED。 ADR-016 →" +
-                " M1227")
+                " M1227"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十三",
+            mNumberFirst: 1228,
+            mNumberLast: 1231,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 1 —" +
+                " Phase 1 of doctrine-collapse debt" +
+                " called out in chapter 462 self-audit。" +
+                " NEW BASChapterDoctrineRecord value-" +
+                "type + BASChapterDoctrineRegistry with" +
+                " 10 entries for chapters 453-462" +
+                " DERIVED from existing per-chapter" +
+                " Swift sources。 14 PROOF tests verify" +
+                " byte-mirror equality + Codable round-" +
+                "trip + lookup-by-tag + lookup-by-" +
+                "mNumberFirst + knife-structure deep" +
+                " mirror。 Phase 2 (chapter 464+) ships" +
+                " new chapters as registry entries;" +
+                " Phase 3 (chapter 465+) deletes the" +
+                " 60+ historical Swift files。 Net debt" +
+                " repayment after Phase 3:~−11K LOC。" +
+                " ADR-016 → M1231")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

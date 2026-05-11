@@ -922,7 +922,23 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// benchmark fictional numbers + substrate
     /// integration)。 V1 byte-equality preserved
     /// through end-to-end test。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1227"
+    /// M1231 bump:STRUCTURAL DEBT REPAYMENT chapter 1
+    /// — chapter 四百六十三 ships Phase 1 of doctrine
+    /// collapse (the structural debt called out in
+    /// chapter 462 self-audit:60+ per-chapter Swift
+    /// files × ~200 LOC of prose,Phase D of original
+    /// radical plan never executed)。 NEW
+    /// BASChapterDoctrineRecord typed value-type +
+    /// BASChapterDoctrineRegistry with 10 entries for
+    /// chapters 453-462 derived from existing per-
+    /// chapter Swift sources。 14 PROOF tests verify
+    /// registry byte-mirrors sources + Codable round-
+    /// trip + lookup APIs。 Phase 2 (chapter 464+)
+    /// writes new chapters as direct registry entries。
+    /// Phase 3 (chapter 465+) deletes the 60+
+    /// historical Swift files。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1231"
 
     /// Query the typed status of a specific gap。
     public static func status(
