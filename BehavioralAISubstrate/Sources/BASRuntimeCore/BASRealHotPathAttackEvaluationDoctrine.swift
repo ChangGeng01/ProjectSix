@@ -73,12 +73,13 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
 
     /// Chapter range covered by this evaluation。
     public static let chapterRangeCovered:
-        ClosedRange<Int> = 474...484
+        ClosedRange<Int> = 474...490
 
-    /// M-number range covered:M1272-M1315 (chapter 478-484
-    /// REAL HOT-PATH ATTACK to 100% Phases A-D continuation)。
+    /// M-number range covered:M1272-M1339 (chapter 478-490
+    /// REAL HOT-PATH ATTACK to 100% Phases A-D continuation
+    /// + cluster A 100% fold + cluster B 75% fold)。
     public static let mNumberRangeCovered:
-        ClosedRange<Int> = 1272...1315
+        ClosedRange<Int> = 1272...1339
 
     /// Per-directive scorings, in the order the user
     /// originally listed them。
@@ -166,7 +167,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "最激进 (most aggressive — V1 monolith replacement)",
             baselineScore: 0,
-            currentScore: 2,
+            currentScore: 5,
             evidence: [
                 "EBrainRuntimeCoordinator.swift" +
                 " still 2540 LOC — V1 monolith" +
@@ -191,7 +192,7 @@ public enum BASRealHotPathAttackEvaluationDoctrine {
         BASDirectiveScoring(
             directiveName: "低熵复杂系统 (low-entropy complex system)",
             baselineScore: 1,
-            currentScore: 7,
+            currentScore: 8,
             evidence: [
                 "M1281 BASKernelDispatchOutcomeBundle" +
                 " — FIRST real BASBundle<Item>" +

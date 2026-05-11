@@ -24,22 +24,22 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
 
     // MARK: - Chapter range covered
 
-    func testChapterRangeCoveredIs474To484() {
+    func testChapterRangeCoveredIs474To490() {
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
                 .chapterRangeCovered.lowerBound, 474)
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
-                .chapterRangeCovered.upperBound, 484)
+                .chapterRangeCovered.upperBound, 490)
     }
 
-    func testMNumberRangeCoveredIs1272To1315() {
+    func testMNumberRangeCoveredIs1272To1339() {
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
                 .mNumberRangeCovered.lowerBound, 1272)
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
-                .mNumberRangeCovered.upperBound, 1315)
+                .mNumberRangeCovered.upperBound, 1339)
     }
 
     // MARK: - Every directive has positive delta
@@ -89,15 +89,16 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
     }
 
     func testCurrentAggregateReflectsShippedWork() {
-        // chapter 484 post-update:9 + 7 + 8 + 2 + 7 + 8 = 41
+        // chapter 490 post-update:9 + 7 + 8 + 5 + 8 + 8 = 45
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
-                .currentAggregate, 41,
-            "chapter 484 current sum (post-update)")
+                .currentAggregate, 45,
+            "chapter 490 current sum (cluster A 100%" +
+            " + cluster B 75% + 8 bundle factories)")
         XCTAssertEqual(
             BASRealHotPathAttackEvaluationDoctrine
                 .currentAverage,
-            41.0 / 6.0, accuracy: 0.01)
+            45.0 / 6.0, accuracy: 0.01)
     }
 
     func testNetProgressIsPositive() {
@@ -105,9 +106,9 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
             .currentAggregate
             - BASRealHotPathAttackEvaluationDoctrine
                 .baselineAggregate
-        XCTAssertEqual(net, 30,
-            "net progress = 41 - 11 = 30 points across" +
-            " 6 directives over 11 chapters (474-484)")
+        XCTAssertEqual(net, 34,
+            "net progress = 45 - 11 = 34 points across" +
+            " 6 directives over 17 chapters (474-490)")
     }
 
     // MARK: - Every directive has stillOpen scope ack
@@ -153,14 +154,16 @@ final class BASRealHotPathAttackEvaluationDoctrineTests:
             " + dispatch latency benchmark")
     }
 
-    func testAggressiveScoreReflectsV1MonolithLargelyUntouched() {
+    func testAggressiveScoreReflectsV1FoldProgress() {
         let aggressive = BASRealHotPathAttackEvaluationDoctrine
             .scorings.first {
                 $0.directiveName.starts(with: "最激进")
             }
-        XCTAssertEqual(aggressive?.currentScore, 2,
-            "最激进 stays low — V1 monolith 2540 LOC" +
-            " mostly untouched (only 3-projection PILOT" +
-            " fold via M1289)。 Honest accounting。")
+        XCTAssertEqual(aggressive?.currentScore, 5,
+            "最激进 5/10 — cluster A 100% (18-of-18)" +
+            " + cluster B 75% (18-of-24) folded into 8" +
+            " typed bundle factories。 V1 deletion still" +
+            " pending (production wire-in + default flip" +
+            " required first)。")
     }
 }
