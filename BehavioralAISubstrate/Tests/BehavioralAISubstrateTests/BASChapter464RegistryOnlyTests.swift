@@ -30,12 +30,18 @@ final class BASChapter464RegistryOnlyTests: XCTestCase
 
     // MARK: - 2. Registry now has 12 entries
 
-    func testRegistryNowHas12Entries() {
-        XCTAssertEqual(
-            BASChapterDoctrineRegistry.count, 12,
-            "Phase 1 added 10 entries (453-462) +" +
-            " Phase 1 itself (463) + Phase 2 first" +
-            " entry (464) = 12")
+    func testRegistryHasAtLeast13Entries() {
+        // chapter 466 / Phase 3 grew the registry to 64
+        // entries (61 historical from AllLiterals + 3
+        // registry-native:464,465,466)。 Pre-Phase-3
+        // count was 13 (10 derived + 463 derived + 464
+        // + 465);post-Phase-3 the count is much higher。
+        // Keep an at-least floor that survives future
+        // chapter additions。
+        XCTAssertGreaterThanOrEqual(
+            BASChapterDoctrineRegistry.count, 13,
+            "registry must include at least chapters" +
+            " 453-465 from pre-Phase-3 era")
     }
 
     // MARK: - 3. Schema parity with Swift-file chapters

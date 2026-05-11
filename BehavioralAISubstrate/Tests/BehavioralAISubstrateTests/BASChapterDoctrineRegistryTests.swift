@@ -27,14 +27,14 @@ final class BASChapterDoctrineRegistryTests:
 
     // MARK: - Registry size + ordering
 
-    func testRegistryHas10EntriesForChapters453Through462() {
-        XCTAssertEqual(
-            BASChapterDoctrineRegistry.count, 10,
-            "Phase 1 registers 10 chapters" +
-            " (453-462)。 Phase 2+ grows this count.")
-        let tags = BASChapterDoctrineRegistry.all
-            .map(\.chapterTag)
-        XCTAssertEqual(tags, [
+    func testRegistryContainsChapters453Through462() {
+        // chapter 466 / Phase 3 update:registry now
+        // holds 64 entries (chapters 403-466)。 The
+        // original assertion (exactly 10 entries) no
+        // longer holds。 Verify the original 10 chapters
+        // (453-462) all have entries reachable by
+        // lookup。
+        let expectedTags = [
             "chapter 四百五十三",
             "chapter 四百五十四",
             "chapter 四百五十五",
@@ -45,7 +45,13 @@ final class BASChapterDoctrineRegistryTests:
             "chapter 四百六十",
             "chapter 四百六十一",
             "chapter 四百六十二"
-        ])
+        ]
+        for tag in expectedTags {
+            XCTAssertNotNil(
+                BASChapterDoctrineRegistry.recordFor(
+                    chapterTag: tag),
+                "registry must include \(tag)")
+        }
     }
 
     // MARK: - Byte-mirror each entry vs source
@@ -374,13 +380,23 @@ final class BASChapterDoctrineRegistryTests:
                 summary: BASChapter462EntropyDoctrine
                     .summary)
         ]
-        XCTAssertEqual(
+        // chapter 466 / Phase 3 update:registry now
+        // holds 64 entries (61 historical + 3 native);
+        // the 10 sources here are a SUBSET。 Look up by
+        // tag instead of indexed position。
+        XCTAssertGreaterThanOrEqual(
+            BASChapterDoctrineRegistry.count,
             sources.count,
-            BASChapterDoctrineRegistry.count)
-        for (idx, src) in sources.enumerated() {
-            let r = BASChapterDoctrineRegistry.all[idx]
+            "registry must include all 10 sources")
+        for src in sources {
+            guard let r = BASChapterDoctrineRegistry
+                .recordFor(chapterTag: src.tag)
+            else {
+                XCTFail("registry missing \(src.tag)")
+                continue
+            }
             XCTAssertEqual(r.chapterTag, src.tag,
-                "tag drift at [\(idx)]")
+                "tag drift at \(src.tag)")
             XCTAssertEqual(r.mNumberFirst, src.mFirst,
                 "mFirst drift at \(src.tag)")
             XCTAssertEqual(r.mNumberLast, src.mLast,

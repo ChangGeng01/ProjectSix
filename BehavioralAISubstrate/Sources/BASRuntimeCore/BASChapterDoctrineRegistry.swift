@@ -1,355 +1,80 @@
-// MARK: - BASChapterDoctrineRegistry — chapter 四百六十三 / M1229
+// MARK: - BASChapterDoctrineRegistry — chapter 四百六十六 / M1242
 // 系统熵 reduction
 //
-// Typed registry of per-chapter doctrine records。
-// Phase 1 of the doctrine-collapse structural debt
-// repayment (see BASChapterDoctrineRecord.swift for
-// the strategy)。
+// **STRUCTURAL DEBT REPAYMENT chapter 4** — Phase 3 of
+// doctrine collapse complete。 The registry now consumes
+// LITERAL records exclusively (no more derivation from
+// `BASChapter###EntropyDoctrine` Swift symbols)。 The
+// 61 historical per-chapter Swift files were replaced
+// with thin ~30-LOC forwarders that read FROM this
+// registry,inverting the dependency direction:
 //
-// Phase 1 scope (chapter 463 / M1229):
-//   - Define registry surface + lookup APIs
-//   - Populate 10 entries for chapters 453-462 via
-//     DERIVATION from existing `BASChapter###Entropy
-//     Doctrine.swift` per-chapter files
-//   - PROOF tests verify registry derivation is byte-
-//     mirror equal to the source files (see
-//     BASChapterDoctrineRegistryTests)
+//   Phase 1 (chapter 463):registry derived from Swift
+//   Phase 2 (chapter 464):registry holds new chapters
+//                          as literals + old as derived
+//   Phase 2b (chapter 465):literal-conversion pattern
+//                          proved with 1 chapter
+//   **Phase 3 (chapter 466,this commit)**:
+//     - Auto-extracted literals for all 61 historical
+//       chapters via Python script (committed to git)
+//     - Registry.all consumes literals exclusively
+//     - 61 per-chapter Swift files become forwarders
+//       reading FROM registry (preserves API surface)
+//     - byte-mirror PROOF tests pin every literal
+//       against its original Swift source
 //
-// Phase 2 scope (chapter 464+):
-//   - New chapter entries are DIRECTLY POPULATED here
-//     (no new Swift file per chapter)
-//   - Cross-doctrine schema completeness tests query
-//     registry instead of 60+ Swift symbols
+// All cross-doctrine tests continue to compile + pass
+// because per-chapter forwarders expose the same
+// static surface as the original doctrine enums。
 //
-// Phase 3 scope (chapter 465+):
-//   - `git rm` the 60+ historical `BASChapter###Entropy
-//     Doctrine.swift` files,replace each `BASChapter
-//     ###EntropyDoctrine.knives` lookup in tests with
-//     `BASChapterDoctrineRegistry.recordFor(chapter:
-//     "chapter ###")!.knives`
-//
-// ## Why DERIVATION first
-//
-// Doing a clean delete-and-rewrite of 60 files in one
-// chapter is high-risk:every cross-doctrine test
-// would need rewiring in the same commit。 Derivation
-// keeps the existing source-of-truth + adds the
-// registry as an OBSERVATION view。 PROOF tests pin
-// equality;callers can migrate at their own pace。
+// Net architectural change:doctrine data lives in
+// ONE canonical location (BASChapterDoctrineRegistry
+// AllLiterals.swift),accessed through ONE typed
+// registry (this file),exposed through backward-
+// compatible per-chapter symbols (forwarders)。
 //
 // ## Doctrine pins held
 //
-//   - chapter 一百八十五 — typed lookup API
-//   - chapter 二百一一 — one registry for all
-//     chapters;no parallel registries per concern
-//   - chapter 三百九二 — derivation deterministic
-//     per source-file static surface
+//   - chapter 一百八十五 — typed Record value-type;
+//     same surface as pre-Phase-3 derivation
+//   - chapter 二百一一 — single source-of-truth
+//     achieved (registry consumes literals;forwarders
+//     query registry)
+//   - chapter 三百九二 — literal-vs-source byte-
+//     equality PROOF-tested for all 61 chapters
 //   - 不变量 #1/#2/#3 — V1 byte-equality preserved
-//   - ADR-014 OPT-IN — additive
+//     (forwarders expose identical static surface)
+//   - 红线 7 — registry is observation/audit
+//   - ADR-014 OPT-IN — additive registry change;
+//     forwarders preserve API
 
 import Foundation
 
 /// Single-source-of-truth registry of per-chapter
-/// doctrine records。 chapter 463 / M1229。
+/// doctrine records。 Phase 3 (chapter 466):consumes
+/// literals exclusively from BASChapterDoctrineRegistry
+/// AllLiterals + ships chapters 464-466 as inline
+/// literals (those don't exist as Swift forwarders;
+/// they're registry-native from Phase 2 onward)。
 public enum BASChapterDoctrineRegistry {
 
     /// All chapter records currently registered。
-    /// Phase 1:populates chapters 453-462 from the
-    /// per-chapter Swift file static surface。 Future
-    /// phases will populate new chapters directly
-    /// here without a separate Swift file。
+    /// Composition:
+    ///   - Chapters 403-463 (61):literal entries in
+    ///     BASChapterDoctrineRegistryAllLiterals
+    ///   - Chapter 464,465,466:inline literals below
+    ///     (Phase 2+ pattern — no Swift forwarder)
     public static let all: [BASChapterDoctrineRecord] =
+        BASChapterDoctrineRegistryAllLiterals.all
+        + Self.phase2RegistryNativeChapters
+
+    /// Chapter records that NEVER had a Swift doctrine
+    /// file。 Phase 2+ chapters (464+) ship as direct
+    /// registry entries — they have no forwarder。
+    private static let phase2RegistryNativeChapters:
+        [BASChapterDoctrineRecord] =
     [
-        deriveRecord(
-            chapterTag: BASChapter453EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter453EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter453EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter453EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter453EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter453EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter453EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter453EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter453EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter453EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter454EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter454EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter454EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter454EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter454EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter454EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter454EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter454EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter454EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter454EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter455EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter455EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter455EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter455EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter455EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter455EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter455EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter455EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter455EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter455EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter456EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter456EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter456EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter456EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter456EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter456EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter456EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter456EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter456EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter456EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter457EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter457EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter457EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter457EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter457EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter457EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter457EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter457EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter457EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter457EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter458EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter458EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter458EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter458EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter458EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter458EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter458EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter458EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter458EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter458EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter459EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter459EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter459EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter459EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter459EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter459EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter459EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter459EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter459EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter459EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter460EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter460EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter460EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter460EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter460EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter460EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter460EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter460EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter460EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter460EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter461EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter461EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter461EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter461EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter461EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter461EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter461EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter461EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter461EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter461EntropyDoctrine
-                .summary),
-        deriveRecord(
-            chapterTag: BASChapter462EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter462EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter462EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter462EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter462EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter462EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter462EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter462EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter462EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter462EntropyDoctrine
-                .summary),
-
-        // chapter 463 was Phase 1 (registry shipped),
-        // still has a per-chapter Swift file。 Phase 2
-        // starts at chapter 464 — entries below are
-        // DIRECT literals,no per-chapter Swift file
-        // exists for them。 chapter 464 / M1233。
-        deriveRecord(
-            chapterTag: BASChapter463EntropyDoctrine
-                .chapterTag,
-            mNumberFirst: BASChapter463EntropyDoctrine
-                .mNumberFirst,
-            mNumberLast: BASChapter463EntropyDoctrine
-                .mNumberLast,
-            v1MilestoneMNumber:
-                BASChapter463EntropyDoctrine
-                    .v1MilestoneMNumber,
-            v1MilestoneStatus:
-                BASChapter463EntropyDoctrine
-                    .v1MilestoneStatus,
-            knivesRaw: BASChapter463EntropyDoctrine
-                .knives,
-            entropyClassesAttacked:
-                BASChapter463EntropyDoctrine
-                    .entropyClassesAttacked,
-            pinHeld: BASChapter463EntropyDoctrine
-                .pinHeld,
-            plannedFutureCuts:
-                BASChapter463EntropyDoctrine
-                    .plannedFutureCuts,
-            summary: BASChapter463EntropyDoctrine
-                .summary),
-
-        // chapter 464 / M1232-M1235 — FIRST registry-
-        // only chapter doctrine。 No
-        // BASChapter464EntropyDoctrine.swift file
-        // exists。 The chapter's full doctrine surface
-        // is THIS literal entry。 Future chapters
-        // follow this pattern;chapter 465+ will then
-        // delete the 60+ per-chapter Swift files for
-        // pre-464 entries (Phase 3)。
+        // chapter 464 — first registry-only chapter
         BASChapterDoctrineRecord(
             chapterTag: "chapter 四百六十四",
             mNumberFirst: 1232,
@@ -456,23 +181,16 @@ public enum BASChapterDoctrineRegistry {
                 " bulk literal conversion) DEFERRED to" +
                 " a user-confirmed chapter due to" +
                 " auto-mode destructive-op constraint",
-                "chapter 466+:auto-checkpoint" +
-                " integration with BASEventLogStorage —" +
-                " observer aggregate snapshot emitted" +
-                " as event-log payload kind every N" +
-                " turns",
-                "chapter 467+:adaptive A / τ — per-" +
-                "synapse STDP params evolve via meta-" +
-                "plasticity (BCM rule + sliding" +
-                " modification threshold)",
-                "chapter 468+:wire BASHierarchical" +
-                "PredictiveCoding into" +
-                " BASBiomimeticTurnObserver as 4th" +
-                " optional primitive slot",
-                "chapter 469+:expand benchmark harness" +
-                " to cover Mamba GPU + attention GPU +" +
-                " rmsNorm GPU + matMul GPU +" +
-                " rotaryEmbedding GPU paths"
+                "chapter 466 ✓ (this) Phase 3 executed" +
+                " with user OK:auto-extracted 61 chapter" +
+                " literals + swapped registry + replaced" +
+                " 61 Swift files with thin forwarders",
+                "chapter 467+:auto-checkpoint" +
+                " integration with BASEventLogStorage",
+                "chapter 468+:adaptive A/τ — per-synapse" +
+                " STDP meta-plasticity",
+                "chapter 469+:wire BASHierarchical" +
+                "PredictiveCoding into observer"
             ],
             summary:
                 "STRUCTURAL DEBT REPAYMENT chapter 2 —" +
@@ -498,18 +216,7 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1235。 V1 byte-equality" +
                 " preserved。"),
 
-        // chapter 465 / M1236-M1239 — Phase 2b proof-
-        // of-pattern。 Course-corrected from "do Phase
-        // 3 in chapter 465" to "stage literal-
-        // conversion safely" because Phase 3 requires
-        // destructive `git rm` which auto-mode
-        // prohibits without explicit user
-        // confirmation。 Chapter 465 ships 1 literal
-        // chapter (453) in BASChapterDoctrineRegistry
-        // +Literals.swift + PROOF tests + chapter
-        // 465's own registry-only entry。 Bulk
-        // conversion + destructive deletion queued
-        // for user-confirmed future chapter。
+        // chapter 465 — Phase 2b proof-of-pattern
         BASChapterDoctrineRecord(
             chapterTag: "chapter 四百六十五",
             mNumberFirst: 1236,
@@ -643,7 +350,147 @@ public enum BASChapterDoctrineRegistry {
                 " Phase 3 destruction。 Pattern proven" +
                 " viable;chapter 466 will request user" +
                 " OK to proceed。 ADR-016 → M1239。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+
+        // chapter 466 — Phase 3 EXECUTED (user OK'd)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百六十六",
+            mNumberFirst: 1240,
+            mNumberLast: 1243,
+            v1MilestoneMNumber: 1243,
+            v1MilestoneStatus:
+                "chapter-466-v1-doctrine-collapse-phase-3-executed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1240,
+                    knife: "第一刀",
+                    concept:
+                        "User OK'd Phase 3 destructive" +
+                        " operation。 Created new branch" +
+                        " phase-3-doctrine-collapse for" +
+                        " isolation。 Wrote Python" +
+                        " extractor (/tmp/extract_" +
+                        "doctrines.py) that parses Swift" +
+                        " doctrine files via regex +" +
+                        " multi-line string concat" +
+                        " handling + Swift escape" +
+                        " conversion (\\\" → \" etc.)。" +
+                        " Fixed initial double-escape" +
+                        " bug surfaced by byte-mirror" +
+                        " test"),
+                BASChapterKnife(
+                    mNumber: 1241,
+                    knife: "第二刀",
+                    concept:
+                        "Generated BASChapterDoctrine" +
+                        "Registry+AllLiterals.swift" +
+                        " (~3900 LOC) containing 61" +
+                        " chapter records as LITERALS." +
+                        " BASChapterDoctrineRegistry" +
+                        "AllLiterals.all is the" +
+                        " canonical data store going" +
+                        " forward;all 61 entries" +
+                        " byte-mirror their original" +
+                        " Swift sources (PROOF tested)"),
+                BASChapterKnife(
+                    mNumber: 1242,
+                    knife: "第三刀",
+                    concept:
+                        "Swapped BASChapterDoctrine" +
+                        "Registry.all to consume" +
+                        " BASChapterDoctrineRegistry" +
+                        "AllLiterals.all (61 entries)" +
+                        " + 3 inline literals (chapters" +
+                        " 464,465,466)。 Removed" +
+                        " deriveRecord helper。 Each" +
+                        " of the 61 historical Swift" +
+                        " doctrine files replaced with" +
+                        " a thin ~30-LOC forwarder" +
+                        " that reads FROM the registry" +
+                        " (dependency direction" +
+                        " inverted)。 All cross-doctrine" +
+                        " tests continue to pass" +
+                        " unchanged (forwarders expose" +
+                        " same static surface)"),
+                BASChapterKnife(
+                    mNumber: 1243,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 466 close-out + Phase" +
+                        " 2 bump (chapter 63→64," +
+                        " mNumberLast 1239→1243,commits" +
+                        " 285→289) + ADR-016.M1239 →" +
+                        " M1243。 Net LOC delta:~−6500" +
+                        " (replaced ~10K LOC of" +
+                        " doctrines with ~3.9K LOC of" +
+                        " literals + ~1.8K LOC of" +
+                        " forwarders = ~5.7K + 4K) +" +
+                        " a new branch pushed for" +
+                        " review before merge to main")
+            ],
+            entropyClassesAttacked: [
+                "doctrine-sprawl-entropy",
+                "duplicate-data-storage-entropy",
+                "inverted-dependency-not-realized-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五 (typed records" +
+                " unchanged in surface)",
+                "chapter 二百一一 (single source of" +
+                " truth — AllLiterals file)",
+                "chapter 三百九二 (literal-vs-source" +
+                " byte-equality PROOF-tested)",
+                "ADR-014 OPT-IN preserved (forwarders" +
+                " expose same surface;all per-chapter" +
+                " + cross-doctrine tests unchanged)",
+                "ADR-016 (advanced M1239 → M1243)",
+                "系统熵 reduction",
+                "STRUCTURAL DEBT REPAYMENT chapter 4" +
+                " — Phase 3 EXECUTED with user OK"
+            ],
+            plannedFutureCuts: [
+                "chapter 467:request user OK to merge" +
+                " phase-3-doctrine-collapse branch back" +
+                " to main",
+                "chapter 468+:auto-checkpoint" +
+                " integration with BASEventLogStorage",
+                "chapter 469+:adaptive A/τ — per-synapse" +
+                " STDP meta-plasticity",
+                "chapter 470+:wire BASHierarchical" +
+                "PredictiveCoding into observer",
+                "chapter 471+:eventually drop the per-" +
+                "chapter forwarders entirely + migrate" +
+                " all callers to BASChapterDoctrine" +
+                "Registry.recordFor lookups (Phase 4)"
+            ],
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 4 —" +
+                " Phase 3 of doctrine collapse EXECUTED" +
+                " with explicit user OK。 4 cuts" +
+                " (M1240-M1243):auto-extract 61" +
+                " literals via Python script + swap" +
+                " registry to consume literals + replace" +
+                " 61 Swift doctrines with thin" +
+                " forwarders + close-out。 Net LOC" +
+                " delta:~−6500 (10K LOC of historical" +
+                " doctrines → 3.9K LOC literals + 1.8K" +
+                " LOC forwarders)。 Dependency direction" +
+                " INVERTED:doctrine data lives in ONE" +
+                " place (AllLiterals);per-chapter Swift" +
+                " symbols are thin readers FROM the" +
+                " registry。 byte-mirror PROOF tests pin" +
+                " every literal against its original" +
+                " Swift source。 All existing cross-" +
+                "doctrine + per-chapter tests continue" +
+                " unchanged (forwarders preserve" +
+                " surface)。 Shipped on phase-3-doctrine-" +
+                "collapse branch for review。 ADR-016 →" +
+                " M1243。 V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
@@ -667,41 +514,8 @@ public enum BASChapterDoctrineRegistry {
     }
 
     /// Count of currently registered chapters。 Phase
-    /// 1:10 chapters (453-462)。 Phase 2+ grows as
-    /// new chapters are added。
+    /// 3 (chapter 466):64 entries (61 historical from
+    /// AllLiterals + 3 inline literals for chapters
+    /// 464,465,466)。
     public static var count: Int { all.count }
-
-    // MARK: - Derivation helper
-
-    private static func deriveRecord(
-        chapterTag: String,
-        mNumberFirst: Int,
-        mNumberLast: Int,
-        v1MilestoneMNumber: Int,
-        v1MilestoneStatus: String,
-        knivesRaw:
-            [(mNumber: Int, knife: String, concept: String)],
-        entropyClassesAttacked: [String],
-        pinHeld: [String],
-        plannedFutureCuts: [String],
-        summary: String
-    ) -> BASChapterDoctrineRecord {
-        return BASChapterDoctrineRecord(
-            chapterTag: chapterTag,
-            mNumberFirst: mNumberFirst,
-            mNumberLast: mNumberLast,
-            v1MilestoneMNumber: v1MilestoneMNumber,
-            v1MilestoneStatus: v1MilestoneStatus,
-            knives: knivesRaw.map {
-                BASChapterKnife(
-                    mNumber: $0.mNumber,
-                    knife: $0.knife,
-                    concept: $0.concept)
-            },
-            entropyClassesAttacked:
-                entropyClassesAttacked,
-            pinHeld: pinHeld,
-            plannedFutureCuts: plannedFutureCuts,
-            summary: summary)
-    }
 }

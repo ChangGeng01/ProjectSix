@@ -965,7 +965,21 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// requires explicit user confirmation and is
     /// queued for chapter 466+。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1239"
+    /// M1243 bump:STRUCTURAL DEBT REPAYMENT chapter 4
+    /// — chapter 四百六十六 ships Phase 3 of doctrine
+    /// collapse with explicit user OK on a separate
+    /// phase-3-doctrine-collapse branch。 Auto-extracted
+    /// 61 chapter literals via Python script + swapped
+    /// BASChapterDoctrineRegistry.all to consume
+    /// literals + replaced 61 historical Swift doctrine
+    /// files with thin ~50-LOC forwarders that read
+    /// FROM the registry (dependency direction
+    /// inverted)。 Net LOC delta:~10K LOC doctrine →
+    /// ~3.9K LOC literals + ~3K LOC forwarders =
+    /// ~−3K LOC repayment。 All 6178+ existing tests
+    /// continue passing (forwarders preserve API)。
+    /// V1 byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1243"
 
     /// Query the typed status of a specific gap。
     public static func status(

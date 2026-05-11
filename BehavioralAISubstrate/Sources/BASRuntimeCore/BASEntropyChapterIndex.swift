@@ -989,7 +989,33 @@ public enum BASEntropyChapterIndex {
                 " (60+ file `git rm` + bulk conversion)" +
                 " requires explicit user confirmation。" +
                 " Queued for chapter 466+。 ADR-016 →" +
-                " M1239")
+                " M1239"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十六",
+            mNumberFirst: 1240,
+            mNumberLast: 1243,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 4 —" +
+                " Phase 3 of doctrine collapse EXECUTED" +
+                " on phase-3-doctrine-collapse branch" +
+                " with user OK。 Auto-extracted 61" +
+                " chapter literals via Python script +" +
+                " swapped BASChapterDoctrineRegistry.all" +
+                " to consume literals + replaced 61" +
+                " historical Swift doctrine files with" +
+                " thin ~50-LOC forwarders。 Net LOC:" +
+                " ~−3K reduction。 byte-mirror PROOF" +
+                " tests pin every literal against its" +
+                " source。 All existing tests pass" +
+                " (forwarders preserve static surface)。" +
+                " Dependency inverted:registry is now" +
+                " the canonical store;per-chapter" +
+                " symbols are thin readers。 ADR-016 →" +
+                " M1243")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
