@@ -1030,34 +1030,39 @@ public struct BASEBrainRuntimeCoordinator {
         // the downstream derives feed audit emission. Same values
         // by construction; separate locals for separation of
         // concerns.
-        let abyssalPressureForGate = BASAbyssalPressureBudget
-            .derive(
-                turnID: derivedSessionID,
-                riskLevel: boundRiskCard.riskLevel,
-                uncertaintyLedger:
-                    thoughtFrame.uncertaintyLedger,
-                evidenceDebtCount:
-                    thoughtFrame.evidenceDebts?.count ?? 0)
-        let humanAnchorSignalForGate = BASHumanAnchorProtocol
-            .derive(
-                anchorID: "human-anchor-\(derivedSessionID)",
-                hostSummaryRef: hostContext.hostID,
-                riskLevel: boundRiskCard.riskLevel,
-                permitMode: boundActionPermit.mode,
-                candidateCount: thoughtFrame.candidates.count)
+        // chapter 五百六 / M1403 — gate-side derive trio fold。
+        // 3 ForGate derives consolidated via shadow-rebinding。
+        // V1 byte-equality preserved by factory's identical
+        // compute order (chapter 三百九二 replay contract)。
+        let gateSideDeriveTrioForGate =
+            BASTurnAuditProjectionsGateSideDeriveTrio
+                .compute(
+                    sessionID: derivedSessionID,
+                    hostID: hostContext.hostID,
+                    riskLevel: boundRiskCard.riskLevel,
+                    permitMode: boundActionPermit.mode,
+                    candidateCount:
+                        thoughtFrame.candidates.count,
+                    uncertaintyLedger:
+                        thoughtFrame.uncertaintyLedger,
+                    evidenceDebtCount:
+                        thoughtFrame.evidenceDebts?
+                            .count ?? 0,
+                    defaultConfidenceFloorWhenNoUncertaintyLedger:
+                        Self
+                        .defaultConfidenceFloorWhenNoUncertaintyLedger)
+        let abyssalPressureForGate =
+            gateSideDeriveTrioForGate.abyssalPressure
+        let humanAnchorSignalForGate =
+            gateSideDeriveTrioForGate.humanAnchorSignal
         let abyssalEscalation = BASAbyssalPermitEscalation
             .escalate(
                 permit: boundActionPermit,
                 pressure: abyssalPressureForGate,
                 humanAnchor: humanAnchorSignalForGate)
         boundActionPermit = abyssalEscalation.permit
-        let unknownReserveForGate = BASUnknownReserve.derive(
-            reserveID:
-                "unknown-reserve-\(derivedSessionID)",
-            confidenceFloor: thoughtFrame.uncertaintyLedger?
-                .confidenceFloor
-                ?? Self
-                .defaultConfidenceFloorWhenNoUncertaintyLedger)
+        let unknownReserveForGate =
+            gateSideDeriveTrioForGate.unknownReserve
         let assertionCeilingDecisionForGate = BASAssertionCeilingGate
             .cap(
                 permit: boundActionPermit,
