@@ -1780,30 +1780,22 @@ public struct BASEBrainRuntimeCoordinator {
         // is high (≥0.8) the reserve resolves to `.unrestricted`
         // and the audit consumer elides the codes; otherwise
         // emits ceiling tier + ref count.
-        let unknownReserveForAudit = BASUnknownReserve.derive(
-            reserveID:
-                "unknown-reserve-\(runtimeTrace.sessionID)",
-            confidenceFloor: thoughtFrame.uncertaintyLedger?
-                .confidenceFloor
-                ?? Self
-                .defaultConfidenceFloorWhenNoUncertaintyLedger)
-        // M385 cap now fires upstream (M392 — see the gating block
-        // right after `thoughtFrame.actionPermit = boundActionPermit`
-        // at line ~380). `unknownReserveForAudit` here is the
-        // audit-emission-side derive; the gate-side derive
-        // (`unknownReserveForGate`) lives upstream. They produce
-        // identical values from identical inputs.
-        // M321 — derive `BASForbiddenKnowledgeCandidate`
-        // aggregate from the turn's quarantine records. Empty
-        // collection (no quarantines this turn) yields nil
-        // aggregate → audit consumer elides all `forbidden.*`
-        // codes.
-        let forbiddenCandidatesForAudit = quarantineRecords.map {
-            BASForbiddenKnowledgeCandidate.derive(from: $0)
-        }
-        let forbiddenAggregateForAudit =
-            BASForbiddenKnowledgeCandidate.aggregate(
-                forbiddenCandidatesForAudit)
+        // chapter 四百九十一 / M1340 — V1 cluster B trio fold
+        let lateClusterDForAudit =
+            BASTurnAuditProjectionsLateClusterD.compute(
+                sessionID: runtimeTrace.sessionID,
+                confidenceFloor:
+                    thoughtFrame.uncertaintyLedger?
+                        .confidenceFloor
+                    ?? Self
+                    .defaultConfidenceFloorWhenNoUncertaintyLedger,
+                quarantineRecords: quarantineRecords)
+        let unknownReserveForAudit = lateClusterDForAudit
+            .unknownReserve
+        let forbiddenCandidatesForAudit = lateClusterDForAudit
+            .forbiddenCandidates
+        let forbiddenAggregateForAudit = lateClusterDForAudit
+            .forbiddenAggregate
         // M402 — Kunlun axis + alignment audit projection.
         // Builds a synthetic axis from the host context + permit
         // mode + risk level, computes alignment for the turn's
