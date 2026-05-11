@@ -1166,23 +1166,27 @@ public struct BASEBrainRuntimeCoordinator {
         // Doctrine: pure derive; no verdict escalation; single
         // commit mouth preserved (only narrows assertionCeiling
         // and appends to stackedModes).
-        let abyssalRunModeForAudit = BASCthulhuLayerProjections
-            .AbyssalRunMode.derive(from: routedBudget.runMode)
-        let abyssBudgetForAudit = BASCthulhuLayerProjections
-            .AbyssBudget.derive(
-                from: routedBudget,
-                turnID: derivedTurnID)
+        // chapter 五百六 / M1402 — abyssal+thermal trio fold。
+        // 3 ForAudit declarations + their inline derive calls
+        // collapsed into a single typed factory call。 Shadow
+        // re-bindings below preserve all downstream reader
+        // sites unchanged。 V1 byte-equality preserved by
+        // factory's identical compute order。
+        let abyssalThermalTrioForAudit =
+            BASTurnAuditProjectionsAbyssalThermalTrio
+                .compute(
+                    routedBudget: routedBudget,
+                    turnID: derivedTurnID)
+        let abyssalRunModeForAudit =
+            abyssalThermalTrioForAudit.abyssalRunMode
+        let abyssBudgetForAudit =
+            abyssalThermalTrioForAudit.abyssBudget
         // M456 (chapter 一百二十) — L8 memory thermal layer
-        // projection from runMode at audit-projection time. Per
-        // chapter 一百十七 doctrine BASMemoryTemperatureLayer
-        // classifies hippocampal-well memory along 5 thermal
-        // tiers; the projection here labels "what thermal class
-        // would a memory atom stored at this turn's runMode
-        // belong to?" — additive audit metadata, no L8 query
-        // mutation.
+        // projection from runMode at audit-projection time.
+        // Now consumed via the typed trio factory above。
         let memoryTemperatureLayerForAudit =
-            BASCthulhuLayerProjections.MemoryTemperatureLayer
-                .derive(from: routedBudget.runMode)
+            abyssalThermalTrioForAudit
+                .memoryTemperatureLayer
         // M480-M485 (chapter 一百二十五) — Kunlun production
         // wires for chapter-一百二十二/三 schemas. Each derive
         // is a pure function from existing turn state; never
