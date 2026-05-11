@@ -1077,95 +1077,45 @@ public struct BASEBrainRuntimeCoordinator {
         // separation of locals follows the M392 pattern: upstream
         // values feed the gate; downstream values feed audit
         // emission.
-        let kunlunAxisForGate = BASKunlunAxis(
-            axisID: "axis-\(derivedSessionID)",
-            hostRef: hostContext.hostID,
-            sovereignRef: "sovereign-\(derivedSessionID)",
-            worldAnchorRef:
-                "world-anchor-\(derivedSessionID)",
-            activeLayerRefs:
-                Self.kunlunActiveLayerRefs,
-            agentSeatRefs: [],
-            centerlineRules:
-                Self.kunlunCenterlineRules(
-                    for: boundActionPermit.mode),
-            deviationThreshold: Self
-                .kunlunAxisDeviationThreshold,
-            lastAlignmentCheck: "")
-        // M595 chapter 一百六十六 — defect #12 cross-site drift fix.
-        // Pre-M595 the gate-side at this seam used the OLD risk-
-        // level lookup table {low: 3, medium: 2, high: 1, extreme: 0}
-        // while M583 chapter 一百五十七 had updated only the audit-
-        // side at line ~1864. The doc-comment (line ~1029-1035)
-        // says "same output by construction" but parity broke when
-        // M583 fixed only one of two sites. Cross-site drift bug.
+        // chapter 四百九十四 / M1355 — Gate-side Kunlun axis fold。
+        // The SAME inline-construction block (~89 LOC) that lived
+        // at audit-side (lines ~1865-1953 pre-fold, folded by
+        // chapter 493 M1348-M1349) ALSO lived at gate-side here。
+        // M595 chapter 一百六十六 cross-site drift fix established
+        // both sites must share predicate semantics — chapter 494
+        // now shares the FACTORY (not just the semantics)。
         //
-        // Post-M595: gate-side mirrors audit-side substrate-state
-        // predicate evaluation. Two predicates of the audit-side
-        // 3-rule evaluation are usable here:
-        //   2. honorsWorldAnchor (anchor + abyssal both available)
-        //   3. permitModeCooperative (always available)
-        // The audit-side's `respectsHostBoundary` uses
-        // `quarantineRecords.isEmpty AND permit.mode ∉ {.block,
-        // .replace}`. quarantineRecords is computed at line ~1630,
-        // AFTER this gate-side seam. Use the simpler permit-mode
-        // check at gate-side; the substrate's permit synthesis
-        // already factors quarantine state into permit.mode.
-        let respectsHostBoundaryForGate: Bool =
-            boundActionPermit.mode != .block
-            && boundActionPermit.mode != .replace
-        let honorsWorldAnchorForGate: Bool =
-            humanAnchorSignalForGate
-                .recommendedSurfaceTone != .reserved
-            && abyssalPressureForGate
-                .sovereignEscalationHint == nil
-        let permitModeCooperativeForGate: Bool = {
-            switch boundActionPermit.mode {
-            case .answer, .mirror, .compare,
-                 .delay, .draftOnly, .localOnly:
-                return true
-            case .block, .replace, .escalate:
-                return false
-            }
-        }()
-        let kunlunMatchedForGate: Int =
-            (respectsHostBoundaryForGate ? 1 : 0)
-            + (honorsWorldAnchorForGate ? 1 : 0)
-            + (permitModeCooperativeForGate ? 1 : 0)
-        let kunlunDeviationCodesForGate: [String] = {
-            var codes: [String] = []
-            if !respectsHostBoundaryForGate {
-                codes.append("host-boundary-not-respected")
-            }
-            if !honorsWorldAnchorForGate {
-                codes.append("world-anchor-not-honored")
-            }
-            if !permitModeCooperativeForGate {
-                codes.append("permit-mode-non-cooperative")
-            }
-            // Risk-level signal preserved as additive context
-            // (parity with audit-side post-M583).
-            switch boundRiskCard.riskLevel {
-            case .low: break
-            case .medium:
-                codes.append("risk-medium-needs-attention")
-            case .high:
-                codes.append("risk-high-narrows-axis")
-            case .extreme:
-                codes.append("risk-extreme-axis-overreach")
-            }
-            return codes
-        }()
-        let kunlunAxisAlignmentForGate = BASKunlunAxisProtocol
-            .computeAlignment(
-                alignmentID:
-                    "axis-align-\(derivedSessionID)",
-                axis: kunlunAxisForGate,
-                targetRef: thoughtFrame.candidates.first?
-                    .candidateID ?? "no-candidate",
-                matchedRules: kunlunMatchedForGate,
-                deviationCodes: kunlunDeviationCodesForGate,
-                correctionHint: "")
+        // Gate-side passes `quarantineRecordsIsEmpty: true` to
+        // skip the audit-side quarantine check (quarantineRecords
+        // is computed AFTER this seam — the substrate's permit
+        // synthesis already factors quarantine state into
+        // permit.mode at this point per M595)。
+        let kunlunAxisProtocolForGate =
+            BASTurnAuditProjectionsKunlunAxisProtocol.compute(
+                sessionID: derivedSessionID,
+                hostID: hostContext.hostID,
+                permitMode: boundActionPermit.mode,
+                riskLevel: boundRiskCard.riskLevel,
+                quarantineRecordsIsEmpty: true,
+                humanAnchorRecommendedSurfaceTone:
+                    humanAnchorSignalForGate
+                        .recommendedSurfaceTone,
+                sovereignEscalationHint:
+                    abyssalPressureForGate
+                        .sovereignEscalationHint,
+                primaryCandidateID:
+                    thoughtFrame.candidates.first?
+                        .candidateID ?? "no-candidate",
+                kunlunActiveLayerRefs:
+                    Self.kunlunActiveLayerRefs,
+                centerlineRules:
+                    Self.kunlunCenterlineRules(
+                        for: boundActionPermit.mode),
+                kunlunAxisDeviationThreshold: Self
+                    .kunlunAxisDeviationThreshold)
+        let kunlunAxisForGate = kunlunAxisProtocolForGate.axis
+        let kunlunAxisAlignmentForGate =
+            kunlunAxisProtocolForGate.alignment
         let kunlunEscalation = BASKunlunPermitEscalation
             .escalate(
                 permit: boundActionPermit,
