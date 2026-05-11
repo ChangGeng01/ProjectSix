@@ -1202,7 +1202,31 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百六十八")!)
+                            "chapter 四百六十八")!),
+            // M1255 POST-PHASE-3 FEATURE 3 (BCM meta-plasticity)
+            checkRegistry("四百六十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百六十九")!),
+            // M1259 POST-PHASE-3 FEATURE 4 (hierarchical observer slot)
+            checkRegistry("四百七十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十")!),
+            // M1263 POST-PHASE-3 FEATURE 5 (Mamba benchmark)
+            checkRegistry("四百七十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十一")!),
+            // M1267 POST-PHASE-3 FEATURE 6 (bundle projection)
+            checkRegistry("四百七十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1439,6 +1463,38 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百六十八")!
+                .mNumberLast),
+            // M1255 POST-PHASE-3 FEATURE 3 (BCM)
+            ("469",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百六十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百六十九")!
+                .mNumberLast),
+            // M1259 POST-PHASE-3 FEATURE 4 (hier obs slot)
+            ("470",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十")!
+                .mNumberLast),
+            // M1263 POST-PHASE-3 FEATURE 5 (Mamba bench)
+            ("471",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十一")!
+                .mNumberLast),
+            // M1267 POST-PHASE-3 FEATURE 6 (bundle proj)
+            ("472",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

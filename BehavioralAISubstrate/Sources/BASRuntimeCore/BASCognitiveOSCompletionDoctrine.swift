@@ -1008,7 +1008,15 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// new session calls restoreObserver(...) →
     /// state byte-matches emitter at checkpoint time。
     /// V1 byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1251"
+    /// M1267 bump:POST-PHASE-3 FEATURES 3-6 —
+    /// chapters 469 (BCM meta-plasticity) + 470
+    /// (hierarchical observer slot) + 471 (Mamba
+    /// benchmark expansion) + 472 (bundle projection
+    /// completion) all shipped in one batch on
+    /// phase-3-doctrine-collapse branch。 All chapter-
+    /// 468 plannedFutureCuts now closed。 V1 byte-
+    /// equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1267"
 
     /// Query the typed status of a specific gap。
     public static func status(

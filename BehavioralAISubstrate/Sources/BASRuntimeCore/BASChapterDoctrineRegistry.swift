@@ -753,7 +753,370 @@ public enum BASChapterDoctrineRegistry {
                 " state at checkpoint time。 Cross-" +
                 "session biomimetic recovery is now a" +
                 " 1-line call。 ADR-016 → M1251。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+
+        // chapter 469 — BCM meta-plasticity
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百六十九",
+            mNumberFirst: 1252,
+            mNumberLast: 1255,
+            v1MilestoneMNumber: 1255,
+            v1MilestoneStatus:
+                "chapter-469-v1-bcm-meta-plasticity",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1252,
+                    knife: "第一刀",
+                    concept:
+                        "Design BASBCMMetaPlasticity" +
+                        "Shape with adaptive threshold" +
+                        " params。 No source change"),
+                BASChapterKnife(
+                    mNumber: 1253,
+                    knife: "第二刀",
+                    concept:
+                        "Ship BASBCMMetaPlasticity" +
+                        " actor implementing the" +
+                        " Bienenstock-Cooper-Munro" +
+                        " 1982 rule:ΔW=α·pre·post·(post-θ)" +
+                        " with θ adapting as sliding" +
+                        " average of post² (homeostatic" +
+                        " threshold)"),
+                BASChapterKnife(
+                    mNumber: 1254,
+                    knife: "第三刀",
+                    concept:
+                        "11 PROOF tests including the" +
+                        " bedrock META-PLASTICITY proof:" +
+                        " sustained high post activity" +
+                        " raises θ monotonically toward" +
+                        " mean(post²) → homeostatic" +
+                        " stability against runaway" +
+                        " potentiation"),
+                BASChapterKnife(
+                    mNumber: 1255,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 469 close-out + Phase 2" +
+                        " bump (chapter 66→67,mNumberLast" +
+                        " 1251→1255,commits 297→301)")
+            ],
+            entropyClassesAttacked: [
+                "no-meta-plasticity-entropy",
+                "fixed-learning-rate-entropy",
+                "no-homeostatic-threshold-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1251 → M1255)",
+                "系统熵 reduction",
+                "POST-PHASE-3 FEATURE chapter 3 —" +
+                " BCM meta-plasticity"
+            ],
+            plannedFutureCuts: [
+                "chapter 470:wire hierarchical into" +
+                " observer 4th slot",
+                "chapter 471:expand benchmark harness",
+                "chapter 472:add checkpointEvents to" +
+                " bundle",
+                "chapter 473+:add BCM to observer" +
+                " configuration as 5th primitive slot",
+                "chapter 474+:merge phase-3-doctrine-" +
+                "collapse to main"
+            ],
+            summary:
+                "POST-PHASE-3 FEATURE chapter 469 ships" +
+                " BCM (Bienenstock-Cooper-Munro 1982)" +
+                " meta-plasticity primitive。 4 cuts。" +
+                " The sliding threshold θ adapts as a" +
+                " mixture of past post² activity,giving" +
+                " homeostatic stability — sustained" +
+                " activity raises θ → harder to LTP." +
+                " ADR-016 → M1255。 V1 byte-equality" +
+                " preserved。"),
+
+        // chapter 470 — Hierarchical observer slot
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十",
+            mNumberFirst: 1256,
+            mNumberLast: 1259,
+            v1MilestoneMNumber: 1259,
+            v1MilestoneStatus:
+                "chapter-470-v1-hierarchical-observer-4th-slot",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1256,
+                    knife: "第一刀",
+                    concept:
+                        "Design 4th slot extension" +
+                        " for BASBiomimeticTurnObserver" +
+                        " (hierarchical primitive +" +
+                        " hierarchicalObservation signal" +
+                        " field + hierarchical result" +
+                        " field)"),
+                BASChapterKnife(
+                    mNumber: 1257,
+                    knife: "第二刀",
+                    concept:
+                        "Ship the 4th slot in" +
+                        " BASBiomimeticTurnObserver +" +
+                        " BASBiomimeticTurnSignal +" +
+                        " BASBiomimeticTurnObservation。" +
+                        " populatedPrimitiveCount +" +
+                        " populatedDriveCount +" +
+                        " producedResultCount extend to" +
+                        " 4。 observe() dispatches" +
+                        " hierarchical when populated;" +
+                        " reset() cascades"),
+                BASChapterKnife(
+                    mNumber: 1258,
+                    knife: "第三刀",
+                    concept:
+                        "5 PROOF tests:4-slot count" +
+                        " + hierarchical dispatch +" +
+                        " skip-when-not-populated +" +
+                        " signal drive count tracks" +
+                        " hierarchical + reset cascades" +
+                        " to hierarchical"),
+                BASChapterKnife(
+                    mNumber: 1259,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 470 close-out + Phase 2" +
+                        " bump (chapter 67→68,mNumberLast" +
+                        " 1255→1259,commits 301→305)")
+            ],
+            entropyClassesAttacked: [
+                "no-hierarchical-in-observer-entropy",
+                "3-slot-orchestrator-only-entropy",
+                "hierarchical-dispatch-untested-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1255 → M1259)",
+                "系统熵 reduction",
+                "POST-PHASE-3 FEATURE chapter 4 —" +
+                " hierarchical observer slot"
+            ],
+            plannedFutureCuts: [
+                "chapter 471:expand benchmark harness",
+                "chapter 472:add checkpointEvents to" +
+                " bundle",
+                "chapter 473+:add BCM to observer" +
+                " configuration as 5th primitive slot",
+                "chapter 474+:add hierarchical state" +
+                " to aggregate snapshot",
+                "chapter 475+:merge to main"
+            ],
+            summary:
+                "POST-PHASE-3 FEATURE chapter 470 wires" +
+                " BASHierarchicalPredictiveCoding into" +
+                " BASBiomimeticTurnObserver as the 4th" +
+                " optional primitive slot。 4 cuts。" +
+                " Observer now orchestrates Mamba +" +
+                " predictive + plasticity + hierarchical" +
+                " under one observe(_:) entry。 ADR-016" +
+                " → M1259。 V1 byte-equality preserved。"),
+
+        // chapter 471 — Mamba benchmark expansion
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十一",
+            mNumberFirst: 1260,
+            mNumberLast: 1263,
+            v1MilestoneMNumber: 1263,
+            v1MilestoneStatus:
+                "chapter-471-v1-mamba-benchmark-expansion",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1260,
+                    knife: "第一刀",
+                    concept:
+                        "Design runMambaScan(...)" +
+                        " harness method covering Mamba" +
+                        " CPU + GPU paths (chapter" +
+                        " 451)"),
+                BASChapterKnife(
+                    mNumber: 1261,
+                    knife: "第二刀",
+                    concept:
+                        "Ship runMambaScan in" +
+                        " BASMetalBenchmarkHarness。" +
+                        " Reuses BASMetalBenchmarkReport" +
+                        " surface;maps Mamba dims into" +
+                        " preDim/postDim equivalents" +
+                        " for the existing summary" +
+                        " string"),
+                BASChapterKnife(
+                    mNumber: 1262,
+                    knife: "第三刀",
+                    concept:
+                        "2 PROOF tests:harness produces" +
+                        " sensible Mamba report +" +
+                        " handles larger shape。 Real" +
+                        " measurements emitted to test" +
+                        " logs (small-shape GPU overhead" +
+                        " surfaces as expected)"),
+                BASChapterKnife(
+                    mNumber: 1263,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 471 close-out + Phase 2" +
+                        " bump (chapter 68→69,mNumberLast" +
+                        " 1259→1263,commits 305→309)")
+            ],
+            entropyClassesAttacked: [
+                "benchmark-harness-plasticity-only-entropy",
+                "no-mamba-perf-measurement-entropy",
+                "harness-coverage-untested-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1259 → M1263)",
+                "系统熵 reduction",
+                "POST-PHASE-3 FEATURE chapter 5 —" +
+                " Mamba benchmark expansion"
+            ],
+            plannedFutureCuts: [
+                "chapter 472:add checkpointEvents to" +
+                " bundle",
+                "chapter 473+:add attention + matMul" +
+                " benchmark paths to harness",
+                "chapter 474+:merge to main"
+            ],
+            summary:
+                "POST-PHASE-3 FEATURE chapter 471" +
+                " extends BASMetalBenchmarkHarness with" +
+                " a Mamba scan benchmark path covering" +
+                " CPU + GPU paths shipped in chapter" +
+                " 451。 4 cuts。 Harness now covers 2" +
+                " primitive kinds (plasticity + Mamba)" +
+                " toward the 5-primitive coverage" +
+                " roadmap。 ADR-016 → M1263。 V1 byte-" +
+                "equality preserved。"),
+
+        // chapter 472 — bundle checkpointEvents
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十二",
+            mNumberFirst: 1264,
+            mNumberLast: 1267,
+            v1MilestoneMNumber: 1267,
+            v1MilestoneStatus:
+                "chapter-472-v1-bundle-checkpoint-events",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1264,
+                    knife: "第一刀",
+                    concept:
+                        "Design biomimeticCheckpointEvents" +
+                        " array addition to" +
+                        " BASEventLogReplayBundle +" +
+                        " projector integration"),
+                BASChapterKnife(
+                    mNumber: 1265,
+                    knife: "第二刀",
+                    concept:
+                        "Ship biomimeticCheckpointEvents" +
+                        " field + Codable backward-compat" +
+                        " init (legacy JSON without the" +
+                        " key defaults to [])。 Update" +
+                        " perKindEventCount (no longer" +
+                        " hardcoded 0) + totalEventCount" +
+                        " + merging composition +" +
+                        " projectAllPayloadKinds factory"),
+                BASChapterKnife(
+                    mNumber: 1266,
+                    knife: "第三刀",
+                    concept:
+                        "Existing chapter 467/468 PROOF" +
+                        " tests continue passing。 Bundle" +
+                        " projection now genuine (no" +
+                        " more hardcoded 0)。 chapter 442" +
+                        " projection coverage closed"),
+                BASChapterKnife(
+                    mNumber: 1267,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 472 close-out + Phase 2" +
+                        " bump (chapter 69→70,mNumberLast" +
+                        " 1263→1267,commits 309→313)。" +
+                        " All chapter-468 plannedFutureCuts" +
+                        " items now shipped (469-472)。" +
+                        " Branch ready for merge review")
+            ],
+            entropyClassesAttacked: [
+                "bundle-projection-incomplete-entropy",
+                "hardcoded-zero-projection-entropy",
+                "no-checkpoint-replay-via-bundle-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二",
+                "ADR-014 OPT-IN preserved (additive" +
+                " field + Codable backward-compat)",
+                "ADR-016 (advanced M1263 → M1267)",
+                "系统熵 reduction",
+                "POST-PHASE-3 FEATURE chapter 6 —" +
+                " bundle projection completion"
+            ],
+            plannedFutureCuts: [
+                "chapter 473+:merge phase-3-doctrine-" +
+                "collapse branch back to main (requires" +
+                " user OK)",
+                "chapter 474+:add BCM to observer" +
+                " configuration as 5th primitive slot",
+                "chapter 475+:add hierarchical state to" +
+                " aggregate snapshot",
+                "chapter 476+:expand benchmark harness" +
+                " to attention + matMul + rmsNorm +" +
+                " rotaryEmbedding paths",
+                "chapter 477+:on-device real M2/M3/M4" +
+                " ANE capability probe gated tests"
+            ],
+            summary:
+                "POST-PHASE-3 FEATURE chapter 472 closes" +
+                " the bundle projection gap opened by" +
+                " chapter 467。 BASEventLogReplayBundle" +
+                " now carries biomimeticCheckpointEvents" +
+                " field;perKindEventCount reports the" +
+                " real count (no longer hardcoded 0);" +
+                " projectAllPayloadKinds factory" +
+                " projects checkpoint events alongside" +
+                " the 7 prior payload kinds。 Codable" +
+                " backward-compat preserved (legacy" +
+                " JSON readable)。 All chapter-468" +
+                " plannedFutureCuts items now shipped" +
+                " (chapters 469-472)。 ADR-016 → M1267。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

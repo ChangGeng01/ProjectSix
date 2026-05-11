@@ -1066,7 +1066,44 @@ public enum BASEntropyChapterIndex {
                 " closure (engine emits → replay" +
                 " restores → byte-equal state)。 Cross-" +
                 "session recovery is now a 1-line call。" +
-                " ADR-016 → M1251")
+                " ADR-016 → M1251"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十九",
+            mNumberFirst: 1252, mNumberLast: 1255,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "BCM meta-plasticity primitive。" +
+                " 11 PROOF tests including threshold-" +
+                "homeostatic-rise proof。 ADR-016 → M1255"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十",
+            mNumberFirst: 1256, mNumberLast: 1259,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "Wire BASHierarchicalPredictive" +
+                "Coding into BASBiomimeticTurnObserver" +
+                " as 4th optional slot。 5 PROOF tests。" +
+                " ADR-016 → M1259"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十一",
+            mNumberFirst: 1260, mNumberLast: 1263,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "Expand BASMetalBenchmarkHarness" +
+                " with runMambaScan covering Mamba CPU" +
+                " + GPU paths。 2 PROOF tests with real" +
+                " µs。 ADR-016 → M1263"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十二",
+            mNumberFirst: 1264, mNumberLast: 1267,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "Add biomimeticCheckpointEvents" +
+                " field to BASEventLogReplayBundle" +
+                " (closes chapter 442 projection gap)。" +
+                " Codable backward-compat preserved。" +
+                " All chapter-468 plannedFutureCuts now" +
+                " shipped。 ADR-016 → M1267")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

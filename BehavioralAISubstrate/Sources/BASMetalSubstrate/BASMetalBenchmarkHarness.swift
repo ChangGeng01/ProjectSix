@@ -250,6 +250,80 @@ public actor BASMetalBenchmarkHarness {
 
     public init() {}
 
+    /// Run a Mamba selective-scan benchmark for the
+    /// given (batch × hiddenDim × stateDim × sequence)
+    /// shape。 chapter 471 / M1261 — extends harness
+    /// coverage from plasticity-only (chapter 460) to
+    /// Mamba SSM (chapter 451 GPU path)。 Reports CPU
+    /// vs GPU µs。
+    public func runMambaScan(
+        batch: Int,
+        hiddenDim: Int,
+        stateDim: Int,
+        sequenceLength: Int,
+        warmupIterations: Int = 3,
+        timedIterations: Int = 10
+    ) async throws -> BASMetalBenchmarkReport {
+        let shape = BASMambaSSMShape(
+            batch: batch,
+            hiddenDim: hiddenDim,
+            stateDim: stateDim)
+        let inputs = BASMambaSSMScanInputs(
+            x: Array(repeating: 0.5,
+                count: batch * sequenceLength * hiddenDim),
+            delta: Array(repeating: 0.1,
+                count: batch * sequenceLength * hiddenDim),
+            a: Array(repeating: -1.0,
+                count: hiddenDim * stateDim),
+            b: Array(repeating: 0.2,
+                count: batch * sequenceLength * stateDim),
+            c: Array(repeating: 0.3,
+                count: batch * sequenceLength * stateDim),
+            sequenceLength: sequenceLength)
+        // CPU path
+        let cpuMamba = BASMambaSSMState(shape: shape)
+        for _ in 0..<warmupIterations {
+            _ = try await cpuMamba.selectiveScan(
+                inputs: inputs)
+        }
+        var cpuSamples: [Double] = []
+        for _ in 0..<timedIterations {
+            let t0 = Self.nowMicroseconds()
+            _ = try await cpuMamba.selectiveScan(
+                inputs: inputs)
+            let t1 = Self.nowMicroseconds()
+            cpuSamples.append(t1 - t0)
+        }
+        // GPU path
+        var gpuSamples: [Double] = []
+        var gpuAvailable = true
+        let gpuMamba = BASMambaSSMState(shape: shape)
+        do {
+            for _ in 0..<warmupIterations {
+                _ = try await gpuMamba.selectiveScanGPU(
+                    inputs: inputs)
+            }
+            for _ in 0..<timedIterations {
+                let t0 = Self.nowMicroseconds()
+                _ = try await gpuMamba.selectiveScanGPU(
+                    inputs: inputs)
+                let t1 = Self.nowMicroseconds()
+                gpuSamples.append(t1 - t0)
+            }
+        } catch BASMambaSSMError.gpuUnavailable {
+            gpuAvailable = false
+        }
+        return BASMetalBenchmarkReport(
+            shape: BASMetalBenchmarkShape(
+                preDim: batch * hiddenDim,
+                postDim: stateDim * sequenceLength,
+                warmupIterations: warmupIterations,
+                timedIterations: timedIterations),
+            cpuMicrosecondsSamples: cpuSamples,
+            gpuMicrosecondsSamples: gpuSamples,
+            gpuAvailable: gpuAvailable)
+    }
+
     /// Run one full benchmark for the given shape。
     /// The fold's plasticity rule is fixed to
     /// `.hebbian` (the simplest rule;all 4 rules share
@@ -317,7 +391,7 @@ public actor BASMetalBenchmarkHarness {
     // High-resolution monotonic clock in µs。 mach
     // absolute time on Apple platforms;falls back to
     // CFAbsoluteTime elsewhere。
-    private static func nowMicroseconds() -> Double {
+    fileprivate static func nowMicroseconds() -> Double {
         return CFAbsoluteTimeGetCurrent() * 1_000_000.0
     }
 }

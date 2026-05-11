@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1251",
-            "M1251:doctrine version reflects POST-PHASE-3 FEATURE 2 (chapter 四百六十八 — BASBiomimeticCheckpointReplay namespace closes cross-session recovery loop;1-line restoration of observer state from event log)")
+            "ADR-016.M1267",
+            "M1267:doctrine version reflects POST-PHASE-3 FEATURES 3-6 (chapters 四百六十九 BCM + 四百七十 hier slot + 四百七十一 Mamba bench + 四百七十二 bundle projection;all chapter-468 plannedFutureCuts now shipped)")
     }
 
     // MARK: - M-number range matches chapter 四百二

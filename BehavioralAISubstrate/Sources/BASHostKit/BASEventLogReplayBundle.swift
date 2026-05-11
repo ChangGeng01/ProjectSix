@@ -80,6 +80,7 @@ import Foundation
 import BASRuntimeCore
 import BASMemory
 import BASPolicy
+import BASMetalSubstrate
 
 // MARK: - Bundle struct
 
@@ -134,6 +135,17 @@ public struct BASEventLogReplayBundle:
     public let nativeStagePerStepEvents:
         [BASNativeStagePerStepEventPayload]
 
+    /// M1245 chapter 四百六十七 biomimetic checkpoint
+    /// events (aggregate snapshot snapshots emitted
+    /// by the engine every N turns when chapter 467's
+    /// auto-checkpoint integration is wired)。 Empty
+    /// unless the host wired the cadence + event log。
+    /// chapter 472 / M1265 closes the projection gap
+    /// (previously perKindEventCount reported 0 for
+    /// this kind because no projection array existed)。
+    public let biomimeticCheckpointEvents:
+        [BASBiomimeticCheckpointEventPayload]
+
     /// Construct the 7-kind bundle。
     ///
     /// **`nativeStagePerStepEvents` default**:Defaults
@@ -154,7 +166,9 @@ public struct BASEventLogReplayBundle:
         planAssignmentEvents:
             [BASTurnRuntimePlanAssignmentEventPayload],
         nativeStagePerStepEvents:
-            [BASNativeStagePerStepEventPayload] = []
+            [BASNativeStagePerStepEventPayload] = [],
+        biomimeticCheckpointEvents:
+            [BASBiomimeticCheckpointEventPayload] = []
     ) {
         self.memoryAtomEvents = memoryAtomEvents
         self.turnLifecycleEvents = turnLifecycleEvents
@@ -165,6 +179,46 @@ public struct BASEventLogReplayBundle:
         self.planAssignmentEvents = planAssignmentEvents
         self.nativeStagePerStepEvents =
             nativeStagePerStepEvents
+        self.biomimeticCheckpointEvents =
+            biomimeticCheckpointEvents
+    }
+
+    // Custom Codable decoder for backward-compat:JSON
+    // payloads encoded BEFORE chapter 472 don't contain
+    // a `biomimeticCheckpointEvents` key。 chapter 472 /
+    // M1265。
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(
+            keyedBy: CodingKeys.self)
+        self.memoryAtomEvents = try c.decode(
+            [BASMemoryAtomEventPayload].self,
+            forKey: .memoryAtomEvents)
+        self.turnLifecycleEvents = try c.decode(
+            [BASTurnLifecycleEventPayload].self,
+            forKey: .turnLifecycleEvents)
+        self.parallelStageEvents = try c.decode(
+            [BASParallelStageEventPayload].self,
+            forKey: .parallelStageEvents)
+        self.permitEscalationEvents = try c.decode(
+            [BASPermitEscalationEventPayload].self,
+            forKey: .permitEscalationEvents)
+        self.nativeStageDispatchEvents = try c.decode(
+            [BASNativeStageDispatchEventPayload].self,
+            forKey: .nativeStageDispatchEvents)
+        self.planAssignmentEvents = try c.decode(
+            [BASTurnRuntimePlanAssignmentEventPayload].self,
+            forKey: .planAssignmentEvents)
+        self.nativeStagePerStepEvents = (try?
+            c.decode(
+                [BASNativeStagePerStepEventPayload].self,
+                forKey: .nativeStagePerStepEvents))
+            ?? []
+        self.biomimeticCheckpointEvents = (try?
+            c.decode(
+                [BASBiomimeticCheckpointEventPayload]
+                    .self,
+                forKey: .biomimeticCheckpointEvents))
+            ?? []
     }
 
     /// Empty bundle for an event log slice that contained
@@ -179,7 +233,8 @@ public struct BASEventLogReplayBundle:
             permitEscalationEvents: [],
             nativeStageDispatchEvents: [],
             planAssignmentEvents: [],
-            nativeStagePerStepEvents: [])
+            nativeStagePerStepEvents: [],
+            biomimeticCheckpointEvents: [])
 
     /// Total event count across all 7 typed payload
     /// kinds。 Cheap sanity assertion for tests + replay
@@ -193,6 +248,7 @@ public struct BASEventLogReplayBundle:
             + nativeStageDispatchEvents.count
             + planAssignmentEvents.count
             + nativeStagePerStepEvents.count
+            + biomimeticCheckpointEvents.count
     }
 
     /// Per-kind event count map。 Useful for replay
@@ -218,15 +274,12 @@ public struct BASEventLogReplayBundle:
             BASEventPayloadKind
                 .nativeStagePerStep.rawValue:
                 nativeStagePerStepEvents.count,
-            // chapter 467 / M1247 — biomimetic-
-            // checkpoint events are NOT yet projected
-            // into the bundle (deferred to chapter
-            // 468 replay-loop closure)。 Reporting 0
-            // here keeps the perKindEventCount map
-            // contract (all 8 kinds present) while
-            // the projection layer catches up。
+            // chapter 472 / M1265 — biomimetic-
+            // checkpoint events now genuinely projected
+            // into the bundle。
             BASEventPayloadKind
-                .biomimeticCheckpoint.rawValue: 0
+                .biomimeticCheckpoint.rawValue:
+                biomimeticCheckpointEvents.count
         ]
     }
 
@@ -275,7 +328,10 @@ public struct BASEventLogReplayBundle:
                     other.planAssignmentEvents,
             nativeStagePerStepEvents:
                 nativeStagePerStepEvents +
-                    other.nativeStagePerStepEvents)
+                    other.nativeStagePerStepEvents,
+            biomimeticCheckpointEvents:
+                biomimeticCheckpointEvents +
+                    other.biomimeticCheckpointEvents)
     }
 
     /// Combine an arbitrary list of bundles into one。
@@ -319,6 +375,16 @@ extension BASEventLogProjectors {
     public static func projectAllPayloadKinds(
         _ entries: [BASEventLogEntry]
     ) -> BASEventLogReplayBundle {
+        // chapter 472 / M1265 — project biomimetic
+        // checkpoint events via filter + decode
+        let bioCheckpoints = entries.compactMap {
+            entry -> BASBiomimeticCheckpointEventPayload? in
+            guard entry.payloadKind ==
+                .biomimeticCheckpoint
+            else { return nil }
+            return entry
+                .biomimeticCheckpointEventPayload
+        }
         return BASEventLogReplayBundle(
             memoryAtomEvents:
                 projectMemoryAtomEvents(entries),
@@ -333,7 +399,9 @@ extension BASEventLogProjectors {
             planAssignmentEvents:
                 projectPlanAssignmentEvents(entries),
             nativeStagePerStepEvents:
-                projectNativeStagePerStepEvents(entries))
+                projectNativeStagePerStepEvents(entries),
+            biomimeticCheckpointEvents:
+                bioCheckpoints)
     }
 
     // MARK: - chapter 四百四十三 / M1149 — cross-session factory

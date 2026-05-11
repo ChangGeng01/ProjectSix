@@ -144,13 +144,20 @@ public struct BASBiomimeticTurnSignal:
     /// observer dispatches mamba.selectiveScan(inputs:)。
     public let mambaInputs: BASMambaSSMScanInputs?
 
+    /// Hierarchical predictive coding input vector。
+    /// When non-nil AND the observer's `hierarchical`
+    /// primitive is populated,observer dispatches
+    /// hierarchical.observe(_:)。 chapter 470 / M1257。
+    public let hierarchicalObservation: [Float]?
+
     public init(
         predictiveObservation: [Float]? = nil,
         plasticityPre: [Float]? = nil,
         plasticityPost: [Float]? = nil,
         plasticityOutcome: Float = 0,
         plasticityTimingDelta: Float = 0,
-        mambaInputs: BASMambaSSMScanInputs? = nil
+        mambaInputs: BASMambaSSMScanInputs? = nil,
+        hierarchicalObservation: [Float]? = nil
     ) {
         self.predictiveObservation = predictiveObservation
         self.plasticityPre = plasticityPre
@@ -158,6 +165,8 @@ public struct BASBiomimeticTurnSignal:
         self.plasticityOutcome = plasticityOutcome
         self.plasticityTimingDelta = plasticityTimingDelta
         self.mambaInputs = mambaInputs
+        self.hierarchicalObservation =
+            hierarchicalObservation
     }
 
     /// Convenience:count of populated (non-nil) drive
@@ -170,6 +179,7 @@ public struct BASBiomimeticTurnSignal:
             count += 1
         }
         if mambaInputs != nil { count += 1 }
+        if hierarchicalObservation != nil { count += 1 }
         return count
     }
 }
@@ -196,6 +206,12 @@ public struct BASBiomimeticTurnObservation:
     /// signal carried scan inputs)。
     public let mamba: BASMambaSSMScanOutputs?
 
+    /// Hierarchical predictive coding observation
+    /// result (if hierarchy was populated AND signal
+    /// carried a hierarchical observation)。 chapter
+    /// 470 / M1257。
+    public let hierarchical: BASHierarchicalObservation?
+
     /// 0-based turn index for this observe call
     /// (matches the observer's turnsObservedCount AT
     /// the moment the call was made)。
@@ -205,11 +221,13 @@ public struct BASBiomimeticTurnObservation:
         predictive: BASPredictiveCodingObservation? = nil,
         plasticity: BASPlasticityUpdate? = nil,
         mamba: BASMambaSSMScanOutputs? = nil,
+        hierarchical: BASHierarchicalObservation? = nil,
         turnIndex: Int = 0
     ) {
         self.predictive = predictive
         self.plasticity = plasticity
         self.mamba = mamba
+        self.hierarchical = hierarchical
         self.turnIndex = max(0, turnIndex)
     }
 
@@ -220,6 +238,7 @@ public struct BASBiomimeticTurnObservation:
         if predictive != nil { count += 1 }
         if plasticity != nil { count += 1 }
         if mamba != nil { count += 1 }
+        if hierarchical != nil { count += 1 }
         return count
     }
 }
@@ -246,6 +265,13 @@ public actor BASBiomimeticTurnObserver {
     /// don't use substrate-level learning here。
     public nonisolated let plasticity: BASPlasticityFold?
 
+    /// Hierarchical predictive coding primitive
+    /// (chapter 459)。 nil means hosts don't use
+    /// multi-level adaptation here。 chapter 470 /
+    /// M1257。
+    public nonisolated let hierarchical:
+        BASHierarchicalPredictiveCoding?
+
     /// Number of `observe(_:)` calls processed since
     /// last `reset()`。
     private var turnsObserved: Int = 0
@@ -253,11 +279,14 @@ public actor BASBiomimeticTurnObserver {
     public init(
         mamba: BASMambaSSMState? = nil,
         predictive: BASPredictiveCodingProbe? = nil,
-        plasticity: BASPlasticityFold? = nil
+        plasticity: BASPlasticityFold? = nil,
+        hierarchical:
+            BASHierarchicalPredictiveCoding? = nil
     ) {
         self.mamba = mamba
         self.predictive = predictive
         self.plasticity = plasticity
+        self.hierarchical = hierarchical
     }
 
     /// Read-only count of turns observed since last
@@ -268,12 +297,14 @@ public actor BASBiomimeticTurnObserver {
 
     /// Read-only count of populated (non-nil) primitive
     /// slots。 Mirrors chapter 455 aggregate's
-    /// populatedPrimitiveCount。
+    /// populatedPrimitiveCount。 chapter 470 / M1257
+    /// extends to 4 slots。
     public nonisolated var populatedPrimitiveCount: Int {
         var count = 0
         if mamba != nil { count += 1 }
         if predictive != nil { count += 1 }
         if plasticity != nil { count += 1 }
+        if hierarchical != nil { count += 1 }
         return count
     }
 
@@ -317,11 +348,21 @@ public actor BASBiomimeticTurnObserver {
             mambaResult = try await state
                 .selectiveScan(inputs: inputs)
         }
+        // Hierarchical dispatch (chapter 470 / M1257)
+        var hierarchicalResult:
+            BASHierarchicalObservation? = nil
+        if let hier = hierarchical,
+           let input = signal.hierarchicalObservation
+        {
+            hierarchicalResult = try await hier
+                .observe(input)
+        }
         turnsObserved += 1
         return BASBiomimeticTurnObservation(
             predictive: predictiveResult,
             plasticity: plasticityResult,
             mamba: mambaResult,
+            hierarchical: hierarchicalResult,
             turnIndex: currentTurn)
     }
 
@@ -385,6 +426,9 @@ public actor BASBiomimeticTurnObserver {
         }
         if let fold = plasticity {
             await fold.reset()
+        }
+        if let hier = hierarchical {
+            await hier.reset()
         }
         turnsObserved = 0
     }
