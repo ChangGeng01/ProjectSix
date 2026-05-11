@@ -37,17 +37,16 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs506() {
+    func testLastChapterIs507() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百六",
-            "M1404 chapter 五百六 — cluster B fold" +
-            " continues。 BASTurnAuditProjectionsAbyssal" +
-            "ThermalTrio + BASTurnAuditProjectionsGate" +
-            "SideDeriveTrio consolidate 6 ForAudit/" +
-            "ForGate derives。 44 typed surfaces" +
-            " cumulative")
+            "chapter 五百七",
+            "M1408 chapter 五百七 — Tier C ADR-019" +
+            " implementation entry。 User approval" +
+            " received via 全面 开发 tier abc;2 of" +
+            " 4 Tier C typed shape-specific primitives" +
+            " shipped。 46 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

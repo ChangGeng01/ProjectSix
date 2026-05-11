@@ -105,11 +105,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// 501 Tier 1 honest SEAL at 52/60 + 502 wire-in
     /// push + 503 observer wire-ins + 504 bundle
     /// aggregator wire-ins + 505 unified audit emission
-    /// M1400 MILESTONE + 506 cluster B fold continues)。
-    /// Re-captured at chapter 506 close-out。 Chapter
-    /// 506:2 typed factory bundles consolidate 6
-    /// ForAudit/ForGate derives (abyssal+thermal trio
-    /// + gate-side derive trio)。
+    /// M1400 MILESTONE + 506 cluster B fold continues +
+    /// 507 Tier C ADR-019 implementation entry)。
+    /// Re-captured at chapter 507 close-out。 Chapter
+    /// 507:USER APPROVAL via 全面 开发 tier abc
+    /// directive flipped ADR-019 proposal to approved;
+    /// 2 of 4 Tier C typed shape-specific primitives
+    /// shipped (BASInspectionFrame + BASRiskObservation
+    /// Card)。
     static let frozenFullRegistrySha256: String =
-        "fb4fbc47328ce4826559d04925431cd6e1b4004aa5e917e3a79601c34f9bc87b"
+        "7b45bedd143396941639ccdb9969dfbd8c8474936862a9a3fbf6417f5b9ad41b"
 }

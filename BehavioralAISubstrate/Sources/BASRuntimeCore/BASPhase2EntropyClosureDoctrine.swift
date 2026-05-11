@@ -160,7 +160,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百三",       // M1389-M1392 (observer wire-ins:3 more typed surfaces consumed)
         "chapter 五百四",       // M1393-M1396 (bundle aggregator wire-ins:9th + 10th BASBundle)
         "chapter 五百五",       // M1397-M1400 (unified end-of-turn audit emission — M1400 milestone)
-        "chapter 五百六"        // M1401-M1404 (cluster B fold continues — 2 trio bundles, 6 derives consolidated)
+        "chapter 五百六",       // M1401-M1404 (cluster B fold continues — 2 trio bundles, 6 derives consolidated)
+        "chapter 五百七"        // M1405-M1408 (Tier C ADR-019 implementation entry — 2 primitives shipped)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -177,16 +178,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1404
+    public static let mNumberLast: Int = 1408
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1404)。 Bumped through chapter 506:445 → 449。
-    /// Chapter 506:cluster B fold continues — M1401
-    /// abyssal+thermal trio + M1402 splice + M1403
-    /// gate-side derive trio + M1404 close-out。 6
-    /// ForAudit/ForGate derives consolidated into 2
-    /// typed factory bundles。
-    public static let commitsShipped: Int = 449
+    /// M1408)。 Bumped through chapter 507:449 → 453。
+    /// Chapter 507:Tier C ADR-019 implementation entry
+    /// — M1405 approval flip + M1406 BASInspectionFrame
+    /// + M1407 BASRiskObservationCard + M1408 close-out。
+    public static let commitsShipped: Int = 453
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

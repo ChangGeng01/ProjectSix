@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1404",
-            "M1404:doctrine version reflects chapter 五百六 — cluster B fold continues。 BASTurnAuditProjectionsAbyssalThermalTrio + BASTurnAuditProjectionsGateSideDeriveTrio consolidate 6 ForAudit/ForGate derives across 2 V1 splices。 44 typed surfaces cumulative。 V1 byte-equality preserved via shadow-rebinding + stress-sweep dual-mode regression guard。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1408",
+            "M1408:doctrine version reflects chapter 五百七 — Tier C ADR-019 implementation entry。 USER APPROVAL via 全面 开发 tier abc directive (M1405);2 of 4 Tier C typed shape-specific generic primitives shipped (BASInspectionFrame<Body> M1406 + BASRiskObservationCard<Kind, Body> M1407)。 46 typed surfaces cumulative。 ADR-014 OPT-IN preserved (purely additive)")
     }
 
     // MARK: - M-number range matches chapter 四百二

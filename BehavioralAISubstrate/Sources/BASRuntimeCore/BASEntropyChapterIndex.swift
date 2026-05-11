@@ -1510,7 +1510,23 @@ public enum BASEntropyChapterIndex {
                 " cumulative。 ADR-016 → M1404。 V1" +
                 " byte-equality preserved via shadow-" +
                 "rebinding + stress-sweep dual-mode" +
-                " regression guard。")
+                " regression guard。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七",
+            mNumberFirst: 1405, mNumberLast: 1408,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier C ADR-019 implementation" +
+                " entry:user 全面 开发 tier abc" +
+                " directive flipped proposal to" +
+                " approved (M1405);2 of 4 Tier C" +
+                " typed shape-specific primitives" +
+                " shipped (BASInspectionFrame<Body> +" +
+                " BASRiskObservationCard<Kind, Body>)。" +
+                " 46 typed surfaces cumulative。" +
+                " ADR-016 → M1408。 Chapter 508 ships" +
+                " remaining 2 (BASArbitrationFrame +" +
+                " BASGovernanceCard)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

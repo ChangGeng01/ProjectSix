@@ -4137,7 +4137,110 @@ public enum BASChapterDoctrineRegistry {
                 " LOC vs declaration accounting:inline-" +
                 "construction LOC drops ~22 lines while" +
                 " declaration count rises +2 (shadow" +
-                " rebindings counted)。")
+                " rebindings counted)。"),
+
+        // chapter 507 — Tier C ADR-019 implementation entry
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七",
+            mNumberFirst: 1405,
+            mNumberLast: 1408,
+            v1MilestoneMNumber: 1408,
+            v1MilestoneStatus:
+                "chapter-507-tier-c-adr-019-implementation-entry",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1405, knife: "第一刀",
+                    concept: "ADR-019 USER APPROVAL" +
+                        " FLIP per directive 全面 开发" +
+                        " tier abc。 BASADR019TierC" +
+                        "ProposalDoctrine.proposalStatus" +
+                        " flipped proposal-only →" +
+                        " approved;isApprovedFor" +
+                        "Implementation false → true。" +
+                        " NEW approvalChapter +" +
+                        " approvalMNumber +" +
+                        " approvalDirective fields" +
+                        " capture audit metadata。"),
+                BASChapterKnife(
+                    mNumber: 1406, knife: "第二刀",
+                    concept: "NEW BASInspectionFrame" +
+                        "<Body> — 1st Tier C shape-" +
+                        "specific generic primitive。" +
+                        " inspectorRefs + inspectedRefs" +
+                        " + inspectionPolicy +" +
+                        " inspectedAtMs + Body +" +
+                        " diagnostics。 Non-empty" +
+                        " inspectorRefs precondition" +
+                        " per ADR-019 inspection-" +
+                        "doctrine pin。 45 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1407, knife: "第三刀",
+                    concept: "NEW BASRiskObservationCard" +
+                        "<Kind, Body> — 2nd Tier C" +
+                        " primitive。 HONEST naming:" +
+                        " proposal called it BASRiskCard" +
+                        " but that name is taken in" +
+                        " BASPolicy;renamed to" +
+                        " BASRiskObservationCard matching" +
+                        " the original bundle migration" +
+                        " target。 severityScore +" +
+                        " confidenceFloor clamped to" +
+                        " [0, 1]。 effectiveWeightedRisk" +
+                        " = severity × confidence。 46" +
+                        " typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1408, knife: "第四刀",
+                    concept: "Chapter 507 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1408。 Tier C entry complete:" +
+                        " ADR-019 approval flipped +" +
+                        " 2 of 4 candidate primitives" +
+                        " shipped (BASInspectionFrame +" +
+                        " BASRiskObservationCard);" +
+                        " chapter 508 ships remaining" +
+                        " 2 (BASArbitrationFrame +" +
+                        " BASGovernanceCard)。")
+            ],
+            entropyClassesAttacked: [
+                "adr-019-stuck-in-proposal-status",
+                "tier-c-shape-specific-generics-missing",
+                "inspection-aggregate-not-typed-generic",
+                "risk-observation-no-clamped-invariants"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1408",
+                "adr-019-user-approval-captured-verbatim",
+                "tier-c-implementation-in-progress",
+                "v1-byte-equality-preserved"
+            ],
+            plannedFutureCuts: [
+                "chapter 508 — remaining 2 Tier C" +
+                " primitives (BASArbitrationFrame<Body>" +
+                " + BASGovernanceCard<Authority, Decision>)",
+                "future arc — actual migration of" +
+                " BASInspectionBundle/BASRiskObservation" +
+                "Bundle/BASArbitrationFrame/BASGovernance" +
+                "Bundle to use the 4 typed generic" +
+                " primitives",
+                "future arc — production wire-in (host" +
+                " CI lane gated)"
+            ],
+            summary: "Tier C ADR-019 implementation" +
+                " entry:user 全面 开发 tier abc directive" +
+                " flipped BASADR019TierCProposalDoctrine" +
+                " from proposal-only to approved (M1405)。" +
+                " 2 of 4 typed shape-specific generic" +
+                " primitives shipped — BASInspectionFrame" +
+                "<Body> (M1406) + BASRiskObservationCard" +
+                "<Kind, Body> (M1407)。 46 typed surfaces" +
+                " cumulative。 ADR-016 → M1408。 ADR-014" +
+                " OPT-IN preserved (purely additive — no" +
+                " existing migrations yet)。 V1 byte-" +
+                "equality untouched。 Chapter 508 ships" +
+                " remaining 2 primitives。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
