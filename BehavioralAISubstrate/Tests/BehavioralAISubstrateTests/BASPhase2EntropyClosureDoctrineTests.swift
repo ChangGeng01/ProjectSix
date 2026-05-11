@@ -37,16 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs480() {
+    func testLastChapterIs481() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百八十",
-            "M1299 chapter 四百八十 Phase C:bumped to" +
-            " 四百八十 (ANE live default flip +" +
-            " BASMPSGraphExecutableCache observation" +
-            " actor + 45×-gap dispatch latency" +
-            " benchmark)")
+            "chapter 四百八十一",
+            "M1303 chapter 四百八十一 Phase D start:" +
+            " bumped to 四百八十一 (5-primitive" +
+            " adoption proof — first BASResult +" +
+            " BASCard + BASFrameEnvelope adoptions)")
     }
 
     // MARK: - M-number range

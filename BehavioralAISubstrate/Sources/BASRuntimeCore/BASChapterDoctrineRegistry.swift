@@ -2191,7 +2191,68 @@ public enum BASChapterDoctrineRegistry {
                 " future chapter where matMul kernel" +
                 " adopts the observation actor + stores" +
                 " MPSGraph references in its actor" +
-                " state。 V1 byte-equality preserved。")
+                " state。 V1 byte-equality preserved。"),
+
+        // chapter 481 — Phase D start: 5-primitive adoption
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十一",
+            mNumberFirst: 1300,
+            mNumberLast: 1303,
+            v1MilestoneMNumber: 1303,
+            v1MilestoneStatus:
+                "chapter-481-phase-d-5-primitive-adoption-proof",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1300, knife: "第一刀",
+                    concept: "First BASResult<Body>" +
+                        " typealias migration:" +
+                        " BASKernelInvocationResult。" +
+                        " 6 PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1301, knife: "第二刀",
+                    concept: "First BASCard<Kind,Body>" +
+                        " typealias migration:" +
+                        " BASNeuralOpCard。 4 PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1302, knife: "第三刀",
+                    concept: "First BASFrameEnvelope" +
+                        "<Body> typealias migration:" +
+                        " BASKernelDispatchTraceFrame。" +
+                        " 4 PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1303, knife: "第四刀",
+                    concept: "Chapter 481 close-out" +
+                        " + Phase 2 bump + ADR-016" +
+                        ".M1299 → M1303。 4-of-5" +
+                        " generic primitives in" +
+                        " production。")
+            ],
+            entropyClassesAttacked: [
+                "single-primitive-adoption-entropy",
+                "generic-scaffold-without-diversity",
+                "result-card-frame-unadopted-entropy",
+                "low-entropy-progress-untracked"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "chapter 一百八十五",
+                "chapter 二百一一", "chapter 三百九二",
+                "chapter 四百二十九 generic adoption" +
+                " diversity",
+                "ADR-014 OPT-IN", "ADR-016 → M1303"
+            ],
+            plannedFutureCuts: [
+                "chapter 482+ — first BASPermit<Decision>" +
+                " adoption (5-of-5 primitive coverage)",
+                "chapter 483+ — additional sprawl type" +
+                " migrations beyond initial proof",
+                "chapter 489-491 — production wire-in +" +
+                " default mode flip"
+            ],
+            summary: "Phase D start — 3 NEW generic-" +
+                "primitive typealias adoptions covering" +
+                " BASResult + BASCard + BASFrameEnvelope。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

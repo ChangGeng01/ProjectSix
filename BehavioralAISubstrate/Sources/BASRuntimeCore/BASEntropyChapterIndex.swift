@@ -1237,17 +1237,18 @@ public enum BASEntropyChapterIndex {
             mNumberFirst: 1296, mNumberLast: 1299,
             knivesCount: 4, entropyClassesCount: 4,
             pinsCount: 12, futureCutsCount: 4,
-            summary: "REAL HOT-PATH ATTACK to 100%" +
-                " Phase C — ANE live binding default" +
-                " flip + MPSGraph cache observation" +
-                " layer。 Cut 1 — BASANECapabilityProbe" +
-                " defaults to BASANELiveReader.live()" +
-                " on iOS 17+/macOS 14+。 Cut 2 —" +
-                " BASMPSGraphExecutableCache observation" +
-                " actor + 3rd BASBundle migration。" +
-                " Cut 3 — dispatch latency benchmark" +
-                " (45×-gap proves cache opportunity)。" +
-                " Cut 4 — close-out。 ADR-016 → M1299。")
+            summary: "Phase C — ANE live binding default" +
+                " flip + cache observation + 45×-gap" +
+                " benchmark。 ADR-016 → M1299。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十一",
+            mNumberFirst: 1300, mNumberLast: 1303,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Phase D start — 1st BASResult +" +
+                " 1st BASCard + 1st BASFrameEnvelope" +
+                " adoptions。 4-of-5 primitives in" +
+                " production。 ADR-016 → M1303。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

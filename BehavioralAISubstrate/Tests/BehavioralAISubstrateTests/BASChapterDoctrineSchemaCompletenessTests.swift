@@ -1295,7 +1295,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百八十")!)
+                            "chapter 四百八十")!),
+            // M1303 Phase D start 5-primitive adoption
+            checkRegistry("四百八十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百八十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1631,6 +1637,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百八十")!
+                .mNumberLast),
+            // M1303 Phase D start chapter 481
+            ("481",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

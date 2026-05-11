@@ -134,7 +134,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百七十七",   // M1284-M1287 (REAL HOT-PATH ATTACK phase 4 final session close-out — attention numerical PROOF closes 4-of-4 MPSGraph + honest 6-directive re-scoring doctrine + second BASBundle migration)
         "chapter 四百七十八",   // M1288-M1291 (V1 fold PILOT + BASTurnAuditProjectionsKunlunTrio + 3-declaration coordinator splice + BASTurnRuntimeFullSummaryStressSweepRunner regression guard with 300-turn-run 0-divergence PROOF)
         "chapter 四百七十九",   // M1292-M1295 (Phase B missing MPSGraph kernels — softmax + layerNorm + conv2D bring BASNeuralOp coverage 4-of-8 → 7-of-8)
-        "chapter 四百八十"      // M1296-M1299 (Phase C — ANE live binding default flip + BASMPSGraphExecutableCache observation actor + 3rd BASBundle migration + 45×-gap dispatch latency benchmark)
+        "chapter 四百八十",     // M1296-M1299 (Phase C — ANE live binding default flip + BASMPSGraphExecutableCache observation actor + 3rd BASBundle migration + 45×-gap dispatch latency benchmark)
+        "chapter 四百八十一"    // M1300-M1303 (Phase D start — first BASResult/BASCard/BASFrameEnvelope adoptions; 4-of-5 primitives in production)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -147,17 +148,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
     /// M1187 → M1191 → M1195 → M1199 → M1203 → M1207 →
     /// M1211 → ... → M1267 → M1271 → M1275 → M1279 → M1283
-    /// → M1287 → M1291 → M1295 → M1299 (chapter 四百八十
-    /// Phase C — ANE live binding default flip +
-    /// BASMPSGraphExecutableCache observation actor +
-    /// 45×-gap dispatch latency benchmark)。
+    /// → M1287 → M1291 → M1295 → M1299 → M1303 (chapter
+    /// 四百八十一 Phase D start — 1st BASResult + 1st
+    /// BASCard + 1st BASFrameEnvelope adoptions)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1299
+    public static let mNumberLast: Int = 1303
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1299)。 Bumped through chapter 480:341 → 345
-    /// (chapter 480 = 4 cuts)。
-    public static let commitsShipped: Int = 345
+    /// M1303)。 Bumped through chapter 481:345 → 349
+    /// (chapter 481 = 4 cuts)。
+    public static let commitsShipped: Int = 349
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

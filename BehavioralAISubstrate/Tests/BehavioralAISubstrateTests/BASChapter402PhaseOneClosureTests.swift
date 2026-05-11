@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1299",
-            "M1299:doctrine version reflects chapter 四百八十 Phase C — ANE live binding default flip (M1296) + BASMPSGraphExecutableCache observation actor + 3rd BASBundle migration (M1297) + dispatch latency benchmark with 45×-gap PROOF (M1298). ADR-014 OPT-IN preserved via conservativeReader() opt-out factory; V1 byte-equality preserved")
+            "ADR-016.M1303",
+            "M1303:doctrine version reflects chapter 四百八十一 Phase D start — 1st BASResult (M1300) + 1st BASCard (M1301) + 1st BASFrameEnvelope (M1302) adoptions bring generic-primitive adoption to 4-of-5 (6 total adoptions). ADR-014 OPT-IN preserved; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
