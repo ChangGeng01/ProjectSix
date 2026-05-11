@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1327",
-            "M1327:doctrine version reflects chapter 四百八十七 — V1 fold cluster B continuation (8 declarations folded total)。 6 bundle factories cumulative。 ADR-014 OPT-IN preserved; V1 byte-equality preserved")
+            "ADR-016.M1331",
+            "M1331:doctrine version reflects chapter 四百八十八 — V1 cluster B lifecycle quartet folded (12 declarations total)。 7 bundle factories cumulative。 ADR-014 OPT-IN preserved; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -2606,7 +2606,52 @@ public enum BASChapterDoctrineRegistry {
             ],
             summary: "Cluster B 8 declarations folded。" +
                 " 6 bundle factories cumulative。 ADR-" +
-                "016 → M1327。")
+                "016 → M1327。"),
+
+        // chapter 488 — lifecycle quartet fold
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十八",
+            mNumberFirst: 1328,
+            mNumberLast: 1331,
+            v1MilestoneMNumber: 1331,
+            v1MilestoneStatus:
+                "chapter-488-cluster-b-12-of-many",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1328, knife: "第一刀",
+                    concept: "BASTurnAuditProjections" +
+                        "LifecycleQuartet — 4 lifecycle" +
+                        " projections folded。"),
+                BASChapterKnife(
+                    mNumber: 1329, knife: "第二刀",
+                    concept: "Coordinator splice for" +
+                        " quartet。 Cluster B: 8 → 12" +
+                        " declarations folded。"),
+                BASChapterKnife(
+                    mNumber: 1330, knife: "第三刀",
+                    concept: "Doctrine sync。"),
+                BASChapterKnife(
+                    mNumber: 1331, knife: "第四刀",
+                    concept: "Chapter 488 close-out。" +
+                        " ADR-016 → M1331。 7 bundle" +
+                        " factories cumulative。")
+            ],
+            entropyClassesAttacked: [
+                "cluster-b-stalled",
+                "lifecycle-projections-untouched"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1331"
+            ],
+            plannedFutureCuts: [
+                "chapter 489+ — Permit fold (6 rebinds)",
+                "chapter 490+ — V1 DELETION"
+            ],
+            summary: "Cluster B 12 declarations folded。" +
+                " 7 bundle factories cumulative。 ADR-" +
+                "016 → M1331。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

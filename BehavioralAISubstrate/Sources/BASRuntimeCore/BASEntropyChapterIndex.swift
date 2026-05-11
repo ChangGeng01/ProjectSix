@@ -1291,7 +1291,14 @@ public enum BASEntropyChapterIndex {
             knivesCount: 4, entropyClassesCount: 2,
             pinsCount: 6, futureCutsCount: 2,
             summary: "Cluster B 8 declarations folded。" +
-                " ADR-016 → M1327。")
+                " ADR-016 → M1327。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十八",
+            mNumberFirst: 1328, mNumberLast: 1331,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 6, futureCutsCount: 2,
+            summary: "Cluster B 12 declarations folded" +
+                " (lifecycle quartet)。 ADR-016 → M1331。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

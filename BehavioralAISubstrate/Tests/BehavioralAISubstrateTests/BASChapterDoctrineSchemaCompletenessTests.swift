@@ -1337,7 +1337,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百八十七")!)
+                            "chapter 四百八十七")!),
+            // M1331 cluster B lifecycle quartet
+            checkRegistry("四百八十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百八十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1729,6 +1735,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百八十七")!
+                .mNumberLast),
+            // M1331 chapter 488
+            ("488",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
