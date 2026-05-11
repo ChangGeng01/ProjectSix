@@ -114,16 +114,16 @@ public enum BASSweepDoctrineExpectations {
     ///   - Pre-RADICAL Phase 2: chapters 403-426 = 24
     ///   - RADICAL sweep:       chapters 427-446 = 20
     ///   - POST-SWEEP:          chapters 447+      = (grows)
-    /// At M1235:24 + 20 + 18 = 62
-    public static let phase2ChapterCount: Int = 62
+    /// At M1239:24 + 20 + 19 = 63
+    public static let phase2ChapterCount: Int = 63
 
-    /// Phase 2 commits shipped。 At M1235:
-    /// 125 + 84 + 72 = 281 (chapters 447-464 each 4 cuts)
-    public static let phase2CommitsShipped: Int = 281
+    /// Phase 2 commits shipped。 At M1239:
+    /// 125 + 84 + 76 = 285 (chapters 447-465 each 4 cuts)
+    public static let phase2CommitsShipped: Int = 285
 
-    /// Phase 2 mNumberLast。 At M1235:chapter 464 ends
+    /// Phase 2 mNumberLast。 At M1239:chapter 465 ends
     /// here。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1235
+    public static let phase2MNumberLast: Int = 1239
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

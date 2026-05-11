@@ -1178,7 +1178,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百六十四")!)
+                            "chapter 四百六十四")!),
+            // M1239 STRUCTURAL DEBT REPAYMENT 3 (Phase 2b — registry-only)
+            checkRegistry("四百六十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百六十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1383,6 +1389,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百六十四")!
+                .mNumberLast),
+            // M1239 STRUCTURAL DEBT REPAYMENT 3 (Phase 2b — registry-only)
+            ("465",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百六十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百六十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

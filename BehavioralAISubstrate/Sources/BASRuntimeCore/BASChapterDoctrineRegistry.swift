@@ -450,13 +450,12 @@ public enum BASChapterDoctrineRegistry {
                 " (first registry-only chapter)"
             ],
             plannedFutureCuts: [
-                "chapter 465+:DOCTRINE COLLAPSE Phase 3" +
-                " — `git rm` the 60+ historical per-" +
-                "chapter Swift files (BASChapter###" +
-                "EntropyDoctrine.swift) after migrating" +
-                " all cross-doctrine test references to" +
-                " registry lookups。 Net debt repayment" +
-                " ~−12K LOC",
+                "chapter 465 ✓ shipped Phase 2b proof-" +
+                "of-pattern (1 literal chapter + test)。" +
+                " Phase 3 (`git rm` 60+ Swift files +" +
+                " bulk literal conversion) DEFERRED to" +
+                " a user-confirmed chapter due to" +
+                " auto-mode destructive-op constraint",
                 "chapter 466+:auto-checkpoint" +
                 " integration with BASEventLogStorage —" +
                 " observer aggregate snapshot emitted" +
@@ -497,7 +496,154 @@ public enum BASChapterDoctrineRegistry {
                 " deletes the 60+ pre-464 Swift files" +
                 " for the full ~−12K LOC repayment。" +
                 " ADR-016 → M1235。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 465 / M1236-M1239 — Phase 2b proof-
+        // of-pattern。 Course-corrected from "do Phase
+        // 3 in chapter 465" to "stage literal-
+        // conversion safely" because Phase 3 requires
+        // destructive `git rm` which auto-mode
+        // prohibits without explicit user
+        // confirmation。 Chapter 465 ships 1 literal
+        // chapter (453) in BASChapterDoctrineRegistry
+        // +Literals.swift + PROOF tests + chapter
+        // 465's own registry-only entry。 Bulk
+        // conversion + destructive deletion queued
+        // for user-confirmed future chapter。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百六十五",
+            mNumberFirst: 1236,
+            mNumberLast: 1239,
+            v1MilestoneMNumber: 1239,
+            v1MilestoneStatus:
+                "chapter-465-v1-phase-2b-literal-proof-of-pattern",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1236,
+                    knife: "第一刀",
+                    concept:
+                        "Course-correct from original" +
+                        " plan (chapter 465 = Phase 3" +
+                        " destructive `git rm`) to" +
+                        " auto-mode-safe scope (Phase" +
+                        " 2b proof-of-pattern via" +
+                        " literal conversion of 1" +
+                        " chapter)。 Auto-mode rule:" +
+                        " destructive operations" +
+                        " require explicit user" +
+                        " confirmation;course-correct" +
+                        " to safer method instead。" +
+                        " Decision pinned in chapter" +
+                        " 465 close-out"),
+                BASChapterKnife(
+                    mNumber: 1237,
+                    knife: "第二刀",
+                    concept:
+                        "Ship BASChapterDoctrine" +
+                        "Registry+Literals.swift with" +
+                        " 1 LITERAL chapter record" +
+                        " (chapter 453) as proof-of-" +
+                        "pattern。 Literal is fully" +
+                        " self-contained,no reference" +
+                        " to BASChapter453Entropy" +
+                        "Doctrine symbol。 Future" +
+                        " chapters extend the literals" +
+                        " array until all 11 derived" +
+                        " entries have counterparts"),
+                BASChapterKnife(
+                    mNumber: 1238,
+                    knife: "第三刀",
+                    concept:
+                        "6 PROOF tests verifying" +
+                        " literal-byte-matches-" +
+                        "derivation invariant +" +
+                        " literal Codable round-trip +" +
+                        " literal fields non-empty +" +
+                        " chapter 465 itself is" +
+                        " registry-only (Phase 2" +
+                        " pattern continued) + Phase" +
+                        " 2 covenant unchanged + main" +
+                        " registry literal accessor" +
+                        " count = 1"),
+                BASChapterKnife(
+                    mNumber: 1239,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 465 close-out + Phase" +
+                        " 2 bump (chapter 62→63," +
+                        " mNumberLast 1235→1239,commits" +
+                        " 281→285) + ADR-016.M1235 →" +
+                        " M1239 + acknowledge Phase 3" +
+                        " (destructive 60+ file `git" +
+                        " rm`) requires user" +
+                        " confirmation and is queued" +
+                        " for a future chapter")
+            ],
+            entropyClassesAttacked: [
+                "premature-destructive-phase3-entropy",
+                "no-literal-conversion-pattern-entropy",
+                "phase2b-invariant-unverified-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五 (typed literal" +
+                " same surface as derived)",
+                "chapter 二百一一 (one literals file)",
+                "chapter 三百九二 (literal-vs-derivation" +
+                " byte-equality verified)",
+                "ADR-014 OPT-IN preserved (additive)",
+                "ADR-016 (advanced M1235 → M1239)",
+                "系统熵 reduction",
+                "STRUCTURAL DEBT REPAYMENT chapter 3" +
+                " — Phase 2b proof-of-pattern"
+            ],
+            plannedFutureCuts: [
+                "chapter 466:request explicit user" +
+                " confirmation for Phase 3 destructive" +
+                " `git rm` of 60+ historical per-" +
+                "chapter Swift files",
+                "chapter 467 (user-confirmed):bulk" +
+                " convert remaining 10 derived" +
+                " entries to literals + swap main" +
+                " BASChapterDoctrineRegistry.all to" +
+                " use literals + `git rm` 60+ files" +
+                " in ONE atomic commit (~−12K LOC" +
+                " repayment)",
+                "chapter 468+:auto-checkpoint" +
+                " integration with BASEventLogStorage",
+                "chapter 469+:adaptive A / τ — per-" +
+                "synapse STDP meta-plasticity",
+                "chapter 470+:wire BASHierarchical" +
+                "PredictiveCoding into" +
+                " BASBiomimeticTurnObserver as 4th" +
+                " optional primitive slot"
+            ],
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 3 —" +
+                " ships Phase 2b proof-of-pattern for" +
+                " doctrine collapse literal-conversion。" +
+                " 4 cuts (M1236-M1239):course-correct" +
+                " + ship literal for chapter 453 +" +
+                " 6 PROOF tests + close-out。 Course-" +
+                "correction motivation:original plan" +
+                " said chapter 465 = Phase 3 destructive" +
+                " `git rm` of 60+ Swift files,but auto-" +
+                "mode prohibits destructive ops without" +
+                " explicit user confirmation。 Honest" +
+                " scope:ship 1 literal proving pattern" +
+                " works + queue full Phase 3 for user-" +
+                "confirmed chapter (466+)。 Acknowledged" +
+                " net LOC delta for Phase 2b ALONE is" +
+                " ~+250 LOC (literal sub-file + tests);" +
+                " the real ~−12K LOC repayment requires" +
+                " Phase 3 destruction。 Pattern proven" +
+                " viable;chapter 466 will request user" +
+                " OK to proceed。 ADR-016 → M1239。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

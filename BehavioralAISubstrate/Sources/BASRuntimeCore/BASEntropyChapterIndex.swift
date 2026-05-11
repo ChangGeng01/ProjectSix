@@ -964,7 +964,32 @@ public enum BASEntropyChapterIndex {
                 " file (4× reduction)。 Phase 3" +
                 " (chapter 465+) deletes 60+ historical" +
                 " Swift files for the full ~−12K LOC" +
-                " repayment。 ADR-016 → M1235")
+                " repayment。 ADR-016 → M1235"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十五",
+            mNumberFirst: 1236,
+            mNumberLast: 1239,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 3 —" +
+                " Phase 2b proof-of-pattern for" +
+                " doctrine-collapse literal conversion。" +
+                " Course-corrects from original chapter" +
+                " 465 plan (destructive Phase 3 `git" +
+                " rm`) to auto-mode-safe scope。 NEW" +
+                " BASChapterDoctrineRegistry+Literals" +
+                ".swift with chapter 453 as LITERAL +" +
+                " 6 PROOF tests pinning literal-vs-" +
+                "derivation byte-equality + chapter" +
+                " 465 itself is registry-only (Phase 2" +
+                " pattern continued)。 Phase 3 destruction" +
+                " (60+ file `git rm` + bulk conversion)" +
+                " requires explicit user confirmation。" +
+                " Queued for chapter 466+。 ADR-016 →" +
+                " M1239")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

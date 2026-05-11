@@ -952,7 +952,20 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ~+50 literal vs ~+200 Swift file (4× reduction)。
     /// Phase 3 still pending。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1235"
+    /// M1239 bump:STRUCTURAL DEBT REPAYMENT chapter 3
+    /// — chapter 四百六十五 ships Phase 2b proof-of-
+    /// pattern for doctrine-collapse literal
+    /// conversion。 Course-corrects from original plan
+    /// (chapter 465 = Phase 3 destructive `git rm`) to
+    /// auto-mode-safe scope:literal conversion of 1
+    /// chapter (453) in BASChapterDoctrineRegistry+
+    /// Literals.swift + 6 PROOF tests pinning literal-
+    /// vs-derivation byte-equality。 Phase 3 destruction
+    /// (60+ file `git rm` + bulk literal conversion)
+    /// requires explicit user confirmation and is
+    /// queued for chapter 466+。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1239"
 
     /// Query the typed status of a specific gap。
     public static func status(
