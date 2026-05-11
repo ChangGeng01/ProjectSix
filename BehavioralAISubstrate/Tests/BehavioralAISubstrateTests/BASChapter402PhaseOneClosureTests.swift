@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1356",
-            "M1356:doctrine version reflects chapter 四百九十四 — Tianmen trio fold + M595 cross-site drift elimination。 13 bundle factories cumulative。 Coordinator -~104 LOC net。 ADR-014 OPT-IN preserved; V1 byte-equality preserved")
+            "ADR-016.M1360",
+            "M1360:doctrine version reflects chapter 四百九十五 — permit pipeline typed-surface ship。 15 typed surfaces cumulative。 V1 byte-equality UNTOUCHED (typed-surface-first pattern;executor consumes in chapter 496+)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

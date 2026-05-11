@@ -3087,7 +3087,98 @@ public enum BASChapterDoctrineRegistry {
                 " inline-construction LOC continues to" +
                 " shrink even though declaration count" +
                 " grew slightly (per chapter 492 scope" +
-                " correction)。")
+                " correction)。"),
+
+        // chapter 495 — permit escalation typed observation surfaces
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十五",
+            mNumberFirst: 1357,
+            mNumberLast: 1360,
+            v1MilestoneMNumber: 1360,
+            v1MilestoneStatus:
+                "chapter-495-permit-pipeline-observation",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1357, knife: "第一刀",
+                    concept: "NEW BASPermitEscalation" +
+                        "PipelineObservation — typed" +
+                        " observation of the V1 5-step" +
+                        " escalation pipeline (Codable +" +
+                        " Equatable + Hashable +" +
+                        " Sendable)。 14 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1358, knife: "第二刀",
+                    concept: "Add typed builder factory" +
+                        " BASPermitEscalationPipeline" +
+                        "Observation.build(initialPermit" +
+                        "Mode:chain:) that threads input" +
+                        " mode through chain。 Builder is" +
+                        " the integration point for the" +
+                        " planned BASPermitEscalation" +
+                        "FoldExecutor。"),
+                BASChapterKnife(
+                    mNumber: 1359, knife: "第三刀",
+                    concept: "NEW BASPermitEscalation" +
+                        "DecisionsBundle — typed Sendable +" +
+                        " Equatable batch of all 5" +
+                        " escalation Decision types。" +
+                        " .pipelineObservation(initial" +
+                        "PermitMode:) bridges to the" +
+                        " observation Codable surface。" +
+                        " 15 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1360, knife: "第四刀",
+                    concept: "Chapter 495 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1360。 Permit pipeline typed-" +
+                        "surface ship complete。 HONEST" +
+                        " SCOPE NOTE: V1 6 rebinds NOT" +
+                        " collapsed — sequential" +
+                        " intermediate derives" +
+                        " (unknownReserve、cosmicCold" +
+                        "Counterweight) prevent single-" +
+                        "call fold without restructuring。" +
+                        " Chapter 496+ executor will" +
+                        " consume these typed surfaces。")
+            ],
+            entropyClassesAttacked: [
+                "permit-pipeline-untyped-implicit-sequence",
+                "5-decision-type-batch-untyped",
+                "audit-walker-multi-type-unpack-cost",
+                "fold-executor-missing-integration-surface"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1360",
+                "typed-surface-ship-first-pattern",
+                "V1-byte-equality-untouched-this-chapter"
+            ],
+            plannedFutureCuts: [
+                "chapter 496+ — BASPermitEscalation" +
+                "FoldExecutor.fold(...) actual implementation" +
+                " (consumes typed surfaces shipped here)",
+                "chapter 497+ — Tier 2 (FoundationModels." +
+                "Tool conformer + ssmScan + Tier C ADR)",
+                "Tier 2 close-out at M1367 target"
+            ],
+            summary: "Permit escalation pipeline typed-" +
+                " surface ship。 3 new typed surfaces:" +
+                " BASPermitEscalationStepObservation +" +
+                " BASPermitEscalationPipelineObservation" +
+                " + BASPermitEscalationDecisionsBundle。" +
+                " 15 typed surfaces cumulative。 ADR-016" +
+                " → M1360。 HONEST SCOPE: V1 byte-equality" +
+                " UNTOUCHED — V1 6 rebinds remain" +
+                " sequential due to intermediate" +
+                " dependency on permit。 The future fold" +
+                " executor (chapter 496+) will consume" +
+                " these typed surfaces and may restructure" +
+                " intermediate derives to enable single-" +
+                " call fold。 Typed-surface-ship-first" +
+                " pattern preserved per chapter 三百九二" +
+                " doctrine。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

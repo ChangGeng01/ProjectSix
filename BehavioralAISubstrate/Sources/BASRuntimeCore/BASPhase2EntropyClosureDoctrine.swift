@@ -148,7 +148,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百九十一",   // M1340-M1343 (cluster B 87.5% — post-Tier-1 progress)
         "chapter 四百九十二",   // M1344-M1347 (surface trio + honest scope correction)
         "chapter 四百九十三",   // M1348-M1352 (downstream Kunlun fold — axis + seal/river)
-        "chapter 四百九十四"    // M1353-M1356 (Tianmen trio + gate-side axis reuse)
+        "chapter 四百九十四",   // M1353-M1356 (Tianmen trio + gate-side axis reuse)
+        "chapter 四百九十五"    // M1357-M1360 (permit pipeline typed-surface ship)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -165,11 +166,11 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1356
+    public static let mNumberLast: Int = 1360
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1356)。 Bumped through chapter 494:398 → 402。
-    public static let commitsShipped: Int = 402
+    /// M1360)。 Bumped through chapter 495:402 → 406。
+    public static let commitsShipped: Int = 406
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

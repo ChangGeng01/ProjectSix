@@ -1352,7 +1352,19 @@ public enum BASEntropyChapterIndex {
                 " factory)。 ~104 V1 LOC reduction。" +
                 " 13 bundle factories cumulative。" +
                 " ADR-016 → M1356。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十五",
+            mNumberFirst: 1357, mNumberLast: 1360,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Permit escalation pipeline" +
+                " typed-surface ship:Step + Pipeline" +
+                " Observation + DecisionsBundle。 15" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1360。 V1 byte-equality UNTOUCHED" +
+                " (typed-surface-first pattern;V1 fold" +
+                " executor consumes in chapter 496+)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

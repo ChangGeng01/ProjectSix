@@ -98,11 +98,11 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// + 479 Phase B + 480 Phase C + 481-491 cluster
     /// A/B folds + 492 surface trio + 493 downstream
     /// Kunlun fold + 494 Tianmen trio + gate-side
-    /// axis-protocol reuse)。 Re-captured at chapter
-    /// 494 close-out。 Honest accounting per chapter
-    /// 492 scope correction:cluster B inline-
-    /// construction LOC continues to shrink even as
-    /// declaration count grew slightly。
+    /// axis-protocol reuse + 495 permit pipeline
+    /// typed-surface ship)。 Re-captured at chapter 495
+    /// close-out。 HONEST SCOPE for chapter 495: V1
+    /// byte-equality UNTOUCHED — typed-surface ship
+    /// only;executor consumption in chapter 496+。
     static let frozenFullRegistrySha256: String =
-        "24c3a1bf60a83df241dc88aae3e4ed851fccbce4cfcb2c376b5716e6e04a363c"
+        "242235e344ca9541a4e65d8bbb72700f4ef6679b2872699484eae5d0dd8f5117"
 }
