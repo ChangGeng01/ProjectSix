@@ -123,23 +123,35 @@ public enum BASTierCAchievementDoctrine {
     }
 
     /// HONEST count of existing types migrated to use
-    /// the new primitives。 At chapter 508 close-out:
-    /// 0 (typed primitives are pure-additive — no
-    /// existing types are migrated)。 Migrations are
-    /// follow-up arc work。
+    /// the new primitives。 At chapter 509 close-out:
+    /// 0 (typed primitives + adapters are pure-additive
+    /// — no existing types are modified)。 Migrations
+    /// are follow-up arc work。
     public static let migrationsCompleted: Int = 0
+
+    /// chapter 五百九 / M1415 — typed adapters shipped
+    /// (pure-function read-only converters from existing
+    /// types to the Tier C primitives)。 Adapters provide
+    /// the migration PATH without breaking existing
+    /// callers。 At chapter 509:2 (BASRiskObservation
+    /// CardAdapter + BASInspectionBundleFrameAdapter)。
+    public static let typedAdaptersShipped: Int = 2
 
     /// Target migration count (4 existing types
     /// originally identified in the ADR-019 proposal)。
     public static let migrationTarget: Int = 4
 
     /// Combined Tier C completion (primitives +
-    /// migrations) / (target × 2)。 At chapter 508:
-    /// 4 + 0 = 4 of 8 = 50%。
+    /// adapters + migrations) / (target × 3)。 At
+    /// chapter 509: 4 + 2 + 0 = 6 of 12 = 50%。
+    /// Three-layer accounting captures the progression
+    /// from typed surface → typed adapter → actual
+    /// migration honestly。
     public static var combinedCompletionRatio: Double {
         let total = primitivesShipped
+            + typedAdaptersShipped
             + migrationsCompleted
-        let target = migrationTarget * 2
+        let target = migrationTarget * 3
         return Double(total) / Double(target)
     }
 
@@ -158,12 +170,14 @@ public enum BASTierCAchievementDoctrine {
         return
             "Tier C ADR-019 implementation:" +
             " \(primitivesShipped)/4 typed primitives" +
-            " shipped + \(migrationsCompleted)/4 existing" +
+            " shipped + \(typedAdaptersShipped)/4 typed" +
+            " adapters + \(migrationsCompleted)/4 existing" +
             " type migrations = \(pct)% combined" +
             " completion。 \(renamedPrimitiveCount)" +
             " primitives renamed honestly due to existing-" +
-            "name collisions。 Migrations are follow-up" +
-            " arc work — primitives provide the typed" +
-            " foundation。"
+            "name collisions。 Adapters provide the" +
+            " migration PATH without breaking existing" +
+            " callers — actual migration is follow-up" +
+            " arc work。"
     }
 }

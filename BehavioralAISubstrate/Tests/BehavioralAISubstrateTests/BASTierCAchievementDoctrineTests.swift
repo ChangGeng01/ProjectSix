@@ -112,11 +112,25 @@ final class BASTierCAchievementDoctrineTests: XCTestCase {
     // MARK: - 7) Combined completion ratio
 
     func testCombinedCompletionRatio() {
-        // 4 primitives + 0 migrations = 4 of 8 = 50%
+        // chapter 509 update: 4 primitives + 2 adapters
+        // + 0 migrations = 6 of 12 = 50%
         XCTAssertEqual(
             BASTierCAchievementDoctrine
                 .combinedCompletionRatio,
-            0.5, accuracy: 0.001)
+            0.5, accuracy: 0.001,
+            "3-layer accounting: 4/4 primitives + 2/4" +
+            " adapters + 0/4 migrations = 6/12 = 50%")
+    }
+
+    // MARK: - 7a) Typed adapters shipped count
+
+    func testTypedAdaptersShippedIsTwo() {
+        XCTAssertEqual(
+            BASTierCAchievementDoctrine
+                .typedAdaptersShipped, 2,
+            "chapter 509 ships 2 typed adapters:" +
+            " BASRiskObservationCardAdapter +" +
+            " BASInspectionBundleFrameAdapter")
     }
 
     // MARK: - 8) Honest summary contains key markers
@@ -126,7 +140,11 @@ final class BASTierCAchievementDoctrineTests: XCTestCase {
             BASTierCAchievementDoctrine.honestSummary
         XCTAssertTrue(summary.contains("Tier C"))
         XCTAssertTrue(summary
-            .contains("primitives shipped"))
+            .contains("primitives"))
+        XCTAssertTrue(summary
+            .contains("typed"))
+        XCTAssertTrue(summary
+            .contains("adapters"))
         XCTAssertTrue(summary
             .contains("migrations"))
         XCTAssertTrue(summary
