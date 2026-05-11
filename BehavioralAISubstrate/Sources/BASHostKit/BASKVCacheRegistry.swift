@@ -12,14 +12,32 @@
 // M1305 default policy)。 Tier 2 / chapter 480+ would
 // add LRU eviction if memory pressure becomes a real
 // concern in production deployments。
+//
+// chapter 五百二 / M1385 — wire-in:
+// BASKVCacheInvalidationPolicy (chapter 500 M1379) now
+// CONSUMED by the registry via an init parameter that
+// defaults to `.explicitOnly` (preserves existing
+// behavior)。 The policy field is exposed via the
+// `invalidationPolicy` accessor so audit walkers can
+// confirm what the host configured。
+//
+// HONEST SCOPE: at M1385,only `.explicitOnly` is
+// implemented (matches BASKVCacheInvalidationPolicy
+// Doctrine.implementedPolicies)。 Constructing the
+// registry with any other policy stores the value but
+// does NOT change runtime behavior — the LRU/TTL impl
+// is a follow-up arc per the policy doctrine。
 
 import Foundation
 import BASRuntimeCore
 
 /// Actor-owned registry mapping sessionID →
 /// `BASTransformerKVCacheSession`。 Pure storage actor;
-/// no eviction policy enforcement at M1306 (deferred
-/// to Tier 2 stretch goals per chapter 477 plan)。
+/// chapter 500 typed `BASKVCacheInvalidationPolicy`
+/// captured at construction (default `.explicitOnly`
+/// preserves M1306 behavior;LRU/TTL deferred per
+/// BASKVCacheInvalidationPolicyDoctrine
+/// .implementedPolicies)。
 public actor BASKVCacheRegistry {
 
     private var sessions:
@@ -27,7 +45,40 @@ public actor BASKVCacheRegistry {
     private var hitCount: Int = 0
     private var missCount: Int = 0
 
-    public init() {}
+    /// chapter 五百二 / M1385 — typed invalidation policy
+    /// captured at construction。 Currently informational
+    /// only;the registry's actual invalidation behavior
+    /// is gated by BASKVCacheInvalidationPolicyDoctrine
+    /// .activeImplementedPolicy (which is `.explicitOnly`
+    /// at chapter 502 close-out)。
+    public nonisolated let invalidationPolicy:
+        BASKVCacheInvalidationPolicy
+
+    /// Backward-compatible default init — preserves
+    /// chapter 482 / M1306 behavior。 The invalidation
+    /// policy defaults to `.explicitOnly` matching the
+    /// implemented runtime behavior。
+    public init() {
+        self.invalidationPolicy = .explicitOnly
+    }
+
+    /// chapter 五百二 / M1385 — typed init accepting a
+    /// host-declared invalidation policy。 At chapter
+    /// 502 close-out the policy is stored for audit
+    /// emission but does NOT yet change runtime
+    /// behavior for non-`.explicitOnly` values。
+    /// Per honest scope:
+    ///   - `.explicitOnly` is FULLY implemented
+    ///   - `.lru` / `.ttl` / `.never` are typed contract
+    ///     only — registry stores the value but invalidation
+    ///     still follows `.explicitOnly` semantics until
+    ///     follow-up arc wires the LRU/TTL paths
+    public init(
+        invalidationPolicy:
+            BASKVCacheInvalidationPolicy
+    ) {
+        self.invalidationPolicy = invalidationPolicy
+    }
 
     // MARK: - Lookup / store
 

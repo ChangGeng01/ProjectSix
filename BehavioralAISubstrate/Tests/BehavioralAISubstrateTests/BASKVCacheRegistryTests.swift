@@ -106,4 +106,61 @@ final class BASKVCacheRegistryTests: XCTestCase {
         let tokens = await registry.totalCachedTokens
         XCTAssertEqual(tokens, 3)
     }
+
+    // MARK: - chapter 五百二 / M1385 — typed policy wire-in
+
+    func testDefaultInitPicksExplicitOnlyPolicy() {
+        let registry = BASKVCacheRegistry()
+        XCTAssertEqual(
+            registry.invalidationPolicy,
+            .explicitOnly,
+            "chapter 502 wire-in pin:default registry" +
+            " MUST report .explicitOnly policy" +
+            " (preserves chapter 482 behavior)")
+    }
+
+    func testExplicitPolicyInitStoresLRU() {
+        let registry = BASKVCacheRegistry(
+            invalidationPolicy: .lru)
+        XCTAssertEqual(
+            registry.invalidationPolicy, .lru,
+            "registry MUST store the host-declared" +
+            " policy even when not yet implemented" +
+            " (honest typed contract)")
+    }
+
+    func testExplicitPolicyInitStoresAllFourCases() {
+        for policy in BASKVCacheInvalidationPolicy
+            .allCases
+        {
+            let registry = BASKVCacheRegistry(
+                invalidationPolicy: policy)
+            XCTAssertEqual(
+                registry.invalidationPolicy, policy)
+        }
+    }
+
+    func testRuntimeBehaviorMatchesActiveDoctrine() async
+    {
+        // HONEST scope:registries constructed with
+        // non-explicit-only policies STORE the value
+        // but still behave per the active implemented
+        // policy (.explicitOnly)。 Tested:LRU-tagged
+        // registry retains entries across many appends
+        // (no eviction fires)。
+        let registry = BASKVCacheRegistry(
+            invalidationPolicy: .lru)
+        for sessionID in ["s1", "s2", "s3"] {
+            await registry.appendToken(
+                sampleToken(),
+                atLayer: 0,
+                sessionID: sessionID)
+        }
+        let count = await registry.sessionCount
+        XCTAssertEqual(count, 3,
+            "non-explicit policy stored but NOT active:" +
+            " LRU-tagged registry MUST retain all 3" +
+            " entries (matches .explicitOnly behavior" +
+            " until follow-up arc wires LRU impl)")
+    }
 }
