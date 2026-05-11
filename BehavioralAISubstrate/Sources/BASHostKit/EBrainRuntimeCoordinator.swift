@@ -1296,45 +1296,29 @@ public struct BASEBrainRuntimeCoordinator {
         // integrity production wires.
         let jadeFidelityMapForAudit = kunlunTrioTwoForAudit
             .jadeFidelityMap
-        let hostJadeRegisterForAudit = BASKunlunLayerProjections
-            .HostJadeRegister.derive(
+        // chapter 四百八十六 / M1320 — V1 cluster A FINAL 6 fold
+        let kunlunHexaTwoForAudit =
+            BASTurnAuditProjectionsKunlunHexaTwo.compute(
                 hostID: hostContext.hostID,
                 sessionID: derivedSessionID,
-                turnID: derivedTurnID)
-        let jadeMirrorDraftForAudit = BASKunlunLayerProjections
-            .JadeMirrorDraft.derive(
-                unknownRefs: unknownReserveForGate.unknownRefs,
-                anchorRef:
-                    "human-anchor-\(derivedSessionID)",
-                turnID: derivedTurnID)
-        let kunlunUnnamableSetForAudit = BASKunlunLayerProjections
-            .KunlunUnnamableSet.derive(
-                unknownRefs: unknownReserveForGate.unknownRefs,
-                preservationPolicy: "await-evidence",
-                turnID: derivedTurnID)
-        // M500-M501 (chapter 一百二十八) — Kunlun L4 chapter-99-
-        // deferred wires. Data sources now exist via chapter
-        // 一百二十一+ BASUnknownReserve + chapter 一百二十六+
-        // candidate state.
-        let firstCandidate = thoughtFrame.candidates.first
-        let returnPathRefsForAudit = thoughtFrame.candidates
-            .map { "return-path:\($0.candidateID)" }
-        let kunlunAscentViewForAudit = BASKunlunLayerProjections
-            .AscentView.derive(
-                candidateID: firstCandidate?.candidateID,
-                confidence: firstCandidate?.confidence ?? 0,
-                reversibility:
-                    firstCandidate?.reversibility ?? 1,
-                riskLevel: boundRiskCard.riskLevel,
-                returnPathRefs: returnPathRefsForAudit,
-                turnID: derivedTurnID)
-        let kunlunFarWestReserveForAudit =
-            BASKunlunLayerProjections.FarWestReserve.derive(
+                turnID: derivedTurnID,
                 unknownRefs: unknownReserveForGate.unknownRefs,
                 assertionCeiling: unknownReserveForGate
                     .assertionCeiling,
                 riskLevel: boundRiskCard.riskLevel,
-                turnID: derivedTurnID)
+                candidates: thoughtFrame.candidates)
+        let hostJadeRegisterForAudit = kunlunHexaTwoForAudit
+            .hostJadeRegister
+        let jadeMirrorDraftForAudit = kunlunHexaTwoForAudit
+            .jadeMirrorDraft
+        let kunlunUnnamableSetForAudit = kunlunHexaTwoForAudit
+            .kunlunUnnamableSet
+        let returnPathRefsForAudit = kunlunHexaTwoForAudit
+            .returnPathRefs
+        let kunlunAscentViewForAudit = kunlunHexaTwoForAudit
+            .kunlunAscentView
+        let kunlunFarWestReserveForAudit = kunlunHexaTwoForAudit
+            .kunlunFarWestReserve
         // M495-M498 (chapter 一百二十七) — chapter 一百二十一
         // Cthulhu leftover production wires.
         let abyssalOrganAliasForAudit =
