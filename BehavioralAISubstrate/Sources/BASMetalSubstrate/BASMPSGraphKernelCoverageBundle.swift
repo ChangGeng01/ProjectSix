@@ -177,4 +177,92 @@ public enum BASCanonicalKernelCoverage {
         ],
         recordedAt:
             Date(timeIntervalSince1970: 1_810_000_000))
+
+    /// Snapshot of MPSGraph kernel coverage at chapter
+    /// 496 close-out (M1363) — Tier 2 entry。
+    ///
+    /// 7 of 8 BASNeuralOp cases have native MPSGraph
+    /// kernels with PROOF tests:
+    ///   - matMul、rmsNorm、rotaryEmbedding、attention
+    ///     (chapter 477)
+    ///   - softmax、layerNorm、conv2D (chapter 479)
+    ///
+    /// 1 of 8 is stubbed at the protocol level with HONEST
+    /// scope acknowledgment:
+    ///   - ssmScan (chapter 496 — stub-identity-scan;
+    ///     production requires external Metal shader OR
+    ///     MLX bridge OR CoreML ML Program work scheduled
+    ///     for Tier 2 phase K)
+    public static let chapter496Snapshot:
+        BASMPSGraphKernelCoverageBundle =
+    BASMPSGraphKernelCoverageBundle(
+        bundleID: "mpsgraph-coverage-chapter-496",
+        schemaVersion: "1.0.0",
+        items: [
+            BASMPSGraphKernelCoverageItem(
+                operation: .matMul,
+                provenInChapter: 475,
+                provenAtMNumber: 1277,
+                testCaseCount: 5,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .rmsNorm,
+                provenInChapter: 476,
+                provenAtMNumber: 1280,
+                testCaseCount: 5,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .rotaryEmbedding,
+                provenInChapter: 476,
+                provenAtMNumber: 1282,
+                testCaseCount: 5,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .attention,
+                provenInChapter: 477,
+                provenAtMNumber: 1284,
+                testCaseCount: 4,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .softmax,
+                provenInChapter: 479,
+                provenAtMNumber: 1292,
+                testCaseCount: 4,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .layerNorm,
+                provenInChapter: 479,
+                provenAtMNumber: 1293,
+                testCaseCount: 4,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .conv2D,
+                provenInChapter: 479,
+                provenAtMNumber: 1294,
+                testCaseCount: 3,
+                hasNumericalCorrectnessProof: true),
+            // ssmScan — STUB ONLY at chapter 496。 PROOF
+            // tests cover the stub's identity-scan +
+            // typed contract;NUMERICAL correctness against
+            // a reference Mamba implementation is NOT
+            // proven (production Metal shader required —
+            // Tier 2 phase K)。 hasNumericalCorrectness
+            // Proof: false acknowledges this honestly。
+            BASMPSGraphKernelCoverageItem(
+                operation: .ssmScan,
+                provenInChapter: 496,
+                provenAtMNumber: 1361,
+                testCaseCount: 7,
+                hasNumericalCorrectnessProof: false)
+        ],
+        metadata: [
+            "coverage-target":
+                "7-of-8-native-plus-1-stub",
+            "ssm-scan-status":
+                "stub-identity-scan-tier-2-phase-K-deferred",
+            "evaluation-doctrine":
+                "BASRealHotPathAttackEvaluationDoctrine"
+        ],
+        recordedAt:
+            Date(timeIntervalSince1970: 1_812_000_000))
 }
