@@ -1237,22 +1237,24 @@ public struct BASEBrainRuntimeCoordinator {
         // wires for chapter-一百二十二/三 schemas. Each derive
         // is a pure function from existing turn state; never
         // mutates permit / verdict / lifecycle state.
-        let ascentLeaseForAudit = BASKunlunLayerProjections
-            .AscentLease.derive(
-                from: routedBudget,
-                turnID: derivedTurnID)
-        let axisDeviationForAudit = BASKunlunLayerProjections
-            .AxisDeviation.derive(
-                from: boundRiskCard.riskLevel,
-                turnID: derivedTurnID,
-                situationRef: derivedSessionID,
-                centerlineRef: kunlunAxisForGate.axisID)
-        let gatePressureForAudit = BASKunlunLayerProjections
-            .GatePressure.derive(
-                from: boundRiskCard.riskLevel,
+        // chapter 四百七十八 / M1289 — V1 fold PILOT replaces
+        // 3 separate `let *ForAudit = ...` declarations with
+        // one typed factory call。 Byte-equal by construction
+        // (factory dispatches the same 3 derive calls in the
+        // same order)。 Shadow re-bindings preserve all
+        // downstream reader sites unchanged。 BASStressSweep
+        // Harness dual mode (M1290) is the regression guard。
+        let kunlunTrioForAudit = BASTurnAuditProjectionsKunlunTrio
+            .compute(
+                routedBudget: routedBudget,
+                riskLevel: boundRiskCard.riskLevel,
                 permit: boundActionPermit,
                 turnID: derivedTurnID,
-                situationRef: derivedSessionID)
+                sessionID: derivedSessionID,
+                kunlunAxisID: kunlunAxisForGate.axisID)
+        let ascentLeaseForAudit = kunlunTrioForAudit.ascentLease
+        let axisDeviationForAudit = kunlunTrioForAudit.axisDeviation
+        let gatePressureForAudit = kunlunTrioForAudit.gatePressure
         let yaochiMemoryLayerForAudit = BASKunlunLayerProjections
             .YaochiMemoryLayer.derive(
                 from: routedBudget.runMode,
