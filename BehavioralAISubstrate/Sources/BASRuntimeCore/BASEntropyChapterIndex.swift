@@ -1455,7 +1455,22 @@ public enum BASEntropyChapterIndex {
                 " BASKVCacheRegistryObservationSnapshot" +
                 " (M1387) emits typed snapshots。 33" +
                 " typed surfaces cumulative。 ADR-016 →" +
-                " M1388。 Step BEYOND typed-surface-only。")
+                " M1388。 Step BEYOND typed-surface-only。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三",
+            mNumberFirst: 1389, mNumberLast: 1392,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Observer wire-in push:3 more" +
+                " typed surfaces from chapter 498-500" +
+                " now have actor-isolated observers:" +
+                " BASKernelRoutingDecisionObserver +" +
+                " BASKernelDispatchStatisticsRecorder +" +
+                " BASEBrainHostRuntimeModeAdvisoryLedger。" +
+                " 36 typed surfaces cumulative。 ADR-016" +
+                " → M1392。 HONEST: production executor" +
+                " still doesn't consult observers" +
+                " (preserves chapter 498-500 invariants)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1388",
-            "M1388:doctrine version reflects chapter 五百二 — wire-in push。 BASKVCacheRegistry consumes M1379 policy via M1385;BASKernelEvaluateLatencyProbeBundle (8th BASBundle) aggregates M1369 bodies via M1386;BASKVCacheRegistryObservationSnapshot emits typed snapshots via M1387。 33 typed surfaces cumulative。 Step BEYOND typed-surface-only into actual substrate consumption。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1392",
+            "M1392:doctrine version reflects chapter 五百三 — observer wire-in push。 BASKernelRoutingDecisionObserver wires M1377 + M1378;BASKernelDispatchStatisticsRecorder wires M1375 → M1373 pipeline;BASEBrainHostRuntimeModeAdvisoryLedger wires M1370 advisory + doctrine。 36 typed surfaces cumulative。 Step further BEYOND typed-surface-only。 HONEST: production executor still doesn't consult observers (preserves invariants)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

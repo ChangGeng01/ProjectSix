@@ -3781,7 +3781,98 @@ public enum BASChapterDoctrineRegistry {
                 " actual substrate behavior connection。" +
                 " ADR-014 OPT-IN preserved (default init" +
                 " paths preserved)。 V1 byte-equality" +
-                " untouched。")
+                " untouched。"),
+
+        // chapter 503 — observer wire-ins
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三",
+            mNumberFirst: 1389,
+            mNumberLast: 1392,
+            v1MilestoneMNumber: 1392,
+            v1MilestoneStatus:
+                "chapter-503-observer-wire-ins",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1389, knife: "第一刀",
+                    concept: "NEW BASKernelRouting" +
+                        "DecisionObserver actor wires" +
+                        " M1377 BASANEKernelEligibility" +
+                        "Classifier + M1378 BASThermal" +
+                        "AwareKernelSelectionPolicy into" +
+                        " real observation。 Records" +
+                        " typed BASKernelRoutingDecision" +
+                        "Record per dispatch with tier" +
+                        " + chosen routing + best-case" +
+                        " match flag。 34 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1390, knife: "第二刀",
+                    concept: "NEW BASKernelDispatch" +
+                        "StatisticsRecorder actor wires" +
+                        " M1375 attempt-card → M1373" +
+                        " statistics-bundle pipeline。" +
+                        " Deterministic-order items per" +
+                        " chapter 三百九二 replay" +
+                        " contract。 35 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1391, knife: "第三刀",
+                    concept: "NEW BASEBrainHostRuntime" +
+                        "ModeAdvisoryLedger actor wires" +
+                        " M1370 advisory surface +" +
+                        " doctrine。 Per-host latest" +
+                        " advisory + honoredRatio rollup。" +
+                        " 36 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1392, knife: "第四刀",
+                    concept: "Chapter 503 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1392。 3 more typed surfaces" +
+                        " from chapter 498-500 now have" +
+                        " REAL actor-isolated wire-ins" +
+                        " observing them in test-proven" +
+                        " consumption。")
+            ],
+            entropyClassesAttacked: [
+                "ane-classifier-without-runtime-observer",
+                "dispatch-attempt-card-without-aggregator",
+                "runtime-mode-advisory-without-ledger",
+                "typed-surface-shipped-but-unconsumed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1392",
+                "typed-surface-real-consumption-proven",
+                "consultedByExecutorInProduction-still-false",
+                "v1-byte-equality-preserved"
+            ],
+            plannedFutureCuts: [
+                "future arc — production-side wire-in" +
+                " (host CI lane required for default-" +
+                " mode flip + V1 deletion)",
+                "future arc — actual LRU/TTL invalidation" +
+                " policy implementation",
+                "future arc — Tier C ADR-019 typed shape-" +
+                " specific generics (user approval gated)"
+            ],
+            summary: "Observer wire-in push:3 more typed" +
+                " surfaces from chapter 498-500 now have" +
+                " REAL actor-isolated consumers:" +
+                " BASKernelRoutingDecisionObserver wires" +
+                " ANE classifier + thermal policy;" +
+                " BASKernelDispatchStatisticsRecorder" +
+                " wires attempt card → statistics bundle;" +
+                " BASEBrainHostRuntimeModeAdvisoryLedger" +
+                " wires runtime-mode advisory + doctrine。" +
+                " 36 typed surfaces cumulative。 ADR-016" +
+                " → M1392。 Step further BEYOND typed-" +
+                "surface-only。 HONEST: production" +
+                " executor still doesn't consult these" +
+                " (preserves M1377/M1378/M1370 invariants);" +
+                " hosts opt-in by constructing observers。" +
+                " ADR-014 OPT-IN preserved。 V1 byte-" +
+                "equality untouched。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

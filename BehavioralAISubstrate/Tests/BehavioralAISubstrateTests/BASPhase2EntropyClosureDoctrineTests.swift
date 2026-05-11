@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs502() {
+    func testLastChapterIs503() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百二",
-            "M1388 chapter 五百二:wire-in push —" +
-            " typed surfaces from chapter 498-501 now" +
-            " CONSUMED by real substrate code (M1385" +
-            " KV cache policy wire-in + M1386 probe" +
-            " bundle + M1387 registry snapshot)。 33" +
-            " typed surfaces cumulative")
+            "chapter 五百三",
+            "M1392 chapter 五百三:observer wire-in" +
+            " push — 3 more typed surfaces from chapter" +
+            " 498-500 now have actor-isolated observers" +
+            " (M1389 routing decision + M1390 dispatch" +
+            " statistics + M1391 runtime-mode advisory" +
+            " ledger)。 36 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

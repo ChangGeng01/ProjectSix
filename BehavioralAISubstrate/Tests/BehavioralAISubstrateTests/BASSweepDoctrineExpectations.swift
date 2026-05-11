@@ -117,19 +117,20 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 100
+    public static let phase2ChapterCount: Int = 101
 
-    /// Phase 2 commits shipped。 At M1388:
-    /// 125 + 84 + 224 = 433 (chapter 502 = 4 cuts —
-    /// KV cache policy wire-in + probe bundle aggregator
-    /// + registry observation snapshot + close-out —
-    /// wire-in push moving beyond typed-surface-only)
-    public static let phase2CommitsShipped: Int = 433
+    /// Phase 2 commits shipped。 At M1392:
+    /// 125 + 84 + 228 = 437 (chapter 503 = 4 cuts —
+    /// routing decision observer + dispatch statistics
+    /// recorder + runtime-mode advisory ledger +
+    /// close-out — observer wire-in push)
+    public static let phase2CommitsShipped: Int = 437
 
-    /// Phase 2 mNumberLast。 At M1388:chapter 502
-    /// (wire-in push — typed surfaces consumed by real
-    /// substrate code)。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1388
+    /// Phase 2 mNumberLast。 At M1392:chapter 503
+    /// (observer wire-ins — 3 more typed surfaces
+    /// consumed by actor-isolated observers)。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1392
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
