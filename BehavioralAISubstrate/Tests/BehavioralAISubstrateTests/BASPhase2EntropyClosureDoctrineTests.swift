@@ -37,18 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs475() {
+    func testLastChapterIs476() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百七十五",
-            "M1279 POST-PHASE-3 REAL HOT-PATH ATTACK" +
-            " phase 2:bumped to 四百七十五" +
-            " (BASCanonicalKernelInputBuilders + first" +
-            " PROOF that MPSGraph kernels compute" +
-            " correctly + EchoKernel placeholder gap" +
-            " closed with real BASMPSGraphMatMulKernel" +
-            " end-to-end dispatch)")
+            "chapter 四百七十六",
+            "M1283 POST-PHASE-3 REAL HOT-PATH ATTACK" +
+            " phase 3:bumped to 四百七十六 (RMSNorm" +
+            " + RotaryEmbedding numerical PROOF" +
+            " brings MPSGraph kernel coverage to 3 of" +
+            " 4 + first real BASBundle<Item>" +
+            " typealias migration via" +
+            " BASKernelDispatchOutcomeBundle)")
     }
 
     // MARK: - M-number range

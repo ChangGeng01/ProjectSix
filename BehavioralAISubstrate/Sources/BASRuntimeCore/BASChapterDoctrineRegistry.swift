@@ -1553,7 +1553,130 @@ public enum BASChapterDoctrineRegistry {
                 " close-out。 ADR-016 → M1279。 '更硬核'" +
                 " now has SUBSTANTIVE evidence —" +
                 " not just kernels-exist-in-registry," +
-                " but kernels-produce-correct-output。")
+                " but kernels-produce-correct-output。"),
+
+        // chapter 476 — REAL HOT-PATH ATTACK phase 3
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十六",
+            mNumberFirst: 1280,
+            mNumberLast: 1283,
+            v1MilestoneMNumber: 1283,
+            v1MilestoneStatus:
+                "chapter-476-v1-hot-path-attack-phase-3-bundle-migration-plus-kernel-coverage",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1280,
+                    knife: "第一刀",
+                    concept:
+                        "BASMPSGraphRMSNormIntegration" +
+                        "Tests — extends M1277 numerical-" +
+                        "correctness PROOF coverage from" +
+                        " matMul to RMSNorm。 5 tests:" +
+                        " 2×2 numerical correctness," +
+                        " 3-D identity weight," +
+                        " weight scaling, exec-nanos pin。"),
+                BASChapterKnife(
+                    mNumber: 1281,
+                    knife: "第二刀",
+                    concept:
+                        "BASKernelDispatchOutcomeBundle" +
+                        " — FIRST real BASBundle<Item>" +
+                        " typealias migration in the" +
+                        " substrate。 Closes part of" +
+                        " chapter 473 '低熵复杂系统 1/10'" +
+                        " with substantive evidence" +
+                        " (not scaffolding)。" +
+                        " BASKernelDispatchOutcomeBundle" +
+                        " = BASBundle<BASKernelDispatch" +
+                        "OutcomeBundleItem> + convenience" +
+                        " accessors (dispatchedCount /" +
+                        " fallbackCount /" +
+                        " dispatchedRatio /" +
+                        " count(of:))。 5 PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1282,
+                    knife: "第三刀",
+                    concept:
+                        "BASMPSGraphRotaryEmbedding" +
+                        "IntegrationTests — third" +
+                        " kernel numerical-correctness" +
+                        " PROOF。 5 tests including" +
+                        " identity rotation preserves" +
+                        " input,90° rotation matches" +
+                        " RoPE reference formula," +
+                        " 4-dim pair-wise rotation。" +
+                        " Coverage:matMul +" +
+                        " rmsNorm + rotaryEmbedding" +
+                        " (3 of 4 MPSGraph kernels now" +
+                        " numerically verified)。"),
+                BASChapterKnife(
+                    mNumber: 1283,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 476 close-out + Phase" +
+                        " 2 bump (chapter 73→74," +
+                        " mNumberLast 1279→1283," +
+                        " commits 325→329) + ADR-016" +
+                        ".M1279 → M1283。 Cross-doctrine" +
+                        " sync of 6 mirror tests + 1" +
+                        " registry-frozen-hash refresh。" +
+                        " ADR-014 OPT-IN preserved。")
+            ],
+            entropyClassesAttacked: [
+                "kernel-numerical-correctness-coverage-gap",
+                "scaffold-without-migration-entropy",
+                "bundle-generic-unadopted-entropy",
+                "registry-hint-mismatch-untracked-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (numerical correctness" +
+                " + Codable round-trip both PROVEN)",
+                "chapter 四百二十九 (low-entropy generics" +
+                " — finally adopted in production)",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1279 → M1283)",
+                "系统熵 reduction"
+            ],
+            plannedFutureCuts: [
+                "chapter 477+:V1 monolith fold scoping" +
+                " + final session close-out",
+                "chapter 478+:BASMPSGraphAttentionKernel" +
+                " numerical-correctness integration" +
+                " test (4-of-4 MPSGraph kernels covered)",
+                "chapter 479+:V1 fold pilot — extract" +
+                " first 3 ForAudit declarations at" +
+                " coordinator lines 1219-1235 into a" +
+                " typed helper file",
+                "chapter 480+:wire BASKernelDispatch" +
+                " OutcomeBundle into BASNativeStage" +
+                "Executor as observable audit surface",
+                "chapter 481+:second BASBundle<Item>" +
+                " typealias migration to prove the" +
+                " adoption pattern scales"
+            ],
+            summary:
+                "REAL HOT-PATH ATTACK phase 3 — extends" +
+                " chapter 475 with broader kernel" +
+                " coverage + first real generic" +
+                " adoption。 4 cuts (M1280-M1283)。 Cut" +
+                " 1 — RMSNorm numerical correctness。" +
+                " Cut 2 — FIRST real BASBundle<Item>" +
+                " typealias migration in the substrate" +
+                " (closes chapter 429 scaffold-without-" +
+                "migration gap)。 Cut 3 — RotaryEmbedding" +
+                " numerical correctness。 Cut 4 — chapter" +
+                " close-out。 ADR-016 → M1283。 3 of 4" +
+                " MPSGraph kernels now have numerical" +
+                " PROOF。 First production-grade bundle" +
+                " adoption demonstrates the chapter 429" +
+                " generic primitive is real,not just" +
+                " a scaffolding tag。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

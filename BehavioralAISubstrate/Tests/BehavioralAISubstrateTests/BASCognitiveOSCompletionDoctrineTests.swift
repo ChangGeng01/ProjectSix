@@ -25,10 +25,10 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1279",
-            "Doctrine version pin。 M1279 POST-PHASE-3 " +
-            "chapter 四百七十五 REAL HOT-PATH ATTACK " +
-            "phase 2:bumped through chapters 453-475" +
+            "ADR-016.M1283",
+            "Doctrine version pin。 M1283 POST-PHASE-3 " +
+            "chapter 四百七十六 REAL HOT-PATH ATTACK " +
+            "phase 3:bumped through chapters 453-476" +
             " — biomimetic build-out (453-459) + " +
             "functional debt repayment (460-462) + " +
             "doctrine-collapse Phases 1-3 (463-466) + " +
@@ -36,12 +36,11 @@ final class BASCognitiveOSCompletionDoctrineTests:
             "(468) + BCM (469) + hier slot (470) + " +
             "Mamba bench (471) + bundle proj (472) + " +
             "self-audit cleanup with 8 honest fixes" +
-            " (473) + REAL HOT-PATH ATTACK phase 1" +
+            " (473) + REAL HOT-PATH ATTACK phases 1-3" +
             " ANE live + registry dispatch + e2e (474)" +
-            " + REAL HOT-PATH ATTACK phase 2" +
-            " BASCanonicalKernelInputBuilders + MPSGraph" +
-            " numerical correctness + EchoKernel" +
-            " placeholder closed (475)")
+            " + MPSGraph numerical correctness (475) +" +
+            " RMSNorm + RotaryEmbedding numerical PROOF" +
+            " + first real BASBundle migration (476)")
     }
 
     // MARK: - Per-gap status pins

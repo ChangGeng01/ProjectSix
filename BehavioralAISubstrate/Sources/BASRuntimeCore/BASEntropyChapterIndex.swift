@@ -1160,7 +1160,24 @@ public enum BASEntropyChapterIndex {
                 " with REAL BASMPSGraphMatMulKernel" +
                 " (replaces EchoKernel stub)。 Cut 4 —" +
                 " chapter close-out。 ADR-016 → M1279。" +
-                " '更硬核' now has SUBSTANTIVE evidence")
+                " '更硬核' now has SUBSTANTIVE evidence"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十六",
+            mNumberFirst: 1280, mNumberLast: 1283,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 3 —" +
+                " RMSNorm + RotaryEmbedding numerical" +
+                " PROOF (3 of 4 MPSGraph kernels now" +
+                " verified) + FIRST real" +
+                " BASBundle<Item> typealias migration" +
+                " (closes chapter 429 scaffold-without-" +
+                "migration gap)。 Cut 1 — RMSNorm" +
+                " kernel correctness。 Cut 2 —" +
+                " BASKernelDispatchOutcomeBundle real" +
+                " adoption。 Cut 3 — RotaryEmbedding" +
+                " kernel correctness。 Cut 4 — chapter" +
+                " close-out。 ADR-016 → M1283。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

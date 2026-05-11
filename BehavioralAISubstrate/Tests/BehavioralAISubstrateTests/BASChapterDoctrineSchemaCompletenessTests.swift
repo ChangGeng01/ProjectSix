@@ -1256,7 +1256,16 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百七十五")!)
+                            "chapter 四百七十五")!),
+            // M1283 POST-PHASE-3 REAL HOT-PATH ATTACK
+            // phase 3 (RMSNorm + RotaryEmbedding
+            // numerical PROOF + first real
+            // BASBundle<Item> typealias migration)
+            checkRegistry("四百七十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1550,6 +1559,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百七十五")!
+                .mNumberLast),
+            // M1283 POST-PHASE-3 REAL HOT-PATH ATTACK
+            // phase 3
+            ("476",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

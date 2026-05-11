@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1279",
-            "M1279:doctrine version reflects POST-PHASE-3 chapter 四百七十五 REAL HOT-PATH ATTACK phase 2 (BASCanonicalKernelInputBuilders + first PROOF that MPSGraph kernels compute correctly + EchoKernel placeholder gap closed via real BASMPSGraphMatMulKernel end-to-end dispatch). ADR-014 OPT-IN preserved; V1 byte-equality preserved")
+            "ADR-016.M1283",
+            "M1283:doctrine version reflects POST-PHASE-3 chapter 四百七十六 REAL HOT-PATH ATTACK phase 3 (RMSNorm + RotaryEmbedding numerical correctness PROOF + FIRST real BASBundle<Item> typealias migration via BASKernelDispatchOutcomeBundle). 3 of 4 MPSGraph kernels now have numerical PROOF. ADR-014 OPT-IN preserved; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

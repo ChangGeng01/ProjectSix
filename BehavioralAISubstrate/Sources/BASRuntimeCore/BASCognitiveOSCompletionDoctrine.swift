@@ -1055,7 +1055,18 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// REAL BASMPSGraphMatMulKernel (no more EchoKernel
     /// stub)。 ADR-014 OPT-IN preserved。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1279"
+    /// M1283 bump:REAL HOT-PATH ATTACK phase 3 —
+    /// chapter 四百七十六 extends kernel numerical-
+    /// correctness coverage to RMSNorm (M1280) +
+    /// RotaryEmbedding (M1282) so 3 of 4 MPSGraph
+    /// kernels now have PROOF。 ALSO ships M1281
+    /// BASKernelDispatchOutcomeBundle — the FIRST real
+    /// BASBundle<Item> typealias migration in the
+    /// substrate (closes part of the chapter 473
+    /// '低熵复杂系统 1/10' gap with substantive evidence,
+    /// not scaffolding)。 ADR-014 OPT-IN preserved。 V1
+    /// byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1283"
 
     /// Query the typed status of a specific gap。
     public static func status(
