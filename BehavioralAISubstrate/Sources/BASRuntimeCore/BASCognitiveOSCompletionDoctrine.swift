@@ -996,7 +996,19 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// stub coordinator。 ADR-014 OPT-IN preserved
     /// (default nil cadence = no emission)。 V1 byte-
     /// equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1247"
+    /// M1251 bump:POST-PHASE-3 FEATURE chapter 2 —
+    /// chapter 四百六十八 ships BASBiomimeticCheckpoint
+    /// Replay namespace closing the cross-session
+    /// biomimetic-state recovery loop。 3 helper
+    /// methods (latestCheckpoint,restoreObserver,
+    /// checkpointCount) reduce 6-step manual replay
+    /// plumbing to 1-call surface。 9 PROOF tests
+    /// including bedrock END-TO-END loop closure:
+    /// engine emits checkpoints → fresh observer on
+    /// new session calls restoreObserver(...) →
+    /// state byte-matches emitter at checkpoint time。
+    /// V1 byte-equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1251"
 
     /// Query the typed status of a specific gap。
     public static func status(

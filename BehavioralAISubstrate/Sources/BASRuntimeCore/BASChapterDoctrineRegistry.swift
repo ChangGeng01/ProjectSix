@@ -624,7 +624,136 @@ public enum BASChapterDoctrineRegistry {
                 " now achievable via event-log replay" +
                 " (loop closure in chapter 468)。" +
                 " ADR-016 → M1247。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 468 — replay-side loop closure
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百六十八",
+            mNumberFirst: 1248,
+            mNumberLast: 1251,
+            v1MilestoneMNumber: 1251,
+            v1MilestoneStatus:
+                "chapter-468-v1-cross-session-recovery-loop-closed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1248,
+                    knife: "第一刀",
+                    concept:
+                        "Design BASBiomimeticCheckpoint" +
+                        "Replay typed namespace。 3" +
+                        " methods:latestCheckpoint(in:" +
+                        "sessionID:) returns most-recent" +
+                        " payload or nil;restoreObserver" +
+                        "(_:from:sessionID:) one-call" +
+                        " query + import;checkpointCount" +
+                        "(in:sessionID:) for audit。" +
+                        " Most-recent selection by" +
+                        " highest turnIndex (tie-broken" +
+                        " by event-log insertion order)"),
+                BASChapterKnife(
+                    mNumber: 1249,
+                    knife: "第二刀",
+                    concept:
+                        "Ship BASBiomimeticCheckpoint" +
+                        "Replay.swift in BASMetalSubstrate" +
+                        " (alongside chapter 467 payload" +
+                        " + chapter 456 observer it" +
+                        " operates on)。 enum namespace" +
+                        " (no instantiation);uses chapter" +
+                        " 467 reverse accessor for" +
+                        " decoding + chapter 455" +
+                        " importAggregate for restoration。" +
+                        " Throws on shape mismatch" +
+                        " (fail-fast preservation)"),
+                BASChapterKnife(
+                    mNumber: 1250,
+                    knife: "第三刀",
+                    concept:
+                        "9 PROOF tests covering empty" +
+                        " log + non-checkpoint entries" +
+                        " + single checkpoint + multiple-" +
+                        "checkpoint-pick-latest + session" +
+                        " isolation + checkpointCount" +
+                        " + restoreObserver-returns-false-" +
+                        "when-empty + END-TO-END loop" +
+                        " closure (engine emits via" +
+                        " chapter 467 → replay namespace" +
+                        " restores into fresh observer →" +
+                        " state byte-matches) + multi-" +
+                        "checkpoint highest-turnIndex" +
+                        " wins"),
+                BASChapterKnife(
+                    mNumber: 1251,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 468 close-out + Phase 2" +
+                        " bump (chapter 65→66,mNumberLast" +
+                        " 1247→1251,commits 293→297) +" +
+                        " ADR-016.M1247 → M1251。 Cross-" +
+                        "session biomimetic state recovery" +
+                        " loop CLOSED — host can resume" +
+                        " from any prior session's most-" +
+                        "recent checkpoint with one call")
+            ],
+            entropyClassesAttacked: [
+                "no-replay-side-helper-entropy",
+                "manual-replay-plumbing-entropy",
+                "cross-session-recovery-unverified-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7 (replay is observation-side" +
+                " restoration,not commitment)",
+                "chapter 一百八十五 (typed namespace +" +
+                " typed return)",
+                "chapter 二百一一 (single replay" +
+                " namespace;not scattered as observer" +
+                " extensions)",
+                "chapter 三百九二 (replay deterministic" +
+                " per (log,sessionID))",
+                "ADR-014 OPT-IN preserved (additive" +
+                " namespace)",
+                "ADR-016 (advanced M1247 → M1251)",
+                "系统熵 reduction",
+                "POST-PHASE-3 FEATURE chapter 2 —" +
+                " cross-session recovery loop closure"
+            ],
+            plannedFutureCuts: [
+                "chapter 469:adaptive A/τ — per-synapse" +
+                " STDP meta-plasticity (BCM rule +" +
+                " sliding modification threshold)",
+                "chapter 470:wire BASHierarchical" +
+                "PredictiveCoding into" +
+                " BASBiomimeticTurnObserver as 4th" +
+                " optional primitive slot",
+                "chapter 471:expand benchmark harness" +
+                " to Mamba GPU + attention GPU + matMul" +
+                " GPU paths",
+                "chapter 472:add biomimeticCheckpoint" +
+                "Events array to BASEventLogReplayBundle" +
+                " (chapter 442 projection completion)",
+                "chapter 473:merge phase-3-doctrine-" +
+                "collapse branch back to main"
+            ],
+            summary:
+                "POST-PHASE-3 FEATURE chapter 468" +
+                " closes the cross-session biomimetic-" +
+                "state recovery loop opened by chapter" +
+                " 467。 4 cuts (M1248-M1251):design +" +
+                " ship BASBiomimeticCheckpointReplay" +
+                " namespace + 9 PROOF tests + close-" +
+                "out。 Bedrock test:engine emits" +
+                " checkpoints during one session →" +
+                " fresh observer on next session calls" +
+                " restoreObserver(_:from:sessionID:) →" +
+                " observer state byte-matches emitter" +
+                " state at checkpoint time。 Cross-" +
+                "session biomimetic recovery is now a" +
+                " 1-line call。 ADR-016 → M1251。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

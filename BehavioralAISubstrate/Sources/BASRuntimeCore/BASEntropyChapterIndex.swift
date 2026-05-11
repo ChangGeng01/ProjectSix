@@ -1045,7 +1045,28 @@ public enum BASEntropyChapterIndex {
                 " emission)。 Cross-session biomimetic" +
                 " state recovery via event-log replay" +
                 " now achievable;loop closure in chapter" +
-                " 468。 ADR-016 → M1247")
+                " 468。 ADR-016 → M1247"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十八",
+            mNumberFirst: 1248,
+            mNumberLast: 1251,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-PHASE-3 FEATURE 2 — closes the" +
+                " cross-session biomimetic-state" +
+                " recovery loop opened by chapter 467。" +
+                " NEW BASBiomimeticCheckpointReplay" +
+                " typed namespace with 3 helpers:" +
+                " latestCheckpoint + restoreObserver +" +
+                " checkpointCount。 9 PROOF tests" +
+                " including bedrock END-TO-END loop" +
+                " closure (engine emits → replay" +
+                " restores → byte-equal state)。 Cross-" +
+                "session recovery is now a 1-line call。" +
+                " ADR-016 → M1251")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

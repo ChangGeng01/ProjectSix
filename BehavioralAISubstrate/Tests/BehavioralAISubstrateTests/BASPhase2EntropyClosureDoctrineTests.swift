@@ -37,13 +37,14 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs467() {
+    func testLastChapterIs468() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百六十七",
-            "M1247 POST-PHASE-3 FEATURE 1:bumped to" +
-            " 四百六十七 (auto-checkpoint integration)")
+            "chapter 四百六十八",
+            "M1251 POST-PHASE-3 FEATURE 2:bumped to" +
+            " 四百六十八 (cross-session recovery loop" +
+            " closure)")
     }
 
     // MARK: - M-number range

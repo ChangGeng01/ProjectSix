@@ -121,7 +121,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百六十四",   // M1232-M1235 (STRUCTURAL DEBT REPAYMENT 2 — doctrine-collapse Phase 2: FIRST registry-only chapter,no Swift file。 Full doctrine lives in BASChapterDoctrineRegistry literal entry)
         "chapter 四百六十五",   // M1236-M1239 (STRUCTURAL DEBT REPAYMENT 3 — doctrine-collapse Phase 2b: course-correct from destructive Phase 3 plan to safer literal-conversion proof-of-pattern (1 chapter literal + tests);Phase 3 destruction deferred to user-confirmed chapter)
         "chapter 四百六十六",   // M1240-M1243 (STRUCTURAL DEBT REPAYMENT 4 — doctrine-collapse Phase 3 EXECUTED: auto-extracted 61 chapter literals + swapped registry + replaced 61 Swift doctrines with thin forwarders。 Shipped on phase-3-doctrine-collapse branch)
-        "chapter 四百六十七"    // M1244-M1247 (POST-PHASE-3 FEATURE 1 — auto-checkpoint integration: BASTurnRuntimeEngine auto-emits biomimetic-checkpoint event to event log every N turns when observer + cadence + eventLog all wired)
+        "chapter 四百六十七",   // M1244-M1247 (POST-PHASE-3 FEATURE 1 — auto-checkpoint integration: BASTurnRuntimeEngine auto-emits biomimetic-checkpoint event to event log every N turns when observer + cadence + eventLog all wired)
+        "chapter 四百六十八"    // M1248-M1251 (POST-PHASE-3 FEATURE 2 — cross-session recovery loop closure: BASBiomimeticCheckpointReplay namespace restores observer from event log)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -134,16 +135,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
     /// M1187 → M1191 → M1195 → M1199 → M1203 → M1207 →
     /// M1211 → M1215 → M1219 → M1223 → M1227 → M1231
-    /// → M1235 → M1239 → M1243 → M1247 (chapter 四百
-    /// 六十七 POST-PHASE-3 FEATURE 1 — auto-checkpoint
-    /// integration)。 M1078-M1079 reserved for post-
-    /// Phase-A follow-up。
-    public static let mNumberLast: Int = 1247
+    /// → M1235 → M1239 → M1243 → M1247 → M1251 (chapter
+    /// 四百六十八 POST-PHASE-3 FEATURE 2 — cross-
+    /// session recovery loop closure)。 M1078-M1079
+    /// reserved for post-Phase-A follow-up。
+    public static let mNumberLast: Int = 1251
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1247)。 Bumped through chapter 467:213 → ... →
-    /// 289 → 293 (chapters 453-467 each 4 cuts)。
-    public static let commitsShipped: Int = 293
+    /// M1251)。 Bumped through chapter 468:213 → ... →
+    /// 293 → 297 (chapters 453-468 each 4 cuts)。
+    public static let commitsShipped: Int = 297
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
