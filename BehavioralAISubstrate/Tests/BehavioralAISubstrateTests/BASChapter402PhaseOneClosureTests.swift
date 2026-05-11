@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1287",
-            "M1287:doctrine version reflects POST-PHASE-3 chapter 四百七十七 REAL HOT-PATH ATTACK phase 4 final session close-out (attention numerical PROOF closes 4-of-4 MPSGraph coverage + BASRealHotPathAttackEvaluationDoctrine honest 11/60 → 28/60 + 17 re-scoring + BASMPSGraphKernelCoverageBundle second BASBundle migration). 4-chapter arc sealed (M1272-M1287 / 16 commits). ADR-014 OPT-IN preserved; V1 byte-equality preserved")
+            "ADR-016.M1291",
+            "M1291:doctrine version reflects chapter 四百七十八 V1 fold PILOT — BASTurnAuditProjectionsKunlunTrio extracts 3 ForAudit declarations + coordinator splice + BASTurnRuntimeFullSummaryStressSweepRunner regression guard with 300-turn-run 0-divergence PROOF. Phase A of REAL HOT-PATH ATTACK to 100% sealed. ADR-014 OPT-IN preserved; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

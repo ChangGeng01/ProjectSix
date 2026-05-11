@@ -55,15 +55,15 @@ final class BASDoctrineChainConsistencyTests: XCTestCase {
     // MARK: - Phase 2 doctrine ends at latest chapter
 
     func testPhase2DoctrineEndsAtLatestChapter() {
-        // chapter 477 is registry-only,query registry
+        // chapter 478 is registry-only,query registry
         let latest = BASChapterDoctrineRegistry
-            .recordFor(chapterTag: "chapter 四百七十七")!
+            .recordFor(chapterTag: "chapter 四百七十八")!
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine.mNumberLast,
             latest.mNumberLast,
             "Phase 2 doctrine mNumberLast must equal " +
             "latest chapter's mNumberLast (chapter " +
-            "四百七十七 at M\(latest.mNumberLast))")
+            "四百七十八 at M\(latest.mNumberLast))")
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,

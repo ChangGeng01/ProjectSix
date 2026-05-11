@@ -1275,7 +1275,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百七十七")!)
+                            "chapter 四百七十七")!),
+            // M1291 V1 fold PILOT (BASTurnAuditProjections
+            // KunlunTrio + coordinator splice + stress-
+            // sweep regression guard)
+            checkRegistry("四百七十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1587,6 +1595,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百七十七")!
+                .mNumberLast),
+            // M1291 V1 fold PILOT chapter 478
+            ("478",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

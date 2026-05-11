@@ -1198,7 +1198,24 @@ public enum BASEntropyChapterIndex {
                 " — chapter close-out。 ADR-016 →" +
                 " M1287。 4-chapter arc sealed (16" +
                 " commits / V1 byte-equality" +
-                " preserved throughout)。")
+                " preserved throughout)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十八",
+            mNumberFirst: 1288, mNumberLast: 1291,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK to 100%" +
+                " Phase A — V1 fold PILOT + stress-" +
+                "sweep dual mode regression guard。" +
+                " Cut 1 — BASTurnAuditProjections" +
+                "KunlunTrio first V1 fold extraction。" +
+                " Cut 2 — coordinator splice replaces" +
+                " 3 ForAudit declarations。 Cut 3 —" +
+                " BASTurnRuntimeFullSummaryStressSweep" +
+                "Runner closes chapter 434 deferral +" +
+                " canonical60 PROOF with 300-turn-run" +
+                " 0-divergence verification。 Cut 4 —" +
+                " chapter close-out。 ADR-016 → M1291。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -114,24 +114,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - Pre-RADICAL Phase 2: chapters 403-426 = 24
     ///   - RADICAL sweep:       chapters 427-446 = 20
     ///   - POST-SWEEP:          chapters 447+      = (grows)
-    /// At M1287:24 + 20 + 31 = 75 (chapter 477 REAL
-    /// HOT-PATH ATTACK phase 4 final session close-
-    /// out added)
-    public static let phase2ChapterCount: Int = 75
+    /// At M1291:24 + 20 + 32 = 76 (chapter 478 V1
+    /// fold PILOT + stress-sweep regression guard added)
+    public static let phase2ChapterCount: Int = 76
 
-    /// Phase 2 commits shipped。 At M1287:
-    /// 125 + 84 + 124 = 333 (chapter 477 REAL
-    /// HOT-PATH ATTACK phase 4 = 4 cuts = 124)
-    public static let phase2CommitsShipped: Int = 333
+    /// Phase 2 commits shipped。 At M1291:
+    /// 125 + 84 + 128 = 337 (chapter 478 = 4 cuts =
+    /// 128)
+    public static let phase2CommitsShipped: Int = 337
 
-    /// Phase 2 mNumberLast。 At M1287:chapter 477
-    /// REAL HOT-PATH ATTACK phase 4 final session
-    /// close-out ends here (attention numerical PROOF
-    /// + honest re-scoring doctrine + second
-    /// BASBundle migration + chapter close-out
-    /// shipped as M1284-M1287)。 SWEEP stays frozen
-    /// at 1163。
-    public static let phase2MNumberLast: Int = 1287
+    /// Phase 2 mNumberLast。 At M1291:chapter 478 V1
+    /// fold PILOT ends here (BASTurnAuditProjections
+    /// KunlunTrio + coordinator splice + BASTurnRuntime
+    /// FullSummaryStressSweepRunner regression guard +
+    /// chapter close-out shipped as M1288-M1291)。
+    /// SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1291
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -131,7 +131,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百七十四",   // M1272-M1275 (REAL HOT-PATH ATTACK phase 1 — ANE live binding + KernelRegistry dispatch executor + end-to-end integration PROOF)
         "chapter 四百七十五",   // M1276-M1279 (REAL HOT-PATH ATTACK phase 2 — BASCanonicalKernelInputBuilders + first PROOF that MPSGraph kernels compute correctly + EchoKernel placeholder gap closed)
         "chapter 四百七十六",   // M1280-M1283 (REAL HOT-PATH ATTACK phase 3 — RMSNorm + RotaryEmbedding numerical PROOF + first real BASBundle<Item> typealias migration)
-        "chapter 四百七十七"    // M1284-M1287 (REAL HOT-PATH ATTACK phase 4 final session close-out — attention numerical PROOF closes 4-of-4 MPSGraph + honest 6-directive re-scoring doctrine + second BASBundle migration)
+        "chapter 四百七十七",   // M1284-M1287 (REAL HOT-PATH ATTACK phase 4 final session close-out — attention numerical PROOF closes 4-of-4 MPSGraph + honest 6-directive re-scoring doctrine + second BASBundle migration)
+        "chapter 四百七十八"    // M1288-M1291 (V1 fold PILOT + BASTurnAuditProjectionsKunlunTrio + 3-declaration coordinator splice + BASTurnRuntimeFullSummaryStressSweepRunner regression guard with 300-turn-run 0-divergence PROOF)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -144,18 +145,19 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
     /// M1187 → M1191 → M1195 → M1199 → M1203 → M1207 →
     /// M1211 → ... → M1267 → M1271 → M1275 → M1279 → M1283
-    /// → M1287 (chapter 四百七十七 REAL HOT-PATH ATTACK
-    /// phase 4 final session close-out — attention
-    /// numerical PROOF closes 4-of-4 MPSGraph coverage +
-    /// honest 6-directive re-scoring doctrine + second
-    /// real BASBundle<Item> typealias migration)。
-    /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1287
+    /// → M1287 → M1291 (chapter 四百七十八 V1 fold PILOT
+    /// — BASTurnAuditProjectionsKunlunTrio extracts 3
+    /// ForAudit declarations + coordinator splice
+    /// preserves byte-equality + BASTurnRuntimeFull
+    /// SummaryStressSweepRunner regression guard PROVES
+    /// 0 divergences across 300 turn-runs)。 M1078-M1079
+    /// reserved for post-Phase-A follow-up。
+    public static let mNumberLast: Int = 1291
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1287)。 Bumped through chapter 477:329 → 333
-    /// (chapter 477 = 4 cuts)。
-    public static let commitsShipped: Int = 333
+    /// M1291)。 Bumped through chapter 478:333 → 337
+    /// (chapter 478 = 4 cuts)。
+    public static let commitsShipped: Int = 337
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

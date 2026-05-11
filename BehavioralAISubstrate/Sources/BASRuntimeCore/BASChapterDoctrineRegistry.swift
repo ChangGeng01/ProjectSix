@@ -1820,7 +1820,144 @@ public enum BASChapterDoctrineRegistry {
                 "equality preserved throughout。" +
                 " Plan complete。 Next session opens" +
                 " chapter 478+ with V1 monolith fold" +
-                " pilot。")
+                " pilot。"),
+
+        // chapter 478 — V1 fold PILOT + stress-sweep dual mode
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十八",
+            mNumberFirst: 1288,
+            mNumberLast: 1291,
+            v1MilestoneMNumber: 1291,
+            v1MilestoneStatus:
+                "chapter-478-v1-fold-pilot-stress-sweep-dual-mode-live",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1288,
+                    knife: "第一刀",
+                    concept:
+                        "BASTurnAuditProjectionsKunlunTrio" +
+                        " — FIRST V1 monolith fold" +
+                        " extraction in the substrate。" +
+                        " Closes 3-of-36 ForAudit" +
+                        " declarations。 Typed factory" +
+                        " bundle dispatches the same 3" +
+                        " derive calls in the same" +
+                        " order as monolith lines" +
+                        " 1240-1255。 6 PROOF tests" +
+                        " including byte-equality vs" +
+                        " direct derive calls +" +
+                        " concurrent thread safety。"),
+                BASChapterKnife(
+                    mNumber: 1289,
+                    knife: "第二刀",
+                    concept:
+                        "EBrainRuntimeCoordinator splice" +
+                        " — replaces 3 separate `let" +
+                        " *ForAudit = ...` declarations" +
+                        " at lines 1240-1255 with one" +
+                        " factory call + 3 shadow re-" +
+                        "bindings。 All downstream" +
+                        " reader sites preserved" +
+                        " unchanged。 Full test suite" +
+                        " 6305+419=6724 tests still" +
+                        " pass — byte-equality" +
+                        " preserved。 This is the" +
+                        " FIRST mechanical V1 fold to" +
+                        " land in the coordinator hot" +
+                        " path。"),
+                BASChapterKnife(
+                    mNumber: 1290,
+                    knife: "第三刀",
+                    concept:
+                        "BASTurnRuntimeFullSummary" +
+                        "StressSweepRunner closes the" +
+                        " chapter 434 deferral for the" +
+                        " REAL coordinator-driven" +
+                        " FixtureRunner。 Wires" +
+                        " BASCoordinatorTestStubs.makeStub" +
+                        " (M1225) to BASStressSweep" +
+                        "Harness.FixtureRunner contract。" +
+                        " Canonical60 end-to-end test" +
+                        " PROOF:60 fixtures × 2 V1" +
+                        " invocations + 3-run flake" +
+                        " detection = 300 turn-runs" +
+                        " with 0 divergences。 First" +
+                        " regression guard for V1 fold" +
+                        " byte-equality。"),
+                BASChapterKnife(
+                    mNumber: 1291,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 478 close-out + Phase" +
+                        " 2 bump (chapter 75→76," +
+                        " mNumberLast 1287→1291," +
+                        " commits 333→337) + ADR-016" +
+                        ".M1287 → M1291。 Cross-" +
+                        "doctrine sync of 6 mirror" +
+                        " tests + 1 registry-frozen-" +
+                        "hash refresh。 V1 fold pilot" +
+                        " validated;chapters 479-491" +
+                        " arc clear to proceed。")
+            ],
+            entropyClassesAttacked: [
+                "v1-monolith-untouched-entropy",
+                "fold-without-regression-guard-entropy",
+                "stress-sweep-coordinator-runner-deferred-entropy",
+                "byte-equality-by-construction-unproven-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (300 turn-runs" +
+                " 0 divergences PROOF)",
+                "chapter 四百三十四 deferral closed",
+                "chapter 四百六十二 stub harness adoption",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1287 → M1291)",
+                "系统熵 reduction",
+                "REAL HOT-PATH ATTACK to 100% Phase A" +
+                " complete"
+            ],
+            plannedFutureCuts: [
+                "chapter 479+:Phase B missing MPSGraph" +
+                " kernels (softmax + layerNorm +" +
+                " conv2D) bring coverage 4-of-8 →" +
+                " 7-of-8 ops",
+                "chapter 480+:Phase C MPSGraph" +
+                " executable caching + ANE live" +
+                " binding default flip",
+                "chapter 481-488:Phase D-F 88 sprawl" +
+                " type migrations to BASBundle /" +
+                " BASFrameEnvelope / BASResult / " +
+                "BASPermit / BASCard generics",
+                "chapter 489-491:Phase G-H production" +
+                " wire-in + KV cache + default mode" +
+                " flip to .nativeV2",
+                "chapter 492-494:Phase I V1 monolith" +
+                " fold (cluster A + B + permit fold)" +
+                " + DELETION + Tier 1 achievement"
+            ],
+            summary:
+                "V1 fold PILOT + stress-sweep dual mode" +
+                " regression guard。 4 cuts (M1288-" +
+                "M1291)。 Cut 1 — first typed V1 fold" +
+                " factory (3-projection trio)。 Cut 2" +
+                " — coordinator splice replaces 3" +
+                " declarations。 Cut 3 — real-" +
+                "coordinator FixtureRunner with 300-" +
+                "turn-run regression guard。 Cut 4 —" +
+                " chapter close-out。 ADR-016 → M1291。" +
+                " Phase A of REAL HOT-PATH ATTACK to" +
+                " 100% complete:V1 monolith starts" +
+                " shrinking + dual-mode infrastructure" +
+                " live for chapters 479-494 bulk fold" +
+                " work。 V1 byte-equality preserved" +
+                " (full test suite 6.7K+ tests still" +
+                " green)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

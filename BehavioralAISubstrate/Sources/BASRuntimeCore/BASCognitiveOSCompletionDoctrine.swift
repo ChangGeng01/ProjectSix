@@ -1079,7 +1079,20 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ATTACK arc sealed (chapters 474-477 / 16 commits)。
     /// ADR-014 OPT-IN preserved。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1287"
+    /// M1291 bump:REAL HOT-PATH ATTACK to 100% Phase A
+    /// — chapter 四百七十八 ships V1 fold PILOT。 (1)
+    /// M1288 BASTurnAuditProjectionsKunlunTrio typed
+    /// factory + 6 PROOF tests;(2) M1289 coordinator
+    /// splice replaces 3 ForAudit declarations at lines
+    /// 1240-1255 with factory call + shadow re-bindings;
+    /// (3) M1290 BASTurnRuntimeFullSummaryStressSweep
+    /// Runner closes chapter 434 deferral + ships
+    /// canonical60 end-to-end harness with 300-turn-run
+    /// 0-divergence PROOF。 (4) M1291 close-out。 First
+    /// mechanical V1 fold lands。 ADR-014 OPT-IN
+    /// preserved。 V1 byte-equality preserved (full
+    /// suite still green)。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1291"
 
     /// Query the typed status of a specific gap。
     public static func status(
