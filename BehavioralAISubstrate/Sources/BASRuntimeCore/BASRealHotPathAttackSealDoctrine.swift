@@ -149,4 +149,51 @@ public enum BASRealHotPathAttackSealDoctrine {
             "internal 78%;remainder requires external" +
             " work outside pure-Swift scope。"
     }
+
+    // MARK: - Post-closure-push refresh (chapter 五百一 / M1382)
+
+    /// Post-closure-push aggregate score reading from
+    /// BASTier1HonestClosureMilestoneDoctrine。 At chapter
+    /// 501 close-out:52/60 (~87%)。 Updates the honest
+    /// delivery picture after chapter 498-500 push without
+    /// breaking the historical chapter-497 seal pins
+    /// above。
+    public static var postClosureAggregate: Int {
+        BASTier1HonestClosureMilestoneDoctrine
+            .newAggregate
+    }
+
+    /// Post-closure aggregate ratio in [0, 1]。
+    public static var postClosureAggregateRatio: Double {
+        guard finalScoring.maxScore > 0 else { return 0 }
+        return Double(postClosureAggregate)
+            / Double(finalScoring.maxScore)
+    }
+
+    /// Post-closure external-blocker points (gap to
+    /// 60/60 after the closure push)。 At chapter 501
+    /// close-out:8 points (60 - 52)。
+    public static var postClosureExternalBlockerPoints:
+        Int
+    {
+        finalScoring.maxScore - postClosureAggregate
+    }
+
+    /// Honest post-closure summary string。
+    public static var honestPostClosureSummary: String {
+        let pct = Int(
+            postClosureAggregateRatio * 100)
+        return
+            "REAL HOT-PATH ATTACK post-closure refresh:" +
+            " \(postClosureAggregate)/60 (\(pct)%)。" +
+            " Tier 1 honest closure push (chapters 498-" +
+            "501 / M1369-M1384 / 16 commits) advanced" +
+            " from sealed 47/60 baseline to" +
+            " \(postClosureAggregate)/60 substrate-" +
+            "internal honest ceiling。" +
+            " \(postClosureExternalBlockerPoints)-point" +
+            " gap remains typed-attributed via" +
+            " BASTier1HonestClosureMilestoneDoctrine" +
+            ".externalBlockerReasons。"
+    }
 }

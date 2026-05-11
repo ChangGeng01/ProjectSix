@@ -120,4 +120,68 @@ final class BASRealHotPathAttackSealDoctrineTests:
             "Tier 2 must not claim full 60/60 — that" +
             " would silently swallow external blockers")
     }
+
+    // MARK: - 9) Post-closure refresh:aggregate reads
+    //             from BASTier1HonestClosureMilestoneDoctrine
+
+    func testPostClosureAggregateReadsFromMilestone() {
+        XCTAssertEqual(
+            BASRealHotPathAttackSealDoctrine
+                .postClosureAggregate,
+            BASTier1HonestClosureMilestoneDoctrine
+                .newAggregate)
+    }
+
+    // MARK: - 10) Post-closure aggregate >= sealed final
+    //              (closure push is honest progress)
+
+    func testPostClosureAggregateExceedsSealedFinal() {
+        let sealed = BASRealHotPathAttackSealDoctrine
+            .finalScoring.finalScore
+        let postClosure =
+            BASRealHotPathAttackSealDoctrine
+                .postClosureAggregate
+        XCTAssertGreaterThanOrEqual(
+            postClosure, sealed,
+            "post-closure aggregate MUST be >= sealed" +
+            " baseline — closure push delivers honest" +
+            " forward progress")
+    }
+
+    // MARK: - 11) Post-closure ratio in [0, 1]
+
+    func testPostClosureRatioInRange() {
+        let r = BASRealHotPathAttackSealDoctrine
+            .postClosureAggregateRatio
+        XCTAssertGreaterThanOrEqual(r, 0.0)
+        XCTAssertLessThanOrEqual(r, 1.0)
+    }
+
+    // MARK: - 12) External blocker points sum correctly
+
+    func testPostClosureBlockerPointsAccountCorrectly() {
+        let total = BASRealHotPathAttackSealDoctrine
+            .postClosureAggregate
+            + BASRealHotPathAttackSealDoctrine
+                .postClosureExternalBlockerPoints
+        XCTAssertEqual(
+            total,
+            BASRealHotPathAttackSealDoctrine
+                .finalScoring.maxScore,
+            "post-closure aggregate + blocker points" +
+            " MUST equal max (60) — no silent under-" +
+            "delivery drift")
+    }
+
+    // MARK: - 13) Honest post-closure summary markers
+
+    func testHonestPostClosureSummaryMarkers() {
+        let summary = BASRealHotPathAttackSealDoctrine
+            .honestPostClosureSummary
+        XCTAssertTrue(summary
+            .contains("post-closure refresh"))
+        XCTAssertTrue(summary
+            .contains("Tier 1 honest closure"))
+        XCTAssertTrue(summary.contains("typed-"))
+    }
 }
