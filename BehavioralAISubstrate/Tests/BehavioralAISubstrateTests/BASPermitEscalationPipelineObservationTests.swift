@@ -135,7 +135,91 @@ final class BASPermitEscalationPipelineObservationTests:
         XCTAssertEqual(seen.count, 1)
     }
 
-    // MARK: - 7) Reason codes preserve step ordering
+    // MARK: - 7a) Builder threads input mode through chain
+
+    func testBuilderThreadsInputModeThroughChain() {
+        let observation =
+            BASPermitEscalationPipelineObservation.build(
+                initialPermitMode: .answer,
+                chain: [
+                    (stepName: "abyssal",
+                     outputPermitMode: .delay,
+                     reasonCodes: ["c1"]),
+                    (stepName: "assertion-ceiling",
+                     outputPermitMode: .delay,
+                     reasonCodes: []),
+                    (stepName: "kunlun",
+                     outputPermitMode: .draftOnly,
+                     reasonCodes: ["c2"]),
+                ])
+        XCTAssertEqual(observation.steps[0].inputPermitMode,
+                       .answer)
+        XCTAssertEqual(observation.steps[0].outputPermitMode,
+                       .delay)
+        XCTAssertEqual(observation.steps[1].inputPermitMode,
+                       .delay)
+        XCTAssertEqual(observation.steps[2].inputPermitMode,
+                       .delay)
+        XCTAssertEqual(observation.steps[2].outputPermitMode,
+                       .draftOnly)
+        XCTAssertEqual(observation.finalPermitMode,
+                       .draftOnly)
+        XCTAssertEqual(observation.escalatedStepCount, 2)
+    }
+
+    // MARK: - 7b) Builder with empty chain preserves initial
+
+    func testBuilderWithEmptyChainPreservesInitial() {
+        let observation =
+            BASPermitEscalationPipelineObservation.build(
+                initialPermitMode: .mirror,
+                chain: [])
+        XCTAssertEqual(observation.initialPermitMode,
+                       .mirror)
+        XCTAssertEqual(observation.finalPermitMode,
+                       .mirror)
+        XCTAssertTrue(observation.steps.isEmpty)
+    }
+
+    // MARK: - 7c) Builder full 5-step pipeline shape
+    //             (proxy for the future fold executor's
+    //              actual call)
+
+    func testBuilderFullFiveStepEscalationPipelineShape() {
+        let observation =
+            BASPermitEscalationPipelineObservation.build(
+                initialPermitMode: .answer,
+                chain: [
+                    (stepName: "abyssal",
+                     outputPermitMode: .delay,
+                     reasonCodes:
+                        ["abyssal-aggregate-magnitude"]),
+                    (stepName: "assertion-ceiling",
+                     outputPermitMode: .delay,
+                     reasonCodes: []),
+                    (stepName: "kunlun",
+                     outputPermitMode: .draftOnly,
+                     reasonCodes:
+                        ["kunlun-axis-deviation"]),
+                    (stepName: "cthulhu-assertion",
+                     outputPermitMode: .draftOnly,
+                     reasonCodes: []),
+                    (stepName: "cthulhu-escalation",
+                     outputPermitMode: .localOnly,
+                     reasonCodes:
+                        ["cthulhu-non-euclidean"]),
+                ])
+        XCTAssertEqual(observation.steps.count, 5)
+        XCTAssertEqual(observation.finalPermitMode,
+                       .localOnly)
+        XCTAssertEqual(observation.escalatedStepCount, 3)
+        XCTAssertEqual(observation.aggregateReasonCodes,
+                       ["abyssal-aggregate-magnitude",
+                        "kunlun-axis-deviation",
+                        "cthulhu-non-euclidean"])
+    }
+
+    // MARK: - 8) Reason codes preserve step ordering
 
     func testReasonCodesPreserveStepOrdering() {
         let pipeline =

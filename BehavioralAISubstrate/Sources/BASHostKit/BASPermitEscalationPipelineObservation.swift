@@ -97,4 +97,38 @@ public struct BASPermitEscalationPipelineObservation:
             steps.last?.outputPermitMode
             ?? initialPermitMode
     }
+
+    // MARK: - Builder (chapter 四百九十五 / M1358)
+
+    /// Typed builder that chains step records by walking
+    /// a sequence of (stepName, outputMode, reasonCodes)
+    /// triples。 Each step's input mode is the prior step's
+    /// output mode (or the pipeline's initial mode for the
+    /// first step)。 The future BASPermitEscalationFoldExecutor
+    /// (chapter 496+) will use this builder to synthesize an
+    /// observation from the 5 typed escalation decisions
+    /// (abyssal、assertionCeiling、kunlun、cthulhuAssertion、
+    /// cthulhuEscalation)。
+    public static func build(
+        initialPermitMode: BASActionPermitMode,
+        chain: [(stepName: String,
+                 outputPermitMode: BASActionPermitMode,
+                 reasonCodes: [String])]
+    ) -> BASPermitEscalationPipelineObservation {
+        var steps: [BASPermitEscalationStepObservation] = []
+        steps.reserveCapacity(chain.count)
+        var currentMode = initialPermitMode
+        for entry in chain {
+            let step = BASPermitEscalationStepObservation(
+                stepName: entry.stepName,
+                inputPermitMode: currentMode,
+                outputPermitMode: entry.outputPermitMode,
+                reasonCodes: entry.reasonCodes)
+            steps.append(step)
+            currentMode = entry.outputPermitMode
+        }
+        return BASPermitEscalationPipelineObservation(
+            initialPermitMode: initialPermitMode,
+            steps: steps)
+    }
 }
