@@ -37,16 +37,16 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs479() {
+    func testLastChapterIs480() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百七十九",
-            "M1295 chapter 四百七十九 Phase B 3 missing" +
-            " MPSGraph kernels:bumped to 四百七十九" +
-            " (softmax + layerNorm + conv2D kernels" +
-            " bring BASNeuralOp coverage 4-of-8 →" +
-            " 7-of-8)")
+            "chapter 四百八十",
+            "M1299 chapter 四百八十 Phase C:bumped to" +
+            " 四百八十 (ANE live default flip +" +
+            " BASMPSGraphExecutableCache observation" +
+            " actor + 45×-gap dispatch latency" +
+            " benchmark)")
     }
 
     // MARK: - M-number range

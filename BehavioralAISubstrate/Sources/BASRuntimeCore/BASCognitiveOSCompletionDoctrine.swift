@@ -1104,7 +1104,21 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// (4) M1295 close-out。 Only ssmScan deferred to
     /// Tier 2 chapter 496。 ADR-014 OPT-IN preserved。 V1
     /// byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1295"
+    /// M1299 bump:Phase C — chapter 四百八十 ships ANE
+    /// default flip + MPSGraph cache scaffolding。 (1)
+    /// M1296 BASANECapabilityProbe defaults to
+    /// BASANELiveReader.live() on iOS 17+/macOS 14+
+    /// (zero production-caller break);(2) M1297
+    /// BASMPSGraphExecutableCache observation actor +
+    /// 3rd real BASBundle<Item> typealias migration;
+    /// (3) M1298 dispatch latency benchmark measures
+    /// 45× same-shape vs distinct-shape gap proving
+    /// cache opportunity;(4) M1299 close-out。 Per-
+    /// kernel cache wiring deferred。 ADR-014 OPT-IN
+    /// preserved (conservativeReader() factory for
+    /// explicit opt-out)。 V1 byte-equality preserved。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1299"
 
     /// Query the typed status of a specific gap。
     public static func status(

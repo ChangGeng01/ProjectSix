@@ -25,10 +25,10 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1295",
-            "Doctrine version pin。 M1295 chapter 四百" +
-            "七十九 Phase B 3 missing MPSGraph kernels:" +
-            " bumped through chapters 453-479 —" +
+            "ADR-016.M1299",
+            "Doctrine version pin。 M1299 chapter 四百" +
+            "八十 Phase C ANE default + MPSGraph cache:" +
+            " bumped through chapters 453-480 —" +
             " biomimetic build-out (453-459) + debt" +
             " repayment (460-462) + doctrine-collapse" +
             " (463-466) + auto-checkpoint (467) +" +
@@ -41,7 +41,9 @@ final class BASCognitiveOSCompletionDoctrineTests:
             " BASBundle (476) + attention PROOF + honest" +
             " re-scoring (477) + V1 fold PILOT (478) +" +
             " softmax + layerNorm + conv2D kernels" +
-            " 7-of-8 coverage (479)")
+            " 7-of-8 coverage (479) + ANE default flip" +
+            " + cache observation + 45×-gap benchmark" +
+            " (480)")
     }
 
     // MARK: - Per-gap status pins

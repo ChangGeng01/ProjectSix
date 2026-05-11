@@ -1231,7 +1231,23 @@ public enum BASEntropyChapterIndex {
                 " BASMPSGraphConv2DKernel + 4 PROOF" +
                 " tests。 Cut 4 — chapter close-out。" +
                 " ADR-016 → M1295。 Only ssmScan" +
-                " (Mamba SSM) deferred to Tier 2。")
+                " (Mamba SSM) deferred to Tier 2。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十",
+            mNumberFirst: 1296, mNumberLast: 1299,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 4,
+            summary: "REAL HOT-PATH ATTACK to 100%" +
+                " Phase C — ANE live binding default" +
+                " flip + MPSGraph cache observation" +
+                " layer。 Cut 1 — BASANECapabilityProbe" +
+                " defaults to BASANELiveReader.live()" +
+                " on iOS 17+/macOS 14+。 Cut 2 —" +
+                " BASMPSGraphExecutableCache observation" +
+                " actor + 3rd BASBundle migration。" +
+                " Cut 3 — dispatch latency benchmark" +
+                " (45×-gap proves cache opportunity)。" +
+                " Cut 4 — close-out。 ADR-016 → M1299。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

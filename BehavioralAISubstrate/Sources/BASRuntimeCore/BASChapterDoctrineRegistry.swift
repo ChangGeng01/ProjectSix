@@ -2074,7 +2074,124 @@ public enum BASChapterDoctrineRegistry {
                 " elements + row-wise independence +" +
                 " sum-to-1 invariants + identity kernels" +
                 " + sum kernels。 V1 byte-equality" +
-                " preserved (additive kernel additions)。")
+                " preserved (additive kernel additions)。"),
+
+        // chapter 480 — Phase C ANE default flip + MPSGraph cache scaffolding
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十",
+            mNumberFirst: 1296,
+            mNumberLast: 1299,
+            v1MilestoneMNumber: 1299,
+            v1MilestoneStatus:
+                "chapter-480-phase-c-ane-default-flipped-cache-observation-live",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1296,
+                    knife: "第一刀",
+                    concept:
+                        "BASANECapabilityProbe default" +
+                        " reader flipped from .conservative" +
+                        " to BASANELiveReader.live() on" +
+                        " iOS 17+/macOS 14+。 Conservative" +
+                        " remains explicit factory" +
+                        " (.conservativeReader()) for" +
+                        " tests + simulator builds。 Zero" +
+                        " production-caller breakage" +
+                        " (Sources/ has 0 default" +
+                        " constructors per chapter 477" +
+                        " audit)。"),
+                BASChapterKnife(
+                    mNumber: 1297,
+                    knife: "第二刀",
+                    concept:
+                        "BASMPSGraphExecutableCache" +
+                        " observation actor + BASMPSGraph" +
+                        "CacheKey typed key + BASMPSGraph" +
+                        "CacheObservationBundle as 3rd" +
+                        " real BASBundle<Item> typealias" +
+                        " migration。 8 PROOF tests" +
+                        " covering equality / Codable" +
+                        " round-trip / hit-miss recording" +
+                        " / bundle ordering / accessor" +
+                        " correctness / reset behavior。"),
+                BASChapterKnife(
+                    mNumber: 1298,
+                    knife: "第三刀",
+                    concept:
+                        "BASMPSGraphDispatchLatency" +
+                        "Benchmark measures the cache" +
+                        " opportunity:100× same-shape" +
+                        " (250µs/call, 3.2% build" +
+                        " overhead) vs 10× distinct" +
+                        " shape (11.1 ms/call) = 45×" +
+                        " gap proving cache-wiring is" +
+                        " worth the complexity。 Cache" +
+                        " observation actor integration" +
+                        " test closes the loop with M1297。"),
+                BASChapterKnife(
+                    mNumber: 1299,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 480 close-out + Phase" +
+                        " 2 bump (chapter 77→78," +
+                        " mNumberLast 1295→1299," +
+                        " commits 341→345) + ADR-016" +
+                        ".M1295 → M1299。 Cross-doctrine" +
+                        " sync + frozen hash refresh。" +
+                        " Phase C of REAL HOT-PATH" +
+                        " ATTACK to 100% complete。")
+            ],
+            entropyClassesAttacked: [
+                "ane-default-conservative-entropy",
+                "mpsgraph-build-overhead-untracked-entropy",
+                "cache-scaffold-without-measurement-entropy",
+                "third-bundle-migration-pattern-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (Codable round-trip" +
+                " + measurement replay-determinism)",
+                "chapter 四百二十九 (3rd BASBundle" +
+                " adoption)",
+                "chapter 四百七十六 first BASBundle" +
+                " migration pattern preserved",
+                "ADR-014 OPT-IN (conservativeReader()" +
+                " explicit factory for opt-out)",
+                "ADR-016 (advanced M1295 → M1299)",
+                "系统熵 reduction"
+            ],
+            plannedFutureCuts: [
+                "chapter 481+:per-kernel MPSGraph cache" +
+                " wiring (matMul first,then 6 others)",
+                "chapter 481-488:Phase D-F 88 sprawl" +
+                " migrations",
+                "chapter 489-491:Phase G-H production" +
+                " wire-in + KV cache + default flip",
+                "chapter 492-494:Phase I V1 monolith" +
+                " deletion + Tier 1 achievement"
+            ],
+            summary:
+                "Phase C — ANE live binding default" +
+                " flip + MPSGraph cache observation" +
+                " layer + dispatch latency baseline" +
+                " measurement。 4 cuts (M1296-M1299)。" +
+                " Cut 1 — probe default flipped (5-LOC" +
+                " change, 0 production caller break)。" +
+                " Cut 2 — cache observation actor + 3rd" +
+                " BASBundle migration。 Cut 3 —" +
+                " 45×-gap baseline benchmark proves" +
+                " cache opportunity worth pursuing。 Cut" +
+                " 4 — close-out。 ADR-016 → M1299。" +
+                " Per-kernel cache wiring deferred to" +
+                " future chapter where matMul kernel" +
+                " adopts the observation actor + stores" +
+                " MPSGraph references in its actor" +
+                " state。 V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1295",
-            "M1295:doctrine version reflects chapter 四百七十九 Phase B — 3 missing MPSGraph kernels (softmax M1292 + layerNorm M1293 + conv2D M1294) bring BASNeuralOp coverage 4-of-8 → 7-of-8 (87.5%). Only ssmScan deferred to Tier 2 chapter 496. ADR-014 OPT-IN preserved; V1 byte-equality preserved")
+            "ADR-016.M1299",
+            "M1299:doctrine version reflects chapter 四百八十 Phase C — ANE live binding default flip (M1296) + BASMPSGraphExecutableCache observation actor + 3rd BASBundle migration (M1297) + dispatch latency benchmark with 45×-gap PROOF (M1298). ADR-014 OPT-IN preserved via conservativeReader() opt-out factory; V1 byte-equality preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -1289,7 +1289,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百七十九")!)
+                            "chapter 四百七十九")!),
+            // M1299 Phase C ANE flip + cache observation
+            checkRegistry("四百八十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百八十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1617,6 +1623,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百七十九")!
+                .mNumberLast),
+            // M1299 Phase C chapter 480
+            ("480",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

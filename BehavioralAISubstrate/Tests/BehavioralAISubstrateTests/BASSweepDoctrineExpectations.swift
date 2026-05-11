@@ -114,21 +114,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - Pre-RADICAL Phase 2: chapters 403-426 = 24
     ///   - RADICAL sweep:       chapters 427-446 = 20
     ///   - POST-SWEEP:          chapters 447+      = (grows)
-    /// At M1295:24 + 20 + 33 = 77 (chapter 479 Phase
-    /// B 3 missing MPSGraph kernels added)
-    public static let phase2ChapterCount: Int = 77
+    /// At M1299:24 + 20 + 34 = 78 (chapter 480 Phase
+    /// C ANE flip + cache observation + benchmark added)
+    public static let phase2ChapterCount: Int = 78
 
-    /// Phase 2 commits shipped。 At M1295:
-    /// 125 + 84 + 132 = 341 (chapter 479 = 4 cuts =
-    /// 132)
-    public static let phase2CommitsShipped: Int = 341
+    /// Phase 2 commits shipped。 At M1299:
+    /// 125 + 84 + 136 = 345 (chapter 480 = 4 cuts =
+    /// 136)
+    public static let phase2CommitsShipped: Int = 345
 
-    /// Phase 2 mNumberLast。 At M1295:chapter 479
-    /// Phase B ends here (3 missing MPSGraph kernels
-    /// shipped — softmax + layerNorm + conv2D as
-    /// M1292-M1294 + close-out M1295)。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1295
+    /// Phase 2 mNumberLast。 At M1299:chapter 480
+    /// Phase C ends here (ANE live binding default
+    /// flip + BASMPSGraphExecutableCache observation
+    /// actor + dispatch latency benchmark + close-out
+    /// shipped as M1296-M1299)。 SWEEP stays frozen
+    /// at 1163。
+    public static let phase2MNumberLast: Int = 1299
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
