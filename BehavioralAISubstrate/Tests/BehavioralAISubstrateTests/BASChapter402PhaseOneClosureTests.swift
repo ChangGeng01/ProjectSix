@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1231",
-            "M1231:doctrine version reflects STRUCTURAL DEBT REPAYMENT 1 (chapter 四百六十三 — doctrine-collapse Phase 1: typed Record + Registry covering chapters 453-462, chapters 447-463 ship biomimetic build-out + functional debt repayment + structural debt repayment Phase 1)")
+            "ADR-016.M1235",
+            "M1235:doctrine version reflects STRUCTURAL DEBT REPAYMENT 2 (chapter 四百六十四 — doctrine-collapse Phase 2: FIRST registry-only chapter,no Swift file。 chapters 447-464 ship biomimetic build-out + functional debt repayment + structural debt repayment Phases 1+2)")
     }
 
     // MARK: - M-number range matches chapter 四百二

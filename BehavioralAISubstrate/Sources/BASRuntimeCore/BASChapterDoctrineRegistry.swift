@@ -309,7 +309,195 @@ public enum BASChapterDoctrineRegistry {
                 BASChapter462EntropyDoctrine
                     .plannedFutureCuts,
             summary: BASChapter462EntropyDoctrine
-                .summary)
+                .summary),
+
+        // chapter 463 was Phase 1 (registry shipped),
+        // still has a per-chapter Swift file。 Phase 2
+        // starts at chapter 464 — entries below are
+        // DIRECT literals,no per-chapter Swift file
+        // exists for them。 chapter 464 / M1233。
+        deriveRecord(
+            chapterTag: BASChapter463EntropyDoctrine
+                .chapterTag,
+            mNumberFirst: BASChapter463EntropyDoctrine
+                .mNumberFirst,
+            mNumberLast: BASChapter463EntropyDoctrine
+                .mNumberLast,
+            v1MilestoneMNumber:
+                BASChapter463EntropyDoctrine
+                    .v1MilestoneMNumber,
+            v1MilestoneStatus:
+                BASChapter463EntropyDoctrine
+                    .v1MilestoneStatus,
+            knivesRaw: BASChapter463EntropyDoctrine
+                .knives,
+            entropyClassesAttacked:
+                BASChapter463EntropyDoctrine
+                    .entropyClassesAttacked,
+            pinHeld: BASChapter463EntropyDoctrine
+                .pinHeld,
+            plannedFutureCuts:
+                BASChapter463EntropyDoctrine
+                    .plannedFutureCuts,
+            summary: BASChapter463EntropyDoctrine
+                .summary),
+
+        // chapter 464 / M1232-M1235 — FIRST registry-
+        // only chapter doctrine。 No
+        // BASChapter464EntropyDoctrine.swift file
+        // exists。 The chapter's full doctrine surface
+        // is THIS literal entry。 Future chapters
+        // follow this pattern;chapter 465+ will then
+        // delete the 60+ per-chapter Swift files for
+        // pre-464 entries (Phase 3)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百六十四",
+            mNumberFirst: 1232,
+            mNumberLast: 1235,
+            v1MilestoneMNumber: 1235,
+            v1MilestoneStatus:
+                "chapter-464-v1-doctrine-collapse-phase-2-first-registry-only-chapter",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1232,
+                    knife: "第一刀",
+                    concept:
+                        "Design schema-test extension" +
+                        " (checkRegistryEntry helper)" +
+                        " that verifies registry-only" +
+                        " chapter records have full" +
+                        " parity with Swift-file-backed" +
+                        " chapters。 Phase 2 invariant" +
+                        " established:new chapters MUST" +
+                        " live as direct registry" +
+                        " entries,no new BASChapter###" +
+                        "EntropyDoctrine.swift files" +
+                        " accepted。 No source change"),
+                BASChapterKnife(
+                    mNumber: 1233,
+                    knife: "第二刀",
+                    concept:
+                        "Add chapter 464 record" +
+                        " DIRECTLY into BASChapter" +
+                        "DoctrineRegistry as Swift" +
+                        " literal — no Swift file" +
+                        " created for chapter 464。" +
+                        " First instance of the Phase" +
+                        " 2 pattern。 Registry now" +
+                        " carries 12 entries:10" +
+                        " chapters via derivation +" +
+                        " chapter 463 derivation +" +
+                        " chapter 464 literal"),
+                BASChapterKnife(
+                    mNumber: 1234,
+                    knife: "第三刀",
+                    concept:
+                        "PROOF tests verify chapter" +
+                        " 464's registry entry has" +
+                        " full schema parity with" +
+                        " Swift-file-backed chapters" +
+                        " (knives count > 0,pin held" +
+                        " count > 0,non-empty summary," +
+                        " non-empty status,M-range" +
+                        " contiguous with chapter 463)" +
+                        " + Phase 2 chapter count" +
+                        " invariant (registry has" +
+                        " entries for ALL chapters in" +
+                        " Phase2Doctrine.chapterTags" +
+                        " Shipped past chapter 453)"),
+                BASChapterKnife(
+                    mNumber: 1235,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 464 close-out — but" +
+                        " the close-out doctrine ITSELF" +
+                        " lives in this registry" +
+                        " literal entry,not in a Swift" +
+                        " file。 Phase 2 bump (chapter" +
+                        " 61→62,mNumberLast 1231→1235," +
+                        " commits 277→281) + ADR-016" +
+                        ".M1231 → M1235 + cross-mirror" +
+                        " tests + commit + push。 Phase" +
+                        " 2 pattern proven viable")
+            ],
+            entropyClassesAttacked: [
+                "no-registry-only-chapter-pattern-entropy",
+                "phase-2-pattern-unverified-entropy",
+                "schema-parity-untested-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7 (registry observation/audit)",
+                "chapter 一百八十五 (typed Record" +
+                " literal — same Codable surface as" +
+                " Swift-file chapters)",
+                "chapter 二百一一 (chapter 464 has ONE" +
+                " entry in ONE registry;no parallel" +
+                " Swift file)",
+                "chapter 三百九二 (registry literal" +
+                " deterministic;Codable round-trip" +
+                " preserves byte-equal)",
+                "ADR-014 OPT-IN preserved (purely" +
+                " structural;no functional surface" +
+                " change)",
+                "ADR-016 (advanced M1231 → M1235)",
+                "系统熵 reduction",
+                "STRUCTURAL DEBT REPAYMENT chapter 2" +
+                " — Phase 2 of doctrine collapse" +
+                " (first registry-only chapter)"
+            ],
+            plannedFutureCuts: [
+                "chapter 465+:DOCTRINE COLLAPSE Phase 3" +
+                " — `git rm` the 60+ historical per-" +
+                "chapter Swift files (BASChapter###" +
+                "EntropyDoctrine.swift) after migrating" +
+                " all cross-doctrine test references to" +
+                " registry lookups。 Net debt repayment" +
+                " ~−12K LOC",
+                "chapter 466+:auto-checkpoint" +
+                " integration with BASEventLogStorage —" +
+                " observer aggregate snapshot emitted" +
+                " as event-log payload kind every N" +
+                " turns",
+                "chapter 467+:adaptive A / τ — per-" +
+                "synapse STDP params evolve via meta-" +
+                "plasticity (BCM rule + sliding" +
+                " modification threshold)",
+                "chapter 468+:wire BASHierarchical" +
+                "PredictiveCoding into" +
+                " BASBiomimeticTurnObserver as 4th" +
+                " optional primitive slot",
+                "chapter 469+:expand benchmark harness" +
+                " to cover Mamba GPU + attention GPU +" +
+                " rmsNorm GPU + matMul GPU +" +
+                " rotaryEmbedding GPU paths"
+            ],
+            summary:
+                "STRUCTURAL DEBT REPAYMENT chapter 2 —" +
+                " ships Phase 2 of doctrine collapse:" +
+                " the FIRST chapter doctrine that lives" +
+                " ONLY in BASChapterDoctrineRegistry," +
+                " no per-chapter Swift file created。 4" +
+                " cuts (M1232-M1235):design schema-" +
+                "test extension + add chapter 464" +
+                " literal entry + PROOF tests verify" +
+                " full parity with Swift-file chapters" +
+                " + close-out。 The chapter PROVES the" +
+                " Phase 2 pattern by BEING the first" +
+                " instance — its full doctrine surface" +
+                " (knives,pins,entropy classes,future" +
+                " cuts,summary) is exactly THIS" +
+                " registry entry。 Phase 2 net per-" +
+                "chapter LOC delta:~+50 LOC literal" +
+                " entry vs ~+200 LOC Swift file (4×" +
+                " reduction)。 Phase 3 (chapter 465+)" +
+                " deletes the 60+ pre-464 Swift files" +
+                " for the full ~−12K LOC repayment。" +
+                " ADR-016 → M1235。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

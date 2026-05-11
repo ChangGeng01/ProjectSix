@@ -25,13 +25,14 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1231",
-            "Doctrine version pin。 M1231 STRUCTURAL " +
-            "DEBT REPAYMENT 1:bumped through chapters " +
-            "453-463 — biomimetic build-out (453-459) " +
+            "ADR-016.M1235",
+            "Doctrine version pin。 M1235 STRUCTURAL " +
+            "DEBT REPAYMENT 2:bumped through chapters " +
+            "453-464 — biomimetic build-out (453-459) " +
             "+ functional debt repayment (460-462) + " +
-            "doctrine-collapse Phase 1 (463 — typed " +
-            "Record + Registry covering 453-462)")
+            "doctrine-collapse Phase 1 (463) + Phase 2 " +
+            "(464 — FIRST registry-only chapter,no " +
+            "BASChapter464EntropyDoctrine.swift file)")
     }
 
     // MARK: - Per-gap status pins

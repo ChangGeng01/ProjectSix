@@ -1170,7 +1170,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 future: BASChapter463EntropyDoctrine
                     .plannedFutureCuts.count,
                 summary: BASChapter463EntropyDoctrine
-                    .summary)
+                    .summary),
+            // M1235 STRUCTURAL DEBT REPAYMENT 2 (Phase 2 — REGISTRY-ONLY chapter,no Swift file)
+            // chapter 464 has no BASChapter464EntropyDoctrine.swift。
+            // Look up the record from the registry instead。
+            checkRegistry("四百六十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百六十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1366,7 +1374,16 @@ final class BASChapterDoctrineSchemaCompletenessTests:
              BASChapter462EntropyDoctrine.mNumberLast),
             // M1231 STRUCTURAL DEBT REPAYMENT 1 (doctrine-collapse Phase 1)
             ("463", BASChapter463EntropyDoctrine.mNumberFirst,
-             BASChapter463EntropyDoctrine.mNumberLast)
+             BASChapter463EntropyDoctrine.mNumberLast),
+            // M1235 STRUCTURAL DEBT REPAYMENT 2 (Phase 2 — REGISTRY-ONLY chapter)
+            // chapter 464 has no Swift symbol;query registry directly
+            ("464",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百六十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百六十四")!
+                .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
         // reserved gap for future Phase B/C/D backfill)。
@@ -1665,6 +1682,29 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             && future > 0
             && !summary.isEmpty
         return (name: name, allOK: allOK)
+    }
+
+    /// chapter 464 / M1234 — schema completeness
+    /// check for REGISTRY-ONLY chapters。 Phase 2 of
+    /// doctrine collapse means new chapters don't
+    /// have BASChapter###EntropyDoctrine Swift symbols;
+    /// they live exclusively in BASChapterDoctrine
+    /// Registry。 This helper queries a record + runs
+    /// the same completeness check as `check(...)`。
+    private func checkRegistry(
+        _ name: String,
+        record: BASChapterDoctrineRecord
+    ) -> (name: String, allOK: Bool) {
+        return check(name,
+            tag: record.chapterTag,
+            first: record.mNumberFirst,
+            last: record.mNumberLast,
+            v1: record.v1MilestoneMNumber,
+            v1Status: record.v1MilestoneStatus,
+            knives: record.knives.count,
+            pins: record.pinHeld.count,
+            future: record.plannedFutureCuts.count,
+            summary: record.summary)
     }
 
     private func verifyKnivesRange(

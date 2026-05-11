@@ -117,7 +117,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百六十",     // M1216-M1219 (DEBT REPAYMENT 1 — BASMetalBenchmarkHarness with REAL µs measurements + chapter 458 doctrine corrected)
         "chapter 四百六十一",   // M1220-M1223 (DEBT REPAYMENT 2 — first real wire from BASTurnRuntimeEngine to BASBiomimeticTurnObserver via 2 config slots + 7-LOC hook)
         "chapter 四百六十二",   // M1224-M1227 (DEBT REPAYMENT 3 — mock-coordinator infra closes last 30% of integration debt via 3 e2e tests through real engine.runWithPlan)
-        "chapter 四百六十三"    // M1228-M1231 (STRUCTURAL DEBT REPAYMENT 1 — doctrine-collapse Phase 1: typed Record + Registry with 10 entries derived from chapter 453-462 sources)
+        "chapter 四百六十三",   // M1228-M1231 (STRUCTURAL DEBT REPAYMENT 1 — doctrine-collapse Phase 1: typed Record + Registry with 10 entries derived from chapter 453-462 sources)
+        "chapter 四百六十四"    // M1232-M1235 (STRUCTURAL DEBT REPAYMENT 2 — doctrine-collapse Phase 2: FIRST registry-only chapter,no Swift file。 Full doctrine lives in BASChapterDoctrineRegistry literal entry)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -130,16 +131,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
     /// M1187 → M1191 → M1195 → M1199 → M1203 → M1207 →
     /// M1211 → M1215 → M1219 → M1223 → M1227 → M1231
-    /// (chapter 四百六十三 STRUCTURAL DEBT REPAYMENT 1
-    /// — doctrine-collapse Phase 1:typed Record +
-    /// Registry covering chapters 453-462)。 M1078-
-    /// M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1231
+    /// → M1235 (chapter 四百六十四 STRUCTURAL DEBT
+    /// REPAYMENT 2 — doctrine-collapse Phase 2:FIRST
+    /// registry-only chapter,no per-chapter Swift
+    /// file)。 M1078-M1079 reserved for post-Phase-A
+    /// follow-up。
+    public static let mNumberLast: Int = 1235
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1231)。 Bumped through chapter 463:213 → ... →
-    /// 273 → 277 (chapters 453-463 each 4 cuts)。
-    public static let commitsShipped: Int = 277
+    /// M1235)。 Bumped through chapter 464:213 → ... →
+    /// 277 → 281 (chapters 453-464 each 4 cuts)。
+    public static let commitsShipped: Int = 281
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

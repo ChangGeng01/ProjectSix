@@ -938,7 +938,21 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// Phase 3 (chapter 465+) deletes the 60+
     /// historical Swift files。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1231"
+    /// M1235 bump:STRUCTURAL DEBT REPAYMENT chapter 2
+    /// — chapter 四百六十四 ships Phase 2 of doctrine
+    /// collapse:the FIRST chapter doctrine that lives
+    /// ONLY in BASChapterDoctrineRegistry,no per-
+    /// chapter Swift file。 The chapter PROVES the
+    /// Phase 2 pattern by BEING its first instance。
+    /// 10 PROOF tests verify schema parity with Swift-
+    /// file chapters + M-range contiguity with chapter
+    /// 463 + Codable round-trip of literal record +
+    /// Phase 2 covenant (every chapter past 453 has
+    /// a registry entry)。 Per-chapter LOC delta:
+    /// ~+50 literal vs ~+200 Swift file (4× reduction)。
+    /// Phase 3 still pending。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1235"
 
     /// Query the typed status of a specific gap。
     public static func status(
