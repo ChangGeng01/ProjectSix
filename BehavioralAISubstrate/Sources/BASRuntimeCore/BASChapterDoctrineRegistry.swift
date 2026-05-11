@@ -4240,7 +4240,104 @@ public enum BASChapterDoctrineRegistry {
                 " OPT-IN preserved (purely additive — no" +
                 " existing migrations yet)。 V1 byte-" +
                 "equality untouched。 Chapter 508 ships" +
-                " remaining 2 primitives。")
+                " remaining 2 primitives。"),
+
+        // chapter 508 — Tier C ADR-019 implementation COMPLETE
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八",
+            mNumberFirst: 1409,
+            mNumberLast: 1412,
+            v1MilestoneMNumber: 1412,
+            v1MilestoneStatus:
+                "chapter-508-tier-c-adr-019-implementation-complete",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1409, knife: "第一刀",
+                    concept: "NEW BASArbitrationObservation" +
+                        "Frame<Body> — 3rd Tier C" +
+                        " primitive。 NEW BASArbitration" +
+                        "Stage enum (.review/.negotiate/" +
+                        ".converged/.escalated)。 HONEST" +
+                        " rename:proposal called it" +
+                        " BASArbitrationFrame but that" +
+                        " name is taken in BASOrchestration。" +
+                        " 47 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1410, knife: "第二刀",
+                    concept: "NEW BASGovernanceCard" +
+                        "<Authority, Decision> — 4th + " +
+                        "FINAL Tier C primitive。 Two-" +
+                        "parameter typing makes governance" +
+                        " decisions compile-time" +
+                        " verifiable (Authority + Decision)。" +
+                        " 48 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1411, knife: "第三刀",
+                    concept: "NEW BASTierCAchievement" +
+                        "Doctrine — typed milestone" +
+                        " pinning all 4 primitive" +
+                        " shipments + HONEST separation" +
+                        " of primitives-shipped (4/4)" +
+                        " vs migrations-completed (0/4)。" +
+                        " Combined Tier C completion =" +
+                        " 50%。 BASTierCPrimitiveRecord" +
+                        " captures rename provenance" +
+                        " (2 collisions resolved" +
+                        " honestly)。 49 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1412, knife: "第四刀",
+                    concept: "Chapter 508 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1412。 Tier C ADR-019" +
+                        " IMPLEMENTATION COMPLETE:" +
+                        " 4 of 4 typed shape-specific" +
+                        " generic primitives shipped" +
+                        " with comprehensive PROOF tests。" +
+                        " 全面 开发 tier abc directive" +
+                        " substantively delivered" +
+                        " (primitives 4/4 = 100%;" +
+                        " migrations 0/4 deferred to" +
+                        " follow-up arc)。")
+            ],
+            entropyClassesAttacked: [
+                "arbitration-frame-no-typed-generic",
+                "governance-card-untyped-2-param",
+                "tier-c-achievement-untyped-milestone",
+                "tier-c-rename-provenance-implicit"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1412",
+                "tier-c-primitives-4-of-4-shipped",
+                "tier-c-migrations-0-of-4-honest-deferral",
+                "v1-byte-equality-preserved"
+            ],
+            plannedFutureCuts: [
+                "future arc — migration of 4 existing" +
+                " types (BASInspectionBundle, BASRisk" +
+                "ObservationBundle, BASArbitrationFrame," +
+                " BASGovernanceBundle) to consume the" +
+                " new typed generic primitives",
+                "future arc — additional substrate" +
+                " surfaces consuming the new primitives",
+                "future arc — production wire-in (host" +
+                " CI lane gated)"
+            ],
+            summary: "Tier C ADR-019 IMPLEMENTATION" +
+                " COMPLETE per 全面 开发 tier abc" +
+                " directive。 4 of 4 typed shape-specific" +
+                " generic primitives shipped:" +
+                " BASInspectionFrame + BASRiskObservation" +
+                "Card + BASArbitrationObservationFrame +" +
+                " BASGovernanceCard。 Combined Tier C" +
+                " completion 50% (4 primitives shipped +" +
+                " 0 migrations,migrations deferred to" +
+                " follow-up arc)。 49 typed surfaces" +
+                " cumulative。 ADR-016 → M1412。 ADR-014" +
+                " OPT-IN preserved。 V1 byte-equality" +
+                " untouched。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

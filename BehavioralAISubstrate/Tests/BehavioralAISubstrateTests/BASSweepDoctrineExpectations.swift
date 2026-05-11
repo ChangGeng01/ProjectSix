@@ -117,20 +117,20 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 105
+    public static let phase2ChapterCount: Int = 106
 
-    /// Phase 2 commits shipped。 At M1408:
-    /// 125 + 84 + 244 = 453 (chapter 507 = 4 cuts —
-    /// ADR-019 approval flip + BASInspectionFrame +
-    /// BASRiskObservationCard + close-out — Tier C
-    /// ADR-019 implementation entry)
-    public static let phase2CommitsShipped: Int = 453
+    /// Phase 2 commits shipped。 At M1412:
+    /// 125 + 84 + 248 = 457 (chapter 508 = 4 cuts —
+    /// BASArbitrationObservationFrame + BASGovernance
+    /// Card + BASTierCAchievementDoctrine + close-out
+    /// — Tier C ADR-019 IMPLEMENTATION COMPLETE)
+    public static let phase2CommitsShipped: Int = 457
 
-    /// Phase 2 mNumberLast。 At M1408:chapter 507
-    /// (Tier C ADR-019 implementation entry — 2 of 4
-    /// typed shape-specific primitives shipped)。
+    /// Phase 2 mNumberLast。 At M1412:chapter 508
+    /// (Tier C ADR-019 IMPLEMENTATION COMPLETE — 4 of
+    /// 4 typed shape-specific primitives shipped)。
     /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1408
+    public static let phase2MNumberLast: Int = 1412
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

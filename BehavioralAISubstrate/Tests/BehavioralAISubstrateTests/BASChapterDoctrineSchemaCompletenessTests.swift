@@ -1457,7 +1457,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七")!)
+                            "chapter 五百七")!),
+            // M1412 chapter 508 — Tier C ADR-019 COMPLETE
+            checkRegistry("五百八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2009,6 +2015,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七")!
+                .mNumberLast),
+            // M1412 chapter 508 — Tier C ADR-019 COMPLETE
+            ("508",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

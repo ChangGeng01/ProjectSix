@@ -1526,7 +1526,21 @@ public enum BASEntropyChapterIndex {
                 " 46 typed surfaces cumulative。" +
                 " ADR-016 → M1408。 Chapter 508 ships" +
                 " remaining 2 (BASArbitrationFrame +" +
-                " BASGovernanceCard)。")
+                " BASGovernanceCard)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八",
+            mNumberFirst: 1409, mNumberLast: 1412,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Tier C ADR-019 IMPLEMENTATION" +
+                " COMPLETE:4 of 4 typed shape-specific" +
+                " primitives shipped (BASArbitration" +
+                "ObservationFrame + BASGovernanceCard" +
+                " final 2) + BASTierCAchievementDoctrine" +
+                " milestone。 49 typed surfaces" +
+                " cumulative。 ADR-016 → M1412。 Combined" +
+                " Tier C completion = 50% (primitives" +
+                " 4/4 + migrations 0/4 honest deferral)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
