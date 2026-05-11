@@ -1278,27 +1278,24 @@ public struct BASEBrainRuntimeCoordinator {
             .ascentBranches
         let restStepsForAudit = kunlunHexaForAudit.restSteps
         let returnPathsForAudit = kunlunHexaForAudit.returnPaths
-        let jadeCasketForAudit = BASKunlunLayerProjections
-            .JadeCasketSnapshot.derive(
+        // chapter 四百八十五 / M1318 — V1 fold trio #2
+        let kunlunTrioTwoForAudit = BASTurnAuditProjectionsKunlunTrioTwo
+            .compute(
+                runMode: routedBudget.runMode,
+                riskLevel: boundRiskCard.riskLevel,
+                candidates: thoughtFrame.candidates,
+                organRefMorph:
+                    thoughtFrame.organMap?.morph.rawValue
+                    ?? "unknown",
                 turnID: derivedTurnID,
                 sessionID: derivedSessionID)
-        let jadeRefinementTicketsForAudit = thoughtFrame
-            .candidates
-            .compactMap { candidate in
-                BASKunlunLayerProjections.JadeRefinementTicket
-                    .derive(
-                        from: candidate,
-                        turnID: derivedTurnID)
-            }
+        let jadeCasketForAudit = kunlunTrioTwoForAudit.jadeCasket
+        let jadeRefinementTicketsForAudit = kunlunTrioTwoForAudit
+            .jadeRefinementTickets
         // M491-M494 (chapter 一百二十七) — final Kunlun host +
         // integrity production wires.
-        let jadeFidelityMapForAudit = BASKunlunLayerProjections
-            .JadeFidelityMap.derive(
-                from: routedBudget.runMode,
-                riskLevel: boundRiskCard.riskLevel,
-                organRef: "neural-organ:" +
-                    "\(thoughtFrame.organMap?.morph.rawValue ?? "unknown")",
-                turnID: derivedTurnID)
+        let jadeFidelityMapForAudit = kunlunTrioTwoForAudit
+            .jadeFidelityMap
         let hostJadeRegisterForAudit = BASKunlunLayerProjections
             .HostJadeRegister.derive(
                 hostID: hostContext.hostID,
