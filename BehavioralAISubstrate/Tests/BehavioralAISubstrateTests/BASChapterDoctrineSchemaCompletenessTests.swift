@@ -1415,7 +1415,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百")!)
+                            "chapter 五百")!),
+            // M1383 chapter 501 — Tier 1 honest SEAL at 52/60
+            checkRegistry("五百一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1911,6 +1917,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百")!
+                .mNumberLast),
+            // M1383 chapter 501 — Tier 1 honest SEAL at 52/60
+            ("501",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

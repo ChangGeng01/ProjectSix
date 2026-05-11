@@ -37,16 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs500() {
+    func testLastChapterIs501() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百",
-            "M1380 chapter 五百:最创新/原生神经引擎" +
-            " push — BASANEKernelEligibilityClassifier" +
-            " + BASThermalAwareKernelSelectionPolicy" +
-            " + BASKVCacheInvalidationPolicy。 28" +
-            " typed surfaces cumulative")
+            "chapter 五百一",
+            "M1383 chapter 五百一:Tier 1 substrate-" +
+            "internal honest CLOSURE SEALED at 52/60" +
+            " (~87%)。 31 typed surfaces cumulative。" +
+            " 8-point gap to 60/60 typed-attributed to" +
+            " 7 external blockers (NO silent under-" +
+            "delivery drift)")
     }
 
     // MARK: - M-number range

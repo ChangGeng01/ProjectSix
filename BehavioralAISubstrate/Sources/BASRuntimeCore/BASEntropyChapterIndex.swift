@@ -1427,7 +1427,21 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative。 ADR-016" +
                 " → M1380。 HONEST: executor wire-in" +
                 " deferred (consultedByExecutorIn" +
-                "Production = false invariant tested)。")
+                "Production = false invariant tested)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百一",
+            mNumberFirst: 1381, mNumberLast: 1383,
+            knivesCount: 3, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Tier 1 substrate-internal honest" +
+                " CLOSURE SEALED at 52/60 (~87%)。" +
+                " BASTier1HonestClosureMilestoneDoctrine" +
+                " + BASRealHotPathAttackSealDoctrine" +
+                " post-closure refresh。 31 typed" +
+                " surfaces cumulative。 ADR-016 → M1383。" +
+                " 8-point gap to 60/60 typed-attributed" +
+                " to 7 external blockers (NO silent" +
+                " under-delivery drift invariant tested)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

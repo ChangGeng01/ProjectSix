@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1380",
-            "M1380:doctrine version reflects chapter 五百 — 最创新/原生神经引擎 push。 3 NEW typed policy surfaces:BASANEKernelEligibilityClassifier + BASThermalAwareKernelSelectionPolicy + BASKVCacheInvalidationPolicy。 28 typed surfaces cumulative。 HONEST: executor wire-in honestly deferred (consultedByExecutorInProduction = false tested)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1383",
+            "M1383:doctrine version reflects chapter 五百一 — Tier 1 substrate-internal honest CLOSURE SEALED at 52/60 (~87%)。 BASTier1HonestClosureMilestoneDoctrine + BASRealHotPathAttackSealDoctrine post-closure refresh。 31 typed surfaces cumulative。 8-point gap to 60/60 typed-attributed to 7 external blockers (no silent under-delivery drift)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
