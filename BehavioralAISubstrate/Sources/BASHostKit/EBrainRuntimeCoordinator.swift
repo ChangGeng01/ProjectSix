@@ -1321,32 +1321,30 @@ public struct BASEBrainRuntimeCoordinator {
             .kunlunFarWestReserve
         // M495-M498 (chapter 一百二十七) — chapter 一百二十一
         // Cthulhu leftover production wires.
-        let abyssalOrganAliasForAudit =
-            BASCthulhuLeftoverProjections.AbyssalOrganAlias
-                .derive(from: routedBudget.runMode)
-        let humanAnchorProfileForAudit =
-            BASCthulhuLeftoverProjections.HumanAnchorProfile
-                .derive(
-                    hostID: hostContext.hostID,
-                    riskLevel: boundRiskCard.riskLevel,
-                    turnID: derivedTurnID)
-        let sealedMemoryForAudit =
-            BASCthulhuLeftoverProjections.SealedMemory.derive(
-                from: memoryTemperatureLayerForAudit,
-                turnID: derivedTurnID)
-        let cosmicScaleViewForAudit = BASCthulhuLayerProjections
-            .CosmicScaleView.derive(
-                from: routedBudget,
-                turnID: derivedTurnID,
-                observedSubjectRef: thoughtFrame.candidates
-                    .first?.candidateID ?? "no-candidate")
-        let ontologyFogForAudit = BASCthulhuLayerProjections
-            .OntologyFog.derive(
-                unknownRefs: unknownReserveForGate
-                    .unknownRefs,
-                assertionCeilingRawValue: unknownReserveForGate
+        // chapter 四百八十六 / M1322 — V1 cluster B start
+        let cthulhuPentaForAudit =
+            BASTurnAuditProjectionsCthulhuPenta.compute(
+                routedBudget: routedBudget,
+                runMode: routedBudget.runMode,
+                hostID: hostContext.hostID,
+                riskLevel: boundRiskCard.riskLevel,
+                memoryTemperatureLayer:
+                    memoryTemperatureLayerForAudit,
+                candidates: thoughtFrame.candidates,
+                unknownRefs: unknownReserveForGate.unknownRefs,
+                assertionCeilingRaw: unknownReserveForGate
                     .assertionCeiling.rawValue,
                 turnID: derivedTurnID)
+        let abyssalOrganAliasForAudit = cthulhuPentaForAudit
+            .abyssalOrganAlias
+        let humanAnchorProfileForAudit = cthulhuPentaForAudit
+            .humanAnchorProfile
+        let sealedMemoryForAudit = cthulhuPentaForAudit
+            .sealedMemory
+        let cosmicScaleViewForAudit = cthulhuPentaForAudit
+            .cosmicScaleView
+        let ontologyFogForAudit = cthulhuPentaForAudit
+            .ontologyFog
         // M452 (chapter 一百十九) — derive L9 retention loop from
         // unknown reserve. Closes the chapter 一百十八 nil
         // placeholder for `retentionLoop:` in M449. Returns nil
