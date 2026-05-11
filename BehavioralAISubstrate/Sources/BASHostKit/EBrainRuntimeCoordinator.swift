@@ -1805,107 +1805,42 @@ public struct BASEBrainRuntimeCoordinator {
         // observability-only at this milestone — no decision
         // influence yet (parity with M303 / M304 audit-only
         // pre-M384 phase for Cthulhu).
-        let kunlunAxisForAudit = BASKunlunAxis(
-            axisID: "axis-\(runtimeTrace.sessionID)",
-            hostRef: hostContext.hostID,
-            sovereignRef: "sovereign-\(runtimeTrace.sessionID)",
-            worldAnchorRef:
-                "world-anchor-\(runtimeTrace.sessionID)",
-            activeLayerRefs:
-                Self.kunlunActiveLayerRefs,
-            agentSeatRefs: [],
-            centerlineRules:
-                Self.kunlunCenterlineRules(
-                    for: boundActionPermit.mode),
-            deviationThreshold: Self
-                .kunlunAxisDeviationThreshold,
-            lastAlignmentCheck: "")
-        // M583 (chapter 一百五十七) — defect #12 partial fix.
-        // Pre-M583: `kunlunMatched` was a 4-valued risk-level lookup
-        // table (`.low → 3 / .medium → 2 / .high → 1 / .extreme → 0`),
-        // making `centerScore = matched / 3` collapse to only 4
-        // possible values regardless of substrate state. Chapter
-        // 一百四十六-一百五十四 found this saturated the bench's
-        // axisStability metric to 1.0 (all sessions hit one of
-        // 4 discrete scores → CV = 0).
-        //
-        // Post-M583: each of the 3 centerline rules is evaluated as
-        // a real predicate against substrate state THIS TURN. The
-        // matched count thus depends on actual emitted observations
-        // (anchor tone, abyssal escalation, quarantines, permit
-        // mode) — not on a static risk-level lookup.
-        //
-        // This is still NOT full M406 (which would wire prompt-
-        // evaluable rule library + L4 inference engine), but it
-        // breaks the placeholder ceiling: matched count can now
-        // genuinely vary from 0 to 3 based on observable substrate
-        // state, giving 4 centerScore values that MEAN something
-        // rather than 4 values pinned to riskLevel.
-        //
-        // Predicate semantics (parity with audit-emission shape):
-        // 1. respects-host-boundary → quarantineRecords empty AND
-        //    permit not in {.block, .replace}
-        // 2. honors-world-anchor    → anchor tone not .reserved AND
-        //    abyssalPressure has no escalation hint
-        // 3. permit-mode-<X>        → permit mode is "cooperative"
-        //    (one of: .answer, .mirror, .compare, .delay,
-        //    .draftOnly, .localOnly)
-        let respectsHostBoundary: Bool =
-            quarantineRecords.isEmpty
-            && boundActionPermit.mode != .block
-            && boundActionPermit.mode != .replace
-        let honorsWorldAnchor: Bool =
-            humanAnchorSignalForAudit
-                .recommendedSurfaceTone != .reserved
-            && abyssalPressureForAudit
-                .sovereignEscalationHint == nil
-        let permitModeCooperative: Bool = {
-            switch boundActionPermit.mode {
-            case .answer, .mirror, .compare,
-                 .delay, .draftOnly, .localOnly:
-                return true
-            case .block, .replace, .escalate:
-                return false
-            }
-        }()
-        let kunlunMatched: Int = (respectsHostBoundary ? 1 : 0)
-            + (honorsWorldAnchor ? 1 : 0)
-            + (permitModeCooperative ? 1 : 0)
-        let kunlunDeviationCodes: [String] = {
-            var codes: [String] = []
-            if !respectsHostBoundary {
-                codes.append("host-boundary-not-respected")
-            }
-            if !honorsWorldAnchor {
-                codes.append("world-anchor-not-honored")
-            }
-            if !permitModeCooperative {
-                codes.append("permit-mode-non-cooperative")
-            }
-            // Risk-level signal preserved as additive context
-            // (not the sole driver of matched count anymore).
-            switch boundRiskCard.riskLevel {
-            case .low: break
-            case .medium:
-                codes.append("risk-medium-needs-attention")
-            case .high:
-                codes.append("risk-high-narrows-axis")
-            case .extreme:
-                codes.append("risk-extreme-axis-overreach")
-            }
-            return codes
-        }()
-        let kunlunAxisAlignmentForAudit = BASKunlunAxisProtocol
-            .computeAlignment(
-                alignmentID:
-                    "axis-align-\(runtimeTrace.sessionID)",
-                axis: kunlunAxisForAudit,
-                targetRef:
+        // chapter 四百九十三 / M1348-M1349 — Kunlun axis + alignment
+        // fold。 4 ForAudit declarations + heavy predicate logic
+        // collapsed into a single typed factory call。 M583 (chapter
+        // 一百五十七) per-turn-predicate semantics preserved 1:1
+        // inside the factory;V1 byte-equality maintained per the
+        // stress-sweep dual-mode regression guard。
+        let kunlunAxisProtocolForAudit =
+            BASTurnAuditProjectionsKunlunAxisProtocol.compute(
+                sessionID: runtimeTrace.sessionID,
+                hostID: hostContext.hostID,
+                permitMode: boundActionPermit.mode,
+                riskLevel: boundRiskCard.riskLevel,
+                quarantineRecordsIsEmpty:
+                    quarantineRecords.isEmpty,
+                humanAnchorRecommendedSurfaceTone:
+                    humanAnchorSignalForAudit
+                        .recommendedSurfaceTone,
+                sovereignEscalationHint:
+                    abyssalPressureForAudit
+                        .sovereignEscalationHint,
+                primaryCandidateID:
                     thoughtFrame.candidates.first?.candidateID
                     ?? "no-candidate",
-                matchedRules: kunlunMatched,
-                deviationCodes: kunlunDeviationCodes,
-                correctionHint: "")
+                kunlunActiveLayerRefs:
+                    Self.kunlunActiveLayerRefs,
+                centerlineRules:
+                    Self.kunlunCenterlineRules(
+                        for: boundActionPermit.mode),
+                kunlunAxisDeviationThreshold: Self
+                    .kunlunAxisDeviationThreshold)
+        let kunlunAxisForAudit = kunlunAxisProtocolForAudit.axis
+        let kunlunMatched = kunlunAxisProtocolForAudit.matched
+        let kunlunDeviationCodes = kunlunAxisProtocolForAudit
+            .deviationCodes
+        let kunlunAxisAlignmentForAudit = kunlunAxisProtocolForAudit
+            .alignment
         // M404 — Jade Canon seal verification audit projection.
         // Doctrine §4.2: 无来源不成玉 / 无签名不进门 / 无回放不
         // 升格 / 无撤销路径不得长期生效. Synthesize a per-turn
