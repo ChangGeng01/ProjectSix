@@ -1852,79 +1852,41 @@ public struct BASEBrainRuntimeCoordinator {
         // checksum; revocation path from session-keyed rollback
         // anchor ref. Audit-only emission — actual seal-driven
         // gating is M413+ composability work (chapter 九十五).
-        let kunlunJadeSealForAudit = BASJadeCanonSeal(
-            sealID: "jade-permit-\(runtimeTrace.sessionID)",
-            targetRef:
-                "permit-\(boundActionPermit.mode.rawValue)",
-            objectClass: .actionPermit,
-            targetSchemaVersion:
-                BASActionPermit.currentSchemaVersion,
-            provenanceRefs: {
-                var refs: [String] = []
-                refs.append(
-                    "verdict-\(sovereignVerdict.verdictID)")
-                refs.append(contentsOf:
-                    sovereignWarrants.map(\.warrantID))
-                if !thoughtFold.foldID.isEmpty {
-                    refs.append("fold-\(thoughtFold.foldID)")
-                }
-                return refs
-            }(),
-            integrityHash: thoughtFold.checksum,
-            signatureRef: sovereignVerdict.verdictID,
-            replayRequired: boundActionPermit.requireMirror
-                || boundActionPermit.requireCompare
-                || boundActionPermit.requireSecondCheck,
-            revocationPath:
-                "rollback-\(runtimeTrace.sessionID)",
-            sourceRiverRef:
-                "river-\(runtimeTrace.sessionID)")
+        // chapter 四百九十三 / M1350-M1351 — Kunlun seal + river
+        // origin fold。 4 ForAudit declarations + 2 inline struct
+        // constructions collapsed into a single typed factory call。
+        // M404 (jade canon §4.2) + M405 (river origin §4.5)
+        // semantics preserved 1:1;V1 byte-equality required。
+        let kunlunSealRiverForAudit =
+            BASTurnAuditProjectionsKunlunSealRiver.compute(
+                sessionID: runtimeTrace.sessionID,
+                permitMode: boundActionPermit.mode,
+                requireMirror: boundActionPermit
+                    .requireMirror,
+                requireCompare: boundActionPermit
+                    .requireCompare,
+                requireSecondCheck: boundActionPermit
+                    .requireSecondCheck,
+                verdictID: sovereignVerdict.verdictID,
+                verdictLevel: sovereignVerdict
+                    .verdictLevel.rawValue,
+                warrantIDs: sovereignWarrants
+                    .map(\.warrantID),
+                candidateIDs: thoughtFrame.candidates
+                    .map(\.candidateID),
+                quarantineIDs: quarantineRecords
+                    .map(\.quarantineID),
+                thoughtFoldID: thoughtFold.foldID,
+                thoughtFoldChecksum: thoughtFold.checksum,
+                riverOriginTransformationSteps:
+                    Self.riverOriginTransformationSteps)
+        let kunlunJadeSealForAudit = kunlunSealRiverForAudit.seal
         let kunlunJadeVerificationForAudit =
-            BASKunlunJadeCanonProtocol.verifySeal(
-                kunlunJadeSealForAudit)
-        // M405 — River-Origin lineage audit projection. Doctrine
-        // §4.5: 没有源流就没有可信成长. Synthesize a per-turn
-        // trace from existing turn metadata: roots from session
-        // ref + verdict ref; tributaries from candidate IDs;
-        // derived objects from the bound permit + warrants;
-        // transformations from the pipeline stages we observably
-        // ran; consents from quarantine + warrant witnesses;
-        // permits from the bound permit; audit refs from the
-        // about-to-be-emitted audit entry's stable prefix.
-        // Audit-only emission — analyze produces orphan / cascade
-        // warnings that surface in signalRefs.
-        let kunlunRiverTraceForAudit = BASRiverOriginTrace(
-            traceID: "river-\(runtimeTrace.sessionID)",
-            rootSourceRefs: [
-                "session-\(runtimeTrace.sessionID)",
-                "verdict-\(sovereignVerdict.verdictID)",
-            ],
-            tributaryRefs: thoughtFrame.candidates
-                .map(\.candidateID),
-            derivedObjectRefs: {
-                var refs: [String] = []
-                refs.append(
-                    "permit-\(boundActionPermit.mode.rawValue)")
-                refs.append(contentsOf:
-                    sovereignWarrants.map(\.warrantID))
-                return refs
-            }(),
-            transformationSteps:
-                Self.riverOriginTransformationSteps,
-            consentRefs: quarantineRecords
-                .map(\.quarantineID),
-            permitRefs: [
-                "permit-\(boundActionPermit.mode.rawValue)",
-            ],
-            auditRefs: [
-                "audit.\(runtimeTrace.sessionID)." +
-                "\(sovereignVerdict.verdictLevel.rawValue)",
-            ],
-            deletionDependents: [],
-            lineageCutRefs: [])
+            kunlunSealRiverForAudit.verification
+        let kunlunRiverTraceForAudit =
+            kunlunSealRiverForAudit.trace
         let kunlunRiverLineageForAudit =
-            BASKunlunRiverOriginProtocol.analyze(
-                kunlunRiverTraceForAudit)
+            kunlunSealRiverForAudit.lineage
         // M408 — Yaochi Sanctum access audit projection. Doctrine
         // §4.4 (line 556-560): 可以存在但默认不参与普通检索 / 可以
         // 被保护但不能被系统操控 / 可以被召回但必须有上下文授权与
