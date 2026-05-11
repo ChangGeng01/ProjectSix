@@ -37,15 +37,13 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs466() {
+    func testLastChapterIs467() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百六十六",
-            "M1243 STRUCTURAL DEBT REPAYMENT 4:" +
-            "bumped to 四百六十六 (doctrine-collapse" +
-            " Phase 3 EXECUTED with user OK on" +
-            " phase-3-doctrine-collapse branch)")
+            "chapter 四百六十七",
+            "M1247 POST-PHASE-3 FEATURE 1:bumped to" +
+            " 四百六十七 (auto-checkpoint integration)")
     }
 
     // MARK: - M-number range

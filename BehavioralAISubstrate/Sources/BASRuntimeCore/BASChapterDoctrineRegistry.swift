@@ -490,7 +490,141 @@ public enum BASChapterDoctrineRegistry {
                 " unchanged (forwarders preserve" +
                 " surface)。 Shipped on phase-3-doctrine-" +
                 "collapse branch for review。 ADR-016 →" +
-                " M1243。 V1 byte-equality preserved。")
+                " M1243。 V1 byte-equality preserved。"),
+
+        // chapter 467 — auto-checkpoint integration
+        // (registry-native;Phase 2 pattern continued)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百六十七",
+            mNumberFirst: 1244,
+            mNumberLast: 1247,
+            v1MilestoneMNumber: 1247,
+            v1MilestoneStatus:
+                "chapter-467-v1-auto-checkpoint-integration",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1244,
+                    knife: "第一刀",
+                    concept:
+                        "Design BASBiomimeticCheckpoint" +
+                        "EventPayload typed Codable +" +
+                        " add .biomimeticCheckpoint 8th" +
+                        " case to BASEventPayloadKind。" +
+                        " No source change yet"),
+                BASChapterKnife(
+                    mNumber: 1245,
+                    knife: "第二刀",
+                    concept:
+                        "Ship payload in BASMetalSubstrate" +
+                        " (alongside chapter 455 snapshot" +
+                        " types it wraps) + BASEventLogEntry" +
+                        " factory `biomimeticCheckpointEvent" +
+                        "` + reverse accessor。 8th payload" +
+                        " kind discriminator matches" +
+                        " 'biomimetic-checkpoint-event'"),
+                BASChapterKnife(
+                    mNumber: 1246,
+                    knife: "第三刀",
+                    concept:
+                        "BASTurnRuntimeEngineConfiguration" +
+                        " gains biomimeticCheckpointEveryN" +
+                        "Turns: Int? slot + immutable" +
+                        " updater。 BASTurnRuntimeEngine" +
+                        " threads slot through both inits" +
+                        " + extends the chapter 461 hook" +
+                        " block:after observer.observe" +
+                        " fires,if all 3 prerequisites" +
+                        " (observer + cadence + eventLog)" +
+                        " wired AND turnsObservedCount() %" +
+                        " everyN == 0,emit a typed" +
+                        " checkpoint event。 12 PROOF tests" +
+                        " verify payload Codable + init" +
+                        " clamps + discriminator string +" +
+                        " factory round-trip + end-to-end" +
+                        " cadence emission (6 turns @" +
+                        " cadence=3 → 2 events) + opt-out" +
+                        " preserves V1 + snapshot reflects" +
+                        " state"),
+                BASChapterKnife(
+                    mNumber: 1247,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 467 close-out + Phase 2" +
+                        " bump (chapter 64→65,mNumberLast" +
+                        " 1243→1247,commits 289→293) +" +
+                        " ADR-016.M1243 → M1247 advance。" +
+                        " Auto-checkpoint integration" +
+                        " complete — biomimetic state" +
+                        " survives across sessions via" +
+                        " event-log replay")
+            ],
+            entropyClassesAttacked: [
+                "no-cross-session-biomimetic-recovery-entropy",
+                "manual-snapshot-bookkeeping-entropy",
+                "checkpoint-cadence-unspecified-entropy",
+                "doctrine-pin-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7 (checkpoint events are audit," +
+                " not commitment;errors try?-swallowed)",
+                "chapter 一百八十五 (typed payload +" +
+                " typed cadence slot)",
+                "chapter 二百一一 (single payload;" +
+                " piggyback on unified event log)",
+                "chapter 三百九二 (Codable byte-stable" +
+                " via JSONEncoder sortedKeys)",
+                "ADR-014 OPT-IN preserved (additive" +
+                " payload + opt-in slot;default nil =" +
+                " no emission)",
+                "ADR-016 (advanced M1243 → M1247)",
+                "系统熵 reduction",
+                "POST-PHASE-3 FEATURE chapter 1 —" +
+                " auto-checkpoint integration"
+            ],
+            plannedFutureCuts: [
+                "chapter 468:replay-side helper for" +
+                " importing the latest checkpoint event" +
+                " from BASEventLogStorage into a fresh" +
+                " observer (closes the cross-session" +
+                " recovery loop)",
+                "chapter 469:adaptive A/τ — per-synapse" +
+                " STDP meta-plasticity (BCM rule)",
+                "chapter 470:wire BASHierarchical" +
+                "PredictiveCoding into" +
+                " BASBiomimeticTurnObserver as 4th" +
+                " optional primitive slot",
+                "chapter 471:expand benchmark harness" +
+                " coverage to Mamba GPU + attention" +
+                " GPU + matMul GPU paths",
+                "chapter 472:merge phase-3-doctrine-" +
+                "collapse branch back to main"
+            ],
+            summary:
+                "POST-PHASE-3 FEATURE chapter 467 ships" +
+                " auto-checkpoint integration tying" +
+                " together chapter 455 snapshot value-" +
+                "type + chapter 456 observer +" +
+                " chapter 461 engine hook + unified" +
+                " event log。 4 cuts (M1244-M1247):" +
+                " design + ship payload + add 8th" +
+                " payload kind + extend engine hook" +
+                " with cadence emission + 12 PROOF" +
+                " tests including end-to-end cadence" +
+                " emission via stub coordinator。 When" +
+                " host wires all 3 prerequisites" +
+                " (observer + cadence + eventLog) the" +
+                " engine auto-emits a typed checkpoint" +
+                " event every N turns。 Opt-out:any" +
+                " of the 3 missing → no emission → V1" +
+                " byte-equality preserved。 Cross-" +
+                "session biomimetic state recovery is" +
+                " now achievable via event-log replay" +
+                " (loop closure in chapter 468)。" +
+                " ADR-016 → M1247。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

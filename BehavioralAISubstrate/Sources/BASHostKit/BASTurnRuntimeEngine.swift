@@ -142,6 +142,14 @@ public actor BASTurnRuntimeEngine {
         (@Sendable (BASEBrainTurnResult)
             -> BASBiomimeticTurnSignal)?
 
+    /// Optional cadence for auto-checkpoint emission。
+    /// nil OR == 0 disables;>= 1 emits a typed
+    /// biomimetic-checkpoint event to `eventLog` every
+    /// N observed turns。 Requires `biomimeticTurnObserver`
+    /// + `eventLog` to ALSO be wired。 chapter 467 /
+    /// M1246。
+    private let biomimeticCheckpointEveryNTurns: Int?
+
     // MARK: - Mutable state (actor-isolated)
 
     private var sequenceCounter: Int = 0
@@ -214,7 +222,8 @@ public actor BASTurnRuntimeEngine {
             BASBiomimeticTurnObserver? = nil,
         biomimeticTurnSignalBuilder:
             (@Sendable (BASEBrainTurnResult)
-                -> BASBiomimeticTurnSignal)? = nil
+                -> BASBiomimeticTurnSignal)? = nil,
+        biomimeticCheckpointEveryNTurns: Int? = nil
     ) {
         self.coordinator = coordinator
         self.eventLog = eventLog
@@ -230,6 +239,8 @@ public actor BASTurnRuntimeEngine {
             biomimeticTurnObserver
         self.biomimeticTurnSignalBuilder =
             biomimeticTurnSignalBuilder
+        self.biomimeticCheckpointEveryNTurns =
+            biomimeticCheckpointEveryNTurns
     }
 
     /// chapter 四百七 / M998 — convenience init taking the
@@ -265,7 +276,10 @@ public actor BASTurnRuntimeEngine {
                 configuration.biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
                 configuration
-                    .biomimeticTurnSignalBuilder)
+                    .biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                configuration
+                    .biomimeticCheckpointEveryNTurns)
     }
 
     // MARK: - chapter 四百三十五 / M1117 — assignment ledger accessor
@@ -578,6 +592,44 @@ public actor BASTurnRuntimeEngine {
             let signal = biomimeticTurnSignalBuilder?(
                 result) ?? BASBiomimeticTurnSignal()
             _ = try? await observer.observe(signal)
+            // chapter 467 / M1246 — auto-checkpoint
+            // emission。 Three prerequisites must ALL
+            // be wired:observer (above),event log,
+            // and cadence >= 1。 When all present AND
+            // observer.turnsObservedCount() %
+            // everyN == 0,emit a typed biomimetic-
+            // checkpoint event。 Errors swallowed via
+            // try? (红线 7)。 ADR-014 OPT-IN:any of
+            // the 3 missing → no emission → V1 byte-
+            // equality preserved。
+            if let eventLog = eventLog,
+               let everyN = biomimeticCheckpointEveryNTurns,
+               everyN >= 1 {
+                let count = await observer
+                    .turnsObservedCount()
+                if count % everyN == 0 {
+                    let snapshot = await observer
+                        .exportAggregate()
+                    let sid = result.runtimeTrace
+                        .sessionID
+                    let payload =
+                        BASBiomimeticCheckpointEventPayload(
+                            snapshot: snapshot,
+                            turnIndex: count,
+                            everyNTurns: everyN,
+                            sessionID: sid)
+                    let entry = BASEventLogEntry
+                        .biomimeticCheckpointEvent(
+                            eventID: eventIDFactory(),
+                            timestampMs:
+                                timestampMsOverride
+                                ?? clockMs(),
+                            sessionID: sid,
+                            payload: payload)
+                    _ = try? await eventLog
+                        .append(entry)
+                }
+            }
         }
         return result
     }

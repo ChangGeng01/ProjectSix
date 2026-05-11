@@ -979,7 +979,24 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// ~−3K LOC repayment。 All 6178+ existing tests
     /// continue passing (forwarders preserve API)。
     /// V1 byte-equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1243"
+    /// M1247 bump:POST-PHASE-3 FEATURE chapter 1 —
+    /// chapter 四百六十七 ships auto-checkpoint
+    /// integration tying together chapter 455
+    /// snapshot value-type + chapter 456 observer +
+    /// chapter 461 engine hook + unified event log。
+    /// 8th BASEventPayloadKind case added
+    /// (.biomimeticCheckpoint)。 New typed payload
+    /// BASBiomimeticCheckpointEventPayload + factory +
+    /// reverse accessor。 BASTurnRuntimeEngine
+    /// Configuration gains biomimeticCheckpointEveryN
+    /// Turns slot;engine hook extends to emit
+    /// checkpoint events every N turns when all 3
+    /// prerequisites wired。 12 PROOF tests include
+    /// end-to-end emission cadence verification via
+    /// stub coordinator。 ADR-014 OPT-IN preserved
+    /// (default nil cadence = no emission)。 V1 byte-
+    /// equality preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1247"
 
     /// Query the typed status of a specific gap。
     public static func status(

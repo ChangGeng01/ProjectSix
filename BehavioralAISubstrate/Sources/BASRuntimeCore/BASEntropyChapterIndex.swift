@@ -1015,7 +1015,37 @@ public enum BASEntropyChapterIndex {
                 " Dependency inverted:registry is now" +
                 " the canonical store;per-chapter" +
                 " symbols are thin readers。 ADR-016 →" +
-                " M1243")
+                " M1243"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百六十七",
+            mNumberFirst: 1244,
+            mNumberLast: 1247,
+            knivesCount: 4,
+            entropyClassesCount: 4,
+            pinsCount: 11,
+            futureCutsCount: 5,
+            summary:
+                "POST-PHASE-3 FEATURE 1 — auto-" +
+                "checkpoint integration ties chapter 455" +
+                " snapshot + chapter 456 observer +" +
+                " chapter 461 engine hook + unified" +
+                " event log。 NEW 8th payload kind" +
+                " .biomimeticCheckpoint + typed" +
+                " BASBiomimeticCheckpointEventPayload +" +
+                " factory + reverse accessor。 NEW" +
+                " biomimeticCheckpointEveryNTurns config" +
+                " slot;engine extends chapter 461 hook" +
+                " block to emit checkpoint events every" +
+                " N turns when observer + cadence +" +
+                " eventLog all wired。 12 PROOF tests" +
+                " including end-to-end cadence emission" +
+                " via stub coordinator (6 turns @" +
+                " cadence=3 → 2 events emitted)。 ADR-" +
+                "014 OPT-IN preserved (nil cadence = no" +
+                " emission)。 Cross-session biomimetic" +
+                " state recovery via event-log replay" +
+                " now achievable;loop closure in chapter" +
+                " 468。 ADR-016 → M1247")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

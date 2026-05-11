@@ -184,6 +184,20 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
         (@Sendable (BASEBrainTurnResult)
             -> BASBiomimeticTurnSignal)?
 
+    // MARK: - Slot (M1246 chapter 四百六十七 — auto-checkpoint)
+
+    /// Optional cadence governing how often the engine
+    /// auto-emits a biomimetic-checkpoint event to the
+    /// configured event log。 When nil OR == 0,no
+    /// auto-emission happens。 When >= 1,after each
+    /// observer.observe(...) call the engine checks
+    /// `observer.turnsObservedCount() % everyN == 0`
+    /// and emits a checkpoint event if so。
+    /// Prerequisites:`biomimeticTurnObserver` + this
+    /// slot + `eventLog` must ALL be wired。 chapter
+    /// 467 / M1246。
+    public let biomimeticCheckpointEveryNTurns: Int?
+
     // MARK: - Init
 
     public init(
@@ -206,7 +220,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             BASBiomimeticTurnObserver? = nil,
         biomimeticTurnSignalBuilder:
             (@Sendable (BASEBrainTurnResult)
-                -> BASBiomimeticTurnSignal)? = nil
+                -> BASBiomimeticTurnSignal)? = nil,
+        biomimeticCheckpointEveryNTurns: Int? = nil
     ) {
         self.eventLog = eventLog
         self.eventIDFactory = eventIDFactory
@@ -221,6 +236,8 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver
         self.biomimeticTurnSignalBuilder =
             biomimeticTurnSignalBuilder
+        self.biomimeticCheckpointEveryNTurns =
+            biomimeticCheckpointEveryNTurns
     }
 
     /// Default config: no event log,UUID factory,system clock,
@@ -252,7 +269,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     public func with(
@@ -272,7 +291,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     public func with(
@@ -291,7 +312,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     // MARK: - Immutable updates (M1100 Phase F)
@@ -312,7 +335,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     public func with(
@@ -331,7 +356,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     public func with(
@@ -350,7 +377,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     /// chapter 四百三十五 / M1116 — immutable updater for
@@ -372,7 +401,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     // MARK: - Immutable updates (M1128 chapter 四百三十八 — host injection)
@@ -399,7 +430,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     /// chapter 四百三十八 / M1128 — immutable updater for
@@ -424,7 +457,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     // MARK: - Immutable updates (M1221 chapter 四百六十一 — biomimetic observer)
@@ -448,7 +483,9 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 
     /// chapter 461 / M1221 — immutable updater for the
@@ -471,6 +508,35 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticTurnObserver:
                 biomimeticTurnObserver,
             biomimeticTurnSignalBuilder:
-                biomimeticTurnSignalBuilder)
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
+    }
+
+    // MARK: - Immutable updates (M1246 chapter 四百六十七 — auto-checkpoint)
+
+    /// chapter 467 / M1246 — immutable updater for the
+    /// optional checkpoint cadence。 nil OR == 0
+    /// disables auto-emission;>= 1 enables it (subject
+    /// to observer + eventLog also being wired)。
+    public func with(
+        biomimeticCheckpointEveryNTurns: Int?
+    ) -> BASTurnRuntimeEngineConfiguration {
+        BASTurnRuntimeEngineConfiguration(
+            eventLog: eventLog,
+            eventIDFactory: eventIDFactory,
+            clockMs: clockMs,
+            runtimeMode: runtimeMode,
+            metalKernelRegistry: metalKernelRegistry,
+            aneCapability: aneCapability,
+            stagePlanHints: stagePlanHints,
+            routedStageExecutor: routedStageExecutor,
+            fallbackStageExecutor: fallbackStageExecutor,
+            biomimeticTurnObserver:
+                biomimeticTurnObserver,
+            biomimeticTurnSignalBuilder:
+                biomimeticTurnSignalBuilder,
+            biomimeticCheckpointEveryNTurns:
+                biomimeticCheckpointEveryNTurns)
     }
 }

@@ -40,7 +40,8 @@ final class BASEventPayloadKindTests: XCTestCase {
             "permit-escalation-event",
             "native-stage-dispatch-event",
             "plan-assignment-event",
-            "native-stage-per-step-event"
+            "native-stage-per-step-event",
+            "biomimetic-checkpoint-event"
         ]
         XCTAssertEqual(raws, expected,
             "allCases must contain exactly the typed" +

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1243",
-            "M1243:doctrine version reflects STRUCTURAL DEBT REPAYMENT 4 (chapter 四百六十六 — doctrine-collapse Phase 3 EXECUTED with user OK on phase-3-doctrine-collapse branch: 61 Swift doctrines collapsed to forwarders + registry consumes literals)")
+            "ADR-016.M1247",
+            "M1247:doctrine version reflects POST-PHASE-3 FEATURE 1 (chapter 四百六十七 — auto-checkpoint integration ties chapter 455/456/461/event-log into automatic biomimetic state checkpoints every N turns)")
     }
 
     // MARK: - M-number range matches chapter 四百二

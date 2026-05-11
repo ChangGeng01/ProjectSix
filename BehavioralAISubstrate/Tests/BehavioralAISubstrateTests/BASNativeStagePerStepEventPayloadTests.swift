@@ -362,8 +362,13 @@ final class BASNativeStagePerStepEventPayloadTests:
             1,
             "perKindEventCount carries the 7th kind")
         XCTAssertEqual(
-            bundle.perKindEventCount.count, 7,
-            "all 7 keys present in perKindEventCount")
+            bundle.perKindEventCount.count,
+            BASSweepDoctrineExpectations
+                .eventPayloadKindCount,
+            "all kind keys present in" +
+            " perKindEventCount (cross-mirror with" +
+            " BASSweepDoctrineExpectations" +
+            ".eventPayloadKindCount)")
     }
 
     // MARK: - Cross-kind isolation through bundle

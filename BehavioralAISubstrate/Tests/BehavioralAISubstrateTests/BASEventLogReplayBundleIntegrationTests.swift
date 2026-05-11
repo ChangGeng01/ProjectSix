@@ -719,17 +719,19 @@ final class BASEventLogReplayBundleIntegrationTests:
     /// "count == 7" if it added another key, but
     /// downstream consumers iterating per-kind would
     /// silently miss the dropped kind。
-    func testPerKindEventCountContainsAll7KindRawValuesByName() {
+    func testPerKindEventCountContainsAll8KindRawValuesByName() {
         let map = BASEventLogReplayBundle.empty
             .perKindEventCount
-        XCTAssertEqual(map.count, 7)
+        XCTAssertEqual(map.count,
+            BASSweepDoctrineExpectations
+                .eventPayloadKindCount)
         for kind in BASEventPayloadKind.allCases {
             XCTAssertNotNil(
                 map[kind.rawValue],
                 "perKindEventCount MUST contain key" +
                 " '\(kind.rawValue)' (kind=\(kind))" +
                 " — caller iteration over the map" +
-                " contract requires all 7 keys present")
+                " contract requires all 8 keys present")
         }
     }
 }

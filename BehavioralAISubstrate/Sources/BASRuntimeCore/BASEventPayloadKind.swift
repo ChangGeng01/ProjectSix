@@ -140,6 +140,21 @@ public enum BASEventPayloadKind:
     /// `BASEventLogEntry.nativeStagePerStepEvent(...)`。
     case nativeStagePerStep =
         "native-stage-per-step-event"
+
+    /// M1245 biomimetic-checkpoint payload (chapter
+    /// 四百六十七 — auto-checkpoint integration)。
+    /// Encodes `BASBiomimeticStateSnapshot` (chapter
+    /// 455 aggregate covering Mamba SSM + predictive-
+    /// coding probe + plasticity fold) as a typed
+    /// event。 Engine auto-emits these every N turns
+    /// when both `biomimeticTurnObserver` AND
+    /// `biomimeticCheckpointEveryNTurns` are wired in
+    /// configuration。 Enables cross-session state
+    /// recovery via event-log replay:on next session,
+    /// observer can restore from the latest checkpoint
+    /// event instead of restarting from zero。
+    case biomimeticCheckpoint =
+        "biomimetic-checkpoint-event"
 }
 
 // MARK: - BASEventLogEntry accessor

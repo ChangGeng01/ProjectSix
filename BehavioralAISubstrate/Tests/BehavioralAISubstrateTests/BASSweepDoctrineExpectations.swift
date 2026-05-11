@@ -114,16 +114,16 @@ public enum BASSweepDoctrineExpectations {
     ///   - Pre-RADICAL Phase 2: chapters 403-426 = 24
     ///   - RADICAL sweep:       chapters 427-446 = 20
     ///   - POST-SWEEP:          chapters 447+      = (grows)
-    /// At M1243:24 + 20 + 20 = 64
-    public static let phase2ChapterCount: Int = 64
+    /// At M1247:24 + 20 + 21 = 65
+    public static let phase2ChapterCount: Int = 65
 
-    /// Phase 2 commits shipped。 At M1243:
-    /// 125 + 84 + 80 = 289 (chapters 447-466 each 4 cuts)
-    public static let phase2CommitsShipped: Int = 289
+    /// Phase 2 commits shipped。 At M1247:
+    /// 125 + 84 + 84 = 293 (chapters 447-467 each 4 cuts)
+    public static let phase2CommitsShipped: Int = 293
 
-    /// Phase 2 mNumberLast。 At M1243:chapter 466 ends
+    /// Phase 2 mNumberLast。 At M1247:chapter 467 ends
     /// here。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1243
+    public static let phase2MNumberLast: Int = 1247
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
@@ -148,6 +148,7 @@ public enum BASSweepDoctrineExpectations {
     ///   - chapter 439 M1132: 5 (+ nativeStageDispatch)
     ///   - chapter 441 M1140: 6 (+ planAssignment)
     ///   - chapter 444 M1153: 7 (+ nativeStagePerStep)
-    /// = 7 at M1163 close-out
-    public static let eventPayloadKindCount: Int = 7
+    ///   - chapter 467 M1245: 8 (+ biomimeticCheckpoint)
+    /// = 8 at M1247 close-out
+    public static let eventPayloadKindCount: Int = 8
 }

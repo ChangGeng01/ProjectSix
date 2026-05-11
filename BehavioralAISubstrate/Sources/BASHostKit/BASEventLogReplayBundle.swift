@@ -217,7 +217,16 @@ public struct BASEventLogReplayBundle:
                 planAssignmentEvents.count,
             BASEventPayloadKind
                 .nativeStagePerStep.rawValue:
-                nativeStagePerStepEvents.count
+                nativeStagePerStepEvents.count,
+            // chapter 467 / M1247 — biomimetic-
+            // checkpoint events are NOT yet projected
+            // into the bundle (deferred to chapter
+            // 468 replay-loop closure)。 Reporting 0
+            // here keeps the perKindEventCount map
+            // contract (all 8 kinds present) while
+            // the projection layer catches up。
+            BASEventPayloadKind
+                .biomimeticCheckpoint.rawValue: 0
         ]
     }
 
