@@ -153,7 +153,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百九十六",   // M1361-M1364 (Tier 2 entry — ssmScan stub + coverage)
         "chapter 四百九十七",   // M1365-M1368 (REAL HOT-PATH ATTACK sealed)
         "chapter 四百九十八",   // M1369-M1372 (Tier 1 honest closure push starts)
-        "chapter 四百九十九"    // M1373-M1376 (更极致/低熵 substantive 3 adoptions)
+        "chapter 四百九十九",   // M1373-M1376 (更极致/低熵 substantive 3 adoptions)
+        "chapter 五百"          // M1377-M1380 (最创新/原生神经引擎 — 3 typed policy surfaces)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -170,14 +171,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1376
+    public static let mNumberLast: Int = 1380
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1376)。 Bumped through chapter 499:418 → 422。
-    /// Chapter 499:更极致/低熵 substantive 3 typed
-    /// primitive adoptions (statistics bundle + cache
-    /// report result + dispatch attempt card)。
-    public static let commitsShipped: Int = 422
+    /// M1380)。 Bumped through chapter 500:422 → 426。
+    /// Chapter 500:最创新/原生神经引擎 — 3 typed
+    /// policy surfaces (ANE eligibility classifier +
+    /// thermal-aware routing policy + KV cache
+    /// invalidation policy)。
+    public static let commitsShipped: Int = 426
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

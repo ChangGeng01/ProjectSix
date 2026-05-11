@@ -117,19 +117,18 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 97
+    public static let phase2ChapterCount: Int = 98
 
-    /// Phase 2 commits shipped。 At M1376:
-    /// 125 + 84 + 213 = 422 (chapter 499 = 4 cuts —
-    /// statistics bundle + cache report result +
-    /// dispatch attempt card + close-out — 更极致/
-    /// 低熵 substantive push)
-    public static let phase2CommitsShipped: Int = 422
+    /// Phase 2 commits shipped。 At M1380:
+    /// 125 + 84 + 217 = 426 (chapter 500 = 4 cuts —
+    /// ANE classifier + thermal policy + KV cache
+    /// policy + close-out — 最创新/原生神经引擎 push)
+    public static let phase2CommitsShipped: Int = 426
 
-    /// Phase 2 mNumberLast。 At M1376:chapter 499
-    /// (更极致/低熵 substantive 3 adoptions)。 SWEEP
-    /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1376
+    /// Phase 2 mNumberLast。 At M1380:chapter 500
+    /// (最创新/原生神经引擎 — 3 typed policy surfaces)。
+    /// SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1380
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

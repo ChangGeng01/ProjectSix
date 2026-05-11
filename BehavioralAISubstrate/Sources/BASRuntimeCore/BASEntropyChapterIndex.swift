@@ -1414,7 +1414,20 @@ public enum BASEntropyChapterIndex {
                 " BASKernelDispatchAttemptCard (1+1+1" +
                 " primitive adoptions)。 25 typed" +
                 " surfaces cumulative。 ADR-016 → M1376。" +
-                " Tier C ADR scope honestly deferred。")
+                " Tier C ADR scope honestly deferred。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百",
+            mNumberFirst: 1377, mNumberLast: 1380,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "最创新/原生神经引擎 push:" +
+                " BASANEKernelEligibilityClassifier +" +
+                " BASThermalAwareKernelSelectionPolicy" +
+                " + BASKVCacheInvalidationPolicy。 28" +
+                " typed surfaces cumulative。 ADR-016" +
+                " → M1380。 HONEST: executor wire-in" +
+                " deferred (consultedByExecutorIn" +
+                "Production = false invariant tested)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

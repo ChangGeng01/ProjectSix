@@ -3526,7 +3526,91 @@ public enum BASChapterDoctrineRegistry {
                 " honestly deferred (user approval gated)" +
                 " — other primitive migrations continue。" +
                 " ADR-014 OPT-IN + V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 500 — 最创新 + 原生神经引擎 push
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百",
+            mNumberFirst: 1377,
+            mNumberLast: 1380,
+            v1MilestoneMNumber: 1380,
+            v1MilestoneStatus:
+                "chapter-500-ane-thermal-kvcache-policies",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1377, knife: "第一刀",
+                    concept: "NEW BASANEKernelEligibility" +
+                        "Classifier — typed 3-tier" +
+                        " classification (aneNative/" +
+                        "mpsGraphNative/fallbackRequired)" +
+                        " for all 8 BASNeuralOp cases" +
+                        " with honest per-op evidence。" +
+                        " 26 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1378, knife: "第二刀",
+                    concept: "NEW BASThermalAwareKernel" +
+                        "SelectionPolicy — typed pure-" +
+                        "function routing decision" +
+                        " policy (7 rules) mapping" +
+                        " (op, thermalState, anePriority)" +
+                        " → preferredRouting。 Composes" +
+                        " M1377 classifier。 27 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1379, knife: "第三刀",
+                    concept: "NEW BASKVCacheInvalidation" +
+                        "Policy — typed 4-strategy enum" +
+                        " (explicitOnly implemented;LRU/" +
+                        "TTL/never typed-contract only)。" +
+                        " HONEST doctrine pins via" +
+                        " BASKVCacheInvalidationPolicy" +
+                        "Doctrine。 28 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1380, knife: "第四刀",
+                    concept: "Chapter 500 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1380。 最创新 8→9 + 原生神经" +
+                        "引擎 8→9 substantive progress" +
+                        " via 3 typed policy surfaces" +
+                        " that future executor wire-in" +
+                        " can consult。")
+            ],
+            entropyClassesAttacked: [
+                "ane-eligibility-untyped-classification",
+                "thermal-aware-routing-untyped-policy",
+                "kv-cache-strategy-untyped-contract",
+                "executor-routing-decision-implicit"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1380",
+                "typed-policy-surface-ship-first",
+                "executor-wire-in-honestly-deferred",
+                "v1-byte-equality-preserved"
+            ],
+            plannedFutureCuts: [
+                "chapter 501 — Tier 1 honest sealing" +
+                " (final doctrine bump with accumulated" +
+                " chapter 498-500 evidence)",
+                "future arc — executor wire-in for" +
+                " thermal-aware + ANE-aware routing",
+                "future arc — LRU/TTL KV cache" +
+                " implementations"
+            ],
+            summary: "最创新 + 原生利用神经引擎 substantive" +
+                " push:3 NEW typed policy surfaces:" +
+                " BASANEKernelEligibilityClassifier +" +
+                " BASThermalAwareKernelSelectionPolicy +" +
+                " BASKVCacheInvalidationPolicy。 28 typed" +
+                " surfaces cumulative。 ADR-016 → M1380。" +
+                " HONEST scope per source doc-comments:" +
+                " executor doesn't consult these yet" +
+                " (consultedByExecutorInProduction =" +
+                " false invariant tested)。 Future arc" +
+                " can adopt with stress-sweep regression" +
+                " guard。 V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

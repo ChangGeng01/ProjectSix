@@ -37,16 +37,16 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs499() {
+    func testLastChapterIs500() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百九十九",
-            "M1376 chapter 四百九十九:更极致/低熵" +
-            " substantive 3-adoption push — Kernel" +
-            "DispatchStatisticsBundle + MPSGraphCache" +
-            "ReportResult + KernelDispatchAttemptCard。" +
-            " 25 typed surfaces cumulative")
+            "chapter 五百",
+            "M1380 chapter 五百:最创新/原生神经引擎" +
+            " push — BASANEKernelEligibilityClassifier" +
+            " + BASThermalAwareKernelSelectionPolicy" +
+            " + BASKVCacheInvalidationPolicy。 28" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range

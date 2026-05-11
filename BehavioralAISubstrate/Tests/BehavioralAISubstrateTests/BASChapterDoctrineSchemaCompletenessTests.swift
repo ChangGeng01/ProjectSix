@@ -1409,7 +1409,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百九十九")!)
+                            "chapter 四百九十九")!),
+            // M1380 chapter 500 — 最创新/原生神经引擎
+            checkRegistry("五百",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1897,6 +1903,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百九十九")!
+                .mNumberLast),
+            // M1380 chapter 500 — 最创新/原生神经引擎 push
+            ("500",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
