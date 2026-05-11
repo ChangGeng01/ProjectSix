@@ -2169,16 +2169,16 @@ public struct BASEBrainRuntimeCoordinator {
         // mode → BASSurfaceMode → doctrine-specific aliases.
         // nil when permit mode has no L12 surface (e.g. .answer
         // / .escalate proceed without surface rendering).
-        let surfaceModeForAudit = BASSurfaceModeFromPermit
-            .derive(from: boundActionPermit.mode)
-        let cthulhuSurfaceAliasForAudit =
-            surfaceModeForAudit.flatMap {
-                BASCthulhuSurfaceAlias.derive(from: $0)
-            }
-        let kunlunSurfaceAliasForAudit =
-            surfaceModeForAudit.map {
-                BASKunlunSurfaceAlias.derive(from: $0)
-            }
+        // chapter 四百九十二 / M1345 — surface trio fold
+        let surfaceTrioForAudit =
+            BASTurnAuditProjectionsSurfaceTrio.compute(
+                permitMode: boundActionPermit.mode)
+        let surfaceModeForAudit = surfaceTrioForAudit
+            .surfaceMode
+        let cthulhuSurfaceAliasForAudit = surfaceTrioForAudit
+            .cthulhuSurfaceAlias
+        let kunlunSurfaceAliasForAudit = surfaceTrioForAudit
+            .kunlunSurfaceAlias
         // M436.4 (chapter 一百七 parameter-bundle refactor) —
         // populate the typed audit-observation bundle once and
         // pass to the bundle-form `buildSovereignAuditEntry`.
