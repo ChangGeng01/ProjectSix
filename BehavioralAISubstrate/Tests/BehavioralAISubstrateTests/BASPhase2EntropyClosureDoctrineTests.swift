@@ -37,13 +37,13 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs486() {
+    func testLastChapterIs487() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百八十六",
-            "M1323 chapter 四百八十六:cluster A 100%" +
-            " + cluster B start")
+            "chapter 四百八十七",
+            "M1327 chapter 四百八十七:cluster B 8" +
+            " declarations folded")
     }
 
     // MARK: - M-number range

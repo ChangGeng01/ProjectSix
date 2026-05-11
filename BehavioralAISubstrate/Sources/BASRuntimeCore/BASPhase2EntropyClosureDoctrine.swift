@@ -140,7 +140,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百八十三",   // M1308-M1311 (9 batched typealias adoptions — 3 BASBundle + 3 BASResult + 3 BASCard)
         "chapter 四百八十四",   // M1312-M1315 (22 cumulative adoptions + directive scoring 28/60 → 41/60)
         "chapter 四百八十五",   // M1316-M1319 (V1 fold cluster A 12-of-18 declarations)
-        "chapter 四百八十六"    // M1320-M1323 (V1 fold cluster A 100% + cluster B start)
+        "chapter 四百八十六",   // M1320-M1323 (V1 fold cluster A 100% + cluster B start)
+        "chapter 四百八十七"    // M1324-M1327 (V1 fold cluster B 8 declarations)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -157,11 +158,11 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1323
+    public static let mNumberLast: Int = 1327
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1323)。 Bumped through chapter 486:365 → 369。
-    public static let commitsShipped: Int = 369
+    /// M1327)。 Bumped through chapter 487:369 → 373。
+    public static let commitsShipped: Int = 373
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

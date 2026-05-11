@@ -2557,7 +2557,56 @@ public enum BASChapterDoctrineRegistry {
             summary: "V1 fold cluster A 100% (18-of-18)" +
                 " + cluster B start (5 of remaining)。" +
                 " 5 bundle factories cumulative。 ADR-" +
-                "016 → M1323。")
+                "016 → M1323。"),
+
+        // chapter 487 — cluster B continuation
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十七",
+            mNumberFirst: 1324,
+            mNumberLast: 1327,
+            v1MilestoneMNumber: 1327,
+            v1MilestoneStatus:
+                "chapter-487-cluster-b-8-of-many",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1324, knife: "第一刀",
+                    concept: "BASTurnAuditProjections" +
+                        "LateClusterB folds 3 late" +
+                        " projections (abyssalPressure" +
+                        " + humanAnchorSignal +" +
+                        " narrativeDistortion)。"),
+                BASChapterKnife(
+                    mNumber: 1325, knife: "第二刀",
+                    concept: "Coordinator splice for" +
+                        " late cluster B trio。" +
+                        " Cluster B: 5 → 8 folded。"),
+                BASChapterKnife(
+                    mNumber: 1326, knife: "第三刀",
+                    concept: "Doctrine sync placeholder" +
+                        " — close-out infrastructure。"),
+                BASChapterKnife(
+                    mNumber: 1327, knife: "第四刀",
+                    concept: "Chapter 487 close-out。" +
+                        " ADR-016 → M1327。 6 bundle" +
+                        " factories cumulative。")
+            ],
+            entropyClassesAttacked: [
+                "cluster-b-stalled",
+                "late-projections-untouched"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1327"
+            ],
+            plannedFutureCuts: [
+                "chapter 488+ — cluster B remaining +" +
+                " Permit fold",
+                "chapter 489+ — V1 DELETION"
+            ],
+            summary: "Cluster B 8 declarations folded。" +
+                " 6 bundle factories cumulative。 ADR-" +
+                "016 → M1327。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
