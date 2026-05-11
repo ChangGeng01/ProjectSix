@@ -80,22 +80,40 @@ public enum BASADR019MigrationRiskLevel:
 
 /// Doctrine namespace declaring the typed ADR-019 PROPOSAL。
 ///
-/// NOT an actual ADR document — see file doc-comment for the
-/// honest scope。 USER APPROVAL required before any chapter
-/// 498+ work codes against this proposal。
+/// chapter 五百七 / M1405 — USER APPROVAL RECEIVED via the
+/// explicit "全面 开发 tier abc" directive。 Proposal flips
+/// from "proposal-only" to "approved";implementation work
+/// commences in chapter 507+。 The 4 candidate types ship
+/// as typed shape-specific generic primitives across
+/// chapters 507-508。
 public enum BASADR019TierCProposalDoctrine {
 
-    /// Proposal status string。 Always "proposal-only" at
-    /// chapter 497 close-out;flips to "approved" only after
-    /// explicit user sign-off + ADR document drafted。
+    /// Proposal status string。 Was "proposal-only" until
+    /// chapter 507 / M1405 — user "全面 开发 tier abc"
+    /// directive approved implementation。
     public static let proposalStatus: String =
-        "proposal-only"
+        "approved"
 
     /// Indicates whether the proposal is approved for
-    /// implementation work。 ALWAYS false at chapter 497
-    /// close-out。
+    /// implementation work。 Was FALSE at chapter 497
+    /// close-out;flipped to TRUE at chapter 507 / M1405
+    /// per explicit user approval。
     public static let isApprovedForImplementation: Bool =
-        false
+        true
+
+    /// chapter 507 / M1405 — typed record of the approval
+    /// event for audit emission。
+    public static let approvalChapter: String =
+        "chapter 五百七"
+
+    /// chapter 507 / M1405 — typed M-number anchor for
+    /// the approval event。
+    public static let approvalMNumber: Int = 1405
+
+    /// chapter 507 / M1405 — typed approval directive
+    /// captured verbatim for audit walker grep。
+    public static let approvalDirective: String =
+        "全面 开发 tier abc"
 
     /// 4 candidate Tier C domain-aggregate types。 Each
     /// needs shape-specific generic rather than one of the

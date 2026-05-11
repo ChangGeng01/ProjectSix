@@ -10,24 +10,42 @@ final class BASADR019TierCProposalDoctrineTests:
 
     // MARK: - 1) Proposal status pinned
 
-    func testProposalStatusIsProposalOnly() {
+    func testProposalStatusIsApproved() {
         XCTAssertEqual(
             BASADR019TierCProposalDoctrine
                 .proposalStatus,
-            "proposal-only",
-            "Chapter 497 close-out:proposal MUST be" +
-            " status 'proposal-only' until explicit user" +
-            " approval shifts it to 'approved'")
+            "approved",
+            "Chapter 507 / M1405 — user 全面 开发 tier" +
+            " abc directive APPROVED proposal for" +
+            " implementation;status flipped from" +
+            " 'proposal-only' to 'approved'")
     }
 
-    // MARK: - 2) Approval flag is FALSE
+    // MARK: - 2) Approval flag is TRUE post-M1405
 
-    func testIsApprovedForImplementationIsFalse() {
-        XCTAssertFalse(
+    func testIsApprovedForImplementationIsTrue() {
+        XCTAssertTrue(
             BASADR019TierCProposalDoctrine
                 .isApprovedForImplementation,
-            "Implementation work BLOCKED until user" +
-            " approval — flag is false at chapter 497")
+            "Chapter 507 / M1405 — user approval" +
+            " received,implementation work in progress")
+    }
+
+    // MARK: - 2a) Approval metadata typed correctly
+
+    func testApprovalMetadataPinned() {
+        XCTAssertEqual(
+            BASADR019TierCProposalDoctrine
+                .approvalChapter,
+            "chapter 五百七")
+        XCTAssertEqual(
+            BASADR019TierCProposalDoctrine
+                .approvalMNumber,
+            1405)
+        XCTAssertEqual(
+            BASADR019TierCProposalDoctrine
+                .approvalDirective,
+            "全面 开发 tier abc")
     }
 
     // MARK: - 3) Candidate count matches plan
@@ -106,15 +124,12 @@ final class BASADR019TierCProposalDoctrineTests:
                 .contains(.high))
     }
 
-    // MARK: - 8) Honest summary mentions proposal-only
+    // MARK: - 8) Honest summary reflects approved status
 
-    func testHonestSummaryMentionsProposalOnly() {
+    func testHonestSummaryReflectsApprovedStatus() {
         XCTAssertTrue(
             BASADR019TierCProposalDoctrine.honestSummary
-                .contains("proposal-only"))
-        XCTAssertTrue(
-            BASADR019TierCProposalDoctrine.honestSummary
-                .contains("REQUIRES user approval"))
+                .contains("approved"))
     }
 
     // MARK: - 9) Candidate Codable round-trip
