@@ -126,7 +126,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百六十九",   // M1252-M1255 (POST-PHASE-3 FEATURE 3 — BCM meta-plasticity primitive)
         "chapter 四百七十",     // M1256-M1259 (POST-PHASE-3 FEATURE 4 — hierarchical observer slot)
         "chapter 四百七十一",   // M1260-M1263 (POST-PHASE-3 FEATURE 5 — Mamba benchmark expansion)
-        "chapter 四百七十二"    // M1264-M1267 (POST-PHASE-3 FEATURE 6 — bundle projection completion;all chapter-468 plannedFutureCuts shipped)
+        "chapter 四百七十二",   // M1264-M1267 (POST-PHASE-3 FEATURE 6 — bundle projection completion;all chapter-468 plannedFutureCuts shipped)
+        "chapter 四百七十三"    // M1268-M1271 (POST-PHASE-3 self-audit cleanup — all 8 findings from chapter 466 deep review addressed with PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -138,17 +139,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1123 → M1127 → M1131 → M1135 → M1139 → M1143 →
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
     /// M1187 → M1191 → M1195 → M1199 → M1203 → M1207 →
-    /// M1211 → ... → M1251 → M1255 → M1259 → M1263 →
-    /// M1267 (chapter 四百七十二 POST-PHASE-3 FEATURE 6
-    /// — bundle projection completion;all chapter-468
-    /// plannedFutureCuts now shipped)。 M1078-M1079
-    /// reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1267
+    /// M1211 → ... → M1267 → M1271 (chapter 四百七十三
+    /// POST-PHASE-3 self-audit cleanup — all 8 findings
+    /// from chapter 466 deep review addressed with PROOF
+    /// tests)。 M1078-M1079 reserved for post-Phase-A
+    /// follow-up。
+    public static let mNumberLast: Int = 1271
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1267)。 Bumped through chapter 472:297 → 313
-    /// (chapters 469-472 each 4 cuts = 16 more)。
-    public static let commitsShipped: Int = 313
+    /// M1271)。 Bumped through chapter 473:313 → 317
+    /// (chapter 473 = 4 cuts)。
+    public static let commitsShipped: Int = 317
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

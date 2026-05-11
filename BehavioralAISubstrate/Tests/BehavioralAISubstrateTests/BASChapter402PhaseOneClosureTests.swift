@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1267",
-            "M1267:doctrine version reflects POST-PHASE-3 FEATURES 3-6 (chapters 四百六十九 BCM + 四百七十 hier slot + 四百七十一 Mamba bench + 四百七十二 bundle projection;all chapter-468 plannedFutureCuts now shipped)")
+            "ADR-016.M1271",
+            "M1271:doctrine version reflects POST-PHASE-3 chapter 四百七十三 SELF-AUDIT CLEANUP (frozen SHA256 anti-drift PROOF replaces circular byte-mirror + BCM 5th observer slot wired + E2E hierarchical/BCM tests + 472 legacy-JSON Codable PROOF + production-scale Mamba B=2 D=64 N=16 L=128 benchmark with measured 25.85x GPU speedup + honest prose revision + Python extractor/forwarder scripts committed)")
     }
 
     // MARK: - M-number range matches chapter 四百二

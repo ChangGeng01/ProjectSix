@@ -1016,7 +1016,21 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// phase-3-doctrine-collapse branch。 All chapter-
     /// 468 plannedFutureCuts now closed。 V1 byte-
     /// equality preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1267"
+    /// M1271 bump:POST-PHASE-3 self-audit cleanup —
+    /// chapter 四百七十三 addresses all 8 findings
+    /// from the chapter 466 deep review with PROOF
+    /// tests backing each fix:circular byte-mirror
+    /// retired in favor of frozen-SHA256 anti-drift;
+    /// BCM wired into observer as 5th slot (closes
+    /// dead-on-arrival);e2e hierarchical + BCM
+    /// through real engine;chapter 472 backward-compat
+    /// decoder PROOF;production-scale Mamba benchmark
+    /// (25.85x at B=2 D=64 N=16 L=128);Python scripts
+    /// committed for reproducibility;chapter 466 prose
+    /// honestly revised (REPLACED not DELETED;~−3.5K
+    /// LOC not ~−12K)。 V1 byte-equality preserved。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1271"
 
     /// Query the typed status of a specific gap。
     public static func status(

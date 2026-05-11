@@ -404,14 +404,16 @@ public enum BASChapterDoctrineRegistry {
                         " 464,465,466)。 Removed" +
                         " deriveRecord helper。 Each" +
                         " of the 61 historical Swift" +
-                        " doctrine files replaced with" +
-                        " a thin ~30-LOC forwarder" +
-                        " that reads FROM the registry" +
-                        " (dependency direction" +
-                        " inverted)。 All cross-doctrine" +
-                        " tests continue to pass" +
-                        " unchanged (forwarders expose" +
-                        " same static surface)"),
+                        " doctrine files REPLACED" +
+                        " (not deleted — files still" +
+                        " exist) with a thin ~50-LOC" +
+                        " forwarder that reads FROM" +
+                        " the registry (dependency" +
+                        " direction inverted)。 All" +
+                        " cross-doctrine tests" +
+                        " continue to pass unchanged" +
+                        " (forwarders expose same" +
+                        " static surface)"),
                 BASChapterKnife(
                     mNumber: 1243,
                     knife: "第四刀",
@@ -420,13 +422,20 @@ public enum BASChapterDoctrineRegistry {
                         " 2 bump (chapter 63→64," +
                         " mNumberLast 1239→1243,commits" +
                         " 285→289) + ADR-016.M1239 →" +
-                        " M1243。 Net LOC delta:~−6500" +
-                        " (replaced ~10K LOC of" +
-                        " doctrines with ~3.9K LOC of" +
-                        " literals + ~1.8K LOC of" +
-                        " forwarders = ~5.7K + 4K) +" +
-                        " a new branch pushed for" +
-                        " review before merge to main")
+                        " M1243。 HONEST net LOC delta" +
+                        " (corrected chapter 473 fix" +
+                        " #8):~−3.5K LOC (10K doctrine" +
+                        " prose replaced by ~3.9K" +
+                        " literals + ~3K forwarders =" +
+                        " ~−3.1K)。 The earlier" +
+                        " ~−12K claim was optimistic;" +
+                        " full repayment would require" +
+                        " deleting forwarders + 38" +
+                        " redundant per-chapter test" +
+                        " files (~3.8K),which this" +
+                        " chapter chose not to do for" +
+                        " API-surface stability。 New" +
+                        " branch pushed for review")
             ],
             entropyClassesAttacked: [
                 "doctrine-sprawl-entropy",
@@ -474,23 +483,29 @@ public enum BASChapterDoctrineRegistry {
                 " with explicit user OK。 4 cuts" +
                 " (M1240-M1243):auto-extract 61" +
                 " literals via Python script + swap" +
-                " registry to consume literals + replace" +
-                " 61 Swift doctrines with thin" +
-                " forwarders + close-out。 Net LOC" +
-                " delta:~−6500 (10K LOC of historical" +
-                " doctrines → 3.9K LOC literals + 1.8K" +
-                " LOC forwarders)。 Dependency direction" +
-                " INVERTED:doctrine data lives in ONE" +
-                " place (AllLiterals);per-chapter Swift" +
-                " symbols are thin readers FROM the" +
-                " registry。 byte-mirror PROOF tests pin" +
-                " every literal against its original" +
-                " Swift source。 All existing cross-" +
-                "doctrine + per-chapter tests continue" +
-                " unchanged (forwarders preserve" +
-                " surface)。 Shipped on phase-3-doctrine-" +
-                "collapse branch for review。 ADR-016 →" +
-                " M1243。 V1 byte-equality preserved。"),
+                " registry to consume literals + REPLACE" +
+                " (not delete) 61 Swift doctrines with" +
+                " thin forwarders + close-out。 HONEST" +
+                " net LOC delta (revised chapter 473" +
+                " fix #8):~−3.5K LOC,not the earlier" +
+                " optimistic ~−6.5K/−12K claims —" +
+                " 10K LOC of doctrine prose replaced" +
+                " by ~3.9K literals + ~3K forwarders。" +
+                " Dependency direction INVERTED:doctrine" +
+                " data lives in ONE place (AllLiterals);" +
+                " per-chapter Swift symbols are thin" +
+                " readers FROM the registry。 chapter" +
+                " 466 byte-mirror PROOF tests against" +
+                " forwarders became CIRCULAR after the" +
+                " swap (both sides resolved to same" +
+                " literals);chapter 473 fix #1 replaced" +
+                " with frozen-SHA256 anti-drift PROOF." +
+                " All existing cross-doctrine + per-" +
+                "chapter tests continue unchanged" +
+                " (forwarders preserve surface)。" +
+                " Shipped on phase-3-doctrine-collapse" +
+                " branch for review。 ADR-016 → M1243。" +
+                " V1 byte-equality preserved。"),
 
         // chapter 467 — auto-checkpoint integration
         // (registry-native;Phase 2 pattern continued)
@@ -1116,7 +1131,133 @@ public enum BASChapterDoctrineRegistry {
                 " JSON readable)。 All chapter-468" +
                 " plannedFutureCuts items now shipped" +
                 " (chapters 469-472)。 ADR-016 → M1267。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+
+        // chapter 473 — honest cleanup of chapter 466 self-audit findings
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十三",
+            mNumberFirst: 1268,
+            mNumberLast: 1271,
+            v1MilestoneMNumber: 1271,
+            v1MilestoneStatus:
+                "chapter-473-v1-honest-cleanup-self-audit-fixes",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1268,
+                    knife: "第一刀",
+                    concept:
+                        "Address chapter 466 self-audit" +
+                        " findings #1+#4+#5+#8:replace" +
+                        " circular byte-mirror with" +
+                        " frozen-SHA256 anti-drift PROOF;" +
+                        " commit Python extractor +" +
+                        " forwarder generator to Scripts/" +
+                        " for reproducibility;audit" +
+                        " chapters 403-462 (only 404+406" +
+                        " non-standard,already patched);" +
+                        " revise chapter 466 prose to" +
+                        " say REPLACED not DELETED +" +
+                        " correct LOC delta claim"),
+                BASChapterKnife(
+                    mNumber: 1269,
+                    knife: "第二刀",
+                    concept:
+                        "Address chapter 466 self-audit" +
+                        " findings #6+#6b:wire BCM" +
+                        " meta-plasticity as 5th slot" +
+                        " in BASBiomimeticTurnObserver" +
+                        " (closes dead-on-arrival gap)。" +
+                        " Observer now orchestrates 5" +
+                        " primitives under one observe" +
+                        " entry。 5 new PROOF tests"),
+                BASChapterKnife(
+                    mNumber: 1270,
+                    knife: "第三刀",
+                    concept:
+                        "Address chapter 466 self-audit" +
+                        " findings #2+#3+#7:e2e" +
+                        " hierarchical-through-engine +" +
+                        " e2e BCM-through-engine +" +
+                        " chapter 472 backward-compat" +
+                        " decoder PROOF + production-" +
+                        "scale Mamba benchmark (B=2 D=64" +
+                        " N=16 L=128 → measured 25.85x" +
+                        " GPU speedup,first production-" +
+                        "shape Mamba data point)"),
+                BASChapterKnife(
+                    mNumber: 1271,
+                    knife: "第四刀",
+                    concept:
+                        "chapter 473 close-out + Phase 2" +
+                        " bump (chapter 70→71," +
+                        " mNumberLast 1267→1271,commits" +
+                        " 313→317) + ADR-016.M1267 →" +
+                        " M1271。 All 8 chapter-466" +
+                        " self-audit findings addressed" +
+                        " with PROOF tests。 Branch" +
+                        " ready for merge review")
+            ],
+            entropyClassesAttacked: [
+                "circular-byte-mirror-entropy",
+                "dead-on-arrival-primitive-entropy",
+                "missing-e2e-coverage-entropy",
+                "over-claim-doctrine-prose-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (frozen-SHA256 anti-" +
+                "drift replaces tautological byte-mirror)",
+                "ADR-014 OPT-IN preserved (5th observer" +
+                " slot defaults to nil)",
+                "ADR-016 (advanced M1267 → M1271)",
+                "系统熵 reduction",
+                "POST-PHASE-3 self-audit cleanup —" +
+                " honest scope + closed 8 review gaps"
+            ],
+            plannedFutureCuts: [
+                "chapter 474+:add BCM state to" +
+                " BASBiomimeticStateSnapshot aggregate" +
+                " (so checkpoint events carry BCM" +
+                " threshold + weights)",
+                "chapter 475+:add hierarchical state" +
+                " to aggregate snapshot",
+                "chapter 476+:merge phase-3-doctrine-" +
+                "collapse branch to main",
+                "chapter 477+:add attention + matMul +" +
+                " rmsNorm + rotaryEmbedding benchmark" +
+                " paths",
+                "chapter 478+:delete redundant per-" +
+                "chapter test files once registry" +
+                " confidence is established"
+            ],
+            summary:
+                "POST-PHASE-3 self-audit cleanup —" +
+                " honestly addresses all 8 findings" +
+                " from the chapter 466 deep review。 4" +
+                " cuts (M1268-M1271)。 Fix #1:replace" +
+                " circular byte-mirror with frozen-" +
+                "SHA256 anti-drift PROOF;Fix #2:e2e" +
+                " hierarchical + BCM through real" +
+                " engine;Fix #3:chapter 472 backward-" +
+                "compat decoder PROOF;Fix #4:commit" +
+                " Python scripts;Fix #5:audit non-" +
+                "standard surfaces (only 404+406);Fix" +
+                " #6:wire BCM into observer as 5th" +
+                " slot (closes dead-on-arrival);Fix" +
+                " #7:production-scale Mamba benchmark" +
+                " (25.85x GPU speedup at B=2 D=64 N=16" +
+                " L=128);Fix #8:revise prose to be" +
+                " honest about REPLACED vs DELETED +" +
+                " ~−3.5K LOC actual repayment。 Branch" +
+                " now ready for merge review with" +
+                " honest doctrine prose + comprehensive" +
+                " PROOF coverage。 ADR-016 → M1271。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

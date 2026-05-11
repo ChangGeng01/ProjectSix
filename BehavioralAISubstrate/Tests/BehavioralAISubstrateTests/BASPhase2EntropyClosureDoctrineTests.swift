@@ -37,14 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs472() {
+    func testLastChapterIs473() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百七十二",
-            "M1267 POST-PHASE-3 FEATURE 6:bumped to" +
-            " 四百七十二 (bundle projection completion);" +
-            " all chapter-468 plannedFutureCuts shipped")
+            "chapter 四百七十三",
+            "M1271 POST-PHASE-3 SELF-AUDIT CLEANUP:" +
+            " bumped to 四百七十三 (frozen SHA256 anti-" +
+            "drift PROOF + BCM 5th slot wiring + E2E" +
+            " tests + legacy-JSON Codable PROOF +" +
+            " production-scale Mamba benchmark +" +
+            " honest prose revision)")
     }
 
     // MARK: - M-number range

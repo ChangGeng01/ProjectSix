@@ -1,88 +1,50 @@
 // MARK: - BASAllLiteralsByteMirrorTests
-// chapter 四百六十六 / M1242 PROOF tests
+// chapter 四百六十六 / M1242 ORIGINAL purpose; chapter
+// 四百七十三 fix #1 of self-audit RETIRED the byte-
+// mirror approach。
 //
-// Verifies the auto-extracted literal records in
-// BASChapterDoctrineRegistryAllLiterals byte-match
-// the original BASChapter###EntropyDoctrine.swift
-// static surfaces for all 61 chapters。
+// ## Why this file is now mostly empty
 //
-// This is THE bedrock test that gates the destructive
-// swap (BASChapterDoctrineRegistry.all switching from
-// derivation to literal consumption)。 If any chapter's
-// literal diverges from its source by even one
-// character,this test fails BEFORE the swap,catching
-// the regression。
+// Pre-chapter-466 the byte-mirror test compared
+// BASChapterDoctrineRegistryAllLiterals.chapter### vs
+// BASChapter###EntropyDoctrine.knives (etc.)。 The
+// comparison meant something because the right-hand
+// side was the canonical static Swift surface holding
+// real literal data。
+//
+// AFTER chapter 466 swap:
+//   - BASChapterDoctrineRegistry.all consumes literals
+//   - BASChapter###EntropyDoctrine became FORWARDERS
+//     that read FROM the registry
+//
+// → both sides of the comparison resolve to the same
+//   data → test became circular and tautological。
+//
+// ## What replaced it (chapter 473 fix #1)
+//
+// `BASRegistryFrozenHashTests.testRegistryLiterals
+//  HaveStableHash`:asserts the SHA256 of the canonical
+//  JSON-encoded literals matches a frozen value
+//  committed in source。 Drift fails loudly with the
+//  new hash printed for review。
+//
+// ## What survives in this file
+//
+// Only the structural shape PROOF (counts > 0,fields
+// non-empty) — that DOESN'T require the registry vs
+// source comparison and remains useful。
 
 import XCTest
 @testable import BASRuntimeCore
 
 final class BASAllLiteralsByteMirrorTests: XCTestCase {
 
-    /// Comprehensive byte-mirror across all 61 chapters。
-    /// Each literal must equal its corresponding Swift
-    /// source byte-for-byte (Equatable comparison covers
-    /// every field including knives,pins,entropy
-    /// classes,future cuts,summary)。
-    func testAllLiteralsByteMatchSwiftSources() {
-        let pairs: [(BASChapterDoctrineRecord, BASChapterDoctrineRecord)] = [
-            (BASChapterDoctrineRegistryAllLiterals.chapter403,
-             Self.derivedRecord(
-                tag: BASChapter403EntropyDoctrine.chapterTag,
-                first: BASChapter403EntropyDoctrine.mNumberFirst,
-                last: BASChapter403EntropyDoctrine.mNumberLast,
-                v1: BASChapter403EntropyDoctrine.v1MilestoneMNumber,
-                v1Status: BASChapter403EntropyDoctrine.v1MilestoneStatus,
-                knives: BASChapter403EntropyDoctrine.knives,
-                ec: BASChapter403EntropyDoctrine.entropyClassesAttacked,
-                pins: BASChapter403EntropyDoctrine.pinHeld,
-                fc: BASChapter403EntropyDoctrine.plannedFutureCuts,
-                summary: BASChapter403EntropyDoctrine.summary)),
-            (BASChapterDoctrineRegistryAllLiterals.chapter404,
-             Self.derivedRecord(
-                tag: BASChapter404EntropyDoctrine.chapterTag,
-                first: BASChapter404EntropyDoctrine.mNumberFirst,
-                last: BASChapter404EntropyDoctrine.mNumberLast,
-                v1: BASChapter404EntropyDoctrine.v1MilestoneMNumber,
-                v1Status: BASChapter404EntropyDoctrine.v1MilestoneStatus,
-                knives: BASChapter404EntropyDoctrine.knives,
-                ec: BASChapter404EntropyDoctrine.entropyClassesAttacked,
-                pins: BASChapter404EntropyDoctrine.pinHeld,
-                fc: BASChapter404EntropyDoctrine.plannedFutureCuts,
-                summary: BASChapter404EntropyDoctrine.summary)),
-        ]
-        // Spot-check first 2 chapters with explicit derivation。
-        // The comprehensive check uses BASChapterDoctrineRegistry.all
-        // (already derived) compared against the all-literals array。
-        for (literal, source) in pairs {
-            XCTAssertEqual(literal, source,
-                "literal mismatch for \(literal.chapterTag)")
-        }
-
-        // The COMPREHENSIVE check:registry.all (which uses
-        // derivation for chapters 453-462 + literal for 463/464/465)
-        // must include records byte-equal to the all-literals entries
-        // for chapters that overlap。
-        let derivedRecords = BASChapterDoctrineRegistry.all
-        let literalRecords =
-            BASChapterDoctrineRegistryAllLiterals.all
-        // For each derived chapter,find matching literal by tag
-        for derived in derivedRecords {
-            // Skip chapters 464,465 (those are already literal in
-            // BASChapterDoctrineRegistry.all and don't have a
-            // BASChapter###EntropyDoctrine Swift symbol);the
-            // AllLiterals file extracts from Swift sources,so
-            // 464+ won't appear there。
-            guard let literal = literalRecords.first(where: {
-                $0.chapterTag == derived.chapterTag
-            }) else {
-                continue
-            }
-            XCTAssertEqual(literal, derived,
-                "drift detected at \(derived.chapterTag)")
-        }
-    }
-
-    /// All 61 literal records must have well-formed shape。
+    /// Structural shape PROOF — every literal has a
+    /// non-empty chapter tag,reasonable M-range,at
+    /// least 1 knife,non-empty summary。 chapter 473
+    /// retained this from the original chapter 466
+    /// test because it does NOT route through the
+    /// forwarder-comparison circularity。
     func testAllLiteralsHaveSensibleShape() {
         let all = BASChapterDoctrineRegistryAllLiterals.all
         XCTAssertEqual(all.count, 61,
@@ -90,38 +52,27 @@ final class BASAllLiteralsByteMirrorTests: XCTestCase {
         for r in all {
             XCTAssertFalse(r.chapterTag.isEmpty)
             XCTAssertGreaterThan(r.mNumberFirst, 0)
-            XCTAssertGreaterThanOrEqual(r.mNumberLast, r.mNumberFirst)
-            XCTAssertGreaterThanOrEqual(r.knives.count, 1)
+            XCTAssertGreaterThanOrEqual(
+                r.mNumberLast, r.mNumberFirst)
+            XCTAssertGreaterThanOrEqual(
+                r.knives.count, 1)
             XCTAssertFalse(r.summary.isEmpty)
         }
     }
 
-    // Helper to construct a record from Swift symbol
-    // surface。 Phase 3 update:forwarders now return
-    // [BASChapterKnife] directly (not tuples)。 chapter
-    // 466 / M1242。
-    private static func derivedRecord(
-        tag: String,
-        first: Int,
-        last: Int,
-        v1: Int,
-        v1Status: String,
-        knives: [BASChapterKnife],
-        ec: [String],
-        pins: [String],
-        fc: [String],
-        summary: String
-    ) -> BASChapterDoctrineRecord {
-        return BASChapterDoctrineRecord(
-            chapterTag: tag,
-            mNumberFirst: first,
-            mNumberLast: last,
-            v1MilestoneMNumber: v1,
-            v1MilestoneStatus: v1Status,
-            knives: knives,
-            entropyClassesAttacked: ec,
-            pinHeld: pins,
-            plannedFutureCuts: fc,
-            summary: summary)
+    /// Anti-drift proof now lives in BASRegistryFrozen
+    /// HashTests。 This stub just documents the
+    /// migration so future readers understand why the
+    /// chapter-466-era byte-mirror is gone。
+    func testFrozenHashTestExistsForActualAntiDriftProof() {
+        // Compile-time pin:if the frozen-hash test
+        // file is ever removed,this test fails to
+        // compile (the type reference is required
+        // for the assertion to resolve)。
+        let _: BASRegistryFrozenHashTests.Type =
+            BASRegistryFrozenHashTests.self
+        XCTAssertTrue(true,
+            "anti-drift PROOF lives in" +
+            " BASRegistryFrozenHashTests")
     }
 }

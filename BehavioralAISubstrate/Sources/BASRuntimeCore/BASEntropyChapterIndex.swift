@@ -1103,7 +1103,24 @@ public enum BASEntropyChapterIndex {
                 " (closes chapter 442 projection gap)。" +
                 " Codable backward-compat preserved。" +
                 " All chapter-468 plannedFutureCuts now" +
-                " shipped。 ADR-016 → M1267")
+                " shipped。 ADR-016 → M1267"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十三",
+            mNumberFirst: 1268, mNumberLast: 1271,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "POST-PHASE-3 self-audit cleanup。" +
+                " 8 fixes from chapter 466 deep review:" +
+                " frozen-SHA256 anti-drift replaces" +
+                " circular byte-mirror;BCM wired into" +
+                " observer as 5th slot;e2e hierarchical" +
+                " + BCM through real engine;chapter 472" +
+                " backward-compat decoder PROOF;" +
+                " production-scale Mamba benchmark" +
+                " (25.85x GPU speedup measured);Python" +
+                " scripts committed;chapter 466 prose" +
+                " honestly revised。 Branch ready for" +
+                " merge review。 ADR-016 → M1271")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

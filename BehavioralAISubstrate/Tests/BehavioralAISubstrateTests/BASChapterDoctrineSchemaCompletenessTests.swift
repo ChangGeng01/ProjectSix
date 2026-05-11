@@ -1226,7 +1226,18 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百七十二")!)
+                            "chapter 四百七十二")!),
+            // M1271 POST-PHASE-3 SELF-AUDIT CLEANUP
+            // (frozen SHA256 anti-drift PROOF + BCM 5th
+            // slot wiring + E2E hierarchical/BCM tests +
+            // 472 legacy-JSON Codable PROOF + production-
+            // scale Mamba benchmark + honest prose +
+            // Python extractor/forwarder scripts)
+            checkRegistry("四百七十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百七十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1495,6 +1506,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百七十二")!
+                .mNumberLast),
+            // M1271 POST-PHASE-3 SELF-AUDIT CLEANUP
+            ("473",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百七十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

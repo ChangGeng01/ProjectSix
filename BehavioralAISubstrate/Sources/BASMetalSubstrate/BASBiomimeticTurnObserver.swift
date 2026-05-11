@@ -150,6 +150,13 @@ public struct BASBiomimeticTurnSignal:
     /// hierarchical.observe(_:)。 chapter 470 / M1257。
     public let hierarchicalObservation: [Float]?
 
+    /// BCM meta-plasticity (pre,post)。 Both vectors
+    /// required;when non-nil AND `bcm` primitive
+    /// populated,observer dispatches bcm.apply。
+    /// chapter 473 / fix #6 of chapter 466 self-audit。
+    public let bcmPre: [Float]?
+    public let bcmPost: [Float]?
+
     public init(
         predictiveObservation: [Float]? = nil,
         plasticityPre: [Float]? = nil,
@@ -157,7 +164,9 @@ public struct BASBiomimeticTurnSignal:
         plasticityOutcome: Float = 0,
         plasticityTimingDelta: Float = 0,
         mambaInputs: BASMambaSSMScanInputs? = nil,
-        hierarchicalObservation: [Float]? = nil
+        hierarchicalObservation: [Float]? = nil,
+        bcmPre: [Float]? = nil,
+        bcmPost: [Float]? = nil
     ) {
         self.predictiveObservation = predictiveObservation
         self.plasticityPre = plasticityPre
@@ -167,6 +176,8 @@ public struct BASBiomimeticTurnSignal:
         self.mambaInputs = mambaInputs
         self.hierarchicalObservation =
             hierarchicalObservation
+        self.bcmPre = bcmPre
+        self.bcmPost = bcmPost
     }
 
     /// Convenience:count of populated (non-nil) drive
@@ -180,6 +191,7 @@ public struct BASBiomimeticTurnSignal:
         }
         if mambaInputs != nil { count += 1 }
         if hierarchicalObservation != nil { count += 1 }
+        if bcmPre != nil && bcmPost != nil { count += 1 }
         return count
     }
 }
@@ -212,6 +224,11 @@ public struct BASBiomimeticTurnObservation:
     /// 470 / M1257。
     public let hierarchical: BASHierarchicalObservation?
 
+    /// BCM meta-plasticity update result (if bcm
+    /// primitive populated AND signal carried pre +
+    /// post)。 chapter 473 / fix #6。
+    public let bcm: BASBCMMetaPlasticityUpdate?
+
     /// 0-based turn index for this observe call
     /// (matches the observer's turnsObservedCount AT
     /// the moment the call was made)。
@@ -222,12 +239,14 @@ public struct BASBiomimeticTurnObservation:
         plasticity: BASPlasticityUpdate? = nil,
         mamba: BASMambaSSMScanOutputs? = nil,
         hierarchical: BASHierarchicalObservation? = nil,
+        bcm: BASBCMMetaPlasticityUpdate? = nil,
         turnIndex: Int = 0
     ) {
         self.predictive = predictive
         self.plasticity = plasticity
         self.mamba = mamba
         self.hierarchical = hierarchical
+        self.bcm = bcm
         self.turnIndex = max(0, turnIndex)
     }
 
@@ -239,6 +258,7 @@ public struct BASBiomimeticTurnObservation:
         if plasticity != nil { count += 1 }
         if mamba != nil { count += 1 }
         if hierarchical != nil { count += 1 }
+        if bcm != nil { count += 1 }
         return count
     }
 }
@@ -272,6 +292,13 @@ public actor BASBiomimeticTurnObserver {
     public nonisolated let hierarchical:
         BASHierarchicalPredictiveCoding?
 
+    /// BCM meta-plasticity primitive (chapter 469)。
+    /// nil means hosts don't use the adaptive-threshold
+    /// learning rule here。 chapter 473 fix #6 closes
+    /// the dead-on-arrival gap surfaced by the chapter
+    /// 466 self-audit。
+    public nonisolated let bcm: BASBCMMetaPlasticity?
+
     /// Number of `observe(_:)` calls processed since
     /// last `reset()`。
     private var turnsObserved: Int = 0
@@ -281,12 +308,14 @@ public actor BASBiomimeticTurnObserver {
         predictive: BASPredictiveCodingProbe? = nil,
         plasticity: BASPlasticityFold? = nil,
         hierarchical:
-            BASHierarchicalPredictiveCoding? = nil
+            BASHierarchicalPredictiveCoding? = nil,
+        bcm: BASBCMMetaPlasticity? = nil
     ) {
         self.mamba = mamba
         self.predictive = predictive
         self.plasticity = plasticity
         self.hierarchical = hierarchical
+        self.bcm = bcm
     }
 
     /// Read-only count of turns observed since last
@@ -305,6 +334,7 @@ public actor BASBiomimeticTurnObserver {
         if predictive != nil { count += 1 }
         if plasticity != nil { count += 1 }
         if hierarchical != nil { count += 1 }
+        if bcm != nil { count += 1 }
         return count
     }
 
@@ -357,12 +387,23 @@ public actor BASBiomimeticTurnObserver {
             hierarchicalResult = try await hier
                 .observe(input)
         }
+        // BCM dispatch (chapter 473 fix #6)
+        var bcmResult:
+            BASBCMMetaPlasticityUpdate? = nil
+        if let b = bcm,
+           let pre = signal.bcmPre,
+           let post = signal.bcmPost
+        {
+            bcmResult = try await b.apply(
+                pre: pre, post: post)
+        }
         turnsObserved += 1
         return BASBiomimeticTurnObservation(
             predictive: predictiveResult,
             plasticity: plasticityResult,
             mamba: mambaResult,
             hierarchical: hierarchicalResult,
+            bcm: bcmResult,
             turnIndex: currentTurn)
     }
 
@@ -429,6 +470,9 @@ public actor BASBiomimeticTurnObserver {
         }
         if let hier = hierarchical {
             await hier.reset()
+        }
+        if let b = bcm {
+            await b.reset()
         }
         turnsObserved = 0
     }
