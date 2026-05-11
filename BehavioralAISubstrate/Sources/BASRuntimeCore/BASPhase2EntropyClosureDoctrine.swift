@@ -128,7 +128,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 四百七十一",   // M1260-M1263 (POST-PHASE-3 FEATURE 5 — Mamba benchmark expansion)
         "chapter 四百七十二",   // M1264-M1267 (POST-PHASE-3 FEATURE 6 — bundle projection completion;all chapter-468 plannedFutureCuts shipped)
         "chapter 四百七十三",   // M1268-M1271 (POST-PHASE-3 self-audit cleanup — all 8 findings from chapter 466 deep review addressed with PROOF tests)
-        "chapter 四百七十四"    // M1272-M1275 (REAL HOT-PATH ATTACK phase 1 — ANE live binding + KernelRegistry dispatch executor + end-to-end integration PROOF)
+        "chapter 四百七十四",   // M1272-M1275 (REAL HOT-PATH ATTACK phase 1 — ANE live binding + KernelRegistry dispatch executor + end-to-end integration PROOF)
+        "chapter 四百七十五"    // M1276-M1279 (REAL HOT-PATH ATTACK phase 2 — BASCanonicalKernelInputBuilders + first PROOF that MPSGraph kernels compute correctly + EchoKernel placeholder gap closed)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -140,17 +141,18 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// M1123 → M1127 → M1131 → M1135 → M1139 → M1143 →
     /// M1147 → M1151 → M1155 → M1159 → M1163 → M1167 →
     /// M1187 → M1191 → M1195 → M1199 → M1203 → M1207 →
-    /// M1211 → ... → M1267 → M1271 → M1275 (chapter 四百
-    /// 七十四 REAL HOT-PATH ATTACK phase 1 — ANE live
-    /// binding + KernelRegistry dispatch executor + end-
-    /// to-end integration PROOF)。 M1078-M1079 reserved
-    /// for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1275
+    /// M1211 → ... → M1267 → M1271 → M1275 → M1279 (chapter
+    /// 四百七十五 REAL HOT-PATH ATTACK phase 2 —
+    /// BASCanonicalKernelInputBuilders + first PROOF that
+    /// MPSGraph kernels compute correctly + EchoKernel
+    /// placeholder gap closed)。 M1078-M1079 reserved for
+    /// post-Phase-A follow-up。
+    public static let mNumberLast: Int = 1279
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1275)。 Bumped through chapter 474:317 → 321
-    /// (chapter 474 = 4 cuts)。
-    public static let commitsShipped: Int = 321
+    /// M1279)。 Bumped through chapter 475:321 → 325
+    /// (chapter 475 = 4 cuts)。
+    public static let commitsShipped: Int = 325
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

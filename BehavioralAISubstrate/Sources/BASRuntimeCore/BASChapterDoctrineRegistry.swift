@@ -1418,7 +1418,142 @@ public enum BASChapterDoctrineRegistry {
                 "doctrine sync。 ADR-016 → M1275。 V1" +
                 " byte-equality preserved。 Branch on" +
                 " trajectory toward chapter 477's" +
-                " default-mode flip。")
+                " default-mode flip。"),
+
+        // chapter 475 — REAL HOT-PATH ATTACK phase 2
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百七十五",
+            mNumberFirst: 1276,
+            mNumberLast: 1279,
+            v1MilestoneMNumber: 1279,
+            v1MilestoneStatus:
+                "chapter-475-v1-hot-path-attack-phase-2-echokernel-placeholder-closed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1276,
+                    knife: "第一刀",
+                    concept:
+                        "BASCanonicalKernelInputBuilders" +
+                        " typed factory namespace with" +
+                        " matMul/rmsNorm/rotaryEmbedding" +
+                        " input helpers + Float↔Data" +
+                        " bit-exact pack/unpack helpers。" +
+                        " Closes the chapter 474" +
+                        " plannedFutureCut for" +
+                        " 'chapter 478+: write input" +
+                        " builders' early。 6 tests" +
+                        " PROOF including bit-exact" +
+                        " round-trip。"),
+                BASChapterKnife(
+                    mNumber: 1277,
+                    knife: "第二刀",
+                    concept:
+                        "BASMPSGraphMatMulIntegration" +
+                        "Tests — FIRST test in the" +
+                        " substrate where an MPSGraph" +
+                        " kernel runs with REAL inputs" +
+                        " and produces NUMERICALLY" +
+                        " CORRECT output。 5 tests" +
+                        " including 2×2 + 2×3×4" +
+                        " rectangular + identity sanity" +
+                        " + execution-nanos contract" +
+                        " pin。 The '更硬核 4/10' score" +
+                        " from chapter 473 deep-review" +
+                        " now has SUBSTANTIVE evidence" +
+                        " — kernels don't just register," +
+                        " they compute correctly。"),
+                BASChapterKnife(
+                    mNumber: 1278,
+                    knife: "第三刀",
+                    concept:
+                        "BASKernelDispatchEndToEndReal" +
+                        "KernelTests — sibling of M1274" +
+                        " chain test but with REAL" +
+                        " BASMPSGraphMatMulKernel" +
+                        " instead of EchoKernel stub。" +
+                        " Proves the FULL chain (hint" +
+                        " → scheduler → assignment →" +
+                        " executor → registry →" +
+                        " MPSGraph dispatch → output)" +
+                        " produces numerically correct" +
+                        " [19,22,43,50] matmul result。" +
+                        " Closes the chapter 474" +
+                        " plannedFutureCut for" +
+                        " EchoKernel placeholder" +
+                        " replacement。"),
+                BASChapterKnife(
+                    mNumber: 1279,
+                    knife: "第四刀",
+                    concept:
+                        "Chapter 475 close-out + Phase" +
+                        " 2 bump (chapter 72→73," +
+                        " mNumberLast 1275→1279," +
+                        " commits 321→325) + ADR-016" +
+                        ".M1275 → M1279。 Cross-doctrine" +
+                        " sync of 6 mirror tests + 1" +
+                        " registry-frozen-hash refresh。" +
+                        " ADR-014 OPT-IN preserved。 V1" +
+                        " hot path untouched。")
+            ],
+            entropyClassesAttacked: [
+                "echo-kernel-placeholder-entropy",
+                "scheduler-no-numerical-evidence-entropy",
+                "kernel-registry-no-correctness-pin-entropy",
+                "hand-built-data-payload-duplication-entropy"
+            ],
+            pinHeld: [
+                "不变量 #1",
+                "不变量 #2",
+                "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五",
+                "chapter 二百一一",
+                "chapter 三百九二 (Float32 numerical" +
+                " correctness within 1e-5 IEEE" +
+                " tolerance — replay-determinism PROOF" +
+                " across repeat dispatches)",
+                "ADR-014 OPT-IN preserved",
+                "ADR-016 (advanced M1275 → M1279)",
+                "系统熵 reduction",
+                "POST-PHASE-3 REAL hot-path attack phase 2"
+            ],
+            plannedFutureCuts: [
+                "chapter 476+:sprawl type migration —" +
+                " 10 high-traffic *Frame / *Bundle" +
+                " types to BASFrameEnvelope<Body> /" +
+                " BASBundle<Body> generics via" +
+                " typealias shims",
+                "chapter 477+:V1 monolith fold —" +
+                " extract 26 ForAudit shadow locals" +
+                " into BASTurnAuditProjectionsBundle +" +
+                " fold 6 boundActionPermit rebinds via" +
+                " BASPermitEscalationFoldExecutor",
+                "chapter 478+:rmsNorm + rotaryEmbedding" +
+                " + attention integration tests (real" +
+                " kernel numerical correctness)",
+                "chapter 479+:wire .nativeV2 opt-in" +
+                " into V1 sole caller (requires V2-side" +
+                " service composition first)",
+                "chapter 480+:real-device CI lane for" +
+                " ANE-aneFirst gated tests on physical" +
+                " M-series silicon"
+            ],
+            summary:
+                "REAL HOT-PATH ATTACK phase 2 — closes" +
+                " the chapter 474 EchoKernel placeholder" +
+                " gap。 4 cuts (M1276-M1279)。 Cut 1 —" +
+                " BASCanonicalKernelInputBuilders typed" +
+                " factory namespace。 Cut 2 — FIRST" +
+                " PROOF that MPSGraph kernels actually" +
+                " compute correctly with 5 numerical" +
+                " tests。 Cut 3 — full chain end-to-end" +
+                " PROOF with REAL" +
+                " BASMPSGraphMatMulKernel (replaces" +
+                " EchoKernel stub)。 Cut 4 — chapter" +
+                " close-out。 ADR-016 → M1279。 '更硬核'" +
+                " now has SUBSTANTIVE evidence —" +
+                " not just kernels-exist-in-registry," +
+                " but kernels-produce-correct-output。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

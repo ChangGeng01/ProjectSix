@@ -114,22 +114,23 @@ public enum BASSweepDoctrineExpectations {
     ///   - Pre-RADICAL Phase 2: chapters 403-426 = 24
     ///   - RADICAL sweep:       chapters 427-446 = 20
     ///   - POST-SWEEP:          chapters 447+      = (grows)
-    /// At M1275:24 + 20 + 28 = 72 (chapter 474 REAL
-    /// HOT-PATH ATTACK phase 1 added)
-    public static let phase2ChapterCount: Int = 72
+    /// At M1279:24 + 20 + 29 = 73 (chapter 475 REAL
+    /// HOT-PATH ATTACK phase 2 added)
+    public static let phase2ChapterCount: Int = 73
 
-    /// Phase 2 commits shipped。 At M1275:
-    /// 125 + 84 + 112 = 321 (chapters 447-473 add
-    /// 108 cuts;chapter 474 REAL HOT-PATH ATTACK
-    /// phase 1 = 4 cuts = 112)
-    public static let phase2CommitsShipped: Int = 321
+    /// Phase 2 commits shipped。 At M1279:
+    /// 125 + 84 + 116 = 325 (chapter 475 REAL
+    /// HOT-PATH ATTACK phase 2 = 4 cuts = 116)
+    public static let phase2CommitsShipped: Int = 325
 
-    /// Phase 2 mNumberLast。 At M1275:chapter 474
-    /// REAL HOT-PATH ATTACK phase 1 ends here (ANE
-    /// live binding + KernelRegistry dispatch +
-    /// end-to-end PROOF + close-out shipped as
-    /// M1272-M1275)。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1275
+    /// Phase 2 mNumberLast。 At M1279:chapter 475
+    /// REAL HOT-PATH ATTACK phase 2 ends here
+    /// (BASCanonicalKernelInputBuilders + first PROOF
+    /// of MPSGraph kernel correctness + EchoKernel
+    /// placeholder gap closed + chapter close-out
+    /// shipped as M1276-M1279)。 SWEEP stays frozen
+    /// at 1163。
+    public static let phase2MNumberLast: Int = 1279
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

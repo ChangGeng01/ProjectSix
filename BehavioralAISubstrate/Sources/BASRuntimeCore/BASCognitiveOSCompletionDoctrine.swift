@@ -1043,7 +1043,19 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// assignment→executor→registry→kernel chain。
     /// ADR-014 OPT-IN preserved。 V1 byte-equality
     /// preserved。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M1275"
+    /// M1279 bump:REAL HOT-PATH ATTACK phase 2 —
+    /// chapter 四百七十五 closes the EchoKernel
+    /// placeholder gap from M1274 with substantive
+    /// PROOF。 1) BASCanonicalKernelInputBuilders
+    /// typed factory for matMul/rmsNorm/rotaryEmbedding
+    /// inputs;2) FIRST test in the substrate where an
+    /// MPSGraph kernel runs with real inputs and produces
+    /// numerically correct output (2×2 + 2×3×4 +
+    /// identity);3) full chain end-to-end PROOF with
+    /// REAL BASMPSGraphMatMulKernel (no more EchoKernel
+    /// stub)。 ADR-014 OPT-IN preserved。 V1 byte-equality
+    /// preserved。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M1279"
 
     /// Query the typed status of a specific gap。
     public static func status(

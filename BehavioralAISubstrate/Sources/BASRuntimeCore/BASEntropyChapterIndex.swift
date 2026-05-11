@@ -1141,7 +1141,26 @@ public enum BASEntropyChapterIndex {
                 " V1 byte-equality preserved via ADR-" +
                 "014 OPT-IN — all new surfaces are" +
                 " additive factories;hosts opt in to" +
-                " activate。")
+                " activate。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百七十五",
+            mNumberFirst: 1276, mNumberLast: 1279,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 5,
+            summary: "REAL HOT-PATH ATTACK phase 2 —" +
+                " closes the chapter 474 EchoKernel" +
+                " placeholder gap。 Cut 1 —" +
+                " BASCanonicalKernelInputBuilders" +
+                " typed factory namespace (matMul/" +
+                "rmsNorm/rotaryEmbedding + Float↔Data" +
+                " helpers)。 Cut 2 — FIRST PROOF that" +
+                " MPSGraph kernels actually compute" +
+                " correctly with 5 numerical tests。" +
+                " Cut 3 — full chain end-to-end PROOF" +
+                " with REAL BASMPSGraphMatMulKernel" +
+                " (replaces EchoKernel stub)。 Cut 4 —" +
+                " chapter close-out。 ADR-016 → M1279。" +
+                " '更硬核' now has SUBSTANTIVE evidence")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
