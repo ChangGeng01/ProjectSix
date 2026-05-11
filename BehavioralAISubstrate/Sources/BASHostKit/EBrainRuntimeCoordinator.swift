@@ -1685,24 +1685,26 @@ public struct BASEBrainRuntimeCoordinator {
         // ledger + evidence debts that L11 / L9 already settled.
         // Pure projection; no verdict escalation; signalRefs
         // additive only.
-        let abyssalPressureForAudit = BASAbyssalPressureBudget
-            .derive(
+        // chapter 四百八十七 / M1325 — V1 cluster B trio fold
+        let lateClusterBForAudit =
+            BASTurnAuditProjectionsLateClusterB.compute(
                 turnID: runtimeTrace.sessionID,
+                hostID: hostContext.hostID,
                 riskLevel: boundRiskCard.riskLevel,
+                permit: boundActionPermit,
                 uncertaintyLedger:
                     thoughtFrame.uncertaintyLedger,
                 evidenceDebtCount:
-                    thoughtFrame.evidenceDebts?.count ?? 0)
+                    thoughtFrame.evidenceDebts?.count ?? 0,
+                candidateCount:
+                    thoughtFrame.candidates.count)
+        let abyssalPressureForAudit = lateClusterBForAudit
+            .abyssalPressure
         // M304 — derive human-anchor signal from final risk +
         // permit + candidate count. White-paper §5.3 / red line
         // 7: hint, not verdict.
-        let humanAnchorSignalForAudit = BASHumanAnchorProtocol
-            .derive(
-                anchorID: "human-anchor-\(runtimeTrace.sessionID)",
-                hostSummaryRef: hostContext.hostID,
-                riskLevel: boundRiskCard.riskLevel,
-                permitMode: boundActionPermit.mode,
-                candidateCount: thoughtFrame.candidates.count)
+        let humanAnchorSignalForAudit = lateClusterBForAudit
+            .humanAnchorSignal
         // M384 escalation now fires upstream (M392 — see the
         // gating block right after `thoughtFrame.actionPermit =
         // boundActionPermit` at line ~380). The audit emission
@@ -1754,12 +1756,8 @@ public struct BASEBrainRuntimeCoordinator {
         // urgencyMask) so the audit-entry consumer elides the
         // narrative codes unless the turn shows real
         // distortion shape.
-        let narrativeDistortionForAudit = BASNarrativeDistortion
-            .derive(
-                distortionID:
-                    "narrative-\(runtimeTrace.sessionID)",
-                riskLevel: boundRiskCard.riskLevel,
-                permitMode: boundActionPermit.mode)
+        let narrativeDistortionForAudit = lateClusterBForAudit
+            .narrativeDistortion
         // M317 — derive anomaly trace from the M316 distortion.
         // Returns nil when no axis crosses the emit threshold;
         // audit-entry consumer elides the codes when nil.
