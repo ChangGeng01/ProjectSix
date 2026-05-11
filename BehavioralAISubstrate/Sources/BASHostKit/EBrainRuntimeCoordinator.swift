@@ -1333,19 +1333,30 @@ public struct BASEBrainRuntimeCoordinator {
         //    (reject "this is just how it is" framing)
         //  - antiPaternalism high when permit narrows below
         //    .answer mode (avoid deciding for the host)
-        let counterweightForGate = BASCosmicColdCounterweight(
-            counterweightID:
-                "cosmic-cold-\(derivedSessionID)",
-            dignityBias: Self.dignityBiasFromRisk(
-                boundRiskCard.riskLevel,
-                permitMode: boundActionPermit.mode),
-            agencyFloor: Self.agencyFloorFromCandidates(
-                thoughtFrame.candidates.count),
-            antiFatalism: Self.antiFatalismFromRisk(
-                boundRiskCard.riskLevel),
-            antiPaternalism: Self
-                .antiPaternalismFromPermit(
-                    boundActionPermit.mode))
+        // chapter 五百十 / M1417-M1418 — counterweight fold。
+        // 13-line inline construction collapses to typed
+        // factory call。 The 4 Self.* helpers stay file
+        // private;factory takes precomputed values to
+        // keep helper visibility unchanged。
+        let counterweightForGate =
+            BASTurnAuditProjectionsCounterweightFactory
+                .compute(
+                    sessionID: derivedSessionID,
+                    dignityBias:
+                        Self.dignityBiasFromRisk(
+                            boundRiskCard.riskLevel,
+                            permitMode:
+                                boundActionPermit.mode),
+                    agencyFloor:
+                        Self.agencyFloorFromCandidates(
+                            thoughtFrame.candidates
+                                .count),
+                    antiFatalism:
+                        Self.antiFatalismFromRisk(
+                            boundRiskCard.riskLevel),
+                    antiPaternalism:
+                        Self.antiPaternalismFromPermit(
+                            boundActionPermit.mode))
         // M453 (chapter 一百十九) — derive [BASNonEuclideanCandidate]
         // from low-confidence candidates. Closes the chapter 一百十八
         // empty-array placeholder for `nonEuclideanCandidates:` in
