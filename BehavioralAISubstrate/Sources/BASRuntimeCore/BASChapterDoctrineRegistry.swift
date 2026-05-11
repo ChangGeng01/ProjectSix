@@ -3178,7 +3178,101 @@ public enum BASChapterDoctrineRegistry {
                 " intermediate derives to enable single-" +
                 " call fold。 Typed-surface-ship-first" +
                 " pattern preserved per chapter 三百九二" +
-                " doctrine。")
+                " doctrine。"),
+
+        // chapter 496 — Tier 2 entry:ssmScan stub + coverage
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十六",
+            mNumberFirst: 1361,
+            mNumberLast: 1364,
+            v1MilestoneMNumber: 1364,
+            v1MilestoneStatus:
+                "chapter-496-tier-2-entry-ssmscan-stub",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1361, knife: "第一刀",
+                    concept: "NEW BASMPSGraphSSMScan" +
+                        "KernelStub conforming to" +
+                        " BASMetalKernel。 Identity-scan" +
+                        " stub for the 8th BASNeuralOp" +
+                        " (ssmScan)。 7 of 8 native" +
+                        " kernels now have stubs OR real" +
+                        " impls;the 8th (ssmScan) is" +
+                        " stubbed per HONEST scope。"),
+                BASChapterKnife(
+                    mNumber: 1362, knife: "第二刀",
+                    concept: "NEW BASSSMScanKernel" +
+                        "ImplementationStatus enum +" +
+                        " .isProductionReady gate +" +
+                        " class-level static const。" +
+                        " 4 typed implementation paths:" +
+                        " stub、metalShader、mlxBridge、" +
+                        " coremlMlProgram。 16 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1363, knife: "第三刀",
+                    concept: "NEW BASCanonicalKernel" +
+                        "Coverage.chapter496Snapshot —" +
+                        " 8-of-8 BASNeuralOp coverage" +
+                        " (7 with numerical proof +" +
+                        " 1 stub with hasNumerical" +
+                        "CorrectnessProof:false honest" +
+                        " marker)。 Metadata carries" +
+                        " explicit Tier 2 phase K" +
+                        " deferral signal。"),
+                BASChapterKnife(
+                    mNumber: 1364, knife: "第四刀",
+                    concept: "Chapter 496 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1364。 Tier 2 entry complete。" +
+                        " HONEST SCOPE: ssmScan production" +
+                        " requires EXTERNAL Metal shader" +
+                        " OR MLX bridge OR CoreML ML" +
+                        " Program work — none of which" +
+                        " ships in chapter 496。 Stub +" +
+                        " coverage doctrine pin the" +
+                        " honest deferral signal so" +
+                        " future readers see it。")
+            ],
+            entropyClassesAttacked: [
+                "8th-neural-op-protocol-gap",
+                "production-readiness-flag-implicit",
+                "kernel-coverage-doctrine-stale",
+                "tier-2-deferral-signal-missing"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1364",
+                "tier-2-entry-honest-scope-deferred",
+                "ssm-scan-stub-not-production-ready",
+                "production-paths-typed-and-enumerated"
+            ],
+            plannedFutureCuts: [
+                "chapter 497+ — Tier C ADR-019 +" +
+                " REAL HOT-PATH ATTACK 100% seal",
+                "Tier 2 phase K (later) — actual ssmScan" +
+                " kernel via custom Metal shader OR" +
+                " MLX-swift bridge OR CoreML ML Program",
+                "External: iOS 26 FoundationModels.Tool" +
+                " macro conformer (chapter 470 audit-only" +
+                " preserved as revert path)"
+            ],
+            summary: "Tier 2 entry shipped:typed ssmScan" +
+                " stub + 4-path implementation-status enum" +
+                " + chapter 496 coverage snapshot (8-of-8" +
+                " BASNeuralOp covered:7 with numerical" +
+                " proof + 1 stub)。 16 typed surfaces" +
+                " cumulative。 ADR-016 → M1364。 HONEST" +
+                " SCOPE: production ssmScan requires" +
+                " external Metal shader / MLX / CoreML" +
+                " work — chapter 496 ships the typed" +
+                " contract + stub + honest deferral" +
+                " signal so substrate integration testing" +
+                " + protocol conformance + coverage" +
+                " doctrine all work today。 ADR-014" +
+                " OPT-IN preserved。 V1 byte-equality" +
+                " untouched。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -37,15 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs495() {
+    func testLastChapterIs496() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百九十五",
-            "M1360 chapter 四百九十五:permit pipeline" +
-            " typed-surface ship — 15 typed surfaces" +
-            " cumulative;V1 byte-equality UNTOUCHED" +
-            " (executor consumes in chapter 496+)")
+            "chapter 四百九十六",
+            "M1364 chapter 四百九十六:Tier 2 entry —" +
+            " ssmScan stub + status enum + 8-of-8" +
+            " coverage snapshot。 16 typed surfaces" +
+            " cumulative;V1 byte-equality untouched。" +
+            " HONEST SCOPE: production ssmScan kernel" +
+            " is Tier 2 phase K external work")
     }
 
     // MARK: - M-number range

@@ -1364,7 +1364,19 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M1360。 V1 byte-equality UNTOUCHED" +
                 " (typed-surface-first pattern;V1 fold" +
-                " executor consumes in chapter 496+)。")
+                " executor consumes in chapter 496+)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十六",
+            mNumberFirst: 1361, mNumberLast: 1364,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Tier 2 entry:ssmScan kernel STUB +" +
+                " 4-path status enum + 8-of-8 coverage" +
+                " snapshot (7 native proof + 1 honest" +
+                " stub)。 16 typed surfaces cumulative。" +
+                " ADR-016 → M1364。 HONEST SCOPE: ssmScan" +
+                " production = external Metal shader /" +
+                " MLX / CoreML work (Tier 2 phase K)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

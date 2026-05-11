@@ -99,10 +99,11 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// A/B folds + 492 surface trio + 493 downstream
     /// Kunlun fold + 494 Tianmen trio + gate-side
     /// axis-protocol reuse + 495 permit pipeline
-    /// typed-surface ship)。 Re-captured at chapter 495
-    /// close-out。 HONEST SCOPE for chapter 495: V1
-    /// byte-equality UNTOUCHED — typed-surface ship
-    /// only;executor consumption in chapter 496+。
+    /// typed-surface ship + 496 Tier 2 entry ssmScan
+    /// stub + coverage snapshot)。 Re-captured at chapter
+    /// 496 close-out。 HONEST SCOPE for chapter 496:
+    /// ssmScan kernel STUB only;production = external
+    /// Metal shader / MLX / CoreML work (Tier 2 phase K)。
     static let frozenFullRegistrySha256: String =
-        "242235e344ca9541a4e65d8bbb72700f4ef6679b2872699484eae5d0dd8f5117"
+        "7f75abd42a8ae5b79ae4d4f339ac82012d8715a94040a3f9b687d8eb6f13e840"
 }
