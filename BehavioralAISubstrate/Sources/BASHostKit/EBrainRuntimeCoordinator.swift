@@ -1751,53 +1751,30 @@ public struct BASEBrainRuntimeCoordinator {
         // M317 — derive anomaly trace from the M316 distortion.
         // Returns nil when no axis crosses the emit threshold;
         // audit-entry consumer elides the codes when nil.
-        let anomalyTraceForAudit = BASAnomalyTrace.deriveOrNil(
-            traceID: "anomaly-\(runtimeTrace.sessionID)",
-            distortion: narrativeDistortionForAudit,
-            relationShift: "",
-            sourceRefs: [runtimeTrace.sessionID],
-            pressureVector: abyssalPressureForAudit)
-        // M318 — derive L9 abyssal-branch annotations from
-        // candidate IDs + the M303 abyssal pressure reading.
-        // Returns empty array when below the abyssal threshold;
-        // audit-entry consumer elides all branch codes when
-        // empty.
-        let abyssalBranchesForAudit = BASAbyssalBranch.deriveAll(
-            candidateIDs: thoughtFrame.candidates
-                .map(\.candidateID),
-            pressure: abyssalPressureForAudit)
-        // M448 (chapter 一百十八) — derive L7 ontology shift mark
-        // from the M316 narrative-distortion projection. Watcher-
-        // hint output (red line 7); never gates verdict / permit.
-        let ontologyShiftMarkForAudit = BASCthulhuLayerProjections
-            .OntologyShiftMark.derive(
-                from: narrativeDistortionForAudit,
+        // chapter 四百八十九 / M1333 — V1 cluster B sextet fold
+        let lateClusterCForAudit =
+            BASTurnAuditProjectionsLateClusterC.compute(
+                sessionID: runtimeTrace.sessionID,
                 turnID: derivedTurnID,
-                targetSubjectRef: thoughtFrame.candidates
-                    .first?.candidateID ?? "no-candidate")
-        // M495 (chapter 一百二十七) — derive L7 narrative-
-        // distortion map from the M316 distortion + candidate
-        // IDs. Watcher-hint only.
-        let narrativeDistortionMapForAudit =
-            BASCthulhuLeftoverProjections.NarrativeDistortionMap
-                .derive(
-                    from: narrativeDistortionForAudit,
-                    candidateIDs: thoughtFrame.candidates
-                        .map(\.candidateID),
-                    turnID: derivedTurnID)
-        // M499 (chapter 一百二十七) — compute hostFragility from
-        // the human-anchor signal and re-build pressure with
-        // fragility folded in. Pre-M499 the field was hard-coded
-        // to 0 (chapter 一百二十一 schema-only ship); chapter
-        // 一百二十七 closes the computation gap.
-        let hostFragilityForAudit =
-            BASCthulhuLeftoverProjections.HostFragilityProjection
-                .derive(from: humanAnchorSignalForAudit)
-        let abyssalPressureWithFragility =
-            BASCthulhuLeftoverProjections.HostFragilityProjection
-                .apply(
-                    fragility: hostFragilityForAudit,
-                    to: abyssalPressureForAudit)
+                narrativeDistortion:
+                    narrativeDistortionForAudit,
+                abyssalPressure:
+                    abyssalPressureForAudit,
+                humanAnchorSignal:
+                    humanAnchorSignalForAudit,
+                candidates: thoughtFrame.candidates)
+        let anomalyTraceForAudit = lateClusterCForAudit
+            .anomalyTrace
+        let abyssalBranchesForAudit = lateClusterCForAudit
+            .abyssalBranches
+        let ontologyShiftMarkForAudit = lateClusterCForAudit
+            .ontologyShiftMark
+        let narrativeDistortionMapForAudit = lateClusterCForAudit
+            .narrativeDistortionMap
+        let hostFragilityForAudit = lateClusterCForAudit
+            .hostFragility
+        let abyssalPressureWithFragility = lateClusterCForAudit
+            .abyssalPressureWithFragility
         // M320 — derive `BASUnknownReserve` projection from L9
         // uncertainty ledger's confidence floor. When the floor
         // is high (≥0.8) the reserve resolves to `.unrestricted`
