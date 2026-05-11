@@ -37,17 +37,16 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs504() {
+    func testLastChapterIs505() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百四",
-            "M1396 chapter 五百四:bundle aggregator" +
-            " wire-ins — M1393 cache report 5-stage" +
-            " pipeline + M1394 routing decision bundle" +
-            " (9th BASBundle) + M1395 advisory bundle" +
-            " (10th BASBundle)。 39 typed surfaces" +
-            " cumulative")
+            "chapter 五百五",
+            "M1400 chapter 五百五 MILESTONE — unified" +
+            " end-of-turn audit emission architecture:" +
+            " M1397 record + M1398 emitter + M1399 11th" +
+            " BASBundle + M1400 close-out。 42 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

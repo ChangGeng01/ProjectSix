@@ -3952,7 +3952,105 @@ public enum BASChapterDoctrineRegistry {
                 " → M1396。 10 BASBundle<Item> adoptions" +
                 " cumulative。 Wire-in pattern stabilized" +
                 " across the substrate。 ADR-014 OPT-IN" +
-                " preserved。 V1 byte-equality untouched。")
+                " preserved。 V1 byte-equality untouched。"),
+
+        // chapter 505 — unified end-of-turn audit
+        // emission (M1400 milestone)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五",
+            mNumberFirst: 1397,
+            mNumberLast: 1400,
+            v1MilestoneMNumber: 1400,
+            v1MilestoneStatus:
+                "chapter-505-unified-audit-emission-m1400",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1397, knife: "第一刀",
+                    concept: "NEW BASEndOfTurnAudit" +
+                        "EmissionRecord typed Codable" +
+                        " surface composing 4 wire-in" +
+                        " pipelines (cache report +" +
+                        " routing decisions + dispatch" +
+                        " statistics + advisory ledger)" +
+                        " into one optional-fields record" +
+                        " for unified audit emission。" +
+                        " 40 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1398, knife: "第二刀",
+                    concept: "NEW BASEndOfTurnAudit" +
+                        "Emitter actor with dependency-" +
+                        "injection design — takes" +
+                        " optional probe bundle +" +
+                        " routing observer + statistics" +
+                        " recorder + advisory ledger and" +
+                        " emits unified M1397 record via" +
+                        " emit(turnID:recordedAtMs:)。 41" +
+                        " typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1399, knife: "第三刀",
+                    concept: "NEW BASEndOfTurnAudit" +
+                        "EmissionBundle (11th BASBundle" +
+                        "<Item> adoption) for multi-turn" +
+                        " replay。 6 typed aggregates" +
+                        " (fully-observed turn count," +
+                        " mean cache hit ratio,etc.)。" +
+                        " Each mean* honestly divides" +
+                        " by populated count only。 42" +
+                        " typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1400, knife: "第四刀",
+                    concept: "Chapter 505 close-out +" +
+                        " doctrine sync。 M1400 milestone。" +
+                        " ADR-016 → M1400。 4-pipeline" +
+                        " typed unified audit emission" +
+                        " architecture complete。 11" +
+                        " cumulative BASBundle<Item>" +
+                        " adoptions。 Substrate has full" +
+                        " end-of-turn audit emission" +
+                        " surface ready for production" +
+                        " host consumption (opt-in)。")
+            ],
+            entropyClassesAttacked: [
+                "4-pipelines-no-unified-emission-record",
+                "host-needs-multi-step-snapshot-orchestration",
+                "multi-turn-replay-untyped-batch",
+                "audit-emission-aggregates-implicit"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1400",
+                "4-pipeline-unified-audit-emission-ready",
+                "11-basbundle-adoptions-cumulative",
+                "v1-byte-equality-preserved",
+                "m1400-milestone-honest-reach"
+            ],
+            plannedFutureCuts: [
+                "future arc — production-side wire-in" +
+                " (host CI lane required for default-" +
+                " mode flip + V1 deletion)",
+                "future arc — actual LRU/TTL invalidation" +
+                " policy implementation",
+                "future arc — Tier C ADR-019 typed shape-" +
+                " specific generics (user approval gated)"
+            ],
+            summary: "M1400 MILESTONE reached via unified" +
+                " end-of-turn audit emission architecture:" +
+                " M1397 record composes 4 wire-in" +
+                " pipelines into one optional-fields" +
+                " Codable surface;M1398 emitter actor" +
+                " uses dependency injection to snapshot" +
+                " all connected observers;M1399 11th" +
+                " BASBundle adoption packs N records for" +
+                " multi-turn replay。 42 typed surfaces" +
+                " cumulative。 11 BASBundle<Item>" +
+                " adoptions cumulative。 ADR-016 → M1400。" +
+                " ADR-014 OPT-IN preserved every commit。" +
+                " V1 byte-equality untouched throughout" +
+                " the 7-chapter wire-in arc (chapters" +
+                " 498-505)。 Substrate audit-emission" +
+                " architecture COMPLETE for production" +
+                " host opt-in consumption。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

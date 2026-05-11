@@ -104,12 +104,12 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// 499 更极致/低熵 + 500 最创新/原生神经引擎 +
     /// 501 Tier 1 honest SEAL at 52/60 + 502 wire-in
     /// push + 503 observer wire-ins + 504 bundle
-    /// aggregator wire-ins)。 Re-captured at chapter
-    /// 504 close-out。 Chapter 504:M1374 cache report
-    /// now reachable via 5-stage typed composition
-    /// pipeline + M1389 routing observer + M1391 advisory
-    /// ledger gain typed Codable bundle output via 9th
-    /// + 10th BASBundle<Item> adoptions。
+    /// aggregator wire-ins + 505 unified audit emission
+    /// M1400 MILESTONE)。 Re-captured at chapter 505
+    /// close-out。 Chapter 505:M1400 milestone reached
+    /// via M1397 record + M1398 emitter + M1399 11th
+    /// BASBundle — 4-pipeline unified audit emission
+    /// architecture complete。
     static let frozenFullRegistrySha256: String =
-        "3116890493cdd35926b4cd6414dbe0738beef745ee3b541067db3249e7959650"
+        "e391fc32f2059a9cbdc5f9e65afe6dabdc92a3c11b66c6a2640471873e9142eb"
 }
