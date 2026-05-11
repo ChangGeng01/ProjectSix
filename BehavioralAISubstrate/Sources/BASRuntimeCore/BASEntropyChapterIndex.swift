@@ -1321,7 +1321,16 @@ public enum BASEntropyChapterIndex {
             pinsCount: 6, futureCutsCount: 3,
             summary: "Cluster B 21 declarations folded" +
                 " (87.5%)。 Post-Tier-1 incremental" +
-                " progress。 ADR-016 → M1343。")
+                " progress。 ADR-016 → M1343。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十二",
+            mNumberFirst: 1344, mNumberLast: 1347,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 3,
+            summary: "Surface trio fold + HONEST scope" +
+                " correction:66 ForAudit declarations" +
+                " remain in coordinator。 10 bundle" +
+                " factories cumulative。 ADR-016 → M1347。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

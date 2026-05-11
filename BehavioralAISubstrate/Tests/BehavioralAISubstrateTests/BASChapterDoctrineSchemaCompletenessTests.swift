@@ -1361,7 +1361,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百九十一")!)
+                            "chapter 四百九十一")!),
+            // M1347 surface trio + honest scope
+            checkRegistry("四百九十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百九十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1785,6 +1791,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百九十一")!
+                .mNumberLast),
+            // M1347 chapter 492
+            ("492",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -95,10 +95,13 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// Frozen hash for the FULL registry (literals +
     /// inline chapters 464-467 + 468-472 + 473 audit +
     /// 474-477 REAL HOT-PATH ATTACK + 478 V1 fold PILOT
-    /// + 479 Phase B + 480 Phase C)。 Re-captured at
-    /// chapter 480 close-out — hash moves because
-    /// chapter 480's record is now part of canonical
-    /// registry JSON。
+    /// + 479 Phase B + 480 Phase C + 481-491 cluster
+    /// A/B folds + 492 surface trio fold)。 Re-captured
+    /// at chapter 492 close-out — hash moves because
+    /// chapter 492's record is now part of canonical
+    /// registry JSON。 HONEST scope correction noted:
+    /// 66 ForAudit declarations still remain in the V1
+    /// monolith despite "cluster B 87.5%" framing。
     static let frozenFullRegistrySha256: String =
-        "e21e5c8346c5ee11de695abd94935f3a48df1d7c32b5840dc5370955dd5a77d0"
+        "d1d436800d7e19f251f491d531c8659af23f88594c5516b60b4b244491caa963"
 }

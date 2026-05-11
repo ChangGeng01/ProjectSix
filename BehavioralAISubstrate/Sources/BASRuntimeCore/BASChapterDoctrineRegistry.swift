@@ -2837,7 +2837,75 @@ public enum BASChapterDoctrineRegistry {
             summary: "Cluster B 21 declarations folded" +
                 " (87.5%)。 9 bundle factories cumulative。" +
                 " ADR-016 → M1343。 Post-Tier-1" +
-                " incremental fold progress。")
+                " incremental fold progress。"),
+
+        // chapter 492 — honest scope correction + surface trio
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十二",
+            mNumberFirst: 1344,
+            mNumberLast: 1347,
+            v1MilestoneMNumber: 1347,
+            v1MilestoneStatus:
+                "chapter-492-honest-scope-correction-surface-trio",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1344, knife: "第一刀",
+                    concept: "BASTurnAuditProjections" +
+                        "SurfaceTrio — surfaceMode +" +
+                        " cthulhuSurfaceAlias +" +
+                        " kunlunSurfaceAlias folded。" +
+                        " 10 bundle factories cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1345, knife: "第二刀",
+                    concept: "Coordinator splice for" +
+                        " surface trio。 grep audit:" +
+                        " 66 ForAudit declarations still" +
+                        " in coordinator —" +
+                        " 'cluster B 87.5%' under-" +
+                        "counted by ~50%。 Honest scope" +
+                        " update: more fold work" +
+                        " remains than previously" +
+                        " framed。"),
+                BASChapterKnife(
+                    mNumber: 1346, knife: "第三刀",
+                    concept: "Doctrine sync。"),
+                BASChapterKnife(
+                    mNumber: 1347, knife: "第四刀",
+                    concept: "Chapter 492 close-out。" +
+                        " ADR-016 → M1347。 10 bundle" +
+                        " factories cumulative。 Honest" +
+                        " accounting:fold progress" +
+                        " visible but ~50% more work" +
+                        " remains than earlier framing" +
+                        " suggested。")
+            ],
+            entropyClassesAttacked: [
+                "scope-undercount-entropy",
+                "doctrine-claim-vs-reality-drift",
+                "surface-trio-untouched"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1347",
+                "honest-scope-correction-acknowledged"
+            ],
+            plannedFutureCuts: [
+                "chapter 493+ — remaining ~60 ForAudit" +
+                " declarations (downstream Kunlun +" +
+                " heaven gate + tianmen + writ +" +
+                " axis-view structures)",
+                "chapter 494+ — Permit fold (6 rebinds)",
+                "chapter 495+ — V1 deletion"
+            ],
+            summary: "Surface trio folded + honest" +
+                " scope correction:66 ForAudit" +
+                " declarations remain (was framed as" +
+                " ~3)。 10 bundle factories cumulative。" +
+                " ADR-016 → M1347。 V1 byte-equality" +
+                " preserved。 Doctrine drift acknowledged:" +
+                " ~50% more fold work remains than" +
+                " 'cluster B 87.5%' framing implied。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
