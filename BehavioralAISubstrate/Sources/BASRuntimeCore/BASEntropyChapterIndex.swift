@@ -1305,7 +1305,17 @@ public enum BASEntropyChapterIndex {
             knivesCount: 4, entropyClassesCount: 2,
             pinsCount: 6, futureCutsCount: 2,
             summary: "Cluster B 18 declarations folded" +
-                " (sextet)。 ADR-016 → M1335。")
+                " (sextet)。 ADR-016 → M1335。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十",
+            mNumberFirst: 1336, mNumberLast: 1339,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 5,
+            summary: "TIER 1 SEALED — substrate-internal" +
+                " achievement at 45/60 (75%)。" +
+                " BASTier1AchievementDoctrine pins" +
+                " per-directive evidence。 ADR-016 →" +
+                " M1339。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

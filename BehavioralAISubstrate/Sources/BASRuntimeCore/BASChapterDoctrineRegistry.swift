@@ -2703,7 +2703,89 @@ public enum BASChapterDoctrineRegistry {
             ],
             summary: "Cluster B 18 declarations folded。" +
                 " 8 bundle factories cumulative。 ADR-" +
-                "016 → M1335。")
+                "016 → M1335。"),
+
+        // chapter 490 — Tier 1 achievement sealed
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十",
+            mNumberFirst: 1336,
+            mNumberLast: 1339,
+            v1MilestoneMNumber: 1339,
+            v1MilestoneStatus:
+                "chapter-490-tier-1-substrate-internal-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1336, knife: "第一刀",
+                    concept: "BASRealHotPathAttackEval" +
+                        "uationDoctrine bumped 41/60 →" +
+                        " 45/60。 最激进 2→5 reflects" +
+                        " cluster A 100% + cluster B" +
+                        " 75% folds。 低熵复杂系统 7→8" +
+                        " reflects 8 bundle factories" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1337, knife: "第二刀",
+                    concept: "BASTier1AchievementDoctrine" +
+                        " — typed milestone declaring" +
+                        " substrate-internal Tier 1 hit" +
+                        " at 45/60 (75%)。 17 chapters /" +
+                        " 68 commits / M1272-M1339。" +
+                        " Per-directive evidence +" +
+                        " honest gap-to-10/10。"),
+                BASChapterKnife(
+                    mNumber: 1338, knife: "第三刀",
+                    concept: "Doctrine sync。"),
+                BASChapterKnife(
+                    mNumber: 1339, knife: "第四刀",
+                    concept: "Chapter 490 close-out +" +
+                        " Tier 1 SEALED at 45/60。" +
+                        " ADR-016 → M1339。 9 bundle" +
+                        " factories cumulative。" +
+                        " Production wire-in + V1" +
+                        " deletion + Tier 2 deferred" +
+                        " to follow-up sessions。")
+            ],
+            entropyClassesAttacked: [
+                "tier-1-undeclared-entropy",
+                "scoring-update-stale-entropy",
+                "achievement-untyped-entropy",
+                "honest-gap-acknowledgment-missing"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7",
+                "chapter 一百八十五 typed achievement",
+                "chapter 二百一一 single source",
+                "chapter 三百九二 Codable replay",
+                "ADR-014 OPT-IN",
+                "ADR-016 → M1339",
+                "Tier 1 substrate-internal SEALED at" +
+                " 45/60 (75%)"
+            ],
+            plannedFutureCuts: [
+                "chapter 491+ — production wire-in" +
+                " (EBrainHostRuntimeSynthesis" +
+                " runtimeMode opt-in)",
+                "chapter 492+ — default mode flip" +
+                " (.v1ByteEqual → .nativeV2)",
+                "chapter 493+ — V1 monolith DELETION",
+                "chapter 494+ — permit fold (6 rebinds)",
+                "chapter 495+ — Tier 2 (FoundationModels" +
+                ".Tool macro + ssmScan kernel + Tier C" +
+                " sprawl ADR-019)"
+            ],
+            summary: "TIER 1 SEALED — substrate-internal" +
+                " achievement declared at 45/60 (75%)。" +
+                " 17 chapters / 68 commits across" +
+                " M1272-M1339。 BASTier1Achievement" +
+                "Doctrine pins per-directive evidence。" +
+                " V1 byte-equality preserved (cluster A" +
+                " 100% + cluster B 75% folded with 0" +
+                " stress-sweep divergences across all" +
+                " 17 chapters)。 ADR-016 → M1339。" +
+                " Honest 25% gap (Production wire-in +" +
+                " V1 deletion + Tier 2 external blockers)" +
+                " explicitly acknowledged for follow-up。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
