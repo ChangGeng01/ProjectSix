@@ -1555,7 +1555,21 @@ public enum BASEntropyChapterIndex {
                 " + adapters + migrations)。 51 typed" +
                 " surfaces cumulative。 ADR-016 → M1416。" +
                 " Combined Tier C completion = 50%" +
-                " (3-layer:6/12)。")
+                " (3-layer:6/12)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十",
+            mNumberFirst: 1417, mNumberLast: 1420,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "V1 monolith fold continues:" +
+                " BASTurnAuditProjectionsCounterweight" +
+                "Factory + BASRoutedBudgetFactory。 38" +
+                " lines of inline construction collapsed" +
+                " to 24 lines of typed factory call。" +
+                " 53 typed surfaces cumulative。 ADR-016" +
+                " → M1420。 V1 byte-equality preserved" +
+                " via shadow-rebinding + stress-sweep" +
+                " dual-mode regression guard。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

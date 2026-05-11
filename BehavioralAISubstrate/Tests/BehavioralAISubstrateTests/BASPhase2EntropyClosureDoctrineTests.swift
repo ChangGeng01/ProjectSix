@@ -37,15 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs509() {
+    func testLastChapterIs510() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九",
-            "M1416 chapter 五百九 — Tier C migration" +
-            " adapters。 2 of 4 typed pure-function" +
-            " adapters shipped + 3-layer doctrine bump。" +
-            " 51 typed surfaces cumulative")
+            "chapter 五百十",
+            "M1420 chapter 五百十 — V1 monolith fold" +
+            " continues。 BASTurnAuditProjections" +
+            "CounterweightFactory + BASRoutedBudget" +
+            "Factory。 53 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

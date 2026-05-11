@@ -4436,7 +4436,89 @@ public enum BASChapterDoctrineRegistry {
                 " 6/12 = 50%。 51 typed surfaces" +
                 " cumulative。 ADR-016 → M1416。 ADR-014" +
                 " OPT-IN preserved。 V1 byte-equality" +
-                " untouched。")
+                " untouched。"),
+
+        // chapter 510 — V1 monolith fold continues
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十",
+            mNumberFirst: 1417,
+            mNumberLast: 1420,
+            v1MilestoneMNumber: 1420,
+            v1MilestoneStatus:
+                "chapter-510-v1-monolith-fold-continues",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1417, knife: "第一刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "CounterweightFactory + V1 splice。" +
+                        " Folds 13-line BASCosmicCold" +
+                        "Counterweight inline construction" +
+                        " into typed factory call。 52" +
+                        " typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1418, knife: "第二刀",
+                    concept: "Splice counterweight factory" +
+                        " into V1 coordinator (line 1336-" +
+                        "1348)。 4 Self.* helpers stay" +
+                        " fileprivate;factory takes" +
+                        " precomputed Double values。" +
+                        " Stress-sweep 6/6 PASS。"),
+                BASChapterKnife(
+                    mNumber: 1419, knife: "第三刀",
+                    concept: "NEW BASRoutedBudgetFactory" +
+                        " + V1 splice。 Folds 25-line" +
+                        " BASBudgetFrame routedBudget" +
+                        " inline construction into typed" +
+                        " factory call。 Threads 15 fields" +
+                        " verbatim + 2 powerClockService-" +
+                        "computed inputs。 53 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1420, knife: "第四刀",
+                    concept: "Chapter 510 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1420。 V1 monolith reduction:" +
+                        " 2 inline constructions (38" +
+                        " lines total) collapsed to" +
+                        " typed factory calls (24 lines" +
+                        " total),preserving byte-equality" +
+                        " via shadow-rebinding pattern。")
+            ],
+            entropyClassesAttacked: [
+                "cosmic-cold-counterweight-inline-13-lines",
+                "routed-budget-inline-25-lines",
+                "v1-monolith-residual-inline-constructions",
+                "powerclockservice-visibility-coupling"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1420",
+                "v1-byte-equality-preserved",
+                "stress-sweep-300-turn-0-divergence",
+                "powerclockservice-visibility-unchanged"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional V1 monolith" +
+                " inline construction folds (BASYaochi" +
+                "SanctumEntry + BASHeavenGatePermit +" +
+                " BASObservationReconciliationReport +" +
+                " BASAuditObservationProjections)",
+                "future arc — production wire-in (host" +
+                " CI lane gated)",
+                "future arc — Tier C adapter consumption" +
+                " by actual migration"
+            ],
+            summary: "V1 monolith fold continues:2 typed" +
+                " pure-function factories shipped (cosmic-" +
+                "cold counterweight + routed budget)。 38" +
+                " lines of inline construction collapsed" +
+                " to 24 lines of typed factory call。 53" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1420。 V1 byte-equality preserved via" +
+                " shadow-rebinding + stress-sweep dual-" +
+                "mode regression guard。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
