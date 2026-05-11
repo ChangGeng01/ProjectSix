@@ -485,6 +485,206 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     /// minimal audit entry (e.g. tests) and don't need any
     /// projections.
     public static let empty = BASAuditObservationProjections()
+
+    // MARK: - chapter 五百十一 / M1422 — Kunlun-inputs convenience
+    //                                    init
+    //
+    // Convenience init that accepts a typed
+    // `BASAuditObservationProjectionsKunlunInputs` block
+    // PLUS the remaining ~30 non-Kunlun fields. Unpacks the
+    // block's 18 trio outputs into the matching projections
+    // fields。 Used by V1 monolith to fold the 18 separate
+    // `*ForAudit` named-arg lines at the projections call
+    // site into one `kunlunInputs:` line + the remaining
+    // ~30 args。
+    //
+    // Byte-equality with the per-parameter init is GUARANTEED
+    // by the body — every field is copied 1:1 from the block
+    // accessors or from the explicit non-Kunlun args。 The
+    // M1421 PROOF test `testPassThroughAccessorsMirrorUnderlying
+    // Trios` is the regression guard:if any block accessor
+    // ever transforms its value,that test fails first。
+    public init(
+        kunlunInputs:
+            BASAuditObservationProjectionsKunlunInputs,
+        candidateObservationBundle:
+            BASCandidateObservationBundle? = nil,
+        tribunalObservationBundle:
+            BASTribunalObservationBundle? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        sealAggregate:
+            BASOldSealSealingProtocol.Aggregate? = nil,
+        lifecycleAggregate:
+            BASEvolutionLifecycleSession.Aggregate? = nil,
+        narrativeDistortion: BASNarrativeDistortion? = nil,
+        anomalyTrace: BASAnomalyTrace? = nil,
+        abyssalBranches: [BASAbyssalBranch] = [],
+        unknownReserve: BASUnknownReserve? = nil,
+        forbiddenAggregate:
+            BASForbiddenKnowledgeCandidate.Aggregate? = nil,
+        kunlunAxisAlignment: BASAxisAlignment? = nil,
+        jadeCanonVerification:
+            BASKunlunJadeCanonProtocol.Verification? = nil,
+        jadeCanonObjectClass:
+            BASJadeCanonObjectClass? = nil,
+        riverOriginLineage:
+            BASKunlunRiverOriginProtocol.LineageReport? = nil,
+        yaochiAccess:
+            BASKunlunYaochiProtocol.AccessDecision? = nil,
+        yaochiSanctumClass: BASYaochiSanctumClass? = nil,
+        tianmenReadiness:
+            BASKunlunHeavenGateProtocol.Readiness? = nil,
+        tianmenGateClass: BASKunlunGateClass? = nil,
+        tianmenPassState: BASKunlunGateState? = nil,
+        escalationSuppressionCodes: [String] = [],
+        kunlunAxisView: BASKunlunAxisView? = nil,
+        kunlunTianmenWarrant: BASKunlunTianmenWarrant? = nil,
+        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil,
+        layerReconciliationVerdict:
+            BASObservationReconciliationVerdict? = nil,
+        layerReconciliationReport:
+            BASObservationReconciliationReport? = nil,
+        presenceObservationBundle:
+            BASPresenceObservationBundle? = nil,
+        decompositionObservationBundle:
+            BASDecompositionObservationBundle? = nil,
+        softHandObservationBundle:
+            BASSoftHandObservationBundle? = nil,
+        leaseLifeObservationBundle:
+            BASLeaseLifeObservationBundle? = nil,
+        hostConstitutionObservationBundle:
+            BASHostConstitutionObservationBundle? = nil,
+        thoughtFoldObservationBundle:
+            BASThoughtFoldObservationBundle? = nil,
+        neuralOrganObservationBundle:
+            BASNeuralOrganObservationBundle? = nil,
+        hippocampalMemoryObservationBundle:
+            BASHippocampalMemoryObservationBundle? = nil,
+        worldPriorObservationBundle:
+            BASWorldPriorObservationBundle? = nil,
+        riskObservationBundle:
+            BASRiskObservationBundle? = nil,
+        updateTicketObservationBundle:
+            BASUpdateTicketObservationBundle? = nil,
+        cosmicScaleView: BASCosmicScaleView? = nil,
+        ontologyFog: BASOntologyFog? = nil,
+        ontologyShiftMark: BASOntologyShiftMark? = nil,
+        abyssalRunMode: BASAbyssalRunMode? = nil,
+        abyssBudget: BASAbyssBudget? = nil,
+        cthulhuAssertionCeilingReasonCodes: [String] = [],
+        cthulhuPermitEscalationReasonCodes: [String] = [],
+        memoryTemperatureLayer: BASMemoryTemperatureLayer? = nil,
+        narrativeDistortionMap: BASNarrativeDistortionMap? = nil,
+        sealedMemory: BASSealedMemory? = nil,
+        humanAnchorProfile: BASHumanAnchorProfile? = nil,
+        abyssalOrganAlias: BASAbyssalOrganAlias? = nil,
+        cthulhuSurfaceAlias: BASCthulhuSurfaceAlias? = nil,
+        kunlunSurfaceAlias: BASKunlunSurfaceAlias? = nil
+    ) {
+        self.init(
+            candidateObservationBundle:
+                candidateObservationBundle,
+            tribunalObservationBundle:
+                tribunalObservationBundle,
+            abyssalPressure: abyssalPressure,
+            humanAnchorSignal: humanAnchorSignal,
+            sealAggregate: sealAggregate,
+            lifecycleAggregate: lifecycleAggregate,
+            narrativeDistortion: narrativeDistortion,
+            anomalyTrace: anomalyTrace,
+            abyssalBranches: abyssalBranches,
+            unknownReserve: unknownReserve,
+            forbiddenAggregate: forbiddenAggregate,
+            kunlunAxisAlignment: kunlunAxisAlignment,
+            jadeCanonVerification: jadeCanonVerification,
+            jadeCanonObjectClass: jadeCanonObjectClass,
+            riverOriginLineage: riverOriginLineage,
+            yaochiAccess: yaochiAccess,
+            yaochiSanctumClass: yaochiSanctumClass,
+            tianmenReadiness: tianmenReadiness,
+            tianmenGateClass: tianmenGateClass,
+            tianmenPassState: tianmenPassState,
+            escalationSuppressionCodes:
+                escalationSuppressionCodes,
+            kunlunAxisView: kunlunAxisView,
+            kunlunTianmenWarrant: kunlunTianmenWarrant,
+            kunlunGateDenialWrit: kunlunGateDenialWrit,
+            layerReconciliationVerdict:
+                layerReconciliationVerdict,
+            layerReconciliationReport:
+                layerReconciliationReport,
+            presenceObservationBundle:
+                presenceObservationBundle,
+            decompositionObservationBundle:
+                decompositionObservationBundle,
+            softHandObservationBundle:
+                softHandObservationBundle,
+            leaseLifeObservationBundle:
+                leaseLifeObservationBundle,
+            hostConstitutionObservationBundle:
+                hostConstitutionObservationBundle,
+            thoughtFoldObservationBundle:
+                thoughtFoldObservationBundle,
+            neuralOrganObservationBundle:
+                neuralOrganObservationBundle,
+            hippocampalMemoryObservationBundle:
+                hippocampalMemoryObservationBundle,
+            worldPriorObservationBundle:
+                worldPriorObservationBundle,
+            riskObservationBundle: riskObservationBundle,
+            updateTicketObservationBundle:
+                updateTicketObservationBundle,
+            cosmicScaleView: cosmicScaleView,
+            ontologyFog: ontologyFog,
+            ontologyShiftMark: ontologyShiftMark,
+            abyssalRunMode: abyssalRunMode,
+            abyssBudget: abyssBudget,
+            cthulhuAssertionCeilingReasonCodes:
+                cthulhuAssertionCeilingReasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                cthulhuPermitEscalationReasonCodes,
+            memoryTemperatureLayer: memoryTemperatureLayer,
+            // 18 Kunlun fields unpacked from the block —
+            // accessor pass-through PROOF lives in
+            // BASAuditObservationProjectionsKunlunInputs
+            // Tests.testPassThroughAccessorsMirrorUnderlying
+            // Trios。
+            ascentLease: kunlunInputs.ascentLease,
+            axisDeviation: kunlunInputs.axisDeviation,
+            gatePressure: kunlunInputs.gatePressure,
+            yaochiMemoryLayer:
+                kunlunInputs.yaochiMemoryLayer,
+            tianhengProfile:
+                kunlunInputs.tianhengProfile,
+            jadePermitGrade:
+                kunlunInputs.jadePermitGrade,
+            ascentBranches:
+                kunlunInputs.ascentBranches,
+            restSteps: kunlunInputs.restSteps,
+            returnPaths: kunlunInputs.returnPaths,
+            jadeCasket: kunlunInputs.jadeCasket,
+            jadeRefinementTickets:
+                kunlunInputs.jadeRefinementTickets,
+            jadeFidelityMap:
+                kunlunInputs.jadeFidelityMap,
+            hostJadeRegister:
+                kunlunInputs.hostJadeRegister,
+            jadeMirrorDraft:
+                kunlunInputs.jadeMirrorDraft,
+            kunlunUnnamableSet:
+                kunlunInputs.kunlunUnnamableSet,
+            narrativeDistortionMap: narrativeDistortionMap,
+            sealedMemory: sealedMemory,
+            humanAnchorProfile: humanAnchorProfile,
+            abyssalOrganAlias: abyssalOrganAlias,
+            kunlunAscentView:
+                kunlunInputs.kunlunAscentView,
+            kunlunFarWestReserve:
+                kunlunInputs.kunlunFarWestReserve,
+            cthulhuSurfaceAlias: cthulhuSurfaceAlias,
+            kunlunSurfaceAlias: kunlunSurfaceAlias)
+    }
 }
 
 // MARK: - M436.4 — bundle-form audit emission overload
