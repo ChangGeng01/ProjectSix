@@ -710,31 +710,21 @@ public struct BASEBrainRuntimeCoordinator {
             activeKillSwitches: request.activeKillSwitches
         )
 
-        let routedBudget = BASBudgetFrame(
-            schemaVersion: plannedBudget.schemaVersion,
-            runMode: plannedBudget.runMode,
-            maxLoops: plannedBudget.maxLoops,
-            maxCandidates: plannedBudget.maxCandidates,
-            maxDecodeTokens: plannedBudget.maxDecodeTokens,
-            retrievalDepth: plannedBudget.retrievalDepth,
-            precisionProfile: plannedBudget.precisionProfile,
-            deviceRoute: powerClockService.routeDevice(
-                deviceState: request.deviceState,
-                budget: plannedBudget
-            ),
-            thermalGuardLevel: plannedBudget.thermalGuardLevel,
-            maintenanceAllowed: powerClockService.scheduleMaintenance(
-                deviceState: request.deviceState,
-                budget: plannedBudget
-            ),
-            leaseID: plannedBudget.leaseID,
-            leaseExpiresAt: plannedBudget.leaseExpiresAt,
-            maintenanceClass: plannedBudget.maintenanceClass,
-            wakeIntentID: plannedBudget.wakeIntentID,
-            allowedHeads: plannedBudget.allowedHeads,
-            policyBundleVersion: plannedBudget.policyBundleVersion,
-            policyDecisionIDs: plannedBudget.policyDecisionIDs
-        )
+        // chapter 五百十 / M1419 — routedBudget fold。
+        // 25-line inline BASBudgetFrame construction
+        // collapses to typed factory call + 2 power
+        // ClockService callbacks at the call site。
+        let routedBudget = BASRoutedBudgetFactory
+            .routedBudget(
+                plannedBudget: plannedBudget,
+                deviceRoute: powerClockService
+                    .routeDevice(
+                        deviceState: request.deviceState,
+                        budget: plannedBudget),
+                maintenanceAllowed: powerClockService
+                    .scheduleMaintenance(
+                        deviceState: request.deviceState,
+                        budget: plannedBudget))
 
         let hostContext = hostProfileService.resolveHost(
             hostID: request.hostID,
