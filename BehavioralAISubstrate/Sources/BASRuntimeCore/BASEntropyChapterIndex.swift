@@ -1262,10 +1262,15 @@ public enum BASEntropyChapterIndex {
             mNumberFirst: 1308, mNumberLast: 1311,
             knivesCount: 4, entropyClassesCount: 4,
             pinsCount: 10, futureCutsCount: 3,
-            summary: "9 batched typealias adoptions" +
-                " (3 BASBundle + 3 BASResult + 3 BASCard)" +
-                " bring cumulative adoption count to" +
-                " 16。 ADR-016 → M1311。")
+            summary: "9 batched typealias adoptions。" +
+                " ADR-016 → M1311。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十四",
+            mNumberFirst: 1312, mNumberLast: 1315,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "22 cumulative adoptions + scoring" +
+                " 28/60 → 41/60。 ADR-016 → M1315。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

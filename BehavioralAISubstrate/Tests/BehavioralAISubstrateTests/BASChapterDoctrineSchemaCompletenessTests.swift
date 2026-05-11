@@ -1313,7 +1313,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百八十三")!)
+                            "chapter 四百八十三")!),
+            // M1315 22 cumulative + scoring update
+            checkRegistry("四百八十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百八十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1673,6 +1679,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百八十三")!
+                .mNumberLast),
+            // M1315 chapter 484
+            ("484",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百八十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

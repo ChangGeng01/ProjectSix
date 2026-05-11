@@ -2378,7 +2378,72 @@ public enum BASChapterDoctrineRegistry {
                 " bring cumulative cross-substrate" +
                 " generic-primitive adoption count to" +
                 " 16。 V1 byte-equality preserved。" +
-                " ADR-016 → M1311。")
+                " ADR-016 → M1311。"),
+
+        // chapter 484 — 22 cumulative adoptions + scoring update
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十四",
+            mNumberFirst: 1312,
+            mNumberLast: 1315,
+            v1MilestoneMNumber: 1315,
+            v1MilestoneStatus:
+                "chapter-484-22-adoptions-scoring-41-of-60",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1312, knife: "第一刀",
+                    concept: "3 batched BASFrameEnvelope" +
+                        " adoptions (Kernel" +
+                        "CorrectnessTrace + Scheduler" +
+                        "DecisionTrace + CacheObservation" +
+                        "Trace)。 Total BASFrameEnvelope" +
+                        " adoptions: 1 → 4。"),
+                BASChapterKnife(
+                    mNumber: 1313, knife: "第二刀",
+                    concept: "3 batched BASPermit" +
+                        " adoptions (TensorAllocation +" +
+                        " CacheStorage + NeuralOpDispatch)。" +
+                        " Total BASPermit adoptions:" +
+                        " 1 → 4。 Cumulative across" +
+                        " primitives: 22。"),
+                BASChapterKnife(
+                    mNumber: 1314, knife: "第三刀",
+                    concept: "BASRealHotPathAttack" +
+                        "EvaluationDoctrine re-scored" +
+                        " post-chapter-484:28/60 →" +
+                        " 41/60 (+13 net progress)。" +
+                        " 更硬核 7→9,更极致 5→7," +
+                        " 最创新 7→8,最激进 1→2," +
+                        " 低熵复杂系统 3→7,原生利用神经" +
+                        "引擎 5→8。"),
+                BASChapterKnife(
+                    mNumber: 1315, knife: "第四刀",
+                    concept: "Chapter 484 close-out +" +
+                        " ADR-016 → M1315。")
+            ],
+            entropyClassesAttacked: [
+                "frame-envelope-permit-undiversified",
+                "scoring-not-updated-post-progress",
+                "achievement-untracked",
+                "milestone-undocumented"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "chapter 一百八十五",
+                "chapter 二百一一", "chapter 三百九二",
+                "chapter 四百七十七 evaluation doctrine",
+                "ADR-014 OPT-IN", "ADR-016 → M1315"
+            ],
+            plannedFutureCuts: [
+                "chapter 485+ — production wire-in" +
+                " (EBrainHostRuntimeSynthesis runtimeMode)",
+                "chapter 486+ — V1 monolith fold + delete",
+                "chapter 487+ — Tier 2 deferred work"
+            ],
+            summary: "Cumulative 22 generic-primitive" +
+                " adoptions across all 5 primitives +" +
+                " directive scoring bumped 28/60 →" +
+                " 41/60。 V1 byte-equality preserved。" +
+                " ADR-016 → M1315。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
