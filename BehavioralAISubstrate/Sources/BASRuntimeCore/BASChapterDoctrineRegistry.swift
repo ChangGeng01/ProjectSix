@@ -3872,7 +3872,87 @@ public enum BASChapterDoctrineRegistry {
                 " (preserves M1377/M1378/M1370 invariants);" +
                 " hosts opt-in by constructing observers。" +
                 " ADR-014 OPT-IN preserved。 V1 byte-" +
-                "equality untouched。")
+                "equality untouched。"),
+
+        // chapter 504 — bundle aggregator wire-ins
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四",
+            mNumberFirst: 1393,
+            mNumberLast: 1396,
+            v1MilestoneMNumber: 1396,
+            v1MilestoneStatus:
+                "chapter-504-bundle-aggregator-wire-ins",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1393, knife: "第一刀",
+                    concept: "NEW BASMPSGraphCacheReport" +
+                        "Aggregator closes 5-stage wire-" +
+                        "in pipeline:M1369 body → M1371" +
+                        " probe → M1386 bundle → M1393" +
+                        " aggregator → M1374 result。" +
+                        " First multi-chapter typed-" +
+                        "surface composition in the" +
+                        " substrate。 37 typed surfaces。"),
+                BASChapterKnife(
+                    mNumber: 1394, knife: "第二刀",
+                    concept: "NEW BASKernelRouting" +
+                        "DecisionBundle (9th BASBundle<" +
+                        "Item> adoption) + observer wire-" +
+                        "in via snapshotAsBundle()。" +
+                        " 38 typed surfaces。"),
+                BASChapterKnife(
+                    mNumber: 1395, knife: "第三刀",
+                    concept: "NEW BASEBrainHostRuntime" +
+                        "ModeAdvisoryBundle (10th" +
+                        " BASBundle<Item> adoption) +" +
+                        " ledger wire-in via" +
+                        " snapshotAsBundle()。 39 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1396, knife: "第四刀",
+                    concept: "Chapter 504 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1396。 10 cumulative BASBundle" +
+                        "<Item> adoptions across the" +
+                        " substrate。 Wire-in pattern" +
+                        " stabilized:every typed surface" +
+                        " composes with a typed bundle" +
+                        " aggregator for Codable audit。")
+            ],
+            entropyClassesAttacked: [
+                "cache-report-result-untyped-aggregator",
+                "routing-decision-records-no-bundle",
+                "advisory-records-no-bundle",
+                "multi-stage-composition-unproven"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1396",
+                "5-stage-typed-composition-pipeline-proven",
+                "10-basbundle-adoptions-cumulative",
+                "v1-byte-equality-preserved"
+            ],
+            plannedFutureCuts: [
+                "future arc — production-side wire-in" +
+                " (host CI lane required for default-" +
+                " mode flip + V1 deletion)",
+                "future arc — actual LRU/TTL invalidation" +
+                " policy implementation",
+                "future arc — Tier C ADR-019 typed shape-" +
+                " specific generics (user approval gated)"
+            ],
+            summary: "Bundle aggregator wire-in push:" +
+                " M1374 cache report now reachable via" +
+                " 5-stage typed composition pipeline;" +
+                " M1389 routing observer + M1391 advisory" +
+                " ledger gain typed Codable bundle output" +
+                " via 9th + 10th BASBundle<Item> adoptions。" +
+                " 39 typed surfaces cumulative。 ADR-016" +
+                " → M1396。 10 BASBundle<Item> adoptions" +
+                " cumulative。 Wire-in pattern stabilized" +
+                " across the substrate。 ADR-014 OPT-IN" +
+                " preserved。 V1 byte-equality untouched。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

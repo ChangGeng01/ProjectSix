@@ -157,7 +157,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百",         // M1377-M1380 (最创新/原生神经引擎 — 3 typed policy surfaces)
         "chapter 五百一",       // M1381-M1383 (Tier 1 honest SEAL at 52/60)
         "chapter 五百二",       // M1385-M1388 (wire-in push:typed surfaces consumed)
-        "chapter 五百三"        // M1389-M1392 (observer wire-ins:3 more typed surfaces consumed)
+        "chapter 五百三",       // M1389-M1392 (observer wire-ins:3 more typed surfaces consumed)
+        "chapter 五百四"        // M1393-M1396 (bundle aggregator wire-ins:9th + 10th BASBundle)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -174,16 +175,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1392
+    public static let mNumberLast: Int = 1396
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1392)。 Bumped through chapter 503:433 → 437。
-    /// Chapter 503:observer wire-in push — 3 more typed
-    /// surfaces (M1370 advisory + M1377 classifier +
-    /// M1378 policy + M1373 statistics bundle + M1375
-    /// attempt card) now CONSUMED by 3 actor-isolated
-    /// observers (M1389 + M1390 + M1391)。
-    public static let commitsShipped: Int = 437
+    /// M1396)。 Bumped through chapter 504:437 → 441。
+    /// Chapter 504:bundle aggregator wire-ins — M1393
+    /// cache report 5-stage pipeline + M1394 routing
+    /// decision bundle (9th BASBundle) + M1395 advisory
+    /// bundle (10th BASBundle)。
+    public static let commitsShipped: Int = 441
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

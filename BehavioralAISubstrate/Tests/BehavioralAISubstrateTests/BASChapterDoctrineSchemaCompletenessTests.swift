@@ -1433,7 +1433,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百三")!)
+                            "chapter 五百三")!),
+            // M1396 chapter 504 — bundle aggregator wire-ins
+            checkRegistry("五百四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1953,6 +1959,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百三")!
+                .mNumberLast),
+            // M1396 chapter 504 — bundle aggregator wire-ins
+            ("504",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

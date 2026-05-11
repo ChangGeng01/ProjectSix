@@ -1470,7 +1470,19 @@ public enum BASEntropyChapterIndex {
                 " 36 typed surfaces cumulative。 ADR-016" +
                 " → M1392。 HONEST: production executor" +
                 " still doesn't consult observers" +
-                " (preserves chapter 498-500 invariants)。")
+                " (preserves chapter 498-500 invariants)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四",
+            mNumberFirst: 1393, mNumberLast: 1396,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Bundle aggregator wire-ins:" +
+                " M1393 cache report 5-stage pipeline +" +
+                " M1394 routing decision bundle (9th" +
+                " BASBundle) + M1395 advisory bundle" +
+                " (10th BASBundle)。 39 typed surfaces" +
+                " cumulative。 ADR-016 → M1396。 10" +
+                " BASBundle<Item> adoptions cumulative。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
