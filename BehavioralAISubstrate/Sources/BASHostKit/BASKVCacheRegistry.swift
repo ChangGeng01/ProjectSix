@@ -169,4 +169,29 @@ public actor BASKVCacheRegistry {
         return sessions.values
             .reduce(0) { $0 + $1.totalCachedTokens }
     }
+
+    // MARK: - chapter 五百二 / M1387 — typed snapshot
+
+    /// Capture a typed point-in-time observation of the
+    /// registry's current state。 Real consumption of the
+    /// M1385 invalidationPolicy wire-in + M1379 policy
+    /// enum。 Suitable for audit emission + Codable
+    /// replay。
+    ///
+    /// Honest scope:read-only。 No state mutation,no
+    /// invalidation triggered。 ADR-014 OPT-IN preserved。
+    public func snapshot(
+        recordedAtMs: Int64
+    ) -> BASKVCacheRegistryObservationSnapshot {
+        return BASKVCacheRegistryObservationSnapshot(
+            invalidationPolicy: invalidationPolicy,
+            sessionCount: sessions.count,
+            totalHits: hitCount,
+            totalMisses: missCount,
+            totalCachedBytes: sessions.values
+                .reduce(0) { $0 + $1.totalCachedBytes },
+            totalCachedTokens: sessions.values
+                .reduce(0) { $0 + $1.totalCachedTokens },
+            recordedAtMs: recordedAtMs)
+    }
 }
