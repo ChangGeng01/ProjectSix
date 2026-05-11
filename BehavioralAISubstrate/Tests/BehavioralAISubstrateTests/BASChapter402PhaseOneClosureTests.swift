@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1315",
-            "M1315:doctrine version reflects chapter 四百八十四 — 22 cumulative generic-primitive adoptions across all 5 primitives + directive scoring re-bump 28/60 → 41/60 (+13 net progress). ADR-014 OPT-IN preserved; V1 byte-equality preserved")
+            "ADR-016.M1319",
+            "M1319:doctrine version reflects chapter 四百八十五 — V1 monolith fold cluster A progress (12-of-18 declarations folded into 3 typed bundle factories). ADR-014 OPT-IN preserved; V1 byte-equality preserved via stress-sweep regression guard")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -2443,7 +2443,68 @@ public enum BASChapterDoctrineRegistry {
                 " adoptions across all 5 primitives +" +
                 " directive scoring bumped 28/60 →" +
                 " 41/60。 V1 byte-equality preserved。" +
-                " ADR-016 → M1315。")
+                " ADR-016 → M1315。"),
+
+        // chapter 485 — V1 cluster A fold expansion (12-of-18)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十五",
+            mNumberFirst: 1316,
+            mNumberLast: 1319,
+            v1MilestoneMNumber: 1319,
+            v1MilestoneStatus:
+                "chapter-485-v1-cluster-a-fold-12-of-18",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1316, knife: "第一刀",
+                    concept: "BASTurnAuditProjectionsKunlunHexa" +
+                        " — 6-projection fold factory" +
+                        " (yaochi + tianheng +" +
+                        " jadePermit + 3 per-candidate" +
+                        " arrays)。"),
+                BASChapterKnife(
+                    mNumber: 1317, knife: "第二刀",
+                    concept: "Coordinator splice for 6" +
+                        " declarations at lines 1258-" +
+                        "1289。 V1 monolith shrinks。" +
+                        " Stress-sweep regression guard" +
+                        " green。"),
+                BASChapterKnife(
+                    mNumber: 1318, knife: "第三刀",
+                    concept: "BASTurnAuditProjectionsKunlunTrioTwo" +
+                        " — 3 more late-stage Kunlun" +
+                        " projections folded (casket +" +
+                        " refinement + fidelity)。 V1" +
+                        " fold:9 → 12 of 18。"),
+                BASChapterKnife(
+                    mNumber: 1319, knife: "第四刀",
+                    concept: "Chapter 485 close-out。" +
+                        " V1 fold cluster-A 67% complete" +
+                        " (12-of-18 declarations)。 ADR-" +
+                        "016 → M1319。")
+            ],
+            entropyClassesAttacked: [
+                "v1-monolith-only-3-folded-entropy",
+                "cluster-a-incomplete",
+                "fold-pattern-not-scaled",
+                "monolith-loc-shrinkage-stalled"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "chapter 一百八十五",
+                "chapter 二百一一", "chapter 三百九二",
+                "ADR-014 OPT-IN", "ADR-016 → M1319"
+            ],
+            plannedFutureCuts: [
+                "chapter 486+ — V1 cluster A final 6" +
+                " declarations + cluster B fold",
+                "chapter 487+ — V1 monolith DELETION",
+                "chapter 488+ — Tier 1 achievement doctrine"
+            ],
+            summary: "V1 monolith fold cluster A at" +
+                " 12-of-18 declarations (67%)。 2 new" +
+                " bundle factories shipped。 V1 byte-" +
+                "equality preserved via stress-sweep" +
+                " regression guard。 ADR-016 → M1319。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
