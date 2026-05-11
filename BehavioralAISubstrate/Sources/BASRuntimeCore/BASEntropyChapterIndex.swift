@@ -1248,7 +1248,17 @@ public enum BASEntropyChapterIndex {
             summary: "Phase D start — 1st BASResult +" +
                 " 1st BASCard + 1st BASFrameEnvelope" +
                 " adoptions。 4-of-5 primitives in" +
-                " production。 ADR-016 → M1303。")
+                " production。 ADR-016 → M1303。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百八十二",
+            mNumberFirst: 1304, mNumberLast: 1307,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "5-of-5 primitive coverage" +
+                " (1st BASPermit) + cross-turn KV" +
+                " cache substrate surface" +
+                " (BASTransformerKVCacheSession +" +
+                " BASKVCacheRegistry)。 ADR-016 → M1307。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

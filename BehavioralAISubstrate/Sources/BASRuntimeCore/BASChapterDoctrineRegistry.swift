@@ -2252,7 +2252,71 @@ public enum BASChapterDoctrineRegistry {
             summary: "Phase D start — 3 NEW generic-" +
                 "primitive typealias adoptions covering" +
                 " BASResult + BASCard + BASFrameEnvelope。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+
+        // chapter 482 — 5-of-5 primitive coverage + KV cache surface
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百八十二",
+            mNumberFirst: 1304,
+            mNumberLast: 1307,
+            v1MilestoneMNumber: 1307,
+            v1MilestoneStatus:
+                "chapter-482-5-of-5-primitive-plus-kv-cache-surface",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1304, knife: "第一刀",
+                    concept: "First BASPermit<Decision>" +
+                        " adoption:BASKernelDispatchPermit。" +
+                        " Closes 5-of-5 generic primitive" +
+                        " coverage。 4 PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1305, knife: "第二刀",
+                    concept: "BASTransformerKVCacheSession" +
+                        " typed surface — closes chapter" +
+                        " 477 deep-review '最创新 cross-" +
+                        "turn KV cache none' gap。 Per-" +
+                        "layer caches + explicit/LRU" +
+                        " invalidation enum + Codable" +
+                        " for persistence。 7 PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1306, knife: "第三刀",
+                    concept: "BASKVCacheRegistry actor —" +
+                        " per-session cache management with" +
+                        " hit-ratio observation。 Explicit-" +
+                        "only invalidation (LRU deferred" +
+                        " Tier 2)。 7 PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1307, knife: "第四刀",
+                    concept: "Chapter 482 close-out +" +
+                        " Phase 2 bump + ADR-016 → M1307。" +
+                        " 5-of-5 primitives in production" +
+                        " + cross-turn KV cache surface" +
+                        " shipped。")
+            ],
+            entropyClassesAttacked: [
+                "five-of-five-primitive-incomplete",
+                "no-cross-turn-kv-cache-surface",
+                "kv-state-recomputed-every-turn",
+                "session-cache-management-untyped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "chapter 一百八十五",
+                "chapter 二百一一", "chapter 三百九二",
+                "chapter 四百二十九 5-of-5 adoption",
+                "ADR-014 OPT-IN", "ADR-016 → M1307"
+            ],
+            plannedFutureCuts: [
+                "chapter 483+ — production wire-in of" +
+                " KV cache + scheduler awareness",
+                "chapter 484+ — default mode flip" +
+                " preparation",
+                "chapter 485+ — V1 monolith cluster A fold"
+            ],
+            summary: "5-of-5 primitive coverage achieved" +
+                " + cross-turn KV cache substrate surface" +
+                " shipped。 4 cuts (M1304-M1307)。 V1" +
+                " byte-equality preserved。 ADR-016 → M1307。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
