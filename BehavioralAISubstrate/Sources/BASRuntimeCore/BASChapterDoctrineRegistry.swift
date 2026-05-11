@@ -2905,7 +2905,99 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1347。 V1 byte-equality" +
                 " preserved。 Doctrine drift acknowledged:" +
                 " ~50% more fold work remains than" +
-                " 'cluster B 87.5%' framing implied。")
+                " 'cluster B 87.5%' framing implied。"),
+
+        // chapter 493 — downstream Kunlun fold (axis + seal/river)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 四百九十三",
+            mNumberFirst: 1348,
+            mNumberLast: 1352,
+            v1MilestoneMNumber: 1352,
+            v1MilestoneStatus:
+                "chapter-493-downstream-kunlun-fold",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1348, knife: "第一刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "KunlunAxisProtocol — folds" +
+                        " kunlunAxisForAudit + kunlunMatched" +
+                        " + kunlunDeviationCodes +" +
+                        " kunlunAxisAlignmentForAudit (4" +
+                        " declarations) + heavy M583 per-" +
+                        "turn predicate logic into typed" +
+                        " factory。 11 bundle factories" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1349, knife: "第二刀",
+                    concept: "Splice axis fold into V1" +
+                        " coordinator — 101-line block" +
+                        " collapses to 33-line factory" +
+                        " call + 4 alias bindings。 V1" +
+                        " byte-equality preserved per" +
+                        " stress-sweep dual-mode regression" +
+                        " guard。"),
+                BASChapterKnife(
+                    mNumber: 1350, knife: "第三刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "KunlunSealRiver — folds" +
+                        " kunlunJadeSealForAudit +" +
+                        " kunlunJadeVerificationForAudit +" +
+                        " kunlunRiverTraceForAudit +" +
+                        " kunlunRiverLineageForAudit (4" +
+                        " declarations) + 2 heavy inline" +
+                        " struct constructions。 M404 jade" +
+                        " canon §4.2 + M405 river origin" +
+                        " §4.5 semantics preserved。 12" +
+                        " bundle factories cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1351, knife: "第四刀",
+                    concept: "Splice seal+river fold into" +
+                        " V1 coordinator — ~73-line block" +
+                        " collapses to ~35-line factory" +
+                        " call + 4 alias bindings。 V1" +
+                        " byte-equality preserved。"),
+                BASChapterKnife(
+                    mNumber: 1352, knife: "第五刀",
+                    concept: "Chapter 493 close-out +" +
+                        " doctrine sync。 ADR-016 → M1352。" +
+                        " 8 ForAudit declarations folded" +
+                        " this chapter。 Coordinator net" +
+                        " LOC reduction: ~100 lines。" +
+                        " Remaining ~52 declarations" +
+                        " queued for chapter 494+。")
+            ],
+            entropyClassesAttacked: [
+                "kunlun-axis-inline-construction-entropy",
+                "kunlun-predicate-inline-entropy",
+                "kunlun-seal-river-inline-entropy",
+                "coordinator-monolith-line-count-drift"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1352",
+                "stress-sweep-dual-mode-300-turn-0-divergence"
+            ],
+            plannedFutureCuts: [
+                "chapter 494+ — yaochi/heavenGate/axisView/" +
+                "tianmenWarrant/gateDenialWrit folds" +
+                " (~10 declarations + 5 inline constructions)",
+                "chapter 495+ — Permit fold (6" +
+                " boundActionPermit rebinds)",
+                "chapter 496+ — V1 deletion"
+            ],
+            summary: "Downstream Kunlun cluster B fold:" +
+                " axis + seal + river origin。 8 ForAudit" +
+                " declarations + 3 inline struct" +
+                " constructions + heavy predicate logic" +
+                " collapsed into 2 typed factories。 12" +
+                " bundle factories cumulative。 ADR-016 →" +
+                " M1352。 V1 byte-equality preserved across" +
+                " stress-sweep dual-mode canonical60。" +
+                " Coordinator monolith reduced by ~100" +
+                " lines net。 Honest accounting: ~52 of" +
+                " 66 cluster B declarations still remain;" +
+                " fold trajectory continues chapter 494+。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

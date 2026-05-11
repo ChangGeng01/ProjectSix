@@ -1330,7 +1330,17 @@ public enum BASEntropyChapterIndex {
             summary: "Surface trio fold + HONEST scope" +
                 " correction:66 ForAudit declarations" +
                 " remain in coordinator。 10 bundle" +
-                " factories cumulative。 ADR-016 → M1347。")
+                " factories cumulative。 ADR-016 → M1347。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十三",
+            mNumberFirst: 1348, mNumberLast: 1352,
+            knivesCount: 5, entropyClassesCount: 4,
+            pinsCount: 7, futureCutsCount: 3,
+            summary: "Downstream Kunlun fold:axis +" +
+                " seal/river。 8 ForAudit declarations" +
+                " folded + ~100 V1 LOC reduction。 12" +
+                " bundle factories cumulative。 ADR-016" +
+                " → M1352。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
