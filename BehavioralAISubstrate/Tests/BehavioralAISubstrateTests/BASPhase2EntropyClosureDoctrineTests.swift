@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs496() {
+    func testLastChapterIs497() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 四百九十六",
-            "M1364 chapter 四百九十六:Tier 2 entry —" +
-            " ssmScan stub + status enum + 8-of-8" +
-            " coverage snapshot。 16 typed surfaces" +
-            " cumulative;V1 byte-equality untouched。" +
-            " HONEST SCOPE: production ssmScan kernel" +
-            " is Tier 2 phase K external work")
+            "chapter 四百九十七",
+            "M1368 chapter 四百九十七:REAL HOT-PATH" +
+            " ATTACK SEALED at honest 47/60 (~78%)。" +
+            " ADR-019 typed proposal + Tier 2 doctrine" +
+            " + Seal doctrine。 19 typed surfaces" +
+            " cumulative。 13-point gap to 60/60" +
+            " typed-attributed via 6 external blockers")
     }
 
     // MARK: - M-number range

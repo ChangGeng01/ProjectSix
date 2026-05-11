@@ -1376,7 +1376,20 @@ public enum BASEntropyChapterIndex {
                 " stub)。 16 typed surfaces cumulative。" +
                 " ADR-016 → M1364。 HONEST SCOPE: ssmScan" +
                 " production = external Metal shader /" +
-                " MLX / CoreML work (Tier 2 phase K)。")
+                " MLX / CoreML work (Tier 2 phase K)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 四百九十七",
+            mNumberFirst: 1365, mNumberLast: 1368,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK SEALED:" +
+                " ADR-019 typed proposal +" +
+                " BASTier2AchievementDoctrine +" +
+                " BASRealHotPathAttackSealDoctrine。" +
+                " Final aggregate 47/60 (~78%)。 13-" +
+                " point gap to 60/60 typed via 6" +
+                " external blockers。 19 typed surfaces" +
+                " cumulative。 ADR-016 → M1368。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

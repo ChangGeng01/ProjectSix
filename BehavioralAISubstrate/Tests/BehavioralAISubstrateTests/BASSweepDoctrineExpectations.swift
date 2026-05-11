@@ -117,18 +117,19 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 94
+    public static let phase2ChapterCount: Int = 95
 
-    /// Phase 2 commits shipped。 At M1364:
-    /// 125 + 84 + 201 = 410 (chapter 496 = 4 cuts —
-    /// ssmScan stub + status enum + coverage snapshot
-    /// + close-out — Tier 2 entry)
-    public static let phase2CommitsShipped: Int = 410
+    /// Phase 2 commits shipped。 At M1368:
+    /// 125 + 84 + 205 = 414 (chapter 497 = 4 cuts —
+    /// ADR-019 typed proposal + Tier 2 doctrine + seal
+    /// doctrine + close-out — REAL HOT-PATH ATTACK
+    /// SEALED)
+    public static let phase2CommitsShipped: Int = 414
 
-    /// Phase 2 mNumberLast。 At M1364:chapter 496
-    /// (Tier 2 entry — ssmScan stub + coverage)。 SWEEP
-    /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1364
+    /// Phase 2 mNumberLast。 At M1368:chapter 497
+    /// (REAL HOT-PATH ATTACK to 100% SEALED at honest
+    /// 47/60 ~78%)。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1368
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

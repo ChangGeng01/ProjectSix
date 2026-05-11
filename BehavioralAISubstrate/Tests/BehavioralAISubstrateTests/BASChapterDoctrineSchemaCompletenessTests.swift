@@ -1391,7 +1391,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 四百九十六")!)
+                            "chapter 四百九十六")!),
+            // M1368 REAL HOT-PATH ATTACK SEALED
+            checkRegistry("四百九十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 四百九十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -1855,6 +1861,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 四百九十六")!
+                .mNumberLast),
+            // M1368 chapter 497 — REAL HOT-PATH ATTACK SEALED
+            ("497",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 四百九十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -98,12 +98,13 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// + 479 Phase B + 480 Phase C + 481-491 cluster
     /// A/B folds + 492 surface trio + 493 downstream
     /// Kunlun fold + 494 Tianmen trio + gate-side
-    /// axis-protocol reuse + 495 permit pipeline
-    /// typed-surface ship + 496 Tier 2 entry ssmScan
-    /// stub + coverage snapshot)。 Re-captured at chapter
-    /// 496 close-out。 HONEST SCOPE for chapter 496:
-    /// ssmScan kernel STUB only;production = external
-    /// Metal shader / MLX / CoreML work (Tier 2 phase K)。
+    /// axis-protocol reuse + 495 permit pipeline +
+    /// 496 Tier 2 entry + 497 REAL HOT-PATH ATTACK
+    /// SEALED)。 Re-captured at chapter 497 close-out。
+    /// HONEST FINAL: arc 474-497 sealed at 47/60 (~78%)
+    /// with 13-point gap typed-attributed via 6 external
+    /// blockers (BASRealHotPathAttackSealDoctrine
+    /// .externalBlockers)。
     static let frozenFullRegistrySha256: String =
-        "7f75abd42a8ae5b79ae4d4f339ac82012d8715a94040a3f9b687d8eb6f13e840"
+        "6253c2ee2fdfb946fb7821cbc2553f0440977082f0e2501f76bb91dbe63b91f7"
 }
