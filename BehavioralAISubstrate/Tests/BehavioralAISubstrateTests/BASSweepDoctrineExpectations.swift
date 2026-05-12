@@ -117,20 +117,21 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 123
+    public static let phase2ChapterCount: Int = 124
 
-    /// Phase 2 commits shipped。 At M1480:
-    /// 125 + 84 + 316 = 525 (chapter 525 = 4 cuts —
-    /// 2nd BASEBrainTurnResult cluster bundle:
-    /// sovereign 8 fields + 2-bundle init + V1 splice
-    /// + close-out)
-    public static let phase2CommitsShipped: Int = 525
+    /// Phase 2 commits shipped。 At M1484:
+    /// 125 + 84 + 320 = 529 (chapter 526 = 4 cuts —
+    /// 3rd BASEBrainTurnResult cluster bundle:audit-
+    /// projection-forward 7 fields + 3-bundle init +
+    /// V1 splice + close-out)
+    public static let phase2CommitsShipped: Int = 529
 
-    /// Phase 2 mNumberLast。 At M1480:chapter 525
-    /// (2nd BASEBrainTurnResult cluster bundle —
-    /// sovereign 8 fields,V1 call site 52 → 36 args
-    /// cumulative)。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1480
+    /// Phase 2 mNumberLast。 At M1484:chapter 526
+    /// (3rd BASEBrainTurnResult cluster bundle —
+    /// audit-projection-forward 7 fields,V1 call site
+    /// 52 → 29 args cumulative across 3 typed bundles)。
+    /// SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1484
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

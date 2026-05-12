@@ -1565,7 +1565,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百二十五")!)
+                            "chapter 五百二十五")!),
+            // M1484 chapter 526 — audit-projection-forward 3rd cluster
+            checkRegistry("五百二十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百二十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2261,6 +2267,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百二十五")!
+                .mNumberLast),
+            // M1484 chapter 526 — audit-projection-forward 3rd cluster
+            ("526",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

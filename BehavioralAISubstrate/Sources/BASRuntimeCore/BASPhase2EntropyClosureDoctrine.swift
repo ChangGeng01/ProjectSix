@@ -179,7 +179,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百二十二",   // M1465-M1468 (100% V1 packaging coverage — 8th + FINAL input block + 8-block init + V1 splice, 69 fields across 8 surfaces, V1 call site 118 → 60 LOC = 49% reduction)
         "chapter 五百二十三",   // M1469-M1472 (12-chapter arc typed milestone doctrine + 8 anti-drift PROOF tests + 3 e2e PROOF tests for 100% packaging coverage + replay-determinism)
         "chapter 五百二十四",   // M1473-M1476 (PIVOT to BASEBrainTurnResult fold — typed evolution bundle + convenience init + V1 splice using bundle)
-        "chapter 五百二十五"    // M1477-M1480 (2nd BASEBrainTurnResult cluster bundle — sovereign 8 fields + 2-bundle init + V1 splice, 52 → 36 args cumulative)
+        "chapter 五百二十五",   // M1477-M1480 (2nd BASEBrainTurnResult cluster bundle — sovereign 8 fields + 2-bundle init + V1 splice, 52 → 36 args cumulative)
+        "chapter 五百二十六"    // M1481-M1484 (3rd BASEBrainTurnResult cluster bundle — audit-projection-forward 7 fields + 3-bundle init + V1 splice, 52 → 29 args cumulative)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -196,16 +197,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1480
+    public static let mNumberLast: Int = 1484
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1480)。 Bumped through chapter 525:521 → 525。
-    /// Chapter 525:2nd BASEBrainTurnResult cluster
-    /// bundle (sovereign,8 fields) — M1477 bundle +
-    /// M1478 2-bundle init + M1479 V1 splice + M1480
-    /// close-out。 BASEBrainTurnResult call site:52 →
-    /// 36 args (16 args collapsed cumulative)。
-    public static let commitsShipped: Int = 525
+    /// M1484)。 Bumped through chapter 526:525 → 529。
+    /// Chapter 526:3rd BASEBrainTurnResult cluster
+    /// bundle (audit-projection-forward,7 fields) —
+    /// M1481 bundle + M1482 3-bundle init + M1483 V1
+    /// splice + M1484 close-out。 BASEBrainTurnResult
+    /// call site:52 → 29 args (23 args collapsed
+    /// across 3 typed bundles)。
+    public static let commitsShipped: Int = 529
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

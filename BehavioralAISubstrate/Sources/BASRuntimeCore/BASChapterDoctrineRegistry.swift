@@ -5938,7 +5938,113 @@ public enum BASChapterDoctrineRegistry {
                 " 71 typed surfaces cumulative。 ADR-016" +
                 " → M1480。 V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved (public API" +
-                " additive only)。")
+                " additive only)。"),
+
+        // chapter 526 — 3rd cluster bundle (audit-
+        //               projection-forwarded)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十六",
+            mNumberFirst: 1481,
+            mNumberLast: 1484,
+            v1MilestoneMNumber: 1484,
+            v1MilestoneStatus:
+                "chapter-526-3rd-turnresult-cluster-bundle",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1481, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "AuditProjectionForwardBundle —" +
+                        " 3rd cluster bundle for the" +
+                        " BASEBrainTurnResult fold。" +
+                        " Packages 7 audit-projection-" +
+                        "forwarded fields:4 M578" +
+                        " projections (kunlunAxisAlignment" +
+                        " + humanAnchorSignal +" +
+                        " abyssalPressure +" +
+                        " unknownReserve) + 3 M581" +
+                        " schema fields" +
+                        " (kunlunHeavenGatePermit +" +
+                        " kunlunRiverOriginTrace +" +
+                        " yaochiSanctumEntry)。 72 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1482, knife: "第二刀",
+                    concept: "BASEBrainTurnResult 3-" +
+                        "bundle convenience init taking" +
+                        " evolution + sovereign +" +
+                        " auditProjectionForward bundles。" +
+                        " Collapses 25 individual args" +
+                        " (10 + 8 + 7) into 3 typed" +
+                        " bundle args。 Delegates to" +
+                        " 2-bundle init with forwarded" +
+                        " fields unpacked。"),
+                BASChapterKnife(
+                    mNumber: 1483, knife: "第三刀",
+                    concept: "V1 monolith splice uses" +
+                        " auditProjectionForwardBundle。" +
+                        " 7 named-arg lines (4 M578" +
+                        " projections + 3 M581 schema)" +
+                        " collapse to 1 typed bundle" +
+                        " construction at the return-" +
+                        "statement call site。 Cumulative" +
+                        " BASEBrainTurnResult fold:25" +
+                        " args collapsed (10 + 8 + 7)" +
+                        " across 3 typed bundles。"),
+                BASChapterKnife(
+                    mNumber: 1484, knife: "第四刀",
+                    concept: "Chapter 526 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1484。 3-cluster bundle fold" +
+                        " progress at BASEBrainTurnResult" +
+                        " call site:52 → 29 named args" +
+                        " (23 args collapsed across" +
+                        " evolution + sovereign +" +
+                        " audit-projection-forward" +
+                        " bundles)。 V1 byte-equality" +
+                        " preserved。")
+            ],
+            entropyClassesAttacked: [
+                "BASEBrainTurnResult-audit-forward-7-args",
+                "v1-monolith-projection-forward-cluster-not-typed",
+                "M578-M581-7-schema-fields-not-bundled",
+                "3-cluster-fold-pattern-extension"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1484",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "public-api-additive-only"
+            ],
+            plannedFutureCuts: [
+                "future arc — host cluster bundle (5" +
+                " host* fields:hostConstitution +" +
+                " hostConstitutionVault + hostVersionTree" +
+                " + hostForgetRequest + hostContext)",
+                "future arc — runtime context cluster" +
+                " (contextFrame + decomposeFrame +" +
+                " memoryBundle + thoughtFrame + ...)",
+                "future arc — SampleHost wire-in of" +
+                " projection-block observer adapter",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 526 ships the 3rd cluster" +
+                " bundle for the BASEBrainTurnResult" +
+                " fold:BASEBrainTurnResultAudit" +
+                "ProjectionForwardBundle (7 audit-" +
+                "projection-forwarded fields) + 3-bundle" +
+                " convenience init + V1 monolith splice。" +
+                " Cumulative fold progress at" +
+                " BASEBrainTurnResult call site:52 →" +
+                " 29 named args (23 args collapsed" +
+                " across evolution + sovereign + audit-" +
+                "projection-forward bundles)。 72 typed" +
+                " surfaces cumulative。 ADR-016 → M1484。" +
+                " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved (public API additive" +
+                " only)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
