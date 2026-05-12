@@ -6829,7 +6829,101 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M1520。" +
                 " 104 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 536 — typed observability sink for
+        // silent-swallow paths
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十六",
+            mNumberFirst: 1521,
+            mNumberLast: 1524,
+            v1MilestoneMNumber: 1524,
+            v1MilestoneStatus:
+                "chapter-536-admit-failure-log-sink-wired",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1521, knife: "第一刀",
+                    concept: "NEW BASHostStorageInitial" +
+                        "AtomAdmitFailureLog actor +" +
+                        " BASHostStorageInitialAtom" +
+                        "AdmitFailureRecord struct。" +
+                        " Typed observability sink for" +
+                        " the M1517 silent-swallow paths" +
+                        " — Codable + Sendable +" +
+                        " Equatable + Hashable record;" +
+                        " actor-isolated record/snapshot" +
+                        " API。 82 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1522, knife: "第二刀",
+                    concept: "Wire BASHostStorageInitial" +
+                        "AtomAdmitFailureLog into" +
+                        " BASHostStorageWireBuilder via" +
+                        " new optional `failureLog:`" +
+                        " param on makeAtomStore +" +
+                        " makeBundle。 nil → behavior" +
+                        " unchanged (silent swallow);" +
+                        " non-nil → each catch records" +
+                        " to the actor sink。 ADR-014" +
+                        " OPT-IN preserved。"),
+                BASChapterKnife(
+                    mNumber: 1523, knife: "第三刀",
+                    concept: "7 PROOF tests:fresh log" +
+                        " empty + single record fields" +
+                        " + multi-record order + record" +
+                        " equality + Codable round-trip" +
+                        " + 50-parallel TaskGroup" +
+                        " Sendable concurrency PROOF。"),
+                BASChapterKnife(
+                    mNumber: 1524, knife: "第四刀",
+                    concept: "Chapter 536 close-out +" +
+                        " doctrine sync — the M1517" +
+                        " silent-swallow TODO is" +
+                        " resolved。 108 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "silent-error-swallow-no-observability",
+                "bootstrap-admission-failure-blackbox",
+                "TODO-marker-undone-by-typed-sink",
+                "host-error-handling-non-extendable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1524",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "user-error-handling-standard-honored"
+            ],
+            plannedFutureCuts: [
+                "future arc — SampleHost wire-in of the" +
+                " new failureLog parameter (production" +
+                " observability hook)",
+                "future arc — V1 monolith internal fold" +
+                " (typed bundle for remaining ForAudit" +
+                " declaration cluster patterns)",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 536 ships a typed" +
+                " observability sink resolving the M1517" +
+                " silent-swallow TODO:" +
+                " BASHostStorageInitialAtomAdmitFailure" +
+                "Log actor + Record struct (M1521) +" +
+                " wire-in to BASHostStorageWireBuilder" +
+                " makeAtomStore + makeBundle via" +
+                " optional `failureLog:` param (M1522)" +
+                " + 7 PROOF tests covering empty state +" +
+                " recording semantics + value semantics" +
+                " + Codable + Sendable concurrency" +
+                " (M1523)。 Default behavior unchanged" +
+                " (nil → silent swallow as documented)。" +
+                " 82 typed surfaces cumulative。 ADR-016" +
+                " → M1524。 108 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -1997,7 +1997,27 @@ public enum BASEntropyChapterIndex {
                 " 64 → 0 across chapters 534-535)。 81" +
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M1520。 V1 byte-equality preserved" +
-                " (pure cleanup,no behavioral change)。")
+                " (pure cleanup,no behavioral change)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十六",
+            mNumberFirst: 1521, mNumberLast: 1524,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Typed observability sink for the" +
+                " silent-swallow paths from chapter 535:" +
+                " BASHostStorageInitialAtomAdmitFailure" +
+                "Log actor + Record struct (M1521)" +
+                " wired into BASHostStorageWireBuilder" +
+                " makeAtomStore + makeBundle via" +
+                " optional `failureLog:` parameter" +
+                " (M1522) + 7 PROOF tests (M1523)。" +
+                " Default behavior unchanged (nil →" +
+                " silent swallow as documented at" +
+                " M1517);hosts opt in to observe" +
+                " admission failures。 The M1517 TODO" +
+                " is resolved。 82 typed surfaces" +
+                " cumulative。 ADR-016 → M1524。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

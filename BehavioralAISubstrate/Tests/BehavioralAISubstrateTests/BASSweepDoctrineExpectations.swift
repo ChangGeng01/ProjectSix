@@ -117,20 +117,19 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 133
+    public static let phase2ChapterCount: Int = 134
 
-    /// Phase 2 commits shipped。 At M1520:125 + 84 + 356
-    /// = 565 (chapter 535 = 4 cuts — substrate-wide
-    /// warning purge + typed milestone doctrine + 12
+    /// Phase 2 commits shipped。 At M1524:125 + 84 + 360
+    /// = 569 (chapter 536 = 4 cuts — typed observability
+    /// sink + wire-in to BASHostStorageWireBuilder + 7
     /// PROOF tests + close-out)
-    public static let phase2CommitsShipped: Int = 565
+    public static let phase2CommitsShipped: Int = 569
 
-    /// Phase 2 mNumberLast。 At M1520:chapter 535
-    /// (substrate-wide warning purge — substrate now
-    /// builds warning-free,cumulative 64 → 0 warnings
-    /// across chapters 534-535)。 SWEEP stays frozen at
-    /// 1163。
-    public static let phase2MNumberLast: Int = 1520
+    /// Phase 2 mNumberLast。 At M1524:chapter 536 (typed
+    /// observability sink for the silent-swallow paths
+    /// from chapter 535 — M1517 TODO resolved)。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1524
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

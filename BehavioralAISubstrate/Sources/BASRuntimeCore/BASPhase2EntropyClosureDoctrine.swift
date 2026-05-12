@@ -189,7 +189,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百三十二",   // M1505-M1508 (100% PACKAGING MILESTONE — 9th + FINAL BASEBrainTurnResult cluster bundle, forensic metadata 3 fields + 9-bundle init + V1 splice, ALL 52 fields collapsed across 9 typed bundles)
         "chapter 五百三十三",   // M1509-M1512 (BASEBrainTurnResultFoldArcSealedDoctrine typed milestone surface + 20 PROOF tests — fold arc sealed non-driftable)
         "chapter 五百三十四",   // M1513-M1516 (30-declaration dead-code purge from EBrainRuntimeCoordinator.swift + typed milestone doctrine + 11 PROOF tests — coordinator warning-free)
-        "chapter 五百三十五"    // M1517-M1520 (substrate-wide warning purge — 2 var→let + 2 try? discards fixed + typed milestone doctrine + 12 PROOF tests — substrate warning-free)
+        "chapter 五百三十五",   // M1517-M1520 (substrate-wide warning purge — 2 var→let + 2 try? discards fixed + typed milestone doctrine + 12 PROOF tests — substrate warning-free)
+        "chapter 五百三十六"    // M1521-M1524 (typed observability sink for silent-swallow paths — BASHostStorageInitialAtomAdmitFailureLog actor + wire-in to BASHostStorageWireBuilder + 7 PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -206,16 +207,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1520
+    public static let mNumberLast: Int = 1524
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1520)。 Bumped through chapter 535:561 → 565。
-    /// Chapter 535:substrate-wide warning purge — 2
-    /// var→let + 2 try? discards + typed milestone
-    /// doctrine + 12 PROOF tests + close-out。 Substrate-
-    /// wide build warning count 4 → 0 (cumulative 64 → 0
-    /// across chapters 534-535)。
-    public static let commitsShipped: Int = 565
+    /// M1524)。 Bumped through chapter 536:565 → 569。
+    /// Chapter 536:typed observability sink for the
+    /// silent-swallow paths from chapter 535 — actor +
+    /// record struct + wire-in to BASHostStorageWire
+    /// Builder + 7 PROOF tests + close-out。 The
+    /// M1517 TODO is resolved。
+    public static let commitsShipped: Int = 569
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

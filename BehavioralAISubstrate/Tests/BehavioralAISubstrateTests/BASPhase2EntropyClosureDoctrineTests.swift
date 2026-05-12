@@ -37,19 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs535() {
+    func testLastChapterIs536() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十五",
-            "Chapter 五百三十五:substrate-wide warning" +
-            " purge — 2 var→let + 2 try? discards fixed" +
-            " + BASSubstrateBuildWarningPurgeDoctrine" +
-            " typed milestone + 12 PROOF tests。" +
-            " Substrate now builds warning-free。" +
-            " Cumulative 64 → 0 warnings across" +
-            " chapters 534-535。 81 typed surfaces" +
-            " cumulative")
+            "chapter 五百三十六",
+            "Chapter 五百三十六:typed observability" +
+            " sink for the silent-swallow paths from" +
+            " chapter 535 — BASHostStorageInitialAtom" +
+            "AdmitFailureLog actor + Record struct +" +
+            " wire-in to BASHostStorageWireBuilder + 7" +
+            " PROOF tests。 The M1517 TODO is resolved。" +
+            " 82 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

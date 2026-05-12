@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1520",
-            "M1520:doctrine version reflects chapter 五百三十五 — substrate-wide warning purge (2 var→let + 2 try? discards → explicit do/catch at M1517) + BASSubstrateBuildWarningPurgeDoctrine typed milestone surface with WarningCategory typed enum (M1518) + 12 anti-drift PROOF tests (M1519)。 Substrate-wide build warning count 4 → 0 (cumulative 64 → 0 across chapters 534-535)。 81 typed surfaces cumulative。 V1 byte-equality preserved (pure cleanup;stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1524",
+            "M1524:doctrine version reflects chapter 五百三十六 — typed observability sink for the silent-swallow paths from chapter 535。 BASHostStorageInitialAtomAdmitFailureLog actor + Record struct (M1521) + wire-in to BASHostStorageWireBuilder makeAtomStore + makeBundle via optional `failureLog:` parameter (M1522) + 7 PROOF tests covering empty state + recording + value semantics + Codable + Sendable concurrency (M1523)。 Default behavior unchanged (nil → silent swallow as documented at M1517);hosts opt in to observe admission failures。 The M1517 TODO is resolved。 82 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
