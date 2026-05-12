@@ -85,7 +85,7 @@ import BASRuntimeCore
 /// `let *ForAudit` declarations with a single typed
 /// factory call。
 public struct BASTurnAuditProjectionsKunlunTrio:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
 
     /// L6 ascent-lease watcher projection。 Pure-derive

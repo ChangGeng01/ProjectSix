@@ -35,7 +35,9 @@ import Foundation
 import BASOrchestration
 import BASPolicy
 
-public struct BASTurnAuditProjectionsKunlunAxisProtocol: Sendable {
+public struct BASTurnAuditProjectionsKunlunAxisProtocol:
+    Codable, Equatable, Sendable
+{
 
     // MARK: - Folded fields
 

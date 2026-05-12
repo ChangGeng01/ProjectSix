@@ -35,7 +35,7 @@ import BASRuntimeCore
 /// shadow-local `let *ForAudit` declarations with a
 /// single typed factory call。
 public struct BASTurnAuditProjectionsAbyssalThermalTrio:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
 
     /// L1 abyssal-run-mode projection from runMode。
