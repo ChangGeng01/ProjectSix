@@ -9186,7 +9186,95 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1624。" +
                 " 208 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 562 — Continued real-substrate
+        // Codable extension to 5 more aggregator types
+        // (combined with chapter 561 = 8 aggregator
+        // types now ledger-serializable)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十二",
+            mNumberFirst: 1625,
+            mNumberLast: 1628,
+            v1MilestoneMNumber: 1628,
+            v1MilestoneStatus:
+                "chapter-562-five-more-aggregator-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1625, knife: "第一刀",
+                    concept: "Real substrate change:" +
+                        " add Codable + Equatable to" +
+                        " 5 more aggregator types" +
+                        " (SurfaceTrio +" +
+                        " GateSideDeriveTrio +" +
+                        " KunlunTrioTwo +" +
+                        " LifecycleQuartet +" +
+                        " KunlunTianmenTrio)。 Combined" +
+                        " with chapter 561 = 8" +
+                        " aggregator types now ledger-" +
+                        "serializable。"),
+                BASChapterKnife(
+                    mNumber: 1626, knife: "第二刀",
+                    concept: "10 PROOF tests:populated" +
+                        " round-trip + sortedKeys" +
+                        " determinism (2 tests per" +
+                        " type × 5 types)。"),
+                BASChapterKnife(
+                    mNumber: 1627, knife: "第三刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "FiveAggregatorCodableExtension" +
+                        "Doctrine typed surface。 typed-" +
+                        "surface count 102 → 103。"),
+                BASChapterKnife(
+                    mNumber: 1628, knife: "第四刀",
+                    concept: "Chapter 562 close-out +" +
+                        " doctrine sync。 212" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "5-aggregator-types-non-codable",
+                "8-aggregators-now-fully-covered",
+                "surface-trio-non-codable",
+                "lifecycle-quartet-non-codable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1628",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "5-more-aggregators-codable",
+                "8-aggregators-cumulative-codable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional Codable" +
+                " extension to remaining non-Codable" +
+                " aggregator types"
+            ],
+            summary: "Chapter 562 continues the real-" +
+                "substrate Codable extension from" +
+                " chapter 561。 5 more audit-projection" +
+                " aggregator types gained Codable +" +
+                " Equatable at M1625 (SurfaceTrio +" +
+                " GateSideDeriveTrio + KunlunTrioTwo +" +
+                " LifecycleQuartet + KunlunTianmenTrio)" +
+                " + 10 PROOF tests (M1626) +" +
+                " BASTurnAuditProjectionsFiveAggregator" +
+                "CodableExtensionDoctrine typed surface" +
+                " (M1627) + close-out (M1628)。" +
+                " Combined with chapter 561 = 8" +
+                " aggregator types now ledger-" +
+                "serializable for replay。 103 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1628。 212 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

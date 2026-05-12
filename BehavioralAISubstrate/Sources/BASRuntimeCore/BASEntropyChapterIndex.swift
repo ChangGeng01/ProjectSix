@@ -2487,7 +2487,25 @@ public enum BASEntropyChapterIndex {
                 " (M1623) + close-out (M1624)。 102" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1624。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十二",
+            mNumberFirst: 1625, mNumberLast: 1628,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CONTINUED REAL SUBSTRATE CHANGE" +
+                " — add Codable + Equatable to 5 more" +
+                " audit-projection aggregator types" +
+                " (SurfaceTrio + GateSideDeriveTrio +" +
+                " KunlunTrioTwo + LifecycleQuartet +" +
+                " KunlunTianmenTrio) at M1625。 10" +
+                " PROOF tests at M1626 + new typed" +
+                " surface (M1627) + close-out (M1628)。" +
+                " Combined with chapter 561 = 8" +
+                " aggregator types now ledger-" +
+                "serializable。 103 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1628。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

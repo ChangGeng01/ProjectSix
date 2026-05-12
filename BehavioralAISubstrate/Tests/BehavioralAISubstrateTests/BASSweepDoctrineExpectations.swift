@@ -116,21 +116,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1624:24 + 20 + 115 = 159 (chapter
-    /// 561 — real substrate change Codable extension
-    /// to 3 aggregator types)
-    public static let phase2ChapterCount: Int = 159
+    /// added)。 At M1628:24 + 20 + 116 = 160 (chapter
+    /// 562 — continued real substrate change Codable
+    /// extension to 5 more aggregator types)
+    public static let phase2ChapterCount: Int = 160
 
-    /// Phase 2 commits shipped。 At M1624:125 + 84 +
-    /// 460 = 669 (chapter 561 = 4 cuts — real substrate
-    /// Codable extension + 8 PROOF tests + typed
-    /// surface + close-out)
-    public static let phase2CommitsShipped: Int = 669
+    /// Phase 2 commits shipped。 At M1628:125 + 84 +
+    /// 464 = 673 (chapter 562 = 4 cuts — continued
+    /// real substrate Codable extension + 10 PROOF
+    /// tests + typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 673
 
-    /// Phase 2 mNumberLast。 At M1624:chapter 561 —
-    /// real substrate Codable extension to 3
-    /// aggregator types。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1624
+    /// Phase 2 mNumberLast。 At M1628:chapter 562 —
+    /// continued real substrate Codable extension to
+    /// 5 more aggregator types。 SWEEP stays frozen at
+    /// 1163。
+    public static let phase2MNumberLast: Int = 1628
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
