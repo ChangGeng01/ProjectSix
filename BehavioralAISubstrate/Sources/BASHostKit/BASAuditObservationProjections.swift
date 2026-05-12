@@ -576,6 +576,107 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
                 observationBundles.updateTicket)
     }
 
+    // MARK: - chapter 五百十七 / M1446 — unified 5-block
+    //                                    convenience init
+    //
+    // Single convenience init taking ALL FIVE typed input
+    // blocks (Kunlun + Cthulhu + ObservationBundles +
+    // KunlunProtocol + CthulhuAggregates) plus the
+    // residual ~6 scalar fields。 Collapses the 56-arg
+    // all-fields init into ~11 args at the call site (5
+    // blocks + ~6 residuals)。
+    //
+    // Byte-equality with the 4-block init GUARANTEED by
+    // body construction — the 7 Cthulhu aggregate fields
+    // are unpacked from the new block's accessors。
+    public init(
+        kunlunInputs:
+            BASAuditObservationProjectionsKunlunInputs,
+        cthulhuInputs:
+            BASAuditObservationProjectionsCthulhuInputs,
+        observationBundles:
+            BASAuditObservationProjectionsObservationBundlesBlock,
+        kunlunProtocolBlock:
+            BASAuditObservationProjectionsKunlunProtocolBlock,
+        cthulhuAggregatesBlock:
+            BASAuditObservationProjectionsCthulhuAggregatesBlock,
+        candidateObservationBundle:
+            BASCandidateObservationBundle? = nil,
+        tribunalObservationBundle:
+            BASTribunalObservationBundle? = nil,
+        unknownReserve: BASUnknownReserve? = nil,
+        forbiddenAggregate:
+            BASForbiddenKnowledgeCandidate.Aggregate? = nil,
+        escalationSuppressionCodes: [String] = [],
+        kunlunAxisView: BASKunlunAxisView? = nil,
+        kunlunTianmenWarrant: BASKunlunTianmenWarrant? = nil,
+        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil,
+        layerReconciliationVerdict:
+            BASObservationReconciliationVerdict? = nil,
+        layerReconciliationReport:
+            BASObservationReconciliationReport? = nil,
+        ontologyShiftMark: BASOntologyShiftMark? = nil,
+        cthulhuAssertionCeilingReasonCodes: [String] = [],
+        cthulhuPermitEscalationReasonCodes: [String] = [],
+        narrativeDistortionMap:
+            BASNarrativeDistortionMap? = nil,
+        cthulhuSurfaceAlias:
+            BASCthulhuSurfaceAlias? = nil,
+        kunlunSurfaceAlias:
+            BASKunlunSurfaceAlias? = nil
+    ) {
+        // Delegate to the 4-block unified init with the
+        // 7 Cthulhu aggregate fields unpacked from the
+        // cthulhuAggregatesBlock as named args。
+        self.init(
+            kunlunInputs: kunlunInputs,
+            cthulhuInputs: cthulhuInputs,
+            observationBundles: observationBundles,
+            kunlunProtocolBlock: kunlunProtocolBlock,
+            candidateObservationBundle:
+                candidateObservationBundle,
+            tribunalObservationBundle:
+                tribunalObservationBundle,
+            // 7 Cthulhu aggregate fields from
+            // cthulhuAggregatesBlock
+            abyssalPressure:
+                cthulhuAggregatesBlock.abyssalPressure,
+            humanAnchorSignal:
+                cthulhuAggregatesBlock.humanAnchorSignal,
+            sealAggregate:
+                cthulhuAggregatesBlock.sealAggregate,
+            lifecycleAggregate:
+                cthulhuAggregatesBlock
+                    .lifecycleAggregate,
+            narrativeDistortion:
+                cthulhuAggregatesBlock
+                    .narrativeDistortion,
+            anomalyTrace:
+                cthulhuAggregatesBlock.anomalyTrace,
+            abyssalBranches:
+                cthulhuAggregatesBlock.abyssalBranches,
+            unknownReserve: unknownReserve,
+            forbiddenAggregate: forbiddenAggregate,
+            escalationSuppressionCodes:
+                escalationSuppressionCodes,
+            kunlunAxisView: kunlunAxisView,
+            kunlunTianmenWarrant: kunlunTianmenWarrant,
+            kunlunGateDenialWrit: kunlunGateDenialWrit,
+            layerReconciliationVerdict:
+                layerReconciliationVerdict,
+            layerReconciliationReport:
+                layerReconciliationReport,
+            ontologyShiftMark: ontologyShiftMark,
+            cthulhuAssertionCeilingReasonCodes:
+                cthulhuAssertionCeilingReasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                cthulhuPermitEscalationReasonCodes,
+            narrativeDistortionMap:
+                narrativeDistortionMap,
+            cthulhuSurfaceAlias: cthulhuSurfaceAlias,
+            kunlunSurfaceAlias: kunlunSurfaceAlias)
+    }
+
     // MARK: - chapter 五百十六 / M1442 — unified 4-block
     //                                    convenience init
     //
