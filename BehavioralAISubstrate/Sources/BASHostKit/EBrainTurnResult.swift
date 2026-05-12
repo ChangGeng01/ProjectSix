@@ -202,6 +202,140 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百二十四 / M1474 — evolutionBundle
+    //                                       convenience init
+    //
+    // Convenience init that accepts a typed
+    // BASEBrainTurnResultEvolutionBundle in place of the
+    // 10 individual evolution-cluster args。 Unpacks the
+    // bundle's 10 fields into the matching turn-result
+    // fields via the all-args init。
+    //
+    // PUBLIC API additive only — the 52-arg all-fields
+    // init remains unchanged。 Existing hosts continue
+    // working。 New hosts (or M1475 V1 monolith splice)
+    // can collapse 10 evolution args into 1
+    // evolutionBundle arg at the call site。
+    //
+    // Byte-equality with the all-fields init GUARANTEED
+    // by body construction — every evolution field is
+    // copied 1:1 from the bundle accessors,every other
+    // field is passed-through verbatim。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignVerdict: BASSovereignVerdict? = nil,
+        sovereignCommitTokens: [BASSovereignCommitToken] = [],
+        sovereignWarrants: [BASSovereignWarrant] = [],
+        sovereignLock: BASSovereignLock? = nil,
+        quarantineRecords: [BASQuarantineRecord] = [],
+        sovereignAuditEntry: BASSovereignAuditEntry? = nil,
+        sovereignActuationCommands: [BASSovereignActuationCommand] = [],
+        sovereignExecutionReceipts: [BASSovereignExecutionReceipt] = [],
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostConstitution: BASHostConstitution? = nil,
+        hostConstitutionVault: BASHostConstitutionVault? = nil,
+        hostVersionTree: BASHostVersionTree? = nil,
+        hostForgetRequest: BASForgetRequest? = nil,
+        hostContext: BASHostProfile,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        thoughtFrame: BASThoughtFrame,
+        thoughtFold: BASThoughtFold,
+        triScores: [BASTriSelfScore],
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
+        hostGateValue: Double,
+        renderedOutput: BASRenderedOutput,
+        updateTickets: [BASUpdateTicket],
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        kunlunAxisAlignment: BASAxisAlignment? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        unknownReserve: BASUnknownReserve? = nil,
+        kunlunHeavenGatePermit: BASHeavenGatePermit? = nil,
+        kunlunRiverOriginTrace: BASRiverOriginTrace? = nil,
+        yaochiSanctumEntry: BASYaochiSanctumEntry? = nil
+    ) {
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            sovereignVerdict: sovereignVerdict,
+            sovereignCommitTokens: sovereignCommitTokens,
+            sovereignWarrants: sovereignWarrants,
+            sovereignLock: sovereignLock,
+            quarantineRecords: quarantineRecords,
+            sovereignAuditEntry: sovereignAuditEntry,
+            sovereignActuationCommands:
+                sovereignActuationCommands,
+            sovereignExecutionReceipts:
+                sovereignExecutionReceipts,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostConstitution: hostConstitution,
+            hostConstitutionVault:
+                hostConstitutionVault,
+            hostVersionTree: hostVersionTree,
+            hostForgetRequest: hostForgetRequest,
+            hostContext: hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: triScores,
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            riskDecisionPackage: riskDecisionPackage,
+            hostGateValue: hostGateValue,
+            renderedOutput: renderedOutput,
+            updateTickets: updateTickets,
+            // 10 evolution fields unpacked from bundle
+            experienceCandidates:
+                evolutionBundle.experienceCandidates,
+            workflowCandidates:
+                evolutionBundle.workflowCandidates,
+            guardTemplateCandidates:
+                evolutionBundle.guardTemplateCandidates,
+            biasRecords: evolutionBundle.biasRecords,
+            riskPatternCandidates:
+                evolutionBundle.riskPatternCandidates,
+            learningExportBundles:
+                evolutionBundle.learningExportBundles,
+            shadowTrialRecords:
+                evolutionBundle.shadowTrialRecords,
+            versionDeltas: evolutionBundle.versionDeltas,
+            retractionOrders:
+                evolutionBundle.retractionOrders,
+            evolutionSeals:
+                evolutionBundle.evolutionSeals,
+            runtimeTrace: runtimeTrace,
+            kunlunAxisAlignment: kunlunAxisAlignment,
+            humanAnchorSignal: humanAnchorSignal,
+            abyssalPressure: abyssalPressure,
+            unknownReserve: unknownReserve,
+            kunlunHeavenGatePermit: kunlunHeavenGatePermit,
+            kunlunRiverOriginTrace: kunlunRiverOriginTrace,
+            yaochiSanctumEntry: yaochiSanctumEntry)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case deviceState
         case budgetFrame
