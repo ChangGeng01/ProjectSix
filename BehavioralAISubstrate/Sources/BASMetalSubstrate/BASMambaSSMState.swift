@@ -559,7 +559,9 @@ public actor BASMambaSSMState {
                 reason: "alloc y failed")
         }
         // Constants buffer (B, L, D, N as uint32)
-        var dims: [UInt32] = [
+        // chapter 五百三十五 / M1517 — immutability per
+        // user coding standards (var → let,never mutated)。
+        let dims: [UInt32] = [
             UInt32(B), UInt32(L), UInt32(D), UInt32(N)
         ]
         guard let dimsBuf = dims

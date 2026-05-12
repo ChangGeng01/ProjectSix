@@ -606,7 +606,9 @@ public actor BASPlasticityFold {
             throw BASPlasticityError.gpuDispatchFailure(
                 reason: "alloc scale failed")
         }
-        var dims: [UInt32] = [
+        // chapter 五百三十五 / M1517 — immutability per
+        // user coding standards (var → let,never mutated)。
+        let dims: [UInt32] = [
             UInt32(shape.preDim),
             UInt32(shape.postDim)
         ]

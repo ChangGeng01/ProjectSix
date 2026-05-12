@@ -127,7 +127,20 @@ public enum BASHostStorageWireBuilder {
             if !initial.isEmpty {
                 Task.detached {
                     for atom in initial {
-                        try? await store.admit(atom)
+                        // chapter 五百三十五 / M1517 — explicit
+                        // silent-swallow at bootstrap (no
+                        // observable error sink exists for
+                        // initial-atom admission failures in
+                        // this background path)。 Converted
+                        // from `try?` to explicit do/catch
+                        // for documented intent。 TODO: wire
+                        // to a typed BASHostStorageInitialAtom
+                        // AdmitFailureLog sink when shipped。
+                        do {
+                            try await store.admit(atom)
+                        } catch {
+                            // intentionally silent — see above
+                        }
                     }
                 }
             }
@@ -443,7 +456,19 @@ public enum BASHostStorageWireBuilder {
             if !atomStoreInitial.isEmpty {
                 Task.detached {
                     for atom in atomStoreInitial {
-                        try? await store.admit(atom)
+                        // chapter 五百三十五 / M1517 — explicit
+                        // silent-swallow at bootstrap (parallel
+                        // to line ~130 path,event-sourced
+                        // variant)。 Converted from `try?` to
+                        // explicit do/catch for documented
+                        // intent。 TODO: wire to a typed
+                        // BASHostStorageInitialAtomAdmitFailure
+                        // Log sink when shipped。
+                        do {
+                            try await store.admit(atom)
+                        } catch {
+                            // intentionally silent — see above
+                        }
                     }
                 }
             }
