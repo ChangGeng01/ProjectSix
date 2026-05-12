@@ -10645,7 +10645,111 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1696。 280 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 580 — Penta-milestone completion
+        // meta-meta milestone。 Supersedes chapter 575
+        // quad-arc snapshot with 5th post-arc trilogy
+        // seal。 M1700 ROUND-NUMBER close-out。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十",
+            mNumberFirst: 1697,
+            mNumberLast: 1700,
+            v1MilestoneMNumber: 1700,
+            v1MilestoneStatus:
+                "chapter-580-penta-milestone-completion-M1700",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1697, knife: "第一刀",
+                    concept: "NEW BASCodableExtension" +
+                        "PentaMilestoneCompletionDoctrine" +
+                        " meta-meta milestone" +
+                        " commemorating ALL 5 sealed" +
+                        " Codable extension milestones" +
+                        " (4 arcs + 1 post-arc trilogy" +
+                        " = 56 types,60 commits,15" +
+                        " chapters,4 modules)。" +
+                        " Supersedes chapter 575 quad-" +
+                        "arc snapshot。 typed-surface" +
+                        " count 120 → 121。"),
+                BASChapterKnife(
+                    mNumber: 1698, knife: "第二刀",
+                    concept: "26 anti-drift PROOF tests" +
+                        " for the M1697 penta-milestone。" +
+                        " Identity + close-out round-" +
+                        "number + 5 per-milestone" +
+                        " identity (with `kind`" +
+                        " discriminator) + aggregate" +
+                        " accessors + dual prior-" +
+                        "snapshot refs + Codable round-" +
+                        "trip。"),
+                BASChapterKnife(
+                    mNumber: 1699, knife: "第三刀",
+                    concept: "18 wire-in PROOF tests" +
+                        " cross-checking the M1697" +
+                        " penta-milestone catalog" +
+                        " against 5 source seal" +
+                        " doctrines + supersession" +
+                        " invariants (penta == quad-arc" +
+                        " + trilogy)。"),
+                BASChapterKnife(
+                    mNumber: 1700, knife: "第四刀",
+                    concept: "Chapter 580 M1700 ROUND-" +
+                        "NUMBER close-out + doctrine" +
+                        " sync。 284 consecutive commits" +
+                        " with V1 byte-equality" +
+                        " preserved。 Codable extension" +
+                        " narrative arc sealed at" +
+                        " M1700。")
+            ],
+            entropyClassesAttacked: [
+                "penta-milestone-meta-meta-undocumented",
+                "quad-arc-snapshot-stale-after-5th-seal",
+                "5-milestone-totals-not-cross-validated",
+                "round-number-narrative-arc-undefined"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1700",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "penta-milestone-completion-meta-meta",
+                "58-session-types-ledger-serializable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — beyond M1700 Codable" +
+                " extension narrative arc (possibly" +
+                " fresh module territory or new" +
+                " entropy class)",
+                "future arc — eventual hexa-milestone" +
+                " when a 6th seal accumulates"
+            ],
+            summary: "Chapter 580 ships the penta-" +
+                "milestone completion meta-meta" +
+                " milestone at M1700 ROUND-NUMBER" +
+                " close-out。 NEW BASCodableExtension" +
+                "PentaMilestoneCompletionDoctrine" +
+                " (M1697) cataloguing ALL 5 sealed" +
+                " Codable extension milestones (16+15" +
+                "+13+6+6 = 56 types,60 commits,15" +
+                " chapters,4 modules) + 26 anti-drift" +
+                " PROOF tests (M1698) + 18 wire-in" +
+                " PROOF tests (M1699) + close-out" +
+                " (M1700)。 Supersedes chapter 575" +
+                " quad-arc snapshot;quad-arc + tri-arc" +
+                " doctrines preserved as historical" +
+                " records。 58 session types ledger-" +
+                "serializable (56 in milestones + 2" +
+                " post-arc inputs)。 121 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1700。" +
+                " 284 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。 Codable" +
+                " extension narrative arc sealed at" +
+                " M1700 round-number milestone。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

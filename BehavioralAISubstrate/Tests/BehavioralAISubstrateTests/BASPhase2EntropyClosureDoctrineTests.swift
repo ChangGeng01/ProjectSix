@@ -37,20 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs579() {
+    func testLastChapterIs580() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百七十九",
-            "Chapter 五百七十九:POST-ARC TRILOGY SEAL" +
-            " MILESTONE。 NEW BASOrchestrationCodable" +
-            "ExtensionPostArcTrilogySealedDoctrine" +
-            " commemorating 3-wave post-arc trilogy" +
-            " (chapters 576-578) + 22 anti-drift PROOF" +
-            " + 15 wire-in PROOF + close-out。 Second" +
-            " sealed milestone for BASOrchestration" +
-            " extensions。 120 typed surfaces" +
-            " cumulative")
+            "chapter 五百八十",
+            "Chapter 五百八十:PENTA-MILESTONE COMPLETION" +
+            " META-META MILESTONE at M1700 ROUND-NUMBER" +
+            " close-out。 NEW BASCodableExtensionPenta" +
+            "MilestoneCompletionDoctrine cataloguing" +
+            " ALL 5 sealed Codable extension milestones" +
+            " (56 types,60 commits) + 26 anti-drift" +
+            " PROOF + 18 wire-in PROOF + close-out。" +
+            " Supersedes chapter 575 quad-arc snapshot。" +
+            " 121 typed surfaces cumulative")
     }
 
     // MARK: - M-number range
