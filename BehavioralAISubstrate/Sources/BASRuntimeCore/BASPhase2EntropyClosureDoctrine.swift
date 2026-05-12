@@ -177,7 +177,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百二十",     // M1457-M1460 (10-chapter pipeline arc close-out — host adapter sync→actor bridge + end-to-end PROOF + typed milestone)
         "chapter 五百二十一",   // M1461-M1464 (7th typed input block + V1 splice extension — 63 fields packaged across 7 input surfaces, V1 call site 118 → 65 LOC)
         "chapter 五百二十二",   // M1465-M1468 (100% V1 packaging coverage — 8th + FINAL input block + 8-block init + V1 splice, 69 fields across 8 surfaces, V1 call site 118 → 60 LOC = 49% reduction)
-        "chapter 五百二十三"    // M1469-M1472 (12-chapter arc typed milestone doctrine + 8 anti-drift PROOF tests + 3 e2e PROOF tests for 100% packaging coverage + replay-determinism)
+        "chapter 五百二十三",   // M1469-M1472 (12-chapter arc typed milestone doctrine + 8 anti-drift PROOF tests + 3 e2e PROOF tests for 100% packaging coverage + replay-determinism)
+        "chapter 五百二十四"    // M1473-M1476 (PIVOT to BASEBrainTurnResult fold — typed evolution bundle + convenience init + V1 splice using bundle)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -194,17 +195,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1472
+    public static let mNumberLast: Int = 1476
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1472)。 Bumped through chapter 523:513 → 517。
-    /// Chapter 523:12-chapter arc milestone +
-    /// anti-drift PROOF — M1469 typed milestone +
-    /// M1470 anti-drift tests + M1471 100% coverage
-    /// e2e PROOF + M1472 close-out。 Replay-determinism
-    /// of Kunlun/Cthulhu block hashes explicitly
-    /// verified。
-    public static let commitsShipped: Int = 517
+    /// M1476)。 Bumped through chapter 524:517 → 521。
+    /// Chapter 524:PIVOT to BASEBrainTurnResult fold
+    /// — M1473 typed evolution bundle + M1474
+    /// convenience init + M1475 V1 splice + M1476
+    /// close-out。 First V1 fold of a non-projection
+    /// call site since chapter 510。
+    public static let commitsShipped: Int = 521
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

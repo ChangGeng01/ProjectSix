@@ -117,19 +117,20 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 121
+    public static let phase2ChapterCount: Int = 122
 
-    /// Phase 2 commits shipped。 At M1472:
-    /// 125 + 84 + 308 = 517 (chapter 523 = 4 cuts —
-    /// 12-chapter arc milestone doctrine + anti-drift
-    /// PROOF + e2e coverage PROOF + close-out)
-    public static let phase2CommitsShipped: Int = 517
+    /// Phase 2 commits shipped。 At M1476:
+    /// 125 + 84 + 312 = 521 (chapter 524 = 4 cuts —
+    /// PIVOT to BASEBrainTurnResult fold:typed
+    /// evolution bundle + convenience init + V1 splice
+    /// + close-out)
+    public static let phase2CommitsShipped: Int = 521
 
-    /// Phase 2 mNumberLast。 At M1472:chapter 523
-    /// (caps the 12-chapter arc with typed milestone +
-    /// anti-drift + e2e coverage PROOF)。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1472
+    /// Phase 2 mNumberLast。 At M1476:chapter 524
+    /// (PIVOT to BASEBrainTurnResult fold — first V1
+    /// fold of a non-projection call site since chapter
+    /// 510)。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1476
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

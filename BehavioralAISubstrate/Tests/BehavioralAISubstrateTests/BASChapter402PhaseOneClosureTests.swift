@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1472",
-            "M1472:doctrine version reflects chapter 五百二十三 — caps the 12-chapter projection-block pipeline arc。 BASChapter511To522PipelineDoctrine typed milestone freezing arc invariants (M1469, 12 chapters / 48 commits / 8 input blocks / 69 packaged fields / 49% V1 LOC reduction / 100% packaging coverage) + 8 anti-drift PROOF tests pinning block types + field counts + .empty singletons (M1470) + 3 end-to-end PROOF tests via real V1 monolith turns including replay-determinism verification of Kunlun + Cthulhu block hashes (M1471)。 69 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence; replay-determinism explicitly proved by M1471)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1476",
+            "M1476:doctrine version reflects chapter 五百二十四 — PIVOT to BASEBrainTurnResult fold (first V1 fold of a non-projection call site since chapter 510)。 BASEBrainTurnResultEvolutionBundle typed cluster packaging 10 L13 evolution fields (M1473) + BASEBrainTurnResult.init(evolutionBundle:) convenience init (M1474) + V1 monolith splice at line 2287+ replacing 10 named-arg lines with 1 typed evolutionBundle construction (M1475)。 Public API additive only — 52-arg all-fields init preserved。 70 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

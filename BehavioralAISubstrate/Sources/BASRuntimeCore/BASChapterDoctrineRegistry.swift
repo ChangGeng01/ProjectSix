@@ -5750,7 +5750,103 @@ public enum BASChapterDoctrineRegistry {
                 " replay-deterministic block hashes。" +
                 " 69 typed surfaces cumulative。 ADR-016" +
                 " → M1472。 V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 524 — pivot to BASEBrainTurnResult fold
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十四",
+            mNumberFirst: 1473,
+            mNumberLast: 1476,
+            v1MilestoneMNumber: 1476,
+            v1MilestoneStatus:
+                "chapter-524-pivot-to-turnresult-fold",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1473, knife: "第一刀",
+                    concept: "PIVOT。 NEW BASEBrainTurn" +
+                        "ResultEvolutionBundle — applies" +
+                        " the chapter 511-522 typed-" +
+                        "input-block pattern to a NEW" +
+                        " target:BASEBrainTurnResult" +
+                        " return type instead of audit" +
+                        " projections。 Packs 10 L13" +
+                        " evolution-cluster fields into" +
+                        " ONE typed surface。 70 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1474, knife: "第二刀",
+                    concept: "BASEBrainTurnResult.init" +
+                        "(evolutionBundle:) convenience" +
+                        " init。 Accepts the typed bundle" +
+                        " + remaining ~42 args。 Public" +
+                        " API additive only — 52-arg" +
+                        " all-fields init remains" +
+                        " unchanged。 Byte-equality" +
+                        " GUARANTEED by body delegation。"),
+                BASChapterKnife(
+                    mNumber: 1475, knife: "第三刀",
+                    concept: "V1 monolith splice extends" +
+                        " the chapter 515-522 pattern to" +
+                        " the BASEBrainTurnResult return" +
+                        " statement at line 2287+。 10" +
+                        " evolution-cluster args collapse" +
+                        " to 1 typed evolutionBundle" +
+                        " construction at call site。" +
+                        " First V1 fold of a non-" +
+                        "projection call site since" +
+                        " chapter 510。"),
+                BASChapterKnife(
+                    mNumber: 1476, knife: "第四刀",
+                    concept: "Chapter 524 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1476。 Pivot to BASEBrain" +
+                        "TurnResult fold begins:" +
+                        " 1 of ~5 potential clusters" +
+                        " (evolution) shipped。 V1 byte-" +
+                        "equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "BASEBrainTurnResult-52-arg-init-not-typed-clusters",
+                "v1-monolith-evolution-cluster-10-args",
+                "first-non-projection-v1-fold-since-510",
+                "public-api-fold-pattern-precedent"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1476",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "public-api-additive-only"
+            ],
+            plannedFutureCuts: [
+                "future arc — sovereign cluster bundle" +
+                " (7 sovereign* fields)",
+                "future arc — host cluster bundle (5" +
+                " host* fields)",
+                "future arc — audit-projection forwarded" +
+                " cluster (7 fields:kunlunAxis +" +
+                " humanAnchor + abyssal + unknownReserve" +
+                " + kunlunHeavenGatePermit +" +
+                " kunlunRiverOriginTrace +" +
+                " yaochiSanctumEntry)",
+                "future arc — SampleHost wire-in of" +
+                " projection-block observer adapter"
+            ],
+            summary: "PIVOT to a new V1 fold target:" +
+                " BASEBrainTurnResult return statement" +
+                " (line 2287+,52 named args)。 Chapter" +
+                " 524 ships:1 typed cluster bundle" +
+                " (BASEBrainTurnResultEvolutionBundle,10" +
+                " L13 evolution fields) + 1 convenience" +
+                " init on BASEBrainTurnResult + V1" +
+                " monolith splice using the bundle。 V1" +
+                " call-site savings:10 named arg lines" +
+                " → 1 evolutionBundle construction" +
+                " (typed surface)。 70 typed surfaces" +
+                " cumulative。 ADR-016 → M1476。 V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved (public API additive only)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

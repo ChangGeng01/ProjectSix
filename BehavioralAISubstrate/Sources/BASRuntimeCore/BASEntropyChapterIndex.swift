@@ -1793,7 +1793,23 @@ public enum BASEntropyChapterIndex {
                 " replay-deterministic block hashes" +
                 " verification)。 69 typed surfaces" +
                 " cumulative。 ADR-016 → M1472。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十四",
+            mNumberFirst: 1473, mNumberLast: 1476,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "PIVOT to BASEBrainTurnResult fold:" +
+                " BASEBrainTurnResultEvolutionBundle (10" +
+                " L13 evolution fields) + convenience" +
+                " init on BASEBrainTurnResult + V1" +
+                " monolith splice using the bundle。" +
+                " First V1 fold of a non-projection" +
+                " call site since chapter 510。 V1 call-" +
+                "site savings:10 named arg lines → 1" +
+                " evolutionBundle construction。 70 typed" +
+                " surfaces cumulative。 ADR-016 → M1476。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
