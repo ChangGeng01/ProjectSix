@@ -2162,6 +2162,14 @@ public struct BASEBrainRuntimeCoordinator {
                     layerReconciliation.report,
                 escalationSuppressionCodes:
                     escalationSuppressionCodes)
+        // chapter 五百二十一 / M1463 — 7th block extension
+        let kunlunAuditSchemasBlockForAudit =
+            BASAuditObservationProjectionsKunlunAuditSchemasBlock(
+                kunlunAxisView: kunlunAxisViewForAudit,
+                kunlunTianmenWarrant:
+                    kunlunTianmenWarrantForAudit,
+                kunlunGateDenialWrit:
+                    kunlunGateDenialWritForAudit)
         let projections = BASAuditObservationProjections(
             kunlunInputs: kunlunInputsForAudit,
             cthulhuInputs: cthulhuInputsForAudit,
@@ -2172,10 +2180,8 @@ public struct BASEBrainRuntimeCoordinator {
             cthulhuAggregatesBlock:
                 cthulhuAggregatesBlockForAudit,
             closureBlock: closureBlockForAudit,
-            kunlunAxisView: kunlunAxisViewForAudit,
-            kunlunTianmenWarrant: kunlunTianmenWarrantForAudit,
-            kunlunGateDenialWrit:
-                kunlunGateDenialWritForAudit,
+            kunlunAuditSchemasBlock:
+                kunlunAuditSchemasBlockForAudit,
             ontologyShiftMark: ontologyShiftMarkForAudit,
             cthulhuAssertionCeilingReasonCodes:
                 cthulhuAssertionDecision.reasonCodes,
