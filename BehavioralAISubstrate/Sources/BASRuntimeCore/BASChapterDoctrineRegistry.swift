@@ -6923,7 +6923,103 @@ public enum BASChapterDoctrineRegistry {
                 " 82 typed surfaces cumulative。 ADR-016" +
                 " → M1524。 108 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 537 — typed observability sink for
+        // BASTurnRuntimeEngine 4 silent-swallow paths
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十七",
+            mNumberFirst: 1525,
+            mNumberLast: 1528,
+            v1MilestoneMNumber: 1528,
+            v1MilestoneStatus:
+                "chapter-537-engine-observation-failure-sink-wired",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1525, knife: "第一刀",
+                    concept: "NEW BASTurnRuntimeEngine" +
+                        "ObservationFailureLog actor +" +
+                        " Kind typed enum (4 cases:" +
+                        " biomimeticObserverObserve +" +
+                        " autoCheckpointEventLogAppend" +
+                        " + nativeStageDispatchEventLog" +
+                        "Append + planAssignmentEvent" +
+                        "LogAppend) + Record struct" +
+                        " with sessionID correlation。" +
+                        " 83 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1526, knife: "第二刀",
+                    concept: "Wire the log into the 4" +
+                        " documented silent-swallow" +
+                        " sites in BASTurnRuntimeEngine" +
+                        " (lines ~594 + ~629 + ~810 +" +
+                        " ~854)。 New optional engine init" +
+                        " parameter `observationFailureLog:`" +
+                        " — nil → behavior unchanged" +
+                        " (silent swallow per 红线 7);" +
+                        " non-nil → record each failure" +
+                        " with typed Kind + sessionID。" +
+                        " Substrate-wide build warnings:" +
+                        " still 0。"),
+                BASChapterKnife(
+                    mNumber: 1527, knife: "第三刀",
+                    concept: "9 PROOF tests:fresh log" +
+                        " empty + Kind enum 4-case +" +
+                        " stable raw values + record" +
+                        " captures all fields + nil" +
+                        " sessionID + per-Kind filter +" +
+                        " Codable round-trip + 40-" +
+                        "parallel Sendable concurrency。"),
+                BASChapterKnife(
+                    mNumber: 1528, knife: "第四刀",
+                    concept: "Chapter 537 close-out +" +
+                        " doctrine sync — the engine's 4" +
+                        " silent-swallow sites now have" +
+                        " an opt-in observability surface。" +
+                        " 112 consecutive commits with" +
+                        " V1 byte-equality preserved" +
+                        " this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "engine-silent-swallow-no-observability",
+                "biomimetic-observer-failure-blackbox",
+                "audit-emission-blackbox-per-path",
+                "TODO-marker-extended-to-engine"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1528",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "user-error-handling-standard-honored-engine-side"
+            ],
+            plannedFutureCuts: [
+                "future arc — extend the typed sink to" +
+                " more silent-swallow paths if any exist" +
+                " (e.g. host-side observer failures)",
+                "future arc — SampleHost production" +
+                " wire-in of the new failureLog params",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 537 extends the chapter 536" +
+                " typed observability sink pattern to" +
+                " BASTurnRuntimeEngine's 4 documented" +
+                " silent-swallow paths。 New typed" +
+                " surfaces:BASTurnRuntimeEngineObservation" +
+                "FailureLog actor + Kind enum (4 cases) +" +
+                " Record struct with sessionID" +
+                " correlation (M1525) + wire-in via" +
+                " optional `observationFailureLog:` engine" +
+                " init parameter (M1526) + 9 PROOF tests" +
+                " (M1527)。 Default behavior unchanged" +
+                " (nil → silent swallow as documented" +
+                " per 红线 7)。 83 typed surfaces" +
+                " cumulative。 ADR-016 → M1528。 112" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

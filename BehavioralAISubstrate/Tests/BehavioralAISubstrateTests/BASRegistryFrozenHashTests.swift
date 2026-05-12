@@ -107,16 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 536 close-out。 Chapter
-    /// 536:typed observability sink for the silent-
-    /// swallow paths from chapter 535 —
-    /// BASHostStorageInitialAtomAdmitFailureLog actor +
-    /// Record struct (M1521) + wire-in to
-    /// BASHostStorageWireBuilder makeAtomStore +
-    /// makeBundle via optional `failureLog:` parameter
-    /// (M1522) + 7 PROOF tests covering empty state +
-    /// recording + value semantics + Codable + Sendable
-    /// concurrency (M1523)。 The M1517 TODO is resolved。
+    /// Re-captured at chapter 537 close-out。 Chapter
+    /// 537:typed observability sink for BASTurnRuntime
+    /// Engine's 4 documented silent-swallow paths —
+    /// BASTurnRuntimeEngineObservationFailureLog actor
+    /// + Kind typed enum (4 cases) + Record struct with
+    /// sessionID correlation (M1525) + wire-in to the
+    /// 4 sites via optional `observationFailureLog:`
+    /// engine init parameter (M1526) + 9 PROOF tests
+    /// (M1527)。 Default behavior unchanged per 红线 7。
     static let frozenFullRegistrySha256: String =
-        "538d4503fe0ab3d5e0944b0da1d8ac2da0c106d9b6c691531cc618965d93f081"
+        "e38d4ab1d214f4f2bed8d863fc76ee0a46827208032985e6289e6d80ae60cf51"
 }

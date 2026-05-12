@@ -37,18 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs536() {
+    func testLastChapterIs537() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十六",
-            "Chapter 五百三十六:typed observability" +
-            " sink for the silent-swallow paths from" +
-            " chapter 535 — BASHostStorageInitialAtom" +
-            "AdmitFailureLog actor + Record struct +" +
-            " wire-in to BASHostStorageWireBuilder + 7" +
-            " PROOF tests。 The M1517 TODO is resolved。" +
-            " 82 typed surfaces cumulative")
+            "chapter 五百三十七",
+            "Chapter 五百三十七:typed observability" +
+            " sink for BASTurnRuntimeEngine's 4" +
+            " documented silent-swallow paths —" +
+            " BASTurnRuntimeEngineObservationFailureLog" +
+            " actor + Kind enum (4 cases) + Record" +
+            " struct + wire-in via optional" +
+            " observationFailureLog: engine init" +
+            " parameter + 9 PROOF tests。 83 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

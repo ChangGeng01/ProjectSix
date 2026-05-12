@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1524",
-            "M1524:doctrine version reflects chapter 五百三十六 — typed observability sink for the silent-swallow paths from chapter 535。 BASHostStorageInitialAtomAdmitFailureLog actor + Record struct (M1521) + wire-in to BASHostStorageWireBuilder makeAtomStore + makeBundle via optional `failureLog:` parameter (M1522) + 7 PROOF tests covering empty state + recording + value semantics + Codable + Sendable concurrency (M1523)。 Default behavior unchanged (nil → silent swallow as documented at M1517);hosts opt in to observe admission failures。 The M1517 TODO is resolved。 82 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1528",
+            "M1528:doctrine version reflects chapter 五百三十七 — typed observability sink for BASTurnRuntimeEngine's 4 documented silent-swallow paths。 BASTurnRuntimeEngineObservationFailureLog actor + Kind typed enum (4 cases) + Record struct with sessionID correlation (M1525) + wire-in to the 4 sites via optional `observationFailureLog:` engine init parameter (M1526) + 9 PROOF tests (M1527)。 Default behavior unchanged (nil → silent swallow as documented per 红线 7)。 83 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

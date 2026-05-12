@@ -1631,7 +1631,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百三十六")!)
+                            "chapter 五百三十六")!),
+            // M1528 chapter 537 — engine observation failure sink + wire-in + 9 PROOF tests
+            checkRegistry("五百三十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百三十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2415,6 +2421,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百三十六")!
+                .mNumberLast),
+            // M1528 chapter 537 — engine observation failure sink + wire-in + 9 PROOF tests
+            ("537",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

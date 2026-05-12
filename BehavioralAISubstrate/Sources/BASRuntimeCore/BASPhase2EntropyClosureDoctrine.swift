@@ -190,7 +190,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百三十三",   // M1509-M1512 (BASEBrainTurnResultFoldArcSealedDoctrine typed milestone surface + 20 PROOF tests — fold arc sealed non-driftable)
         "chapter 五百三十四",   // M1513-M1516 (30-declaration dead-code purge from EBrainRuntimeCoordinator.swift + typed milestone doctrine + 11 PROOF tests — coordinator warning-free)
         "chapter 五百三十五",   // M1517-M1520 (substrate-wide warning purge — 2 var→let + 2 try? discards fixed + typed milestone doctrine + 12 PROOF tests — substrate warning-free)
-        "chapter 五百三十六"    // M1521-M1524 (typed observability sink for silent-swallow paths — BASHostStorageInitialAtomAdmitFailureLog actor + wire-in to BASHostStorageWireBuilder + 7 PROOF tests)
+        "chapter 五百三十六",   // M1521-M1524 (typed observability sink for silent-swallow paths — BASHostStorageInitialAtomAdmitFailureLog actor + wire-in to BASHostStorageWireBuilder + 7 PROOF tests)
+        "chapter 五百三十七"    // M1525-M1528 (typed observability sink for BASTurnRuntimeEngine 4 silent-swallow paths — BASTurnRuntimeEngineObservationFailureLog actor + Kind enum + wire-in + 9 PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -207,16 +208,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1524
+    public static let mNumberLast: Int = 1528
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1524)。 Bumped through chapter 536:565 → 569。
-    /// Chapter 536:typed observability sink for the
-    /// silent-swallow paths from chapter 535 — actor +
-    /// record struct + wire-in to BASHostStorageWire
-    /// Builder + 7 PROOF tests + close-out。 The
-    /// M1517 TODO is resolved。
-    public static let commitsShipped: Int = 569
+    /// M1528)。 Bumped through chapter 537:569 → 573。
+    /// Chapter 537:typed observability sink for
+    /// BASTurnRuntimeEngine's 4 documented silent-
+    /// swallow paths — actor + Kind enum + Record +
+    /// wire-in + 9 PROOF tests + close-out。
+    public static let commitsShipped: Int = 573
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

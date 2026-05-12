@@ -2017,7 +2017,27 @@ public enum BASEntropyChapterIndex {
                 " admission failures。 The M1517 TODO" +
                 " is resolved。 82 typed surfaces" +
                 " cumulative。 ADR-016 → M1524。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十七",
+            mNumberFirst: 1525, mNumberLast: 1528,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Typed observability sink for" +
+                " BASTurnRuntimeEngine's 4 documented" +
+                " silent-swallow paths (biomimetic" +
+                " observer + 3 event-log append sites):" +
+                " BASTurnRuntimeEngineObservationFailure" +
+                "Log actor + Kind typed enum (4 cases) +" +
+                " Record struct with sessionID" +
+                " correlation (M1525) + wire-in to the" +
+                " 4 sites via optional `observationFailure" +
+                "Log:` engine init parameter (M1526) +" +
+                " 9 PROOF tests (M1527)。 Default" +
+                " behavior unchanged (nil → silent" +
+                " swallow as documented per 红线 7)。" +
+                " 83 typed surfaces cumulative。 ADR-016" +
+                " → M1528。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
