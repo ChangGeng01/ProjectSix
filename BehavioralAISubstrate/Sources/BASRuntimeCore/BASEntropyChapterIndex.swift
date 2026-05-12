@@ -2718,7 +2718,28 @@ public enum BASEntropyChapterIndex {
                 " 6 BASOrchestration types ledger-" +
                 "serializable。 115 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1676。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十五",
+            mNumberFirst: 1677, mNumberLast: 1680,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "QUAD-ARC COMPLETION META-META" +
+                " MILESTONE。 NEW BASCodableExtension" +
+                "QuadArcCompletionDoctrine (M1677)" +
+                " cataloguing ALL 4 sealed Codable" +
+                " extension arcs (16+15+13+6 = 50" +
+                " types,48 commits,12 chapters,4" +
+                " modules) + 20 anti-drift PROOF tests" +
+                " (M1678) + 16 wire-in PROOF tests" +
+                " (M1679) + close-out (M1680)。" +
+                " Supersedes chapter 570 tri-arc" +
+                " snapshot;tri-arc doctrine preserved" +
+                " as historical record。 52 session" +
+                " types ledger-serializable。 116" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1680。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

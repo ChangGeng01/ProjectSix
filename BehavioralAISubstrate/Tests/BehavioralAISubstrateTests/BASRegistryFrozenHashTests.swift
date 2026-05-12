@@ -107,16 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 574 close-out。 Chapter
-    /// 574:ORCHESTRATION CODABLE EXTENSION ARC-SEAL
-    /// MILESTONE。 NEW BASOrchestrationCodable
-    /// ExtensionArcSealedDoctrine (M1673) + 21 anti-
-    /// drift PROOF tests (M1674) + 16 wire-in PROOF
-    /// tests (M1675) commemorating 3-chapter / 12-
-    /// commit BASOrchestration Codable extension arc
-    /// (chapters 571-573)。 Mirrors chapter 569 cross-
-    /// module arc-seal pattern for BASOrchestration
-    /// layer。
+    /// Re-captured at chapter 575 close-out。 Chapter
+    /// 575:QUAD-ARC COMPLETION META-META MILESTONE。
+    /// NEW BASCodableExtensionQuadArcCompletionDoctrine
+    /// (M1677) + 20 anti-drift PROOF tests (M1678) +
+    /// 16 wire-in PROOF tests (M1679) cataloguing ALL
+    /// 4 sealed Codable extension arcs。 Supersedes
+    /// chapter 570 tri-arc snapshot;tri-arc doctrine
+    /// preserved as historical record。 52 session
+    /// types ledger-serializable。
     static let frozenFullRegistrySha256: String =
-        "13661060e04d43ac6e71b087ed2289b93739f5317f76829a893d3ec8f5d7992b"
+        "af6d046fc69557576168dae0680665a3b34de9a8f9bcd4178fc503a5c76c8bd4"
 }

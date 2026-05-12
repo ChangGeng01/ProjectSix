@@ -10207,7 +10207,96 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1676。 260 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 575 — Quad-arc completion meta-meta
+        // milestone。 Supersedes chapter 570 tri-arc
+        // snapshot with the 4th BASOrchestration arc。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十五",
+            mNumberFirst: 1677,
+            mNumberLast: 1680,
+            v1MilestoneMNumber: 1680,
+            v1MilestoneStatus:
+                "chapter-575-quad-arc-completion-M1680",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1677, knife: "第一刀",
+                    concept: "NEW BASCodableExtension" +
+                        "QuadArcCompletionDoctrine meta-" +
+                        "meta milestone commemorating" +
+                        " ALL 4 sealed Codable extension" +
+                        " arcs (50 types,48 commits,12" +
+                        " chapters,4 modules)。 Supersedes" +
+                        " chapter 570 tri-arc snapshot。" +
+                        " typed-surface count 115 → 116。"),
+                BASChapterKnife(
+                    mNumber: 1678, knife: "第二刀",
+                    concept: "20 anti-drift PROOF tests" +
+                        " for the M1677 quad-arc。" +
+                        " Identity + arc count + per-arc" +
+                        " identity (4 arcs) + 4" +
+                        " aggregate accessors + 2 post-" +
+                        "arc/session + 3 flags +" +
+                        " ArcRecord Codable round-trip。"),
+                BASChapterKnife(
+                    mNumber: 1679, knife: "第三刀",
+                    concept: "16 wire-in PROOF tests" +
+                        " cross-checking the M1677 quad-" +
+                        "arc catalog against the 4" +
+                        " source arc-seal doctrines +" +
+                        " tri-arc snapshot ref +" +
+                        " supersession invariant。"),
+                BASChapterKnife(
+                    mNumber: 1680, knife: "第四刀",
+                    concept: "Chapter 575 close-out +" +
+                        " doctrine sync。 264" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "quad-arc-meta-meta-undocumented",
+                "tri-arc-snapshot-stale-after-4th-arc",
+                "4-arc-totals-not-cross-validated",
+                "arc-supersession-pattern-undefined"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1680",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "quad-arc-completion-meta-meta",
+                "52-session-types-ledger-serializable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — fresh Codable extension" +
+                " territory (more BASOrchestration" +
+                " value types or other modules)",
+                "future arc — eventual penta-arc" +
+                " milestone after the 5th arc seals"
+            ],
+            summary: "Chapter 575 ships the quad-arc" +
+                " completion meta-meta milestone。 NEW" +
+                " BASCodableExtensionQuadArcCompletion" +
+                "Doctrine (M1677) cataloguing ALL 4" +
+                " sealed Codable extension arcs (16+15+" +
+                "13+6 = 50 types,48 commits,12" +
+                " chapters,4 modules) + 20 anti-drift" +
+                " PROOF tests (M1678) + 16 wire-in" +
+                " PROOF tests (M1679) + close-out" +
+                " (M1680)。 Supersedes chapter 570 tri-" +
+                "arc snapshot;tri-arc doctrine" +
+                " preserved as historical record。 52" +
+                " session types ledger-serializable" +
+                " (50 in arcs + 2 post-arc inputs)。" +
+                " 116 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1680。 264 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
