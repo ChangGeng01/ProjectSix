@@ -1883,7 +1883,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七十八")!)
+                            "chapter 五百七十八")!),
+            // M1696 chapter 579 — Post-arc trilogy seal milestone
+            checkRegistry("五百七十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3003,6 +3009,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七十八")!
+                .mNumberLast),
+            // M1696 chapter 579 — Post-arc trilogy seal milestone
+            ("579",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -2802,6 +2802,27 @@ public enum BASEntropyChapterIndex {
                 "Orchestration types ledger-" +
                 "serializable。 119 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1692。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十九",
+            mNumberFirst: 1693, mNumberLast: 1696,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC TRILOGY SEAL MILESTONE。" +
+                " NEW BASOrchestrationCodableExtension" +
+                "PostArcTrilogySealedDoctrine (M1693)" +
+                " commemorating 3-wave / 12-commit" +
+                " post-arc trilogy (chapters 576-578) +" +
+                " 22 anti-drift PROOF tests (M1694) +" +
+                " 15 wire-in PROOF tests (M1695) +" +
+                " close-out (M1696)。 Second sealed" +
+                " milestone for BASOrchestration" +
+                " extensions (after chapter 574 arc" +
+                " seal)。 Combined chapter 574 arc (6)" +
+                " + chapter 579 trilogy (6) = 12" +
+                " BASOrchestration types ledger-" +
+                "serializable。 120 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1696。" +
                 " V1 byte-equality preserved。")
     ]
 

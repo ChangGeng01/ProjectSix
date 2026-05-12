@@ -10551,7 +10551,101 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1692。" +
                 " 276 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 579 — Post-arc trilogy seal milestone
+        // for the BASOrchestration Codable extension
+        // (chapters 576-578)。 Second sealed milestone
+        // for BASOrchestration (after chapter 574 arc
+        // seal)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十九",
+            mNumberFirst: 1693,
+            mNumberLast: 1696,
+            v1MilestoneMNumber: 1696,
+            v1MilestoneStatus:
+                "chapter-579-orchestration-post-arc-trilogy-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1693, knife: "第一刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionPostArcTrilogySealed" +
+                        "Doctrine typed milestone" +
+                        " commemorating 3-wave post-arc" +
+                        " trilogy (chapters 576-578)。" +
+                        " 6 types,12 commits,single-" +
+                        "module。 Second sealed milestone" +
+                        " for BASOrchestration after" +
+                        " chapter 574 arc seal。 typed-" +
+                        "surface count 119 → 120。"),
+                BASChapterKnife(
+                    mNumber: 1694, knife: "第二刀",
+                    concept: "22 anti-drift PROOF tests" +
+                        " for the M1693 trilogy seal。" +
+                        " Identity + trilogy range +" +
+                        " coverage + wave contributions" +
+                        " + type list + cross-doctrine" +
+                        " refs + 3 cumulative state pins" +
+                        " + 3 achievement flags。"),
+                BASChapterKnife(
+                    mNumber: 1695, knife: "第三刀",
+                    concept: "15 wire-in PROOF tests" +
+                        " cross-checking the M1693" +
+                        " trilogy seal against the 3" +
+                        " wave-specific post-arc" +
+                        " doctrines + chapter 574 arc" +
+                        " seal + cumulative invariants。"),
+                BASChapterKnife(
+                    mNumber: 1696, knife: "第四刀",
+                    concept: "Chapter 579 close-out +" +
+                        " doctrine sync。 280" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "post-arc-trilogy-undocumented",
+                "no-single-source-of-truth-for-6-wave-types",
+                "wave-doctrines-not-cross-validated",
+                "second-orchestration-seal-pattern-undefined"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1696",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "orchestration-post-arc-trilogy-sealed",
+                "12-orchestration-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — penta-arc meta-meta" +
+                " milestone (5 sealed arcs:564 +" +
+                " 569 + 574 + chapter 575 + 579)",
+                "future arc — continue Codable" +
+                " extension into more BASOrchestration" +
+                " value types or fresh module territory"
+            ],
+            summary: "Chapter 579 seals the 3-wave post-" +
+                "arc BASOrchestration Codable extension" +
+                " trilogy (chapters 576-578)。 NEW BAS" +
+                "OrchestrationCodableExtensionPostArc" +
+                "TrilogySealedDoctrine typed milestone" +
+                " (M1693) commemorating 6 types,12" +
+                " commits + 22 anti-drift PROOF tests" +
+                " (M1694) + 15 wire-in PROOF tests" +
+                " (M1695) + close-out (M1696)。 Second" +
+                " sealed milestone for BAS" +
+                "Orchestration extensions (after" +
+                " chapter 574 arc seal)。 Combined" +
+                " chapter 574 arc (6) + chapter 579" +
+                " trilogy (6) = 12 BASOrchestration" +
+                " types ledger-serializable。 120 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1696。 280 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
