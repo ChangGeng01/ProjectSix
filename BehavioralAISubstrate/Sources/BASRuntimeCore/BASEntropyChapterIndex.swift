@@ -2739,7 +2739,28 @@ public enum BASEntropyChapterIndex {
                 " types ledger-serializable。 116" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1680。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十六",
+            mNumberFirst: 1681, mNumberLast: 1684,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC ORCHESTRATION CODABLE" +
+                " EXTENSION。 2 more BASOrchestration" +
+                " value types gained Codable at M1681" +
+                " (BASNeuralCoreFrame +" +
+                " BASProductRedLineLinter.Violation)" +
+                " — both unblocked by the chapter 573" +
+                " third-wave。 2 PROOF tests (M1682) +" +
+                " new typed surface (M1683) + close-out" +
+                " (M1684)。 Mirrors chapter 565 post-" +
+                "aggregator-arc follow-up pattern。" +
+                " Chapter 574 arc (6 types) + chapter" +
+                " 576 post-arc (2 types) = 8 BAS" +
+                "Orchestration types ledger-" +
+                "serializable。 117 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1684。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

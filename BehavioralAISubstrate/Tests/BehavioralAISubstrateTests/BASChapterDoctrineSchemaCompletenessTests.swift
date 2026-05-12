@@ -1865,7 +1865,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七十五")!)
+                            "chapter 五百七十五")!),
+            // M1684 chapter 576 — Post-arc Orchestration Codable extension
+            checkRegistry("五百七十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2961,6 +2967,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七十五")!
+                .mNumberLast),
+            // M1684 chapter 576 — Post-arc Orchestration Codable extension
+            ("576",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

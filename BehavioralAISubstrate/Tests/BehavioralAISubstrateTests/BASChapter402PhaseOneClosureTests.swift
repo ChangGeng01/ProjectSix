@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1680",
-            "M1680:doctrine version reflects chapter 五百七十五 — QUAD-ARC COMPLETION META-META MILESTONE。 NEW BASCodableExtensionQuadArcCompletionDoctrine (M1677) cataloguing ALL 4 sealed Codable extension arcs (16+15+13+6 = 50 types,48 commits,12 chapters,4 modules) + 20 anti-drift PROOF tests (M1678) + 16 wire-in PROOF tests (M1679) + close-out (M1680)。 Supersedes chapter 570 tri-arc snapshot;tri-arc doctrine preserved as historical record。 52 session types ledger-serializable。 116 typed surfaces cumulative。 264 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1684",
+            "M1684:doctrine version reflects chapter 五百七十六 — POST-ARC ORCHESTRATION CODABLE EXTENSION。 2 more BASOrchestration value types gained Codable (BASNeuralCoreFrame + BASProductRedLineLinter.Violation) at M1681 — both unblocked by the chapter 573 third-wave。 2 PROOF tests (M1682) + BASOrchestrationCodableExtensionPostArcDoctrine typed surface (M1683) + close-out (M1684)。 Mirrors chapter 565 post-aggregator-arc follow-up pattern。 Chapter 574 arc (6 types) + chapter 576 post-arc (2 types) = 8 BASOrchestration types ledger-serializable。 117 typed surfaces cumulative。 268 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

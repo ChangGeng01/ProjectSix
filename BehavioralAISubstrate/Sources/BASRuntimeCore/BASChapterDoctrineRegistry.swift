@@ -10296,7 +10296,93 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1680。 264 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 576 — Post-arc Codable extension into
+        // BASOrchestration。 2 more types (BASNeural
+        // CoreFrame + BASProductRedLineLinter.Violation)
+        // unblocked by chapter 573 BASLatentTissueState
+        // + BASBadToneLinter.Violation Codable
+        // additions。 Mirrors chapter 565 post-arc
+        // pattern。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十六",
+            mNumberFirst: 1681,
+            mNumberLast: 1684,
+            v1MilestoneMNumber: 1684,
+            v1MilestoneStatus:
+                "chapter-576-post-arc-orchestration-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1681, knife: "第一刀",
+                    concept: "Add Codable to 2 more" +
+                        " BASOrchestration value types" +
+                        " (BASNeuralCoreFrame +" +
+                        " BASProductRedLineLinter." +
+                        "Violation)。 Both unblocked by" +
+                        " chapter 573 BASLatentTissue" +
+                        "State + BASBadToneLinter." +
+                        "Violation Codable additions。"),
+                BASChapterKnife(
+                    mNumber: 1682, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1683, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionPostArcDoctrine typed" +
+                        " surface with upstream-" +
+                        "dependency map。 Mirrors chapter" +
+                        " 565 post-arc precedent。 typed-" +
+                        "surface count 116 → 117。"),
+                BASChapterKnife(
+                    mNumber: 1684, knife: "第四刀",
+                    concept: "Chapter 576 close-out +" +
+                        " doctrine sync。 268" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "neural-core-frame-non-codable",
+                "product-red-line-violation-non-codable",
+                "post-arc-aftermath-incomplete",
+                "downstream-types-blocked-by-prior-non-codable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1684",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "post-arc-orchestration-codable",
+                "8-orchestration-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — additional BASOrchestration" +
+                " value types as candidates surface",
+                "future arc — start 5th sealed arc" +
+                " (different module territory)"
+            ],
+            summary: "Chapter 576 ships post-arc Codable" +
+                " extension into BASOrchestration。 2" +
+                " more value types (BASNeuralCoreFrame +" +
+                " BASProductRedLineLinter.Violation)" +
+                " gained Codable at M1681 — both" +
+                " unblocked by the chapter 573 third-" +
+                "wave Codable extension。 2 PROOF tests" +
+                " (M1682) + new typed surface (M1683) +" +
+                " close-out (M1684)。 Mirrors chapter" +
+                " 565 post-aggregator-arc follow-up" +
+                " pattern。 Combined chapter 574 arc" +
+                " (6 types) + chapter 576 post-arc" +
+                " (2 types) = 8 BASOrchestration types" +
+                " ledger-serializable。 117 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1684。 268 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

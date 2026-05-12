@@ -37,20 +37,21 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs575() {
+    func testLastChapterIs576() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百七十五",
-            "Chapter 五百七十五:QUAD-ARC COMPLETION" +
-            " META-META MILESTONE。 NEW BASCodable" +
-            "ExtensionQuadArcCompletionDoctrine" +
-            " cataloguing ALL 4 sealed Codable" +
-            " extension arcs (50 types,48 commits)" +
-            " + 20 anti-drift PROOF + 16 wire-in" +
-            " PROOF + close-out。 Supersedes chapter" +
-            " 570 tri-arc snapshot。 116 typed" +
-            " surfaces cumulative")
+            "chapter 五百七十六",
+            "Chapter 五百七十六:POST-ARC ORCHESTRATION" +
+            " CODABLE EXTENSION。 2 more BASOrchestration" +
+            " value types gained Codable" +
+            " (BASNeuralCoreFrame +" +
+            " BASProductRedLineLinter.Violation) +" +
+            " 2 PROOF tests + BASOrchestrationCodable" +
+            "ExtensionPostArcDoctrine typed surface" +
+            " + close-out。 Mirrors chapter 565" +
+            " post-arc pattern。 117 typed surfaces" +
+            " cumulative")
     }
 
     // MARK: - M-number range
