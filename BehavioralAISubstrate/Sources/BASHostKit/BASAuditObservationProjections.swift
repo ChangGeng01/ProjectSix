@@ -576,6 +576,72 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
                 observationBundles.updateTicket)
     }
 
+    // MARK: - chapter 五百二十二 / M1466 — unified 8-block
+    //                                       convenience init
+    //                                       (100% PACKAGING
+    //                                        COVERAGE)
+    //
+    // Single convenience init taking ALL EIGHT typed
+    // input blocks。 NO RESIDUAL named args — every
+    // audit-projection field belongs to exactly one
+    // block。 Collapses the 56-arg all-fields init into
+    // just 8 args at the call site (the 8 blocks)。
+    //
+    // 100% V1 call-site packaging coverage milestone。
+    //
+    // Byte-equality with the 7-block init GUARANTEED by
+    // body construction — the 6 leftover fields are
+    // unpacked from the new block's accessors。
+    public init(
+        kunlunInputs:
+            BASAuditObservationProjectionsKunlunInputs,
+        cthulhuInputs:
+            BASAuditObservationProjectionsCthulhuInputs,
+        observationBundles:
+            BASAuditObservationProjectionsObservationBundlesBlock,
+        kunlunProtocolBlock:
+            BASAuditObservationProjectionsKunlunProtocolBlock,
+        cthulhuAggregatesBlock:
+            BASAuditObservationProjectionsCthulhuAggregatesBlock,
+        closureBlock:
+            BASAuditObservationProjectionsClosureBlock,
+        kunlunAuditSchemasBlock:
+            BASAuditObservationProjectionsKunlunAuditSchemasBlock,
+        cthulhuLeftoversBlock:
+            BASAuditObservationProjectionsCthulhuLeftoversBlock
+    ) {
+        // Delegate to the 7-block init with 6 leftover
+        // fields unpacked from cthulhuLeftoversBlock。
+        self.init(
+            kunlunInputs: kunlunInputs,
+            cthulhuInputs: cthulhuInputs,
+            observationBundles: observationBundles,
+            kunlunProtocolBlock: kunlunProtocolBlock,
+            cthulhuAggregatesBlock:
+                cthulhuAggregatesBlock,
+            closureBlock: closureBlock,
+            kunlunAuditSchemasBlock:
+                kunlunAuditSchemasBlock,
+            ontologyShiftMark:
+                cthulhuLeftoversBlock
+                    .ontologyShiftMark,
+            cthulhuAssertionCeilingReasonCodes:
+                cthulhuLeftoversBlock
+                    .cthulhuAssertionCeilingReasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                cthulhuLeftoversBlock
+                    .cthulhuPermitEscalationReasonCodes,
+            narrativeDistortionMap:
+                cthulhuLeftoversBlock
+                    .narrativeDistortionMap,
+            cthulhuSurfaceAlias:
+                cthulhuLeftoversBlock
+                    .cthulhuSurfaceAlias,
+            kunlunSurfaceAlias:
+                cthulhuLeftoversBlock
+                    .kunlunSurfaceAlias)
+    }
+
     // MARK: - chapter 五百二十一 / M1462 — unified 7-block
     //                                       convenience init
     //
