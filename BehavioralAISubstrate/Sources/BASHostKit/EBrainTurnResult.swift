@@ -202,6 +202,117 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百二十五 / M1478 — sovereignBundle
+    //                                       convenience init
+    //
+    // Convenience init that accepts a typed
+    // BASEBrainTurnResultSovereignBundle (8 L14
+    // sovereign fields) in place of 8 individual
+    // sovereign-cluster args。 Sibling of the M1474
+    // evolutionBundle init。
+    //
+    // PUBLIC API additive only。 Byte-equality with the
+    // all-fields init GUARANTEED by body delegation。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostConstitution: BASHostConstitution? = nil,
+        hostConstitutionVault: BASHostConstitutionVault? = nil,
+        hostVersionTree: BASHostVersionTree? = nil,
+        hostForgetRequest: BASForgetRequest? = nil,
+        hostContext: BASHostProfile,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        thoughtFrame: BASThoughtFrame,
+        thoughtFold: BASThoughtFold,
+        triScores: [BASTriSelfScore],
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
+        hostGateValue: Double,
+        renderedOutput: BASRenderedOutput,
+        updateTickets: [BASUpdateTicket],
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        kunlunAxisAlignment: BASAxisAlignment? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        unknownReserve: BASUnknownReserve? = nil,
+        kunlunHeavenGatePermit: BASHeavenGatePermit? = nil,
+        kunlunRiverOriginTrace: BASRiverOriginTrace? = nil,
+        yaochiSanctumEntry: BASYaochiSanctumEntry? = nil
+    ) {
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            // 8 sovereign fields unpacked from bundle
+            sovereignVerdict:
+                sovereignBundle.sovereignVerdict,
+            sovereignCommitTokens:
+                sovereignBundle.sovereignCommitTokens,
+            sovereignWarrants:
+                sovereignBundle.sovereignWarrants,
+            sovereignLock:
+                sovereignBundle.sovereignLock,
+            quarantineRecords:
+                sovereignBundle.quarantineRecords,
+            sovereignAuditEntry:
+                sovereignBundle.sovereignAuditEntry,
+            sovereignActuationCommands:
+                sovereignBundle
+                    .sovereignActuationCommands,
+            sovereignExecutionReceipts:
+                sovereignBundle
+                    .sovereignExecutionReceipts,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostConstitution: hostConstitution,
+            hostConstitutionVault:
+                hostConstitutionVault,
+            hostVersionTree: hostVersionTree,
+            hostForgetRequest: hostForgetRequest,
+            hostContext: hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: triScores,
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            riskDecisionPackage: riskDecisionPackage,
+            hostGateValue: hostGateValue,
+            renderedOutput: renderedOutput,
+            updateTickets: updateTickets,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace: runtimeTrace,
+            kunlunAxisAlignment: kunlunAxisAlignment,
+            humanAnchorSignal: humanAnchorSignal,
+            abyssalPressure: abyssalPressure,
+            unknownReserve: unknownReserve,
+            kunlunHeavenGatePermit: kunlunHeavenGatePermit,
+            kunlunRiverOriginTrace: kunlunRiverOriginTrace,
+            yaochiSanctumEntry: yaochiSanctumEntry)
+    }
+
     // MARK: - chapter 五百二十四 / M1474 — evolutionBundle
     //                                       convenience init
     //
