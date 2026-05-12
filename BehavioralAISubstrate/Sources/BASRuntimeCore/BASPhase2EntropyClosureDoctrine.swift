@@ -181,7 +181,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百二十四",   // M1473-M1476 (PIVOT to BASEBrainTurnResult fold — typed evolution bundle + convenience init + V1 splice using bundle)
         "chapter 五百二十五",   // M1477-M1480 (2nd BASEBrainTurnResult cluster bundle — sovereign 8 fields + 2-bundle init + V1 splice, 52 → 36 args cumulative)
         "chapter 五百二十六",   // M1481-M1484 (3rd BASEBrainTurnResult cluster bundle — audit-projection-forward 7 fields + 3-bundle init + V1 splice, 52 → 29 args cumulative)
-        "chapter 五百二十七"    // M1485-M1488 (parallel-run reconciliation — 4-bundle convenience init + PROOF tests + typed milestone)
+        "chapter 五百二十七",   // M1485-M1488 (parallel-run reconciliation — 4-bundle convenience init + PROOF tests + typed milestone)
+        "chapter 五百二十八"    // M1489-M1492 (5th BASEBrainTurnResult cluster bundle — cognitive frames 5 fields + 5-bundle init + V1 splice, 52 → 22 args cumulative)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -198,16 +199,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1488
+    public static let mNumberLast: Int = 1492
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1488)。 Bumped through chapter 527:529 → 533。
-    /// Chapter 527:parallel-run reconciliation — M1485
-    /// 4-bundle convenience init + M1486 PROOF tests +
-    /// M1487 typed milestone doctrine + M1488 close-out。
-    /// Closes the call-site contract gap from chapter
-    /// 526's parallel /loop interleave。
-    public static let commitsShipped: Int = 533
+    /// M1492)。 Bumped through chapter 528:533 → 537。
+    /// Chapter 528:5th BASEBrainTurnResult cluster
+    /// bundle (cognitive frames,5 fields) — M1489 +
+    /// M1490 5-bundle init + M1491 V1 splice + M1492
+    /// close-out。 V1 call site 52 → 22 args (35 fields
+    /// collapsed across 5 typed bundles)。
+    public static let commitsShipped: Int = 537
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

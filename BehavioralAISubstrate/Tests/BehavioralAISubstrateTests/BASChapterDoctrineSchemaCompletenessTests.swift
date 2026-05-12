@@ -1577,7 +1577,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百二十七")!)
+                            "chapter 五百二十七")!),
+            // M1492 chapter 528 — cognitive frames 5th cluster
+            checkRegistry("五百二十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百二十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2289,6 +2295,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百二十七")!
+                .mNumberLast),
+            // M1492 chapter 528 — cognitive frames 5th cluster
+            ("528",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

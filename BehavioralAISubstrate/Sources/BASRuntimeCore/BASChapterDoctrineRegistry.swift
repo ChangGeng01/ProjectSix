@@ -6127,7 +6127,91 @@ public enum BASChapterDoctrineRegistry {
                 " M1488 close-out。 73 typed surfaces" +
                 " cumulative。 ADR-016 → M1488。 V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 528 — cognitive frames cluster
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十八",
+            mNumberFirst: 1489,
+            mNumberLast: 1492,
+            v1MilestoneMNumber: 1492,
+            v1MilestoneStatus:
+                "chapter-528-cognitive-frames-5th-cluster",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1489, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "CognitiveFramesBundle — 5th" +
+                        " cluster bundle。 Packs 5 cognitive-" +
+                        "frame fields (contextFrame +" +
+                        " decomposeFrame + memoryBundle" +
+                        " + thoughtFrame + thoughtFold)。" +
+                        " All required (non-optional)。" +
+                        " 74 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1490, knife: "第二刀",
+                    concept: "BASEBrainTurnResult 5-bundle" +
+                        " convenience init taking ALL 5" +
+                        " typed cluster bundles。 Collapses" +
+                        " 35 individual fields into 5" +
+                        " typed bundle args。 Delegates to" +
+                        " M1485 4-bundle init。"),
+                BASChapterKnife(
+                    mNumber: 1491, knife: "第三刀",
+                    concept: "V1 monolith splice uses" +
+                        " cognitiveFramesBundle (5 args" +
+                        " → 1 typed block)。 Cumulative" +
+                        " BASEBrainTurnResult fold:52 →" +
+                        " 22 named args at line 2287+" +
+                        " (35 fields collapsed across 5" +
+                        " typed bundles)。"),
+                BASChapterKnife(
+                    mNumber: 1492, knife: "第四刀",
+                    concept: "Chapter 528 close-out +" +
+                        " doctrine sync。 ADR-016 → M1492。" +
+                        " 5 of ~5 BASEBrainTurnResult" +
+                        " cluster bundles shipped。 V1" +
+                        " call site at 22 args (down" +
+                        " from 52)。")
+            ],
+            entropyClassesAttacked: [
+                "BASEBrainTurnResult-cognitive-frames-5-args",
+                "5-bundle-convenience-init-absent",
+                "BASEBrainTurnResult-fold-incomplete",
+                "L1-L11-cognitive-chain-not-typed-as-bundle"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1492",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "5-bundle-call-site-fold"
+            ],
+            plannedFutureCuts: [
+                "future arc — risk/choice cluster (4" +
+                " fields:triScores,mergedChoice," +
+                " riskCard,actionPermit)",
+                "future arc — misc cluster (riskDecision" +
+                "Package + hostGateValue + renderedOutput" +
+                " + updateTickets)",
+                "future arc — SampleHost wire-in",
+                "future arc — Tier C migration"
+            ],
+            summary: "Chapter 528 ships the 5th cluster" +
+                " bundle for the BASEBrainTurnResult" +
+                " fold:BASEBrainTurnResultCognitiveFrames" +
+                "Bundle (5 cognitive-frame fields) +" +
+                " 5-bundle convenience init + V1 monolith" +
+                " splice using the bundle。 Cumulative" +
+                " fold progress at BASEBrainTurnResult" +
+                " call site:52 → 22 named args (35" +
+                " fields collapsed across 5 typed" +
+                " bundles)。 74 typed surfaces cumulative。" +
+                " ADR-016 → M1492。 V1 byte-equality" +
+                " preserved (stress-sweep canonical60" +
+                " × 3 repeat runs 0-divergence)。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

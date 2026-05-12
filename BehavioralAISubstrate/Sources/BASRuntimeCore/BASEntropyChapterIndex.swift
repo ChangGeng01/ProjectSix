@@ -1854,7 +1854,25 @@ public enum BASEntropyChapterIndex {
                 " inits existed) + M1486 PROOF tests +" +
                 " M1487 typed milestone doctrine。 73" +
                 " typed surfaces cumulative。 ADR-016 →" +
-                " M1488。 V1 byte-equality preserved。")
+                " M1488。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十八",
+            mNumberFirst: 1489, mNumberLast: 1492,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "5th BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultCognitive" +
+                "FramesBundle (5 required cognitive" +
+                " frame fields:contextFrame +" +
+                " decomposeFrame + memoryBundle +" +
+                " thoughtFrame + thoughtFold) +" +
+                " 5-bundle convenience init + V1" +
+                " monolith splice。 BASEBrainTurnResult" +
+                " call site cumulative:52 → 22 args" +
+                " (35 fields collapsed across 5 typed" +
+                " bundles)。 74 typed surfaces cumulative。" +
+                " ADR-016 → M1492。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
