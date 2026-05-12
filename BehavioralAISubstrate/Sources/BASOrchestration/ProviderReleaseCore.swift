@@ -3,7 +3,7 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
-public struct BASProviderReleaseAssessment: Sendable, Equatable {
+public struct BASProviderReleaseAssessment: Codable, Sendable, Equatable {
     public var outputPreview: String
     public var consistencyCheck: BASConsistencyCheckResult?
 
@@ -16,7 +16,7 @@ public struct BASProviderReleaseAssessment: Sendable, Equatable {
     }
 }
 
-public struct BASProviderReleaseEvaluationRequest: Sendable, Equatable {
+public struct BASProviderReleaseEvaluationRequest: Codable, Sendable, Equatable {
     public var kind: BASAdaptiveTraceKind
     public var outputPreview: String
     public var kernelSnapshot: BASCognitionKernelSnapshot
