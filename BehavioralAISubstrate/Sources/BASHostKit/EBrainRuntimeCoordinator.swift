@@ -2291,14 +2291,28 @@ public struct BASEBrainRuntimeCoordinator {
             vitalState: vitalState,
             runLease: runLease,
             emergencyBrake: emergencyBrake,
-            sovereignVerdict: finalSovereignVerdict,
-            sovereignCommitTokens: sovereignCommitTokens,
-            sovereignWarrants: sovereignWarrants,
-            sovereignLock: sovereignLock,
-            quarantineRecords: quarantineRecords,
-            sovereignAuditEntry: sovereignAuditEntry,
-            sovereignActuationCommands: sovereignActuationCommands,
-            sovereignExecutionReceipts: sovereignExecutionReceipts,
+            // chapter 五百二十五 / M1479 — V1 splice:
+            // 8 sovereign-cluster args collapse to 1
+            // typed sovereignBundle。 Byte-equality
+            // preserved by M1478 PROOF (bundle accessors
+            // pass through verbatim)。
+            sovereignBundle:
+                BASEBrainTurnResultSovereignBundle(
+                    sovereignVerdict:
+                        finalSovereignVerdict,
+                    sovereignCommitTokens:
+                        sovereignCommitTokens,
+                    sovereignWarrants:
+                        sovereignWarrants,
+                    sovereignLock: sovereignLock,
+                    quarantineRecords:
+                        quarantineRecords,
+                    sovereignAuditEntry:
+                        sovereignAuditEntry,
+                    sovereignActuationCommands:
+                        sovereignActuationCommands,
+                    sovereignExecutionReceipts:
+                        sovereignExecutionReceipts),
             policyLineage: policyLineage,
             recoveryDisposition: recoveryDisposition,
             hostConstitution: hostConstitution,
