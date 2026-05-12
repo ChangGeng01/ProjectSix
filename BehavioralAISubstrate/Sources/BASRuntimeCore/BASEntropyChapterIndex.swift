@@ -2780,6 +2780,28 @@ public enum BASEntropyChapterIndex {
                 "Orchestration types ledger-" +
                 "serializable。 118 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1688。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十八",
+            mNumberFirst: 1689, mNumberLast: 1692,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC WAVE 3 ORCHESTRATION" +
+                " CODABLE EXTENSION。 2 more BAS" +
+                "Orchestration value types gained" +
+                " Codable at M1689 (BASNeuralPublic" +
+                "ThoughtProjection +" +
+                " BASSoftHandModeSelector." +
+                "SelectionResult)。 2 PROOF tests" +
+                " (M1690) + new typed surface (M1691)" +
+                " + close-out (M1692)。 Continues" +
+                " chapter 576+577 post-arc pattern。" +
+                " Chapter 574 arc (6) + chapter 576" +
+                " wave 1 (2) + chapter 577 wave 2 (2)" +
+                " + chapter 578 wave 3 (2) = 12 BAS" +
+                "Orchestration types ledger-" +
+                "serializable。 119 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1692。" +
                 " V1 byte-equality preserved。")
     ]
 

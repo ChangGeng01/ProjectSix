@@ -10465,6 +10465,92 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1688。" +
                 " 272 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 578 — Post-arc wave 3 Codable
+        // extension into BASOrchestration。 2 more
+        // value types (BASNeuralPublicThoughtProjection
+        // + BASSoftHandModeSelector.SelectionResult)。
+        // Continues chapter 576+577 post-arc pattern。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十八",
+            mNumberFirst: 1689,
+            mNumberLast: 1692,
+            v1MilestoneMNumber: 1692,
+            v1MilestoneStatus:
+                "chapter-578-post-arc-wave-three-orchestration-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1689, knife: "第一刀",
+                    concept: "Add Codable to 2 more" +
+                        " BASOrchestration value types" +
+                        " (BASNeuralPublicThought" +
+                        "Projection +" +
+                        " BASSoftHandModeSelector." +
+                        "SelectionResult)。 Both" +
+                        " composite field types pre-" +
+                        "Codable (BASSchemaVersioned +" +
+                        " Codable enum)。"),
+                BASChapterKnife(
+                    mNumber: 1690, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1691, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionPostArcWaveThree" +
+                        "Doctrine typed surface。 Wave" +
+                        " 3 of post-arc continuation。" +
+                        " typed-surface count 118 → 119。"),
+                BASChapterKnife(
+                    mNumber: 1692, knife: "第四刀",
+                    concept: "Chapter 578 close-out +" +
+                        " doctrine sync。 276" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "neural-public-thought-projection-non-codable",
+                "soft-hand-mode-selection-result-non-codable",
+                "post-arc-wave-three-aftermath-incomplete",
+                "selection-result-nested-types-non-serializable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1692",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "post-arc-wave-three-orchestration-codable",
+                "12-orchestration-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — additional BAS" +
+                "Orchestration value types (BASNeural" +
+                "ThoughtMaterialization composite,etc。)",
+                "future arc — eventual post-arc seal" +
+                " milestone after 3+ waves accumulated"
+            ],
+            summary: "Chapter 578 ships post-arc wave 3" +
+                " Codable extension into BASOrchestration。" +
+                " 2 more value types (BASNeuralPublic" +
+                "ThoughtProjection +" +
+                " BASSoftHandModeSelector." +
+                "SelectionResult) gained Codable at" +
+                " M1689。 2 PROOF tests (M1690) + new" +
+                " typed surface (M1691) + close-out" +
+                " (M1692)。 Continues chapter 576+577" +
+                " post-arc pattern。 Combined chapter" +
+                " 574 arc (6) + chapter 576 wave 1 (2)" +
+                " + chapter 577 wave 2 (2) + chapter" +
+                " 578 wave 3 (2) = 12 BAS" +
+                "Orchestration types ledger-" +
+                "serializable。 119 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1692。" +
+                " 276 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

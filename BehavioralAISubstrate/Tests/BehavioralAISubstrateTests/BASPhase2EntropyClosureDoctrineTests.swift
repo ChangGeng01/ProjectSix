@@ -37,20 +37,21 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs577() {
+    func testLastChapterIs578() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百七十七",
-            "Chapter 五百七十七:POST-ARC WAVE 2" +
+            "chapter 五百七十八",
+            "Chapter 五百七十八:POST-ARC WAVE 3" +
             " ORCHESTRATION CODABLE EXTENSION。 2 more" +
             " BASOrchestration value types gained" +
-            " Codable (BASProviderReleaseAssessment +" +
-            " BASProviderReleaseEvaluationRequest) +" +
-            " 2 PROOF tests + BASOrchestrationCodable" +
-            "ExtensionPostArcWaveTwoDoctrine typed" +
-            " surface + close-out。 Continues chapter" +
-            " 576 post-arc pattern。 118 typed surfaces" +
+            " Codable (BASNeuralPublicThoughtProjection" +
+            " + BASSoftHandModeSelector." +
+            "SelectionResult) + 2 PROOF tests +" +
+            " BASOrchestrationCodableExtensionPostArc" +
+            "WaveThreeDoctrine typed surface +" +
+            " close-out。 Continues chapter 576+577" +
+            " post-arc pattern。 119 typed surfaces" +
             " cumulative")
     }
 

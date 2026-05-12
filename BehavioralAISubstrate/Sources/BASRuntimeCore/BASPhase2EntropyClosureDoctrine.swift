@@ -231,7 +231,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百七十四",   // M1673-M1676 (ORCHESTRATION CODABLE EXTENSION ARC-SEAL MILESTONE — BASOrchestrationCodableExtensionArcSealedDoctrine + 21 anti-drift + 16 wire-in PROOF tests commemorating 3-chapter / 12-commit arc across chapters 571-573;6 BASOrchestration types ledger-serializable)
         "chapter 五百七十五",   // M1677-M1680 (QUAD-ARC COMPLETION META-META MILESTONE — BASCodableExtensionQuadArcCompletionDoctrine + 20 anti-drift + 16 wire-in PROOF tests cataloguing all 4 sealed Codable extension arcs;50 types,48 commits,12 chapters,4 modules;52 session types ledger-serializable)
         "chapter 五百七十六",   // M1681-M1684 (POST-ARC ORCHESTRATION CODABLE EXTENSION — 2 more BASOrchestration value types gained Codable (BASNeuralCoreFrame + BASProductRedLineLinter.Violation) + 2 PROOF tests + BASOrchestrationCodableExtensionPostArcDoctrine + close-out;mirrors chapter 565 post-arc pattern;chapter 574 arc + chapter 576 post-arc = 8 Orchestration types)
-        "chapter 五百七十七"    // M1685-M1688 (POST-ARC WAVE 2 ORCHESTRATION CODABLE EXTENSION — 2 more BASOrchestration value types gained Codable (BASProviderReleaseAssessment + BASProviderReleaseEvaluationRequest) + 2 PROOF tests + BASOrchestrationCodableExtensionPostArcWaveTwoDoctrine + close-out;chapter 574 arc + 576 + 577 = 10 Orchestration types)
+        "chapter 五百七十七",   // M1685-M1688 (POST-ARC WAVE 2 ORCHESTRATION CODABLE EXTENSION — 2 more BASOrchestration value types gained Codable (BASProviderReleaseAssessment + BASProviderReleaseEvaluationRequest) + 2 PROOF tests + BASOrchestrationCodableExtensionPostArcWaveTwoDoctrine + close-out;chapter 574 arc + 576 + 577 = 10 Orchestration types)
+        "chapter 五百七十八"    // M1689-M1692 (POST-ARC WAVE 3 ORCHESTRATION CODABLE EXTENSION — 2 more BASOrchestration value types gained Codable (BASNeuralPublicThoughtProjection + BASSoftHandModeSelector.SelectionResult) + 2 PROOF tests + BASOrchestrationCodableExtensionPostArcWaveThreeDoctrine + close-out;chapter 574 arc + 576 + 577 + 578 = 12 Orchestration types)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -248,15 +249,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1688
+    public static let mNumberLast: Int = 1692
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1688)。 Bumped through chapter 577:729 → 733。
-    /// Chapter 577:Post-arc wave 2 Codable extension
+    /// M1692)。 Bumped through chapter 578:733 → 737。
+    /// Chapter 578:Post-arc wave 3 Codable extension
     /// into BASOrchestration + 2 PROOF tests + typed
-    /// surface + close-out。 Continues chapter 576
+    /// surface + close-out。 Continues chapter 576+577
     /// post-arc pattern。
-    public static let commitsShipped: Int = 733
+    public static let commitsShipped: Int = 737
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
