@@ -56,14 +56,14 @@ public actor BASThermalTwin {
     /// OS-level thermal reading. Mirrors `ProcessInfo.ThermalState`
     /// so the actor remains portable across platforms where that
     /// type is available and testable where it isn't.
-    public enum OSThermalState: String, Sendable, Equatable, CaseIterable {
+    public enum OSThermalState: String, Codable, Sendable, Equatable, CaseIterable {
         case nominal
         case fair
         case serious
         case critical
     }
 
-    public struct Reading: Sendable, Equatable {
+    public struct Reading: Codable, Sendable, Equatable {
         public let osState: OSThermalState
         public let thermalLevel: BASThermalLevel
         public let guardLevel: BASThermalGuardLevel

@@ -37,7 +37,7 @@ import BASRuntimeCore
 /// Time constant defaults to 180 s — pressure decays ~37% each
 /// 3-minute idle window. Configurable by the caller.
 public actor BASLungStateAccumulator {
-    public struct Snapshot: Sendable, Equatable {
+    public struct Snapshot: Codable, Sendable, Equatable {
         public let pressure: Double
         public let turnCount: Int
         public let lastTurnAt: Date?
