@@ -112,18 +112,58 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripExtendedTests:
         XCTAssertEqual(data1, data2)
     }
 
+    // MARK: - MiscBundle fixture (chapter 544 / M1553)
+
+    private func makeMiscBundle()
+        -> BASEBrainTurnResultMiscBundle
+    {
+        // Minimal fixture:
+        //   - riskDecisionPackage: nil (optional)
+        //   - hostGateValue: 0.5 (Double)
+        //   - renderedOutput: minimal answer-mode
+        //     surface (mode + headline + body required)
+        //   - updateTickets: [] (empty)
+        let output = BASRenderedOutput(
+            mode: .answer,
+            headline: "fixture-headline",
+            body: "fixture-body")
+        return BASEBrainTurnResultMiscBundle(
+            riskDecisionPackage: nil,
+            hostGateValue: 0.5,
+            renderedOutput: output,
+            updateTickets: [])
+    }
+
+    func testMiscBundleMinimumRoundTrips() throws {
+        let original = makeMiscBundle()
+        let decoded = try roundTrip(original)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testMiscBundleEncodingIsDeterministic() throws {
+        let bundle = makeMiscBundle()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data1 = try encoder.encode(bundle)
+        let data2 = try encoder.encode(bundle)
+        XCTAssertEqual(data1, data2)
+    }
+
     // MARK: - Cross-bundle round-trip determinism PROOF
 
-    func testTwoBundlesRoundTripPreservesFieldEquality()
+    func testThreeBundlesRoundTripPreservesFieldEquality()
         throws
     {
         let host = makeHostBundle()
         let forensic = makeForensicMetadataBundle()
+        let misc = makeMiscBundle()
         let decodedHost = try roundTrip(host)
         let decodedForensic = try roundTrip(forensic)
+        let decodedMisc = try roundTrip(misc)
         // Bundles are distinct types — equality only
         // holds for like-typed values。
         XCTAssertEqual(decodedHost, host)
         XCTAssertEqual(decodedForensic, forensic)
+        XCTAssertEqual(decodedMisc, misc)
     }
 }
