@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs530() {
+    func testLastChapterIs531() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十",
-            "M1500 MILESTONE — chapter 五百三十:7th" +
-            " BASEBrainTurnResult cluster bundle (misc" +
-            " 4 fields) + 7-bundle init + V1 splice。" +
-            " V1 call site 52 → 14 args cumulative" +
-            " across 7 typed bundles (73% reduction)。" +
-            " 76 typed surfaces cumulative")
+            "chapter 五百三十一",
+            "Chapter 五百三十一:8th BASEBrainTurnResult" +
+            " cluster bundle (device/lifecycle 6" +
+            " fields) + 8-bundle init + V1 splice。" +
+            " V1 call site 52 → 8 args cumulative across" +
+            " 8 typed bundles (85% reduction)。 77 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

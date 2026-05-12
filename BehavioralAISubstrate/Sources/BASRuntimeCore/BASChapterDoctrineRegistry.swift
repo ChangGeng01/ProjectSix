@@ -6384,6 +6384,95 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M1500。" +
                 " 84 consecutive autonomous commits with" +
                 " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。"),
+
+        // chapter 531 — device/lifecycle 8th cluster
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十一",
+            mNumberFirst: 1501,
+            mNumberLast: 1504,
+            v1MilestoneMNumber: 1504,
+            v1MilestoneStatus:
+                "chapter-531-device-lifecycle-8th-cluster",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1501, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "DeviceLifecycleBundle — 8th" +
+                        " cluster bundle。 Packs 6 L0" +
+                        " device/lifecycle fields" +
+                        " (deviceState + budgetFrame +" +
+                        " wakeIntent + vitalState +" +
+                        " runLease + emergencyBrake)。" +
+                        " 77 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1502, knife: "第二刀",
+                    concept: "BASEBrainTurnResult 8-bundle" +
+                        " convenience init taking ALL 8" +
+                        " typed cluster bundles。 Collapses" +
+                        " 49 individual fields into 8" +
+                        " typed bundle args (6+8+5+10+7+" +
+                        "5+4+4)。"),
+                BASChapterKnife(
+                    mNumber: 1503, knife: "第三刀",
+                    concept: "V1 monolith splice uses" +
+                        " deviceLifecycleBundle (6 args" +
+                        " → 1 typed block)。 Cumulative" +
+                        " BASEBrainTurnResult fold:52 →" +
+                        " 8 named args at line 2287+" +
+                        " (85% reduction across 8 typed" +
+                        " bundles)。"),
+                BASChapterKnife(
+                    mNumber: 1504, knife: "第四刀",
+                    concept: "Chapter 531 close-out +" +
+                        " doctrine sync — 8 of ~8 cohesive" +
+                        " BASEBrainTurnResult cluster" +
+                        " bundles shipped。 V1 call site" +
+                        " at 8 args (down from 52,85%" +
+                        " reduction)。 88 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "BASEBrainTurnResult-device-lifecycle-6-args",
+                "8-bundle-convenience-init-absent",
+                "L0-host-envelope-cluster-not-typed",
+                "BASEBrainTurnResult-fold-final-stretch"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1504",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "8-bundle-fold-85%-reduction"
+            ],
+            plannedFutureCuts: [
+                "future arc — policy/recovery + runtime" +
+                "Trace residuals (3 fields:" +
+                " policyLineage + recoveryDisposition +" +
+                " runtimeTrace,if coherent enough to" +
+                " package)",
+                "future arc — SampleHost production" +
+                " wire-in of the 8-bundle init",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 531 ships the 8th cluster" +
+                " bundle for the BASEBrainTurnResult fold:" +
+                " BASEBrainTurnResultDeviceLifecycleBundle" +
+                " (6 L0 device/lifecycle fields:" +
+                " deviceState + budgetFrame + wakeIntent" +
+                " + vitalState + runLease + emergencyBrake)" +
+                " + 8-bundle convenience init + V1" +
+                " monolith splice。 Cumulative fold" +
+                " progress at BASEBrainTurnResult call" +
+                " site:52 → 8 named args (49 fields" +
+                " collapsed across 8 typed bundles,85%" +
+                " reduction)。 77 typed surfaces" +
+                " cumulative。 ADR-016 → M1504。 88" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014" +
                 " OPT-IN preserved。")
     ]
 

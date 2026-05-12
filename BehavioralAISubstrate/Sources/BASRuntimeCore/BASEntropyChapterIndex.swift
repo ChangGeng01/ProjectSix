@@ -1907,6 +1907,24 @@ public enum BASEntropyChapterIndex {
                 " collapsed across 7 typed bundles," +
                 " 73% reduction)。 76 typed surfaces" +
                 " cumulative。 ADR-016 → M1500。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十一",
+            mNumberFirst: 1501, mNumberLast: 1504,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "8th BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultDevice" +
+                "LifecycleBundle (6 L0 device/lifecycle" +
+                " fields:deviceState + budgetFrame +" +
+                " wakeIntent + vitalState + runLease +" +
+                " emergencyBrake) + 8-bundle convenience" +
+                " init + V1 monolith splice。" +
+                " BASEBrainTurnResult call site" +
+                " cumulative:52 → 8 args (49 fields" +
+                " collapsed across 8 typed bundles," +
+                " 85% reduction)。 77 typed surfaces" +
+                " cumulative。 ADR-016 → M1504。 V1" +
                 " byte-equality preserved。")
     ]
 

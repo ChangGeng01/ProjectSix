@@ -184,7 +184,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百二十七",   // M1485-M1488 (parallel-run reconciliation — 4-bundle convenience init + PROOF tests + typed milestone)
         "chapter 五百二十八",   // M1489-M1492 (5th BASEBrainTurnResult cluster bundle — cognitive frames 5 fields + 5-bundle init + V1 splice, 52 → 22 args cumulative)
         "chapter 五百二十九",   // M1493-M1496 (6th BASEBrainTurnResult cluster bundle — risk/choice 4 fields + 6-bundle init + V1 splice, 52 → 18 args cumulative, 65% reduction)
-        "chapter 五百三十"      // M1497-M1500 (M1500 MILESTONE — 7th BASEBrainTurnResult cluster bundle, misc 4 fields + 7-bundle init + V1 splice, 52 → 14 args cumulative, 73% reduction)
+        "chapter 五百三十",     // M1497-M1500 (M1500 MILESTONE — 7th BASEBrainTurnResult cluster bundle, misc 4 fields + 7-bundle init + V1 splice, 52 → 14 args cumulative, 73% reduction)
+        "chapter 五百三十一"    // M1501-M1504 (8th BASEBrainTurnResult cluster bundle — device/lifecycle 6 fields + 8-bundle init + V1 splice, 52 → 8 args cumulative, 85% reduction)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -201,17 +202,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1500
+    public static let mNumberLast: Int = 1504
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1500)。 Bumped through chapter 530 (M1500
-    /// MILESTONE):541 → 545。 Chapter 530:7th
-    /// BASEBrainTurnResult cluster bundle (misc,4
-    /// fields) — M1497 + M1498 7-bundle init + M1499
-    /// V1 splice + M1500 close-out。 V1 call site 52 →
-    /// 14 args (43 fields collapsed across 7 typed
-    /// bundles,73% reduction)。
-    public static let commitsShipped: Int = 545
+    /// M1504)。 Bumped through chapter 531:545 → 549。
+    /// Chapter 531:8th BASEBrainTurnResult cluster
+    /// bundle (device/lifecycle,6 fields) — M1501 +
+    /// M1502 8-bundle init + M1503 V1 splice + M1504
+    /// close-out。 V1 call site 52 → 8 args (49 fields
+    /// collapsed across 8 typed bundles,85% reduction)。
+    public static let commitsShipped: Int = 549
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

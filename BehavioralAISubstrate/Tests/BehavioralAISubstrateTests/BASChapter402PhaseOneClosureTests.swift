@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1500",
-            "M1484:doctrine version reflects chapter 五百二十六 — 3rd BASEBrainTurnResult cluster bundle (audit-projection-forward 7 fields)。 BASEBrainTurnResultAuditProjectionForwardBundle typed cluster packaging 7 audit-projection-forwarded fields (M1481) + BASEBrainTurnResult 3-bundle convenience init evolution + sovereign + auditProjectionForward (M1482) + V1 monolith splice using audit-projection-forward bundle (M1483)。 Cumulative BASEBrainTurnResult call-site fold:52 → 29 named args (23 collapsed across 3 typed bundles)。 72 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1504",
+            "M1504:doctrine version reflects chapter 五百三十一 — 8th BASEBrainTurnResult cluster bundle (device/lifecycle 6 fields)。 BASEBrainTurnResultDeviceLifecycleBundle typed cluster packaging 6 L0 device/lifecycle fields (M1501) + BASEBrainTurnResult 8-bundle convenience init (M1502) + V1 monolith splice using device/lifecycle bundle (M1503)。 Cumulative BASEBrainTurnResult call-site fold:52 → 8 named args (49 collapsed across 8 typed bundles,85% reduction)。 77 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
