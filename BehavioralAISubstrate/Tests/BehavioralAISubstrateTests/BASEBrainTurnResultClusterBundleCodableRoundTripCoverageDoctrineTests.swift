@@ -28,28 +28,28 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrineTest
 
     // MARK: - Coverage counts
 
-    func testExplicitlyCoveredCountIsSevenAtM1558() {
+    func testExplicitlyCoveredCountIsEightAtM1562() {
         XCTAssertEqual(
             BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
                 .explicitlyCoveredCount,
-            7,
-            "7 of 9 bundles have explicit round-trip" +
-            " coverage at chapter 545 close-out (added" +
-            " DeviceLifecycleBundle at M1557)")
+            8,
+            "8 of 9 bundles have explicit round-trip" +
+            " coverage at chapter 546 close-out (added" +
+            " RiskChoiceBundle at M1561)")
     }
 
-    func testCompileTimeOnlyCountIsTwoAtM1558() {
+    func testCompileTimeOnlyCountIsOneAtM1562() {
         XCTAssertEqual(
             BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
                 .compileTimeOnlyCount,
-            2)
+            1)
     }
 
-    func testCoverageRatioIsAboutSevenNinths() {
+    func testCoverageRatioIsAboutEightNinths() {
         let ratio = BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
             .coverageRatio
-        XCTAssertGreaterThan(ratio, 0.77)
-        XCTAssertLessThan(ratio, 0.78)
+        XCTAssertGreaterThan(ratio, 0.88)
+        XCTAssertLessThan(ratio, 0.89)
     }
 
     // MARK: - Consistency invariant
@@ -147,6 +147,19 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrineTest
             .explicitRoundTripCovered)
         XCTAssertEqual(entry.explicitCoverageMNumber,
             1557)
+    }
+
+    func testRiskChoiceBundleIsExplicitlyCoveredAtM1561() {
+        let entry =
+            BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
+                .entries.first {
+                    $0.bundleTypeName ==
+                        "BASEBrainTurnResultRiskChoiceBundle"
+                }!
+        XCTAssertEqual(entry.status,
+            .explicitRoundTripCovered)
+        XCTAssertEqual(entry.explicitCoverageMNumber,
+            1561)
     }
 
     // MARK: - Unique bundle names
