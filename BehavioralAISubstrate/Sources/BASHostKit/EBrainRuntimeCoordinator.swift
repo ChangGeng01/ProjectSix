@@ -652,6 +652,28 @@ public struct BASEBrainRuntimeCoordinator {
     public let memoryMutationEventEmitter:
         BASMemoryMutationEventEmitter?
 
+    /// chapter 五百十九 / M1453:optional projection-block
+    /// emission handler。 When set,V1 monolith fires this
+    /// synchronous callback with the typed
+    /// `BASAuditObservationProjectionsBundleObservation`
+    /// after constructing the audit projections at line
+    /// 2035。
+    ///
+    /// Hosts wire this to capture per-turn projection
+    /// coverage:
+    ///   - Synchronous loggers can record directly
+    ///   - Async observers can wrap submission in
+    ///     `Task { await observer.recordEmission(rec) }`
+    ///   - Tests can capture into a local for inspection
+    ///
+    /// Default nil preserves V1 byte-equality —
+    /// pre-M1453 behavior is identical when handler not
+    /// set。 ADR-014 OPT-IN preserved。
+    public let projectionBlockEmissionHandler:
+        (@Sendable
+            (BASAuditObservationProjectionsBundleObservation)
+            -> Void)?
+
     public init(
         powerClockService: any BASPowerClockServicing,
         hostProfileService: any BASHostProfileServicing,
@@ -672,7 +694,11 @@ public struct BASEBrainRuntimeCoordinator {
         hostForgetRequest: BASForgetRequest? = nil,
         memoryEventLog: (any BASEventLogStorage)? = nil,
         memoryMutationEventEmitter:
-            BASMemoryMutationEventEmitter? = nil
+            BASMemoryMutationEventEmitter? = nil,
+        projectionBlockEmissionHandler:
+            (@Sendable
+                (BASAuditObservationProjectionsBundleObservation)
+                -> Void)? = nil
     ) {
         self.powerClockService = powerClockService
         self.hostProfileService = hostProfileService
@@ -694,6 +720,8 @@ public struct BASEBrainRuntimeCoordinator {
         self.memoryEventLog = memoryEventLog
         self.memoryMutationEventEmitter =
             memoryMutationEventEmitter
+        self.projectionBlockEmissionHandler =
+            projectionBlockEmissionHandler
     }
 
     public func runTurn(
