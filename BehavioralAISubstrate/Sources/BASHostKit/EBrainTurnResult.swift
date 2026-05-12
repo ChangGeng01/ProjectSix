@@ -202,6 +202,101 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百二十六 / M1482 — hostBundle +
+    //                                       sovereignBundle +
+    //                                       evolutionBundle
+    //                                       convenience init
+    //
+    // 3-bundle convenience init that accepts all 3
+    // cluster bundles (host + sovereign + evolution)
+    // in place of 23 individual fields (5 + 8 + 10)。
+    //
+    // PUBLIC API additive only。 Byte-equality with the
+    // all-fields init GUARANTEED by body delegation。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostBundle: BASEBrainTurnResultHostBundle,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        thoughtFrame: BASThoughtFrame,
+        thoughtFold: BASThoughtFold,
+        triScores: [BASTriSelfScore],
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
+        hostGateValue: Double,
+        renderedOutput: BASRenderedOutput,
+        updateTickets: [BASUpdateTicket],
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        kunlunAxisAlignment: BASAxisAlignment? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        unknownReserve: BASUnknownReserve? = nil,
+        kunlunHeavenGatePermit: BASHeavenGatePermit? = nil,
+        kunlunRiverOriginTrace: BASRiverOriginTrace? = nil,
+        yaochiSanctumEntry: BASYaochiSanctumEntry? = nil
+    ) {
+        // Delegate to the M1478 2-bundle init,
+        // unpacking the 5 host fields from hostBundle。
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            sovereignBundle: sovereignBundle,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            // 5 host fields unpacked from bundle
+            hostConstitution:
+                hostBundle.hostConstitution,
+            hostConstitutionVault:
+                hostBundle.hostConstitutionVault,
+            hostVersionTree:
+                hostBundle.hostVersionTree,
+            hostForgetRequest:
+                hostBundle.hostForgetRequest,
+            hostContext: hostBundle.hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: triScores,
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            riskDecisionPackage: riskDecisionPackage,
+            hostGateValue: hostGateValue,
+            renderedOutput: renderedOutput,
+            updateTickets: updateTickets,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace: runtimeTrace,
+            kunlunAxisAlignment: kunlunAxisAlignment,
+            humanAnchorSignal: humanAnchorSignal,
+            abyssalPressure: abyssalPressure,
+            unknownReserve: unknownReserve,
+            kunlunHeavenGatePermit: kunlunHeavenGatePermit,
+            kunlunRiverOriginTrace: kunlunRiverOriginTrace,
+            yaochiSanctumEntry: yaochiSanctumEntry)
+    }
+
     // MARK: - chapter 五百二十五 / M1478 — sovereignBundle
     //                                       convenience init
     //
