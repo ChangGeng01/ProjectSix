@@ -107,11 +107,12 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 510 close-out。 Chapter
-    /// 510:V1 monolith fold continues — BASTurnAudit
-    /// ProjectionsCounterweightFactory + BASRoutedBudget
-    /// Factory consolidate 38 lines of inline construction
-    /// into 24 lines of typed factory call。
+    /// Re-captured at chapter 511 close-out。 Chapter
+    /// 511:projection-block fold — BASAuditObservation
+    /// Projections KunlunInputs (18 fields, 4 trios) +
+    /// CthulhuInputs (8 fields, 2 trio/penta) + matching
+    /// convenience inits collapse 26 audit-projection
+    /// fields into 2 typed input blocks。
     static let frozenFullRegistrySha256: String =
-        "ec0333ba94367a6ed597e4d756f756697aff00d5cd189dd93e93fb2ce470fa1a"
+        "fa1fa093558ca38a89166ac376d66d06a3861d46a5c42446bddfb2509ead8aef"
 }

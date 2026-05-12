@@ -4518,7 +4518,96 @@ public enum BASChapterDoctrineRegistry {
                 " M1420。 V1 byte-equality preserved via" +
                 " shadow-rebinding + stress-sweep dual-" +
                 "mode regression guard。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 511 — Kunlun + Cthulhu inputs blocks
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十一",
+            mNumberFirst: 1421,
+            mNumberLast: 1424,
+            v1MilestoneMNumber: 1424,
+            v1MilestoneStatus:
+                "chapter-511-projection-block-fold",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1421, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsKunlunInputs — typed" +
+                        " block aggregating 4 Kunlun trio/" +
+                        "hexa factory outputs (18 fields)" +
+                        " as ONE typed surface。 Plus" +
+                        " Hashable conformance on" +
+                        " KunlunHexaTwo。 54 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1422, knife: "第二刀",
+                    concept: "BASAuditObservation" +
+                        "Projections.init(kunlunInputs:)" +
+                        " convenience init。 Delegates" +
+                        " to all-fields init by unpacking" +
+                        " block accessors。 Byte-equal" +
+                        " with all-fields form by body" +
+                        " construction。 6 PROOF tests" +
+                        " including critical equality" +
+                        " regression guard。"),
+                BASChapterKnife(
+                    mNumber: 1423, knife: "第三刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsCthulhuInputs" +
+                        " sibling block aggregating 2" +
+                        " Cthulhu trio/penta factory" +
+                        " outputs (8 fields) + matching" +
+                        " convenience init。 Hashable on" +
+                        " CthulhuPenta。 55 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1424, knife: "第四刀",
+                    concept: "Chapter 511 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1424。 26 audit-projection" +
+                        " fields now flow through 2" +
+                        " typed input blocks instead of" +
+                        " 26 separate named args" +
+                        " (future M1425+ V1 splice" +
+                        " target)。")
+            ],
+            entropyClassesAttacked: [
+                "kunlun-trio-unpack-18-shadow-rebindings",
+                "cthulhu-trio-penta-unpack-8-shadow-rebindings",
+                "projection-call-site-56-named-args",
+                "audit-projection-typed-surface-grouping"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1424",
+                "v1-byte-equality-preserved",
+                "stress-sweep-300-turn-0-divergence",
+                "additive-convenience-init-only"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith splice using" +
+                " kunlunInputs + cthulhuInputs blocks" +
+                " (collapses 26 named args at line 2035)",
+                "future arc — additional inline" +
+                " construction folds in V1 monolith",
+                "future arc — production wire-in (host CI" +
+                " lane gated)",
+                "future arc — Tier C adapter consumption"
+            ],
+            summary: "Projection-block fold:2 typed input" +
+                " blocks shipped (BASAuditObservation" +
+                "ProjectionsKunlunInputs +" +
+                "CthulhuInputs)。 Aggregates 6 existing" +
+                " trio/hexa/penta factory outputs (26" +
+                " projection fields) into 2 typed surfaces" +
+                " + 2 matching convenience inits on" +
+                " BASAuditObservationProjections。 Both" +
+                " inits byte-equal to all-fields form by" +
+                " body construction。 55 typed surfaces" +
+                " cumulative。 ADR-016 → M1424。 V1" +
+                " byte-equality untouched (additive APIs" +
+                " only)。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -164,7 +164,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百七",       // M1405-M1408 (Tier C ADR-019 implementation entry — 2 primitives shipped)
         "chapter 五百八",       // M1409-M1412 (Tier C ADR-019 IMPLEMENTATION COMPLETE — 4/4 primitives)
         "chapter 五百九",       // M1413-M1416 (Tier C migration adapters — 2/4 shipped)
-        "chapter 五百十"        // M1417-M1420 (V1 monolith fold continues — counterweight + routed budget)
+        "chapter 五百十",       // M1417-M1420 (V1 monolith fold continues — counterweight + routed budget)
+        "chapter 五百十一"      // M1421-M1424 (projection-block fold — Kunlun + Cthulhu inputs blocks + convenience inits)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -181,16 +182,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1420
+    public static let mNumberLast: Int = 1424
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1420)。 Bumped through chapter 510:461 → 465。
-    /// Chapter 510:V1 monolith fold continues — M1417
-    /// counterweight factory + M1418 splice + M1419
-    /// routed budget factory + M1420 close-out。 38
-    /// lines of inline construction collapsed to 24
-    /// lines of typed factory call。
-    public static let commitsShipped: Int = 465
+    /// M1424)。 Bumped through chapter 511:465 → 469。
+    /// Chapter 511:projection-block fold — M1421 Kunlun
+    /// inputs block + M1422 Kunlun convenience init +
+    /// M1423 Cthulhu inputs block + M1424 close-out。 26
+    /// audit-projection fields now grouped into 2 typed
+    /// input blocks (additive APIs;V1 byte-equality
+    /// untouched)。
+    public static let commitsShipped: Int = 469
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

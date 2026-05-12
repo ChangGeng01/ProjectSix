@@ -117,19 +117,19 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 108
+    public static let phase2ChapterCount: Int = 109
 
-    /// Phase 2 commits shipped。 At M1420:
-    /// 125 + 84 + 256 = 465 (chapter 510 = 4 cuts —
-    /// counterweight factory + splice + routed budget
-    /// factory + close-out — V1 monolith fold continues)
-    public static let phase2CommitsShipped: Int = 465
+    /// Phase 2 commits shipped。 At M1424:
+    /// 125 + 84 + 260 = 469 (chapter 511 = 4 cuts —
+    /// Kunlun + Cthulhu inputs blocks + matching
+    /// convenience inits — projection-block fold)
+    public static let phase2CommitsShipped: Int = 469
 
-    /// Phase 2 mNumberLast。 At M1420:chapter 510
-    /// (V1 monolith fold continues — counterweight +
-    /// routed budget factories)。 SWEEP stays frozen
-    /// at 1163。
-    public static let phase2MNumberLast: Int = 1420
+    /// Phase 2 mNumberLast。 At M1424:chapter 511
+    /// (projection-block fold — Kunlun + Cthulhu
+    /// inputs blocks + matching convenience inits)。
+    /// SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1424
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

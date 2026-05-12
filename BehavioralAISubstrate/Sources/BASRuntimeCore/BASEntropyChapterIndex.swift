@@ -1569,7 +1569,23 @@ public enum BASEntropyChapterIndex {
                 " 53 typed surfaces cumulative。 ADR-016" +
                 " → M1420。 V1 byte-equality preserved" +
                 " via shadow-rebinding + stress-sweep" +
-                " dual-mode regression guard。")
+                " dual-mode regression guard。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十一",
+            mNumberFirst: 1421, mNumberLast: 1424,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Projection-block fold:" +
+                " BASAuditObservationProjectionsKunlun" +
+                "Inputs (18 fields, 4 trio outputs)" +
+                " + BASAuditObservationProjections" +
+                "CthulhuInputs (8 fields, 2 trio/penta" +
+                " outputs) + 2 matching convenience" +
+                " inits。 26 audit-projection fields" +
+                " now flow through 2 typed input blocks。" +
+                " 55 typed surfaces cumulative。 ADR-016" +
+                " → M1424。 V1 untouched (additive APIs" +
+                " only)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

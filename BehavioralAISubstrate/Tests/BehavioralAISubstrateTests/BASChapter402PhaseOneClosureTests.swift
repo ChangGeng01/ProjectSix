@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1420",
-            "M1420:doctrine version reflects chapter 五百十 — V1 monolith fold continues。 BASTurnAuditProjectionsCounterweightFactory (M1417-M1418) + BASRoutedBudgetFactory (M1419)。 38 lines of inline construction collapsed to 24 lines of typed factory call。 53 typed surfaces cumulative。 V1 byte-equality preserved via shadow-rebinding + stress-sweep dual-mode regression guard。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1424",
+            "M1424:doctrine version reflects chapter 五百十一 — projection-block fold。 BASAuditObservationProjectionsKunlunInputs (18 fields, 4 trio outputs, M1421) + KunlunConvenienceInit (M1422) + BASAuditObservationProjectionsCthulhuInputs (8 fields, 2 trio/penta outputs, M1423) + matching CthulhuConvenienceInit。 26 audit-projection fields collapsed into 2 typed input blocks (additive APIs only; V1 untouched)。 55 typed surfaces cumulative。 V1 byte-equality preserved (no monolith change in chapter 511)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -37,15 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs510() {
+    func testLastChapterIs511() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百十",
-            "M1420 chapter 五百十 — V1 monolith fold" +
-            " continues。 BASTurnAuditProjections" +
-            "CounterweightFactory + BASRoutedBudget" +
-            "Factory。 53 typed surfaces cumulative")
+            "chapter 五百十一",
+            "M1424 chapter 五百十一 — projection-block" +
+            " fold。 BASAuditObservationProjections" +
+            "KunlunInputs (18 fields) +" +
+            " BASAuditObservationProjectionsCthulhu" +
+            "Inputs (8 fields) + 2 convenience inits。" +
+            " 55 typed surfaces cumulative")
     }
 
     // MARK: - M-number range
