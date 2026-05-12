@@ -28,27 +28,28 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrineTest
 
     // MARK: - Coverage counts
 
-    func testExplicitlyCoveredCountIsFiveAtM1550() {
+    func testExplicitlyCoveredCountIsSixAtM1554() {
         XCTAssertEqual(
             BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
                 .explicitlyCoveredCount,
-            5,
-            "5 of 9 bundles have explicit round-trip" +
-            " coverage at chapter 543 close-out")
+            6,
+            "6 of 9 bundles have explicit round-trip" +
+            " coverage at chapter 544 close-out (added" +
+            " MiscBundle at M1553)")
     }
 
-    func testCompileTimeOnlyCountIsFourAtM1550() {
+    func testCompileTimeOnlyCountIsThreeAtM1554() {
         XCTAssertEqual(
             BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
                 .compileTimeOnlyCount,
-            4)
+            3)
     }
 
-    func testCoverageRatioIsAbout556Percent() {
+    func testCoverageRatioIsAboutTwoThirds() {
         let ratio = BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
             .coverageRatio
-        XCTAssertGreaterThan(ratio, 0.55)
-        XCTAssertLessThan(ratio, 0.56)
+        XCTAssertGreaterThan(ratio, 0.66)
+        XCTAssertLessThan(ratio, 0.67)
     }
 
     // MARK: - Consistency invariant
@@ -120,6 +121,19 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrineTest
         XCTAssertEqual(entry.status,
             .compileTimeOnly)
         XCTAssertNil(entry.explicitCoverageMNumber)
+    }
+
+    func testMiscBundleIsExplicitlyCoveredAtM1553() {
+        let entry =
+            BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
+                .entries.first {
+                    $0.bundleTypeName ==
+                        "BASEBrainTurnResultMiscBundle"
+                }!
+        XCTAssertEqual(entry.status,
+            .explicitRoundTripCovered)
+        XCTAssertEqual(entry.explicitCoverageMNumber,
+            1553)
     }
 
     // MARK: - Unique bundle names
