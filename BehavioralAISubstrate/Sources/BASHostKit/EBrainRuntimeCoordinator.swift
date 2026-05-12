@@ -2033,17 +2033,20 @@ public struct BASEBrainRuntimeCoordinator {
         // chapter 五百十六 / M1443 — extended to 4-block
         // init (M1442),packaging 9 more Kunlun protocol
         // fields into the new kunlunProtocolBlock。
+        // chapter 五百十七 / M1447 — extended to 5-block
+        // init (M1446),packaging 7 more L1-L7 Cthulhu
+        // aggregate fields into the new
+        // cthulhuAggregatesBlock。
         //
         // Byte-equality with the pre-fold path GUARANTEED
-        // by M1435 + M1442 PROOF tests。 Stress-sweep
-        // regression guard runs canonical60 × 3 repeat
-        // runs and asserts 0 divergence。
+        // by M1435 + M1442 + M1446 PROOF tests + stress-
+        // sweep canonical60 × 3 repeat runs 0-divergence。
         //
         // The 4 Kunlun trios + Cthulhu trio + Penta + 11
-        // cognitive bundles + 9 Kunlun protocol fields now
-        // flow into 4 typed input surfaces。 Residual
-        // fields stay as named args because they're not
-        // yet grouped into blocks。
+        // cognitive bundles + 9 Kunlun protocol fields + 7
+        // Cthulhu aggregate fields now flow into 5 typed
+        // input surfaces (53 of 56 projection fields,
+        // ~95% packaging coverage)。
         let kunlunInputsForAudit =
             BASAuditObservationProjectionsKunlunInputs(
                 trio: kunlunTrioForAudit,
@@ -2099,6 +2102,20 @@ public struct BASEBrainRuntimeCoordinator {
                     kunlunHeavenGateForAudit.gateClass,
                 tianmenPassState:
                     kunlunHeavenGateForAudit.passState)
+        let cthulhuAggregatesBlockForAudit =
+            BASAuditObservationProjectionsCthulhuAggregatesBlock(
+                abyssalPressure:
+                    abyssalPressureWithFragility,
+                humanAnchorSignal:
+                    humanAnchorSignalForAudit,
+                sealAggregate: sealAggregateForAudit,
+                lifecycleAggregate:
+                    lifecycleAggregateForAudit,
+                narrativeDistortion:
+                    narrativeDistortionForAudit,
+                anomalyTrace: anomalyTraceForAudit,
+                abyssalBranches:
+                    abyssalBranchesForAudit)
         let projections = BASAuditObservationProjections(
             kunlunInputs: kunlunInputsForAudit,
             cthulhuInputs: cthulhuInputsForAudit,
@@ -2106,17 +2123,12 @@ public struct BASEBrainRuntimeCoordinator {
                 observationBundlesForAudit,
             kunlunProtocolBlock:
                 kunlunProtocolBlockForAudit,
+            cthulhuAggregatesBlock:
+                cthulhuAggregatesBlockForAudit,
             candidateObservationBundle: thoughtArtifacts
                 .candidateObservationBundle,
             tribunalObservationBundle: thoughtFrame
                 .tribunalObservationBundle,
-            abyssalPressure: abyssalPressureWithFragility,
-            humanAnchorSignal: humanAnchorSignalForAudit,
-            sealAggregate: sealAggregateForAudit,
-            lifecycleAggregate: lifecycleAggregateForAudit,
-            narrativeDistortion: narrativeDistortionForAudit,
-            anomalyTrace: anomalyTraceForAudit,
-            abyssalBranches: abyssalBranchesForAudit,
             unknownReserve: unknownReserveForAudit,
             forbiddenAggregate: forbiddenAggregateForAudit,
             escalationSuppressionCodes:
