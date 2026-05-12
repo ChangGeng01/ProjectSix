@@ -5,7 +5,9 @@ import Foundation
 import BASMemory
 import BASRuntimeCore
 
-public struct BASTurnAuditProjectionsLifecycleQuartet: Sendable {
+public struct BASTurnAuditProjectionsLifecycleQuartet:
+    Codable, Equatable, Sendable
+{
     public let synthesizedSeals: [BASSealEnvelope]
     public let sealAggregate:
         BASOldSealSealingProtocol.Aggregate?

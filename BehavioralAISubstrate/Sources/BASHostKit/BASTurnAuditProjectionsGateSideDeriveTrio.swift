@@ -34,7 +34,7 @@ import BASWorldPrior
 /// from EBrainRuntimeCoordinator.runTurn(_:) at chapter
 /// 506。
 public struct BASTurnAuditProjectionsGateSideDeriveTrio:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
 
     /// L4 abyssal-pressure-budget derive for gate-side

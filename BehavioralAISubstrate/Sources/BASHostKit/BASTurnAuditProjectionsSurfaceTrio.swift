@@ -6,7 +6,9 @@ import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
 
-public struct BASTurnAuditProjectionsSurfaceTrio: Sendable {
+public struct BASTurnAuditProjectionsSurfaceTrio:
+    Codable, Equatable, Sendable
+{
     public let surfaceMode: BASSurfaceMode?
     public let cthulhuSurfaceAlias: BASCthulhuSurfaceAlias?
     public let kunlunSurfaceAlias: BASKunlunSurfaceAlias?

@@ -7,7 +7,7 @@ import BASPolicy
 import BASRuntimeCore
 
 public struct BASTurnAuditProjectionsKunlunTrioTwo:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
     public let jadeCasket: BASJadeCasketSnapshot
     public let jadeRefinementTickets:

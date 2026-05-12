@@ -40,7 +40,9 @@ import Foundation
 import BASOrchestration
 import BASPolicy
 
-public struct BASTurnAuditProjectionsKunlunTianmenTrio: Sendable {
+public struct BASTurnAuditProjectionsKunlunTianmenTrio:
+    Codable, Equatable, Sendable
+{
 
     // MARK: - Folded fields
 
