@@ -37,15 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs550() {
+    func testLastChapterIs551() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百五十",
-            "Chapter 五百五十:meta-catalogue of 7" +
-            " session milestone doctrines + 21 PROOF" +
-            " tests (13 anti-drift + 8 wire-in)。 92" +
-            " typed surfaces cumulative")
+            "chapter 五百五十一",
+            "Chapter 五百五十一:cascading Codable to 4" +
+            " audit-projection types + typed milestone" +
+            " doctrine + 10 PROOF tests。 93 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

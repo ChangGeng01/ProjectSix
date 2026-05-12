@@ -1715,7 +1715,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百五十")!)
+                            "chapter 五百五十")!),
+            // M1584 chapter 551 — cascading Codable + doctrine + 10 PROOF tests
+            checkRegistry("五百五十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百五十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2611,6 +2617,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百五十")!
+                .mNumberLast),
+            // M1584 chapter 551 — cascading Codable + doctrine + 10 PROOF tests
+            ("551",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

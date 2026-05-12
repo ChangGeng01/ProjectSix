@@ -2267,7 +2267,25 @@ public enum BASEntropyChapterIndex {
                 " tests cross-checking against actual" +
                 " milestone doctrines (M1579)。 92 typed" +
                 " surfaces cumulative。 ADR-016 → M1580。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十一",
+            mNumberFirst: 1581, mNumberLast: 1584,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Cascading Codable conformance to 4" +
+                " audit-projection types (M1581):BAS" +
+                "CthulhuPermitEscalationDecision + BAS" +
+                "CthulhuAssertionCeilingDecision leaf" +
+                " types + BASCthulhuAuditProjections" +
+                " namespace + BASRuntimeAuditProjections" +
+                "Bundle aggregate。 BASRuntimeAudit" +
+                "ProjectionsBundleCodableDoctrine typed" +
+                " milestone (M1582) + 10 PROOF tests" +
+                " including round-trip + sortedKeys" +
+                " determinism (M1583)。 93 typed surfaces" +
+                " cumulative。 ADR-016 → M1584。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

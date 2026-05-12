@@ -8169,7 +8169,91 @@ public enum BASChapterDoctrineRegistry {
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M1580。 164 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 551 — cascading Codable conformance
+        // to 4 audit-projection types
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十一",
+            mNumberFirst: 1581,
+            mNumberLast: 1584,
+            v1MilestoneMNumber: 1584,
+            v1MilestoneStatus:
+                "chapter-551-audit-projections-codable-cascade",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1581, knife: "第一刀",
+                    concept: "Cascading Codable conformance" +
+                        " addition to 4 audit-projection" +
+                        " types (BASCthulhuPermit" +
+                        "EscalationDecision + BAS" +
+                        "CthulhuAssertionCeilingDecision" +
+                        " leaf types + BASCthulhuAudit" +
+                        "Projections namespace +" +
+                        " BASRuntimeAuditProjectionsBundle" +
+                        " aggregate)。 All underlying" +
+                        " fields already Codable;Swift" +
+                        " synthesizes automatically。"),
+                BASChapterKnife(
+                    mNumber: 1582, knife: "第二刀",
+                    concept: "NEW BASRuntimeAudit" +
+                        "ProjectionsBundleCodableDoctrine" +
+                        " typed milestone with" +
+                        " typesGainedCodable: 4 +" +
+                        " synthesized-conformance pin。" +
+                        " 93 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1583, knife: "第三刀",
+                    concept: "10 PROOF tests:doctrine" +
+                        " invariants + compile-time" +
+                        " conformance check across 4" +
+                        " types + 3 round-trip tests" +
+                        " (empty aggregate / .none() /" +
+                        " empty Cthulhu) + sortedKeys" +
+                        " determinism。"),
+                BASChapterKnife(
+                    mNumber: 1584, knife: "第四刀",
+                    concept: "Chapter 551 close-out +" +
+                        " doctrine sync。 168 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "cthulhu-audit-projections-non-codable",
+                "audit-projections-bundle-non-codable",
+                "cascading-codable-cascade-undocumented",
+                "json-replay-determinism-gap-on-aggregate"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1584",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "audit-projections-codable-cascade-sealed"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional Codable" +
+                " cascades for remaining non-Codable" +
+                " types if any exist"
+            ],
+            summary: "Chapter 551 cascades Codable" +
+                " conformance through 4 audit-projection" +
+                " types (M1581) + ships a typed milestone" +
+                " doctrine (M1582) + 10 PROOF tests" +
+                " including round-trip + sortedKeys" +
+                " determinism (M1583) + close-out (M1584)。" +
+                " The aggregate BASRuntimeAuditProjections" +
+                "Bundle is now JSON-serializable for" +
+                " replay determinism PROOF。 93 typed" +
+                " surfaces cumulative。 ADR-016 → M1584。" +
+                " 168 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
