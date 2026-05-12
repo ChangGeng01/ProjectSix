@@ -36,18 +36,20 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
 
     // MARK: - Size + scope invariants
 
-    func testCatalogueHasFourEntries() {
+    func testCatalogueHasFiveEntries() {
+        // M1608 extended the catalogue with the M1606
+        // doctrine。 New count is 5。
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .catalogue.count,
-            4)
+            5)
     }
 
-    func testTotalCataloguedIsFour() {
+    func testTotalCataloguedIsFive() {
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .totalCatalogued,
-            4)
+            5)
     }
 
     func testFirstChapterTagIs551() {
@@ -57,11 +59,11 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
             "chapter 五百五十一")
     }
 
-    func testLastChapterTagIs555() {
+    func testLastChapterTagIs557() {
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .lastChapterTag,
-            "chapter 五百五十五")
+            "chapter 五百五十七")
     }
 
     // MARK: - M-number invariants
@@ -73,19 +75,21 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
             1582)
     }
 
-    func testLatestMNumberIs1598() {
+    func testLatestMNumberIs1606() {
+        // Updated at M1608 with new 5th catalogue
+        // entry (M1606)。
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .latestMNumber,
-            1598)
+            1606)
     }
 
-    func testMNumberSpanIsSeventeen() {
-        // 1598 - 1582 + 1 = 17
+    func testMNumberSpanIsTwentyFive() {
+        // 1606 - 1582 + 1 = 25
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .mNumberSpan,
-            17)
+            25)
     }
 
     // MARK: - Flag pins
@@ -111,10 +115,11 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
 
     // MARK: - Per-entry pins
 
-    /// 4 catalogued doctrines with their expected (
+    /// 5 catalogued doctrines with their expected (
     /// chapter,M-number) values。 Single test ensures
-    /// no drift on any entry。
-    func testAllFourCatalogueEntriesAreConsistent() {
+    /// no drift on any entry。 Extended at M1608 to
+    /// cover the 5th entry (M1606)。
+    func testAllFiveCatalogueEntriesAreConsistent() {
         let expected: [(typeName: String,
                         chapterTag: String,
                         mNumber: Int)] = [
@@ -125,7 +130,9 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
             ("BASAuditProjectionsBundleEndToEndJsonProofDoctrine",
              "chapter 五百五十四", 1594),
             ("BASAuditProjectionsFiveNamespacePopulatedJsonProofDoctrine",
-             "chapter 五百五十五", 1598)
+             "chapter 五百五十五", 1598),
+            ("BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine",
+             "chapter 五百五十七", 1606)
         ]
         let catalogue = BASJsonProofDoctrineCatalogueDoctrine
             .catalogue
@@ -199,7 +206,7 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
                 .CatalogueEntry].self,
             from: data)
         XCTAssertEqual(decoded, catalogue)
-        XCTAssertEqual(decoded.count, 4)
+        XCTAssertEqual(decoded.count, 5)
         // Determinism:3 repeat encodes byte-identical。
         let d1 = try encoder.encode(catalogue)
         let d2 = try encoder.encode(catalogue)

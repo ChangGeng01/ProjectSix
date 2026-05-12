@@ -116,20 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1604:24 + 20 + 110 = 154 (chapter
-    /// 556 — JSON PROOF doctrine meta-catalogue)
-    public static let phase2ChapterCount: Int = 154
+    /// added)。 At M1608:24 + 20 + 111 = 155 (chapter
+    /// 557 — 5-of-5 ProjectionsBlock populated PROOF)
+    public static let phase2ChapterCount: Int = 155
 
-    /// Phase 2 commits shipped。 At M1604:125 + 84 +
-    /// 440 = 649 (chapter 556 = 4 cuts — JSON PROOF
-    /// doctrine meta-catalogue:catalogue + 15 anti-
-    /// drift tests + 9 wire-in tests + close-out)
-    public static let phase2CommitsShipped: Int = 649
+    /// Phase 2 commits shipped。 At M1608:125 + 84 +
+    /// 444 = 653 (chapter 557 = 4 cuts — 5-of-5
+    /// ProjectionsBlock populated PROOF + new typed
+    /// surface + 15 anti-drift/wire-in tests +
+    /// catalogue extension)
+    public static let phase2CommitsShipped: Int = 653
 
-    /// Phase 2 mNumberLast。 At M1604:chapter 556 —
-    /// JSON PROOF doctrine meta-catalogue。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1604
+    /// Phase 2 mNumberLast。 At M1608:chapter 557 —
+    /// 5-of-5 ProjectionsBlock populated PROOF coverage
+    /// achieved。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1608
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

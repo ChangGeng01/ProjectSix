@@ -37,19 +37,19 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs556() {
+    func testLastChapterIs557() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百五十六",
-            "Chapter 五百五十六:JSON PROOF doctrine" +
-            " meta-catalogue。 Single source-of-truth" +
-            " BASJsonProofDoctrineCatalogueDoctrine" +
-            " typed surface for the 4 JSON PROOF" +
-            " doctrines shipped in chapters 551-555 +" +
-            " 15 anti-drift PROOF tests + 9 wire-in" +
-            " PROOF tests cross-checking the catalogue" +
-            " against each catalogued doctrine。 97" +
+            "chapter 五百五十七",
+            "Chapter 五百五十七:5-of-5 ProjectionsBlock" +
+            " populated JSON PROOF coverage achieved。" +
+            " 7 PROOF tests for the 4 remaining" +
+            " blocks (ClosureBlock + CthulhuLeftovers" +
+            "Block + KunlunAuditSchemasBlock +" +
+            " KunlunProtocolBlock) + new typed surface" +
+            " + 15 anti-drift + wire-in tests +" +
+            " catalogue extension to 5 entries。 98" +
             " typed surfaces cumulative")
     }
 

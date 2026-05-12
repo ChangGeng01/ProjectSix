@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1604",
-            "M1604:doctrine version reflects chapter 五百五十六 — JSON PROOF doctrine meta-catalogue。 Single source-of-truth BASJsonProofDoctrineCatalogueDoctrine typed surface (M1601) for the 4 JSON PROOF doctrines shipped in chapters 551-555 + 15 anti-drift PROOF tests (M1602) + 9 wire-in PROOF tests cross-checking the catalogue against each catalogued doctrine (M1603)。 97 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1608",
+            "M1608:doctrine version reflects chapter 五百五十七 — 5-of-5 ProjectionsBlock populated JSON PROOF coverage achieved。 7 PROOF tests for the 4 remaining blocks (M1605) + BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine typed surface (M1606) + 15 anti-drift + wire-in PROOF tests (M1607) + catalogue extension to 5 entries (M1608)。 98 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

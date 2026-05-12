@@ -2387,7 +2387,28 @@ public enum BASEntropyChapterIndex {
                 " catalogue against each catalogued" +
                 " doctrine (M1603)。 97 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1604。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十七",
+            mNumberFirst: 1605, mNumberLast: 1608,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "5-of-5 ProjectionsBlock populated" +
+                " JSON PROOF coverage achieved。 The 4" +
+                " blocks NOT exercised in populated" +
+                " state at chapter 554 (ClosureBlock +" +
+                " CthulhuLeftoversBlock +" +
+                " KunlunAuditSchemasBlock +" +
+                " KunlunProtocolBlock) all proven at" +
+                " M1605 (7 PROOF tests) +" +
+                " BASAuditObservationProjectionsBlock" +
+                "PopulatedJsonProofDoctrine typed" +
+                " surface (M1606) + 15 anti-drift +" +
+                " wire-in PROOF tests (M1607) +" +
+                " catalogue extension to 5 entries" +
+                " (M1608)。 98 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1608。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

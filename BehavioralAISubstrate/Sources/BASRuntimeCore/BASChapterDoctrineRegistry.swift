@@ -8724,7 +8724,96 @@ public enum BASChapterDoctrineRegistry {
                 " → M1604。 188 consecutive autonomous" +
                 " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 557 — 5-of-5 ProjectionsBlock
+        // populated PROOF + meta-catalogue extension
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十七",
+            mNumberFirst: 1605,
+            mNumberLast: 1608,
+            v1MilestoneMNumber: 1608,
+            v1MilestoneStatus:
+                "chapter-557-five-of-five-projections-block-populated-proof",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1605, knife: "第一刀",
+                    concept: "7 PROOF tests extending" +
+                        " populated JSON round-trip" +
+                        " coverage to the 4 remaining" +
+                        " ProjectionsBlock types" +
+                        " (ClosureBlock +" +
+                        " CthulhuLeftoversBlock +" +
+                        " KunlunAuditSchemasBlock +" +
+                        " KunlunProtocolBlock) — the" +
+                        " blocks NOT exercised in" +
+                        " populated state at chapter" +
+                        " 554。 5-of-5 ProjectionsBlock" +
+                        " populated coverage achieved。"),
+                BASChapterKnife(
+                    mNumber: 1606, knife: "第二刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsBlockPopulatedJson" +
+                        "ProofDoctrine typed surface" +
+                        " commemorating 5-of-5" +
+                        " populated block coverage。" +
+                        " typed-surface count 97 → 98。"),
+                BASChapterKnife(
+                    mNumber: 1607, knife: "第三刀",
+                    concept: "15 anti-drift + wire-in" +
+                        " PROOF tests for the M1606" +
+                        " typed surface。 arc-seal" +
+                        " doctrine ref resolves +" +
+                        " M1605 sits AFTER arc range。"),
+                BASChapterKnife(
+                    mNumber: 1608, knife: "第四刀",
+                    concept: "Chapter 557 close-out +" +
+                        " doctrine sync + extend" +
+                        " BASJsonProofDoctrineCatalogue" +
+                        "Doctrine to 5 entries (add" +
+                        " M1606 doctrine)。 192" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "closure-block-populated-untested",
+                "cthulhu-leftovers-block-populated-untested",
+                "kunlun-audit-schemas-block-populated-untested",
+                "kunlun-protocol-block-populated-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1608",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "five-of-five-projections-block-populated-proof",
+                "json-proof-catalogue-5-entries"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional Codable" +
+                " cascade or PROOF coverage" +
+                " extensions if more surfaces ship"
+            ],
+            summary: "Chapter 557 closes the 5-of-5" +
+                " ProjectionsBlock POPULATED PROOF" +
+                " gap。 7 PROOF tests covering the 4" +
+                " remaining blocks (M1605) +" +
+                " BASAuditObservationProjectionsBlock" +
+                "PopulatedJsonProofDoctrine typed" +
+                " surface (M1606) + 15 anti-drift +" +
+                " wire-in PROOF tests (M1607) + close-" +
+                "out + meta-catalogue extension to 5" +
+                " entries (M1608)。 98 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1608。" +
+                " 192 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

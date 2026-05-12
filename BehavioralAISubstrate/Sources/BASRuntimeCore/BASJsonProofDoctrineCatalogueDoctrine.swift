@@ -93,8 +93,11 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
 
     // MARK: - Catalogue contents
 
-    /// All 4 JSON PROOF doctrines shipped in this
+    /// All 5 JSON PROOF doctrines shipped in this
     /// session,in chronological M-number order。
+    /// Updated at chapter 五百五十七 / M1608 to include
+    /// BASAuditObservationProjectionsBlockPopulatedJson
+    /// ProofDoctrine (5th entry)。
     public static let catalogue: [CatalogueEntry] = [
         CatalogueEntry(
             doctrineTypeName:
@@ -128,7 +131,19 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
             summary: "5-of-5 namespace populated JSON" +
                 " PROOF coverage at M1600 MILESTONE。" +
                 " Cthulhu + RiskCalibration newly" +
-                " proven。")
+                " proven。"),
+        CatalogueEntry(
+            doctrineTypeName:
+                "BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine",
+            chapterTag: "chapter 五百五十七",
+            mNumber: 1606,
+            summary: "5-of-5 ProjectionsBlock POPULATED" +
+                " round-trip PROOF coverage。 The 4" +
+                " blocks NOT exercised in populated" +
+                " state at chapter 554 (Closure +" +
+                " CthulhuLeftovers + KunlunAuditSchemas" +
+                " + KunlunProtocol) all proven at" +
+                " M1605。")
     ]
 
     // MARK: - Aggregate accessors
@@ -144,9 +159,10 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
         "chapter 五百五十一"
 
     /// Last chapter that shipped a JSON PROOF doctrine
-    /// in this session。
+    /// in this session。 Updated at M1608 to chapter
+    /// 五百五十七。
     public static let lastChapterTag: String =
-        "chapter 五百五十五"
+        "chapter 五百五十七"
 
     /// Earliest M-number across the catalogue (chapter
     /// 551 / M1582)。

@@ -1751,7 +1751,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百五十六")!)
+                            "chapter 五百五十六")!),
+            // M1608 chapter 557 — 5-of-5 ProjectionsBlock populated JSON PROOF + new doctrine + 15 anti-drift/wire-in tests + catalogue extension
+            checkRegistry("五百五十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百五十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2695,6 +2701,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百五十六")!
+                .mNumberLast),
+            // M1608 chapter 557 — 5-of-5 ProjectionsBlock populated JSON PROOF + new doctrine + 15 anti-drift/wire-in tests + catalogue extension
+            ("557",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

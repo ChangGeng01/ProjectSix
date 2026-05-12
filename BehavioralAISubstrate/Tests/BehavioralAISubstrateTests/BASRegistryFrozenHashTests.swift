@@ -107,13 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 556 close-out。 Chapter
-    /// 556:JSON PROOF doctrine meta-catalogue —
-    /// BASJsonProofDoctrineCatalogueDoctrine typed
-    /// surface (M1601) + 15 anti-drift PROOF tests
-    /// (M1602) + 9 wire-in PROOF tests cross-checking
-    /// the catalogue against each catalogued doctrine
-    /// (M1603)。
+    /// Re-captured at chapter 557 close-out。 Chapter
+    /// 557:5-of-5 ProjectionsBlock populated JSON
+    /// PROOF coverage achieved — 7 PROOF tests for the
+    /// 4 remaining blocks (M1605) +
+    /// BASAuditObservationProjectionsBlockPopulatedJson
+    /// ProofDoctrine typed surface (M1606) + 15 anti-
+    /// drift + wire-in PROOF tests (M1607) + catalogue
+    /// extension to 5 entries (M1608)。
     static let frozenFullRegistrySha256: String =
-        "08d43f7ab55c9d129715de9a351b02f31c8bfb405b75f2be72051204dc28caf1"
+        "a2a930e9141988e8a3b4873709c9cd952e65929d7f89885eda8adcfd5471ca1a"
 }
