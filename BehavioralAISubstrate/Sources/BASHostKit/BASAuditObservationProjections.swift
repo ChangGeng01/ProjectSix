@@ -486,6 +486,96 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
     /// projections.
     public static let empty = BASAuditObservationProjections()
 
+    // MARK: - chapter 五百十四 / M1434 — observation-bundles
+    //                                    convenience init
+    //
+    // Convenience init that accepts a typed
+    // `BASAuditObservationProjectionsObservationBundles
+    // Block` PLUS the remaining ~40 non-observation-
+    // bundle fields。 Unpacks the block's 11 cognitive
+    // bundles into the matching projections fields。
+    //
+    // Sibling of the M1422 Kunlun-inputs convenience
+    // init + M1423 Cthulhu-inputs convenience init。
+    //
+    // Byte-equality with the per-parameter init
+    // GUARANTEED by body construction — every field
+    // copied 1:1 from block accessors or explicit
+    // non-bundle args。
+    public init(
+        observationBundles:
+            BASAuditObservationProjectionsObservationBundlesBlock,
+        candidateObservationBundle:
+            BASCandidateObservationBundle? = nil,
+        tribunalObservationBundle:
+            BASTribunalObservationBundle? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        sealAggregate:
+            BASOldSealSealingProtocol.Aggregate? = nil,
+        lifecycleAggregate:
+            BASEvolutionLifecycleSession.Aggregate? = nil,
+        narrativeDistortion: BASNarrativeDistortion? = nil,
+        anomalyTrace: BASAnomalyTrace? = nil,
+        abyssalBranches: [BASAbyssalBranch] = [],
+        unknownReserve: BASUnknownReserve? = nil,
+        forbiddenAggregate:
+            BASForbiddenKnowledgeCandidate.Aggregate? = nil,
+        layerReconciliationVerdict:
+            BASObservationReconciliationVerdict? = nil,
+        layerReconciliationReport:
+            BASObservationReconciliationReport? = nil,
+        escalationSuppressionCodes: [String] = []
+    ) {
+        self.init(
+            candidateObservationBundle:
+                candidateObservationBundle,
+            tribunalObservationBundle:
+                tribunalObservationBundle,
+            abyssalPressure: abyssalPressure,
+            humanAnchorSignal: humanAnchorSignal,
+            sealAggregate: sealAggregate,
+            lifecycleAggregate: lifecycleAggregate,
+            narrativeDistortion: narrativeDistortion,
+            anomalyTrace: anomalyTrace,
+            abyssalBranches: abyssalBranches,
+            unknownReserve: unknownReserve,
+            forbiddenAggregate: forbiddenAggregate,
+            escalationSuppressionCodes:
+                escalationSuppressionCodes,
+            layerReconciliationVerdict:
+                layerReconciliationVerdict,
+            layerReconciliationReport:
+                layerReconciliationReport,
+            // 11 observation bundles unpacked from the
+            // block — accessor pass-through PROOF lives
+            // in
+            // BASAuditObservationProjectionsObservation
+            // BundlesBlockTests。
+            presenceObservationBundle:
+                observationBundles.presence,
+            decompositionObservationBundle:
+                observationBundles.decomposition,
+            softHandObservationBundle:
+                observationBundles.softHand,
+            leaseLifeObservationBundle:
+                observationBundles.leaseLife,
+            hostConstitutionObservationBundle:
+                observationBundles.hostConstitution,
+            thoughtFoldObservationBundle:
+                observationBundles.thoughtFold,
+            neuralOrganObservationBundle:
+                observationBundles.neuralOrgan,
+            hippocampalMemoryObservationBundle:
+                observationBundles.hippocampalMemory,
+            worldPriorObservationBundle:
+                observationBundles.worldPrior,
+            riskObservationBundle:
+                observationBundles.risk,
+            updateTicketObservationBundle:
+                observationBundles.updateTicket)
+    }
+
     // MARK: - chapter 五百十一 / M1422 — Kunlun-inputs convenience
     //                                    init
     //
