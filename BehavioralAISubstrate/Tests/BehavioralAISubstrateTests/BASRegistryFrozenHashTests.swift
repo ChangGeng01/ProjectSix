@@ -107,23 +107,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 602 close-out。 Chapter
-    /// 602:REAL HOT-PATH ATTACK PHASE I CONTINUATION
-    /// WAVE 3 THE BIG MOVE — runTurn(_:) 1733-LOC body
-    /// + runTurnAndIngest 12-LOC async wrapper MOVED
-    /// from EBrainRuntimeCoordinator.swift to NEW
-    /// sibling EBrainRuntimeCoordinator+RunTurn.swift
-    /// (M1785)。 4 PROOF tests (M1786) verify symbol-
-    /// path continuity + V1 byte-equality preserved
-    /// (40 stress-sweep canonical60 green)。 NEW BASV1
-    /// MonolithExtractionWaveThreeDoctrine (M1787)
-    /// supersedes chapter 601 wave 2 doctrine + bumps
-    /// 最激进 score 8 → 9 + planTargetAchievedInSpirit
-    /// = true。 V1 monolith file LOC:1918 → 196
-    /// (-1722)。 Cumulative V1 reduction from chapter
-    /// 477 baseline 2540 → 196 (-2344 = 92.3% of plan
-    /// target)。 THIRD consecutive 最激进 advancement +
-    /// consecutiveV1FoldChapters = 3。
+    /// Re-captured at chapter 603 close-out。 Chapter
+    /// 603:BASCHATCOMPLETIONSADAPTER FIRST-EVER
+    /// CODABLE EXTENSION WAVE 1 — 9TH MODULE FRESH
+    /// TERRITORY。 1 type (BASChatCompletionsOrgan
+    /// Adapter.Endpoint nested in actor) gained Codable
+    /// at M1789 + 1 PROOF test (M1790) + NEW BASChat
+    /// CompletionsAdapterCodableExtensionDoctrine
+    /// (M1791) + close-out (M1792)。 BASChatCompletions
+    /// Adapter uncovered by chapter 599 BASMLXAdapter
+    /// first-ever (8th-module entry)。 Module count
+    /// bumped 8 → 9 — 3rd consecutive fresh-module
+    /// first-ever extension after the chapter 597
+    /// octa-milestone seal (BASOrgan ch598 + BAS
+    /// MLXAdapter ch599 + BASChatCompletionsAdapter
+    /// ch603)。
     static let frozenFullRegistrySha256: String =
-        "cb092c849b1ac0ad1921bcb5ea7711150fd603fef0bfd495364cebe4c91fd5fc"
+        "495045aea9e11762d2c8610fe1becdfe944904f4c0ca1fed4879cb5b13be3d1e"
 }

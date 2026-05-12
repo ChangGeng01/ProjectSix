@@ -2027,7 +2027,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二")!)
+                            "chapter 六百二")!),
+            // M1792 chapter 603 — BASChatCompletionsAdapter first-ever (9th-module)
+            checkRegistry("六百三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3339,6 +3345,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二")!
+                .mNumberLast),
+            // M1792 chapter 603 — BASChatCompletionsAdapter first-ever (9th-module)
+            ("603",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

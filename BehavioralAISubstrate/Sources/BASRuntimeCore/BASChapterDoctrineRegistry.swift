@@ -12900,7 +12900,104 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1788。 372" +
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014 OPT-" +
-                "IN preserved。")
+                "IN preserved。"),
+
+        // chapter 603 — BASChatCompletionsAdapter
+        // first-ever Codable extension wave 1。 9TH
+        // MODULE FRESH TERRITORY:uncovered by chapter
+        // 599 BASMLXAdapter first-ever。 Module count
+        // bumped 8 → 9。 3rd consecutive fresh-module
+        // first-ever extension after chapter 597 octa
+        // -milestone seal。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三",
+            mNumberFirst: 1789,
+            mNumberLast: 1792,
+            v1MilestoneMNumber: 1792,
+            v1MilestoneStatus:
+                "chapter-603-chatcompletions-adapter-first-ever-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1789, knife: "第一刀",
+                    concept: "Add Codable to 1 BASChat" +
+                        "CompletionsAdapter type —" +
+                        " BASChatCompletionsOrganAdapter" +
+                        ".Endpoint (3-field nested" +
+                        " endpoint config:url + headers" +
+                        " + model)。 Pure-value struct" +
+                        " nested in actor。 All field" +
+                        " types already Codable — trivial" +
+                        " conformance addition。"),
+                BASChapterKnife(
+                    mNumber: 1790, knife: "第二刀",
+                    concept: "1 compile-time conformance" +
+                        " PROOF test。"),
+                BASChapterKnife(
+                    mNumber: 1791, knife: "第三刀",
+                    concept: "NEW BASChatCompletions" +
+                        "AdapterCodableExtensionDoctrine" +
+                        " + isFreshModuleTerritory flag" +
+                        " + moduleCountAfterThis = 9 +" +
+                        " isThirdConsecutiveFreshModule" +
+                        "AfterOcta flag + typeIsNestedIn" +
+                        "ActorContext flag。 typed-surface" +
+                        " count 143 → 144。"),
+                BASChapterKnife(
+                    mNumber: 1792, knife: "第四刀",
+                    concept: "Chapter 603 close-out +" +
+                        " doctrine sync。 376 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 BASChatCompletions" +
+                        "Adapter now in ledger-" +
+                        "serializable contract surface。" +
+                        " 9 modules covered。")
+            ],
+            entropyClassesAttacked: [
+                "chat-completions-endpoint-non-codable",
+                "bas-chat-completions-adapter-module-not-in-narrative",
+                "module-count-stuck-at-8-after-chapter-599",
+                "third-consecutive-post-octa-fresh-module-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1792",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "chat-completions-adapter-first-ever-codable-extension",
+                "fresh-module-territory",
+                "module-count-bumped-8-to-9",
+                "third-consecutive-fresh-module-after-octa"
+            ],
+            plannedFutureCuts: [
+                "future arc — BASChatCompletionsAdapter" +
+                " Codable extension wave 2",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — 10th module exploration" +
+                " (BASAppleAdapters non-Codable types" +
+                " e.g。 BASChengluPromptSignature)"
+            ],
+            summary: "Chapter 603 ships BASChat" +
+                "CompletionsAdapter first-ever Codable" +
+                " extension wave 1。 9TH MODULE FRESH" +
+                " TERRITORY:BASChatCompletionsAdapter" +
+                " uncovered by chapter 599 BASMLXAdapter" +
+                " first-ever (8th-module entry)。 This" +
+                " extension is the 9th-module entry —" +
+                " 3rd consecutive fresh-module first-" +
+                "ever extension after chapter 597 octa-" +
+                "milestone seal (BASOrgan ch598 + BAS" +
+                "MLXAdapter ch599 + BASChatCompletions" +
+                "Adapter ch603)。 1 type (BASChat" +
+                "CompletionsOrganAdapter.Endpoint nested" +
+                " in actor) gained Codable at M1789。 1" +
+                " PROOF test (M1790) + new typed surface" +
+                " (M1791) + close-out (M1792)。 144 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1792。 376 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

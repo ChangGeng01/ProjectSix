@@ -37,28 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs602() {
+    func testLastChapterIs603() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二",
-            "Chapter 六百二:REAL HOT-PATH ATTACK PHASE I" +
-            " CONTINUATION WAVE 3 THE BIG MOVE —" +
-            " runTurn(_:) 1733-LOC body +" +
-            " runTurnAndIngest 12-LOC async wrapper" +
-            " moved from V1 monolith file to NEW" +
-            " sibling EBrainRuntimeCoordinator+RunTurn" +
-            ".swift。 V1 monolith file LOC 1918 → 196" +
-            " (-1722)。 Cumulative V1 reduction from" +
-            " chapter 477 baseline:-2344 LOC = 92.3%" +
-            " of plan target。 4 PROOF tests verify" +
-            " symbol-path continuity。 NEW BASV1" +
-            "MonolithExtractionWaveThreeDoctrine" +
-            " supersedes wave 2 + bumps 最激进 score" +
-            " 8 → 9 + planTargetAchievedInSpirit =" +
-            " true。 THIRD consecutive 最激进" +
-            " advancement。 143 typed surfaces" +
-            " cumulative")
+            "chapter 六百三",
+            "Chapter 六百三:BASCHATCOMPLETIONSADAPTER" +
+            " FIRST-EVER CODABLE EXTENSION WAVE 1 —" +
+            " 9TH MODULE FRESH TERRITORY。 BASChat" +
+            "CompletionsAdapter uncovered by chapter" +
+            " 599 BASMLXAdapter first-ever (8th-module" +
+            " entry)。 1 type (BASChatCompletionsOrgan" +
+            "Adapter.Endpoint nested in actor) gained" +
+            " Codable + 1 PROOF test + BASChat" +
+            "CompletionsAdapterCodableExtensionDoctrine" +
+            " typed surface + close-out。 Module count" +
+            " bumped 8 → 9。 3rd consecutive fresh-" +
+            "module first-ever extension after the" +
+            " chapter 597 octa-milestone seal。 144" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range

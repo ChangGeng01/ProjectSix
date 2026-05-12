@@ -3341,6 +3341,30 @@ public enum BASEntropyChapterIndex {
                 " consecutiveV1FoldChapters = 3。 143" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1788。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三",
+            mNumberFirst: 1789, mNumberLast: 1792,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASCHATCOMPLETIONSADAPTER FIRST-" +
+                "EVER CODABLE EXTENSION WAVE 1 — 9TH" +
+                " MODULE FRESH TERRITORY。 1 type" +
+                " (BASChatCompletionsOrganAdapter." +
+                "Endpoint nested in actor) gained" +
+                " Codable at M1789 + 1 PROOF test" +
+                " (M1790) + new typed surface (M1791)" +
+                " + close-out (M1792)。 BASChat" +
+                "CompletionsAdapter was uncovered by" +
+                " chapter 599 BASMLXAdapter first-ever" +
+                " (8th-module entry)。 Module count" +
+                " bumped 8 → 9 — 3rd consecutive fresh-" +
+                "module first-ever extension after the" +
+                " chapter 597 octa-milestone seal (BAS" +
+                "Organ ch598 + BASMLXAdapter ch599 +" +
+                " BASChatCompletionsAdapter ch603)。" +
+                " 144 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1792。 V1 byte-equality" +
                 " preserved。")
     ]
 

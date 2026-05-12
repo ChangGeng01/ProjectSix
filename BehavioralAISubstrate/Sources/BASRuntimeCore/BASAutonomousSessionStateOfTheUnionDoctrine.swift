@@ -110,24 +110,20 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 602
-    /// close-out (M1788 — REAL HOT-PATH ATTACK Phase I
-    /// CONTINUATION WAVE 3 THE BIG MOVE;runTurn(_:)
-    /// 1733-LOC body + runTurnAndIngest 12-LOC wrapper
-    /// moved from V1 monolith to NEW sibling extension
-    /// file;V1 monolith file LOC 1918 → 196 (-1722);
-    /// cumulative V1 reduction from chapter 477
-    /// baseline 2540 → 196 (-2344 = 92.3% of plan
-    /// target);NEW BASV1MonolithExtractionWaveThree
-    /// Doctrine bumps 最激进 score 8 → 9 +
-    /// planTargetAchievedInSpirit = true;THIRD
-    /// consecutive 最激进 advancement;
-    /// consecutiveV1FoldChapters = 3)。
-    public static let typedSurfaceCount: Int = 143
+    /// Cumulative achievement metrics at chapter 603
+    /// close-out (M1792 — BASChatCompletionsAdapter
+    /// first-ever Codable extension wave 1;9TH MODULE
+    /// FRESH TERRITORY uncovered by chapter 599 BAS
+    /// MLXAdapter first-ever;1 BASChatCompletions
+    /// OrganAdapter.Endpoint type gained Codable;
+    /// module count bumped 8 → 9;3rd consecutive
+    /// fresh-module first-ever extension after octa-
+    /// milestone seal at chapter 597)。
+    public static let typedSurfaceCount: Int = 144
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 372
-    public static let phase2CommitsShipped: Int = 833
-    public static let chapter2NumberLast: Int = 1788
+        Int = 376
+    public static let phase2CommitsShipped: Int = 837
+    public static let chapter2NumberLast: Int = 1792
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

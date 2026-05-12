@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1788",
-            "M1788:doctrine version reflects chapter 六百二 — REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 3 THE BIG MOVE。 runTurn(_:) 1733-LOC body + runTurnAndIngest 12-LOC async wrapper MOVED OUT of V1 monolith file to NEW sibling EBrainRuntimeCoordinator+RunTurn.swift (M1785)。 V1 monolith file LOC 1918 → 196 (-1722)。 Cumulative V1 reduction from chapter 477 baseline (2540 LOC):-2344 LOC = 92.3% of plan target。 4 PROOF tests (M1786) verify symbol-path continuity + V1 byte-equality preserved (40 stress-sweep canonical60 green)。 NEW BASV1MonolithExtractionWaveThreeDoctrine (M1787) supersedes chapter 601 wave 2 doctrine + bumps 最激进 score 8 → 9 + planTargetAchievedInSpirit = true。 THIRD consecutive 最激进 advancement。 consecutiveV1FoldChapters = 3。 143 typed surfaces cumulative。 372 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1792",
+            "M1792:doctrine version reflects chapter 六百三 — BASCHATCOMPLETIONSADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1。 9TH MODULE FRESH TERRITORY:BASChatCompletionsAdapter uncovered by chapter 599 BASMLXAdapter first-ever (8th-module entry)。 1 BASChatCompletionsOrganAdapter.Endpoint type (nested in actor) gained Codable at M1789 + 1 PROOF test (M1790) + BASChatCompletionsAdapterCodableExtensionDoctrine typed surface (M1791) + close-out (M1792)。 Module count bumped 8 → 9。 3rd consecutive fresh-module first-ever extension after the chapter 597 octa-milestone seal (BASOrgan ch598 + BASMLXAdapter ch599 + BASChatCompletionsAdapter ch603)。 144 typed surfaces cumulative。 376 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
