@@ -208,7 +208,7 @@ public struct BASCortexPacket: BASSchemaVersioned {
         consistencyChecksum: "")
 }
 
-public struct BASLatentTissueState: Equatable, Sendable {
+public struct BASLatentTissueState: Codable, Equatable, Sendable {
     public var scoutState: String?
     public var cortexState: String?
     public var simuState: String?

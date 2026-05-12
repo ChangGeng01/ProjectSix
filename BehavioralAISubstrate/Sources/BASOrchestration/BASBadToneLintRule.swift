@@ -145,7 +145,7 @@ public enum BASBadToneLinter {
 
     /// Violation report — rule + the offending input string +
     /// the matched substring.
-    public struct Violation: Sendable, Equatable, Hashable {
+    public struct Violation: Codable, Sendable, Equatable, Hashable {
         public let rule: BASBadToneLintRule
         public let offendingInput: String
         public let matchedSubstring: String
