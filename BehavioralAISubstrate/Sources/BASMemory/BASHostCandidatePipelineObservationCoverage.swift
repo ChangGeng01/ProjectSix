@@ -105,7 +105,7 @@ public enum BASHostCandidatePipelineObservationBudget {
 /// so callers can compose coverage summaries in tests without
 /// instantiating the pipeline.
 public struct BASHostCandidatePipelineObservationSnapshot:
-    Sendable, Equatable
+    Codable, Sendable, Equatable
 {
     public let activeVersionID: String
     public let committedVersionIDs: [String]

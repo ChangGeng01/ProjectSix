@@ -28,7 +28,7 @@ import Foundation
 /// Pure result type carrying the gated action (or `nil` when
 /// refused) and the typed reason code that motivated the refusal.
 public struct BASForbiddenLifecycleGateDecision:
-    Sendable, Equatable, Hashable
+    Codable, Sendable, Equatable, Hashable
 {
     /// The action allowed by the gate, or `nil` when the gate
     /// refuses. The caller (lifecycle coordinator) is expected to

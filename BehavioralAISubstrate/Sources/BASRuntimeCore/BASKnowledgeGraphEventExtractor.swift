@@ -60,7 +60,7 @@ import Foundation
 
 /// Typed result from one extraction run。
 public struct BASKnowledgeGraphEventExtractionResult:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
     /// Count of new nodes inserted into the graph (excluding
     /// those already present)。
