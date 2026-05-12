@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1584",
-            "M1584:doctrine version reflects chapter 五百五十一 — cascading Codable conformance to 4 audit-projection types (BASCthulhuPermitEscalationDecision + BASCthulhuAssertionCeilingDecision + BASCthulhuAuditProjections + BASRuntimeAuditProjectionsBundle) (M1581) + BASRuntimeAuditProjectionsBundleCodableDoctrine typed milestone (M1582) + 10 PROOF tests including round-trip + sortedKeys determinism (M1583)。 93 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1588",
+            "M1588:doctrine version reflects chapter 五百五十二 — Codable cascade extension to 9 more typed surfaces (BASForbiddenKnowledgeCandidate.Aggregate + 3 ProjectionsBlocks at M1585 + 4 BASKunlunProtocol nested types + KunlunProtocolBlock at M1587) + 6 PROOF tests (M1586)。 93 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -205,7 +205,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百四十八",   // M1569-M1572 (typed milestone doctrine commemorating the 6-chapter Codable arc + 15 anti-drift PROOF tests + 6 wire-in PROOF tests cross-checking 3 other doctrines)
         "chapter 五百四十九",   // M1573-M1576 (substrate state-of-the-union audit doctrine + 16 anti-drift PROOF tests + 7 cross-doctrine wire-in PROOF tests)
         "chapter 五百五十",     // M1577-M1580 (meta-catalogue of 7 session milestone doctrines + 13 anti-drift PROOF tests + 8 wire-in PROOF tests)
-        "chapter 五百五十一"    // M1581-M1584 (cascading Codable to 4 audit-projection types + doctrine + 10 PROOF tests)
+        "chapter 五百五十一",   // M1581-M1584 (cascading Codable to 4 audit-projection types + doctrine + 10 PROOF tests)
+        "chapter 五百五十二"    // M1585-M1588 (Codable cascade extension to 9 more typed surfaces + 6 PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -222,14 +223,13 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1584
+    public static let mNumberLast: Int = 1588
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1584)。 Bumped through chapter 551:625 → 629。
-    /// Chapter 551:cascading Codable to 4 audit-
-    /// projection types + typed milestone doctrine + 10
-    /// PROOF tests + close-out。
-    public static let commitsShipped: Int = 629
+    /// M1588)。 Bumped through chapter 552:629 → 633。
+    /// Chapter 552:Codable cascade extension to 9 more
+    /// typed surfaces + 6 PROOF tests + close-out。
+    public static let commitsShipped: Int = 633
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

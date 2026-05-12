@@ -2285,6 +2285,30 @@ public enum BASEntropyChapterIndex {
                 " including round-trip + sortedKeys" +
                 " determinism (M1583)。 93 typed surfaces" +
                 " cumulative。 ADR-016 → M1584。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十二",
+            mNumberFirst: 1585, mNumberLast: 1588,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable cascade extension to 9" +
+                " more typed surfaces (M1585 4 +" +
+                " M1587 5 = 9 total):BASForbiddenKnow" +
+                "ledgeCandidate.Aggregate + 3 typed" +
+                " ProjectionsBlock types (Closure +" +
+                " CthulhuLeftovers + KunlunAuditSchemas)" +
+                " (M1585) + 6 PROOF tests (M1586) + 4" +
+                " BASKunlunProtocol nested types" +
+                " (Verification + Readiness +" +
+                " AccessDecision + LineageReport) + 5th" +
+                " ProjectionsBlock (KunlunProtocol)" +
+                " (M1587)。 CthulhuAggregatesBlock" +
+                " remains blocked by BASOldSealSealing" +
+                "Protocol.Aggregate + BASEvolutionLife" +
+                "cycleSession.Aggregate (deferred)。 93" +
+                " typed surfaces cumulative (no new" +
+                " surfaces — pure Codable cascade" +
+                " extension)。 ADR-016 → M1588。 V1" +
                 " byte-equality preserved。")
     ]
 

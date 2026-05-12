@@ -8253,7 +8253,95 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M1584。" +
                 " 168 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 552 — Codable cascade extension to 9
+        // more typed surfaces
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十二",
+            mNumberFirst: 1585,
+            mNumberLast: 1588,
+            v1MilestoneMNumber: 1588,
+            v1MilestoneStatus:
+                "chapter-552-codable-cascade-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1585, knife: "第一刀",
+                    concept: "Add Codable to 4 typed" +
+                        " surfaces (BASForbidden" +
+                        "KnowledgeCandidate.Aggregate" +
+                        " nested + BASAuditObservation" +
+                        "ProjectionsClosureBlock +" +
+                        " CthulhuLeftoversBlock +" +
+                        " KunlunAuditSchemasBlock)。 2" +
+                        " ProjectionsBlock types" +
+                        " attempted but blocked by" +
+                        " deeper nested types。"),
+                BASChapterKnife(
+                    mNumber: 1586, knife: "第二刀",
+                    concept: "6 PROOF tests:compile-" +
+                        "time conformance check across" +
+                        " 4 types + round-trip tests +" +
+                        " sortedKeys determinism for" +
+                        " Aggregate。"),
+                BASChapterKnife(
+                    mNumber: 1587, knife: "第三刀",
+                    concept: "Extended Codable cascade" +
+                        " to 5 more types (4" +
+                        " BASKunlunProtocol nested" +
+                        " types + KunlunProtocolBlock" +
+                        " which was blocked at M1585)。" +
+                        " Total chapter 552 cascade:9" +
+                        " types gained Codable。"),
+                BASChapterKnife(
+                    mNumber: 1588, knife: "第四刀",
+                    concept: "Chapter 552 close-out +" +
+                        " doctrine sync。 172 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "nested-aggregate-non-codable",
+                "projections-block-codable-incomplete",
+                "kunlun-protocol-nested-non-codable",
+                "json-replay-determinism-gap-on-blocks"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1588",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "codable-cascade-9-types-sealed"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional cascading" +
+                " Codable for CthulhuAggregatesBlock" +
+                " (requires BASOldSealSealingProtocol" +
+                " + BASEvolutionLifecycleSession" +
+                " Aggregates to gain Codable first)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in"
+            ],
+            summary: "Chapter 552 extends the Codable" +
+                " cascade pattern from chapter 551 to" +
+                " 9 more typed surfaces:1 nested" +
+                " Aggregate + 4 BASKunlunProtocol nested" +
+                " types + 4 ProjectionsBlock types" +
+                " (ClosureBlock + CthulhuLeftoversBlock" +
+                " + KunlunAuditSchemasBlock +" +
+                " KunlunProtocolBlock)。 1 ProjectionsBlock" +
+                " (CthulhuAggregatesBlock) remains" +
+                " blocked by deeper non-Codable types" +
+                " (deferred)。 6 PROOF tests included。" +
+                " 93 typed surfaces cumulative (no new" +
+                " surfaces — pure Codable cascade" +
+                " extension)。 ADR-016 → M1588。 172" +
+                " consecutive autonomous commits with" +
+                " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

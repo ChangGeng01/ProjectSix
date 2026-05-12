@@ -107,14 +107,12 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 551 close-out。 Chapter
-    /// 551:cascading Codable conformance to 4 audit-
-    /// projection types (BASCthulhuPermitEscalation
-    /// Decision + BASCthulhuAssertionCeilingDecision +
-    /// BASCthulhuAuditProjections +
-    /// BASRuntimeAuditProjectionsBundle) (M1581) +
-    /// typed milestone doctrine (M1582) + 10 PROOF
-    /// tests (M1583)。
+    /// Re-captured at chapter 552 close-out。 Chapter
+    /// 552:Codable cascade extension to 9 more typed
+    /// surfaces (BASForbiddenKnowledgeCandidate.Aggregate
+    /// + 3 ProjectionsBlocks at M1585 + 4 BASKunlun
+    /// Protocol nested types + KunlunProtocolBlock at
+    /// M1587) + 6 PROOF tests (M1586)。
     static let frozenFullRegistrySha256: String =
-        "2a81edc0cb8e9a6ea5d1b7e2cba13c268dd51529d6e1a3a5df830484ed1bd8f6"
+        "65e7db4174628feda8f960d530b82658c844c5db75a0279d8d4f2014accb02e0"
 }

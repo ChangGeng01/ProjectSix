@@ -117,19 +117,18 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 149
+    public static let phase2ChapterCount: Int = 150
 
-    /// Phase 2 commits shipped。 At M1584:125 + 84 + 420
-    /// = 629 (chapter 551 = 4 cuts — cascading Codable
-    /// to 4 audit-projection types + doctrine + 10
-    /// PROOF tests + close-out)
-    public static let phase2CommitsShipped: Int = 629
+    /// Phase 2 commits shipped。 At M1588:125 + 84 + 424
+    /// = 633 (chapter 552 = 4 cuts — Codable cascade
+    /// extension to 9 more typed surfaces + 6 PROOF
+    /// tests + close-out)
+    public static let phase2CommitsShipped: Int = 633
 
-    /// Phase 2 mNumberLast。 At M1584:chapter 551 —
-    /// cascading Codable conformance through the audit
-    /// projections aggregate bundle + 3 underlying types。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1584
+    /// Phase 2 mNumberLast。 At M1588:chapter 552 —
+    /// 9 more typed surfaces gained Codable conformance
+    /// through the cascade。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1588
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
