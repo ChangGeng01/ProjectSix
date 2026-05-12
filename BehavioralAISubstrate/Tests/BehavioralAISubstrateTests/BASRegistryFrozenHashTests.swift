@@ -107,14 +107,13 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 549 close-out。 Chapter
-    /// 549:substrate state-of-the-union typed audit
-    /// doctrine pinning the cumulative achievement +
-    /// remaining-work state with honest reframe of the
-    /// original plan's Tier A mismatch (M1573) + 16
-    /// anti-drift PROOF tests (M1574) + 7 cross-doctrine
-    /// wire-in PROOF tests against 6 other doctrines
-    /// (M1575)。
+    /// Re-captured at chapter 550 close-out。 Chapter
+    /// 550:meta-catalogue typed surface cataloguing
+    /// all 7 session milestone doctrines shipped during
+    /// chapters 531-549 (M1577) + 13 anti-drift PROOF
+    /// tests (M1578) + 8 wire-in PROOF tests cross-
+    /// checking against actual milestone doctrines
+    /// (M1579)。
     static let frozenFullRegistrySha256: String =
-        "59b4816a304a13eef3f0ea460c7ac8ad5458c73ef0d33d9c12e12efe842d6f71"
+        "42c2b84ec3a5c7b4aed6b0bbb853e6fd8212c3f03ab76cc26a689691a65dce1e"
 }

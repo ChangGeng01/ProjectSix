@@ -203,7 +203,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百四十六",   // M1561-M1564 (Codable round-trip PROOF for RiskChoiceBundle extends coverage 7 → 8 of 9 + doctrine catalogue update + anti-drift tests update)
         "chapter 五百四十七",   // M1565-M1568 (100% MILESTONE — final Codable round-trip PROOF for CognitiveFramesBundle 8 → 9 of 9 + doctrine catalogue update to 100% + anti-drift tests with milestone invariants)
         "chapter 五百四十八",   // M1569-M1572 (typed milestone doctrine commemorating the 6-chapter Codable arc + 15 anti-drift PROOF tests + 6 wire-in PROOF tests cross-checking 3 other doctrines)
-        "chapter 五百四十九"    // M1573-M1576 (substrate state-of-the-union audit doctrine + 16 anti-drift PROOF tests + 7 cross-doctrine wire-in PROOF tests)
+        "chapter 五百四十九",   // M1573-M1576 (substrate state-of-the-union audit doctrine + 16 anti-drift PROOF tests + 7 cross-doctrine wire-in PROOF tests)
+        "chapter 五百五十"      // M1577-M1580 (meta-catalogue of 7 session milestone doctrines + 13 anti-drift PROOF tests + 8 wire-in PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -220,14 +221,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1576
+    public static let mNumberLast: Int = 1580
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1576)。 Bumped through chapter 549:617 → 621。
-    /// Chapter 549:state-of-the-union typed audit
-    /// doctrine + 23 PROOF tests (16 anti-drift + 7
-    /// cross-doctrine wire-in) + close-out。
-    public static let commitsShipped: Int = 621
+    /// M1580)。 Bumped through chapter 550:621 → 625。
+    /// Chapter 550:meta-catalogue of 7 session
+    /// milestone doctrines + 21 PROOF tests (13 anti-
+    /// drift + 8 wire-in) + close-out。
+    public static let commitsShipped: Int = 625
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1576",
-            "M1576:doctrine version reflects chapter 五百四十九 — substrate state-of-the-union typed audit doctrine。 BASAutonomousSessionStateOfTheUnionDoctrine with 6 achievement kinds + 5 remaining-work kinds + honest reframe flag (M1573) + 16 anti-drift PROOF tests (M1574) + 7 cross-doctrine wire-in PROOF tests cross-checking 6 other doctrines (M1575)。 91 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1580",
+            "M1580:doctrine version reflects chapter 五百五十 — meta-catalogue of 7 session milestone doctrines。 BASSessionMilestoneDoctrineCatalogueDoctrine with typed ID enum + Entry struct + 7-entry chronological catalogue (M1577) + 13 anti-drift PROOF tests (M1578) + 8 wire-in PROOF tests cross-checking actual milestone doctrines (M1579)。 92 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
