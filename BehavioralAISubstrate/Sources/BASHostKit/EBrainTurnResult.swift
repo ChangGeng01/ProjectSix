@@ -202,6 +202,73 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百三十 / M1498 — 7-bundle
+    //                                     convenience init
+    //
+    // Adds a 7-bundle convenience init that accepts ALL
+    // SEVEN typed cluster bundles (sovereign + host +
+    // evolution + auditProjectionForward + cognitive
+    // frames + risk/choice + misc)。 Collapses 43
+    // individual fields into 7 typed bundle args at the
+    // call site。
+    //
+    // Delegates to the M1494 6-bundle init,unpacking
+    // the 4 misc fields from miscBundle。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostBundle: BASEBrainTurnResultHostBundle,
+        cognitiveFramesBundle:
+            BASEBrainTurnResultCognitiveFramesBundle,
+        riskChoiceBundle:
+            BASEBrainTurnResultRiskChoiceBundle,
+        miscBundle: BASEBrainTurnResultMiscBundle,
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        auditProjectionForwardBundle:
+            BASEBrainTurnResultAuditProjectionForwardBundle
+    ) {
+        // Delegate to the M1494 6-bundle init,
+        // unpacking the 4 misc fields from miscBundle。
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            sovereignBundle: sovereignBundle,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostBundle: hostBundle,
+            cognitiveFramesBundle:
+                cognitiveFramesBundle,
+            riskChoiceBundle: riskChoiceBundle,
+            riskDecisionPackage:
+                miscBundle.riskDecisionPackage,
+            hostGateValue:
+                miscBundle.hostGateValue,
+            renderedOutput:
+                miscBundle.renderedOutput,
+            updateTickets:
+                miscBundle.updateTickets,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace: runtimeTrace,
+            auditProjectionForwardBundle:
+                auditProjectionForwardBundle)
+    }
+
     // MARK: - chapter 五百二十九 / M1494 — 6-bundle
     //                                       convenience init
     //
