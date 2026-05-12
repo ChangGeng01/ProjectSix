@@ -1733,7 +1733,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百五十三")!)
+                            "chapter 五百五十三")!),
+            // M1596 chapter 554 — Post-arc-seal follow-through + 8 PROOF tests + EndToEndJsonProof doctrine + 13 anti-drift tests
+            checkRegistry("五百五十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百五十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2653,6 +2659,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百五十三")!
+                .mNumberLast),
+            // M1596 chapter 554 — Post-arc-seal follow-through + 8 PROOF tests + EndToEndJsonProof doctrine + 13 anti-drift tests
+            ("554",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

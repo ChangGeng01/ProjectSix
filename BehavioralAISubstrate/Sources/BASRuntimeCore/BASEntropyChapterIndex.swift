@@ -2331,7 +2331,26 @@ public enum BASEntropyChapterIndex {
                 " 16 types gained Codable across 12" +
                 " commits (chapters 551-553)。 94 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1592。 V1 byte-equality preserved。")
+                " M1592。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十四",
+            mNumberFirst: 1593, mNumberLast: 1596,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Post-arc-seal follow-through。" +
+                " Converts the M1591 doctrine CLAIM into" +
+                " actual runtime PROOF。 8 end-to-end" +
+                " JSON round-trip PROOF tests exercising" +
+                " POPULATED bundle state across the" +
+                " chapter-553 newly-Codable types" +
+                " (M1593) +" +
+                " BASAuditProjectionsBundleEndToEndJson" +
+                "ProofDoctrine typed surface (M1594) +" +
+                " 13 anti-drift PROOF tests with" +
+                " cross-doctrine wire-in (M1595)。 95" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1596。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

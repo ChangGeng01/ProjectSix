@@ -8441,6 +8441,105 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1592。 176 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 554 — Post-arc-seal follow-through。
+        // Converts the M1591 doctrine CLAIM into actual
+        // runtime PROOF + records the PROOF as a typed
+        // surface。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十四",
+            mNumberFirst: 1593,
+            mNumberLast: 1596,
+            v1MilestoneMNumber: 1596,
+            v1MilestoneStatus:
+                "chapter-554-end-to-end-json-proof-shipped",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1593, knife: "第一刀",
+                    concept: "8 end-to-end JSON round-" +
+                        "trip PROOF tests exercising" +
+                        " POPULATED bundle state across" +
+                        " the chapter-553 newly-Codable" +
+                        " types (seal aggregate +" +
+                        " lifecycle aggregate +" +
+                        " CthulhuAggregatesBlock with" +
+                        " both populated)。 Converts" +
+                        " the M1591 doctrine claim" +
+                        " from a flag into actual" +
+                        " runtime PROOF。"),
+                BASChapterKnife(
+                    mNumber: 1594, knife: "第二刀",
+                    concept: "NEW BASAuditProjections" +
+                        "BundleEndToEndJsonProofDoctrine" +
+                        " typed surface commemorating" +
+                        " the M1593 PROOF。 Records" +
+                        " chapterTag + proofMNumber +" +
+                        " proofTestCount +" +
+                        " proofMethod + 3 chapter-553" +
+                        " types proven + 5 bundle" +
+                        " surfaces proven + 5 proven" +
+                        " properties +" +
+                        " arcSealDoctrineRef。 typed-" +
+                        "surface count 94 → 95。"),
+                BASChapterKnife(
+                    mNumber: 1595, knife: "第三刀",
+                    concept: "13 anti-drift PROOF tests" +
+                        " + cross-doctrine wire-in for" +
+                        " the M1594 typed surface。 Wire-" +
+                        "in tests prove the arc-seal" +
+                        " doctrine ref resolves" +
+                        " correctly and that the PROOF" +
+                        " M-number sits AFTER the arc-" +
+                        "seal range。"),
+                BASChapterKnife(
+                    mNumber: 1596, knife: "第四刀",
+                    concept: "Chapter 554 close-out +" +
+                        " doctrine sync。 180" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。 Post-arc-" +
+                        "seal PROOF-backing closed。")
+            ],
+            entropyClassesAttacked: [
+                "doctrine-claim-without-runtime-proof",
+                "populated-bundle-codable-untested",
+                "sortedKeys-determinism-untested-on-populated",
+                "cross-doctrine-ref-string-anti-drift"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1596",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "m1591-claim-backed-by-runtime-proof"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — Codable cascade to" +
+                " remaining substrate types if" +
+                " demand arises"
+            ],
+            summary: "Chapter 554 closes the gap between" +
+                " the M1591 arc-seal doctrine CLAIM" +
+                " (audit-projection family is JSON-" +
+                "serializable end-to-end) and actual" +
+                " runtime PROOF。 8 PROOF tests exercise" +
+                " populated bundle round-trip" +
+                " including the chapter-553 newly-" +
+                "Codable types (M1593) +" +
+                " BASAuditProjectionsBundleEndToEndJson" +
+                "ProofDoctrine typed surface (M1594) +" +
+                " 13 anti-drift PROOF tests with" +
+                " cross-doctrine wire-in (M1595)。 95" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1596。 180 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

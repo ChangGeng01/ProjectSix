@@ -207,7 +207,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百五十",     // M1577-M1580 (meta-catalogue of 7 session milestone doctrines + 13 anti-drift PROOF tests + 8 wire-in PROOF tests)
         "chapter 五百五十一",   // M1581-M1584 (cascading Codable to 4 audit-projection types + doctrine + 10 PROOF tests)
         "chapter 五百五十二",   // M1585-M1588 (Codable cascade extension to 9 more typed surfaces + 6 PROOF tests)
-        "chapter 五百五十三"    // M1589-M1592 (final Codable cascade to 3 more types — all 5 BASAuditObservationProjections*Block types now Codable + 5 PROOF tests + BASCodableCascadeArcSealedDoctrine typed milestone)
+        "chapter 五百五十三",   // M1589-M1592 (final Codable cascade to 3 more types — all 5 BASAuditObservationProjections*Block types now Codable + 5 PROOF tests + BASCodableCascadeArcSealedDoctrine typed milestone)
+        "chapter 五百五十四"    // M1593-M1596 (post-arc-seal follow-through — 8 end-to-end JSON round-trip PROOF tests + BASAuditProjectionsBundleEndToEndJsonProofDoctrine typed surface + 13 anti-drift PROOF tests with cross-doctrine wire-in)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -224,16 +225,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1592
+    public static let mNumberLast: Int = 1596
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1592)。 Bumped through chapter 553:633 → 637。
-    /// Chapter 553:Final Codable cascade to 3 more types
-    /// (all 5 BASAuditObservationProjections*Block types
-    /// now Codable) + 5 PROOF tests +
-    /// BASCodableCascadeArcSealedDoctrine typed milestone
-    /// + close-out。
-    public static let commitsShipped: Int = 637
+    /// M1596)。 Bumped through chapter 554:637 → 641。
+    /// Chapter 554:Post-arc-seal follow-through — 8 end-
+    /// to-end JSON round-trip PROOF tests +
+    /// BASAuditProjectionsBundleEndToEndJsonProofDoctrine
+    /// typed surface + 13 anti-drift PROOF tests + close-
+    /// out。
+    public static let commitsShipped: Int = 641
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
