@@ -119,7 +119,7 @@ public enum BASOrganRegistryObservationBudget {
 /// a provider to the back). This is deliberate — audit consumers
 /// expect a stable iteration sequence.
 public struct BASOrganRegistryObservationSnapshot:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     public let descriptors: [BASOrganDescriptor]
 

@@ -57,7 +57,7 @@ public protocol BASStreamingOrganAdapter: BASOrganAdapter {
 /// `producedAt` is the wall-clock time at which the chunk was
 /// emitted, useful for measuring time-to-first-token and inter-chunk
 /// gap statistics.
-public struct BASOrganDraftChunk: Sendable, Equatable {
+public struct BASOrganDraftChunk: Sendable, Equatable, Codable {
     public let requestID: String
     public let providerID: String
     public let role: BASOrganRole
