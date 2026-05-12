@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs528() {
+    func testLastChapterIs529() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百二十八",
-            "M1492 chapter 五百二十八 — 5th BASEBrain" +
-            "TurnResult cluster bundle。 Cognitive frames" +
-            " 5 fields + 5-bundle init + V1 splice。 V1" +
-            " call site 52 → 22 args cumulative across" +
-            " 5 typed bundles。 74 typed surfaces" +
-            " cumulative")
+            "chapter 五百二十九",
+            "M1496 chapter 五百二十九 — 6th BASEBrain" +
+            "TurnResult cluster bundle。 Risk/choice 4" +
+            " fields + 6-bundle init + V1 splice。 V1" +
+            " call site 52 → 18 args cumulative across" +
+            " 6 typed bundles (65% reduction)。 75 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

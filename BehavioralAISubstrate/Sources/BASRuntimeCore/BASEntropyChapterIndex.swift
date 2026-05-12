@@ -1872,7 +1872,24 @@ public enum BASEntropyChapterIndex {
                 " (35 fields collapsed across 5 typed" +
                 " bundles)。 74 typed surfaces cumulative。" +
                 " ADR-016 → M1492。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十九",
+            mNumberFirst: 1493, mNumberLast: 1496,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "6th BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultRiskChoice" +
+                "Bundle (4 L10-L12 fields:triScores +" +
+                " mergedChoice + riskCard +" +
+                " actionPermit) + 6-bundle convenience" +
+                " init + V1 monolith splice。" +
+                " BASEBrainTurnResult call site" +
+                " cumulative:52 → 18 args (39 fields" +
+                " collapsed across 6 typed bundles," +
+                " 65% reduction)。 75 typed surfaces" +
+                " cumulative。 ADR-016 → M1496。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

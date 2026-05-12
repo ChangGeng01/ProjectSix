@@ -6211,7 +6211,89 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1492。 V1 byte-equality" +
                 " preserved (stress-sweep canonical60" +
                 " × 3 repeat runs 0-divergence)。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 529 — risk/choice cluster
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十九",
+            mNumberFirst: 1493,
+            mNumberLast: 1496,
+            v1MilestoneMNumber: 1496,
+            v1MilestoneStatus:
+                "chapter-529-risk-choice-6th-cluster",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1493, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "RiskChoiceBundle — 6th cluster" +
+                        " bundle。 Packs 4 L10-L12 risk/" +
+                        "choice fields (triScores +" +
+                        " mergedChoice + riskCard +" +
+                        " actionPermit)。 75 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1494, knife: "第二刀",
+                    concept: "BASEBrainTurnResult 6-bundle" +
+                        " convenience init taking ALL 6" +
+                        " typed cluster bundles。 Collapses" +
+                        " 39 individual fields into 6" +
+                        " typed bundle args。 Delegates to" +
+                        " M1490 5-bundle init。"),
+                BASChapterKnife(
+                    mNumber: 1495, knife: "第三刀",
+                    concept: "V1 monolith splice uses" +
+                        " riskChoiceBundle (4 args → 1" +
+                        " typed block)。 Cumulative" +
+                        " BASEBrainTurnResult fold:52 →" +
+                        " 18 named args at line 2287+。"),
+                BASChapterKnife(
+                    mNumber: 1496, knife: "第四刀",
+                    concept: "Chapter 529 close-out +" +
+                        " doctrine sync。 ADR-016 → M1496。" +
+                        " 6 of ~7 BASEBrainTurnResult" +
+                        " cluster bundles shipped。 V1" +
+                        " call site at 18 args (down" +
+                        " from 52,65% reduction)。")
+            ],
+            entropyClassesAttacked: [
+                "BASEBrainTurnResult-risk-choice-4-args",
+                "6-bundle-convenience-init-absent",
+                "L10-L12-risk-chain-not-typed-as-bundle",
+                "BASEBrainTurnResult-fold-still-incomplete"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1496",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "6-bundle-call-site-fold"
+            ],
+            plannedFutureCuts: [
+                "future arc — misc cluster bundle" +
+                " (riskDecisionPackage + hostGateValue" +
+                " + renderedOutput + updateTickets)",
+                "future arc — device/lifecycle cluster" +
+                " (deviceState + budgetFrame + wakeIntent" +
+                " + vitalState + runLease + emergencyBrake)",
+                "future arc — policy/recovery cluster" +
+                " (policyLineage + recoveryDisposition)",
+                "future arc — SampleHost production wire-in"
+            ],
+            summary: "Chapter 529 ships the 6th cluster" +
+                " bundle for the BASEBrainTurnResult" +
+                " fold:BASEBrainTurnResultRiskChoiceBundle" +
+                " (4 risk/choice fields:triScores +" +
+                " mergedChoice + riskCard + actionPermit)" +
+                " + 6-bundle convenience init + V1" +
+                " monolith splice using the bundle。" +
+                " Cumulative fold progress at BASEBrain" +
+                "TurnResult call site:52 → 18 named" +
+                " args (39 fields collapsed across 6" +
+                " typed bundles,65% reduction)。 75 typed" +
+                " surfaces cumulative。 ADR-016 → M1496。" +
+                " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
