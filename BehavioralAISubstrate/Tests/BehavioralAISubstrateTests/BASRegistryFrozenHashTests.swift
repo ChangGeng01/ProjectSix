@@ -107,17 +107,18 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 589 close-out。 Chapter
-    /// 589:BASMEMORY POST-CROSS-MODULE-ARC WAVE 3
-    /// CODABLE EXTENSION。 2 BASMemory types (BAS
-    /// MemoryImportanceScorer + BASMemoryMutation
-    /// Writer.MutationOutcome) gained Codable at
-    /// M1733 + 2 PROOF tests (M1734) + NEW BASMemory
-    /// PostCrossModuleArcExtensionWaveThreeDoctrine
-    /// (M1735)。 Completes 3-wave BASMemory post-arc
-    /// trilogy。 Combined chapter 569 + 587 + 588 +
-    /// 589 = 16 BASMemory types ledger-serializable。
-    /// Arc ready for sealing at chapter 590。
+    /// Re-captured at chapter 590 close-out。 Chapter
+    /// 590:BASMEMORY POST-ARC TRILOGY SEAL MILESTONE
+    /// for the 3-wave BASMemory post-arc extension
+    /// trilogy (chapters 587-589)。 NEW BASMemory
+    /// PostCrossModuleArcTrilogySealedDoctrine (M1737)
+    /// + 25 anti-drift PROOF tests (M1738) + 16
+    /// wire-in PROOF tests (M1739) commemorating
+    /// 3-wave / 12-commit BASMemory post-arc
+    /// trilogy。 Mirrors chapter 579 BASOrchestration
+    /// trilogy seal pattern。 Second sealed milestone
+    /// for BASMemory extensions (after chapter 569
+    /// cross-module arc seal)。
     static let frozenFullRegistrySha256: String =
-        "a79eef7a0aaace6fc5e778bd6625c18ab0624eef46a9ae5b3f99f585d24eb268"
+        "bef1b40760e9bcb4a4d0226dee6f2cb809d478ecfdd0ba7b78e921c6af7a0dd7"
 }

@@ -3028,7 +3028,29 @@ public enum BASEntropyChapterIndex {
                 " ledger-serializable。 Arc ready for" +
                 " sealing at chapter 590。 130 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1736。 V1 byte-equality preserved。")
+                " M1736。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十",
+            mNumberFirst: 1737, mNumberLast: 1740,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-ARC TRILOGY SEAL" +
+                " MILESTONE。 NEW BASMemoryPostCross" +
+                "ModuleArcTrilogySealedDoctrine (M1737)" +
+                " commemorating 3-wave BASMemory post-" +
+                "arc trilogy (chapters 587-589) + 25" +
+                " anti-drift PROOF tests (M1738) + 16" +
+                " wire-in PROOF tests (M1739) + close-" +
+                "out (M1740)。 Second sealed milestone" +
+                " for BASMemory extensions (after" +
+                " chapter 569 cross-module arc seal)。" +
+                " Mirrors chapter 579 BASOrchestration" +
+                " trilogy seal pattern。 Combined" +
+                " chapter 569 (10) + chapter 590" +
+                " trilogy (6) = 16 BASMemory types" +
+                " ledger-serializable。 131 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1740。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

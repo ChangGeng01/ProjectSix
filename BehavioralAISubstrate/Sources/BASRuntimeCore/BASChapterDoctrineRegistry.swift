@@ -11577,6 +11577,103 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1736。 320 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 590 — BASMemory post-arc trilogy
+        // seal milestone for the 3-wave extension
+        // trilogy (chapters 587-589)。 Mirrors chapter
+        // 579 BASOrchestration trilogy seal pattern。
+        // Second sealed milestone for BASMemory after
+        // chapter 569 cross-module arc seal。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十",
+            mNumberFirst: 1737,
+            mNumberLast: 1740,
+            v1MilestoneMNumber: 1740,
+            v1MilestoneStatus:
+                "chapter-590-memory-post-arc-trilogy-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1737, knife: "第一刀",
+                    concept: "NEW BASMemoryPostCross" +
+                        "ModuleArcTrilogySealedDoctrine" +
+                        " typed milestone commemorating" +
+                        " 3-wave BASMemory post-arc" +
+                        " trilogy (chapters 587-589)。" +
+                        " 6 types,12 commits,single-" +
+                        "module。 Mirrors chapter 579" +
+                        " BASOrchestration trilogy seal。" +
+                        " typed-surface count 130 → 131。"),
+                BASChapterKnife(
+                    mNumber: 1738, knife: "第二刀",
+                    concept: "25 anti-drift PROOF tests" +
+                        " for the M1737 trilogy seal。" +
+                        " Identity + trilogy range + 5" +
+                        " coverage pins + type list + 6" +
+                        " achievement flags (incl。 is" +
+                        "SecondMemorySeal + isBeyond" +
+                        "M1700NarrativeArc)。"),
+                BASChapterKnife(
+                    mNumber: 1739, knife: "第三刀",
+                    concept: "16 wire-in PROOF tests" +
+                        " cross-checking the M1737" +
+                        " trilogy seal against 3 wave" +
+                        " doctrines + chapter 569" +
+                        " cross-module arc seal +" +
+                        " chapter 579 parallel trilogy" +
+                        " seal + cumulative invariants。"),
+                BASChapterKnife(
+                    mNumber: 1740, knife: "第四刀",
+                    concept: "Chapter 590 close-out +" +
+                        " doctrine sync。 324" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "memory-trilogy-undocumented",
+                "no-single-source-of-truth-for-6-memory-wave-types",
+                "memory-wave-doctrines-not-cross-validated",
+                "second-memory-seal-pattern-undefined"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1740",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "memory-post-arc-trilogy-sealed",
+                "16-memory-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — hepta-milestone meta-meta" +
+                " (7 sealed milestones:564 + 569 +" +
+                " 574 + 579 + 584 + 590 + new memory" +
+                " seal)",
+                "future arc — additional fresh module" +
+                " territory or 8th seal"
+            ],
+            summary: "Chapter 590 seals the 3-wave BAS" +
+                "Memory post-arc Codable extension" +
+                " trilogy (chapters 587-589)。 NEW BAS" +
+                "MemoryPostCrossModuleArcTrilogySealed" +
+                "Doctrine typed milestone (M1737)" +
+                " commemorating 6 BASMemory types,12" +
+                " commits + 25 anti-drift PROOF tests" +
+                " (M1738) + 16 wire-in PROOF tests" +
+                " (M1739) + close-out (M1740)。 Second" +
+                " sealed milestone for BASMemory" +
+                " extensions (after chapter 569 cross-" +
+                "module arc seal)。 Mirrors chapter 579" +
+                " BASOrchestration trilogy seal" +
+                " pattern。 Combined chapter 569 (10)" +
+                " + chapter 590 trilogy (6) = 16 BAS" +
+                "Memory types ledger-serializable。 131" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1740。 324 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

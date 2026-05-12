@@ -1949,7 +1949,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十九")!)
+                            "chapter 五百八十九")!),
+            // M1740 chapter 590 — BASMemory post-arc trilogy seal milestone
+            checkRegistry("五百九十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百九十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3157,6 +3163,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十九")!
+                .mNumberLast),
+            // M1740 chapter 590 — BASMemory post-arc trilogy seal milestone
+            ("590",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
