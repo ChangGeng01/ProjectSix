@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1752",
-            "M1752:doctrine version reflects chapter 五百九十三 — BASHOSTKIT NON-PROJECTION WAVE 2 CODABLE EXTENSION。 2 BASHostKit regression-hint types (BASChengluLengthHint + BASChengluLatencyHint) gained Codable at M1749 + 2 PROOF tests (M1750) + BASHostKitConfigurationHintCodableExtensionWaveTwoDoctrine typed surface (M1751) + close-out (M1752)。 Continues chapter 592 wave 1 pattern。 Combined 37 BASHostKit-related types ledger-serializable。 134 typed surfaces cumulative。 336 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1756",
+            "M1756:doctrine version reflects chapter 五百九十四 — BASHOSTKIT NON-PROJECTION WAVE 3 CODABLE EXTENSION。 2 BASHostKit hint types (BASChengluMultiHeadHint + BASChengluPermitPredictHint) gained Codable at M1753 + 2 PROOF tests (M1754) + BASHostKitConfigurationHintCodableExtensionWaveThreeDoctrine typed surface (M1755) + close-out (M1756)。 Completes coverage of 5 individual Chenglu hint types。 BASChengluHintSet aggregator ready for culmination at chapter 595。 Combined 39 BASHostKit-related types ledger-serializable。 135 typed surfaces cumulative。 340 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

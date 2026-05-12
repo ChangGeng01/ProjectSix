@@ -3109,6 +3109,26 @@ public enum BASEntropyChapterIndex {
                 "HostKit-related types ledger-" +
                 "serializable。 134 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1752。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十四",
+            mNumberFirst: 1753, mNumberLast: 1756,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASHOSTKIT NON-PROJECTION WAVE 3" +
+                " CODABLE EXTENSION。 2 hint types" +
+                " (BASChengluMultiHeadHint + BAS" +
+                "ChengluPermitPredictHint) gained" +
+                " Codable at M1753 + 2 PROOF tests" +
+                " (M1754) + new typed surface (M1755)" +
+                " + close-out (M1756)。 Completes" +
+                " coverage of 5 individual Chenglu" +
+                " hint types。 BASChengluHintSet" +
+                " aggregator ready for culmination at" +
+                " chapter 595。 Combined 39 BAS" +
+                "HostKit-related types ledger-" +
+                "serializable。 135 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1756。" +
                 " V1 byte-equality preserved。")
     ]
 

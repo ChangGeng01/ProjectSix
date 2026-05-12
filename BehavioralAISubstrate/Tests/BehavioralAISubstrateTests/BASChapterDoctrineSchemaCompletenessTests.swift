@@ -1973,7 +1973,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百九十三")!)
+                            "chapter 五百九十三")!),
+            // M1756 chapter 594 — BASHostKit non-projection wave 3
+            checkRegistry("五百九十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百九十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3213,6 +3219,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百九十三")!
+                .mNumberLast),
+            // M1756 chapter 594 — BASHostKit non-projection wave 3
+            ("594",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

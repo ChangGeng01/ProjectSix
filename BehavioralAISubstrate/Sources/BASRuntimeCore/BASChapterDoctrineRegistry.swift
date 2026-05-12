@@ -11947,7 +11947,91 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1752。 336 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 594 — BASHostKit non-projection
+        // wave 3 Codable extension。 2 hint types。
+        // Completes coverage of 5 individual hint
+        // types,unblocking BASChengluHintSet for
+        // chapter 595 culmination。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十四",
+            mNumberFirst: 1753,
+            mNumberLast: 1756,
+            v1MilestoneMNumber: 1756,
+            v1MilestoneStatus:
+                "chapter-594-hostkit-non-projection-wave-three",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1753, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "HostKit hint types (BAS" +
+                        "ChengluMultiHeadHint +" +
+                        " BASChengluPermitPredictHint)。" +
+                        " Wave 3 completes coverage of" +
+                        " 5 individual Chenglu hint" +
+                        " types。"),
+                BASChapterKnife(
+                    mNumber: 1754, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1755, knife: "第三刀",
+                    concept: "NEW BASHostKitConfiguration" +
+                        "HintCodableExtensionWaveThree" +
+                        "Doctrine + aggregatorReadyFor" +
+                        "Culmination flag。 Combined 39" +
+                        " BASHostKit-related types。" +
+                        " typed-surface count 134 → 135。"),
+                BASChapterKnife(
+                    mNumber: 1756, knife: "第四刀",
+                    concept: "Chapter 594 close-out +" +
+                        " doctrine sync。 340" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。" +
+                        " BASChengluHintSet ready for" +
+                        " culmination。")
+            ],
+            entropyClassesAttacked: [
+                "chenglu-multi-head-hint-non-codable",
+                "chenglu-permit-predict-hint-non-codable",
+                "hostkit-non-projection-wave-3-incomplete",
+                "5-hint-types-coverage-incomplete"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1756",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-non-projection-wave-three",
+                "39-hostkit-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — chapter 595 BAS" +
+                "ChengluHintSet aggregator culmination",
+                "future arc — eventual BASHostKit non-" +
+                "projection arc seal milestone"
+            ],
+            summary: "Chapter 594 ships BASHostKit non-" +
+                "projection wave 3 Codable extension。" +
+                " 2 hint types (BASChengluMultiHead" +
+                "Hint + BASChengluPermitPredictHint)" +
+                " gained Codable at M1753。 2 PROOF" +
+                " tests (M1754) + new typed surface" +
+                " (M1755) + close-out (M1756)。" +
+                " Completes coverage of 5 individual" +
+                " Chenglu hint types。 BASChengluHintSet" +
+                " aggregator now unblocked for chapter" +
+                " 595 culmination。 Combined 39 BAS" +
+                "HostKit-related types ledger-" +
+                "serializable。 135 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1756。" +
+                " 340 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

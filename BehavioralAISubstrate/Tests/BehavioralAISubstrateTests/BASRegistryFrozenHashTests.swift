@@ -107,15 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 593 close-out。 Chapter
-    /// 593:BASHOSTKIT NON-PROJECTION WAVE 2 CODABLE
-    /// EXTENSION。 2 regression-hint types (BASChenglu
-    /// LengthHint + BASChengluLatencyHint) gained
-    /// Codable at M1749 + 2 PROOF tests (M1750) + NEW
+    /// Re-captured at chapter 594 close-out。 Chapter
+    /// 594:BASHOSTKIT NON-PROJECTION WAVE 3 CODABLE
+    /// EXTENSION。 2 hint types (BASChengluMultiHead
+    /// Hint + BASChengluPermitPredictHint) gained
+    /// Codable at M1753 + 2 PROOF tests (M1754) + NEW
     /// BASHostKitConfigurationHintCodableExtension
-    /// WaveTwoDoctrine (M1751)。 Continues chapter 592
-    /// wave 1 pattern。 Combined 37 BASHostKit-related
+    /// WaveThreeDoctrine (M1755)。 Completes 5 hint
+    /// types coverage。 Combined 39 BASHostKit-related
     /// types ledger-serializable。
     static let frozenFullRegistrySha256: String =
-        "8e2831628a08fc414d57c088c2186afa3f547b47499640799ec315ab641509ce"
+        "2850eb6ac8cdfd0287074552cf155ea450e79e647ffc6a560359d6382bf492cd"
 }

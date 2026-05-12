@@ -247,7 +247,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百九十",     // M1737-M1740 (BASMEMORY POST-ARC TRILOGY SEAL MILESTONE — BASMemoryPostCrossModuleArcTrilogySealedDoctrine + 25 anti-drift + 16 wire-in PROOF tests commemorating 3-wave BASMemory post-arc trilogy (chapters 587-589);6 types ledger-serializable;mirrors chapter 579 BASOrchestration trilogy seal pattern)
         "chapter 五百九十一",   // M1741-M1744 (HEPTA-MILESTONE COMPLETION META-META MILESTONE — BASCodableExtensionHeptaMilestoneCompletionDoctrine + 31 anti-drift + 18 wire-in PROOF tests cataloguing all 7 sealed Codable extension milestones;69 types,84 commits,21 chapters,6 modules;71 session types ledger-serializable;new beyond-m1700-post-arc-trilogy kind discriminator)
         "chapter 五百九十二",   // M1745-M1748 (BASHOSTKIT CONFIGURATION + HINT CODABLE EXTENSION — 2 types (BASCognitiveOSBundleOptions + BASChengluPreflightHint) gained Codable + 2 PROOF tests + BASHostKitConfigurationHintCodableExtensionDoctrine + close-out;extends BASHostKit beyond projections + aggregators + inputs into non-projection territory;combined 35 BASHostKit-related types cumulative)
-        "chapter 五百九十三"    // M1749-M1752 (BASHOSTKIT NON-PROJECTION WAVE 2 CODABLE EXTENSION — 2 regression-hint types (BASChengluLengthHint + BASChengluLatencyHint) gained Codable + 2 PROOF tests + BASHostKitConfigurationHintCodableExtensionWaveTwoDoctrine + close-out;combined 37 BASHostKit-related types cumulative)
+        "chapter 五百九十三",   // M1749-M1752 (BASHOSTKIT NON-PROJECTION WAVE 2 CODABLE EXTENSION — 2 regression-hint types (BASChengluLengthHint + BASChengluLatencyHint) gained Codable + 2 PROOF tests + BASHostKitConfigurationHintCodableExtensionWaveTwoDoctrine + close-out;combined 37 BASHostKit-related types cumulative)
+        "chapter 五百九十四"    // M1753-M1756 (BASHOSTKIT NON-PROJECTION WAVE 3 CODABLE EXTENSION — 2 hint types (BASChengluMultiHeadHint + BASChengluPermitPredictHint) gained Codable + 2 PROOF tests + BASHostKitConfigurationHintCodableExtensionWaveThreeDoctrine + close-out;completes 5 hint types coverage;combined 39 BASHostKit-related types cumulative;BASChengluHintSet ready for culmination)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -264,14 +265,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1752
+    public static let mNumberLast: Int = 1756
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1752)。 Bumped through chapter 593:793 → 797。
-    /// Chapter 593:BASHostKit non-projection wave 2
+    /// M1756)。 Bumped through chapter 594:797 → 801。
+    /// Chapter 594:BASHostKit non-projection wave 3
     /// Codable extension + 2 PROOF tests + typed
     /// surface + close-out。
-    public static let commitsShipped: Int = 797
+    public static let commitsShipped: Int = 801
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
