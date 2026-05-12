@@ -2116,6 +2116,24 @@ public struct BASEBrainRuntimeCoordinator {
                 anomalyTrace: anomalyTraceForAudit,
                 abyssalBranches:
                     abyssalBranchesForAudit)
+        // chapter 五百十八 / M1451 — 6th block extension
+        let closureBlockForAudit =
+            BASAuditObservationProjectionsClosureBlock(
+                candidateObservationBundle:
+                    thoughtArtifacts
+                        .candidateObservationBundle,
+                tribunalObservationBundle:
+                    thoughtFrame
+                        .tribunalObservationBundle,
+                unknownReserve: unknownReserveForAudit,
+                forbiddenAggregate:
+                    forbiddenAggregateForAudit,
+                layerReconciliationVerdict:
+                    layerReconciliation.verdict,
+                layerReconciliationReport:
+                    layerReconciliation.report,
+                escalationSuppressionCodes:
+                    escalationSuppressionCodes)
         let projections = BASAuditObservationProjections(
             kunlunInputs: kunlunInputsForAudit,
             cthulhuInputs: cthulhuInputsForAudit,
@@ -2125,22 +2143,11 @@ public struct BASEBrainRuntimeCoordinator {
                 kunlunProtocolBlockForAudit,
             cthulhuAggregatesBlock:
                 cthulhuAggregatesBlockForAudit,
-            candidateObservationBundle: thoughtArtifacts
-                .candidateObservationBundle,
-            tribunalObservationBundle: thoughtFrame
-                .tribunalObservationBundle,
-            unknownReserve: unknownReserveForAudit,
-            forbiddenAggregate: forbiddenAggregateForAudit,
-            escalationSuppressionCodes:
-                escalationSuppressionCodes,
+            closureBlock: closureBlockForAudit,
             kunlunAxisView: kunlunAxisViewForAudit,
             kunlunTianmenWarrant: kunlunTianmenWarrantForAudit,
             kunlunGateDenialWrit:
                 kunlunGateDenialWritForAudit,
-            layerReconciliationVerdict:
-                layerReconciliation.verdict,
-            layerReconciliationReport:
-                layerReconciliation.report,
             ontologyShiftMark: ontologyShiftMarkForAudit,
             cthulhuAssertionCeilingReasonCodes:
                 cthulhuAssertionDecision.reasonCodes,
