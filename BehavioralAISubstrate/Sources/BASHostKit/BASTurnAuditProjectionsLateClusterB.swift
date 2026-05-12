@@ -13,7 +13,9 @@ import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
 
-public struct BASTurnAuditProjectionsLateClusterB: Sendable {
+public struct BASTurnAuditProjectionsLateClusterB:
+    Codable, Equatable, Sendable
+{
     public let abyssalPressure: BASAbyssalPressure
     public let humanAnchorSignal: BASHumanAnchorSignal
     public let narrativeDistortion: BASNarrativeDistortion

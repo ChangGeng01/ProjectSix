@@ -8,7 +8,7 @@ import BASRuntimeCore
 import BASWorldPrior
 
 public struct BASTurnAuditProjectionsKunlunHexaTwo:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
     public let hostJadeRegister: BASHostJadeRegister
     public let jadeMirrorDraft: BASJadeMirrorDraft

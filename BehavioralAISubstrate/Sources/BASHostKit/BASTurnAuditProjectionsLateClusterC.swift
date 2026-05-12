@@ -9,7 +9,9 @@ import Foundation
 import BASOrchestration
 import BASRuntimeCore
 
-public struct BASTurnAuditProjectionsLateClusterC: Sendable {
+public struct BASTurnAuditProjectionsLateClusterC:
+    Codable, Equatable, Sendable
+{
     public let anomalyTrace: BASAnomalyTrace?
     public let abyssalBranches: [BASAbyssalBranch]
     public let ontologyShiftMark: BASOntologyShiftMark

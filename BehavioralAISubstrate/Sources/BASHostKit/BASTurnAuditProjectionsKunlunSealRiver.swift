@@ -23,7 +23,9 @@ import Foundation
 import BASOrchestration
 import BASPolicy
 
-public struct BASTurnAuditProjectionsKunlunSealRiver: Sendable {
+public struct BASTurnAuditProjectionsKunlunSealRiver:
+    Codable, Equatable, Sendable
+{
 
     // MARK: - Folded fields
 

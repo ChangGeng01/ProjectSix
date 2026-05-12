@@ -6,7 +6,9 @@ import BASMemory
 import BASRuntimeCore
 import BASWorldPrior
 
-public struct BASTurnAuditProjectionsLateClusterD: Sendable {
+public struct BASTurnAuditProjectionsLateClusterD:
+    Codable, Equatable, Sendable
+{
     public let unknownReserve: BASUnknownReserve
     public let forbiddenCandidates:
         [BASForbiddenKnowledgeCandidate]

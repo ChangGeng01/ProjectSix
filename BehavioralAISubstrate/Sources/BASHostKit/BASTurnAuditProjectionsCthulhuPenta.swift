@@ -8,7 +8,7 @@ import BASRuntimeCore
 import BASWorldPrior
 
 public struct BASTurnAuditProjectionsCthulhuPenta:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
     public let abyssalOrganAlias: BASAbyssalOrganAlias
     public let humanAnchorProfile: BASHumanAnchorProfile

@@ -20,7 +20,7 @@ import BASPolicy
 import BASRuntimeCore
 
 public struct BASTurnAuditProjectionsKunlunHexa:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
     public let yaochiMemoryLayer:
         BASYaochiMemoryLayer
