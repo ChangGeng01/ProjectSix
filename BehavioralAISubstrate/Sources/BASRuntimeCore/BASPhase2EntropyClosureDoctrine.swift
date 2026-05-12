@@ -172,7 +172,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百十五",     // M1437-M1440 (REAL V1 monolith projections fold — 118 LOC → 83 LOC at call site, byte-equality preserved)
         "chapter 五百十六",     // M1441-M1444 (4th typed input block + V1 splice extension — 46-of-56 fields packaged, 82% coverage)
         "chapter 五百十七",     // M1445-M1448 (5th typed input block + V1 splice extension — 53-of-56 fields packaged, 95% coverage)
-        "chapter 五百十八"      // M1449-M1452 (6th typed input block + V1 splice extension — 60 fields packaged across 6 input surfaces, V1 call site 118 → 68 LOC)
+        "chapter 五百十八",     // M1449-M1452 (6th typed input block + V1 splice extension — 60 fields packaged across 6 input surfaces, V1 call site 118 → 68 LOC)
+        "chapter 五百十九"      // M1453-M1456 (FIRST PRODUCTION WIRE-IN — projectionBlockEmissionHandler slot + V1 monolith fires handler + 5 PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -189,16 +190,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1452
+    public static let mNumberLast: Int = 1456
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1452)。 Bumped through chapter 518:493 → 497。
-    /// Chapter 518:6th typed input block + V1 splice
-    /// extension — M1449 ClosureBlock + M1450 6-block
-    /// init + M1451 V1 splice extension + M1452 close-
-    /// out。 60 fields packaged into 6 typed input
-    /// surfaces (V1 call site 118 → 68 LOC cumulative)。
-    public static let commitsShipped: Int = 497
+    /// M1456)。 Bumped through chapter 519:497 → 501。
+    /// Chapter 519:FIRST PRODUCTION WIRE-IN since
+    /// chapter 512 — M1453 handler slot + M1454 V1
+    /// monolith fires handler + M1455 PROOF tests +
+    /// M1456 close-out。 Moves chapters 511-518 typed
+    /// surfaces from 'shipped opt-in' to 'fires in V1
+    /// production hot path when hosts wire'。
+    public static let commitsShipped: Int = 501
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

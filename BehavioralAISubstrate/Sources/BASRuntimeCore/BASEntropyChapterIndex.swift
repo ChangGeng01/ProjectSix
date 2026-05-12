@@ -1705,7 +1705,23 @@ public enum BASEntropyChapterIndex {
                 " across chapters 515-518 = ~50 LOC" +
                 " saved)。 64 typed surfaces cumulative。" +
                 " ADR-016 → M1452。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十九",
+            mNumberFirst: 1453, mNumberLast: 1456,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "FIRST PRODUCTION WIRE-IN since" +
+                " chapter 512:projectionBlockEmission" +
+                "Handler slot on BASEBrainRuntime" +
+                "Coordinator + V1 monolith fires the" +
+                " handler after projections construction" +
+                " + 5 PROOF tests via real coordinator" +
+                " turns。 Moves chapters 511-518 typed" +
+                " surfaces from 'shipped opt-in' to" +
+                " 'fires in V1 production hot path'。" +
+                " 64 typed surfaces cumulative。 ADR-016" +
+                " → M1456。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

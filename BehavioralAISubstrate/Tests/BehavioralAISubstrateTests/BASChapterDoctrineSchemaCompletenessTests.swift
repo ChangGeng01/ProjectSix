@@ -1523,7 +1523,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百十八")!)
+                            "chapter 五百十八")!),
+            // M1456 chapter 519 — FIRST PRODUCTION WIRE-IN
+            checkRegistry("五百十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2163,6 +2169,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百十八")!
+                .mNumberLast),
+            // M1456 chapter 519 — FIRST PRODUCTION WIRE-IN
+            ("519",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

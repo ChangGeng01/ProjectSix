@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1452",
-            "M1452:doctrine version reflects chapter 五百十八 — 6th typed input block + V1 splice extension。 BASAuditObservationProjectionsClosureBlock (M1449, 7 closure-themed fields) + BASAuditObservationProjections 6-block unified convenience init (M1450) + V1 monolith splice extending M1447 (M1451)。 60 audit-projection fields now flow through 6 typed input surfaces。 V1 call site shrinks from chapter 517's 73 LOC → ~68 LOC (cumulative 118 → 68 across chapters 515-518, ~50 LOC saved)。 64 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1456",
+            "M1456:doctrine version reflects chapter 五百十九 — FIRST PRODUCTION WIRE-IN since chapter 512。 projectionBlockEmissionHandler slot on BASEBrainRuntimeCoordinator (M1453) + V1 monolith fires handler after projections construction (M1454) + 5 PROOF tests via real coordinator turns (M1455)。 Moves chapters 511-518 typed projection-block surfaces from 'shipped opt-in' to 'fires in V1 production hot path when hosts wire'。 64 typed surfaces cumulative。 V1 byte-equality preserved (default nil handler = pre-M1453 behavior unchanged; stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

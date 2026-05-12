@@ -37,20 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs518() {
+    func testLastChapterIs519() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百十八",
-            "M1452 chapter 五百十八 — 6th typed input" +
-            " block + V1 splice extension。" +
-            " BASAuditObservationProjectionsClosure" +
-            "Block (7 closure-themed fields) + 6-block" +
-            " convenience init + V1 monolith splice" +
-            " extending M1447。 60 fields packaged into" +
-            " 6 typed input surfaces。 V1 call site" +
-            " 118 → 68 LOC cumulative across chapters" +
-            " 515-518。 64 typed surfaces cumulative")
+            "chapter 五百十九",
+            "M1456 chapter 五百十九 — FIRST PRODUCTION" +
+            " WIRE-IN。 projectionBlockEmissionHandler" +
+            " slot on BASEBrainRuntimeCoordinator + V1" +
+            " monolith fires handler after projections" +
+            " construction + 5 PROOF tests via real" +
+            " coordinator turns。 Moves chapters 511-" +
+            "518 typed surfaces from 'shipped opt-in'" +
+            " to 'fires in V1 production hot path'。" +
+            " 64 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

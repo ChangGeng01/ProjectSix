@@ -5269,6 +5269,101 @@ public enum BASChapterDoctrineRegistry {
                 " chapters 515-518 = ~50 LOC saved)。" +
                 " 64 typed surfaces cumulative。 ADR-016" +
                 " → M1452。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 519 — FIRST PRODUCTION WIRE-IN
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十九",
+            mNumberFirst: 1453,
+            mNumberLast: 1456,
+            v1MilestoneMNumber: 1456,
+            v1MilestoneStatus:
+                "chapter-519-FIRST-production-wire-in",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1453, knife: "第一刀",
+                    concept: "NEW projectionBlockEmission" +
+                        "Handler slot on BASEBrainRuntime" +
+                        "Coordinator。 Optional Sendable" +
+                        " closure callback taking" +
+                        " BASAuditObservationProjections" +
+                        "BundleObservation。 Hosts wire" +
+                        " synchronously or wrap async via" +
+                        " Task。 Default nil = pre-M1453" +
+                        " behavior unchanged。"),
+                BASChapterKnife(
+                    mNumber: 1454, knife: "第二刀",
+                    concept: "FIRST PRODUCTION WIRE-IN。" +
+                        " V1 monolith fires" +
+                        " projectionBlockEmissionHandler" +
+                        " after constructing projections" +
+                        " at line 2035。 Uses M1429" +
+                        " emitter facade (fullyCovered" +
+                        " variant) to build observation。" +
+                        " First time chapter 511-518" +
+                        " typed surfaces actually exercise" +
+                        " in production V1 hot path。"),
+                BASChapterKnife(
+                    mNumber: 1455, knife: "第三刀",
+                    concept: "5 PROOF tests verifying" +
+                        " production wire-in:default" +
+                        " nil-handler-no-fire +" +
+                        " wired-handler-fires-once +" +
+                        " observation-fully-covered +" +
+                        " non-empty-IDs + multi-turn-" +
+                        "produces-N-observations。 Thread-" +
+                        "safe capture helper for Sendable" +
+                        " closure。"),
+                BASChapterKnife(
+                    mNumber: 1456, knife: "第四刀",
+                    concept: "Chapter 519 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1456。 Wire-in milestone:" +
+                        " moves chapters 511-518 from" +
+                        " 'shipped opt-in' to 'actually" +
+                        " fires in V1 monolith hot path" +
+                        " when hosts wire'。 V1 byte-" +
+                        "equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "projection-block-observer-no-production-callers",
+                "opt-in-surface-never-exercised",
+                "production-wire-in-gap-since-chapter-512",
+                "v1-monolith-projection-emission-not-observed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1456",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "first-production-wire-in-since-chapter-512"
+            ],
+            plannedFutureCuts: [
+                "future arc — wire SampleHost or similar" +
+                " production host with handler callback" +
+                " (currently only tests wire it)",
+                "future arc — extend handler to support" +
+                " partial-coverage variants",
+                "future arc — production observer actor" +
+                " wiring (Task-based)",
+                "future arc — additional V1 inline-" +
+                "construction folds"
+            ],
+            summary: "FIRST PRODUCTION WIRE-IN since" +
+                " chapter 512 wire-in chain shipped:" +
+                " new projectionBlockEmissionHandler" +
+                " slot on BASEBrainRuntimeCoordinator" +
+                " + V1 monolith fires it after" +
+                " projections construction + 5 PROOF" +
+                " tests via real coordinator turns。" +
+                " Moves chapters 511-518 typed surfaces" +
+                " from 'shipped opt-in' to 'actually" +
+                " fires in production V1 hot path when" +
+                " hosts wire'。 64 typed surfaces" +
+                " cumulative。 ADR-016 → M1456。 V1" +
+                " byte-equality preserved (default nil" +
+                " handler = pre-M1453 behavior)。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 
