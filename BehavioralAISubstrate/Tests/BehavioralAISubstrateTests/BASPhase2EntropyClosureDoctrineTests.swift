@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs545() {
+    func testLastChapterIs546() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百四十五",
-            "Chapter 五百四十五:Codable round-trip" +
-            " PROOF tests for DeviceLifecycleBundle" +
-            " extends coverage 6 → 7 of 9 cluster" +
-            " bundles via 5-subtype fixture + doctrine" +
-            " catalogue update + anti-drift tests" +
-            " update。 89 typed surfaces cumulative")
+            "chapter 五百四十六",
+            "Chapter 五百四十六:Codable round-trip" +
+            " PROOF tests for RiskChoiceBundle extends" +
+            " coverage 7 → 8 of 9 cluster bundles via" +
+            " 4-subtype fixture + doctrine catalogue" +
+            " update + anti-drift tests update。 89" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range

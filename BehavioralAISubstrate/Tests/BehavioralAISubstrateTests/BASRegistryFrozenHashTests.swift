@@ -107,12 +107,12 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 545 close-out。 Chapter
-    /// 545:Codable round-trip PROOF tests for
-    /// DeviceLifecycleBundle extends coverage from 6
-    /// → 7 of 9 cluster bundles via 5-subtype fixture
-    /// (M1557) + update coverage doctrine catalogue
-    /// (M1558) + update anti-drift PROOF tests (M1559)。
+    /// Re-captured at chapter 546 close-out。 Chapter
+    /// 546:Codable round-trip PROOF tests for
+    /// RiskChoiceBundle extends coverage from 7 → 8
+    /// of 9 cluster bundles via 4-subtype fixture
+    /// (M1561) + update coverage doctrine catalogue
+    /// (M1562) + update anti-drift PROOF tests (M1563)。
     static let frozenFullRegistrySha256: String =
-        "adfcf816b1aa8ec1f1b60c4df2120086ab3bc84ac4a0e3e7fa1cf6f61198fb7c"
+        "3c0ae3a2f6463e9aea2b963f195a9674ddfa13581e287a3ee3a2e0de2f6ea0ac"
 }

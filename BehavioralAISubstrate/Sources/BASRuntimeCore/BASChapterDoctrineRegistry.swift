@@ -7743,7 +7743,85 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1560。 144 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 546 — round-trip coverage extension
+        // to 8 of 9
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十六",
+            mNumberFirst: 1561,
+            mNumberLast: 1564,
+            v1MilestoneMNumber: 1564,
+            v1MilestoneStatus:
+                "chapter-546-roundtrip-riskchoice-coverage-8-of-9",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1561, knife: "第一刀",
+                    concept: "Codable round-trip PROOF" +
+                        " tests for RiskChoiceBundle:" +
+                        " fixture with 4 typed sub-types" +
+                        " (BASTriSelfScore + BASMerged" +
+                        "Choice + BASRiskCard +" +
+                        " BASActionPermit)。 Extends" +
+                        " coverage 7 → 8 of 9。"),
+                BASChapterKnife(
+                    mNumber: 1562, knife: "第二刀",
+                    concept: "Update coverage doctrine" +
+                        " catalogue:RiskChoiceBundle" +
+                        " status .compileTimeOnly →" +
+                        " .explicitRoundTripCovered" +
+                        " explicitCoverageMNumber 1561。" +
+                        " Derived counts:8/1 +" +
+                        " coverageRatio ≈0.889。"),
+                BASChapterKnife(
+                    mNumber: 1563, knife: "第三刀",
+                    concept: "Update anti-drift PROOF" +
+                        " tests:counts 8/1 + ratio" +
+                        " 0.88-0.89 + RiskChoiceBundle" +
+                        " lookup test。 Test count 15" +
+                        " → 16。"),
+                BASChapterKnife(
+                    mNumber: 1564, knife: "第四刀",
+                    concept: "Chapter 546 close-out +" +
+                        " doctrine sync。 148 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "risk-choice-round-trip-untested",
+                "4-subtype-tribunal-fixture-missing",
+                "coverage-ratio-stuck-at-78%",
+                "compileTimeOnly-count-1-remaining-untracked"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1564",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "8-of-9-round-trip-coverage-pinned"
+            ],
+            plannedFutureCuts: [
+                "future arc — round-trip coverage for" +
+                " final 1 bundle (CognitiveFrames —" +
+                " deepest fixture with frame trees +" +
+                " memory bundle + thought fold)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in of observability sinks"
+            ],
+            summary: "Chapter 546 extends Codable round-" +
+                "trip PROOF coverage from 7 → 8 of 9" +
+                " cluster bundles by adding RiskChoice" +
+                "Bundle fixture with 4 typed sub-types" +
+                " (M1561) + doctrine catalogue update" +
+                " (M1562) + anti-drift tests update" +
+                " (M1563) + close-out (M1564)。 89 typed" +
+                " surfaces cumulative。 ADR-016 → M1564。" +
+                " 148 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

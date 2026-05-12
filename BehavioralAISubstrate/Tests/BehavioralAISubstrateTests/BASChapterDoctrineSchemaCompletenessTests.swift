@@ -1685,7 +1685,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十五")!)
+                            "chapter 五百四十五")!),
+            // M1564 chapter 546 — RiskChoice round-trip + coverage doctrine update + anti-drift tests
+            checkRegistry("五百四十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2541,6 +2547,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十五")!
+                .mNumberLast),
+            // M1564 chapter 546 — RiskChoice round-trip + coverage doctrine update + anti-drift tests
+            ("546",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
