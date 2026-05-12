@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1512",
-            "M1512:doctrine version reflects chapter 五百三十三 — fold arc sealed milestone doctrine + 20 PROOF tests。 BASEBrainTurnResultFoldArcSealedDoctrine typed milestone surface commemorating the 9-chapter fold arc seal (M1509) + 10 anti-drift PROOF tests (M1510) + 10 wire-in PROOF tests cross-checking doctrine vs each cluster bundle's static field-count constant (M1511)。 The fold arc sealed state is now non-driftable — any silent change to a cluster bundle's field count breaks the wire-in PROOF loudly。 79 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1516",
+            "M1516:doctrine version reflects chapter 五百三十四 — 30-declaration dead-code purge from EBrainRuntimeCoordinator.swift (M1513) + BASCoordinatorDeadDeclarationPurgeDoctrine typed milestone surface cataloguing all 30 purged shadow re-bindings by origin cluster (M1514) + 11 anti-drift PROOF tests (M1515)。 Build warning count on the coordinator:60 → 0。 80 typed surfaces cumulative。 V1 byte-equality preserved (pure-accessor reads with no side effects;stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

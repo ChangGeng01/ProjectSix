@@ -37,19 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs533() {
+    func testLastChapterIs534() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十三",
-            "Chapter 五百三十三:fold arc sealed" +
-            " milestone doctrine +20 PROOF tests。" +
-            " BASEBrainTurnResultFoldArcSealedDoctrine" +
-            " typed milestone surface commemorating the" +
-            " 9-chapter fold arc seal + 10 anti-drift" +
-            " PROOF tests + 10 wire-in PROOF tests。" +
-            " Fold arc sealed state is now non-" +
-            "driftable。 79 typed surfaces cumulative")
+            "chapter 五百三十四",
+            "Chapter 五百三十四:30-declaration dead-" +
+            "code purge from EBrainRuntimeCoordinator" +
+            ".swift + BASCoordinatorDeadDeclarationPurge" +
+            "Doctrine typed milestone surface + 11 anti-" +
+            "drift PROOF tests。 Coordinator build" +
+            " warning count 60 → 0。 80 typed surfaces" +
+            " cumulative")
     }
 
     // MARK: - M-number range

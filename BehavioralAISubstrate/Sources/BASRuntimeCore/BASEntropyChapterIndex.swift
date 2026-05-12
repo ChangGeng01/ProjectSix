@@ -1963,7 +1963,22 @@ public enum BASEntropyChapterIndex {
                 " The fold arc sealed state is now non-" +
                 "driftable。 79 typed surfaces cumulative。" +
                 " ADR-016 → M1512。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十四",
+            mNumberFirst: 1513, mNumberLast: 1516,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "30-declaration dead-code purge from" +
+                " EBrainRuntimeCoordinator.swift (M1513)" +
+                " + BASCoordinatorDeadDeclarationPurge" +
+                "Doctrine typed milestone surface (M1514)" +
+                " + 11 anti-drift PROOF tests (M1515)。" +
+                " Build warning count on the coordinator:" +
+                " 60 → 0。 80 typed surfaces cumulative。" +
+                " ADR-016 → M1516。 V1 byte-equality" +
+                " preserved (pure-accessor reads with no" +
+                " side effects)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

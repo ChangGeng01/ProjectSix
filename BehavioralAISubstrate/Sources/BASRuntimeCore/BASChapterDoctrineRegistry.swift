@@ -6660,6 +6660,87 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1512。 96 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 534 — 30-declaration dead-code purge
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十四",
+            mNumberFirst: 1513,
+            mNumberLast: 1516,
+            v1MilestoneMNumber: 1516,
+            v1MilestoneStatus:
+                "chapter-534-30-decl-dead-code-purge",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1513, knife: "第一刀",
+                    concept: "Delete 30 dead `let *For" +
+                        "Audit = ...` shadow re-binding" +
+                        " declarations from EBrainRuntime" +
+                        "Coordinator.swift。 Pure entropy" +
+                        " purge:Swift's 'was never" +
+                        " used' warning is the regression" +
+                        " guard。 Build warning count 60" +
+                        " → 0 on the coordinator。"),
+                BASChapterKnife(
+                    mNumber: 1514, knife: "第二刀",
+                    concept: "NEW BASCoordinatorDead" +
+                        "DeclarationPurgeDoctrine typed" +
+                        " milestone surface cataloguing" +
+                        " all 30 purged declarations by" +
+                        " origin cluster (11 clusters)。" +
+                        " 80 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1515, knife: "第三刀",
+                    concept: "11 anti-drift PROOF tests" +
+                        " for the purge doctrine:" +
+                        " count + cluster + warning" +
+                        " delta + per-cluster sample" +
+                        " checks。 If a dead shadow is" +
+                        " re-introduced,a test fails" +
+                        " loudly。"),
+                BASChapterKnife(
+                    mNumber: 1516, knife: "第四刀",
+                    concept: "Chapter 534 close-out +" +
+                        " doctrine sync — coordinator is" +
+                        " now warning-free。 100" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "30-dead-shadow-rebindings-bloat",
+                "60-was-never-used-warnings",
+                "shadow-rebinding-pattern-leftover-entropy",
+                "coordinator-warning-noise"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1516",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "coordinator-warning-free"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal fold" +
+                " (typed bundle for the remaining ForAudit" +
+                " declaration cluster patterns)",
+                "future arc — SampleHost production" +
+                " wire-in of the 9-bundle init",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 534 ships a 30-declaration" +
+                " dead-code purge from EBrainRuntime" +
+                "Coordinator.swift (M1513) + a typed" +
+                " milestone doctrine cataloguing the" +
+                " purge (M1514) + 11 anti-drift PROOF" +
+                " tests (M1515) + close-out (M1516)。" +
+                " Build warning count on the coordinator:" +
+                " 60 → 0。 80 typed surfaces cumulative。" +
+                " ADR-016 → M1516。 100 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

@@ -1613,7 +1613,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百三十三")!)
+                            "chapter 五百三十三")!),
+            // M1516 chapter 534 — 30-declaration dead-code purge + doctrine + 11 PROOF tests
+            checkRegistry("五百三十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百三十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2373,6 +2379,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百三十三")!
+                .mNumberLast),
+            // M1516 chapter 534 — 30-declaration dead-code purge + doctrine + 11 PROOF tests
+            ("534",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

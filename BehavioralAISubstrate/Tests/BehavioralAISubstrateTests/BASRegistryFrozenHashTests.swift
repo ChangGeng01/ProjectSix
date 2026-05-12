@@ -107,14 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 533 close-out。 Chapter
-    /// 533:BASEBrainTurnResultFoldArcSealedDoctrine
-    /// typed milestone surface commemorating the 9-
-    /// chapter fold arc seal + 20 PROOF tests (10 anti-
-    /// drift + 10 wire-in cross-checking doctrine vs
-    /// each actual cluster bundle's static field-count
-    /// constant)。 The fold arc sealed state is now
-    /// non-driftable。
+    /// Re-captured at chapter 534 close-out。 Chapter
+    /// 534:30-declaration dead-code purge from
+    /// EBrainRuntimeCoordinator.swift +
+    /// BASCoordinatorDeadDeclarationPurgeDoctrine typed
+    /// milestone surface cataloguing all 30 purged
+    /// shadow re-bindings by origin cluster (11
+    /// clusters) + 11 anti-drift PROOF tests。 Build
+    /// warning count on the coordinator:60 → 0。
     static let frozenFullRegistrySha256: String =
-        "00d058a4a180537e8cf8cbc80a375fafac4fbaec4cc8dfcec016032bf7b85a3c"
+        "51bc0ef2f3b37e29900c6371ba3450054266b592b5c672883024e3d8dd2df97f"
 }
