@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1748",
-            "M1748:doctrine version reflects chapter 五百九十二 — BASHOSTKIT CONFIGURATION + HINT CODABLE EXTENSION。 2 BASHostKit types (BASCognitiveOSBundleOptions + BASChengluPreflightHint) gained Codable at M1745 + 2 PROOF tests (M1746) + BASHostKitConfigurationHintCodableExtensionDoctrine typed surface (M1747) + close-out (M1748)。 Extends BASHostKit coverage beyond projections + aggregators + inputs into non-projection territory。 Combined 35 BASHostKit-related types ledger-serializable。 133 typed surfaces cumulative。 332 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1752",
+            "M1752:doctrine version reflects chapter 五百九十三 — BASHOSTKIT NON-PROJECTION WAVE 2 CODABLE EXTENSION。 2 BASHostKit regression-hint types (BASChengluLengthHint + BASChengluLatencyHint) gained Codable at M1749 + 2 PROOF tests (M1750) + BASHostKitConfigurationHintCodableExtensionWaveTwoDoctrine typed surface (M1751) + close-out (M1752)。 Continues chapter 592 wave 1 pattern。 Combined 37 BASHostKit-related types ledger-serializable。 134 typed surfaces cumulative。 336 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -11868,6 +11868,85 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1748。 332 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 593 — BASHostKit non-projection
+        // wave 2 Codable extension。 2 regression-
+        // hint types。 Continues chapter 592 wave 1。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十三",
+            mNumberFirst: 1749,
+            mNumberLast: 1752,
+            v1MilestoneMNumber: 1752,
+            v1MilestoneStatus:
+                "chapter-593-hostkit-non-projection-wave-two",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1749, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "HostKit regression-hint types" +
+                        " (BASChengluLengthHint + BAS" +
+                        "ChengluLatencyHint)。 Wave 2" +
+                        " of BASHostKit non-projection" +
+                        " extension after chapter 592" +
+                        " wave 1。"),
+                BASChapterKnife(
+                    mNumber: 1750, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1751, knife: "第三刀",
+                    concept: "NEW BASHostKitConfiguration" +
+                        "HintCodableExtensionWaveTwo" +
+                        "Doctrine typed surface。" +
+                        " Combined 37 BASHostKit-" +
+                        "related types。 typed-surface" +
+                        " count 133 → 134。"),
+                BASChapterKnife(
+                    mNumber: 1752, knife: "第四刀",
+                    concept: "Chapter 593 close-out +" +
+                        " doctrine sync。 336" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "chenglu-length-hint-non-codable",
+                "chenglu-latency-hint-non-codable",
+                "hostkit-non-projection-wave-2-incomplete",
+                "regression-hints-non-serializable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1752",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-non-projection-wave-two",
+                "37-hostkit-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — BASHostKit wave 3" +
+                " (BASChengluMultiHeadHint +" +
+                " BASChengluPermitPredictHint)",
+                "future arc — eventual BASChenglu" +
+                "HintSet aggregator once all child" +
+                " hints become Codable"
+            ],
+            summary: "Chapter 593 ships BASHostKit non-" +
+                "projection wave 2 Codable extension。" +
+                " 2 BASHostKit hint types (BASChenglu" +
+                "LengthHint + BASChengluLatencyHint)" +
+                " gained Codable at M1749。 2 PROOF" +
+                " tests (M1750) + new typed surface" +
+                " (M1751) + close-out (M1752)。" +
+                " Continues chapter 592 wave 1 pattern。" +
+                " Combined 37 BASHostKit-related" +
+                " types ledger-serializable。 134 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1752。 336 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
