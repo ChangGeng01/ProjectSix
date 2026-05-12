@@ -37,25 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs598() {
+    func testLastChapterIs599() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十八",
-            "Chapter 五百九十八:BASORGAN FIRST-EVER" +
-            " CODABLE EXTENSION WAVE 1。 FRESH MODULE" +
-            " TERRITORY:BASOrgan uncovered by chapter" +
-            " 597 octa snapshot。 2 types (BASOrgan" +
-            "DraftChunk + BASOrganRegistryObservation" +
-            "Snapshot) gained Codable + 2 PROOF" +
-            " tests + BASOrganCodableExtensionDoctrine" +
-            " typed surface + close-out。 Module" +
-            " count bumped 6 → 7,mirroring chapter" +
-            " 586 BASObservability first-ever" +
-            " precedent。 139 typed surfaces" +
-            " cumulative。 Both types are pure-value" +
-            " structs with already-Codable field" +
-            " types")
+            "chapter 五百九十九",
+            "Chapter 五百九十九:BASMLXADAPTER FIRST-" +
+            "EVER CODABLE EXTENSION WAVE 1。 FRESH" +
+            " MODULE TERRITORY:BASMLXAdapter uncovered" +
+            " by chapter 598 BASOrgan first-ever (the" +
+            " 7th-module entry)。 2 types (MLXModel" +
+            "Catalog.Entry + MLXLoRATrainer.Training" +
+            "Progress 4-case enum) gained Codable + 2" +
+            " PROOF tests + BASMLXAdapterCodable" +
+            "ExtensionDoctrine typed surface + close-" +
+            "out。 Module count bumped 7 → 8 — 2nd" +
+            " consecutive fresh-module first-ever" +
+            " extension after the chapter 597 octa-" +
+            "milestone seal。 140 typed surfaces" +
+            " cumulative")
     }
 
     // MARK: - M-number range

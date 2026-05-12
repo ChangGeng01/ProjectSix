@@ -107,18 +107,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 598 close-out。 Chapter
-    /// 598:BASORGAN FIRST-EVER CODABLE EXTENSION
-    /// WAVE 1 — FRESH MODULE TERRITORY。 2 types (BAS
-    /// OrganDraftChunk + BASOrganRegistryObservation
-    /// Snapshot) gained Codable at M1769 + 2 PROOF
-    /// tests (M1770) + NEW BASOrganCodableExtension
-    /// Doctrine (M1771) + close-out (M1772)。 BASOrgan
-    /// uncovered by chapter 597 octa snapshot (6
-    /// modules covered)。 Module count bumped 6 → 7,
-    /// mirroring chapter 586 BASObservability first-
-    /// ever extension precedent。 Both types pure-value
-    /// structs with already-Codable field types。
+    /// Re-captured at chapter 599 close-out。 Chapter
+    /// 599:BASMLXADAPTER FIRST-EVER CODABLE
+    /// EXTENSION WAVE 1 — FRESH MODULE TERRITORY。 2
+    /// types (MLXModelCatalog.Entry + MLXLoRATrainer.
+    /// TrainingProgress 4-case enum with associated
+    /// values) gained Codable at M1773 + 2 PROOF tests
+    /// (M1774) + NEW BASMLXAdapterCodableExtension
+    /// Doctrine (M1775) + close-out (M1776)。
+    /// BASMLXAdapter uncovered by chapter 598 BASOrgan
+    /// first-ever (the 7th-module entry)。 Module count
+    /// bumped 7 → 8 — 2nd consecutive fresh-module
+    /// first-ever after the chapter 597 octa-milestone
+    /// seal。
     static let frozenFullRegistrySha256: String =
-        "59caf15ed8b0461262193a4938bf30a769bd4bc2f0e2a6df4c3ebd0cdbb2aa7c"
+        "50bb98ef1fd03a4f3a03b7be187707e39002ee7f659ecc972486a084088dfba3"
 }

@@ -3230,7 +3230,30 @@ public enum BASEntropyChapterIndex {
                 " structs with already-Codable field" +
                 " types。 139 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1772。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十九",
+            mNumberFirst: 1773, mNumberLast: 1776,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMLXADAPTER FIRST-EVER CODABLE" +
+                " EXTENSION WAVE 1 — FRESH MODULE" +
+                " TERRITORY。 2 types (MLXModelCatalog." +
+                "Entry + MLXLoRATrainer.TrainingProgress" +
+                " 4-case enum with associated values)" +
+                " gained Codable at M1773 + 2 PROOF" +
+                " tests (M1774) + new typed surface" +
+                " (M1775) + close-out (M1776)。" +
+                " BASMLXAdapter was uncovered by chapter" +
+                " 598 BASOrgan first-ever (the 7th-" +
+                "module entry)。 This extension is the" +
+                " 8th-module entry into the ledger-" +
+                "serializable contract surface — 2nd" +
+                " consecutive fresh-module first-ever" +
+                " after the chapter 597 octa-milestone" +
+                " seal。 140 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1776。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

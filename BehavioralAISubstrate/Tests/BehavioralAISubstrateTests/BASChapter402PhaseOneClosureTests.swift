@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1772",
-            "M1772:doctrine version reflects chapter 五百九十八 — BASORGAN FIRST-EVER CODABLE EXTENSION WAVE 1。 FRESH MODULE TERRITORY:BASOrgan uncovered by chapter 597 octa snapshot (6 modules covered)。 2 BASOrgan types (BASOrganDraftChunk + BASOrganRegistryObservationSnapshot) gained Codable at M1769 + 2 PROOF tests (M1770) + BASOrganCodableExtensionDoctrine typed surface (M1771) + close-out (M1772)。 Module count bumped 6 → 7,mirroring chapter 586 BASObservability first-ever precedent。 Both types are pure-value structs with already-Codable field types。 139 typed surfaces cumulative。 356 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1776",
+            "M1776:doctrine version reflects chapter 五百九十九 — BASMLXADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1。 FRESH MODULE TERRITORY:BASMLXAdapter uncovered by chapter 598 BASOrgan first-ever (the 7th-module entry)。 2 BASMLXAdapter types (MLXModelCatalog.Entry + MLXLoRATrainer.TrainingProgress 4-case enum with associated values) gained Codable at M1773 + 2 PROOF tests (M1774) + BASMLXAdapterCodableExtensionDoctrine typed surface (M1775) + close-out (M1776)。 Module count bumped 7 → 8。 2nd consecutive fresh-module first-ever extension after the chapter 597 octa-milestone seal。 140 typed surfaces cumulative。 360 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

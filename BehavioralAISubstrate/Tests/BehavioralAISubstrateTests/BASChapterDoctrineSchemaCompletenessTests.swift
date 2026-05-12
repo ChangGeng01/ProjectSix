@@ -2003,7 +2003,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百九十八")!)
+                            "chapter 五百九十八")!),
+            // M1776 chapter 599 — BASMLXAdapter first-ever Codable extension wave 1
+            checkRegistry("五百九十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百九十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3283,6 +3289,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百九十八")!
+                .mNumberLast),
+            // M1776 chapter 599 — BASMLXAdapter first-ever Codable extension wave 1
+            ("599",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -12449,7 +12449,109 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1772。 356 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 599 — BASMLXAdapter first-ever
+        // Codable extension wave 1。 FRESH MODULE
+        // TERRITORY:BASMLXAdapter uncovered by
+        // chapter 598 BASOrgan first-ever。 8th-module
+        // entry into ledger-serializable contract
+        // surface。 2nd consecutive fresh-module first-
+        // ever extension after chapter 597 octa-
+        // milestone seal。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十九",
+            mNumberFirst: 1773,
+            mNumberLast: 1776,
+            v1MilestoneMNumber: 1776,
+            v1MilestoneStatus:
+                "chapter-599-mlxadapter-first-ever-codable-extension-wave-one",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1773, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "MLXAdapter types — MLXModel" +
+                        "Catalog.Entry (4-field nested" +
+                        " catalog entry) + MLXLoRA" +
+                        "Trainer.TrainingProgress (4-" +
+                        "case enum with associated" +
+                        " values)。 All field/payload" +
+                        " types already Codable —" +
+                        " trivial conformance addition" +
+                        " with synthesized enum Codable。"),
+                BASChapterKnife(
+                    mNumber: 1774, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1775, knife: "第三刀",
+                    concept: "NEW BASMLXAdapterCodable" +
+                        "ExtensionDoctrine +" +
+                        " isFreshModuleTerritory flag +" +
+                        " moduleCountAfterThis = 8 +" +
+                        " isSecondConsecutiveFreshModule" +
+                        "AfterOcta flag。 Mirrors chapter" +
+                        " 598 BASOrgan first-ever pattern。" +
+                        " typed-surface count 139 → 140。"),
+                BASChapterKnife(
+                    mNumber: 1776, knife: "第四刀",
+                    concept: "Chapter 599 close-out +" +
+                        " doctrine sync。 360" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。" +
+                        " BASMLXAdapter now in ledger-" +
+                        "serializable contract surface。" +
+                        " 8 modules covered (2 added" +
+                        " post-octa-milestone seal)。")
+            ],
+            entropyClassesAttacked: [
+                "mlx-model-catalog-entry-non-codable",
+                "mlx-lora-trainer-training-progress-non-codable",
+                "bas-mlx-adapter-module-not-in-codable-extension-narrative",
+                "octa-module-count-still-at-7-pre-chapter-599"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1776",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "mlx-adapter-first-ever-codable-extension",
+                "fresh-module-territory",
+                "octa-module-count-bumped-7-to-8",
+                "second-consecutive-fresh-module-after-octa"
+            ],
+            plannedFutureCuts: [
+                "future arc — BASMLXAdapter Codable" +
+                " extension wave 2 (additional non-" +
+                "Codable types)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — Tier A sprawl migrations" +
+                " per wild-rolling-meerkat plan"
+            ],
+            summary: "Chapter 599 ships BASMLXAdapter" +
+                " first-ever Codable extension wave 1。" +
+                " FRESH MODULE TERRITORY:BAS" +
+                "MLXAdapter uncovered by chapter 598" +
+                " BASOrgan first-ever (the 7th-module" +
+                " entry)。 This extension is the 8th-" +
+                "module entry into the ledger-" +
+                "serializable contract surface。 2 types" +
+                " (MLXModelCatalog.Entry + MLXLoRA" +
+                "Trainer.TrainingProgress) gained" +
+                " Codable at M1773。 2 PROOF tests" +
+                " (M1774) + new typed surface (M1775)" +
+                " + close-out (M1776)。 TrainingProgress" +
+                " is a 4-case enum with associated" +
+                " values — synthesized Codable。 140" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1776。 360 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 2nd consecutive" +
+                " fresh-module first-ever extension" +
+                " after the chapter 597 octa-milestone" +
+                " seal。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
