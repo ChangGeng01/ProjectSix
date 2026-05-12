@@ -45,7 +45,7 @@ public actor BASChatCompletionsOrganAdapter: BASOrganAdapter {
 
     /// Endpoint config — URL + auth headers + model ID. All three
     /// fields are required because remote providers vary per axis.
-    public struct Endpoint: Sendable, Equatable {
+    public struct Endpoint: Sendable, Equatable, Codable {
         public let url: URL
         public let headers: [String: String]
         public let model: String
