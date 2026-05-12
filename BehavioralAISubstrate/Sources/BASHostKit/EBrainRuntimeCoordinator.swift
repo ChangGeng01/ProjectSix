@@ -2285,12 +2285,21 @@ public struct BASEBrainRuntimeCoordinator {
         }
 
         return BASEBrainTurnResult(
-            deviceState: request.deviceState,
-            budgetFrame: finalizedBudgetFrame,
-            wakeIntent: wakeIntent,
-            vitalState: vitalState,
-            runLease: runLease,
-            emergencyBrake: emergencyBrake,
+            // chapter 五百三十一 / M1503 — V1 splice:
+            // 6 device/lifecycle args collapse to 1 typed
+            // deviceLifecycleBundle (deviceState +
+            // budgetFrame + wakeIntent + vitalState +
+            // runLease + emergencyBrake)。 Byte-equality
+            // preserved by M1502 PROOF (bundle accessors
+            // pass through verbatim)。
+            deviceLifecycleBundle:
+                BASEBrainTurnResultDeviceLifecycleBundle(
+                    deviceState: request.deviceState,
+                    budgetFrame: finalizedBudgetFrame,
+                    wakeIntent: wakeIntent,
+                    vitalState: vitalState,
+                    runLease: runLease,
+                    emergencyBrake: emergencyBrake),
             // chapter 五百二十五 / M1479 — V1 splice:
             // 8 sovereign-cluster args collapse to 1
             // typed sovereignBundle。 Byte-equality
