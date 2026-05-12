@@ -186,7 +186,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百二十九",   // M1493-M1496 (6th BASEBrainTurnResult cluster bundle — risk/choice 4 fields + 6-bundle init + V1 splice, 52 → 18 args cumulative, 65% reduction)
         "chapter 五百三十",     // M1497-M1500 (M1500 MILESTONE — 7th BASEBrainTurnResult cluster bundle, misc 4 fields + 7-bundle init + V1 splice, 52 → 14 args cumulative, 73% reduction)
         "chapter 五百三十一",   // M1501-M1504 (8th BASEBrainTurnResult cluster bundle — device/lifecycle 6 fields + 8-bundle init + V1 splice, 52 → 8 args cumulative, 85% reduction)
-        "chapter 五百三十二"    // M1505-M1508 (100% PACKAGING MILESTONE — 9th + FINAL BASEBrainTurnResult cluster bundle, forensic metadata 3 fields + 9-bundle init + V1 splice, ALL 52 fields collapsed across 9 typed bundles)
+        "chapter 五百三十二",   // M1505-M1508 (100% PACKAGING MILESTONE — 9th + FINAL BASEBrainTurnResult cluster bundle, forensic metadata 3 fields + 9-bundle init + V1 splice, ALL 52 fields collapsed across 9 typed bundles)
+        "chapter 五百三十三"    // M1509-M1512 (BASEBrainTurnResultFoldArcSealedDoctrine typed milestone surface + 20 PROOF tests — fold arc sealed non-driftable)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -203,18 +204,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1508
+    public static let mNumberLast: Int = 1512
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1508)。 Bumped through chapter 532 (100%
-    /// PACKAGING MILESTONE):549 → 553。 Chapter 532:
-    /// 9th + FINAL BASEBrainTurnResult cluster bundle
-    /// (forensic metadata,3 fields) — M1505 + M1506
-    /// 9-bundle init + M1507 V1 splice + M1508 close-out。
-    /// V1 call site 52 → 9 args (ALL 52 fields
-    /// collapsed across 9 typed bundles,~83% arg-count
-    /// reduction)。 BASEBrainTurnResult fold ARC SEALED。
-    public static let commitsShipped: Int = 553
+    /// M1512)。 Bumped through chapter 533:553 → 557。
+    /// Chapter 533:fold arc sealed milestone doctrine
+    /// + 20 PROOF tests — M1509 doctrine + M1510 10
+    /// anti-drift tests + M1511 10 wire-in tests +
+    /// M1512 close-out。 Fold arc sealed state now non-
+    /// driftable。
+    public static let commitsShipped: Int = 557
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

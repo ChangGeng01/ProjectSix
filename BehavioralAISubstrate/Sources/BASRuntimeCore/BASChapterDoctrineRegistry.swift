@@ -6571,7 +6571,96 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 BASEBrain" +
                 "TurnResult fold ARC SEALED。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 533 — fold arc sealed milestone
+        // doctrine + 20 PROOF tests
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十三",
+            mNumberFirst: 1509,
+            mNumberLast: 1512,
+            v1MilestoneMNumber: 1512,
+            v1MilestoneStatus:
+                "chapter-533-fold-arc-sealed-milestone-doctrine",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1509, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "FoldArcSealedDoctrine typed" +
+                        " milestone surface" +
+                        " commemorating the 9-chapter" +
+                        " fold arc seal。 Exposes 11" +
+                        " typed accessors including" +
+                        " hundredPercentPackaging" +
+                        " computed invariant。 79 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1510, knife: "第二刀",
+                    concept: "10 anti-drift PROOF tests" +
+                        " for the milestone doctrine:" +
+                        " cluster bundle count + array" +
+                        " length + total fields + 100%" +
+                        " packaging invariant + post-" +
+                        "fold arg count + commit count" +
+                        " + reduction ratio + M-number" +
+                        " range + byte-equality flag。"),
+                BASChapterKnife(
+                    mNumber: 1511, knife: "第三刀",
+                    concept: "10 wire-in PROOF tests" +
+                        " cross-checking doctrine vs" +
+                        " each actual cluster bundle's" +
+                        " static field-count constant。" +
+                        " Direct module reference,no" +
+                        " reflection。 If a bundle's" +
+                        " underlying structure drifts," +
+                        " the wire-in test fails loudly。"),
+                BASChapterKnife(
+                    mNumber: 1512, knife: "第四刀",
+                    concept: "Chapter 533 close-out +" +
+                        " doctrine sync — fold arc" +
+                        " sealed milestone is now non-" +
+                        "driftable via 20 PROOF tests" +
+                        " (anti-drift × 10 + wire-in ×" +
+                        " 10)。 96 consecutive commits" +
+                        " with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "fold-arc-milestone-undocumented",
+                "9-cluster-bundle-field-count-drift",
+                "doctrine-vs-actual-bundle-state-not-cross-checked",
+                "100%-packaging-claim-not-verifiable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1512",
+                "v1-byte-equality-preserved",
+                "fold-arc-sealed-non-driftable",
+                "20-PROOF-tests-anti-drift-shield"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal fold" +
+                " (cluster A ForAudit declarations at" +
+                " lines 1219-1369 → typed bundle)",
+                "future arc — SampleHost production" +
+                " wire-in of the 9-bundle init",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 533 commemorates the" +
+                " 9-chapter BASEBrainTurnResult fold arc" +
+                " seal with a typed milestone doctrine +" +
+                " 20 PROOF tests (10 anti-drift + 10" +
+                " wire-in)。 The fold arc sealed state" +
+                " is now non-driftable — any silent" +
+                " change to a cluster bundle's field" +
+                " count breaks the wire-in PROOF" +
+                " loudly。 79 typed surfaces cumulative。" +
+                " ADR-016 → M1512。 96 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

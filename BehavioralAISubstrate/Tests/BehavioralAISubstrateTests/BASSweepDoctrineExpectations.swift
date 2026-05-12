@@ -117,22 +117,18 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 130
+    public static let phase2ChapterCount: Int = 131
 
-    /// Phase 2 commits shipped。 At M1508 (100% PACKAGING
-    /// MILESTONE):125 + 84 + 344 = 553 (chapter 532 = 4
-    /// cuts — 9th + FINAL BASEBrainTurnResult cluster
-    /// bundle:forensic metadata 3 fields + 9-bundle
-    /// init + V1 splice + close-out)
-    public static let phase2CommitsShipped: Int = 553
+    /// Phase 2 commits shipped。 At M1512:125 + 84 + 348
+    /// = 557 (chapter 533 = 4 cuts — fold arc sealed
+    /// milestone doctrine + 20 PROOF tests + close-out)
+    public static let phase2CommitsShipped: Int = 557
 
-    /// Phase 2 mNumberLast。 At M1508 (100% PACKAGING
-    /// MILESTONE):chapter 532 (9th + FINAL BASEBrain
-    /// TurnResult cluster bundle — forensic metadata 3
-    /// fields,V1 call site 52 → 9 args cumulative across
-    /// 9 typed bundles,ALL 52 fields collapsed)。 SWEEP
-    /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1508
+    /// Phase 2 mNumberLast。 At M1512:chapter 533 (fold
+    /// arc sealed milestone doctrine + 20 PROOF tests —
+    /// the fold arc sealed state is now non-driftable)。
+    /// SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1512
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -1946,7 +1946,24 @@ public enum BASEntropyChapterIndex {
                 " arg-count reduction)。 78 typed" +
                 " surfaces cumulative。 ADR-016 → M1508。" +
                 " V1 byte-equality preserved。 BASEBrain" +
-                "TurnResult fold ARC SEALED。")
+                "TurnResult fold ARC SEALED。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十三",
+            mNumberFirst: 1509, mNumberLast: 1512,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Fold arc sealed milestone doctrine" +
+                " + 20 PROOF tests:" +
+                " BASEBrainTurnResultFoldArcSealed" +
+                "Doctrine typed milestone surface (M1509)" +
+                " + 10 anti-drift PROOF tests (M1510)" +
+                " + 10 wire-in PROOF tests cross-checking" +
+                " doctrine vs each actual cluster bundle's" +
+                " static field-count constant (M1511)。" +
+                " The fold arc sealed state is now non-" +
+                "driftable。 79 typed surfaces cumulative。" +
+                " ADR-016 → M1512。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

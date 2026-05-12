@@ -37,20 +37,19 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs532() {
+    func testLastChapterIs533() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十二",
-            "100% PACKAGING MILESTONE — chapter 五百三十二:" +
-            " 9th + FINAL BASEBrainTurnResult cluster" +
-            " bundle (forensic metadata 3 fields) +" +
-            " 9-bundle init + V1 splice。 100% arg" +
-            " packaging coverage achieved。 V1 call site" +
-            " 52 → 9 args cumulative across 9 typed" +
-            " bundles (ALL 52 fields collapsed)。 78" +
-            " typed surfaces cumulative。 BASEBrainTurn" +
-            "Result fold ARC SEALED")
+            "chapter 五百三十三",
+            "Chapter 五百三十三:fold arc sealed" +
+            " milestone doctrine +20 PROOF tests。" +
+            " BASEBrainTurnResultFoldArcSealedDoctrine" +
+            " typed milestone surface commemorating the" +
+            " 9-chapter fold arc seal + 10 anti-drift" +
+            " PROOF tests + 10 wire-in PROOF tests。" +
+            " Fold arc sealed state is now non-" +
+            "driftable。 79 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

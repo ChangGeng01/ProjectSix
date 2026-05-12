@@ -1607,7 +1607,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百三十二")!)
+                            "chapter 五百三十二")!),
+            // M1512 chapter 533 — fold arc sealed milestone doctrine + 20 PROOF tests
+            checkRegistry("五百三十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百三十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2359,6 +2365,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百三十二")!
+                .mNumberLast),
+            // M1512 chapter 533 — fold arc sealed milestone doctrine + 20 PROOF tests
+            ("533",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -107,17 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 532 close-out — 100%
-    /// PACKAGING MILESTONE。 Chapter 532:9th + FINAL
-    /// BASEBrainTurnResult cluster bundle —
-    /// BASEBrainTurnResultForensicMetadataBundle (3
-    /// forensic metadata fields:policyLineage +
-    /// recoveryDisposition + runtimeTrace) + 9-bundle
-    /// convenience init + V1 monolith splice。 100% arg
-    /// packaging coverage achieved — ALL 52 fields now
-    /// travel through 9 typed cluster bundles。 V1 call
-    /// site 52 → 9 args (~83% arg-count reduction)。
-    /// BASEBrainTurnResult fold ARC SEALED。
+    /// Re-captured at chapter 533 close-out。 Chapter
+    /// 533:BASEBrainTurnResultFoldArcSealedDoctrine
+    /// typed milestone surface commemorating the 9-
+    /// chapter fold arc seal + 20 PROOF tests (10 anti-
+    /// drift + 10 wire-in cross-checking doctrine vs
+    /// each actual cluster bundle's static field-count
+    /// constant)。 The fold arc sealed state is now
+    /// non-driftable。
     static let frozenFullRegistrySha256: String =
-        "1242e35595a2edbdd73c0f0470b9ad067d91909e94462b322b40f2ab095cc7ac"
+        "00d058a4a180537e8cf8cbc80a375fafac4fbaec4cc8dfcec016032bf7b85a3c"
 }
