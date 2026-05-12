@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1564",
-            "M1564:doctrine version reflects chapter 五百四十六 — Codable round-trip PROOF tests for RiskChoiceBundle extending coverage 7 → 8 of 9 cluster bundles via 4-subtype fixture (BASTriSelfScore + BASMergedChoice + BASRiskCard + BASActionPermit) (M1561) + update coverage doctrine catalogue (M1562) + update anti-drift PROOF tests (M1563)。 89 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1568",
+            "M1568:doctrine version reflects chapter 五百四十七 — 100% MILESTONE — final Codable round-trip PROOF for CognitiveFramesBundle via 5-subtype fixture extends coverage 8 → 9 of 9 cluster bundles (M1565) + update coverage doctrine catalogue to 100% (M1566) + anti-drift PROOF tests with 2 milestone invariants (allBundlesExplicitlyCovered + allCoverageMNumbersNonNil) (M1567)。 100% explicit round-trip coverage achieved across all 9 BASEBrainTurnResult cluster bundles。 89 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

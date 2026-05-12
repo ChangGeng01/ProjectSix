@@ -1691,7 +1691,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十六")!)
+                            "chapter 五百四十六")!),
+            // M1568 chapter 547 — 100% MILESTONE — CognitiveFrames round-trip + 100% doctrine + milestone invariants
+            checkRegistry("五百四十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2555,6 +2561,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十六")!
+                .mNumberLast),
+            // M1568 chapter 547 — 100% MILESTONE — CognitiveFrames round-trip + 100% doctrine + milestone invariants
+            ("547",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

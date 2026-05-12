@@ -2195,7 +2195,25 @@ public enum BASEntropyChapterIndex {
                 " coverage doctrine catalogue (M1562) +" +
                 " update anti-drift PROOF tests (M1563)。" +
                 " 89 typed surfaces cumulative。 ADR-016" +
-                " → M1564。 V1 byte-equality preserved。")
+                " → M1564。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十七",
+            mNumberFirst: 1565, mNumberLast: 1568,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "100% MILESTONE — final Codable" +
+                " round-trip PROOF for CognitiveFrames" +
+                "Bundle via 5-subtype fixture extends" +
+                " coverage from 8 → 9 of 9 cluster" +
+                " bundles (M1565) + update coverage" +
+                " doctrine catalogue to 100% (M1566) +" +
+                " anti-drift PROOF tests with 2 new" +
+                " milestone invariants (M1567)。 100%" +
+                " explicit round-trip coverage achieved" +
+                " across all 9 BASEBrainTurnResult" +
+                " cluster bundles。 89 typed surfaces" +
+                " cumulative。 ADR-016 → M1568。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

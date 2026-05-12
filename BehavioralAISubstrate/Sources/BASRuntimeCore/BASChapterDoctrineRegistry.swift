@@ -7821,7 +7821,96 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M1564。" +
                 " 148 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 547 — 100% MILESTONE — final 9 of 9
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十七",
+            mNumberFirst: 1565,
+            mNumberLast: 1568,
+            v1MilestoneMNumber: 1568,
+            v1MilestoneStatus:
+                "chapter-547-roundtrip-100-percent-milestone-9-of-9",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1565, knife: "第一刀",
+                    concept: "Codable round-trip PROOF" +
+                        " tests for CognitiveFramesBundle:" +
+                        " 5-subtype fixture (BAS" +
+                        "ContextFrame + BASDecomposeFrame" +
+                        " + BASMemoryBundle + BASThought" +
+                        "Frame + BASThoughtFold) with" +
+                        " pinned retrievedAt date for" +
+                        " deterministic round-trip。" +
+                        " Extends coverage 8 → 9 of 9。" +
+                        " 100% MILESTONE achieved。"),
+                BASChapterKnife(
+                    mNumber: 1566, knife: "第二刀",
+                    concept: "Update coverage doctrine" +
+                        " catalogue:CognitiveFrames" +
+                        "Bundle status .compileTimeOnly" +
+                        " → .explicitRoundTripCovered" +
+                        " explicitCoverageMNumber 1565。" +
+                        " Derived counts:9/0 +" +
+                        " coverageRatio EXACTLY 1.0。"),
+                BASChapterKnife(
+                    mNumber: 1567, knife: "第三刀",
+                    concept: "Update anti-drift PROOF" +
+                        " tests:counts 9/0 + ratio" +
+                        " == 1.0 + CognitiveFramesBundle" +
+                        " lookup test + 2 milestone" +
+                        " invariants (allBundles" +
+                        "ExplicitlyCovered +" +
+                        " allCoverageMNumbersNonNil)。" +
+                        " Test count 16 → 18。"),
+                BASChapterKnife(
+                    mNumber: 1568, knife: "第四刀",
+                    concept: "Chapter 547 close-out +" +
+                        " doctrine sync — 100% Codable" +
+                        " round-trip explicit coverage" +
+                        " MILESTONE achieved。 152" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "cognitive-frames-round-trip-untested",
+                "5-subtype-deepest-fixture-missing",
+                "100%-coverage-milestone-undeclared",
+                "compileTimeOnly-count-non-zero"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1568",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "100%-round-trip-coverage-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in of observability sinks",
+                "future arc — typed milestone doctrine" +
+                " commemorating the 6-chapter Codable" +
+                " arc (chapters 541-547)"
+            ],
+            summary: "Chapter 547 ships the FINAL round-" +
+                "trip fixture for CognitiveFramesBundle" +
+                " with 5 typed sub-types (M1565) +" +
+                " coverage doctrine update flipping" +
+                " final entry to .explicitRoundTrip" +
+                "Covered (M1566) + anti-drift tests +" +
+                " 2 milestone invariants (M1567) +" +
+                " close-out (M1568)。 100% Codable" +
+                " round-trip explicit coverage MILESTONE" +
+                " achieved across all 9 BASEBrainTurnResult" +
+                " cluster bundles。 89 typed surfaces" +
+                " cumulative。 ADR-016 → M1568。 152" +
+                " consecutive autonomous commits with" +
+                " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
