@@ -2329,11 +2329,17 @@ public struct BASEBrainRuntimeCoordinator {
                     hostForgetRequest:
                         hostForgetRequest,
                     hostContext: hostContext),
-            contextFrame: contextFrame,
-            decomposeFrame: decomposeFrame,
-            memoryBundle: memoryBundle,
-            thoughtFrame: thoughtFrame,
-            thoughtFold: thoughtFold,
+            // chapter 五百二十八 / M1491 — V1 splice:
+            // 5 cognitive-frame args collapse to 1 typed
+            // cognitiveFramesBundle。 Byte-equality
+            // preserved by M1490 PROOF。
+            cognitiveFramesBundle:
+                BASEBrainTurnResultCognitiveFramesBundle(
+                    contextFrame: contextFrame,
+                    decomposeFrame: decomposeFrame,
+                    memoryBundle: memoryBundle,
+                    thoughtFrame: thoughtFrame,
+                    thoughtFold: thoughtFold),
             triScores: triScores,
             mergedChoice: mergedChoice,
             riskCard: boundRiskCard,
