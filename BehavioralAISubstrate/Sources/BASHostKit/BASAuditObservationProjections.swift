@@ -576,6 +576,121 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
                 observationBundles.updateTicket)
     }
 
+    // MARK: - chapter 五百十六 / M1442 — unified 4-block
+    //                                    convenience init
+    //
+    // Single convenience init taking ALL FOUR typed input
+    // blocks (Kunlun + Cthulhu + ObservationBundles +
+    // KunlunProtocol) plus the residual ~13 scalar fields。
+    // Collapses 56-arg all-fields init into ~17 args at
+    // the call site (4 blocks + ~13 residuals)。
+    //
+    // Byte-equality with the all-fields init GUARANTEED
+    // by body construction — each block's accessor pass-
+    // through PROOF is the regression guard。
+    public init(
+        kunlunInputs:
+            BASAuditObservationProjectionsKunlunInputs,
+        cthulhuInputs:
+            BASAuditObservationProjectionsCthulhuInputs,
+        observationBundles:
+            BASAuditObservationProjectionsObservationBundlesBlock,
+        kunlunProtocolBlock:
+            BASAuditObservationProjectionsKunlunProtocolBlock,
+        candidateObservationBundle:
+            BASCandidateObservationBundle? = nil,
+        tribunalObservationBundle:
+            BASTribunalObservationBundle? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        sealAggregate:
+            BASOldSealSealingProtocol.Aggregate? = nil,
+        lifecycleAggregate:
+            BASEvolutionLifecycleSession.Aggregate? = nil,
+        narrativeDistortion: BASNarrativeDistortion? = nil,
+        anomalyTrace: BASAnomalyTrace? = nil,
+        abyssalBranches: [BASAbyssalBranch] = [],
+        unknownReserve: BASUnknownReserve? = nil,
+        forbiddenAggregate:
+            BASForbiddenKnowledgeCandidate.Aggregate? = nil,
+        escalationSuppressionCodes: [String] = [],
+        kunlunAxisView: BASKunlunAxisView? = nil,
+        kunlunTianmenWarrant: BASKunlunTianmenWarrant? = nil,
+        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil,
+        layerReconciliationVerdict:
+            BASObservationReconciliationVerdict? = nil,
+        layerReconciliationReport:
+            BASObservationReconciliationReport? = nil,
+        ontologyShiftMark: BASOntologyShiftMark? = nil,
+        cthulhuAssertionCeilingReasonCodes: [String] = [],
+        cthulhuPermitEscalationReasonCodes: [String] = [],
+        narrativeDistortionMap:
+            BASNarrativeDistortionMap? = nil,
+        cthulhuSurfaceAlias:
+            BASCthulhuSurfaceAlias? = nil,
+        kunlunSurfaceAlias:
+            BASKunlunSurfaceAlias? = nil
+    ) {
+        // Delegate to the 3-block unified init with the
+        // 9 protocol fields unpacked from the
+        // kunlunProtocolBlock as named args。
+        self.init(
+            kunlunInputs: kunlunInputs,
+            cthulhuInputs: cthulhuInputs,
+            observationBundles: observationBundles,
+            candidateObservationBundle:
+                candidateObservationBundle,
+            tribunalObservationBundle:
+                tribunalObservationBundle,
+            abyssalPressure: abyssalPressure,
+            humanAnchorSignal: humanAnchorSignal,
+            sealAggregate: sealAggregate,
+            lifecycleAggregate: lifecycleAggregate,
+            narrativeDistortion: narrativeDistortion,
+            anomalyTrace: anomalyTrace,
+            abyssalBranches: abyssalBranches,
+            unknownReserve: unknownReserve,
+            forbiddenAggregate: forbiddenAggregate,
+            // 9 Kunlun protocol fields from
+            // kunlunProtocolBlock
+            kunlunAxisAlignment:
+                kunlunProtocolBlock.kunlunAxisAlignment,
+            jadeCanonVerification:
+                kunlunProtocolBlock.jadeCanonVerification,
+            jadeCanonObjectClass:
+                kunlunProtocolBlock.jadeCanonObjectClass,
+            riverOriginLineage:
+                kunlunProtocolBlock.riverOriginLineage,
+            yaochiAccess:
+                kunlunProtocolBlock.yaochiAccess,
+            yaochiSanctumClass:
+                kunlunProtocolBlock.yaochiSanctumClass,
+            tianmenReadiness:
+                kunlunProtocolBlock.tianmenReadiness,
+            tianmenGateClass:
+                kunlunProtocolBlock.tianmenGateClass,
+            tianmenPassState:
+                kunlunProtocolBlock.tianmenPassState,
+            escalationSuppressionCodes:
+                escalationSuppressionCodes,
+            kunlunAxisView: kunlunAxisView,
+            kunlunTianmenWarrant: kunlunTianmenWarrant,
+            kunlunGateDenialWrit: kunlunGateDenialWrit,
+            layerReconciliationVerdict:
+                layerReconciliationVerdict,
+            layerReconciliationReport:
+                layerReconciliationReport,
+            ontologyShiftMark: ontologyShiftMark,
+            cthulhuAssertionCeilingReasonCodes:
+                cthulhuAssertionCeilingReasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                cthulhuPermitEscalationReasonCodes,
+            narrativeDistortionMap:
+                narrativeDistortionMap,
+            cthulhuSurfaceAlias: cthulhuSurfaceAlias,
+            kunlunSurfaceAlias: kunlunSurfaceAlias)
+    }
+
     // MARK: - chapter 五百十四 / M1435 — unified 3-block
     //                                    convenience init
     //
