@@ -1649,7 +1649,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百三十九")!)
+                            "chapter 五百三十九")!),
+            // M1540 chapter 540 — unified observability sink catalogue + 23 PROOF tests
+            checkRegistry("五百四十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2457,6 +2463,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百三十九")!
+                .mNumberLast),
+            // M1540 chapter 540 — unified observability sink catalogue + 23 PROOF tests
+            ("540",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

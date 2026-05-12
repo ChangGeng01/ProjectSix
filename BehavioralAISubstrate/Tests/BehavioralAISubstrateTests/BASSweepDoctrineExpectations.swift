@@ -117,20 +117,18 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 137
+    public static let phase2ChapterCount: Int = 138
 
-    /// Phase 2 commits shipped。 At M1536:125 + 84 + 372
-    /// = 581 (chapter 539 = 4 cuts — 3rd typed
-    /// observability sink + wire-in + 10 PROOF tests +
-    /// close-out)
-    public static let phase2CommitsShipped: Int = 581
+    /// Phase 2 commits shipped。 At M1540:125 + 84 + 376
+    /// = 585 (chapter 540 = 4 cuts — unified typed
+    /// catalogue doctrine + 23 PROOF tests + close-out)
+    public static let phase2CommitsShipped: Int = 585
 
-    /// Phase 2 mNumberLast。 At M1536:chapter 539 (3rd
-    /// typed observability sink — cross-module
-    /// BASAuditEmissionFailureLog in BASRuntimeCore" +
-    /// wired into BASHostKit + BASSovereign)。 SWEEP
-    /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1536
+    /// Phase 2 mNumberLast。 At M1540:chapter 540
+    /// (unified typed catalogue doctrine for the 3
+    /// observability sinks — 8-path / 3-sink achievement
+    /// non-driftable)。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1540
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -2075,7 +2075,28 @@ public enum BASEntropyChapterIndex {
                 " tests (M1535)。 3 typed observability" +
                 " sinks now shipped。 85 typed surfaces" +
                 " cumulative。 ADR-016 → M1536。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十",
+            mNumberFirst: 1537, mNumberLast: 1540,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Unified typed catalogue doctrine" +
+                " for the 3 observability sinks shipped" +
+                " to date (chapters 536+537+539):" +
+                " BASTypedObservabilitySinkCatalogue" +
+                "Doctrine with SinkID typed enum (3" +
+                " cases) + Entry struct + entries" +
+                " array + catalogueIsConsistent" +
+                " computed invariant (M1537) + 14" +
+                " anti-drift PROOF tests (M1538) + 9" +
+                " wire-in PROOF tests cross-checking" +
+                " against actual sink types via direct" +
+                " module references (M1539)。 The 8-path" +
+                " / 3-sink achievement is now non-" +
+                "driftable。 86 typed surfaces cumulative。" +
+                " ADR-016 → M1540。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

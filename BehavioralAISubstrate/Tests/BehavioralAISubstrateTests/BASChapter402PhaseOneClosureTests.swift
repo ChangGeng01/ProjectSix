@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1536",
-            "M1536:doctrine version reflects chapter 五百三十九 — 3rd typed observability sink。 BASAuditEmissionFailureLog actor + Kind enum (2 cases) + Record struct in BASRuntimeCore (M1533) wired into BASHostKit's BASEventLogStorage.appendTurnEnvelope + BASSovereign's BASSovereignCleanRebootCoordinator (M1534) + 10 PROOF tests (M1535)。 Cross-module observability sink shipped。 3 sinks total across chapters 536+537+539。 85 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1540",
+            "M1540:doctrine version reflects chapter 五百四十 — unified typed catalogue doctrine for the 3 observability sinks shipped to date。 BASTypedObservabilitySinkCatalogueDoctrine with SinkID typed enum (3 cases) + Entry struct + catalogueIsConsistent computed invariant (M1537) + 14 anti-drift PROOF tests (M1538) + 9 wire-in PROOF tests cross-checking against actual sink types via direct module references (M1539)。 The 8-path / 3-sink achievement is now non-driftable。 86 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

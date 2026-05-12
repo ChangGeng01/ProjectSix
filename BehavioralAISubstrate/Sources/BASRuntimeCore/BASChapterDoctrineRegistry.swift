@@ -7202,7 +7202,104 @@ public enum BASChapterDoctrineRegistry {
                 " 85 typed surfaces cumulative。 ADR-016" +
                 " → M1536。 120 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 540 — unified observability sink
+        // catalogue doctrine
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十",
+            mNumberFirst: 1537,
+            mNumberLast: 1540,
+            v1MilestoneMNumber: 1540,
+            v1MilestoneStatus:
+                "chapter-540-observability-sink-catalogue",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1537, knife: "第一刀",
+                    concept: "NEW BASTypedObservability" +
+                        "SinkCatalogueDoctrine unified" +
+                        " milestone surface cataloguing" +
+                        " all 3 sinks shipped to date" +
+                        " (chapters 536+537+539)。" +
+                        " Includes SinkID typed enum (3" +
+                        " cases) + Entry struct (Codable" +
+                        " + Sendable + Equatable +" +
+                        " Hashable) + entries array +" +
+                        " sinkCount + totalCoveredPath" +
+                        "Count + catalogueIsConsistent" +
+                        " computed invariant。 86 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1538, knife: "第二刀",
+                    concept: "14 anti-drift PROOF tests" +
+                        " for the catalogue:counts +" +
+                        " path coverage + consistency" +
+                        " invariant + M-number range +" +
+                        " per-sink lookups (3) +" +
+                        " chronological order +" +
+                        " uniqueness + Codable round-trip。"),
+                BASChapterKnife(
+                    mNumber: 1539, knife: "第三刀",
+                    concept: "9 wire-in PROOF tests" +
+                        " cross-checking the catalogue" +
+                        " against actual sink types via" +
+                        " direct module references (no" +
+                        " reflection)。 If a sink is" +
+                        " renamed/removed:fails at" +
+                        " compile time。 If a Kind enum" +
+                        " gains/loses cases without" +
+                        " updating the catalogue:per-" +
+                        "sink path count cross-check" +
+                        " fails loudly。"),
+                BASChapterKnife(
+                    mNumber: 1540, knife: "第四刀",
+                    concept: "Chapter 540 close-out +" +
+                        " doctrine sync — the 8-path /" +
+                        " 3-sink observability-sink arc" +
+                        " is now non-driftable via 23" +
+                        " PROOF tests + the catalogue" +
+                        "IsConsistent invariant。 124" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "observability-sink-3-shipped-undocumented",
+                "sink-catalogue-untyped",
+                "8-path-coverage-not-pinned",
+                "sink-type-name-drift-undetected"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1540",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "observability-sink-catalogue-non-driftable"
+            ],
+            plannedFutureCuts: [
+                "future arc — SampleHost production" +
+                " wire-in of all 3 observability sinks",
+                "future arc — V1 monolith internal fold" +
+                " continuation",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 540 ships the unified typed" +
+                " catalogue doctrine for the 3" +
+                " observability sinks shipped to date" +
+                " (chapters 536+537+539)。 The 8-path /" +
+                " 3-sink achievement is now discoverable" +
+                " via BASTypedObservabilitySinkCatalogue" +
+                "Doctrine (M1537) + non-driftable via 14" +
+                " anti-drift PROOF tests (M1538) + 9" +
+                " wire-in PROOF tests cross-checking" +
+                " against actual sink types via direct" +
+                " module references (M1539)。 86 typed" +
+                " surfaces cumulative。 ADR-016 → M1540。" +
+                " 124 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
