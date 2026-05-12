@@ -169,7 +169,7 @@ public struct BASChengluLatencyHint:
 /// independently (e.g. "intent confidence is high but emotion
 /// confidence is low → ask clarifying question")。
 public struct BASChengluMultiHeadHint:
-    Sendable, Equatable, Hashable
+    Codable, Sendable, Equatable, Hashable
 {
     public let outputKey: String
     public let score: Double
@@ -195,7 +195,7 @@ public enum BASChengluPermitPolicy:
 }
 
 public struct BASChengluPermitPredictHint:
-    Sendable, Equatable, Hashable
+    Codable, Sendable, Equatable, Hashable
 {
     public let policy: BASChengluPermitPolicy
     public let blockProbability: Double
