@@ -2505,6 +2505,25 @@ public enum BASEntropyChapterIndex {
                 " aggregator types now ledger-" +
                 "serializable。 103 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1628。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十三",
+            mNumberFirst: 1629, mNumberLast: 1632,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CONTINUED REAL SUBSTRATE CHANGE" +
+                " — add Codable + Equatable to 7 more" +
+                " audit-projection aggregator types" +
+                " (CthulhuPenta + KunlunHexa +" +
+                " KunlunHexaTwo + LateClusterB +" +
+                " LateClusterC + LateClusterD +" +
+                " KunlunSealRiver) at M1629。 9 PROOF" +
+                " tests at M1630 + new typed surface" +
+                " (M1631) + close-out (M1632)。" +
+                " Combined chapters 561+562+563 = 15" +
+                " aggregator types now ledger-" +
+                "serializable。 104 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1632。" +
                 " V1 byte-equality preserved。")
     ]
 

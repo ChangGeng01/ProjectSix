@@ -110,15 +110,16 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 562
-    /// close-out (M1628 — continued real-substrate
-    /// Codable extension to 5 more aggregator types,
-    /// combined 8 aggregators now ledger-serializable)。
-    public static let typedSurfaceCount: Int = 103
+    /// Cumulative achievement metrics at chapter 563
+    /// close-out (M1632 — continued real-substrate
+    /// Codable extension to 7 more aggregator types,
+    /// combined 15 aggregators now ledger-serializable
+    /// across chapters 561-563)。
+    public static let typedSurfaceCount: Int = 104
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 212
-    public static let phase2CommitsShipped: Int = 673
-    public static let chapter2NumberLast: Int = 1628
+        Int = 216
+    public static let phase2CommitsShipped: Int = 677
+    public static let chapter2NumberLast: Int = 1632
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1628",
-            "M1628:doctrine version reflects chapter 五百六十二 — CONTINUED REAL SUBSTRATE CHANGE adding Codable + Equatable to 5 more audit-projection aggregator types (SurfaceTrio + GateSideDeriveTrio + KunlunTrioTwo + LifecycleQuartet + KunlunTianmenTrio) at M1625 + 10 PROOF tests (M1626) + BASTurnAuditProjectionsFiveAggregatorCodableExtensionDoctrine typed surface (M1627) + close-out (M1628)。 Combined with chapter 561 = 8 aggregator types now ledger-serializable。 103 typed surfaces cumulative。 212 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1632",
+            "M1632:doctrine version reflects chapter 五百六十三 — CONTINUED REAL SUBSTRATE CHANGE adding Codable + Equatable to 7 more audit-projection aggregator types (CthulhuPenta + KunlunHexa + KunlunHexaTwo + LateClusterB + LateClusterC + LateClusterD + KunlunSealRiver) at M1629 + 9 PROOF tests (M1630) + BASTurnAuditProjectionsSevenAggregatorCodableExtensionDoctrine typed surface (M1631) + close-out (M1632)。 Combined chapters 561+562+563 = 15 aggregator types now ledger-serializable。 104 typed surfaces cumulative。 216 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

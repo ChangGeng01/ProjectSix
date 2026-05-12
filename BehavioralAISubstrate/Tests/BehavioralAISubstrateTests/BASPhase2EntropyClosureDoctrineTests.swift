@@ -37,20 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs562() {
+    func testLastChapterIs563() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百六十二",
-            "Chapter 五百六十二:CONTINUED REAL" +
+            "chapter 五百六十三",
+            "Chapter 五百六十三:CONTINUED REAL" +
             " SUBSTRATE CHANGE adding Codable +" +
-            " Equatable to 5 more audit-projection" +
-            " aggregator types + 10 PROOF tests +" +
-            " BASTurnAuditProjectionsFiveAggregator" +
+            " Equatable to 7 more audit-projection" +
+            " aggregator types + 9 PROOF tests +" +
+            " BASTurnAuditProjectionsSevenAggregator" +
             "CodableExtensionDoctrine typed surface +" +
-            " close-out。 Combined with chapter 561 =" +
-            " 8 aggregator types now ledger-" +
-            "serializable。 103 typed surfaces" +
+            " close-out。 Combined chapters 561+562+563" +
+            " = 15 aggregator types now ledger-" +
+            "serializable。 104 typed surfaces" +
             " cumulative")
     }
 

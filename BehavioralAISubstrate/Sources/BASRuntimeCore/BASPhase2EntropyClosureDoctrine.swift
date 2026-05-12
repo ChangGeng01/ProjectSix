@@ -216,7 +216,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百五十九",   // M1613-M1616 (FLOATING-POINT DETERMINISM PROOF — 100th typed surface CENTURY MILESTONE + BASAuditProjectionsFloatingPointDeterminismProofDoctrine + 13 anti-drift/wire-in tests + catalogue extension to 7 entries)
         "chapter 五百六十",     // M1617-M1620 (REPLAY DETERMINISM CONTRACT CLOSURE MILESTONE — BASReplayDeterminismContractClosureDoctrine + 18 anti-drift + 11 wire-in PROOF tests commemorating 9-chapter / 37-M-number arc closing the chapter 三百九二 contract)
         "chapter 五百六十一",   // M1621-M1624 (REAL SUBSTRATE CHANGE — add Codable + Equatable to 3 Trio/Protocol audit-projection aggregator types + 8 PROOF tests + BASTurnAuditProjectionsTrioCodableExtensionDoctrine + close-out)
-        "chapter 五百六十二"    // M1625-M1628 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 5 more aggregator types + 10 PROOF tests + BASTurnAuditProjectionsFiveAggregatorCodableExtensionDoctrine + close-out;combined 8 aggregator types now ledger-serializable)
+        "chapter 五百六十二",   // M1625-M1628 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 5 more aggregator types + 10 PROOF tests + BASTurnAuditProjectionsFiveAggregatorCodableExtensionDoctrine + close-out;combined 8 aggregator types now ledger-serializable)
+        "chapter 五百六十三"    // M1629-M1632 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 7 more aggregator types + 9 PROOF tests + BASTurnAuditProjectionsSevenAggregatorCodableExtensionDoctrine + close-out;combined 15 aggregator types now ledger-serializable)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -233,14 +234,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1628
+    public static let mNumberLast: Int = 1632
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1628)。 Bumped through chapter 562:669 → 673。
-    /// Chapter 562:Continued real-substrate Codable
-    /// extension to 5 more aggregator types + 10 PROOF
+    /// M1632)。 Bumped through chapter 563:673 → 677。
+    /// Chapter 563:Continued real-substrate Codable
+    /// extension to 7 more aggregator types + 9 PROOF
     /// tests + typed surface + close-out。
-    public static let commitsShipped: Int = 673
+    public static let commitsShipped: Int = 677
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
