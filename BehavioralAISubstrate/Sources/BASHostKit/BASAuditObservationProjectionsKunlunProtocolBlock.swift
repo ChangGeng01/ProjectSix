@@ -57,7 +57,7 @@ import BASRuntimeCore
 /// protocol path (e.g. heavily-redirected turn that
 /// never touches yaochi) leave fields nil。
 public struct BASAuditObservationProjectionsKunlunProtocolBlock:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 9 Kunlun-protocol-verification fields

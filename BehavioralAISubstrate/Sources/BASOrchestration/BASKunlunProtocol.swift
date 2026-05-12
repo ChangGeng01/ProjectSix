@@ -717,7 +717,7 @@ public enum BASKunlunJadeCanonProtocol {
 
     /// Result of seal verification — typed missing-fields list
     /// per the four canonical requirements.
-    public struct Verification: Sendable, Equatable {
+    public struct Verification: Codable, Sendable, Equatable {
         public let isCanonical: Bool
         public let missingRequirements: [String]
 
@@ -760,7 +760,7 @@ public enum BASKunlunJadeCanonProtocol {
 public enum BASKunlunHeavenGateProtocol {
 
     /// Result of gate-readiness evaluation.
-    public struct Readiness: Sendable, Equatable {
+    public struct Readiness: Codable, Sendable, Equatable {
         public let isReady: Bool
         public let reasonCodes: [String]
 
@@ -822,7 +822,7 @@ public enum BASKunlunHeavenGateProtocol {
 public enum BASKunlunYaochiProtocol {
 
     /// Result of an access decision.
-    public struct AccessDecision: Sendable, Equatable {
+    public struct AccessDecision: Codable, Sendable, Equatable {
         public let granted: Bool
         public let reasonCodes: [String]
 
@@ -892,7 +892,7 @@ public enum BASKunlunYaochiProtocol {
 public enum BASKunlunRiverOriginProtocol {
 
     /// Result of trace analysis.
-    public struct LineageReport: Sendable, Equatable {
+    public struct LineageReport: Codable, Sendable, Equatable {
         /// `true` when trace is well-formed (root + audit
         /// non-empty).
         public let isWellFormed: Bool
