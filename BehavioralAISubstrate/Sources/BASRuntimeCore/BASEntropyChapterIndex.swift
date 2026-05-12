@@ -2056,7 +2056,26 @@ public enum BASEntropyChapterIndex {
                 " across Sources/ AND Tests/。 84 typed" +
                 " surfaces cumulative。 ADR-016 → M1532。" +
                 " V1 byte-equality preserved (pure" +
-                " cleanup,no behavioral change)。")
+                " cleanup,no behavioral change)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十九",
+            mNumberFirst: 1533, mNumberLast: 1536,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "3rd typed observability sink —" +
+                " cross-module BASAuditEmissionFailure" +
+                "Log actor + Kind enum (2 cases:" +
+                " turnEnvelopeAppend +" +
+                " sovereignRebootAuditAppend) +" +
+                " Record struct in BASRuntimeCore" +
+                " (M1533)。 Wired into BASHostKit's" +
+                " BASEventLogStorage.appendTurnEnvelope" +
+                " + BASSovereign's BASSovereignClean" +
+                "RebootCoordinator (M1534) + 10 PROOF" +
+                " tests (M1535)。 3 typed observability" +
+                " sinks now shipped。 85 typed surfaces" +
+                " cumulative。 ADR-016 → M1536。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

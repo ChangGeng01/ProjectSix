@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1532",
-            "M1532:doctrine version reflects chapter 五百三十八 — test-target build-warning purge。 4 distinct warnings purged (3 dead lets + 1 var→let) across 4 test files at M1529 + BASTestTargetBuildWarningPurgeDoctrine typed milestone surface with bothTargetsWarningFree computed cross-check (M1530) + 13 anti-drift PROOF tests (M1531)。 Both Sources/ AND Tests/ now build warning-free。 84 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1536",
+            "M1536:doctrine version reflects chapter 五百三十九 — 3rd typed observability sink。 BASAuditEmissionFailureLog actor + Kind enum (2 cases) + Record struct in BASRuntimeCore (M1533) wired into BASHostKit's BASEventLogStorage.appendTurnEnvelope + BASSovereign's BASSovereignCleanRebootCoordinator (M1534) + 10 PROOF tests (M1535)。 Cross-module observability sink shipped。 3 sinks total across chapters 536+537+539。 85 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

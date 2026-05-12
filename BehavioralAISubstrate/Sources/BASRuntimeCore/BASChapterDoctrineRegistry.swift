@@ -7107,7 +7107,102 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative。 ADR-016 → M1532。 116" +
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 539 — 3rd typed observability sink
+        // (cross-module BASRuntimeCore-resident)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十九",
+            mNumberFirst: 1533,
+            mNumberLast: 1536,
+            v1MilestoneMNumber: 1536,
+            v1MilestoneStatus:
+                "chapter-539-cross-module-audit-emission-sink",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1533, knife: "第一刀",
+                    concept: "NEW cross-module typed" +
+                        " observability sink in" +
+                        " BASRuntimeCore:" +
+                        " BASAuditEmissionFailureLog" +
+                        " actor + Kind typed enum (2" +
+                        " cases:turnEnvelopeAppend +" +
+                        " sovereignRebootAuditAppend) +" +
+                        " Record struct with turnID +" +
+                        " sessionID correlation。 Lives" +
+                        " in BASRuntimeCore so both" +
+                        " BASHostKit AND BASSovereign" +
+                        " can opt in。 85 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1534, knife: "第二刀",
+                    concept: "Wire BASAuditEmissionFailure" +
+                        "Log into 2 documented silent-" +
+                        "swallow sites:BASEventLogStorage" +
+                        ".appendTurnEnvelope(...,failureLog:)" +
+                        " in BASHostKit + BASSovereign" +
+                        "CleanRebootCoordinator's audit" +
+                        " ledger append (via new" +
+                        " auditFailureLog: coordinator" +
+                        " init parameter)。 ADR-014" +
+                        " OPT-IN preserved。"),
+                BASChapterKnife(
+                    mNumber: 1535, knife: "第三刀",
+                    concept: "10 PROOF tests for the" +
+                        " cross-module sink:fresh log" +
+                        " empty + Kind 2-case + record" +
+                        " fields + nil IDs + per-Kind" +
+                        " filter + Codable round-trip +" +
+                        " 30-parallel Sendable" +
+                        " concurrency。"),
+                BASChapterKnife(
+                    mNumber: 1536, knife: "第四刀",
+                    concept: "Chapter 539 close-out +" +
+                        " doctrine sync — 3 typed" +
+                        " observability sinks shipped" +
+                        " (BASHostKit + BASHostKit +" +
+                        " cross-module BASRuntimeCore)。" +
+                        " 120 consecutive commits with" +
+                        " V1 byte-equality preserved" +
+                        " this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "turn-envelope-append-silent-swallow",
+                "sovereign-reboot-audit-silent-swallow",
+                "cross-module-observability-gap",
+                "audit-emission-blackbox-extended"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1536",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "cross-module-sink-shipped"
+            ],
+            plannedFutureCuts: [
+                "future arc — typed milestone doctrine" +
+                " cataloguing all 3 observability sinks" +
+                " shipped to date (chapters 536+537+539)",
+                "future arc — SampleHost production" +
+                " wire-in of all 3 sinks",
+                "future arc — V1 monolith internal fold" +
+                " continuation"
+            ],
+            summary: "Chapter 539 extends the observability-" +
+                "sink pattern across module boundaries。" +
+                " NEW BASAuditEmissionFailureLog actor +" +
+                " Kind enum + Record struct in BASRuntime" +
+                "Core (M1533) wired into BASHostKit's" +
+                " BASEventLogStorage.appendTurnEnvelope +" +
+                " BASSovereign's BASSovereignCleanReboot" +
+                "Coordinator (M1534) + 10 PROOF tests" +
+                " (M1535)。 3 typed observability sinks" +
+                " now shipped (chapters 536+537+539)。" +
+                " 85 typed surfaces cumulative。 ADR-016" +
+                " → M1536。 120 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

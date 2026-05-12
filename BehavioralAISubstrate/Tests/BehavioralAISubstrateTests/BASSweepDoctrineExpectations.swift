@@ -117,19 +117,20 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 136
+    public static let phase2ChapterCount: Int = 137
 
-    /// Phase 2 commits shipped。 At M1532:125 + 84 + 368
-    /// = 577 (chapter 538 = 4 cuts — test-target
-    /// warning purge + typed milestone doctrine + 13
-    /// PROOF tests + close-out)
-    public static let phase2CommitsShipped: Int = 577
+    /// Phase 2 commits shipped。 At M1536:125 + 84 + 372
+    /// = 581 (chapter 539 = 4 cuts — 3rd typed
+    /// observability sink + wire-in + 10 PROOF tests +
+    /// close-out)
+    public static let phase2CommitsShipped: Int = 581
 
-    /// Phase 2 mNumberLast。 At M1532:chapter 538 (test-
-    /// target build-warning purge — both Sources/ AND
-    /// Tests/ now warning-free)。 SWEEP stays frozen at
-    /// 1163。
-    public static let phase2MNumberLast: Int = 1532
+    /// Phase 2 mNumberLast。 At M1536:chapter 539 (3rd
+    /// typed observability sink — cross-module
+    /// BASAuditEmissionFailureLog in BASRuntimeCore" +
+    /// wired into BASHostKit + BASSovereign)。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1536
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

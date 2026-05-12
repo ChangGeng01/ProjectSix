@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs538() {
+    func testLastChapterIs539() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十八",
-            "Chapter 五百三十八:test-target build-" +
-            "warning purge — 4 warnings 0 + BASTest" +
-            "TargetBuildWarningPurgeDoctrine typed" +
-            " milestone + 13 PROOF tests。 Both" +
-            " Sources/ AND Tests/ now warning-free。" +
-            " 84 typed surfaces cumulative")
+            "chapter 五百三十九",
+            "Chapter 五百三十九:3rd typed observability" +
+            " sink — cross-module BASAuditEmission" +
+            "FailureLog actor + Kind enum (2 cases) +" +
+            " Record struct in BASRuntimeCore + wire-in" +
+            " to BASHostKit + BASSovereign + 10 PROOF" +
+            " tests。 85 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

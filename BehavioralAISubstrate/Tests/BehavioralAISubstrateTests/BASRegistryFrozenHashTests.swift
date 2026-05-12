@@ -107,13 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 538 close-out。 Chapter
-    /// 538:test-target build-warning purge (4 distinct
-    /// warnings purged at M1529) + typed milestone
-    /// doctrine BASTestTargetBuildWarningPurgeDoctrine
-    /// with bothTargetsWarningFree computed cross-check
-    /// (M1530) + 13 anti-drift PROOF tests (M1531)。
-    /// Both Sources/ AND Tests/ now build warning-free。
+    /// Re-captured at chapter 539 close-out。 Chapter
+    /// 539:3rd typed observability sink — cross-module
+    /// BASAuditEmissionFailureLog actor + Kind typed
+    /// enum (2 cases) + Record struct in BASRuntimeCore
+    /// (M1533) + wire-in to BASHostKit's
+    /// BASEventLogStorage.appendTurnEnvelope +
+    /// BASSovereign's BASSovereignCleanRebootCoordinator
+    /// (M1534) + 10 PROOF tests (M1535)。 3 typed
+    /// observability sinks shipped total。
     static let frozenFullRegistrySha256: String =
-        "727e59bc81b22cf018ddebd10d5d5c60271ff17381e5110c6beb310ce7f050de"
+        "fbfc2cba601993cfeee10a8254bf733ebf4abc36835dff98334d1a7b774eed43"
 }
