@@ -8634,7 +8634,97 @@ public enum BASChapterDoctrineRegistry {
                 " 184 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。 ADR-016" +
-                " → M1600。")
+                " → M1600。"),
+
+        // chapter 556 — JSON PROOF doctrine meta-
+        // catalogue。 Single source-of-truth for the 4
+        // JSON PROOF doctrines shipped in chapters
+        // 551-555 + wire-in PROOF that the catalogue
+        // agrees with the catalogued doctrines。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十六",
+            mNumberFirst: 1601,
+            mNumberLast: 1604,
+            v1MilestoneMNumber: 1604,
+            v1MilestoneStatus:
+                "chapter-556-json-proof-meta-catalogue",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1601, knife: "第一刀",
+                    concept: "NEW BASJsonProofDoctrine" +
+                        "CatalogueDoctrine meta-" +
+                        "catalogue typed surface。 Single" +
+                        " source-of-truth for 4 JSON" +
+                        " PROOF doctrines shipped in" +
+                        " this session (M1582 + M1591" +
+                        " + M1594 + M1598)。 typed-" +
+                        "surface count 96 → 97。"),
+                BASChapterKnife(
+                    mNumber: 1602, knife: "第二刀",
+                    concept: "15 anti-drift PROOF tests" +
+                        " for the M1601 meta-catalogue。" +
+                        " Pins size + scope + per-entry" +
+                        " values + lookup helpers +" +
+                        " Codable round-trip of the" +
+                        " catalogue itself。"),
+                BASChapterKnife(
+                    mNumber: 1603, knife: "第三刀",
+                    concept: "9 wire-in PROOF tests" +
+                        " cross-checking the M1601" +
+                        " catalogue against the actual" +
+                        " catalogued doctrines。 Type" +
+                        " names + M-numbers + flags +" +
+                        " cross-doctrine chain all" +
+                        " verified consistent。"),
+                BASChapterKnife(
+                    mNumber: 1604, knife: "第四刀",
+                    concept: "Chapter 556 close-out +" +
+                        " doctrine sync。 188" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "json-proof-doctrines-without-catalogue",
+                "catalogue-anti-drift-coverage",
+                "cross-doctrine-wire-in-coverage",
+                "meta-catalogue-codable-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1604",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "json-proof-meta-catalogue-shipped"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional doctrine" +
+                " catalogue extensions if more JSON" +
+                " PROOF surfaces ship"
+            ],
+            summary: "Chapter 556 ships a meta-" +
+                "catalogue typed surface (chapter 二百" +
+                "一一 single source-of-truth doctrine)" +
+                " for the 4 JSON PROOF doctrines that" +
+                " landed in chapters 551-555:M1582" +
+                " (initial cascade) + M1591 (arc seal)" +
+                " + M1594 (3-of-5 namespace PROOF) +" +
+                " M1598 (5-of-5 namespace PROOF)。 15" +
+                " anti-drift PROOF tests + 9 wire-in" +
+                " tests cross-checking the catalogue" +
+                " against each catalogued doctrine。" +
+                " Pattern follows chapter 550 meta-" +
+                "catalogue precedent。 97 typed" +
+                " surfaces cumulative (+1)。 ADR-016" +
+                " → M1604。 188 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

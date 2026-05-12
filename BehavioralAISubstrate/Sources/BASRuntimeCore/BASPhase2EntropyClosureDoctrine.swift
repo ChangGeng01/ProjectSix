@@ -209,7 +209,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百五十二",   // M1585-M1588 (Codable cascade extension to 9 more typed surfaces + 6 PROOF tests)
         "chapter 五百五十三",   // M1589-M1592 (final Codable cascade to 3 more types — all 5 BASAuditObservationProjections*Block types now Codable + 5 PROOF tests + BASCodableCascadeArcSealedDoctrine typed milestone)
         "chapter 五百五十四",   // M1593-M1596 (post-arc-seal follow-through — 8 end-to-end JSON round-trip PROOF tests + BASAuditProjectionsBundleEndToEndJsonProofDoctrine typed surface + 13 anti-drift PROOF tests with cross-doctrine wire-in)
-        "chapter 五百五十五"    // M1597-M1600 (M1600 MILESTONE — 5-namespace populated JSON PROOF extension + BASAuditProjectionsFiveNamespacePopulatedJsonProofDoctrine + 15 anti-drift PROOF tests with cross-doctrine wire-in)
+        "chapter 五百五十五",   // M1597-M1600 (M1600 MILESTONE — 5-namespace populated JSON PROOF extension + BASAuditProjectionsFiveNamespacePopulatedJsonProofDoctrine + 15 anti-drift PROOF tests with cross-doctrine wire-in)
+        "chapter 五百五十六"    // M1601-M1604 (JSON PROOF meta-catalogue — BASJsonProofDoctrineCatalogueDoctrine + 15 anti-drift PROOF tests + 9 wire-in PROOF tests cross-checking the catalogue against each catalogued doctrine)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -226,16 +227,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1600
+    public static let mNumberLast: Int = 1604
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1600)。 Bumped through chapter 555:641 → 645。
-    /// Chapter 555 (M1600 MILESTONE):5-namespace
-    /// populated JSON PROOF extension — 8 PROOF tests +
-    /// BASAuditProjectionsFiveNamespacePopulatedJsonProof
-    /// Doctrine typed surface + 15 anti-drift PROOF
-    /// tests + close-out。
-    public static let commitsShipped: Int = 645
+    /// M1604)。 Bumped through chapter 556:645 → 649。
+    /// Chapter 556:JSON PROOF doctrine meta-catalogue
+    /// (BASJsonProofDoctrineCatalogueDoctrine) + 15
+    /// anti-drift PROOF tests + 9 wire-in PROOF tests +
+    /// close-out。
+    public static let commitsShipped: Int = 649
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

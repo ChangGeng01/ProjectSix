@@ -2369,7 +2369,25 @@ public enum BASEntropyChapterIndex {
                 "drift PROOF tests with cross-" +
                 "doctrine wire-in (M1599)。 96 typed" +
                 " surfaces cumulative (+1)。 ADR-016" +
-                " → M1600。 V1 byte-equality preserved。")
+                " → M1600。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十六",
+            mNumberFirst: 1601, mNumberLast: 1604,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "JSON PROOF doctrine meta-" +
+                "catalogue。 Single source-of-truth" +
+                " typed surface for the 4 JSON PROOF" +
+                " doctrines shipped in chapters 551-" +
+                "555 (M1582 + M1591 + M1594 + M1598)。" +
+                " BASJsonProofDoctrineCatalogueDoctrine" +
+                " typed surface (M1601) + 15 anti-" +
+                "drift PROOF tests (M1602) + 9 wire-" +
+                "in PROOF tests cross-checking the" +
+                " catalogue against each catalogued" +
+                " doctrine (M1603)。 97 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1604。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
