@@ -225,7 +225,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百六十八",   // M1649-M1652 (THIRD WAVE CROSS-MODULE CODABLE EXTENSION — 3 more types gained Codable + 4 PROOF tests + BASCrossModuleCodableExtensionThirdWaveDoctrine + close-out;combined chapters 566+567+568 = 13 cross-module types ledger-serializable)
         "chapter 五百六十九",   // M1653-M1656 (CROSS-MODULE CODABLE EXTENSION ARC-SEAL MILESTONE — BASCrossModuleCodableExtensionArcSealedDoctrine + 21 anti-drift + 13 wire-in PROOF tests commemorating 3-chapter / 12-commit arc across chapters 566-568)
         "chapter 五百七十",     // M1657-M1660 (TRI-ARC COMPLETION META-META MILESTONE — BASCodableExtensionTriArcCompletionDoctrine + 18 anti-drift + 12 wire-in PROOF tests summing all 3 sealed Codable extension arcs of this session; M1660 round-number milestone)
-        "chapter 五百七十一"    // M1661-M1664 (FIRST-EVER ORCHESTRATION CODABLE EXTENSION — 2 BASOrchestration decision types gained Codable + 2 PROOF tests + BASOrchestrationCodableExtensionDoctrine + close-out;new module territory)
+        "chapter 五百七十一",   // M1661-M1664 (FIRST-EVER ORCHESTRATION CODABLE EXTENSION — 2 BASOrchestration decision types gained Codable + 2 PROOF tests + BASOrchestrationCodableExtensionDoctrine + close-out;new module territory)
+        "chapter 五百七十二"    // M1665-M1668 (SECOND-WAVE ORCHESTRATION CODABLE EXTENSION — 2 more BASOrchestration decision types gained Codable + 2 PROOF tests + BASOrchestrationCodableExtensionSecondWaveDoctrine + close-out;combined chapters 571+572 = 4 Orchestration types ledger-serializable)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -242,14 +243,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1664
+    public static let mNumberLast: Int = 1668
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1664)。 Bumped through chapter 571:705 → 709。
-    /// Chapter 571:First-ever Codable extension into
+    /// M1668)。 Bumped through chapter 572:709 → 713。
+    /// Chapter 572:Second-wave Codable extension into
     /// BASOrchestration module + 2 PROOF tests +
-    /// typed surface + close-out。
-    public static let commitsShipped: Int = 709
+    /// typed surface + close-out;combined chapters
+    /// 571+572 = 4 BASOrchestration types now ledger-
+    /// serializable。
+    public static let commitsShipped: Int = 713
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

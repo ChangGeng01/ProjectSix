@@ -107,14 +107,16 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 571 close-out。 Chapter
-    /// 571:FIRST-EVER ORCHESTRATION CODABLE
-    /// EXTENSION。 2 BASOrchestration decision types
-    /// gained Codable (AssertionCeilingDecision +
-    /// AbyssalPermitEscalationDecision) at M1661 +
-    /// 2 PROOF tests (M1662) +
-    /// BASOrchestrationCodableExtensionDoctrine typed
-    /// surface (M1663)。
+    /// Re-captured at chapter 572 close-out。 Chapter
+    /// 572:SECOND-WAVE ORCHESTRATION CODABLE
+    /// EXTENSION。 2 more BASOrchestration decision
+    /// types gained Codable (KunlunPermitEscalation
+    /// Decision + ForbiddenCandidateZoneGateDecision)
+    /// at M1665 + 2 PROOF tests (M1666) +
+    /// BASOrchestrationCodableExtensionSecondWaveDoctrine
+    /// typed surface (M1667)。 Combined chapters
+    /// 571+572 = 4 Orchestration types ledger-
+    /// serializable。
     static let frozenFullRegistrySha256: String =
-        "01e9e414cd1c841c9d4e220490224f4c289bef6525389cc74b60ee43ae42bf74"
+        "31d8a3869d6e77f6224e07d27a7f38e4de7cee2c865d4f4bb95601b78368c228"
 }

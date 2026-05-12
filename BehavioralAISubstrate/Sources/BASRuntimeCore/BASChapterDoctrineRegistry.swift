@@ -9974,6 +9974,76 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1664。 248 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 572 — Second wave of BASOrchestration
+        // Codable extension。 2 more decision types。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十二",
+            mNumberFirst: 1665,
+            mNumberLast: 1668,
+            v1MilestoneMNumber: 1668,
+            v1MilestoneStatus:
+                "chapter-572-second-wave-orchestration-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1665, knife: "第一刀",
+                    concept: "Add Codable to 2 more" +
+                        " BASOrchestration decision" +
+                        " types (KunlunPermitEscalation" +
+                        "Decision + ForbiddenCandidate" +
+                        "ZoneGateDecision)。"),
+                BASChapterKnife(
+                    mNumber: 1666, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1667, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionSecondWaveDoctrine" +
+                        " typed surface。 typed-surface" +
+                        " count 112 → 113。"),
+                BASChapterKnife(
+                    mNumber: 1668, knife: "第四刀",
+                    concept: "Chapter 572 close-out +" +
+                        " doctrine sync。 252" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "kunlun-permit-escalation-non-codable",
+                "forbidden-candidate-zone-gate-non-codable",
+                "second-wave-orchestration-gap",
+                "decision-types-remaining-non-codable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1668",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "second-wave-orchestration-codable",
+                "4-orchestration-decisions-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — continue Codable" +
+                " extension into more Orchestration" +
+                " types or other modules"
+            ],
+            summary: "Chapter 572 ships the second wave" +
+                " of BASOrchestration Codable extension。" +
+                " 2 more decision types gained Codable" +
+                " + 2 PROOF tests + new typed surface +" +
+                " close-out。 Combined chapters 571+572" +
+                " = 4 BASOrchestration decision types" +
+                " now ledger-serializable。 113 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1668。 252 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

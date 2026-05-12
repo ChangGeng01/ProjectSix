@@ -2664,7 +2664,24 @@ public enum BASEntropyChapterIndex {
                 " (M1664)。 New module territory。 112" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1664。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十二",
+            mNumberFirst: 1665, mNumberLast: 1668,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "SECOND-WAVE ORCHESTRATION CODABLE" +
+                " EXTENSION。 2 more BASOrchestration" +
+                " decision types gained Codable at" +
+                " M1665 (KunlunPermitEscalationDecision" +
+                " + ForbiddenCandidateZoneGateDecision)" +
+                " + 2 PROOF tests (M1666) + new typed" +
+                " surface (M1667) + close-out (M1668)。" +
+                " Combined chapters 571+572 = 4" +
+                " BASOrchestration types ledger-" +
+                "serializable。 113 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1668。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

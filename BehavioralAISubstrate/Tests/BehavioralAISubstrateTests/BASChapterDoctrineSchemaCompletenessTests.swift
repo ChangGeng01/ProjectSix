@@ -1841,7 +1841,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七十一")!)
+                            "chapter 五百七十一")!),
+            // M1668 chapter 572 — Second-wave Orchestration Codable extension
+            checkRegistry("五百七十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2905,6 +2911,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七十一")!
+                .mNumberLast),
+            // M1668 chapter 572 — Second-wave Orchestration Codable extension
+            ("572",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
