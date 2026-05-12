@@ -116,23 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1672:24 + 20 + 127 = 171 (chapter
-    /// 573 — third-wave Orchestration Codable
-    /// extension)
-    public static let phase2ChapterCount: Int = 171
+    /// added)。 At M1676:24 + 20 + 128 = 172 (chapter
+    /// 574 — Orchestration Codable extension arc-seal)
+    public static let phase2ChapterCount: Int = 172
 
-    /// Phase 2 commits shipped。 At M1672:125 + 84 +
-    /// 508 = 717 (chapter 573 = 4 cuts — third-wave
-    /// Orchestration Codable extension + 2 PROOF tests
-    /// + typed surface + close-out;combined chapters
-    /// 571+572+573 = 6 Orchestration types ledger-
-    /// serializable)
-    public static let phase2CommitsShipped: Int = 717
+    /// Phase 2 commits shipped。 At M1676:125 + 84 +
+    /// 512 = 721 (chapter 574 = 4 cuts — arc-seal
+    /// milestone for the BASOrchestration Codable
+    /// extension trio + 21 anti-drift PROOF + 16
+    /// wire-in PROOF + close-out)
+    public static let phase2CommitsShipped: Int = 721
 
-    /// Phase 2 mNumberLast。 At M1672:chapter 573 —
-    /// third-wave Orchestration Codable extension。
+    /// Phase 2 mNumberLast。 At M1676:chapter 574 —
+    /// Orchestration Codable extension arc-seal。
     /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1672
+    public static let phase2MNumberLast: Int = 1676
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

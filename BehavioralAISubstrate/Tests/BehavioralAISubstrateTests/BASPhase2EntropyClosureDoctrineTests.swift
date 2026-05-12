@@ -37,21 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs573() {
+    func testLastChapterIs574() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百七十三",
-            "Chapter 五百七十三:THIRD-WAVE ORCHESTRATION" +
-            " CODABLE EXTENSION。 2 more BASOrchestration" +
-            " value types gained Codable" +
-            " (BASLatentTissueState +" +
-            " BASBadToneLinter.Violation) + 2 PROOF" +
-            " tests + BASOrchestrationCodableExtension" +
-            "ThirdWaveDoctrine typed surface +" +
-            " close-out。 Combined chapters 571+572+573" +
-            " = 6 BASOrchestration types ledger-" +
-            "serializable。 114 typed surfaces cumulative")
+            "chapter 五百七十四",
+            "Chapter 五百七十四:ORCHESTRATION CODABLE" +
+            " EXTENSION ARC-SEAL MILESTONE。 NEW" +
+            " BASOrchestrationCodableExtensionArc" +
+            "SealedDoctrine commemorating 3-chapter /" +
+            " 12-commit arc (chapters 571-573) + 21" +
+            " anti-drift PROOF tests + 16 wire-in" +
+            " PROOF tests + close-out。 Mirrors chapter" +
+            " 569 cross-module arc-seal pattern。 115" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range

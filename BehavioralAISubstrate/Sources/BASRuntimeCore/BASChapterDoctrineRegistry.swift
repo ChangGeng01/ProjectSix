@@ -10118,6 +10118,95 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1672。 256 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 574 — Arc-seal milestone for the
+        // BASOrchestration Codable extension arc
+        // (chapters 571-573)。 Mirrors chapter 569
+        // cross-module arc-seal pattern。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十四",
+            mNumberFirst: 1673,
+            mNumberLast: 1676,
+            v1MilestoneMNumber: 1676,
+            v1MilestoneStatus:
+                "chapter-574-orchestration-codable-extension-arc-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1673, knife: "第一刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionArcSealedDoctrine" +
+                        " typed milestone commemorating" +
+                        " 3-chapter BASOrchestration" +
+                        " Codable extension arc" +
+                        " (chapters 571-573)。 6 types," +
+                        " 12 commits,single-module。" +
+                        " Mirrors chapter 569 cross-" +
+                        "module arc-seal pattern。 typed-" +
+                        "surface count 114 → 115。"),
+                BASChapterKnife(
+                    mNumber: 1674, knife: "第二刀",
+                    concept: "21 anti-drift PROOF tests" +
+                        " for the M1673 arc-seal。 Chapter" +
+                        " tag + M-number + arc range +" +
+                        " coverage + type list size + 5" +
+                        " achievement flags + cross-list" +
+                        " size invariants。"),
+                BASChapterKnife(
+                    mNumber: 1675, knife: "第三刀",
+                    concept: "16 wire-in PROOF tests" +
+                        " cross-checking the M1673 arc-" +
+                        "seal against the 3" +
+                        " BASOrchestration extension" +
+                        " doctrines + parallel chapter" +
+                        " 569 cross-module arc-seal +" +
+                        " originator chapter 564" +
+                        " aggregator arc-seal。"),
+                BASChapterKnife(
+                    mNumber: 1676, knife: "第四刀",
+                    concept: "Chapter 574 close-out +" +
+                        " doctrine sync。 260" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "orchestration-arc-undocumented",
+                "no-single-source-of-truth-for-6-types",
+                "orchestration-extension-doctrines-not-cross-validated",
+                "second-arc-seal-pattern-not-cross-referenced"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1676",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "orchestration-extension-arc-sealed",
+                "6-orchestration-types-ledger-serializable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — meta-meta milestone" +
+                " summing all 4 sealed Codable" +
+                " extension arcs (564+569+574+...)",
+                "future arc — additional substrate" +
+                " coverage as needed"
+            ],
+            summary: "Chapter 574 seals the 3-chapter" +
+                " BASOrchestration Codable extension" +
+                " arc (chapters 571-573)。 NEW" +
+                " BASOrchestrationCodableExtensionArc" +
+                "SealedDoctrine typed milestone (M1673)" +
+                " commemorating 6 types,12 commits +" +
+                " 21 anti-drift PROOF tests (M1674) +" +
+                " 16 wire-in PROOF tests (M1675) +" +
+                " close-out (M1676)。 Mirrors chapter" +
+                " 569 cross-module arc-seal pattern" +
+                " for BASOrchestration layer。 115 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1676。 260 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

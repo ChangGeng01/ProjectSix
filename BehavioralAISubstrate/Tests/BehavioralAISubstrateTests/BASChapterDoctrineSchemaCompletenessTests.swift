@@ -1853,7 +1853,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七十三")!)
+                            "chapter 五百七十三")!),
+            // M1676 chapter 574 — Orchestration Codable extension arc-seal
+            checkRegistry("五百七十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2933,6 +2939,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七十三")!
+                .mNumberLast),
+            // M1676 chapter 574 — Orchestration Codable extension arc-seal
+            ("574",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
