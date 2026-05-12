@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1700",
-            "M1700:doctrine version reflects chapter 五百八十 — PENTA-MILESTONE COMPLETION META-META MILESTONE at M1700 ROUND-NUMBER close-out。 NEW BASCodableExtensionPentaMilestoneCompletionDoctrine (M1697) cataloguing ALL 5 sealed Codable extension milestones (16+15+13+6+6 = 56 types,60 commits,15 chapters,4 modules) + 26 anti-drift PROOF tests (M1698) + 18 wire-in PROOF tests (M1699) + close-out (M1700)。 Supersedes chapter 575 quad-arc snapshot;quad-arc + tri-arc doctrines preserved as historical records。 58 session types ledger-serializable。 121 typed surfaces cumulative。 284 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Codable extension narrative arc sealed at M1700 round-number milestone")
+            "ADR-016.M1704",
+            "M1704:doctrine version reflects chapter 五百八十一 — FIRST-EVER BASLEASELIFE CODABLE EXTENSION — fresh module territory beyond M1700 narrative arc close-out。 2 nested types (BASBreathScheduler.Request + BASBreathScheduler.ScheduledBreath) gained Codable at M1701 + 2 PROOF tests (M1702) + BASLeaseLifeCodableExtensionDoctrine typed surface (M1703) + close-out (M1704)。 Module coverage expanded: 4 → 5 (added BASLeaseLife to BASHostKit + BASRuntimeCore + BASMemory + BASOrchestration)。 122 typed surfaces cumulative。 288 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

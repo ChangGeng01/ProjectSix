@@ -116,22 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1700:24 + 20 + 134 = 178 (chapter
-    /// 580 — penta-milestone completion at M1700
-    /// ROUND-NUMBER close-out)
-    public static let phase2ChapterCount: Int = 178
+    /// added)。 At M1704:24 + 20 + 135 = 179 (chapter
+    /// 581 — first-ever BASLeaseLife Codable extension
+    /// beyond M1700 narrative arc)
+    public static let phase2ChapterCount: Int = 179
 
-    /// Phase 2 commits shipped。 At M1700:125 + 84 +
-    /// 536 = 745 (chapter 580 = 4 cuts — penta-
-    /// milestone completion meta-meta + 26 anti-drift
-    /// PROOF + 18 wire-in PROOF + M1700 round-number
-    /// close-out)
-    public static let phase2CommitsShipped: Int = 745
+    /// Phase 2 commits shipped。 At M1704:125 + 84 +
+    /// 540 = 749 (chapter 581 = 4 cuts — first-ever
+    /// BASLeaseLife Codable extension + 2 PROOF +
+    /// typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 749
 
-    /// Phase 2 mNumberLast。 At M1700:chapter 580 —
-    /// penta-milestone completion meta-meta milestone。
+    /// Phase 2 mNumberLast。 At M1704:chapter 581 —
+    /// first-ever BASLeaseLife Codable extension。
     /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1700
+    public static let phase2MNumberLast: Int = 1704
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

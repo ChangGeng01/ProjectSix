@@ -36,32 +36,32 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
 
     // MARK: - Cumulative metric pins
 
-    func testTypedSurfaceCountIsOneHundredTwentyOne() {
+    func testTypedSurfaceCountIsOneHundredTwentyTwo() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .typedSurfaceCount,
-            121)
+            122)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs284() {
+    func testConsecutiveByteEqualityCleanCommitsIs288() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            284)
+            288)
     }
 
-    func testPhase2CommitsShippedIs745() {
+    func testPhase2CommitsShippedIs749() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            745)
+            749)
     }
 
-    func testChapter2NumberLastIs1700() {
+    func testChapter2NumberLastIs1704() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            1700)
+            1704)
     }
 
     // MARK: - Quality invariants

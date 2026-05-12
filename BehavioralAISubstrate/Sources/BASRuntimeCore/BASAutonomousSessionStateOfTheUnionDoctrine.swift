@@ -110,18 +110,16 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 580
-    /// M1700 ROUND-NUMBER close-out — penta-milestone
-    /// completion meta-meta milestone catalogues all 5
-    /// sealed Codable extension milestones (4 arcs +
-    /// 1 post-arc trilogy);58 session types ledger-
-    /// serializable;Codable extension narrative arc
-    /// sealed。
-    public static let typedSurfaceCount: Int = 121
+    /// Cumulative achievement metrics at chapter 581
+    /// close-out (M1704 — first-ever Codable extension
+    /// into BASLeaseLife module;fresh module territory
+    /// beyond M1700 narrative arc;module coverage
+    /// expanded 4 → 5)。
+    public static let typedSurfaceCount: Int = 122
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 284
-    public static let phase2CommitsShipped: Int = 745
-    public static let chapter2NumberLast: Int = 1700
+        Int = 288
+    public static let phase2CommitsShipped: Int = 749
+    public static let chapter2NumberLast: Int = 1704
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

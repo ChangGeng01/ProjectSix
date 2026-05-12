@@ -10749,7 +10749,94 @@ public enum BASChapterDoctrineRegistry {
                 " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。 Codable" +
                 " extension narrative arc sealed at" +
-                " M1700 round-number milestone。")
+                " M1700 round-number milestone。"),
+
+        // chapter 581 — Beyond M1700 fresh module
+        // territory: first-ever BASLeaseLife Codable
+        // extension。 2 nested types (BASBreathScheduler.
+        // Request + ScheduledBreath)。 Expands module
+        // coverage from 4 to 5。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十一",
+            mNumberFirst: 1701,
+            mNumberLast: 1704,
+            v1MilestoneMNumber: 1704,
+            v1MilestoneStatus:
+                "chapter-581-first-ever-leaselife-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1701, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "LeaseLife nested types (BAS" +
+                        "BreathScheduler.Request +" +
+                        " BASBreathScheduler.Scheduled" +
+                        "Breath)。 First-ever Codable" +
+                        " extension into BASLeaseLife" +
+                        " module — fresh module" +
+                        " territory beyond M1700" +
+                        " narrative arc。"),
+                BASChapterKnife(
+                    mNumber: 1702, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1703, knife: "第三刀",
+                    concept: "NEW BASLeaseLifeCodable" +
+                        "ExtensionDoctrine typed surface。" +
+                        " Documents the 5th module" +
+                        " covered + isBeyondM1700" +
+                        "NarrativeArc flag。 typed-" +
+                        "surface count 121 → 122。"),
+                BASChapterKnife(
+                    mNumber: 1704, knife: "第四刀",
+                    concept: "Chapter 581 close-out +" +
+                        " doctrine sync。 288" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "breath-scheduler-request-non-codable",
+                "breath-scheduler-scheduled-breath-non-codable",
+                "leaselife-module-fully-non-codable",
+                "5th-module-territory-unexplored"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1704",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "first-ever-leaselife-codable",
+                "fresh-module-territory-beyond-M1700"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — additional BASLeaseLife" +
+                " types (BASThermalTwin.Reading,BAS" +
+                "LungStateAccumulator.Snapshot,BAS" +
+                "LeaseLifeCoordinator.TurnRecorded)",
+                "future arc — eventual BASLeaseLife" +
+                " arc seal after 3+ chapters accumulate"
+            ],
+            summary: "Chapter 581 ships first-ever" +
+                " Codable extension into BASLeaseLife" +
+                " module — fresh module territory" +
+                " beyond M1700 narrative arc close-out。" +
+                " 2 nested types (BASBreathScheduler." +
+                "Request + BASBreathScheduler." +
+                "ScheduledBreath) gained Codable at" +
+                " M1701。 2 PROOF tests (M1702) + new" +
+                " typed surface (M1703) + close-out" +
+                " (M1704)。 Module coverage expanded:" +
+                " 4 → 5 (added BASLeaseLife to" +
+                " BASHostKit + BASRuntimeCore + BAS" +
+                "Memory + BASOrchestration)。 122" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1704。 288 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

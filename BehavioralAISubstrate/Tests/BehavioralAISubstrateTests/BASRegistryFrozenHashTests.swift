@@ -107,19 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 580 M1700 ROUND-NUMBER
-    /// close-out。 Chapter 580:PENTA-MILESTONE
-    /// COMPLETION META-META MILESTONE。 NEW BAS
-    /// CodableExtensionPentaMilestoneCompletion
-    /// Doctrine (M1697) + 26 anti-drift PROOF tests
-    /// (M1698) + 18 wire-in PROOF tests (M1699)
-    /// cataloguing ALL 5 sealed Codable extension
-    /// milestones。 Supersedes chapter 575 quad-arc
-    /// snapshot;quad-arc + tri-arc doctrines
-    /// preserved as historical records。 58 session
-    /// types ledger-serializable。 Codable extension
-    /// narrative arc sealed at M1700 round-number
-    /// milestone。
+    /// Re-captured at chapter 581 close-out。 Chapter
+    /// 581:FIRST-EVER BASLEASELIFE CODABLE EXTENSION
+    /// — fresh module territory beyond M1700 narrative
+    /// arc close-out。 2 nested types (BASBreath
+    /// Scheduler.Request + ScheduledBreath) gained
+    /// Codable at M1701 + 2 PROOF tests (M1702) + NEW
+    /// BASLeaseLifeCodableExtensionDoctrine (M1703)。
+    /// Module coverage 4 → 5。
     static let frozenFullRegistrySha256: String =
-        "4be1174d136f24388d600d79402e4a8c8b27455a02a565e775182c3c55963f08"
+        "df58a6b94d31b8cbfb08df7c468b16e790c3811aa43e7f16f6ef15eb402ea0ef"
 }

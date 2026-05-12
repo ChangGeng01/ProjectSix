@@ -2848,6 +2848,24 @@ public enum BASEntropyChapterIndex {
                 " M1700。 Codable extension narrative" +
                 " arc sealed at M1700 round-number" +
                 " milestone。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十一",
+            mNumberFirst: 1701, mNumberLast: 1704,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "FIRST-EVER BASLEASELIFE CODABLE" +
+                " EXTENSION — fresh module territory" +
+                " beyond M1700 narrative arc close-out。" +
+                " 2 nested types (BASBreathScheduler." +
+                "Request + BASBreathScheduler." +
+                "ScheduledBreath) gained Codable at" +
+                " M1701 + 2 PROOF tests (M1702) + new" +
+                " typed surface (M1703) + close-out" +
+                " (M1704)。 Module coverage expanded:" +
+                " 4 → 5 (added BASLeaseLife)。 122" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1704。 V1 byte-equality" +
                 " preserved。")
     ]
 

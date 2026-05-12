@@ -1895,7 +1895,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十")!)
+                            "chapter 五百八十")!),
+            // M1704 chapter 581 — First-ever BASLeaseLife Codable extension
+            checkRegistry("五百八十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3031,6 +3037,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十")!
+                .mNumberLast),
+            // M1704 chapter 581 — First-ever BASLeaseLife Codable extension
+            ("581",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

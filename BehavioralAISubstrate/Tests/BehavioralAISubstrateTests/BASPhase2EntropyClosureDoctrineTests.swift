@@ -37,20 +37,19 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs580() {
+    func testLastChapterIs581() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百八十",
-            "Chapter 五百八十:PENTA-MILESTONE COMPLETION" +
-            " META-META MILESTONE at M1700 ROUND-NUMBER" +
-            " close-out。 NEW BASCodableExtensionPenta" +
-            "MilestoneCompletionDoctrine cataloguing" +
-            " ALL 5 sealed Codable extension milestones" +
-            " (56 types,60 commits) + 26 anti-drift" +
-            " PROOF + 18 wire-in PROOF + close-out。" +
-            " Supersedes chapter 575 quad-arc snapshot。" +
-            " 121 typed surfaces cumulative")
+            "chapter 五百八十一",
+            "Chapter 五百八十一:FIRST-EVER BASLEASELIFE" +
+            " CODABLE EXTENSION — fresh module" +
+            " territory beyond M1700 narrative arc。" +
+            " 2 nested types gained Codable + 2 PROOF" +
+            " tests + BASLeaseLifeCodableExtension" +
+            "Doctrine typed surface + close-out。" +
+            " Module coverage 4 → 5。 122 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range
