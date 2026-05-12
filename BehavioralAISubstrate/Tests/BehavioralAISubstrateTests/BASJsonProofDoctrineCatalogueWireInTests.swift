@@ -89,6 +89,11 @@ final class BASJsonProofDoctrineCatalogueWireInTests:
                 "BASAuditProjectionsJsonRejectionProofDoctrine",
              actual: String(describing:
                 BASAuditProjectionsJsonRejectionProofDoctrine
+                    .self)),
+            (catalogued:
+                "BASAuditProjectionsFloatingPointDeterminismProofDoctrine",
+             actual: String(describing:
+                BASAuditProjectionsFloatingPointDeterminismProofDoctrine
                     .self))
         ]
         for pair in pairs {
@@ -200,21 +205,21 @@ final class BASJsonProofDoctrineCatalogueWireInTests:
 
     // MARK: - Wire-in #4:latestMNumber matches latest doctrine
 
-    /// Catalogue's latestMNumber equals 1610 — the
-    /// shipping M-number for the M1610 doctrine (6th
-    /// catalogue entry added at M1612)。
+    /// Catalogue's latestMNumber equals 1614 — the
+    /// shipping M-number for the M1614 doctrine (7th
+    /// catalogue entry added at M1616)。
     func testLatestMNumberMatchesLastDoctrine() {
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .latestMNumber,
-            1610)
-        // M1610 shipped one cut after M1609 (the
-        // proofMNumber where rejection PROOF tests
-        // landed)
+            1614)
+        // M1614 shipped one cut after M1613 (the
+        // proofMNumber where floating-point PROOF
+        // tests landed)
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .latestMNumber,
-            BASAuditProjectionsJsonRejectionProofDoctrine
+            BASAuditProjectionsFloatingPointDeterminismProofDoctrine
                 .proofMNumber + 1)
     }
 

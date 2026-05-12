@@ -8903,6 +8903,108 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1612。 196 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 559 — Floating-point determinism
+        // PROOF。 Closes the FLOATING-POINT half of
+        // the chapter 三百九二 replay-determinism
+        // contract。 100th typed surface (CENTURY
+        // MILESTONE) lands at M1614。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十九",
+            mNumberFirst: 1613,
+            mNumberLast: 1616,
+            v1MilestoneMNumber: 1616,
+            v1MilestoneStatus:
+                "chapter-559-floating-point-determinism-proof-100th-typed-surface",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1613, knife: "第一刀",
+                    concept: "8 floating-point" +
+                        " determinism PROOF tests for" +
+                        " Double-carrying audit-" +
+                        "projection fields。 Asserts" +
+                        " BIT-PATTERN equality (stricter" +
+                        " than ==) on round-trip of" +
+                        " repeating-decimal Doubles" +
+                        " (1/3 + 1/7),very small" +
+                        " (1e-300),exact-integer (0.0," +
+                        " 1.0),zero,5-field bundle" +
+                        " with prime-fraction Doubles," +
+                        " 1-ULP precision sensitivity," +
+                        " end-to-end multitype bundle。"),
+                BASChapterKnife(
+                    mNumber: 1614, knife: "第二刀",
+                    concept: "NEW BASAuditProjections" +
+                        "FloatingPointDeterminismProof" +
+                        "Doctrine typed surface。 100th" +
+                        " typed surface (CENTURY" +
+                        " MILESTONE for this autonomous" +
+                        " arc)。 typed-surface count" +
+                        " 99 → 100。"),
+                BASChapterKnife(
+                    mNumber: 1615, knife: "第三刀",
+                    concept: "13 anti-drift + wire-in" +
+                        " PROOF tests for the M1614" +
+                        " typed surface。 Includes pin" +
+                        " on replayDeterminismDoctrine" +
+                        "Ref + chain check M1613 >" +
+                        " M1609 (rejection PROOF)。"),
+                BASChapterKnife(
+                    mNumber: 1616, knife: "第四刀",
+                    concept: "Chapter 559 close-out +" +
+                        " doctrine sync + catalogue" +
+                        " extension to 7 entries (add" +
+                        " M1614 floating-point" +
+                        " doctrine)。 200 consecutive" +
+                        " commits with V1 byte-" +
+                        "equality preserved this" +
+                        " autonomous arc — DOUBLE-" +
+                        "CENTURY landmark。")
+            ],
+            entropyClassesAttacked: [
+                "repeating-decimal-double-untested",
+                "very-small-double-untested",
+                "one-ulp-precision-loss-untested",
+                "exact-integer-double-edge-case-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1616",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "floating-point-determinism-proven",
+                "json-proof-catalogue-7-entries",
+                "100th-typed-surface-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional PROOF" +
+                " coverage extensions if more numeric" +
+                " edge cases arise"
+            ],
+            summary: "Chapter 559 closes the FLOATING-" +
+                "POINT half of the chapter 三百九二" +
+                " replay-determinism contract + lands" +
+                " the 100th typed surface (CENTURY" +
+                " MILESTONE)。 8 PROOF tests at M1613" +
+                " with BIT-PATTERN equality assertion" +
+                " (stricter than ==) +" +
+                " BASAuditProjectionsFloatingPoint" +
+                "DeterminismProofDoctrine (M1614 —" +
+                " 100th typed surface) + 13 anti-" +
+                "drift + wire-in tests (M1615) +" +
+                " close-out + catalogue extension to" +
+                " 7 entries (M1616)。 100 typed" +
+                " surfaces cumulative (+1 — CENTURY" +
+                " MILESTONE)。 ADR-016 → M1616。 200" +
+                " consecutive autonomous commits with" +
+                " V1 byte-equality preserved (DOUBLE-" +
+                "CENTURY landmark)。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

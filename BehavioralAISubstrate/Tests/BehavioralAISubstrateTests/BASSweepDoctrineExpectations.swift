@@ -116,20 +116,23 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1612:24 + 20 + 112 = 156 (chapter
-    /// 558 — JSON REJECTION PROOF)
-    public static let phase2ChapterCount: Int = 156
+    /// added)。 At M1616:24 + 20 + 113 = 157 (chapter
+    /// 559 — floating-point determinism PROOF + 100th
+    /// typed surface CENTURY MILESTONE)
+    public static let phase2ChapterCount: Int = 157
 
-    /// Phase 2 commits shipped。 At M1612:125 + 84 +
-    /// 448 = 657 (chapter 558 = 4 cuts — JSON
-    /// REJECTION PROOF + new typed surface + 12 anti-
-    /// drift/wire-in tests + catalogue extension)
-    public static let phase2CommitsShipped: Int = 657
+    /// Phase 2 commits shipped。 At M1616:125 + 84 +
+    /// 452 = 661 (chapter 559 = 4 cuts — Floating-
+    /// point determinism PROOF + 100th typed surface
+    /// + 13 anti-drift/wire-in tests + catalogue
+    /// extension to 7)
+    public static let phase2CommitsShipped: Int = 661
 
-    /// Phase 2 mNumberLast。 At M1612:chapter 558 —
-    /// JSON REJECTION PROOF closes replay-determinism
-    /// contract。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1612
+    /// Phase 2 mNumberLast。 At M1616:chapter 559 —
+    /// floating-point determinism PROOF closes the
+    /// FLOATING-POINT half of replay-determinism。
+    /// SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1616
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

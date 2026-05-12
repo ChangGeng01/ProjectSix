@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1612",
-            "M1612:doctrine version reflects chapter 五百五十八 — JSON REJECTION PROOF closes the SECOND half of the chapter 三百九二 replay-determinism contract。 11 PROOF tests (M1609) + BASAuditProjectionsJsonRejectionProofDoctrine typed surface (M1610) + 12 anti-drift + wire-in PROOF tests (M1611) + catalogue extension to 6 entries (M1612)。 99 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1616",
+            "M1616:doctrine version reflects chapter 五百五十九 — Floating-point determinism PROOF closes the FLOATING-POINT half of the chapter 三百九二 replay-determinism contract。 100th typed surface (CENTURY MILESTONE) lands at M1614。 8 PROOF tests asserting BIT-PATTERN equality (M1613) + BASAuditProjectionsFloatingPointDeterminismProofDoctrine typed surface (M1614) + 13 anti-drift + wire-in PROOF tests (M1615) + catalogue extension to 7 entries (M1616)。 100 typed surfaces cumulative (CENTURY MILESTONE)。 200 consecutive byte-equality clean commits (DOUBLE-CENTURY)。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

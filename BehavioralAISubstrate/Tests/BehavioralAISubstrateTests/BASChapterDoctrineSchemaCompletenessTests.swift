@@ -1763,7 +1763,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百五十八")!)
+                            "chapter 五百五十八")!),
+            // M1616 chapter 559 — Floating-point determinism PROOF + 100th typed surface CENTURY MILESTONE + catalogue extension to 7
+            checkRegistry("五百五十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百五十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2723,6 +2729,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百五十八")!
+                .mNumberLast),
+            // M1616 chapter 559 — Floating-point determinism PROOF + 100th typed surface + catalogue extension to 7
+            ("559",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

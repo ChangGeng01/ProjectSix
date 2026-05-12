@@ -37,19 +37,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs558() {
+    func testLastChapterIs559() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百五十八",
-            "Chapter 五百五十八:JSON REJECTION PROOF" +
-            " closes the SECOND half of the chapter" +
-            " 三百九二 replay-determinism contract。" +
-            " 11 PROOF tests + BASAuditProjectionsJson" +
-            "RejectionProofDoctrine typed surface + 12" +
-            " anti-drift + wire-in tests + catalogue" +
-            " extension to 6 entries。 99 typed" +
-            " surfaces cumulative")
+            "chapter 五百五十九",
+            "Chapter 五百五十九:Floating-point" +
+            " determinism PROOF closes the FLOATING-" +
+            "POINT half of the chapter 三百九二" +
+            " replay-determinism contract。 8 PROOF" +
+            " tests + BASAuditProjectionsFloatingPoint" +
+            "DeterminismProofDoctrine typed surface" +
+            " (100th typed surface CENTURY MILESTONE)" +
+            " + 13 anti-drift + wire-in tests +" +
+            " catalogue extension to 7 entries。 100" +
+            " typed surfaces cumulative (CENTURY" +
+            " MILESTONE)")
     }
 
     // MARK: - M-number range

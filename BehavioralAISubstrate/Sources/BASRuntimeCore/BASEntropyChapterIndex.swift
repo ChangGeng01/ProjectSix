@@ -2428,6 +2428,28 @@ public enum BASEntropyChapterIndex {
                 " (M1611) + catalogue extension to 6" +
                 " entries (M1612)。 99 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1612。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十九",
+            mNumberFirst: 1613, mNumberLast: 1616,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "Floating-point determinism PROOF" +
+                " — closes the FLOATING-POINT half of" +
+                " the chapter 三百九二 replay-" +
+                "determinism contract。 100th typed" +
+                " surface (CENTURY MILESTONE) lands at" +
+                " M1614。 8 PROOF tests asserting BIT-" +
+                "PATTERN equality (M1613) +" +
+                " BASAuditProjectionsFloatingPoint" +
+                "DeterminismProofDoctrine (M1614) +" +
+                " 13 anti-drift + wire-in PROOF tests" +
+                " (M1615) + catalogue extension to 7" +
+                " entries (M1616)。 100 typed surfaces" +
+                " cumulative (CENTURY MILESTONE)。" +
+                " ADR-016 → M1616。 200 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved (DOUBLE-CENTURY)。" +
                 " V1 byte-equality preserved。")
     ]
 

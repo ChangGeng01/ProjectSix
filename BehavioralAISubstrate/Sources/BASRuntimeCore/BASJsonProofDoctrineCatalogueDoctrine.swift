@@ -93,12 +93,12 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
 
     // MARK: - Catalogue contents
 
-    /// All 6 JSON PROOF doctrines shipped in this
+    /// All 7 JSON PROOF doctrines shipped in this
     /// session,in chronological M-number order。
-    /// Updated at chapter 五百五十八 / M1612 to include
-    /// BASAuditProjectionsJsonRejectionProofDoctrine
-    /// (6th entry — closes the rejection half of the
-    /// replay-determinism contract)。
+    /// Updated at chapter 五百五十九 / M1616 to include
+    /// BASAuditProjectionsFloatingPointDeterminismProof
+    /// Doctrine (7th entry — closes the floating-point
+    /// half of the replay-determinism contract)。
     public static let catalogue: [CatalogueEntry] = [
         CatalogueEntry(
             doctrineTypeName:
@@ -158,7 +158,23 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
                 " missing-required) rejected cleanly" +
                 " via DecodingError。 11 PROOF tests" +
                 " at M1609 covering Bundle + 5" +
-                " ProjectionsBlock types。")
+                " ProjectionsBlock types。"),
+        CatalogueEntry(
+            doctrineTypeName:
+                "BASAuditProjectionsFloatingPointDeterminismProofDoctrine",
+            chapterTag: "chapter 五百五十九",
+            mNumber: 1614,
+            summary: "Floating-point determinism PROOF" +
+                " — closes the FLOATING-POINT half of" +
+                " replay-determinism。 8 PROOF tests" +
+                " (M1613) asserting BIT-PATTERN" +
+                " equality on Double round-trip:" +
+                " repeating decimals (1/3 + 1/7) +" +
+                " very small Doubles (1e-300) + exact" +
+                " integers + zero + 1-ULP precision" +
+                " sensitivity + end-to-end multitype" +
+                " bundle。 100th typed surface" +
+                " (CENTURY MILESTONE)。")
     ]
 
     // MARK: - Aggregate accessors
@@ -174,10 +190,10 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
         "chapter 五百五十一"
 
     /// Last chapter that shipped a JSON PROOF doctrine
-    /// in this session。 Updated at M1612 to chapter
-    /// 五百五十八。
+    /// in this session。 Updated at M1616 to chapter
+    /// 五百五十九。
     public static let lastChapterTag: String =
-        "chapter 五百五十八"
+        "chapter 五百五十九"
 
     /// Earliest M-number across the catalogue (chapter
     /// 551 / M1582)。

@@ -36,20 +36,21 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
 
     // MARK: - Size + scope invariants
 
-    func testCatalogueHasSixEntries() {
-        // M1612 extended the catalogue with the M1610
-        // rejection-PROOF doctrine。 New count is 6。
+    func testCatalogueHasSevenEntries() {
+        // M1616 extended the catalogue with the M1614
+        // floating-point determinism PROOF doctrine。
+        // New count is 7。
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .catalogue.count,
-            6)
+            7)
     }
 
-    func testTotalCataloguedIsSix() {
+    func testTotalCataloguedIsSeven() {
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .totalCatalogued,
-            6)
+            7)
     }
 
     func testFirstChapterTagIs551() {
@@ -59,11 +60,11 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
             "chapter 五百五十一")
     }
 
-    func testLastChapterTagIs558() {
+    func testLastChapterTagIs559() {
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .lastChapterTag,
-            "chapter 五百五十八")
+            "chapter 五百五十九")
     }
 
     // MARK: - M-number invariants
@@ -75,21 +76,22 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
             1582)
     }
 
-    func testLatestMNumberIs1610() {
-        // Updated at M1612 with new 6th catalogue
-        // entry (M1610 — rejection PROOF)。
+    func testLatestMNumberIs1614() {
+        // Updated at M1616 with new 7th catalogue
+        // entry (M1614 — floating-point determinism
+        // PROOF)。
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .latestMNumber,
-            1610)
+            1614)
     }
 
-    func testMNumberSpanIsTwentyNine() {
-        // 1610 - 1582 + 1 = 29
+    func testMNumberSpanIsThirtyThree() {
+        // 1614 - 1582 + 1 = 33
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .mNumberSpan,
-            29)
+            33)
     }
 
     // MARK: - Flag pins
@@ -115,11 +117,12 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
 
     // MARK: - Per-entry pins
 
-    /// 6 catalogued doctrines with their expected (
+    /// 7 catalogued doctrines with their expected (
     /// chapter,M-number) values。 Single test ensures
-    /// no drift on any entry。 Extended at M1612 to
-    /// cover the 6th entry (M1610 rejection PROOF)。
-    func testAllSixCatalogueEntriesAreConsistent() {
+    /// no drift on any entry。 Extended at M1616 to
+    /// cover the 7th entry (M1614 floating-point
+    /// determinism PROOF)。
+    func testAllSevenCatalogueEntriesAreConsistent() {
         let expected: [(typeName: String,
                         chapterTag: String,
                         mNumber: Int)] = [
@@ -134,7 +137,9 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
             ("BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine",
              "chapter 五百五十七", 1606),
             ("BASAuditProjectionsJsonRejectionProofDoctrine",
-             "chapter 五百五十八", 1610)
+             "chapter 五百五十八", 1610),
+            ("BASAuditProjectionsFloatingPointDeterminismProofDoctrine",
+             "chapter 五百五十九", 1614)
         ]
         let catalogue = BASJsonProofDoctrineCatalogueDoctrine
             .catalogue
@@ -208,7 +213,7 @@ final class BASJsonProofDoctrineCatalogueDoctrineTests:
                 .CatalogueEntry].self,
             from: data)
         XCTAssertEqual(decoded, catalogue)
-        XCTAssertEqual(decoded.count, 6)
+        XCTAssertEqual(decoded.count, 7)
         // Determinism:3 repeat encodes byte-identical。
         let d1 = try encoder.encode(catalogue)
         let d2 = try encoder.encode(catalogue)
