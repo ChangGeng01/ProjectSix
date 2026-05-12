@@ -1769,7 +1769,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百五十九")!)
+                            "chapter 五百五十九")!),
+            // M1620 chapter 560 — Replay-determinism contract closure milestone (BASReplayDeterminismContractClosureDoctrine) + 29 PROOF tests
+            checkRegistry("五百六十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百六十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2737,6 +2743,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百五十九")!
+                .mNumberLast),
+            // M1620 chapter 560 — Replay-determinism contract closure milestone + 29 PROOF tests
+            ("560",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

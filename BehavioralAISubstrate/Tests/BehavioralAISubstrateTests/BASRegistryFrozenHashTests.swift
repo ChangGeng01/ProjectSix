@@ -107,15 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 559 close-out。 Chapter
-    /// 559:Floating-point determinism PROOF closes the
-    /// FLOATING-POINT half of replay-determinism。
-    /// 100th typed surface (CENTURY MILESTONE)。 8
-    /// PROOF tests (M1613) +
-    /// BASAuditProjectionsFloatingPointDeterminismProof
-    /// Doctrine typed surface (M1614) + 13 anti-drift
-    /// + wire-in tests (M1615) + catalogue extension
-    /// to 7 entries (M1616)。
+    /// Re-captured at chapter 560 close-out。 Chapter
+    /// 560:chapter 三百九二 REPLAY DETERMINISM
+    /// CONTRACT CLOSURE MILESTONE。
+    /// BASReplayDeterminismContractClosureDoctrine
+    /// typed milestone (M1617) commemorating 9-chapter
+    /// / 37-M-number arc (551-560) PROVEN across all
+    /// 3 verification halves + 18 anti-drift PROOF
+    /// tests (M1618) + 11 wire-in PROOF tests (M1619)。
     static let frozenFullRegistrySha256: String =
-        "63141312289e8cdb71bad7661b84936c87ccb31805a675c8316aed5b66490203"
+        "157ffe859d8952fac9a8f2040a042a25fd9f7daeec1a5b71078c85e78ee572c7"
 }

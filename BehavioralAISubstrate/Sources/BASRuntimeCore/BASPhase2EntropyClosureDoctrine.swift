@@ -213,7 +213,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百五十六",   // M1601-M1604 (JSON PROOF meta-catalogue — BASJsonProofDoctrineCatalogueDoctrine + 15 anti-drift PROOF tests + 9 wire-in PROOF tests cross-checking the catalogue against each catalogued doctrine)
         "chapter 五百五十七",   // M1605-M1608 (5-of-5 ProjectionsBlock populated JSON PROOF + BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine + 15 anti-drift + wire-in tests + catalogue extension to 5 entries)
         "chapter 五百五十八",   // M1609-M1612 (JSON REJECTION PROOF — closes the SECOND half of replay-determinism contract + BASAuditProjectionsJsonRejectionProofDoctrine + 12 anti-drift/wire-in tests + catalogue extension to 6 entries)
-        "chapter 五百五十九"    // M1613-M1616 (FLOATING-POINT DETERMINISM PROOF — 100th typed surface CENTURY MILESTONE + BASAuditProjectionsFloatingPointDeterminismProofDoctrine + 13 anti-drift/wire-in tests + catalogue extension to 7 entries)
+        "chapter 五百五十九",   // M1613-M1616 (FLOATING-POINT DETERMINISM PROOF — 100th typed surface CENTURY MILESTONE + BASAuditProjectionsFloatingPointDeterminismProofDoctrine + 13 anti-drift/wire-in tests + catalogue extension to 7 entries)
+        "chapter 五百六十"      // M1617-M1620 (REPLAY DETERMINISM CONTRACT CLOSURE MILESTONE — BASReplayDeterminismContractClosureDoctrine + 18 anti-drift + 11 wire-in PROOF tests commemorating 9-chapter / 37-M-number arc closing the chapter 三百九二 contract)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -230,15 +231,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1616
+    public static let mNumberLast: Int = 1620
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1616)。 Bumped through chapter 559:657 → 661。
-    /// Chapter 559:Floating-point determinism PROOF
-    /// (100th typed surface CENTURY MILESTONE) + 200
-    /// consecutive byte-equality commits (DOUBLE-
-    /// CENTURY landmark)。
-    public static let commitsShipped: Int = 661
+    /// M1620)。 Bumped through chapter 560:661 → 665。
+    /// Chapter 560:Replay-determinism contract closure
+    /// milestone doctrine + 29 anti-drift / wire-in
+    /// PROOF tests。
+    public static let commitsShipped: Int = 665
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

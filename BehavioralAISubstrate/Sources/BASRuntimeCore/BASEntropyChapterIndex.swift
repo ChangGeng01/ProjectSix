@@ -2450,6 +2450,26 @@ public enum BASEntropyChapterIndex {
                 " ADR-016 → M1616。 200 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved (DOUBLE-CENTURY)。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十",
+            mNumberFirst: 1617, mNumberLast: 1620,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Replay-determinism contract" +
+                " closure milestone for the chapter" +
+                " 三百九二 contract。 9-chapter / 37-" +
+                "M-number-span arc (551-560) PROVEN" +
+                " across all 3 verification halves" +
+                " (round-trip + rejection + floating-" +
+                "point)。 BASReplayDeterminismContract" +
+                "ClosureDoctrine typed milestone" +
+                " (M1617) + 18 anti-drift PROOF tests" +
+                " (M1618) + 11 wire-in PROOF tests" +
+                " (M1619)。 101 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1620。" +
+                " 204 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " V1 byte-equality preserved。")
     ]
 

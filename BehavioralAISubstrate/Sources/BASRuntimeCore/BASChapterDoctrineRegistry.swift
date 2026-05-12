@@ -9005,6 +9005,104 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive autonomous commits with" +
                 " V1 byte-equality preserved (DOUBLE-" +
                 "CENTURY landmark)。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 560 — chapter 三百九二 replay-
+        // determinism contract closure milestone
+        // doctrine commemorating chapter 551-559
+        // arc。 All 3 verification halves (round-trip
+        // + rejection + floating-point) now PROVEN。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十",
+            mNumberFirst: 1617,
+            mNumberLast: 1620,
+            v1MilestoneMNumber: 1620,
+            v1MilestoneStatus:
+                "chapter-560-replay-determinism-contract-closure-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1617, knife: "第一刀",
+                    concept: "NEW BASReplayDeterminism" +
+                        "ContractClosureDoctrine typed" +
+                        " milestone doctrine。" +
+                        " Commemorates the chapter" +
+                        " 三百九二 replay-determinism" +
+                        " contract closure across 9" +
+                        " chapters (551-560) + 37 M-" +
+                        "number span (1581-1617) + 3" +
+                        " verification halves (round-" +
+                        "trip + rejection + floating-" +
+                        "point) all PROVEN。 typed-" +
+                        "surface count 100 → 101。"),
+                BASChapterKnife(
+                    mNumber: 1618, knife: "第二刀",
+                    concept: "18 anti-drift PROOF tests" +
+                        " for the M1617 milestone。 Pin" +
+                        " count + chapter tags + arc" +
+                        " range + 9 boolean / string" +
+                        " flags。"),
+                BASChapterKnife(
+                    mNumber: 1619, knife: "第三刀",
+                    concept: "11 wire-in PROOF tests" +
+                        " cross-checking the M1617" +
+                        " milestone against the 5" +
+                        " contract-proving doctrines +" +
+                        " M1591 cascade-foundation arc" +
+                        " + M1610 contract-closed flag" +
+                        " agreement + catalogue" +
+                        " membership。"),
+                BASChapterKnife(
+                    mNumber: 1620, knife: "第四刀",
+                    concept: "Chapter 560 close-out +" +
+                        " doctrine sync。 204" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "contract-closure-undocumented-across-9-chapters",
+                "no-single-source-of-truth-for-closure-status",
+                "cross-doctrine-chain-untested",
+                "milestone-doctrine-anti-drift-uncovered"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1620",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "replay-determinism-contract-closed",
+                "all-3-verification-halves-proven"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional doctrine" +
+                " coverage as new audit-projection" +
+                " types or numeric edge cases arise"
+            ],
+            summary: "Chapter 560 commemorates the" +
+                " chapter 三百九二 REPLAY DETERMINISM" +
+                " CONTRACT CLOSURE for the audit-" +
+                "projection emission family。 9-chapter" +
+                " / 37-M-number-span arc (551-560)" +
+                " systematically PROVEN across all 3" +
+                " verification halves:round-trip" +
+                " (chapters 554+555+557) + rejection" +
+                " (chapter 558) + floating-point" +
+                " (chapter 559)。 5 contract-proving" +
+                " doctrines + 2 cascade-foundation" +
+                " doctrines in the M1601 catalogue。" +
+                " BASReplayDeterminismContractClosure" +
+                "Doctrine typed milestone (M1617) +" +
+                " 18 anti-drift PROOF tests (M1618) +" +
+                " 11 wire-in PROOF tests (M1619)。" +
+                " 101 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1620。 204 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 
