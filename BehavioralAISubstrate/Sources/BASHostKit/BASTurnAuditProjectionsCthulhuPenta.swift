@@ -7,7 +7,9 @@ import BASPolicy
 import BASRuntimeCore
 import BASWorldPrior
 
-public struct BASTurnAuditProjectionsCthulhuPenta: Sendable {
+public struct BASTurnAuditProjectionsCthulhuPenta:
+    Hashable, Sendable
+{
     public let abyssalOrganAlias: BASAbyssalOrganAlias
     public let humanAnchorProfile: BASHumanAnchorProfile
     public let sealedMemory: BASSealedMemory?
