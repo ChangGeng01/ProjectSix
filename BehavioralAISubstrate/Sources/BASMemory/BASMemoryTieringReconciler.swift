@@ -42,7 +42,7 @@ public struct BASMemoryTieringReconciliationOutcome:
     public let startedAt: Date
     public let completedAt: Date
 
-    public struct Decision: Sendable, Equatable {
+    public struct Decision: Codable, Sendable, Equatable {
         public let profile: BASMemoryTieringProfile
         public let transition: BASMemoryTierTransition
 

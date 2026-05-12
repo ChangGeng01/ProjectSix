@@ -163,7 +163,7 @@ public enum BASMemoryLoadStatus: String, Codable, Sendable, CaseIterable {
     case pending
 }
 
-public struct BASMemoryTrustProfile: Equatable, Sendable {
+public struct BASMemoryTrustProfile: Codable, Equatable, Sendable {
     public let score: Double
     public let tier: BASMemorySourceTrustTier
     public let provenanceRisk: Bool
