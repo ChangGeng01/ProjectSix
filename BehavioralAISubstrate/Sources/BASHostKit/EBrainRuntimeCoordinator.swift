@@ -2315,11 +2315,20 @@ public struct BASEBrainRuntimeCoordinator {
                         sovereignExecutionReceipts),
             policyLineage: policyLineage,
             recoveryDisposition: recoveryDisposition,
-            hostConstitution: hostConstitution,
-            hostConstitutionVault: hostConstitutionVault,
-            hostVersionTree: hostVersionTree,
-            hostForgetRequest: hostForgetRequest,
-            hostContext: hostContext,
+            // chapter 五百二十六 / M1483 — V1 splice:
+            // 5 host-cluster args collapse to 1 typed
+            // hostBundle。 Byte-equality preserved by
+            // M1482 PROOF (bundle accessors pass through
+            // verbatim)。
+            hostBundle:
+                BASEBrainTurnResultHostBundle(
+                    hostConstitution: hostConstitution,
+                    hostConstitutionVault:
+                        hostConstitutionVault,
+                    hostVersionTree: hostVersionTree,
+                    hostForgetRequest:
+                        hostForgetRequest,
+                    hostContext: hostContext),
             contextFrame: contextFrame,
             decomposeFrame: decomposeFrame,
             memoryBundle: memoryBundle,
@@ -2371,26 +2380,35 @@ public struct BASEBrainRuntimeCoordinator {
                         evolutionGovernance
                             .evolutionSeals),
             runtimeTrace: finalizedRuntimeTrace,
-            // M578 (chapter 一百五十三 — 一次性解决掉) — populate
-            // 4 typed projection fields directly on turn result so
-            // bench/observability code can read REAL substrate
-            // outputs instead of synthesizing from public fields.
-            kunlunAxisAlignment: projections.kunlunAxisAlignment,
-            humanAnchorSignal: projections.humanAnchorSignal,
-            abyssalPressure: projections.abyssalPressure,
-            unknownReserve: projections.unknownReserve,
-            // M581 (chapter 一百五十六 — 解决缺陷 #15-#17) — wire 3
-            // additional REAL substrate-emitted schema types (locals
-            // built earlier in this function at lines 267 / 335 /
-            // 1901 — `kunlunYaochiSanctumForAudit` /
-            // `kunlunHeavenGateForAudit` / `kunlunRiverTraceForAudit`)
-            // so doctrine bench can use them directly instead of
-            // synthesizing from `(permitMode, stake, tone)`. Closes
-            // bench saturation: gateFidelity 1.0 / sanctumLeak 0.0 /
-            // originCompleteness 1.0 → real substrate variation.
-            kunlunHeavenGatePermit: kunlunHeavenGateForAudit,
-            kunlunRiverOriginTrace: kunlunRiverTraceForAudit,
-            yaochiSanctumEntry: kunlunYaochiSanctumForAudit
+            // chapter 五百二十六 / M1483 — V1 splice:
+            // 7 audit-projection-forwarded args collapse
+            // to 1 typed auditProjectionForwardBundle。
+            // Bundle accessors pass through verbatim:
+            //   - M578 (chapter 一百五十三) 4 fields
+            //     from projections (kunlunAxisAlignment +
+            //     humanAnchorSignal + abyssalPressure +
+            //     unknownReserve)
+            //   - M581 (chapter 一百五十六) 3 fields from
+            //     runTurn-scope locals (heavenGate +
+            //     riverTrace + yaochiSanctum)
+            // Byte-equality preserved via 3-bundle init
+            // delegation (M1482)。
+            auditProjectionForwardBundle:
+                BASEBrainTurnResultAuditProjectionForwardBundle(
+                    kunlunAxisAlignment:
+                        projections.kunlunAxisAlignment,
+                    humanAnchorSignal:
+                        projections.humanAnchorSignal,
+                    abyssalPressure:
+                        projections.abyssalPressure,
+                    unknownReserve:
+                        projections.unknownReserve,
+                    kunlunHeavenGatePermit:
+                        kunlunHeavenGateForAudit,
+                    kunlunRiverOriginTrace:
+                        kunlunRiverTraceForAudit,
+                    yaochiSanctumEntry:
+                        kunlunYaochiSanctumForAudit)
         )
     }
 
