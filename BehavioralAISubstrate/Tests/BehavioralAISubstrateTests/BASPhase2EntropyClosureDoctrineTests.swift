@@ -37,19 +37,21 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs572() {
+    func testLastChapterIs573() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百七十二",
-            "Chapter 五百七十二:SECOND-WAVE ORCHESTRATION" +
+            "chapter 五百七十三",
+            "Chapter 五百七十三:THIRD-WAVE ORCHESTRATION" +
             " CODABLE EXTENSION。 2 more BASOrchestration" +
-            " decision types gained Codable + 2 PROOF" +
+            " value types gained Codable" +
+            " (BASLatentTissueState +" +
+            " BASBadToneLinter.Violation) + 2 PROOF" +
             " tests + BASOrchestrationCodableExtension" +
-            "SecondWaveDoctrine typed surface +" +
-            " close-out。 Combined chapters 571+572 = 4" +
-            " BASOrchestration types ledger-" +
-            "serializable。 113 typed surfaces cumulative")
+            "ThirdWaveDoctrine typed surface +" +
+            " close-out。 Combined chapters 571+572+573" +
+            " = 6 BASOrchestration types ledger-" +
+            "serializable。 114 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1668",
-            "M1668:doctrine version reflects chapter 五百七十二 — SECOND-WAVE ORCHESTRATION CODABLE EXTENSION。 2 more BASOrchestration decision types gained Codable (KunlunPermitEscalationDecision + ForbiddenCandidateZoneGateDecision) at M1665 + 2 PROOF tests (M1666) + BASOrchestrationCodableExtensionSecondWaveDoctrine typed surface (M1667) + close-out (M1668)。 Combined chapters 571+572 = 4 BASOrchestration types ledger-serializable。 113 typed surfaces cumulative。 252 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1672",
+            "M1672:doctrine version reflects chapter 五百七十三 — THIRD-WAVE ORCHESTRATION CODABLE EXTENSION。 2 more BASOrchestration value types gained Codable (BASLatentTissueState + BASBadToneLinter.Violation) at M1669 + 2 PROOF tests (M1670) + BASOrchestrationCodableExtensionThirdWaveDoctrine typed surface (M1671) + close-out (M1672)。 Combined chapters 571+572+573 = 6 BASOrchestration types ledger-serializable。 114 typed surfaces cumulative。 256 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

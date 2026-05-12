@@ -1847,7 +1847,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七十二")!)
+                            "chapter 五百七十二")!),
+            // M1672 chapter 573 — Third-wave Orchestration Codable extension
+            checkRegistry("五百七十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2919,6 +2925,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七十二")!
+                .mNumberLast),
+            // M1672 chapter 573 — Third-wave Orchestration Codable extension
+            ("573",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

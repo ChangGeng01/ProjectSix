@@ -10044,6 +10044,80 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1668。 252 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 573 — Third wave of BASOrchestration
+        // Codable extension。 2 more value types
+        // (BASLatentTissueState + BASBadToneLinter.
+        // Violation)。 Combined 571+572+573 = 6 BAS
+        // Orchestration types ledger-serializable。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十三",
+            mNumberFirst: 1669,
+            mNumberLast: 1672,
+            v1MilestoneMNumber: 1672,
+            v1MilestoneStatus:
+                "chapter-573-third-wave-orchestration-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1669, knife: "第一刀",
+                    concept: "Add Codable to 2 more" +
+                        " BASOrchestration value types" +
+                        " (BASLatentTissueState +" +
+                        " BASBadToneLinter.Violation)。"),
+                BASChapterKnife(
+                    mNumber: 1670, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1671, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionThirdWaveDoctrine" +
+                        " typed surface。 typed-surface" +
+                        " count 113 → 114。"),
+                BASChapterKnife(
+                    mNumber: 1672, knife: "第四刀",
+                    concept: "Chapter 573 close-out +" +
+                        " doctrine sync。 256" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "latent-tissue-state-non-codable",
+                "bad-tone-linter-violation-non-codable",
+                "third-wave-orchestration-gap",
+                "non-decision-value-types-non-codable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1672",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "third-wave-orchestration-codable",
+                "6-orchestration-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — Orchestration Codable" +
+                " extension fourth wave (more value" +
+                " types) or fresh module territory",
+                "future arc — arc-seal milestone for" +
+                " the Orchestration extension trio"
+            ],
+            summary: "Chapter 573 ships the third wave" +
+                " of BASOrchestration Codable extension。" +
+                " 2 more value types gained Codable" +
+                " (BASLatentTissueState +" +
+                " BASBadToneLinter.Violation) + 2 PROOF" +
+                " tests + new typed surface +" +
+                " close-out。 Combined chapters 571+572" +
+                "+573 = 6 BASOrchestration types now" +
+                " ledger-serializable。 114 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1672。 256 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
