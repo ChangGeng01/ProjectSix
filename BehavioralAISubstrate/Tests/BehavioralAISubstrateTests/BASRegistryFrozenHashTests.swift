@@ -107,18 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 576 close-out。 Chapter
-    /// 576:POST-ARC ORCHESTRATION CODABLE EXTENSION。
-    /// 2 more BASOrchestration value types
-    /// (BASNeuralCoreFrame +
-    /// BASProductRedLineLinter.Violation) gained
-    /// Codable at M1681 — both unblocked by the
-    /// chapter 573 third-wave。 NEW BASOrchestration
-    /// CodableExtensionPostArcDoctrine (M1683) +
-    /// 2 PROOF tests (M1682)。 Mirrors chapter 565
-    /// post-arc pattern。 Chapter 574 arc (6 types)
-    /// + chapter 576 post-arc (2 types) = 8 BAS
+    /// Re-captured at chapter 577 close-out。 Chapter
+    /// 577:POST-ARC WAVE 2 ORCHESTRATION CODABLE
+    /// EXTENSION。 2 more BASOrchestration value types
+    /// (BASProviderReleaseAssessment +
+    /// BASProviderReleaseEvaluationRequest) gained
+    /// Codable at M1685。 NEW BASOrchestrationCodable
+    /// ExtensionPostArcWaveTwoDoctrine (M1687) + 2
+    /// PROOF tests (M1686)。 Continues chapter 576
+    /// post-arc pattern。 Chapter 574 arc (6) +
+    /// chapter 576 (2) + chapter 577 (2) = 10 BAS
     /// Orchestration types ledger-serializable。
     static let frozenFullRegistrySha256: String =
-        "9233c6e6360fe9061a751a96709a5f8b5914c612c2f604a280e51464e9328878"
+        "2a9d485e5fa81367539607df2e024268b2f0e043561c2fab8c07e1dd7393fb3e"
 }

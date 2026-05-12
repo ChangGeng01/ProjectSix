@@ -10382,7 +10382,90 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1684。 268 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 577 — Post-arc wave 2 Codable
+        // extension into BASOrchestration。 2 more
+        // value types (BASProviderReleaseAssessment +
+        // BASProviderReleaseEvaluationRequest)。
+        // Continues chapter 576 post-arc pattern。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十七",
+            mNumberFirst: 1685,
+            mNumberLast: 1688,
+            v1MilestoneMNumber: 1688,
+            v1MilestoneStatus:
+                "chapter-577-post-arc-wave-two-orchestration-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1685, knife: "第一刀",
+                    concept: "Add Codable to 2 more" +
+                        " BASOrchestration value types" +
+                        " (BASProviderReleaseAssessment" +
+                        " + BASProviderReleaseEvaluation" +
+                        "Request)。 All composite field" +
+                        " types pre-Codable。"),
+                BASChapterKnife(
+                    mNumber: 1686, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1687, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionPostArcWaveTwoDoctrine" +
+                        " typed surface。 Wave 2 of" +
+                        " post-arc continuation。 typed-" +
+                        "surface count 117 → 118。"),
+                BASChapterKnife(
+                    mNumber: 1688, knife: "第四刀",
+                    concept: "Chapter 577 close-out +" +
+                        " doctrine sync。 272" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "provider-release-assessment-non-codable",
+                "provider-release-eval-request-non-codable",
+                "post-arc-wave-aftermath-incomplete",
+                "release-gate-types-non-serializable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1688",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "post-arc-wave-two-orchestration-codable",
+                "10-orchestration-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — additional BASOrchestration" +
+                " value types (BASNeuralPublic" +
+                "ThoughtProjection,etc。)",
+                "future arc — eventual post-arc seal" +
+                " milestone after multiple waves" +
+                " accumulate"
+            ],
+            summary: "Chapter 577 ships post-arc wave 2" +
+                " Codable extension into BASOrchestration。" +
+                " 2 more value types (BAS" +
+                "ProviderReleaseAssessment + BAS" +
+                "ProviderReleaseEvaluationRequest)" +
+                " gained Codable at M1685。 2 PROOF" +
+                " tests (M1686) + new typed surface" +
+                " (M1687) + close-out (M1688)。" +
+                " Continues chapter 576 post-arc" +
+                " pattern。 Combined chapter 574 arc" +
+                " (6) + chapter 576 wave 1 (2) +" +
+                " chapter 577 wave 2 (2) = 10 BAS" +
+                "Orchestration types ledger-" +
+                "serializable。 118 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1688。" +
+                " 272 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

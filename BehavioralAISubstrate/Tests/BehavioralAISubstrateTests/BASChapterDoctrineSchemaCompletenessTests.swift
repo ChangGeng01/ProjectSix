@@ -1871,7 +1871,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七十六")!)
+                            "chapter 五百七十六")!),
+            // M1688 chapter 577 — Post-arc wave 2 Orchestration Codable
+            checkRegistry("五百七十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2975,6 +2981,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七十六")!
+                .mNumberLast),
+            // M1688 chapter 577 — Post-arc wave 2 Orchestration Codable
+            ("577",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
