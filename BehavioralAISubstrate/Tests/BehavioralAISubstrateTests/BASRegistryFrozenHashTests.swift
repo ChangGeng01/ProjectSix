@@ -107,18 +107,18 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 590 close-out。 Chapter
-    /// 590:BASMEMORY POST-ARC TRILOGY SEAL MILESTONE
-    /// for the 3-wave BASMemory post-arc extension
-    /// trilogy (chapters 587-589)。 NEW BASMemory
-    /// PostCrossModuleArcTrilogySealedDoctrine (M1737)
-    /// + 25 anti-drift PROOF tests (M1738) + 16
-    /// wire-in PROOF tests (M1739) commemorating
-    /// 3-wave / 12-commit BASMemory post-arc
-    /// trilogy。 Mirrors chapter 579 BASOrchestration
-    /// trilogy seal pattern。 Second sealed milestone
-    /// for BASMemory extensions (after chapter 569
-    /// cross-module arc seal)。
+    /// Re-captured at chapter 591 close-out。 Chapter
+    /// 591:HEPTA-MILESTONE COMPLETION META-META
+    /// MILESTONE。 NEW BASCodableExtensionHepta
+    /// MilestoneCompletionDoctrine (M1741) + 31 anti-
+    /// drift PROOF tests (M1742) + 18 wire-in PROOF
+    /// tests (M1743) cataloguing ALL 7 sealed Codable
+    /// extension milestones。 Supersedes chapter 585
+    /// hexa snapshot;hexa + penta + quad-arc + tri-
+    /// arc doctrines preserved as historical records。
+    /// NEW beyond-m1700-post-arc-trilogy kind
+    /// discriminator。 71 session types ledger-
+    /// serializable。
     static let frozenFullRegistrySha256: String =
-        "bef1b40760e9bcb4a4d0226dee6f2cb809d478ecfdd0ba7b78e921c6af7a0dd7"
+        "3b279488eec15b59cc274c2cdfdb1b5c1fe6965e6a2d974b4b28368323aba89a"
 }

@@ -3050,7 +3050,30 @@ public enum BASEntropyChapterIndex {
                 " trilogy (6) = 16 BASMemory types" +
                 " ledger-serializable。 131 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1740。 V1 byte-equality preserved。")
+                " M1740。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十一",
+            mNumberFirst: 1741, mNumberLast: 1744,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "HEPTA-MILESTONE COMPLETION META-" +
+                "META MILESTONE。 NEW BASCodable" +
+                "ExtensionHeptaMilestoneCompletion" +
+                "Doctrine (M1741) cataloguing ALL 7" +
+                " sealed Codable extension milestones" +
+                " (16+15+13+6+6+7+6 = 69 types,84" +
+                " commits,21 chapters,6 modules) + 31" +
+                " anti-drift PROOF tests (M1742) + 18" +
+                " wire-in PROOF tests (M1743) + close-" +
+                "out (M1744)。 Supersedes chapter 585" +
+                " hexa snapshot;hexa + penta + quad-" +
+                "arc + tri-arc doctrines preserved as" +
+                " historical records。 NEW beyond-" +
+                "m1700-post-arc-trilogy kind" +
+                " discriminator。 71 session types" +
+                " ledger-serializable。 132 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1744。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

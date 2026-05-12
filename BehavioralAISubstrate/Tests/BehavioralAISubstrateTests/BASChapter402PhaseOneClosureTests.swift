@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1740",
-            "M1740:doctrine version reflects chapter 五百九十 — BASMEMORY POST-ARC TRILOGY SEAL MILESTONE。 NEW BASMemoryPostCrossModuleArcTrilogySealedDoctrine (M1737) commemorating 3-wave BASMemory post-arc trilogy (chapters 587-589) + 25 anti-drift PROOF tests (M1738) + 16 wire-in PROOF tests (M1739) + close-out (M1740)。 Second sealed milestone for BASMemory extensions。 Mirrors chapter 579 BASOrchestration trilogy seal pattern。 Combined chapter 569 + chapter 590 trilogy = 16 BASMemory types ledger-serializable。 131 typed surfaces cumulative。 324 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1744",
+            "M1744:doctrine version reflects chapter 五百九十一 — HEPTA-MILESTONE COMPLETION META-META MILESTONE。 NEW BASCodableExtensionHeptaMilestoneCompletionDoctrine (M1741) cataloguing ALL 7 sealed Codable extension milestones (16+15+13+6+6+7+6 = 69 types,84 commits,21 chapters,6 modules) + 31 anti-drift PROOF tests (M1742) + 18 wire-in PROOF tests (M1743) + close-out (M1744)。 Supersedes chapter 585 hexa snapshot;hexa + penta + quad-arc + tri-arc doctrines preserved as historical records。 NEW beyond-m1700-post-arc-trilogy kind discriminator。 71 session types ledger-serializable。 132 typed surfaces cumulative。 328 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

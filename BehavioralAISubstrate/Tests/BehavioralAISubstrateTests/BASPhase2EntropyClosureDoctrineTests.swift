@@ -37,20 +37,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs590() {
+    func testLastChapterIs591() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十",
-            "Chapter 五百九十:BASMEMORY POST-ARC" +
-            " TRILOGY SEAL MILESTONE。 NEW BASMemory" +
-            "PostCrossModuleArcTrilogySealedDoctrine" +
-            " commemorating 3-wave BASMemory post-arc" +
-            " trilogy (chapters 587-589) + 25 anti-" +
-            "drift PROOF + 16 wire-in PROOF + close-" +
-            "out。 Second sealed milestone for BAS" +
-            "Memory。 Mirrors chapter 579 trilogy seal" +
-            " pattern。 131 typed surfaces cumulative")
+            "chapter 五百九十一",
+            "Chapter 五百九十一:HEPTA-MILESTONE" +
+            " COMPLETION META-META MILESTONE。 NEW" +
+            " BASCodableExtensionHeptaMilestoneCompletion" +
+            "Doctrine cataloguing ALL 7 sealed Codable" +
+            " extension milestones (69 types,84" +
+            " commits,6 modules) + 31 anti-drift PROOF" +
+            " + 18 wire-in PROOF + close-out。" +
+            " Supersedes chapter 585 hexa snapshot。" +
+            " NEW beyond-m1700-post-arc-trilogy kind" +
+            " discriminator。 132 typed surfaces" +
+            " cumulative")
     }
 
     // MARK: - M-number range

@@ -244,7 +244,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百八十七",   // M1725-M1728 (BASMEMORY POST-CROSS-MODULE-ARC CODABLE EXTENSION — 2 BASMemory types (BASMemoryTrustProfile + BASMemoryTieringReconciliationOutcome.Decision) gained Codable + 2 PROOF tests + BASMemoryPostCrossModuleArcExtensionDoctrine + close-out;combined chapter 569 + 587 = 12 BASMemory types cumulative)
         "chapter 五百八十八",   // M1729-M1732 (BASMEMORY POST-CROSS-MODULE-ARC WAVE 2 CODABLE EXTENSION — 2 nested types (HostCandidatePipeline.RejectionRecord + BASMemoryMutationEventEmitter.EmitOutcome) gained Codable + 2 PROOF tests + BASMemoryPostCrossModuleArcExtensionWaveTwoDoctrine + close-out;combined chapter 569 + 587 + 588 = 14 BASMemory types cumulative)
         "chapter 五百八十九",   // M1733-M1736 (BASMEMORY POST-CROSS-MODULE-ARC WAVE 3 CODABLE EXTENSION — 2 types (BASMemoryImportanceScorer + BASMemoryMutationWriter.MutationOutcome) gained Codable + 2 PROOF tests + BASMemoryPostCrossModuleArcExtensionWaveThreeDoctrine + close-out;combined chapter 569 + 587 + 588 + 589 = 16 BASMemory types cumulative;trilogy ready for sealing at chapter 590)
-        "chapter 五百九十"      // M1737-M1740 (BASMEMORY POST-ARC TRILOGY SEAL MILESTONE — BASMemoryPostCrossModuleArcTrilogySealedDoctrine + 25 anti-drift + 16 wire-in PROOF tests commemorating 3-wave BASMemory post-arc trilogy (chapters 587-589);6 types ledger-serializable;mirrors chapter 579 BASOrchestration trilogy seal pattern)
+        "chapter 五百九十",     // M1737-M1740 (BASMEMORY POST-ARC TRILOGY SEAL MILESTONE — BASMemoryPostCrossModuleArcTrilogySealedDoctrine + 25 anti-drift + 16 wire-in PROOF tests commemorating 3-wave BASMemory post-arc trilogy (chapters 587-589);6 types ledger-serializable;mirrors chapter 579 BASOrchestration trilogy seal pattern)
+        "chapter 五百九十一"    // M1741-M1744 (HEPTA-MILESTONE COMPLETION META-META MILESTONE — BASCodableExtensionHeptaMilestoneCompletionDoctrine + 31 anti-drift + 18 wire-in PROOF tests cataloguing all 7 sealed Codable extension milestones;69 types,84 commits,21 chapters,6 modules;71 session types ledger-serializable;new beyond-m1700-post-arc-trilogy kind discriminator)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -261,15 +262,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1740
+    public static let mNumberLast: Int = 1744
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1740)。 Bumped through chapter 590:781 → 785。
-    /// Chapter 590:BASMemory post-arc trilogy seal
-    /// milestone + 25 anti-drift + 16 wire-in PROOF
-    /// tests + close-out。 Second sealed milestone for
-    /// BASMemory extensions。
-    public static let commitsShipped: Int = 785
+    /// M1744)。 Bumped through chapter 591:785 → 789。
+    /// Chapter 591:Hepta-milestone completion meta-
+    /// meta milestone commemorating all 7 sealed
+    /// Codable extension milestones + 31 anti-drift +
+    /// 18 wire-in PROOF tests + close-out。
+    public static let commitsShipped: Int = 789
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
