@@ -113,7 +113,9 @@ public enum BASHostStorageWireBuilder {
         options: BASHostStorageOptions,
         initial: [BASGovernedMemory] = [],
         eventSourcedSessionID: String =
-            "host.event-sourced-atom-store"
+            "host.event-sourced-atom-store",
+        failureLog:
+            BASHostStorageInitialAtomAdmitFailureLog? = nil
     ) throws -> any BASMemoryAtomStore {
         // chapter 四百二 / M947 — event-sourced opt-in branch
         if options.useEventSourcedAtomStore {
@@ -127,19 +129,22 @@ public enum BASHostStorageWireBuilder {
             if !initial.isEmpty {
                 Task.detached {
                     for atom in initial {
-                        // chapter 五百三十五 / M1517 — explicit
-                        // silent-swallow at bootstrap (no
-                        // observable error sink exists for
-                        // initial-atom admission failures in
-                        // this background path)。 Converted
-                        // from `try?` to explicit do/catch
-                        // for documented intent。 TODO: wire
-                        // to a typed BASHostStorageInitialAtom
-                        // AdmitFailureLog sink when shipped。
+                        // chapter 五百三十六 / M1522 — wire-in of
+                        // the typed observability sink (M1521)。
+                        // When `failureLog == nil`,behavior is
+                        // unchanged from M1517's documented
+                        // silent-swallow。 When non-nil,each
+                        // admission failure is recorded for
+                        // host inspection。 ADR-014 OPT-IN
+                        // preserved (default nil → no observation)。
                         do {
                             try await store.admit(atom)
                         } catch {
-                            // intentionally silent — see above
+                            if let log = failureLog {
+                                await log.record(
+                                    atomID: atom.id,
+                                    error: error)
+                            }
                         }
                     }
                 }
@@ -439,7 +444,9 @@ public enum BASHostStorageWireBuilder {
         ticketLifecycleAuditSink:
             BASUpdateTicketLifecycleCoordinator.AuditSink? = nil,
         eventSourcedSessionID: String =
-            "host.event-sourced-atom-store"
+            "host.event-sourced-atom-store",
+        atomStoreFailureLog:
+            BASHostStorageInitialAtomAdmitFailureLog? = nil
     ) async throws -> BASHostStorageWireBundle {
         // chapter 四百二 / M947:if event-sourced atom store is
         // requested,construct one event log and pass it through
@@ -456,18 +463,21 @@ public enum BASHostStorageWireBuilder {
             if !atomStoreInitial.isEmpty {
                 Task.detached {
                     for atom in atomStoreInitial {
-                        // chapter 五百三十五 / M1517 — explicit
-                        // silent-swallow at bootstrap (parallel
-                        // to line ~130 path,event-sourced
-                        // variant)。 Converted from `try?` to
-                        // explicit do/catch for documented
-                        // intent。 TODO: wire to a typed
-                        // BASHostStorageInitialAtomAdmitFailure
-                        // Log sink when shipped。
+                        // chapter 五百三十六 / M1522 — wire-in of
+                        // the typed observability sink (M1521)。
+                        // Parallel to makeAtomStore line ~130
+                        // path。 ADR-014 OPT-IN preserved
+                        // (default nil → no observation)。
                         do {
                             try await store.admit(atom)
                         } catch {
-                            // intentionally silent — see above
+                            if let bundleLog =
+                                atomStoreFailureLog
+                            {
+                                await bundleLog.record(
+                                    atomID: atom.id,
+                                    error: error)
+                            }
                         }
                     }
                 }
@@ -475,7 +485,9 @@ public enum BASHostStorageWireBuilder {
             atomStore = store
         } else {
             atomStore = try makeAtomStore(
-                options: options, initial: atomStoreInitial)
+                options: options,
+                initial: atomStoreInitial,
+                failureLog: atomStoreFailureLog)
         }
         let vault = try makeVaultStorage(options: options)
         let lifecycle = try await makeTicketLifecycleCoordinator(
