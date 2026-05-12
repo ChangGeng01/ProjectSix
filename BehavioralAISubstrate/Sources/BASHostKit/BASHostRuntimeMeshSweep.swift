@@ -59,7 +59,7 @@ import BASRuntimeCore
 /// Carries `BASHostMeshConsultationResult` (chapter 三百二三)
 /// directly so callers can inspect cascade outcome + reason codes
 /// per layer。
-public struct BASHostMeshSweepLayerEntry: Sendable, Equatable {
+public struct BASHostMeshSweepLayerEntry: Sendable, Equatable, Codable {
     public let layerID: BASMotherboardLayer14
     public let consultation: BASHostMeshConsultationResult
 
@@ -78,7 +78,7 @@ public struct BASHostMeshSweepLayerEntry: Sendable, Equatable {
 /// (in the order they were consulted) + aggregated reason codes
 /// across all layers (deduplication NOT performed — caller
 /// inspects raw codes for grep)。
-public struct BASHostMeshSweepResult: Sendable, Equatable {
+public struct BASHostMeshSweepResult: Sendable, Equatable, Codable {
     /// Per-layer consultation results in caller-supplied order。
     public let layerEntries: [BASHostMeshSweepLayerEntry]
 

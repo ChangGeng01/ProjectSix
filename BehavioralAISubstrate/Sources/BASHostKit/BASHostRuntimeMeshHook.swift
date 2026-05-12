@@ -58,7 +58,7 @@ import BASRuntimeCore
 /// Typed wrapper for `BASLayerCascadeResult` augmented with the
 /// canonical audit reason codes hosts emit into their trace。
 public struct BASHostMeshConsultationResult:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     /// The underlying typed cascade result。
     public let cascadeResult: BASLayerCascadeResult
