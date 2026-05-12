@@ -9512,7 +9512,95 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1640。 224 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 566 — Cross-module Codable extension。
+        // First chapter extending Codable OUTSIDE the
+        // BASHostKit audit-projection family。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十六",
+            mNumberFirst: 1641,
+            mNumberLast: 1644,
+            v1MilestoneMNumber: 1644,
+            v1MilestoneStatus:
+                "chapter-566-cross-module-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1641, knife: "第一刀",
+                    concept: "Real substrate change:" +
+                        " add Codable to 5 types in" +
+                        " BASRuntimeCore + BASMemory" +
+                        " (CoreMLFeatureFrame +" +
+                        " KnowledgeCycle + RAGResult +" +
+                        " VectorIndexEntry +" +
+                        " VectorTopKResult)。 First" +
+                        " extension OUTSIDE the" +
+                        " BASHostKit audit-projection" +
+                        " family。"),
+                BASChapterKnife(
+                    mNumber: 1642, knife: "第二刀",
+                    concept: "7 PROOF tests:5 compile-" +
+                        "time conformance + 2 populated" +
+                        " round-trips on simplest" +
+                        " types。"),
+                BASChapterKnife(
+                    mNumber: 1643, knife: "第三刀",
+                    concept: "NEW BASCrossModuleCodable" +
+                        "ExtensionDoctrine typed" +
+                        " surface with module breakdown" +
+                        " (2 RuntimeCore + 3 Memory)。" +
+                        " typed-surface count 106 → 107。"),
+                BASChapterKnife(
+                    mNumber: 1644, knife: "第四刀",
+                    concept: "Chapter 566 close-out +" +
+                        " doctrine sync。 228" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "core-ml-feature-frame-non-codable",
+                "knowledge-cycle-non-codable",
+                "rag-result-non-codable",
+                "vector-index-types-non-codable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1644",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "cross-module-codable-extension",
+                "outside-audit-projection-family"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — continue cross-module" +
+                " Codable extension to additional" +
+                " types"
+            ],
+            summary: "Chapter 566 starts a NEW arc:" +
+                " cross-module Codable extension。" +
+                " First chapter extending Codable" +
+                " OUTSIDE the BASHostKit audit-" +
+                "projection family。 5 types in" +
+                " BASRuntimeCore (CoreMLFeatureFrame" +
+                " + KnowledgeCycle) + BASMemory" +
+                " (RAGResult + VectorIndexEntry +" +
+                " VectorTopKResult) gained Codable at" +
+                " M1641 + 7 PROOF tests (M1642) + new" +
+                " typed surface with module breakdown" +
+                " (M1643) + close-out (M1644)。" +
+                " Replay-determinism surface extends" +
+                " into ML inference + knowledge graph" +
+                " + RAG + vector indexing layers。 107" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1644。 228 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

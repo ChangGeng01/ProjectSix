@@ -2557,7 +2557,27 @@ public enum BASEntropyChapterIndex {
                 " (M1638) + new typed surface (M1639)" +
                 " + close-out (M1640)。 106 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1640。 V1 byte-equality preserved。")
+                " M1640。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十六",
+            mNumberFirst: 1641, mNumberLast: 1644,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CROSS-MODULE CODABLE EXTENSION —" +
+                " first chapter extending Codable" +
+                " OUTSIDE the BASHostKit audit-" +
+                "projection family。 5 types gained" +
+                " Codable across BASRuntimeCore" +
+                " (CoreMLFeatureFrame +" +
+                " KnowledgeCycle) + BASMemory" +
+                " (RAGResult + VectorIndexEntry +" +
+                " VectorTopKResult) at M1641 + 7 PROOF" +
+                " tests (M1642) +" +
+                " BASCrossModuleCodableExtensionDoctrine" +
+                " typed surface (M1643) + close-out" +
+                " (M1644)。 107 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1644。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -107,13 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 565 close-out。 Chapter
-    /// 565:POST-ARC FOLLOW-UP — Codable + Equatable
-    /// extension to 2 high-level Inputs aggregator
-    /// types (KunlunInputs + CthulhuInputs) at M1637
-    /// + 2 compile-time PROOF tests (M1638) +
-    /// BASAuditObservationProjectionsInputsCodable
-    /// ExtensionDoctrine typed surface (M1639)。
+    /// Re-captured at chapter 566 close-out。 Chapter
+    /// 566:CROSS-MODULE CODABLE EXTENSION。 First
+    /// chapter extending Codable OUTSIDE the BASHostKit
+    /// audit-projection family。 5 types gained Codable
+    /// (CoreMLFeatureFrame + KnowledgeCycle +
+    /// RAGResult + VectorIndexEntry +
+    /// VectorTopKResult) at M1641 + 7 PROOF tests
+    /// (M1642) + BASCrossModuleCodableExtensionDoctrine
+    /// typed surface (M1643)。
     static let frozenFullRegistrySha256: String =
-        "34f5c714afd6ef7dd4e471a439fbf604ffde5b3dea4d1cf2af159b89e6547d41"
+        "524cee659e594561e7ef0c000ac5cdccd8915ec6e1946018d45baeb05fa7bd1b"
 }

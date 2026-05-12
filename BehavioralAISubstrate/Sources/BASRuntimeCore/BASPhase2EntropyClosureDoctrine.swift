@@ -219,7 +219,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百六十二",   // M1625-M1628 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 5 more aggregator types + 10 PROOF tests + BASTurnAuditProjectionsFiveAggregatorCodableExtensionDoctrine + close-out;combined 8 aggregator types now ledger-serializable)
         "chapter 五百六十三",   // M1629-M1632 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 7 more aggregator types + 9 PROOF tests + BASTurnAuditProjectionsSevenAggregatorCodableExtensionDoctrine + close-out;combined 15 aggregator types now ledger-serializable)
         "chapter 五百六十四",   // M1633-M1636 (AGGREGATOR CODABLE EXTENSION ARC-SEAL MILESTONE — BASAuditProjectionsAggregatorCodableExtensionArcSealedDoctrine + 20 anti-drift + 13 wire-in PROOF tests commemorating 3-chapter / 12-commit arc across chapters 561-563)
-        "chapter 五百六十五"    // M1637-M1640 (POST-ARC FOLLOW-UP — Codable extension to 2 Inputs aggregator types + 2 PROOF tests + BASAuditObservationProjectionsInputsCodableExtensionDoctrine + close-out)
+        "chapter 五百六十五",   // M1637-M1640 (POST-ARC FOLLOW-UP — Codable extension to 2 Inputs aggregator types + 2 PROOF tests + BASAuditObservationProjectionsInputsCodableExtensionDoctrine + close-out)
+        "chapter 五百六十六"    // M1641-M1644 (CROSS-MODULE CODABLE EXTENSION — first chapter extending Codable OUTSIDE the BASHostKit audit-projection family;5 types in BASRuntimeCore + BASMemory + 7 PROOF tests + BASCrossModuleCodableExtensionDoctrine + close-out)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -236,14 +237,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1640
+    public static let mNumberLast: Int = 1644
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1640)。 Bumped through chapter 565:681 → 685。
-    /// Chapter 565:Post-arc follow-up — Codable
-    /// extension to 2 Inputs aggregator types + PROOF
+    /// M1644)。 Bumped through chapter 566:685 → 689。
+    /// Chapter 566:Cross-module Codable extension —
+    /// 5 types in BASRuntimeCore + BASMemory + 7 PROOF
     /// tests + typed surface + close-out。
-    public static let commitsShipped: Int = 685
+    public static let commitsShipped: Int = 689
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
