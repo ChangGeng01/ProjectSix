@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1456",
-            "M1456:doctrine version reflects chapter 五百十九 — FIRST PRODUCTION WIRE-IN since chapter 512。 projectionBlockEmissionHandler slot on BASEBrainRuntimeCoordinator (M1453) + V1 monolith fires handler after projections construction (M1454) + 5 PROOF tests via real coordinator turns (M1455)。 Moves chapters 511-518 typed projection-block surfaces from 'shipped opt-in' to 'fires in V1 production hot path when hosts wire'。 64 typed surfaces cumulative。 V1 byte-equality preserved (default nil handler = pre-M1453 behavior unchanged; stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1460",
+            "M1460:doctrine version reflects chapter 五百二十 — closes the 10-chapter projection-block pipeline arc。 BASAuditObservationProjectionsBundleObserverHostAdapter sync→actor bridge (M1457) + 5 end-to-end PROOF tests for chapter 511-520 pipeline (M1458) + BASChapter511To520PipelineDoctrine typed milestone freezing arc invariants (M1459)。 10-chapter arc: 6 typed input blocks + 1 production wire-in + 1 sync→actor bridge + 50 LOC V1 reduction (118 → 68) + V1 byte-equality preserved every commit。 66 typed surfaces cumulative。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -173,7 +173,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百十六",     // M1441-M1444 (4th typed input block + V1 splice extension — 46-of-56 fields packaged, 82% coverage)
         "chapter 五百十七",     // M1445-M1448 (5th typed input block + V1 splice extension — 53-of-56 fields packaged, 95% coverage)
         "chapter 五百十八",     // M1449-M1452 (6th typed input block + V1 splice extension — 60 fields packaged across 6 input surfaces, V1 call site 118 → 68 LOC)
-        "chapter 五百十九"      // M1453-M1456 (FIRST PRODUCTION WIRE-IN — projectionBlockEmissionHandler slot + V1 monolith fires handler + 5 PROOF tests)
+        "chapter 五百十九",     // M1453-M1456 (FIRST PRODUCTION WIRE-IN — projectionBlockEmissionHandler slot + V1 monolith fires handler + 5 PROOF tests)
+        "chapter 五百二十"      // M1457-M1460 (10-chapter pipeline arc close-out — host adapter sync→actor bridge + end-to-end PROOF + typed milestone)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -190,17 +191,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1456
+    public static let mNumberLast: Int = 1460
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1456)。 Bumped through chapter 519:497 → 501。
-    /// Chapter 519:FIRST PRODUCTION WIRE-IN since
-    /// chapter 512 — M1453 handler slot + M1454 V1
-    /// monolith fires handler + M1455 PROOF tests +
-    /// M1456 close-out。 Moves chapters 511-518 typed
-    /// surfaces from 'shipped opt-in' to 'fires in V1
-    /// production hot path when hosts wire'。
-    public static let commitsShipped: Int = 501
+    /// M1460)。 Bumped through chapter 520:501 → 505。
+    /// Chapter 520:10-chapter projection-block pipeline
+    /// arc close-out — M1457 host adapter sync→actor
+    /// bridge + M1458 end-to-end PROOF + M1459 typed
+    /// milestone + M1460 close-out。 6 typed input
+    /// blocks + 1 production wire-in + 50 LOC V1
+    /// reduction sealed。
+    public static let commitsShipped: Int = 505
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -5364,6 +5364,104 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative。 ADR-016 → M1456。 V1" +
                 " byte-equality preserved (default nil" +
                 " handler = pre-M1453 behavior)。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 520 — host adapter + end-to-end PROOF
+        //               + 10-chapter arc milestone
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十",
+            mNumberFirst: 1457,
+            mNumberLast: 1460,
+            v1MilestoneMNumber: 1460,
+            v1MilestoneStatus:
+                "chapter-520-end-to-end-arc-complete",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1457, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsBundleObserver" +
+                        "HostAdapter — typed sync→actor" +
+                        " bridge。 Adapter takes the" +
+                        " M1426 actor observer + exposes" +
+                        " a sync @Sendable handler" +
+                        " closure ready to wire to the" +
+                        " M1453 handler slot。 Closes" +
+                        " the per-host boilerplate Task" +
+                        " launch gap。 65 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1458, knife: "第二刀",
+                    concept: "5 end-to-end PROOF tests" +
+                        " exercising the COMPLETE" +
+                        " chapter 511-520 pipeline:" +
+                        " coordinator+adapter+observer+" +
+                        "bundle。 Real V1 monolith turns" +
+                        " through real Task.detached" +
+                        " through real actor observer" +
+                        " through real BASBundle。 First" +
+                        " end-to-end PROOF for the arc。"),
+                BASChapterKnife(
+                    mNumber: 1459, knife: "第三刀",
+                    concept: "NEW BASChapter511To520" +
+                        "PipelineDoctrine typed milestone" +
+                        " freezing arc invariants:" +
+                        " chapterCount=10,commitCount=" +
+                        "40,typedInputBlockCount=6," +
+                        " totalPackagedFieldCount=60," +
+                        " v1CallSiteLOCReductionNet=50。" +
+                        " 66 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1460, knife: "第四刀",
+                    concept: "Chapter 520 + 10-chapter" +
+                        " arc close-out + doctrine sync。" +
+                        " ADR-016 → M1460。 Arc seals:" +
+                        " 6 typed input blocks +" +
+                        " 1 production wire-in +" +
+                        " 1 sync→actor bridge +" +
+                        " 1 typed milestone +" +
+                        " 50 LOC V1 reduction +" +
+                        " V1 byte-equality preserved" +
+                        " every commit。")
+            ],
+            entropyClassesAttacked: [
+                "sync-to-actor-bridge-per-host-boilerplate",
+                "end-to-end-arc-coverage-not-proved",
+                "10-chapter-arc-no-aggregate-milestone",
+                "production-wire-in-without-adapter-pattern"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1460",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "10-chapter-arc-end-to-end-PROVED"
+            ],
+            plannedFutureCuts: [
+                "future arc — SampleHost or BASTurnRuntime" +
+                " Engine wire the adapter for production" +
+                " observer aggregation",
+                "future arc — extend pipeline to other V1" +
+                " monolith inline constructions",
+                "future arc — Tier C migration source-" +
+                "type adoption",
+                "future arc — additional V1 fold work" +
+                " in other coordinator areas"
+            ],
+            summary: "Chapter 520 closes the 10-chapter" +
+                " projection-block pipeline arc:host" +
+                " adapter (sync→actor bridge) +" +
+                " end-to-end PROOF for the complete" +
+                " coordinator→adapter→observer→bundle" +
+                " pipeline + typed milestone freezing" +
+                " arc invariants (10 chapters,40" +
+                " commits,6 input blocks,60 packaged" +
+                " fields,50 LOC V1 reduction)。 66" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1460。 First end-to-end PROOF that" +
+                " chapters 511-520 work in production" +
+                " V1 hot path。 V1 byte-equality" +
+                " preserved at every commit boundary。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

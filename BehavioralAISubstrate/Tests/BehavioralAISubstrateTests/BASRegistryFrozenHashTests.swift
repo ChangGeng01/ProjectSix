@@ -107,15 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 519 close-out。 Chapter
-    /// 519:FIRST PRODUCTION WIRE-IN since chapter 512
-    /// — projectionBlockEmissionHandler slot on
-    /// BASEBrainRuntimeCoordinator + V1 monolith fires
-    /// handler after projections construction at line
-    /// 2035 + 5 PROOF tests via real coordinator turns。
-    /// Moves chapters 511-518 typed surfaces from
-    /// 'shipped opt-in' to 'fires in V1 production hot
-    /// path when hosts wire'。
+    /// Re-captured at chapter 520 close-out。 Chapter
+    /// 520:closes the 10-chapter projection-block
+    /// pipeline arc — BASAuditObservationProjections
+    /// BundleObserverHostAdapter (sync→actor bridge) +
+    /// end-to-end PROOF for chapter 511-520 pipeline +
+    /// BASChapter511To520PipelineDoctrine typed
+    /// milestone freezing arc invariants (10 chapters,
+    /// 40 commits,6 input blocks,60 packaged fields,
+    /// 50 LOC V1 reduction)。
     static let frozenFullRegistrySha256: String =
-        "76cac7398670b87acd960cbb0871238486631f0a22586fb6e2e908485e123cc7"
+        "ad6479a3bafc9e2ceff6cdb7906cdb8ac2e0e838b1fbf9f40b344377d18e65d6"
 }

@@ -1721,7 +1721,25 @@ public enum BASEntropyChapterIndex {
                 " surfaces from 'shipped opt-in' to" +
                 " 'fires in V1 production hot path'。" +
                 " 64 typed surfaces cumulative。 ADR-016" +
-                " → M1456。 V1 byte-equality preserved。")
+                " → M1456。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十",
+            mNumberFirst: 1457, mNumberLast: 1460,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Chapter 520 closes the 10-chapter" +
+                " projection-block pipeline arc:" +
+                " BASAuditObservationProjectionsBundle" +
+                "ObserverHostAdapter (sync→actor bridge)" +
+                " + end-to-end PROOF for the complete" +
+                " coordinator→adapter→observer→bundle" +
+                " pipeline + BASChapter511To520Pipeline" +
+                "Doctrine typed milestone freezing arc" +
+                " invariants (10 chapters,40 commits,6" +
+                " input blocks,60 packaged fields,50" +
+                " LOC V1 reduction)。 66 typed surfaces" +
+                " cumulative。 ADR-016 → M1460。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -1529,7 +1529,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百十九")!)
+                            "chapter 五百十九")!),
+            // M1460 chapter 520 — 10-chapter arc close-out
+            checkRegistry("五百二十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百二十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2177,6 +2183,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百十九")!
+                .mNumberLast),
+            // M1460 chapter 520 — 10-chapter arc close-out
+            ("520",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
