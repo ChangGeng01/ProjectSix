@@ -1200,10 +1200,10 @@ public struct BASEBrainRuntimeCoordinator {
                 .compute(
                     routedBudget: routedBudget,
                     turnID: derivedTurnID)
-        let abyssalRunModeForAudit =
-            abyssalThermalTrioForAudit.abyssalRunMode
-        let abyssBudgetForAudit =
-            abyssalThermalTrioForAudit.abyssBudget
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // abyssalRunModeForAudit + abyssBudgetForAudit
+        // shadow re-bindings (chapter 506 M1402) never
+        // read downstream。 Deleted。
         // M456 (chapter 一百二十) — L8 memory thermal layer
         // projection from runMode at audit-projection time.
         // Now consumed via the typed trio factory above。
@@ -1229,9 +1229,11 @@ public struct BASEBrainRuntimeCoordinator {
                 turnID: derivedTurnID,
                 sessionID: derivedSessionID,
                 kunlunAxisID: kunlunAxisForGate.axisID)
-        let ascentLeaseForAudit = kunlunTrioForAudit.ascentLease
-        let axisDeviationForAudit = kunlunTrioForAudit.axisDeviation
-        let gatePressureForAudit = kunlunTrioForAudit.gatePressure
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // ascentLeaseForAudit + axisDeviationForAudit +
+        // gatePressureForAudit shadow re-bindings
+        // (chapter 478 M1289) never read downstream。
+        // Deleted。 Trio is now consumed via input blocks。
         // chapter 四百八十五 / M1317 — V1 fold cluster A
         // continuation。 6 declarations folded via hexa factory。
         let kunlunHexaForAudit = BASTurnAuditProjectionsKunlunHexa
@@ -1241,20 +1243,12 @@ public struct BASEBrainRuntimeCoordinator {
                 permit: boundActionPermit,
                 candidates: thoughtFrame.candidates,
                 turnID: derivedTurnID)
-        let yaochiMemoryLayerForAudit = kunlunHexaForAudit
-            .yaochiMemoryLayer
-        let tianhengProfileForAudit = kunlunHexaForAudit
-            .tianhengProfile
-        let jadePermitGradeForAudit = kunlunHexaForAudit
-            .jadePermitGrade
-        // M486-M490 (chapter 一百二十六) — L9 dream-loop + L3
-        // fold-page + L13 refinement production wires. Derive
-        // per-candidate ascent + rest + return + refinement
-        // schemas; one casket per turn.
-        let ascentBranchesForAudit = kunlunHexaForAudit
-            .ascentBranches
-        let restStepsForAudit = kunlunHexaForAudit.restSteps
-        let returnPathsForAudit = kunlunHexaForAudit.returnPaths
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // 6 hexa shadow re-bindings (yaochiMemoryLayer +
+        // tianhengProfile + jadePermitGrade +
+        // ascentBranches + restSteps + returnPaths) never
+        // read downstream。 Deleted。 Hexa is now consumed
+        // via input blocks。
         // chapter 四百八十五 / M1318 — V1 fold trio #2
         let kunlunTrioTwoForAudit = BASTurnAuditProjectionsKunlunTrioTwo
             .compute(
@@ -1266,13 +1260,10 @@ public struct BASEBrainRuntimeCoordinator {
                     ?? "unknown",
                 turnID: derivedTurnID,
                 sessionID: derivedSessionID)
-        let jadeCasketForAudit = kunlunTrioTwoForAudit.jadeCasket
-        let jadeRefinementTicketsForAudit = kunlunTrioTwoForAudit
-            .jadeRefinementTickets
-        // M491-M494 (chapter 一百二十七) — final Kunlun host +
-        // integrity production wires.
-        let jadeFidelityMapForAudit = kunlunTrioTwoForAudit
-            .jadeFidelityMap
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // 3 trio-two shadow re-bindings (jadeCasket +
+        // jadeRefinementTickets + jadeFidelityMap) never
+        // read downstream。 Deleted。
         // chapter 四百八十六 / M1320 — V1 cluster A FINAL 6 fold
         let kunlunHexaTwoForAudit =
             BASTurnAuditProjectionsKunlunHexaTwo.compute(
@@ -1284,20 +1275,12 @@ public struct BASEBrainRuntimeCoordinator {
                     .assertionCeiling,
                 riskLevel: boundRiskCard.riskLevel,
                 candidates: thoughtFrame.candidates)
-        let hostJadeRegisterForAudit = kunlunHexaTwoForAudit
-            .hostJadeRegister
-        let jadeMirrorDraftForAudit = kunlunHexaTwoForAudit
-            .jadeMirrorDraft
-        let kunlunUnnamableSetForAudit = kunlunHexaTwoForAudit
-            .kunlunUnnamableSet
-        let returnPathRefsForAudit = kunlunHexaTwoForAudit
-            .returnPathRefs
-        let kunlunAscentViewForAudit = kunlunHexaTwoForAudit
-            .kunlunAscentView
-        let kunlunFarWestReserveForAudit = kunlunHexaTwoForAudit
-            .kunlunFarWestReserve
-        // M495-M498 (chapter 一百二十七) — chapter 一百二十一
-        // Cthulhu leftover production wires.
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // 6 hexa-two shadow re-bindings (hostJadeRegister
+        // + jadeMirrorDraft + kunlunUnnamableSet +
+        // returnPathRefs + kunlunAscentView +
+        // kunlunFarWestReserve) never read downstream。
+        // Deleted。
         // chapter 四百八十六 / M1322 — V1 cluster B start
         let cthulhuPentaForAudit =
             BASTurnAuditProjectionsCthulhuPenta.compute(
@@ -1312,14 +1295,12 @@ public struct BASEBrainRuntimeCoordinator {
                 assertionCeilingRaw: unknownReserveForGate
                     .assertionCeiling.rawValue,
                 turnID: derivedTurnID)
-        let abyssalOrganAliasForAudit = cthulhuPentaForAudit
-            .abyssalOrganAlias
-        let humanAnchorProfileForAudit = cthulhuPentaForAudit
-            .humanAnchorProfile
-        let sealedMemoryForAudit = cthulhuPentaForAudit
-            .sealedMemory
-        let cosmicScaleViewForAudit = cthulhuPentaForAudit
-            .cosmicScaleView
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // 4 cthulhu-penta shadow re-bindings
+        // (abyssalOrganAlias + humanAnchorProfile +
+        // sealedMemory + cosmicScaleView) never read
+        // downstream。 Deleted。 ontologyFogForAudit
+        // remains as it IS consumed below。
         let ontologyFogForAudit = cthulhuPentaForAudit
             .ontologyFog
         // M452 (chapter 一百十九) — derive L9 retention loop from
@@ -1713,19 +1694,13 @@ public struct BASEBrainRuntimeCoordinator {
             BASTurnAuditProjectionsLifecycleQuartet.compute(
                 quarantineRecords: quarantineRecords,
                 updateTickets: updateTickets)
-        let synthesizedSealsForAudit = lifecycleQuartetForAudit
-            .synthesizedSeals
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // synthesizedSealsForAudit + lifecycleSessionsForAudit
+        // shadow re-bindings never read downstream。 Only the
+        // aggregates (sealAggregateForAudit +
+        // lifecycleAggregateForAudit) are consumed。
         let sealAggregateForAudit = lifecycleQuartetForAudit
             .sealAggregate
-        // M305 — synthesize an L13 lifecycle session per fresh
-        // UpdateTicket on this turn. All start at `.proposed`
-        // (the typed entry point of the 8-stage state machine);
-        // cross-turn promotion / retraction is the L13 actor
-        // primitives' job, not this projection. The aggregate
-        // is nil for turns that produced zero tickets, so the
-        // audit-entry builder elides the lifecycle.* codes.
-        let lifecycleSessionsForAudit = lifecycleQuartetForAudit
-            .lifecycleSessions
         let lifecycleAggregateForAudit = lifecycleQuartetForAudit
             .lifecycleAggregate
         // M316 — derive narrative distortion projection from
@@ -1759,8 +1734,10 @@ public struct BASEBrainRuntimeCoordinator {
             .ontologyShiftMark
         let narrativeDistortionMapForAudit = lateClusterCForAudit
             .narrativeDistortionMap
-        let hostFragilityForAudit = lateClusterCForAudit
-            .hostFragility
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // hostFragilityForAudit shadow re-binding never read
+        // downstream。 abyssalPressureWithFragility remains
+        // as it IS consumed below。
         let abyssalPressureWithFragility = lateClusterCForAudit
             .abyssalPressureWithFragility
         // M320 — derive `BASUnknownReserve` projection from L9
@@ -1780,8 +1757,10 @@ public struct BASEBrainRuntimeCoordinator {
                 quarantineRecords: quarantineRecords)
         let unknownReserveForAudit = lateClusterDForAudit
             .unknownReserve
-        let forbiddenCandidatesForAudit = lateClusterDForAudit
-            .forbiddenCandidates
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // forbiddenCandidatesForAudit shadow re-binding
+        // never read downstream。 forbiddenAggregateForAudit
+        // remains as it IS consumed below。
         let forbiddenAggregateForAudit = lateClusterDForAudit
             .forbiddenAggregate
         // M402 — Kunlun axis + alignment audit projection.
@@ -1824,7 +1803,9 @@ public struct BASEBrainRuntimeCoordinator {
                 kunlunAxisDeviationThreshold: Self
                     .kunlunAxisDeviationThreshold)
         let kunlunAxisForAudit = kunlunAxisProtocolForAudit.axis
-        let kunlunMatched = kunlunAxisProtocolForAudit.matched
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // kunlunMatched shadow re-binding never read
+        // downstream。 Deleted。
         let kunlunDeviationCodes = kunlunAxisProtocolForAudit
             .deviationCodes
         let kunlunAxisAlignmentForAudit = kunlunAxisProtocolForAudit
@@ -2045,8 +2026,9 @@ public struct BASEBrainRuntimeCoordinator {
         let surfaceTrioForAudit =
             BASTurnAuditProjectionsSurfaceTrio.compute(
                 permitMode: boundActionPermit.mode)
-        let surfaceModeForAudit = surfaceTrioForAudit
-            .surfaceMode
+        // chapter 五百三十四 / M1513 — dead-code purge:
+        // surfaceModeForAudit shadow re-binding never
+        // read downstream。 Deleted。
         let cthulhuSurfaceAliasForAudit = surfaceTrioForAudit
             .cthulhuSurfaceAlias
         let kunlunSurfaceAliasForAudit = surfaceTrioForAudit
