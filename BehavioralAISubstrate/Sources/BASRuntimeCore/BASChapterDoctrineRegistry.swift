@@ -6741,7 +6741,95 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1516。 100 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 535 — substrate-wide warning purge
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十五",
+            mNumberFirst: 1517,
+            mNumberLast: 1520,
+            v1MilestoneMNumber: 1520,
+            v1MilestoneStatus:
+                "chapter-535-substrate-wide-warning-zero",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1517, knife: "第一刀",
+                    concept: "Substrate-wide build-" +
+                        "warning purge:2 var→let in" +
+                        " BASPlasticityFold + BASMamba" +
+                        "SSMState (immutability per user" +
+                        " coding standards) + 2 `try?`" +
+                        " → explicit do/catch in" +
+                        " BASHostStorageWireBuilder" +
+                        " (silent-swallow made explicit" +
+                        " + documented)。 Substrate-wide" +
+                        " warning count 4 → 0。"),
+                BASChapterKnife(
+                    mNumber: 1518, knife: "第二刀",
+                    concept: "NEW BASSubstrateBuild" +
+                        "WarningPurgeDoctrine typed" +
+                        " milestone surface +" +
+                        " WarningCategory typed enum (3" +
+                        " categories:neverUsedLet +" +
+                        " neverMutatedVar +" +
+                        " tryDiscardUnused)。 81 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1519, knife: "第三刀",
+                    concept: "12 anti-drift PROOF tests" +
+                        " validating the substrate-wide" +
+                        " warning purge state:category" +
+                        " count + per-category purge" +
+                        " contributions + 100%" +
+                        " warning-free invariant。"),
+                BASChapterKnife(
+                    mNumber: 1520, knife: "第四刀",
+                    concept: "Chapter 535 close-out +" +
+                        " doctrine sync — substrate now" +
+                        " builds warning-free。 104" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "var-mutability-inversion-leftover",
+                "try-discard-silent-error-swallow",
+                "substrate-wide-warning-noise",
+                "coding-standards-drift-undocumented"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1520",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "substrate-warning-free"
+            ],
+            plannedFutureCuts: [
+                "future arc — wire up typed" +
+                " BASHostStorageInitialAtomAdmitFailure" +
+                "Log sink for the explicit silent-" +
+                "swallow paths in BASHostStorageWire" +
+                "Builder",
+                "future arc — V1 monolith internal fold" +
+                " (typed bundle for the remaining ForAudit" +
+                " declaration cluster patterns)",
+                "future arc — SampleHost production" +
+                " wire-in of the 9-bundle init"
+            ],
+            summary: "Chapter 535 sweeps the remaining 4" +
+                " substrate-wide build warnings to zero" +
+                " (M1517) + ships a typed milestone" +
+                " doctrine cataloguing the purge by" +
+                " WarningCategory typed enum (M1518) +" +
+                " 12 anti-drift PROOF tests (M1519) +" +
+                " close-out (M1520)。 Substrate-wide" +
+                " build warning count cumulative across" +
+                " chapters 534-535:64 → 0。 81 typed" +
+                " surfaces cumulative。 ADR-016 → M1520。" +
+                " 104 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

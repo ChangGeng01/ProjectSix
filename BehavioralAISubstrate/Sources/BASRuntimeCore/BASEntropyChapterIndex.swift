@@ -1978,7 +1978,26 @@ public enum BASEntropyChapterIndex {
                 " 60 → 0。 80 typed surfaces cumulative。" +
                 " ADR-016 → M1516。 V1 byte-equality" +
                 " preserved (pure-accessor reads with no" +
-                " side effects)。")
+                " side effects)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十五",
+            mNumberFirst: 1517, mNumberLast: 1520,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Substrate-wide build-warning" +
+                " purge:2 var→let (immutability) + 2" +
+                " try? discards → explicit do/catch" +
+                " (silent-swallow documented) at M1517." +
+                " BASSubstrateBuildWarningPurgeDoctrine" +
+                " typed milestone surface +" +
+                " WarningCategory typed enum (3" +
+                " categories) at M1518。 12 anti-drift" +
+                " PROOF tests at M1519。 Substrate-wide" +
+                " build warning count 4 → 0 (cumulative" +
+                " 64 → 0 across chapters 534-535)。 81" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1520。 V1 byte-equality preserved" +
+                " (pure cleanup,no behavioral change)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

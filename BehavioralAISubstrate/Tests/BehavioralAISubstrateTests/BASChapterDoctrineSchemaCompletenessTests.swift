@@ -1619,7 +1619,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百三十四")!)
+                            "chapter 五百三十四")!),
+            // M1520 chapter 535 — substrate-wide warning purge + doctrine + 12 PROOF tests
+            checkRegistry("五百三十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百三十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2387,6 +2393,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百三十四")!
+                .mNumberLast),
+            // M1520 chapter 535 — substrate-wide warning purge + doctrine + 12 PROOF tests
+            ("535",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百三十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

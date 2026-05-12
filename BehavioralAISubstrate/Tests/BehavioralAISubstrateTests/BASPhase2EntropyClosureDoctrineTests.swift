@@ -37,17 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs534() {
+    func testLastChapterIs535() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十四",
-            "Chapter 五百三十四:30-declaration dead-" +
-            "code purge from EBrainRuntimeCoordinator" +
-            ".swift + BASCoordinatorDeadDeclarationPurge" +
-            "Doctrine typed milestone surface + 11 anti-" +
-            "drift PROOF tests。 Coordinator build" +
-            " warning count 60 → 0。 80 typed surfaces" +
+            "chapter 五百三十五",
+            "Chapter 五百三十五:substrate-wide warning" +
+            " purge — 2 var→let + 2 try? discards fixed" +
+            " + BASSubstrateBuildWarningPurgeDoctrine" +
+            " typed milestone + 12 PROOF tests。" +
+            " Substrate now builds warning-free。" +
+            " Cumulative 64 → 0 warnings across" +
+            " chapters 534-535。 81 typed surfaces" +
             " cumulative")
     }
 

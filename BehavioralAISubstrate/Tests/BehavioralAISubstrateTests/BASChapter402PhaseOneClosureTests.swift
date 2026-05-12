@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1516",
-            "M1516:doctrine version reflects chapter 五百三十四 — 30-declaration dead-code purge from EBrainRuntimeCoordinator.swift (M1513) + BASCoordinatorDeadDeclarationPurgeDoctrine typed milestone surface cataloguing all 30 purged shadow re-bindings by origin cluster (M1514) + 11 anti-drift PROOF tests (M1515)。 Build warning count on the coordinator:60 → 0。 80 typed surfaces cumulative。 V1 byte-equality preserved (pure-accessor reads with no side effects;stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1520",
+            "M1520:doctrine version reflects chapter 五百三十五 — substrate-wide warning purge (2 var→let + 2 try? discards → explicit do/catch at M1517) + BASSubstrateBuildWarningPurgeDoctrine typed milestone surface with WarningCategory typed enum (M1518) + 12 anti-drift PROOF tests (M1519)。 Substrate-wide build warning count 4 → 0 (cumulative 64 → 0 across chapters 534-535)。 81 typed surfaces cumulative。 V1 byte-equality preserved (pure cleanup;stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

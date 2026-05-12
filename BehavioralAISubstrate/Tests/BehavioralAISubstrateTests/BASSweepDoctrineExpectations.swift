@@ -117,19 +117,20 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 132
+    public static let phase2ChapterCount: Int = 133
 
-    /// Phase 2 commits shipped。 At M1516:125 + 84 + 352
-    /// = 561 (chapter 534 = 4 cuts — 30-declaration
-    /// dead-code purge from coordinator + typed milestone
-    /// doctrine + 11 PROOF tests + close-out)
-    public static let phase2CommitsShipped: Int = 561
+    /// Phase 2 commits shipped。 At M1520:125 + 84 + 356
+    /// = 565 (chapter 535 = 4 cuts — substrate-wide
+    /// warning purge + typed milestone doctrine + 12
+    /// PROOF tests + close-out)
+    public static let phase2CommitsShipped: Int = 565
 
-    /// Phase 2 mNumberLast。 At M1516:chapter 534 (30-
-    /// declaration dead-code purge — coordinator now
-    /// warning-free,build warning count 60 → 0)。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1516
+    /// Phase 2 mNumberLast。 At M1520:chapter 535
+    /// (substrate-wide warning purge — substrate now
+    /// builds warning-free,cumulative 64 → 0 warnings
+    /// across chapters 534-535)。 SWEEP stays frozen at
+    /// 1163。
+    public static let phase2MNumberLast: Int = 1520
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

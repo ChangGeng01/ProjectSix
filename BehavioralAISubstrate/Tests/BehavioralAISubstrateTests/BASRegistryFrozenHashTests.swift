@@ -107,14 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 534 close-out。 Chapter
-    /// 534:30-declaration dead-code purge from
-    /// EBrainRuntimeCoordinator.swift +
-    /// BASCoordinatorDeadDeclarationPurgeDoctrine typed
-    /// milestone surface cataloguing all 30 purged
-    /// shadow re-bindings by origin cluster (11
-    /// clusters) + 11 anti-drift PROOF tests。 Build
-    /// warning count on the coordinator:60 → 0。
+    /// Re-captured at chapter 535 close-out。 Chapter
+    /// 535:substrate-wide warning purge — 2 var→let
+    /// (immutability) + 2 try? → explicit do/catch
+    /// (silent-swallow documented) +
+    /// BASSubstrateBuildWarningPurgeDoctrine typed
+    /// milestone surface with WarningCategory typed
+    /// enum (3 categories) + 12 anti-drift PROOF tests。
+    /// Substrate now builds warning-free (cumulative
+    /// 64 → 0 across chapters 534-535)。
     static let frozenFullRegistrySha256: String =
-        "51bc0ef2f3b37e29900c6371ba3450054266b592b5c672883024e3d8dd2df97f"
+        "0c7c4677ad6fc29cb2e2a7632acfca585ed6c6ee203f2f4011e16384d1793bad"
 }
