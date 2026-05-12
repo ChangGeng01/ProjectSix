@@ -1913,7 +1913,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十三")!)
+                            "chapter 五百八十三")!),
+            // M1716 chapter 584 — BASLeaseLife arc-seal milestone
+            checkRegistry("五百八十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3073,6 +3079,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十三")!
+                .mNumberLast),
+            // M1716 chapter 584 — BASLeaseLife arc-seal milestone
+            ("584",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

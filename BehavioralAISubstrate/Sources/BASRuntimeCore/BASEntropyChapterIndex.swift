@@ -2906,7 +2906,29 @@ public enum BASEntropyChapterIndex {
                 " Arc structure ready for sealing at" +
                 " chapter 584。 124 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1712。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十四",
+            mNumberFirst: 1713, mNumberLast: 1716,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASLEASELIFE CODABLE EXTENSION" +
+                " ARC-SEAL MILESTONE。 NEW BASLeaseLife" +
+                "CodableExtensionArcSealedDoctrine" +
+                " (M1713) commemorating 3-wave /" +
+                " 12-commit BASLeaseLife extension arc" +
+                " (chapters 581-583) + 24 anti-drift" +
+                " PROOF tests (M1714) + 16 wire-in" +
+                " PROOF tests (M1715) + close-out" +
+                " (M1716)。 7 types (6 structs + 1" +
+                " supporting enum) ledger-serializable。" +
+                " First sealed arc beyond M1700" +
+                " narrative arc。 Mirrors chapter 574" +
+                " Orchestration arc-seal pattern。 125" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1716。 300-consecutive-" +
+                "commit milestone reached。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

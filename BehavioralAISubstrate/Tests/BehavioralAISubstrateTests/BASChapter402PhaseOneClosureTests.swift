@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1712",
-            "M1712:doctrine version reflects chapter 五百八十三 — BASLEASELIFE WAVE 3 CODABLE EXTENSION。 2 struct types (BASLeaseLifeCoordinator.TurnRecorded composite culminating waves 1+2 + BASComputeRouter) gained Codable at M1709 + 2 PROOF tests (M1710) + BASLeaseLifeCodableExtensionWaveThreeDoctrine typed surface (M1711) + close-out (M1712)。 Completes BASLeaseLife 3-wave extension trilogy。 Chapter 581+582+583 = 6 BASLeaseLife struct types + 1 supporting enum ledger-serializable。 Arc structure ready for sealing at chapter 584。 124 typed surfaces cumulative。 296 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1716",
+            "M1716:doctrine version reflects chapter 五百八十四 — BASLEASELIFE CODABLE EXTENSION ARC-SEAL MILESTONE。 NEW BASLeaseLifeCodableExtensionArcSealedDoctrine (M1713) commemorating 3-wave / 12-commit BASLeaseLife extension arc (chapters 581-583) + 24 anti-drift PROOF tests (M1714) + 16 wire-in PROOF tests (M1715) + close-out (M1716)。 7 types (6 structs + 1 supporting enum) ledger-serializable。 First sealed arc beyond M1700 narrative arc。 Mirrors chapter 574 Orchestration arc-seal pattern。 125 typed surfaces cumulative。 300 consecutive byte-equality clean commits — 300-CONSECUTIVE-COMMIT milestone。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

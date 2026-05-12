@@ -107,17 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 583 close-out。 Chapter
-    /// 583:BASLEASELIFE WAVE 3 CODABLE EXTENSION。
-    /// 2 struct types (BASLeaseLifeCoordinator.
-    /// TurnRecorded composite + BASComputeRouter)
-    /// gained Codable at M1709 + 2 PROOF tests
-    /// (M1710) + NEW BASLeaseLifeCodableExtension
-    /// WaveThreeDoctrine (M1711)。 Completes BAS
-    /// LeaseLife 3-wave extension trilogy。 Chapter
-    /// 581+582+583 = 6 BASLeaseLife structs + 1
-    /// supporting enum ledger-serializable。 Arc
-    /// structure ready for sealing。
+    /// Re-captured at chapter 584 close-out。 Chapter
+    /// 584:BASLEASELIFE CODABLE EXTENSION ARC-SEAL
+    /// MILESTONE for the 3-wave BASLeaseLife extension
+    /// trilogy (chapters 581-583)。 NEW BASLeaseLife
+    /// CodableExtensionArcSealedDoctrine (M1713) + 24
+    /// anti-drift PROOF tests (M1714) + 16 wire-in
+    /// PROOF tests (M1715) commemorating 3-wave /
+    /// 12-commit BASLeaseLife arc。 First sealed arc
+    /// beyond M1700 narrative arc。 Mirrors chapter
+    /// 574 Orchestration arc-seal pattern。 300-
+    /// consecutive-commit milestone reached。
     static let frozenFullRegistrySha256: String =
-        "75a36c14d7a64eac7ee77dadbf79f96033ff66defb46431b2b35005e5c63c3c7"
+        "23e0caffd032d5ecb37cc982a644337b236698b82db86c9226d28af6df92e5bc"
 }

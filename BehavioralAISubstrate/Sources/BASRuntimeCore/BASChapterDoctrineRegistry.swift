@@ -11017,7 +11017,108 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1712。" +
                 " 296 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 584 — BASLeaseLife arc-seal
+        // milestone for the 3-wave extension trilogy
+        // (chapters 581-583)。 First sealed arc beyond
+        // the M1700 narrative arc。 Mirrors chapter
+        // 574 Orchestration arc-seal pattern。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十四",
+            mNumberFirst: 1713,
+            mNumberLast: 1716,
+            v1MilestoneMNumber: 1716,
+            v1MilestoneStatus:
+                "chapter-584-leaselife-codable-extension-arc-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1713, knife: "第一刀",
+                    concept: "NEW BASLeaseLifeCodable" +
+                        "ExtensionArcSealedDoctrine" +
+                        " typed milestone commemorating" +
+                        " 3-wave BASLeaseLife extension" +
+                        " arc (chapters 581-583)。 7" +
+                        " types (6 structs + 1" +
+                        " supporting enum),12 commits," +
+                        " single-module。 First sealed" +
+                        " arc beyond M1700 narrative" +
+                        " arc。 Mirrors chapter 574" +
+                        " Orchestration arc-seal" +
+                        " pattern。 typed-surface count" +
+                        " 124 → 125。"),
+                BASChapterKnife(
+                    mNumber: 1714, knife: "第二刀",
+                    concept: "24 anti-drift PROOF tests" +
+                        " for the M1713 arc-seal。" +
+                        " Identity + arc range + 7" +
+                        " coverage pins + type list +" +
+                        " cross-doctrine refs + 6" +
+                        " achievement flags (incl。" +
+                        " isFirstSealedArcBeyondM1700" +
+                        " + includesSupportingEnum)。"),
+                BASChapterKnife(
+                    mNumber: 1715, knife: "第三刀",
+                    concept: "16 wire-in PROOF tests" +
+                        " cross-checking the M1713" +
+                        " arc-seal against 3 wave" +
+                        " doctrines + chapter 574" +
+                        " parallel arc-seal + chapter" +
+                        " 580 narrative arc reference" +
+                        " + cumulative invariants。"),
+                BASChapterKnife(
+                    mNumber: 1716, knife: "第四刀",
+                    concept: "Chapter 584 close-out +" +
+                        " doctrine sync。 300" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved (M1716" +
+                        " = 300-CONSECUTIVE-COMMIT" +
+                        " milestone)。")
+            ],
+            entropyClassesAttacked: [
+                "leaselife-arc-undocumented",
+                "no-single-source-of-truth-for-7-leaselife-types",
+                "leaselife-wave-doctrines-not-cross-validated",
+                "first-post-m1700-arc-pattern-undefined"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1716",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "leaselife-extension-arc-sealed",
+                "7-leaselife-types-ledger-serializable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — hexa-milestone meta-meta" +
+                " milestone (6 sealed arcs:564 + 569" +
+                " + 574 + 575 + 579 + 584)",
+                "future arc — continue Codable" +
+                " extension into more modules (BAS" +
+                "Memory more types,BASObservability," +
+                " BASPolicy,BASWorldPrior)"
+            ],
+            summary: "Chapter 584 seals the 3-wave BAS" +
+                "LeaseLife Codable extension arc" +
+                " (chapters 581-583)。 NEW BAS" +
+                "LeaseLifeCodableExtensionArcSealed" +
+                "Doctrine typed milestone (M1713)" +
+                " commemorating 7 types (6 structs +" +
+                " 1 supporting enum),12 commits + 24" +
+                " anti-drift PROOF tests (M1714) + 16" +
+                " wire-in PROOF tests (M1715) + close-" +
+                "out (M1716)。 First sealed arc beyond" +
+                " the M1700 narrative arc。 Mirrors" +
+                " chapter 574 Orchestration arc-seal" +
+                " pattern。 125 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1716。" +
+                " 300 consecutive autonomous commits" +
+                " with V1 byte-equality preserved" +
+                " (M1716 = 300-CONSECUTIVE-COMMIT" +
+                " milestone)。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
