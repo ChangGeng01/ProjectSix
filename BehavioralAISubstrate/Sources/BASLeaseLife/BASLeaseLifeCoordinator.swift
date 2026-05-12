@@ -28,7 +28,7 @@ import BASRuntimeCore
 /// subtly different implementations and three hard-to-diagnose
 /// bugs. Concentrate the glue here, test it once.
 public actor BASLeaseLifeCoordinator {
-    public struct TurnRecorded: Sendable, Equatable {
+    public struct TurnRecorded: Codable, Sendable, Equatable {
         public let lung: BASLungStateAccumulator.Snapshot
         public let thermal: BASThermalTwin.Reading
         public let cancelledBreathIDs: [String]

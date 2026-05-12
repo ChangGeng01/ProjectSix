@@ -138,7 +138,7 @@ public struct BASComputeTierThermalSnapshot:
 ///
 /// Pure function by design: same snapshot + same preferences →
 /// same tier, no hidden state, no I/O.
-public struct BASComputeRouter: Sendable {
+public struct BASComputeRouter: Codable, Sendable, Equatable {
     public let preferredOrder: [BASComputeTier]
     public let minHeadroom: Double
 
