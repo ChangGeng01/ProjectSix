@@ -116,20 +116,20 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1636:24 + 20 + 118 = 162 (chapter
-    /// 564 — aggregator extension arc-seal milestone)
-    public static let phase2ChapterCount: Int = 162
+    /// added)。 At M1640:24 + 20 + 119 = 163 (chapter
+    /// 565 — post-arc Inputs Codable extension)
+    public static let phase2ChapterCount: Int = 163
 
-    /// Phase 2 commits shipped。 At M1636:125 + 84 +
-    /// 472 = 681 (chapter 564 = 4 cuts — aggregator
-    /// extension arc-seal milestone + 20 anti-drift +
-    /// 13 wire-in PROOF tests + close-out)
-    public static let phase2CommitsShipped: Int = 681
+    /// Phase 2 commits shipped。 At M1640:125 + 84 +
+    /// 476 = 685 (chapter 565 = 4 cuts — post-arc
+    /// Inputs Codable extension + 2 PROOF tests +
+    /// typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 685
 
-    /// Phase 2 mNumberLast。 At M1636:chapter 564 —
-    /// aggregator extension arc-seal milestone。 SWEEP
-    /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1636
+    /// Phase 2 mNumberLast。 At M1640:chapter 565 —
+    /// post-arc Inputs Codable extension。 SWEEP stays
+    /// frozen at 1163。
+    public static let phase2MNumberLast: Int = 1640
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

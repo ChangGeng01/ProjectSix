@@ -218,7 +218,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百六十一",   // M1621-M1624 (REAL SUBSTRATE CHANGE — add Codable + Equatable to 3 Trio/Protocol audit-projection aggregator types + 8 PROOF tests + BASTurnAuditProjectionsTrioCodableExtensionDoctrine + close-out)
         "chapter 五百六十二",   // M1625-M1628 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 5 more aggregator types + 10 PROOF tests + BASTurnAuditProjectionsFiveAggregatorCodableExtensionDoctrine + close-out;combined 8 aggregator types now ledger-serializable)
         "chapter 五百六十三",   // M1629-M1632 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 7 more aggregator types + 9 PROOF tests + BASTurnAuditProjectionsSevenAggregatorCodableExtensionDoctrine + close-out;combined 15 aggregator types now ledger-serializable)
-        "chapter 五百六十四"    // M1633-M1636 (AGGREGATOR CODABLE EXTENSION ARC-SEAL MILESTONE — BASAuditProjectionsAggregatorCodableExtensionArcSealedDoctrine + 20 anti-drift + 13 wire-in PROOF tests commemorating 3-chapter / 12-commit arc across chapters 561-563)
+        "chapter 五百六十四",   // M1633-M1636 (AGGREGATOR CODABLE EXTENSION ARC-SEAL MILESTONE — BASAuditProjectionsAggregatorCodableExtensionArcSealedDoctrine + 20 anti-drift + 13 wire-in PROOF tests commemorating 3-chapter / 12-commit arc across chapters 561-563)
+        "chapter 五百六十五"    // M1637-M1640 (POST-ARC FOLLOW-UP — Codable extension to 2 Inputs aggregator types + 2 PROOF tests + BASAuditObservationProjectionsInputsCodableExtensionDoctrine + close-out)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -235,14 +236,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1636
+    public static let mNumberLast: Int = 1640
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1636)。 Bumped through chapter 564:677 → 681。
-    /// Chapter 564:Aggregator extension arc-seal
-    /// milestone + 20 anti-drift + 13 wire-in PROOF
-    /// tests + close-out。
-    public static let commitsShipped: Int = 681
+    /// M1640)。 Bumped through chapter 565:681 → 685。
+    /// Chapter 565:Post-arc follow-up — Codable
+    /// extension to 2 Inputs aggregator types + PROOF
+    /// tests + typed surface + close-out。
+    public static let commitsShipped: Int = 685
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1636",
-            "M1636:doctrine version reflects chapter 五百六十四 — AGGREGATOR CODABLE EXTENSION ARC-SEAL MILESTONE。 BASAuditProjectionsAggregatorCodableExtensionArcSealedDoctrine typed milestone (M1633) commemorating 3-chapter / 12-commit arc (chapters 561-563) covering 15 aggregator types + 20 anti-drift PROOF tests (M1634) + 13 wire-in PROOF tests (M1635) + close-out (M1636)。 Mirrors chapter 553 cascade-arc pattern at aggregator layer。 105 typed surfaces cumulative。 220 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1640",
+            "M1640:doctrine version reflects chapter 五百六十五 — POST-ARC FOLLOW-UP。 Codable + Equatable extension to 2 high-level Inputs aggregator types (KunlunInputs + CthulhuInputs) at M1637 + 2 compile-time PROOF tests (M1638) + BASAuditObservationProjectionsInputsCodableExtensionDoctrine typed surface (M1639) + close-out (M1640)。 106 typed surfaces cumulative。 224 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

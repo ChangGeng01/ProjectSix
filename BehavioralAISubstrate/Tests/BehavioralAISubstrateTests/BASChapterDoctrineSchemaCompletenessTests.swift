@@ -1799,7 +1799,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百六十四")!)
+                            "chapter 五百六十四")!),
+            // M1640 chapter 565 — Post-arc follow-up Codable extension to 2 Inputs aggregator types
+            checkRegistry("五百六十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百六十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2807,6 +2813,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百六十四")!
+                .mNumberLast),
+            // M1640 chapter 565 — Post-arc Inputs Codable extension
+            ("565",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

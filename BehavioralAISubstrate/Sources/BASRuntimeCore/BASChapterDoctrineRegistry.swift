@@ -9433,6 +9433,85 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1636。 220 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 565 — Codable extension to 2 Inputs
+        // aggregator types。 Natural follow-up to the
+        // chapter 561-564 aggregator arc。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十五",
+            mNumberFirst: 1637,
+            mNumberLast: 1640,
+            v1MilestoneMNumber: 1640,
+            v1MilestoneStatus:
+                "chapter-565-inputs-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1637, knife: "第一刀",
+                    concept: "Real substrate change:" +
+                        " add Codable + Equatable to 2" +
+                        " Inputs aggregator types" +
+                        " (KunlunInputs + CthulhuInputs)。" +
+                        " Enabled by the chapter" +
+                        " 561-564 arc making upstream" +
+                        " aggregators Codable。"),
+                BASChapterKnife(
+                    mNumber: 1638, knife: "第二刀",
+                    concept: "2 compile-time Codable" +
+                        " conformance PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1639, knife: "第三刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsInputsCodable" +
+                        "ExtensionDoctrine typed" +
+                        " surface with upstream-" +
+                        "dependency map。 typed-surface" +
+                        " count 105 → 106。"),
+                BASChapterKnife(
+                    mNumber: 1640, knife: "第四刀",
+                    concept: "Chapter 565 close-out +" +
+                        " doctrine sync。 224" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "kunlun-inputs-non-codable",
+                "cthulhu-inputs-non-codable",
+                "aggregator-arc-aftermath-incomplete",
+                "next-layer-up-not-extended"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1640",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "inputs-codable-extension",
+                "post-arc-followthrough"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional substrate" +
+                " coverage if more non-Codable" +
+                " types arise"
+            ],
+            summary: "Chapter 565 extends Codable +" +
+                " Equatable to 2 high-level Inputs" +
+                " aggregator types (KunlunInputs +" +
+                " CthulhuInputs) at M1637 — the" +
+                " natural follow-up to the chapter" +
+                " 561-564 aggregator arc。 2 compile-" +
+                "time PROOF tests (M1638) +" +
+                " BASAuditObservationProjectionsInputs" +
+                "CodableExtensionDoctrine typed surface" +
+                " with upstream-dependency map (M1639)" +
+                " + close-out (M1640)。 106 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1640。 224 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

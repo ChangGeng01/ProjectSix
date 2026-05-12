@@ -2543,7 +2543,21 @@ public enum BASEntropyChapterIndex {
                 " cascade-arc pattern at aggregator" +
                 " layer。 105 typed surfaces cumulative" +
                 " (+1)。 ADR-016 → M1636。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十五",
+            mNumberFirst: 1637, mNumberLast: 1640,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "POST-ARC FOLLOW-UP — Codable +" +
+                " Equatable extension to 2 high-level" +
+                " Inputs aggregator types" +
+                " (KunlunInputs + CthulhuInputs) at" +
+                " M1637 + 2 compile-time PROOF tests" +
+                " (M1638) + new typed surface (M1639)" +
+                " + close-out (M1640)。 106 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1640。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
