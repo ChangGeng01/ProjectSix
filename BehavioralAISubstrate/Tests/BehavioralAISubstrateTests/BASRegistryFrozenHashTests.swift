@@ -107,14 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 514 close-out。 Chapter
-    /// 514:3rd typed input block + unified convenience
-    /// inits — BASAuditObservationProjectionsObservation
-    /// BundlesBlock (11 cognitive bundles) + observation-
-    /// bundles-only convenience init + unified 3-block
-    /// init taking all of Kunlun + Cthulhu + Observation。
-    /// 37 of 56 audit-projection fields now packaged
-    /// into 3 typed input surfaces。
+    /// Re-captured at chapter 515 close-out。 Chapter
+    /// 515:REAL V1 monolith projections fold —
+    /// EBrainRuntimeCoordinator.swift:2035 switches from
+    /// 56-arg/118-LOC inline construction to 3 typed
+    /// input blocks + ~22-arg unified 3-block init。
+    /// ~35 LOC saved at call site。 First real V1
+    /// monolith inline-construction fold since chapter
+    /// 510。 V1 byte-equality preserved via stress-sweep
+    /// canonical60 × 3 repeat runs 0-divergence。
     static let frozenFullRegistrySha256: String =
-        "3e113562026b3d142e8ab2a6a8bfdf07081cd48e6d684f7b05ccb113b623d299"
+        "6e53d3263e1138aad3aaeafd7caab599fd326dcbb2a1702dac39a41ea69b8fca"
 }

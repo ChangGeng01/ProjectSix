@@ -1499,7 +1499,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百十四")!)
+                            "chapter 五百十四")!),
+            // M1440 chapter 515 — V1 monolith projections fold
+            checkRegistry("五百十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2107,6 +2113,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百十四")!
+                .mNumberLast),
+            // M1440 chapter 515 — V1 monolith projections fold
+            ("515",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

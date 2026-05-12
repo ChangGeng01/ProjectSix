@@ -1637,7 +1637,23 @@ public enum BASEntropyChapterIndex {
                 " 3 typed input surfaces。 60 typed" +
                 " surfaces cumulative。 ADR-016 →" +
                 " M1436。 V1 untouched (additive APIs" +
-                " only)。")
+                " only)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十五",
+            mNumberFirst: 1437, mNumberLast: 1440,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "REAL V1 monolith projections fold:" +
+                " EBrainRuntimeCoordinator.swift line" +
+                " 2035 switches from 56-arg/118-LOC" +
+                " inline construction to 3 typed input" +
+                " blocks + ~22-arg unified 3-block init。" +
+                " ~35 LOC saved at call site。 V1 byte-" +
+                "equality preserved via stress-sweep" +
+                " canonical60 × 3 repeat runs 0-" +
+                "divergence。 61 typed surfaces" +
+                " cumulative。 ADR-016 → M1440。 First" +
+                " real V1 fold since chapter 510。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

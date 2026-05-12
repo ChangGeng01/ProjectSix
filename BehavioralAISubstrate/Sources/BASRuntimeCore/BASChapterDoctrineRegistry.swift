@@ -4875,6 +4875,103 @@ public enum BASChapterDoctrineRegistry {
                 " into 3 typed input surfaces。 60 typed" +
                 " surfaces cumulative。 ADR-016 → M1436。" +
                 " V1 untouched (additive APIs only)。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 515 — REAL V1 monolith fold using
+        // unified 3-block init
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十五",
+            mNumberFirst: 1437,
+            mNumberLast: 1440,
+            v1MilestoneMNumber: 1440,
+            v1MilestoneStatus:
+                "chapter-515-V1-projections-fold-shipped",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1437, knife: "第一刀",
+                    concept: "REAL V1 monolith fold:" +
+                        " EBrainRuntimeCoordinator.swift" +
+                        " line 2035 projections" +
+                        " construction switched from" +
+                        " 56-line named-arg list to" +
+                        " 3 typed input blocks + ~22-arg" +
+                        " unified init call。 ~35 LOC" +
+                        " saved at call site。 Stress-" +
+                        "sweep regression guard" +
+                        " PASSES。"),
+                BASChapterKnife(
+                    mNumber: 1438, knife: "第二刀",
+                    concept: "3 PROOF tests pinning" +
+                        " the V1 splice byte-equality:" +
+                        " M1435 invariant re-asserted" +
+                        " at chapter 515 ship time +" +
+                        " marker test verifying chapter" +
+                        " 515 doctrine record exists" +
+                        " post-close-out + block" +
+                        " Hashable conformance pin。"),
+                BASChapterKnife(
+                    mNumber: 1439, knife: "第三刀",
+                    concept: "NEW BASV1MonolithProjections" +
+                        "FoldDoctrine typed milestone +" +
+                        " chapter515ShipRecord singleton" +
+                        " freezing the fold's LOC pins" +
+                        " (preFold=118, postFold=83," +
+                        " net=35) + field accounting" +
+                        " (packaged=37, residual=22) +" +
+                        " 3 byte-equality PROOF" +
+                        " references。 61 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1440, knife: "第四刀",
+                    concept: "Chapter 515 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1440。 V1 byte-equality" +
+                        " preserved (stress-sweep" +
+                        " canonical60 × 3 repeat runs" +
+                        " 0-divergence + full test" +
+                        " suite 4700+ tests pass)。 First" +
+                        " real V1 monolith inline-" +
+                        "construction fold since" +
+                        " chapter 510。")
+            ],
+            entropyClassesAttacked: [
+                "v1-monolith-projections-56-arg-call-site",
+                "v1-monolith-118-loc-inline-construction",
+                "audit-projection-call-site-unfolded",
+                "v1-fold-pending-since-chapter-510"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1440",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "v1-monolith-projections-fold-35-loc-reduction"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional V1 inline-" +
+                "construction folds (71+ ForAudit" +
+                " declarations remain)",
+                "future arc — production wire-in of" +
+                " projection-block emitter through" +
+                " observer chain",
+                "future arc — Tier C migration source-" +
+                "type adoption",
+                "future arc — V1 monolith deletion" +
+                " (long-term Tier 1 closure target)"
+            ],
+            summary: "REAL V1 monolith projections fold:" +
+                " EBrainRuntimeCoordinator.swift line" +
+                " 2035 switches from 56-arg/118-LOC" +
+                " inline construction to 3 typed input" +
+                " blocks (kunlunInputs/cthulhuInputs/" +
+                "observationBundles) + ~22-arg unified" +
+                " 3-block init。 ~35 LOC saved at call" +
+                " site。 V1 byte-equality preserved" +
+                " (stress-sweep canonical60 × 3 repeat" +
+                " runs 0-divergence)。 61 typed surfaces" +
+                " cumulative。 ADR-016 → M1440。 First" +
+                " real V1 fold since chapter 510。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

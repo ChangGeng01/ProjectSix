@@ -37,20 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs514() {
+    func testLastChapterIs515() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百十四",
-            "M1436 chapter 五百十四 — 3rd typed input" +
-            " block + unified convenience inits。" +
-            " BASAuditObservationProjections" +
-            "ObservationBundlesBlock (11 cognitive" +
-            " bundles) + observation-bundles-only" +
-            " convenience init + unified 3-block init。" +
-            " 37 of 56 audit-projection fields" +
-            " packaged into 3 typed input surfaces。" +
-            " 60 typed surfaces cumulative")
+            "chapter 五百十五",
+            "M1440 chapter 五百十五 — REAL V1 monolith" +
+            " projections fold。 EBrainRuntime" +
+            "Coordinator.swift:2035 switches from" +
+            " 56-arg/118-LOC inline construction to" +
+            " 3 typed input blocks + unified 3-block" +
+            " init。 ~35 LOC saved。 V1 byte-equality" +
+            " preserved。 61 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1436",
-            "M1436:doctrine version reflects chapter 五百十四 — 3rd typed input block + unified convenience inits。 BASAuditObservationProjectionsObservationBundlesBlock (M1433, 11 cognitive observation bundles) + BASAuditObservationProjections.init(observationBundles:) convenience init (M1434) + BASAuditObservationProjections.init(kunlunInputs:cthulhuInputs:observationBundles:) UNIFIED 3-block init (M1435)。 37 of 56 audit-projection fields now packaged into 3 typed input surfaces。 60 typed surfaces cumulative。 V1 untouched (additive APIs only)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1440",
+            "M1440:doctrine version reflects chapter 五百十五 — REAL V1 monolith projections fold。 EBrainRuntimeCoordinator.swift:2035 (M1437) switches from 56-arg/118-LOC inline construction to 3 typed input blocks (kunlunInputs/cthulhuInputs/observationBundles) + ~22-arg unified 3-block init。 ~35 LOC saved at call site。 M1438 PROOF tests + M1439 BASV1MonolithProjectionsFoldDoctrine typed milestone freeze the fold's LOC + byte-equality invariants。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 61 typed surfaces cumulative。 First real V1 monolith inline-construction fold since chapter 510。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
