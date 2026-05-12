@@ -2319,16 +2319,43 @@ public struct BASEBrainRuntimeCoordinator {
             hostGateValue: hostGateValue,
             renderedOutput: renderedOutput,
             updateTickets: updateTickets,
-            experienceCandidates: evolutionGovernance.experienceCandidates,
-            workflowCandidates: evolutionGovernance.workflowCandidates,
-            guardTemplateCandidates: evolutionGovernance.guardTemplateCandidates,
-            biasRecords: evolutionGovernance.biasRecords,
-            riskPatternCandidates: evolutionGovernance.riskPatternCandidates,
-            learningExportBundles: evolutionGovernance.learningExportBundles,
-            shadowTrialRecords: evolutionGovernance.shadowTrialRecords,
-            versionDeltas: evolutionGovernance.versionDeltas,
-            retractionOrders: evolutionGovernance.retractionOrders,
-            evolutionSeals: evolutionGovernance.evolutionSeals,
+            // chapter 五百二十四 / M1475 — V1 splice:
+            // 10 evolution-cluster args collapse to 1
+            // typed evolutionBundle。 Byte-equality
+            // preserved by M1474 PROOF (bundle accessors
+            // pass through verbatim)。
+            evolutionBundle:
+                BASEBrainTurnResultEvolutionBundle(
+                    experienceCandidates:
+                        evolutionGovernance
+                            .experienceCandidates,
+                    workflowCandidates:
+                        evolutionGovernance
+                            .workflowCandidates,
+                    guardTemplateCandidates:
+                        evolutionGovernance
+                            .guardTemplateCandidates,
+                    biasRecords:
+                        evolutionGovernance
+                            .biasRecords,
+                    riskPatternCandidates:
+                        evolutionGovernance
+                            .riskPatternCandidates,
+                    learningExportBundles:
+                        evolutionGovernance
+                            .learningExportBundles,
+                    shadowTrialRecords:
+                        evolutionGovernance
+                            .shadowTrialRecords,
+                    versionDeltas:
+                        evolutionGovernance
+                            .versionDeltas,
+                    retractionOrders:
+                        evolutionGovernance
+                            .retractionOrders,
+                    evolutionSeals:
+                        evolutionGovernance
+                            .evolutionSeals),
             runtimeTrace: finalizedRuntimeTrace,
             // M578 (chapter 一百五十三 — 一次性解决掉) — populate
             // 4 typed projection fields directly on turn result so
