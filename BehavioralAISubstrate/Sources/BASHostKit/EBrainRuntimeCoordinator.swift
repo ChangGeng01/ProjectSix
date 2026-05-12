@@ -2322,8 +2322,21 @@ public struct BASEBrainRuntimeCoordinator {
                         sovereignActuationCommands,
                     sovereignExecutionReceipts:
                         sovereignExecutionReceipts),
-            policyLineage: policyLineage,
-            recoveryDisposition: recoveryDisposition,
+            // chapter 五百三十二 / M1507 — V1 splice:
+            // 3 forensic metadata args collapse to 1
+            // typed forensicMetadataBundle (policyLineage
+            // + recoveryDisposition + runtimeTrace)。
+            // Byte-equality preserved by M1506 PROOF
+            // (bundle accessors pass through verbatim)。
+            // 100% arg packaging coverage achieved at
+            // this V1 call site。
+            forensicMetadataBundle:
+                BASEBrainTurnResultForensicMetadataBundle(
+                    policyLineage: policyLineage,
+                    recoveryDisposition:
+                        recoveryDisposition,
+                    runtimeTrace:
+                        finalizedRuntimeTrace),
             // chapter 五百二十六 / M1483 — V1 splice:
             // 5 host-cluster args collapse to 1 typed
             // hostBundle。 Byte-equality preserved by
@@ -2406,7 +2419,6 @@ public struct BASEBrainRuntimeCoordinator {
                     evolutionSeals:
                         evolutionGovernance
                             .evolutionSeals),
-            runtimeTrace: finalizedRuntimeTrace,
             // chapter 五百二十六 / M1483 — V1 splice:
             // 7 audit-projection-forwarded args collapse
             // to 1 typed auditProjectionForwardBundle。
