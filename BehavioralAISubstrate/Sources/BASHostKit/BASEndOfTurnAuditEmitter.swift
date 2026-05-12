@@ -2,13 +2,16 @@
 // chapter 五百五 / M1398 — actor that composes all 4
 // observation pipelines into a unified emission record
 //
+// chapter 五百十三 / M1431 — 5th pipeline (projection
+// blocks) added
+//
 // Hosts construct the emitter with optional observer +
 // ledger references。 At end-of-turn,calling
 // `emit(turnID:recordedAtMs:)` snapshots each connected
 // pipeline and returns a typed BASEndOfTurnAudit
 // EmissionRecord ready for audit emission。
 //
-// REAL CONSUMPTION across the 4 pipelines:
+// REAL CONSUMPTION across the 5 pipelines:
 //   - probeBundle (M1386) → cacheReport via M1393
 //   - routingObserver (M1389) → routingDecisions via
 //     M1394 snapshotAsBundle()
@@ -16,8 +19,11 @@
 //     via snapshot()
 //   - advisoryLedger (M1391) → runtimeModeAdvisories
 //     via M1395 snapshotAsBundle()
+//   - projectionBlockObserver (M1426) →
+//     projectionBlockObservations via M1427
+//     snapshotAsBundle()  [chapter 513 M1431 addition]
 //
-// HONEST SCOPE — chapter 五百五:
+// HONEST SCOPE — chapter 五百五 (chapter 五百十三 extends):
 // =============================================================
 // All connections are OPTIONAL — hosts may omit any
 // observer they don't use。 The emitter passes through
@@ -44,6 +50,8 @@ public actor BASEndOfTurnAuditEmitter {
         BASKernelDispatchStatisticsRecorder?
     private let advisoryLedger:
         BASEBrainHostRuntimeModeAdvisoryLedger?
+    private let projectionBlockObserver:
+        BASAuditObservationProjectionsBundleObserver?
 
     public init(
         probeBundle:
@@ -53,12 +61,17 @@ public actor BASEndOfTurnAuditEmitter {
         statisticsRecorder:
             BASKernelDispatchStatisticsRecorder? = nil,
         advisoryLedger:
-            BASEBrainHostRuntimeModeAdvisoryLedger? = nil
+            BASEBrainHostRuntimeModeAdvisoryLedger? = nil,
+        projectionBlockObserver:
+            BASAuditObservationProjectionsBundleObserver?
+            = nil
     ) {
         self.probeBundle = probeBundle
         self.routingObserver = routingObserver
         self.statisticsRecorder = statisticsRecorder
         self.advisoryLedger = advisoryLedger
+        self.projectionBlockObserver =
+            projectionBlockObserver
     }
 
     /// Snapshot all connected pipelines and emit a
@@ -116,6 +129,17 @@ public actor BASEndOfTurnAuditEmitter {
             runtimeModeAdvisories = nil
         }
 
+        // Pipeline 5: projection-block observations
+        // bundle (chapter 513 M1431)
+        let projectionBlockObservations:
+            BASAuditObservationProjectionsBundle?
+        if let observer = projectionBlockObserver {
+            projectionBlockObservations = await observer
+                .snapshotAsBundle()
+        } else {
+            projectionBlockObservations = nil
+        }
+
         return BASEndOfTurnAuditEmissionRecord(
             turnID: turnID,
             cacheReport: cacheReport,
@@ -123,6 +147,8 @@ public actor BASEndOfTurnAuditEmitter {
             dispatchStatistics: dispatchStatistics,
             runtimeModeAdvisories:
                 runtimeModeAdvisories,
+            projectionBlockObservations:
+                projectionBlockObservations,
             recordedAtMs: recordedAtMs)
     }
 
@@ -152,13 +178,23 @@ public actor BASEndOfTurnAuditEmitter {
         advisoryLedger != nil
     }
 
-    /// Count of connected pipelines (0-4)。
+    /// `true` when the emitter holds a projection-block
+    /// observer reference for pipeline 5 (chapter 513
+    /// M1431)。
+    public nonisolated var hasProjectionBlockObserver: Bool
+    {
+        projectionBlockObserver != nil
+    }
+
+    /// Count of connected pipelines (0-5)。 M1431 grows
+    /// upper bound from 4 → 5。
     public nonisolated var connectedPipelineCount: Int {
         var count = 0
         if hasProbeBundle { count += 1 }
         if hasRoutingObserver { count += 1 }
         if hasStatisticsRecorder { count += 1 }
         if hasAdvisoryLedger { count += 1 }
+        if hasProjectionBlockObserver { count += 1 }
         return count
     }
 }
