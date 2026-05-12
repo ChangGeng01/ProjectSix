@@ -1667,7 +1667,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十二")!)
+                            "chapter 五百四十二")!),
+            // M1552 chapter 543 — Codable round-trip coverage extension + tracking doctrine + 13 PROOF tests
+            checkRegistry("五百四十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2499,6 +2505,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十二")!
+                .mNumberLast),
+            // M1552 chapter 543 — Codable round-trip coverage extension + tracking doctrine + 13 PROOF tests
+            ("543",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

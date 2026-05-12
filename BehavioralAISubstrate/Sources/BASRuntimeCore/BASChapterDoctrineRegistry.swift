@@ -7483,7 +7483,93 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M1548。" +
                 " 132 consecutive autonomous commits with" +
                 " V1 byte-equality preserved。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 543 — extend Codable round-trip
+        // coverage to 5 of 9 bundles + coverage
+        // tracking doctrine
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十三",
+            mNumberFirst: 1549,
+            mNumberLast: 1552,
+            v1MilestoneMNumber: 1552,
+            v1MilestoneStatus:
+                "chapter-543-roundtrip-coverage-extended",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1549, knife: "第一刀",
+                    concept: "5 Codable round-trip PROOF" +
+                        " tests for HostBundle + Forensic" +
+                        "MetadataBundle (2 simplest" +
+                        " required-field fixtures)。" +
+                        " Extends coverage from 3 → 5 of" +
+                        " 9 cluster bundles。"),
+                BASChapterKnife(
+                    mNumber: 1550, knife: "第二刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "ClusterBundleCodableRoundTrip" +
+                        "CoverageDoctrine typed surface" +
+                        " with CoverageStatus typed enum" +
+                        " (2 cases) + 9-entry catalogue" +
+                        " + coverageRatio + catalogueIs" +
+                        "Consistent computed invariants。" +
+                        " 89 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1551, knife: "第三刀",
+                    concept: "13 anti-drift PROOF tests:" +
+                        " counts + ratio + consistency" +
+                        " + per-status + per-bundle" +
+                        " lookups + uniqueness + cross-" +
+                        "doctrine invariant pinning total" +
+                        " against BASEBrainTurnResultFold" +
+                        "ArcSealedDoctrine.clusterBundle" +
+                        "Count。"),
+                BASChapterKnife(
+                    mNumber: 1552, knife: "第四刀",
+                    concept: "Chapter 543 close-out +" +
+                        " doctrine sync。 136 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "round-trip-coverage-fragmented",
+                "host-forensic-fixture-absent",
+                "coverage-rolling-state-untracked",
+                "cross-doctrine-cluster-count-not-pinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1552",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "5-of-9-round-trip-coverage-pinned"
+            ],
+            plannedFutureCuts: [
+                "future arc — Codable round-trip" +
+                " coverage extension to remaining 4" +
+                " bundles (CognitiveFrames + RiskChoice" +
+                " + Misc + DeviceLifecycle — require" +
+                " deeper fixtures)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in of observability sinks"
+            ],
+            summary: "Chapter 543 extends Codable round-" +
+                "trip PROOF test coverage from 3 → 5 of" +
+                " 9 cluster bundles (M1549) + ships a" +
+                " typed coverage tracking doctrine with" +
+                " 2-case CoverageStatus enum +" +
+                " catalogueIsConsistent computed" +
+                " invariant + cross-doctrine total" +
+                " consistency check (M1550) + 13 anti-" +
+                "drift PROOF tests (M1551) + close-out" +
+                " (M1552)。 89 typed surfaces cumulative。" +
+                " ADR-016 → M1552。 136 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

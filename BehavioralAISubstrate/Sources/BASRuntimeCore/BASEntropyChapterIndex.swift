@@ -2133,7 +2133,25 @@ public enum BASEntropyChapterIndex {
                 "lacks-Hashable blockers (M1546) + 10" +
                 " anti-drift PROOF tests (M1547)。 88" +
                 " typed surfaces cumulative。 ADR-016 →" +
-                " M1548。 V1 byte-equality preserved。")
+                " M1548。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十三",
+            mNumberFirst: 1549, mNumberLast: 1552,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "5 Codable round-trip PROOF tests" +
+                " for HostBundle + ForensicMetadata" +
+                "Bundle extending coverage from 3 → 5" +
+                " of 9 cluster bundles (M1549) + NEW" +
+                " BASEBrainTurnResultClusterBundleCodable" +
+                "RoundTripCoverageDoctrine typed surface" +
+                " with 2-case CoverageStatus enum +" +
+                " catalogueIsConsistent computed" +
+                " invariant + cross-doctrine total" +
+                " consistency check (M1550) + 13" +
+                " anti-drift PROOF tests (M1551)。 89" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1552。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
