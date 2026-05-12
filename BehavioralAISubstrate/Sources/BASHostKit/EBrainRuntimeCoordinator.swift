@@ -2029,20 +2029,21 @@ public struct BASEBrainRuntimeCoordinator {
         // Pre-M436.4 the call site spelled 24+ named parameters
         // chapter 五百十五 / M1437 — V1 monolith projections
         // construction FOLD using the unified 3-block init
-        // (M1435)。 Replaces 56-line named-arg list with 3
-        // typed input block constructions + ~22-arg unified
-        // init call。 Byte-equality with the pre-fold path
-        // GUARANTEED by M1435 PROOF tests
-        // (`BASAuditObservationProjectionsThreeBlockUnified
-        // InitTests.testThreeBlockInitEqualsAllFields`)。
+        // (M1435)。
+        // chapter 五百十六 / M1443 — extended to 4-block
+        // init (M1442),packaging 9 more Kunlun protocol
+        // fields into the new kunlunProtocolBlock。
+        //
+        // Byte-equality with the pre-fold path GUARANTEED
+        // by M1435 + M1442 PROOF tests。 Stress-sweep
+        // regression guard runs canonical60 × 3 repeat
+        // runs and asserts 0 divergence。
         //
         // The 4 Kunlun trios + Cthulhu trio + Penta + 11
-        // cognitive bundles flow into 3 typed input surfaces
-        // (kunlunInputs / cthulhuInputs / observationBundles)。
-        // Residual fields stay as named args because they're
-        // not yet grouped into blocks (e.g.
-        // `kunlunAxisAlignment`,`yaochiSanctumClass`,
-        // reason codes,reconciliation outputs)。
+        // cognitive bundles + 9 Kunlun protocol fields now
+        // flow into 4 typed input surfaces。 Residual
+        // fields stay as named args because they're not
+        // yet grouped into blocks。
         let kunlunInputsForAudit =
             BASAuditObservationProjectionsKunlunInputs(
                 trio: kunlunTrioForAudit,
@@ -2078,11 +2079,33 @@ public struct BASEBrainRuntimeCoordinator {
                     .riskObservationBundle,
                 updateTicket: thoughtFrame
                     .updateTicketObservationBundle)
+        let kunlunProtocolBlockForAudit =
+            BASAuditObservationProjectionsKunlunProtocolBlock(
+                kunlunAxisAlignment:
+                    kunlunAxisAlignmentForAudit,
+                jadeCanonVerification:
+                    kunlunJadeVerificationForAudit,
+                jadeCanonObjectClass: .actionPermit,
+                riverOriginLineage:
+                    kunlunRiverLineageForAudit,
+                yaochiAccess:
+                    kunlunYaochiAccessForAudit,
+                yaochiSanctumClass:
+                    kunlunYaochiSanctumForAudit
+                        .sanctumClass,
+                tianmenReadiness:
+                    kunlunHeavenGateReadinessForAudit,
+                tianmenGateClass:
+                    kunlunHeavenGateForAudit.gateClass,
+                tianmenPassState:
+                    kunlunHeavenGateForAudit.passState)
         let projections = BASAuditObservationProjections(
             kunlunInputs: kunlunInputsForAudit,
             cthulhuInputs: cthulhuInputsForAudit,
             observationBundles:
                 observationBundlesForAudit,
+            kunlunProtocolBlock:
+                kunlunProtocolBlockForAudit,
             candidateObservationBundle: thoughtArtifacts
                 .candidateObservationBundle,
             tribunalObservationBundle: thoughtFrame
@@ -2096,20 +2119,6 @@ public struct BASEBrainRuntimeCoordinator {
             abyssalBranches: abyssalBranchesForAudit,
             unknownReserve: unknownReserveForAudit,
             forbiddenAggregate: forbiddenAggregateForAudit,
-            kunlunAxisAlignment: kunlunAxisAlignmentForAudit,
-            jadeCanonVerification:
-                kunlunJadeVerificationForAudit,
-            jadeCanonObjectClass: .actionPermit,
-            riverOriginLineage: kunlunRiverLineageForAudit,
-            yaochiAccess: kunlunYaochiAccessForAudit,
-            yaochiSanctumClass:
-                kunlunYaochiSanctumForAudit.sanctumClass,
-            tianmenReadiness:
-                kunlunHeavenGateReadinessForAudit,
-            tianmenGateClass:
-                kunlunHeavenGateForAudit.gateClass,
-            tianmenPassState:
-                kunlunHeavenGateForAudit.passState,
             escalationSuppressionCodes:
                 escalationSuppressionCodes,
             kunlunAxisView: kunlunAxisViewForAudit,
