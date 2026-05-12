@@ -1511,7 +1511,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百十六")!)
+                            "chapter 五百十六")!),
+            // M1448 chapter 517 — 5th input block + V1 splice extension
+            checkRegistry("五百十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2135,6 +2141,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百十六")!
+                .mNumberLast),
+            // M1448 chapter 517 — 5th input block + V1 splice extension
+            ("517",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

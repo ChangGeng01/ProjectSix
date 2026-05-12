@@ -1669,7 +1669,26 @@ public enum BASEntropyChapterIndex {
                 " (82% coverage)。 V1 call site shrinks" +
                 " from 83 → ~78 LOC。 62 typed surfaces" +
                 " cumulative。 ADR-016 → M1444。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十七",
+            mNumberFirst: 1445, mNumberLast: 1448,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "5th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "CthulhuAggregatesBlock (7 L1-L7" +
+                " aggregate fields) + 5-block" +
+                " convenience init + V1 monolith splice" +
+                " extending M1443。 53 of 56 audit-" +
+                "projection fields now flow through 5" +
+                " typed input surfaces (95% packaging" +
+                " coverage)。 V1 call site shrinks from" +
+                " 78 → ~73 LOC (cumulative 118 → 73" +
+                " across chapters 515-517 = ~45 LOC" +
+                " saved)。 63 typed surfaces cumulative。" +
+                " ADR-016 → M1448。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

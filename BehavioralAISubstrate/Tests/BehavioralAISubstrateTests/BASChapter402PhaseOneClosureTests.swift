@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1444",
-            "M1444:doctrine version reflects chapter 五百十六 — 4th typed input block + V1 splice extension。 BASAuditObservationProjectionsKunlunProtocolBlock (M1441, 9 protocol fields) + BASAuditObservationProjections.init(kunlunInputs:cthulhuInputs:observationBundles:kunlunProtocolBlock:) UNIFIED 4-block init (M1442) + V1 monolith splice extending M1437 (M1443)。 46 of 56 audit-projection fields now flow through 4 typed input surfaces (82% packaging coverage)。 V1 call site shrinks from chapter 515's 83 LOC → ~78 LOC (cumulative 118 → 78, ~40 LOC saved across chapters 515-516)。 62 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1448",
+            "M1448:doctrine version reflects chapter 五百十七 — 5th typed input block + V1 splice extension。 BASAuditObservationProjectionsCthulhuAggregatesBlock (M1445, 7 L1-L7 aggregate fields) + BASAuditObservationProjections 5-block unified convenience init (M1446) + V1 monolith splice extending M1443 (M1447)。 53 of 56 audit-projection fields now flow through 5 typed input surfaces (95% packaging coverage)。 V1 call site shrinks from chapter 516's 78 LOC → ~73 LOC (cumulative 118 → 73 across chapters 515-517, ~45 LOC saved)。 63 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

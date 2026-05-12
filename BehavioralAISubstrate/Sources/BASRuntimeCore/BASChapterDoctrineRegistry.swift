@@ -5072,7 +5072,104 @@ public enum BASChapterDoctrineRegistry {
                 " 515 start = ~40 LOC saved)。 62 typed" +
                 " surfaces cumulative。 ADR-016 → M1444。" +
                 " V1 byte-equality preserved。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 517 — 5th input block + V1 splice extension
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十七",
+            mNumberFirst: 1445,
+            mNumberLast: 1448,
+            v1MilestoneMNumber: 1448,
+            v1MilestoneStatus:
+                "chapter-517-5th-input-block-v1-splice",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1445, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsCthulhuAggregates" +
+                        "Block 5th typed input block。" +
+                        " Aggregates 7 L1-L7 Cthulhu" +
+                        " doctrine aggregate fields" +
+                        " (abyssalPressure + humanAnchor" +
+                        "Signal + sealAggregate +" +
+                        " lifecycleAggregate +" +
+                        " narrativeDistortion +" +
+                        " anomalyTrace + abyssalBranches)。" +
+                        " 63 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1446, knife: "第二刀",
+                    concept: "BASAuditObservation" +
+                        "Projections 5-block unified" +
+                        " convenience init。 Delegates" +
+                        " to M1442 4-block init with 7" +
+                        " Cthulhu aggregate fields" +
+                        " unpacked。 Reduces 56-arg" +
+                        " all-fields call to ~11-arg" +
+                        " 5-block call。"),
+                BASChapterKnife(
+                    mNumber: 1447, knife: "第三刀",
+                    concept: "V1 monolith splice extends" +
+                        " M1443 to use 5-block init。" +
+                        " 7 Cthulhu aggregate locals" +
+                        " (abyssalPressureWithFragility" +
+                        " etc.) now package into 5th" +
+                        " typed block instead of 7" +
+                        " individual named args。" +
+                        " Cumulative LOC reduction:" +
+                        " 118 → 73 (~45 LOC saved)。"),
+                BASChapterKnife(
+                    mNumber: 1448, knife: "第四刀",
+                    concept: "Chapter 517 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1448。 53 of 56 audit-" +
+                        "projection fields now flow" +
+                        " through 5 typed input" +
+                        " surfaces (95% packaging" +
+                        " coverage)。 V1 monolith call" +
+                        " site reduces to ~73 LOC" +
+                        " (cumulative 118 → 73 across" +
+                        " chapters 515-517)。")
+            ],
+            entropyClassesAttacked: [
+                "cthulhu-aggregate-7-field-cluster-untyped",
+                "v1-monolith-residual-aggregate-args",
+                "5-block-unified-init-absent",
+                "audit-projection-packaging-< 95%"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1448",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "53-of-56-fields-packaged-95-percent"
+            ],
+            plannedFutureCuts: [
+                "future arc — 6th block for the last" +
+                " ~3 residual args (mostly reserve" +
+                " fields,reconciliation,surface" +
+                " aliases) to hit 100% packaging",
+                "future arc — additional V1 inline-" +
+                "construction folds (other call sites)",
+                "future arc — production wire-in of" +
+                " projection-block observer",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "5th typed input block + V1 splice" +
+                " extension:BASAuditObservation" +
+                "ProjectionsCthulhuAggregatesBlock (7" +
+                " L1-L7 aggregate fields) + 5-block" +
+                " convenience init + V1 monolith splice" +
+                " extending M1443。 53 of 56 audit-" +
+                "projection fields now flow through 5" +
+                " typed input surfaces (95% packaging" +
+                " coverage)。 V1 call site shrinks from" +
+                " 78 → ~73 LOC (cumulative 118 → 73" +
+                " across chapters 515-517 = ~45 LOC" +
+                " saved)。 63 typed surfaces cumulative。" +
+                " ADR-016 → M1448。 V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
