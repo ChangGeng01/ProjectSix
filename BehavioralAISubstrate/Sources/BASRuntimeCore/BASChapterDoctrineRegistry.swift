@@ -6473,6 +6473,104 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative。 ADR-016 → M1504。 88" +
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。"),
+
+        // chapter 532 — 100% PACKAGING MILESTONE —
+        // forensic 9th + FINAL cluster
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十二",
+            mNumberFirst: 1505,
+            mNumberLast: 1508,
+            v1MilestoneMNumber: 1508,
+            v1MilestoneStatus:
+                "chapter-532-100%-packaging-9th-final-cluster",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1505, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "ForensicMetadataBundle — 9th +" +
+                        " FINAL cluster bundle。 Packs" +
+                        " the 3 final residual forensic" +
+                        " metadata fields (policyLineage" +
+                        " + recoveryDisposition +" +
+                        " runtimeTrace)。 78 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1506, knife: "第二刀",
+                    concept: "BASEBrainTurnResult 9-bundle" +
+                        " convenience init taking ALL 9" +
+                        " typed cluster bundles。 100% arg" +
+                        " packaging coverage achieved at" +
+                        " this commit — ALL 52 fields" +
+                        " collapsed into 9 typed bundles" +
+                        " (6+8+3+5+10+7+5+4+4)。"),
+                BASChapterKnife(
+                    mNumber: 1507, knife: "第三刀",
+                    concept: "V1 monolith splice uses" +
+                        " forensicMetadataBundle (3 args" +
+                        " → 1 typed block)。 100% arg" +
+                        " packaging coverage achieved at" +
+                        " V1 call site。 ZERO residual" +
+                        " scalar args remain。 Cumulative" +
+                        " BASEBrainTurnResult fold:52 →" +
+                        " 9 named args at line 2287+ (~83%" +
+                        " arg-count reduction)。"),
+                BASChapterKnife(
+                    mNumber: 1508, knife: "第四刀",
+                    concept: "Chapter 532 close-out +" +
+                        " doctrine sync — 100% PACKAGING" +
+                        " MILESTONE。 9 of 9 cohesive" +
+                        " BASEBrainTurnResult cluster" +
+                        " bundles shipped。 V1 call site" +
+                        " at 9 args (down from 52)。 92" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。 BASEBrainTurn" +
+                        "Result fold ARC SEALED。")
+            ],
+            entropyClassesAttacked: [
+                "BASEBrainTurnResult-forensic-3-residuals",
+                "9-bundle-convenience-init-absent",
+                "100%-arg-packaging-not-achieved",
+                "BASEBrainTurnResult-fold-incomplete"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1508",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "100%-arg-packaging-milestone-sealed"
+            ],
+            plannedFutureCuts: [
+                "future arc — SampleHost production" +
+                " wire-in of the 9-bundle init",
+                "future arc — V1 monolith deletion fold" +
+                " (the BASEBrainTurnResult fold arc is" +
+                " now complete;next reduce coordinator" +
+                " ForAudit declaration clusters via" +
+                " typed bundles)",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "100% PACKAGING MILESTONE — chapter" +
+                " 532 ships the 9th + FINAL cluster" +
+                " bundle for the BASEBrainTurnResult" +
+                " fold:BASEBrainTurnResultForensic" +
+                "MetadataBundle (3 forensic metadata" +
+                " fields:policyLineage +" +
+                " recoveryDisposition + runtimeTrace) +" +
+                " 9-bundle convenience init + V1" +
+                " monolith splice。 100% arg packaging" +
+                " coverage achieved — ALL 52 fields now" +
+                " travel through 9 typed cluster" +
+                " bundles。 V1 call site cumulative:52" +
+                " → 9 named args (~83% arg-count" +
+                " reduction)。 78 typed surfaces" +
+                " cumulative。 ADR-016 → M1508。 92" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 BASEBrain" +
+                "TurnResult fold ARC SEALED。 ADR-014" +
                 " OPT-IN preserved。")
     ]
 

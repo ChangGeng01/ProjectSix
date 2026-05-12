@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1504",
-            "M1504:doctrine version reflects chapter 五百三十一 — 8th BASEBrainTurnResult cluster bundle (device/lifecycle 6 fields)。 BASEBrainTurnResultDeviceLifecycleBundle typed cluster packaging 6 L0 device/lifecycle fields (M1501) + BASEBrainTurnResult 8-bundle convenience init (M1502) + V1 monolith splice using device/lifecycle bundle (M1503)。 Cumulative BASEBrainTurnResult call-site fold:52 → 8 named args (49 collapsed across 8 typed bundles,85% reduction)。 77 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1508",
+            "M1508:doctrine version reflects chapter 五百三十二 — 100% PACKAGING MILESTONE — 9th + FINAL BASEBrainTurnResult cluster bundle (forensic metadata 3 fields)。 BASEBrainTurnResultForensicMetadataBundle typed cluster packaging 3 forensic metadata fields:policyLineage + recoveryDisposition + runtimeTrace (M1505) + BASEBrainTurnResult 9-bundle convenience init (M1506) + V1 monolith splice using forensic bundle (M1507)。 100% arg packaging coverage achieved — ALL 52 fields now travel through 9 typed cluster bundles。 V1 call site cumulative fold:52 → 9 args (~83% arg-count reduction)。 78 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 BASEBrainTurnResult fold ARC SEALED。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
