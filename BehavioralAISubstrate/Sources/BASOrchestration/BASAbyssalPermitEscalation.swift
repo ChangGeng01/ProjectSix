@@ -39,7 +39,7 @@ import BASPolicy
 /// state. Returned as a value so downstream callers (audit emitter,
 /// observability) can introspect the decision without re-computing.
 public struct BASAbyssalPermitEscalationDecision:
-    Sendable, Equatable
+    Codable, Sendable, Equatable
 {
     /// The permit after escalation. Equal to the input permit (by
     /// value) when no escalation fires.

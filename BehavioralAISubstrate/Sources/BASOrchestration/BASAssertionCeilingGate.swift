@@ -37,7 +37,9 @@ import BASWorldPrior
 
 /// Pure result type carrying the (possibly-capped) permit, the typed
 /// reason codes that motivated the cap, and the trigger state.
-public struct BASAssertionCeilingDecision: Sendable, Equatable {
+public struct BASAssertionCeilingDecision:
+    Codable, Sendable, Equatable
+{
     /// The permit after capping. Equal to the input permit (by
     /// value) when no cap fires.
     public let permit: BASActionPermit
