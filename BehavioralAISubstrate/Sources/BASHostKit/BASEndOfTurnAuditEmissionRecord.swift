@@ -3,7 +3,11 @@
 // emission record composing 4 wire-in pipelines into
 // a single Codable surface
 //
-// COMPOSITION across 7 chapters + 4 typed pipelines:
+// chapter 五百十三 / M1430 — 5th pipeline added
+// (projection-block observations from chapter 512 wire-in
+// chain)
+//
+// COMPOSITION across 9 chapters + 5 typed pipelines:
 //
 //   Pipeline 1 (cache report):
 //     M1369 body → M1371 probe → M1386 bundle →
@@ -21,7 +25,12 @@
 //     M1370 advisory → M1391 ledger →
 //     M1395 bundle (10th BASBundle)
 //
-// HONEST SCOPE — chapter 五百五:
+//   Pipeline 5 (projection-block observations) — M1430:
+//     M1425 observation record → M1426 observer →
+//     M1427 bundle (12th BASBundle) → optional 5th
+//     field on this record
+//
+// HONEST SCOPE — chapter 五百五 (chapter 五百十三 extends):
 // =============================================================
 // This record is a TYPED COMPOSITION SURFACE。 It does
 // NOT auto-collect data — hosts (or the chapter 505
@@ -67,6 +76,14 @@ public struct BASEndOfTurnAuditEmissionRecord:
     public let runtimeModeAdvisories:
         BASEBrainHostRuntimeModeAdvisoryBundle?
 
+    /// Pipeline 5 — chapter 513 M1430 projection-block
+    /// observations (12th BASBundle adoption,via M1426
+    /// observer)。 Captures per-turn Kunlun + Cthulhu
+    /// input-block coverage for replay drift detection
+    /// and audit-projection emission rollups。
+    public let projectionBlockObservations:
+        BASAuditObservationProjectionsBundle?
+
     /// Millis since epoch when this record was emitted。
     public let recordedAtMs: Int64
 
@@ -80,6 +97,8 @@ public struct BASEndOfTurnAuditEmissionRecord:
             BASKernelDispatchStatisticsBundle? = nil,
         runtimeModeAdvisories:
             BASEBrainHostRuntimeModeAdvisoryBundle? = nil,
+        projectionBlockObservations:
+            BASAuditObservationProjectionsBundle? = nil,
         recordedAtMs: Int64
     ) {
         self.turnID = turnID
@@ -88,28 +107,48 @@ public struct BASEndOfTurnAuditEmissionRecord:
         self.dispatchStatistics = dispatchStatistics
         self.runtimeModeAdvisories =
             runtimeModeAdvisories
+        self.projectionBlockObservations =
+            projectionBlockObservations
         self.recordedAtMs = recordedAtMs
     }
 
     // MARK: - Composition queries
 
-    /// Count of pipelines (out of 4) that emitted data
-    /// for this turn。 Useful for "did hosts wire all
-    /// observation surfaces correctly?" audit checks。
+    /// Count of pipelines (out of 5 at chapter 513) that
+    /// emitted data for this turn。 Useful for "did hosts
+    /// wire all observation surfaces correctly?" audit
+    /// checks。 M1430 grows from 4 → 5 (adds projection-
+    /// block observations pipeline)。
     public var populatedPipelineCount: Int {
         var count = 0
         if cacheReport != nil { count += 1 }
         if routingDecisions != nil { count += 1 }
         if dispatchStatistics != nil { count += 1 }
         if runtimeModeAdvisories != nil { count += 1 }
+        if projectionBlockObservations != nil {
+            count += 1
+        }
         return count
     }
 
-    /// `true` when all four pipelines are populated。
-    /// Hosts running "fully observed" turns emit records
-    /// with this property true。
+    /// `true` when all four legacy pipelines (M1397
+    /// shape) are populated。 Kept for backwards-compat
+    /// with chapter 505 callers — new audits should
+    /// prefer `hasAllFivePipelines` (M1430) which
+    /// includes the projection-block pipeline。
     public var hasAllFourPipelines: Bool {
-        populatedPipelineCount == 4
+        cacheReport != nil
+            && routingDecisions != nil
+            && dispatchStatistics != nil
+            && runtimeModeAdvisories != nil
+    }
+
+    /// `true` when all FIVE pipelines (M1430 shape) are
+    /// populated。 Hosts running "fully observed" turns
+    /// at chapter 513+ emit records with this property
+    /// true。
+    public var hasAllFivePipelines: Bool {
+        populatedPipelineCount == 5
     }
 
     /// Total kernel dispatches observed by pipelines 1+3。
