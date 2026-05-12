@@ -129,7 +129,7 @@ public actor MLXLoRATrainer {
     /// Progress events emitted during training. Mirrors
     /// `MLXLLM.LoRATrain.Progress` but is BAS-shaped (no MLX type
     /// names cross the substrate redaction boundary).
-    public enum TrainingProgress: Sendable, Equatable {
+    public enum TrainingProgress: Sendable, Equatable, Codable {
         /// Per-step training event. `loss` is the rolling mean of
         /// the most recent `stepsPerReport` steps.
         case trainStep(

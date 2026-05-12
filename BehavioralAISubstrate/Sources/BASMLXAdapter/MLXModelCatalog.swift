@@ -26,7 +26,7 @@ import Foundation
 /// snapshots or audit ledgers without ownership concerns.
 public struct MLXModelCatalog: Sendable, Equatable {
 
-    public struct Entry: Sendable, Equatable, Hashable {
+    public struct Entry: Sendable, Equatable, Hashable, Codable {
         /// Hugging Face repository identifier
         /// (e.g. `mlx-community/gemma-4-e4b-it-4bit`).
         public let id: String
