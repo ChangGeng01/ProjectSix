@@ -58,7 +58,7 @@ public actor BASHostCandidatePipeline {
 
     // MARK: - Decision log
 
-    public struct RejectionRecord: Sendable, Equatable {
+    public struct RejectionRecord: Codable, Sendable, Equatable {
         public let candidateID: String
         public let reason: String
         public let recordedAt: Date

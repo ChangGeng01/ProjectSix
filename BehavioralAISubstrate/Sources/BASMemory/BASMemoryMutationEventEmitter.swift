@@ -53,7 +53,7 @@ public actor BASMemoryMutationEventEmitter {
 
     // MARK: - Outcome surface
 
-    public struct EmitOutcome: Sendable, Equatable {
+    public struct EmitOutcome: Codable, Sendable, Equatable {
         /// Number of decisions that produced an appended event。
         public let appended: Int
         /// Number of decisions that produced no event (e.g.
