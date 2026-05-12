@@ -63,7 +63,7 @@ import BASWorldPrior
 /// non-optional array (escalationSuppressionCodes has
 /// default [])。
 public struct BASAuditObservationProjectionsClosureBlock:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 7 closure-themed fields

@@ -56,7 +56,7 @@ import BASRuntimeCore
 /// fields optional — hosts skipping the Kunlun audit
 /// path leave fields nil。
 public struct BASAuditObservationProjectionsKunlunAuditSchemasBlock:
-    Equatable, Hashable, Sendable
+    Codable, Equatable, Hashable, Sendable
 {
 
     // MARK: - 3 M424 Kunlun audit schemas

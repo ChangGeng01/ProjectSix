@@ -61,7 +61,7 @@ import BASRuntimeCore
 /// projections。 8th and final block,achieves 100% V1
 /// call-site packaging coverage when used。
 public struct BASAuditObservationProjectionsCthulhuLeftoversBlock:
-    Equatable, Hashable, Sendable
+    Codable, Equatable, Hashable, Sendable
 {
 
     // MARK: - 6 leftover fields

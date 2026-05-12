@@ -225,7 +225,7 @@ public extension BASForbiddenKnowledgeCandidate {
     /// consumer reads `count` + `strictestPolicy` to emit
     /// `forbidden.*` codes; nil aggregate = no candidates this
     /// turn → all codes elided.
-    struct Aggregate: Sendable, Equatable {
+    struct Aggregate: Codable, Sendable, Equatable {
         public let count: Int
         public let strictestPolicy: BASShadowTrialPolicy
         public let allHeld: Bool
