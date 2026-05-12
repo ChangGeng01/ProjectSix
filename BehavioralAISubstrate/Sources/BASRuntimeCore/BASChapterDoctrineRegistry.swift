@@ -11777,6 +11777,97 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1744。 328 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 592 — BASHostKit configuration +
+        // hint Codable extension。 2 types (BAS
+        // CognitiveOSBundleOptions + BASChengluPreflight
+        // Hint)。 Extends BASHostKit coverage beyond
+        // projections + aggregators + inputs into
+        // configuration + hint primitives。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十二",
+            mNumberFirst: 1745,
+            mNumberLast: 1748,
+            v1MilestoneMNumber: 1748,
+            v1MilestoneStatus:
+                "chapter-592-hostkit-configuration-hint-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1745, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "HostKit types in non-" +
+                        "projection territory (BAS" +
+                        "CognitiveOSBundleOptions +" +
+                        " BASChengluPreflightHint)。" +
+                        " Extends BASHostKit coverage" +
+                        " beyond cascade + aggregator" +
+                        " + inputs into configuration" +
+                        " + hint primitives。"),
+                BASChapterKnife(
+                    mNumber: 1746, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1747, knife: "第三刀",
+                    concept: "NEW BASHostKitConfiguration" +
+                        "HintCodableExtensionDoctrine" +
+                        " typed surface + isNon" +
+                        "ProjectionTerritory flag。" +
+                        " Combined BASHostKit types =" +
+                        " 35。 typed-surface count" +
+                        " 132 → 133。"),
+                BASChapterKnife(
+                    mNumber: 1748, knife: "第四刀",
+                    concept: "Chapter 592 close-out +" +
+                        " doctrine sync。 332" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "cognitive-os-bundle-options-non-codable",
+                "chenglu-preflight-hint-non-codable",
+                "hostkit-non-projection-territory-incomplete",
+                "configuration-hint-non-serializable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1748",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-configuration-hint-codable",
+                "35-hostkit-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — additional BASHostKit" +
+                " types (BASChengluHintSet,BASHost" +
+                "MeshSweepLayerEntry,etc。)",
+                "future arc — additional fresh module" +
+                " territory"
+            ],
+            summary: "Chapter 592 ships BASHostKit" +
+                " configuration + hint Codable" +
+                " extension into non-projection" +
+                " territory。 2 BASHostKit types (BAS" +
+                "CognitiveOSBundleOptions + BAS" +
+                "ChengluPreflightHint) gained Codable" +
+                " at M1745。 2 PROOF tests (M1746) +" +
+                " new typed surface (M1747) + close-" +
+                "out (M1748)。 Extends BASHostKit" +
+                " coverage beyond projections" +
+                " (cascade arc) + aggregators" +
+                " (aggregator arc) + inputs (chapter" +
+                " 565) into configuration + hint" +
+                " primitives。 Combined 16 (cascade) +" +
+                " 15 (aggregator) + 2 (inputs) + 2" +
+                " (this) = 35 BASHostKit-related" +
+                " types ledger-serializable。 133 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1748。 332 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

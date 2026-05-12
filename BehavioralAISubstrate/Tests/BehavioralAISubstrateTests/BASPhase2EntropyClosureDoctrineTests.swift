@@ -37,22 +37,21 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs591() {
+    func testLastChapterIs592() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十一",
-            "Chapter 五百九十一:HEPTA-MILESTONE" +
-            " COMPLETION META-META MILESTONE。 NEW" +
-            " BASCodableExtensionHeptaMilestoneCompletion" +
-            "Doctrine cataloguing ALL 7 sealed Codable" +
-            " extension milestones (69 types,84" +
-            " commits,6 modules) + 31 anti-drift PROOF" +
-            " + 18 wire-in PROOF + close-out。" +
-            " Supersedes chapter 585 hexa snapshot。" +
-            " NEW beyond-m1700-post-arc-trilogy kind" +
-            " discriminator。 132 typed surfaces" +
-            " cumulative")
+            "chapter 五百九十二",
+            "Chapter 五百九十二:BASHOSTKIT" +
+            " CONFIGURATION + HINT CODABLE EXTENSION。" +
+            " 2 BASHostKit types gained Codable + 2" +
+            " PROOF tests + BASHostKitConfiguration" +
+            "HintCodableExtensionDoctrine typed surface" +
+            " + close-out。 Extends BASHostKit beyond" +
+            " projections + aggregators + inputs into" +
+            " non-projection territory。 Combined 35" +
+            " BASHostKit-related types cumulative。" +
+            " 133 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

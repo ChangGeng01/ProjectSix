@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1744",
-            "M1744:doctrine version reflects chapter 五百九十一 — HEPTA-MILESTONE COMPLETION META-META MILESTONE。 NEW BASCodableExtensionHeptaMilestoneCompletionDoctrine (M1741) cataloguing ALL 7 sealed Codable extension milestones (16+15+13+6+6+7+6 = 69 types,84 commits,21 chapters,6 modules) + 31 anti-drift PROOF tests (M1742) + 18 wire-in PROOF tests (M1743) + close-out (M1744)。 Supersedes chapter 585 hexa snapshot;hexa + penta + quad-arc + tri-arc doctrines preserved as historical records。 NEW beyond-m1700-post-arc-trilogy kind discriminator。 71 session types ledger-serializable。 132 typed surfaces cumulative。 328 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1748",
+            "M1748:doctrine version reflects chapter 五百九十二 — BASHOSTKIT CONFIGURATION + HINT CODABLE EXTENSION。 2 BASHostKit types (BASCognitiveOSBundleOptions + BASChengluPreflightHint) gained Codable at M1745 + 2 PROOF tests (M1746) + BASHostKitConfigurationHintCodableExtensionDoctrine typed surface (M1747) + close-out (M1748)。 Extends BASHostKit coverage beyond projections + aggregators + inputs into non-projection territory。 Combined 35 BASHostKit-related types ledger-serializable。 133 typed surfaces cumulative。 332 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

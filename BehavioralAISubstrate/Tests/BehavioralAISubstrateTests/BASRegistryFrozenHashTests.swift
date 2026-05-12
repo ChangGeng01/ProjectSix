@@ -107,18 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 591 close-out。 Chapter
-    /// 591:HEPTA-MILESTONE COMPLETION META-META
-    /// MILESTONE。 NEW BASCodableExtensionHepta
-    /// MilestoneCompletionDoctrine (M1741) + 31 anti-
-    /// drift PROOF tests (M1742) + 18 wire-in PROOF
-    /// tests (M1743) cataloguing ALL 7 sealed Codable
-    /// extension milestones。 Supersedes chapter 585
-    /// hexa snapshot;hexa + penta + quad-arc + tri-
-    /// arc doctrines preserved as historical records。
-    /// NEW beyond-m1700-post-arc-trilogy kind
-    /// discriminator。 71 session types ledger-
+    /// Re-captured at chapter 592 close-out。 Chapter
+    /// 592:BASHOSTKIT CONFIGURATION + HINT CODABLE
+    /// EXTENSION。 2 BASHostKit types (BASCognitiveOS
+    /// BundleOptions + BASChengluPreflightHint)
+    /// gained Codable at M1745 + 2 PROOF tests
+    /// (M1746) + NEW BASHostKitConfigurationHint
+    /// CodableExtensionDoctrine (M1747)。 Extends BAS
+    /// HostKit beyond projections + aggregators +
+    /// inputs into non-projection territory。
+    /// Combined 35 BASHostKit-related types ledger-
     /// serializable。
     static let frozenFullRegistrySha256: String =
-        "3b279488eec15b59cc274c2cdfdb1b5c1fe6965e6a2d974b4b28368323aba89a"
+        "7a57f46b12d14fc225121ea74b5cedb1591a58b6790d17904f13d48b788136e9"
 }

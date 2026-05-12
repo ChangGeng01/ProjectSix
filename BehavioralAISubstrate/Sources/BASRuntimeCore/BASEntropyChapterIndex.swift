@@ -3073,7 +3073,26 @@ public enum BASEntropyChapterIndex {
                 " discriminator。 71 session types" +
                 " ledger-serializable。 132 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1744。 V1 byte-equality preserved。")
+                " M1744。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十二",
+            mNumberFirst: 1745, mNumberLast: 1748,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASHOSTKIT CONFIGURATION + HINT" +
+                " CODABLE EXTENSION。 2 BASHostKit" +
+                " types (BASCognitiveOSBundleOptions" +
+                " + BASChengluPreflightHint) gained" +
+                " Codable at M1745 + 2 PROOF tests" +
+                " (M1746) + new typed surface (M1747)" +
+                " + close-out (M1748)。 Extends BAS" +
+                "HostKit coverage beyond projections" +
+                " + aggregators + inputs into non-" +
+                "projection territory。 Combined 35" +
+                " BASHostKit-related types ledger-" +
+                "serializable。 133 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1748。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
