@@ -2170,6 +2170,25 @@ public struct BASEBrainRuntimeCoordinator {
                     kunlunTianmenWarrantForAudit,
                 kunlunGateDenialWrit:
                     kunlunGateDenialWritForAudit)
+        // chapter 五百二十二 / M1467 — 8th + FINAL block
+        // extension。 100% V1 call-site packaging coverage
+        // milestone:every audit-projection field now
+        // flows through a typed input surface。
+        let cthulhuLeftoversBlockForAudit =
+            BASAuditObservationProjectionsCthulhuLeftoversBlock(
+                ontologyShiftMark:
+                    ontologyShiftMarkForAudit,
+                narrativeDistortionMap:
+                    narrativeDistortionMapForAudit,
+                cthulhuAssertionCeilingReasonCodes:
+                    cthulhuAssertionDecision
+                        .reasonCodes,
+                cthulhuPermitEscalationReasonCodes:
+                    cthulhuEscalation.reasonCodes,
+                cthulhuSurfaceAlias:
+                    cthulhuSurfaceAliasForAudit,
+                kunlunSurfaceAlias:
+                    kunlunSurfaceAliasForAudit)
         let projections = BASAuditObservationProjections(
             kunlunInputs: kunlunInputsForAudit,
             cthulhuInputs: cthulhuInputsForAudit,
@@ -2182,17 +2201,8 @@ public struct BASEBrainRuntimeCoordinator {
             closureBlock: closureBlockForAudit,
             kunlunAuditSchemasBlock:
                 kunlunAuditSchemasBlockForAudit,
-            ontologyShiftMark: ontologyShiftMarkForAudit,
-            cthulhuAssertionCeilingReasonCodes:
-                cthulhuAssertionDecision.reasonCodes,
-            cthulhuPermitEscalationReasonCodes:
-                cthulhuEscalation.reasonCodes,
-            narrativeDistortionMap:
-                narrativeDistortionMapForAudit,
-            cthulhuSurfaceAlias:
-                cthulhuSurfaceAliasForAudit,
-            kunlunSurfaceAlias:
-                kunlunSurfaceAliasForAudit)
+            cthulhuLeftoversBlock:
+                cthulhuLeftoversBlockForAudit)
         // chapter 五百十九 / M1454 — FIRST PRODUCTION
         // WIRE-IN of the M1426 projection-block emission
         // pattern。 When the host wired
