@@ -37,20 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs537() {
+    func testLastChapterIs538() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百三十七",
-            "Chapter 五百三十七:typed observability" +
-            " sink for BASTurnRuntimeEngine's 4" +
-            " documented silent-swallow paths —" +
-            " BASTurnRuntimeEngineObservationFailureLog" +
-            " actor + Kind enum (4 cases) + Record" +
-            " struct + wire-in via optional" +
-            " observationFailureLog: engine init" +
-            " parameter + 9 PROOF tests。 83 typed" +
-            " surfaces cumulative")
+            "chapter 五百三十八",
+            "Chapter 五百三十八:test-target build-" +
+            "warning purge — 4 warnings 0 + BASTest" +
+            "TargetBuildWarningPurgeDoctrine typed" +
+            " milestone + 13 PROOF tests。 Both" +
+            " Sources/ AND Tests/ now warning-free。" +
+            " 84 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

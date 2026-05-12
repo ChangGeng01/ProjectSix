@@ -2037,7 +2037,26 @@ public enum BASEntropyChapterIndex {
                 " behavior unchanged (nil → silent" +
                 " swallow as documented per 红线 7)。" +
                 " 83 typed surfaces cumulative。 ADR-016" +
-                " → M1528。 V1 byte-equality preserved。")
+                " → M1528。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十八",
+            mNumberFirst: 1529, mNumberLast: 1532,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Test-target build-warning purge:" +
+                " 3 dead let declarations + 1 var→let" +
+                " immutability fix across 4 distinct" +
+                " test files (M1529)。 NEW BASTest" +
+                "TargetBuildWarningPurgeDoctrine typed" +
+                " milestone surface with bothTargets" +
+                "WarningFree computed cross-check" +
+                " (M1530) + 13 anti-drift PROOF tests" +
+                " (M1531)。 Test-target build warning" +
+                " count 4 → 0。 Cumulative warning-free" +
+                " across Sources/ AND Tests/。 84 typed" +
+                " surfaces cumulative。 ADR-016 → M1532。" +
+                " V1 byte-equality preserved (pure" +
+                " cleanup,no behavioral change)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

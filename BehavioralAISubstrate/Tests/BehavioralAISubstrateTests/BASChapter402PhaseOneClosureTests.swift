@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1528",
-            "M1528:doctrine version reflects chapter 五百三十七 — typed observability sink for BASTurnRuntimeEngine's 4 documented silent-swallow paths。 BASTurnRuntimeEngineObservationFailureLog actor + Kind typed enum (4 cases) + Record struct with sessionID correlation (M1525) + wire-in to the 4 sites via optional `observationFailureLog:` engine init parameter (M1526) + 9 PROOF tests (M1527)。 Default behavior unchanged (nil → silent swallow as documented per 红线 7)。 83 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1532",
+            "M1532:doctrine version reflects chapter 五百三十八 — test-target build-warning purge。 4 distinct warnings purged (3 dead lets + 1 var→let) across 4 test files at M1529 + BASTestTargetBuildWarningPurgeDoctrine typed milestone surface with bothTargetsWarningFree computed cross-check (M1530) + 13 anti-drift PROOF tests (M1531)。 Both Sources/ AND Tests/ now build warning-free。 84 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

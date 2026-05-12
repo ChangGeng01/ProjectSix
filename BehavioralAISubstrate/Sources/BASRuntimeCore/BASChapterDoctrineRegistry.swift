@@ -7019,6 +7019,94 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative。 ADR-016 → M1528。 112" +
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。"),
+
+        // chapter 538 — test-target warning purge
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百三十八",
+            mNumberFirst: 1529,
+            mNumberLast: 1532,
+            v1MilestoneMNumber: 1532,
+            v1MilestoneStatus:
+                "chapter-538-test-target-warning-zero",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1529, knife: "第一刀",
+                    concept: "Test-target build-warning" +
+                        " purge — 3 unused let" +
+                        " declarations across 3 distinct" +
+                        " test files + 1 var→let" +
+                        " immutability fix。 Test-target" +
+                        " warning count 4 → 0。" +
+                        " Cumulative warning-free across" +
+                        " Sources/ AND Tests/。"),
+                BASChapterKnife(
+                    mNumber: 1530, knife: "第二刀",
+                    concept: "NEW BASTestTargetBuild" +
+                        "WarningPurgeDoctrine typed" +
+                        " milestone surface +" +
+                        " bothTargetsWarningFree" +
+                        " computed cross-check" +
+                        " referencing the substrate-" +
+                        "side BASSubstrateBuildWarning" +
+                        "PurgeDoctrine。 84 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1531, knife: "第三刀",
+                    concept: "13 anti-drift PROOF tests" +
+                        " for the test-target purge" +
+                        " doctrine:counts + invariants" +
+                        " + per-file mappings + both-" +
+                        "targets cross-check + categories" +
+                        " + determinism。"),
+                BASChapterKnife(
+                    mNumber: 1532, knife: "第四刀",
+                    concept: "Chapter 538 close-out +" +
+                        " doctrine sync — substrate +" +
+                        " tests both warning-free。 116" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "test-side-build-warning-noise",
+                "dead-let-in-test-fixtures",
+                "var-mutability-inversion-in-tests",
+                "single-target-warning-monitoring"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1532",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "both-targets-warning-free"
+            ],
+            plannedFutureCuts: [
+                "future arc — anti-regression CI hook" +
+                " asserting `swift build` warning count" +
+                " is 0 on every PR",
+                "future arc — V1 monolith internal fold" +
+                " (typed bundle for remaining ForAudit" +
+                " declaration cluster patterns)",
+                "future arc — SampleHost production" +
+                " wire-in of the observability sinks"
+            ],
+            summary: "Chapter 538 sweeps the test target" +
+                " to 0 build warnings (M1529:3 dead" +
+                " let purges + 1 var→let fix across 4" +
+                " distinct test files) + ships the" +
+                " typed milestone BASTestTargetBuild" +
+                "WarningPurgeDoctrine with both-targets" +
+                " cross-check (M1530) + 13 anti-drift" +
+                " PROOF tests (M1531) + close-out" +
+                " (M1532)。 Cumulative warning-free state" +
+                " across Sources/ AND Tests/ now pinned" +
+                " via the bothTargetsWarningFree" +
+                " invariant。 84 typed surfaces" +
+                " cumulative。 ADR-016 → M1532。 116" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014" +
                 " OPT-IN preserved。")
     ]
 
