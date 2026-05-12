@@ -37,25 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs600() {
+    func testLastChapterIs601() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百",
-            "Chapter 六百:REAL HOT-PATH ATTACK PHASE I" +
-            " CONTINUATION — V1 monolith extraction。 9" +
-            " audit-projection symbols moved from" +
-            " EBrainRuntimeCoordinator.swift to sibling" +
-            " extension file。 V1 LOC 2472 → 2136" +
-            " (-336)。 Cumulative V1 reduction from" +
-            " chapter 477 baseline:-404 LOC = 16.4%" +
-            " of plan target。 6 PROOF tests verify" +
-            " cross-package contract preserved。 NEW" +
-            " BASV1MonolithExtractionContinuation" +
-            "Doctrine bumps 最激进 score 6 → 7。 141" +
-            " typed surfaces cumulative。 First 最激进" +
-            " advancement beyond chapter 501 honest" +
-            " closure")
+            "chapter 六百一",
+            "Chapter 六百一:REAL HOT-PATH ATTACK PHASE I" +
+            " CONTINUATION WAVE 2 — V1 monolith" +
+            " extraction continued。 11 symbols (M420" +
+            " Kunlun hot-path + M450 cosmic-cold" +
+            " counterweight) moved to NEW sibling" +
+            " EBrainRuntimeCoordinator+CoreHelpers" +
+            ".swift。 V1 LOC 2136 → 1918 (-218)。" +
+            " Cumulative V1 reduction from chapter 477" +
+            " baseline:-622 LOC = 24.5% of plan target。" +
+            " 10 PROOF tests verify constant value-" +
+            "stability + cosmic-cold anti-drift。 NEW" +
+            " BASV1MonolithExtractionWaveTwoDoctrine" +
+            " supersedes wave 1 + bumps 最激进 score" +
+            " 7 → 8。 SECOND consecutive 最激进" +
+            " advancement。 142 typed surfaces" +
+            " cumulative")
     }
 
     // MARK: - M-number range

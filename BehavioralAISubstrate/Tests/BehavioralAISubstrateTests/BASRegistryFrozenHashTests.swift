@@ -107,22 +107,25 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 600 close-out。 Chapter
-    /// 600:REAL HOT-PATH ATTACK PHASE I CONTINUATION —
-    /// V1 monolith extraction。 9 audit-projection symbols
-    /// (3 derive helpers + 1 fileprivate const +
-    /// coverageStatus + 4 public layerReconciliation*
+    /// Re-captured at chapter 601 close-out。 Chapter
+    /// 601:REAL HOT-PATH ATTACK PHASE I CONTINUATION
+    /// WAVE 2 — V1 monolith extraction continued。 11
+    /// symbols (M420 Kunlun hot-path constants + M422
+    /// kunlunCenterlineRules helper + M450 cosmic-cold
+    /// counterweight 4 helpers + 18 magic-number
     /// constants) MOVED from EBrainRuntimeCoordinator.
-    /// swift to NEW sibling extension file (M1777)。 6
-    /// PROOF tests (M1778) verify cross-package contract
-    /// preserved + V1 byte-equality preserved (40 stress-
-    /// sweep canonical60 green)。 NEW BASV1Monolith
-    /// ExtractionContinuationDoctrine (M1779) bumps
-    /// 最激进 score 6 → 7。 V1 LOC trajectory:2472 →
-    /// 2136 (-336)。 Cumulative V1 reduction from chapter
-    /// 477 baseline 2540 → 2136 (-404 = 16.4% of plan
-    /// target)。 First 最激进 advancement beyond chapter
-    /// 501 honest closure。
+    /// swift to NEW sibling EBrainRuntimeCoordinator+
+    /// CoreHelpers.swift (M1781)。 10 PROOF tests (M1782)
+    /// verify constant value-stability + cosmic-cold
+    /// anti-drift + V1 byte-equality preserved (40
+    /// stress-sweep canonical60 green)。 NEW BASV1
+    /// MonolithExtractionWaveTwoDoctrine (M1783)
+    /// supersedes chapter 600 wave 1 doctrine + bumps
+    /// 最激进 score 7 → 8。 V1 LOC trajectory:2136 →
+    /// 1918 (-218)。 Cumulative V1 reduction from chapter
+    /// 477 baseline 2540 → 1918 (-622 = 24.5% of plan
+    /// target)。 SECOND consecutive 最激进 advancement +
+    /// consecutiveV1FoldChapters = 2。
     static let frozenFullRegistrySha256: String =
-        "f79200794f61d9b814c1c9c877613c1b859042be97efcf002fbecf4f402da2f5"
+        "02ed495b7554b877fea86ce4221a406fe17032ab6c21217682ea748401d6ef42"
 }

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1780",
-            "M1780:doctrine version reflects chapter 六百 — REAL HOT-PATH ATTACK PHASE I CONTINUATION。 V1 monolith extraction:9 audit-projection symbols moved from EBrainRuntimeCoordinator.swift to sibling extension file。 V1 LOC 2472 → 2136 (-336)。 Cumulative V1 reduction from chapter 477 baseline (2540 LOC):-404 LOC = 16.4% of plan target。 6 PROOF tests (M1778) verify cross-package contract preserved + V1 byte-equality preserved (40 stress-sweep canonical60 green)。 NEW BASV1MonolithExtractionContinuationDoctrine (M1779) bumps 最激进 score 6 → 7。 First 最激进 advancement beyond chapter 501 honest closure milestone。 141 typed surfaces cumulative。 364 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1784",
+            "M1784:doctrine version reflects chapter 六百一 — REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 2。 V1 monolith extraction continued:11 symbols (M420 Kunlun hot-path + M450 cosmic-cold counterweight) moved from EBrainRuntimeCoordinator.swift to NEW sibling EBrainRuntimeCoordinator+CoreHelpers.swift。 V1 LOC 2136 → 1918 (-218)。 Cumulative V1 reduction from chapter 477 baseline (2540 LOC):-622 LOC = 24.5% of plan target。 10 PROOF tests (M1782) verify constant value-stability + cosmic-cold anti-drift + V1 byte-equality preserved (40 stress-sweep canonical60 green)。 NEW BASV1MonolithExtractionWaveTwoDoctrine (M1783) supersedes chapter 600 wave 1 doctrine + bumps 最激进 score 7 → 8。 SECOND consecutive 最激进 advancement。 consecutiveV1FoldChapters = 2。 142 typed surfaces cumulative。 368 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

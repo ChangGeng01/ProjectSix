@@ -12665,6 +12665,120 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1780。 364 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 601 — REAL HOT-PATH ATTACK Phase I
+        // CONTINUATION wave 2:V1 monolith extraction
+        // continued。 218 more LOC moved out (Kunlun
+        // hot-path + cosmic-cold counterweight)。 V1
+        // byte-equality preserved。 最激进 score bumped
+        // 7 → 8。 Cumulative V1 fold = 24.5% of plan
+        // target。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一",
+            mNumberFirst: 1781,
+            mNumberLast: 1784,
+            v1MilestoneMNumber: 1784,
+            v1MilestoneStatus:
+                "chapter-601-v1-monolith-extraction-wave-two",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1781, knife: "第一刀",
+                    concept: "V1 fold Phase I continuation" +
+                        " wave 2。 Extract 11 symbols" +
+                        " (M420 Kunlun hot-path constants" +
+                        " + M422 kunlunCenterlineRules" +
+                        " helper + M450 cosmic-cold" +
+                        " counterweight 4 helpers + 18" +
+                        " magic-number constants) to NEW" +
+                        " sibling extension file" +
+                        " EBrainRuntimeCoordinator+Core" +
+                        "Helpers.swift。 V1 monolith LOC:" +
+                        " 2136 → 1918 (-218)。 Pure code" +
+                        " MOVE — byte-equal by construction。"),
+                BASChapterKnife(
+                    mNumber: 1782, knife: "第二刀",
+                    concept: "10 PROOF tests for wave 2" +
+                        " — 4 Kunlun hot-path constants" +
+                        " reachable + 6 cosmic-cold" +
+                        " counterweight anti-drift" +
+                        " (canonical inputs yield same" +
+                        " outputs as pre-move)。"),
+                BASChapterKnife(
+                    mNumber: 1783, knife: "第三刀",
+                    concept: "NEW BASV1MonolithExtraction" +
+                        "WaveTwoDoctrine supersedes" +
+                        " chapter 600 wave 1 doctrine。 V1" +
+                        " LOC trajectory updated (2540 →" +
+                        " 1918 = -622 cumulative,24.5%" +
+                        " of plan target) +" +
+                        " mostAggressiveScoreAtThisChapter" +
+                        " = 8/10 (+1 from wave 1) +" +
+                        " mostAggressiveRemainingGap = 2。" +
+                        " typed-surface count 141 → 142。"),
+                BASChapterKnife(
+                    mNumber: 1784, knife: "第四刀",
+                    concept: "Chapter 601 close-out +" +
+                        " doctrine sync。 368 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 SECOND consecutive" +
+                        " 最激进 score advancement +" +
+                        " consecutiveV1FoldChapters = 2。")
+            ],
+            entropyClassesAttacked: [
+                "v1-monolith-still-2136-loc",
+                "kunlun-hot-path-constants-mixed-with-runturn",
+                "cosmic-cold-counterweight-helpers-mixed-with-runturn",
+                "most-aggressive-stuck-at-7-after-chapter-600"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1784",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "v1-monolith-loc-reduction-218",
+                "most-aggressive-score-bumped-7-to-8",
+                "real-hot-path-attack-phase-i-wave-2",
+                "real-hot-path-attack-plan-target-25-pct"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional V1 monolith" +
+                " extractions (deeper into runTurn body" +
+                " orchestration code)",
+                "future arc — Phase H default mode flip" +
+                " after multi-day stress-sweep dual-mode" +
+                " 24h soak",
+                "future arc — Phase I final V1 deletion" +
+                " (runTurn body collapsed to delegate" +
+                " bridge)"
+            ],
+            summary: "Chapter 601 ships REAL HOT-PATH" +
+                " ATTACK Phase I CONTINUATION wave 2 V1" +
+                " monolith extraction。 218 LOC of M420" +
+                " Kunlun hot-path constants + M422" +
+                " kunlunCenterlineRules helper + M450" +
+                " cosmic-cold counterweight 4 helpers" +
+                " + 18 magic-number constants moved" +
+                " from EBrainRuntimeCoordinator.swift" +
+                " to NEW sibling EBrainRuntimeCoordinator" +
+                "+CoreHelpers.swift。 V1 monolith LOC:" +
+                " 2136 → 1918 (-218)。 Cumulative V1" +
+                " reduction from chapter 477 baseline:" +
+                " 2540 → 1918 = -622 LOC (24.5% of" +
+                " plan target)。 10 PROOF tests verify" +
+                " constant value-stability + cosmic-" +
+                "cold counterweight anti-drift。 V1" +
+                " byte-equality preserved (40 stress-" +
+                "sweep canonical60 tests green)。 NEW" +
+                " BASV1MonolithExtractionWaveTwoDoctrine" +
+                " supersedes chapter 600 wave 1 doctrine" +
+                " + bumps 最激进 directive score 7 → 8。" +
+                " Second consecutive 最激进 advancement。" +
+                " 142 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1784。 368 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

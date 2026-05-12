@@ -2015,7 +2015,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百")!)
+                            "chapter 六百")!),
+            // M1784 chapter 601 — REAL HOT-PATH ATTACK Phase I continuation wave 2 V1 extraction
+            checkRegistry("六百一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3311,6 +3317,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百")!
+                .mNumberLast),
+            // M1784 chapter 601 — REAL HOT-PATH ATTACK Phase I continuation wave 2 V1 extraction
+            ("601",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

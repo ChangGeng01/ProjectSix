@@ -3281,6 +3281,37 @@ public enum BASEntropyChapterIndex {
                 " chapter 501 honest closure milestone。" +
                 " 141 typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1780。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一",
+            mNumberFirst: 1781, mNumberLast: 1784,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK PHASE I" +
+                " CONTINUATION WAVE 2 — V1 monolith" +
+                " extraction continued。 11 symbols" +
+                " (M420 Kunlun hot-path constants + M422" +
+                " kunlunCenterlineRules helper + M450" +
+                " cosmic-cold counterweight 4 helpers +" +
+                " 18 magic-number constants) moved from" +
+                " EBrainRuntimeCoordinator.swift to NEW" +
+                " sibling EBrainRuntimeCoordinator+Core" +
+                "Helpers.swift (M1781)。 V1 monolith LOC:" +
+                " 2136 → 1918 (-218)。 Cumulative V1" +
+                " reduction from chapter 477 baseline:" +
+                " 2540 → 1918 = -622 LOC (24.5% of plan" +
+                " target)。 10 PROOF tests (M1782)" +
+                " verify constant value-stability +" +
+                " cosmic-cold anti-drift。 V1 byte-" +
+                "equality preserved (40 stress-sweep" +
+                " canonical60 green)。 NEW BASV1Monolith" +
+                "ExtractionWaveTwoDoctrine (M1783)" +
+                " supersedes chapter 600 wave 1 doctrine" +
+                " + bumps 最激进 score 7 → 8。 SECOND" +
+                " consecutive 最激进 advancement +" +
+                " consecutiveV1FoldChapters = 2。 142" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1784。 V1 byte-equality" +
                 " preserved。")
     ]
 
