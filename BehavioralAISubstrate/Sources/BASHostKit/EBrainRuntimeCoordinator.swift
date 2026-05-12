@@ -2350,10 +2350,16 @@ public struct BASEBrainRuntimeCoordinator {
                     mergedChoice: mergedChoice,
                     riskCard: boundRiskCard,
                     actionPermit: boundActionPermit),
-            riskDecisionPackage: normalizedRiskDecisionPackage,
-            hostGateValue: hostGateValue,
-            renderedOutput: renderedOutput,
-            updateTickets: updateTickets,
+            // chapter 五百三十 / M1499 — V1 splice:
+            // 4 misc args collapse to 1 typed miscBundle。
+            // Byte-equality preserved by M1498 PROOF。
+            miscBundle:
+                BASEBrainTurnResultMiscBundle(
+                    riskDecisionPackage:
+                        normalizedRiskDecisionPackage,
+                    hostGateValue: hostGateValue,
+                    renderedOutput: renderedOutput,
+                    updateTickets: updateTickets),
             // chapter 五百二十四 / M1475 — V1 splice:
             // 10 evolution-cluster args collapse to 1
             // typed evolutionBundle。 Byte-equality
