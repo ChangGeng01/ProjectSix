@@ -1653,7 +1653,23 @@ public enum BASEntropyChapterIndex {
                 " canonical60 × 3 repeat runs 0-" +
                 "divergence。 61 typed surfaces" +
                 " cumulative。 ADR-016 → M1440。 First" +
-                " real V1 fold since chapter 510。")
+                " real V1 fold since chapter 510。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十六",
+            mNumberFirst: 1441, mNumberLast: 1444,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "4th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "KunlunProtocolBlock (9 protocol fields)" +
+                " + 4-block convenience init + V1" +
+                " monolith splice extending M1437。" +
+                " 46 of 56 audit-projection fields now" +
+                " flow through 4 typed input surfaces" +
+                " (82% coverage)。 V1 call site shrinks" +
+                " from 83 → ~78 LOC。 62 typed surfaces" +
+                " cumulative。 ADR-016 → M1444。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

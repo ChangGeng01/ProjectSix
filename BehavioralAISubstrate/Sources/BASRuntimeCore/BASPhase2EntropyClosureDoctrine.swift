@@ -169,7 +169,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百十二",     // M1425-M1428 (projection-block wire-in chain — observation + observer + 12th BASBundle adoption)
         "chapter 五百十三",     // M1429-M1432 (5-pipeline unified audit emission — emitter facade + 5th pipeline + emitter hook)
         "chapter 五百十四",     // M1433-M1436 (3rd typed input block + unified convenience inits — 37 fields packaged into 3 input surfaces)
-        "chapter 五百十五"      // M1437-M1440 (REAL V1 monolith projections fold — 118 LOC → 83 LOC at call site, byte-equality preserved)
+        "chapter 五百十五",     // M1437-M1440 (REAL V1 monolith projections fold — 118 LOC → 83 LOC at call site, byte-equality preserved)
+        "chapter 五百十六"      // M1441-M1444 (4th typed input block + V1 splice extension — 46-of-56 fields packaged, 82% coverage)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -186,15 +187,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1440
+    public static let mNumberLast: Int = 1444
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1440)。 Bumped through chapter 515:481 → 485。
-    /// Chapter 515:REAL V1 monolith projections fold —
-    /// M1437 V1 splice (118 LOC → 83 LOC) + M1438 PROOF
-    /// tests + M1439 typed milestone doctrine + M1440
-    /// close-out。 First real V1 fold since chapter 510。
-    public static let commitsShipped: Int = 485
+    /// M1444)。 Bumped through chapter 516:485 → 489。
+    /// Chapter 516:4th typed input block + V1 splice
+    /// extension — M1441 KunlunProtocolBlock + M1442
+    /// 4-block init + M1443 V1 splice extension + M1444
+    /// close-out。 46 of 56 audit-projection fields now
+    /// flow through 4 typed input surfaces (82%)。
+    public static let commitsShipped: Int = 489
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

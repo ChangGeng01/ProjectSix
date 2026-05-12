@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1440",
-            "M1440:doctrine version reflects chapter 五百十五 — REAL V1 monolith projections fold。 EBrainRuntimeCoordinator.swift:2035 (M1437) switches from 56-arg/118-LOC inline construction to 3 typed input blocks (kunlunInputs/cthulhuInputs/observationBundles) + ~22-arg unified 3-block init。 ~35 LOC saved at call site。 M1438 PROOF tests + M1439 BASV1MonolithProjectionsFoldDoctrine typed milestone freeze the fold's LOC + byte-equality invariants。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 61 typed surfaces cumulative。 First real V1 monolith inline-construction fold since chapter 510。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1444",
+            "M1444:doctrine version reflects chapter 五百十六 — 4th typed input block + V1 splice extension。 BASAuditObservationProjectionsKunlunProtocolBlock (M1441, 9 protocol fields) + BASAuditObservationProjections.init(kunlunInputs:cthulhuInputs:observationBundles:kunlunProtocolBlock:) UNIFIED 4-block init (M1442) + V1 monolith splice extending M1437 (M1443)。 46 of 56 audit-projection fields now flow through 4 typed input surfaces (82% packaging coverage)。 V1 call site shrinks from chapter 515's 83 LOC → ~78 LOC (cumulative 118 → 78, ~40 LOC saved across chapters 515-516)。 62 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

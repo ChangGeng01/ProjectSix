@@ -117,20 +117,20 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 113
+    public static let phase2ChapterCount: Int = 114
 
-    /// Phase 2 commits shipped。 At M1440:
-    /// 125 + 84 + 276 = 485 (chapter 515 = 4 cuts —
-    /// REAL V1 monolith projections fold:V1 splice +
-    /// PROOF tests + typed milestone doctrine + close-
-    /// out)
-    public static let phase2CommitsShipped: Int = 485
+    /// Phase 2 commits shipped。 At M1444:
+    /// 125 + 84 + 280 = 489 (chapter 516 = 4 cuts —
+    /// 4th typed input block + 4-block convenience init
+    /// + V1 splice extension + close-out)
+    public static let phase2CommitsShipped: Int = 489
 
-    /// Phase 2 mNumberLast。 At M1440:chapter 515
-    /// (REAL V1 monolith projections fold — 118 LOC →
-    /// 83 LOC at call site,byte-equality preserved)。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1440
+    /// Phase 2 mNumberLast。 At M1444:chapter 516
+    /// (4th typed input block + V1 splice extension —
+    /// 46 of 56 audit-projection fields packaged into
+    /// 4 typed input surfaces,82% coverage)。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1444
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

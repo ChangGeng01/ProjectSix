@@ -4972,7 +4972,107 @@ public enum BASChapterDoctrineRegistry {
                 " runs 0-divergence)。 61 typed surfaces" +
                 " cumulative。 ADR-016 → M1440。 First" +
                 " real V1 fold since chapter 510。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 516 — 4th input block + V1 splice extension
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十六",
+            mNumberFirst: 1441,
+            mNumberLast: 1444,
+            v1MilestoneMNumber: 1444,
+            v1MilestoneStatus:
+                "chapter-516-4th-input-block-v1-splice",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1441, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsKunlunProtocolBlock" +
+                        " 4th typed input block。" +
+                        " Aggregates 9 Kunlun-protocol-" +
+                        "verification fields (axis +" +
+                        " jade canon + river origin +" +
+                        " yaochi access + tianmen" +
+                        " readiness)。 62 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1442, knife: "第二刀",
+                    concept: "BASAuditObservation" +
+                        "Projections.init(kunlunInputs:" +
+                        " cthulhuInputs:" +
+                        " observationBundles:" +
+                        " kunlunProtocolBlock:) UNIFIED" +
+                        " 4-block init。 Delegates to" +
+                        " M1435 3-block init with 9" +
+                        " protocol fields unpacked。" +
+                        " Collapses ~17-arg call vs" +
+                        " 56-arg all-fields init。"),
+                BASChapterKnife(
+                    mNumber: 1443, knife: "第三刀",
+                    concept: "V1 monolith splice extends" +
+                        " M1437 to use 4-block init。" +
+                        " 9 Kunlun protocol locals" +
+                        " (kunlunAxisAlignment,jade" +
+                        "Verification,riverLineage," +
+                        " yaochiAccess,tianmen*) now" +
+                        " package into 4th typed block" +
+                        " instead of 9 individual named" +
+                        " args。 Stress-sweep canonical60" +
+                        " × 3 repeat runs 0-divergence。"),
+                BASChapterKnife(
+                    mNumber: 1444, knife: "第四刀",
+                    concept: "Chapter 516 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1444。 46 of 56 audit-" +
+                        "projection fields now flow" +
+                        " through 4 typed input" +
+                        " surfaces (82% packaging" +
+                        " coverage)。 V1 monolith call" +
+                        " site at line 2035 reduces" +
+                        " from chapter 515's 83 LOC →" +
+                        " ~78 LOC (cumulative 118 → 78," +
+                        " ~40 LOC saved across chapters" +
+                        " 515-516)。")
+            ],
+            entropyClassesAttacked: [
+                "kunlun-protocol-9-field-cluster-untyped",
+                "v1-monolith-residual-protocol-args",
+                "4-block-unified-init-absent",
+                "audit-projection-packaging-< 50%"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1444",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "46-of-56-fields-packaged-82-percent"
+            ],
+            plannedFutureCuts: [
+                "future arc — 5th input block for the" +
+                " remaining ~13 residual args (reason" +
+                " codes,reconciliation,surface" +
+                " aliases)",
+                "future arc — additional V1 inline-" +
+                "construction folds (other call sites)",
+                "future arc — production wire-in of" +
+                " projection-block observer",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "4th typed input block + V1 splice" +
+                " extension:BASAuditObservation" +
+                "ProjectionsKunlunProtocolBlock (9" +
+                " protocol fields) + 4-block convenience" +
+                " init + V1 monolith splice extending" +
+                " M1437。 46 of 56 audit-projection" +
+                " fields now flow through 4 typed input" +
+                " surfaces (82% packaging coverage)。 V1" +
+                " call site shrinks from 83 → ~78 LOC" +
+                " (cumulative 118 → 78 since chapter" +
+                " 515 start = ~40 LOC saved)。 62 typed" +
+                " surfaces cumulative。 ADR-016 → M1444。" +
+                " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
