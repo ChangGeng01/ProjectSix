@@ -150,6 +150,16 @@ public actor BASTurnRuntimeEngine {
     /// M1246。
     private let biomimeticCheckpointEveryNTurns: Int?
 
+    /// chapter 五百三十七 / M1526 — typed observability
+    /// sink for the 4 documented silent-swallow paths
+    /// (biomimetic observer + 3 event-log append sites)。
+    /// nil → behavior unchanged from pre-M1526 (silent
+    /// swallow continues as documented per 红线 7);
+    /// non-nil → each failed emission also records to
+    /// the sink for host inspection。
+    private let observationFailureLog:
+        BASTurnRuntimeEngineObservationFailureLog?
+
     // MARK: - Mutable state (actor-isolated)
 
     private var sequenceCounter: Int = 0
@@ -223,7 +233,10 @@ public actor BASTurnRuntimeEngine {
         biomimeticTurnSignalBuilder:
             (@Sendable (BASEBrainTurnResult)
                 -> BASBiomimeticTurnSignal)? = nil,
-        biomimeticCheckpointEveryNTurns: Int? = nil
+        biomimeticCheckpointEveryNTurns: Int? = nil,
+        observationFailureLog:
+            BASTurnRuntimeEngineObservationFailureLog?
+            = nil
     ) {
         self.coordinator = coordinator
         self.eventLog = eventLog
@@ -241,6 +254,8 @@ public actor BASTurnRuntimeEngine {
             biomimeticTurnSignalBuilder
         self.biomimeticCheckpointEveryNTurns =
             biomimeticCheckpointEveryNTurns
+        self.observationFailureLog =
+            observationFailureLog
     }
 
     /// chapter 四百七 / M998 — convenience init taking the
@@ -591,7 +606,21 @@ public actor BASTurnRuntimeEngine {
         if let observer = biomimeticTurnObserver {
             let signal = biomimeticTurnSignalBuilder?(
                 result) ?? BASBiomimeticTurnSignal()
-            _ = try? await observer.observe(signal)
+            // chapter 五百三十七 / M1526 — wire-in of
+            // typed observability sink (M1525)。 nil log
+            // → behavior unchanged (silent swallow per
+            // 红线 7);non-nil → record failure。
+            do {
+                _ = try await observer.observe(signal)
+            } catch {
+                if let log = observationFailureLog {
+                    await log.record(
+                        kind: .biomimeticObserverObserve,
+                        error: error,
+                        sessionID: result
+                            .runtimeTrace.sessionID)
+                }
+            }
             // chapter 467 / M1246 — auto-checkpoint
             // emission。 Three prerequisites must ALL
             // be wired:observer (above),event log,
@@ -626,8 +655,23 @@ public actor BASTurnRuntimeEngine {
                                 ?? clockMs(),
                             sessionID: sid,
                             payload: payload)
-                    _ = try? await eventLog
-                        .append(entry)
+                    // chapter 五百三十七 / M1526 —
+                    // wire-in of typed observability
+                    // sink (M1525)。
+                    do {
+                        try await eventLog
+                            .append(entry)
+                    } catch {
+                        if let log =
+                            observationFailureLog
+                        {
+                            await log.record(
+                                kind:
+                                .autoCheckpointEventLogAppend,
+                                error: error,
+                                sessionID: sid)
+                        }
+                    }
                 }
             }
         }
@@ -807,7 +851,20 @@ public actor BASTurnRuntimeEngine {
         // swallow any storage failure here。 Audit
         // emission is hint-only (红线 7);failure to
         // emit must not break runtime correctness。
-        _ = try? await log.append(entry)
+        // chapter 五百三十七 / M1526 — wire-in of typed
+        // observability sink (M1525)。
+        do {
+            try await log.append(entry)
+        } catch {
+            if let failureLog = observationFailureLog {
+                await failureLog.record(
+                    kind:
+                    .nativeStageDispatchEventLogAppend,
+                    error: error,
+                    sessionID: result
+                        .runtimeTrace.sessionID)
+            }
+        }
         lastEmittedDispatchEventID = eventID
     }
 
@@ -851,7 +908,20 @@ public actor BASTurnRuntimeEngine {
         // swallow any storage failure here。 Audit
         // emission is hint-only (红线 7);failure to
         // emit must not break runtime correctness。
-        _ = try? await log.append(entry)
+        // chapter 五百三十七 / M1526 — wire-in of typed
+        // observability sink (M1525)。
+        do {
+            try await log.append(entry)
+        } catch {
+            if let failureLog = observationFailureLog {
+                await failureLog.record(
+                    kind:
+                    .planAssignmentEventLogAppend,
+                    error: error,
+                    sessionID: result
+                        .runtimeTrace.sessionID)
+            }
+        }
         lastEmittedPlanAssignmentEventID = eventID
     }
 }
