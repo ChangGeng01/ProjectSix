@@ -202,6 +202,159 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百二十六 / M1483 — 4-bundle
+    //                                       convenience init
+    //                                       (parallel-run
+    //                                        reconciliation)
+    //
+    // The earlier autonomous run committed:
+    //   - BASEBrainTurnResultAuditProjectionForwardBundle
+    //     (M1481) + 3-bundle init at line ~311 (M1482)
+    //     using evolution+sovereign+auditProjectionForward
+    //   - V1 splice (M1483) calling with 4 bundles
+    //     (sovereign + host + evolution + auditProjectionForward)
+    //
+    // My session also committed:
+    //   - BASEBrainTurnResultHostBundle (M1481)
+    //   - 3-bundle init using host+sovereign+evolution
+    //     (M1482)
+    //
+    // The V1 splice references BOTH hostBundle AND
+    // auditProjectionForwardBundle but no 4-bundle init
+    // exists。 This init closes the gap:accepts all 4
+    // bundles (sovereign + host + evolution +
+    // auditProjectionForward) plus the remaining ~21
+    // pass-through fields。
+    //
+    // Public API additive only。 Byte-equality with the
+    // all-fields init GUARANTEED by body delegation。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostBundle: BASEBrainTurnResultHostBundle,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        thoughtFrame: BASThoughtFrame,
+        thoughtFold: BASThoughtFold,
+        triScores: [BASTriSelfScore],
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
+        hostGateValue: Double,
+        renderedOutput: BASRenderedOutput,
+        updateTickets: [BASUpdateTicket],
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        auditProjectionForwardBundle:
+            BASEBrainTurnResultAuditProjectionForwardBundle
+    ) {
+        // Delegate to the all-fields init,unpacking all
+        // 4 bundles' 30 fields (sovereign 8 + host 5 +
+        // evolution 10 + auditProjectionForward 7)。
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            sovereignVerdict:
+                sovereignBundle.sovereignVerdict,
+            sovereignCommitTokens:
+                sovereignBundle.sovereignCommitTokens,
+            sovereignWarrants:
+                sovereignBundle.sovereignWarrants,
+            sovereignLock:
+                sovereignBundle.sovereignLock,
+            quarantineRecords:
+                sovereignBundle.quarantineRecords,
+            sovereignAuditEntry:
+                sovereignBundle.sovereignAuditEntry,
+            sovereignActuationCommands:
+                sovereignBundle
+                    .sovereignActuationCommands,
+            sovereignExecutionReceipts:
+                sovereignBundle
+                    .sovereignExecutionReceipts,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostConstitution:
+                hostBundle.hostConstitution,
+            hostConstitutionVault:
+                hostBundle.hostConstitutionVault,
+            hostVersionTree:
+                hostBundle.hostVersionTree,
+            hostForgetRequest:
+                hostBundle.hostForgetRequest,
+            hostContext: hostBundle.hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: triScores,
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            riskDecisionPackage: riskDecisionPackage,
+            hostGateValue: hostGateValue,
+            renderedOutput: renderedOutput,
+            updateTickets: updateTickets,
+            experienceCandidates:
+                evolutionBundle.experienceCandidates,
+            workflowCandidates:
+                evolutionBundle.workflowCandidates,
+            guardTemplateCandidates:
+                evolutionBundle.guardTemplateCandidates,
+            biasRecords: evolutionBundle.biasRecords,
+            riskPatternCandidates:
+                evolutionBundle.riskPatternCandidates,
+            learningExportBundles:
+                evolutionBundle.learningExportBundles,
+            shadowTrialRecords:
+                evolutionBundle.shadowTrialRecords,
+            versionDeltas: evolutionBundle.versionDeltas,
+            retractionOrders:
+                evolutionBundle.retractionOrders,
+            evolutionSeals:
+                evolutionBundle.evolutionSeals,
+            runtimeTrace: runtimeTrace,
+            kunlunAxisAlignment:
+                auditProjectionForwardBundle
+                    .kunlunAxisAlignment,
+            humanAnchorSignal:
+                auditProjectionForwardBundle
+                    .humanAnchorSignal,
+            abyssalPressure:
+                auditProjectionForwardBundle
+                    .abyssalPressure,
+            unknownReserve:
+                auditProjectionForwardBundle
+                    .unknownReserve,
+            kunlunHeavenGatePermit:
+                auditProjectionForwardBundle
+                    .kunlunHeavenGatePermit,
+            kunlunRiverOriginTrace:
+                auditProjectionForwardBundle
+                    .kunlunRiverOriginTrace,
+            yaochiSanctumEntry:
+                auditProjectionForwardBundle
+                    .yaochiSanctumEntry)
+    }
+
     // MARK: - chapter 五百二十六 / M1482 — hostBundle +
     //                                       sovereignBundle +
     //                                       evolutionBundle
