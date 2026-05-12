@@ -1889,6 +1889,24 @@ public enum BASEntropyChapterIndex {
                 " collapsed across 6 typed bundles," +
                 " 65% reduction)。 75 typed surfaces" +
                 " cumulative。 ADR-016 → M1496。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百三十",
+            mNumberFirst: 1497, mNumberLast: 1500,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "M1500 MILESTONE — 7th BASEBrain" +
+                "TurnResult cluster bundle:" +
+                " BASEBrainTurnResultMiscBundle (4 misc" +
+                " output fields:riskDecisionPackage +" +
+                " hostGateValue + renderedOutput +" +
+                " updateTickets) + 7-bundle convenience" +
+                " init + V1 monolith splice。" +
+                " BASEBrainTurnResult call site" +
+                " cumulative:52 → 14 args (43 fields" +
+                " collapsed across 7 typed bundles," +
+                " 73% reduction)。 76 typed surfaces" +
+                " cumulative。 ADR-016 → M1500。 V1" +
                 " byte-equality preserved。")
     ]
 
