@@ -149,6 +149,67 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripExtendedTests:
         XCTAssertEqual(data1, data2)
     }
 
+    // MARK: - DeviceLifecycleBundle fixture
+    //         (chapter 545 / M1557)
+
+    private func makeDeviceLifecycleBundle()
+        -> BASEBrainTurnResultDeviceLifecycleBundle
+    {
+        let device = BASDeviceState(
+            batteryLevel: 0.5,
+            thermalLevel: .nominal,
+            memoryFreeMB: 2048,
+            networkState: .online,
+            foregroundState: .foreground,
+            cpuLoad: 0.3,
+            gpuLoad: 0.1,
+            npuAvailable: true,
+            latencyBudgetMs: 1000)
+        let budget = BASBudgetFrame.guardedLocal()
+        let wakeIntent = BASWakeIntent(
+            intentLevel: .sentinel,
+            estimatedValue: 0.5,
+            estimatedRisk: 0.3,
+            estimatedCost: 0.2,
+            preferredMode: .guard)
+        let vital = BASVitalState(
+            wakeState: .guard,
+            survivalMargin: 0.9,
+            thermalMargin: 0.8,
+            powerMargin: 0.7,
+            continuityScore: 0.95,
+            stabilityScore: 0.9)
+        let brake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: [])
+        return BASEBrainTurnResultDeviceLifecycleBundle(
+            deviceState: device,
+            budgetFrame: budget,
+            wakeIntent: wakeIntent,
+            vitalState: vital,
+            runLease: nil,
+            emergencyBrake: brake)
+    }
+
+    func testDeviceLifecycleBundleMinimumRoundTrips()
+        throws
+    {
+        let original = makeDeviceLifecycleBundle()
+        let decoded = try roundTrip(original)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testDeviceLifecycleBundleEncodingIsDeterministic()
+        throws
+    {
+        let bundle = makeDeviceLifecycleBundle()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data1 = try encoder.encode(bundle)
+        let data2 = try encoder.encode(bundle)
+        XCTAssertEqual(data1, data2)
+    }
+
     // MARK: - Cross-bundle round-trip determinism PROOF
 
     func testThreeBundlesRoundTripPreservesFieldEquality()
