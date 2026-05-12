@@ -116,20 +116,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1596:24 + 20 + 108 = 152 (chapter
-    /// 554 — post-arc-seal PROOF backing shipped)
-    public static let phase2ChapterCount: Int = 152
+    /// added)。 At M1600:24 + 20 + 109 = 153 (chapter
+    /// 555 — M1600 MILESTONE,5-namespace populated
+    /// PROOF coverage at 100%)
+    public static let phase2ChapterCount: Int = 153
 
-    /// Phase 2 commits shipped。 At M1596:125 + 84 + 432
-    /// = 641 (chapter 554 = 4 cuts — post-arc-seal
-    /// follow-through:8 PROOF tests + EndToEndJsonProof
-    /// doctrine + 13 anti-drift tests + close-out)
-    public static let phase2CommitsShipped: Int = 641
+    /// Phase 2 commits shipped。 At M1600 MILESTONE:
+    /// 125 + 84 + 436 = 645 (chapter 555 = 4 cuts —
+    /// 5-namespace populated JSON PROOF extension:
+    /// 8 PROOF tests + FiveNamespacePopulatedJsonProof
+    /// doctrine + 15 anti-drift tests + close-out)
+    public static let phase2CommitsShipped: Int = 645
 
-    /// Phase 2 mNumberLast。 At M1596:chapter 554 —
-    /// post-arc-seal PROOF backing shipped。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1596
+    /// Phase 2 mNumberLast。 At M1600 MILESTONE:chapter
+    /// 555 — 5-namespace populated JSON PROOF coverage
+    /// achieved。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1600
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

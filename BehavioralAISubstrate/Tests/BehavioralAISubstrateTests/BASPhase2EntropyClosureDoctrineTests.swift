@@ -37,19 +37,21 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs554() {
+    func testLastChapterIs555() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百五十四",
-            "Chapter 五百五十四:Post-arc-seal follow-" +
-            "through。 Converts the M1591 doctrine CLAIM" +
-            " into actual runtime PROOF。 8 end-to-end" +
-            " JSON round-trip PROOF tests + " +
-            "BASAuditProjectionsBundleEndToEndJsonProof" +
-            "Doctrine typed surface + 13 anti-drift" +
-            " PROOF tests with cross-doctrine wire-in。" +
-            " 95 typed surfaces cumulative")
+            "chapter 五百五十五",
+            "Chapter 五百五十五 (M1600 MILESTONE):" +
+            "5-namespace populated JSON PROOF" +
+            " extension。 Cthulhu populated via typed" +
+            " BASUnknownReserve + RiskCalibration" +
+            " populated via typed BASRiskCard +" +
+            " BASAuditProjectionsFiveNamespacePopulated" +
+            "JsonProofDoctrine typed surface + 15" +
+            " anti-drift PROOF tests with cross-" +
+            "doctrine wire-in。 96 typed surfaces" +
+            " cumulative")
     }
 
     // MARK: - M-number range

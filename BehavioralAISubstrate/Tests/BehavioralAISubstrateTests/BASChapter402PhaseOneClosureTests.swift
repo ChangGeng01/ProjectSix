@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1596",
-            "M1596:doctrine version reflects chapter 五百五十四 — Post-arc-seal follow-through。 Converts the M1591 doctrine CLAIM into actual runtime PROOF。 8 end-to-end JSON round-trip PROOF tests exercising POPULATED bundle state across the chapter-553 newly-Codable types (M1593) + BASAuditProjectionsBundleEndToEndJsonProofDoctrine typed surface (M1594) + 13 anti-drift PROOF tests with cross-doctrine wire-in (M1595)。 95 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1600",
+            "M1600 MILESTONE:doctrine version reflects chapter 五百五十五 — 5-namespace populated JSON PROOF extension。 Extends chapter 554 from 3-of-5 namespace coverage to 5-of-5。 Cthulhu populated via typed BASUnknownReserve + RiskCalibration populated via typed BASRiskCard (M1597) + BASAuditProjectionsFiveNamespacePopulatedJsonProofDoctrine typed surface (M1598) + 15 anti-drift PROOF tests with cross-doctrine wire-in (M1599)。 96 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

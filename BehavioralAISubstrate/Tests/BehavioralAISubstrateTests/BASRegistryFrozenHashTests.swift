@@ -107,13 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 554 close-out。 Chapter
-    /// 554:Post-arc-seal follow-through。 Converts the
-    /// M1591 doctrine CLAIM into actual runtime PROOF。
-    /// 8 end-to-end JSON round-trip PROOF tests +
-    /// BASAuditProjectionsBundleEndToEndJsonProof
-    /// Doctrine typed surface + 13 anti-drift PROOF
+    /// Re-captured at chapter 555 close-out (M1600
+    /// MILESTONE)。 Chapter 555:5-namespace populated
+    /// JSON PROOF extension。 Cthulhu populated via
+    /// typed BASUnknownReserve + RiskCalibration
+    /// populated via typed BASRiskCard +
+    /// BASAuditProjectionsFiveNamespacePopulatedJsonProof
+    /// Doctrine typed surface + 15 anti-drift PROOF
     /// tests with cross-doctrine wire-in。
     static let frozenFullRegistrySha256: String =
-        "a14d87e297b59e062e9fa7d757f0cc5d83f46e319df5ace318c4248787e9526b"
+        "7f7f527dbb4afbe4fb5c94e3c06970b5116543dbe8209e4fd1f6ebbfa22181dd"
 }

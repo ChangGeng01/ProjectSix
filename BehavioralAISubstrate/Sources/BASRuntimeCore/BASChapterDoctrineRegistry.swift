@@ -8540,7 +8540,101 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1596。 180 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 555 — 5-namespace populated JSON
+        // PROOF extension。 Extends the chapter 554
+        // PROOF from 3-of-5 namespace coverage to
+        // 5-of-5。 M1600 MILESTONE close-out。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十五",
+            mNumberFirst: 1597,
+            mNumberLast: 1600,
+            v1MilestoneMNumber: 1600,
+            v1MilestoneStatus:
+                "chapter-555-five-namespace-populated-json-proof-M1600-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1597, knife: "第一刀",
+                    concept: "8 PROOF tests extending" +
+                        " populated JSON round-trip" +
+                        " coverage to Cthulhu + Risk" +
+                        "Calibration namespaces (the 2" +
+                        " namespaces NOT exercised in" +
+                        " populated state at chapter" +
+                        " 554)。 Includes full 5-" +
+                        "namespace bundle round-trip +" +
+                        " sortedKeys determinism +" +
+                        " negative PROOF + populated-" +
+                        "vs-empty discrimination。"),
+                BASChapterKnife(
+                    mNumber: 1598, knife: "第二刀",
+                    concept: "NEW BASAuditProjections" +
+                        "FiveNamespacePopulatedJson" +
+                        "ProofDoctrine typed surface" +
+                        " commemorating 100% populated-" +
+                        "namespace JSON PROOF coverage。" +
+                        " typed-surface count 95 → 96。"),
+                BASChapterKnife(
+                    mNumber: 1599, knife: "第三刀",
+                    concept: "15 anti-drift PROOF tests" +
+                        " + cross-doctrine wire-in for" +
+                        " the M1598 typed surface。 Wire-" +
+                        "in tests prove the baseline" +
+                        " doctrine ref resolves and" +
+                        " that M1597 sits AFTER M1593。"),
+                BASChapterKnife(
+                    mNumber: 1600, knife: "第四刀",
+                    concept: "M1600 MILESTONE close-out" +
+                        " + doctrine sync。 184" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。 5-of-5" +
+                        " populated namespace JSON" +
+                        " PROOF coverage achieved。")
+            ],
+            entropyClassesAttacked: [
+                "populated-cthulhu-codable-untested",
+                "populated-risk-calibration-codable-untested",
+                "full-5-namespace-bundle-untested-end-to-end",
+                "cross-doctrine-ref-string-anti-drift"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1600",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "five-namespace-populated-json-proof-100-percent",
+                "m1600-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional Codable cascade" +
+                " or PROOF coverage extensions"
+            ],
+            summary: "Chapter 555 extends the chapter" +
+                " 554 end-to-end JSON PROOF from 3-of-" +
+                "5 namespace coverage to 5-of-5。" +
+                " Cthulhu populated via typed" +
+                " BASUnknownReserve + RiskCalibration" +
+                " populated via typed BASRiskCard +" +
+                " full 5-namespace bundle exercised" +
+                " simultaneously。 8 PROOF tests" +
+                " (M1597) +" +
+                " BASAuditProjectionsFiveNamespace" +
+                "PopulatedJsonProofDoctrine typed" +
+                " surface (M1598) + 15 anti-drift" +
+                " PROOF tests with cross-doctrine" +
+                " wire-in (M1599)。 96 typed surfaces" +
+                " cumulative (+1)。 M1600 MILESTONE。" +
+                " 184 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。 ADR-016" +
+                " → M1600。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

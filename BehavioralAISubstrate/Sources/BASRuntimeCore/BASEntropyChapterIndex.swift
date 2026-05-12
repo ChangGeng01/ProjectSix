@@ -2350,7 +2350,26 @@ public enum BASEntropyChapterIndex {
                 " cross-doctrine wire-in (M1595)。 95" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1596。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十五",
+            mNumberFirst: 1597, mNumberLast: 1600,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "M1600 MILESTONE — 5-namespace" +
+                " populated JSON PROOF extension。" +
+                " Extends chapter 554 from 3-of-5" +
+                " namespace coverage to 5-of-5。" +
+                " Cthulhu populated via typed" +
+                " BASUnknownReserve + RiskCalibration" +
+                " populated via typed BASRiskCard" +
+                " (M1597) + BASAuditProjectionsFive" +
+                "NamespacePopulatedJsonProofDoctrine" +
+                " typed surface (M1598) + 15 anti-" +
+                "drift PROOF tests with cross-" +
+                "doctrine wire-in (M1599)。 96 typed" +
+                " surfaces cumulative (+1)。 ADR-016" +
+                " → M1600。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
