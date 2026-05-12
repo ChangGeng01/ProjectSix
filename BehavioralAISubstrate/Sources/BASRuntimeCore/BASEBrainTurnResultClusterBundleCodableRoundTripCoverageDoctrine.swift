@@ -132,15 +132,17 @@ public enum BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
             status: .explicitRoundTripCovered,
             explicitCoverageMNumber: 1557),
 
-        // Pending (deeper fixture builders required)
-        BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
-            bundleTypeName:
-                "BASEBrainTurnResultCognitiveFramesBundle",
-            status: .compileTimeOnly,
-            explicitCoverageMNumber: nil),
+        // Chapter 546 / M1561 — RiskChoice fixture added
         BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
             bundleTypeName:
                 "BASEBrainTurnResultRiskChoiceBundle",
+            status: .explicitRoundTripCovered,
+            explicitCoverageMNumber: 1561),
+
+        // Pending (deepest fixture remaining)
+        BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
+            bundleTypeName:
+                "BASEBrainTurnResultCognitiveFramesBundle",
             status: .compileTimeOnly,
             explicitCoverageMNumber: nil)
     ]
