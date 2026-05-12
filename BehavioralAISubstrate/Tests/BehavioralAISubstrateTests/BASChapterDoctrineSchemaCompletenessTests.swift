@@ -2033,7 +2033,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三")!)
+                            "chapter 六百三")!),
+            // M1796 chapter 604 — BASAppleAdapters wave 1 (10th-module formal entry)
+            checkRegistry("六百四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3353,6 +3359,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三")!
+                .mNumberLast),
+            // M1796 chapter 604 — BASAppleAdapters wave 1 (10th-module formal entry)
+            ("604",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

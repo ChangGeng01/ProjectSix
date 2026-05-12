@@ -12997,7 +12997,99 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1792。 376 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 604 — BASAppleAdapters Codable
+        // extension wave 1 (10TH MODULE FORMAL ENTRY)。
+        // 4th consecutive post-octa fresh-module
+        // advancement。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四",
+            mNumberFirst: 1793,
+            mNumberLast: 1796,
+            v1MilestoneMNumber: 1796,
+            v1MilestoneStatus:
+                "chapter-604-apple-adapters-codable-extension-wave-one",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1793, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "AppleAdapters types — BASChengluPrompt" +
+                        "Signature (7-field 6-String-1-Int" +
+                        " signature) + BASAppleProviderRelease" +
+                        "Input (7-field with Codable kernel" +
+                        " snapshot + brain state + structured" +
+                        " truth + facts dict)。 All field types" +
+                        " already Codable — trivial addition。"),
+                BASChapterKnife(
+                    mNumber: 1794, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1795, knife: "第三刀",
+                    concept: "NEW BASAppleAdaptersCodable" +
+                        "ExtensionDoctrine + isFormalModule" +
+                        "Entry flag + moduleCountAfterThis" +
+                        " = 10 + isFourthConsecutiveFresh" +
+                        "ModuleAfterOcta flag +" +
+                        " preExistingCodableTypes list (8" +
+                        " pre-octa types acknowledged)。" +
+                        " typed-surface count 144 → 145。"),
+                BASChapterKnife(
+                    mNumber: 1796, knife: "第四刀",
+                    concept: "Chapter 604 close-out +" +
+                        " doctrine sync。 380 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 BASAppleAdapters" +
+                        " formally entered narrative。" +
+                        " 10 modules covered。")
+            ],
+            entropyClassesAttacked: [
+                "chenglu-prompt-signature-non-codable",
+                "apple-provider-release-input-non-codable",
+                "bas-apple-adapters-not-formally-in-module-narrative",
+                "module-count-stuck-at-9-after-chapter-603"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1796",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "apple-adapters-formal-module-entry",
+                "module-count-bumped-9-to-10",
+                "fourth-consecutive-fresh-module-after-octa",
+                "pre-octa-codable-types-acknowledged"
+            ],
+            plannedFutureCuts: [
+                "future arc — BASAppleAdapters wave 2" +
+                " (additional non-Codable types)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — 11th module exploration" +
+                " (BASEvaluation or BASMetalSubstrate)"
+            ],
+            summary: "Chapter 604 ships BASAppleAdapters" +
+                " Codable extension wave 1 — 10TH MODULE" +
+                " FORMAL ENTRY into post-octa narrative。" +
+                " 2 types (BASChengluPromptSignature 7-" +
+                "field + BASAppleProviderReleaseInput 7-" +
+                "field) gained Codable at M1793 + 2" +
+                " PROOF tests (M1794) + new typed surface" +
+                " (M1795) + close-out (M1796)。 BASApple" +
+                "Adapters has pre-octa Codable types (8" +
+                " acknowledged in preExistingCodableTypes" +
+                " manifest) but was never tracked at" +
+                " module-extension doctrine level until" +
+                " this chapter。 4th consecutive post-" +
+                "octa fresh-module advancement (BASOrgan" +
+                " ch598 + BASMLXAdapter ch599 + BASChat" +
+                "CompletionsAdapter ch603 + BASApple" +
+                "Adapters ch604)。 145 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1796。" +
+                " 380 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

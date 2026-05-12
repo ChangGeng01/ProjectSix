@@ -257,7 +257,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百",         // M1777-M1780 (REAL HOT-PATH ATTACK PHASE I CONTINUATION — V1 monolith extraction;9 audit-projection symbols moved from EBrainRuntimeCoordinator.swift to sibling extension file;V1 LOC 2472→2136 (-336);cumulative reduction from chapter 477 baseline 2540→2136 (-404 = 16.4% of plan target);6 PROOF tests cross-package contract preserved;NEW BASV1MonolithExtractionContinuationDoctrine bumps 最激进 score 6→7;first 最激进 advancement beyond chapter 501 honest closure)
         "chapter 六百一",       // M1781-M1784 (REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 2 — V1 monolith extraction continued;11 symbols (M420 Kunlun hot-path + M450 cosmic-cold counterweight) moved to NEW sibling extension file;V1 LOC 2136→1918 (-218);cumulative 2540→1918 (-622 = 24.5% of plan target);10 PROOF tests value-stability + anti-drift;NEW BASV1MonolithExtractionWaveTwoDoctrine supersedes wave 1 + bumps 最激进 7→8;SECOND consecutive 最激进 advancement;consecutiveV1FoldChapters = 2)
         "chapter 六百二",       // M1785-M1788 (REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 3 THE BIG MOVE — runTurn(_:) 1733-LOC body + runTurnAndIngest 12-LOC wrapper moved from V1 monolith to NEW sibling EBrainRuntimeCoordinator+RunTurn.swift;V1 LOC 1918→196 (-1722);cumulative 2540→196 (-2344 = 92.3% of plan target);4 PROOF tests symbol-path continuity;NEW BASV1MonolithExtractionWaveThreeDoctrine supersedes wave 2 + bumps 最激进 8→9;THIRD consecutive 最激进 advancement;consecutiveV1FoldChapters = 3;planTargetAchievedInSpirit = true)
-        "chapter 六百三"        // M1789-M1792 (BASCHATCOMPLETIONSADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1 — 9TH MODULE FRESH TERRITORY;1 type (BASChatCompletionsOrganAdapter.Endpoint nested in actor) gained Codable + 1 PROOF test + BASChatCompletionsAdapterCodableExtensionDoctrine typed surface + close-out;BASChatCompletionsAdapter uncovered by chapter 599 BASMLXAdapter first-ever;module count bumped 8→9;3rd consecutive fresh-module first-ever extension after chapter 597 octa-milestone seal)
+        "chapter 六百三",       // M1789-M1792 (BASCHATCOMPLETIONSADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1 — 9TH MODULE FRESH TERRITORY;1 type (BASChatCompletionsOrganAdapter.Endpoint nested in actor) gained Codable + 1 PROOF test + BASChatCompletionsAdapterCodableExtensionDoctrine typed surface + close-out;BASChatCompletionsAdapter uncovered by chapter 599 BASMLXAdapter first-ever;module count bumped 8→9;3rd consecutive fresh-module first-ever extension after chapter 597 octa-milestone seal)
+        "chapter 六百四"        // M1793-M1796 (BASAPPLEADAPTERS CODABLE EXTENSION WAVE 1 — 10TH MODULE FORMAL ENTRY;2 types (BASChengluPromptSignature + BASAppleProviderReleaseInput) gained Codable + 2 PROOF tests + BASAppleAdaptersCodableExtensionDoctrine typed surface (with 8 pre-existing Codable types acknowledged) + close-out;BASAppleAdapters formal entry into post-octa narrative;module count bumped 9→10;4th consecutive post-octa fresh-module-territory advancement)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -274,14 +275,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1792
+    public static let mNumberLast: Int = 1796
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1792)。 Bumped through chapter 603:833 → 837。
-    /// Chapter 603:BASChatCompletionsAdapter first-
-    /// ever Codable extension wave 1 + 1 PROOF test +
-    /// typed surface + close-out。
-    public static let commitsShipped: Int = 837
+    /// M1796)。 Bumped through chapter 604:837 → 841。
+    /// Chapter 604:BASAppleAdapters Codable extension
+    /// wave 1 + 2 PROOF tests + typed surface +
+    /// close-out。
+    public static let commitsShipped: Int = 841
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

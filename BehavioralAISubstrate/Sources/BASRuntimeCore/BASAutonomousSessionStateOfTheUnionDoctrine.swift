@@ -110,20 +110,19 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 603
-    /// close-out (M1792 — BASChatCompletionsAdapter
-    /// first-ever Codable extension wave 1;9TH MODULE
-    /// FRESH TERRITORY uncovered by chapter 599 BAS
-    /// MLXAdapter first-ever;1 BASChatCompletions
-    /// OrganAdapter.Endpoint type gained Codable;
-    /// module count bumped 8 → 9;3rd consecutive
-    /// fresh-module first-ever extension after octa-
-    /// milestone seal at chapter 597)。
-    public static let typedSurfaceCount: Int = 144
+    /// Cumulative achievement metrics at chapter 604
+    /// close-out (M1796 — BASAppleAdapters Codable
+    /// extension wave 1;10TH MODULE FORMAL ENTRY into
+    /// post-octa narrative;2 BASAppleAdapters types
+    /// (BASChengluPromptSignature + BASAppleProvider
+    /// ReleaseInput) gained Codable;module count
+    /// bumped 9 → 10;4th consecutive post-octa fresh-
+    /// module-territory advancement)。
+    public static let typedSurfaceCount: Int = 145
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 376
-    public static let phase2CommitsShipped: Int = 837
-    public static let chapter2NumberLast: Int = 1792
+        Int = 380
+    public static let phase2CommitsShipped: Int = 841
+    public static let chapter2NumberLast: Int = 1796
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

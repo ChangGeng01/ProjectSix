@@ -37,24 +37,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs603() {
+    func testLastChapterIs604() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百三",
-            "Chapter 六百三:BASCHATCOMPLETIONSADAPTER" +
-            " FIRST-EVER CODABLE EXTENSION WAVE 1 —" +
-            " 9TH MODULE FRESH TERRITORY。 BASChat" +
-            "CompletionsAdapter uncovered by chapter" +
-            " 599 BASMLXAdapter first-ever (8th-module" +
-            " entry)。 1 type (BASChatCompletionsOrgan" +
-            "Adapter.Endpoint nested in actor) gained" +
-            " Codable + 1 PROOF test + BASChat" +
-            "CompletionsAdapterCodableExtensionDoctrine" +
-            " typed surface + close-out。 Module count" +
-            " bumped 8 → 9。 3rd consecutive fresh-" +
-            "module first-ever extension after the" +
-            " chapter 597 octa-milestone seal。 144" +
+            "chapter 六百四",
+            "Chapter 六百四:BASAPPLEADAPTERS CODABLE" +
+            " EXTENSION WAVE 1 — 10TH MODULE FORMAL" +
+            " ENTRY into post-octa narrative。 2 types" +
+            " (BASChengluPromptSignature 7-field +" +
+            " BASAppleProviderReleaseInput 7-field)" +
+            " gained Codable + 2 PROOF tests + BAS" +
+            "AppleAdaptersCodableExtensionDoctrine" +
+            " typed surface (with 8 pre-octa types" +
+            " acknowledged) + close-out。 Module count" +
+            " bumped 9 → 10。 4th consecutive post-octa" +
+            " fresh-module-territory advancement。 145" +
             " typed surfaces cumulative")
     }
 

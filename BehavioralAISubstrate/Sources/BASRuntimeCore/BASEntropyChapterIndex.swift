@@ -3365,7 +3365,32 @@ public enum BASEntropyChapterIndex {
                 " BASChatCompletionsAdapter ch603)。" +
                 " 144 typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1792。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四",
+            mNumberFirst: 1793, mNumberLast: 1796,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASAPPLEADAPTERS CODABLE EXTENSION" +
+                " WAVE 1 — 10TH MODULE FORMAL ENTRY。 2" +
+                " types (BASChengluPromptSignature 7-" +
+                "field + BASAppleProviderReleaseInput" +
+                " 7-field) gained Codable at M1793 + 2" +
+                " PROOF tests (M1794) + new typed" +
+                " surface (M1795) + close-out (M1796)。" +
+                " BASAppleAdapters has pre-octa Codable" +
+                " types (8 acknowledged in preExisting" +
+                "CodableTypes manifest) but was never" +
+                " tracked at module-extension doctrine" +
+                " level until this chapter。 4th" +
+                " consecutive post-octa fresh-module-" +
+                "territory advancement (BASOrgan ch598" +
+                " + BASMLXAdapter ch599 + BASChat" +
+                "CompletionsAdapter ch603 + BASApple" +
+                "Adapters ch604)。 Module count bumped" +
+                " 9 → 10。 145 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1796。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

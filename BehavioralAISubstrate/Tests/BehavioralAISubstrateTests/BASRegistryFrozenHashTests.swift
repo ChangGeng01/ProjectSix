@@ -107,21 +107,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 603 close-out。 Chapter
-    /// 603:BASCHATCOMPLETIONSADAPTER FIRST-EVER
-    /// CODABLE EXTENSION WAVE 1 — 9TH MODULE FRESH
-    /// TERRITORY。 1 type (BASChatCompletionsOrgan
-    /// Adapter.Endpoint nested in actor) gained Codable
-    /// at M1789 + 1 PROOF test (M1790) + NEW BASChat
-    /// CompletionsAdapterCodableExtensionDoctrine
-    /// (M1791) + close-out (M1792)。 BASChatCompletions
-    /// Adapter uncovered by chapter 599 BASMLXAdapter
-    /// first-ever (8th-module entry)。 Module count
-    /// bumped 8 → 9 — 3rd consecutive fresh-module
-    /// first-ever extension after the chapter 597
-    /// octa-milestone seal (BASOrgan ch598 + BAS
-    /// MLXAdapter ch599 + BASChatCompletionsAdapter
-    /// ch603)。
+    /// Re-captured at chapter 604 close-out。 Chapter
+    /// 604:BASAPPLEADAPTERS CODABLE EXTENSION WAVE 1
+    /// — 10TH MODULE FORMAL ENTRY into post-octa
+    /// narrative。 2 types (BASChengluPromptSignature
+    /// 7-field + BASAppleProviderReleaseInput 7-field)
+    /// gained Codable at M1793 + 2 PROOF tests (M1794)
+    /// + NEW BASAppleAdaptersCodableExtensionDoctrine
+    /// (M1795) with 8 pre-octa types acknowledged in
+    /// preExistingCodableTypes manifest + close-out
+    /// (M1796)。 Module count bumped 9 → 10 — 4th
+    /// consecutive post-octa fresh-module-territory
+    /// advancement (BASOrgan ch598 + BASMLXAdapter
+    /// ch599 + BASChatCompletionsAdapter ch603 + BAS
+    /// AppleAdapters ch604)。
     static let frozenFullRegistrySha256: String =
-        "495045aea9e11762d2c8610fe1becdfe944904f4c0ca1fed4879cb5b13be3d1e"
+        "6237b02be2daa61dcc802adb52540dd388b3b510900ce3c9e816ec09c374f9bd"
 }

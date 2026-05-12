@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1792",
-            "M1792:doctrine version reflects chapter 六百三 — BASCHATCOMPLETIONSADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1。 9TH MODULE FRESH TERRITORY:BASChatCompletionsAdapter uncovered by chapter 599 BASMLXAdapter first-ever (8th-module entry)。 1 BASChatCompletionsOrganAdapter.Endpoint type (nested in actor) gained Codable at M1789 + 1 PROOF test (M1790) + BASChatCompletionsAdapterCodableExtensionDoctrine typed surface (M1791) + close-out (M1792)。 Module count bumped 8 → 9。 3rd consecutive fresh-module first-ever extension after the chapter 597 octa-milestone seal (BASOrgan ch598 + BASMLXAdapter ch599 + BASChatCompletionsAdapter ch603)。 144 typed surfaces cumulative。 376 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1796",
+            "M1796:doctrine version reflects chapter 六百四 — BASAPPLEADAPTERS CODABLE EXTENSION WAVE 1。 10TH MODULE FORMAL ENTRY into post-octa narrative。 2 BASAppleAdapters types (BASChengluPromptSignature + BASAppleProviderReleaseInput) gained Codable at M1793 + 2 PROOF tests (M1794) + BASAppleAdaptersCodableExtensionDoctrine typed surface (M1795) with 8 pre-octa types acknowledged + close-out (M1796)。 Module count bumped 9 → 10。 4th consecutive post-octa fresh-module-territory advancement (BASOrgan ch598 + BASMLXAdapter ch599 + BASChatCompletionsAdapter ch603 + BASAppleAdapters ch604)。 145 typed surfaces cumulative。 380 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
