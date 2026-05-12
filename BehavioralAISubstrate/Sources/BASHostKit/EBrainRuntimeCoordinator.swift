@@ -2027,20 +2027,66 @@ public struct BASEBrainRuntimeCoordinator {
         // populate the typed audit-observation bundle once and
         // pass to the bundle-form `buildSovereignAuditEntry`.
         // Pre-M436.4 the call site spelled 24+ named parameters
-        // inline (130+ lines of named-arg list); now we name
-        // each projection field once on the bundle and pass
-        // the bundle as a single `projections:` argument. Each
-        // chapter that adds a new audit emission grows the
-        // bundle struct rather than the function signature.
+        // chapter 五百十五 / M1437 — V1 monolith projections
+        // construction FOLD using the unified 3-block init
+        // (M1435)。 Replaces 56-line named-arg list with 3
+        // typed input block constructions + ~22-arg unified
+        // init call。 Byte-equality with the pre-fold path
+        // GUARANTEED by M1435 PROOF tests
+        // (`BASAuditObservationProjectionsThreeBlockUnified
+        // InitTests.testThreeBlockInitEqualsAllFields`)。
+        //
+        // The 4 Kunlun trios + Cthulhu trio + Penta + 11
+        // cognitive bundles flow into 3 typed input surfaces
+        // (kunlunInputs / cthulhuInputs / observationBundles)。
+        // Residual fields stay as named args because they're
+        // not yet grouped into blocks (e.g.
+        // `kunlunAxisAlignment`,`yaochiSanctumClass`,
+        // reason codes,reconciliation outputs)。
+        let kunlunInputsForAudit =
+            BASAuditObservationProjectionsKunlunInputs(
+                trio: kunlunTrioForAudit,
+                hexa: kunlunHexaForAudit,
+                trioTwo: kunlunTrioTwoForAudit,
+                hexaTwo: kunlunHexaTwoForAudit)
+        let cthulhuInputsForAudit =
+            BASAuditObservationProjectionsCthulhuInputs(
+                abyssalThermalTrio:
+                    abyssalThermalTrioForAudit,
+                cthulhuPenta: cthulhuPentaForAudit)
+        let observationBundlesForAudit =
+            BASAuditObservationProjectionsObservationBundlesBlock(
+                presence:
+                    contextFrame.presenceObservationBundle,
+                decomposition: decomposeFrame
+                    .decompositionObservationBundle,
+                softHand: thoughtFrame
+                    .softHandObservationBundle,
+                leaseLife: thoughtFrame
+                    .leaseLifeObservationBundle,
+                hostConstitution: thoughtFrame
+                    .hostConstitutionObservationBundle,
+                thoughtFold: thoughtFrame
+                    .thoughtFoldObservationBundle,
+                neuralOrgan: thoughtFrame
+                    .neuralOrganObservationBundle,
+                hippocampalMemory: thoughtFrame
+                    .hippocampalMemoryObservationBundle,
+                worldPrior: thoughtFrame
+                    .worldPriorObservationBundle,
+                risk: thoughtFrame
+                    .riskObservationBundle,
+                updateTicket: thoughtFrame
+                    .updateTicketObservationBundle)
         let projections = BASAuditObservationProjections(
+            kunlunInputs: kunlunInputsForAudit,
+            cthulhuInputs: cthulhuInputsForAudit,
+            observationBundles:
+                observationBundlesForAudit,
             candidateObservationBundle: thoughtArtifacts
                 .candidateObservationBundle,
             tribunalObservationBundle: thoughtFrame
                 .tribunalObservationBundle,
-            // M499 (chapter 一百二十七) — thread the
-            // fragility-folded pressure into projections so the
-            // audit emission reflects the spec-canonical
-            // 7-field aggregate.
             abyssalPressure: abyssalPressureWithFragility,
             humanAnchorSignal: humanAnchorSignalForAudit,
             sealAggregate: sealAggregateForAudit,
@@ -2074,78 +2120,13 @@ public struct BASEBrainRuntimeCoordinator {
                 layerReconciliation.verdict,
             layerReconciliationReport:
                 layerReconciliation.report,
-            presenceObservationBundle:
-                contextFrame.presenceObservationBundle,
-            decompositionObservationBundle:
-                decomposeFrame.decompositionObservationBundle,
-            softHandObservationBundle: thoughtFrame
-                .softHandObservationBundle,
-            leaseLifeObservationBundle: thoughtFrame
-                .leaseLifeObservationBundle,
-            hostConstitutionObservationBundle: thoughtFrame
-                .hostConstitutionObservationBundle,
-            thoughtFoldObservationBundle: thoughtFrame
-                .thoughtFoldObservationBundle,
-            neuralOrganObservationBundle: thoughtFrame
-                .neuralOrganObservationBundle,
-            hippocampalMemoryObservationBundle: thoughtFrame
-                .hippocampalMemoryObservationBundle,
-            worldPriorObservationBundle: thoughtFrame
-                .worldPriorObservationBundle,
-            riskObservationBundle: thoughtFrame
-                .riskObservationBundle,
-            updateTicketObservationBundle: thoughtFrame
-                .updateTicketObservationBundle,
-            // M448-M451 (chapter 一百十八) — chapter 一百十七
-            // Cthulhu helper outputs threaded through the audit
-            // emission seam.
-            cosmicScaleView: cosmicScaleViewForAudit,
-            ontologyFog: ontologyFogForAudit,
             ontologyShiftMark: ontologyShiftMarkForAudit,
-            abyssalRunMode: abyssalRunModeForAudit,
-            abyssBudget: abyssBudgetForAudit,
             cthulhuAssertionCeilingReasonCodes:
                 cthulhuAssertionDecision.reasonCodes,
             cthulhuPermitEscalationReasonCodes:
                 cthulhuEscalation.reasonCodes,
-            memoryTemperatureLayer:
-                memoryTemperatureLayerForAudit,
-            // M480-M485 (chapter 一百二十五) — Kunlun production
-            // wire projections.
-            ascentLease: ascentLeaseForAudit,
-            axisDeviation: axisDeviationForAudit,
-            gatePressure: gatePressureForAudit,
-            yaochiMemoryLayer: yaochiMemoryLayerForAudit,
-            tianhengProfile: tianhengProfileForAudit,
-            jadePermitGrade: jadePermitGradeForAudit,
-            ascentBranches: ascentBranchesForAudit,
-            restSteps: restStepsForAudit,
-            returnPaths: returnPathsForAudit,
-            jadeCasket: jadeCasketForAudit,
-            jadeRefinementTickets:
-                jadeRefinementTicketsForAudit,
-            // M491-M494 (chapter 一百二十七) — final Kunlun
-            // host + integrity production-wire projections.
-            jadeFidelityMap: jadeFidelityMapForAudit,
-            hostJadeRegister: hostJadeRegisterForAudit,
-            jadeMirrorDraft: jadeMirrorDraftForAudit,
-            kunlunUnnamableSet: kunlunUnnamableSetForAudit,
-            // M495-M498 (chapter 一百二十七) — chapter 一百
-            // 二十一 Cthulhu leftover production-wire
-            // projections.
             narrativeDistortionMap:
                 narrativeDistortionMapForAudit,
-            sealedMemory: sealedMemoryForAudit,
-            humanAnchorProfile:
-                humanAnchorProfileForAudit,
-            abyssalOrganAlias: abyssalOrganAliasForAudit,
-            // M500-M501 (chapter 一百二十八) — Kunlun L4
-            // chapter-99-deferred wires.
-            kunlunAscentView: kunlunAscentViewForAudit,
-            kunlunFarWestReserve:
-                kunlunFarWestReserveForAudit,
-            // M502-M510 (chapter 一百二十八) — L12 doctrine
-            // surface aliases.
             cthulhuSurfaceAlias:
                 cthulhuSurfaceAliasForAudit,
             kunlunSurfaceAlias:
