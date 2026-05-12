@@ -43,7 +43,7 @@ import BASRuntimeCore
 /// cognitive-OS primitives。All flags default to `false` —
 /// passing `default` produces an empty bundle (zero behavior
 /// change for ADR-014 OPT-IN compliance)。
-public struct BASCognitiveOSBundleOptions: Sendable, Equatable {
+public struct BASCognitiveOSBundleOptions: Codable, Sendable, Equatable {
 
     // MARK: - Event log (G1, M841)
 

@@ -111,7 +111,7 @@ public enum BASChengluPreflightRoute:
 }
 
 public struct BASChengluPreflightHint:
-    Sendable, Equatable, Hashable
+    Codable, Sendable, Equatable, Hashable
 {
     public let route: BASChengluPreflightRoute
     public let probability: Double
