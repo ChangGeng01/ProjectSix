@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1568",
-            "M1568:doctrine version reflects chapter 五百四十七 — 100% MILESTONE — final Codable round-trip PROOF for CognitiveFramesBundle via 5-subtype fixture extends coverage 8 → 9 of 9 cluster bundles (M1565) + update coverage doctrine catalogue to 100% (M1566) + anti-drift PROOF tests with 2 milestone invariants (allBundlesExplicitlyCovered + allCoverageMNumbersNonNil) (M1567)。 100% explicit round-trip coverage achieved across all 9 BASEBrainTurnResult cluster bundles。 89 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1572",
+            "M1572:doctrine version reflects chapter 五百四十八 — typed milestone doctrine commemorating the 6-chapter Codable arc seal。 BASEBrainTurnResultClusterBundleCodableArcSealedDoctrine with 7-entry chapter catalogue + 100% milestone invariants + replay-determinism PROOF method pin (M1569) + 15 anti-drift PROOF tests (M1570) + 6 wire-in PROOF tests cross-checking against 3 other doctrines (M1571)。 The Codable arc seal is now non-driftable。 90 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

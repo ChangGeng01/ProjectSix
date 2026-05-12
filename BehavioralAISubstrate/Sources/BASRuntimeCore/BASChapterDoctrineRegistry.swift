@@ -7910,6 +7910,99 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative。 ADR-016 → M1568。 152" +
                 " consecutive autonomous commits with" +
                 " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。"),
+
+        // chapter 548 — typed milestone doctrine
+        // commemorating the 6-chapter Codable arc
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十八",
+            mNumberFirst: 1569,
+            mNumberLast: 1572,
+            v1MilestoneMNumber: 1572,
+            v1MilestoneStatus:
+                "chapter-548-codable-arc-sealed-doctrine",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1569, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "ClusterBundleCodableArcSealed" +
+                        "Doctrine typed milestone" +
+                        " surface commemorating the" +
+                        " 6-chapter Codable arc (chapters" +
+                        " 541-547 / M1541-M1568) at its" +
+                        " 100% MILESTONE seal。 Includes" +
+                        " 7-entry chapter catalogue +" +
+                        " 100% milestone invariants +" +
+                        " replay-determinism PROOF" +
+                        " method pin。 90 typed surfaces" +
+                        " cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1570, knife: "第二刀",
+                    concept: "15 anti-drift PROOF tests" +
+                        " for the arc sealed doctrine:" +
+                        " arc shape + 100% milestone" +
+                        " invariants + per-chapter" +
+                        " entries (first/last + chrono" +
+                        " order + monotonic coverage)" +
+                        " + replay-determinism pin。"),
+                BASChapterKnife(
+                    mNumber: 1571, knife: "第三刀",
+                    concept: "6 wire-in PROOF tests" +
+                        " cross-checking arc sealed" +
+                        " doctrine vs 3 other doctrines:" +
+                        " coverage doctrine (final" +
+                        " count + ratio) + fold arc" +
+                        " sealed (clusterBundleCount) +" +
+                        " Codable doctrine (conformance" +
+                        " M-number) + 100% invariant" +
+                        " consistency。"),
+                BASChapterKnife(
+                    mNumber: 1572, knife: "第四刀",
+                    concept: "Chapter 548 close-out +" +
+                        " doctrine sync — 6-chapter" +
+                        " Codable arc seal now non-" +
+                        "driftable via 21 PROOF tests +" +
+                        " cross-doctrine consistency" +
+                        " invariants。 156 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "codable-arc-achievement-undocumented",
+                "6-chapter-arc-untyped-surface",
+                "cross-doctrine-state-not-verified",
+                "100%-milestone-not-non-driftable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1572",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "codable-arc-sealed-non-driftable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in of observability sinks",
+                "future arc — generic primitive" +
+                " adoption push (Tier A migrations)"
+            ],
+            summary: "Chapter 548 ships the typed" +
+                " milestone doctrine commemorating the" +
+                " 6-chapter Codable arc seal at chapter" +
+                " 547 M1568 close-out。 21 PROOF tests" +
+                " (15 anti-drift + 6 wire-in) make the" +
+                " 6-chapter / 28-commit / 0→9 coverage" +
+                " trajectory non-driftable + verify" +
+                " cross-doctrine consistency against 3" +
+                " other typed surfaces (round-trip" +
+                " coverage + fold arc sealed + Codable" +
+                " conformance)。 90 typed surfaces" +
+                " cumulative。 ADR-016 → M1572。 156" +
+                " consecutive autonomous commits with" +
+                " V1 byte-equality preserved。 ADR-014" +
                 " OPT-IN preserved。")
     ]
 

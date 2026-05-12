@@ -37,18 +37,16 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs547() {
+    func testLastChapterIs548() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百四十七",
-            "Chapter 五百四十七:100% MILESTONE —" +
-            " final Codable round-trip PROOF for" +
-            " CognitiveFramesBundle extends coverage" +
-            " 8 → 9 of 9 cluster bundles via 5-subtype" +
-            " fixture + doctrine catalogue update to" +
-            " 100% + anti-drift tests with milestone" +
-            " invariants。 89 typed surfaces cumulative")
+            "chapter 五百四十八",
+            "Chapter 五百四十八:typed milestone doctrine" +
+            " commemorating the 6-chapter Codable arc" +
+            " + 21 PROOF tests (15 anti-drift + 6 wire-" +
+            "in cross-checking 3 other doctrines)。 90" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range

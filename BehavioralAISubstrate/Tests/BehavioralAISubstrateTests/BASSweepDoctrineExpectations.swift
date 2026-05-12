@@ -117,19 +117,18 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 145
+    public static let phase2ChapterCount: Int = 146
 
-    /// Phase 2 commits shipped。 At M1568 (100%
-    /// MILESTONE):125 + 84 + 404 = 613 (chapter 547 =
-    /// 4 cuts — CognitiveFramesBundle round-trip PROOF
-    /// + doctrine catalogue update to 100% + anti-drift
-    /// tests with milestone invariants + close-out)
-    public static let phase2CommitsShipped: Int = 613
+    /// Phase 2 commits shipped。 At M1572:125 + 84 + 408
+    /// = 617 (chapter 548 = 4 cuts — Codable arc sealed
+    /// doctrine + 21 PROOF tests + close-out)
+    public static let phase2CommitsShipped: Int = 617
 
-    /// Phase 2 mNumberLast。 At M1568 (100% MILESTONE):
-    /// chapter 547 — 9 of 9 bundles have explicit
-    /// round-trip coverage。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1568
+    /// Phase 2 mNumberLast。 At M1572:chapter 548 — the
+    /// 6-chapter Codable arc seal is now commemorated
+    /// via typed milestone doctrine with 21 PROOF tests。
+    /// SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1572
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

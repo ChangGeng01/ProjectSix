@@ -1697,7 +1697,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十七")!)
+                            "chapter 五百四十七")!),
+            // M1572 chapter 548 — Codable arc sealed doctrine + 21 PROOF tests
+            checkRegistry("五百四十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2569,6 +2575,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十七")!
+                .mNumberLast),
+            // M1572 chapter 548 — Codable arc sealed doctrine + 21 PROOF tests
+            ("548",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

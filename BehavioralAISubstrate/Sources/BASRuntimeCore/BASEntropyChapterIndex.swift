@@ -2213,6 +2213,25 @@ public enum BASEntropyChapterIndex {
                 " across all 9 BASEBrainTurnResult" +
                 " cluster bundles。 89 typed surfaces" +
                 " cumulative。 ADR-016 → M1568。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十八",
+            mNumberFirst: 1569, mNumberLast: 1572,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Typed milestone doctrine" +
+                " commemorating the 6-chapter Codable" +
+                " arc seal at chapter 547 M1568 close-" +
+                "out:BASEBrainTurnResultClusterBundle" +
+                "CodableArcSealedDoctrine with 7-entry" +
+                " chapter catalogue + 100% milestone" +
+                " invariants + replay-determinism PROOF" +
+                " method pin (M1569) + 15 anti-drift" +
+                " PROOF tests (M1570) + 6 wire-in PROOF" +
+                " tests cross-checking 3 other doctrines" +
+                " (M1571)。 The Codable arc seal is now" +
+                " non-driftable。 90 typed surfaces" +
+                " cumulative。 ADR-016 → M1572。 V1" +
                 " byte-equality preserved。")
     ]
 
