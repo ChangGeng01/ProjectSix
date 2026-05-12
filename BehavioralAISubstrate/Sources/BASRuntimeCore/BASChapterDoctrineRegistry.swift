@@ -9742,7 +9742,94 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1652。" +
                 " 236 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 569 — Arc-seal milestone for the
+        // cross-module Codable extension arc (chapters
+        // 566-568)。 Mirrors chapter 564 aggregator-arc
+        // pattern for cross-module extension layer。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十九",
+            mNumberFirst: 1653,
+            mNumberLast: 1656,
+            v1MilestoneMNumber: 1656,
+            v1MilestoneStatus:
+                "chapter-569-cross-module-codable-extension-arc-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1653, knife: "第一刀",
+                    concept: "NEW BASCrossModuleCodable" +
+                        "ExtensionArcSealedDoctrine" +
+                        " typed milestone commemorating" +
+                        " 3-chapter cross-module arc" +
+                        " (chapters 566-568)。 13 types," +
+                        " 12 commits across BASRuntime" +
+                        "Core + BASMemory。 Mirrors" +
+                        " chapter 564 aggregator-arc" +
+                        " pattern。 typed-surface count" +
+                        " 109 → 110。"),
+                BASChapterKnife(
+                    mNumber: 1654, knife: "第二刀",
+                    concept: "21 anti-drift PROOF tests" +
+                        " for the M1653 arc-seal。 Pin" +
+                        " count + 3 chapter contribs +" +
+                        " arc range + module breakdown" +
+                        " + 4 boolean flags + cross-" +
+                        "list size invariants。"),
+                BASChapterKnife(
+                    mNumber: 1655, knife: "第三刀",
+                    concept: "13 wire-in PROOF tests" +
+                        " cross-checking the M1653" +
+                        " arc-seal against the 3 cross-" +
+                        "module extension doctrines +" +
+                        " parallel chapter 564" +
+                        " aggregator-arc doctrine。"),
+                BASChapterKnife(
+                    mNumber: 1656, knife: "第四刀",
+                    concept: "Chapter 569 close-out +" +
+                        " doctrine sync。 240" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "cross-module-arc-undocumented",
+                "no-single-source-of-truth-for-13-types",
+                "extension-doctrines-not-cross-validated",
+                "parallel-arc-pattern-not-cross-referenced"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1656",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "cross-module-extension-arc-sealed",
+                "13-cross-module-types-ledger-serializable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional substrate" +
+                " coverage as needed"
+            ],
+            summary: "Chapter 569 seals the 3-chapter" +
+                " cross-module Codable extension arc" +
+                " (chapters 566-568)。 NEW" +
+                " BASCrossModuleCodableExtensionArc" +
+                "SealedDoctrine typed milestone" +
+                " (M1653) commemorating 13 types," +
+                " 12 commits + 21 anti-drift PROOF" +
+                " tests (M1654) + 13 wire-in PROOF" +
+                " tests (M1655) + close-out (M1656)。" +
+                " Mirrors chapter 564 aggregator-arc" +
+                " pattern for cross-module layer。 110" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1656。 240 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

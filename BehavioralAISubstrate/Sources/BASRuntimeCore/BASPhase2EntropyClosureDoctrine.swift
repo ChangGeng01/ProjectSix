@@ -222,7 +222,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百六十五",   // M1637-M1640 (POST-ARC FOLLOW-UP — Codable extension to 2 Inputs aggregator types + 2 PROOF tests + BASAuditObservationProjectionsInputsCodableExtensionDoctrine + close-out)
         "chapter 五百六十六",   // M1641-M1644 (CROSS-MODULE CODABLE EXTENSION — first chapter extending Codable OUTSIDE the BASHostKit audit-projection family;5 types in BASRuntimeCore + BASMemory + 7 PROOF tests + BASCrossModuleCodableExtensionDoctrine + close-out)
         "chapter 五百六十七",   // M1645-M1648 (CONTINUED CROSS-MODULE CODABLE EXTENSION — 5 more BASMemory types gained Codable + 5 PROOF tests + BASMemoryCodableExtensionDoctrine + close-out;combined chapters 566+567 = 10 cross-module types ledger-serializable)
-        "chapter 五百六十八"    // M1649-M1652 (THIRD WAVE CROSS-MODULE CODABLE EXTENSION — 3 more types gained Codable + 4 PROOF tests + BASCrossModuleCodableExtensionThirdWaveDoctrine + close-out;combined chapters 566+567+568 = 13 cross-module types ledger-serializable)
+        "chapter 五百六十八",   // M1649-M1652 (THIRD WAVE CROSS-MODULE CODABLE EXTENSION — 3 more types gained Codable + 4 PROOF tests + BASCrossModuleCodableExtensionThirdWaveDoctrine + close-out;combined chapters 566+567+568 = 13 cross-module types ledger-serializable)
+        "chapter 五百六十九"    // M1653-M1656 (CROSS-MODULE CODABLE EXTENSION ARC-SEAL MILESTONE — BASCrossModuleCodableExtensionArcSealedDoctrine + 21 anti-drift + 13 wire-in PROOF tests commemorating 3-chapter / 12-commit arc across chapters 566-568)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -239,14 +240,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1652
+    public static let mNumberLast: Int = 1656
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1652)。 Bumped through chapter 568:693 → 697。
-    /// Chapter 568:Third-wave cross-module Codable
-    /// extension — 3 more types + 4 PROOF tests +
-    /// typed surface + close-out。
-    public static let commitsShipped: Int = 697
+    /// M1656)。 Bumped through chapter 569:697 → 701。
+    /// Chapter 569:Cross-module extension arc-seal
+    /// milestone + 21 anti-drift + 13 wire-in PROOF
+    /// tests + close-out。
+    public static let commitsShipped: Int = 701
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -116,20 +116,20 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1652:24 + 20 + 122 = 166 (chapter
-    /// 568 — third-wave cross-module extension)
-    public static let phase2ChapterCount: Int = 166
+    /// added)。 At M1656:24 + 20 + 123 = 167 (chapter
+    /// 569 — cross-module extension arc-seal milestone)
+    public static let phase2ChapterCount: Int = 167
 
-    /// Phase 2 commits shipped。 At M1652:125 + 84 +
-    /// 488 = 697 (chapter 568 = 4 cuts — third-wave
-    /// cross-module Codable extension + 4 PROOF tests
-    /// + typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 697
+    /// Phase 2 commits shipped。 At M1656:125 + 84 +
+    /// 492 = 701 (chapter 569 = 4 cuts — cross-module
+    /// extension arc-seal milestone + 21 anti-drift +
+    /// 13 wire-in PROOF tests + close-out)
+    public static let phase2CommitsShipped: Int = 701
 
-    /// Phase 2 mNumberLast。 At M1652:chapter 568 —
-    /// third-wave cross-module Codable extension。
+    /// Phase 2 mNumberLast。 At M1656:chapter 569 —
+    /// cross-module extension arc-seal milestone。
     /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1652
+    public static let phase2MNumberLast: Int = 1656
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

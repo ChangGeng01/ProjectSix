@@ -2612,7 +2612,26 @@ public enum BASEntropyChapterIndex {
                 " cross-module types ledger-" +
                 "serializable。 109 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1652。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十九",
+            mNumberFirst: 1653, mNumberLast: 1656,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CROSS-MODULE CODABLE EXTENSION" +
+                " ARC-SEAL MILESTONE。" +
+                " BASCrossModuleCodableExtensionArc" +
+                "SealedDoctrine typed milestone" +
+                " (M1653) commemorating 3-chapter /" +
+                " 12-commit arc (chapters 566-568)" +
+                " covering 13 cross-module types。" +
+                " 21 anti-drift PROOF tests (M1654)" +
+                " + 13 wire-in PROOF tests (M1655) +" +
+                " close-out (M1656)。 Mirrors chapter" +
+                " 564 aggregator-arc pattern。 110" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1656。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
