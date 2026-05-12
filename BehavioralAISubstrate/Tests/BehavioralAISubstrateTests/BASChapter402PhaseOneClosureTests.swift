@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1648",
-            "M1648:doctrine version reflects chapter 五百六十七 — CONTINUED CROSS-MODULE CODABLE EXTENSION。 5 more BASMemory types gained Codable (ConstitutionMatch + ClosedLoopApplyOutcome + EvolutionPromotionGateVerdict + PreparedMemoryGovernanceDraft + ShadowTrialLedgerEntry) at M1645 + 5 PROOF tests (M1646) + BASMemoryCodableExtensionDoctrine typed surface (M1647) + close-out (M1648)。 Combined chapters 566+567 = 10 cross-module types。 108 typed surfaces cumulative。 232 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1652",
+            "M1652:doctrine version reflects chapter 五百六十八 — THIRD-WAVE CROSS-MODULE CODABLE EXTENSION。 3 more types gained Codable (KnowledgeGraphEventExtractionResult + HostCandidatePipelineObservationSnapshot + ForbiddenLifecycleGateDecision) at M1649 + 4 PROOF tests (M1650) + BASCrossModuleCodableExtensionThirdWaveDoctrine typed surface (M1651) + close-out (M1652)。 Combined chapters 566+567+568 = 13 cross-module types。 109 typed surfaces cumulative。 236 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

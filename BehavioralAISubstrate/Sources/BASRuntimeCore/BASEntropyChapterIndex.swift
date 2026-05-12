@@ -2596,6 +2596,22 @@ public enum BASEntropyChapterIndex {
                 " typed surface (M1647) + close-out" +
                 " (M1648)。 108 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1648。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十八",
+            mNumberFirst: 1649, mNumberLast: 1652,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "THIRD-WAVE CROSS-MODULE CODABLE" +
+                " EXTENSION — 3 more types gained" +
+                " Codable at M1649 + 4 PROOF tests" +
+                " (M1650) + BASCrossModuleCodable" +
+                "ExtensionThirdWaveDoctrine typed" +
+                " surface (M1651) + close-out (M1652)。" +
+                " Combined chapters 566+567+568 = 13" +
+                " cross-module types ledger-" +
+                "serializable。 109 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1652。" +
                 " V1 byte-equality preserved。")
     ]
 

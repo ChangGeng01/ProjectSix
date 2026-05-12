@@ -1817,7 +1817,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百六十七")!)
+                            "chapter 五百六十七")!),
+            // M1652 chapter 568 — Third-wave cross-module Codable extension to 3 more types
+            checkRegistry("五百六十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百六十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2849,6 +2855,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百六十七")!
+                .mNumberLast),
+            // M1652 chapter 568 — Third-wave cross-module Codable extension
+            ("568",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

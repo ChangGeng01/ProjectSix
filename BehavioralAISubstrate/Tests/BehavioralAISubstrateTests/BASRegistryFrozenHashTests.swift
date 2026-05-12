@@ -107,16 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 567 close-out。 Chapter
-    /// 567:CONTINUED CROSS-MODULE CODABLE EXTENSION。
-    /// 5 more BASMemory types gained Codable
-    /// (ConstitutionMatch + ClosedLoopApplyOutcome +
-    /// EvolutionPromotionGateVerdict +
-    /// PreparedMemoryGovernanceDraft +
-    /// ShadowTrialLedgerEntry) at M1645 + 5 PROOF
-    /// tests (M1646) +
-    /// BASMemoryCodableExtensionDoctrine typed
-    /// surface (M1647)。
+    /// Re-captured at chapter 568 close-out。 Chapter
+    /// 568:THIRD-WAVE CROSS-MODULE CODABLE EXTENSION。
+    /// 3 more types gained Codable
+    /// (KnowledgeGraphEventExtractionResult +
+    /// HostCandidatePipelineObservationSnapshot +
+    /// ForbiddenLifecycleGateDecision) at M1649 + 4
+    /// PROOF tests (M1650) +
+    /// BASCrossModuleCodableExtensionThirdWaveDoctrine
+    /// typed surface (M1651)。
     static let frozenFullRegistrySha256: String =
-        "8fb94e0d4000542e1748fdb3ac5ab10a647b1c94acc60bd82469d73c96681c07"
+        "72ba0a6b34a543ba7d730375352be2482565824862192a80dc41b13ddd38afa9"
 }

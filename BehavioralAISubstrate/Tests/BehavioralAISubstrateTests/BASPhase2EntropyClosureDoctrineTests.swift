@@ -37,18 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs567() {
+    func testLastChapterIs568() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百六十七",
-            "Chapter 五百六十七:CONTINUED CROSS-" +
-            "MODULE CODABLE EXTENSION。 5 more" +
-            " BASMemory types gained Codable + 5" +
-            " PROOF tests + BASMemoryCodable" +
-            "ExtensionDoctrine typed surface + close-" +
-            "out。 Combined chapters 566+567 = 10" +
-            " cross-module types。 108 typed surfaces" +
+            "chapter 五百六十八",
+            "Chapter 五百六十八:THIRD-WAVE CROSS-" +
+            "MODULE CODABLE EXTENSION。 3 more types" +
+            " gained Codable + 4 PROOF tests +" +
+            " BASCrossModuleCodableExtensionThirdWave" +
+            "Doctrine typed surface + close-out。" +
+            " Combined chapters 566+567+568 = 13" +
+            " cross-module types。 109 typed surfaces" +
             " cumulative")
     }
 

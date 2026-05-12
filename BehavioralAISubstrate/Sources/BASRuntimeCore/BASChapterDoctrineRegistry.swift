@@ -9670,7 +9670,79 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1648。 232 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 568 — Third wave of cross-module
+        // Codable extension。 3 more types。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十八",
+            mNumberFirst: 1649,
+            mNumberLast: 1652,
+            v1MilestoneMNumber: 1652,
+            v1MilestoneStatus:
+                "chapter-568-third-wave-cross-module-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1649, knife: "第一刀",
+                    concept: "Add Codable to 3 more" +
+                        " types (KnowledgeGraphEvent" +
+                        "ExtractionResult +" +
+                        " HostCandidatePipeline" +
+                        "ObservationSnapshot +" +
+                        " ForbiddenLifecycleGate" +
+                        "Decision)。"),
+                BASChapterKnife(
+                    mNumber: 1650, knife: "第二刀",
+                    concept: "4 PROOF tests:3 compile-" +
+                        "time conformance + 1 populated" +
+                        " round-trip。"),
+                BASChapterKnife(
+                    mNumber: 1651, knife: "第三刀",
+                    concept: "NEW BASCrossModuleCodable" +
+                        "ExtensionThirdWaveDoctrine" +
+                        " typed surface。 typed-surface" +
+                        " count 108 → 109。"),
+                BASChapterKnife(
+                    mNumber: 1652, knife: "第四刀",
+                    concept: "Chapter 568 close-out +" +
+                        " doctrine sync。 236" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "knowledge-graph-extraction-non-codable",
+                "host-candidate-snapshot-non-codable",
+                "forbidden-lifecycle-decision-non-codable",
+                "third-wave-coverage-gap"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1652",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "third-wave-cross-module-codable",
+                "13-cross-module-types-ledger-serializable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — continue cross-module" +
+                " extension or pivot"
+            ],
+            summary: "Chapter 568 ships the third wave" +
+                " of cross-module Codable extension。 3" +
+                " more types gained Codable + 4 PROOF" +
+                " tests + new typed surface + close-" +
+                "out。 Combined chapters 566+567+568 =" +
+                " 13 cross-module types now ledger-" +
+                "serializable。 109 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1652。" +
+                " 236 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
