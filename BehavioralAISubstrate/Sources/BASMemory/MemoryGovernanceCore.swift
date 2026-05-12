@@ -99,7 +99,9 @@ public struct BASMemoryLifecycleReviewInput: Codable, Equatable, Sendable {
     }
 }
 
-public struct BASPreparedMemoryGovernanceDraft: Equatable, Sendable {
+public struct BASPreparedMemoryGovernanceDraft:
+    Codable, Equatable, Sendable
+{
     public let draft: BASMemoryGovernanceDraftInput
     public let assessment: BASMemoryGovernanceAssessment
     public let horizonDescriptor: BASMemoryHorizonClaimDescriptor

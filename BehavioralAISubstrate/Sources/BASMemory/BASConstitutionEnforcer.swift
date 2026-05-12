@@ -113,7 +113,9 @@ public enum BASConstitutionReasonCode {
 /// Typed result of a constitution boundary check。Caller (the
 /// permit gate / post-LLM observer / memory filter) consumes
 /// this to decide the next action。
-public struct BASConstitutionMatch: Equatable, Sendable {
+public struct BASConstitutionMatch:
+    Codable, Equatable, Sendable
+{
     /// The constitutional pattern that matched (eg. an entry
     /// from `BASBoundaryVeil.hardNoGo`)。Empty string only when
     /// `isMatch == false`。

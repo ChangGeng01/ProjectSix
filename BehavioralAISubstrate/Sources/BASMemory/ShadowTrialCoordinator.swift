@@ -588,7 +588,9 @@ public actor BASShadowTrialCoordinator {
 /// `BASMemory` does not leak `BAS*Sovereign*` types into its public
 /// surface (redaction-safe by construction — every field here is a
 /// scalar `String` / `Date` / `[String]`).
-public struct BASShadowTrialLedgerEntry: Sendable, Equatable {
+public struct BASShadowTrialLedgerEntry:
+    Codable, Sendable, Equatable
+{
     public let auditID: String
     public let sessionID: String
     public let turnID: String

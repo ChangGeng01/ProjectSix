@@ -346,7 +346,9 @@ public struct BASEvolutionSeal: BASSchemaVersioned {
     }
 }
 
-public struct BASEvolutionPromotionGateVerdict: Equatable, Sendable {
+public struct BASEvolutionPromotionGateVerdict:
+    Codable, Equatable, Sendable
+{
     public let allowsPromotion: Bool
     public let reasonCodes: [String]
     public let primaryReason: String?

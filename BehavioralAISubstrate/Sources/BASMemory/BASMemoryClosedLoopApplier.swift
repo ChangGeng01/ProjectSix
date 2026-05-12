@@ -74,7 +74,9 @@
 import Foundation
 
 /// Result of one closed-loop apply pass.
-public struct BASMemoryClosedLoopApplyOutcome: Sendable, Equatable {
+public struct BASMemoryClosedLoopApplyOutcome:
+    Codable, Sendable, Equatable
+{
     /// The full report computed for this pass.
     public let report: BASMemoryImportanceReport
     /// Tier mutations actually applied (atomID → newTier).
