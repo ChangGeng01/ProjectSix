@@ -37,20 +37,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs588() {
+    func testLastChapterIs589() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百八十八",
-            "Chapter 五百八十八:BASMEMORY POST-CROSS-" +
-            "MODULE-ARC WAVE 2 CODABLE EXTENSION。 2" +
-            " nested types (RejectionRecord +" +
-            " EmitOutcome) gained Codable + 2 PROOF" +
+            "chapter 五百八十九",
+            "Chapter 五百八十九:BASMEMORY POST-CROSS-" +
+            "MODULE-ARC WAVE 3 CODABLE EXTENSION。 2" +
+            " BASMemory types (BASMemoryImportance" +
+            "Scorer + BASMemoryMutationWriter." +
+            "MutationOutcome) gained Codable + 2 PROOF" +
             " tests + BASMemoryPostCrossModuleArc" +
-            "ExtensionWaveTwoDoctrine typed surface +" +
-            " close-out。 Continues chapter 587 wave 1" +
-            " pattern。 Combined 14 BASMemory types" +
-            " cumulative。 129 typed surfaces cumulative")
+            "ExtensionWaveThreeDoctrine typed surface" +
+            " + close-out。 Completes 3-wave BASMemory" +
+            " post-arc trilogy。 Combined 16 BAS" +
+            "Memory types cumulative。 130 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

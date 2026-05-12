@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1732",
-            "M1732:doctrine version reflects chapter 五百八十八 — BASMEMORY POST-CROSS-MODULE-ARC WAVE 2 CODABLE EXTENSION。 2 nested types (BASHostCandidatePipeline.RejectionRecord + BASMemoryMutationEventEmitter.EmitOutcome) gained Codable at M1729 + 2 PROOF tests (M1730) + BASMemoryPostCrossModuleArcExtensionWaveTwoDoctrine typed surface (M1731) + close-out (M1732)。 Continues chapter 587 wave 1 pattern。 Combined chapter 569 + 587 + 588 = 14 BASMemory types ledger-serializable。 129 typed surfaces cumulative。 316 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1736",
+            "M1736:doctrine version reflects chapter 五百八十九 — BASMEMORY POST-CROSS-MODULE-ARC WAVE 3 CODABLE EXTENSION。 2 BASMemory types (BASMemoryImportanceScorer + BASMemoryMutationWriter.MutationOutcome) gained Codable at M1733 + 2 PROOF tests (M1734) + BASMemoryPostCrossModuleArcExtensionWaveThreeDoctrine typed surface (M1735) + close-out (M1736)。 Completes 3-wave BASMemory post-arc trilogy。 Combined chapter 569 + 587 + 588 + 589 = 16 BASMemory types ledger-serializable。 Arc ready for sealing at chapter 590。 130 typed surfaces cumulative。 320 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

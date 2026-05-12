@@ -1943,7 +1943,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十八")!)
+                            "chapter 五百八十八")!),
+            // M1736 chapter 589 — BASMemory post-cross-module-arc wave 3
+            checkRegistry("五百八十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3143,6 +3149,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十八")!
+                .mNumberLast),
+            // M1736 chapter 589 — BASMemory post-cross-module-arc wave 3
+            ("589",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

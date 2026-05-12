@@ -242,7 +242,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百八十五",   // M1717-M1720 (HEXA-MILESTONE COMPLETION META-META MILESTONE — BASCodableExtensionHexaMilestoneCompletionDoctrine + 28 anti-drift + 16 wire-in PROOF tests cataloguing all 6 sealed Codable extension milestones;63 types,72 commits,18 chapters,5 modules;65 session types ledger-serializable;new beyond-m1700-arc kind discriminator)
         "chapter 五百八十六",   // M1721-M1724 (FIRST-EVER BASOBSERVABILITY CODABLE EXTENSION — 2 nested types (BASUnifiedStorageLocator.Locations + BASUpdateTicketLifecycleSQLiteStorage.CheckpointResult) gained Codable + 2 PROOF tests + BASObservabilityCodableExtensionDoctrine + close-out;module coverage 5→6;second fresh-module extension beyond M1700)
         "chapter 五百八十七",   // M1725-M1728 (BASMEMORY POST-CROSS-MODULE-ARC CODABLE EXTENSION — 2 BASMemory types (BASMemoryTrustProfile + BASMemoryTieringReconciliationOutcome.Decision) gained Codable + 2 PROOF tests + BASMemoryPostCrossModuleArcExtensionDoctrine + close-out;combined chapter 569 + 587 = 12 BASMemory types cumulative)
-        "chapter 五百八十八"    // M1729-M1732 (BASMEMORY POST-CROSS-MODULE-ARC WAVE 2 CODABLE EXTENSION — 2 nested types (HostCandidatePipeline.RejectionRecord + BASMemoryMutationEventEmitter.EmitOutcome) gained Codable + 2 PROOF tests + BASMemoryPostCrossModuleArcExtensionWaveTwoDoctrine + close-out;combined chapter 569 + 587 + 588 = 14 BASMemory types cumulative)
+        "chapter 五百八十八",   // M1729-M1732 (BASMEMORY POST-CROSS-MODULE-ARC WAVE 2 CODABLE EXTENSION — 2 nested types (HostCandidatePipeline.RejectionRecord + BASMemoryMutationEventEmitter.EmitOutcome) gained Codable + 2 PROOF tests + BASMemoryPostCrossModuleArcExtensionWaveTwoDoctrine + close-out;combined chapter 569 + 587 + 588 = 14 BASMemory types cumulative)
+        "chapter 五百八十九"    // M1733-M1736 (BASMEMORY POST-CROSS-MODULE-ARC WAVE 3 CODABLE EXTENSION — 2 types (BASMemoryImportanceScorer + BASMemoryMutationWriter.MutationOutcome) gained Codable + 2 PROOF tests + BASMemoryPostCrossModuleArcExtensionWaveThreeDoctrine + close-out;combined chapter 569 + 587 + 588 + 589 = 16 BASMemory types cumulative;trilogy ready for sealing at chapter 590)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -259,15 +260,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1732
+    public static let mNumberLast: Int = 1736
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1732)。 Bumped through chapter 588:773 → 777。
-    /// Chapter 588:BASMemory post-cross-module-arc
-    /// wave 2 Codable extension + 2 PROOF tests +
-    /// typed surface + close-out。 Continues chapter
-    /// 587 wave 1 pattern。
-    public static let commitsShipped: Int = 777
+    /// M1736)。 Bumped through chapter 589:777 → 781。
+    /// Chapter 589:BASMemory post-cross-module-arc
+    /// wave 3 Codable extension + 2 PROOF tests +
+    /// typed surface + close-out。 Completes 3-wave
+    /// BASMemory post-arc trilogy。
+    public static let commitsShipped: Int = 781
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

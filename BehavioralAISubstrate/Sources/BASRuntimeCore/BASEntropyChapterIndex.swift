@@ -3009,7 +3009,26 @@ public enum BASEntropyChapterIndex {
                 " 14 BASMemory types ledger-" +
                 "serializable。 129 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1732。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十九",
+            mNumberFirst: 1733, mNumberLast: 1736,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-CROSS-MODULE-ARC" +
+                " WAVE 3 CODABLE EXTENSION。 2 types" +
+                " (BASMemoryImportanceScorer + BAS" +
+                "MemoryMutationWriter.MutationOutcome)" +
+                " gained Codable at M1733 + 2 PROOF" +
+                " tests (M1734) + new typed surface" +
+                " (M1735) + close-out (M1736)。" +
+                " Completes 3-wave BASMemory post-arc" +
+                " trilogy。 Combined chapter 569 + 587" +
+                " + 588 + 589 = 16 BASMemory types" +
+                " ledger-serializable。 Arc ready for" +
+                " sealing at chapter 590。 130 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1736。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

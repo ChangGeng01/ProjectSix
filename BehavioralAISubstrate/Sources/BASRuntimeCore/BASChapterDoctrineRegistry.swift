@@ -11483,6 +11483,100 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1732。 316 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 589 — BASMemory post-cross-module-
+        // arc wave 3 Codable extension。 2 types
+        // (BASMemoryImportanceScorer +
+        // BASMemoryMutationWriter.MutationOutcome)。
+        // Completes 3-wave BASMemory post-arc trilogy;
+        // arc structure ready for sealing at chapter
+        // 590。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十九",
+            mNumberFirst: 1733,
+            mNumberLast: 1736,
+            v1MilestoneMNumber: 1736,
+            v1MilestoneStatus:
+                "chapter-589-memory-post-cross-module-arc-wave-three",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1733, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Memory types (BASMemory" +
+                        "ImportanceScorer + BASMemory" +
+                        "MutationWriter.Mutation" +
+                        "Outcome)。 Wave 3 of post-cross-" +
+                        "module-arc BASMemory extension。" +
+                        " Completes 3-wave trilogy。"),
+                BASChapterKnife(
+                    mNumber: 1734, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1735, knife: "第三刀",
+                    concept: "NEW BASMemoryPostCross" +
+                        "ModuleArcExtensionWaveThree" +
+                        "Doctrine typed surface +" +
+                        " trilogyReadyForSealing flag。" +
+                        " Combined chapter 569 + 587 +" +
+                        " 588 + 589 = 16 BASMemory" +
+                        " types cumulative。 typed-" +
+                        "surface count 129 → 130。"),
+                BASChapterKnife(
+                    mNumber: 1736, knife: "第四刀",
+                    concept: "Chapter 589 close-out +" +
+                        " doctrine sync。 320" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。 BAS" +
+                        "Memory post-arc trilogy ready" +
+                        " for sealing at chapter 590。")
+            ],
+            entropyClassesAttacked: [
+                "memory-importance-scorer-non-codable",
+                "memory-mutation-writer-outcome-non-codable",
+                "memory-wave-3-aftermath-incomplete",
+                "memory-trilogy-not-yet-sealed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1736",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "memory-post-cross-module-arc-wave-three",
+                "16-memory-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — chapter 590 BASMemory" +
+                " post-arc trilogy seal milestone" +
+                " mirroring chapter 579 BASOrchestration" +
+                " post-arc trilogy seal pattern",
+                "future arc — additional fresh module" +
+                " territory or seal milestones"
+            ],
+            summary: "Chapter 589 ships BASMemory post-" +
+                "cross-module-arc wave 3 Codable" +
+                " extension。 2 BASMemory types (BAS" +
+                "MemoryImportanceScorer + BASMemory" +
+                "MutationWriter.MutationOutcome)" +
+                " gained Codable at M1733。 2 PROOF" +
+                " tests (M1734) + new typed surface" +
+                " (M1735) + close-out (M1736)。" +
+                " Completes 3-wave BASMemory post-arc" +
+                " trilogy。 Combined chapter 569 (10) +" +
+                " chapter 587 (2) + chapter 588 (2) +" +
+                " chapter 589 (2) = 16 BASMemory types" +
+                " ledger-serializable。 Arc structure" +
+                " ready for sealing at chapter 590" +
+                " (mirroring chapter 579 BAS" +
+                "Orchestration post-arc trilogy seal)。" +
+                " 130 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1736。 320 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 
