@@ -2039,7 +2039,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四")!)
+                            "chapter 六百四")!),
+            // M1800 chapter 605 — BASMetalSubstrate wave 1 (11th-module formal entry, M1800 milestone)
+            checkRegistry("六百五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3367,6 +3373,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四")!
+                .mNumberLast),
+            // M1800 chapter 605 — BASMetalSubstrate wave 1 (11th-module formal entry, M1800)
+            ("605",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

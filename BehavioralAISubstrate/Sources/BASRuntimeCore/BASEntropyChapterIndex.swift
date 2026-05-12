@@ -3390,6 +3390,35 @@ public enum BASEntropyChapterIndex {
                 "Adapters ch604)。 Module count bumped" +
                 " 9 → 10。 145 typed surfaces cumulative" +
                 " (+1)。 ADR-016 → M1796。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五",
+            mNumberFirst: 1797, mNumberLast: 1800,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE CODABLE" +
+                " EXTENSION WAVE 1 — 11TH MODULE FORMAL" +
+                " ENTRY + M1800 ROUND-NUMBER MILESTONE。" +
+                " 2 types (BASKernelInputs 2-field +" +
+                " BASKernelOutputs 3-field) gained" +
+                " Codable at M1797 + 2 PROOF tests" +
+                " (M1798) + new typed surface (M1799)" +
+                " + close-out (M1800)。 BASMetalSubstrate" +
+                " has pre-octa Codable types (10" +
+                " acknowledged in preExistingCodableTypes" +
+                " manifest) but was never tracked at" +
+                " module-extension doctrine level until" +
+                " this chapter。 5th consecutive post-" +
+                "octa fresh-module-territory advancement" +
+                " (BASOrgan ch598 + BASMLXAdapter ch599" +
+                " + BASChatCompletionsAdapter ch603 +" +
+                " BASAppleAdapters ch604 + BAS" +
+                "MetalSubstrate ch605)。 Module count" +
+                " bumped 10 → 11。 ADR-016 reaches" +
+                " M1800 round-number milestone (100-" +
+                "step jump since chapter 580 M1700" +
+                " round-number close-out)。 146 typed" +
+                " surfaces cumulative (+1)。 V1 byte-" +
                 "equality preserved。")
     ]
 

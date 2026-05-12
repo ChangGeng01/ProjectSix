@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1796",
-            "M1796:doctrine version reflects chapter 六百四 — BASAPPLEADAPTERS CODABLE EXTENSION WAVE 1。 10TH MODULE FORMAL ENTRY into post-octa narrative。 2 BASAppleAdapters types (BASChengluPromptSignature + BASAppleProviderReleaseInput) gained Codable at M1793 + 2 PROOF tests (M1794) + BASAppleAdaptersCodableExtensionDoctrine typed surface (M1795) with 8 pre-octa types acknowledged + close-out (M1796)。 Module count bumped 9 → 10。 4th consecutive post-octa fresh-module-territory advancement (BASOrgan ch598 + BASMLXAdapter ch599 + BASChatCompletionsAdapter ch603 + BASAppleAdapters ch604)。 145 typed surfaces cumulative。 380 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1800",
+            "M1800:doctrine version reflects chapter 六百五 — BASMETALSUBSTRATE CODABLE EXTENSION WAVE 1 + M1800 ROUND-NUMBER MILESTONE。 11TH MODULE FORMAL ENTRY into post-octa narrative。 2 BASMetalSubstrate types (BASKernelInputs + BASKernelOutputs) gained Codable at M1797 + 2 PROOF tests (M1798) + BASMetalSubstrateCodableExtensionDoctrine typed surface (M1799) with 10 pre-octa types acknowledged + close-out (M1800)。 Module count bumped 10 → 11。 5th consecutive post-octa fresh-module-territory advancement (BASOrgan ch598 + BASMLXAdapter ch599 + BASChatCompletionsAdapter ch603 + BASAppleAdapters ch604 + BASMetalSubstrate ch605)。 M1800 ROUND-NUMBER MILESTONE — 100-step jump since chapter 580 M1700 round-number close-out。 146 typed surfaces cumulative。 384 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

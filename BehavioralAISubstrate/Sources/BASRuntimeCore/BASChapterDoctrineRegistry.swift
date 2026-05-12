@@ -13089,6 +13089,107 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1796。" +
                 " 380 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 605 — BASMetalSubstrate Codable
+        // extension wave 1 (11TH MODULE FORMAL ENTRY)。
+        // 5th consecutive post-octa fresh-module
+        // advancement。 Reaches M1800 round-number
+        // milestone at close-out (100-step jump since
+        // chapter 580 M1700 round-number close-out)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五",
+            mNumberFirst: 1797,
+            mNumberLast: 1800,
+            v1MilestoneMNumber: 1800,
+            v1MilestoneStatus:
+                "chapter-605-metal-substrate-codable-extension-wave-one-m1800-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1797, knife: "第一刀",
+                    concept: "Add Codable to 2 BASMetal" +
+                        "Substrate types — BASKernelInputs" +
+                        " (descriptors + payloads:[Data])" +
+                        " + BASKernelOutputs (descriptors" +
+                        " + payloads + executionNanos" +
+                        " UInt64)。 All field types Codable" +
+                        " (BASTensorDescriptor + Data +" +
+                        " UInt64)。 Trivial addition。"),
+                BASChapterKnife(
+                    mNumber: 1798, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1799, knife: "第三刀",
+                    concept: "NEW BASMetalSubstrateCodable" +
+                        "ExtensionDoctrine + isFormalModule" +
+                        "Entry flag + moduleCountAfterThis" +
+                        " = 11 + isFifthConsecutiveFresh" +
+                        "ModuleAfterOcta flag +" +
+                        " reachesM1800RoundMilestone flag" +
+                        " + preExistingCodableTypes list" +
+                        " (10 pre-octa types acknowledged)。" +
+                        " typed-surface count 145 → 146。"),
+                BASChapterKnife(
+                    mNumber: 1800, knife: "第四刀",
+                    concept: "Chapter 605 close-out +" +
+                        " doctrine sync。 384 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 M1800 ROUND-NUMBER" +
+                        " MILESTONE REACHED — 100-step" +
+                        " jump since chapter 580 M1700" +
+                        " round-number close-out。 11" +
+                        " modules covered。")
+            ],
+            entropyClassesAttacked: [
+                "kernel-inputs-non-codable",
+                "kernel-outputs-non-codable",
+                "bas-metal-substrate-not-formally-in-module-narrative",
+                "module-count-stuck-at-10-after-chapter-604"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1800",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "metal-substrate-formal-module-entry",
+                "module-count-bumped-10-to-11",
+                "fifth-consecutive-fresh-module-after-octa",
+                "m1800-round-number-milestone-reached"
+            ],
+            plannedFutureCuts: [
+                "future arc — BASMetalSubstrate wave 2" +
+                " (additional non-Codable types)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — 12th module exploration" +
+                " (BASPolicy or BASEvaluation or" +
+                " BASWorldPrior)"
+            ],
+            summary: "Chapter 605 ships BASMetalSubstrate" +
+                " Codable extension wave 1 — 11TH MODULE" +
+                " FORMAL ENTRY into post-octa narrative。" +
+                " 2 types (BASKernelInputs 2-field +" +
+                " BASKernelOutputs 3-field) gained" +
+                " Codable at M1797 + 2 PROOF tests" +
+                " (M1798) + new typed surface (M1799)" +
+                " + close-out (M1800)。 BASMetalSubstrate" +
+                " has pre-octa Codable types (10" +
+                " acknowledged in preExistingCodableTypes" +
+                " manifest) but was never tracked at" +
+                " module-extension doctrine level until" +
+                " this chapter。 5th consecutive post-" +
+                "octa fresh-module advancement (BASOrgan" +
+                " ch598 + BASMLXAdapter ch599 + BASChat" +
+                "CompletionsAdapter ch603 + BASApple" +
+                "Adapters ch604 + BASMetalSubstrate" +
+                " ch605)。 146 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1800 ROUND-NUMBER" +
+                " MILESTONE (100-step jump since chapter" +
+                " 580 M1700 round-number close-out)。" +
+                " 384 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 
