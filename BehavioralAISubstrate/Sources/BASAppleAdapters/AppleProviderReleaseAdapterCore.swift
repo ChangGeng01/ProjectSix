@@ -4,7 +4,7 @@ import BASOrchestration
 import BASPolicy
 import BASRuntimeCore
 
-public struct BASAppleProviderReleaseInput: Sendable, Equatable {
+public struct BASAppleProviderReleaseInput: Sendable, Equatable, Codable {
     public var traceKindRawValue: String
     public var outputPreview: String
     public var kernelSnapshot: BASCognitionKernelSnapshot

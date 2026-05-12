@@ -50,7 +50,7 @@ import CoreML
 ///
 /// 6 categorical fields + 1 mutation seed → 43-dim one-hot
 /// encoding via `BASChengluFeatureEncoder.encode(...)`。
-public struct BASChengluPromptSignature: Sendable, Equatable {
+public struct BASChengluPromptSignature: Sendable, Equatable, Codable {
     public let tone: String
     public let domain: String
     public let stake: String
