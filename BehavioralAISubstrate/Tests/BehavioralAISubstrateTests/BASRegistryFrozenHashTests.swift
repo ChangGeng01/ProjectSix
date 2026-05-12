@@ -107,15 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 522 close-out。 Chapter
-    /// 522:100% V1 CALL-SITE PACKAGING COVERAGE
-    /// MILESTONE — BASAuditObservationProjectionsCthulhu
-    /// LeftoversBlock (6 leftover fields,8th + FINAL
-    /// typed input block) + 8-block unified convenience
-    /// init with NO residual args + V1 monolith splice
-    /// using all 8 blocks。 69 fields packaged across 8
-    /// typed input surfaces。 V1 call site 118 → 60 LOC
-    /// cumulative (~58 LOC saved,49% reduction)。
+    /// Re-captured at chapter 523 close-out。 Chapter
+    /// 523:caps the 12-chapter projection-block
+    /// pipeline arc — BASChapter511To522Pipeline
+    /// Doctrine typed milestone freezing arc invariants
+    /// (12 chapters,48 commits,8 input blocks,69
+    /// packaged fields,49% V1 LOC reduction,100%
+    /// packaging coverage) + 8 anti-drift PROOF tests +
+    /// 3 end-to-end PROOF tests via V1 monolith
+    /// including replay-determinism verification。
     static let frozenFullRegistrySha256: String =
-        "b09f93469c009bbd11c72072d45ebdadd2f39ff8922931a5faf990e9ac4ceca4"
+        "cd022b728bfd6ac5977003b3eaf4937f2fee738d39b44644569f45d08019017a"
 }

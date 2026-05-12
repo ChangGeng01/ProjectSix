@@ -5647,6 +5647,109 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative across chapters 515-522)。" +
                 " 68 typed surfaces cumulative。 ADR-016" +
                 " → M1468。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 523 — 12-chapter arc milestone +
+        //               anti-drift PROOF tests
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十三",
+            mNumberFirst: 1469,
+            mNumberLast: 1472,
+            v1MilestoneMNumber: 1472,
+            v1MilestoneStatus:
+                "chapter-523-12-chapter-arc-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1469, knife: "第一刀",
+                    concept: "NEW BASChapter511To522" +
+                        "PipelineDoctrine — typed" +
+                        " milestone freezing the" +
+                        " complete 12-chapter arc" +
+                        " (M1421-M1468) invariants:" +
+                        " chapterCount=12,commitCount=" +
+                        "48,typedInputBlockCount=8," +
+                        " totalPackagedFieldCount=69," +
+                        " hundredPercentPackagingCoverage" +
+                        "=true,v1CallSiteLOCReductionNet" +
+                        "=58 (49%)。 SUPERSEDES M1459" +
+                        " chapter 520 record。 69 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1470, knife: "第二刀",
+                    concept: "Anti-drift PROOF tests" +
+                        " pinning all 8 typed input" +
+                        " blocks:type existence +" +
+                        " Sendable conformance + field" +
+                        " count constants (11+9+7+7+3+6" +
+                        " explicit;+18 Kunlun + 8 Cthulhu" +
+                        " trio outputs = 69 total) +" +
+                        " .empty singletons + zero-" +
+                        "populated empties。"),
+                BASChapterKnife(
+                    mNumber: 1471, knife: "第三刀",
+                    concept: "End-to-end PROOF for 100%" +
+                        " V1 packaging coverage via" +
+                        " real V1 turns:V1 fires" +
+                        " hasBothBlocks=true observation" +
+                        " + 3-turn observer bundle has" +
+                        " 100% fullyCoveredTurnRatio +" +
+                        " replay-deterministic Kunlun" +
+                        " /Cthulhu block hashes for" +
+                        " same request。"),
+                BASChapterKnife(
+                    mNumber: 1472, knife: "第四刀",
+                    concept: "Chapter 523 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1472。 Chapter 522 100%" +
+                        " packaging milestone now has" +
+                        " a typed doctrine record + 8" +
+                        " anti-drift tests + 3 e2e" +
+                        " PROOF tests。 Replay-" +
+                        "determinism explicitly" +
+                        " verified。")
+            ],
+            entropyClassesAttacked: [
+                "12-chapter-arc-no-superseding-milestone",
+                "8-block-anti-drift-tests-absent",
+                "100-percent-coverage-e2e-PROOF-absent",
+                "replay-determinism-not-explicitly-verified"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1472",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "12-chapter-arc-100-percent-milestone-doctrine"
+            ],
+            plannedFutureCuts: [
+                "future arc — production host (SampleHost" +
+                " etc.) wire-in of projection-block" +
+                " observer adapter",
+                "future arc — additional V1 monolith" +
+                " inline-construction folds in OTHER" +
+                " call sites",
+                "future arc — Tier C migration source-" +
+                "type adoption",
+                "future arc — external blocker work" +
+                " (ssmScan,FoundationModels.Tool)"
+            ],
+            summary: "Chapter 523 caps the 12-chapter" +
+                " projection-block pipeline arc with a" +
+                " typed milestone doctrine + anti-drift" +
+                " PROOF tests + end-to-end coverage" +
+                " PROOF。 BASChapter511To522Pipeline" +
+                "Doctrine freezes arc invariants (12" +
+                " chapters,48 commits,8 input blocks," +
+                " 69 packaged fields,49% V1 LOC" +
+                " reduction,100% packaging coverage)。" +
+                " 8 anti-drift tests pin all block" +
+                " types + field counts + .empty" +
+                " singletons。 3 e2e tests verify V1" +
+                " monolith drives 100% coverage with" +
+                " replay-deterministic block hashes。" +
+                " 69 typed surfaces cumulative。 ADR-016" +
+                " → M1472。 V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

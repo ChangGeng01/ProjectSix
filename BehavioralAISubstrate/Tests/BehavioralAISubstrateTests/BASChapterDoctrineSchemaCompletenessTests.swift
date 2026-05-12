@@ -1547,7 +1547,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百二十二")!)
+                            "chapter 五百二十二")!),
+            // M1472 chapter 523 — 12-chapter arc milestone
+            checkRegistry("五百二十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百二十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2219,6 +2225,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百二十二")!
+                .mNumberLast),
+            // M1472 chapter 523 — 12-chapter arc milestone
+            ("523",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

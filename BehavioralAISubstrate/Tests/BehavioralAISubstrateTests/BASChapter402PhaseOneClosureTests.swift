@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1468",
-            "M1468:doctrine version reflects chapter 五百二十二 — 100% V1 CALL-SITE PACKAGING COVERAGE MILESTONE。 BASAuditObservationProjectionsCthulhuLeftoversBlock (M1465, 8th + FINAL typed input block with 6 leftover fields) + BASAuditObservationProjections 8-block unified convenience init with NO residual args (M1466) + V1 monolith splice using all 8 blocks (M1467)。 Every audit-projection field flows through a typed input surface。 69 fields packaged across 8 typed surfaces。 V1 call site shrinks from chapter 521's 65 LOC → ~60 LOC (cumulative 118 → 60 across chapters 515-522, ~58 LOC saved, 49% reduction)。 68 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1472",
+            "M1472:doctrine version reflects chapter 五百二十三 — caps the 12-chapter projection-block pipeline arc。 BASChapter511To522PipelineDoctrine typed milestone freezing arc invariants (M1469, 12 chapters / 48 commits / 8 input blocks / 69 packaged fields / 49% V1 LOC reduction / 100% packaging coverage) + 8 anti-drift PROOF tests pinning block types + field counts + .empty singletons (M1470) + 3 end-to-end PROOF tests via real V1 monolith turns including replay-determinism verification of Kunlun + Cthulhu block hashes (M1471)。 69 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence; replay-determinism explicitly proved by M1471)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

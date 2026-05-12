@@ -1774,6 +1774,25 @@ public enum BASEntropyChapterIndex {
                 " (~58 LOC saved,49% reduction" +
                 " cumulative)。 68 typed surfaces" +
                 " cumulative。 ADR-016 → M1468。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十三",
+            mNumberFirst: 1469, mNumberLast: 1472,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Caps the 12-chapter projection-" +
+                "block pipeline arc:BASChapter511To522" +
+                "PipelineDoctrine typed milestone" +
+                " freezing 12-chapter arc invariants" +
+                " (12 chapters,48 commits,8 input" +
+                " blocks,69 packaged fields,49% V1" +
+                " LOC reduction,100% packaging" +
+                " coverage) + 8 anti-drift tests pinning" +
+                " all block types + 3 end-to-end PROOF" +
+                " tests via V1 monolith (including" +
+                " replay-deterministic block hashes" +
+                " verification)。 69 typed surfaces" +
+                " cumulative。 ADR-016 → M1472。 V1" +
                 " byte-equality preserved。")
     ]
 

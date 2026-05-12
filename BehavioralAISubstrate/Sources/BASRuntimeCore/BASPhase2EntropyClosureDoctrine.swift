@@ -176,7 +176,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百十九",     // M1453-M1456 (FIRST PRODUCTION WIRE-IN — projectionBlockEmissionHandler slot + V1 monolith fires handler + 5 PROOF tests)
         "chapter 五百二十",     // M1457-M1460 (10-chapter pipeline arc close-out — host adapter sync→actor bridge + end-to-end PROOF + typed milestone)
         "chapter 五百二十一",   // M1461-M1464 (7th typed input block + V1 splice extension — 63 fields packaged across 7 input surfaces, V1 call site 118 → 65 LOC)
-        "chapter 五百二十二"    // M1465-M1468 (100% V1 packaging coverage — 8th + FINAL input block + 8-block init + V1 splice, 69 fields across 8 surfaces, V1 call site 118 → 60 LOC = 49% reduction)
+        "chapter 五百二十二",   // M1465-M1468 (100% V1 packaging coverage — 8th + FINAL input block + 8-block init + V1 splice, 69 fields across 8 surfaces, V1 call site 118 → 60 LOC = 49% reduction)
+        "chapter 五百二十三"    // M1469-M1472 (12-chapter arc typed milestone doctrine + 8 anti-drift PROOF tests + 3 e2e PROOF tests for 100% packaging coverage + replay-determinism)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -193,16 +194,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1468
+    public static let mNumberLast: Int = 1472
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1468)。 Bumped through chapter 522:509 → 513。
-    /// Chapter 522:100% V1 packaging coverage milestone
-    /// — M1465 CthulhuLeftoversBlock + M1466 8-block
-    /// init + M1467 V1 splice extension + M1468 close-
-    /// out。 V1 monolith call site at 60 LOC (cumulative
-    /// 118 → 60 = ~58 LOC saved,49% reduction)。
-    public static let commitsShipped: Int = 513
+    /// M1472)。 Bumped through chapter 523:513 → 517。
+    /// Chapter 523:12-chapter arc milestone +
+    /// anti-drift PROOF — M1469 typed milestone +
+    /// M1470 anti-drift tests + M1471 100% coverage
+    /// e2e PROOF + M1472 close-out。 Replay-determinism
+    /// of Kunlun/Cthulhu block hashes explicitly
+    /// verified。
+    public static let commitsShipped: Int = 517
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

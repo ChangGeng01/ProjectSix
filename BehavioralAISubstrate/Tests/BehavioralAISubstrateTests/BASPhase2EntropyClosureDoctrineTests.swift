@@ -37,21 +37,21 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs522() {
+    func testLastChapterIs523() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百二十二",
-            "M1468 chapter 五百二十二 — 100% V1" +
-            " PACKAGING COVERAGE MILESTONE。" +
-            " BASAuditObservationProjectionsCthulhu" +
-            "LeftoversBlock (6 leftover fields) +" +
-            " 8-block convenience init (NO residual" +
-            " args) + V1 monolith splice using all" +
-            " 8 blocks。 69 fields packaged across 8" +
-            " typed input surfaces。 V1 call site 118" +
-            " → 60 LOC (~58 LOC saved,49% reduction)。" +
-            " 68 typed surfaces cumulative")
+            "chapter 五百二十三",
+            "M1472 chapter 五百二十三 — caps the 12-" +
+            "chapter projection-block pipeline arc。" +
+            " BASChapter511To522PipelineDoctrine typed" +
+            " milestone (12 chapters,48 commits,8" +
+            " input blocks,69 packaged fields,49% V1" +
+            " LOC reduction,100% packaging coverage)" +
+            " + 8 anti-drift PROOF tests + 3 end-to-" +
+            "end PROOF tests via V1 monolith including" +
+            " replay-determinism verification。 69 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range
