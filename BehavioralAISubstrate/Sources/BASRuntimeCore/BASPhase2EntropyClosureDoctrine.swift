@@ -171,7 +171,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百十四",     // M1433-M1436 (3rd typed input block + unified convenience inits — 37 fields packaged into 3 input surfaces)
         "chapter 五百十五",     // M1437-M1440 (REAL V1 monolith projections fold — 118 LOC → 83 LOC at call site, byte-equality preserved)
         "chapter 五百十六",     // M1441-M1444 (4th typed input block + V1 splice extension — 46-of-56 fields packaged, 82% coverage)
-        "chapter 五百十七"      // M1445-M1448 (5th typed input block + V1 splice extension — 53-of-56 fields packaged, 95% coverage)
+        "chapter 五百十七",     // M1445-M1448 (5th typed input block + V1 splice extension — 53-of-56 fields packaged, 95% coverage)
+        "chapter 五百十八"      // M1449-M1452 (6th typed input block + V1 splice extension — 60 fields packaged across 6 input surfaces, V1 call site 118 → 68 LOC)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -188,16 +189,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1448
+    public static let mNumberLast: Int = 1452
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1448)。 Bumped through chapter 517:489 → 493。
-    /// Chapter 517:5th typed input block + V1 splice
-    /// extension — M1445 CthulhuAggregatesBlock + M1446
-    /// 5-block init + M1447 V1 splice extension + M1448
-    /// close-out。 53 of 56 audit-projection fields now
-    /// flow through 5 typed input surfaces (95%)。
-    public static let commitsShipped: Int = 493
+    /// M1452)。 Bumped through chapter 518:493 → 497。
+    /// Chapter 518:6th typed input block + V1 splice
+    /// extension — M1449 ClosureBlock + M1450 6-block
+    /// init + M1451 V1 splice extension + M1452 close-
+    /// out。 60 fields packaged into 6 typed input
+    /// surfaces (V1 call site 118 → 68 LOC cumulative)。
+    public static let commitsShipped: Int = 497
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -1688,6 +1688,23 @@ public enum BASEntropyChapterIndex {
                 " across chapters 515-517 = ~45 LOC" +
                 " saved)。 63 typed surfaces cumulative。" +
                 " ADR-016 → M1448。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十八",
+            mNumberFirst: 1449, mNumberLast: 1452,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "6th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "ClosureBlock (7 closure-themed fields)" +
+                " + 6-block convenience init + V1" +
+                " monolith splice extending M1447。" +
+                " 60 fields packaged across 6 input" +
+                " surfaces。 V1 call site shrinks from" +
+                " 73 → ~68 LOC (cumulative 118 → 68" +
+                " across chapters 515-518 = ~50 LOC" +
+                " saved)。 64 typed surfaces cumulative。" +
+                " ADR-016 → M1452。 V1 byte-equality" +
                 " preserved。")
     ]
 

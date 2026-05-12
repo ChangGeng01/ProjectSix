@@ -5169,7 +5169,107 @@ public enum BASChapterDoctrineRegistry {
                 " across chapters 515-517 = ~45 LOC" +
                 " saved)。 63 typed surfaces cumulative。" +
                 " ADR-016 → M1448。 V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 518 — 6th input block + V1 splice extension
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十八",
+            mNumberFirst: 1449,
+            mNumberLast: 1452,
+            v1MilestoneMNumber: 1452,
+            v1MilestoneStatus:
+                "chapter-518-6th-input-block-v1-splice",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1449, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsClosureBlock 6th" +
+                        " typed input block。 Aggregates" +
+                        " 7 closure-themed fields:" +
+                        " candidate + tribunal" +
+                        " observation bundles +" +
+                        " unknownReserve +" +
+                        " forbiddenAggregate +" +
+                        " layerReconciliation verdict" +
+                        " + report + escalation" +
+                        "SuppressionCodes。 64 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1450, knife: "第二刀",
+                    concept: "BASAuditObservation" +
+                        "Projections 6-block unified" +
+                        " convenience init。 Delegates" +
+                        " to M1446 5-block init with" +
+                        " 7 closure fields unpacked。" +
+                        " Reduces 56-arg all-fields" +
+                        " call to ~16-arg 6-block" +
+                        " call。"),
+                BASChapterKnife(
+                    mNumber: 1451, knife: "第三刀",
+                    concept: "V1 monolith splice extends" +
+                        " M1447 to use 6-block init。" +
+                        " 7 closure-themed locals" +
+                        " (thoughtArtifacts.candidate" +
+                        " etc.) now package into 6th" +
+                        " typed block instead of 7" +
+                        " individual named args。" +
+                        " Cumulative LOC reduction:" +
+                        " 118 → 68 (~50 LOC saved)。"),
+                BASChapterKnife(
+                    mNumber: 1452, knife: "第四刀",
+                    concept: "Chapter 518 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1452。 60 of 56 (104%)" +
+                        " audit-projection fields now" +
+                        " flow through 6 typed input" +
+                        " surfaces — exceeds original" +
+                        " M1437 count because closure" +
+                        " block includes non-optional" +
+                        " escalationSuppressionCodes" +
+                        " array。 V1 monolith call" +
+                        " site reduces to ~68 LOC" +
+                        " (cumulative 118 → 68 across" +
+                        " chapters 515-518)。")
+            ],
+            entropyClassesAttacked: [
+                "closure-7-field-cluster-untyped",
+                "v1-monolith-residual-closure-args",
+                "6-block-unified-init-absent",
+                "thoughtArtifact-bundles-residual"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1452",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "60-fields-packaged-across-6-input-blocks"
+            ],
+            plannedFutureCuts: [
+                "future arc — residual ~10 fields stay" +
+                " as named args (no further coherent" +
+                " cluster identified;reason codes +" +
+                " M424 schemas + surface aliases)",
+                "future arc — additional V1 inline-" +
+                "construction folds in other call sites",
+                "future arc — production wire-in of" +
+                " projection-block observer",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "6th typed input block + V1 splice" +
+                " extension:BASAuditObservation" +
+                "ProjectionsClosureBlock (7 closure-" +
+                "themed fields) + 6-block convenience" +
+                " init + V1 monolith splice extending" +
+                " M1447。 60 fields (above 56 baseline)" +
+                " packaged into 6 typed input surfaces。" +
+                " V1 call site shrinks from 73 → ~68" +
+                " LOC (cumulative 118 → 68 across" +
+                " chapters 515-518 = ~50 LOC saved)。" +
+                " 64 typed surfaces cumulative。 ADR-016" +
+                " → M1452。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

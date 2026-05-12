@@ -37,20 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs517() {
+    func testLastChapterIs518() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百十七",
-            "M1448 chapter 五百十七 — 5th typed input" +
+            "chapter 五百十八",
+            "M1452 chapter 五百十八 — 6th typed input" +
             " block + V1 splice extension。" +
-            " BASAuditObservationProjectionsCthulhu" +
-            "AggregatesBlock (7 L1-L7 aggregate" +
-            " fields) + 5-block convenience init +" +
-            " V1 monolith splice extending M1443。" +
-            " 53 of 56 audit-projection fields" +
-            " packaged (95%)。 63 typed surfaces" +
-            " cumulative")
+            " BASAuditObservationProjectionsClosure" +
+            "Block (7 closure-themed fields) + 6-block" +
+            " convenience init + V1 monolith splice" +
+            " extending M1447。 60 fields packaged into" +
+            " 6 typed input surfaces。 V1 call site" +
+            " 118 → 68 LOC cumulative across chapters" +
+            " 515-518。 64 typed surfaces cumulative")
     }
 
     // MARK: - M-number range
