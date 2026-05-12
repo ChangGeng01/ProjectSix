@@ -2051,7 +2051,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六")!)
+                            "chapter 六百六")!),
+            // M1808 chapter 607 — Post-octa hexa catalog meta-meta milestone
+            checkRegistry("六百七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3395,6 +3401,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六")!
+                .mNumberLast),
+            // M1808 chapter 607 — Post-octa hexa catalog meta-meta milestone
+            ("607",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

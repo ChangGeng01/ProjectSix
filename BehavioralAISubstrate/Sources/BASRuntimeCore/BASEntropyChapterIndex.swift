@@ -3446,7 +3446,28 @@ public enum BASEntropyChapterIndex {
                 " — mixed-shape extension。 Module count" +
                 " bumped 11 → 12。 147 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1804。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七",
+            mNumberFirst: 1805, mNumberLast: 1808,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "POST-OCTA HEXA CATALOG META-META" +
+                " MILESTONE。 NEW BASPostOctaModule" +
+                "ExtensionHexaCompletionDoctrine (M1805)" +
+                " cataloging 6 post-octa fresh-module" +
+                " formal-entry chapters (598-606)。" +
+                " Aggregate:13 new types/enums via 24" +
+                " commits,6 distinct modules touched," +
+                " module count bumped 6 → 12 across" +
+                " run。 30 anti-drift PROOF tests (M1806)" +
+                " + 14 wire-in PROOF tests (M1807) +" +
+                " close-out (M1808)。 Parallel doctrine" +
+                " to chapter 597 octa-milestone at" +
+                " single-wave-entry level rather than" +
+                " sealed-milestone level。 148 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1808。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

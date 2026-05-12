@@ -13297,7 +13297,116 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1804。" +
                 " 388 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 607 — POST-OCTA HEXA CATALOG meta-
+        // meta milestone。 Catalogs 6 post-octa fresh-
+        // module formal-entry chapters (598-606)。
+        // Parallel doctrine to chapter 597 octa-
+        // milestone but at the single-wave entry
+        // level rather than sealed-milestone level。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七",
+            mNumberFirst: 1805,
+            mNumberLast: 1808,
+            v1MilestoneMNumber: 1808,
+            v1MilestoneStatus:
+                "chapter-607-post-octa-hexa-catalog-meta-meta",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1805, knife: "第一刀",
+                    concept: "NEW BASPostOctaModule" +
+                        "ExtensionHexaCompletionDoctrine" +
+                        " meta-meta milestone cataloging" +
+                        " 6 post-octa fresh-module" +
+                        " formal-entry chapters" +
+                        " (598-606)。 13 new types/enums" +
+                        " gained Codable,24 commits,6" +
+                        " distinct modules touched,module" +
+                        " count bumped 6 → 12。 Parallel" +
+                        " to chapter 597 octa-milestone" +
+                        " but at single-wave-entry level。" +
+                        " typed-surface count 147 → 148。"),
+                BASChapterKnife(
+                    mNumber: 1806, knife: "第二刀",
+                    concept: "30 anti-drift PROOF tests" +
+                        " for the M1805 hexa catalog。" +
+                        " Identity + 6 entry counts + 6" +
+                        " per-entry identity + 5" +
+                        " aggregate accessors + 7" +
+                        " achievement flags + 2 reference" +
+                        " pins + EntryRecord Codable" +
+                        " round-trip。"),
+                BASChapterKnife(
+                    mNumber: 1807, knife: "第三刀",
+                    concept: "14 wire-in PROOF tests" +
+                        " cross-checking the M1805 hexa" +
+                        " catalog against 6 source per-" +
+                        "entry extension doctrines +" +
+                        " chapter 597 octa-milestone" +
+                        " precedent (2 cross-catalog" +
+                        " invariants:lastEntry.module" +
+                        "CountAfter == aggregate;moduleC" +
+                        "ountAtOctaClose == octa.total" +
+                        "ModulesCovered)。"),
+                BASChapterKnife(
+                    mNumber: 1808, knife: "第四刀",
+                    concept: "Chapter 607 close-out +" +
+                        " doctrine sync。 392 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 Post-octa run" +
+                        " formally cataloged。 Ready for" +
+                        " future module wave or" +
+                        " continuation。")
+            ],
+            entropyClassesAttacked: [
+                "post-octa-run-not-cataloged",
+                "6-formal-entry-chapters-isolated",
+                "no-cross-doctrine-aggregation-of-post-octa-state",
+                "hexa-level-meta-meta-pattern-not-shipped-yet"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1808",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "post-octa-hexa-catalog-shipped",
+                "13-types-across-6-entries",
+                "module-count-bumped-6-to-12-across-run",
+                "second-consecutive-chapter-past-m1800"
+            ],
+            plannedFutureCuts: [
+                "future arc — 13th-module extension" +
+                " when fresh territory becomes available",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — next meta-meta level" +
+                " (heptaPostOcta when 7th post-octa" +
+                " entry ships)"
+            ],
+            summary: "Chapter 607 seals the POST-OCTA" +
+                " HEXA CATALOG meta-meta milestone。" +
+                " NEW BASPostOctaModuleExtensionHexa" +
+                "CompletionDoctrine (M1805) cataloging" +
+                " 6 post-octa fresh-module formal-entry" +
+                " chapters (598 BASOrgan + 599 BAS" +
+                "MLXAdapter + 603 BASChatCompletions" +
+                "Adapter + 604 BASAppleAdapters + 605" +
+                " BASMetalSubstrate + 606 BASSovereign)。" +
+                " Aggregate:13 new types/enums,24" +
+                " commits,6 distinct modules,module" +
+                " count bumped 6 → 12。 30 anti-drift" +
+                " PROOF tests (M1806) + 14 wire-in PROOF" +
+                " tests (M1807) + close-out (M1808)。" +
+                " Parallel doctrine to chapter 597 octa-" +
+                "milestone (at single-wave-entry level" +
+                " rather than sealed-milestone level)。" +
+                " 148 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1808。 392 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

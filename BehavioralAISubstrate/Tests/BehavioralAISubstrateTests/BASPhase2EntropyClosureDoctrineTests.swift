@@ -37,26 +37,23 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs606() {
+    func testLastChapterIs607() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百六",
-            "Chapter 六百六:BASSOVEREIGN CODABLE" +
-            " EXTENSION WAVE 1 — 12TH MODULE FORMAL" +
-            " ENTRY。 4 types/enums (BASSovereignTurn" +
-            "Parity + BASSovereignVerdictEngine.Operation" +
-            "Domain + BASSovereignTurnObservations +" +
-            " BASSovereignTurnVerifierReport) gained" +
-            " Codable + 4 PROOF tests + BASSovereign" +
-            "CodableExtensionDoctrine typed surface" +
-            " (with 7 pre-octa types acknowledged +" +
-            " nested-enums flag) + close-out。 Module" +
-            " count bumped 11 → 12。 6th consecutive" +
-            " post-octa fresh-module-territory" +
-            " advancement。 FIRST chapter past M1800" +
-            " round-number milestone。 147 typed" +
-            " surfaces cumulative")
+            "chapter 六百七",
+            "Chapter 六百七:POST-OCTA HEXA CATALOG" +
+            " META-META MILESTONE。 NEW BASPostOcta" +
+            "ModuleExtensionHexaCompletionDoctrine" +
+            " (M1805) cataloging 6 post-octa fresh-" +
+            "module formal-entry chapters (598-606)。" +
+            " Aggregate:13 new types/enums via 24" +
+            " commits,6 distinct modules touched," +
+            " module count bumped 6 → 12 across run。" +
+            " 30 anti-drift + 14 wire-in PROOF tests。" +
+            " Parallel doctrine to chapter 597 octa-" +
+            "milestone at single-wave-entry level。" +
+            " 148 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

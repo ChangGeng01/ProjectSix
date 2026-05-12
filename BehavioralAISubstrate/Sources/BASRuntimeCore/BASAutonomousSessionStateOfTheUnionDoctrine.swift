@@ -110,21 +110,20 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 606
-    /// close-out (M1804 — BASSovereign Codable
-    /// extension wave 1;12TH MODULE FORMAL ENTRY into
-    /// post-octa narrative;4 BASSovereign types/enums
-    /// (BASSovereignTurnParity + OperationDomain +
-    /// BASSovereignTurnObservations + BASSovereignTurn
-    /// VerifierReport) gained Codable;module count
-    /// bumped 11 → 12;6th consecutive post-octa
-    /// fresh-module advancement;first chapter past
-    /// M1800 round-number milestone)。
-    public static let typedSurfaceCount: Int = 147
+    /// Cumulative achievement metrics at chapter 607
+    /// close-out (M1808 — Post-octa hexa catalog meta-
+    /// meta milestone;BASPostOctaModuleExtensionHexa
+    /// CompletionDoctrine cataloging 6 post-octa
+    /// fresh-module formal-entry chapters (598-606);
+    /// 13 new types/enums via 24 commits;module count
+    /// bumped 6 → 12 across run;parallel doctrine to
+    /// chapter 597 octa-milestone at single-wave-entry
+    /// level)。
+    public static let typedSurfaceCount: Int = 148
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 388
-    public static let phase2CommitsShipped: Int = 849
-    public static let chapter2NumberLast: Int = 1804
+        Int = 392
+    public static let phase2CommitsShipped: Int = 853
+    public static let chapter2NumberLast: Int = 1808
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

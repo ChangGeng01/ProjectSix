@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1804",
-            "M1804:doctrine version reflects chapter 六百六 — BASSOVEREIGN CODABLE EXTENSION WAVE 1。 12TH MODULE FORMAL ENTRY into post-octa narrative。 4 BASSovereign types/enums (BASSovereignTurnParity + BASSovereignVerdictEngine.OperationDomain + BASSovereignTurnObservations + BASSovereignTurnVerifierReport) gained Codable at M1801 + 4 PROOF tests (M1802) + BASSovereignCodableExtensionDoctrine typed surface (M1803) with 7 pre-octa types acknowledged + nested-enums flag + close-out (M1804)。 Module count bumped 11 → 12。 6th consecutive post-octa fresh-module-territory advancement。 FIRST chapter past M1800 round-number milestone。 147 typed surfaces cumulative。 388 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1808",
+            "M1808:doctrine version reflects chapter 六百七 — POST-OCTA HEXA CATALOG META-META MILESTONE。 NEW BASPostOctaModuleExtensionHexaCompletionDoctrine (M1805) cataloging 6 post-octa fresh-module formal-entry chapters (598-606)。 Aggregate:13 new types/enums via 24 commits,6 distinct modules touched,module count bumped 6 → 12 across run。 30 anti-drift PROOF tests (M1806) + 14 wire-in PROOF tests (M1807) + close-out (M1808)。 Parallel doctrine to chapter 597 octa-milestone at single-wave-entry level。 148 typed surfaces cumulative。 392 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
