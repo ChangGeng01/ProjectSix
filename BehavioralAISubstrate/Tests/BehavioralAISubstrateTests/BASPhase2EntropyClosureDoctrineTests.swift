@@ -37,18 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs520() {
+    func testLastChapterIs521() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百二十",
-            "M1460 chapter 五百二十 — 10-chapter pipeline" +
-            " arc close-out。 Host adapter sync→actor" +
-            " bridge + end-to-end PROOF + typed" +
-            " milestone freezing arc invariants" +
-            " (10 chapters,40 commits,6 input blocks," +
-            " 60 packaged fields,50 LOC V1 reduction)。" +
-            " 66 typed surfaces cumulative")
+            "chapter 五百二十一",
+            "M1464 chapter 五百二十一 — 7th typed input" +
+            " block + V1 splice extension。" +
+            " BASAuditObservationProjectionsKunlun" +
+            "AuditSchemasBlock (3 M424 Kunlun audit" +
+            " schemas) + 7-block convenience init +" +
+            " V1 monolith splice extending M1451。" +
+            " 63 fields packaged across 7 typed input" +
+            " surfaces。 V1 call site 118 → 65 LOC" +
+            " cumulative。 67 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

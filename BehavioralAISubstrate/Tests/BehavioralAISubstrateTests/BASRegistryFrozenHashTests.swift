@@ -107,15 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 520 close-out。 Chapter
-    /// 520:closes the 10-chapter projection-block
-    /// pipeline arc — BASAuditObservationProjections
-    /// BundleObserverHostAdapter (sync→actor bridge) +
-    /// end-to-end PROOF for chapter 511-520 pipeline +
-    /// BASChapter511To520PipelineDoctrine typed
-    /// milestone freezing arc invariants (10 chapters,
-    /// 40 commits,6 input blocks,60 packaged fields,
-    /// 50 LOC V1 reduction)。
+    /// Re-captured at chapter 521 close-out。 Chapter
+    /// 521:7th typed input block + V1 splice extension
+    /// — BASAuditObservationProjectionsKunlunAudit
+    /// SchemasBlock (3 M424 Kunlun audit schemas) +
+    /// 7-block convenience init + V1 monolith splice
+    /// extending M1451。 63 fields packaged across 7
+    /// typed input surfaces。 V1 call site 118 → 65
+    /// LOC cumulative (~53 LOC saved)。
     static let frozenFullRegistrySha256: String =
-        "ad6479a3bafc9e2ceff6cdb7906cdb8ac2e0e838b1fbf9f40b344377d18e65d6"
+        "19492308c16e7879d17e46dc2b425dfa3d7abae6dd231f80018d7796ad9d7fa5"
 }

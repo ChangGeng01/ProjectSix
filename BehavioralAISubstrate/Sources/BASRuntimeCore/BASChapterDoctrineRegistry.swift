@@ -5462,7 +5462,94 @@ public enum BASChapterDoctrineRegistry {
                 " chapters 511-520 work in production" +
                 " V1 hot path。 V1 byte-equality" +
                 " preserved at every commit boundary。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 521 — 7th input block + V1 splice
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十一",
+            mNumberFirst: 1461,
+            mNumberLast: 1464,
+            v1MilestoneMNumber: 1464,
+            v1MilestoneStatus:
+                "chapter-521-7th-input-block-v1-splice",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1461, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsKunlunAuditSchemas" +
+                        "Block — 7th typed input block。" +
+                        " Aggregates 3 M424 Kunlun audit" +
+                        " schemas (axisView + tianmen" +
+                        "Warrant + gateDenialWrit)。" +
+                        " 67 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1462, knife: "第二刀",
+                    concept: "BASAuditObservation" +
+                        "Projections 7-block unified" +
+                        " convenience init。 Delegates" +
+                        " to M1450 6-block init with 3" +
+                        " audit schemas unpacked。" +
+                        " Collapses 56-arg all-fields" +
+                        " call to ~14-arg 7-block call。"),
+                BASChapterKnife(
+                    mNumber: 1463, knife: "第三刀",
+                    concept: "V1 monolith splice extends" +
+                        " M1451 to use 7-block init。" +
+                        " 3 M424 audit schema locals" +
+                        " package into 7th typed block。" +
+                        " Cumulative LOC reduction:" +
+                        " 118 → 65 (~53 LOC saved)。"),
+                BASChapterKnife(
+                    mNumber: 1464, knife: "第四刀",
+                    concept: "Chapter 521 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1464。 63 fields packaged" +
+                        " across 7 typed input surfaces。" +
+                        " V1 monolith call site reduces" +
+                        " from 68 → ~65 LOC (cumulative" +
+                        " 118 → 65 across chapters" +
+                        " 515-521)。")
+            ],
+            entropyClassesAttacked: [
+                "m424-kunlun-audit-schemas-3-field-cluster-untyped",
+                "v1-monolith-residual-audit-schema-args",
+                "7-block-unified-init-absent",
+                "audit-schema-packaging-not-typed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1464",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "63-fields-packaged-across-7-input-blocks"
+            ],
+            plannedFutureCuts: [
+                "future arc — residual ~7 fields stay" +
+                " as named args (reason codes + surface" +
+                " aliases — no further coherent cluster)",
+                "future arc — production wire-in" +
+                " continues (SampleHost adapter wiring)",
+                "future arc — additional V1 inline-" +
+                "construction folds in other call sites",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "7th typed input block + V1 splice" +
+                " extension:BASAuditObservation" +
+                "ProjectionsKunlunAuditSchemasBlock (3" +
+                " M424 Kunlun audit schemas) + 7-block" +
+                " convenience init + V1 monolith splice" +
+                " extending M1451。 63 fields packaged" +
+                " across 7 typed input surfaces。 V1 call" +
+                " site shrinks from 68 → ~65 LOC" +
+                " (cumulative 118 → 65 across chapters" +
+                " 515-521 = ~53 LOC saved)。 67 typed" +
+                " surfaces cumulative。 ADR-016 → M1464。" +
+                " V1 byte-equality preserved (stress-" +
+                "sweep canonical60 × 3 repeat runs" +
+                " 0-divergence)。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

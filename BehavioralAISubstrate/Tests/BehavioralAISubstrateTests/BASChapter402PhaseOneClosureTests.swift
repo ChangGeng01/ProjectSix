@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1460",
-            "M1460:doctrine version reflects chapter 五百二十 — closes the 10-chapter projection-block pipeline arc。 BASAuditObservationProjectionsBundleObserverHostAdapter sync→actor bridge (M1457) + 5 end-to-end PROOF tests for chapter 511-520 pipeline (M1458) + BASChapter511To520PipelineDoctrine typed milestone freezing arc invariants (M1459)。 10-chapter arc: 6 typed input blocks + 1 production wire-in + 1 sync→actor bridge + 50 LOC V1 reduction (118 → 68) + V1 byte-equality preserved every commit。 66 typed surfaces cumulative。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1464",
+            "M1464:doctrine version reflects chapter 五百二十一 — 7th typed input block + V1 splice extension。 BASAuditObservationProjectionsKunlunAuditSchemasBlock (M1461, 3 M424 Kunlun audit schemas: axisView + tianmenWarrant + gateDenialWrit) + BASAuditObservationProjections 7-block unified convenience init (M1462) + V1 monolith splice extending M1451 (M1463)。 63 fields packaged across 7 typed input surfaces。 V1 call site shrinks from chapter 520's 68 LOC → ~65 LOC (cumulative 118 → 65 across chapters 515-521, ~53 LOC saved)。 67 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -1739,7 +1739,24 @@ public enum BASEntropyChapterIndex {
                 " input blocks,60 packaged fields,50" +
                 " LOC V1 reduction)。 66 typed surfaces" +
                 " cumulative。 ADR-016 → M1460。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十一",
+            mNumberFirst: 1461, mNumberLast: 1464,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "7th typed input block + V1 splice" +
+                " extension:BASAuditObservationProjections" +
+                "KunlunAuditSchemasBlock (3 M424 Kunlun" +
+                " audit schemas) + 7-block convenience" +
+                " init + V1 monolith splice extending" +
+                " M1451。 63 fields packaged across 7" +
+                " typed input surfaces。 V1 call site" +
+                " shrinks to ~65 LOC (cumulative 118 →" +
+                " 65 across chapters 515-521 = ~53 LOC" +
+                " saved)。 67 typed surfaces cumulative。" +
+                " ADR-016 → M1464。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
