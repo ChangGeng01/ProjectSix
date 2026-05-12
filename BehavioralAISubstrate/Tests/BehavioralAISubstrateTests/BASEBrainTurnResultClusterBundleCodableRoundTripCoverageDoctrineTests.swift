@@ -28,28 +28,32 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrineTest
 
     // MARK: - Coverage counts
 
-    func testExplicitlyCoveredCountIsEightAtM1562() {
+    func testExplicitlyCoveredCountIsNineAtM1566() {
         XCTAssertEqual(
             BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
                 .explicitlyCoveredCount,
-            8,
-            "8 of 9 bundles have explicit round-trip" +
-            " coverage at chapter 546 close-out (added" +
-            " RiskChoiceBundle at M1561)")
+            9,
+            "9 of 9 bundles have explicit round-trip" +
+            " coverage at chapter 547 close-out (added" +
+            " CognitiveFramesBundle at M1565) — 100%" +
+            " MILESTONE achieved")
     }
 
-    func testCompileTimeOnlyCountIsOneAtM1562() {
+    func testCompileTimeOnlyCountIsZeroAtM1566() {
         XCTAssertEqual(
             BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
                 .compileTimeOnlyCount,
-            1)
+            0,
+            "Zero bundles remain in compileTimeOnly " +
+            "state — 100% explicit coverage achieved")
     }
 
-    func testCoverageRatioIsAboutEightNinths() {
-        let ratio = BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
-            .coverageRatio
-        XCTAssertGreaterThan(ratio, 0.88)
-        XCTAssertLessThan(ratio, 0.89)
+    func testCoverageRatioIsExactlyOne() {
+        XCTAssertEqual(
+            BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
+                .coverageRatio,
+            1.0,
+            "9/9 = 1.0 — 100% MILESTONE")
     }
 
     // MARK: - Consistency invariant
@@ -111,7 +115,7 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrineTest
             1549)
     }
 
-    func testCognitiveFramesBundleIsCompileTimeOnly() {
+    func testCognitiveFramesBundleIsExplicitlyCoveredAtM1565() {
         let entry =
             BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
                 .entries.first {
@@ -119,8 +123,31 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrineTest
                         "BASEBrainTurnResultCognitiveFramesBundle"
                 }!
         XCTAssertEqual(entry.status,
-            .compileTimeOnly)
-        XCTAssertNil(entry.explicitCoverageMNumber)
+            .explicitRoundTripCovered)
+        XCTAssertEqual(entry.explicitCoverageMNumber,
+            1565)
+    }
+
+    // MARK: - 100% milestone invariants
+
+    func testAllNineBundlesAreExplicitlyCovered() {
+        let allExplicit =
+            BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
+                .entries.allSatisfy {
+                    $0.status == .explicitRoundTripCovered
+                }
+        XCTAssertTrue(allExplicit,
+            "100% MILESTONE:every entry must be" +
+            " .explicitRoundTripCovered")
+    }
+
+    func testAllCoverageMNumbersAreNonNil() {
+        let allHaveCoverageMNumber =
+            BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
+                .entries.allSatisfy {
+                    $0.explicitCoverageMNumber != nil
+                }
+        XCTAssertTrue(allHaveCoverageMNumber)
     }
 
     func testMiscBundleIsExplicitlyCoveredAtM1553() {
