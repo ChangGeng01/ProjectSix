@@ -37,22 +37,21 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs584() {
+    func testLastChapterIs585() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百八十四",
-            "Chapter 五百八十四:BASLEASELIFE CODABLE" +
-            " EXTENSION ARC-SEAL MILESTONE。 NEW BAS" +
-            "LeaseLifeCodableExtensionArcSealedDoctrine" +
-            " commemorating 3-wave / 12-commit BAS" +
-            "LeaseLife extension arc (chapters 581-583)" +
-            " + 24 anti-drift PROOF + 16 wire-in PROOF" +
-            " + close-out。 7 types (6 structs + 1" +
-            " supporting enum) ledger-serializable。" +
-            " First sealed arc beyond M1700 narrative" +
-            " arc。 125 typed surfaces cumulative。" +
-            " 300-CONSECUTIVE-COMMIT milestone")
+            "chapter 五百八十五",
+            "Chapter 五百八十五:HEXA-MILESTONE" +
+            " COMPLETION META-META MILESTONE。 NEW" +
+            " BASCodableExtensionHexaMilestoneCompletion" +
+            "Doctrine cataloguing ALL 6 sealed Codable" +
+            " extension milestones (63 types,72" +
+            " commits,5 modules) + 28 anti-drift PROOF" +
+            " + 16 wire-in PROOF + close-out。" +
+            " Supersedes chapter 580 penta snapshot。" +
+            " NEW beyond-m1700-arc kind discriminator。" +
+            " 126 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

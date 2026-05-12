@@ -238,7 +238,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百八十一",   // M1701-M1704 (FIRST-EVER BASLEASELIFE CODABLE EXTENSION — 2 nested types (BASBreathScheduler.Request + ScheduledBreath) gained Codable + 2 PROOF tests + BASLeaseLifeCodableExtensionDoctrine + close-out;fresh module territory beyond M1700 narrative arc;module coverage 4→5)
         "chapter 五百八十二",   // M1705-M1708 (BASLEASELIFE WAVE 2 CODABLE EXTENSION — 2 struct types (BASThermalTwin.Reading + BASLungStateAccumulator.Snapshot) + 1 supporting enum (BASThermalTwin.OSThermalState) gained Codable + 3 PROOF tests + BASLeaseLifeCodableExtensionWaveTwoDoctrine + close-out;chapter 581 + 582 = 4 BASLeaseLife structs cumulative)
         "chapter 五百八十三",   // M1709-M1712 (BASLEASELIFE WAVE 3 CODABLE EXTENSION — 2 struct types (BASLeaseLifeCoordinator.TurnRecorded composite culminating waves 1+2 + BASComputeRouter) gained Codable + 2 PROOF tests + BASLeaseLifeCodableExtensionWaveThreeDoctrine + close-out;chapter 581+582+583 = 6 BASLeaseLife structs cumulative;arc structure ready for sealing)
-        "chapter 五百八十四"    // M1713-M1716 (BASLEASELIFE CODABLE EXTENSION ARC-SEAL MILESTONE — BASLeaseLifeCodableExtensionArcSealedDoctrine + 24 anti-drift + 16 wire-in PROOF tests commemorating 3-wave / 12-commit BASLeaseLife extension arc (chapters 581-583);7 types (6 structs + 1 enum) ledger-serializable;first sealed arc beyond M1700 narrative;mirrors chapter 574 pattern;300-CONSECUTIVE-COMMIT milestone)
+        "chapter 五百八十四",   // M1713-M1716 (BASLEASELIFE CODABLE EXTENSION ARC-SEAL MILESTONE — BASLeaseLifeCodableExtensionArcSealedDoctrine + 24 anti-drift + 16 wire-in PROOF tests commemorating 3-wave / 12-commit BASLeaseLife extension arc (chapters 581-583);7 types (6 structs + 1 enum) ledger-serializable;first sealed arc beyond M1700 narrative;mirrors chapter 574 pattern;300-CONSECUTIVE-COMMIT milestone)
+        "chapter 五百八十五"    // M1717-M1720 (HEXA-MILESTONE COMPLETION META-META MILESTONE — BASCodableExtensionHexaMilestoneCompletionDoctrine + 28 anti-drift + 16 wire-in PROOF tests cataloguing all 6 sealed Codable extension milestones;63 types,72 commits,18 chapters,5 modules;65 session types ledger-serializable;new beyond-m1700-arc kind discriminator)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -255,15 +256,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1716
+    public static let mNumberLast: Int = 1720
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1716)。 Bumped through chapter 584:757 → 761。
-    /// Chapter 584:BASLeaseLife arc-seal milestone +
-    /// 24 anti-drift + 16 wire-in PROOF tests + close-
-    /// out。 First sealed arc beyond M1700 narrative
-    /// arc;300-consecutive-commit milestone。
-    public static let commitsShipped: Int = 761
+    /// M1720)。 Bumped through chapter 585:761 → 765。
+    /// Chapter 585:Hexa-milestone completion meta-
+    /// meta milestone commemorating all 6 sealed
+    /// Codable extension milestones + 28 anti-drift +
+    /// 16 wire-in PROOF tests + close-out。
+    public static let commitsShipped: Int = 765
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

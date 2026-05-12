@@ -1919,7 +1919,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十四")!)
+                            "chapter 五百八十四")!),
+            // M1720 chapter 585 — Hexa-milestone completion meta-meta
+            checkRegistry("五百八十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3087,6 +3093,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十四")!
+                .mNumberLast),
+            // M1720 chapter 585 — Hexa-milestone completion meta-meta
+            ("585",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
