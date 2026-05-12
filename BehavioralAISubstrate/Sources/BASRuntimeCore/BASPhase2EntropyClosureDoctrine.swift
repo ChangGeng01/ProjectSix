@@ -180,7 +180,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百二十三",   // M1469-M1472 (12-chapter arc typed milestone doctrine + 8 anti-drift PROOF tests + 3 e2e PROOF tests for 100% packaging coverage + replay-determinism)
         "chapter 五百二十四",   // M1473-M1476 (PIVOT to BASEBrainTurnResult fold — typed evolution bundle + convenience init + V1 splice using bundle)
         "chapter 五百二十五",   // M1477-M1480 (2nd BASEBrainTurnResult cluster bundle — sovereign 8 fields + 2-bundle init + V1 splice, 52 → 36 args cumulative)
-        "chapter 五百二十六"    // M1481-M1484 (3rd BASEBrainTurnResult cluster bundle — audit-projection-forward 7 fields + 3-bundle init + V1 splice, 52 → 29 args cumulative)
+        "chapter 五百二十六",   // M1481-M1484 (3rd BASEBrainTurnResult cluster bundle — audit-projection-forward 7 fields + 3-bundle init + V1 splice, 52 → 29 args cumulative)
+        "chapter 五百二十七"    // M1485-M1488 (parallel-run reconciliation — 4-bundle convenience init + PROOF tests + typed milestone)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -197,17 +198,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1484
+    public static let mNumberLast: Int = 1488
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1484)。 Bumped through chapter 526:525 → 529。
-    /// Chapter 526:3rd BASEBrainTurnResult cluster
-    /// bundle (audit-projection-forward,7 fields) —
-    /// M1481 bundle + M1482 3-bundle init + M1483 V1
-    /// splice + M1484 close-out。 BASEBrainTurnResult
-    /// call site:52 → 29 args (23 args collapsed
-    /// across 3 typed bundles)。
-    public static let commitsShipped: Int = 529
+    /// M1488)。 Bumped through chapter 527:529 → 533。
+    /// Chapter 527:parallel-run reconciliation — M1485
+    /// 4-bundle convenience init + M1486 PROOF tests +
+    /// M1487 typed milestone doctrine + M1488 close-out。
+    /// Closes the call-site contract gap from chapter
+    /// 526's parallel /loop interleave。
+    public static let commitsShipped: Int = 533
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

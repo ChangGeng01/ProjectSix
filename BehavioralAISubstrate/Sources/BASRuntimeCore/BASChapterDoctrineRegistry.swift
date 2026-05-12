@@ -6044,7 +6044,90 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M1484。" +
                 " V1 byte-equality preserved。 ADR-014" +
                 " OPT-IN preserved (public API additive" +
-                " only)。")
+                " only)。"),
+
+        // chapter 527 — parallel-run reconciliation
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十七",
+            mNumberFirst: 1485,
+            mNumberLast: 1488,
+            v1MilestoneMNumber: 1488,
+            v1MilestoneStatus:
+                "chapter-527-parallel-run-reconciliation",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1485, knife: "第一刀",
+                    concept: "4-bundle convenience init" +
+                        " reconciliation。 Parallel /loop" +
+                        " interleave at chapter 526 left" +
+                        " V1 splice calling with 4 bundles" +
+                        " (sovereign + host + evolution +" +
+                        " auditProjectionForward) but no" +
+                        " 4-bundle init existed。 M1485" +
+                        " adds it,closing the call-site" +
+                        " contract。 Byte-equality" +
+                        " preserved。"),
+                BASChapterKnife(
+                    mNumber: 1486, knife: "第二刀",
+                    concept: "3 PROOF tests for 4-bundle" +
+                        " init:bundle composition + 30-" +
+                        "field invariant (10+8+5+7) +" +
+                        " @Sendable conformance for all 4" +
+                        " bundle types。"),
+                BASChapterKnife(
+                    mNumber: 1487, knife: "第三刀",
+                    concept: "NEW BASChapter527ParallelRun" +
+                        "ReconciliationDoctrine typed" +
+                        " milestone。 Freezes pins:drift" +
+                        " chapter,reconciliation M-range," +
+                        " 4-bundle/30-field invariants," +
+                        " parallelRunCommitCount=6,5" +
+                        " validated mitigations。 73 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1488, knife: "第四刀",
+                    concept: "Chapter 527 close-out +" +
+                        " doctrine sync。 ADR-016 → M1488。" +
+                        " Parallel-run lesson documented" +
+                        " for future autonomous /loop" +
+                        " interactions。")
+            ],
+            entropyClassesAttacked: [
+                "parallel-run-interleave-build-broken-state",
+                "4-bundle-call-site-contract-gap",
+                "parallel-run-reconciliation-no-typed-doctrine",
+                "build-verify-skip-during-doctrine-sync"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1488",
+                "v1-byte-equality-preserved",
+                "full-suite-passes-post-reconciliation",
+                "5-validated-mitigations-pinned"
+            ],
+            plannedFutureCuts: [
+                "future arc — build-verify hook in /loop" +
+                " skill before close-out commit",
+                "future arc — pre-commit conflict detection" +
+                " for parallel /loop instances",
+                "future arc — additional BASEBrainTurnResult" +
+                " cluster bundles (audit-projection cluster" +
+                " was 3rd of ~5)",
+                "future arc — production host (SampleHost)" +
+                " wire-in"
+            ],
+            summary: "Chapter 527 reconciles the chapter" +
+                " 526 parallel-run drift:M1485 ships the" +
+                " 4-bundle convenience init that closes" +
+                " the V1 splice call-site contract (V1" +
+                " calls with 4 bundles but only 3-bundle" +
+                " inits existed) + M1486 PROOF tests +" +
+                " M1487 typed milestone doctrine +" +
+                " M1488 close-out。 73 typed surfaces" +
+                " cumulative。 ADR-016 → M1488。 V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

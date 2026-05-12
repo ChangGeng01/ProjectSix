@@ -107,15 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 526 close-out。 Chapter
-    /// 526:3rd BASEBrainTurnResult cluster bundle —
-    /// BASEBrainTurnResultAuditProjectionForwardBundle
-    /// (7 audit-projection-forwarded fields) + 3-bundle
-    /// convenience init (evolution + sovereign +
-    /// auditProjectionForward) + V1 monolith splice。
-    /// Cumulative BASEBrainTurnResult fold:52 → 29
-    /// named args at line 2287+ (23 collapsed across
-    /// 3 typed bundles)。
+    /// Re-captured at chapter 527 close-out。 Chapter
+    /// 527:parallel-run reconciliation — 4-bundle
+    /// convenience init (M1485) closes the chapter 526
+    /// V1 splice call-site contract gap (V1 splice
+    /// references 4 bundles but only 3-bundle inits
+    /// existed pre-M1485)。 Includes 4-bundle init PROOF
+    /// (M1486) + typed milestone doctrine (M1487)
+    /// freezing parallel-run lesson + 5 validated
+    /// mitigations。
     static let frozenFullRegistrySha256: String =
-        "4c449e6e2715c985db803e06d80c5d66c2b96c0a63cacadb87bc4b11e2783703"
+        "9e6b5497c5e2a17061d5ad605e0d9ccdc53685e790b2969e54d7bc73e9098a5e"
 }

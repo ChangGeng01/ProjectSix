@@ -37,21 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs526() {
+    func testLastChapterIs527() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百二十六",
-            "M1484 chapter 五百二十六 — 3rd BASEBrain" +
-            "TurnResult cluster bundle。" +
-            " BASEBrainTurnResultAuditProjection" +
-            "ForwardBundle (7 audit-projection-" +
-            "forwarded fields) + 3-bundle convenience" +
-            " init + V1 monolith splice。 Cumulative" +
-            " BASEBrainTurnResult fold:52 → 29 args" +
-            " (23 collapsed across evolution +" +
-            " sovereign + audit-projection-forward" +
-            " bundles)。 72 typed surfaces cumulative")
+            "chapter 五百二十七",
+            "M1488 chapter 五百二十七 — parallel-run" +
+            " reconciliation。 4-bundle convenience init" +
+            " + PROOF tests + typed milestone doctrine。" +
+            " Closes the chapter 526 V1 splice call-" +
+            "site contract gap (V1 calls with 4 bundles" +
+            " but only 3-bundle inits existed)。 73 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

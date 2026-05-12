@@ -1571,7 +1571,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百二十六")!)
+                            "chapter 五百二十六")!),
+            // M1488 chapter 527 — parallel-run reconciliation
+            checkRegistry("五百二十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百二十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2275,6 +2281,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百二十六")!
+                .mNumberLast),
+            // M1488 chapter 527 — parallel-run reconciliation
+            ("527",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

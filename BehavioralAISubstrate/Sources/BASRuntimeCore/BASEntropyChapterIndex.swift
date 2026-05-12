@@ -1840,7 +1840,21 @@ public enum BASEntropyChapterIndex {
                 " collapsed across evolution + sovereign" +
                 " + audit-projection-forward bundles)。" +
                 " 72 typed surfaces cumulative。 ADR-016" +
-                " → M1484。 V1 byte-equality preserved。")
+                " → M1484。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十七",
+            mNumberFirst: 1485, mNumberLast: 1488,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Parallel-run reconciliation:M1485" +
+                " ships the 4-bundle convenience init" +
+                " that closes the chapter 526 V1 splice" +
+                " call-site contract gap (V1 splice" +
+                " calls with 4 bundles but only 3-bundle" +
+                " inits existed) + M1486 PROOF tests +" +
+                " M1487 typed milestone doctrine。 73" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1488。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
