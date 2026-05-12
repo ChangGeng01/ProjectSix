@@ -202,6 +202,71 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百三十一 / M1502 — 8-bundle
+    //                                       convenience init
+    //
+    // Adds an 8-bundle convenience init that accepts ALL
+    // EIGHT typed cluster bundles (device/lifecycle +
+    // sovereign + host + evolution + auditProjectionForward
+    // + cognitive frames + risk/choice + misc)。 Collapses
+    // 49 individual fields into 8 typed bundle args at the
+    // call site (6+8+5+10+7+5+4+4)。
+    //
+    // Delegates to the M1498 7-bundle init,unpacking the
+    // 6 device/lifecycle fields from deviceLifecycleBundle
+    // (deviceState + budgetFrame + wakeIntent + vitalState
+    // + runLease + emergencyBrake)。
+    //
+    // Public API additive only。 Byte-equality with the
+    // all-fields init GUARANTEED by body delegation。
+    public init(
+        deviceLifecycleBundle:
+            BASEBrainTurnResultDeviceLifecycleBundle,
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostBundle: BASEBrainTurnResultHostBundle,
+        cognitiveFramesBundle:
+            BASEBrainTurnResultCognitiveFramesBundle,
+        riskChoiceBundle:
+            BASEBrainTurnResultRiskChoiceBundle,
+        miscBundle: BASEBrainTurnResultMiscBundle,
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        auditProjectionForwardBundle:
+            BASEBrainTurnResultAuditProjectionForwardBundle
+    ) {
+        // Delegate to the M1498 7-bundle init,unpacking
+        // the 6 device/lifecycle fields from
+        // deviceLifecycleBundle。
+        self.init(
+            deviceState:
+                deviceLifecycleBundle.deviceState,
+            budgetFrame:
+                deviceLifecycleBundle.budgetFrame,
+            wakeIntent:
+                deviceLifecycleBundle.wakeIntent,
+            vitalState:
+                deviceLifecycleBundle.vitalState,
+            runLease:
+                deviceLifecycleBundle.runLease,
+            emergencyBrake:
+                deviceLifecycleBundle.emergencyBrake,
+            sovereignBundle: sovereignBundle,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostBundle: hostBundle,
+            cognitiveFramesBundle:
+                cognitiveFramesBundle,
+            riskChoiceBundle: riskChoiceBundle,
+            miscBundle: miscBundle,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace: runtimeTrace,
+            auditProjectionForwardBundle:
+                auditProjectionForwardBundle)
+    }
+
     // MARK: - chapter 五百三十 / M1498 — 7-bundle
     //                                     convenience init
     //
