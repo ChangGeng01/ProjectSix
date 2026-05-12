@@ -116,20 +116,20 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1720:24 + 20 + 139 = 183 (chapter
-    /// 585 — hexa-milestone completion meta-meta)
-    public static let phase2ChapterCount: Int = 183
+    /// added)。 At M1724:24 + 20 + 140 = 184 (chapter
+    /// 586 — first-ever BASObservability Codable)
+    public static let phase2ChapterCount: Int = 184
 
-    /// Phase 2 commits shipped。 At M1720:125 + 84 +
-    /// 556 = 765 (chapter 585 = 4 cuts — hexa-
-    /// milestone completion meta-meta + 28 anti-drift
-    /// PROOF + 16 wire-in PROOF + close-out)
-    public static let phase2CommitsShipped: Int = 765
+    /// Phase 2 commits shipped。 At M1724:125 + 84 +
+    /// 560 = 769 (chapter 586 = 4 cuts — first-ever
+    /// BASObservability Codable extension + 2 PROOF +
+    /// typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 769
 
-    /// Phase 2 mNumberLast。 At M1720:chapter 585 —
-    /// hexa-milestone completion meta-meta milestone。
+    /// Phase 2 mNumberLast。 At M1724:chapter 586 —
+    /// first-ever BASObservability Codable extension。
     /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1720
+    public static let phase2MNumberLast: Int = 1724
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

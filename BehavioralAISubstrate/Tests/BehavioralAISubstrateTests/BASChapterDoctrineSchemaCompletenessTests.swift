@@ -1925,7 +1925,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十五")!)
+                            "chapter 五百八十五")!),
+            // M1724 chapter 586 — First-ever BASObservability Codable
+            checkRegistry("五百八十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3101,6 +3107,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十五")!
+                .mNumberLast),
+            // M1724 chapter 586 — First-ever BASObservability Codable
+            ("586",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

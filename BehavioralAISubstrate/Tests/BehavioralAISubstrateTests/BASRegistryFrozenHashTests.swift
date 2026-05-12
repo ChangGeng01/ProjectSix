@@ -107,18 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 585 close-out。 Chapter
-    /// 585:HEXA-MILESTONE COMPLETION META-META
-    /// MILESTONE。 NEW BASCodableExtensionHexa
-    /// MilestoneCompletionDoctrine (M1717) + 28 anti-
-    /// drift PROOF tests (M1718) + 16 wire-in PROOF
-    /// tests (M1719) cataloguing ALL 6 sealed Codable
-    /// extension milestones。 Supersedes chapter 580
-    /// penta snapshot;penta + quad-arc + tri-arc
-    /// doctrines preserved as historical records。
-    /// NEW beyond-m1700-arc kind discriminator on
-    /// MilestoneRecord。 65 session types ledger-
-    /// serializable。
+    /// Re-captured at chapter 586 close-out。 Chapter
+    /// 586:FIRST-EVER BASOBSERVABILITY CODABLE
+    /// EXTENSION — fresh module territory (module #6)
+    /// in the beyond-M1700 narrative arc。 2 nested
+    /// types (BASUnifiedStorageLocator.Locations +
+    /// BASUpdateTicketLifecycleSQLiteStorage.
+    /// CheckpointResult) gained Codable at M1721 + 2
+    /// PROOF tests (M1722) + NEW BASObservability
+    /// CodableExtensionDoctrine (M1723)。 Module
+    /// coverage 5 → 6。 Second fresh-module extension
+    /// beyond M1700。
     static let frozenFullRegistrySha256: String =
-        "3b39d46742c5bd856026243d166cfcee6f62017f217c3933e159ae04ff380614"
+        "ba0893e56396b4b573adbc9a8dfa91509434198c5f6b89b89ca98e878a03001f"
 }

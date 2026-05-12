@@ -11221,7 +11221,97 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1720。 304 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 586 — First-ever BASObservability
+        // Codable extension。 2 nested types (BAS
+        // UnifiedStorageLocator.Locations + BAS
+        // UpdateTicketLifecycleSQLiteStorage.
+        // CheckpointResult)。 Module coverage 5 → 6;
+        // second fresh-module extension beyond M1700。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十六",
+            mNumberFirst: 1721,
+            mNumberLast: 1724,
+            v1MilestoneMNumber: 1724,
+            v1MilestoneStatus:
+                "chapter-586-first-ever-observability-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1721, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Observability nested types" +
+                        " (BASUnifiedStorageLocator." +
+                        "Locations + BASUpdateTicket" +
+                        "LifecycleSQLiteStorage." +
+                        "CheckpointResult)。 First-ever" +
+                        " Codable extension into BAS" +
+                        "Observability module — module" +
+                        " #6 in the beyond-M1700" +
+                        " narrative arc。"),
+                BASChapterKnife(
+                    mNumber: 1722, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1723, knife: "第三刀",
+                    concept: "NEW BASObservabilityCodable" +
+                        "ExtensionDoctrine typed surface。" +
+                        " Documents 6th module covered +" +
+                        " beyondM1700FreshModuleNumber=2" +
+                        " field。 typed-surface count" +
+                        " 126 → 127。"),
+                BASChapterKnife(
+                    mNumber: 1724, knife: "第四刀",
+                    concept: "Chapter 586 close-out +" +
+                        " doctrine sync。 308" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "unified-storage-locator-locations-non-codable",
+                "checkpoint-result-non-codable",
+                "observability-module-fully-non-codable",
+                "6th-module-territory-unexplored"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1724",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "first-ever-observability-codable",
+                "fresh-module-territory-beyond-M1700"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — additional BAS" +
+                "Observability types as candidates" +
+                " surface",
+                "future arc — eventual BASObservability" +
+                " arc seal after wave 2-3 accumulate"
+            ],
+            summary: "Chapter 586 ships first-ever" +
+                " Codable extension into BAS" +
+                "Observability module — fresh module" +
+                " territory (module #6) in the beyond-" +
+                "M1700 narrative arc。 2 nested types" +
+                " (BASUnifiedStorageLocator.Locations" +
+                " + BASUpdateTicketLifecycleSQLite" +
+                "Storage.CheckpointResult) gained" +
+                " Codable at M1721。 2 PROOF tests" +
+                " (M1722) + new typed surface (M1723)" +
+                " + close-out (M1724)。 Module coverage" +
+                " expanded:5 → 6 (added BAS" +
+                "Observability to BASHostKit + BAS" +
+                "RuntimeCore + BASMemory + BAS" +
+                "Orchestration + BASLeaseLife)。 127" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1724。 308 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

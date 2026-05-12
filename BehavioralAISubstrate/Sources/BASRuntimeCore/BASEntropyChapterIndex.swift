@@ -2951,7 +2951,27 @@ public enum BASEntropyChapterIndex {
                 " MilestoneRecord。 65 session types" +
                 " ledger-serializable。 126 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1720。 V1 byte-equality preserved。")
+                " M1720。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十六",
+            mNumberFirst: 1721, mNumberLast: 1724,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "FIRST-EVER BASOBSERVABILITY" +
+                " CODABLE EXTENSION — fresh module" +
+                " territory (module #6) in the beyond-" +
+                "M1700 narrative arc。 2 nested types" +
+                " (BASUnifiedStorageLocator.Locations" +
+                " + BASUpdateTicketLifecycleSQLite" +
+                "Storage.CheckpointResult) gained" +
+                " Codable at M1721 + 2 PROOF tests" +
+                " (M1722) + new typed surface (M1723)" +
+                " + close-out (M1724)。 Module coverage" +
+                " 5 → 6 (added BASObservability)。 127" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1724。 Second fresh-module" +
+                " extension beyond M1700。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
