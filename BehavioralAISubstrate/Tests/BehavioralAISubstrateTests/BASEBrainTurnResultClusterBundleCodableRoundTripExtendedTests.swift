@@ -262,6 +262,66 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripExtendedTests:
         XCTAssertEqual(data1, data2)
     }
 
+    // MARK: - CognitiveFramesBundle fixture
+    //         (chapter 547 / M1565 — final 9 of 9)
+
+    private func makeCognitiveFramesBundle()
+        -> BASEBrainTurnResultCognitiveFramesBundle
+    {
+        let context = BASContextFrame(
+            utterance: "fixture-utterance",
+            taskType: .chat,
+            sceneType: nil,
+            emotionalLoad: 0.3,
+            timePressure: 0.2,
+            relationPattern: "fixture-relation",
+            ambiguityScore: 0.4,
+            consequenceLevel: 0.1,
+            hostRelevance: 0.5)
+        let decompose = BASDecomposeFrame()
+        // Pin retrievedAt for deterministic Codable
+        // round-trip (`.now` would produce a different
+        // value per construction)。
+        let fixedDate = Date(timeIntervalSince1970:
+            1_700_000_000)
+        let memory = BASMemoryBundle(
+            atoms: [],
+            retrievedAt: fixedDate)
+        let thought = BASThoughtFrame(
+            stepIndex: 0,
+            decomposeRef: "fixture-decompose-ref")
+        let fold = BASThoughtFold(
+            foldID: "fixture-fold-id",
+            hostEffectSummary: "fixture-summary",
+            restorePointer: "fixture-restore",
+            checksum: "fixture-checksum")
+        return BASEBrainTurnResultCognitiveFramesBundle(
+            contextFrame: context,
+            decomposeFrame: decompose,
+            memoryBundle: memory,
+            thoughtFrame: thought,
+            thoughtFold: fold)
+    }
+
+    func testCognitiveFramesBundleMinimumRoundTrips()
+        throws
+    {
+        let original = makeCognitiveFramesBundle()
+        let decoded = try roundTrip(original)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testCognitiveFramesBundleEncodingIsDeterministic()
+        throws
+    {
+        let bundle = makeCognitiveFramesBundle()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data1 = try encoder.encode(bundle)
+        let data2 = try encoder.encode(bundle)
+        XCTAssertEqual(data1, data2)
+    }
+
     // MARK: - Cross-bundle round-trip determinism PROOF
 
     func testThreeBundlesRoundTripPreservesFieldEquality()
