@@ -5549,7 +5549,105 @@ public enum BASChapterDoctrineRegistry {
                 " V1 byte-equality preserved (stress-" +
                 "sweep canonical60 × 3 repeat runs" +
                 " 0-divergence)。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 522 — 100% PACKAGING COVERAGE
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十二",
+            mNumberFirst: 1465,
+            mNumberLast: 1468,
+            v1MilestoneMNumber: 1468,
+            v1MilestoneStatus:
+                "chapter-522-100-percent-packaging-coverage",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1465, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsCthulhuLeftoversBlock" +
+                        " — 8th + FINAL typed input" +
+                        " block。 Aggregates 6 leftover" +
+                        " fields (ontologyShiftMark +" +
+                        " narrativeDistortionMap + 2" +
+                        " reason code arrays + 2 L12" +
+                        " surface aliases)。 68 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1466, knife: "第二刀",
+                    concept: "BASAuditObservation" +
+                        "Projections 8-block unified" +
+                        " convenience init — NO RESIDUAL" +
+                        " named args。 Every audit-" +
+                        "projection field belongs to" +
+                        " exactly one block。 Collapses" +
+                        " 56-arg all-fields init to JUST" +
+                        " 8 args at the call site (the" +
+                        " 8 typed blocks)。"),
+                BASChapterKnife(
+                    mNumber: 1467, knife: "第三刀",
+                    concept: "V1 monolith splice extends" +
+                        " M1463 to use 8-block init —" +
+                        " 100% V1 CALL-SITE PACKAGING" +
+                        " COVERAGE MILESTONE。 Every" +
+                        " field flows through a typed" +
+                        " input surface。 Cumulative LOC:" +
+                        " 118 → 60 (~58 LOC saved)。"),
+                BASChapterKnife(
+                    mNumber: 1468, knife: "第四刀",
+                    concept: "Chapter 522 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1468。 69 fields packaged" +
+                        " across 8 typed input surfaces。" +
+                        " V1 monolith call site reduces" +
+                        " to ~60 LOC (cumulative 118 →" +
+                        " 60 across chapters 515-522 =" +
+                        " ~58 LOC,49% reduction)。" +
+                        " 100% V1 packaging coverage" +
+                        " achieved。")
+            ],
+            entropyClassesAttacked: [
+                "cthulhu-leftover-6-field-cluster-untyped",
+                "v1-monolith-residual-named-args",
+                "8-block-unified-init-absent",
+                "v1-packaging-coverage-not-100-percent"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1468",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "100-percent-v1-call-site-packaging-coverage"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional V1 monolith" +
+                " inline-construction folds in OTHER" +
+                " call sites (projections call site is" +
+                " now 100% packaged)",
+                "future arc — SampleHost / production" +
+                " host wire-in of projection-block" +
+                " observer adapter",
+                "future arc — Tier C migration source-" +
+                "type adoption (4 remaining)",
+                "future arc — external blocker work" +
+                " (ssmScan kernel,FoundationModels.Tool," +
+                " real-device CI lane)"
+            ],
+            summary: "100% V1 CALL-SITE PACKAGING" +
+                " COVERAGE MILESTONE achieved at chapter" +
+                " 522:8th + FINAL typed input block" +
+                " (BASAuditObservationProjectionsCthulhu" +
+                "LeftoversBlock,6 fields) + 8-block" +
+                " convenience init with NO residual args" +
+                " + V1 monolith splice using all 8" +
+                " blocks。 Every audit-projection field" +
+                " flows through a typed input surface。" +
+                " 69 fields packaged across 8 typed" +
+                " surfaces。 V1 call site:118 → ~60 LOC" +
+                " (~58 LOC saved,49% reduction" +
+                " cumulative across chapters 515-522)。" +
+                " 68 typed surfaces cumulative。 ADR-016" +
+                " → M1468。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -1541,7 +1541,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百二十一")!)
+                            "chapter 五百二十一")!),
+            // M1468 chapter 522 — 100% V1 packaging coverage
+            checkRegistry("五百二十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百二十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2205,6 +2211,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百二十一")!
+                .mNumberLast),
+            // M1468 chapter 522 — 100% V1 packaging coverage
+            ("522",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

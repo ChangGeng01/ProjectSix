@@ -175,7 +175,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百十八",     // M1449-M1452 (6th typed input block + V1 splice extension — 60 fields packaged across 6 input surfaces, V1 call site 118 → 68 LOC)
         "chapter 五百十九",     // M1453-M1456 (FIRST PRODUCTION WIRE-IN — projectionBlockEmissionHandler slot + V1 monolith fires handler + 5 PROOF tests)
         "chapter 五百二十",     // M1457-M1460 (10-chapter pipeline arc close-out — host adapter sync→actor bridge + end-to-end PROOF + typed milestone)
-        "chapter 五百二十一"    // M1461-M1464 (7th typed input block + V1 splice extension — 63 fields packaged across 7 input surfaces, V1 call site 118 → 65 LOC)
+        "chapter 五百二十一",   // M1461-M1464 (7th typed input block + V1 splice extension — 63 fields packaged across 7 input surfaces, V1 call site 118 → 65 LOC)
+        "chapter 五百二十二"    // M1465-M1468 (100% V1 packaging coverage — 8th + FINAL input block + 8-block init + V1 splice, 69 fields across 8 surfaces, V1 call site 118 → 60 LOC = 49% reduction)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -192,16 +193,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1464
+    public static let mNumberLast: Int = 1468
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1464)。 Bumped through chapter 521:505 → 509。
-    /// Chapter 521:7th typed input block + V1 splice
-    /// extension — M1461 KunlunAuditSchemasBlock +
-    /// M1462 7-block init + M1463 V1 splice extension +
-    /// M1464 close-out。 V1 monolith call site shrinks
-    /// to 65 LOC (cumulative 118 → 65 = ~53 LOC saved)。
-    public static let commitsShipped: Int = 509
+    /// M1468)。 Bumped through chapter 522:509 → 513。
+    /// Chapter 522:100% V1 packaging coverage milestone
+    /// — M1465 CthulhuLeftoversBlock + M1466 8-block
+    /// init + M1467 V1 splice extension + M1468 close-
+    /// out。 V1 monolith call site at 60 LOC (cumulative
+    /// 118 → 60 = ~58 LOC saved,49% reduction)。
+    public static let commitsShipped: Int = 513
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
