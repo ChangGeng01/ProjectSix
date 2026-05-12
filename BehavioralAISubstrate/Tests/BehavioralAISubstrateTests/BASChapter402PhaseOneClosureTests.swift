@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1540",
-            "M1540:doctrine version reflects chapter 五百四十 — unified typed catalogue doctrine for the 3 observability sinks shipped to date。 BASTypedObservabilitySinkCatalogueDoctrine with SinkID typed enum (3 cases) + Entry struct + catalogueIsConsistent computed invariant (M1537) + 14 anti-drift PROOF tests (M1538) + 9 wire-in PROOF tests cross-checking against actual sink types via direct module references (M1539)。 The 8-path / 3-sink achievement is now non-driftable。 86 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1544",
+            "M1544:doctrine version reflects chapter 五百四十一 — Codable conformance addition across all 9 BASEBrainTurnResult cluster bundles (Equatable, Sendable → Codable, Equatable, Sendable at M1541) + BASEBrainTurnResultClusterBundleCodableDoctrine typed milestone with matchesFoldArcCount cross-doctrine invariant (M1542) + 7 PROOF tests including compile-time conformance check (M1543)。 All 52 underlying fields already Codable via BASSchemaVersioned。 87 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

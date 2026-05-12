@@ -107,16 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 540 close-out。 Chapter
-    /// 540:unified typed catalogue doctrine for the 3
-    /// observability sinks shipped to date —
-    /// BASTypedObservabilitySinkCatalogueDoctrine with
-    /// SinkID typed enum (3 cases) + Entry struct +
-    /// catalogueIsConsistent computed invariant (M1537)
-    /// + 14 anti-drift PROOF tests (M1538) + 9 wire-in
-    /// PROOF tests cross-checking against actual sink
-    /// types via direct module references (M1539)。 The
-    /// 8-path / 3-sink achievement is now non-driftable。
+    /// Re-captured at chapter 541 close-out。 Chapter
+    /// 541:Codable conformance addition across all 9
+    /// BASEBrainTurnResult cluster bundles (Equatable,
+    /// Sendable → Codable, Equatable, Sendable at
+    /// M1541) + BASEBrainTurnResultClusterBundleCodable
+    /// Doctrine typed milestone with matchesFoldArcCount
+    /// cross-doctrine invariant against BASEBrainTurn
+    /// ResultFoldArcSealedDoctrine (M1542) + 7 PROOF
+    /// tests including compile-time conformance check
+    /// (M1543)。 All 52 underlying fields already
+    /// Codable via BASSchemaVersioned。
     static let frozenFullRegistrySha256: String =
-        "780225df89f89eecc6524c0b85514aad73f3e0be33564b07aa52314fcdf30378"
+        "9afaf2989fe70c3c05deea72525b0def71ecabb2cfad237d21d50f7e3ac103b9"
 }

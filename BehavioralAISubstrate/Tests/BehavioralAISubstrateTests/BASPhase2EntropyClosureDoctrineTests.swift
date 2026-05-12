@@ -37,17 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs540() {
+    func testLastChapterIs541() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百四十",
-            "Chapter 五百四十:unified typed catalogue" +
-            " doctrine for 3 observability sinks +" +
-            " 23 PROOF tests (14 anti-drift + 9 wire-" +
-            "in)。 The 8-path / 3-sink achievement is" +
-            " now non-driftable。 86 typed surfaces" +
-            " cumulative")
+            "chapter 五百四十一",
+            "Chapter 五百四十一:Codable conformance" +
+            " addition across all 9 BASEBrainTurnResult" +
+            " cluster bundles + typed milestone doctrine" +
+            " with matchesFoldArcCount cross-doctrine" +
+            " invariant + 7 PROOF tests。 87 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

@@ -1655,7 +1655,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十")!)
+                            "chapter 五百四十")!),
+            // M1544 chapter 541 — Codable conformance addition + typed milestone + 7 PROOF tests
+            checkRegistry("五百四十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2471,6 +2477,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十")!
+                .mNumberLast),
+            // M1544 chapter 541 — Codable conformance + doctrine + 7 PROOF tests
+            ("541",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

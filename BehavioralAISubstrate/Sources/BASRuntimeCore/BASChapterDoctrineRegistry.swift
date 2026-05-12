@@ -7299,7 +7299,100 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M1540。" +
                 " 124 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 541 — Codable conformance addition
+        // across the 9 BASEBrainTurnResult cluster
+        // bundles + typed milestone + PROOF tests
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十一",
+            mNumberFirst: 1541,
+            mNumberLast: 1544,
+            v1MilestoneMNumber: 1544,
+            v1MilestoneStatus:
+                "chapter-541-cluster-bundle-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1541, knife: "第一刀",
+                    concept: "Add Codable conformance to" +
+                        " all 9 BASEBrainTurnResult" +
+                        " cluster bundles (Equatable," +
+                        " Sendable → Codable, Equatable," +
+                        " Sendable)。 All 52 underlying" +
+                        " fields are already Codable via" +
+                        " BASSchemaVersioned conformance;" +
+                        " Swift synthesizes Codable" +
+                        " automatically。 Zero behavioral" +
+                        " change,additive typed surface" +
+                        " for JSON serialization + replay-" +
+                        "determinism PROOF。"),
+                BASChapterKnife(
+                    mNumber: 1542, knife: "第二刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "ClusterBundleCodableDoctrine" +
+                        " typed milestone with" +
+                        " matchesFoldArcCount computed" +
+                        " cross-check against" +
+                        " BASEBrainTurnResultFoldArc" +
+                        "SealedDoctrine。 87 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1543, knife: "第三刀",
+                    concept: "7 PROOF tests for the" +
+                        " Codable doctrine + compile-time" +
+                        " conformance check across all 9" +
+                        " bundles via generic helper" +
+                        " `assertConformsToCodable<T:" +
+                        " Codable>`。 If any bundle loses" +
+                        " Codable,test file fails to" +
+                        " compile loudly。"),
+                BASChapterKnife(
+                    mNumber: 1544, knife: "第四刀",
+                    concept: "Chapter 541 close-out +" +
+                        " doctrine sync — Codable" +
+                        " conformance addition sealed。" +
+                        " 128 consecutive commits with" +
+                        " V1 byte-equality preserved" +
+                        " this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "cluster-bundle-codable-missing",
+                "fold-arc-replay-determinism-incomplete",
+                "json-serialization-surface-absent",
+                "cross-doctrine-invariant-undocumented"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1544",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "codable-conformance-9-of-9"
+            ],
+            plannedFutureCuts: [
+                "future arc — Hashable conformance" +
+                " addition across the 9 bundles if" +
+                " feasible (subject to underlying" +
+                " field Hashable support)",
+                "future arc — Codable round-trip" +
+                " explicit PROOF tests covering all" +
+                " 9 bundles (compile-time conformance" +
+                " was M1543 first wave)",
+                "future arc — V1 monolith internal" +
+                " fold continuation"
+            ],
+            summary: "Chapter 541 adds Codable conformance" +
+                " to all 9 BASEBrainTurnResult cluster" +
+                " bundles (M1541) + ships a typed" +
+                " milestone doctrine with cross-doctrine" +
+                " invariant against BASEBrainTurnResult" +
+                "FoldArcSealedDoctrine (M1542) + 7 PROOF" +
+                " tests including compile-time conformance" +
+                " check (M1543) + close-out (M1544)。 87" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1544。 128 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

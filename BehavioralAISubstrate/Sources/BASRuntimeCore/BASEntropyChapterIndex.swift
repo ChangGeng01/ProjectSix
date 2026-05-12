@@ -2096,7 +2096,28 @@ public enum BASEntropyChapterIndex {
                 " / 3-sink achievement is now non-" +
                 "driftable。 86 typed surfaces cumulative。" +
                 " ADR-016 → M1540。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十一",
+            mNumberFirst: 1541, mNumberLast: 1544,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable conformance addition" +
+                " across all 9 BASEBrainTurnResult" +
+                " cluster bundles (M1541):Equatable," +
+                " Sendable → Codable, Equatable," +
+                " Sendable。 BASEBrainTurnResultCluster" +
+                "BundleCodableDoctrine typed milestone" +
+                " with matchesFoldArcCount computed" +
+                " cross-check against BASEBrainTurnResult" +
+                "FoldArcSealedDoctrine (M1542) + 7" +
+                " PROOF tests including compile-time" +
+                " conformance check (M1543)。 All 52" +
+                " underlying fields already Codable via" +
+                " BASSchemaVersioned;Swift synthesizes" +
+                " automatically。 87 typed surfaces" +
+                " cumulative。 ADR-016 → M1544。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
