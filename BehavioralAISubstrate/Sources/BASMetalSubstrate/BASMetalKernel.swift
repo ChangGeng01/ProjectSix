@@ -69,7 +69,7 @@ import Foundation
 /// Inputs are by-value Data so cross-actor + cross-process
 /// dispatch is free。 GPU-resident kernels upload to
 /// MTLBuffer inside their isolated context。
-public struct BASKernelInputs: Equatable, Hashable, Sendable {
+public struct BASKernelInputs: Equatable, Hashable, Sendable, Codable {
 
     /// Per-input tensor descriptor。 Length must equal
     /// `payloads.count`。
@@ -107,7 +107,7 @@ public struct BASKernelInputs: Equatable, Hashable, Sendable {
 /// Sendable output bundle returned from a kernel。 Mirrors
 /// `BASKernelInputs` shape with an extra `executionNanos`
 /// observability field。
-public struct BASKernelOutputs: Equatable, Hashable, Sendable {
+public struct BASKernelOutputs: Equatable, Hashable, Sendable, Codable {
 
     /// Per-output tensor descriptor。
     public let descriptors: [BASTensorDescriptor]
