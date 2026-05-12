@@ -11398,7 +11398,92 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1728。" +
                 " 312 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 588 — BASMemory post-cross-module-
+        // arc wave 2 Codable extension。 2 nested
+        // types (HostCandidatePipeline.RejectionRecord
+        // + BASMemoryMutationEventEmitter.EmitOutcome)。
+        // Continues chapter 587 wave 1 pattern。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十八",
+            mNumberFirst: 1729,
+            mNumberLast: 1732,
+            v1MilestoneMNumber: 1732,
+            v1MilestoneStatus:
+                "chapter-588-memory-post-cross-module-arc-wave-two",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1729, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Memory nested types (BASHost" +
+                        "CandidatePipeline." +
+                        "RejectionRecord + BASMemory" +
+                        "MutationEventEmitter." +
+                        "EmitOutcome)。 Wave 2 of" +
+                        " post-cross-module-arc" +
+                        " BASMemory extension。"),
+                BASChapterKnife(
+                    mNumber: 1730, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1731, knife: "第三刀",
+                    concept: "NEW BASMemoryPostCross" +
+                        "ModuleArcExtensionWaveTwo" +
+                        "Doctrine typed surface。" +
+                        " Documents combined chapter" +
+                        " 569 + 587 + 588 coverage =" +
+                        " 14 BASMemory types。 typed-" +
+                        "surface count 128 → 129。"),
+                BASChapterKnife(
+                    mNumber: 1732, knife: "第四刀",
+                    concept: "Chapter 588 close-out +" +
+                        " doctrine sync。 316" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "rejection-record-non-codable",
+                "emit-outcome-non-codable",
+                "memory-wave-2-aftermath-incomplete",
+                "memory-nested-types-non-serializable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1732",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "memory-post-cross-module-arc-wave-two",
+                "14-memory-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — BASMemory wave 3" +
+                " (BASMemoryImportanceScorer or other" +
+                " remaining types)",
+                "future arc — eventual BASMemory" +
+                " post-arc trilogy seal milestone"
+            ],
+            summary: "Chapter 588 ships BASMemory post-" +
+                "cross-module-arc wave 2 Codable" +
+                " extension。 2 nested types (BAS" +
+                "HostCandidatePipeline.RejectionRecord" +
+                " + BASMemoryMutationEventEmitter." +
+                "EmitOutcome) gained Codable at M1729。" +
+                " 2 PROOF tests (M1730) + new typed" +
+                " surface (M1731) + close-out (M1732)。" +
+                " Continues chapter 587 wave 1 pattern。" +
+                " Combined chapter 569 (10) + chapter" +
+                " 587 (2) + chapter 588 (2) = 14 BAS" +
+                "Memory types ledger-serializable。 129" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1732。 316 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

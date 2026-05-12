@@ -2990,6 +2990,25 @@ public enum BASEntropyChapterIndex {
                 " + 587 = 12 BASMemory types ledger-" +
                 "serializable。 128 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1728。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十八",
+            mNumberFirst: 1729, mNumberLast: 1732,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-CROSS-MODULE-ARC" +
+                " WAVE 2 CODABLE EXTENSION。 2 nested" +
+                " types (BASHostCandidatePipeline." +
+                "RejectionRecord +" +
+                " BASMemoryMutationEventEmitter." +
+                "EmitOutcome) gained Codable at M1729" +
+                " + 2 PROOF tests (M1730) + new typed" +
+                " surface (M1731) + close-out (M1732)。" +
+                " Continues chapter 587 wave 1 pattern。" +
+                " Combined chapter 569 + 587 + 588 =" +
+                " 14 BASMemory types ledger-" +
+                "serializable。 129 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1732。" +
                 " V1 byte-equality preserved。")
     ]
 
