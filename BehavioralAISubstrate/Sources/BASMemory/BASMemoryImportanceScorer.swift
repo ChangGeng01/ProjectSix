@@ -160,7 +160,7 @@ public struct BASMemoryImportanceReport: Sendable, Equatable,
 
 /// Pure-function scorer. Construct once with thresholds + decay
 /// params; reuse forever. Stateless / Sendable / immutable.
-public struct BASMemoryImportanceScorer: Sendable, Equatable,
+public struct BASMemoryImportanceScorer: Codable, Sendable, Equatable,
     Hashable
 {
     /// Default tunables. Hosts override per their workload.

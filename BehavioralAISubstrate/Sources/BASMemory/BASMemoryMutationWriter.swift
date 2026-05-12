@@ -100,7 +100,7 @@ public actor BASMemoryMutationWriter {
     /// skipped + notFound` is an invariant that all hold-vs-
     /// active-vs-stale transitions are accounted for.
     public struct MutationOutcome:
-        Sendable, Equatable, Hashable
+        Codable, Sendable, Equatable, Hashable
     {
         public let evaluated: Int
         public let applied: Int
