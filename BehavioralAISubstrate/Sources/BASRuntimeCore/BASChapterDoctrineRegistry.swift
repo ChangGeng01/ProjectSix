@@ -8341,7 +8341,107 @@ public enum BASChapterDoctrineRegistry {
                 " extension)。 ADR-016 → M1588。 172" +
                 " consecutive autonomous commits with" +
                 " V1 byte-equality preserved。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 553 — Final Codable cascade closing
+        // the 3-chapter arc。 3 more typed surfaces
+        // gained Codable (2 nested Aggregates +
+        // CthulhuAggregatesBlock)。 All 5
+        // BASAuditObservationProjections*Block types
+        // now Codable。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十三",
+            mNumberFirst: 1589,
+            mNumberLast: 1592,
+            v1MilestoneMNumber: 1592,
+            v1MilestoneStatus:
+                "chapter-553-codable-cascade-arc-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1589, knife: "第一刀",
+                    concept: "Final Codable cascade:" +
+                        " BASOldSealSealingProtocol" +
+                        ".Aggregate +" +
+                        " BASEvolutionLifecycleSession" +
+                        ".Aggregate +" +
+                        " CthulhuAggregatesBlock —" +
+                        " the last ProjectionsBlock" +
+                        " type to gain Codable。 All 5" +
+                        " BASAuditObservation" +
+                        "Projections*Block types now" +
+                        " Codable。"),
+                BASChapterKnife(
+                    mNumber: 1590, knife: "第二刀",
+                    concept: "5 PROOF tests for the" +
+                        " M1589 final cascade:" +
+                        " compile-time Codable" +
+                        " conformance + round-trip" +
+                        " tests + empty-aggregates" +
+                        " round-trip + sortedKeys" +
+                        " determinism。"),
+                BASChapterKnife(
+                    mNumber: 1591, knife: "第三刀",
+                    concept: "BASCodableCascadeArc" +
+                        "SealedDoctrine typed milestone" +
+                        " commemorating the 3-chapter" +
+                        " Codable cascade arc" +
+                        " (chapters 551-553)。 16 typed" +
+                        " surfaces gained Codable" +
+                        " across 12 commits。 typed" +
+                        " surface count 93 → 94。"),
+                BASChapterKnife(
+                    mNumber: 1592, knife: "第四刀",
+                    concept: "Chapter 553 close-out +" +
+                        " doctrine sync。 176" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。 Codable" +
+                        " cascade arc sealed。")
+            ],
+            entropyClassesAttacked: [
+                "seal-aggregate-non-codable",
+                "lifecycle-aggregate-non-codable",
+                "cthulhu-aggregates-block-non-codable",
+                "json-replay-determinism-gap-on-blocks"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1592",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "codable-cascade-arc-sealed",
+                "all-5-projections-blocks-codable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — typed Bundle migrations" +
+                " under the reframed plan"
+            ],
+            summary: "Chapter 553 closes the 3-chapter" +
+                " Codable cascade arc (chapters" +
+                " 551-553)。 3 final types gained" +
+                " Codable:BASOldSealSealingProtocol" +
+                ".Aggregate +" +
+                " BASEvolutionLifecycleSession" +
+                ".Aggregate +" +
+                " BASAuditObservationProjections" +
+                "CthulhuAggregatesBlock。 All 5" +
+                " BASAuditObservationProjections*Block" +
+                " types are now Codable — the audit-" +
+                "projection emission family is" +
+                " JSON-serializable end-to-end for" +
+                " replay determinism PROOF。 5 PROOF" +
+                " tests + BASCodableCascadeArcSealed" +
+                "Doctrine typed milestone." +
+                " 94 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1592。 176 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

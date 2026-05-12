@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1588",
-            "M1588:doctrine version reflects chapter 五百五十二 — Codable cascade extension to 9 more typed surfaces (BASForbiddenKnowledgeCandidate.Aggregate + 3 ProjectionsBlocks at M1585 + 4 BASKunlunProtocol nested types + KunlunProtocolBlock at M1587) + 6 PROOF tests (M1586)。 93 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1592",
+            "M1592:doctrine version reflects chapter 五百五十三 — Final Codable cascade closing the 3-chapter arc (chapters 551-553)。 3 more types gained Codable:BASOldSealSealingProtocol.Aggregate + BASEvolutionLifecycleSession.Aggregate + BASAuditObservationProjectionsCthulhuAggregatesBlock。 All 5 BASAuditObservationProjections*Block types now Codable。 5 PROOF tests + BASCodableCascadeArcSealedDoctrine typed milestone。 94 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

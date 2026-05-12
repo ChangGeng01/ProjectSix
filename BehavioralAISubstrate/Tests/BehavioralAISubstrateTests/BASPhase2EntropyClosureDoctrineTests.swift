@@ -37,14 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs552() {
+    func testLastChapterIs553() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百五十二",
-            "Chapter 五百五十二:Codable cascade extension" +
-            " to 9 more typed surfaces + 6 PROOF tests。" +
-            " 93 typed surfaces cumulative")
+            "chapter 五百五十三",
+            "Chapter 五百五十三:Final Codable cascade" +
+            " closing the 3-chapter arc。 3 more types" +
+            " gained Codable (BASOldSealSealingProtocol" +
+            ".Aggregate + BASEvolutionLifecycleSession" +
+            ".Aggregate + CthulhuAggregatesBlock)。 All" +
+            " 5 BASAuditObservationProjections*Block" +
+            " types now Codable。 5 PROOF tests +" +
+            " BASCodableCascadeArcSealedDoctrine typed" +
+            " milestone。 94 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

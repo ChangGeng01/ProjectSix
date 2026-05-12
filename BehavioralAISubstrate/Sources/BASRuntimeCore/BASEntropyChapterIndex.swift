@@ -2309,7 +2309,29 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative (no new" +
                 " surfaces — pure Codable cascade" +
                 " extension)。 ADR-016 → M1588。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十三",
+            mNumberFirst: 1589, mNumberLast: 1592,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "Final Codable cascade closing the" +
+                " 3-chapter arc。 3 more types gained" +
+                " Codable (M1589):BASOldSealSealing" +
+                "Protocol.Aggregate +" +
+                " BASEvolutionLifecycleSession.Aggregate" +
+                " + BASAuditObservationProjections" +
+                "CthulhuAggregatesBlock — the last" +
+                " ProjectionsBlock type。 All 5" +
+                " BASAuditObservationProjections*Block" +
+                " types are now Codable。 5 PROOF tests" +
+                " (M1590) +" +
+                " BASCodableCascadeArcSealedDoctrine" +
+                " typed milestone (M1591) commemorating" +
+                " 16 types gained Codable across 12" +
+                " commits (chapters 551-553)。 94 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1592。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
