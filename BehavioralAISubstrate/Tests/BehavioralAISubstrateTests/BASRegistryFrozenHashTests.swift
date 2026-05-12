@@ -107,25 +107,23 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 601 close-out。 Chapter
-    /// 601:REAL HOT-PATH ATTACK PHASE I CONTINUATION
-    /// WAVE 2 — V1 monolith extraction continued。 11
-    /// symbols (M420 Kunlun hot-path constants + M422
-    /// kunlunCenterlineRules helper + M450 cosmic-cold
-    /// counterweight 4 helpers + 18 magic-number
-    /// constants) MOVED from EBrainRuntimeCoordinator.
-    /// swift to NEW sibling EBrainRuntimeCoordinator+
-    /// CoreHelpers.swift (M1781)。 10 PROOF tests (M1782)
-    /// verify constant value-stability + cosmic-cold
-    /// anti-drift + V1 byte-equality preserved (40
-    /// stress-sweep canonical60 green)。 NEW BASV1
-    /// MonolithExtractionWaveTwoDoctrine (M1783)
-    /// supersedes chapter 600 wave 1 doctrine + bumps
-    /// 最激进 score 7 → 8。 V1 LOC trajectory:2136 →
-    /// 1918 (-218)。 Cumulative V1 reduction from chapter
-    /// 477 baseline 2540 → 1918 (-622 = 24.5% of plan
-    /// target)。 SECOND consecutive 最激进 advancement +
-    /// consecutiveV1FoldChapters = 2。
+    /// Re-captured at chapter 602 close-out。 Chapter
+    /// 602:REAL HOT-PATH ATTACK PHASE I CONTINUATION
+    /// WAVE 3 THE BIG MOVE — runTurn(_:) 1733-LOC body
+    /// + runTurnAndIngest 12-LOC async wrapper MOVED
+    /// from EBrainRuntimeCoordinator.swift to NEW
+    /// sibling EBrainRuntimeCoordinator+RunTurn.swift
+    /// (M1785)。 4 PROOF tests (M1786) verify symbol-
+    /// path continuity + V1 byte-equality preserved
+    /// (40 stress-sweep canonical60 green)。 NEW BASV1
+    /// MonolithExtractionWaveThreeDoctrine (M1787)
+    /// supersedes chapter 601 wave 2 doctrine + bumps
+    /// 最激进 score 8 → 9 + planTargetAchievedInSpirit
+    /// = true。 V1 monolith file LOC:1918 → 196
+    /// (-1722)。 Cumulative V1 reduction from chapter
+    /// 477 baseline 2540 → 196 (-2344 = 92.3% of plan
+    /// target)。 THIRD consecutive 最激进 advancement +
+    /// consecutiveV1FoldChapters = 3。
     static let frozenFullRegistrySha256: String =
-        "02ed495b7554b877fea86ce4221a406fe17032ab6c21217682ea748401d6ef42"
+        "cb092c849b1ac0ad1921bcb5ea7711150fd603fef0bfd495364cebe4c91fd5fc"
 }

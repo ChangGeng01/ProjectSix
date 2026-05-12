@@ -116,22 +116,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1784:24 + 20 + 155 = 199 (chapter
-    /// 601 — REAL HOT-PATH ATTACK Phase I continuation
-    /// wave 2 V1 monolith extraction)
-    public static let phase2ChapterCount: Int = 199
+    /// added)。 At M1788:24 + 20 + 156 = 200 (chapter
+    /// 602 — REAL HOT-PATH ATTACK Phase I continuation
+    /// wave 3 V1 monolith THE BIG MOVE)
+    public static let phase2ChapterCount: Int = 200
 
-    /// Phase 2 commits shipped。 At M1784:125 + 84 +
-    /// 620 = 829 (chapter 601 = 4 cuts — REAL HOT-PATH
-    /// ATTACK Phase I continuation wave 2 V1 monolith
-    /// extraction + 10 PROOF + typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 829
+    /// Phase 2 commits shipped。 At M1788:125 + 84 +
+    /// 624 = 833 (chapter 602 = 4 cuts — REAL HOT-PATH
+    /// ATTACK Phase I continuation wave 3 V1 monolith
+    /// BIG MOVE + 4 PROOF + typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 833
 
-    /// Phase 2 mNumberLast。 At M1784:chapter 601 —
+    /// Phase 2 mNumberLast。 At M1788:chapter 602 —
     /// REAL HOT-PATH ATTACK Phase I continuation wave
-    /// 2 V1 monolith extraction。 SWEEP stays frozen
-    /// at 1163。
-    public static let phase2MNumberLast: Int = 1784
+    /// 3 V1 monolith BIG MOVE。 SWEEP stays frozen at
+    /// 1163。
+    public static let phase2MNumberLast: Int = 1788
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

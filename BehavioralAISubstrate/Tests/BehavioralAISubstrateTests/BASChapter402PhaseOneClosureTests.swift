@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1784",
-            "M1784:doctrine version reflects chapter 六百一 — REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 2。 V1 monolith extraction continued:11 symbols (M420 Kunlun hot-path + M450 cosmic-cold counterweight) moved from EBrainRuntimeCoordinator.swift to NEW sibling EBrainRuntimeCoordinator+CoreHelpers.swift。 V1 LOC 2136 → 1918 (-218)。 Cumulative V1 reduction from chapter 477 baseline (2540 LOC):-622 LOC = 24.5% of plan target。 10 PROOF tests (M1782) verify constant value-stability + cosmic-cold anti-drift + V1 byte-equality preserved (40 stress-sweep canonical60 green)。 NEW BASV1MonolithExtractionWaveTwoDoctrine (M1783) supersedes chapter 600 wave 1 doctrine + bumps 最激进 score 7 → 8。 SECOND consecutive 最激进 advancement。 consecutiveV1FoldChapters = 2。 142 typed surfaces cumulative。 368 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1788",
+            "M1788:doctrine version reflects chapter 六百二 — REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 3 THE BIG MOVE。 runTurn(_:) 1733-LOC body + runTurnAndIngest 12-LOC async wrapper MOVED OUT of V1 monolith file to NEW sibling EBrainRuntimeCoordinator+RunTurn.swift (M1785)。 V1 monolith file LOC 1918 → 196 (-1722)。 Cumulative V1 reduction from chapter 477 baseline (2540 LOC):-2344 LOC = 92.3% of plan target。 4 PROOF tests (M1786) verify symbol-path continuity + V1 byte-equality preserved (40 stress-sweep canonical60 green)。 NEW BASV1MonolithExtractionWaveThreeDoctrine (M1787) supersedes chapter 601 wave 2 doctrine + bumps 最激进 score 8 → 9 + planTargetAchievedInSpirit = true。 THIRD consecutive 最激进 advancement。 consecutiveV1FoldChapters = 3。 143 typed surfaces cumulative。 372 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

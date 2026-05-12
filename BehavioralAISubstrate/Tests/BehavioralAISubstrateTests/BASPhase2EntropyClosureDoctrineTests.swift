@@ -37,26 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs601() {
+    func testLastChapterIs602() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一",
-            "Chapter 六百一:REAL HOT-PATH ATTACK PHASE I" +
-            " CONTINUATION WAVE 2 — V1 monolith" +
-            " extraction continued。 11 symbols (M420" +
-            " Kunlun hot-path + M450 cosmic-cold" +
-            " counterweight) moved to NEW sibling" +
-            " EBrainRuntimeCoordinator+CoreHelpers" +
-            ".swift。 V1 LOC 2136 → 1918 (-218)。" +
-            " Cumulative V1 reduction from chapter 477" +
-            " baseline:-622 LOC = 24.5% of plan target。" +
-            " 10 PROOF tests verify constant value-" +
-            "stability + cosmic-cold anti-drift。 NEW" +
-            " BASV1MonolithExtractionWaveTwoDoctrine" +
-            " supersedes wave 1 + bumps 最激进 score" +
-            " 7 → 8。 SECOND consecutive 最激进" +
-            " advancement。 142 typed surfaces" +
+            "chapter 六百二",
+            "Chapter 六百二:REAL HOT-PATH ATTACK PHASE I" +
+            " CONTINUATION WAVE 3 THE BIG MOVE —" +
+            " runTurn(_:) 1733-LOC body +" +
+            " runTurnAndIngest 12-LOC async wrapper" +
+            " moved from V1 monolith file to NEW" +
+            " sibling EBrainRuntimeCoordinator+RunTurn" +
+            ".swift。 V1 monolith file LOC 1918 → 196" +
+            " (-1722)。 Cumulative V1 reduction from" +
+            " chapter 477 baseline:-2344 LOC = 92.3%" +
+            " of plan target。 4 PROOF tests verify" +
+            " symbol-path continuity。 NEW BASV1" +
+            "MonolithExtractionWaveThreeDoctrine" +
+            " supersedes wave 2 + bumps 最激进 score" +
+            " 8 → 9 + planTargetAchievedInSpirit =" +
+            " true。 THIRD consecutive 最激进" +
+            " advancement。 143 typed surfaces" +
             " cumulative")
     }
 

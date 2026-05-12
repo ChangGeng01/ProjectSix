@@ -3312,6 +3312,35 @@ public enum BASEntropyChapterIndex {
                 " consecutiveV1FoldChapters = 2。 142" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1784。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二",
+            mNumberFirst: 1785, mNumberLast: 1788,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK PHASE I" +
+                " CONTINUATION WAVE 3 THE BIG MOVE。" +
+                " runTurn(_:) 1733-LOC body +" +
+                " runTurnAndIngest 12-LOC async wrapper" +
+                " moved from EBrainRuntimeCoordinator" +
+                ".swift to NEW sibling EBrainRuntime" +
+                "Coordinator+RunTurn.swift (M1785)。 V1" +
+                " monolith file LOC:1918 → 196 (-1722)。" +
+                " Cumulative V1 reduction from chapter" +
+                " 477 baseline:2540 → 196 = -2344 LOC" +
+                " (92.3% of plan target)。 4 PROOF tests" +
+                " (M1786) verify runTurn + runTurnAndIngest" +
+                " symbol-path continuity + V1 byte-" +
+                "equality preserved (40 stress-sweep" +
+                " canonical60 green)。 NEW BASV1Monolith" +
+                "ExtractionWaveThreeDoctrine (M1787)" +
+                " supersedes chapter 601 wave 2 doctrine" +
+                " + bumps 最激进 score 8 → 9 +" +
+                " planTargetAchievedInSpirit = true。" +
+                " THIRD consecutive 最激进 advancement +" +
+                " consecutiveV1FoldChapters = 3。 143" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1788。 V1 byte-equality" +
                 " preserved。")
     ]
 

@@ -255,7 +255,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百九十八",   // M1769-M1772 (BASORGAN FIRST-EVER CODABLE EXTENSION WAVE 1 — FRESH MODULE TERRITORY;2 types (BASOrganDraftChunk + BASOrganRegistryObservationSnapshot) gained Codable + 2 PROOF tests + BASOrganCodableExtensionDoctrine typed surface + close-out;BASOrgan uncovered by chapter 597 octa snapshot;module count bumped 6 → 7;mirrors chapter 586 BASObservability first-ever precedent)
         "chapter 五百九十九",   // M1773-M1776 (BASMLXADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1 — FRESH MODULE TERRITORY;2 types (MLXModelCatalog.Entry + MLXLoRATrainer.TrainingProgress 4-case enum) gained Codable + 2 PROOF tests + BASMLXAdapterCodableExtensionDoctrine typed surface + close-out;BASMLXAdapter uncovered by chapter 598 BASOrgan first-ever;module count bumped 7 → 8;2nd consecutive fresh-module first-ever after chapter 597 octa-milestone seal)
         "chapter 六百",         // M1777-M1780 (REAL HOT-PATH ATTACK PHASE I CONTINUATION — V1 monolith extraction;9 audit-projection symbols moved from EBrainRuntimeCoordinator.swift to sibling extension file;V1 LOC 2472→2136 (-336);cumulative reduction from chapter 477 baseline 2540→2136 (-404 = 16.4% of plan target);6 PROOF tests cross-package contract preserved;NEW BASV1MonolithExtractionContinuationDoctrine bumps 最激进 score 6→7;first 最激进 advancement beyond chapter 501 honest closure)
-        "chapter 六百一"        // M1781-M1784 (REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 2 — V1 monolith extraction continued;11 symbols (M420 Kunlun hot-path + M450 cosmic-cold counterweight) moved to NEW sibling extension file;V1 LOC 2136→1918 (-218);cumulative 2540→1918 (-622 = 24.5% of plan target);10 PROOF tests value-stability + anti-drift;NEW BASV1MonolithExtractionWaveTwoDoctrine supersedes wave 1 + bumps 最激进 7→8;SECOND consecutive 最激进 advancement;consecutiveV1FoldChapters = 2)
+        "chapter 六百一",       // M1781-M1784 (REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 2 — V1 monolith extraction continued;11 symbols (M420 Kunlun hot-path + M450 cosmic-cold counterweight) moved to NEW sibling extension file;V1 LOC 2136→1918 (-218);cumulative 2540→1918 (-622 = 24.5% of plan target);10 PROOF tests value-stability + anti-drift;NEW BASV1MonolithExtractionWaveTwoDoctrine supersedes wave 1 + bumps 最激进 7→8;SECOND consecutive 最激进 advancement;consecutiveV1FoldChapters = 2)
+        "chapter 六百二"        // M1785-M1788 (REAL HOT-PATH ATTACK PHASE I CONTINUATION WAVE 3 THE BIG MOVE — runTurn(_:) 1733-LOC body + runTurnAndIngest 12-LOC wrapper moved from V1 monolith to NEW sibling EBrainRuntimeCoordinator+RunTurn.swift;V1 LOC 1918→196 (-1722);cumulative 2540→196 (-2344 = 92.3% of plan target);4 PROOF tests symbol-path continuity;NEW BASV1MonolithExtractionWaveThreeDoctrine supersedes wave 2 + bumps 最激进 8→9;THIRD consecutive 最激进 advancement;consecutiveV1FoldChapters = 3;planTargetAchievedInSpirit = true)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -272,15 +273,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1784
+    public static let mNumberLast: Int = 1788
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1784)。 Bumped through chapter 601:825 → 829。
-    /// Chapter 601:REAL HOT-PATH ATTACK Phase I
-    /// continuation wave 2 V1 monolith extraction +
-    /// 10 PROOF tests + V1 monolith extraction wave
-    /// two doctrine + close-out。
-    public static let commitsShipped: Int = 829
+    /// M1788)。 Bumped through chapter 602:829 → 833。
+    /// Chapter 602:REAL HOT-PATH ATTACK Phase I
+    /// continuation wave 3 THE BIG MOVE V1 monolith
+    /// extraction + 4 PROOF tests + V1 monolith
+    /// extraction wave three doctrine + close-out。
+    public static let commitsShipped: Int = 833
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
