@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1760",
-            "M1760:doctrine version reflects chapter 五百九十五 — BASHOSTKIT NON-PROJECTION WAVE 4 CULMINATION CODABLE EXTENSION。 2 BASHostKit types (BASChengluHintSet 8-field aggregator composing all 5 Chenglu hint types from waves 1-3 + BASTrainingDataExportFilter 7-field filter) gained Codable at M1757 + 2 PROOF tests (M1758) + BASHostKitConfigurationHintCodableExtensionWaveFourDoctrine typed surface (M1759) + close-out (M1760)。 Mirrors chapter 583 BASLeaseLifeCoordinator.TurnRecorded culmination pattern。 Combined 41 BASHostKit-related types ledger-serializable。 136 typed surfaces cumulative。 344 consecutive byte-equality clean commits。 BASHostKit non-projection 4-wave arc structure complete + ready for sealing at chapter 596。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1764",
+            "M1764:doctrine version reflects chapter 五百九十六 — BASHOSTKIT NON-PROJECTION 4-WAVE ARC SEAL MILESTONE。 NEW BASHostKitNonProjectionCodableExtensionArcSealedDoctrine typed milestone (M1761) commemorating 4-wave BASHostKit non-projection arc (chapters 592-595);8 types,16 commits,single-module。 Second sealed arc beyond M1700 narrative arc (after chapter 584 BASLeaseLife)。 Mirrors chapter 584 pattern but extended to 4 waves + includes culmination wave (BASChengluHintSet 8-field aggregator)。 38 anti-drift PROOF tests (M1762) + 22 wire-in PROOF tests (M1763) + close-out (M1764)。 Combined 41 BASHostKit-related types ledger-serializable。 137 typed surfaces cumulative。 348 consecutive byte-equality clean commits。 8 sealed milestones extant。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

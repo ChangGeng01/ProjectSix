@@ -12128,7 +12128,116 @@ public enum BASChapterDoctrineRegistry {
                 "equality preserved。 BASHostKit non-" +
                 "projection 4-wave arc structure" +
                 " complete + ready for sealing at" +
-                " chapter 596。 ADR-014 OPT-IN preserved。")
+                " chapter 596。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 596 — BASHostKit non-projection 4-wave
+        // arc seal milestone。 NEW BASHostKit
+        // NonProjectionCodableExtensionArcSealedDoctrine
+        // commemorating chapters 592-595 (8 types,16
+        // commits)。 Second sealed arc beyond M1700
+        // narrative arc (after chapter 584 BASLeaseLife)。
+        // Differs structurally:4-wave (vs 3-wave) +
+        // includes culmination wave (BASChengluHintSet)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十六",
+            mNumberFirst: 1761,
+            mNumberLast: 1764,
+            v1MilestoneMNumber: 1764,
+            v1MilestoneStatus:
+                "chapter-596-hostkit-non-projection-arc-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1761, knife: "第一刀",
+                    concept: "NEW BASHostKitNonProjection" +
+                        "CodableExtensionArcSealedDoctrine" +
+                        " typed milestone commemorating 4-" +
+                        "wave BASHostKit non-projection" +
+                        " arc (chapters 592-595)。 8 types," +
+                        " 16 commits,single-module。" +
+                        " Mirrors chapter 584 BASLeaseLife" +
+                        " arc seal,extended to 4 waves +" +
+                        " culmination。 typed-surface count" +
+                        " 136 → 137。"),
+                BASChapterKnife(
+                    mNumber: 1762, knife: "第二刀",
+                    concept: "38 anti-drift PROOF tests" +
+                        " for the M1761 arc seal。 Identity" +
+                        " + arc range + coverage + wave" +
+                        " contributions + culmination wave" +
+                        " attestation + type list + module" +
+                        " breakdown + cross-doctrine refs" +
+                        " + 10 achievement flags + 2" +
+                        " cumulative-count invariants。"),
+                BASChapterKnife(
+                    mNumber: 1763, knife: "第三刀",
+                    concept: "22 wire-in PROOF tests" +
+                        " cross-checking the M1761 arc" +
+                        " seal against 4 wave doctrines +" +
+                        " chapter 584 parallel arc seal +" +
+                        " chapter 590 parallel trilogy" +
+                        " seal + chapter 591 hepta meta-" +
+                        "meta + cumulative invariants。"),
+                BASChapterKnife(
+                    mNumber: 1764, knife: "第四刀",
+                    concept: "Chapter 596 close-out +" +
+                        " doctrine sync。 348" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。 BAS" +
+                        "HostKit non-projection 4-wave" +
+                        " arc sealed。 8 sealed milestones" +
+                        " extant (catalog upgrade ready" +
+                        " for chapter 597 octa-milestone)。")
+            ],
+            entropyClassesAttacked: [
+                "hostkit-non-projection-arc-undocumented",
+                "no-single-source-of-truth-for-8-hostkit-wave-types",
+                "hostkit-wave-doctrines-not-cross-validated",
+                "fourth-wave-culmination-pattern-undefined"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1764",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-non-projection-arc-sealed",
+                "41-hostkit-types-cumulative",
+                "second-sealed-arc-beyond-m1700",
+                "first-four-wave-arc-beyond-m1700"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 597 octa-milestone" +
+                " meta-meta (8 sealed milestones:564 +" +
+                " 569 + 574 + 579 + 584 + 590 + 591" +
+                " hepta + 596 hostkit arc seal)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — Tier A sprawl migrations" +
+                " per wild-rolling-meerkat plan"
+            ],
+            summary: "Chapter 596 seals the 4-wave BAS" +
+                "HostKit non-projection Codable extension" +
+                " arc (chapters 592-595)。 NEW BASHostKit" +
+                "NonProjectionCodableExtensionArcSealed" +
+                "Doctrine typed milestone (M1761)" +
+                " commemorating 8 BASHostKit types,16" +
+                " commits + 38 anti-drift PROOF tests" +
+                " (M1762) + 22 wire-in PROOF tests" +
+                " (M1763) + close-out (M1764)。 Second" +
+                " sealed arc beyond M1700 narrative arc" +
+                " (after chapter 584 BASLeaseLife)。" +
+                " Mirrors chapter 584 pattern but" +
+                " extended to 4 waves + includes" +
+                " culmination wave (BASChengluHintSet" +
+                " 8-field aggregator)。 41 BASHostKit-" +
+                "related types ledger-serializable。 137" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1764。 348 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 8 sealed milestones" +
+                " extant — catalog upgrade ready for" +
+                " chapter 597 octa-milestone。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -107,19 +107,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 595 close-out。 Chapter
-    /// 595:BASHOSTKIT NON-PROJECTION WAVE 4 CULMINATION
-    /// CODABLE EXTENSION。 2 types (BASChengluHintSet
-    /// 8-field aggregator composing all 5 Chenglu hint
-    /// types from waves 1-3 + BASTrainingDataExportFilter
-    /// 7-field filter) gained Codable at M1757 + 2
-    /// PROOF tests (M1758) + NEW BASHostKitConfiguration
-    /// HintCodableExtensionWaveFourDoctrine (M1759)。
-    /// Mirrors chapter 583 BASLeaseLifeCoordinator.
-    /// TurnRecorded culmination pattern。 Combined 41
-    /// BASHostKit-related types ledger-serializable。
-    /// Non-projection 4-wave arc structure ready for
-    /// sealing at chapter 596。
+    /// Re-captured at chapter 596 close-out。 Chapter
+    /// 596:BASHOSTKIT NON-PROJECTION 4-WAVE ARC SEAL
+    /// MILESTONE。 NEW BASHostKitNonProjectionCodable
+    /// ExtensionArcSealedDoctrine typed milestone
+    /// (M1761) commemorating 4-wave BASHostKit non-
+    /// projection arc (chapters 592-595);8 types,16
+    /// commits,single-module。 Second sealed arc beyond
+    /// M1700 narrative arc (after chapter 584 BASLease
+    /// Life)。 Mirrors chapter 584 pattern but extended
+    /// to 4 waves + includes culmination wave。 38 anti-
+    /// drift PROOF tests (M1762) + 22 wire-in PROOF
+    /// tests (M1763) + close-out (M1764)。 Combined 41
+    /// BASHostKit-related types ledger-serializable。 8
+    /// sealed milestones extant。
     static let frozenFullRegistrySha256: String =
-        "e92529f917227b707f560fd8bb8d68c04c001eed282dc721213498178ba80e4c"
+        "e07588815b3c9942702afd44b8da1b1bc25c44c1fe21d750f2dfcf9e498ce5b6"
 }

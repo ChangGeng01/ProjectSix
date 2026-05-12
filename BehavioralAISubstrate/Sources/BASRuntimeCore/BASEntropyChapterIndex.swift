@@ -3152,7 +3152,33 @@ public enum BASEntropyChapterIndex {
                 " BASHostKit non-projection 4-wave arc" +
                 " structure complete + ready for" +
                 " sealing at chapter 596。 ADR-016 →" +
-                " M1760。 V1 byte-equality preserved。")
+                " M1760。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十六",
+            mNumberFirst: 1761, mNumberLast: 1764,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASHOSTKIT NON-PROJECTION 4-WAVE" +
+                " ARC SEAL MILESTONE。 NEW BASHostKit" +
+                "NonProjectionCodableExtensionArcSealed" +
+                "Doctrine typed milestone (M1761)" +
+                " commemorating 4-wave BASHostKit non-" +
+                "projection arc (chapters 592-595)。 8" +
+                " types,16 commits,single-module。" +
+                " Second sealed arc beyond M1700" +
+                " narrative arc (after chapter 584" +
+                " BASLeaseLife)。 Mirrors chapter 584" +
+                " pattern but extended to 4 waves +" +
+                " includes culmination wave (BAS" +
+                "ChengluHintSet 8-field aggregator)。" +
+                " 38 anti-drift PROOF tests (M1762) +" +
+                " 22 wire-in PROOF tests (M1763) +" +
+                " close-out (M1764)。 Combined 41 BAS" +
+                "HostKit-related types ledger-" +
+                "serializable。 137 typed surfaces" +
+                " cumulative (+1)。 8 sealed milestones" +
+                " extant。 ADR-016 → M1764。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

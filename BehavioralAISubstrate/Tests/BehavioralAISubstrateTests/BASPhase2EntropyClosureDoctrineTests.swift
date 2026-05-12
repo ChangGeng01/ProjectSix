@@ -37,24 +37,26 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs595() {
+    func testLastChapterIs596() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十五",
-            "Chapter 五百九十五:BASHOSTKIT NON-" +
-            "PROJECTION WAVE 4 CULMINATION CODABLE" +
-            " EXTENSION。 2 types (BASChengluHintSet" +
-            " 8-field aggregator composing all 5" +
-            " Chenglu hint types from waves 1-3 +" +
-            " BASTrainingDataExportFilter 7-field" +
-            " filter) gained Codable + 2 PROOF tests" +
-            " + BASHostKitConfigurationHintCodable" +
-            "ExtensionWaveFourDoctrine typed surface" +
-            " + close-out。 Mirrors chapter 583" +
-            " culmination pattern。 Combined 41 BAS" +
-            "HostKit-related types cumulative。 136" +
-            " typed surfaces cumulative")
+            "chapter 五百九十六",
+            "Chapter 五百九十六:BASHOSTKIT NON-" +
+            "PROJECTION 4-WAVE ARC SEAL MILESTONE。" +
+            " NEW BASHostKitNonProjectionCodable" +
+            "ExtensionArcSealedDoctrine typed" +
+            " milestone (M1761) commemorating 4-wave" +
+            " BASHostKit non-projection arc" +
+            " (chapters 592-595);8 types,16" +
+            " commits,single-module。 Second sealed" +
+            " arc beyond M1700 narrative arc。" +
+            " Mirrors chapter 584 pattern but" +
+            " extended to 4 waves + includes" +
+            " culmination wave。 38 anti-drift + 22" +
+            " wire-in PROOF tests。 137 typed" +
+            " surfaces cumulative。 8 sealed" +
+            " milestones extant")
     }
 
     // MARK: - M-number range
