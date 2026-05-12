@@ -43,7 +43,7 @@ import Foundation
 /// the audit emission pipeline instead of threading 4
 /// separate values。
 public struct BASRuntimeAuditProjectionsBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - Typed slots (1 per namespace)

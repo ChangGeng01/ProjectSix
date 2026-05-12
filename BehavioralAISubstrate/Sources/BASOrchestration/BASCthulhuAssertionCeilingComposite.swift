@@ -60,7 +60,7 @@ import BASWorldPrior
 /// typed reason codes that motivated the cap, the trigger
 /// state, and per-source fired flags so callers can branch.
 public struct BASCthulhuAssertionCeilingDecision:
-    Sendable, Equatable
+    Codable, Sendable, Equatable
 {
     /// The permit after capping. Equal (by value) to input
     /// permit when no cap fires.

@@ -29,7 +29,7 @@ import Foundation
 import BASWorldPrior
 
 public struct BASCthulhuAuditProjections:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - Typed slots

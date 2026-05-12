@@ -64,7 +64,7 @@ import BASRuntimeCore
 /// Pure result type carrying the (possibly-escalated) permit,
 /// typed reason codes, and per-source fired flags.
 public struct BASCthulhuPermitEscalationDecision:
-    Sendable, Equatable
+    Codable, Sendable, Equatable
 {
     /// Permit after escalation. Equal (by value) to input
     /// permit when no escalation fires.
