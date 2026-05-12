@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1608",
-            "M1608:doctrine version reflects chapter 五百五十七 — 5-of-5 ProjectionsBlock populated JSON PROOF coverage achieved。 7 PROOF tests for the 4 remaining blocks (M1605) + BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine typed surface (M1606) + 15 anti-drift + wire-in PROOF tests (M1607) + catalogue extension to 5 entries (M1608)。 98 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1612",
+            "M1612:doctrine version reflects chapter 五百五十八 — JSON REJECTION PROOF closes the SECOND half of the chapter 三百九二 replay-determinism contract。 11 PROOF tests (M1609) + BASAuditProjectionsJsonRejectionProofDoctrine typed surface (M1610) + 12 anti-drift + wire-in PROOF tests (M1611) + catalogue extension to 6 entries (M1612)。 99 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -8813,7 +8813,97 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1608。" +
                 " 192 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 558 — JSON REJECTION PROOF。 Closes
+        // the SECOND half of the chapter 三百九二
+        // replay-determinism contract:malformed input
+        // is rejected cleanly。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百五十八",
+            mNumberFirst: 1609,
+            mNumberLast: 1612,
+            v1MilestoneMNumber: 1612,
+            v1MilestoneStatus:
+                "chapter-558-json-rejection-proof-replay-determinism-second-half-closed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1609, knife: "第一刀",
+                    concept: "11 JSON REJECTION PROOF" +
+                        " tests:malformed input" +
+                        " (truncated + malformed +" +
+                        " empty + wrong-type + missing-" +
+                        "required-field) rejected" +
+                        " cleanly across Bundle + 5" +
+                        " ProjectionsBlock types。" +
+                        " Forward-compat:unknown" +
+                        " extra fields tolerated。" +
+                        " Decoder state isolated" +
+                        " across errors。"),
+                BASChapterKnife(
+                    mNumber: 1610, knife: "第二刀",
+                    concept: "NEW BASAuditProjections" +
+                        "JsonRejectionProofDoctrine" +
+                        " typed surface — closes the" +
+                        " SECOND half of the chapter" +
+                        " 三百九二 replay-determinism" +
+                        " contract。 typed-surface" +
+                        " count 98 → 99。"),
+                BASChapterKnife(
+                    mNumber: 1611, knife: "第三刀",
+                    concept: "12 anti-drift + wire-in" +
+                        " PROOF tests for the M1610" +
+                        " typed surface。 Includes pin" +
+                        " on replayDeterminismDoctrine" +
+                        "Ref = chapter 三百九二。"),
+                BASChapterKnife(
+                    mNumber: 1612, knife: "第四刀",
+                    concept: "Chapter 558 close-out +" +
+                        " doctrine sync + catalogue" +
+                        " extension to 6 entries (add" +
+                        " M1610 rejection-PROOF" +
+                        " doctrine)。 196 consecutive" +
+                        " commits with V1 byte-" +
+                        "equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "malformed-json-silent-acceptance",
+                "wrong-type-silent-coercion",
+                "missing-required-silent-default",
+                "decoder-state-pollution"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1612",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "replay-determinism-contract-closed",
+                "json-proof-catalogue-6-entries"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional PROOF" +
+                " coverage extensions if more JSON" +
+                " surfaces ship"
+            ],
+            summary: "Chapter 558 closes the SECOND" +
+                " half of the chapter 三百九二 replay-" +
+                "determinism contract。 11 JSON" +
+                " REJECTION PROOF tests (M1609) +" +
+                " BASAuditProjectionsJsonRejectionProof" +
+                "Doctrine typed surface (M1610) + 12" +
+                " anti-drift + wire-in PROOF tests" +
+                " (M1611) + close-out + catalogue" +
+                " extension to 6 entries (M1612)。 99" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1612。 196 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -1757,7 +1757,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百五十七")!)
+                            "chapter 五百五十七")!),
+            // M1612 chapter 558 — JSON REJECTION PROOF + rejection doctrine + 12 anti-drift/wire-in tests + catalogue extension to 6
+            checkRegistry("五百五十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百五十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2709,6 +2715,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百五十七")!
+                .mNumberLast),
+            // M1612 chapter 558 — JSON REJECTION PROOF + new doctrine + 12 anti-drift/wire-in tests + catalogue extension to 6
+            ("558",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百五十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

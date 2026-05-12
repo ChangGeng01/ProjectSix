@@ -84,6 +84,11 @@ final class BASJsonProofDoctrineCatalogueWireInTests:
                 "BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine",
              actual: String(describing:
                 BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine
+                    .self)),
+            (catalogued:
+                "BASAuditProjectionsJsonRejectionProofDoctrine",
+             actual: String(describing:
+                BASAuditProjectionsJsonRejectionProofDoctrine
                     .self))
         ]
         for pair in pairs {
@@ -195,20 +200,21 @@ final class BASJsonProofDoctrineCatalogueWireInTests:
 
     // MARK: - Wire-in #4:latestMNumber matches latest doctrine
 
-    /// Catalogue's latestMNumber equals 1606 — the
-    /// shipping M-number for the M1606 doctrine (5th
-    /// catalogue entry added at M1608)。
+    /// Catalogue's latestMNumber equals 1610 — the
+    /// shipping M-number for the M1610 doctrine (6th
+    /// catalogue entry added at M1612)。
     func testLatestMNumberMatchesLastDoctrine() {
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .latestMNumber,
-            1606)
-        // M1606 shipped one cut after M1605 (the
-        // proofMNumber where PROOF tests landed)
+            1610)
+        // M1610 shipped one cut after M1609 (the
+        // proofMNumber where rejection PROOF tests
+        // landed)
         XCTAssertEqual(
             BASJsonProofDoctrineCatalogueDoctrine
                 .latestMNumber,
-            BASAuditObservationProjectionsBlockPopulatedJsonProofDoctrine
+            BASAuditProjectionsJsonRejectionProofDoctrine
                 .proofMNumber + 1)
     }
 

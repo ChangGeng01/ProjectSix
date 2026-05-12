@@ -93,11 +93,12 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
 
     // MARK: - Catalogue contents
 
-    /// All 5 JSON PROOF doctrines shipped in this
+    /// All 6 JSON PROOF doctrines shipped in this
     /// session,in chronological M-number order。
-    /// Updated at chapter 五百五十七 / M1608 to include
-    /// BASAuditObservationProjectionsBlockPopulatedJson
-    /// ProofDoctrine (5th entry)。
+    /// Updated at chapter 五百五十八 / M1612 to include
+    /// BASAuditProjectionsJsonRejectionProofDoctrine
+    /// (6th entry — closes the rejection half of the
+    /// replay-determinism contract)。
     public static let catalogue: [CatalogueEntry] = [
         CatalogueEntry(
             doctrineTypeName:
@@ -143,7 +144,21 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
                 " state at chapter 554 (Closure +" +
                 " CthulhuLeftovers + KunlunAuditSchemas" +
                 " + KunlunProtocol) all proven at" +
-                " M1605。")
+                " M1605。"),
+        CatalogueEntry(
+            doctrineTypeName:
+                "BASAuditProjectionsJsonRejectionProofDoctrine",
+            chapterTag: "chapter 五百五十八",
+            mNumber: 1610,
+            summary: "JSON REJECTION PROOF — closes" +
+                " the SECOND half of chapter 三百九二" +
+                " replay-determinism contract。" +
+                " Malformed input (truncated /" +
+                " malformed / empty / wrong-type /" +
+                " missing-required) rejected cleanly" +
+                " via DecodingError。 11 PROOF tests" +
+                " at M1609 covering Bundle + 5" +
+                " ProjectionsBlock types。")
     ]
 
     // MARK: - Aggregate accessors
@@ -159,10 +174,10 @@ public enum BASJsonProofDoctrineCatalogueDoctrine {
         "chapter 五百五十一"
 
     /// Last chapter that shipped a JSON PROOF doctrine
-    /// in this session。 Updated at M1608 to chapter
-    /// 五百五十七。
+    /// in this session。 Updated at M1612 to chapter
+    /// 五百五十八。
     public static let lastChapterTag: String =
-        "chapter 五百五十七"
+        "chapter 五百五十八"
 
     /// Earliest M-number across the catalogue (chapter
     /// 551 / M1582)。

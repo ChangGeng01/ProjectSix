@@ -37,20 +37,19 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs557() {
+    func testLastChapterIs558() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百五十七",
-            "Chapter 五百五十七:5-of-5 ProjectionsBlock" +
-            " populated JSON PROOF coverage achieved。" +
-            " 7 PROOF tests for the 4 remaining" +
-            " blocks (ClosureBlock + CthulhuLeftovers" +
-            "Block + KunlunAuditSchemasBlock +" +
-            " KunlunProtocolBlock) + new typed surface" +
-            " + 15 anti-drift + wire-in tests +" +
-            " catalogue extension to 5 entries。 98" +
-            " typed surfaces cumulative")
+            "chapter 五百五十八",
+            "Chapter 五百五十八:JSON REJECTION PROOF" +
+            " closes the SECOND half of the chapter" +
+            " 三百九二 replay-determinism contract。" +
+            " 11 PROOF tests + BASAuditProjectionsJson" +
+            "RejectionProofDoctrine typed surface + 12" +
+            " anti-drift + wire-in tests + catalogue" +
+            " extension to 6 entries。 99 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

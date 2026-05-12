@@ -2408,6 +2408,26 @@ public enum BASEntropyChapterIndex {
                 " catalogue extension to 5 entries" +
                 " (M1608)。 98 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1608。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百五十八",
+            mNumberFirst: 1609, mNumberLast: 1612,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "JSON REJECTION PROOF — closes the" +
+                " SECOND half of the chapter 三百九二" +
+                " replay-determinism contract。 11" +
+                " PROOF tests at M1609 (truncated +" +
+                " malformed + empty + wrong-type +" +
+                " missing-required-field rejected" +
+                " cleanly across Bundle + 5" +
+                " ProjectionsBlock types) +" +
+                " BASAuditProjectionsJsonRejectionProof" +
+                "Doctrine typed surface (M1610) + 12" +
+                " anti-drift + wire-in PROOF tests" +
+                " (M1611) + catalogue extension to 6" +
+                " entries (M1612)。 99 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1612。" +
                 " V1 byte-equality preserved。")
     ]
 
