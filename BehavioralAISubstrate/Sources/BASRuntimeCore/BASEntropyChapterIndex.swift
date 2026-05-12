@@ -3129,7 +3129,30 @@ public enum BASEntropyChapterIndex {
                 "HostKit-related types ledger-" +
                 "serializable。 135 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1756。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十五",
+            mNumberFirst: 1757, mNumberLast: 1760,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASHOSTKIT NON-PROJECTION WAVE 4" +
+                " CULMINATION CODABLE EXTENSION。 2" +
+                " types (BASChengluHintSet 8-field" +
+                " aggregator composing all 5 Chenglu" +
+                " hint types from waves 1-3 + BAS" +
+                "TrainingDataExportFilter 7-field" +
+                " filter) gained Codable at M1757 + 2" +
+                " PROOF tests (M1758) + new typed" +
+                " surface (M1759) + close-out (M1760)。" +
+                " Mirrors chapter 583 BASLeaseLife" +
+                "Coordinator.TurnRecorded culmination" +
+                " pattern。 Combined 41 BASHostKit-" +
+                "related types ledger-serializable。" +
+                " 136 typed surfaces cumulative (+1)。" +
+                " BASHostKit non-projection 4-wave arc" +
+                " structure complete + ready for" +
+                " sealing at chapter 596。 ADR-016 →" +
+                " M1760。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

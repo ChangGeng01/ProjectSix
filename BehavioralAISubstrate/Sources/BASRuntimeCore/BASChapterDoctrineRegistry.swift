@@ -12031,7 +12031,104 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1756。" +
                 " 340 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 595 — BASHostKit non-projection
+        // wave 4 CULMINATION Codable extension。
+        // BASChengluHintSet aggregator composes all 5
+        // Chenglu hint types from waves 1-3。 Mirrors
+        // chapter 583 BASLeaseLifeCoordinator.TurnRecorded
+        // culmination pattern。 Arc structure ready for
+        // sealing at chapter 596。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十五",
+            mNumberFirst: 1757,
+            mNumberLast: 1760,
+            v1MilestoneMNumber: 1760,
+            v1MilestoneStatus:
+                "chapter-595-hostkit-non-projection-wave-four-culmination",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1757, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "HostKit types — BASChengluHintSet" +
+                        " (CULMINATION 8-field aggregator" +
+                        " composing all 5 Chenglu hint" +
+                        " types from waves 1-3) +" +
+                        " BASTrainingDataExportFilter" +
+                        " (7-field filter)。 Wave 4" +
+                        " culminates the non-projection" +
+                        " arc structure。"),
+                BASChapterKnife(
+                    mNumber: 1758, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1759, knife: "第三刀",
+                    concept: "NEW BASHostKitConfiguration" +
+                        "HintCodableExtensionWaveFour" +
+                        "Doctrine + hintSetIsCulmination" +
+                        "OfPriorWaves flag + arcStructure" +
+                        "ReadyForSealing flag。 Combined" +
+                        " 41 BASHostKit-related types。" +
+                        " typed-surface count 135 → 136。"),
+                BASChapterKnife(
+                    mNumber: 1760, knife: "第四刀",
+                    concept: "Chapter 595 close-out +" +
+                        " doctrine sync。 344" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。 BAS" +
+                        "HostKit non-projection 4-wave" +
+                        " arc structure complete +" +
+                        " ready for sealing at chapter" +
+                        " 596 (mirroring chapter 584" +
+                        " BASLeaseLife arc seal pattern)。")
+            ],
+            entropyClassesAttacked: [
+                "chenglu-hint-set-aggregator-non-codable",
+                "training-data-export-filter-non-codable",
+                "hostkit-non-projection-wave-4-incomplete",
+                "non-projection-arc-structure-incomplete"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1760",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-non-projection-wave-four-culmination",
+                "41-hostkit-types-cumulative",
+                "arc-structure-ready-for-sealing"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 596 BASHostKit non-" +
+                "projection arc seal milestone " +
+                "(mirroring chapter 584 BASLeaseLife)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — Tier A sprawl migrations" +
+                " per wild-rolling-meerkat plan"
+            ],
+            summary: "Chapter 595 ships BASHostKit non-" +
+                "projection wave 4 CULMINATION Codable" +
+                " extension。 2 types (BASChengluHintSet" +
+                " 8-field aggregator composing all 5" +
+                " Chenglu hint types from waves 1-3 +" +
+                " BASTrainingDataExportFilter 7-field" +
+                " filter) gained Codable at M1757。 2" +
+                " PROOF tests (M1758) + new typed" +
+                " surface (M1759) + close-out (M1760)。" +
+                " Mirrors chapter 583 BASLeaseLife" +
+                "Coordinator.TurnRecorded culmination" +
+                " pattern。 Combined 41 BASHostKit-" +
+                "related types ledger-serializable。" +
+                " 136 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1760。 344 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 BASHostKit non-" +
+                "projection 4-wave arc structure" +
+                " complete + ready for sealing at" +
+                " chapter 596。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

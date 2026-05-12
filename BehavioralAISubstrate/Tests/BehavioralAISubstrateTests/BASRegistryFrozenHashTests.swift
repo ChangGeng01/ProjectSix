@@ -107,15 +107,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 594 close-out。 Chapter
-    /// 594:BASHOSTKIT NON-PROJECTION WAVE 3 CODABLE
-    /// EXTENSION。 2 hint types (BASChengluMultiHead
-    /// Hint + BASChengluPermitPredictHint) gained
-    /// Codable at M1753 + 2 PROOF tests (M1754) + NEW
-    /// BASHostKitConfigurationHintCodableExtension
-    /// WaveThreeDoctrine (M1755)。 Completes 5 hint
-    /// types coverage。 Combined 39 BASHostKit-related
-    /// types ledger-serializable。
+    /// Re-captured at chapter 595 close-out。 Chapter
+    /// 595:BASHOSTKIT NON-PROJECTION WAVE 4 CULMINATION
+    /// CODABLE EXTENSION。 2 types (BASChengluHintSet
+    /// 8-field aggregator composing all 5 Chenglu hint
+    /// types from waves 1-3 + BASTrainingDataExportFilter
+    /// 7-field filter) gained Codable at M1757 + 2
+    /// PROOF tests (M1758) + NEW BASHostKitConfiguration
+    /// HintCodableExtensionWaveFourDoctrine (M1759)。
+    /// Mirrors chapter 583 BASLeaseLifeCoordinator.
+    /// TurnRecorded culmination pattern。 Combined 41
+    /// BASHostKit-related types ledger-serializable。
+    /// Non-projection 4-wave arc structure ready for
+    /// sealing at chapter 596。
     static let frozenFullRegistrySha256: String =
-        "2850eb6ac8cdfd0287074552cf155ea450e79e647ffc6a560359d6382bf492cd"
+        "e92529f917227b707f560fd8bb8d68c04c001eed282dc721213498178ba80e4c"
 }

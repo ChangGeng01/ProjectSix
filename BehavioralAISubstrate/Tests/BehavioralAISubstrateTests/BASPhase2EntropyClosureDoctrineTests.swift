@@ -37,21 +37,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs594() {
+    func testLastChapterIs595() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十四",
-            "Chapter 五百九十四:BASHOSTKIT NON-" +
-            "PROJECTION WAVE 3 CODABLE EXTENSION。 2" +
-            " hint types (BASChengluMultiHeadHint +" +
-            " BASChengluPermitPredictHint) gained" +
-            " Codable + 2 PROOF tests + BASHostKit" +
-            "ConfigurationHintCodableExtensionWaveThree" +
-            "Doctrine typed surface + close-out。" +
-            " Completes 5 hint types coverage。" +
-            " Combined 39 BASHostKit-related types" +
-            " cumulative。 135 typed surfaces cumulative")
+            "chapter 五百九十五",
+            "Chapter 五百九十五:BASHOSTKIT NON-" +
+            "PROJECTION WAVE 4 CULMINATION CODABLE" +
+            " EXTENSION。 2 types (BASChengluHintSet" +
+            " 8-field aggregator composing all 5" +
+            " Chenglu hint types from waves 1-3 +" +
+            " BASTrainingDataExportFilter 7-field" +
+            " filter) gained Codable + 2 PROOF tests" +
+            " + BASHostKitConfigurationHintCodable" +
+            "ExtensionWaveFourDoctrine typed surface" +
+            " + close-out。 Mirrors chapter 583" +
+            " culmination pattern。 Combined 41 BAS" +
+            "HostKit-related types cumulative。 136" +
+            " typed surfaces cumulative")
     }
 
     // MARK: - M-number range

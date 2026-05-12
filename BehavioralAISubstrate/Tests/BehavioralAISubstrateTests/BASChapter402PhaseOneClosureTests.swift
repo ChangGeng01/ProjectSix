@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1756",
-            "M1756:doctrine version reflects chapter 五百九十四 — BASHOSTKIT NON-PROJECTION WAVE 3 CODABLE EXTENSION。 2 BASHostKit hint types (BASChengluMultiHeadHint + BASChengluPermitPredictHint) gained Codable at M1753 + 2 PROOF tests (M1754) + BASHostKitConfigurationHintCodableExtensionWaveThreeDoctrine typed surface (M1755) + close-out (M1756)。 Completes coverage of 5 individual Chenglu hint types。 BASChengluHintSet aggregator ready for culmination at chapter 595。 Combined 39 BASHostKit-related types ledger-serializable。 135 typed surfaces cumulative。 340 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1760",
+            "M1760:doctrine version reflects chapter 五百九十五 — BASHOSTKIT NON-PROJECTION WAVE 4 CULMINATION CODABLE EXTENSION。 2 BASHostKit types (BASChengluHintSet 8-field aggregator composing all 5 Chenglu hint types from waves 1-3 + BASTrainingDataExportFilter 7-field filter) gained Codable at M1757 + 2 PROOF tests (M1758) + BASHostKitConfigurationHintCodableExtensionWaveFourDoctrine typed surface (M1759) + close-out (M1760)。 Mirrors chapter 583 BASLeaseLifeCoordinator.TurnRecorded culmination pattern。 Combined 41 BASHostKit-related types ledger-serializable。 136 typed surfaces cumulative。 344 consecutive byte-equality clean commits。 BASHostKit non-projection 4-wave arc structure complete + ready for sealing at chapter 596。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
