@@ -213,6 +213,115 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
     //
     // PUBLIC API additive only。 Byte-equality with the
     // all-fields init GUARANTEED by body delegation。
+    // MARK: - chapter 五百二十六 / M1482 — 3-bundle
+    //                                       convenience init
+    //
+    // 3-bundle convenience init taking evolution +
+    // sovereign + auditProjectionForward bundles。
+    // Collapses 25 individual args (10 evolution + 8
+    // sovereign + 7 audit-projection-forwarded) into 3
+    // typed bundle args at the call site。
+    //
+    // Delegates to the 2-bundle init (M1478) with the
+    // 7 forwarded fields unpacked from the new bundle。
+    // Byte-equality with the all-fields init GUARANTEED
+    // by chained delegation。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostConstitution: BASHostConstitution? = nil,
+        hostConstitutionVault: BASHostConstitutionVault? = nil,
+        hostVersionTree: BASHostVersionTree? = nil,
+        hostForgetRequest: BASForgetRequest? = nil,
+        hostContext: BASHostProfile,
+        contextFrame: BASContextFrame,
+        decomposeFrame: BASDecomposeFrame,
+        memoryBundle: BASMemoryBundle,
+        thoughtFrame: BASThoughtFrame,
+        thoughtFold: BASThoughtFold,
+        triScores: [BASTriSelfScore],
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
+        hostGateValue: Double,
+        renderedOutput: BASRenderedOutput,
+        updateTickets: [BASUpdateTicket],
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        auditProjectionForwardBundle:
+            BASEBrainTurnResultAuditProjectionForwardBundle
+    ) {
+        // Delegate to the 2-bundle init (M1478) with
+        // 7 forwarded fields unpacked from the
+        // auditProjectionForwardBundle。
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            sovereignBundle: sovereignBundle,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostConstitution: hostConstitution,
+            hostConstitutionVault:
+                hostConstitutionVault,
+            hostVersionTree: hostVersionTree,
+            hostForgetRequest: hostForgetRequest,
+            hostContext: hostContext,
+            contextFrame: contextFrame,
+            decomposeFrame: decomposeFrame,
+            memoryBundle: memoryBundle,
+            thoughtFrame: thoughtFrame,
+            thoughtFold: thoughtFold,
+            triScores: triScores,
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            riskDecisionPackage: riskDecisionPackage,
+            hostGateValue: hostGateValue,
+            renderedOutput: renderedOutput,
+            updateTickets: updateTickets,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace: runtimeTrace,
+            // 7 audit-projection-forwarded fields
+            // unpacked from auditProjectionForwardBundle
+            kunlunAxisAlignment:
+                auditProjectionForwardBundle
+                    .kunlunAxisAlignment,
+            humanAnchorSignal:
+                auditProjectionForwardBundle
+                    .humanAnchorSignal,
+            abyssalPressure:
+                auditProjectionForwardBundle
+                    .abyssalPressure,
+            unknownReserve:
+                auditProjectionForwardBundle
+                    .unknownReserve,
+            kunlunHeavenGatePermit:
+                auditProjectionForwardBundle
+                    .kunlunHeavenGatePermit,
+            kunlunRiverOriginTrace:
+                auditProjectionForwardBundle
+                    .kunlunRiverOriginTrace,
+            yaochiSanctumEntry:
+                auditProjectionForwardBundle
+                    .yaochiSanctumEntry)
+    }
+
     public init(
         deviceState: BASDeviceState,
         budgetFrame: BASBudgetFrame,
