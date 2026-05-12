@@ -43,7 +43,7 @@ public actor BASBreathScheduler {
         case duplicateRequest(id: String)
     }
 
-    public struct Request: Sendable, Equatable {
+    public struct Request: Codable, Sendable, Equatable {
         public let id: String
         public let maintenanceClass: BASMaintenanceClass
         public let earliestFireAt: Date
@@ -62,7 +62,7 @@ public actor BASBreathScheduler {
         }
     }
 
-    public struct ScheduledBreath: Sendable, Equatable {
+    public struct ScheduledBreath: Codable, Sendable, Equatable {
         public let request: Request
         public let scheduledAt: Date
         public let guardLevelAtSchedule: BASThermalGuardLevel
