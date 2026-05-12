@@ -139,12 +139,13 @@ public enum BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
             status: .explicitRoundTripCovered,
             explicitCoverageMNumber: 1561),
 
-        // Pending (deepest fixture remaining)
+        // Chapter 547 / M1565 — CognitiveFrames fixture
+        // added — 100% explicit coverage MILESTONE
         BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
             bundleTypeName:
                 "BASEBrainTurnResultCognitiveFramesBundle",
-            status: .compileTimeOnly,
-            explicitCoverageMNumber: nil)
+            status: .explicitRoundTripCovered,
+            explicitCoverageMNumber: 1565)
     ]
 
     /// Total cluster bundles in the catalogue。 Pinned at
