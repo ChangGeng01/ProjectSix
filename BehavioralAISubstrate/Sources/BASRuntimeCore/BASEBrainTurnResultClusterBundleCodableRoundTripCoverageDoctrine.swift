@@ -118,6 +118,13 @@ public enum BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
             status: .explicitRoundTripCovered,
             explicitCoverageMNumber: 1549),
 
+        // Chapter 544 / M1553 — Misc fixture added
+        BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
+            bundleTypeName:
+                "BASEBrainTurnResultMiscBundle",
+            status: .explicitRoundTripCovered,
+            explicitCoverageMNumber: 1553),
+
         // Pending (deeper fixture builders required)
         BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
             bundleTypeName:
@@ -127,11 +134,6 @@ public enum BASEBrainTurnResultClusterBundleCodableRoundTripCoverageDoctrine
         BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
             bundleTypeName:
                 "BASEBrainTurnResultRiskChoiceBundle",
-            status: .compileTimeOnly,
-            explicitCoverageMNumber: nil),
-        BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
-            bundleTypeName:
-                "BASEBrainTurnResultMiscBundle",
             status: .compileTimeOnly,
             explicitCoverageMNumber: nil),
         BASEBrainTurnResultClusterBundleCodableRoundTripCoverageEntry(
