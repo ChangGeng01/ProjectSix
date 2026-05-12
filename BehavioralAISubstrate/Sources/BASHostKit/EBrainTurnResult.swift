@@ -202,6 +202,68 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百三十二 / M1506 — 9-bundle
+    //                                       convenience init
+    //                                       (100% packaging)
+    //
+    // Adds a 9-bundle convenience init that accepts ALL
+    // NINE typed cluster bundles (device/lifecycle +
+    // sovereign + forensic-metadata + host + evolution +
+    // auditProjectionForward + cognitive frames +
+    // risk/choice + misc)。 Collapses ALL 52 individual
+    // fields into 9 typed bundle args at the call site
+    // (6+8+3+5+10+7+5+4+4)。
+    //
+    // 100% arg packaging coverage achieved at this commit。
+    // No residual scalars remain at the convenience-init
+    // surface。
+    //
+    // Delegates to the M1502 8-bundle init,unpacking the
+    // 3 forensic metadata fields from forensicMetadataBundle
+    // (policyLineage + recoveryDisposition + runtimeTrace)。
+    //
+    // Public API additive only。 Byte-equality with the
+    // all-fields init GUARANTEED by body delegation。
+    public init(
+        deviceLifecycleBundle:
+            BASEBrainTurnResultDeviceLifecycleBundle,
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        forensicMetadataBundle:
+            BASEBrainTurnResultForensicMetadataBundle,
+        hostBundle: BASEBrainTurnResultHostBundle,
+        cognitiveFramesBundle:
+            BASEBrainTurnResultCognitiveFramesBundle,
+        riskChoiceBundle:
+            BASEBrainTurnResultRiskChoiceBundle,
+        miscBundle: BASEBrainTurnResultMiscBundle,
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        auditProjectionForwardBundle:
+            BASEBrainTurnResultAuditProjectionForwardBundle
+    ) {
+        // Delegate to the M1502 8-bundle init,unpacking
+        // the 3 forensic metadata fields from
+        // forensicMetadataBundle。
+        self.init(
+            deviceLifecycleBundle: deviceLifecycleBundle,
+            sovereignBundle: sovereignBundle,
+            policyLineage:
+                forensicMetadataBundle.policyLineage,
+            recoveryDisposition:
+                forensicMetadataBundle
+                    .recoveryDisposition,
+            hostBundle: hostBundle,
+            cognitiveFramesBundle:
+                cognitiveFramesBundle,
+            riskChoiceBundle: riskChoiceBundle,
+            miscBundle: miscBundle,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace:
+                forensicMetadataBundle.runtimeTrace,
+            auditProjectionForwardBundle:
+                auditProjectionForwardBundle)
+    }
+
     // MARK: - chapter 五百三十一 / M1502 — 8-bundle
     //                                       convenience init
     //
