@@ -202,6 +202,78 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百二十九 / M1494 — 6-bundle
+    //                                       convenience init
+    //
+    // Adds a 6-bundle convenience init that accepts ALL
+    // SIX typed cluster bundles (sovereign + host +
+    // evolution + auditProjectionForward + cognitive
+    // frames + risk/choice)。 Collapses 39 individual
+    // fields into 6 typed bundle args at the call site。
+    //
+    // Delegates to the M1490 5-bundle init,unpacking
+    // the 4 risk/choice fields from the new
+    // riskChoiceBundle。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostBundle: BASEBrainTurnResultHostBundle,
+        cognitiveFramesBundle:
+            BASEBrainTurnResultCognitiveFramesBundle,
+        riskChoiceBundle:
+            BASEBrainTurnResultRiskChoiceBundle,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
+        hostGateValue: Double,
+        renderedOutput: BASRenderedOutput,
+        updateTickets: [BASUpdateTicket],
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        auditProjectionForwardBundle:
+            BASEBrainTurnResultAuditProjectionForwardBundle
+    ) {
+        // Delegate to the M1490 5-bundle init,
+        // unpacking the 4 risk/choice fields from the
+        // riskChoiceBundle。
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            sovereignBundle: sovereignBundle,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostBundle: hostBundle,
+            cognitiveFramesBundle:
+                cognitiveFramesBundle,
+            triScores: riskChoiceBundle.triScores,
+            mergedChoice:
+                riskChoiceBundle.mergedChoice,
+            riskCard: riskChoiceBundle.riskCard,
+            actionPermit:
+                riskChoiceBundle.actionPermit,
+            riskDecisionPackage: riskDecisionPackage,
+            hostGateValue: hostGateValue,
+            renderedOutput: renderedOutput,
+            updateTickets: updateTickets,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace: runtimeTrace,
+            auditProjectionForwardBundle:
+                auditProjectionForwardBundle)
+    }
+
     // MARK: - chapter 五百二十八 / M1490 — 5-bundle
     //                                       convenience init
     //
