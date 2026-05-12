@@ -50,7 +50,7 @@ public struct BASNeuralThoughtMaterialization: Equatable, Sendable {
     }
 }
 
-public struct BASNeuralPublicThoughtProjection: Equatable, Sendable {
+public struct BASNeuralPublicThoughtProjection: Codable, Equatable, Sendable {
     public var candidates: [BASCandidatePath]?
     public var forecasts: [BASForecastItem]?
     public var critiques: [BASCritiqueItem]?

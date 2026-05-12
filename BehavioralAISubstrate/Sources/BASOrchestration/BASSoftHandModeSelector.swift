@@ -64,7 +64,7 @@ public enum BASSoftHandModeSelector {
     ///   permit mode was .block
     /// - `"candidate-count:3"` — multi-candidate hint applied
     /// - `"fallback:no-permit-no-verdict"` — fail-safe default
-    public struct SelectionResult: Sendable, Equatable, Hashable {
+    public struct SelectionResult: Codable, Sendable, Equatable, Hashable {
         public let mode: BASSoftHandMode
         public let reasonCodes: [String]
 
