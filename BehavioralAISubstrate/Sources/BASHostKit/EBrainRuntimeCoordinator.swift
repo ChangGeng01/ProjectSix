@@ -2187,6 +2187,32 @@ public struct BASEBrainRuntimeCoordinator {
                 cthulhuSurfaceAliasForAudit,
             kunlunSurfaceAlias:
                 kunlunSurfaceAliasForAudit)
+        // chapter 五百十九 / M1454 — FIRST PRODUCTION
+        // WIRE-IN of the M1426 projection-block emission
+        // pattern。 When the host wired
+        // `projectionBlockEmissionHandler` at coordinator
+        // construction time,we fire it now with the
+        // typed observation record。 Default nil = handler
+        // not set = behavior identical to pre-M1454。
+        //
+        // V1 byte-equality preserved:the handler runs
+        // AFTER projections construction,does not mutate
+        // any audit state,and its return value is
+        // discarded。 Stress-sweep regression guard
+        // catches drift。
+        if let handler = projectionBlockEmissionHandler {
+            let observation =
+                BASAuditObservationProjectionsBundleEmitter
+                    .makeObservation(
+                        turnID: derivedTurnID,
+                        sessionID: derivedSessionID,
+                        emittedAt: Date(),
+                        kunlunInputs:
+                            kunlunInputsForAudit,
+                        cthulhuInputs:
+                            cthulhuInputsForAudit)
+            handler(observation)
+        }
         let sovereignAuditEntry = buildSovereignAuditEntry(
             sovereignVerdict: sovereignVerdict,
             sovereignCommitTokens: sovereignCommitTokens,
