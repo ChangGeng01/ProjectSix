@@ -1931,7 +1931,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十六")!)
+                            "chapter 五百八十六")!),
+            // M1728 chapter 587 — BASMemory post-cross-module-arc Codable
+            checkRegistry("五百八十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3115,6 +3121,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十六")!
+                .mNumberLast),
+            // M1728 chapter 587 — BASMemory post-cross-module-arc Codable
+            ("587",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

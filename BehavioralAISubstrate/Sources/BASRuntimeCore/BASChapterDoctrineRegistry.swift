@@ -11311,7 +11311,94 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1724。 308 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 587 — BASMemory post-cross-module-
+        // arc Codable extension。 Extends chapter 569
+        // cross-module arc coverage with 2 more types
+        // (BASMemoryTrustProfile +
+        // BASMemoryTieringReconciliationOutcome.
+        // Decision)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十七",
+            mNumberFirst: 1725,
+            mNumberLast: 1728,
+            v1MilestoneMNumber: 1728,
+            v1MilestoneStatus:
+                "chapter-587-memory-post-cross-module-arc-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1725, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Memory types (BASMemoryTrust" +
+                        "Profile + BASMemoryTiering" +
+                        "ReconciliationOutcome.Decision)。" +
+                        " Post-cross-module-arc" +
+                        " extension after chapter 569" +
+                        " cross-module arc sealed 10" +
+                        " BASMemory types。"),
+                BASChapterKnife(
+                    mNumber: 1726, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1727, knife: "第三刀",
+                    concept: "NEW BASMemoryPostCross" +
+                        "ModuleArcExtensionDoctrine" +
+                        " typed surface。 Documents" +
+                        " combined chapter 569 + 587" +
+                        " coverage = 12 BASMemory types。" +
+                        " typed-surface count 127 → 128。"),
+                BASChapterKnife(
+                    mNumber: 1728, knife: "第四刀",
+                    concept: "Chapter 587 close-out +" +
+                        " doctrine sync。 312" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "memory-trust-profile-non-codable",
+                "memory-tiering-decision-non-codable",
+                "post-cross-module-arc-memory-incomplete",
+                "memory-extension-beyond-arc-undocumented"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1728",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "memory-post-cross-module-arc-codable",
+                "12-memory-types-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — additional BASMemory" +
+                " types (BASMemoryImportanceScore," +
+                " BASMemoryMutationEventEmitter." +
+                "EmitOutcome,HostCandidatePipeline." +
+                "RejectionRecord)",
+                "future arc — fresh module territory" +
+                " (BASPolicy or 7th module)"
+            ],
+            summary: "Chapter 587 ships post-cross-" +
+                "module-arc BASMemory Codable extension。" +
+                " 2 BASMemory types (BASMemoryTrust" +
+                "Profile + BASMemoryTiering" +
+                "ReconciliationOutcome.Decision) gained" +
+                " Codable at M1725。 2 PROOF tests" +
+                " (M1726) + new typed surface (M1727)" +
+                " + close-out (M1728)。 Extends chapter" +
+                " 569 cross-module arc coverage (which" +
+                " sealed 10 BASMemory types) with 2" +
+                " more types。 Combined chapter 569 +" +
+                " 587 = 12 BASMemory types ledger-" +
+                "serializable。 128 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1728。" +
+                " 312 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

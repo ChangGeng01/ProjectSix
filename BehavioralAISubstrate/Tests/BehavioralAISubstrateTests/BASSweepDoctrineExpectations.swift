@@ -116,20 +116,20 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1724:24 + 20 + 140 = 184 (chapter
-    /// 586 — first-ever BASObservability Codable)
-    public static let phase2ChapterCount: Int = 184
+    /// added)。 At M1728:24 + 20 + 141 = 185 (chapter
+    /// 587 — BASMemory post-cross-module-arc Codable)
+    public static let phase2ChapterCount: Int = 185
 
-    /// Phase 2 commits shipped。 At M1724:125 + 84 +
-    /// 560 = 769 (chapter 586 = 4 cuts — first-ever
-    /// BASObservability Codable extension + 2 PROOF +
-    /// typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 769
+    /// Phase 2 commits shipped。 At M1728:125 + 84 +
+    /// 564 = 773 (chapter 587 = 4 cuts — BASMemory
+    /// post-cross-module-arc Codable extension + 2
+    /// PROOF + typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 773
 
-    /// Phase 2 mNumberLast。 At M1724:chapter 586 —
-    /// first-ever BASObservability Codable extension。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1724
+    /// Phase 2 mNumberLast。 At M1728:chapter 587 —
+    /// BASMemory post-cross-module-arc Codable
+    /// extension。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1728
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

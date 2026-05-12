@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1724",
-            "M1724:doctrine version reflects chapter 五百八十六 — FIRST-EVER BASOBSERVABILITY CODABLE EXTENSION — fresh module territory (module #6) in the beyond-M1700 narrative arc。 2 nested types (BASUnifiedStorageLocator.Locations + BASUpdateTicketLifecycleSQLiteStorage.CheckpointResult) gained Codable at M1721 + 2 PROOF tests (M1722) + BASObservabilityCodableExtensionDoctrine typed surface (M1723) + close-out (M1724)。 Module coverage 5 → 6 (added BASObservability)。 127 typed surfaces cumulative。 308 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1728",
+            "M1728:doctrine version reflects chapter 五百八十七 — BASMEMORY POST-CROSS-MODULE-ARC CODABLE EXTENSION。 2 BASMemory types (BASMemoryTrustProfile + BASMemoryTieringReconciliationOutcome.Decision) gained Codable at M1725 + 2 PROOF tests (M1726) + BASMemoryPostCrossModuleArcExtensionDoctrine typed surface (M1727) + close-out (M1728)。 Extends chapter 569 cross-module arc coverage (10 BASMemory types) with 2 more types。 Combined chapter 569 + 587 = 12 BASMemory types ledger-serializable。 128 typed surfaces cumulative。 312 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

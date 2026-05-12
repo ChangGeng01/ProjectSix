@@ -2971,7 +2971,26 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1724。 Second fresh-module" +
                 " extension beyond M1700。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十七",
+            mNumberFirst: 1725, mNumberLast: 1728,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASMEMORY POST-CROSS-MODULE-ARC" +
+                " CODABLE EXTENSION。 2 BASMemory types" +
+                " (BASMemoryTrustProfile + BASMemory" +
+                "TieringReconciliationOutcome.Decision)" +
+                " gained Codable at M1725 + 2 PROOF" +
+                " tests (M1726) + new typed surface" +
+                " (M1727) + close-out (M1728)。 Extends" +
+                " chapter 569 cross-module arc" +
+                " coverage (10 BASMemory types) with" +
+                " 2 more types。 Combined chapter 569" +
+                " + 587 = 12 BASMemory types ledger-" +
+                "serializable。 128 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1728。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
