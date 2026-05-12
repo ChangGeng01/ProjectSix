@@ -107,14 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 581 close-out。 Chapter
-    /// 581:FIRST-EVER BASLEASELIFE CODABLE EXTENSION
-    /// — fresh module territory beyond M1700 narrative
-    /// arc close-out。 2 nested types (BASBreath
-    /// Scheduler.Request + ScheduledBreath) gained
-    /// Codable at M1701 + 2 PROOF tests (M1702) + NEW
-    /// BASLeaseLifeCodableExtensionDoctrine (M1703)。
-    /// Module coverage 4 → 5。
+    /// Re-captured at chapter 582 close-out。 Chapter
+    /// 582:BASLEASELIFE WAVE 2 CODABLE EXTENSION。
+    /// 2 struct types (BASThermalTwin.Reading + BAS
+    /// LungStateAccumulator.Snapshot) + 1 supporting
+    /// enum (BASThermalTwin.OSThermalState) gained
+    /// Codable at M1705 + 3 PROOF tests (M1706) + NEW
+    /// BASLeaseLifeCodableExtensionWaveTwoDoctrine
+    /// (M1707)。 Continues chapter 581 first-ever BAS
+    /// LeaseLife pattern。 Chapter 581 + 582 = 4 BAS
+    /// LeaseLife structs + 1 supporting enum ledger-
+    /// serializable。
     static let frozenFullRegistrySha256: String =
-        "df58a6b94d31b8cbfb08df7c468b16e790c3811aa43e7f16f6ef15eb402ea0ef"
+        "d973caf9322b3bb9ddec4433a5d9b56b5f8317be618299c040d7aad21b2f4491"
 }

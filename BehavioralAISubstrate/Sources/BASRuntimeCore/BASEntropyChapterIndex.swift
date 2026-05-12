@@ -2866,7 +2866,27 @@ public enum BASEntropyChapterIndex {
                 " 4 → 5 (added BASLeaseLife)。 122" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1704。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十二",
+            mNumberFirst: 1705, mNumberLast: 1708,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASLEASELIFE WAVE 2 CODABLE" +
+                " EXTENSION。 2 struct types (BAS" +
+                "ThermalTwin.Reading + BAS" +
+                "LungStateAccumulator.Snapshot) +" +
+                " 1 supporting enum (BASThermalTwin." +
+                "OSThermalState) gained Codable at" +
+                " M1705 + 3 PROOF tests (M1706) + new" +
+                " typed surface (M1707) + close-out" +
+                " (M1708)。 Continues chapter 581 first-" +
+                "ever BASLeaseLife pattern。 Chapter" +
+                " 581 + 582 = 4 BASLeaseLife structs" +
+                " + 1 supporting enum ledger-" +
+                "serializable。 123 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1708。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

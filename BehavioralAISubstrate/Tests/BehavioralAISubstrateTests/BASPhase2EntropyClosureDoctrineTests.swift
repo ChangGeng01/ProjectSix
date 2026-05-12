@@ -37,19 +37,18 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs581() {
+    func testLastChapterIs582() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百八十一",
-            "Chapter 五百八十一:FIRST-EVER BASLEASELIFE" +
-            " CODABLE EXTENSION — fresh module" +
-            " territory beyond M1700 narrative arc。" +
-            " 2 nested types gained Codable + 2 PROOF" +
+            "chapter 五百八十二",
+            "Chapter 五百八十二:BASLEASELIFE WAVE 2" +
+            " CODABLE EXTENSION。 2 struct types + 1" +
+            " supporting enum gained Codable + 3 PROOF" +
             " tests + BASLeaseLifeCodableExtension" +
-            "Doctrine typed surface + close-out。" +
-            " Module coverage 4 → 5。 122 typed" +
-            " surfaces cumulative")
+            "WaveTwoDoctrine typed surface + close-" +
+            "out。 Continues chapter 581 BASLeaseLife" +
+            " pattern。 123 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

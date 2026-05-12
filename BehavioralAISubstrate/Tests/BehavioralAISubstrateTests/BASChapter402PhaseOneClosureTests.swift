@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1704",
-            "M1704:doctrine version reflects chapter 五百八十一 — FIRST-EVER BASLEASELIFE CODABLE EXTENSION — fresh module territory beyond M1700 narrative arc close-out。 2 nested types (BASBreathScheduler.Request + BASBreathScheduler.ScheduledBreath) gained Codable at M1701 + 2 PROOF tests (M1702) + BASLeaseLifeCodableExtensionDoctrine typed surface (M1703) + close-out (M1704)。 Module coverage expanded: 4 → 5 (added BASLeaseLife to BASHostKit + BASRuntimeCore + BASMemory + BASOrchestration)。 122 typed surfaces cumulative。 288 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1708",
+            "M1708:doctrine version reflects chapter 五百八十二 — BASLEASELIFE WAVE 2 CODABLE EXTENSION。 2 struct types (BASThermalTwin.Reading + BASLungStateAccumulator.Snapshot) + 1 supporting enum (BASThermalTwin.OSThermalState) gained Codable at M1705 + 3 PROOF tests (M1706) + BASLeaseLifeCodableExtensionWaveTwoDoctrine typed surface (M1707) + close-out (M1708)。 Chapter 581 + 582 = 4 BASLeaseLife struct types + 1 supporting enum ledger-serializable。 123 typed surfaces cumulative。 292 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

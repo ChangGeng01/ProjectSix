@@ -1901,7 +1901,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百八十一")!)
+                            "chapter 五百八十一")!),
+            // M1708 chapter 582 — BASLeaseLife wave 2 Codable extension
+            checkRegistry("五百八十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百八十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3045,6 +3051,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百八十一")!
+                .mNumberLast),
+            // M1708 chapter 582 — BASLeaseLife wave 2 Codable extension
+            ("582",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百八十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -235,7 +235,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百七十八",   // M1689-M1692 (POST-ARC WAVE 3 ORCHESTRATION CODABLE EXTENSION — 2 more BASOrchestration value types gained Codable (BASNeuralPublicThoughtProjection + BASSoftHandModeSelector.SelectionResult) + 2 PROOF tests + BASOrchestrationCodableExtensionPostArcWaveThreeDoctrine + close-out;chapter 574 arc + 576 + 577 + 578 = 12 Orchestration types)
         "chapter 五百七十九",   // M1693-M1696 (POST-ARC TRILOGY SEAL MILESTONE — BASOrchestrationCodableExtensionPostArcTrilogySealedDoctrine + 22 anti-drift + 15 wire-in PROOF tests commemorating 3-wave / 12-commit trilogy (chapters 576-578);second sealed milestone for BASOrchestration after chapter 574 arc seal)
         "chapter 五百八十",     // M1697-M1700 (PENTA-MILESTONE COMPLETION META-META MILESTONE — BASCodableExtensionPentaMilestoneCompletionDoctrine + 26 anti-drift + 18 wire-in PROOF tests cataloguing all 5 sealed Codable extension milestones;56 types,60 commits,15 chapters,4 modules;58 session types ledger-serializable;M1700 ROUND-NUMBER close-out)
-        "chapter 五百八十一"    // M1701-M1704 (FIRST-EVER BASLEASELIFE CODABLE EXTENSION — 2 nested types (BASBreathScheduler.Request + ScheduledBreath) gained Codable + 2 PROOF tests + BASLeaseLifeCodableExtensionDoctrine + close-out;fresh module territory beyond M1700 narrative arc;module coverage 4→5)
+        "chapter 五百八十一",   // M1701-M1704 (FIRST-EVER BASLEASELIFE CODABLE EXTENSION — 2 nested types (BASBreathScheduler.Request + ScheduledBreath) gained Codable + 2 PROOF tests + BASLeaseLifeCodableExtensionDoctrine + close-out;fresh module territory beyond M1700 narrative arc;module coverage 4→5)
+        "chapter 五百八十二"    // M1705-M1708 (BASLEASELIFE WAVE 2 CODABLE EXTENSION — 2 struct types (BASThermalTwin.Reading + BASLungStateAccumulator.Snapshot) + 1 supporting enum (BASThermalTwin.OSThermalState) gained Codable + 3 PROOF tests + BASLeaseLifeCodableExtensionWaveTwoDoctrine + close-out;chapter 581 + 582 = 4 BASLeaseLife structs cumulative)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -252,15 +253,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1704
+    public static let mNumberLast: Int = 1708
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1704)。 Bumped through chapter 581:745 → 749。
-    /// Chapter 581:First-ever Codable extension into
-    /// BASLeaseLife module (fresh territory beyond
-    /// M1700 narrative arc) + 2 PROOF tests + typed
-    /// surface + close-out。
-    public static let commitsShipped: Int = 749
+    /// M1708)。 Bumped through chapter 582:749 → 753。
+    /// Chapter 582:BASLeaseLife wave 2 Codable
+    /// extension + 3 PROOF tests + typed surface +
+    /// close-out。 Continues chapter 581 first-ever
+    /// BASLeaseLife pattern。
+    public static let commitsShipped: Int = 753
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

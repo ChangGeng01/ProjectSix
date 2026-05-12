@@ -10836,7 +10836,95 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1704。 288 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 582 — BASLeaseLife wave 2 Codable
+        // extension。 2 struct types + 1 supporting
+        // enum (BASThermalTwin.OSThermalState +
+        // Reading + BASLungStateAccumulator.Snapshot)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十二",
+            mNumberFirst: 1705,
+            mNumberLast: 1708,
+            v1MilestoneMNumber: 1708,
+            v1MilestoneStatus:
+                "chapter-582-leaselife-wave-two-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1705, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "LeaseLife struct types (BAS" +
+                        "ThermalTwin.Reading + BAS" +
+                        "LungStateAccumulator.Snapshot)" +
+                        " + 1 supporting enum (BAS" +
+                        "ThermalTwin.OSThermalState)。" +
+                        " Wave 2 of BASLeaseLife" +
+                        " extension after chapter 581" +
+                        " first-ever。"),
+                BASChapterKnife(
+                    mNumber: 1706, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests (2 structs + 1" +
+                        " enum)。"),
+                BASChapterKnife(
+                    mNumber: 1707, knife: "第三刀",
+                    concept: "NEW BASLeaseLifeCodable" +
+                        "ExtensionWaveTwoDoctrine typed" +
+                        " surface。 Documents wave 2" +
+                        " contribution with struct +" +
+                        " enum split。 typed-surface" +
+                        " count 122 → 123。"),
+                BASChapterKnife(
+                    mNumber: 1708, knife: "第四刀",
+                    concept: "Chapter 582 close-out +" +
+                        " doctrine sync。 292" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "os-thermal-state-non-codable",
+                "thermal-twin-reading-non-codable",
+                "lung-state-snapshot-non-codable",
+                "leaselife-wave-2-aftermath-incomplete"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1708",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "leaselife-wave-two-codable",
+                "4-leaselife-structs-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — BASLeaseLife wave 3 with" +
+                " BASLeaseLifeCoordinator.TurnRecorded" +
+                " (depends on both wave 1 + wave 2" +
+                " types)",
+                "future arc — eventual BASLeaseLife" +
+                " arc seal after wave 3 accumulates"
+            ],
+            summary: "Chapter 582 ships BASLeaseLife" +
+                " wave 2 Codable extension。 2 struct" +
+                " types (BASThermalTwin.Reading +" +
+                " BASLungStateAccumulator.Snapshot) +" +
+                " 1 supporting enum (BASThermalTwin." +
+                "OSThermalState) gained Codable at" +
+                " M1705。 3 PROOF tests (M1706) + new" +
+                " typed surface (M1707) + close-out" +
+                " (M1708)。 Continues chapter 581" +
+                " BASLeaseLife extension pattern。" +
+                " Combined chapter 581 wave 1 (2" +
+                " structs) + chapter 582 wave 2 (2" +
+                " structs + 1 enum) = 4 BASLeaseLife" +
+                " struct types + 1 supporting enum" +
+                " ledger-serializable。 123 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1708。 292 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
