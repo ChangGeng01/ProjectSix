@@ -291,7 +291,7 @@ public final class BASUpdateTicketLifecycleSQLiteStorage:
     }
 
     /// M277 — observability bundle for one checkpoint call.
-    public struct CheckpointResult: Sendable, Equatable {
+    public struct CheckpointResult: Codable, Sendable, Equatable {
         public let wasBusy: Bool
         public let walFramesAtStart: Int
         public let framesMerged: Int

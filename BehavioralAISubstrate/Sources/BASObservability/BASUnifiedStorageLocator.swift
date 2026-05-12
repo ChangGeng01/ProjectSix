@@ -107,7 +107,7 @@ public enum BASUnifiedStorageLocator {
     ///     BASUpdateTicketLifecycleSQLiteStorage(
     ///         url: locator.lifecycleURL)
     /// ```
-    public struct Locations: Sendable, Equatable, Hashable {
+    public struct Locations: Codable, Sendable, Equatable, Hashable {
         public let root: URL
         public let auditLedgerURL: URL
         public let lifecycleURL: URL
