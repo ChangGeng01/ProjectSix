@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1644",
-            "M1644:doctrine version reflects chapter 五百六十六 — CROSS-MODULE CODABLE EXTENSION。 First chapter extending Codable OUTSIDE the BASHostKit audit-projection family。 5 types in BASRuntimeCore (CoreMLFeatureFrame + KnowledgeCycle) + BASMemory (RAGResult + VectorIndexEntry + VectorTopKResult) gained Codable at M1641 + 7 PROOF tests (M1642) + BASCrossModuleCodableExtensionDoctrine typed surface (M1643) + close-out (M1644)。 107 typed surfaces cumulative。 228 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1648",
+            "M1648:doctrine version reflects chapter 五百六十七 — CONTINUED CROSS-MODULE CODABLE EXTENSION。 5 more BASMemory types gained Codable (ConstitutionMatch + ClosedLoopApplyOutcome + EvolutionPromotionGateVerdict + PreparedMemoryGovernanceDraft + ShadowTrialLedgerEntry) at M1645 + 5 PROOF tests (M1646) + BASMemoryCodableExtensionDoctrine typed surface (M1647) + close-out (M1648)。 Combined chapters 566+567 = 10 cross-module types。 108 typed surfaces cumulative。 232 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

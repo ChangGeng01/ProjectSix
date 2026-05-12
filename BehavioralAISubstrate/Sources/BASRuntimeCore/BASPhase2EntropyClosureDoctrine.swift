@@ -220,7 +220,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百六十三",   // M1629-M1632 (CONTINUED REAL SUBSTRATE CHANGE — add Codable + Equatable to 7 more aggregator types + 9 PROOF tests + BASTurnAuditProjectionsSevenAggregatorCodableExtensionDoctrine + close-out;combined 15 aggregator types now ledger-serializable)
         "chapter 五百六十四",   // M1633-M1636 (AGGREGATOR CODABLE EXTENSION ARC-SEAL MILESTONE — BASAuditProjectionsAggregatorCodableExtensionArcSealedDoctrine + 20 anti-drift + 13 wire-in PROOF tests commemorating 3-chapter / 12-commit arc across chapters 561-563)
         "chapter 五百六十五",   // M1637-M1640 (POST-ARC FOLLOW-UP — Codable extension to 2 Inputs aggregator types + 2 PROOF tests + BASAuditObservationProjectionsInputsCodableExtensionDoctrine + close-out)
-        "chapter 五百六十六"    // M1641-M1644 (CROSS-MODULE CODABLE EXTENSION — first chapter extending Codable OUTSIDE the BASHostKit audit-projection family;5 types in BASRuntimeCore + BASMemory + 7 PROOF tests + BASCrossModuleCodableExtensionDoctrine + close-out)
+        "chapter 五百六十六",   // M1641-M1644 (CROSS-MODULE CODABLE EXTENSION — first chapter extending Codable OUTSIDE the BASHostKit audit-projection family;5 types in BASRuntimeCore + BASMemory + 7 PROOF tests + BASCrossModuleCodableExtensionDoctrine + close-out)
+        "chapter 五百六十七"    // M1645-M1648 (CONTINUED CROSS-MODULE CODABLE EXTENSION — 5 more BASMemory types gained Codable + 5 PROOF tests + BASMemoryCodableExtensionDoctrine + close-out;combined chapters 566+567 = 10 cross-module types ledger-serializable)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -237,14 +238,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1644
+    public static let mNumberLast: Int = 1648
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1644)。 Bumped through chapter 566:685 → 689。
-    /// Chapter 566:Cross-module Codable extension —
-    /// 5 types in BASRuntimeCore + BASMemory + 7 PROOF
+    /// M1648)。 Bumped through chapter 567:689 → 693。
+    /// Chapter 567:Continued cross-module Codable
+    /// extension — 5 more BASMemory types + 5 PROOF
     /// tests + typed surface + close-out。
-    public static let commitsShipped: Int = 689
+    public static let commitsShipped: Int = 693
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

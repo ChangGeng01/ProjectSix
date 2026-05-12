@@ -2577,6 +2577,25 @@ public enum BASEntropyChapterIndex {
                 " typed surface (M1643) + close-out" +
                 " (M1644)。 107 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1644。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十七",
+            mNumberFirst: 1645, mNumberLast: 1648,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "CONTINUED CROSS-MODULE CODABLE" +
+                " EXTENSION — 5 more BASMemory types" +
+                " gained Codable at M1645" +
+                " (ConstitutionMatch +" +
+                " ClosedLoopApplyOutcome +" +
+                " EvolutionPromotionGateVerdict +" +
+                " PreparedMemoryGovernanceDraft +" +
+                " ShadowTrialLedgerEntry) + 5 PROOF" +
+                " tests (M1646) +" +
+                " BASMemoryCodableExtensionDoctrine" +
+                " typed surface (M1647) + close-out" +
+                " (M1648)。 108 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1648。" +
                 " V1 byte-equality preserved。")
     ]
 

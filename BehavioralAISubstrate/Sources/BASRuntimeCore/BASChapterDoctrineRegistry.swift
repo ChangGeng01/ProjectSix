@@ -9600,7 +9600,77 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1644。 228 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 567 — Continued cross-module Codable
+        // extension to 5 more BASMemory types。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十七",
+            mNumberFirst: 1645,
+            mNumberLast: 1648,
+            v1MilestoneMNumber: 1648,
+            v1MilestoneStatus:
+                "chapter-567-more-memory-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1645, knife: "第一刀",
+                    concept: "Add Codable to 5 more" +
+                        " BASMemory types。"),
+                BASChapterKnife(
+                    mNumber: 1646, knife: "第二刀",
+                    concept: "5 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1647, knife: "第三刀",
+                    concept: "NEW BASMemoryCodableExt" +
+                        "ensionDoctrine typed surface。" +
+                        " typed-surface count 107 →" +
+                        " 108。"),
+                BASChapterKnife(
+                    mNumber: 1648, knife: "第四刀",
+                    concept: "Chapter 567 close-out +" +
+                        " doctrine sync。 232" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "constitution-match-non-codable",
+                "memory-closed-loop-non-codable",
+                "evolution-verdict-non-codable",
+                "shadow-trial-ledger-non-codable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1648",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "more-memory-codable",
+                "cross-module-arc-continues"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — continue Codable" +
+                " extension hunt"
+            ],
+            summary: "Chapter 567 continues the cross-" +
+                "module Codable extension。 5 more" +
+                " BASMemory types gained Codable" +
+                " (ConstitutionMatch + ClosedLoopApply" +
+                "Outcome + EvolutionPromotionGate" +
+                "Verdict + PreparedMemoryGovernance" +
+                "Draft + ShadowTrialLedgerEntry) + 5" +
+                " PROOF tests + new typed surface +" +
+                " close-out。 Combined chapters 566+" +
+                "567 = 10 cross-module types now" +
+                " ledger-serializable。 108 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1648。 232 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
