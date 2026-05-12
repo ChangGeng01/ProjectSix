@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1572",
-            "M1572:doctrine version reflects chapter 五百四十八 — typed milestone doctrine commemorating the 6-chapter Codable arc seal。 BASEBrainTurnResultClusterBundleCodableArcSealedDoctrine with 7-entry chapter catalogue + 100% milestone invariants + replay-determinism PROOF method pin (M1569) + 15 anti-drift PROOF tests (M1570) + 6 wire-in PROOF tests cross-checking against 3 other doctrines (M1571)。 The Codable arc seal is now non-driftable。 90 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1576",
+            "M1576:doctrine version reflects chapter 五百四十九 — substrate state-of-the-union typed audit doctrine。 BASAutonomousSessionStateOfTheUnionDoctrine with 6 achievement kinds + 5 remaining-work kinds + honest reframe flag (M1573) + 16 anti-drift PROOF tests (M1574) + 7 cross-doctrine wire-in PROOF tests cross-checking 6 other doctrines (M1575)。 91 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

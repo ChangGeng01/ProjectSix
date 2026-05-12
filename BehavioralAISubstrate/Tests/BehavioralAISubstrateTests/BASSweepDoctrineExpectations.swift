@@ -117,18 +117,19 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 146
+    public static let phase2ChapterCount: Int = 147
 
-    /// Phase 2 commits shipped。 At M1572:125 + 84 + 408
-    /// = 617 (chapter 548 = 4 cuts — Codable arc sealed
-    /// doctrine + 21 PROOF tests + close-out)
-    public static let phase2CommitsShipped: Int = 617
+    /// Phase 2 commits shipped。 At M1576:125 + 84 + 412
+    /// = 621 (chapter 549 = 4 cuts — state-of-the-union
+    /// audit doctrine + 23 PROOF tests + close-out)
+    public static let phase2CommitsShipped: Int = 621
 
-    /// Phase 2 mNumberLast。 At M1572:chapter 548 — the
-    /// 6-chapter Codable arc seal is now commemorated
-    /// via typed milestone doctrine with 21 PROOF tests。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1572
+    /// Phase 2 mNumberLast。 At M1576:chapter 549 —
+    /// substrate state-of-the-union typed audit doctrine
+    /// pins cumulative state across 6 achievement kinds
+    /// + 5 remaining-work kinds。 SWEEP stays frozen
+    /// at 1163。
+    public static let phase2MNumberLast: Int = 1576
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

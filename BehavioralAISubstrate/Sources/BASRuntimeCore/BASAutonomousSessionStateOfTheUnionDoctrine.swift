@@ -110,13 +110,13 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 548
-    /// close-out (M1572)。
-    public static let typedSurfaceCount: Int = 90
+    /// Cumulative achievement metrics at chapter 549
+    /// close-out (M1576)。
+    public static let typedSurfaceCount: Int = 91
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 156
-    public static let phase2CommitsShipped: Int = 617
-    public static let chapter2NumberLast: Int = 1572
+        Int = 160
+    public static let phase2CommitsShipped: Int = 621
+    public static let chapter2NumberLast: Int = 1576
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

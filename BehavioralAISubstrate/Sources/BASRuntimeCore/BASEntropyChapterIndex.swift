@@ -2232,7 +2232,25 @@ public enum BASEntropyChapterIndex {
                 " (M1571)。 The Codable arc seal is now" +
                 " non-driftable。 90 typed surfaces" +
                 " cumulative。 ADR-016 → M1572。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十九",
+            mNumberFirst: 1573, mNumberLast: 1576,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Substrate state-of-the-union" +
+                " typed audit doctrine:" +
+                " BASAutonomousSessionStateOfTheUnion" +
+                "Doctrine with 6 achievement kinds + 5" +
+                " remaining-work kinds + honest reframe" +
+                " flag for the original plan's Tier A" +
+                " mismatch with substrate shape (M1573)" +
+                " + 16 anti-drift PROOF tests (M1574)" +
+                " + 7 cross-doctrine wire-in PROOF" +
+                " tests cross-checking 6 other doctrines" +
+                " (M1575)。 91 typed surfaces cumulative。" +
+                " ADR-016 → M1576。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

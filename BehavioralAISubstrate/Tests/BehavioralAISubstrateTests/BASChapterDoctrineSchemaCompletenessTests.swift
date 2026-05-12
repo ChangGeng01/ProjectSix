@@ -1703,7 +1703,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十八")!)
+                            "chapter 五百四十八")!),
+            // M1576 chapter 549 — state-of-the-union audit doctrine + 23 PROOF tests
+            checkRegistry("五百四十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2583,6 +2589,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十八")!
+                .mNumberLast),
+            // M1576 chapter 549 — state-of-the-union audit doctrine + 23 PROOF tests
+            ("549",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

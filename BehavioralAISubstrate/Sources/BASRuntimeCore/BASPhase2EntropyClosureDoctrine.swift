@@ -202,7 +202,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百四十五",   // M1557-M1560 (Codable round-trip PROOF for DeviceLifecycleBundle extends coverage 6 → 7 of 9 + doctrine catalogue update + anti-drift tests update)
         "chapter 五百四十六",   // M1561-M1564 (Codable round-trip PROOF for RiskChoiceBundle extends coverage 7 → 8 of 9 + doctrine catalogue update + anti-drift tests update)
         "chapter 五百四十七",   // M1565-M1568 (100% MILESTONE — final Codable round-trip PROOF for CognitiveFramesBundle 8 → 9 of 9 + doctrine catalogue update to 100% + anti-drift tests with milestone invariants)
-        "chapter 五百四十八"    // M1569-M1572 (typed milestone doctrine commemorating the 6-chapter Codable arc + 15 anti-drift PROOF tests + 6 wire-in PROOF tests cross-checking 3 other doctrines)
+        "chapter 五百四十八",   // M1569-M1572 (typed milestone doctrine commemorating the 6-chapter Codable arc + 15 anti-drift PROOF tests + 6 wire-in PROOF tests cross-checking 3 other doctrines)
+        "chapter 五百四十九"    // M1573-M1576 (substrate state-of-the-union audit doctrine + 16 anti-drift PROOF tests + 7 cross-doctrine wire-in PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -219,15 +220,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1572
+    public static let mNumberLast: Int = 1576
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1572)。 Bumped through chapter 548:613 → 617。
-    /// Chapter 548:typed milestone doctrine
-    /// commemorating the 6-chapter Codable arc + 21
-    /// PROOF tests (15 anti-drift + 6 wire-in) +
-    /// close-out。
-    public static let commitsShipped: Int = 617
+    /// M1576)。 Bumped through chapter 549:617 → 621。
+    /// Chapter 549:state-of-the-union typed audit
+    /// doctrine + 23 PROOF tests (16 anti-drift + 7
+    /// cross-doctrine wire-in) + close-out。
+    public static let commitsShipped: Int = 621
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

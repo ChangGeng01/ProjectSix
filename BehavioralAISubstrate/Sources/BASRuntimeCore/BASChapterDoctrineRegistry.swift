@@ -8003,7 +8003,94 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative。 ADR-016 → M1572。 156" +
                 " consecutive autonomous commits with" +
                 " V1 byte-equality preserved。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 549 — substrate state-of-the-union
+        // typed audit doctrine
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十九",
+            mNumberFirst: 1573,
+            mNumberLast: 1576,
+            v1MilestoneMNumber: 1576,
+            v1MilestoneStatus:
+                "chapter-549-state-of-the-union-audit",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1573, knife: "第一刀",
+                    concept: "NEW BASAutonomousSession" +
+                        "StateOfTheUnionDoctrine typed" +
+                        " audit doctrine pinning the" +
+                        " substrate's cumulative" +
+                        " achievement state with 6" +
+                        " achievement kinds + 5" +
+                        " remaining-work kinds + honest" +
+                        " reframe flag for the original" +
+                        " plan's Tier A mismatch with" +
+                        " substrate shape。 91 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1574, knife: "第二刀",
+                    concept: "16 anti-drift PROOF tests:" +
+                        " kind enum counts + cumulative" +
+                        " metrics + quality invariants +" +
+                        " achievement details +" +
+                        " enumerated kinds + honest" +
+                        " reframe flag。"),
+                BASChapterKnife(
+                    mNumber: 1575, knife: "第三刀",
+                    concept: "7 cross-doctrine wire-in" +
+                        " PROOF tests cross-checking" +
+                        " state-of-the-union against 6" +
+                        " other doctrines (fold arc" +
+                        " sealed + Codable coverage +" +
+                        " observability sink catalogue" +
+                        " + substrate warning purge +" +
+                        " test target purge + Phase 2)。"),
+                BASChapterKnife(
+                    mNumber: 1576, knife: "第四刀",
+                    concept: "Chapter 549 close-out +" +
+                        " doctrine sync。 160 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "state-of-the-union-undocumented",
+                "original-plan-tier-a-mismatch-hidden",
+                "cross-doctrine-cumulative-state-not-typed",
+                "session-achievement-vs-remaining-untyped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1576",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "state-of-the-union-non-driftable"
+            ],
+            plannedFutureCuts: [
+                "future arc — reframe of Tier A/B/C" +
+                " migration plan to match substrate" +
+                " reality",
+                "future arc — V1 monolith internal fold" +
+                " continuation",
+                "future arc — SampleHost production" +
+                " wire-in (requires .xcodeproj changes)"
+            ],
+            summary: "Chapter 549 ships a typed state-of-" +
+                "the-union audit doctrine pinning the" +
+                " substrate's cumulative achievement +" +
+                " remaining-work state with honest" +
+                " acknowledgment that the original plan's" +
+                " Tier A definition doesn't match" +
+                " substrate reality (M1573) + 16 anti-" +
+                "drift PROOF tests (M1574) + 7 cross-" +
+                "doctrine wire-in PROOF tests against 6" +
+                " other doctrines (M1575) + close-out" +
+                " (M1576)。 91 typed surfaces cumulative。" +
+                " ADR-016 → M1576。 160 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
