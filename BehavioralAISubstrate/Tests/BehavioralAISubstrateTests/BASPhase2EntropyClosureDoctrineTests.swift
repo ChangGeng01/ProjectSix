@@ -37,24 +37,26 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs605() {
+    func testLastChapterIs606() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五",
-            "Chapter 六百五:BASMETALSUBSTRATE CODABLE" +
-            " EXTENSION WAVE 1 — 11TH MODULE FORMAL" +
-            " ENTRY + M1800 ROUND-NUMBER MILESTONE。 2" +
-            " types (BASKernelInputs + BASKernelOutputs)" +
-            " gained Codable + 2 PROOF tests + BAS" +
-            "MetalSubstrateCodableExtensionDoctrine" +
-            " typed surface (with 10 pre-octa types" +
-            " acknowledged) + close-out。 Module count" +
-            " bumped 10 → 11。 5th consecutive post-" +
-            "octa fresh-module-territory advancement。" +
-            " M1800 round-number milestone — 100-step" +
-            " jump since chapter 580 M1700 round-number" +
-            " close-out。 146 typed surfaces cumulative")
+            "chapter 六百六",
+            "Chapter 六百六:BASSOVEREIGN CODABLE" +
+            " EXTENSION WAVE 1 — 12TH MODULE FORMAL" +
+            " ENTRY。 4 types/enums (BASSovereignTurn" +
+            "Parity + BASSovereignVerdictEngine.Operation" +
+            "Domain + BASSovereignTurnObservations +" +
+            " BASSovereignTurnVerifierReport) gained" +
+            " Codable + 4 PROOF tests + BASSovereign" +
+            "CodableExtensionDoctrine typed surface" +
+            " (with 7 pre-octa types acknowledged +" +
+            " nested-enums flag) + close-out。 Module" +
+            " count bumped 11 → 12。 6th consecutive" +
+            " post-octa fresh-module-territory" +
+            " advancement。 FIRST chapter past M1800" +
+            " round-number milestone。 147 typed" +
+            " surfaces cumulative")
     }
 
     // MARK: - M-number range

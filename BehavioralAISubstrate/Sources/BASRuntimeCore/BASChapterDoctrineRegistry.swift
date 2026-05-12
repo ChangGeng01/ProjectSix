@@ -13190,6 +13190,113 @@ public enum BASChapterDoctrineRegistry {
                 " 580 M1700 round-number close-out)。" +
                 " 384 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 606 — BASSovereign Codable extension
+        // wave 1 (12TH MODULE FORMAL ENTRY)。 First
+        // chapter past M1800 round-number milestone。
+        // 6th consecutive post-octa fresh-module
+        // advancement。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六",
+            mNumberFirst: 1801,
+            mNumberLast: 1804,
+            v1MilestoneMNumber: 1804,
+            v1MilestoneStatus:
+                "chapter-606-sovereign-codable-extension-wave-one",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1801, knife: "第一刀",
+                    concept: "Add Codable to 4 BASSovereign" +
+                        " types/enums — BASSovereignTurn" +
+                        "Parity (String-raw 4-case enum)" +
+                        " + BASSovereignVerdictEngine." +
+                        "OperationDomain (String-raw enum" +
+                        " nested in engine type) + BAS" +
+                        "SovereignTurnObservations (~17-" +
+                        "field struct) + BASSovereignTurn" +
+                        "VerifierReport (4-field wrapping" +
+                        " observations + engine verdict" +
+                        " + coordinator level + parity)。" +
+                        " Includes nested enums — mixed-" +
+                        "shape extension。"),
+                BASChapterKnife(
+                    mNumber: 1802, knife: "第二刀",
+                    concept: "4 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1803, knife: "第三刀",
+                    concept: "NEW BASSovereignCodable" +
+                        "ExtensionDoctrine + isFormalModule" +
+                        "Entry flag + moduleCountAfterThis" +
+                        " = 12 + isSixthConsecutiveFresh" +
+                        "ModuleAfterOcta flag + includes" +
+                        "NestedEnums flag +" +
+                        " isFirstPastM1800Milestone flag" +
+                        " + preExistingCodableTypes list" +
+                        " (7 pre-octa types acknowledged)。" +
+                        " typed-surface count 146 → 147。"),
+                BASChapterKnife(
+                    mNumber: 1804, knife: "第四刀",
+                    concept: "Chapter 606 close-out +" +
+                        " doctrine sync。 388 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 12 modules covered。" +
+                        " First chapter past M1800.")
+            ],
+            entropyClassesAttacked: [
+                "sovereign-turn-parity-non-codable",
+                "operation-domain-non-codable",
+                "sovereign-turn-observations-non-codable",
+                "sovereign-turn-verifier-report-non-codable",
+                "bas-sovereign-not-formally-in-module-narrative",
+                "module-count-stuck-at-11-after-chapter-605"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1804",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-formal-module-entry",
+                "module-count-bumped-11-to-12",
+                "sixth-consecutive-fresh-module-after-octa",
+                "first-chapter-past-m1800-milestone",
+                "includes-nested-enums"
+            ],
+            plannedFutureCuts: [
+                "future arc — BASSovereign wave 2" +
+                " (additional non-Codable types)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — 13th module exploration" +
+                " (BASChatCompletionsAdapter / BASEvaluation" +
+                " wave 2 etc。)"
+            ],
+            summary: "Chapter 606 ships BASSovereign" +
+                " Codable extension wave 1 — 12TH MODULE" +
+                " FORMAL ENTRY into post-octa narrative。" +
+                " 4 types/enums (BASSovereignTurnParity" +
+                " + OperationDomain + BASSovereignTurn" +
+                "Observations + BASSovereignTurnVerifier" +
+                "Report) gained Codable at M1801 + 4" +
+                " PROOF tests (M1802) + new typed surface" +
+                " (M1803) + close-out (M1804)。 BAS" +
+                "Sovereign has pre-octa Codable types (7" +
+                " acknowledged in preExistingCodableTypes" +
+                " manifest) but was never tracked at" +
+                " module-extension doctrine level until" +
+                " this chapter。 6th consecutive post-" +
+                "octa fresh-module advancement。 FIRST" +
+                " chapter past M1800 round-number" +
+                " milestone (reached at chapter 605" +
+                " close-out)。 Includes nested enums" +
+                " (Parity + OperationDomain) — mixed-" +
+                "shape extension distinct from earlier" +
+                " formal entries。 147 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1804。" +
+                " 388 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

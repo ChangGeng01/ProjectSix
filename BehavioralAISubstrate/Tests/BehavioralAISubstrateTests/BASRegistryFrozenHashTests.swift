@@ -107,18 +107,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 605 close-out。 Chapter
-    /// 605:BASMETALSUBSTRATE CODABLE EXTENSION WAVE 1
-    /// — 11TH MODULE FORMAL ENTRY + M1800 ROUND-NUMBER
-    /// MILESTONE。 2 types (BASKernelInputs +
-    /// BASKernelOutputs) gained Codable at M1797 + 2
-    /// PROOF tests (M1798) + NEW BASMetalSubstrate
-    /// CodableExtensionDoctrine (M1799) with 10 pre-
-    /// octa types acknowledged + close-out (M1800)。
-    /// Module count bumped 10 → 11 — 5th consecutive
-    /// post-octa fresh-module-territory advancement。
-    /// M1800 round-number milestone — 100-step jump
-    /// since chapter 580 M1700 round-number close-out。
+    /// Re-captured at chapter 606 close-out。 Chapter
+    /// 606:BASSOVEREIGN CODABLE EXTENSION WAVE 1 —
+    /// 12TH MODULE FORMAL ENTRY。 4 types/enums (BAS
+    /// SovereignTurnParity + BASSovereignVerdictEngine
+    /// .OperationDomain + BASSovereignTurnObservations
+    /// + BASSovereignTurnVerifierReport) gained Codable
+    /// at M1801 + 4 PROOF tests (M1802) + NEW BASSovereign
+    /// CodableExtensionDoctrine (M1803) with 7 pre-
+    /// octa types acknowledged + nested-enums flag +
+    /// close-out (M1804)。 Module count bumped 11 → 12
+    /// — 6th consecutive post-octa fresh-module-
+    /// territory advancement。 FIRST chapter past M1800
+    /// round-number milestone (reached at chapter 605
+    /// close-out)。
     static let frozenFullRegistrySha256: String =
-        "6c2e161b6d3251be42aa411f119d93f6d3db95928352a347c390fc0e3c884634"
+        "d6dec26b15ecaf763a5cfe5443371cf51e31ead3f19d78307abb130240603e5c"
 }

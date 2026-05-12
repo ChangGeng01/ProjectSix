@@ -2045,7 +2045,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五")!)
+                            "chapter 六百五")!),
+            // M1804 chapter 606 — BASSovereign wave 1 (12th-module formal entry)
+            checkRegistry("六百六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3381,6 +3387,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五")!
+                .mNumberLast),
+            // M1804 chapter 606 — BASSovereign wave 1 (12th-module formal entry)
+            ("606",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

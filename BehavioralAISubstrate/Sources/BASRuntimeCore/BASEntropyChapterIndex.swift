@@ -3419,7 +3419,34 @@ public enum BASEntropyChapterIndex {
                 "step jump since chapter 580 M1700" +
                 " round-number close-out)。 146 typed" +
                 " surfaces cumulative (+1)。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六",
+            mNumberFirst: 1801, mNumberLast: 1804,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CODABLE EXTENSION" +
+                " WAVE 1 — 12TH MODULE FORMAL ENTRY。 4" +
+                " types/enums (BASSovereignTurnParity +" +
+                " BASSovereignVerdictEngine.Operation" +
+                "Domain nested + BASSovereignTurn" +
+                "Observations 17-field + BASSovereign" +
+                "TurnVerifierReport 4-field) gained" +
+                " Codable at M1801 + 4 PROOF tests" +
+                " (M1802) + new typed surface (M1803)" +
+                " + close-out (M1804)。 BASSovereign" +
+                " has pre-octa Codable types (7" +
+                " acknowledged) but was never tracked" +
+                " at module-extension doctrine level" +
+                " until this chapter。 6th consecutive" +
+                " post-octa fresh-module-territory" +
+                " advancement。 FIRST chapter past M1800" +
+                " round-number milestone。 Includes" +
+                " nested enums (Parity + OperationDomain)" +
+                " — mixed-shape extension。 Module count" +
+                " bumped 11 → 12。 147 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1804。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
