@@ -576,6 +576,185 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
                 observationBundles.updateTicket)
     }
 
+    // MARK: - chapter 五百十四 / M1435 — unified 3-block
+    //                                    convenience init
+    //
+    // Single convenience init that takes ALL THREE typed
+    // input blocks (Kunlun + Cthulhu + ObservationBundles)
+    // plus the residual ~15 scalar fields。 Collapses the
+    // 56-arg all-fields init into ~18 args at the call
+    // site (3 blocks + ~15 residuals)。
+    //
+    // Byte-equality with the all-fields init GUARANTEED
+    // by body — each block's accessor pass-through PROOF
+    // is the regression guard。 PROOF lives in
+    // `BASAuditObservationProjectionsThreeBlockUnified
+    // InitTests`。
+    public init(
+        kunlunInputs:
+            BASAuditObservationProjectionsKunlunInputs,
+        cthulhuInputs:
+            BASAuditObservationProjectionsCthulhuInputs,
+        observationBundles:
+            BASAuditObservationProjectionsObservationBundlesBlock,
+        candidateObservationBundle:
+            BASCandidateObservationBundle? = nil,
+        tribunalObservationBundle:
+            BASTribunalObservationBundle? = nil,
+        abyssalPressure: BASAbyssalPressure? = nil,
+        humanAnchorSignal: BASHumanAnchorSignal? = nil,
+        sealAggregate:
+            BASOldSealSealingProtocol.Aggregate? = nil,
+        lifecycleAggregate:
+            BASEvolutionLifecycleSession.Aggregate? = nil,
+        narrativeDistortion: BASNarrativeDistortion? = nil,
+        anomalyTrace: BASAnomalyTrace? = nil,
+        abyssalBranches: [BASAbyssalBranch] = [],
+        unknownReserve: BASUnknownReserve? = nil,
+        forbiddenAggregate:
+            BASForbiddenKnowledgeCandidate.Aggregate? = nil,
+        kunlunAxisAlignment: BASAxisAlignment? = nil,
+        jadeCanonVerification:
+            BASKunlunJadeCanonProtocol.Verification? = nil,
+        jadeCanonObjectClass:
+            BASJadeCanonObjectClass? = nil,
+        riverOriginLineage:
+            BASKunlunRiverOriginProtocol.LineageReport? = nil,
+        yaochiAccess:
+            BASKunlunYaochiProtocol.AccessDecision? = nil,
+        yaochiSanctumClass: BASYaochiSanctumClass? = nil,
+        tianmenReadiness:
+            BASKunlunHeavenGateProtocol.Readiness? = nil,
+        tianmenGateClass: BASKunlunGateClass? = nil,
+        tianmenPassState: BASKunlunGateState? = nil,
+        escalationSuppressionCodes: [String] = [],
+        kunlunAxisView: BASKunlunAxisView? = nil,
+        kunlunTianmenWarrant: BASKunlunTianmenWarrant? = nil,
+        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil,
+        layerReconciliationVerdict:
+            BASObservationReconciliationVerdict? = nil,
+        layerReconciliationReport:
+            BASObservationReconciliationReport? = nil,
+        ontologyShiftMark: BASOntologyShiftMark? = nil,
+        cthulhuAssertionCeilingReasonCodes: [String] = [],
+        cthulhuPermitEscalationReasonCodes: [String] = [],
+        narrativeDistortionMap:
+            BASNarrativeDistortionMap? = nil,
+        cthulhuSurfaceAlias:
+            BASCthulhuSurfaceAlias? = nil,
+        kunlunSurfaceAlias:
+            BASKunlunSurfaceAlias? = nil
+    ) {
+        self.init(
+            candidateObservationBundle:
+                candidateObservationBundle,
+            tribunalObservationBundle:
+                tribunalObservationBundle,
+            abyssalPressure: abyssalPressure,
+            humanAnchorSignal: humanAnchorSignal,
+            sealAggregate: sealAggregate,
+            lifecycleAggregate: lifecycleAggregate,
+            narrativeDistortion: narrativeDistortion,
+            anomalyTrace: anomalyTrace,
+            abyssalBranches: abyssalBranches,
+            unknownReserve: unknownReserve,
+            forbiddenAggregate: forbiddenAggregate,
+            kunlunAxisAlignment: kunlunAxisAlignment,
+            jadeCanonVerification: jadeCanonVerification,
+            jadeCanonObjectClass: jadeCanonObjectClass,
+            riverOriginLineage: riverOriginLineage,
+            yaochiAccess: yaochiAccess,
+            yaochiSanctumClass: yaochiSanctumClass,
+            tianmenReadiness: tianmenReadiness,
+            tianmenGateClass: tianmenGateClass,
+            tianmenPassState: tianmenPassState,
+            escalationSuppressionCodes:
+                escalationSuppressionCodes,
+            kunlunAxisView: kunlunAxisView,
+            kunlunTianmenWarrant: kunlunTianmenWarrant,
+            kunlunGateDenialWrit: kunlunGateDenialWrit,
+            layerReconciliationVerdict:
+                layerReconciliationVerdict,
+            layerReconciliationReport:
+                layerReconciliationReport,
+            // 11 observation bundles from
+            // observationBundles block
+            presenceObservationBundle:
+                observationBundles.presence,
+            decompositionObservationBundle:
+                observationBundles.decomposition,
+            softHandObservationBundle:
+                observationBundles.softHand,
+            leaseLifeObservationBundle:
+                observationBundles.leaseLife,
+            hostConstitutionObservationBundle:
+                observationBundles.hostConstitution,
+            thoughtFoldObservationBundle:
+                observationBundles.thoughtFold,
+            neuralOrganObservationBundle:
+                observationBundles.neuralOrgan,
+            hippocampalMemoryObservationBundle:
+                observationBundles.hippocampalMemory,
+            worldPriorObservationBundle:
+                observationBundles.worldPrior,
+            riskObservationBundle:
+                observationBundles.risk,
+            updateTicketObservationBundle:
+                observationBundles.updateTicket,
+            // 8 Cthulhu fields from cthulhuInputs block
+            cosmicScaleView:
+                cthulhuInputs.cosmicScaleView,
+            ontologyFog: cthulhuInputs.ontologyFog,
+            ontologyShiftMark: ontologyShiftMark,
+            abyssalRunMode:
+                cthulhuInputs.abyssalRunMode,
+            abyssBudget: cthulhuInputs.abyssBudget,
+            cthulhuAssertionCeilingReasonCodes:
+                cthulhuAssertionCeilingReasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                cthulhuPermitEscalationReasonCodes,
+            memoryTemperatureLayer:
+                cthulhuInputs.memoryTemperatureLayer,
+            // 18 Kunlun fields from kunlunInputs block
+            ascentLease: kunlunInputs.ascentLease,
+            axisDeviation: kunlunInputs.axisDeviation,
+            gatePressure: kunlunInputs.gatePressure,
+            yaochiMemoryLayer:
+                kunlunInputs.yaochiMemoryLayer,
+            tianhengProfile:
+                kunlunInputs.tianhengProfile,
+            jadePermitGrade:
+                kunlunInputs.jadePermitGrade,
+            ascentBranches:
+                kunlunInputs.ascentBranches,
+            restSteps: kunlunInputs.restSteps,
+            returnPaths: kunlunInputs.returnPaths,
+            jadeCasket: kunlunInputs.jadeCasket,
+            jadeRefinementTickets:
+                kunlunInputs.jadeRefinementTickets,
+            jadeFidelityMap:
+                kunlunInputs.jadeFidelityMap,
+            hostJadeRegister:
+                kunlunInputs.hostJadeRegister,
+            jadeMirrorDraft:
+                kunlunInputs.jadeMirrorDraft,
+            kunlunUnnamableSet:
+                kunlunInputs.kunlunUnnamableSet,
+            narrativeDistortionMap:
+                narrativeDistortionMap,
+            sealedMemory: cthulhuInputs.sealedMemory,
+            humanAnchorProfile:
+                cthulhuInputs.humanAnchorProfile,
+            abyssalOrganAlias:
+                cthulhuInputs.abyssalOrganAlias,
+            kunlunAscentView:
+                kunlunInputs.kunlunAscentView,
+            kunlunFarWestReserve:
+                kunlunInputs.kunlunFarWestReserve,
+            cthulhuSurfaceAlias: cthulhuSurfaceAlias,
+            kunlunSurfaceAlias: kunlunSurfaceAlias)
+    }
+
     // MARK: - chapter 五百十一 / M1422 — Kunlun-inputs convenience
     //                                    init
     //
