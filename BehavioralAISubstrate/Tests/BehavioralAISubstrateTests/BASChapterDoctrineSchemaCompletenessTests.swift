@@ -1679,7 +1679,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十四")!)
+                            "chapter 五百四十四")!),
+            // M1560 chapter 545 — DeviceLifecycle round-trip + coverage doctrine update + anti-drift tests
+            checkRegistry("五百四十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2527,6 +2533,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十四")!
+                .mNumberLast),
+            // M1560 chapter 545 — DeviceLifecycle round-trip + coverage doctrine update + anti-drift tests
+            ("545",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
