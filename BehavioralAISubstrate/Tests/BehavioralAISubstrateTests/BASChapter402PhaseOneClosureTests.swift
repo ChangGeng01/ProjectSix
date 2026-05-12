@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1764",
-            "M1764:doctrine version reflects chapter 五百九十六 — BASHOSTKIT NON-PROJECTION 4-WAVE ARC SEAL MILESTONE。 NEW BASHostKitNonProjectionCodableExtensionArcSealedDoctrine typed milestone (M1761) commemorating 4-wave BASHostKit non-projection arc (chapters 592-595);8 types,16 commits,single-module。 Second sealed arc beyond M1700 narrative arc (after chapter 584 BASLeaseLife)。 Mirrors chapter 584 pattern but extended to 4 waves + includes culmination wave (BASChengluHintSet 8-field aggregator)。 38 anti-drift PROOF tests (M1762) + 22 wire-in PROOF tests (M1763) + close-out (M1764)。 Combined 41 BASHostKit-related types ledger-serializable。 137 typed surfaces cumulative。 348 consecutive byte-equality clean commits。 8 sealed milestones extant。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1768",
+            "M1768:doctrine version reflects chapter 五百九十七 — OCTA-MILESTONE COMPLETION META-META MILESTONE。 NEW BASCodableExtensionOctaMilestoneCompletionDoctrine (M1765) cataloging all 8 sealed Codable extension milestones extant (553 cascade + 564 aggregator + 569 cross-module + 574 orchestration + 579 post-arc trilogy + 584 BASLeaseLife arc + 590 BASMemory trilogy + 596 BASHostKit arc)。 Aggregate 77 types via 8 milestones,100 commits,25 chapters,6 modules。 79 session types ledger-serializable。 NEW beyond-m1700-four-wave-arc kind discriminator + 2 octa-novelty flags。 36 anti-drift PROOF tests (M1766) + 21 wire-in PROOF tests (M1767) + close-out (M1768)。 138 typed surfaces cumulative。 352 consecutive byte-equality clean commits。 Supersedes chapter 591 hepta snapshot。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

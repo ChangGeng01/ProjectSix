@@ -37,26 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs596() {
+    func testLastChapterIs597() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十六",
-            "Chapter 五百九十六:BASHOSTKIT NON-" +
-            "PROJECTION 4-WAVE ARC SEAL MILESTONE。" +
-            " NEW BASHostKitNonProjectionCodable" +
-            "ExtensionArcSealedDoctrine typed" +
-            " milestone (M1761) commemorating 4-wave" +
-            " BASHostKit non-projection arc" +
-            " (chapters 592-595);8 types,16" +
-            " commits,single-module。 Second sealed" +
-            " arc beyond M1700 narrative arc。" +
-            " Mirrors chapter 584 pattern but" +
-            " extended to 4 waves + includes" +
-            " culmination wave。 38 anti-drift + 22" +
-            " wire-in PROOF tests。 137 typed" +
-            " surfaces cumulative。 8 sealed" +
-            " milestones extant")
+            "chapter 五百九十七",
+            "Chapter 五百九十七:OCTA-MILESTONE" +
+            " COMPLETION META-META MILESTONE。 NEW" +
+            " BASCodableExtensionOctaMilestone" +
+            "CompletionDoctrine (M1765) cataloging" +
+            " all 8 sealed Codable extension" +
+            " milestones extant。 Aggregate:77" +
+            " types via 8 milestones,100 commits," +
+            " 25 chapters,6 modules。 79 session" +
+            " types ledger-serializable。 NEW beyond-" +
+            "m1700-four-wave-arc kind discriminator" +
+            " + 2 octa-novelty flags。 36 anti-drift" +
+            " + 21 wire-in PROOF tests。 138 typed" +
+            " surfaces cumulative。 Supersedes" +
+            " chapter 591 hepta snapshot")
     }
 
     // MARK: - M-number range

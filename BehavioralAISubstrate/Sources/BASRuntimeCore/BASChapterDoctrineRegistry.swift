@@ -12237,7 +12237,124 @@ public enum BASChapterDoctrineRegistry {
                 "equality preserved。 8 sealed milestones" +
                 " extant — catalog upgrade ready for" +
                 " chapter 597 octa-milestone。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 597 — Octa-milestone completion meta-
+        // meta milestone。 Supersedes chapter 591
+        // hepta snapshot with 8th sealed milestone
+        // (chapter 596 BASHostKit non-projection arc)。
+        // Introduces "beyond-m1700-four-wave-arc" kind
+        // discriminator + 2 new octa-novelty flags
+        // (firstFourWaveArcSealAchieved +
+        // firstFourWaveCulminationAchieved)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十七",
+            mNumberFirst: 1765,
+            mNumberLast: 1768,
+            v1MilestoneMNumber: 1768,
+            v1MilestoneStatus:
+                "chapter-597-octa-milestone-completion",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1765, knife: "第一刀",
+                    concept: "NEW BASCodableExtensionOcta" +
+                        "MilestoneCompletionDoctrine meta-" +
+                        "meta milestone cataloging all 8" +
+                        " sealed milestones extant。" +
+                        " Supersedes chapter 591 hepta" +
+                        " snapshot with 8th milestone" +
+                        " (chapter 596 BASHostKit non-" +
+                        "projection arc)。 NEW kind" +
+                        " discriminator beyond-m1700-four-" +
+                        "wave-arc + 2 octa-novelty flags。" +
+                        " 77 types via 8 milestones, 100" +
+                        " commits, 25 chapters, 6 modules。" +
+                        " 79 session types ledger-" +
+                        "serializable。 typed-surface count" +
+                        " 137 → 138。"),
+                BASChapterKnife(
+                    mNumber: 1766, knife: "第二刀",
+                    concept: "36 anti-drift PROOF tests" +
+                        " for the M1765 octa milestone。" +
+                        " Identity + 8 milestone counts" +
+                        " (incl。 5 kind-bucket counts) + 8" +
+                        " per-milestone identity + 4" +
+                        " aggregate + 5 achievement flags" +
+                        " (incl。 2 NEW octa-novelty) + 5" +
+                        " prior-snapshot refs +" +
+                        " consecutive-commit pin +" +
+                        " MilestoneRecord Codable round-" +
+                        "trip。"),
+                BASChapterKnife(
+                    mNumber: 1767, knife: "第三刀",
+                    concept: "21 wire-in PROOF tests" +
+                        " cross-checking the M1765 octa" +
+                        " milestone against 8 source seal" +
+                        " doctrines + hepta supersession" +
+                        " invariants + cumulative invariants。"),
+                BASChapterKnife(
+                    mNumber: 1768, knife: "第四刀",
+                    concept: "Chapter 597 close-out +" +
+                        " doctrine sync。 352" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。 8" +
+                        " sealed milestones formally" +
+                        " cataloged at octa-meta-meta" +
+                        " level。 Ready for next" +
+                        " extension cycle or 9th seal" +
+                        " future arc。")
+            ],
+            entropyClassesAttacked: [
+                "octa-milestone-catalog-undocumented",
+                "8th-seal-not-cross-validated-against-hepta",
+                "beyond-m1700-four-wave-arc-kind-undefined",
+                "first-four-wave-arc-novelty-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1768",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "octa-milestone-completion-sealed",
+                "77-types-via-8-milestones",
+                "79-session-types-ledger-serializable",
+                "beyond-m1700-four-wave-arc-kind-discriminator"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — Tier A sprawl migrations" +
+                " per wild-rolling-meerkat plan",
+                "future arc — 9th sealed milestone" +
+                " (potential nona-milestone catalog at" +
+                " future chapter)"
+            ],
+            summary: "Chapter 597 seals the octa-" +
+                "milestone completion meta-meta。 NEW" +
+                " BASCodableExtensionOctaMilestone" +
+                "CompletionDoctrine (M1765) cataloging" +
+                " all 8 sealed Codable extension" +
+                " milestones extant (553 cascade + 564" +
+                " aggregator + 569 cross-module + 574" +
+                " orchestration + 579 post-arc trilogy" +
+                " + 584 BASLeaseLife arc + 590 BAS" +
+                "Memory trilogy + 596 BASHostKit arc)。" +
+                " 36 anti-drift PROOF tests (M1766) +" +
+                " 21 wire-in PROOF tests (M1767) +" +
+                " close-out (M1768)。 Aggregate:77" +
+                " types via 8 milestones,100 commits," +
+                " 25 chapters,6 modules。 79 session" +
+                " types ledger-serializable (77 + 2" +
+                " chapter 565 post-arc-inputs)。" +
+                " Supersedes chapter 591 hepta with 8th" +
+                " seal + NEW beyond-m1700-four-wave-arc" +
+                " kind discriminator + 2 octa-novelty" +
+                " flags。 138 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1768。 352" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014 OPT-" +
+                "IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

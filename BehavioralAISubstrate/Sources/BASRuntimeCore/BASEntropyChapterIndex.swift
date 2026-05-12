@@ -3178,7 +3178,37 @@ public enum BASEntropyChapterIndex {
                 "serializable。 137 typed surfaces" +
                 " cumulative (+1)。 8 sealed milestones" +
                 " extant。 ADR-016 → M1764。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十七",
+            mNumberFirst: 1765, mNumberLast: 1768,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "OCTA-MILESTONE COMPLETION META-" +
+                "META MILESTONE。 NEW BASCodable" +
+                "ExtensionOctaMilestoneCompletion" +
+                "Doctrine (M1765) cataloging all 8" +
+                " sealed Codable extension milestones" +
+                " extant (553 cascade + 564 aggregator" +
+                " + 569 cross-module + 574 orchestration" +
+                " + 579 post-arc trilogy + 584 BAS" +
+                "LeaseLife arc + 590 BASMemory" +
+                " trilogy + 596 BASHostKit arc)。" +
+                " Aggregate:77 types via 8 milestones," +
+                " 100 commits,25 chapters,6 modules。" +
+                " 79 session types ledger-serializable" +
+                " (77 + 2 chapter 565 post-arc-inputs)。" +
+                " NEW beyond-m1700-four-wave-arc kind" +
+                " discriminator + 2 octa-novelty flags" +
+                " (firstFourWaveArcSealAchieved +" +
+                " firstFourWaveCulminationAchieved)。" +
+                " 36 anti-drift PROOF tests (M1766) +" +
+                " 21 wire-in PROOF tests (M1767) +" +
+                " close-out (M1768)。 138 typed" +
+                " surfaces cumulative (+1)。" +
+                " Supersedes chapter 591 hepta snapshot。" +
+                " ADR-016 → M1768。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

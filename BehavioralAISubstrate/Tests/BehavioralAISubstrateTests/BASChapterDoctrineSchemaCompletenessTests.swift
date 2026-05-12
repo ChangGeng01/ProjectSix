@@ -1991,7 +1991,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百九十六")!)
+                            "chapter 五百九十六")!),
+            // M1768 chapter 597 — octa-milestone completion meta-meta
+            checkRegistry("五百九十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百九十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3255,6 +3261,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百九十六")!
+                .mNumberLast),
+            // M1768 chapter 597 — octa-milestone completion meta-meta
+            ("597",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百九十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -107,20 +107,18 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 596 close-out。 Chapter
-    /// 596:BASHOSTKIT NON-PROJECTION 4-WAVE ARC SEAL
-    /// MILESTONE。 NEW BASHostKitNonProjectionCodable
-    /// ExtensionArcSealedDoctrine typed milestone
-    /// (M1761) commemorating 4-wave BASHostKit non-
-    /// projection arc (chapters 592-595);8 types,16
-    /// commits,single-module。 Second sealed arc beyond
-    /// M1700 narrative arc (after chapter 584 BASLease
-    /// Life)。 Mirrors chapter 584 pattern but extended
-    /// to 4 waves + includes culmination wave。 38 anti-
-    /// drift PROOF tests (M1762) + 22 wire-in PROOF
-    /// tests (M1763) + close-out (M1764)。 Combined 41
-    /// BASHostKit-related types ledger-serializable。 8
-    /// sealed milestones extant。
+    /// Re-captured at chapter 597 close-out。 Chapter
+    /// 597:OCTA-MILESTONE COMPLETION META-META
+    /// MILESTONE。 NEW BASCodableExtensionOcta
+    /// MilestoneCompletionDoctrine (M1765) cataloging
+    /// all 8 sealed Codable extension milestones
+    /// extant。 Aggregate:77 types via 8 milestones,
+    /// 100 commits,25 chapters,6 modules。 79 session
+    /// types ledger-serializable。 NEW beyond-m1700-
+    /// four-wave-arc kind discriminator + 2 octa-
+    /// novelty flags。 36 anti-drift PROOF tests (M1766)
+    /// + 21 wire-in PROOF tests (M1767) + close-out
+    /// (M1768)。 Supersedes chapter 591 hepta snapshot。
     static let frozenFullRegistrySha256: String =
-        "e07588815b3c9942702afd44b8da1b1bc25c44c1fe21d750f2dfcf9e498ce5b6"
+        "805440aefbb42e9fae06fc39cd37d9b1955129f23101f9a2eaed73624864f0bb"
 }
