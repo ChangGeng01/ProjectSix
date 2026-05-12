@@ -1585,7 +1585,24 @@ public enum BASEntropyChapterIndex {
                 " now flow through 2 typed input blocks。" +
                 " 55 typed surfaces cumulative。 ADR-016" +
                 " → M1424。 V1 untouched (additive APIs" +
-                " only)。")
+                " only)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十二",
+            mNumberFirst: 1425, mNumberLast: 1428,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "Wire-in chain for projection" +
+                " blocks: BASAuditObservation" +
+                "ProjectionsBundleObservation typed" +
+                " observation record + Bundle Observer" +
+                " actor + 12th BASBundle<Item>" +
+                " adoption (BASAuditObservation" +
+                "ProjectionsBundle)。 4-stage typed" +
+                " composition pipeline closed。 58" +
+                " typed surfaces cumulative。 ADR-016" +
+                " → M1428。 Observer is OPT-IN — no" +
+                " production callers wired at" +
+                " close-out。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

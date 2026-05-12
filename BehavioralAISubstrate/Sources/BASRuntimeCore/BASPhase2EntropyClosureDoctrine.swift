@@ -165,7 +165,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百八",       // M1409-M1412 (Tier C ADR-019 IMPLEMENTATION COMPLETE — 4/4 primitives)
         "chapter 五百九",       // M1413-M1416 (Tier C migration adapters — 2/4 shipped)
         "chapter 五百十",       // M1417-M1420 (V1 monolith fold continues — counterweight + routed budget)
-        "chapter 五百十一"      // M1421-M1424 (projection-block fold — Kunlun + Cthulhu inputs blocks + convenience inits)
+        "chapter 五百十一",     // M1421-M1424 (projection-block fold — Kunlun + Cthulhu inputs blocks + convenience inits)
+        "chapter 五百十二"      // M1425-M1428 (projection-block wire-in chain — observation + observer + 12th BASBundle adoption)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -182,17 +183,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1424
+    public static let mNumberLast: Int = 1428
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1424)。 Bumped through chapter 511:465 → 469。
-    /// Chapter 511:projection-block fold — M1421 Kunlun
-    /// inputs block + M1422 Kunlun convenience init +
-    /// M1423 Cthulhu inputs block + M1424 close-out。 26
-    /// audit-projection fields now grouped into 2 typed
-    /// input blocks (additive APIs;V1 byte-equality
-    /// untouched)。
-    public static let commitsShipped: Int = 469
+    /// M1428)。 Bumped through chapter 512:469 → 473。
+    /// Chapter 512:projection-block wire-in chain —
+    /// M1425 typed observation record + M1426 actor
+    /// accumulator + M1427 12th BASBundle<Item> adoption
+    /// + M1428 close-out。 4-stage typed composition
+    /// pipeline closed (block → observation → observer →
+    /// BASBundle batch)。
+    public static let commitsShipped: Int = 473
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

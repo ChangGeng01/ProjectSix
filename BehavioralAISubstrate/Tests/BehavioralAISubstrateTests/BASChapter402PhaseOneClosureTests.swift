@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1424",
-            "M1424:doctrine version reflects chapter 五百十一 — projection-block fold。 BASAuditObservationProjectionsKunlunInputs (18 fields, 4 trio outputs, M1421) + KunlunConvenienceInit (M1422) + BASAuditObservationProjectionsCthulhuInputs (8 fields, 2 trio/penta outputs, M1423) + matching CthulhuConvenienceInit。 26 audit-projection fields collapsed into 2 typed input blocks (additive APIs only; V1 untouched)。 55 typed surfaces cumulative。 V1 byte-equality preserved (no monolith change in chapter 511)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1428",
+            "M1428:doctrine version reflects chapter 五百十二 — projection-block wire-in chain。 BASAuditObservationProjectionsBundleObservation (M1425, typed per-turn record) + BASAuditObservationProjectionsBundleObserver actor (M1426) + BASAuditObservationProjectionsBundle 12th BASBundle<Item> adoption (M1427)。 4-stage typed composition pipeline closed (Block inputs → projections → observation → observer-actor → BASBundle batch)。 58 typed surfaces cumulative。 V1 byte-equality preserved (observer is opt-in, no production callers wired)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

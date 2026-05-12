@@ -1481,7 +1481,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百十一")!)
+                            "chapter 五百十一")!),
+            // M1428 chapter 512 — projection-block wire-in
+            checkRegistry("五百十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2065,6 +2071,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百十一")!
+                .mNumberLast),
+            // M1428 chapter 512 — projection-block wire-in
+            ("512",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

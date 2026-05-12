@@ -4607,7 +4607,95 @@ public enum BASChapterDoctrineRegistry {
                 " body construction。 55 typed surfaces" +
                 " cumulative。 ADR-016 → M1424。 V1" +
                 " byte-equality untouched (additive APIs" +
-                " only)。 ADR-014 OPT-IN preserved。")
+                " only)。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 512 — projection-block wire-in chain
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十二",
+            mNumberFirst: 1425,
+            mNumberLast: 1428,
+            v1MilestoneMNumber: 1428,
+            v1MilestoneStatus:
+                "chapter-512-projection-wire-in-chain",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1425, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsBundleObservation —" +
+                        " typed per-turn record capturing" +
+                        " Kunlun + Cthulhu block coverage" +
+                        " flags + Hashable digests for" +
+                        " replay drift detection。 4" +
+                        " typed factory constructors。 56" +
+                        " typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1426, knife: "第二刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsBundleObserver actor" +
+                        " — accumulates per-turn records," +
+                        " exposes coverage rollups" +
+                        " (fullyCoveredCount /" +
+                        " coldEmissionCount /" +
+                        " cumulativePopulatedBlockCount /" +
+                        " distinctTurnCount)。 57 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1427, knife: "第三刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsBundle — 12th" +
+                        " BASBundle<Item> adoption。" +
+                        " Bundle-side coverage rollups +" +
+                        " observer-to-bundle bridge" +
+                        " (snapshotAsBundle)。 58 typed" +
+                        " surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1428, knife: "第四刀",
+                    concept: "Chapter 512 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1428。 Wire-in chain closed:" +
+                        " typed observation record →" +
+                        " actor accumulator → typed" +
+                        " BASBundle adoption。 12 typed" +
+                        " BASBundle<Item> adoptions" +
+                        " cumulative。")
+            ],
+            entropyClassesAttacked: [
+                "projection-block-emission-untyped",
+                "kunlun-cthulhu-coverage-tracking-absent",
+                "cross-turn-projection-replay-drift",
+                "projection-bundle-aggregation-absent"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1428",
+                "v1-byte-equality-preserved",
+                "additive-opt-in-surfaces-only",
+                "12th-BASBundle-adoption"
+            ],
+            plannedFutureCuts: [
+                "future arc — production wire-in" +
+                " (V1 monolith emits to the observer" +
+                " when host opts in via BASKVCache" +
+                "Registry-style typed policy slot)",
+                "future arc — cross-host federated" +
+                " event log integration",
+                "future arc — additional inline" +
+                " construction folds",
+                "future arc — Tier C migration adoption"
+            ],
+            summary: "Wire-in chain for chapter 511" +
+                " projection blocks:typed observation" +
+                " record + actor accumulator + 12th" +
+                " BASBundle<Item> adoption。 4-stage" +
+                " typed composition pipeline (Block" +
+                " inputs → projections → observation →" +
+                " observer-actor → BASBundle batch)。" +
+                " 58 typed surfaces cumulative。 ADR-016" +
+                " → M1428。 V1 byte-equality untouched" +
+                " (observer is OPT-IN,no production" +
+                " callers wired at close-out)。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
