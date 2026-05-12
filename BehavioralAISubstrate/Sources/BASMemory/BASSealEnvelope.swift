@@ -223,7 +223,7 @@ public enum BASOldSealSealingProtocol {
     /// auditedAccess ≻ passive). Returns `nil` when the seal
     /// list is empty so consumers can elide both codes when no
     /// seals are present this turn.
-    public struct Aggregate: Sendable, Equatable {
+    public struct Aggregate: Codable, Sendable, Equatable {
         public let count: Int
         public let strictestPolicy: BASSealAccessPolicy
         /// **M387** — per-policy histogram of the seals in this

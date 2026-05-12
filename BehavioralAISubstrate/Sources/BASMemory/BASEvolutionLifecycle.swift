@@ -304,7 +304,7 @@ public struct BASEvolutionLifecycleSession:
 /// runtime coordinator to summarize per-turn ticket lifecycle
 /// state without importing the actor primitives.
 public extension BASEvolutionLifecycleSession {
-    struct Aggregate: Sendable, Equatable {
+    struct Aggregate: Codable, Sendable, Equatable {
         /// Total session count.
         public let count: Int
         /// Number of sessions where `currentStage.isTerminal` is

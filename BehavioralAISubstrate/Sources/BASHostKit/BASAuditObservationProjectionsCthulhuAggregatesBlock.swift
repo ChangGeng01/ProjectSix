@@ -61,7 +61,7 @@ import BASWorldPrior
 /// 6 optional fields + 1 array (abyssalBranches has
 /// default [])。
 public struct BASAuditObservationProjectionsCthulhuAggregatesBlock:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 7 L1-L7 Cthulhu aggregate fields
