@@ -131,7 +131,7 @@ public struct BASChengluPreflightHint:
 // MARK: - Length hint (regression)
 
 public struct BASChengluLengthHint:
-    Sendable, Equatable, Hashable
+    Codable, Sendable, Equatable, Hashable
 {
     public let predictedLengthChars: Double
     public let confidence: BASChengluHintConfidence
@@ -148,7 +148,7 @@ public struct BASChengluLengthHint:
 // MARK: - Latency hint (regression)
 
 public struct BASChengluLatencyHint:
-    Sendable, Equatable, Hashable
+    Codable, Sendable, Equatable, Hashable
 {
     public let predictedDurationMs: Double
     public let confidence: BASChengluHintConfidence
