@@ -32,7 +32,9 @@ import Foundation
 ///     are `Double` because CoreML's `MLFeatureValue` is most
 ///     commonly numeric;categorical features are pre-one-hot-
 ///     encoded by the caller。
-public struct BASCoreMLFeatureFrame: Sendable, Equatable {
+public struct BASCoreMLFeatureFrame:
+    Codable, Sendable, Equatable
+{
     public let featureValues: [String: Double]
 
     public init(featureValues: [String: Double] = [:]) {

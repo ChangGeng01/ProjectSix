@@ -47,7 +47,9 @@ import Foundation
 
 /// Typed row in the vector index。Pairs an atom ID with its
 /// embedding + free-form metadata for retrieval-time filtering。
-public struct BASVectorIndexEntry: Sendable, Equatable {
+public struct BASVectorIndexEntry:
+    Codable, Sendable, Equatable
+{
     /// Atom ID (matches `BASGovernedMemory.id.uuidString`)。
     public let atomID: String
 
@@ -81,7 +83,9 @@ public struct BASVectorIndexEntry: Sendable, Equatable {
 // MARK: - Top-k result
 
 /// Typed result of a top-k similarity query。
-public struct BASVectorTopKResult: Sendable, Equatable {
+public struct BASVectorTopKResult:
+    Codable, Sendable, Equatable
+{
     /// Candidate atom ID。
     public let atomID: String
 

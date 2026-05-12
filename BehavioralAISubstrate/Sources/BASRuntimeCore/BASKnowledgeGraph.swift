@@ -193,7 +193,9 @@ public enum BASKnowledgeGraphError: Error, Equatable, Sendable {
 
 /// Typed result of cycle detection — a sequence of nodeIDs
 /// forming a directed cycle。
-public struct BASKnowledgeCycle: Equatable, Sendable {
+public struct BASKnowledgeCycle:
+    Codable, Equatable, Sendable
+{
     /// Ordered list of nodeIDs forming the cycle。Length ≥ 2;
     /// the cycle closes from `nodeIDs.last` back to
     /// `nodeIDs.first`。

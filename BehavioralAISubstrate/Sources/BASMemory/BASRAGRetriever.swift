@@ -81,7 +81,9 @@ import BASRuntimeCore
 // MARK: - BASRAGResult
 
 /// Typed result of a RAG retrieval pipeline run。
-public struct BASRAGResult: Sendable, Equatable {
+public struct BASRAGResult:
+    Codable, Sendable, Equatable
+{
     /// Successfully-fetched atoms,ordered by reranker score
     /// descending。Same order as the reranker output。
     public let atoms: [BASMemoryAtom]
