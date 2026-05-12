@@ -1809,6 +1809,21 @@ public enum BASEntropyChapterIndex {
                 "site savings:10 named arg lines → 1" +
                 " evolutionBundle construction。 70 typed" +
                 " surfaces cumulative。 ADR-016 → M1476。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百二十五",
+            mNumberFirst: 1477, mNumberLast: 1480,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "2nd BASEBrainTurnResult cluster" +
+                " bundle:BASEBrainTurnResultSovereign" +
+                "Bundle (8 L14 sovereign fields) +" +
+                " 2-bundle convenience init + V1" +
+                " monolith splice。 BASEBrainTurnResult" +
+                " call site cumulative:52 → 36 args" +
+                " (16 args collapsed across evolution" +
+                " + sovereign bundles)。 71 typed" +
+                " surfaces cumulative。 ADR-016 → M1480。" +
                 " V1 byte-equality preserved。")
     ]
 

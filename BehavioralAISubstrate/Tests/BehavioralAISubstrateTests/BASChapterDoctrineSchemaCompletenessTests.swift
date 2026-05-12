@@ -1559,7 +1559,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百二十四")!)
+                            "chapter 五百二十四")!),
+            // M1480 chapter 525 — sovereign bundle 2nd cluster
+            checkRegistry("五百二十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百二十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2247,6 +2253,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百二十四")!
+                .mNumberLast),
+            // M1480 chapter 525 — sovereign bundle 2nd cluster
+            ("525",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百二十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1476",
-            "M1476:doctrine version reflects chapter 五百二十四 — PIVOT to BASEBrainTurnResult fold (first V1 fold of a non-projection call site since chapter 510)。 BASEBrainTurnResultEvolutionBundle typed cluster packaging 10 L13 evolution fields (M1473) + BASEBrainTurnResult.init(evolutionBundle:) convenience init (M1474) + V1 monolith splice at line 2287+ replacing 10 named-arg lines with 1 typed evolutionBundle construction (M1475)。 Public API additive only — 52-arg all-fields init preserved。 70 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1480",
+            "M1480:doctrine version reflects chapter 五百二十五 — 2nd BASEBrainTurnResult cluster bundle (sovereign 8 fields)。 BASEBrainTurnResultSovereignBundle typed cluster packaging 8 L14 sovereign fields (M1477) + BASEBrainTurnResult.init(sovereignBundle:evolutionBundle:) 2-bundle convenience init (M1478) + V1 monolith splice using sovereign bundle (M1479)。 Cumulative BASEBrainTurnResult call-site fold:52 → 36 named args (16 collapsed across evolution + sovereign bundles)。 71 typed surfaces cumulative。 V1 byte-equality preserved (stress-sweep canonical60 × 3 repeat runs 0-divergence)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

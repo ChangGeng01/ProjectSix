@@ -5846,7 +5846,99 @@ public enum BASChapterDoctrineRegistry {
                 " (typed surface)。 70 typed surfaces" +
                 " cumulative。 ADR-016 → M1476。 V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved (public API additive only)。")
+                " preserved (public API additive only)。"),
+
+        // chapter 525 — sovereign bundle (2nd cluster)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百二十五",
+            mNumberFirst: 1477,
+            mNumberLast: 1480,
+            v1MilestoneMNumber: 1480,
+            v1MilestoneStatus:
+                "chapter-525-sovereign-bundle-2nd-cluster",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1477, knife: "第一刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "SovereignBundle — 2nd cluster" +
+                        " in the BASEBrainTurnResult" +
+                        " fold (1st was evolution at" +
+                        " chapter 524)。 Packs 8 L14" +
+                        " sovereign fields (verdict +" +
+                        " commit tokens + warrants +" +
+                        " lock + quarantine records +" +
+                        " audit entry + actuation" +
+                        " commands + execution receipts)。" +
+                        " 71 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1478, knife: "第二刀",
+                    concept: "BASEBrainTurnResult.init(" +
+                        "sovereignBundle:" +
+                        "evolutionBundle:) 2-bundle" +
+                        " convenience init。 Delegates" +
+                        " to all-fields init with 8" +
+                        " sovereign fields unpacked。" +
+                        " Sibling of M1474 evolution-" +
+                        "only init。"),
+                BASChapterKnife(
+                    mNumber: 1479, knife: "第三刀",
+                    concept: "V1 monolith splice uses" +
+                        " sovereignBundle (8 args → 1" +
+                        " typed block)。 Cumulative" +
+                        " BASEBrainTurnResult fold:52" +
+                        " → 36 named args at line" +
+                        " 2287+ (16 args collapsed" +
+                        " across evolution + sovereign" +
+                        " bundles)。"),
+                BASChapterKnife(
+                    mNumber: 1480, knife: "第四刀",
+                    concept: "Chapter 525 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1480。 2 of ~5 BASEBrain" +
+                        "TurnResult cluster bundles" +
+                        " shipped (evolution + sovereign)。" +
+                        " V1 byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "BASEBrainTurnResult-sovereign-cluster-8-args",
+                "BASEBrainTurnResult-fold-incomplete",
+                "L14-sovereign-chain-not-typed-as-bundle",
+                "convenience-init-pattern-needs-extension"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1480",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "public-api-additive-only"
+            ],
+            plannedFutureCuts: [
+                "future arc — host cluster bundle (5" +
+                " host* fields:hostConstitution +" +
+                " hostConstitutionVault + hostVersionTree" +
+                " + hostForgetRequest + hostContext)",
+                "future arc — audit-projection forwarded" +
+                " cluster (7 fields)",
+                "future arc — SampleHost wire-in of" +
+                " projection-block observer adapter",
+                "future arc — Tier C migration source-" +
+                "type adoption"
+            ],
+            summary: "Chapter 525 ships the 2nd cluster" +
+                " bundle for the BASEBrainTurnResult" +
+                " fold:BASEBrainTurnResultSovereign" +
+                "Bundle (8 L14 sovereign fields) +" +
+                " 2-bundle convenience init + V1" +
+                " monolith splice using the sovereign" +
+                " bundle。 Cumulative fold progress at" +
+                " BASEBrainTurnResult call site:52 →" +
+                " 36 named args (16 args collapsed" +
+                " across evolution + sovereign bundles)。" +
+                " 71 typed surfaces cumulative。 ADR-016" +
+                " → M1480。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved (public API" +
+                " additive only)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
