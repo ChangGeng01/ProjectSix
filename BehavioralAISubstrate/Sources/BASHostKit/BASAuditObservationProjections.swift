@@ -576,6 +576,81 @@ public struct BASAuditObservationProjections: Sendable, Equatable {
                 observationBundles.updateTicket)
     }
 
+    // MARK: - chapter 五百十八 / M1450 — unified 6-block
+    //                                    convenience init
+    //
+    // Single convenience init taking ALL SIX typed input
+    // blocks (Kunlun + Cthulhu + ObservationBundles +
+    // KunlunProtocol + CthulhuAggregates + Closure) plus
+    // the residual ~10 scalar fields。 Collapses the
+    // 56-arg all-fields init into ~16 args at the call
+    // site (6 blocks + ~10 residuals)。
+    //
+    // Byte-equality with the 5-block init GUARANTEED by
+    // body construction — the 7 closure fields are
+    // unpacked from the new block's accessors。
+    public init(
+        kunlunInputs:
+            BASAuditObservationProjectionsKunlunInputs,
+        cthulhuInputs:
+            BASAuditObservationProjectionsCthulhuInputs,
+        observationBundles:
+            BASAuditObservationProjectionsObservationBundlesBlock,
+        kunlunProtocolBlock:
+            BASAuditObservationProjectionsKunlunProtocolBlock,
+        cthulhuAggregatesBlock:
+            BASAuditObservationProjectionsCthulhuAggregatesBlock,
+        closureBlock:
+            BASAuditObservationProjectionsClosureBlock,
+        kunlunAxisView: BASKunlunAxisView? = nil,
+        kunlunTianmenWarrant: BASKunlunTianmenWarrant? = nil,
+        kunlunGateDenialWrit: BASKunlunGateDenialWrit? = nil,
+        ontologyShiftMark: BASOntologyShiftMark? = nil,
+        cthulhuAssertionCeilingReasonCodes: [String] = [],
+        cthulhuPermitEscalationReasonCodes: [String] = [],
+        narrativeDistortionMap:
+            BASNarrativeDistortionMap? = nil,
+        cthulhuSurfaceAlias:
+            BASCthulhuSurfaceAlias? = nil,
+        kunlunSurfaceAlias:
+            BASKunlunSurfaceAlias? = nil
+    ) {
+        // Delegate to the 5-block unified init with the
+        // 7 closure fields unpacked from closureBlock。
+        self.init(
+            kunlunInputs: kunlunInputs,
+            cthulhuInputs: cthulhuInputs,
+            observationBundles: observationBundles,
+            kunlunProtocolBlock: kunlunProtocolBlock,
+            cthulhuAggregatesBlock:
+                cthulhuAggregatesBlock,
+            candidateObservationBundle:
+                closureBlock.candidateObservationBundle,
+            tribunalObservationBundle:
+                closureBlock.tribunalObservationBundle,
+            unknownReserve: closureBlock.unknownReserve,
+            forbiddenAggregate:
+                closureBlock.forbiddenAggregate,
+            escalationSuppressionCodes:
+                closureBlock.escalationSuppressionCodes,
+            kunlunAxisView: kunlunAxisView,
+            kunlunTianmenWarrant: kunlunTianmenWarrant,
+            kunlunGateDenialWrit: kunlunGateDenialWrit,
+            layerReconciliationVerdict:
+                closureBlock.layerReconciliationVerdict,
+            layerReconciliationReport:
+                closureBlock.layerReconciliationReport,
+            ontologyShiftMark: ontologyShiftMark,
+            cthulhuAssertionCeilingReasonCodes:
+                cthulhuAssertionCeilingReasonCodes,
+            cthulhuPermitEscalationReasonCodes:
+                cthulhuPermitEscalationReasonCodes,
+            narrativeDistortionMap:
+                narrativeDistortionMap,
+            cthulhuSurfaceAlias: cthulhuSurfaceAlias,
+            kunlunSurfaceAlias: kunlunSurfaceAlias)
+    }
+
     // MARK: - chapter 五百十七 / M1446 — unified 5-block
     //                                    convenience init
     //
