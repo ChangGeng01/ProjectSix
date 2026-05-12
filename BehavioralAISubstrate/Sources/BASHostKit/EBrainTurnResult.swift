@@ -202,6 +202,88 @@ public struct BASEBrainTurnResult: Codable, Equatable, Sendable {
         self.yaochiSanctumEntry = yaochiSanctumEntry
     }
 
+    // MARK: - chapter 五百二十八 / M1490 — 5-bundle
+    //                                       convenience init
+    //
+    // Adds a 5-bundle convenience init that accepts ALL
+    // FIVE typed cluster bundles (sovereign + host +
+    // evolution + auditProjectionForward + cognitive
+    // frames)。 Collapses 35 individual fields into 5
+    // typed bundle args at the call site (10+8+5+7+5)。
+    //
+    // Public API additive only — all earlier inits
+    // remain working。 Byte-equality with the all-fields
+    // init GUARANTEED by body delegation through the
+    // 4-bundle M1485 init,with the 5 cognitive frames
+    // unpacked from the new cognitiveFramesBundle。
+    public init(
+        deviceState: BASDeviceState,
+        budgetFrame: BASBudgetFrame,
+        wakeIntent: BASWakeIntent,
+        vitalState: BASVitalState,
+        runLease: BASRunLease? = nil,
+        emergencyBrake: BASEmergencyBrake = BASEmergencyBrake(
+            brakeLevel: .none,
+            reasonCodes: []
+        ),
+        sovereignBundle:
+            BASEBrainTurnResultSovereignBundle,
+        policyLineage: BASRuntimePolicyLineage? = nil,
+        recoveryDisposition: BASRecoveryDisposition? = nil,
+        hostBundle: BASEBrainTurnResultHostBundle,
+        cognitiveFramesBundle:
+            BASEBrainTurnResultCognitiveFramesBundle,
+        triScores: [BASTriSelfScore],
+        mergedChoice: BASMergedChoice,
+        riskCard: BASRiskCard,
+        actionPermit: BASActionPermit,
+        riskDecisionPackage: BASRiskDecisionPackage? = nil,
+        hostGateValue: Double,
+        renderedOutput: BASRenderedOutput,
+        updateTickets: [BASUpdateTicket],
+        evolutionBundle: BASEBrainTurnResultEvolutionBundle,
+        runtimeTrace: BASRuntimeTrace,
+        auditProjectionForwardBundle:
+            BASEBrainTurnResultAuditProjectionForwardBundle
+    ) {
+        // Delegate to the M1485 4-bundle init,
+        // unpacking the 5 cognitive frames from the
+        // cognitiveFramesBundle。
+        self.init(
+            deviceState: deviceState,
+            budgetFrame: budgetFrame,
+            wakeIntent: wakeIntent,
+            vitalState: vitalState,
+            runLease: runLease,
+            emergencyBrake: emergencyBrake,
+            sovereignBundle: sovereignBundle,
+            policyLineage: policyLineage,
+            recoveryDisposition: recoveryDisposition,
+            hostBundle: hostBundle,
+            contextFrame:
+                cognitiveFramesBundle.contextFrame,
+            decomposeFrame:
+                cognitiveFramesBundle.decomposeFrame,
+            memoryBundle:
+                cognitiveFramesBundle.memoryBundle,
+            thoughtFrame:
+                cognitiveFramesBundle.thoughtFrame,
+            thoughtFold:
+                cognitiveFramesBundle.thoughtFold,
+            triScores: triScores,
+            mergedChoice: mergedChoice,
+            riskCard: riskCard,
+            actionPermit: actionPermit,
+            riskDecisionPackage: riskDecisionPackage,
+            hostGateValue: hostGateValue,
+            renderedOutput: renderedOutput,
+            updateTickets: updateTickets,
+            evolutionBundle: evolutionBundle,
+            runtimeTrace: runtimeTrace,
+            auditProjectionForwardBundle:
+                auditProjectionForwardBundle)
+    }
+
     // MARK: - chapter 五百二十六 / M1483 — 4-bundle
     //                                       convenience init
     //                                       (parallel-run
