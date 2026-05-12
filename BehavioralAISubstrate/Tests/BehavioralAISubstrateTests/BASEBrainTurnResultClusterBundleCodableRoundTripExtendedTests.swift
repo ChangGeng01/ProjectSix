@@ -210,6 +210,58 @@ final class BASEBrainTurnResultClusterBundleCodableRoundTripExtendedTests:
         XCTAssertEqual(data1, data2)
     }
 
+    // MARK: - RiskChoiceBundle fixture
+    //         (chapter 546 / M1561)
+
+    private func makeRiskChoiceBundle()
+        -> BASEBrainTurnResultRiskChoiceBundle
+    {
+        let triScore = BASTriSelfScore(
+            candidateID: "cand-001",
+            idScore: 0.5,
+            egoScore: 0.6,
+            superegoScore: 0.7,
+            mergedScore: 0.6,
+            veto: false)
+        let choice = BASMergedChoice(
+            candidateID: "cand-001",
+            title: "fixture-choice",
+            actionSummary: "fixture-action")
+        let riskCard = BASRiskCard(
+            totalRisk: 0.4,
+            riskLevel: .medium,
+            uncertainty: 0.3,
+            irreversibility: 0.2,
+            manipulationStrength: 0.1,
+            gsiScore: 0.5,
+            recommendedMode: .answer)
+        let permit = BASActionPermit(
+            mode: .answer)
+        return BASEBrainTurnResultRiskChoiceBundle(
+            triScores: [triScore],
+            mergedChoice: choice,
+            riskCard: riskCard,
+            actionPermit: permit)
+    }
+
+    func testRiskChoiceBundleMinimumRoundTrips() throws
+    {
+        let original = makeRiskChoiceBundle()
+        let decoded = try roundTrip(original)
+        XCTAssertEqual(decoded, original)
+    }
+
+    func testRiskChoiceBundleEncodingIsDeterministic()
+        throws
+    {
+        let bundle = makeRiskChoiceBundle()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data1 = try encoder.encode(bundle)
+        let data2 = try encoder.encode(bundle)
+        XCTAssertEqual(data1, data2)
+    }
+
     // MARK: - Cross-bundle round-trip determinism PROOF
 
     func testThreeBundlesRoundTripPreservesFieldEquality()
