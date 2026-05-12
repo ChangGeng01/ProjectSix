@@ -2117,7 +2117,23 @@ public enum BASEntropyChapterIndex {
                 " BASSchemaVersioned;Swift synthesizes" +
                 " automatically。 87 typed surfaces" +
                 " cumulative。 ADR-016 → M1544。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十二",
+            mNumberFirst: 1545, mNumberLast: 1548,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "7 explicit Codable round-trip" +
+                " PROOF tests for 3 cluster bundles" +
+                " with empty defaults (M1545) + NEW" +
+                " BASEBrainTurnResultClusterBundle" +
+                "HashableBlockerDoctrine typed surface" +
+                " with BlockerCategory typed enum (3" +
+                " cases) cataloguing BAS Schema Versioned-" +
+                "lacks-Hashable blockers (M1546) + 10" +
+                " anti-drift PROOF tests (M1547)。 88" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M1548。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

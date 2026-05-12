@@ -7392,7 +7392,98 @@ public enum BASChapterDoctrineRegistry {
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M1544。 128 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 542 — Codable round-trip PROOF tests
+        // + Hashable blocker doctrine
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十二",
+            mNumberFirst: 1545,
+            mNumberLast: 1548,
+            v1MilestoneMNumber: 1548,
+            v1MilestoneStatus:
+                "chapter-542-codable-roundtrip-hashable-blocker",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1545, knife: "第一刀",
+                    concept: "7 explicit Codable round-" +
+                        "trip PROOF tests for the 3" +
+                        " cluster bundles with empty" +
+                        " defaults (Evolution + Sovereign" +
+                        " + AuditProjectionForward)。" +
+                        " Pins:.empty == init() byte-" +
+                        "equal at serialization layer" +
+                        " + sortedKeys JSON encoding is" +
+                        " deterministic across repeated" +
+                        " runs (chapter 三百九二)。"),
+                BASChapterKnife(
+                    mNumber: 1546, knife: "第二刀",
+                    concept: "NEW BASEBrainTurnResult" +
+                        "ClusterBundleHashableBlocker" +
+                        "Doctrine typed surface +" +
+                        " BlockerCategory typed enum (3" +
+                        " cases) cataloguing why Hashable" +
+                        " synthesis is BLOCKED:BAS" +
+                        "RecoveryDisposition + BAS" +
+                        "RuntimeTrace lack Hashable (both" +
+                        " BASSchemaVersioned family)。" +
+                        " 88 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1547, knife: "第三刀",
+                    concept: "10 anti-drift PROOF tests:" +
+                        " blocker count + per-type" +
+                        " entries + BlockerCategory" +
+                        " enum + canary + decision pins" +
+                        " + family invariant (all" +
+                        " catalogued blockers are" +
+                        " BASSchemaVersioned-family)。"),
+                BASChapterKnife(
+                    mNumber: 1548, knife: "第四刀",
+                    concept: "Chapter 542 close-out +" +
+                        " doctrine sync — Codable round-" +
+                        "trip PROOF + Hashable blocker" +
+                        " analysis sealed。 132" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "codable-round-trip-untested",
+                "hashable-blocker-undocumented",
+                "BASSchemaVersioned-lacks-hashable-trade-off-hidden",
+                "future-maintainer-rederives-blocker"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1548",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hashable-blocker-non-driftable"
+            ],
+            plannedFutureCuts: [
+                "future arc — Codable round-trip PROOF" +
+                " for the remaining 6 cluster bundles" +
+                " (requires fixture builders)",
+                "future arc — stakeholder review of" +
+                " whether BASSchemaVersioned should" +
+                " require Hashable (large-blast-radius" +
+                " trade-off captured by M1546 doctrine)",
+                "future arc — V1 monolith internal" +
+                " fold continuation"
+            ],
+            summary: "Chapter 542 ships 7 explicit" +
+                " Codable round-trip PROOF tests for the" +
+                " 3 cluster bundles with empty defaults" +
+                " (M1545) + NEW BASEBrainTurnResultCluster" +
+                "BundleHashableBlockerDoctrine typed" +
+                " surface with BlockerCategory typed enum" +
+                " (M1546) + 10 anti-drift PROOF tests" +
+                " (M1547) + close-out (M1548)。 88 typed" +
+                " surfaces cumulative。 ADR-016 → M1548。" +
+                " 132 consecutive autonomous commits with" +
+                " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

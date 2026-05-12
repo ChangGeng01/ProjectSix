@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1544",
-            "M1544:doctrine version reflects chapter 五百四十一 — Codable conformance addition across all 9 BASEBrainTurnResult cluster bundles (Equatable, Sendable → Codable, Equatable, Sendable at M1541) + BASEBrainTurnResultClusterBundleCodableDoctrine typed milestone with matchesFoldArcCount cross-doctrine invariant (M1542) + 7 PROOF tests including compile-time conformance check (M1543)。 All 52 underlying fields already Codable via BASSchemaVersioned。 87 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1548",
+            "M1548:doctrine version reflects chapter 五百四十二 — 7 explicit Codable round-trip PROOF tests for 3 cluster bundles with empty defaults (M1545) + BASEBrainTurnResultClusterBundleHashableBlockerDoctrine typed surface cataloguing BASSchemaVersioned-lacks-Hashable blockers (M1546) + 10 anti-drift PROOF tests (M1547)。 88 typed surfaces cumulative。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

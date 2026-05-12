@@ -37,16 +37,15 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs541() {
+    func testLastChapterIs542() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百四十一",
-            "Chapter 五百四十一:Codable conformance" +
-            " addition across all 9 BASEBrainTurnResult" +
-            " cluster bundles + typed milestone doctrine" +
-            " with matchesFoldArcCount cross-doctrine" +
-            " invariant + 7 PROOF tests。 87 typed" +
+            "chapter 五百四十二",
+            "Chapter 五百四十二:7 Codable round-trip" +
+            " PROOF tests + BASEBrainTurnResultCluster" +
+            "BundleHashableBlockerDoctrine typed surface" +
+            " + 10 anti-drift PROOF tests。 88 typed" +
             " surfaces cumulative")
     }
 

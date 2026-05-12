@@ -195,7 +195,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百三十八",   // M1529-M1532 (test-target warning purge — 4 warnings 0 + typed milestone doctrine + 13 PROOF tests — both targets warning-free)
         "chapter 五百三十九",   // M1533-M1536 (3rd typed observability sink — cross-module BASAuditEmissionFailureLog in BASRuntimeCore + wire-in to BASHostKit + BASSovereign + 10 PROOF tests)
         "chapter 五百四十",     // M1537-M1540 (unified typed catalogue doctrine for 3 observability sinks + 23 PROOF tests — 8-path / 3-sink achievement non-driftable)
-        "chapter 五百四十一"    // M1541-M1544 (Codable conformance addition across 9 BASEBrainTurnResult cluster bundles + typed milestone + 7 PROOF tests)
+        "chapter 五百四十一",   // M1541-M1544 (Codable conformance addition across 9 BASEBrainTurnResult cluster bundles + typed milestone + 7 PROOF tests)
+        "chapter 五百四十二"    // M1545-M1548 (7 Codable round-trip PROOF tests + typed Hashable blocker doctrine + 10 anti-drift PROOF tests)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -212,14 +213,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1544
+    public static let mNumberLast: Int = 1548
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1544)。 Bumped through chapter 541:585 → 589。
-    /// Chapter 541:Codable conformance addition across
-    /// 9 BASEBrainTurnResult cluster bundles + typed
-    /// milestone doctrine + 7 PROOF tests + close-out。
-    public static let commitsShipped: Int = 589
+    /// M1548)。 Bumped through chapter 542:589 → 593。
+    /// Chapter 542:7 Codable round-trip PROOF tests +
+    /// typed Hashable blocker doctrine + 10 anti-drift
+    /// PROOF tests + close-out。
+    public static let commitsShipped: Int = 593
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

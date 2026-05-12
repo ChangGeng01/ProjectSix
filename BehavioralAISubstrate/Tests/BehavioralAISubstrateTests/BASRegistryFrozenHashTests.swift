@@ -107,17 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 541 close-out。 Chapter
-    /// 541:Codable conformance addition across all 9
-    /// BASEBrainTurnResult cluster bundles (Equatable,
-    /// Sendable → Codable, Equatable, Sendable at
-    /// M1541) + BASEBrainTurnResultClusterBundleCodable
-    /// Doctrine typed milestone with matchesFoldArcCount
-    /// cross-doctrine invariant against BASEBrainTurn
-    /// ResultFoldArcSealedDoctrine (M1542) + 7 PROOF
-    /// tests including compile-time conformance check
-    /// (M1543)。 All 52 underlying fields already
-    /// Codable via BASSchemaVersioned。
+    /// Re-captured at chapter 542 close-out。 Chapter
+    /// 542:7 explicit Codable round-trip PROOF tests
+    /// for 3 cluster bundles with empty defaults
+    /// (M1545) + NEW BASEBrainTurnResultClusterBundle
+    /// HashableBlockerDoctrine typed surface with
+    /// BlockerCategory typed enum (3 cases) cataloguing
+    /// BAS Schema Versioned-lacks-Hashable blockers
+    /// (BASRecoveryDisposition + BASRuntimeTrace)
+    /// (M1546) + 10 anti-drift PROOF tests (M1547)。
     static let frozenFullRegistrySha256: String =
-        "9afaf2989fe70c3c05deea72525b0def71ecabb2cfad237d21d50f7e3ac103b9"
+        "a60e33c949a67b935c0009bd2b303fb8d8471530ebace357ef160250459ea925"
 }
