@@ -1829,7 +1829,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百六十九")!)
+                            "chapter 五百六十九")!),
+            // M1660 chapter 570 — Tri-arc completion meta-meta milestone (round-number M1660)
+            checkRegistry("五百七十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2877,6 +2883,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百六十九")!
+                .mNumberLast),
+            // M1660 chapter 570 — Tri-arc completion meta-meta milestone (round-number M1660)
+            ("570",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

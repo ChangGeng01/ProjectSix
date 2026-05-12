@@ -2631,7 +2631,26 @@ public enum BASEntropyChapterIndex {
                 " 564 aggregator-arc pattern。 110" +
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1656。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十",
+            mNumberFirst: 1657, mNumberLast: 1660,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "TRI-ARC COMPLETION META-META" +
+                " MILESTONE。 NEW" +
+                " BASCodableExtensionTriArcCompletion" +
+                "Doctrine typed milestone (M1657)" +
+                " commemorating ALL 3 sealed Codable" +
+                " extension arcs of this session" +
+                " (cascade + aggregator + cross-module" +
+                " = 44 types, 36 commits, 9 chapters)。" +
+                " 18 anti-drift PROOF tests (M1658) +" +
+                " 12 wire-in PROOF tests (M1659) +" +
+                " close-out (M1660 round-number" +
+                " milestone)。 111 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1660。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1656",
-            "M1656:doctrine version reflects chapter 五百六十九 — CROSS-MODULE CODABLE EXTENSION ARC-SEAL MILESTONE。 BASCrossModuleCodableExtensionArcSealedDoctrine typed milestone (M1653) commemorating 3-chapter / 12-commit arc (chapters 566-568) covering 13 cross-module types + 21 anti-drift PROOF tests (M1654) + 13 wire-in PROOF tests (M1655) + close-out (M1656)。 Mirrors chapter 564 aggregator-arc pattern。 110 typed surfaces cumulative。 240 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1660",
+            "M1660:doctrine version reflects chapter 五百七十 — TRI-ARC COMPLETION META-META MILESTONE (M1660 round-number)。 BASCodableExtensionTriArcCompletionDoctrine typed milestone (M1657) commemorating ALL 3 sealed Codable extension arcs of this session (cascade + aggregator + cross-module = 44 types, 36 commits, 9 chapters) + 18 anti-drift PROOF tests (M1658) + 12 wire-in PROOF tests (M1659) + close-out (M1660)。 111 typed surfaces cumulative。 244 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -9829,6 +9829,83 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1656。 240 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 570 — Meta-meta milestone summing
+        // all 3 sealed Codable extension arcs。 M1660
+        // round-number close-out。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十",
+            mNumberFirst: 1657,
+            mNumberLast: 1660,
+            v1MilestoneMNumber: 1660,
+            v1MilestoneStatus:
+                "chapter-570-tri-arc-completion-M1660",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1657, knife: "第一刀",
+                    concept: "NEW BASCodableExtension" +
+                        "TriArcCompletionDoctrine meta-" +
+                        "meta milestone commemorating" +
+                        " 3 sealed Codable extension" +
+                        " arcs (44 types,36 commits,9" +
+                        " chapters)。 typed-surface" +
+                        " count 110 → 111。"),
+                BASChapterKnife(
+                    mNumber: 1658, knife: "第二刀",
+                    concept: "18 anti-drift PROOF tests" +
+                        " for the M1657 milestone。"),
+                BASChapterKnife(
+                    mNumber: 1659, knife: "第三刀",
+                    concept: "12 wire-in PROOF tests" +
+                        " cross-checking the M1657" +
+                        " milestone against the 3 arc-" +
+                        "seal doctrines。"),
+                BASChapterKnife(
+                    mNumber: 1660, knife: "第四刀",
+                    concept: "Chapter 570 close-out +" +
+                        " doctrine sync。 244" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。" +
+                        " M1660 round-number milestone。")
+            ],
+            entropyClassesAttacked: [
+                "three-arcs-uncatalogued",
+                "no-meta-meta-source-of-truth",
+                "arc-cross-validation-gap",
+                "aggregate-counts-not-cross-checked"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1660",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "tri-arc-completion",
+                "M1660-round-number-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional substrate" +
+                " work as needed"
+            ],
+            summary: "Chapter 570 ships a META-META" +
+                " milestone commemorating ALL 3 sealed" +
+                " Codable extension arcs (cascade +" +
+                " aggregator + cross-module = 44 types," +
+                " 36 commits,9 chapters)。 NEW" +
+                " BASCodableExtensionTriArcCompletion" +
+                "Doctrine (M1657) + 18 anti-drift" +
+                " PROOF tests (M1658) + 12 wire-in" +
+                " PROOF tests (M1659) + close-out" +
+                " (M1660 round-number milestone)。 111" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1660。 244 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 
