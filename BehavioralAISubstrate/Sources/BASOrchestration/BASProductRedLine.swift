@@ -129,7 +129,7 @@ public enum BASProductRedLineLinter {
 
     /// Violation report — red-line + offending input + matched
     /// substring.
-    public struct Violation: Sendable, Equatable, Hashable {
+    public struct Violation: Codable, Sendable, Equatable, Hashable {
         public let redLine: BASProductRedLine
         public let offendingInput: String
         public let matchedSubstring: String

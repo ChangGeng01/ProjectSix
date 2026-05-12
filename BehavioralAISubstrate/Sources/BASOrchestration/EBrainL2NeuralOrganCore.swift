@@ -248,7 +248,7 @@ public struct BASLatentTissueState: Codable, Equatable, Sendable {
     }
 }
 
-public struct BASNeuralCoreFrame: Equatable, Sendable {
+public struct BASNeuralCoreFrame: Codable, Equatable, Sendable {
     public var organMap: BASNeuralOrganMap
     public var tissueState: BASLatentTissueState
     public var degradedReasonCodes: [String]
