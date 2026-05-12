@@ -9103,7 +9103,90 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1620。 204 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 561 — Codable extension to 3 Trio/
+        // Protocol audit-projection aggregator types。
+        // Real substrate change。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十一",
+            mNumberFirst: 1621,
+            mNumberLast: 1624,
+            v1MilestoneMNumber: 1624,
+            v1MilestoneStatus:
+                "chapter-561-trio-codable-extension-real-substrate-change",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1621, knife: "第一刀",
+                    concept: "Real substrate change:" +
+                        " add Codable + Equatable" +
+                        " conformance to 3 audit-" +
+                        "projection aggregator types" +
+                        " (KunlunAxisProtocol +" +
+                        " KunlunTrio + AbyssalThermal" +
+                        "Trio)。 All 3 now ledger-" +
+                        "serializable for replay。"),
+                BASChapterKnife(
+                    mNumber: 1622, knife: "第二刀",
+                    concept: "8 PROOF tests:populated" +
+                        " round-trip + sortedKeys" +
+                        " determinism + distinct-value" +
+                        " negative PROOF across the 3" +
+                        " newly-Codable aggregator" +
+                        " types。"),
+                BASChapterKnife(
+                    mNumber: 1623, knife: "第三刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "TrioCodableExtensionDoctrine" +
+                        " typed surface。 typed-surface" +
+                        " count 101 → 102。"),
+                BASChapterKnife(
+                    mNumber: 1624, knife: "第四刀",
+                    concept: "Chapter 561 close-out +" +
+                        " doctrine sync。 208" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved this" +
+                        " autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "trio-types-non-codable",
+                "axis-protocol-non-codable",
+                "aggregator-types-outside-replay-contract",
+                "doctrine-only-arc-pattern-needs-real-work-counterbalance"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1624",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "3-aggregator-types-codable",
+                "real-substrate-change"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional Codable" +
+                " extension to other non-Codable" +
+                " aggregator types"
+            ],
+            summary: "Chapter 561 extends Codable +" +
+                " Equatable conformance to 3 audit-" +
+                "projection aggregator types via a" +
+                " REAL SUBSTRATE CHANGE (M1621" +
+                " modifies production code)。 8 PROOF" +
+                " tests (M1622) +" +
+                " BASTurnAuditProjectionsTrioCodable" +
+                "ExtensionDoctrine typed surface" +
+                " (M1623) + close-out (M1624)。 The 3" +
+                " types are now ledger-serializable" +
+                " for replay。 102 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1624。" +
+                " 208 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

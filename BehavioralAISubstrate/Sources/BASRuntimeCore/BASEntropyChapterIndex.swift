@@ -2470,7 +2470,24 @@ public enum BASEntropyChapterIndex {
                 " cumulative (+1)。 ADR-016 → M1620。" +
                 " 204 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十一",
+            mNumberFirst: 1621, mNumberLast: 1624,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "REAL SUBSTRATE CHANGE — add" +
+                " Codable + Equatable to 3 audit-" +
+                "projection aggregator types" +
+                " (KunlunAxisProtocol + KunlunTrio +" +
+                " AbyssalThermalTrio) at M1621。 8" +
+                " PROOF tests at M1622 +" +
+                " BASTurnAuditProjectionsTrioCodable" +
+                "ExtensionDoctrine typed surface" +
+                " (M1623) + close-out (M1624)。 102" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1624。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -37,19 +37,17 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs560() {
+    func testLastChapterIs561() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百六十",
-            "Chapter 五百六十:chapter 三百九二 REPLAY" +
-            " DETERMINISM CONTRACT CLOSURE MILESTONE。" +
-            " BASReplayDeterminismContractClosure" +
-            "Doctrine typed milestone commemorating" +
-            " 9-chapter / 37-M-number arc (551-560)" +
-            " PROVEN across all 3 verification halves" +
-            " + 18 anti-drift + 11 wire-in PROOF" +
-            " tests。 101 typed surfaces cumulative")
+            "chapter 五百六十一",
+            "Chapter 五百六十一:REAL SUBSTRATE CHANGE" +
+            " adding Codable + Equatable to 3 audit-" +
+            "projection aggregator types + 8 PROOF" +
+            " tests + BASTurnAuditProjectionsTrio" +
+            "CodableExtensionDoctrine typed surface +" +
+            " close-out。 102 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

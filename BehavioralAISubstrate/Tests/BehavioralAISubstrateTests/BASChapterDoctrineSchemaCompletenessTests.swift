@@ -1775,7 +1775,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百六十")!)
+                            "chapter 五百六十")!),
+            // M1624 chapter 561 — Real substrate change adding Codable to 3 aggregator types + PROOF tests + typed surface
+            checkRegistry("五百六十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百六十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2751,6 +2757,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百六十")!
+                .mNumberLast),
+            // M1624 chapter 561 — Real substrate change adding Codable to 3 aggregator types + PROOF tests + typed surface
+            ("561",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

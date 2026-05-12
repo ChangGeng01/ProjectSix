@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1620",
-            "M1620:doctrine version reflects chapter 五百六十 — chapter 三百九二 REPLAY DETERMINISM CONTRACT CLOSURE MILESTONE。 BASReplayDeterminismContractClosureDoctrine typed milestone (M1617) commemorating 9-chapter / 37-M-number arc (551-560) PROVEN across all 3 verification halves (round-trip + rejection + floating-point) + 18 anti-drift PROOF tests (M1618) + 11 wire-in PROOF tests (M1619)。 101 typed surfaces cumulative。 204 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1624",
+            "M1624:doctrine version reflects chapter 五百六十一 — REAL SUBSTRATE CHANGE adding Codable + Equatable to 3 audit-projection aggregator types (BASTurnAuditProjectionsKunlunAxisProtocol + BASTurnAuditProjectionsKunlunTrio + BASTurnAuditProjectionsAbyssalThermalTrio) at M1621 + 8 PROOF tests (M1622) + BASTurnAuditProjectionsTrioCodableExtensionDoctrine typed surface (M1623) + close-out (M1624)。 102 typed surfaces cumulative。 208 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
