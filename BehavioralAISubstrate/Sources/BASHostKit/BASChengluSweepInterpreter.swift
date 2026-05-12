@@ -223,7 +223,7 @@ public struct BASChengluPermitPredictHint:
 /// Hosts that opt into mesh consultation read this bundle to make
 /// downstream decisions — preflight nil means use default routing,
 /// permit-predict nil means follow normal L11 path,etc。
-public struct BASChengluHintSet: Sendable, Equatable {
+public struct BASChengluHintSet: Codable, Sendable, Equatable {
 
     public let preflight: BASChengluPreflightHint?
     public let length: BASChengluLengthHint?

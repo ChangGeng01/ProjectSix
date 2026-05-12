@@ -71,7 +71,7 @@ import BASRuntimeCore
 
 /// Typed selector for which events the exporter emits。
 public struct BASTrainingDataExportFilter:
-    Sendable, Equatable, Hashable
+    Codable, Sendable, Equatable, Hashable
 {
     /// Optional session ID filter — if set,only events from
     /// this session are emitted。Default nil = all sessions。
