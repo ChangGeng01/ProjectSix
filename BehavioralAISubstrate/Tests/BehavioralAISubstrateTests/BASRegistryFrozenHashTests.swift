@@ -107,15 +107,15 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 563 close-out。 Chapter
-    /// 563:CONTINUED REAL SUBSTRATE CHANGE adding
-    /// Codable + Equatable to 7 more audit-projection
-    /// aggregator types (CthulhuPenta + KunlunHexa +
-    /// KunlunHexaTwo + LateClusterB + LateClusterC +
-    /// LateClusterD + KunlunSealRiver) at M1629 + 9
-    /// PROOF tests (M1630) +
-    /// BASTurnAuditProjectionsSevenAggregatorCodable
-    /// ExtensionDoctrine typed surface (M1631)。
+    /// Re-captured at chapter 564 close-out。 Chapter
+    /// 564:AGGREGATOR CODABLE EXTENSION ARC-SEAL
+    /// MILESTONE。
+    /// BASAuditProjectionsAggregatorCodableExtensionArc
+    /// SealedDoctrine typed milestone (M1633)
+    /// commemorating 3-chapter / 12-commit arc
+    /// (chapters 561-563) covering 15 aggregator
+    /// types + 20 anti-drift PROOF tests (M1634) +
+    /// 13 wire-in PROOF tests (M1635)。
     static let frozenFullRegistrySha256: String =
-        "1f9c6a9126d766db8885e0ffd73a3ebc659972d4419c1fa1e296fd607e060a77"
+        "3b5d64cdefd26f48740a74e17247d4717cfb778fcfde37fb830f62e9d5c7dc55"
 }

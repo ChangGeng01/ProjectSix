@@ -9353,6 +9353,86 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1632。 216 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 564 — Arc-seal milestone for the
+        // 3-chapter aggregator Codable extension arc。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百六十四",
+            mNumberFirst: 1633,
+            mNumberLast: 1636,
+            v1MilestoneMNumber: 1636,
+            v1MilestoneStatus:
+                "chapter-564-aggregator-codable-extension-arc-sealed",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1633, knife: "第一刀",
+                    concept: "NEW BASAuditProjections" +
+                        "AggregatorCodableExtensionArc" +
+                        "SealedDoctrine typed milestone" +
+                        " commemorating the 3-chapter" +
+                        " arc (chapters 561-563)。 15" +
+                        " aggregator types,12 commits。" +
+                        " Mirrors chapter 553 cascade" +
+                        "-arc pattern。 typed-surface" +
+                        " count 104 → 105。"),
+                BASChapterKnife(
+                    mNumber: 1634, knife: "第二刀",
+                    concept: "20 anti-drift PROOF tests" +
+                        " for the M1633 arc-seal。"),
+                BASChapterKnife(
+                    mNumber: 1635, knife: "第三刀",
+                    concept: "13 wire-in PROOF tests" +
+                        " cross-checking the M1633" +
+                        " arc-seal against the 3" +
+                        " chapter-specific extension" +
+                        " doctrines + parallel chapter" +
+                        " 553 cascade-arc doctrine。"),
+                BASChapterKnife(
+                    mNumber: 1636, knife: "第四刀",
+                    concept: "Chapter 564 close-out +" +
+                        " doctrine sync。 220" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "aggregator-arc-undocumented",
+                "no-single-source-of-truth-for-15-aggregators",
+                "extension-doctrines-not-cross-validated",
+                "parallel-arc-pattern-not-cross-referenced"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1636",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "aggregator-extension-arc-sealed",
+                "15-aggregator-types-ledger-serializable"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — additional substrate" +
+                " coverage as new aggregator types" +
+                " arise"
+            ],
+            summary: "Chapter 564 seals the 3-chapter" +
+                " aggregator Codable extension arc" +
+                " (chapters 561-563)。 NEW" +
+                " BASAuditProjectionsAggregatorCodable" +
+                "ExtensionArcSealedDoctrine typed" +
+                " milestone (M1633) + 20 anti-drift" +
+                " PROOF tests (M1634) + 13 wire-in" +
+                " PROOF tests (M1635) + close-out" +
+                " (M1636)。 Mirrors chapter 553" +
+                " cascade-arc pattern at the" +
+                " aggregator layer。 105 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1636。 220 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

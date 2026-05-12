@@ -1793,7 +1793,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百六十三")!)
+                            "chapter 五百六十三")!),
+            // M1636 chapter 564 — Aggregator extension arc-seal milestone + 20 anti-drift + 13 wire-in PROOF tests
+            checkRegistry("五百六十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百六十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2793,6 +2799,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百六十三")!
+                .mNumberLast),
+            // M1636 chapter 564 — Aggregator extension arc-seal milestone
+            ("564",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百六十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

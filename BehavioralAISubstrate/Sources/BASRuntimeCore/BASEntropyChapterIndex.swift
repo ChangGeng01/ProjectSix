@@ -2524,7 +2524,26 @@ public enum BASEntropyChapterIndex {
                 " aggregator types now ledger-" +
                 "serializable。 104 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1632。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百六十四",
+            mNumberFirst: 1633, mNumberLast: 1636,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "AGGREGATOR CODABLE EXTENSION" +
+                " ARC-SEAL MILESTONE。" +
+                " BASAuditProjectionsAggregatorCodable" +
+                "ExtensionArcSealedDoctrine typed" +
+                " milestone (M1633) commemorating" +
+                " 3-chapter / 12-commit arc (chapters" +
+                " 561-563) covering 15 aggregator" +
+                " types。 20 anti-drift PROOF tests" +
+                " (M1634) + 13 wire-in PROOF tests" +
+                " (M1635)。 Mirrors chapter 553" +
+                " cascade-arc pattern at aggregator" +
+                " layer。 105 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1636。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
