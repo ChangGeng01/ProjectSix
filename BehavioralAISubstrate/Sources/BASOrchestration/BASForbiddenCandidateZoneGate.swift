@@ -72,7 +72,7 @@ import BASRuntimeCore
 /// Pure result type carrying the gate verdict, reason codes,
 /// and per-source state.
 public struct BASForbiddenCandidateZoneGateDecision:
-    Sendable, Equatable
+    Codable, Sendable, Equatable
 {
     /// `true` when the action is denied. Caller must NOT apply
     /// the requested lifecycle action.
