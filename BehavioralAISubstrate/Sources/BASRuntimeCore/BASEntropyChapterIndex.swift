@@ -3253,7 +3253,35 @@ public enum BASEntropyChapterIndex {
                 " after the chapter 597 octa-milestone" +
                 " seal。 140 typed surfaces cumulative" +
                 " (+1)。 ADR-016 → M1776。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百",
+            mNumberFirst: 1777, mNumberLast: 1780,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "REAL HOT-PATH ATTACK PHASE I" +
+                " CONTINUATION — V1 monolith extraction。" +
+                " 9 audit-projection symbols (3 derive" +
+                " helpers + 1 fileprivate const +" +
+                " coverageStatus + 4 public layer" +
+                "Reconciliation* constants) moved from" +
+                " EBrainRuntimeCoordinator.swift to" +
+                " sibling extension file EBrainRuntime" +
+                "Coordinator+AuditProjectionHelpers.swift。" +
+                " V1 monolith LOC:2472 → 2136 (-336)。" +
+                " Cumulative V1 reduction from chapter" +
+                " 477 baseline (2540 LOC):-404 LOC =" +
+                " 16.4% of plan target。 6 PROOF tests" +
+                " (M1778) verify cross-package contract" +
+                " preserved + V1 byte-equality preserved" +
+                " (40 stress-sweep canonical60 green)。" +
+                " NEW BASV1MonolithExtractionContinuation" +
+                "Doctrine (M1779) bumps 最激进 score 6 →" +
+                " 7。 First 最激进 advancement beyond" +
+                " chapter 501 honest closure milestone。" +
+                " 141 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1780。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

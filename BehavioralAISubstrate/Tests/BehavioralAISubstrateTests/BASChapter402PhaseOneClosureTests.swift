@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1776",
-            "M1776:doctrine version reflects chapter 五百九十九 — BASMLXADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1。 FRESH MODULE TERRITORY:BASMLXAdapter uncovered by chapter 598 BASOrgan first-ever (the 7th-module entry)。 2 BASMLXAdapter types (MLXModelCatalog.Entry + MLXLoRATrainer.TrainingProgress 4-case enum with associated values) gained Codable at M1773 + 2 PROOF tests (M1774) + BASMLXAdapterCodableExtensionDoctrine typed surface (M1775) + close-out (M1776)。 Module count bumped 7 → 8。 2nd consecutive fresh-module first-ever extension after the chapter 597 octa-milestone seal。 140 typed surfaces cumulative。 360 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1780",
+            "M1780:doctrine version reflects chapter 六百 — REAL HOT-PATH ATTACK PHASE I CONTINUATION。 V1 monolith extraction:9 audit-projection symbols moved from EBrainRuntimeCoordinator.swift to sibling extension file。 V1 LOC 2472 → 2136 (-336)。 Cumulative V1 reduction from chapter 477 baseline (2540 LOC):-404 LOC = 16.4% of plan target。 6 PROOF tests (M1778) verify cross-package contract preserved + V1 byte-equality preserved (40 stress-sweep canonical60 green)。 NEW BASV1MonolithExtractionContinuationDoctrine (M1779) bumps 最激进 score 6 → 7。 First 最激进 advancement beyond chapter 501 honest closure milestone。 141 typed surfaces cumulative。 364 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

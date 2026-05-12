@@ -116,21 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1776:24 + 20 + 153 = 197 (chapter
-    /// 599 — BASMLXAdapter first-ever Codable
-    /// extension wave 1)
-    public static let phase2ChapterCount: Int = 197
+    /// added)。 At M1780:24 + 20 + 154 = 198 (chapter
+    /// 600 — REAL HOT-PATH ATTACK Phase I continuation
+    /// V1 monolith extraction)
+    public static let phase2ChapterCount: Int = 198
 
-    /// Phase 2 commits shipped。 At M1776:125 + 84 +
-    /// 612 = 821 (chapter 599 = 4 cuts — BASMLXAdapter
-    /// first-ever Codable extension wave 1 + 2 PROOF
-    /// + typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 821
+    /// Phase 2 commits shipped。 At M1780:125 + 84 +
+    /// 616 = 825 (chapter 600 = 4 cuts — REAL HOT-PATH
+    /// ATTACK Phase I continuation V1 monolith
+    /// extraction + 6 PROOF + typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 825
 
-    /// Phase 2 mNumberLast。 At M1776:chapter 599 —
-    /// BASMLXAdapter first-ever Codable extension wave
-    /// 1。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1776
+    /// Phase 2 mNumberLast。 At M1780:chapter 600 —
+    /// REAL HOT-PATH ATTACK Phase I continuation V1
+    /// monolith extraction。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1780
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

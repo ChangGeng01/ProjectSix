@@ -253,7 +253,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百九十六",   // M1761-M1764 (BASHOSTKIT NON-PROJECTION 4-WAVE ARC SEAL MILESTONE — NEW BASHostKitNonProjectionCodableExtensionArcSealedDoctrine + 38 anti-drift + 22 wire-in PROOF tests commemorating 4-wave BASHostKit non-projection arc (chapters 592-595);8 types,16 commits,single-module;second sealed arc beyond M1700 narrative arc;mirrors chapter 584 BASLeaseLife arc seal pattern but extended to 4 waves + includes culmination wave;8 sealed milestones extant)
         "chapter 五百九十七",   // M1765-M1768 (OCTA-MILESTONE COMPLETION META-META MILESTONE — BASCodableExtensionOctaMilestoneCompletionDoctrine + 36 anti-drift + 21 wire-in PROOF tests cataloging all 8 sealed Codable extension milestones;77 types,100 commits,25 chapters,6 modules;79 session types ledger-serializable;NEW beyond-m1700-four-wave-arc kind discriminator + 2 octa-novelty flags;supersedes chapter 591 hepta snapshot)
         "chapter 五百九十八",   // M1769-M1772 (BASORGAN FIRST-EVER CODABLE EXTENSION WAVE 1 — FRESH MODULE TERRITORY;2 types (BASOrganDraftChunk + BASOrganRegistryObservationSnapshot) gained Codable + 2 PROOF tests + BASOrganCodableExtensionDoctrine typed surface + close-out;BASOrgan uncovered by chapter 597 octa snapshot;module count bumped 6 → 7;mirrors chapter 586 BASObservability first-ever precedent)
-        "chapter 五百九十九"    // M1773-M1776 (BASMLXADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1 — FRESH MODULE TERRITORY;2 types (MLXModelCatalog.Entry + MLXLoRATrainer.TrainingProgress 4-case enum) gained Codable + 2 PROOF tests + BASMLXAdapterCodableExtensionDoctrine typed surface + close-out;BASMLXAdapter uncovered by chapter 598 BASOrgan first-ever;module count bumped 7 → 8;2nd consecutive fresh-module first-ever after chapter 597 octa-milestone seal)
+        "chapter 五百九十九",   // M1773-M1776 (BASMLXADAPTER FIRST-EVER CODABLE EXTENSION WAVE 1 — FRESH MODULE TERRITORY;2 types (MLXModelCatalog.Entry + MLXLoRATrainer.TrainingProgress 4-case enum) gained Codable + 2 PROOF tests + BASMLXAdapterCodableExtensionDoctrine typed surface + close-out;BASMLXAdapter uncovered by chapter 598 BASOrgan first-ever;module count bumped 7 → 8;2nd consecutive fresh-module first-ever after chapter 597 octa-milestone seal)
+        "chapter 六百"          // M1777-M1780 (REAL HOT-PATH ATTACK PHASE I CONTINUATION — V1 monolith extraction;9 audit-projection symbols moved from EBrainRuntimeCoordinator.swift to sibling extension file;V1 LOC 2472→2136 (-336);cumulative reduction from chapter 477 baseline 2540→2136 (-404 = 16.4% of plan target);6 PROOF tests cross-package contract preserved;NEW BASV1MonolithExtractionContinuationDoctrine bumps 最激进 score 6→7;first 最激进 advancement beyond chapter 501 honest closure)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -270,14 +271,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1776
+    public static let mNumberLast: Int = 1780
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1776)。 Bumped through chapter 599:817 → 821。
-    /// Chapter 599:BASMLXAdapter first-ever Codable
-    /// extension wave 1 + 2 PROOF tests + typed
-    /// surface + close-out。
-    public static let commitsShipped: Int = 821
+    /// M1780)。 Bumped through chapter 600:821 → 825。
+    /// Chapter 600:REAL HOT-PATH ATTACK Phase I
+    /// continuation V1 monolith extraction + 6 PROOF
+    /// tests + V1 monolith extraction continuation
+    /// doctrine + close-out。
+    public static let commitsShipped: Int = 825
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

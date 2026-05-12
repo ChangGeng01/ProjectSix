@@ -107,19 +107,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 599 close-out。 Chapter
-    /// 599:BASMLXADAPTER FIRST-EVER CODABLE
-    /// EXTENSION WAVE 1 — FRESH MODULE TERRITORY。 2
-    /// types (MLXModelCatalog.Entry + MLXLoRATrainer.
-    /// TrainingProgress 4-case enum with associated
-    /// values) gained Codable at M1773 + 2 PROOF tests
-    /// (M1774) + NEW BASMLXAdapterCodableExtension
-    /// Doctrine (M1775) + close-out (M1776)。
-    /// BASMLXAdapter uncovered by chapter 598 BASOrgan
-    /// first-ever (the 7th-module entry)。 Module count
-    /// bumped 7 → 8 — 2nd consecutive fresh-module
-    /// first-ever after the chapter 597 octa-milestone
-    /// seal。
+    /// Re-captured at chapter 600 close-out。 Chapter
+    /// 600:REAL HOT-PATH ATTACK PHASE I CONTINUATION —
+    /// V1 monolith extraction。 9 audit-projection symbols
+    /// (3 derive helpers + 1 fileprivate const +
+    /// coverageStatus + 4 public layerReconciliation*
+    /// constants) MOVED from EBrainRuntimeCoordinator.
+    /// swift to NEW sibling extension file (M1777)。 6
+    /// PROOF tests (M1778) verify cross-package contract
+    /// preserved + V1 byte-equality preserved (40 stress-
+    /// sweep canonical60 green)。 NEW BASV1Monolith
+    /// ExtractionContinuationDoctrine (M1779) bumps
+    /// 最激进 score 6 → 7。 V1 LOC trajectory:2472 →
+    /// 2136 (-336)。 Cumulative V1 reduction from chapter
+    /// 477 baseline 2540 → 2136 (-404 = 16.4% of plan
+    /// target)。 First 最激进 advancement beyond chapter
+    /// 501 honest closure。
     static let frozenFullRegistrySha256: String =
-        "50bb98ef1fd03a4f3a03b7be187707e39002ee7f659ecc972486a084088dfba3"
+        "f79200794f61d9b814c1c9c877613c1b859042be97efcf002fbecf4f402da2f5"
 }

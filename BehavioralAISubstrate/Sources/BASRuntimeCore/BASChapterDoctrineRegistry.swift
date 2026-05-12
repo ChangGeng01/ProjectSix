@@ -12551,7 +12551,121 @@ public enum BASChapterDoctrineRegistry {
                 "equality preserved。 2nd consecutive" +
                 " fresh-module first-ever extension" +
                 " after the chapter 597 octa-milestone" +
-                " seal。 ADR-014 OPT-IN preserved。")
+                " seal。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 600 — REAL HOT-PATH ATTACK Phase I
+        // CONTINUATION:V1 monolith extraction。 9 audit-
+        // projection helpers + constants moved from
+        // EBrainRuntimeCoordinator.swift to sibling
+        // extension file (~367 LOC reduction)。 V1 byte-
+        // equality preserved via stress-sweep canonical60。
+        // 最激进 score bumped 6 → 7。 Cumulative V1 fold
+        // achieves 16.4% of plan-target LOC reduction。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百",
+            mNumberFirst: 1777,
+            mNumberLast: 1780,
+            v1MilestoneMNumber: 1780,
+            v1MilestoneStatus:
+                "chapter-600-v1-monolith-extraction-continuation",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1777, knife: "第一刀",
+                    concept: "V1 fold Phase I continuation。" +
+                        " Extract 9 symbols (3 derive" +
+                        " helpers + 1 fileprivate const +" +
+                        " coverageStatus + 4 public layer" +
+                        "Reconciliation* constants) from" +
+                        " EBrainRuntimeCoordinator.swift to" +
+                        " NEW sibling extension file" +
+                        " EBrainRuntimeCoordinator+Audit" +
+                        "ProjectionHelpers.swift。 V1" +
+                        " monolith LOC:2472 → 2136 (-336)。" +
+                        " Pure code MOVE — byte-equal by" +
+                        " construction。"),
+                BASChapterKnife(
+                    mNumber: 1778, knife: "第二刀",
+                    concept: "6 PROOF tests verifying the 4" +
+                        " public layerReconciliation*" +
+                        " constants still reachable through" +
+                        " BASEBrainRuntimeCoordinator (cross-" +
+                        "package contract preserved) +" +
+                        " value-stability + ID-derivation" +
+                        " anti-drift。"),
+                BASChapterKnife(
+                    mNumber: 1779, knife: "第三刀",
+                    concept: "NEW BASV1MonolithExtraction" +
+                        "ContinuationDoctrine tracking V1" +
+                        " LOC trajectory (2540 baseline →" +
+                        " 2136 now = -404 cumulative,16.4%" +
+                        " of plan target) +" +
+                        " mostAggressiveScoreAtThisChapter" +
+                        " = 7/10 (+1 from chapter 501" +
+                        " honest closure) +" +
+                        " mostAggressiveRemainingGap = 3。" +
+                        " typed-surface count 140 → 141。"),
+                BASChapterKnife(
+                    mNumber: 1780, knife: "第四刀",
+                    concept: "Chapter 600 close-out +" +
+                        " doctrine sync。 364 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 FIRST 最激进 score" +
+                        " advancement beyond chapter 501" +
+                        " honest closure milestone。")
+            ],
+            entropyClassesAttacked: [
+                "v1-monolith-stuck-at-2472-loc",
+                "audit-projection-helpers-mixed-with-runturn",
+                "most-aggressive-directive-stuck-at-6-out-of-10",
+                "v1-fold-phase-i-paused-since-chapter-501"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1780",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "v1-monolith-loc-reduction-336",
+                "most-aggressive-score-bumped-6-to-7",
+                "real-hot-path-attack-phase-i-continuation",
+                "real-hot-path-attack-plan-target-16-pct"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional V1 monolith" +
+                " extractions (cosmic-cold counterweight" +
+                " helpers + Kunlun centerline rules" +
+                " etc。)",
+                "future arc — Phase H default mode flip" +
+                " (.v1ByteEqual → .nativeV2) after" +
+                " multi-day stress-sweep dual-mode 24h" +
+                " soak",
+                "future arc — Phase I final V1 deletion" +
+                " (runTurn body collapsed to delegate" +
+                " bridge)"
+            ],
+            summary: "Chapter 600 advances REAL HOT-" +
+                "PATH ATTACK Phase I via V1 monolith" +
+                " extraction continuation。 367 LOC of" +
+                " audit-projection helpers + constants" +
+                " moved from EBrainRuntimeCoordinator" +
+                ".swift to sibling extension file。 V1" +
+                " monolith LOC:2472 → 2136 (-336)。" +
+                " Cumulative V1 reduction from chapter" +
+                " 477 baseline:2540 → 2136 = -404 LOC" +
+                " (16.4% of plan target)。 6 PROOF tests" +
+                " verify cross-package contract preserved。" +
+                " V1 byte-equality preserved (40 stress-" +
+                "sweep canonical60 tests green)。 NEW" +
+                " BASV1MonolithExtractionContinuation" +
+                "Doctrine surfaces the LOC trajectory +" +
+                " bumps 最激进 directive score 6 → 7。" +
+                " First 最激进 score advancement beyond" +
+                " chapter 501 honest closure milestone。" +
+                " 141 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1780。 364 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

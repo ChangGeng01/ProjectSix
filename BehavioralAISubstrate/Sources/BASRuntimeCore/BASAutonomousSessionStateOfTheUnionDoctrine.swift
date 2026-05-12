@@ -110,20 +110,22 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 599
-    /// close-out (M1776 — BASMLXAdapter first-ever
-    /// Codable extension wave 1;FRESH MODULE TERRITORY
-    /// uncovered by chapter 598 BASOrgan first-ever;2
-    /// BASMLXAdapter types (MLXModelCatalog.Entry +
-    /// MLXLoRATrainer.TrainingProgress 4-case enum)
-    /// gained Codable;module count bumped 7 → 8;2nd
-    /// consecutive fresh-module first-ever after octa-
-    /// milestone seal at chapter 597)。
-    public static let typedSurfaceCount: Int = 140
+    /// Cumulative achievement metrics at chapter 600
+    /// close-out (M1780 — REAL HOT-PATH ATTACK Phase I
+    /// continuation;V1 monolith extraction;9 audit-
+    /// projection symbols moved from EBrainRuntime
+    /// Coordinator.swift to sibling extension file;V1
+    /// LOC 2472 → 2136 (-336);cumulative V1 reduction
+    /// from chapter 477 baseline 2540 → 2136 (-404 =
+    /// 16.4% of plan target);NEW BASV1MonolithExtraction
+    /// ContinuationDoctrine bumps 最激进 score 6 → 7;
+    /// first 最激进 advancement beyond chapter 501
+    /// honest closure)。
+    public static let typedSurfaceCount: Int = 141
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 360
-    public static let phase2CommitsShipped: Int = 821
-    public static let chapter2NumberLast: Int = 1776
+        Int = 364
+    public static let phase2CommitsShipped: Int = 825
+    public static let chapter2NumberLast: Int = 1780
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

@@ -37,25 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs599() {
+    func testLastChapterIs600() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十九",
-            "Chapter 五百九十九:BASMLXADAPTER FIRST-" +
-            "EVER CODABLE EXTENSION WAVE 1。 FRESH" +
-            " MODULE TERRITORY:BASMLXAdapter uncovered" +
-            " by chapter 598 BASOrgan first-ever (the" +
-            " 7th-module entry)。 2 types (MLXModel" +
-            "Catalog.Entry + MLXLoRATrainer.Training" +
-            "Progress 4-case enum) gained Codable + 2" +
-            " PROOF tests + BASMLXAdapterCodable" +
-            "ExtensionDoctrine typed surface + close-" +
-            "out。 Module count bumped 7 → 8 — 2nd" +
-            " consecutive fresh-module first-ever" +
-            " extension after the chapter 597 octa-" +
-            "milestone seal。 140 typed surfaces" +
-            " cumulative")
+            "chapter 六百",
+            "Chapter 六百:REAL HOT-PATH ATTACK PHASE I" +
+            " CONTINUATION — V1 monolith extraction。 9" +
+            " audit-projection symbols moved from" +
+            " EBrainRuntimeCoordinator.swift to sibling" +
+            " extension file。 V1 LOC 2472 → 2136" +
+            " (-336)。 Cumulative V1 reduction from" +
+            " chapter 477 baseline:-404 LOC = 16.4%" +
+            " of plan target。 6 PROOF tests verify" +
+            " cross-package contract preserved。 NEW" +
+            " BASV1MonolithExtractionContinuation" +
+            "Doctrine bumps 最激进 score 6 → 7。 141" +
+            " typed surfaces cumulative。 First 最激进" +
+            " advancement beyond chapter 501 honest" +
+            " closure")
     }
 
     // MARK: - M-number range
