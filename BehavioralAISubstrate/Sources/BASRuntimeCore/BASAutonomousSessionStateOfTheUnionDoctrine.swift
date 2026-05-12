@@ -110,21 +110,19 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 597
-    /// close-out (M1768 — Octa-milestone completion
-    /// meta-meta milestone;NEW BASCodableExtension
-    /// OctaMilestoneCompletionDoctrine cataloging all
-    /// 8 sealed Codable extension milestones extant;
-    /// supersedes chapter 591 hepta snapshot with 8th
-    /// seal;77 types via 8 milestones,100 commits,25
-    /// chapters,6 modules;79 session types ledger-
-    /// serializable;NEW beyond-m1700-four-wave-arc
-    /// kind discriminator + 2 octa-novelty flags)。
-    public static let typedSurfaceCount: Int = 138
+    /// Cumulative achievement metrics at chapter 598
+    /// close-out (M1772 — BASOrgan first-ever Codable
+    /// extension wave 1;FRESH MODULE TERRITORY uncovered
+    /// by chapter 597 octa snapshot;2 BASOrgan types
+    /// (BASOrganDraftChunk + BASOrganRegistryObservation
+    /// Snapshot) gained Codable;module count bumped
+    /// 6 → 7 mirroring chapter 586 BASObservability
+    /// first-ever precedent)。
+    public static let typedSurfaceCount: Int = 139
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 352
-    public static let phase2CommitsShipped: Int = 813
-    public static let chapter2NumberLast: Int = 1768
+        Int = 356
+    public static let phase2CommitsShipped: Int = 817
+    public static let chapter2NumberLast: Int = 1772
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1768",
-            "M1768:doctrine version reflects chapter 五百九十七 — OCTA-MILESTONE COMPLETION META-META MILESTONE。 NEW BASCodableExtensionOctaMilestoneCompletionDoctrine (M1765) cataloging all 8 sealed Codable extension milestones extant (553 cascade + 564 aggregator + 569 cross-module + 574 orchestration + 579 post-arc trilogy + 584 BASLeaseLife arc + 590 BASMemory trilogy + 596 BASHostKit arc)。 Aggregate 77 types via 8 milestones,100 commits,25 chapters,6 modules。 79 session types ledger-serializable。 NEW beyond-m1700-four-wave-arc kind discriminator + 2 octa-novelty flags。 36 anti-drift PROOF tests (M1766) + 21 wire-in PROOF tests (M1767) + close-out (M1768)。 138 typed surfaces cumulative。 352 consecutive byte-equality clean commits。 Supersedes chapter 591 hepta snapshot。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1772",
+            "M1772:doctrine version reflects chapter 五百九十八 — BASORGAN FIRST-EVER CODABLE EXTENSION WAVE 1。 FRESH MODULE TERRITORY:BASOrgan uncovered by chapter 597 octa snapshot (6 modules covered)。 2 BASOrgan types (BASOrganDraftChunk + BASOrganRegistryObservationSnapshot) gained Codable at M1769 + 2 PROOF tests (M1770) + BASOrganCodableExtensionDoctrine typed surface (M1771) + close-out (M1772)。 Module count bumped 6 → 7,mirroring chapter 586 BASObservability first-ever precedent。 Both types are pure-value structs with already-Codable field types。 139 typed surfaces cumulative。 356 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

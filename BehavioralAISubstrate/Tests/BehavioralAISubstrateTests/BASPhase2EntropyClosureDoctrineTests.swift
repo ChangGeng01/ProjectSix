@@ -37,25 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs597() {
+    func testLastChapterIs598() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百九十七",
-            "Chapter 五百九十七:OCTA-MILESTONE" +
-            " COMPLETION META-META MILESTONE。 NEW" +
-            " BASCodableExtensionOctaMilestone" +
-            "CompletionDoctrine (M1765) cataloging" +
-            " all 8 sealed Codable extension" +
-            " milestones extant。 Aggregate:77" +
-            " types via 8 milestones,100 commits," +
-            " 25 chapters,6 modules。 79 session" +
-            " types ledger-serializable。 NEW beyond-" +
-            "m1700-four-wave-arc kind discriminator" +
-            " + 2 octa-novelty flags。 36 anti-drift" +
-            " + 21 wire-in PROOF tests。 138 typed" +
-            " surfaces cumulative。 Supersedes" +
-            " chapter 591 hepta snapshot")
+            "chapter 五百九十八",
+            "Chapter 五百九十八:BASORGAN FIRST-EVER" +
+            " CODABLE EXTENSION WAVE 1。 FRESH MODULE" +
+            " TERRITORY:BASOrgan uncovered by chapter" +
+            " 597 octa snapshot。 2 types (BASOrgan" +
+            "DraftChunk + BASOrganRegistryObservation" +
+            "Snapshot) gained Codable + 2 PROOF" +
+            " tests + BASOrganCodableExtensionDoctrine" +
+            " typed surface + close-out。 Module" +
+            " count bumped 6 → 7,mirroring chapter" +
+            " 586 BASObservability first-ever" +
+            " precedent。 139 typed surfaces" +
+            " cumulative。 Both types are pure-value" +
+            " structs with already-Codable field" +
+            " types")
     }
 
     // MARK: - M-number range

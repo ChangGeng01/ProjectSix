@@ -12354,7 +12354,102 @@ public enum BASChapterDoctrineRegistry {
                 " (+1)。 ADR-016 → M1768。 352" +
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014 OPT-" +
-                "IN preserved。")
+                "IN preserved。"),
+
+        // chapter 598 — BASOrgan first-ever Codable
+        // extension wave 1。 FRESH MODULE TERRITORY:
+        // BASOrgan was uncovered by the chapter 597
+        // octa snapshot (covering 6 modules)。 This
+        // extension bumps the module count from 6 to
+        // 7,mirroring chapter 586 BASObservability
+        // first-ever extension precedent。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百九十八",
+            mNumberFirst: 1769,
+            mNumberLast: 1772,
+            v1MilestoneMNumber: 1772,
+            v1MilestoneStatus:
+                "chapter-598-organ-first-ever-codable-extension-wave-one",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1769, knife: "第一刀",
+                    concept: "Add Codable to 2 BASOrgan" +
+                        " types — BASOrganDraftChunk" +
+                        " (6-field streaming draft" +
+                        " chunk) + BASOrganRegistry" +
+                        "ObservationSnapshot (single-" +
+                        "field snapshot wrapping [BAS" +
+                        "OrganDescriptor])。 Pure-value" +
+                        " structs with already-Codable" +
+                        " field types — trivial" +
+                        " conformance addition。"),
+                BASChapterKnife(
+                    mNumber: 1770, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1771, knife: "第三刀",
+                    concept: "NEW BASOrganCodable" +
+                        "ExtensionDoctrine + is" +
+                        "FreshModuleTerritory flag +" +
+                        " moduleCountAfterThis = 7。" +
+                        " Mirrors chapter 586 BAS" +
+                        "Observability first-ever" +
+                        " extension precedent。 typed-" +
+                        "surface count 138 → 139。"),
+                BASChapterKnife(
+                    mNumber: 1772, knife: "第四刀",
+                    concept: "Chapter 598 close-out +" +
+                        " doctrine sync。 356" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。" +
+                        " BASOrgan now in ledger-" +
+                        "serializable contract surface。")
+            ],
+            entropyClassesAttacked: [
+                "organ-draft-chunk-non-codable",
+                "organ-registry-observation-snapshot-non-codable",
+                "bas-organ-module-not-in-codable-extension-narrative",
+                "octa-module-count-stuck-at-6"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1772",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-first-ever-codable-extension",
+                "fresh-module-territory",
+                "octa-module-count-bumped-6-to-7"
+            ],
+            plannedFutureCuts: [
+                "future arc — BASOrgan Codable extension" +
+                " wave 2 (additional non-Codable types)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — Tier A sprawl migrations" +
+                " per wild-rolling-meerkat plan"
+            ],
+            summary: "Chapter 598 ships BASOrgan first-" +
+                "ever Codable extension wave 1。 FRESH" +
+                " MODULE TERRITORY:BASOrgan was" +
+                " uncovered by the chapter 597 octa" +
+                " snapshot (6 modules covered)。 This" +
+                " extension bumps module count from 6" +
+                " to 7,mirroring chapter 586 BAS" +
+                "Observability first-ever extension" +
+                " precedent。 2 types (BASOrganDraft" +
+                "Chunk + BASOrganRegistryObservation" +
+                "Snapshot) gained Codable at M1769。 2" +
+                " PROOF tests (M1770) + new typed" +
+                " surface (M1771) + close-out (M1772)。" +
+                " Both types are pure-value structs" +
+                " with already-Codable field types。" +
+                " 139 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1772。 356 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

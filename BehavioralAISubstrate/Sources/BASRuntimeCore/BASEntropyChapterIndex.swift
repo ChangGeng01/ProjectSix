@@ -3208,7 +3208,29 @@ public enum BASEntropyChapterIndex {
                 " surfaces cumulative (+1)。" +
                 " Supersedes chapter 591 hepta snapshot。" +
                 " ADR-016 → M1768。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百九十八",
+            mNumberFirst: 1769, mNumberLast: 1772,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASORGAN FIRST-EVER CODABLE" +
+                " EXTENSION WAVE 1 — FRESH MODULE" +
+                " TERRITORY。 2 types (BASOrganDraft" +
+                "Chunk + BASOrganRegistryObservation" +
+                "Snapshot) gained Codable at M1769 + 2" +
+                " PROOF tests (M1770) + new typed" +
+                " surface (M1771) + close-out (M1772)。" +
+                " BASOrgan was uncovered by chapter" +
+                " 597 octa snapshot (6 modules covered)。" +
+                " This extension bumps module count" +
+                " from 6 to 7,mirroring chapter 586" +
+                " BASObservability first-ever extension" +
+                " precedent。 Both types are pure-value" +
+                " structs with already-Codable field" +
+                " types。 139 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1772。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
