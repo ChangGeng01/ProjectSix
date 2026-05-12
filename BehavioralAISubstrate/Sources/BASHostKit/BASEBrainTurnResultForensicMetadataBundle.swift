@@ -53,7 +53,7 @@ import BASRuntimeCore
 /// fold arc — its arrival enables 100% arg packaging at
 /// the V1 call site。
 public struct BASEBrainTurnResultForensicMetadataBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 3 forensic metadata fields

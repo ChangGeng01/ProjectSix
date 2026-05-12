@@ -52,7 +52,7 @@ import BASRuntimeCore
 /// (hostGateValue + renderedOutput + updateTickets) +
 /// 1 optional (riskDecisionPackage)。
 public struct BASEBrainTurnResultMiscBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 4 miscellaneous output fields

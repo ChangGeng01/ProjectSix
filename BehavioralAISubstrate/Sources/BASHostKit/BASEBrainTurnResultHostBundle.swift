@@ -47,7 +47,7 @@ import BASRuntimeCore
 /// carrier — no derive calls,no IO。 hostContext is
 /// required;the other 4 fields are optional。
 public struct BASEBrainTurnResultHostBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 5 host-cluster fields

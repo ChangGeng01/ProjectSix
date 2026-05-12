@@ -51,7 +51,7 @@ import BASRuntimeCore
 /// REQUIRED (non-optional) since the cognitive chain
 /// always emits frames per turn。
 public struct BASEBrainTurnResultCognitiveFramesBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 5 cognitive-frame fields

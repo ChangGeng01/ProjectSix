@@ -45,7 +45,7 @@ import BASRuntimeCore
 /// fields of `BASEBrainTurnResult`。 All 4 fields are
 /// REQUIRED (non-optional)。
 public struct BASEBrainTurnResultRiskChoiceBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 4 risk/choice fields

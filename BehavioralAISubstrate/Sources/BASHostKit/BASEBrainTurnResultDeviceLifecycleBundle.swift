@@ -46,7 +46,7 @@ import BASRuntimeCore
 /// fields of `BASEBrainTurnResult`。 5 required + 1
 /// optional (runLease)。
 public struct BASEBrainTurnResultDeviceLifecycleBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 6 device/lifecycle fields

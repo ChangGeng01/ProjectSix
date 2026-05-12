@@ -63,7 +63,7 @@ import BASRuntimeCore
 /// cluster fields of `BASEBrainTurnResult`。 Pure value-
 /// type carrier — no derive calls,no IO。
 public struct BASEBrainTurnResultSovereignBundle:
-    Equatable, Sendable
+    Codable, Equatable, Sendable
 {
 
     // MARK: - 8 L14 sovereign-cluster fields
