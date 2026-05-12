@@ -98,7 +98,10 @@ final class BAS392MemoryAtomReplayDeterminismPinTests:
         let log = BASInMemoryEventLogStorage()
         let evStore = BASEventSourcedMemoryAtomStore(
             eventLog: log, sessionID: "x")
-        let inMem = BASInMemoryMemoryAtomStore()
+        // chapter 五百三十八 / M1529 — dead `let inMem =
+        // ...` purged。 The test references `inMem2`
+        // (constructed from evStore's final atoms below)
+        // not this declaration。
 
         for i in 0..<5 {
             let atom = BASGovernedMemory(

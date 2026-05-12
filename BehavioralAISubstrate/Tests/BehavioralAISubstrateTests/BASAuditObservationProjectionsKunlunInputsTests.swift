@@ -279,7 +279,11 @@ final class BASAuditObservationProjectionsKunlunInputsTests:
         // Recompute with different turn/session IDs
         let budget = makeBudget()
         let permit = makePermit()
-        let candidates = makeCandidates()
+        // chapter 五百三十八 / M1529 — dead `let
+        // candidates = ...` purged。 Only trio recompute
+        // is exercised by the inequality check below;
+        // candidates were not actually fed into trioB
+        // construction。
         let trioB = BASTurnAuditProjectionsKunlunTrio
             .compute(
                 routedBudget: budget,

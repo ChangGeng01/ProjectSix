@@ -177,7 +177,11 @@ final class BASFrameContextObservationBundleAdaptersTests:
     }
 
     func testAdditivePathLeavesLegacyThreeArgUnchanged() {
-        let ctx = makeFrameContext()
+        // chapter 五百三十八 / M1529 — dead `let ctx =
+        // makeFrameContext()` purged。 This test
+        // exercises the 3-arg legacy path with
+        // hardcoded turnID/sessionID/emittedAt and
+        // never references ctx。
         let frame = makeThoughtFrame()
         // 3-arg path still exists + works
         let legacy = frame

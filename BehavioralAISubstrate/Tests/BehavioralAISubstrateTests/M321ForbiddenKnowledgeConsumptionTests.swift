@@ -116,15 +116,17 @@ final class M321ForbiddenKnowledgeConsumptionTests: XCTestCase {
     func testAggregateAllHeldFlipsWhenAnyNotHeld() {
         let q = makeQuarantine(
             zone: .session, sourceRef: "s", reasons: [])
-        var c1 = BASForbiddenKnowledgeCandidate.derive(from: q)
+        // chapter 五百三十八 / M1529 — c1 was var
+        // (never mutated);changed to let。 Removed the
+        // `_ = c1` nudge workaround that suppressed an
+        // unused-var warning Swift was still emitting。
+        let c1 = BASForbiddenKnowledgeCandidate.derive(from: q)
         var c2 = BASForbiddenKnowledgeCandidate.derive(from: q)
         c2.sovereignReviewState = .cleared
         let agg = try? XCTUnwrap(
             BASForbiddenKnowledgeCandidate.aggregate(
                 [c1, c2]))
         XCTAssertEqual(agg?.allHeld, false)
-        // Nudge c1 to suppress unused-var warning.
-        _ = c1
     }
 
     // MARK: - Runtime integration
