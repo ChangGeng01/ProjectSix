@@ -128,7 +128,7 @@ public actor BASSovereignVerdictEngine {
 
     /// Which operation domain this turn is attempting. Drives the
     /// evidence-insufficient upgrade path from §12.3.
-    public enum OperationDomain: String, Sendable, Equatable {
+    public enum OperationDomain: String, Sendable, Equatable, Codable {
         case pureInference    // no external effect, not upgraded
         case toolRead
         case toolWrite        // upgraded to toolCut when evidence insufficient

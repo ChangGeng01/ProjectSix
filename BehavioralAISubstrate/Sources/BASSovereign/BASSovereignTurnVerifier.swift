@@ -41,7 +41,7 @@ import BASRuntimeCore
 /// a `BASEBrainTurnResult` lives in `BASHostKit` where it can see
 /// every needed type.
 
-public struct BASSovereignTurnObservations: Sendable, Equatable {
+public struct BASSovereignTurnObservations: Sendable, Equatable, Codable {
 
     // MARK: - Identity
 
@@ -159,7 +159,7 @@ public struct BASSovereignTurnObservations: Sendable, Equatable {
 
 /// Parity status between the coordinator's hand-rolled verdict and
 /// the engine's verdict on the same turn.
-public enum BASSovereignTurnParity: String, Sendable, Equatable {
+public enum BASSovereignTurnParity: String, Sendable, Equatable, Codable {
     /// Coordinator verdict level == engine verdict level.
     case match
     /// Coordinator was stricter than engine. This is *allowed* — the
@@ -174,7 +174,7 @@ public enum BASSovereignTurnParity: String, Sendable, Equatable {
     case engineOnly
 }
 
-public struct BASSovereignTurnVerifierReport: Sendable, Equatable {
+public struct BASSovereignTurnVerifierReport: Sendable, Equatable, Codable {
     public let observations: BASSovereignTurnObservations
     public let engineVerdict: BASSovereignVerdict
     public let coordinatorLevel: BASSovereignVerdictLevel?
