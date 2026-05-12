@@ -58,7 +58,7 @@ import BASWorldPrior
 /// factory outputs。 Pure packaging — no derive calls,no
 /// transformations beyond the 2-pointer struct itself。
 public struct BASAuditObservationProjectionsCthulhuInputs:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
 
     // MARK: - Inputs

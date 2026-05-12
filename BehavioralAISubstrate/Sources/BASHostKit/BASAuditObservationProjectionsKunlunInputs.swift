@@ -81,7 +81,7 @@ import BASRuntimeCore
 /// derive calls,no transformations,no allocations
 /// beyond the 4-pointer struct itself。
 public struct BASAuditObservationProjectionsKunlunInputs:
-    Hashable, Sendable
+    Codable, Hashable, Sendable
 {
 
     // MARK: - Inputs
