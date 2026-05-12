@@ -2340,10 +2340,16 @@ public struct BASEBrainRuntimeCoordinator {
                     memoryBundle: memoryBundle,
                     thoughtFrame: thoughtFrame,
                     thoughtFold: thoughtFold),
-            triScores: triScores,
-            mergedChoice: mergedChoice,
-            riskCard: boundRiskCard,
-            actionPermit: boundActionPermit,
+            // chapter 五百二十九 / M1495 — V1 splice:
+            // 4 risk/choice args collapse to 1 typed
+            // riskChoiceBundle。 Byte-equality preserved
+            // by M1494 PROOF。
+            riskChoiceBundle:
+                BASEBrainTurnResultRiskChoiceBundle(
+                    triScores: triScores,
+                    mergedChoice: mergedChoice,
+                    riskCard: boundRiskCard,
+                    actionPermit: boundActionPermit),
             riskDecisionPackage: normalizedRiskDecisionPackage,
             hostGateValue: hostGateValue,
             renderedOutput: renderedOutput,
