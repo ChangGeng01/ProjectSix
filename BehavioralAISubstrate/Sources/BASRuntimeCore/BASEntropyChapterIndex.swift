@@ -1602,7 +1602,24 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative。 ADR-016" +
                 " → M1428。 Observer is OPT-IN — no" +
                 " production callers wired at" +
-                " close-out。")
+                " close-out。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十三",
+            mNumberFirst: 1429, mNumberLast: 1432,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "5-pipeline unified audit emission" +
+                " shape sealed: BASAuditObservation" +
+                "ProjectionsBundleEmitter typed facade" +
+                " + 5th pipeline (projectionBlock" +
+                "Observations) added to BASEndOfTurn" +
+                "AuditEmissionRecord + BASEndOfTurnAudit" +
+                "Emitter projection-bundle hook。" +
+                " Backwards-compat preserved (hasAllFour" +
+                "Pipelines retains M1397 semantics)。" +
+                " 59 typed surfaces cumulative。 ADR-016" +
+                " → M1432。 All pipelines opt-in;V1" +
+                " untouched。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -166,7 +166,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百九",       // M1413-M1416 (Tier C migration adapters — 2/4 shipped)
         "chapter 五百十",       // M1417-M1420 (V1 monolith fold continues — counterweight + routed budget)
         "chapter 五百十一",     // M1421-M1424 (projection-block fold — Kunlun + Cthulhu inputs blocks + convenience inits)
-        "chapter 五百十二"      // M1425-M1428 (projection-block wire-in chain — observation + observer + 12th BASBundle adoption)
+        "chapter 五百十二",     // M1425-M1428 (projection-block wire-in chain — observation + observer + 12th BASBundle adoption)
+        "chapter 五百十三"      // M1429-M1432 (5-pipeline unified audit emission — emitter facade + 5th pipeline + emitter hook)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -183,17 +184,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1428
+    public static let mNumberLast: Int = 1432
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1428)。 Bumped through chapter 512:469 → 473。
-    /// Chapter 512:projection-block wire-in chain —
-    /// M1425 typed observation record + M1426 actor
-    /// accumulator + M1427 12th BASBundle<Item> adoption
-    /// + M1428 close-out。 4-stage typed composition
-    /// pipeline closed (block → observation → observer →
-    /// BASBundle batch)。
-    public static let commitsShipped: Int = 473
+    /// M1432)。 Bumped through chapter 513:473 → 477。
+    /// Chapter 513:5-pipeline unified audit emission —
+    /// M1429 emitter facade + M1430 5th pipeline on
+    /// audit record + M1431 emitter hook + M1432
+    /// close-out。 Unified audit emission shape sealed
+    /// at 5 pipelines。
+    public static let commitsShipped: Int = 477
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

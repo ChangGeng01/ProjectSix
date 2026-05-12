@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1428",
-            "M1428:doctrine version reflects chapter 五百十二 — projection-block wire-in chain。 BASAuditObservationProjectionsBundleObservation (M1425, typed per-turn record) + BASAuditObservationProjectionsBundleObserver actor (M1426) + BASAuditObservationProjectionsBundle 12th BASBundle<Item> adoption (M1427)。 4-stage typed composition pipeline closed (Block inputs → projections → observation → observer-actor → BASBundle batch)。 58 typed surfaces cumulative。 V1 byte-equality preserved (observer is opt-in, no production callers wired)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1432",
+            "M1432:doctrine version reflects chapter 五百十三 — 5-pipeline unified audit emission shape sealed。 BASAuditObservationProjectionsBundleEmitter typed facade (M1429) + BASEndOfTurnAuditEmissionRecord 5th pipeline projectionBlockObservations (M1430) + BASEndOfTurnAuditEmitter projection-bundle hook (M1431)。 Unified record now composes 5 typed wire-in pipelines (cache report + routing decisions + dispatch statistics + advisory ledger + projection blocks)。 Backwards-compat preserved (hasAllFourPipelines kept for M1397 callers)。 59 typed surfaces cumulative。 V1 byte-equality untouched (all pipelines opt-in)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -4695,7 +4695,95 @@ public enum BASChapterDoctrineRegistry {
                 " → M1428。 V1 byte-equality untouched" +
                 " (observer is OPT-IN,no production" +
                 " callers wired at close-out)。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 513 — projection-block 5th pipeline
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十三",
+            mNumberFirst: 1429,
+            mNumberLast: 1432,
+            v1MilestoneMNumber: 1432,
+            v1MilestoneStatus:
+                "chapter-513-projection-5th-pipeline",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1429, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsBundleEmitter typed" +
+                        " facade。 Stateless dispatcher" +
+                        " routing optional Kunlun +" +
+                        " Cthulhu inputs through the" +
+                        " correct M1425 factory variant" +
+                        " (fullyCovered / kunlunOnly /" +
+                        " cthulhuOnly / uncovered)。 59" +
+                        " typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1430, knife: "第二刀",
+                    concept: "BASEndOfTurnAuditEmission" +
+                        "Record gains 5th optional" +
+                        " pipeline (projectionBlock" +
+                        "Observations)。 populated" +
+                        "PipelineCount upper bound 4 → 5。" +
+                        " hasAllFourPipelines kept for" +
+                        " backwards-compat (M1397" +
+                        " semantics);hasAllFive" +
+                        "Pipelines is new threshold。"),
+                BASChapterKnife(
+                    mNumber: 1431, knife: "第三刀",
+                    concept: "BASEndOfTurnAuditEmitter" +
+                        " gains 5th optional pipeline" +
+                        " observer (projectionBlock" +
+                        "Observer)。 emit() snapshots" +
+                        " via M1427 snapshotAsBundle()。" +
+                        " connectedPipelineCount upper" +
+                        " bound 4 → 5。 hasProjectionBlock" +
+                        "Observer flag。"),
+                BASChapterKnife(
+                    mNumber: 1432, knife: "第四刀",
+                    concept: "Chapter 513 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1432。 5-pipeline unified" +
+                        " audit emission shape sealed。" +
+                        " All 24 existing 4-pipeline" +
+                        " tests still pass + 18 new" +
+                        " chapter-513 PROOF tests。")
+            ],
+            entropyClassesAttacked: [
+                "projection-block-routing-4-branch-switch",
+                "audit-emission-record-4-pipeline-cap",
+                "audit-emitter-projection-bundle-hook-absent",
+                "unified-audit-shape-coverage-gap"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1432",
+                "v1-byte-equality-preserved",
+                "backwards-compat-hasAllFourPipelines",
+                "5-pipeline-unified-audit-emission"
+            ],
+            plannedFutureCuts: [
+                "future arc — production wire-in (V1" +
+                " monolith emits projection-block" +
+                " observations to the emitter via" +
+                " typed slot)",
+                "future arc — cross-host federated" +
+                " replay (5-pipeline records flow" +
+                " through event log)",
+                "future arc — additional V1 monolith" +
+                " inline construction folds",
+                "future arc — Tier C migration adoption"
+            ],
+            summary: "5-pipeline unified audit emission" +
+                " shape sealed at chapter 513:typed" +
+                " emitter facade + projection-block" +
+                " pipeline added to unified record +" +
+                " emitter hook。 Backwards-compat" +
+                " preserved (hasAllFourPipelines retains" +
+                " M1397 semantics)。 59 typed surfaces" +
+                " cumulative。 ADR-016 → M1432。 V1" +
+                " byte-equality untouched (all pipelines" +
+                " opt-in)。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
