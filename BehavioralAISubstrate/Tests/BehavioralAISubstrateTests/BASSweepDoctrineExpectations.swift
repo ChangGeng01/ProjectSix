@@ -117,18 +117,18 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 141
+    public static let phase2ChapterCount: Int = 142
 
-    /// Phase 2 commits shipped。 At M1552:125 + 84 + 388
-    /// = 597 (chapter 543 = 4 cuts — 5 Codable round-
-    /// trip PROOF tests + typed coverage doctrine +
-    /// 13 anti-drift PROOF tests + close-out)
-    public static let phase2CommitsShipped: Int = 597
+    /// Phase 2 commits shipped。 At M1556:125 + 84 + 392
+    /// = 601 (chapter 544 = 4 cuts — MiscBundle round-
+    /// trip PROOF + doctrine catalogue update + anti-
+    /// drift tests update + close-out)
+    public static let phase2CommitsShipped: Int = 601
 
-    /// Phase 2 mNumberLast。 At M1552:chapter 543 (5 of
+    /// Phase 2 mNumberLast。 At M1556:chapter 544 (6 of
     /// 9 bundles now have explicit round-trip coverage)。
     /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1552
+    public static let phase2MNumberLast: Int = 1556
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

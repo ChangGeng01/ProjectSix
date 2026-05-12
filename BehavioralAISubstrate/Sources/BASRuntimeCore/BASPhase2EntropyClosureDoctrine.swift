@@ -197,7 +197,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百四十",     // M1537-M1540 (unified typed catalogue doctrine for 3 observability sinks + 23 PROOF tests — 8-path / 3-sink achievement non-driftable)
         "chapter 五百四十一",   // M1541-M1544 (Codable conformance addition across 9 BASEBrainTurnResult cluster bundles + typed milestone + 7 PROOF tests)
         "chapter 五百四十二",   // M1545-M1548 (7 Codable round-trip PROOF tests + typed Hashable blocker doctrine + 10 anti-drift PROOF tests)
-        "chapter 五百四十三"    // M1549-M1552 (5 Codable round-trip PROOF tests for HostBundle + ForensicMetadataBundle + typed coverage doctrine + 13 anti-drift PROOF tests)
+        "chapter 五百四十三",   // M1549-M1552 (5 Codable round-trip PROOF tests for HostBundle + ForensicMetadataBundle + typed coverage doctrine + 13 anti-drift PROOF tests)
+        "chapter 五百四十四"    // M1553-M1556 (Codable round-trip PROOF for MiscBundle extends coverage 5 → 6 of 9 + doctrine catalogue update + anti-drift PROOF tests update)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -214,15 +215,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1552
+    public static let mNumberLast: Int = 1556
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1552)。 Bumped through chapter 543:593 → 597。
-    /// Chapter 543:5 Codable round-trip PROOF tests +
-    /// typed coverage doctrine + 13 anti-drift PROOF
-    /// tests + close-out。 5 of 9 bundles now have
-    /// explicit round-trip coverage。
-    public static let commitsShipped: Int = 597
+    /// M1556)。 Bumped through chapter 544:597 → 601。
+    /// Chapter 544:Codable round-trip PROOF for
+    /// MiscBundle extends coverage 5 → 6 of 9 + doctrine
+    /// catalogue update + anti-drift PROOF tests update
+    /// + close-out。
+    public static let commitsShipped: Int = 601
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

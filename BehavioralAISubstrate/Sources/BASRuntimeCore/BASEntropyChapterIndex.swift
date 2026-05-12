@@ -2151,7 +2151,22 @@ public enum BASEntropyChapterIndex {
                 " consistency check (M1550) + 13" +
                 " anti-drift PROOF tests (M1551)。 89" +
                 " typed surfaces cumulative。 ADR-016 →" +
-                " M1552。 V1 byte-equality preserved。")
+                " M1552。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百四十四",
+            mNumberFirst: 1553, mNumberLast: 1556,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 3,
+            summary: "Codable round-trip PROOF test for" +
+                " MiscBundle extends coverage from 5 →" +
+                " 6 of 9 cluster bundles (M1553) +" +
+                " update coverage doctrine catalogue" +
+                " (M1554) + update anti-drift PROOF" +
+                " tests with new counts + MiscBundle" +
+                " lookup test (M1555)。 89 typed surfaces" +
+                " cumulative (no new surfaces — pure" +
+                " coverage extension)。 ADR-016 → M1556。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

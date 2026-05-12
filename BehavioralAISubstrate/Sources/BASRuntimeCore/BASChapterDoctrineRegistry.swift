@@ -7569,7 +7569,93 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1552。 136 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 544 — round-trip coverage extension
+        // to 6 of 9
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百四十四",
+            mNumberFirst: 1553,
+            mNumberLast: 1556,
+            v1MilestoneMNumber: 1556,
+            v1MilestoneStatus:
+                "chapter-544-roundtrip-misc-coverage-6-of-9",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1553, knife: "第一刀",
+                    concept: "Codable round-trip PROOF" +
+                        " tests for MiscBundle:minimal" +
+                        " fixture (riskDecisionPackage" +
+                        " nil + hostGateValue 0.5 +" +
+                        " renderedOutput .answer mode +" +
+                        " empty updateTickets)。 Extends" +
+                        " coverage from 5 → 6 of 9" +
+                        " cluster bundles。"),
+                BASChapterKnife(
+                    mNumber: 1554, knife: "第二刀",
+                    concept: "Update BASEBrainTurnResult" +
+                        "ClusterBundleCodableRoundTrip" +
+                        "CoverageDoctrine catalogue:" +
+                        " MiscBundle status flips" +
+                        " .compileTimeOnly →" +
+                        " .explicitRoundTripCovered with" +
+                        " explicitCoverageMNumber 1553。" +
+                        " Derived counts:explicitly" +
+                        "Covered 5→6 + compileTimeOnly" +
+                        " 4→3 + coverageRatio ≈0.667。"),
+                BASChapterKnife(
+                    mNumber: 1555, knife: "第三刀",
+                    concept: "Update anti-drift PROOF" +
+                        " tests:counts pinned to 6/3 +" +
+                        " ratio range 0.66-0.67 +" +
+                        " testMiscBundleIsExplicitly" +
+                        "CoveredAtM1553 added。 Test" +
+                        " count 13 → 14。"),
+                BASChapterKnife(
+                    mNumber: 1556, knife: "第四刀",
+                    concept: "Chapter 544 close-out +" +
+                        " doctrine sync。 140 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved this autonomous arc。")
+            ],
+            entropyClassesAttacked: [
+                "misc-bundle-round-trip-untested",
+                "renderedOutput-fixture-pattern-missing",
+                "coverage-ratio-stuck-at-55%",
+                "compileTimeOnly-count-decreasing-untracked"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1556",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "6-of-9-round-trip-coverage-pinned"
+            ],
+            plannedFutureCuts: [
+                "future arc — round-trip coverage for" +
+                " 3 remaining bundles (CognitiveFrames" +
+                " + RiskChoice + DeviceLifecycle —" +
+                " require deeper fixtures with multiple" +
+                " required sub-types)",
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in of observability sinks"
+            ],
+            summary: "Chapter 544 extends Codable round-" +
+                "trip PROOF test coverage from 5 → 6 of" +
+                " 9 cluster bundles by adding MiscBundle" +
+                " fixture (M1553) + updates coverage" +
+                " doctrine catalogue (M1554) + updates" +
+                " anti-drift PROOF tests with new counts" +
+                " + lookup (M1555) + close-out (M1556)。" +
+                " 89 typed surfaces cumulative (no new" +
+                " surfaces this chapter — pure coverage" +
+                " extension)。 ADR-016 → M1556。 140" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

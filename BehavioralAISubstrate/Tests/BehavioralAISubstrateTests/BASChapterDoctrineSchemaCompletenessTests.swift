@@ -1673,7 +1673,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百四十三")!)
+                            "chapter 五百四十三")!),
+            // M1556 chapter 544 — MiscBundle round-trip + coverage doctrine update + anti-drift tests
+            checkRegistry("五百四十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百四十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2513,6 +2519,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百四十三")!
+                .mNumberLast),
+            // M1556 chapter 544 — MiscBundle round-trip + coverage doctrine update + anti-drift tests
+            ("544",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百四十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
