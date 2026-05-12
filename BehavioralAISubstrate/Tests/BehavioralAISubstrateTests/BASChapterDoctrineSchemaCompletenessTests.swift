@@ -1835,7 +1835,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 五百七十")!)
+                            "chapter 五百七十")!),
+            // M1664 chapter 571 — First-ever Orchestration Codable extension
+            checkRegistry("五百七十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 五百七十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -2891,6 +2897,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 五百七十")!
+                .mNumberLast),
+            // M1664 chapter 571 — First-ever Orchestration Codable extension
+            ("571",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 五百七十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

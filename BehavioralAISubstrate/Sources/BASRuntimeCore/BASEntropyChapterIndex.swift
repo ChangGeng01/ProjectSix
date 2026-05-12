@@ -2650,7 +2650,21 @@ public enum BASEntropyChapterIndex {
                 " close-out (M1660 round-number" +
                 " milestone)。 111 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1660。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百七十一",
+            mNumberFirst: 1661, mNumberLast: 1664,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "FIRST-EVER ORCHESTRATION CODABLE" +
+                " EXTENSION。 2 BASOrchestration" +
+                " decision types gained Codable at" +
+                " M1661 + 2 PROOF tests (M1662) + new" +
+                " typed surface (M1663) + close-out" +
+                " (M1664)。 New module territory。 112" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1664。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

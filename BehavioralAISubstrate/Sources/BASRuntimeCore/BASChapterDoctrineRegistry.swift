@@ -9906,7 +9906,75 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1660。 244 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 571 — First-ever Codable extension
+        // into BASOrchestration module。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百七十一",
+            mNumberFirst: 1661,
+            mNumberLast: 1664,
+            v1MilestoneMNumber: 1664,
+            v1MilestoneStatus:
+                "chapter-571-first-orchestration-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1661, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Orchestration decision types" +
+                        " (AssertionCeilingDecision +" +
+                        " AbyssalPermitEscalationDecision)" +
+                        "。 First-ever Codable extension" +
+                        " into BASOrchestration module。"),
+                BASChapterKnife(
+                    mNumber: 1662, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1663, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionDoctrine typed surface。" +
+                        " typed-surface count 111 → 112。"),
+                BASChapterKnife(
+                    mNumber: 1664, knife: "第四刀",
+                    concept: "Chapter 571 close-out +" +
+                        " doctrine sync。 248" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "assertion-ceiling-decision-non-codable",
+                "abyssal-permit-escalation-decision-non-codable",
+                "orchestration-module-untouched",
+                "post-tri-arc-coverage-gap"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1664",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "first-orchestration-codable",
+                "new-module-territory"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — SampleHost production" +
+                " wire-in",
+                "future arc — continue Codable" +
+                " extension into BASOrchestration or" +
+                " other modules"
+            ],
+            summary: "Chapter 571 ships the first-ever" +
+                " Codable extension into the BAS" +
+                "Orchestration module。 2 decision types" +
+                " gained Codable + 2 PROOF tests + new" +
+                " typed surface + close-out。 112 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1664。 248 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
