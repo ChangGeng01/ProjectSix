@@ -4783,7 +4783,99 @@ public enum BASChapterDoctrineRegistry {
                 " M1397 semantics)。 59 typed surfaces" +
                 " cumulative。 ADR-016 → M1432。 V1" +
                 " byte-equality untouched (all pipelines" +
-                " opt-in)。 ADR-014 OPT-IN preserved。")
+                " opt-in)。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 514 — 3rd input block + unified init
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百十四",
+            mNumberFirst: 1433,
+            mNumberLast: 1436,
+            v1MilestoneMNumber: 1436,
+            v1MilestoneStatus:
+                "chapter-514-3rd-input-block-unified",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1433, knife: "第一刀",
+                    concept: "NEW BASAuditObservation" +
+                        "ProjectionsObservationBundles" +
+                        "Block — 3rd typed input block" +
+                        " aggregating 11 cognitive-layer" +
+                        " observation bundles。 Sibling" +
+                        " of Kunlun (18 fields) +" +
+                        " Cthulhu (8 fields) blocks。" +
+                        " 60 typed surfaces cumulative。"),
+                BASChapterKnife(
+                    mNumber: 1434, knife: "第二刀",
+                    concept: "BASAuditObservation" +
+                        "Projections.init(observation" +
+                        "Bundles:) convenience init。" +
+                        " Sibling of M1422 Kunlun init" +
+                        " + M1423 Cthulhu init。" +
+                        " 3 input blocks now have" +
+                        " matching convenience inits。"),
+                BASChapterKnife(
+                    mNumber: 1435, knife: "第三刀",
+                    concept: "BASAuditObservation" +
+                        "Projections.init(kunlunInputs:" +
+                        " cthulhuInputs:" +
+                        " observationBundles:) UNIFIED" +
+                        " 3-block init。 Collapses 56-" +
+                        "arg all-fields init into ~18" +
+                        " args at call site (3 blocks +" +
+                        " 15 residuals)。 37 of 56" +
+                        " fields packaged into typed" +
+                        " input surfaces。"),
+                BASChapterKnife(
+                    mNumber: 1436, knife: "第四刀",
+                    concept: "Chapter 514 close-out +" +
+                        " doctrine sync。 ADR-016 →" +
+                        " M1436。 3-input-block typed" +
+                        " surface shape sealed。 60" +
+                        " typed surfaces cumulative。" +
+                        " 26 PROOF tests across" +
+                        " chapters 511-514 covering" +
+                        " block accessors,convenience" +
+                        " inits,byte-equality" +
+                        " regression guards。")
+            ],
+            entropyClassesAttacked: [
+                "audit-projection-observation-bundle-cluster-untyped",
+                "audit-projection-56-named-args",
+                "convenience-init-coverage-partial",
+                "3-block-unified-init-absent"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1436",
+                "v1-byte-equality-preserved",
+                "3-block-typed-input-surface",
+                "37-of-56-fields-packaged"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith splice using" +
+                " unified 3-block init at line 2035" +
+                " (eliminates 37 named args at the" +
+                " projections call site)",
+                "future arc — wire 3-block input emission" +
+                " through observer-actor chain",
+                "future arc — additional inline" +
+                " construction folds",
+                "future arc — Tier C migration adoption"
+            ],
+            summary: "3rd typed input block + unified" +
+                " convenience inits sealed at chapter" +
+                " 514:BASAuditObservation" +
+                "ProjectionsObservationBundlesBlock (11" +
+                " cognitive bundles) + 2 new convenience" +
+                " inits (observation-bundles-only +" +
+                " unified 3-block taking all of Kunlun" +
+                " + Cthulhu + Observation)。 37 of 56" +
+                " audit-projection fields now packaged" +
+                " into 3 typed input surfaces。 60 typed" +
+                " surfaces cumulative。 ADR-016 → M1436。" +
+                " V1 untouched (additive APIs only)。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

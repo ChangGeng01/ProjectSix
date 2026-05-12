@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1432",
-            "M1432:doctrine version reflects chapter 五百十三 — 5-pipeline unified audit emission shape sealed。 BASAuditObservationProjectionsBundleEmitter typed facade (M1429) + BASEndOfTurnAuditEmissionRecord 5th pipeline projectionBlockObservations (M1430) + BASEndOfTurnAuditEmitter projection-bundle hook (M1431)。 Unified record now composes 5 typed wire-in pipelines (cache report + routing decisions + dispatch statistics + advisory ledger + projection blocks)。 Backwards-compat preserved (hasAllFourPipelines kept for M1397 callers)。 59 typed surfaces cumulative。 V1 byte-equality untouched (all pipelines opt-in)。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1436",
+            "M1436:doctrine version reflects chapter 五百十四 — 3rd typed input block + unified convenience inits。 BASAuditObservationProjectionsObservationBundlesBlock (M1433, 11 cognitive observation bundles) + BASAuditObservationProjections.init(observationBundles:) convenience init (M1434) + BASAuditObservationProjections.init(kunlunInputs:cthulhuInputs:observationBundles:) UNIFIED 3-block init (M1435)。 37 of 56 audit-projection fields now packaged into 3 typed input surfaces。 60 typed surfaces cumulative。 V1 untouched (additive APIs only)。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

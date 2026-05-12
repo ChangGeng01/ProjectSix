@@ -37,18 +37,20 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs513() {
+    func testLastChapterIs514() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 五百十三",
-            "M1432 chapter 五百十三 — 5-pipeline unified" +
-            " audit emission。 BASAuditObservation" +
-            "ProjectionsBundleEmitter typed facade" +
-            " + 5th pipeline on BASEndOfTurnAudit" +
-            "EmissionRecord + emitter hook。" +
-            " Backwards-compat preserved。 59 typed" +
-            " surfaces cumulative")
+            "chapter 五百十四",
+            "M1436 chapter 五百十四 — 3rd typed input" +
+            " block + unified convenience inits。" +
+            " BASAuditObservationProjections" +
+            "ObservationBundlesBlock (11 cognitive" +
+            " bundles) + observation-bundles-only" +
+            " convenience init + unified 3-block init。" +
+            " 37 of 56 audit-projection fields" +
+            " packaged into 3 typed input surfaces。" +
+            " 60 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

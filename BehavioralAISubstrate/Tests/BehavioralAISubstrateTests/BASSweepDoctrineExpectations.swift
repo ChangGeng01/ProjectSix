@@ -117,19 +117,19 @@ public enum BASSweepDoctrineExpectations {
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
     /// added)
-    public static let phase2ChapterCount: Int = 111
+    public static let phase2ChapterCount: Int = 112
 
-    /// Phase 2 commits shipped。 At M1432:
-    /// 125 + 84 + 268 = 477 (chapter 513 = 4 cuts —
-    /// 5-pipeline unified audit emission:emitter facade
-    /// + 5th pipeline + emitter hook + close-out)
-    public static let phase2CommitsShipped: Int = 477
+    /// Phase 2 commits shipped。 At M1436:
+    /// 125 + 84 + 272 = 481 (chapter 514 = 4 cuts —
+    /// 3rd typed input block + 2 new convenience inits
+    /// + close-out)
+    public static let phase2CommitsShipped: Int = 481
 
-    /// Phase 2 mNumberLast。 At M1432:chapter 513
-    /// (5-pipeline unified audit emission — emitter
-    /// facade + 5th pipeline + emitter hook)。 SWEEP
-    /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1432
+    /// Phase 2 mNumberLast。 At M1436:chapter 514
+    /// (3rd typed input block + unified convenience
+    /// inits — 37 fields packaged into 3 typed input
+    /// surfaces)。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1436
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

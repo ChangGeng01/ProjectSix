@@ -107,13 +107,14 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 513 close-out。 Chapter
-    /// 513:5-pipeline unified audit emission shape
-    /// sealed — BASAuditObservationProjectionsBundle
-    /// Emitter facade + 5th pipeline on BASEndOfTurn
-    /// AuditEmissionRecord + emitter projection-bundle
-    /// hook。 Unified record composes 5 typed wire-in
-    /// pipelines。
+    /// Re-captured at chapter 514 close-out。 Chapter
+    /// 514:3rd typed input block + unified convenience
+    /// inits — BASAuditObservationProjectionsObservation
+    /// BundlesBlock (11 cognitive bundles) + observation-
+    /// bundles-only convenience init + unified 3-block
+    /// init taking all of Kunlun + Cthulhu + Observation。
+    /// 37 of 56 audit-projection fields now packaged
+    /// into 3 typed input surfaces。
     static let frozenFullRegistrySha256: String =
-        "3e8afec801fb3e9a6105abf28440966af203619094a5d69dbb666549f5cf10be"
+        "3e113562026b3d142e8ab2a6a8bfdf07081cd48e6d684f7b05ccb113b623d299"
 }

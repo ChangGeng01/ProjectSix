@@ -1619,7 +1619,25 @@ public enum BASEntropyChapterIndex {
                 "Pipelines retains M1397 semantics)。" +
                 " 59 typed surfaces cumulative。 ADR-016" +
                 " → M1432。 All pipelines opt-in;V1" +
-                " untouched。")
+                " untouched。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百十四",
+            mNumberFirst: 1433, mNumberLast: 1436,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 9, futureCutsCount: 4,
+            summary: "3rd typed input block + unified" +
+                " convenience inits sealed:" +
+                " BASAuditObservationProjections" +
+                "ObservationBundlesBlock (11 cognitive" +
+                " bundles) + 2 new convenience inits" +
+                " (observation-bundles-only + unified" +
+                " 3-block taking all of Kunlun +" +
+                " Cthulhu + Observation)。 37 of 56" +
+                " audit-projection fields packaged into" +
+                " 3 typed input surfaces。 60 typed" +
+                " surfaces cumulative。 ADR-016 →" +
+                " M1436。 V1 untouched (additive APIs" +
+                " only)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
