@@ -66,15 +66,36 @@ extension BASEventLogStorage {
     /// are silently dropped (V2 actor adopts the
     /// fire-and-forget contract for envelope emission so a
     /// transient log error doesn't fail the turn)。
+    ///
+    /// chapter 五百三十九 / M1534 — wire-in of typed
+    /// observability sink (M1533)。 New optional
+    /// `failureLog:` parameter,default nil。 When nil,
+    /// behavior is unchanged from chapter 304 (silent
+    /// swallow);when non-nil,each failed append also
+    /// records to the actor sink with kind
+    /// `.turnEnvelopeAppend` + envelope's turnID +
+    /// sessionID for diagnostic correlation。 ADR-014
+    /// OPT-IN preserved。
     public func appendTurnEnvelope(
         _ envelope: BASTurnRuntimeAuditEnvelope,
         eventID: String,
-        source: String = "turn-runtime-engine"
+        source: String = "turn-runtime-engine",
+        failureLog: BASAuditEmissionFailureLog? = nil
     ) async {
         let entry = BASEventLogEntry(
             turnEnvelope: envelope,
             eventID: eventID,
             source: source)
-        _ = try? await self.append(entry)
+        do {
+            try await self.append(entry)
+        } catch {
+            if let log = failureLog {
+                await log.record(
+                    kind: .turnEnvelopeAppend,
+                    error: error,
+                    turnID: envelope.turnID,
+                    sessionID: envelope.sessionID)
+            }
+        }
     }
 }

@@ -70,6 +70,15 @@ public actor BASSovereignCleanRebootCoordinator {
     private let ledger: BASSovereignAuditLedger
     private let now: @Sendable () -> Date
 
+    /// chapter 五百三十九 / M1534 — typed observability
+    /// sink for the documented silent-swallow at the
+    /// reboot-plan audit append site (line ~237)。 nil
+    /// → behavior unchanged (silent swallow per the
+    /// coordinator's best-effort audit-trail contract);
+    /// non-nil → record each failed append。
+    private let auditFailureLog:
+        BASAuditEmissionFailureLog?
+
     /// Map from hostVersionID → anchorID. Populated by `bindAnchor`
     /// whenever a snapshot is registered for a known version. The
     /// coordinator needs this to pick an anchor for a given
@@ -80,12 +89,15 @@ public actor BASSovereignCleanRebootCoordinator {
         snapshotManager: BASSovereignSnapshotManager,
         versionTree: BASSovereignHostVersionTree,
         ledger: BASSovereignAuditLedger,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        auditFailureLog:
+            BASAuditEmissionFailureLog? = nil
     ) {
         self.snapshotManager = snapshotManager
         self.versionTree = versionTree
         self.ledger = ledger
         self.now = now
+        self.auditFailureLog = auditFailureLog
     }
 
     // MARK: - Anchor binding
@@ -234,7 +246,24 @@ public actor BASSovereignCleanRebootCoordinator {
             actor: .system,
             signature: "",
             appendedAt: plan.issuedAt)
-        _ = try? await ledger.append(entry)
+        // chapter 五百三十九 / M1534 — wire-in of typed
+        // observability sink (M1533)。 Default nil →
+        // silent swallow continues (best-effort audit
+        // trail per the coordinator's contract);non-nil
+        // → record failure with kind
+        // `.sovereignRebootAuditAppend` for diagnostic
+        // inspection。 ADR-014 OPT-IN preserved。
+        do {
+            try await ledger.append(entry)
+        } catch {
+            if let failureLog = auditFailureLog {
+                await failureLog.record(
+                    kind: .sovereignRebootAuditAppend,
+                    error: error,
+                    turnID: verdict.verdictID,
+                    sessionID: sessionID)
+            }
+        }
 
         return plan
     }
