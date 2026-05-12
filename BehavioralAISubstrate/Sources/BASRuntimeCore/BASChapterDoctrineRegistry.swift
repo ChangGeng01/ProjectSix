@@ -10924,7 +10924,100 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1708。 292 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 583 — BASLeaseLife wave 3 Codable
+        // extension。 2 struct types (BASLeaseLife
+        // Coordinator.TurnRecorded composite culminates
+        // waves 1+2 + BASComputeRouter)。 Arc structure
+        // ready for sealing at chapter 584。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 五百八十三",
+            mNumberFirst: 1709,
+            mNumberLast: 1712,
+            v1MilestoneMNumber: 1712,
+            v1MilestoneStatus:
+                "chapter-583-leaselife-wave-three-codable",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1709, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "LeaseLife struct types (BAS" +
+                        "LeaseLifeCoordinator." +
+                        "TurnRecorded composite +" +
+                        " BASComputeRouter)。" +
+                        " TurnRecorded culminates" +
+                        " waves 1+2 (composes Snapshot" +
+                        " + Reading)。 BASComputeRouter" +
+                        " gained Codable + Equatable" +
+                        " together。"),
+                BASChapterKnife(
+                    mNumber: 1710, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1711, knife: "第三刀",
+                    concept: "NEW BASLeaseLifeCodable" +
+                        "ExtensionWaveThreeDoctrine typed" +
+                        " surface。 Documents wave 3 +" +
+                        " arcStructureReadyForSealing" +
+                        " flag。 typed-surface count" +
+                        " 123 → 124。"),
+                BASChapterKnife(
+                    mNumber: 1712, knife: "第四刀",
+                    concept: "Chapter 583 close-out +" +
+                        " doctrine sync。 296" +
+                        " consecutive commits with V1" +
+                        " byte-equality preserved。 BAS" +
+                        "LeaseLife arc ready for sealing。")
+            ],
+            entropyClassesAttacked: [
+                "turn-recorded-composite-non-codable",
+                "compute-router-non-codable",
+                "leaselife-wave-3-aftermath-incomplete",
+                "leaselife-arc-not-yet-sealed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1712",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "leaselife-wave-three-codable",
+                "6-leaselife-structs-cumulative"
+            ],
+            plannedFutureCuts: [
+                "future arc — V1 monolith internal" +
+                " fold continuation",
+                "future arc — chapter 584 BASLeaseLife" +
+                " arc seal milestone mirroring chapter" +
+                " 574 pattern",
+                "future arc — additional fresh module" +
+                " territory (BASMemory more types,BAS" +
+                "Observability,etc。)"
+            ],
+            summary: "Chapter 583 ships BASLeaseLife" +
+                " wave 3 Codable extension。 2 struct" +
+                " types (BASLeaseLifeCoordinator." +
+                "TurnRecorded composite + BASCompute" +
+                "Router) gained Codable at M1709。" +
+                " TurnRecorded is natural CULMINATION" +
+                " of waves 1+2 (composes Snapshot +" +
+                " Reading)。 2 PROOF tests (M1710) +" +
+                " new typed surface (M1711) + close-" +
+                "out (M1712)。 Completes BASLeaseLife" +
+                " 3-wave extension trilogy。 Combined" +
+                " chapter 581 wave 1 (2) + chapter 582" +
+                " wave 2 (2 structs + 1 enum) + chapter" +
+                " 583 wave 3 (2) = 6 BASLeaseLife" +
+                " struct types + 1 supporting enum" +
+                " ledger-serializable。 BASLeaseLife" +
+                " arc structure ready for sealing at" +
+                " chapter 584。 124 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1712。" +
+                " 296 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

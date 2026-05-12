@@ -236,7 +236,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 五百七十九",   // M1693-M1696 (POST-ARC TRILOGY SEAL MILESTONE — BASOrchestrationCodableExtensionPostArcTrilogySealedDoctrine + 22 anti-drift + 15 wire-in PROOF tests commemorating 3-wave / 12-commit trilogy (chapters 576-578);second sealed milestone for BASOrchestration after chapter 574 arc seal)
         "chapter 五百八十",     // M1697-M1700 (PENTA-MILESTONE COMPLETION META-META MILESTONE — BASCodableExtensionPentaMilestoneCompletionDoctrine + 26 anti-drift + 18 wire-in PROOF tests cataloguing all 5 sealed Codable extension milestones;56 types,60 commits,15 chapters,4 modules;58 session types ledger-serializable;M1700 ROUND-NUMBER close-out)
         "chapter 五百八十一",   // M1701-M1704 (FIRST-EVER BASLEASELIFE CODABLE EXTENSION — 2 nested types (BASBreathScheduler.Request + ScheduledBreath) gained Codable + 2 PROOF tests + BASLeaseLifeCodableExtensionDoctrine + close-out;fresh module territory beyond M1700 narrative arc;module coverage 4→5)
-        "chapter 五百八十二"    // M1705-M1708 (BASLEASELIFE WAVE 2 CODABLE EXTENSION — 2 struct types (BASThermalTwin.Reading + BASLungStateAccumulator.Snapshot) + 1 supporting enum (BASThermalTwin.OSThermalState) gained Codable + 3 PROOF tests + BASLeaseLifeCodableExtensionWaveTwoDoctrine + close-out;chapter 581 + 582 = 4 BASLeaseLife structs cumulative)
+        "chapter 五百八十二",   // M1705-M1708 (BASLEASELIFE WAVE 2 CODABLE EXTENSION — 2 struct types (BASThermalTwin.Reading + BASLungStateAccumulator.Snapshot) + 1 supporting enum (BASThermalTwin.OSThermalState) gained Codable + 3 PROOF tests + BASLeaseLifeCodableExtensionWaveTwoDoctrine + close-out;chapter 581 + 582 = 4 BASLeaseLife structs cumulative)
+        "chapter 五百八十三"    // M1709-M1712 (BASLEASELIFE WAVE 3 CODABLE EXTENSION — 2 struct types (BASLeaseLifeCoordinator.TurnRecorded composite culminating waves 1+2 + BASComputeRouter) gained Codable + 2 PROOF tests + BASLeaseLifeCodableExtensionWaveThreeDoctrine + close-out;chapter 581+582+583 = 6 BASLeaseLife structs cumulative;arc structure ready for sealing)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -253,15 +254,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1708
+    public static let mNumberLast: Int = 1712
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1708)。 Bumped through chapter 582:749 → 753。
-    /// Chapter 582:BASLeaseLife wave 2 Codable
-    /// extension + 3 PROOF tests + typed surface +
-    /// close-out。 Continues chapter 581 first-ever
-    /// BASLeaseLife pattern。
-    public static let commitsShipped: Int = 753
+    /// M1712)。 Bumped through chapter 583:753 → 757。
+    /// Chapter 583:BASLeaseLife wave 3 Codable
+    /// extension + 2 PROOF tests + typed surface +
+    /// close-out。 Completes BASLeaseLife 3-wave
+    /// trilogy。
+    public static let commitsShipped: Int = 757
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

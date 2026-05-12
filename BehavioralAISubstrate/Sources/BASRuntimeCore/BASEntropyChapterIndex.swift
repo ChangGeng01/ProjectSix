@@ -2886,6 +2886,26 @@ public enum BASEntropyChapterIndex {
                 " + 1 supporting enum ledger-" +
                 "serializable。 123 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1708。" +
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 五百八十三",
+            mNumberFirst: 1709, mNumberLast: 1712,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 3,
+            summary: "BASLEASELIFE WAVE 3 CODABLE" +
+                " EXTENSION。 2 struct types (BASLease" +
+                "LifeCoordinator.TurnRecorded composite" +
+                " culminating waves 1+2 + BASCompute" +
+                "Router) gained Codable at M1709 + 2" +
+                " PROOF tests (M1710) + new typed" +
+                " surface (M1711) + close-out (M1712)。" +
+                " Completes BASLeaseLife 3-wave" +
+                " extension trilogy。 Chapter 581+582+" +
+                "583 = 6 BASLeaseLife struct types + 1" +
+                " supporting enum ledger-serializable。" +
+                " Arc structure ready for sealing at" +
+                " chapter 584。 124 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1712。" +
                 " V1 byte-equality preserved。")
     ]
 

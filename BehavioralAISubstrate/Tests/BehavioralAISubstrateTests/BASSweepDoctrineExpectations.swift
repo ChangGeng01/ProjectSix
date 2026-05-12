@@ -116,20 +116,20 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1708:24 + 20 + 136 = 180 (chapter
-    /// 582 — BASLeaseLife wave 2 Codable extension)
-    public static let phase2ChapterCount: Int = 180
+    /// added)。 At M1712:24 + 20 + 137 = 181 (chapter
+    /// 583 — BASLeaseLife wave 3 Codable extension)
+    public static let phase2ChapterCount: Int = 181
 
-    /// Phase 2 commits shipped。 At M1708:125 + 84 +
-    /// 544 = 753 (chapter 582 = 4 cuts — BASLeaseLife
-    /// wave 2 Codable extension + 3 PROOF + typed
+    /// Phase 2 commits shipped。 At M1712:125 + 84 +
+    /// 548 = 757 (chapter 583 = 4 cuts — BASLeaseLife
+    /// wave 3 Codable extension + 2 PROOF + typed
     /// surface + close-out)
-    public static let phase2CommitsShipped: Int = 753
+    public static let phase2CommitsShipped: Int = 757
 
-    /// Phase 2 mNumberLast。 At M1708:chapter 582 —
-    /// BASLeaseLife wave 2 Codable extension。 SWEEP
+    /// Phase 2 mNumberLast。 At M1712:chapter 583 —
+    /// BASLeaseLife wave 3 Codable extension。 SWEEP
     /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1708
+    public static let phase2MNumberLast: Int = 1712
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
