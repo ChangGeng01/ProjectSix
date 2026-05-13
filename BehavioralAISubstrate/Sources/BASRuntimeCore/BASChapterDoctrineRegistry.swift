@@ -14529,7 +14529,117 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1852。" +
                 " 436 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 619 — BASMemory Codable extension
+        // post-trilogy (gap-fill,5th post-hexa-catalog,
+        // 1st non-BASOrgan post-hexa)。 3 types gained
+        // Codable, reopening BASMemory module 29
+        // chapters after the chapter 590 trilogy seal。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十九",
+            mNumberFirst: 1853,
+            mNumberLast: 1856,
+            v1MilestoneMNumber: 1856,
+            v1MilestoneStatus:
+                "chapter-619-memory-codable-extension-post-trilogy",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1853, knife: "第一刀",
+                    concept: "Add Codable to 3 BASMemory" +
+                        " types within already-covered" +
+                        " BASMemory module (post chapter" +
+                        " 590 trilogy seal) — BAS" +
+                        "EventSourcedMemoryAtomStore" +
+                        "CachePolicy (3-case enum:lazy" +
+                        " + warmAtInit + cachedWithTTL" +
+                        "(seconds:Int)) + BASMemory" +
+                        "TieringReconciliationOutcome" +
+                        " (9-field struct:6 Int counts" +
+                        " + decisions:[Decision] + 2" +
+                        " Date stamps) + BASMemory" +
+                        "TieringReconcilerOrdering (3-" +
+                        "case enum:insertionOrder +" +
+                        " highestHeatFirst +" +
+                        " mostRiskyFirst)。"),
+                BASChapterKnife(
+                    mNumber: 1854, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1855, knife: "第三刀",
+                    concept: "NEW BASMemoryCodable" +
+                        "ExtensionPostTrilogyDoctrine +" +
+                        " isGapFillExtension +" +
+                        " isFifthPostHexaCatalogGapFill" +
+                        " + isFirstNonOrganPostHexa" +
+                        "GapFill +" +
+                        " chaptersDormantSinceTrilogy" +
+                        "Seal = 29 (619 - 590) +" +
+                        " structCount/enumCount split" +
+                        " (1/2) + trilogySealRef points" +
+                        " to chapter 590。 typed-surface" +
+                        " count 159 → 160。"),
+                BASChapterKnife(
+                    mNumber: 1856, knife: "第四刀",
+                    concept: "Chapter 619 close-out +" +
+                        " doctrine sync。 440 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 5th post-hexa-" +
+                        "catalog gap-fill + 1st non-BAS" +
+                        "Organ post-hexa gap-fill —" +
+                        " diversifying the run。 ONE" +
+                        " more gap-fill to reach next" +
+                        " hexa catalog threshold at" +
+                        " chapter 620。")
+            ],
+            entropyClassesAttacked: [
+                "bas-event-sourced-memory-atom-store-cache-policy-non-codable",
+                "bas-memory-tiering-reconciliation-outcome-non-codable",
+                "bas-memory-tiering-reconciler-ordering-non-codable",
+                "bas-memory-post-trilogy-not-shipped",
+                "non-organ-post-hexa-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1856",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "memory-post-trilogy-codable-extension",
+                "fifth-post-hexa-catalog-gap-fill",
+                "first-non-organ-post-hexa-gap-fill",
+                "29-chapters-dormant-bridged"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 620 will be the 6th" +
+                " gap-fill triggering next gap-fill hexa" +
+                " catalog opportunity (parallel to" +
+                " chapter 614 hexa pattern)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 619 ships BASMemory Codable" +
+                " extension post-trilogy — gap-fill" +
+                " within already-covered BASMemory" +
+                " module reopening after the chapter" +
+                " 590 trilogy seal (29-chapter dormant" +
+                " period bridged)。 3 BASMemory types" +
+                " gained Codable at M1853 (BAS" +
+                "EventSourcedMemoryAtomStoreCachePolicy" +
+                " 3-case + BASMemoryTieringReconciliation" +
+                "Outcome 9-field + BASMemoryTiering" +
+                "ReconcilerOrdering 3-case) + 3 PROOF" +
+                " tests (M1854) + new typed surface" +
+                " (M1855) + close-out (M1856)。 5TH" +
+                " post-hexa-catalog gap-fill chapter" +
+                " (615+616+617+618+619) and FIRST non-" +
+                "BASOrgan post-hexa gap-fill —" +
+                " diversifying the run。 160 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1856。 440 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -107,20 +107,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 618 close-out。 Chapter
-    /// 618:BASORGAN CODABLE EXTENSION WAVE 5 — GAP-
-    /// FILL via 2 SIBLING ENUMS。 BASFoundationModels
-    /// ToolBridgeStatus (3-case enum) + BASToolInvocation
-    /// Decision (2-case enum) gained Codable
-    /// simultaneously at M1849 + 2 PROOF tests (M1850)
-    /// + NEW BASOrganCodableExtensionWaveFiveDoctrine
-    /// (M1851) + close-out (M1852)。 Combined 10
-    /// BASOrgan-related types ledger-serializable
-    /// (2+1+2+3+2) — CROSSES 10-TYPE THRESHOLD。 4TH
-    /// post-hexa-catalog gap-fill chapter
-    /// (615+616+617+618) + 4th consecutive BASOrgan
-    /// gap-fill (609+616+617+618)。 2 more to next
-    /// hexa catalog opportunity (around chapter 620)。
+    /// Re-captured at chapter 619 close-out。 Chapter
+    /// 619:BASMEMORY CODABLE EXTENSION POST-TRILOGY
+    /// — GAP-FILL reopening BASMemory 29 chapters
+    /// after chapter 590 trilogy seal。 3 BASMemory
+    /// types (BASEventSourcedMemoryAtomStoreCachePolicy
+    /// 3-case + BASMemoryTieringReconciliationOutcome
+    /// 9-field + BASMemoryTieringReconcilerOrdering
+    /// 3-case) gained Codable at M1853 + 3 PROOF tests
+    /// (M1854) + NEW BASMemoryCodableExtensionPost
+    /// TrilogyDoctrine (M1855) + close-out (M1856)。
+    /// FIFTH post-hexa-catalog gap-fill chapter
+    /// (615+616+617+618+619) + FIRST non-BASOrgan
+    /// post-hexa gap-fill — diversifying the run。 ONE
+    /// more gap-fill to reach hexa catalog threshold
+    /// at chapter 620。
     static let frozenFullRegistrySha256: String =
-        "d09450ee809a05034244ddd894ef440a29c0c5046e133a756fec66a7513d1b07"
+        "755662e97a40bb8a5866505ab2fe2cf0f04484e4a8157920a69324b3434596cb"
 }

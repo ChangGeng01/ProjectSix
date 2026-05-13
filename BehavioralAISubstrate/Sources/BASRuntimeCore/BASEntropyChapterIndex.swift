@@ -3738,7 +3738,29 @@ public enum BASEntropyChapterIndex {
                 "618) + 4TH consecutive BASOrgan gap-" +
                 "fill (609+616+617+618)。 159 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1852。 V1 byte-equality preserved。")
+                " M1852。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十九",
+            mNumberFirst: 1853, mNumberLast: 1856,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMEMORY CODABLE EXTENSION POST-" +
+                "TRILOGY — GAP-FILL reopening BASMemory" +
+                " 29 chapters after chapter 590" +
+                " trilogy seal。 3 BASMemory types" +
+                " (BASEventSourcedMemoryAtomStoreCache" +
+                "Policy 3-case + BASMemoryTiering" +
+                "ReconciliationOutcome 9-field +" +
+                " BASMemoryTieringReconcilerOrdering" +
+                " 3-case) gained Codable at M1853 + 3" +
+                " PROOF tests (M1854) + new typed" +
+                " surface (M1855) + close-out (M1856)。" +
+                " FIFTH post-hexa-catalog gap-fill" +
+                " chapter (615+616+617+618+619) +" +
+                " FIRST non-BASOrgan post-hexa gap-fill" +
+                " — diversifying the run。 160 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1856。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -116,21 +116,20 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1852:24 + 20 + 172 = 216 (chapter
-    /// 618 — BASOrgan Codable extension wave 5 gap-
-    /// fill via 2 sibling enums)
-    public static let phase2ChapterCount: Int = 216
+    /// added)。 At M1856:24 + 20 + 173 = 217 (chapter
+    /// 619 — BASMemory Codable extension post-trilogy)
+    public static let phase2ChapterCount: Int = 217
 
-    /// Phase 2 commits shipped。 At M1852:125 + 84 +
-    /// 688 = 897 (chapter 618 = 4 cuts — BASOrgan
-    /// wave 5 gap-fill via sibling enums + 2 PROOF +
-    /// typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 897
+    /// Phase 2 commits shipped。 At M1856:125 + 84 +
+    /// 692 = 901 (chapter 619 = 4 cuts — BASMemory
+    /// post-trilogy gap-fill + 3 PROOF + typed surface
+    /// + close-out)
+    public static let phase2CommitsShipped: Int = 901
 
-    /// Phase 2 mNumberLast。 At M1852:chapter 618 —
-    /// BASOrgan Codable extension wave 5 gap-fill。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1852
+    /// Phase 2 mNumberLast。 At M1856:chapter 619 —
+    /// BASMemory Codable extension post-trilogy gap-
+    /// fill。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1856
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -37,26 +37,26 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs618() {
+    func testLastChapterIs619() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十八",
-            "Chapter 六百一十八:BASORGAN CODABLE" +
-            " EXTENSION WAVE 5 — GAP-FILL via 2" +
-            " SIBLING ENUMS。 BASFoundationModelsTool" +
-            "BridgeStatus (3-case enum) + BASTool" +
-            "InvocationDecision (2-case enum) gained" +
-            " Codable simultaneously + 2 PROOF tests" +
-            " + BASOrganCodableExtensionWaveFive" +
+            "chapter 六百一十九",
+            "Chapter 六百一十九:BASMEMORY CODABLE" +
+            " EXTENSION POST-TRILOGY — GAP-FILL" +
+            " reopening BASMemory 29 chapters after" +
+            " chapter 590 trilogy seal。 3 BASMemory" +
+            " types (BASEventSourcedMemoryAtomStore" +
+            "CachePolicy 3-case + BASMemoryTiering" +
+            "ReconciliationOutcome 9-field + BAS" +
+            "MemoryTieringReconcilerOrdering 3-case)" +
+            " gained Codable + 3 PROOF tests +" +
+            " BASMemoryCodableExtensionPostTrilogy" +
             "Doctrine typed surface + close-out。" +
-            " Combined 10 BASOrgan-related types" +
-            " ledger-serializable (2+1+2+3+2) —" +
-            " CROSSES 10-TYPE THRESHOLD。 FOURTH" +
-            " post-hexa-catalog gap-fill chapter" +
-            " (615+616+617+618) + 4th consecutive" +
-            " BASOrgan gap-fill (609+616+617+618)。" +
-            " 159 typed surfaces cumulative。 436" +
+            " FIFTH post-hexa-catalog gap-fill" +
+            " (615+616+617+618+619) + FIRST non-BAS" +
+            "Organ post-hexa — diversifying the run。" +
+            " 160 typed surfaces cumulative。 440" +
             " consecutive byte-equality clean commits")
     }
 

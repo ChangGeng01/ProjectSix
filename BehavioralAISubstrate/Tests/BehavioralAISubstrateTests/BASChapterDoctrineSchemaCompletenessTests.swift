@@ -2123,7 +2123,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百一十八")!)
+                            "chapter 六百一十八")!),
+            // M1856 chapter 619 — BASMemory Codable extension post-trilogy gap-fill (5th post-hexa, 1st non-BASOrgan)
+            checkRegistry("六百一十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3563,6 +3569,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百一十八")!
+                .mNumberLast),
+            // M1856 chapter 619 — BASMemory Codable extension post-trilogy gap-fill
+            ("619",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
