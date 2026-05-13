@@ -63,7 +63,9 @@ import BASSovereign
 // MARK: - Typed error taxonomy
 
 /// 2-case typed error for storage construction failures。
-public enum BASHostStorageWireError: Error, Sendable, Equatable {
+public enum BASHostStorageWireError:
+    Error, Sendable, Equatable, Codable
+{
     /// `.sqliteRequired` preference set but no URL provided。
     /// Caller failed to honor fail-fast semantics.
     case missingSQLiteURL(component: String)

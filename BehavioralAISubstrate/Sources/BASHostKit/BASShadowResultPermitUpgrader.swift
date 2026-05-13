@@ -67,7 +67,7 @@ import BASPolicy
 /// Caller (the substrate gate / host coordinator) inspects this
 /// to either keep the current permit or escalate to a new mode。
 public enum BASShadowPermitUpgradeDecision:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     /// No upgrade needed — caller keeps the current permit。
     /// Emitted when:
