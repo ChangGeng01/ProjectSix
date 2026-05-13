@@ -13782,7 +13782,112 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1824。 408 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 612 — BASSovereign Codable extension
+        // wave 3 (gap-fill)。 5TH consecutive gap-fill。
+        // 2 nested-in-engine types。 One chapter short
+        // of hexa-catalog threshold (chapter 613 would
+        // trigger gap-fill hexa meta-meta opportunity)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十二",
+            mNumberFirst: 1825,
+            mNumberLast: 1828,
+            v1MilestoneMNumber: 1828,
+            v1MilestoneStatus:
+                "chapter-612-sovereign-codable-extension-wave-three",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1825, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Sovereign nested-in-engine" +
+                        " types — BASSovereignVerdict" +
+                        "Engine.HardObservations (12-" +
+                        "field Bool BR-001 through" +
+                        " BR-012) + BASSovereignVerdict" +
+                        "Engine.SoftSignals (7-field" +
+                        " Double scores in [0.0,1.0])。"),
+                BASChapterKnife(
+                    mNumber: 1826, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1827, knife: "第三刀",
+                    concept: "NEW BASSovereignCodable" +
+                        "ExtensionWaveThreeDoctrine +" +
+                        " isGapFillExtension flag +" +
+                        " waveNumber = 3 +" +
+                        " combinedSovereignCount = 8 +" +
+                        " typesAreNestedInEngine flag +" +
+                        " isFifthConsecutiveGapFill +" +
+                        " isSecondConsecutiveSovereign" +
+                        "GapFill +" +
+                        " isOneShortOfGapFillHexaThreshold" +
+                        " flag。 typed-surface count" +
+                        " 152 → 153。"),
+                BASChapterKnife(
+                    mNumber: 1828, knife: "第四刀",
+                    concept: "Chapter 612 close-out +" +
+                        " doctrine sync。 412 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 5-consecutive-" +
+                        "gap-fill run reaches penultimate" +
+                        " threshold for hexa catalog。")
+            ],
+            entropyClassesAttacked: [
+                "hard-observations-non-codable",
+                "soft-signals-non-codable",
+                "bas-sovereign-wave-3-not-shipped-yet",
+                "fifth-consecutive-gap-fill-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1828",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-wave-3-codable-extension",
+                "8-sovereign-types-cumulative",
+                "fifth-consecutive-gap-fill",
+                "second-consecutive-sovereign-gap-fill",
+                "one-short-of-gap-fill-hexa-threshold"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 613 gap-fill (6th" +
+                " consecutive,would trigger hexa" +
+                " catalog meta-meta opportunity)",
+                "future arc — gap-fill hexa catalog" +
+                " meta-meta milestone (parallel to" +
+                " chapter 607 post-octa hexa)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)"
+            ],
+            summary: "Chapter 612 ships BASSovereign" +
+                " Codable extension wave 3 — gap-fill" +
+                " within already-covered BASSovereign" +
+                " module。 2 nested-in-engine types" +
+                " (BASSovereignVerdictEngine.Hard" +
+                "Observations 12-field Bool +" +
+                " BASSovereignVerdictEngine.SoftSignals" +
+                " 7-field Double) gained Codable at" +
+                " M1825 + 2 PROOF tests (M1826) + new" +
+                " typed surface (M1827) + close-out" +
+                " (M1828)。 Combined 8 BASSovereign-" +
+                "related types ledger-serializable (4" +
+                " wave 1 + 2 wave 2 + 2 wave 3)。 5TH" +
+                " consecutive gap-fill chapter (608" +
+                " mesh-sweep + 609 organ wave 2 + 610" +
+                " orchestration continuation + 611" +
+                " sovereign wave 2 + 612 sovereign" +
+                " wave 3)。 2nd consecutive BASSovereign" +
+                " gap-fill chapter (611 + 612)。 ONE" +
+                " SHORT of gap-fill hexa catalog meta-" +
+                "meta threshold (chapter 613 would" +
+                " trigger)。 153 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1828。" +
+                " 412 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

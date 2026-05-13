@@ -3557,7 +3557,33 @@ public enum BASEntropyChapterIndex {
                 " 4TH consecutive gap-fill chapter" +
                 " (608 + 609 + 610 + 611)。 152 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1824。 V1 byte-equality preserved。")
+                " M1824。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十二",
+            mNumberFirst: 1825, mNumberLast: 1828,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CODABLE EXTENSION" +
+                " WAVE 3 — GAP-FILL within already-" +
+                "covered BASSovereign module。 2" +
+                " nested-in-engine types (BASSovereign" +
+                "VerdictEngine.HardObservations 12-" +
+                "field Bool BR-001 through BR-012 +" +
+                " BASSovereignVerdictEngine.SoftSignals" +
+                " 7-field Double scores in [0.0,1.0])" +
+                " gained Codable at M1825 + 2 PROOF" +
+                " tests (M1826) + new typed surface" +
+                " (M1827) + close-out (M1828)。 Combined" +
+                " 8 BASSovereign-related types ledger-" +
+                "serializable (4 wave 1 + 2 wave 2 + 2" +
+                " wave 3)。 5TH consecutive gap-fill" +
+                " chapter (608 + 609 + 610 + 611 +" +
+                " 612)。 2nd consecutive BASSovereign" +
+                " gap-fill。 ONE SHORT of gap-fill hexa" +
+                " catalog threshold (chapter 613 would" +
+                " trigger)。 153 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1828。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

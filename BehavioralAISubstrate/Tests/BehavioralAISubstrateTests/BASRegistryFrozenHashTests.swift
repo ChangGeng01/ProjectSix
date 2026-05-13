@@ -107,19 +107,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 611 close-out。 Chapter
-    /// 611:BASSOVEREIGN CODABLE EXTENSION WAVE 2 —
+    /// Re-captured at chapter 612 close-out。 Chapter
+    /// 612:BASSOVEREIGN CODABLE EXTENSION WAVE 3 —
     /// GAP-FILL within already-covered BASSovereign
-    /// module (chapter 606 was wave 1 formal entry)。
-    /// 2 nested-in-actor types (BASSovereignStub
-    /// Renderer.StubOutput + BASSovereignStub
-    /// Renderer.RefusalPhrases) gained Codable at
-    /// M1821 + 2 PROOF tests (M1822) + NEW BAS
-    /// SovereignCodableExtensionWaveTwoDoctrine (M1823)
-    /// + close-out (M1824)。 Combined 6 BASSovereign-
-    /// related types ledger-serializable (4 wave 1 +
-    /// 2 wave 2)。 4TH consecutive gap-fill chapter
-    /// (608 + 609 + 610 + 611)。
+    /// module。 2 nested-in-engine types (BASSovereign
+    /// VerdictEngine.HardObservations 12-field Bool +
+    /// SoftSignals 7-field Double) gained Codable at
+    /// M1825 + 2 PROOF tests (M1826) + NEW BAS
+    /// SovereignCodableExtensionWaveThreeDoctrine
+    /// (M1827) + close-out (M1828)。 Combined 8 BAS
+    /// Sovereign-related types ledger-serializable
+    /// (4+2+2)。 5TH consecutive gap-fill chapter
+    /// (608+609+610+611+612)。 2nd consecutive BAS
+    /// Sovereign gap-fill。 ONE SHORT of gap-fill hexa
+    /// catalog threshold (chapter 613 would trigger)。
     static let frozenFullRegistrySha256: String =
-        "637d1d2bc76bd857d5eeb13b8436dfbe96a9ba62fabcfc0437a7e511f0bd942f"
+        "c5eccf95665e0e8b425b39a84ff712c720f6279c9374a716c751033fa41f1d95"
 }

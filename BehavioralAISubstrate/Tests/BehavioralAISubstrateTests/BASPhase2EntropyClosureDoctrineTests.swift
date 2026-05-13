@@ -37,24 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs611() {
+    func testLastChapterIs612() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十一",
-            "Chapter 六百一十一:BASSOVEREIGN CODABLE" +
-            " EXTENSION WAVE 2 — GAP-FILL within" +
+            "chapter 六百一十二",
+            "Chapter 六百一十二:BASSOVEREIGN CODABLE" +
+            " EXTENSION WAVE 3 — GAP-FILL within" +
             " already-covered BASSovereign module。 2" +
-            " nested-in-actor types (BASSovereignStub" +
-            "Renderer.StubOutput + BASSovereignStub" +
-            "Renderer.RefusalPhrases) gained Codable" +
-            " + 2 PROOF tests + BASSovereignCodable" +
-            "ExtensionWaveTwoDoctrine typed surface +" +
-            " close-out。 Combined 6 BASSovereign-" +
-            "related types (4 wave 1 + 2 wave 2)。 4TH" +
-            " consecutive gap-fill chapter (608 +" +
-            " 609 + 610 + 611)。 152 typed surfaces" +
-            " cumulative")
+            " nested-in-engine types (BASSovereign" +
+            "VerdictEngine.HardObservations 12-field" +
+            " Bool + SoftSignals 7-field Double)" +
+            " gained Codable + 2 PROOF tests +" +
+            " BASSovereignCodableExtensionWaveThree" +
+            "Doctrine typed surface + close-out。" +
+            " Combined 8 BASSovereign-related types" +
+            " (4+2+2)。 5TH consecutive gap-fill" +
+            " chapter (608+609+610+611+612)。 ONE SHORT" +
+            " of gap-fill hexa catalog threshold。" +
+            " 153 typed surfaces cumulative")
     }
 
     // MARK: - M-number range
