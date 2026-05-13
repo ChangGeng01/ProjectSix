@@ -43,7 +43,7 @@ public actor BASSovereignContaminationGuard {
         case retrievalChannel
     }
 
-    public struct Key: Hashable, Sendable {
+    public struct Key: Hashable, Sendable, Codable {
         public let id: String
         public let kind: ArtifactKind
 
@@ -53,7 +53,9 @@ public actor BASSovereignContaminationGuard {
         }
     }
 
-    public struct QuarantineRecord: Sendable, Equatable {
+    public struct QuarantineRecord:
+        Sendable, Equatable, Codable
+    {
         public let key: Key
         public let reasonCode: String
         public let originatingVerdictID: String?
@@ -72,7 +74,7 @@ public actor BASSovereignContaminationGuard {
         }
     }
 
-    public struct ProbeReport: Sendable, Equatable {
+    public struct ProbeReport: Sendable, Equatable, Codable {
         public let quarantinedIDs: [String]
         public let cleanIDs: [String]
         /// True iff any member of the probe batch hit a quarantined
