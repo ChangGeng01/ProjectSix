@@ -107,19 +107,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 617 close-out。 Chapter
-    /// 617:BASORGAN CODABLE EXTENSION WAVE 4 — GAP-
-    /// FILL via DOMINO CHAIN。 3 BASOrgan types (BAS
-    /// OrganDraft 8-field + BASLLMExtractionResult
-    /// 4-field + BASLLMExtractionEngineError 4-case
-    /// enum) gained Codable simultaneously at M1845
-    /// (BASOrganDraft unblocked BASLLMExtractionResult)
-    /// + 3 PROOF tests (M1846) + NEW BASOrganCodable
-    /// ExtensionWaveFourDoctrine (M1847) + close-out
-    /// (M1848)。 Combined 8 BASOrgan-related types
-    /// ledger-serializable (2+1+2+3)。 3RD post-hexa-
-    /// catalog gap-fill chapter (615+616+617) + 3rd
-    /// consecutive BASOrgan gap-fill (609+616+617)。
+    /// Re-captured at chapter 618 close-out。 Chapter
+    /// 618:BASORGAN CODABLE EXTENSION WAVE 5 — GAP-
+    /// FILL via 2 SIBLING ENUMS。 BASFoundationModels
+    /// ToolBridgeStatus (3-case enum) + BASToolInvocation
+    /// Decision (2-case enum) gained Codable
+    /// simultaneously at M1849 + 2 PROOF tests (M1850)
+    /// + NEW BASOrganCodableExtensionWaveFiveDoctrine
+    /// (M1851) + close-out (M1852)。 Combined 10
+    /// BASOrgan-related types ledger-serializable
+    /// (2+1+2+3+2) — CROSSES 10-TYPE THRESHOLD。 4TH
+    /// post-hexa-catalog gap-fill chapter
+    /// (615+616+617+618) + 4th consecutive BASOrgan
+    /// gap-fill (609+616+617+618)。 2 more to next
+    /// hexa catalog opportunity (around chapter 620)。
     static let frozenFullRegistrySha256: String =
-        "d06d260167e75dfa3ca8c0f61643af82c18dedcf87f3bdb8428d07f78bf5b9e2"
+        "d09450ee809a05034244ddd894ef440a29c0c5046e133a756fec66a7513d1b07"
 }

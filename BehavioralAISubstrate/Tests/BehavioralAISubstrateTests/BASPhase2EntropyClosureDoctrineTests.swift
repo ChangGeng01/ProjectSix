@@ -37,29 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs617() {
+    func testLastChapterIs618() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十七",
-            "Chapter 六百一十七:BASORGAN CODABLE" +
-            " EXTENSION WAVE 4 — GAP-FILL via DOMINO" +
-            " CHAIN。 3 BASOrgan types (BASOrganDraft" +
-            " 8-field + BASLLMExtractionResult 4-field" +
-            " + BASLLMExtractionEngineError 4-case" +
-            " enum) gained Codable simultaneously" +
-            " (BASOrganDraft unblocked BASLLM" +
-            "ExtractionResult) + 3 PROOF tests + BAS" +
-            "OrganCodableExtensionWaveFourDoctrine" +
-            " typed surface + close-out。 Combined 8" +
-            " BASOrgan-related types ledger-" +
-            "serializable (2 wave 1 + 1 wave 2 + 2" +
-            " wave 3 + 3 wave 4)。 THIRD post-hexa-" +
-            "catalog gap-fill chapter (615 + 616 +" +
-            " 617) + 3rd consecutive BASOrgan gap-fill" +
-            " (609 + 616 + 617)。 158 typed surfaces" +
-            " cumulative。 432 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百一十八",
+            "Chapter 六百一十八:BASORGAN CODABLE" +
+            " EXTENSION WAVE 5 — GAP-FILL via 2" +
+            " SIBLING ENUMS。 BASFoundationModelsTool" +
+            "BridgeStatus (3-case enum) + BASTool" +
+            "InvocationDecision (2-case enum) gained" +
+            " Codable simultaneously + 2 PROOF tests" +
+            " + BASOrganCodableExtensionWaveFive" +
+            "Doctrine typed surface + close-out。" +
+            " Combined 10 BASOrgan-related types" +
+            " ledger-serializable (2+1+2+3+2) —" +
+            " CROSSES 10-TYPE THRESHOLD。 FOURTH" +
+            " post-hexa-catalog gap-fill chapter" +
+            " (615+616+617+618) + 4th consecutive" +
+            " BASOrgan gap-fill (609+616+617+618)。" +
+            " 159 typed surfaces cumulative。 436" +
+            " consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range

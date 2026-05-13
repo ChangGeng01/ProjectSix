@@ -3713,7 +3713,32 @@ public enum BASEntropyChapterIndex {
                 " consecutive BASOrgan gap-fill (609 +" +
                 " 616 + 617)。 158 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1848。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十八",
+            mNumberFirst: 1849, mNumberLast: 1852,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASORGAN CODABLE EXTENSION WAVE" +
+                " 5 — GAP-FILL via 2 SIBLING ENUMS。 BAS" +
+                "FoundationModelsToolBridgeStatus" +
+                " (3-case enum with associated values:" +
+                " audited(traceID:String)," +
+                " bridgedRuntimeSchema(toolCount:Int)," +
+                " bridgedCompiledGenerable(toolCount:" +
+                "Int)) + BASToolInvocationDecision (2-" +
+                "case enum:allow + reject(reasonCodes:" +
+                "[String])) gained Codable at M1849 +" +
+                " 2 PROOF tests (M1850) + new typed" +
+                " surface (M1851) + close-out (M1852)。" +
+                " Combined 10 BASOrgan-related types" +
+                " ledger-serializable (2+1+2+3+2) —" +
+                " CROSSES 10-TYPE THRESHOLD。 4TH post-" +
+                "hexa-catalog gap-fill (615+616+617+" +
+                "618) + 4TH consecutive BASOrgan gap-" +
+                "fill (609+616+617+618)。 159 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1852。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

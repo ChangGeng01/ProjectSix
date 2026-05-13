@@ -110,22 +110,21 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 617
-    /// close-out (M1848 — BASOrgan Codable extension
-    /// wave 4 gap-fill via DOMINO CHAIN;3 BASOrgan
-    /// types (BASOrganDraft 8-field +
-    /// BASLLMExtractionResult 4-field +
-    /// BASLLMExtractionEngineError 4-case enum) gained
-    /// Codable simultaneously;combined 8 BASOrgan-
-    /// related types (2+1+2+3);THIRD post-hexa-
-    /// catalog gap-fill chapter + 3rd consecutive
-    /// BASOrgan gap-fill;halfway to next hexa
-    /// catalog opportunity)。
-    public static let typedSurfaceCount: Int = 158
+    /// Cumulative achievement metrics at chapter 618
+    /// close-out (M1852 — BASOrgan Codable extension
+    /// wave 5 gap-fill via 2 SIBLING ENUMS;BAS
+    /// FoundationModelsToolBridgeStatus +
+    /// BASToolInvocationDecision gained Codable
+    /// simultaneously;combined 10 BASOrgan-related
+    /// types (2+1+2+3+2) — CROSSES 10-TYPE THRESHOLD;
+    /// FOURTH post-hexa-catalog gap-fill + 4th
+    /// consecutive BASOrgan gap-fill;2 more to next
+    /// hexa catalog opportunity)。
+    public static let typedSurfaceCount: Int = 159
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 432
-    public static let phase2CommitsShipped: Int = 893
-    public static let chapter2NumberLast: Int = 1848
+        Int = 436
+    public static let phase2CommitsShipped: Int = 897
+    public static let chapter2NumberLast: Int = 1852
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

@@ -14425,6 +14425,110 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1848。" +
                 " 432 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 618 — BASOrgan Codable extension
+        // wave 5 (gap-fill,2 sibling enums,4th post-
+        // hexa-catalog,4th consecutive BASOrgan gap-
+        // fill,combined count crosses 10-type threshold)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十八",
+            mNumberFirst: 1849,
+            mNumberLast: 1852,
+            v1MilestoneMNumber: 1852,
+            v1MilestoneStatus:
+                "chapter-618-organ-codable-extension-wave-five",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1849, knife: "第一刀",
+                    concept: "Add Codable to 2 sibling" +
+                        " BASOrgan enums (no inter-" +
+                        "dependency) — BASFoundation" +
+                        "ModelsToolBridgeStatus (3-case:" +
+                        " audited(traceID:String),bridged" +
+                        "RuntimeSchema(toolCount:Int)," +
+                        " bridgedCompiledGenerable" +
+                        "(toolCount:Int)) + BASTool" +
+                        "InvocationDecision (2-case:" +
+                        " allow + reject(reasonCodes:" +
+                        "[String]))。"),
+                BASChapterKnife(
+                    mNumber: 1850, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1851, knife: "第三刀",
+                    concept: "NEW BASOrganCodable" +
+                        "ExtensionWaveFiveDoctrine +" +
+                        " isGapFillExtension flag +" +
+                        " waveNumber = 5 +" +
+                        " combinedOrganCount = 10 +" +
+                        " structCount/enumCount split" +
+                        " (0/2) +" +
+                        " enumsHaveAssociatedValues +" +
+                        " isFourthPostHexaCatalogGapFill" +
+                        " + isFourthConsecutiveOrganGap" +
+                        "Fill + extendsViaSiblingEnums" +
+                        " + crossesTenTypeThreshold。" +
+                        " typed-surface count 158 →" +
+                        " 159。"),
+                BASChapterKnife(
+                    mNumber: 1852, knife: "第四刀",
+                    concept: "Chapter 618 close-out +" +
+                        " doctrine sync。 436 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4th post-hexa-" +
+                        "catalog gap-fill + 4th" +
+                        " consecutive BASOrgan gap-fill" +
+                        " (609 + 616 + 617 + 618)。 2" +
+                        " more to next hexa catalog" +
+                        " opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-foundation-models-tool-bridge-status-non-codable",
+                "bas-tool-invocation-decision-non-codable",
+                "bas-organ-wave-5-not-shipped",
+                "sibling-enums-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1852",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-wave-5-codable-extension",
+                "10-organ-types-cumulative",
+                "fourth-post-hexa-catalog-gap-fill",
+                "fourth-consecutive-organ-gap-fill",
+                "sibling-enums-extension"
+            ],
+            plannedFutureCuts: [
+                "future arc — 2 more gap-fill chapters" +
+                " toward next hexa catalog opportunity" +
+                " (chapter 620 if cadence holds)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 618 ships BASOrgan Codable" +
+                " extension wave 5 — gap-fill within" +
+                " already-covered BASOrgan module via" +
+                " 2 SIBLING ENUMS (no inter-" +
+                "dependency,both shipped same wave)。" +
+                " BASFoundationModelsToolBridgeStatus" +
+                " (3-case enum) + BASToolInvocation" +
+                "Decision (2-case enum) gained Codable" +
+                " at M1849 + 2 PROOF tests (M1850) +" +
+                " new typed surface (M1851) + close-" +
+                "out (M1852)。 Combined 10 BASOrgan-" +
+                "related types ledger-serializable" +
+                " (2+1+2+3+2) — CROSSES 10-TYPE" +
+                " THRESHOLD。 4TH post-hexa-catalog gap-" +
+                "fill (615+616+617+618) + 4TH" +
+                " consecutive BASOrgan gap-fill" +
+                " (609+616+617+618)。 159 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1852。" +
+                " 436 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

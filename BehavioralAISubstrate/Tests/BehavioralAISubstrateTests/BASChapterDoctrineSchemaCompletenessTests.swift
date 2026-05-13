@@ -2117,7 +2117,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百一十七")!)
+                            "chapter 六百一十七")!),
+            // M1852 chapter 618 — BASOrgan Codable extension wave 5 gap-fill (sibling enums, 4th post-hexa-catalog)
+            checkRegistry("六百一十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3549,6 +3555,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百一十七")!
+                .mNumberLast),
+            // M1852 chapter 618 — BASOrgan Codable extension wave 5 gap-fill (sibling enums)
+            ("618",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
