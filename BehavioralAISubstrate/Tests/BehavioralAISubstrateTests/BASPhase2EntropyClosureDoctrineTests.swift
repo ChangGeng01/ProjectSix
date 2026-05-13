@@ -37,24 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs624() {
+    func testLastChapterIs625() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十四",
-            "Chapter 六百二十四:BASRUNTIMECORE SOLO" +
-            " ENUM CODABLE EXTENSION — GAP-FILL,3rd" +
-            " post-hexa-#2,1st BASRuntimeCore non-" +
-            "doctrine type touched since post-octa" +
-            " narrative began (chapter 597)。 BAS" +
-            "EventLogFailureInjectionScenario (4-case" +
-            " enum) gained Codable + 1 PROOF test +" +
-            " BASRuntimeCoreSoloEnumCodableExtension" +
-            "Doctrine typed surface + close-out。 NEW" +
-            " kind 'runtime-core-solo-enum' distinct" +
-            " from prior post-hexa-#2 kinds。 165 typed" +
-            " surfaces cumulative。 460 consecutive" +
-            " byte-equality clean commits")
+            "chapter 六百二十五",
+            "Chapter 六百二十五:BASHOSTKIT ERROR TRIO" +
+            " CODABLE EXTENSION — GAP-FILL,4th post-" +
+            "hexa-#2,1st error-enum-cluster wave。 3" +
+            " BASHostKit Error enums (BASTrainingData" +
+            "ExportError + BASHostMeshError + BAS" +
+            "HostIntegrationError) gained Codable + 3" +
+            " PROOF tests + BASHostKitErrorTrio" +
+            "CodableExtensionDoctrine typed surface +" +
+            " close-out。 M1880 ROUND-NUMBER MILESTONE" +
+            " reached — 80-step jump since chapter 605" +
+            " M1800 round。 NEW kind 'error-trio'" +
+            " distinct from prior post-hexa-#2 kinds。" +
+            " 166 typed surfaces cumulative。 464" +
+            " consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range

@@ -15145,6 +15145,101 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1876。 460 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 625 — BASHostKit error trio Codable
+        // extension (4th post-hexa-#2 gap-fill,NEW
+        // kind 'error-trio',M1880 ROUND-NUMBER
+        // MILESTONE — 80-step jump since M1800 hit
+        // at chapter 605)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十五",
+            mNumberFirst: 1877,
+            mNumberLast: 1880,
+            v1MilestoneMNumber: 1880,
+            v1MilestoneStatus:
+                "chapter-625-hostkit-error-trio-codable-extension-m1880-round-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1877, knife: "第一刀",
+                    concept: "Add Codable to 3 BASHostKit" +
+                        " Error enums — BASTrainingData" +
+                        "ExportError (3-case with URL+" +
+                        "String) + BASHostMeshError" +
+                        " (1-case with BASMotherboard" +
+                        "Layer14) + BASHostIntegration" +
+                        "Error (8-case all-String)。"),
+                BASChapterKnife(
+                    mNumber: 1878, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1879, knife: "第三刀",
+                    concept: "NEW BASHostKitErrorTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " isGapFillExtension +" +
+                        " allTypesAreErrors flag +" +
+                        " kindLabel='error-trio' (NEW" +
+                        " kind) + isFourthPostHexaTwo" +
+                        "GapFill + isFirstErrorCluster" +
+                        "PostHexaTwo。 typed-surface" +
+                        " count 165 → 166。"),
+                BASChapterKnife(
+                    mNumber: 1880, knife: "第四刀",
+                    concept: "Chapter 625 close-out +" +
+                        " doctrine sync。 M1880 ROUND-" +
+                        "NUMBER MILESTONE reached (80-" +
+                        "step jump since M1800 at" +
+                        " chapter 605)。 464 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4th post-hexa-#2" +
+                        " gap-fill — 2 more to chapter" +
+                        " 627 hexa #3 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-training-data-export-error-non-codable",
+                "bas-host-mesh-error-non-codable",
+                "bas-host-integration-error-non-codable",
+                "bas-hostkit-error-trio-not-shipped",
+                "error-enum-cluster-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1880",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-error-trio-codable-extension",
+                "fourth-post-hexa-two-gap-fill",
+                "first-error-cluster-post-hexa-two",
+                "new-kind-label-error-trio",
+                "m1880-round-number-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — 2 more gap-fill chapters" +
+                " toward chapter 627 hexa #3" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 625 ships BASHostKit error" +
+                " trio Codable extension — 4th post-" +
+                "hexa-#2 gap-fill chapter,1st error-" +
+                "enum-cluster wave in the post-hexa-#2" +
+                " run。 3 BASHostKit Error enums" +
+                " (BASTrainingDataExportError 3-case +" +
+                " BASHostMeshError 1-case + BAS" +
+                "HostIntegrationError 8-case) gained" +
+                " Codable at M1877 + 3 PROOF tests" +
+                " (M1878) + new typed surface (M1879)" +
+                " + close-out (M1880)。 M1880 ROUND-" +
+                "NUMBER MILESTONE reached — 80-step" +
+                " jump since chapter 605 M1800 round。" +
+                " NEW kind 'error-trio' distinct from" +
+                " prior post-hexa-#2 kinds。 166 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1880。 464 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

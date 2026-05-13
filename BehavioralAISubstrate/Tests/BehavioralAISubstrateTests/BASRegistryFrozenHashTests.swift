@@ -107,17 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 624 close-out。 Chapter
-    /// 624:BASRUNTIMECORE SOLO ENUM CODABLE EXTENSION
-    /// — GAP-FILL,3rd post-hexa-#2,1st BASRuntimeCore
-    /// non-doctrine type touched since post-octa
-    /// narrative began (chapter 597)。 BASEventLog
-    /// FailureInjectionScenario (4-case enum) gained
-    /// Codable at M1873 + 1 PROOF test (M1874) + NEW
-    /// BASRuntimeCoreSoloEnumCodableExtensionDoctrine
-    /// (M1875) + close-out (M1876)。 NEW kind 'runtime-
-    /// core-solo-enum' distinct from prior post-hexa-
-    /// #2 kinds。
+    /// Re-captured at chapter 625 close-out。 Chapter
+    /// 625:BASHOSTKIT ERROR TRIO CODABLE EXTENSION —
+    /// GAP-FILL,4th post-hexa-#2,1st error-enum-
+    /// cluster wave。 3 BASHostKit Error enums (BAS
+    /// TrainingDataExportError 3-case + BASHostMesh
+    /// Error 1-case + BASHostIntegrationError 8-case)
+    /// gained Codable at M1877 + 3 PROOF tests (M1878)
+    /// + NEW BASHostKitErrorTrioCodableExtensionDoctrine
+    /// (M1879) + close-out (M1880)。 M1880 ROUND-
+    /// NUMBER MILESTONE reached — 80-step jump since
+    /// chapter 605 M1800 round。 NEW kind 'error-trio'。
     static let frozenFullRegistrySha256: String =
-        "3c4b05b809359b01ad94fbf52d8d5ab9c6fea410b00ccac473d0c6169661ceec"
+        "f113b0aef024b08878117fa5784ec8f9954c8baaa817c1934d704d1eccabbee2"
 }

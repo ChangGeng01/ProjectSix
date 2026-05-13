@@ -110,18 +110,18 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 624
-    /// close-out (M1876 — BASRuntimeCore solo enum
-    /// Codable extension,3rd post-hexa-#2,1st BAS
-    /// RuntimeCore non-doctrine type touched since
-    /// post-octa narrative began;BASEventLogFailure
-    /// InjectionScenario gained Codable;NEW kind
-    /// 'runtime-core-solo-enum')。
-    public static let typedSurfaceCount: Int = 165
+    /// Cumulative achievement metrics at chapter 625
+    /// close-out (M1880 — BASHostKit error trio Codable
+    /// extension,4th post-hexa-#2,1st error-enum-
+    /// cluster wave;3 BASHostKit Error enums gained
+    /// Codable;M1880 ROUND-NUMBER MILESTONE reached
+    /// — 80-step jump since chapter 605 M1800 round;
+    /// NEW kind 'error-trio')。
+    public static let typedSurfaceCount: Int = 166
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 460
-    public static let phase2CommitsShipped: Int = 921
-    public static let chapter2NumberLast: Int = 1876
+        Int = 464
+    public static let phase2CommitsShipped: Int = 925
+    public static let chapter2NumberLast: Int = 1880
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

@@ -3871,7 +3871,28 @@ public enum BASEntropyChapterIndex {
                 " + close-out (M1876)。 NEW kind" +
                 " 'runtime-core-solo-enum'。 165 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1876。 V1 byte-equality preserved。")
+                " M1876。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十五",
+            mNumberFirst: 1877, mNumberLast: 1880,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASHOSTKIT ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,4th post-hexa-" +
+                "#2,1st error-enum-cluster wave in the" +
+                " post-hexa-#2 run。 3 BASHostKit Error" +
+                " enums (BASTrainingDataExportError" +
+                " 3-case + BASHostMeshError 1-case +" +
+                " BASHostIntegrationError 8-case)" +
+                " gained Codable at M1877 + 3 PROOF" +
+                " tests (M1878) + new typed surface" +
+                " (M1879) + close-out (M1880)。 M1880" +
+                " ROUND-NUMBER MILESTONE reached — 80-" +
+                "step jump since chapter 605 M1800" +
+                " round。 NEW kind 'error-trio'。 166" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M1880。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

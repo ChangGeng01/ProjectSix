@@ -2159,7 +2159,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二十四")!)
+                            "chapter 六百二十四")!),
+            // M1880 chapter 625 — BASHostKit error trio Codable extension gap-fill (4th post-hexa-#2, M1880 round-number milestone)
+            checkRegistry("六百二十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百二十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3647,6 +3653,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二十四")!
+                .mNumberLast),
+            // M1880 chapter 625 — BASHostKit error trio Codable extension gap-fill
+            ("625",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

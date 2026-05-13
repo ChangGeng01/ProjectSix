@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1876",
-            "M1876:doctrine version reflects chapter 六百二十四 — BASRUNTIMECORE SOLO ENUM CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#2,1st BASRuntimeCore non-doctrine type touched since post-octa narrative began (chapter 597)。 BASEventLogFailureInjectionScenario (4-case enum) gained Codable at M1873 + 1 PROOF test (M1874) + BASRuntimeCoreSoloEnumCodableExtensionDoctrine typed surface (M1875) + close-out (M1876)。 NEW kind 'runtime-core-solo-enum' distinct from prior post-hexa-#2 kinds。 165 typed surfaces cumulative。 460 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1880",
+            "M1880:doctrine version reflects chapter 六百二十五 — BASHOSTKIT ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#2,1st error-enum-cluster wave。 3 BASHostKit Error enums (BASTrainingDataExportError + BASHostMeshError + BASHostIntegrationError) gained Codable at M1877 + 3 PROOF tests (M1878) + BASHostKitErrorTrioCodableExtensionDoctrine typed surface (M1879) + close-out (M1880)。 M1880 ROUND-NUMBER MILESTONE reached — 80-step jump since chapter 605 M1800 round。 NEW kind 'error-trio'。 166 typed surfaces cumulative。 464 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
