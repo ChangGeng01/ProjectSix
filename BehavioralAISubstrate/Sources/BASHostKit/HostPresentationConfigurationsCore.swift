@@ -407,7 +407,9 @@ public struct BASHostLifecycleBehaviorConfiguration: Codable, Equatable, Sendabl
     }
 }
 
-public enum BASHostIntegrationError: Error, Equatable, Sendable {
+public enum BASHostIntegrationError:
+    Error, Equatable, Sendable, Codable
+{
     case missingWorkflowModeMapping(profileID: String)
     case unsupportedWorkflowModeID(profileID: String, modeID: String)
     case missingWorkflowMemorySource(profileID: String)

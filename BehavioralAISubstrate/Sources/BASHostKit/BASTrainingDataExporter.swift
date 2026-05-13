@@ -307,7 +307,9 @@ public struct BASTrainingDataExportSummary:
 
 // MARK: - Errors
 
-public enum BASTrainingDataExportError: Error, Sendable {
+public enum BASTrainingDataExportError:
+    Error, Sendable, Codable, Equatable
+{
     case fileCreateFailed(URL, underlyingError: String)
     case fileWriteFailed(URL, underlyingError: String)
     case stateContextRequestedButNoStore

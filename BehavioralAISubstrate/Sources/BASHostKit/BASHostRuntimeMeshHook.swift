@@ -128,7 +128,9 @@ public enum BASHostMeshReasonCodes {
 /// Typed error cases for mesh consultation。Lets hot-path callers
 /// distinguish "registry not wired" from cascade-runner failures
 /// (bad head, infer-throw, etc.)。
-public enum BASHostMeshError: Error, Equatable, Sendable {
+public enum BASHostMeshError:
+    Error, Equatable, Sendable, Codable
+{
     /// `runMeshCascadeRequired(...)` was called on a runtime that
     /// has no mesh registry wired。The non-Optional contract makes
     /// this an explicit invariant violation rather than a silent
