@@ -37,28 +37,26 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs648() {
+    func testLastChapterIs649() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十八",
-            "Chapter 六百四十八:BASSOVEREIGN TERTIARY" +
-            " ERROR TRIO CODABLE EXTENSION — GAP-FILL," +
-            "6th and FINAL post-hexa-#5,9th BAS" +
-            "Sovereign touch overall。 THIRD BAS" +
-            "Sovereign error trio — closes BASSovereign" +
-            " Error enum Codable coverage。 3 BAS" +
-            "Sovereign Error enums (CoordinatorError +" +
-            " EngineError + SigningError) gained Codable" +
-            " + 3 PROOF tests + BASSovereignTertiary" +
-            "ErrorTrioCodableExtensionDoctrine typed" +
-            " surface + close-out。 NEW kind 'sovereign-" +
-            "tertiary-error-trio'。 BASSovereign" +
-            " cumulative typed surfaces = 26 — past 25-" +
-            "surface milestone。 Post-hexa-#5 arc sealed" +
-            " entirely-BASSovereign。 189 typed surfaces" +
-            " cumulative。 556 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百四十九",
+            "Chapter 六百四十九:6TH GAP-FILL HEXA" +
+            " CATALOG META-META MILESTONE。 NEW BASGap" +
+            "FillHexaSixCompletionDoctrine cataloging" +
+            " 6 post-hexa-#5 gap-fill chapters (643-" +
+            "648) — 18 BASSovereign types / 24 commits" +
+            " / 1 module touched。 DISTINCTIVE FEATURE" +
+            " FIRST entirely-single-module hexa。" +
+            " DEEPEST recursive Codable proof shipped" +
+            " + Set<T> composition demonstrated。 NEW" +
+            " catalog + 54 anti-drift PROOF tests + 15" +
+            " wire-in PROOF tests + close-out。 Catalog" +
+            " lineage M1805 → M1833 → M1861 → M1889 →" +
+            " M1917 → M1945 → M1973。 190 typed surfaces" +
+            " — hits 190-surface milestone。 560" +
+            " consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range

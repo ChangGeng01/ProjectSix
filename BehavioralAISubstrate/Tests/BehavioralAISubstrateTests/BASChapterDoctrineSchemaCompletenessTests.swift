@@ -2303,7 +2303,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十八")!)
+                            "chapter 六百四十八")!),
+            // M1976 chapter 649 — 6TH gap-fill hexa catalog meta-meta milestone (cataloging 643-648, entirely BASSovereign)
+            checkRegistry("六百四十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3983,6 +3989,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十八")!
+                .mNumberLast),
+            // M1976 chapter 649 — 6TH gap-fill hexa catalog meta-meta milestone (cataloging 643-648)
+            ("649",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

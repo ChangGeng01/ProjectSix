@@ -398,6 +398,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// trio'。 BASSovereign cumulative typed surfaces
     /// = 26 — past 25-surface milestone。 Post-hexa-#5
     /// arc sealed entirely-BASSovereign。
+    /// Re-captured at chapter 649 close-out。 Chapter
+    /// 649:6TH GAP-FILL HEXA CATALOG META-META
+    /// MILESTONE。 NEW BASGapFillHexaSixCompletion
+    /// Doctrine cataloging 6 post-hexa-#5 gap-fill
+    /// chapters (643-648) — 18 BASSovereign types
+    /// extended / 24 commits / 1 module touched
+    /// (entirely BASSovereign — DISTINCTIVE FEATURE)。
+    /// DEEPEST recursive Codable proof + Set<T>
+    /// composition pattern demonstrated。 NEW catalog
+    /// (M1973) + 54 anti-drift PROOF tests (M1974) +
+    /// 15 wire-in PROOF tests (M1975) + close-out
+    /// (M1976)。 Catalog lineage M1805 post-octa →
+    /// M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3
+    /// → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa
+    /// #6。 190 typed surfaces — hits 190-surface
+    /// milestone。
     static let frozenFullRegistrySha256: String =
-        "94f7ae94627e076edf2b59353edf133d16da7ca7d704c769aeebae5feb956700"
+        "1e03f38d073494b0ec9a8391ba8025dacde5b94077c308ccf4ea15bc609cb676"
 }

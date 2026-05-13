@@ -4464,7 +4464,41 @@ public enum BASEntropyChapterIndex {
                 " commits。 Post-hexa-#5 arc sealed" +
                 " (entirely-BASSovereign)。 Chapter 649" +
                 " hexa #6 catalog opportunity NEXT。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十九",
+            mNumberFirst: 1973, mNumberLast: 1976,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "6TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaSix" +
+                "CompletionDoctrine cataloging 6 post-" +
+                "hexa-#5 gap-fill chapters (643-648)" +
+                " — 18 BASSovereign types extended / 24" +
+                " commits / 1 module touched。" +
+                " DISTINCTIVE FEATURE:FIRST entirely-" +
+                "single-module hexa (hexa #1-#5 each" +
+                " spanned 4-7 modules)。 DEEPEST" +
+                " recursive Codable proof shipped (3-" +
+                "level at ch647) + Set<T> composition" +
+                " pattern demonstrated。 BASSovereign" +
+                " cumulative typed surfaces grew 8 → 26" +
+                " across hexa #6 cycle。 NEW catalog" +
+                " (M1973) + 54 anti-drift PROOF tests" +
+                " (M1974) + 15 wire-in PROOF tests" +
+                " (M1975) + close-out (M1976)。 PARALLEL" +
+                " structurally to chapter 614 hexa #1" +
+                " + chapter 621 hexa #2 + chapter 628" +
+                " hexa #3 + chapter 635 hexa #4 +" +
+                " chapter 642 hexa #5。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2 → M1889 hexa #3 → M1917" +
+                " hexa #4 → M1945 hexa #5 → M1973 hexa" +
+                " #6。 190 typed surfaces cumulative" +
+                " (+1) — hits 190-surface milestone。" +
+                " ADR-016 → M1976。 560 consecutive" +
+                " byte-equality clean commits。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

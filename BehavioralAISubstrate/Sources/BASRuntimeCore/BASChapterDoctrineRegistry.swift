@@ -17788,7 +17788,137 @@ public enum BASChapterDoctrineRegistry {
                 " sealed (entirely-BASSovereign,6" +
                 " chapters / 24 commits) — chapter 649" +
                 " hexa #6 catalog opportunity NEXT。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 649 — 6TH GAP-FILL HEXA CATALOG META-
+        // META MILESTONE — BASGapFillHexaSixCompletion
+        // Doctrine cataloging 6 post-hexa-#5 gap-fill
+        // chapters (643-648,entirely BASSovereign)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十九",
+            mNumberFirst: 1973,
+            mNumberLast: 1976,
+            v1MilestoneMNumber: 1976,
+            v1MilestoneStatus:
+                "chapter-649-gap-fill-hexa-six-completion",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1973, knife: "第一刀",
+                    concept: "NEW BASGapFillHexaSix" +
+                        "CompletionDoctrine cataloging" +
+                        " 6 post-hexa-#5 gap-fill" +
+                        " chapters (643-648) — 18 BAS" +
+                        "Sovereign types extended / 24" +
+                        " commits / 1 module touched" +
+                        " (entirely BASSovereign)。" +
+                        " DISTINCTIVE FEATURE:FIRST" +
+                        " entirely-single-module hexa。" +
+                        " Hexa #1-#5 each spanned 4-7" +
+                        " modules — hexa #6 is the" +
+                        " concentrated-coverage" +
+                        " exception。"),
+                BASChapterKnife(
+                    mNumber: 1974, knife: "第二刀",
+                    concept: "54 anti-drift PROOF tests" +
+                        " for the new catalog (2 identity" +
+                        " + 3 entry count + 7 kind" +
+                        " bucket + 6 per-entry + 8" +
+                        " aggregate + 14 achievement +" +
+                        " 13 cross-doctrine ref +" +
+                        " milestone + 1 Codable round-" +
+                        "trip)。"),
+                BASChapterKnife(
+                    mNumber: 1975, knife: "第三刀",
+                    concept: "15 wire-in PROOF tests" +
+                        " cross-checking the catalog" +
+                        " against the 6 source per-" +
+                        "entry extension doctrines (12" +
+                        " per-entry mNumber+typesExtended" +
+                        " wire-ins + 3 cross-catalog" +
+                        " invariants — entries match," +
+                        " modules less than all priors," +
+                        " types match hexa #4+#5 +" +
+                        " exceed earlier hexas)。"),
+                BASChapterKnife(
+                    mNumber: 1976, knife: "第四刀",
+                    concept: "Chapter 649 close-out +" +
+                        " doctrine sync。 560 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6TH GAP-FILL HEXA" +
+                        " CATALOG META-META MILESTONE" +
+                        " sealed at M1973。 Catalog" +
+                        " lineage M1805 post-octa →" +
+                        " M1833 hexa #1 → M1861 hexa #2" +
+                        " → M1889 hexa #3 → M1917 hexa" +
+                        " #4 → M1945 hexa #5 → M1973" +
+                        " hexa #6。 typed-surface count" +
+                        " 189 → 190 — hits 190-surface" +
+                        " milestone。")
+            ],
+            entropyClassesAttacked: [
+                "post-hexa-five-gap-fill-cycle-uncataloged",
+                "sixth-gap-fill-hexa-meta-meta-not-shipped",
+                "first-entirely-single-module-hexa-theme-uncaptured",
+                "deepest-recursive-codable-proof-uncaptured",
+                "catalog-lineage-seven-step-not-extended",
+                "hexa-six-wire-in-coverage-gap"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1976",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "gap-fill-hexa-six-completion-doctrine",
+                "sixth-gap-fill-hexa-catalog-meta-meta",
+                "first-entirely-single-module-hexa",
+                "deepest-recursive-codable-proof",
+                "set-codable-composition-demonstrated",
+                "18-types-extended-matches-hexa-four-and-five",
+                "1-module-fewer-than-all-prior-hexas",
+                "catalog-lineage-7-step-extension",
+                "560-consecutive-byte-equality-clean-commits",
+                "190-typed-surfaces-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — post-hexa-#6 gap-fill" +
+                " cycle (chapters 650-655) — likely" +
+                " return to multi-module coverage",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 649 ships 6TH GAP-FILL" +
+                " HEXA CATALOG META-META MILESTONE。" +
+                " NEW BASGapFillHexaSixCompletion" +
+                "Doctrine cataloging 6 post-hexa-#5" +
+                " gap-fill chapters (643-648) — 18 BAS" +
+                "Sovereign types extended / 24 commits" +
+                " / 1 module touched。 DISTINCTIVE" +
+                " FEATURE:FIRST entirely-single-module" +
+                " hexa (hexa #1-#5 each spanned 4-7" +
+                " distinct modules)。 DEEPEST recursive" +
+                " Codable proof shipped in any hexa" +
+                " cycle (3-level proof at chapter 647)" +
+                " + Set<T: Codable> composition pattern" +
+                " demonstrated。 BASSovereign cumulative" +
+                " typed surfaces grew 8 → 26 across" +
+                " hexa #6 (gained 18)。 NEW catalog" +
+                " (M1973) + 54 anti-drift PROOF tests" +
+                " (M1974) + 15 wire-in PROOF tests" +
+                " (M1975) + close-out (M1976)。 PARALLEL" +
+                " structurally to chapter 614 hexa #1" +
+                " + chapter 621 hexa #2 + chapter 628" +
+                " hexa #3 + chapter 635 hexa #4 +" +
+                " chapter 642 hexa #5。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2 → M1889 hexa #3 → M1917" +
+                " hexa #4 → M1945 hexa #5 → M1973 hexa" +
+                " #6。 190 typed surfaces cumulative" +
+                " (+1) — hits 190-surface milestone。" +
+                " ADR-016 → M1976。 560 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

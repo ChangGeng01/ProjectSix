@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1972",
-            "M1972:doctrine version reflects chapter 六百四十八 — BASSOVEREIGN TERTIARY ERROR TRIO CODABLE EXTENSION — GAP-FILL,6th and FINAL post-hexa-#5,9th BASSovereign touch overall。 THIRD BASSovereign error trio (after ch633 primary + ch638 secondary) — closes BASSovereign Error enum Codable coverage。 3 BASSovereign Error enums (CoordinatorError + EngineError + SigningError) gained Codable at M1969 + 3 PROOF tests (M1970) + BASSovereignTertiaryErrorTrioCodableExtensionDoctrine typed surface (M1971) + close-out (M1972)。 NEW kind 'sovereign-tertiary-error-trio'。 BASSovereign cumulative typed surfaces = 26 — past 25-surface milestone。 Post-hexa-#5 arc sealed entirely-BASSovereign。 189 typed surfaces cumulative。 556 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1976",
+            "M1976:doctrine version reflects chapter 六百四十九 — 6TH GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaSixCompletionDoctrine cataloging 6 post-hexa-#5 gap-fill chapters (643-648) — 18 BASSovereign types extended / 24 commits / 1 module touched。 DISTINCTIVE FEATURE FIRST entirely-single-module hexa (hexa #1-#5 each spanned 4-7 modules)。 DEEPEST recursive Codable proof shipped + Set<T> composition pattern demonstrated。 NEW catalog (M1973) + 54 anti-drift PROOF tests (M1974) + 15 wire-in PROOF tests (M1975) + close-out (M1976)。 Catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6。 190 typed surfaces cumulative — hits 190-surface milestone。 560 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
