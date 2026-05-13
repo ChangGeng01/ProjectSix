@@ -42,7 +42,7 @@ public actor BASSovereignHostVersionTree {
         case cycle(at: String)
     }
 
-    public struct Node: Sendable, Equatable {
+    public struct Node: Sendable, Equatable, Codable {
         public let versionID: String
         public let parentID: String?
         public let diffSummary: String
@@ -71,7 +71,9 @@ public actor BASSovereignHostVersionTree {
     /// lowest version present on both ancestor chains; `up` is the
     /// path from `from` up to the common ancestor (exclusive); `down`
     /// is the path from the common ancestor (exclusive) down to `to`.
-    public struct LineagePath: Sendable, Equatable {
+    public struct LineagePath:
+        Sendable, Equatable, Codable
+    {
         public let from: String
         public let to: String
         public let commonAncestor: String?

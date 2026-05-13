@@ -92,7 +92,9 @@ public struct BASSovereignCrossDeviceClock:
     }
 
     /// Causal ordering between two clocks.
-    public enum Order: Sendable, Equatable, Hashable {
+    public enum Order:
+        Sendable, Equatable, Hashable, Codable
+    {
         case before
         case equal
         case after
