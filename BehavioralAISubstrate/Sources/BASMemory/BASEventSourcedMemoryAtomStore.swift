@@ -54,7 +54,7 @@ import BASRuntimeCore
 /// Cache policy for the event-sourced atom store。Trades memory
 /// for read latency。
 public enum BASEventSourcedMemoryAtomStoreCachePolicy:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     /// Project the full atom set from the event log on every
     /// read。Smallest memory footprint;O(N) per read where N

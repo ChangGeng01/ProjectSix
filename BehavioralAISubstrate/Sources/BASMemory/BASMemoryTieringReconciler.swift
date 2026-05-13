@@ -27,7 +27,7 @@ import BASRuntimeCore
 
 /// Typed outcome of a single reconciliation pass.
 public struct BASMemoryTieringReconciliationOutcome:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     public let evaluatedCount: Int
     public let heldCount: Int
@@ -100,7 +100,7 @@ public struct BASMemoryTieringReconciliationOutcome:
 /// but order *does* affect which decisions land first in the
 /// transition log and — in a later wiring — which atoms get moved
 /// before a per-pass budget runs out.
-public enum BASMemoryTieringReconcilerOrdering: Sendable, Equatable {
+public enum BASMemoryTieringReconcilerOrdering: Sendable, Equatable, Codable {
     /// Preserve the order in which profiles arrived. Fastest; no
     /// extra sort.
     case insertionOrder
