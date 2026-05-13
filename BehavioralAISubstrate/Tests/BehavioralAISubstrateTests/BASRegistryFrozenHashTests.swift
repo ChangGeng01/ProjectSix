@@ -107,21 +107,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 627 close-out。 Chapter
-    /// 627:CROSS-MODULE ERROR TRIO CODABLE EXTENSION
-    /// — GAP-FILL,6TH (FINAL) post-hexa-#2,3rd error-
-    /// cluster wave (1st spanning 2 modules:BASApple
-    /// Adapters + BASSovereign)。 3 Error enums (BAS
-    /// AppleCurrentBrainBootstrapHostResolutionError +
-    /// BASSovereignAuditLedger.LedgerError + BAS
-    /// SovereignKeychainBinding.KeychainError) gained
-    /// Codable at M1885 + 3 PROOF tests (M1886) + NEW
-    /// BASCrossModuleErrorTrioCodableExtensionDoctrine
-    /// (M1887) + close-out (M1888)。 NEW kind 'cross-
-    /// module-error-trio'。 TRIGGERS chapter 628 hexa
-    /// #3 catalog meta-meta opportunity。 7 distinct
-    /// modules in post-hexa-#2 run far exceeds prior
-    /// hexa runs' 4。
+    /// Re-captured at chapter 628 close-out。 Chapter
+    /// 628:3RD GAP-FILL HEXA CATALOG META-META
+    /// MILESTONE。 NEW BASGapFillHexaThreeCompletion
+    /// Doctrine cataloging 6 post-hexa-#2 gap-fill
+    /// chapters (622-627) — 15 types extended / 24
+    /// commits / 7 distinct modules touched FAR
+    /// EXCEEDS hexa #1+#2's 4 each / 6 distinct kind
+    /// buckets each appearing exactly once。 NEW
+    /// catalog (M1889) + 42 anti-drift PROOF tests
+    /// (M1890) + 15 wire-in PROOF tests cross-checking
+    /// 6 source doctrines (M1891) + close-out (M1892)。
+    /// PARALLEL structurally to chapter 614 hexa #1 +
+    /// chapter 621 hexa #2。 Catalog lineage:M1805
+    /// post-octa → M1833 hexa #1 → M1861 hexa #2 →
+    /// M1889 hexa #3。
     static let frozenFullRegistrySha256: String =
-        "973a19ead79879bb3869380c33a604f32c50c25beb753907b84e391379658ce8"
+        "1a84dde829e0f9e39f09bcab4e029ab7b9122a3573fcf45a9759c4f7ec9831b4"
 }

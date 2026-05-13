@@ -3941,7 +3941,33 @@ public enum BASEntropyChapterIndex {
                 " exceeds chapter 614 hexa #1's 4 and" +
                 " chapter 621 hexa #2's 4。 168 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1888。 V1 byte-equality preserved。")
+                " M1888。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十八",
+            mNumberFirst: 1889, mNumberLast: 1892,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "3RD GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaThree" +
+                "CompletionDoctrine (M1889) cataloging" +
+                " 6 post-hexa-#2 gap-fill chapters" +
+                " (622-627):cross-module-trio +" +
+                " nested-in-actor-pair + runtime-core-" +
+                "solo-enum + error-trio + metal-error-" +
+                "trio + cross-module-error-trio。 15" +
+                " types extended / 24 commits / 7" +
+                " distinct modules FAR EXCEEDS prior" +
+                " hexas' 4 each / 6 distinct kind" +
+                " buckets each appearing exactly once。" +
+                " 42 anti-drift PROOF tests (M1890) +" +
+                " 15 wire-in PROOF tests cross-checking" +
+                " 6 source doctrines (M1891) + close-" +
+                "out (M1892)。 PARALLEL structurally to" +
+                " chapter 614 hexa #1 + chapter 621" +
+                " hexa #2。 Catalog lineage M1805 →" +
+                " M1833 → M1861 → M1889。 169 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1892。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

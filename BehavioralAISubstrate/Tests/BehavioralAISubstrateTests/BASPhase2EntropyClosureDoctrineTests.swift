@@ -37,29 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs627() {
+    func testLastChapterIs628() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十七",
-            "Chapter 六百二十七:CROSS-MODULE ERROR" +
-            " TRIO CODABLE EXTENSION — GAP-FILL,6TH" +
-            " (FINAL) post-hexa-#2,3rd error-cluster" +
-            " wave (1st spanning 2 modules:BASApple" +
-            "Adapters + BASSovereign)。 3 Error enums" +
-            " (BASAppleCurrentBrainBootstrapHost" +
-            "ResolutionError + BASSovereignAuditLedger" +
-            ".LedgerError + BASSovereignKeychainBinding" +
-            ".KeychainError) gained Codable + 3 PROOF" +
-            " tests + BASCrossModuleErrorTrioCodable" +
-            "ExtensionDoctrine typed surface + close-" +
-            "out。 NEW kind 'cross-module-error-trio'。" +
-            " TRIGGERS chapter 628 hexa #3 catalog" +
-            " meta-meta opportunity。 7 distinct modules" +
-            " in post-hexa-#2 run far exceeds prior" +
-            " hexa runs' 4。 168 typed surfaces" +
-            " cumulative。 472 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百二十八",
+            "Chapter 六百二十八:3RD GAP-FILL HEXA" +
+            " CATALOG META-META MILESTONE。 NEW BAS" +
+            "GapFillHexaThreeCompletionDoctrine" +
+            " cataloging 6 post-hexa-#2 gap-fill" +
+            " chapters (622-627) — 15 types extended" +
+            " / 24 commits / 7 distinct modules" +
+            " FAR EXCEEDS hexa #1+#2's 4 each / 6" +
+            " distinct kind buckets each appearing" +
+            " exactly once + 42 anti-drift PROOF + 15" +
+            " wire-in PROOF + close-out。 PARALLEL" +
+            " structurally to chapter 614 hexa #1 +" +
+            " chapter 621 hexa #2。 Catalog lineage" +
+            " M1805 post-octa → M1833 hexa #1 → M1861" +
+            " hexa #2 → M1889 hexa #3。 169 typed" +
+            " surfaces cumulative。 476 consecutive" +
+            " byte-equality clean commits")
     }
 
     // MARK: - M-number range

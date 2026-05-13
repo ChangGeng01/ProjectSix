@@ -281,7 +281,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百二十四",   // M1873-M1876 (BASRUNTIMECORE SOLO ENUM CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#2,1st BASRuntimeCore non-doctrine type touched since post-octa narrative began;BASEventLogFailureInjectionScenario (4-case enum) gained Codable + 1 PROOF test + BASRuntimeCoreSoloEnumCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-solo-enum' distinct from prior post-hexa-#2 kinds)
         "chapter 六百二十五",   // M1877-M1880 (BASHOSTKIT ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#2,1st error-enum-cluster wave in the run;3 BASHostKit Error enums (BASTrainingDataExportError 3-case + BASHostMeshError 1-case + BASHostIntegrationError 8-case) gained Codable + 3 PROOF tests + BASHostKitErrorTrioCodableExtensionDoctrine typed surface + close-out;M1880 ROUND-NUMBER MILESTONE reached — 80-step jump since chapter 605 M1800 round;NEW kind 'error-trio' distinct from prior post-hexa-#2 kinds)
         "chapter 六百二十六",   // M1881-M1884 (BASMETALSUBSTRATE METAL ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#2,2nd error-cluster wave in run,1st BASMetalSubstrate touch since chapter 605;3 BASMetalSubstrate Error enums (BASKernelError + BASKernelLookupError + BASMambaSSMError) gained Codable + 3 PROOF tests + BASMetalSubstrateMetalErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'metal-error-trio' distinct from chapter 625 'error-trio' (different module);1 more to chapter 627 hexa #3 opportunity!)
-        "chapter 六百二十七"    // M1885-M1888 (CROSS-MODULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,6TH (FINAL) post-hexa-#2,3rd error-cluster wave (1st spanning 2 modules:BASAppleAdapters + BASSovereign);3 Error enums (BASAppleCurrentBrainBootstrapHostResolutionError + BASSovereignAuditLedger.LedgerError + BASSovereignKeychainBinding.KeychainError) gained Codable + 3 PROOF tests + BASCrossModuleErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'cross-module-error-trio';TRIGGERS chapter 628 hexa #3 catalog meta-meta opportunity;7 distinct modules in post-hexa-#2 run far exceeds prior hexa runs' 4)
+        "chapter 六百二十七",   // M1885-M1888 (CROSS-MODULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,6TH (FINAL) post-hexa-#2,3rd error-cluster wave (1st spanning 2 modules:BASAppleAdapters + BASSovereign);3 Error enums (BASAppleCurrentBrainBootstrapHostResolutionError + BASSovereignAuditLedger.LedgerError + BASSovereignKeychainBinding.KeychainError) gained Codable + 3 PROOF tests + BASCrossModuleErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'cross-module-error-trio';TRIGGERS chapter 628 hexa #3 catalog meta-meta opportunity;7 distinct modules in post-hexa-#2 run far exceeds prior hexa runs' 4)
+        "chapter 六百二十八"    // M1889-M1892 (3RD GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaThreeCompletionDoctrine cataloging 6 post-hexa-#2 gap-fill chapters (622-627) — 15 types extended / 24 commits / 7 distinct modules touched FAR EXCEEDS hexa #1+#2's 4 each / 6 distinct kind buckets each appearing exactly once + 42 anti-drift PROOF tests + 15 wire-in PROOF tests cross-checking 6 source doctrines + close-out;PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3;169 typed surfaces cumulative;476 consecutive byte-equality clean commits)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -298,14 +299,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1888
+    public static let mNumberLast: Int = 1892
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1888)。 Bumped through chapter 627:929 → 933。
-    /// Chapter 627:cross-module error trio (6TH post-
-    /// hexa-#2,triggers hexa #3) + 3 PROOF tests +
-    /// typed surface + close-out。
-    public static let commitsShipped: Int = 933
+    /// M1892)。 Bumped through chapter 628:933 → 937。
+    /// Chapter 628:3rd gap-fill hexa catalog meta-meta
+    /// milestone + 42 anti-drift PROOF + 15 wire-in
+    /// PROOF + close-out。
+    public static let commitsShipped: Int = 937
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
