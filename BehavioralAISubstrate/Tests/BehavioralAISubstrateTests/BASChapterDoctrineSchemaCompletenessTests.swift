@@ -2267,7 +2267,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十二")!)
+                            "chapter 六百四十二")!),
+            // M1952 chapter 643 — BASSovereign clock+tree typed-trio Codable extension gap-fill (1st post-hexa-#5, FIRST mixed enum+struct trio)
+            checkRegistry("六百四十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3899,6 +3905,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十二")!
+                .mNumberLast),
+            // M1952 chapter 643 — BASSovereign clock+tree typed-trio Codable extension gap-fill (1st post-hexa-#5)
+            ("643",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

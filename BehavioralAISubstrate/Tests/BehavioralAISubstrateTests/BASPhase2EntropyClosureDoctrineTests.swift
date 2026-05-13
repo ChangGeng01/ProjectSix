@@ -37,30 +37,26 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs642() {
+    func testLastChapterIs643() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十二",
-            "Chapter 六百四十二:5TH GAP-FILL HEXA" +
-            " CATALOG META-META MILESTONE。 NEW BASGap" +
-            "FillHexaFiveCompletionDoctrine cataloging" +
-            " 6 post-hexa-#4 gap-fill chapters" +
-            " (636-641) — 18 types extended / 24" +
-            " commits / 6 distinct modules touched (1" +
-            " fewer than hexa #3+#4's 7 each but exceeds" +
-            " hexa #1+#2's 4 each)。 FIRST hexa to MIX" +
-            " error-trio + non-error-trio kinds (4" +
-            " error variants + 2 non-error variants) —" +
-            " distinctive feature。 ALSO brings BAS" +
-            "WorldPrior into typed surface for the" +
-            " FIRST time in any hexa cycle。 NEW catalog" +
-            " + 49 anti-drift PROOF tests + 15 wire-in" +
-            " PROOF tests + close-out。 Catalog lineage" +
-            " M1805 post-octa → M1833 hexa #1 → M1861" +
-            " hexa #2 → M1889 hexa #3 → M1917 hexa #4" +
-            " → M1945 hexa #5。 183 typed surfaces" +
-            " cumulative。 532 consecutive byte-equality" +
+            "chapter 六百四十三",
+            "Chapter 六百四十三:BASSOVEREIGN CLOCK+TREE" +
+            " TYPED-TRIO CODABLE EXTENSION — GAP-FILL," +
+            "1st post-hexa-#5,FIRST mixed enum+struct" +
+            " trio in post-hexa-#5 run (prior 6 chapters" +
+            " 636-641 all had pure-enum-trio shape)。" +
+            " 4th BASSovereign touch overall。 3 BAS" +
+            "Sovereign types nested-in-actor (1 enum +" +
+            " 2 structs) gained Codable + 3 PROOF tests" +
+            " + BASSovereignClockTreeTypedTrioCodable" +
+            "ExtensionDoctrine typed surface + close-out。" +
+            " NEW kind 'sovereign-clock-tree-typed-trio'。" +
+            " Rounds out BASSovereignHostVersionTree" +
+            " coverage。 BASSovereign cumulative typed" +
+            " surfaces = 11。 184 typed surfaces" +
+            " cumulative。 536 consecutive byte-equality" +
             " clean commits")
     }
 

@@ -110,24 +110,23 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 642
-    /// close-out (M1948 — 5TH GAP-FILL HEXA CATALOG
-    /// META-META MILESTONE;NEW BASGapFillHexaFive
-    /// CompletionDoctrine cataloging 6 post-hexa-#4
-    /// gap-fill chapters 636-641 — 18 types extended /
-    /// 24 commits / 6 distinct modules touched (1
-    /// fewer than hexa #3+#4's 7 each);FIRST hexa to
-    /// MIX error-trio + non-error-trio kinds (4 error
-    /// variants + 2 non-error variants);ALSO brings
-    /// BASWorldPrior into typed surface for the FIRST
-    /// time in any hexa cycle;catalog lineage M1805
-    /// post-octa → M1833 hexa #1 → M1861 hexa #2 →
-    /// M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5)。
-    public static let typedSurfaceCount: Int = 183
+    /// Cumulative achievement metrics at chapter 643
+    /// close-out (M1952 — BASSovereign clock+tree
+    /// typed-trio Codable extension,1st post-hexa-#5
+    /// gap-fill,FIRST mixed enum+struct trio in post-
+    /// hexa-#5 run;4th BASSovereign touch overall;3
+    /// BASSovereign types nested-in-actor (1 enum + 2
+    /// structs):BASSovereignCrossDeviceClock.Order +
+    /// BASSovereignHostVersionTree.Node + BASSovereign
+    /// HostVersionTree.LineagePath gained Codable;NEW
+    /// kind 'sovereign-clock-tree-typed-trio';rounds
+    /// out BASSovereignHostVersionTree coverage;BAS
+    /// Sovereign cumulative typed surfaces = 11)。
+    public static let typedSurfaceCount: Int = 184
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 532
-    public static let phase2CommitsShipped: Int = 993
-    public static let chapter2NumberLast: Int = 1948
+        Int = 536
+    public static let phase2CommitsShipped: Int = 997
+    public static let chapter2NumberLast: Int = 1952
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

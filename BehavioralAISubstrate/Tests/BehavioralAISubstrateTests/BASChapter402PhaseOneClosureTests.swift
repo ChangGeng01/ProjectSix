@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1948",
-            "M1948:doctrine version reflects chapter 六百四十二 — 5TH GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaFiveCompletionDoctrine cataloging 6 post-hexa-#4 gap-fill chapters (636-641) — 18 types extended / 24 commits / 6 distinct modules touched (1 fewer than hexa #3+#4's 7 each but exceeds hexa #1+#2's 4 each)。 FIRST hexa to MIX error-trio + non-error-trio kinds (4 error variants + 2 non-error variants) — distinctive feature。 ALSO brings BASWorldPrior into typed surface for the FIRST time in any hexa cycle。 NEW catalog (M1945) + 49 anti-drift PROOF tests (M1946) + 15 wire-in PROOF tests (M1947) + close-out (M1948)。 Catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5。 183 typed surfaces cumulative。 532 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1952",
+            "M1952:doctrine version reflects chapter 六百四十三 — BASSOVEREIGN CLOCK+TREE TYPED-TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#5,FIRST mixed enum+struct trio in post-hexa-#5 run (prior 6 chapters 636-641 all had pure-enum-trio shape)。 4th BASSovereign touch overall。 3 BASSovereign types nested-in-actor (1 enum + 2 structs):BASSovereignCrossDeviceClock.Order + BASSovereignHostVersionTree.Node + BASSovereignHostVersionTree.LineagePath gained Codable at M1949 + 3 PROOF tests (M1950) + BASSovereignClockTreeTypedTrioCodableExtensionDoctrine typed surface (M1951) + close-out (M1952)。 NEW kind 'sovereign-clock-tree-typed-trio'。 Rounds out BASSovereignHostVersionTree coverage。 BASSovereign cumulative typed surfaces = 11。 184 typed surfaces cumulative。 536 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

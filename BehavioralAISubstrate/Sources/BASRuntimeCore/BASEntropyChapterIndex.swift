@@ -4300,7 +4300,34 @@ public enum BASEntropyChapterIndex {
                 " M1945 hexa #5。 183 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1948。" +
                 " 532 consecutive byte-equality clean" +
-                " commits。 V1 byte-equality preserved。")
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十三",
+            mNumberFirst: 1949, mNumberLast: 1952,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CLOCK+TREE TYPED-" +
+                "TRIO CODABLE EXTENSION — GAP-FILL,1st" +
+                " post-hexa-#5,FIRST mixed enum+struct" +
+                " trio in post-hexa-#5 run (prior 6" +
+                " chapters 636-641 all had pure-enum-" +
+                "trio shape)。 4th BASSovereign touch" +
+                " overall。 3 BASSovereign types nested-" +
+                "in-actor (1 enum + 2 structs):BAS" +
+                "SovereignCrossDeviceClock.Order + BAS" +
+                "SovereignHostVersionTree.Node + BAS" +
+                "SovereignHostVersionTree.LineagePath" +
+                " gained Codable at M1949 + 3 PROOF" +
+                " tests (M1950) + new typed surface" +
+                " (M1951) + close-out (M1952)。 NEW kind" +
+                " 'sovereign-clock-tree-typed-trio'。" +
+                " Rounds out BASSovereignHostVersionTree" +
+                " coverage。 BASSovereign cumulative" +
+                " typed surfaces = 11。 184 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1952。 536 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

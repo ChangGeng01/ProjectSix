@@ -17081,7 +17081,122 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1948。" +
                 " 532 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 643 — BASSovereign clock+tree typed-
+        // trio Codable extension (1st post-hexa-#5
+        // gap-fill,FIRST mixed enum+struct trio)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十三",
+            mNumberFirst: 1949,
+            mNumberLast: 1952,
+            v1MilestoneMNumber: 1952,
+            v1MilestoneStatus:
+                "chapter-643-sovereign-clock-tree-typed-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1949, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign types (1 enum + 2" +
+                        " structs) all nested-in-actor" +
+                        " — BASSovereignCrossDeviceClock" +
+                        ".Order (4-case enum) + BAS" +
+                        "SovereignHostVersionTree.Node" +
+                        " (6-field struct) + BAS" +
+                        "SovereignHostVersionTree." +
+                        "LineagePath (5-field struct)。" +
+                        " MIXED enum+struct trio。"),
+                BASChapterKnife(
+                    mNumber: 1950, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1951, knife: "第三刀",
+                    concept: "NEW BASSovereignClockTree" +
+                        "TypedTrioCodableExtension" +
+                        "Doctrine + moduleCount = 1" +
+                        " (BASSovereign entirely) +" +
+                        " nestedInActorCount = 3 +" +
+                        " structCount = 2 + enumCount =" +
+                        " 1 (DISTINCTIVE mixed shape) +" +
+                        " allTypesAreErrors = false +" +
+                        " kindLabel='sovereign-clock-" +
+                        "tree-typed-trio' (NEW kind) +" +
+                        " isFirstPostHexaFiveGapFill +" +
+                        " isFirstMixedEnumStructTrio +" +
+                        " isFourthBASSovereignTouch" +
+                        "Overall +" +
+                        " cumulativeBASSovereignTyped" +
+                        "Surfaces = 11 +" +
+                        " roundsOutBASSovereignHost" +
+                        "VersionTreeCoverage。 typed-" +
+                        "surface count 183 → 184。"),
+                BASChapterKnife(
+                    mNumber: 1952, knife: "第四刀",
+                    concept: "Chapter 643 close-out +" +
+                        " doctrine sync。 536 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 1st post-hexa-#5" +
+                        " gap-fill — opens new arc with" +
+                        " FIRST mixed enum+struct trio" +
+                        " pattern (prior hexa runs" +
+                        " were pure-enum-trio)。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-cross-device-clock-order-non-codable",
+                "bas-sovereign-host-version-tree-node-non-codable",
+                "bas-sovereign-host-version-tree-lineage-path-non-codable",
+                "sovereign-clock-tree-typed-trio-pattern-uncaptured",
+                "first-post-hexa-five-gap-fill-not-shipped",
+                "bas-sovereign-host-version-tree-coverage-incomplete"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1952",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-clock-tree-typed-trio-codable-extension",
+                "first-post-hexa-five-gap-fill",
+                "first-mixed-enum-struct-trio",
+                "fourth-bas-sovereign-touch-overall",
+                "cumulative-11-bas-sovereign-typed-surfaces",
+                "rounds-out-bas-sovereign-host-version-tree-coverage",
+                "new-kind-label-sovereign-clock-tree-typed-trio",
+                "536-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 5 more gap-fill chapters" +
+                " (644-648) toward chapter 649 hexa #6" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 643 ships BASSovereign" +
+                " clock+tree typed-trio Codable" +
+                " extension — 1st post-hexa-#5 gap-fill" +
+                " chapter,FIRST mixed enum+struct trio" +
+                " in post-hexa-#5 run (prior 6 chapters" +
+                " 636-641 all had pure-enum-trio shape)。" +
+                " 4th BASSovereign touch overall。 3" +
+                " types all nested-in-actor (1 enum +" +
+                " 2 structs):BASSovereignCrossDevice" +
+                "Clock.Order + BASSovereignHostVersion" +
+                "Tree.Node + BASSovereignHostVersionTree" +
+                ".LineagePath。 Rounds out BASSovereign" +
+                "HostVersionTree coverage (chapter 633" +
+                " extended TreeError;this extends Node" +
+                " + LineagePath)。 Gained Codable at" +
+                " M1949 + 3 PROOF tests (M1950) + new" +
+                " typed surface (M1951) + close-out" +
+                " (M1952)。 NEW kind 'sovereign-clock-" +
+                "tree-typed-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 11。 184" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1952。 536 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

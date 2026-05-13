@@ -306,6 +306,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// hexa #3 → M1917 hexa #4 → M1945 hexa #5。 183
     /// typed surfaces;532 consecutive byte-equality
     /// clean commits。
+    /// Re-captured at chapter 643 close-out。 Chapter
+    /// 643:BASSOVEREIGN CLOCK+TREE TYPED-TRIO CODABLE
+    /// EXTENSION — GAP-FILL,1st post-hexa-#5,FIRST
+    /// mixed enum+struct trio in post-hexa-#5 run。
+    /// 4th BASSovereign touch overall。 3 BASSovereign
+    /// types nested-in-actor (1 enum + 2 structs):
+    /// BASSovereignCrossDeviceClock.Order + BASSovereign
+    /// HostVersionTree.Node + BASSovereignHostVersion
+    /// Tree.LineagePath gained Codable at M1949 + 3
+    /// PROOF tests (M1950) + NEW BASSovereignClockTree
+    /// TypedTrioCodableExtensionDoctrine (M1951) +
+    /// close-out (M1952)。 NEW kind 'sovereign-clock-
+    /// tree-typed-trio'。 Rounds out BASSovereignHost
+    /// VersionTree coverage。 BASSovereign cumulative
+    /// typed surfaces = 11。
     static let frozenFullRegistrySha256: String =
-        "979213d34ac0f85496687ab697281702fba0e27d92b26206180ce6c5e8f2e319"
+        "9b5ffaa9433a412883ac6cb3eeb4e631b5eead4ce03d35d1cce9064d23411098"
 }
