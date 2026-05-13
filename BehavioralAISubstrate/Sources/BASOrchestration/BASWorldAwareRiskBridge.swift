@@ -86,7 +86,7 @@ public actor BASWorldAwareRiskBridge {
     /// to make a decision. `matchedTemplateID` comes from whatever
     /// upstream component routed this intent — L9 projection, a
     /// retrieval index, or an explicit policy rule.
-    public struct ProposedIntent: Sendable, Equatable {
+    public struct ProposedIntent: Sendable, Equatable, Codable {
         public let sessionID: String
         public let turnID: String
         public let operation: BASSovereignVerdictEngine.OperationDomain
@@ -135,7 +135,7 @@ public actor BASWorldAwareRiskBridge {
     /// Exposed so tests / observability layers can prove "this
     /// verdict actually used world-prior knowledge — both the
     /// risk score AND the counterfactual fan-out".
-    public struct Decision: Sendable, Equatable {
+    public struct Decision: Sendable, Equatable, Codable {
         public let verdict: BASSovereignVerdict
         public let assessment: BASWorldPriorRiskAssessment
         public let branches:
