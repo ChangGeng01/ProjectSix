@@ -55,7 +55,9 @@ import Foundation
 // MARK: - Assembly result record
 
 /// Typed result of canonical mesh assembly。
-public struct BAS14LayerMeshAssemblyReport: Sendable {
+public struct BAS14LayerMeshAssemblyReport:
+    Sendable, Equatable, Codable
+{
     public let registeredHeadCount: Int
     public let perLayerCounts: [BASMotherboardLayer14: Int]
     public let totalCanonicalSlots: Int

@@ -183,7 +183,9 @@ public struct BASKnowledgeEdge: Codable, Equatable, Sendable {
 
 // MARK: - Errors
 
-public enum BASKnowledgeGraphError: Error, Equatable, Sendable {
+public enum BASKnowledgeGraphError:
+    Error, Equatable, Sendable, Codable
+{
     case duplicateNodeID(String)
     case duplicateEdgeID(String)
     case nodeNotFound(String)

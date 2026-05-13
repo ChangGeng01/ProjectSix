@@ -85,7 +85,9 @@ public enum BASMeshSyncFrameApplier {
 
     /// Per-slot diff entry with typed conflict classification +
     /// the local + remote slot records (when present)。
-    public struct SlotDiff: Sendable, Equatable {
+    public struct SlotDiff:
+        Sendable, Equatable, Codable
+    {
         public let conflict: SlotConflict
         public let headID: String
         public let layerID: BASMotherboardLayer14
