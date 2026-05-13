@@ -258,6 +258,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// Doctrine (M1935) + close-out (M1936)。 NEW kind
     /// 'organ-tool-feature-error-trio'。 BASOrgan
     /// cumulative = 3 + BASAppleAdapters cumulative = 3。
+    /// Re-captured at chapter 640 close-out。 Chapter
+    /// 640:CROSS-MODULE RUNTIME-STEP ENUM TRIO CODABLE
+    /// EXTENSION — GAP-FILL,5th post-hexa-#4,FIRST
+    /// non-Error-trio chapter in post-hexa-#4 run —
+    /// diversification away from error-trio pattern
+    /// that dominated hexa #3+#4。 3 non-Error control-
+    /// flow step enums (BASEventReplayRange + BASTool
+    /// CallingPlanStep + BASShadowTrialCoordinator.
+    /// FinalizeOutcome) spanning 3 modules gained
+    /// Codable at M1937 + 3 PROOF tests (M1938) + NEW
+    /// BASRuntimeStepEnumTrioCodableExtensionDoctrine
+    /// (M1939) + close-out (M1940)。 NEW kind 'runtime-
+    /// step-enum-trio'。 BASRuntimeCore+BASOrgan+BAS
+    /// Memory all at 3rd-touch overall。
     static let frozenFullRegistrySha256: String =
-        "d1b6c59331e5bfe50093416d0fc1da7e6d3448f55bbc6bacb167c28585c4c633"
+        "a909efdd1d160c0b3dec781946580dca9ac2eeafb392c4372488a8f0bbb4d338"
 }

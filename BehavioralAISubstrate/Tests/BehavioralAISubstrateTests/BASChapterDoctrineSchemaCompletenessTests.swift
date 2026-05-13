@@ -2249,7 +2249,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十九")!)
+                            "chapter 六百三十九")!),
+            // M1940 chapter 640 — cross-module runtime-step enum trio Codable extension gap-fill (5th post-hexa-#4, FIRST non-Error-trio in post-hexa-#4 run)
+            checkRegistry("六百四十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3857,6 +3863,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十九")!
+                .mNumberLast),
+            // M1940 chapter 640 — cross-module runtime-step enum trio Codable extension gap-fill (5th post-hexa-#4)
+            ("640",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

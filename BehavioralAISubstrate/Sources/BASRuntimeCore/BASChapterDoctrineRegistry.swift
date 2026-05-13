@@ -16715,6 +16715,125 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1936。 520 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 640 — cross-module runtime-step enum
+        // trio Codable extension (5th post-hexa-#4 gap-
+        // fill,FIRST non-Error-trio chapter in post-
+        // hexa-#4 run)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十",
+            mNumberFirst: 1937,
+            mNumberLast: 1940,
+            v1MilestoneMNumber: 1940,
+            v1MilestoneStatus:
+                "chapter-640-runtime-step-enum-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1937, knife: "第一刀",
+                    concept: "Add Codable to 3 non-Error" +
+                        " control-flow step enums" +
+                        " spanning 3 modules — BAS" +
+                        "RuntimeCore.BASEventReplayRange" +
+                        " (2-case top-level) + BASOrgan." +
+                        "BASToolCallingPlanStep (3-case" +
+                        " top-level) + BASMemory." +
+                        "BASShadowTrialCoordinator." +
+                        "FinalizeOutcome (3-case nested-" +
+                        "in-actor)。 BASSurfaceSubstitute" +
+                        " was originally a candidate but" +
+                        " already has manual Codable" +
+                        " conformance — reverted to" +
+                        " avoid redundant-conformance" +
+                        " compile error。"),
+                BASChapterKnife(
+                    mNumber: 1938, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1939, knife: "第三刀",
+                    concept: "NEW BASRuntimeStepEnumTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " moduleCount = 3 (BASRuntime" +
+                        "Core + BASOrgan + BASMemory) +" +
+                        " topLevelCount = 2 + nested" +
+                        "InActorCount = 1 + allTypes" +
+                        "AreErrors = false (DISTINGUISHING" +
+                        " FEATURE — first non-error-trio" +
+                        " in post-hexa-#4 run) +" +
+                        " kindLabel='runtime-step-enum-" +
+                        "trio' (NEW kind) +" +
+                        " isFifthPostHexaFourGapFill +" +
+                        " isFirstNonErrorTrioPostHexaFour" +
+                        " + 3 module 3rd-touch flags +" +
+                        " cumulative typed surfaces per" +
+                        " module。 typed-surface count" +
+                        " 180 → 181。"),
+                BASChapterKnife(
+                    mNumber: 1940, knife: "第四刀",
+                    concept: "Chapter 640 close-out +" +
+                        " doctrine sync。 524 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 5th post-hexa-#4" +
+                        " gap-fill — 1 more chapter" +
+                        " (641) to chapter 642 hexa #5" +
+                        " opportunity。 Diversification" +
+                        " away from error-trio pattern" +
+                        " — non-Error step enums brought" +
+                        " into replay-determinism" +
+                        " contract surface。")
+            ],
+            entropyClassesAttacked: [
+                "bas-event-replay-range-non-codable",
+                "bas-tool-calling-plan-step-non-codable",
+                "bas-shadow-trial-finalize-outcome-non-codable",
+                "runtime-step-enum-trio-pattern-uncaptured",
+                "fifth-post-hexa-four-gap-fill-not-shipped",
+                "post-hexa-four-arc-all-error-trios"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1940",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "runtime-step-enum-trio-codable-extension",
+                "fifth-post-hexa-four-gap-fill",
+                "first-non-error-trio-post-hexa-four",
+                "third-bas-runtime-core-touch-overall",
+                "third-bas-organ-touch-overall",
+                "third-bas-memory-touch-overall",
+                "new-kind-label-runtime-step-enum-trio",
+                "524-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 1 more gap-fill chapter" +
+                " (641) toward chapter 642 hexa #5" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 640 ships cross-module" +
+                " runtime-step enum trio Codable" +
+                " extension — 5th post-hexa-#4 gap-fill" +
+                " chapter,FIRST non-Error-trio chapter" +
+                " in the post-hexa-#4 run。" +
+                " Diversification away from the error-" +
+                "trio pattern that dominated hexa #3+#4。" +
+                " 3 non-Error enums (BASEventReplayRange" +
+                " + BASToolCallingPlanStep + BASShadow" +
+                "TrialCoordinator.FinalizeOutcome)" +
+                " spanning 3 modules gained Codable at" +
+                " M1937 + 3 PROOF tests (M1938) + new" +
+                " typed surface (M1939) + close-out" +
+                " (M1940)。 NEW kind 'runtime-step-enum-" +
+                "trio' (3 modules,2 top-level + 1" +
+                " nested-in-actor,all describing typed" +
+                " runtime control-flow decision points)。" +
+                " 181 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1940。 524 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

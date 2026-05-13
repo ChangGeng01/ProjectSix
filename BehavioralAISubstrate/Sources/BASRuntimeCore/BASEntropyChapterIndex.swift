@@ -4218,7 +4218,31 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1936。 520 consecutive" +
                 " byte-equality clean commits。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十",
+            mNumberFirst: 1937, mNumberLast: 1940,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "CROSS-MODULE RUNTIME-STEP ENUM" +
+                " TRIO CODABLE EXTENSION — GAP-FILL," +
+                "5th post-hexa-#4,FIRST non-Error-trio" +
+                " chapter in post-hexa-#4 run —" +
+                " diversification away from error-trio" +
+                " pattern that dominated hexa #3+#4。" +
+                " 3 non-Error control-flow step enums" +
+                " (BASEventReplayRange + BASToolCalling" +
+                "PlanStep + BASShadowTrialCoordinator." +
+                "FinalizeOutcome) spanning 3 modules" +
+                " gained Codable at M1937 + 3 PROOF" +
+                " tests (M1938) + new typed surface" +
+                " (M1939) + close-out (M1940)。 NEW kind" +
+                " 'runtime-step-enum-trio'。 BASRuntime" +
+                "Core+BASOrgan+BASMemory all at 3rd-" +
+                "touch overall。 181 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1940。" +
+                " 524 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
