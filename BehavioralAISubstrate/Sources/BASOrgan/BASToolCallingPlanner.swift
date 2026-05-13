@@ -122,7 +122,9 @@ public struct BASToolCallingPlanContext: Sendable, Equatable {
 /// planner's loop:invocation steps fan out via the dispatcher,
 /// completion steps end the loop,failure steps abort with a
 /// typed reason。
-public enum BASToolCallingPlanStep: Sendable, Equatable {
+public enum BASToolCallingPlanStep:
+    Sendable, Equatable, Codable
+{
     /// Dispatch these tool invocations + feed the results back
     /// into the next adapter call。Empty list is treated as
     /// `.completeWithDraft(latestDraft)` for safety。

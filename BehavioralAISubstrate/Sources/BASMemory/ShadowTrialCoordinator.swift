@@ -87,7 +87,9 @@ public actor BASShadowTrialCoordinator {
     /// The three terminal states a trial can reach. Expressed as a
     /// typed enum so callers cannot invent a fourth state by handing
     /// in a free-form string.
-    public enum FinalizeOutcome: Equatable, Sendable {
+    public enum FinalizeOutcome:
+        Equatable, Sendable, Codable
+    {
         case passed
         case failed
         case blocked

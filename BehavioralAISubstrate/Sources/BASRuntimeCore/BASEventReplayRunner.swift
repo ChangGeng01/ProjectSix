@@ -44,7 +44,9 @@ import Foundation
 // MARK: - Replay range typed selector
 
 /// Typed selector for which events the replay runner reads。
-public enum BASEventReplayRange: Sendable, Equatable {
+public enum BASEventReplayRange:
+    Sendable, Equatable, Codable
+{
     /// Replay every event for a single session,sequence-ordered。
     case singleSession(sessionID: String)
     /// Replay every event with `timestampMs >= since`,bounded by
