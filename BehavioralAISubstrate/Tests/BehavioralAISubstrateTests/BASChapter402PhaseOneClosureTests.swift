@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1820",
-            "M1820:doctrine version reflects chapter 六百一十 — BASORCHESTRATION CODABLE EXTENSION CONTINUATION — GAP-FILL。 1 type (BASNeuralThoughtMaterialization 8-field) gained Codable at M1817 + 1 PROOF test (M1818) + BASOrchestrationCodableExtensionContinuationDoctrine typed surface (M1819) + close-out (M1820)。 Combined 13 BASOrchestration-related types ledger-serializable (6 arc + 6 post-arc trilogy + 1 this)。 THIRD consecutive gap-fill chapter (608 + 609 + 610)。 151 typed surfaces cumulative。 404 consecutive byte-equality clean commits — first chapter past 400-CONSECUTIVE-HUNDRED MILESTONE。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1824",
+            "M1824:doctrine version reflects chapter 六百一十一 — BASSOVEREIGN CODABLE EXTENSION WAVE 2 — GAP-FILL。 2 nested-in-actor types (BASSovereignStubRenderer.StubOutput + BASSovereignStubRenderer.RefusalPhrases) gained Codable at M1821 + 2 PROOF tests (M1822) + BASSovereignCodableExtensionWaveTwoDoctrine typed surface (M1823) + close-out (M1824)。 Combined 6 BASSovereign-related types ledger-serializable (4 wave 1 + 2 wave 2)。 4TH consecutive gap-fill chapter (608 + 609 + 610 + 611)。 152 typed surfaces cumulative。 408 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

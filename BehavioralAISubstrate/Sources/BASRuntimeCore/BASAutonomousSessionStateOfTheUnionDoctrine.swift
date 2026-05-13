@@ -110,18 +110,18 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 610
-    /// close-out (M1820 — BASOrchestration Codable
-    /// extension continuation gap-fill;1 type (BAS
-    /// NeuralThoughtMaterialization 8-field) gained
-    /// Codable;combined 13 BASOrchestration-related
-    /// types;THIRD consecutive gap-fill chapter;
-    /// first chapter past 400-consecutive milestone)。
-    public static let typedSurfaceCount: Int = 151
+    /// Cumulative achievement metrics at chapter 611
+    /// close-out (M1824 — BASSovereign Codable
+    /// extension wave 2 gap-fill;2 nested-in-actor
+    /// types (StubOutput + RefusalPhrases) gained
+    /// Codable;combined 6 BASSovereign-related types
+    /// (4 wave 1 + 2 wave 2);4TH consecutive gap-fill
+    /// chapter)。
+    public static let typedSurfaceCount: Int = 152
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 404
-    public static let phase2CommitsShipped: Int = 865
-    public static let chapter2NumberLast: Int = 1820
+        Int = 408
+    public static let phase2CommitsShipped: Int = 869
+    public static let chapter2NumberLast: Int = 1824
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

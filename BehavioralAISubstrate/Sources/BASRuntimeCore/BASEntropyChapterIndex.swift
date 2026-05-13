@@ -3536,7 +3536,28 @@ public enum BASEntropyChapterIndex {
                 " cumulative (+1)。 ADR-016 → M1820。" +
                 " First chapter past 400-consecutive-" +
                 "byte-equal-commits milestone。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十一",
+            mNumberFirst: 1821, mNumberLast: 1824,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CODABLE EXTENSION" +
+                " WAVE 2 — GAP-FILL within already-" +
+                "covered BASSovereign module (chapter" +
+                " 606 was wave 1 formal entry)。 2" +
+                " nested-in-actor types (BASSovereignStub" +
+                "Renderer.StubOutput + BASSovereignStub" +
+                "Renderer.RefusalPhrases) gained" +
+                " Codable at M1821 + 2 PROOF tests" +
+                " (M1822) + new typed surface (M1823)" +
+                " + close-out (M1824)。 Combined 6" +
+                " BASSovereign-related types ledger-" +
+                "serializable (4 wave 1 + 2 wave 2)。" +
+                " 4TH consecutive gap-fill chapter" +
+                " (608 + 609 + 610 + 611)。 152 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1824。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

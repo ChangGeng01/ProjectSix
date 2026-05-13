@@ -2075,7 +2075,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百一十")!)
+                            "chapter 六百一十")!),
+            // M1824 chapter 611 — BASSovereign Codable extension wave 2 gap-fill
+            checkRegistry("六百一十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3451,6 +3457,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百一十")!
+                .mNumberLast),
+            // M1824 chapter 611 — BASSovereign Codable extension wave 2 gap-fill
+            ("611",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

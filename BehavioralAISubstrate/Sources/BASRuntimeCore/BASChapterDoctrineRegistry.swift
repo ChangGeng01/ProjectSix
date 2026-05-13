@@ -13686,7 +13686,103 @@ public enum BASChapterDoctrineRegistry {
                 " commits with V1 byte-equality" +
                 " preserved。 First chapter past 400-" +
                 "consecutive-byte-equal milestone。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 611 — BASSovereign Codable extension
+        // wave 2 (gap-fill)。 4TH consecutive gap-fill
+        // chapter。 2 nested-in-actor types extend
+        // chapter 606 wave 1 formal entry coverage。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十一",
+            mNumberFirst: 1821,
+            mNumberLast: 1824,
+            v1MilestoneMNumber: 1824,
+            v1MilestoneStatus:
+                "chapter-611-sovereign-codable-extension-wave-two",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1821, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Sovereign nested types — BAS" +
+                        "SovereignStubRenderer.StubOutput" +
+                        " (3-field) + BASSovereignStub" +
+                        "Renderer.RefusalPhrases (2-" +
+                        "field)。 Both nested in actor" +
+                        " (nested-in-actor pattern" +
+                        " similar to chapter 603)。"),
+                BASChapterKnife(
+                    mNumber: 1822, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1823, knife: "第三刀",
+                    concept: "NEW BASSovereignCodable" +
+                        "ExtensionWaveTwoDoctrine +" +
+                        " isGapFillExtension flag +" +
+                        " waveNumber = 2 +" +
+                        " combinedSovereignCount = 6 +" +
+                        " typesAreNestedInActor flag +" +
+                        " isFourthConsecutiveGapFill" +
+                        " flag。 typed-surface count" +
+                        " 151 → 152。"),
+                BASChapterKnife(
+                    mNumber: 1824, knife: "第四刀",
+                    concept: "Chapter 611 close-out +" +
+                        " doctrine sync。 408 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4-consecutive-gap-" +
+                        "fill run extended (608+609+" +
+                        "610+611)。")
+            ],
+            entropyClassesAttacked: [
+                "sovereign-stub-output-non-codable",
+                "sovereign-refusal-phrases-non-codable",
+                "bas-sovereign-wave-2-not-shipped-yet",
+                "fourth-consecutive-gap-fill-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1824",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-wave-2-codable-extension",
+                "6-sovereign-types-cumulative",
+                "fourth-consecutive-gap-fill",
+                "types-nested-in-actor"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional gap-fill" +
+                " extensions in BASSovereign or" +
+                " other covered modules",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — eventual gap-fill catalog" +
+                " meta-meta when N-consecutive gap-" +
+                "fill chapters threshold met (e.g。" +
+                " 6 like the chapter 607 post-octa hexa)"
+            ],
+            summary: "Chapter 611 ships BASSovereign" +
+                " Codable extension wave 2 — gap-fill" +
+                " within already-covered BASSovereign" +
+                " module (chapter 606 was wave 1 formal" +
+                " entry)。 2 nested-in-actor types (BAS" +
+                "SovereignStubRenderer.StubOutput +" +
+                " BASSovereignStubRenderer." +
+                "RefusalPhrases) gained Codable at" +
+                " M1821 + 2 PROOF tests (M1822) + new" +
+                " typed surface (M1823) + close-out" +
+                " (M1824)。 Combined 6 BASSovereign-" +
+                "related types ledger-serializable (4" +
+                " wave 1 + 2 wave 2)。 4TH consecutive" +
+                " gap-fill chapter (608 mesh-sweep +" +
+                " 609 organ wave 2 + 610 orchestration" +
+                " continuation + 611 sovereign wave 2)。" +
+                " 152 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1824。 408 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
