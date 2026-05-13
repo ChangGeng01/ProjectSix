@@ -54,7 +54,9 @@ public actor BASSovereignIntegritySentinel {
 
     /// Which integrity column a failed artifact rolls up into. The
     /// mapping is fixed by `BR-01..BR-07` of the spec.
-    public enum ArtifactKind: String, Sendable, Equatable, CaseIterable {
+    public enum ArtifactKind:
+        String, Sendable, Equatable, CaseIterable, Codable
+    {
         /// Model weights / policy bundles whose signatures must match.
         /// Failure → BR-001.
         case modelOrPolicyArtifact

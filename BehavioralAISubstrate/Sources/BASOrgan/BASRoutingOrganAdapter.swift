@@ -67,7 +67,9 @@ import BASRuntimeCore
 ///   provider is about to handle the next request.
 public actor BASRoutingOrganAdapter: BASOrganAdapter {
 
-    public enum Strategy: Sendable, Equatable, Hashable {
+    public enum Strategy:
+        Sendable, Equatable, Hashable, Codable
+    {
         /// Try primary; on infrastructure failure (provider
         /// unavailable / pressure refusal) fall through to
         /// secondary. Any other error propagates.

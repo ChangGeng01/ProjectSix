@@ -30,7 +30,9 @@ import BASRuntimeCore
 /// "everything is fine unless we've said otherwise" — making the
 /// guard a targeted block-list rather than an allow-list.
 public actor BASSovereignContaminationGuard {
-    public enum ArtifactKind: String, Sendable, Equatable, CaseIterable {
+    public enum ArtifactKind:
+        String, Sendable, Equatable, CaseIterable, Codable
+    {
         /// Memory atoms / ThoughtFold refs / L8 cache entries.
         case memoryAtom
         /// L5 Host Constitution vault entries.
