@@ -31,7 +31,9 @@ import BASRuntimeCore
 /// an actor inside the sovereign module, reading only from its own
 /// in-memory trusted-fingerprint store.
 public actor BASSovereignIntegritySentinel {
-    public enum SentinelError: Error, Equatable, Sendable {
+    public enum SentinelError:
+        Error, Equatable, Sendable, Codable
+    {
         case unknownArtifact(id: String)
     }
 

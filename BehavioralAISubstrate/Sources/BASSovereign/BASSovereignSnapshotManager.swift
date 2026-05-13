@@ -67,7 +67,9 @@ public actor BASSovereignSnapshotManager {
         }
     }
 
-    public enum ManagerError: Error, Equatable, Sendable {
+    public enum ManagerError:
+        Error, Equatable, Sendable, Codable
+    {
         case unknownAnchor(id: String)
         case hashBindingMismatch(anchorID: String, declared: String, computed: String)
         case payloadHashMismatch(anchorID: String, expected: String, actual: String)

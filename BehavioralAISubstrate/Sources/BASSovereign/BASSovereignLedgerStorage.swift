@@ -149,7 +149,9 @@ public struct BASSovereignLedgerNullStorage: BASSovereignLedgerStorage {
 public final class BASSovereignLedgerSQLiteStorage:
     BASSovereignLedgerStorage
 {
-    public enum StorageError: Error, Equatable {
+    public enum StorageError:
+        Error, Equatable, Sendable, Codable
+    {
         case openFailed(code: Int32, message: String)
         case prepareFailed(sql: String, message: String)
         case stepFailed(sql: String, message: String)
