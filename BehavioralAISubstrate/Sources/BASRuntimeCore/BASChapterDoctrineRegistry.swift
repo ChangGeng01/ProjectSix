@@ -14109,7 +14109,105 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1836。 420 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 615 — BASLeaseLife Codable extension
+        // continuation (gap-fill post-arc-seal,first
+        // post-hexa-catalog gap-fill)。 2 nested-in-
+        // enum String-raw-value enums within BAS
+        // DeviceRouting gained Codable。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十五",
+            mNumberFirst: 1837,
+            mNumberLast: 1840,
+            v1MilestoneMNumber: 1840,
+            v1MilestoneStatus:
+                "chapter-615-leaselife-codable-extension-continuation",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1837, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "LeaseLife nested-in-enum" +
+                        " String-raw-value enums" +
+                        " within BASDeviceRouting —" +
+                        " Capability (3-case:cpu/gpu/" +
+                        "ane) + Role (2-case:scout/" +
+                        "core)。 Both gain Codable via" +
+                        " automatic synthesis。"),
+                BASChapterKnife(
+                    mNumber: 1838, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1839, knife: "第三刀",
+                    concept: "NEW BASLeaseLifeCodable" +
+                        "ExtensionContinuationDoctrine" +
+                        " + isGapFillExtension flag +" +
+                        " combinedLeaseLifeCount = 9 +" +
+                        " typesAreNestedInEnum flag +" +
+                        " typesAreStringRawValueEnums" +
+                        " flag + isFirstPostHexaCatalog" +
+                        "GapFill flag。 typed-surface" +
+                        " count 155 → 156。"),
+                BASChapterKnife(
+                    mNumber: 1840, knife: "第四刀",
+                    concept: "Chapter 615 close-out +" +
+                        " doctrine sync。 424 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 FIRST post-hexa-" +
+                        "catalog gap-fill — starts new" +
+                        " gap-fill run toward next hexa" +
+                        " catalog opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "capability-enum-non-codable",
+                "role-enum-non-codable",
+                "bas-leaselife-continuation-not-shipped",
+                "post-hexa-catalog-cadence-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1840",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "leaselife-continuation-codable-extension",
+                "9-leaselife-types-cumulative",
+                "first-post-hexa-catalog-gap-fill"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional gap-fill" +
+                " chapters heading toward next hexa" +
+                " catalog opportunity (around chapter" +
+                " 620 if cadence holds)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进" +
+                " 10/10)",
+                "future arc — Tier 2 final 60/60 (M1367" +
+                " ssmScan + Tier C ADR-019)"
+            ],
+            summary: "Chapter 615 ships BASLeaseLife" +
+                " Codable extension continuation — gap-" +
+                "fill within already-covered BAS" +
+                "LeaseLife module post-arc-seal at" +
+                " chapter 584。 2 nested-in-enum String-" +
+                "raw-value enums within BASDeviceRouting" +
+                " (Capability 3-case + Role 2-case)" +
+                " gained Codable at M1837 + 2 PROOF" +
+                " tests (M1838) + new typed surface" +
+                " (M1839) + close-out (M1840)。 Combined" +
+                " 9 BASLeaseLife-related types ledger-" +
+                "serializable (7 arc seal + 2" +
+                " continuation)。 FIRST post-hexa-" +
+                "catalog gap-fill chapter (chapter 614" +
+                " sealed the previous gap-fill hexa)。" +
+                " Starts new gap-fill run heading" +
+                " toward next hexa catalog opportunity。" +
+                " 156 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1840。 424 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

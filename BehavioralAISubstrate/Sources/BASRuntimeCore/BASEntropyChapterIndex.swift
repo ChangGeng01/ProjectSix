@@ -3641,6 +3641,29 @@ public enum BASEntropyChapterIndex {
                 " chapter 607 post-octa fresh-module" +
                 " hexa catalog。 155 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1836。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十五",
+            mNumberFirst: 1837, mNumberLast: 1840,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 3,
+            summary: "BASLEASELIFE CODABLE EXTENSION" +
+                " CONTINUATION — GAP-FILL POST-ARC-SEAL。" +
+                " 2 nested-in-enum String-raw-value" +
+                " enums within BASDeviceRouting" +
+                " (Capability 3-case cpu/gpu/ane + Role" +
+                " 2-case scout/core) gained Codable at" +
+                " M1837 via automatic Swift synthesis +" +
+                " 2 PROOF tests (M1838) + new typed" +
+                " surface (M1839) + close-out (M1840)。" +
+                " Combined 9 BASLeaseLife-related types" +
+                " ledger-serializable (7 arc seal + 2" +
+                " continuation)。 FIRST post-hexa-" +
+                "catalog gap-fill chapter — starts new" +
+                " gap-fill run toward next hexa catalog" +
+                " opportunity (around chapter 620 if" +
+                " cadence holds)。 156 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1840。 V1" +
                 " byte-equality preserved。")
     ]
 

@@ -110,19 +110,20 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 614
-    /// close-out (M1836 — gap-fill hexa catalog meta-
-    /// meta milestone;NEW BASGapFillHexaCompletion
-    /// Doctrine cataloging 6 gap-fill chapters (608-
-    /// 613) within already-covered modules + 37 anti-
-    /// drift PROOF + 20 wire-in PROOF;PARALLEL
-    /// structurally to chapter 607 post-octa fresh-
-    /// module hexa catalog)。
-    public static let typedSurfaceCount: Int = 155
+    /// Cumulative achievement metrics at chapter 615
+    /// close-out (M1840 — BASLeaseLife Codable
+    /// extension continuation gap-fill;2 nested-in-
+    /// enum String-raw-value enums within BAS
+    /// DeviceRouting (Capability + Role) gained Codable;
+    /// combined 9 BASLeaseLife-related types (7 arc
+    /// seal + 2 continuation);FIRST post-hexa-catalog
+    /// gap-fill chapter — starts new gap-fill run
+    /// toward next hexa catalog opportunity)。
+    public static let typedSurfaceCount: Int = 156
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 420
-    public static let phase2CommitsShipped: Int = 881
-    public static let chapter2NumberLast: Int = 1836
+        Int = 424
+    public static let phase2CommitsShipped: Int = 885
+    public static let chapter2NumberLast: Int = 1840
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

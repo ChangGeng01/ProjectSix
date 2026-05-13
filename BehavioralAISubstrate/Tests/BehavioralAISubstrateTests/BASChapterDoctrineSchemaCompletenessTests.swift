@@ -2099,7 +2099,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百一十四")!)
+                            "chapter 六百一十四")!),
+            // M1840 chapter 615 — BASLeaseLife Codable extension continuation gap-fill (first post-hexa-catalog gap-fill)
+            checkRegistry("六百一十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3507,6 +3513,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百一十四")!
+                .mNumberLast),
+            // M1840 chapter 615 — BASLeaseLife Codable extension continuation gap-fill (first post-hexa-catalog)
+            ("615",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

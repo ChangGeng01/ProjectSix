@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1836",
-            "M1836:doctrine version reflects chapter 六百一十四 — GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaCompletionDoctrine cataloging 6 gap-fill chapters (608-613) within already-covered modules — 11 types extended / 24 commits / 4 distinct modules / 5 kind buckets + 37 anti-drift PROOF + 20 wire-in PROOF + close-out。 PARALLEL structurally to chapter 607 post-octa fresh-module hexa catalog。 155 typed surfaces cumulative。 420 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1840",
+            "M1840:doctrine version reflects chapter 六百一十五 — BASLEASELIFE CODABLE EXTENSION CONTINUATION — GAP-FILL POST-ARC-SEAL。 2 nested-in-enum String-raw-value enums within BASDeviceRouting (Capability 3-case cpu/gpu/ane + Role 2-case scout/core) gained Codable at M1837 + 2 PROOF tests (M1838) + BASLeaseLifeCodableExtensionContinuationDoctrine typed surface (M1839) + close-out (M1840)。 Combined 9 BASLeaseLife-related types ledger-serializable (7 arc seal + 2 continuation)。 FIRST post-hexa-catalog gap-fill chapter — starts new gap-fill run toward next hexa catalog opportunity。 156 typed surfaces cumulative。 424 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -37,25 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs614() {
+    func testLastChapterIs615() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十四",
-            "Chapter 六百一十四:GAP-FILL HEXA CATALOG" +
-            " META-META MILESTONE。 NEW BASGapFillHexa" +
-            "CompletionDoctrine cataloging 6 gap-fill" +
-            " chapters (608-613) within already-covered" +
-            " modules — 11 types extended / 24 commits" +
-            " / 4 distinct modules touched / 5 kind" +
-            " buckets (chain-dep + wave-2 ×2 + wave-3" +
-            " + continuation + continuation-wave-2) +" +
-            " 37 anti-drift PROOF + 20 wire-in PROOF" +
-            " + close-out。 PARALLEL structurally to" +
-            " chapter 607 post-octa fresh-module hexa" +
-            " catalog (which cataloged 6 FRESH-MODULE" +
-            " entries at M1805)。 155 typed surfaces" +
-            " cumulative。 420 consecutive byte-equality" +
+            "chapter 六百一十五",
+            "Chapter 六百一十五:BASLEASELIFE CODABLE" +
+            " EXTENSION CONTINUATION — GAP-FILL POST-" +
+            "ARC-SEAL。 2 nested-in-enum String-raw-" +
+            "value enums within BASDeviceRouting" +
+            " (Capability 3-case + Role 2-case) gained" +
+            " Codable + 2 PROOF tests + BASLeaseLife" +
+            "CodableExtensionContinuationDoctrine typed" +
+            " surface + close-out。 Combined 9 BAS" +
+            "LeaseLife-related types ledger-serializable" +
+            " (7 arc seal + 2 continuation)。 FIRST" +
+            " post-hexa-catalog gap-fill chapter —" +
+            " starts new gap-fill run toward next hexa" +
+            " catalog opportunity。 156 typed surfaces" +
+            " cumulative。 424 consecutive byte-equality" +
             " clean commits")
     }
 

@@ -107,19 +107,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 614 close-out。 Chapter
-    /// 614:GAP-FILL HEXA CATALOG META-META MILESTONE。
-    /// NEW BASGapFillHexaCompletionDoctrine cataloging
-    /// 6 gap-fill chapters (608-613) within already-
-    /// covered modules — 11 types extended / 24 commits
-    /// / 4 distinct modules touched / 5 kind buckets
-    /// (chain-dep + wave-2 ×2 + wave-3 + continuation
-    /// + continuation-wave-2)。 NEW catalog (M1833) +
-    /// 37 anti-drift PROOF tests (M1834) + 20 wire-in
-    /// PROOF tests cross-checking 6 source doctrines
-    /// (M1835) + close-out (M1836)。 PARALLEL
-    /// structurally to chapter 607 post-octa fresh-
-    /// module hexa catalog。
+    /// Re-captured at chapter 615 close-out。 Chapter
+    /// 615:BASLEASELIFE CODABLE EXTENSION CONTINUATION
+    /// — GAP-FILL POST-ARC-SEAL。 2 nested-in-enum
+    /// String-raw-value enums within BASDeviceRouting
+    /// (Capability 3-case cpu/gpu/ane + Role 2-case
+    /// scout/core) gained Codable at M1837 via Swift
+    /// automatic synthesis + 2 PROOF tests (M1838) +
+    /// NEW BASLeaseLifeCodableExtensionContinuation
+    /// Doctrine (M1839) + close-out (M1840)。 Combined
+    /// 9 BASLeaseLife-related types ledger-serializable
+    /// (7 arc seal + 2 continuation)。 FIRST post-hexa-
+    /// catalog gap-fill chapter — starts new gap-fill
+    /// run toward next hexa catalog opportunity (around
+    /// chapter 620 if cadence holds)。
     static let frozenFullRegistrySha256: String =
-        "a0dcc467bd940a4a820d01f4ea62b757c2beb903754a61563ca9ab0a28302e6c"
+        "5aa27022dd6615eb0f4ae7c3b538d47f6aa1f492b7fd05251fb8393f4ccccbd7"
 }
