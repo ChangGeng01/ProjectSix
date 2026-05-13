@@ -2111,7 +2111,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百一十六")!)
+                            "chapter 六百一十六")!),
+            // M1848 chapter 617 — BASOrgan Codable extension wave 4 gap-fill (domino chain, 3rd post-hexa-catalog)
+            checkRegistry("六百一十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3535,6 +3541,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百一十六")!
+                .mNumberLast),
+            // M1848 chapter 617 — BASOrgan Codable extension wave 4 gap-fill (domino chain)
+            ("617",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

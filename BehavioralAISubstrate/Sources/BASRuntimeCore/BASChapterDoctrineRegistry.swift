@@ -14313,6 +14313,118 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1844。" +
                 " 428 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 617 — BASOrgan Codable extension
+        // wave 4 (gap-fill via DOMINO CHAIN,3rd post-
+        // hexa-catalog,3rd consecutive BASOrgan gap-
+        // fill)。 3 types gained Codable simultaneously:
+        // BASOrganDraft unblocked BASLLMExtractionResult,
+        // BASLLMExtractionEngineError added in same wave。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十七",
+            mNumberFirst: 1845,
+            mNumberLast: 1848,
+            v1MilestoneMNumber: 1848,
+            v1MilestoneStatus:
+                "chapter-617-organ-codable-extension-wave-four",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1845, knife: "第一刀",
+                    concept: "Add Codable to 3 BASOrgan" +
+                        " types via DOMINO CHAIN —" +
+                        " BASOrganDraft (8-field draft:" +
+                        " requestID + providerID + role" +
+                        " + body + inputTokensEstimated" +
+                        " + outputTokensEstimated +" +
+                        " producedAt + traceID) +" +
+                        " BASLLMExtractionResult (4-" +
+                        "field;held BASOrganDraft) +" +
+                        " BASLLMExtractionEngineError" +
+                        " (4-case error enum with" +
+                        " single-String associated" +
+                        " values)。"),
+                BASChapterKnife(
+                    mNumber: 1846, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1847, knife: "第三刀",
+                    concept: "NEW BASOrganCodable" +
+                        "ExtensionWaveFourDoctrine +" +
+                        " isGapFillExtension flag +" +
+                        " waveNumber = 4 +" +
+                        " combinedOrganCount = 8 +" +
+                        " structCount/enumCount split" +
+                        " (2/1) + isThirdPostHexa" +
+                        "CatalogGapFill +" +
+                        " isThirdConsecutiveOrganGapFill" +
+                        " + extendsViaDominoChain。" +
+                        " typed-surface count 157 →" +
+                        " 158。"),
+                BASChapterKnife(
+                    mNumber: 1848, knife: "第四刀",
+                    concept: "Chapter 617 close-out +" +
+                        " doctrine sync。 432 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 3rd post-hexa-" +
+                        "catalog gap-fill + 3rd" +
+                        " consecutive BASOrgan gap-fill" +
+                        " (609 + 616 + 617)。 Halfway" +
+                        " to next hexa catalog" +
+                        " opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-organ-draft-non-codable",
+                "bas-llm-extraction-result-non-codable",
+                "bas-llm-extraction-engine-error-non-codable",
+                "bas-organ-wave-4-not-shipped",
+                "domino-chain-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1848",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-wave-4-codable-extension",
+                "8-organ-types-cumulative",
+                "third-post-hexa-catalog-gap-fill",
+                "third-consecutive-organ-gap-fill",
+                "domino-chain-extension"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional gap-fill" +
+                " chapters heading toward next hexa" +
+                " catalog opportunity (chapter 620 if" +
+                " cadence holds — 3 more needed)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进" +
+                " 10/10)",
+                "future arc — Tier 2 final 60/60 (M1367" +
+                " ssmScan + Tier C ADR-019)"
+            ],
+            summary: "Chapter 617 ships BASOrgan Codable" +
+                " extension wave 4 — gap-fill within" +
+                " already-covered BASOrgan module via" +
+                " DOMINO CHAIN。 3 BASOrgan types gained" +
+                " Codable simultaneously at M1845 — BAS" +
+                "OrganDraft (8-field draft) unblocked" +
+                " BASLLMExtractionResult (4-field;held" +
+                " BASOrganDraft) and BASLLMExtraction" +
+                "EngineError (4-case error enum) was" +
+                " added in same wave。 + 3 PROOF tests" +
+                " (M1846) + new typed surface (M1847) +" +
+                " close-out (M1848)。 Combined 8 BAS" +
+                "Organ-related types ledger-serializable" +
+                " (2 wave 1 + 1 wave 2 + 2 wave 3 + 3" +
+                " wave 4)。 3rd post-hexa-catalog gap-" +
+                "fill chapter (615 + 616 + 617) and 3rd" +
+                " consecutive BASOrgan gap-fill (609 +" +
+                " 616 + 617)。 158 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1848。" +
+                " 432 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

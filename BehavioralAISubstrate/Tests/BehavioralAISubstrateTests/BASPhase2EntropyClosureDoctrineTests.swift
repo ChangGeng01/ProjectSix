@@ -37,25 +37,29 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs616() {
+    func testLastChapterIs617() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十六",
-            "Chapter 六百一十六:BASORGAN CODABLE" +
-            " EXTENSION WAVE 3 — GAP-FILL。 2 BASOrgan" +
-            " types (BASOrganRequest 10-field + BAS" +
-            "NeuralHeadEvalPrompt 4-field) gained" +
-            " Codable simultaneously via DOMINO EFFECT" +
-            " (BASOrganRequest unblocked BASNeuralHead" +
-            "EvalPrompt) + 2 PROOF tests + BASOrgan" +
-            "CodableExtensionWaveThreeDoctrine typed" +
-            " surface + close-out。 Combined 5 BASOrgan-" +
-            "related types ledger-serializable (2 wave" +
-            " 1 + 1 wave 2 + 2 wave 3)。 SECOND post-" +
-            "hexa-catalog gap-fill chapter (615 + 616)。" +
-            " 157 typed surfaces cumulative。 428" +
-            " consecutive byte-equality clean commits")
+            "chapter 六百一十七",
+            "Chapter 六百一十七:BASORGAN CODABLE" +
+            " EXTENSION WAVE 4 — GAP-FILL via DOMINO" +
+            " CHAIN。 3 BASOrgan types (BASOrganDraft" +
+            " 8-field + BASLLMExtractionResult 4-field" +
+            " + BASLLMExtractionEngineError 4-case" +
+            " enum) gained Codable simultaneously" +
+            " (BASOrganDraft unblocked BASLLM" +
+            "ExtractionResult) + 3 PROOF tests + BAS" +
+            "OrganCodableExtensionWaveFourDoctrine" +
+            " typed surface + close-out。 Combined 8" +
+            " BASOrgan-related types ledger-" +
+            "serializable (2 wave 1 + 1 wave 2 + 2" +
+            " wave 3 + 3 wave 4)。 THIRD post-hexa-" +
+            "catalog gap-fill chapter (615 + 616 +" +
+            " 617) + 3rd consecutive BASOrgan gap-fill" +
+            " (609 + 616 + 617)。 158 typed surfaces" +
+            " cumulative。 432 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range
