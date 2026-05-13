@@ -54,7 +54,9 @@ import BASRuntimeCore
 public final class BASUpdateTicketLifecycleSQLiteStorage:
     BASUpdateTicketLifecycleStorage, @unchecked Sendable
 {
-    public enum SQLiteError: Error, Equatable, Sendable {
+    public enum SQLiteError:
+        Error, Equatable, Sendable, Codable
+    {
         case openFailed(reason: String)
         case prepareFailed(sql: String, reason: String)
         case stepFailed(sql: String, reason: String)

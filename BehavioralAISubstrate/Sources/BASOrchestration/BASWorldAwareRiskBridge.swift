@@ -38,7 +38,9 @@ import BASWorldPrior
 /// policy. Every knob it turns is a knob the verdict engine
 /// already exposes.
 public actor BASWorldAwareRiskBridge {
-    public enum BridgeError: Error, Equatable, Sendable {
+    public enum BridgeError:
+        Error, Equatable, Sendable, Codable
+    {
         case unknownTemplate(String)
     }
 

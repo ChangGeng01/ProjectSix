@@ -90,7 +90,9 @@ public protocol BASToolHandler: Sendable {
 
 // MARK: - Errors
 
-public enum BASToolDispatchError: Error, Sendable, Equatable {
+public enum BASToolDispatchError:
+    Error, Sendable, Equatable, Codable
+{
     /// No handler registered for the requested tool name。
     case noHandlerRegistered(toolName: String)
     /// Tool name was on the constitution's
