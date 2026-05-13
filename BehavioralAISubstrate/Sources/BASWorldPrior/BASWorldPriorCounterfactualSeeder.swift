@@ -34,7 +34,9 @@ import Foundation
 ///
 /// Rungs cannot fall below `.contested`.
 public actor BASWorldPriorCounterfactualSeeder {
-    public enum SeederError: Error, Equatable, Sendable {
+    public enum SeederError:
+        Error, Equatable, Sendable, Codable
+    {
         case unknownTemplate(String)
     }
 

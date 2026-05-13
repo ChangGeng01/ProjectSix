@@ -292,7 +292,9 @@ public extension BASCoreMLLayerHead {
 
 /// Typed error cases for CoreML adapter construction + inference
 /// (chapter 三百三二 / M819)。
-public enum BASCoreMLAdapterError: Error, Equatable, Sendable {
+public enum BASCoreMLAdapterError:
+    Error, Equatable, Sendable, Codable
+{
     /// `MLMultiArray(shape:dataType:)` returned nil。Includes
     /// the expected shape for diagnostic emission。
     case multiArrayConstructionFailed(expectedShape: [Int])

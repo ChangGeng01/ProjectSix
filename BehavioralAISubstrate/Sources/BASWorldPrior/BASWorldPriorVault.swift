@@ -24,7 +24,9 @@ import BASRuntimeCore
 /// a world prior being forgotten mid-session is a category error —
 /// use a fresh vault for a clean world).
 public actor BASWorldPriorVault {
-    public enum VaultError: Error, Equatable, Sendable {
+    public enum VaultError:
+        Error, Equatable, Sendable, Codable
+    {
         case duplicateTemplateID(String)
         case duplicateBridgeID(String)
         case duplicateAxiomID(String)
