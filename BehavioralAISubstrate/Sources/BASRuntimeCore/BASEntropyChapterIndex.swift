@@ -4011,7 +4011,29 @@ public enum BASEntropyChapterIndex {
                 "error-trio' distinct from chapter 626" +
                 " 'metal-error-trio'。 171 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1900。 V1 byte-equality preserved。")
+                " M1900。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十一",
+            mNumberFirst: 1901, mNumberLast: 1904,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMEMORY PIPELINE ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,3rd" +
+                " post-hexa-#3,2nd BASMemory touch" +
+                " covering vector-index/usage-tracker/" +
+                "pipeline domain。 3 nested-in-actor" +
+                " Error enums (BASSQLiteVectorIndex" +
+                "Storage.StorageError + BASMemoryUsage" +
+                "Tracker.TrackerError + BASHost" +
+                "CandidatePipeline.PipelineError)" +
+                " gained Codable at M1901 + 3 PROOF" +
+                " tests (M1902) + new typed surface" +
+                " (M1903) + close-out (M1904)。 NEW" +
+                " kind 'memory-pipeline-error-trio'" +
+                " distinct from chapter 629 'memory-" +
+                "sqlite-error-trio'。 172 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1904。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

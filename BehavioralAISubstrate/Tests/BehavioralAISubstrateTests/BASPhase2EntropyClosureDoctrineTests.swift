@@ -37,27 +37,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs630() {
+    func testLastChapterIs631() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百三十",
-            "Chapter 六百三十:BASMETALSUBSTRATE" +
-            " BIOMIMETIC ERROR TRIO CODABLE EXTENSION" +
-            " — GAP-FILL,2nd post-hexa-#3,2nd BAS" +
-            "MetalSubstrate touch covering biomimetic/" +
-            "plasticity/predictive-coding domain。 3" +
-            " Error enums (BASBiomimeticSnapshotError" +
-            " + BASPlasticityError +" +
-            " BASPredictiveCodingError) gained Codable" +
-            " + 3 PROOF tests + BASMetalSubstrateMetal" +
-            "BiomimeticErrorTrioCodableExtensionDoctrine" +
-            " typed surface + close-out。 M1900 ROUND-" +
-            "NUMBER MILESTONE reached — 100-step jump" +
-            " since chapter 605 M1800。 NEW kind" +
-            " 'metal-biomimetic-error-trio'。 171 typed" +
-            " surfaces cumulative。 484 consecutive" +
-            " byte-equality clean commits")
+            "chapter 六百三十一",
+            "Chapter 六百三十一:BASMEMORY PIPELINE" +
+            " ERROR TRIO CODABLE EXTENSION — GAP-FILL," +
+            " 3rd post-hexa-#3,2nd BASMemory touch in" +
+            " the run covering vector-index/usage-" +
+            "tracker/pipeline domain。 3 nested-in-actor" +
+            " Error enums gained Codable + 3 PROOF" +
+            " tests + BASMemoryPipelineErrorTrioCodable" +
+            "ExtensionDoctrine typed surface + close-" +
+            "out。 NEW kind 'memory-pipeline-error-trio'" +
+            " distinct from chapter 629 'memory-sqlite-" +
+            "error-trio'。 172 typed surfaces" +
+            " cumulative。 488 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

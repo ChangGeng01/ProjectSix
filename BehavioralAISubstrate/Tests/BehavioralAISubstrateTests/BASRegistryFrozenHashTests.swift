@@ -132,9 +132,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// + NEW BASMetalSubstrateMetalBiomimeticErrorTrio
     /// CodableExtensionDoctrine (M1899) + close-out
     /// (M1900)。 M1900 ROUND-NUMBER MILESTONE reached
-    /// — 100-step jump since chapter 605 M1800。 NEW
-    /// kind 'metal-biomimetic-error-trio' distinct
-    /// from chapter 626 'metal-error-trio'。
+    /// Re-captured at chapter 631 close-out。 Chapter
+    /// 631:BASMEMORY PIPELINE ERROR TRIO CODABLE
+    /// EXTENSION — GAP-FILL,3rd post-hexa-#3,2nd
+    /// BASMemory touch covering vector-index/usage-
+    /// tracker/pipeline domain。 3 nested-in-actor
+    /// Error enums (BASSQLiteVectorIndexStorage +
+    /// BASMemoryUsageTracker + BASHostCandidate
+    /// Pipeline) gained Codable at M1901 + 3 PROOF
+    /// tests (M1902) + NEW BASMemoryPipelineError
+    /// TrioCodableExtensionDoctrine (M1903) + close-
+    /// out (M1904)。 NEW kind 'memory-pipeline-error-
+    /// trio' distinct from chapter 629 'memory-sqlite-
+    /// error-trio'。
     static let frozenFullRegistrySha256: String =
-        "181dcad8b20524ca34f3897aa4ebfed3c90f3267e7087dfe01a1d58470d660cc"
+        "251d713d0bae572e060314fb2cbd54eb03b75de6e4af75a57f13eb91f3e45816"
 }

@@ -15758,7 +15758,98 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1900。" +
                 " 484 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 631 — BASMemory pipeline error trio
+        // Codable extension (3rd post-hexa-#3 gap-fill,
+        // NEW kind 'memory-pipeline-error-trio')。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十一",
+            mNumberFirst: 1901,
+            mNumberLast: 1904,
+            v1MilestoneMNumber: 1904,
+            v1MilestoneStatus:
+                "chapter-631-memory-pipeline-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1901, knife: "第一刀",
+                    concept: "Add Codable to 3 more BAS" +
+                        "Memory nested-in-actor Error" +
+                        " enums — BASSQLiteVectorIndex" +
+                        "Storage.StorageError + BAS" +
+                        "MemoryUsageTracker.TrackerError" +
+                        " + BASHostCandidatePipeline." +
+                        "PipelineError。 Covers vector-" +
+                        "index/usage-tracker/pipeline" +
+                        " domain。"),
+                BASChapterKnife(
+                    mNumber: 1902, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1903, knife: "第三刀",
+                    concept: "NEW BASMemoryPipelineError" +
+                        "TrioCodableExtensionDoctrine +" +
+                        " kindLabel='memory-pipeline-" +
+                        "error-trio' (NEW kind distinct" +
+                        " from chapter 629 'memory-" +
+                        "sqlite-error-trio') +" +
+                        " isThirdPostHexaThreeGapFill +" +
+                        " isSecondBASMemoryPostHexaThree" +
+                        "。 typed-surface count 171 →" +
+                        " 172。"),
+                BASChapterKnife(
+                    mNumber: 1904, knife: "第四刀",
+                    concept: "Chapter 631 close-out +" +
+                        " doctrine sync。 488 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 3rd post-hexa-#3" +
+                        " gap-fill — 3 more to chapter" +
+                        " 634 hexa #4 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sqlite-vector-index-storage-error-non-codable",
+                "bas-memory-usage-tracker-error-non-codable",
+                "bas-host-candidate-pipeline-error-non-codable",
+                "bas-memory-pipeline-error-trio-not-shipped",
+                "memory-pipeline-domain-error-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1904",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "memory-pipeline-error-trio-codable-extension",
+                "third-post-hexa-three-gap-fill",
+                "second-bas-memory-post-hexa-three",
+                "new-kind-label-memory-pipeline-error-trio"
+            ],
+            plannedFutureCuts: [
+                "future arc — 3 more gap-fill chapters" +
+                " toward chapter 634 hexa #4" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 631 ships BASMemory" +
+                " pipeline error trio Codable extension" +
+                " — 3rd post-hexa-#3 gap-fill chapter," +
+                " 2nd BASMemory touch in the run (after" +
+                " chapter 629 memory-sqlite-error-trio)。" +
+                " 3 nested-in-actor Error enums covering" +
+                " vector-index / usage-tracker /" +
+                " pipeline domain gained Codable at" +
+                " M1901 + 3 PROOF tests (M1902) + new" +
+                " typed surface (M1903) + close-out" +
+                " (M1904)。 NEW kind 'memory-pipeline-" +
+                "error-trio' distinct from chapter 629" +
+                " 'memory-sqlite-error-trio' (different" +
+                " domain within same module)。 172 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1904。 488 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

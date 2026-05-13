@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1900",
-            "M1900:doctrine version reflects chapter 六百三十 — BASMETALSUBSTRATE BIOMIMETIC ERROR TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#3,2nd BASMetalSubstrate touch covering biomimetic/plasticity/predictive-coding domain。 3 Error enums (BASBiomimeticSnapshotError + BASPlasticityError + BASPredictiveCodingError) gained Codable at M1897 + 3 PROOF tests (M1898) + BASMetalSubstrateMetalBiomimeticErrorTrioCodableExtensionDoctrine typed surface (M1899) + close-out (M1900)。 M1900 ROUND-NUMBER MILESTONE reached — 100-step jump since chapter 605 M1800。 NEW kind 'metal-biomimetic-error-trio' distinct from chapter 626 'metal-error-trio'。 171 typed surfaces cumulative。 484 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1904",
+            "M1904:doctrine version reflects chapter 六百三十一 — BASMEMORY PIPELINE ERROR TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#3,2nd BASMemory touch covering vector-index/usage-tracker/pipeline domain。 3 nested-in-actor Error enums (BASSQLiteVectorIndexStorage.StorageError + BASMemoryUsageTracker.TrackerError + BASHostCandidatePipeline.PipelineError) gained Codable at M1901 + 3 PROOF tests (M1902) + BASMemoryPipelineErrorTrioCodableExtensionDoctrine typed surface (M1903) + close-out (M1904)。 NEW kind 'memory-pipeline-error-trio' distinct from chapter 629 'memory-sqlite-error-trio'。 172 typed surfaces cumulative。 488 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

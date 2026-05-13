@@ -2195,7 +2195,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十")!)
+                            "chapter 六百三十")!),
+            // M1904 chapter 631 — BASMemory pipeline error trio Codable extension gap-fill (3rd post-hexa-#3, 2nd BASMemory touch)
+            checkRegistry("六百三十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3731,6 +3737,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十")!
+                .mNumberLast),
+            // M1904 chapter 631 — BASMemory pipeline error trio Codable extension gap-fill
+            ("631",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
