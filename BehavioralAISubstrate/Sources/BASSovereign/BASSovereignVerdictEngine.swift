@@ -50,7 +50,7 @@ public actor BASSovereignVerdictEngine {
     /// the soft-signal scores + operation metadata — it does not
     /// perform its own integrity checks (those belong to
     /// IntegritySentinel and feed this struct).
-    public struct HardObservations: Sendable, Equatable {
+    public struct HardObservations: Sendable, Equatable, Codable {
         public var artifactSignatureInvalid: Bool       // BR-001
         public var thoughtFoldChecksumBroken: Bool      // BR-002
         public var externalSideEffectWithoutSCT: Bool   // BR-003
@@ -96,7 +96,7 @@ public actor BASSovereignVerdictEngine {
     }
 
     /// Seven soft signals ordered per §12.2. All scores in [0.0, 1.0].
-    public struct SoftSignals: Sendable, Equatable {
+    public struct SoftSignals: Sendable, Equatable, Codable {
         public var integrity: Double
         public var privilegeViolation: Double
         public var selfMod: Double
