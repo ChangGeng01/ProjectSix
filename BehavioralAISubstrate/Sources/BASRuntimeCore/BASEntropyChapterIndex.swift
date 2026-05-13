@@ -3615,7 +3615,33 @@ public enum BASEntropyChapterIndex {
                 " post-octa fresh-module hexa catalog)。" +
                 " 154 typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1832。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十四",
+            mNumberFirst: 1833, mNumberLast: 1836,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "GAP-FILL HEXA CATALOG META-META" +
+                " MILESTONE。 NEW BASGapFillHexa" +
+                "CompletionDoctrine (M1833) cataloging" +
+                " 6 gap-fill chapters (608-613) within" +
+                " already-covered modules:BASHostKit" +
+                " mesh-sweep + BASOrgan wave 2 + BAS" +
+                "Orchestration continuation + BAS" +
+                "Sovereign wave 2 + BASSovereign wave 3" +
+                " + BASOrchestration continuation wave" +
+                " 2 = 11 types extended / 24 commits /" +
+                " 4 distinct modules / 5 kind buckets" +
+                " (chain-dep + wave-2 ×2 + wave-3 +" +
+                " continuation + continuation-wave-2)。" +
+                " 37 anti-drift PROOF tests (M1834) +" +
+                " 20 wire-in PROOF tests cross-checking" +
+                " 6 source doctrines (M1835) + close-" +
+                "out (M1836)。 PARALLEL structurally to" +
+                " chapter 607 post-octa fresh-module" +
+                " hexa catalog。 155 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1836。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

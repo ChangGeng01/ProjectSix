@@ -13998,6 +13998,117 @@ public enum BASChapterDoctrineRegistry {
                 " typed surfaces cumulative (+1)。 ADR-" +
                 "016 → M1832。 416 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 614 — gap-fill hexa catalog meta-meta
+        // milestone。 Cataloging 6 gap-fill chapters
+        // (608-613) within already-covered modules。
+        // PARALLEL structurally to chapter 607 post-octa
+        // fresh-module hexa catalog。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十四",
+            mNumberFirst: 1833,
+            mNumberLast: 1836,
+            v1MilestoneMNumber: 1836,
+            v1MilestoneStatus:
+                "chapter-614-gap-fill-hexa-catalog-meta-meta-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1833, knife: "第一刀",
+                    concept: "NEW BASGapFillHexa" +
+                        "CompletionDoctrine cataloging" +
+                        " 6 gap-fill chapters (608-613)" +
+                        " within already-covered modules" +
+                        " — 11 types extended / 24" +
+                        " commits / 4 distinct modules" +
+                        " touched (BASHostKit + BAS" +
+                        "Organ + BASOrchestration ×2 +" +
+                        " BASSovereign ×2)。 5 kind" +
+                        " buckets (chain-dep + wave-2" +
+                        " ×2 + wave-3 + continuation +" +
+                        " continuation-wave-2)。 EntryRecord" +
+                        " struct mirrors chapter 607" +
+                        " post-octa hexa structure。"),
+                BASChapterKnife(
+                    mNumber: 1834, knife: "第二刀",
+                    concept: "37 anti-drift PROOF tests" +
+                        " — identity + 5 kind buckets +" +
+                        " nesting buckets + 6 per-entry" +
+                        " identity + 5 aggregate accessor" +
+                        " + 9 achievement flags + 2 ref" +
+                        " pins + EntryRecord Codable" +
+                        " round-trip。"),
+                BASChapterKnife(
+                    mNumber: 1835, knife: "第三刀",
+                    concept: "20 wire-in PROOF tests" +
+                        " cross-checking the catalog" +
+                        " against each of the 6 per-" +
+                        "entry source doctrines (3" +
+                        " wire-ins per entry:" +
+                        " mNumberFirst + typesExtended" +
+                        " + combinedXxxCount) + 2 cross-" +
+                        "catalog invariants。"),
+                BASChapterKnife(
+                    mNumber: 1836, knife: "第四刀",
+                    concept: "Chapter 614 close-out +" +
+                        " doctrine sync。 420 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 Gap-fill hexa" +
+                        " catalog sealed (parallel to" +
+                        " chapter 607 post-octa hexa)。")
+            ],
+            entropyClassesAttacked: [
+                "gap-fill-hexa-pattern-uncataloged",
+                "6-gap-fill-chapter-run-uncommemorated",
+                "no-cross-catalog-wire-in-protection",
+                "post-octa-hexa-precedent-not-mirrored",
+                "kind-bucket-taxonomy-untyped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1836",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "gap-fill-hexa-catalog-sealed",
+                "structural-parallel-to-post-octa-hexa",
+                "11-types-via-gap-fill-cataloged",
+                "wire-in-protection-active"
+            ],
+            plannedFutureCuts: [
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进" +
+                " 10/10)",
+                "future arc — Tier 2 final 60/60 (M1367" +
+                " ssmScan + Tier C ADR-019)",
+                "future arc — additional gap-fill" +
+                " chapters when modules need further" +
+                " extension"
+            ],
+            summary: "Chapter 614 seals the gap-fill" +
+                " hexa catalog meta-meta milestone via" +
+                " NEW BASGapFillHexaCompletionDoctrine" +
+                " (M1833) + 37 anti-drift PROOF tests" +
+                " (M1834) + 20 wire-in PROOF tests" +
+                " cross-checking against the 6 per-entry" +
+                " source doctrines (M1835) + close-out" +
+                " (M1836)。 Cataloging the 6 gap-fill" +
+                " chapters (608-613):BASHostKit mesh-" +
+                "sweep + BASOrgan wave 2 + BAS" +
+                "Orchestration continuation + BAS" +
+                "Sovereign wave 2 + BASSovereign wave 3" +
+                " + BASOrchestration continuation wave" +
+                " 2。 11 types extended / 24 commits / 4" +
+                " distinct modules touched / 5 kind" +
+                " buckets (chain-dep + wave-2 ×2 +" +
+                " wave-3 + continuation + continuation-" +
+                "wave-2)。 PARALLEL structurally to" +
+                " chapter 607 post-octa fresh-module" +
+                " hexa catalog (which cataloged 6 FRESH-" +
+                "MODULE entries at M1805)。 155 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1836。 420 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

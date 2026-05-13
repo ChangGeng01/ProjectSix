@@ -267,7 +267,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百一十",     // M1817-M1820 (BASORCHESTRATION CODABLE EXTENSION CONTINUATION — GAP-FILL;1 type (BASNeuralThoughtMaterialization 8-field) gained Codable + 1 PROOF test + BASOrchestrationCodableExtensionContinuationDoctrine typed surface + close-out;combined 13 BASOrchestration-related types cumulative (6 arc + 6 post-arc trilogy + 1 this);THIRD consecutive gap-fill chapter;first chapter past 400-consecutive milestone)
         "chapter 六百一十一",   // M1821-M1824 (BASSOVEREIGN CODABLE EXTENSION WAVE 2 — GAP-FILL;2 nested-in-actor types (BASSovereignStubRenderer.StubOutput + RefusalPhrases) gained Codable + 2 PROOF tests + BASSovereignCodableExtensionWaveTwoDoctrine typed surface + close-out;combined 6 BASSovereign-related types cumulative (4 wave 1 + 2 wave 2);4TH consecutive gap-fill chapter)
         "chapter 六百一十二",   // M1825-M1828 (BASSOVEREIGN CODABLE EXTENSION WAVE 3 — GAP-FILL;2 nested-in-engine types (BASSovereignVerdictEngine.HardObservations 12-field Bool + SoftSignals 7-field Double) gained Codable + 2 PROOF tests + BASSovereignCodableExtensionWaveThreeDoctrine typed surface + close-out;combined 8 BASSovereign-related types cumulative (4+2+2);5TH consecutive gap-fill chapter;2nd consecutive BASSovereign gap-fill;ONE SHORT of gap-fill hexa catalog threshold)
-        "chapter 六百一十三"    // M1829-M1832 (BASORCHESTRATION CODABLE EXTENSION CONTINUATION WAVE 2 — GAP-FILL;2 nested-in-actor inner types within BASWorldAwareRiskBridge (ProposedIntent 8-field + Decision 3-field) gained Codable + 2 PROOF tests + BASOrchestrationCodableExtensionContinuationWaveTwoDoctrine typed surface + close-out;combined 15 BASOrchestration-related types cumulative (6 arc + 6 post-arc trilogy + 1 continuation wave 1 + 2 continuation wave 2);6TH consecutive gap-fill chapter — TRIGGERS gap-fill hexa catalog meta-meta opportunity at chapter 614;parallel structurally to chapter 607 post-octa fresh-module hexa catalog)
+        "chapter 六百一十三",   // M1829-M1832 (BASORCHESTRATION CODABLE EXTENSION CONTINUATION WAVE 2 — GAP-FILL;2 nested-in-actor inner types within BASWorldAwareRiskBridge (ProposedIntent 8-field + Decision 3-field) gained Codable + 2 PROOF tests + BASOrchestrationCodableExtensionContinuationWaveTwoDoctrine typed surface + close-out;combined 15 BASOrchestration-related types cumulative (6 arc + 6 post-arc trilogy + 1 continuation wave 1 + 2 continuation wave 2);6TH consecutive gap-fill chapter — TRIGGERS gap-fill hexa catalog meta-meta opportunity at chapter 614;parallel structurally to chapter 607 post-octa fresh-module hexa catalog)
+        "chapter 六百一十四"    // M1833-M1836 (GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaCompletionDoctrine cataloging 6 gap-fill chapters (608-613) within already-covered modules — 11 types extended / 24 commits / 4 distinct modules touched / 5 kind buckets (chain-dep + wave-2 ×2 + wave-3 + continuation + continuation-wave-2) + 37 anti-drift PROOF tests + 20 wire-in PROOF tests cross-checking 6 source doctrines + close-out;PARALLEL structurally to chapter 607 post-octa fresh-module hexa catalog;155 typed surfaces cumulative;420 consecutive byte-equality clean commits)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -284,14 +285,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1832
+    public static let mNumberLast: Int = 1836
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1832)。 Bumped through chapter 613:873 → 877。
-    /// Chapter 613:BASOrchestration Codable extension
-    /// continuation wave 2 gap-fill + 2 PROOF tests +
-    /// typed surface + close-out。
-    public static let commitsShipped: Int = 877
+    /// M1836)。 Bumped through chapter 614:877 → 881。
+    /// Chapter 614:gap-fill hexa catalog meta-meta
+    /// milestone + 37 anti-drift PROOF tests + 20 wire-
+    /// in PROOF tests + close-out。
+    public static let commitsShipped: Int = 881
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

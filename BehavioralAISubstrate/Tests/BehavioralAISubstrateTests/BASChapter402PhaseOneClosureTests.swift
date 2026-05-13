@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1832",
-            "M1832:doctrine version reflects chapter 六百一十三 — BASORCHESTRATION CODABLE EXTENSION CONTINUATION WAVE 2 — GAP-FILL。 2 nested-in-actor inner types within BASWorldAwareRiskBridge (ProposedIntent 8-field + Decision 3-field) gained Codable at M1829 + 2 PROOF tests (M1830) + BASOrchestrationCodableExtensionContinuationWaveTwoDoctrine typed surface (M1831) + close-out (M1832)。 Combined 15 BASOrchestration-related types ledger-serializable (6+6+1+2)。 6TH consecutive gap-fill chapter (608+609+610+611+612+613) — TRIGGERS gap-fill hexa catalog meta-meta opportunity at chapter 614。 154 typed surfaces cumulative。 416 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1836",
+            "M1836:doctrine version reflects chapter 六百一十四 — GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaCompletionDoctrine cataloging 6 gap-fill chapters (608-613) within already-covered modules — 11 types extended / 24 commits / 4 distinct modules / 5 kind buckets + 37 anti-drift PROOF + 20 wire-in PROOF + close-out。 PARALLEL structurally to chapter 607 post-octa fresh-module hexa catalog。 155 typed surfaces cumulative。 420 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

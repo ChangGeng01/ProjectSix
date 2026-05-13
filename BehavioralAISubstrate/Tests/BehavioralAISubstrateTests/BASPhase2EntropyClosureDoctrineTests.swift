@@ -37,27 +37,26 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs613() {
+    func testLastChapterIs614() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十三",
-            "Chapter 六百一十三:BASORCHESTRATION CODABLE" +
-            " EXTENSION CONTINUATION WAVE 2 — GAP-FILL" +
-            " within already-covered BASOrchestration" +
-            " module。 2 nested-in-actor inner types" +
-            " within BASWorldAwareRiskBridge" +
-            " (ProposedIntent 8-field + Decision 3-" +
-            "field) gained Codable + 2 PROOF tests +" +
-            " BASOrchestrationCodableExtensionContinuation" +
-            "WaveTwoDoctrine typed surface + close-out。" +
-            " Combined 15 BASOrchestration-related" +
-            " types (6+6+1+2)。 6TH consecutive gap-fill" +
-            " chapter (608+609+610+611+612+613) —" +
-            " TRIGGERS gap-fill hexa catalog meta-meta" +
-            " opportunity at chapter 614 (parallel to" +
-            " chapter 607 post-octa fresh-module hexa)。" +
-            " 154 typed surfaces cumulative")
+            "chapter 六百一十四",
+            "Chapter 六百一十四:GAP-FILL HEXA CATALOG" +
+            " META-META MILESTONE。 NEW BASGapFillHexa" +
+            "CompletionDoctrine cataloging 6 gap-fill" +
+            " chapters (608-613) within already-covered" +
+            " modules — 11 types extended / 24 commits" +
+            " / 4 distinct modules touched / 5 kind" +
+            " buckets (chain-dep + wave-2 ×2 + wave-3" +
+            " + continuation + continuation-wave-2) +" +
+            " 37 anti-drift PROOF + 20 wire-in PROOF" +
+            " + close-out。 PARALLEL structurally to" +
+            " chapter 607 post-octa fresh-module hexa" +
+            " catalog (which cataloged 6 FRESH-MODULE" +
+            " entries at M1805)。 155 typed surfaces" +
+            " cumulative。 420 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

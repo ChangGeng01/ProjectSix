@@ -107,22 +107,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 613 close-out。 Chapter
-    /// 613:BASORCHESTRATION CODABLE EXTENSION
-    /// CONTINUATION WAVE 2 — GAP-FILL within already-
-    /// covered BASOrchestration module。 2 nested-in-
-    /// actor inner types within BASWorldAwareRiskBridge
-    /// (ProposedIntent 8-field + Decision 3-field)
-    /// gained Codable at M1829 + 2 PROOF tests (M1830)
-    /// + NEW BASOrchestrationCodableExtension
-    /// ContinuationWaveTwoDoctrine (M1831) + close-out
-    /// (M1832)。 Combined 15 BASOrchestration-related
-    /// types ledger-serializable (6+6+1+2)。 6TH
-    /// consecutive gap-fill chapter (608+609+610+611+
-    /// 612+613) — TRIGGERS gap-fill hexa catalog meta-
-    /// meta opportunity at chapter 614 (parallel to
-    /// chapter 607 post-octa fresh-module hexa
-    /// catalog)。
+    /// Re-captured at chapter 614 close-out。 Chapter
+    /// 614:GAP-FILL HEXA CATALOG META-META MILESTONE。
+    /// NEW BASGapFillHexaCompletionDoctrine cataloging
+    /// 6 gap-fill chapters (608-613) within already-
+    /// covered modules — 11 types extended / 24 commits
+    /// / 4 distinct modules touched / 5 kind buckets
+    /// (chain-dep + wave-2 ×2 + wave-3 + continuation
+    /// + continuation-wave-2)。 NEW catalog (M1833) +
+    /// 37 anti-drift PROOF tests (M1834) + 20 wire-in
+    /// PROOF tests cross-checking 6 source doctrines
+    /// (M1835) + close-out (M1836)。 PARALLEL
+    /// structurally to chapter 607 post-octa fresh-
+    /// module hexa catalog。
     static let frozenFullRegistrySha256: String =
-        "703a545ea7b7a87ff85d49142c0594daa2a1a43dace960c0bb1737e2f6d3263e"
+        "a0dcc467bd940a4a820d01f4ea62b757c2beb903754a61563ca9ab0a28302e6c"
 }
