@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1924",
-            "M1924:doctrine version reflects chapter 六百三十六 — CROSS-MODULE BASWORLDPRIOR + BASAPPLEADAPTERS ERROR TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#4,FIRST BASWorldPrior touch in any hexa cycle (module entirely untouched through hexa #1+#2+#3+#4) + 2nd BASAppleAdapters touch overall。 3 Error enums (BASWorldPriorVault.VaultError + BASWorldPriorCounterfactualSeeder.SeederError + BASCoreMLAdapterError) gained Codable at M1921 + 3 PROOF tests (M1922) + BASWorldPriorCoreMLErrorTrioCodableExtensionDoctrine typed surface (M1923) + close-out (M1924)。 NEW kind 'world-prior-coreml-error-trio' opens post-hexa-#4 arc into previously-untouched territory。 177 typed surfaces cumulative。 508 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1928",
+            "M1928:doctrine version reflects chapter 六百三十七 — BASRUNTIMECORE SQLITE STORAGE ERROR TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#4,structural triple-mirror PARALLELS chapter 629 BASMemory SQLite trio in a different module。 1st BASRuntimeCore post-hexa-#4 touch + 2nd BASRuntimeCore touch overall。 3 Error enums (BASSQLiteEventLogStorage.StorageError + BASSQLiteEvalRunStorage.StorageError + BASSQLiteKnowledgeGraphStorage.StorageError) all nested-in-actor gained Codable at M1925 + 3 PROOF tests (M1926) + BASRuntimeCoreSQLiteErrorTrioCodableExtensionDoctrine typed surface (M1927) + close-out (M1928)。 NEW kind 'runtime-core-sqlite-error-trio'。 178 typed surfaces cumulative。 512 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

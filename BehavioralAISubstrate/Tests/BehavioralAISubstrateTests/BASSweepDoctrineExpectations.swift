@@ -116,21 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1924:24 + 20 + 190 = 234 (chapter
-    /// 636 — cross-module BASWorldPrior + BASApple
-    /// Adapters error trio Codable extension,1st
-    /// post-hexa-#4 gap-fill)
-    public static let phase2ChapterCount: Int = 234
+    /// added)。 At M1928:24 + 20 + 191 = 235 (chapter
+    /// 637 — BASRuntimeCore SQLite storage error trio
+    /// Codable extension,2nd post-hexa-#4 gap-fill)
+    public static let phase2ChapterCount: Int = 235
 
-    /// Phase 2 commits shipped。 At M1924:125 + 84 +
-    /// 760 = 969 (chapter 636 = 4 cuts — cross-module
-    /// trio + 3 PROOF + typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 969
+    /// Phase 2 commits shipped。 At M1928:125 + 84 +
+    /// 764 = 973 (chapter 637 = 4 cuts — runtime-core-
+    /// sqlite trio + 3 PROOF + typed surface + close-
+    /// out)
+    public static let phase2CommitsShipped: Int = 973
 
-    /// Phase 2 mNumberLast。 At M1924:chapter 636 —
-    /// cross-module BASWorldPrior + BASAppleAdapters
-    /// error trio。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1924
+    /// Phase 2 mNumberLast。 At M1928:chapter 637 —
+    /// BASRuntimeCore SQLite storage error trio。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1928
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

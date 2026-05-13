@@ -4140,6 +4140,30 @@ public enum BASEntropyChapterIndex {
                 "untouched territory。 177 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1924。" +
                 " 508 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十七",
+            mNumberFirst: 1925, mNumberLast: 1928,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE SQLITE STORAGE" +
+                " ERROR TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,2nd post-hexa-#4,structural" +
+                " triple-mirror PARALLELS chapter 629" +
+                " BASMemory SQLite trio in a different" +
+                " module。 1st BASRuntimeCore post-hexa-" +
+                "#4 touch + 2nd BASRuntimeCore touch" +
+                " overall。 3 Error enums (BASSQLiteEvent" +
+                "LogStorage.StorageError + BASSQLiteEval" +
+                "RunStorage.StorageError + BASSQLite" +
+                "KnowledgeGraphStorage.StorageError) all" +
+                " nested-in-actor gained Codable at" +
+                " M1925 + 3 PROOF tests (M1926) + new" +
+                " typed surface (M1927) + close-out" +
+                " (M1928)。 NEW kind 'runtime-core-sqlite-" +
+                "error-trio'。 178 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1928。" +
+                " 512 consecutive byte-equality clean" +
                 " commits。 V1 byte-equality preserved。")
     ]
 

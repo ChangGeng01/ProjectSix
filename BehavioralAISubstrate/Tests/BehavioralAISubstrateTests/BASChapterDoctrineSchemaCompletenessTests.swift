@@ -2231,7 +2231,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十六")!)
+                            "chapter 六百三十六")!),
+            // M1928 chapter 637 — BASRuntimeCore SQLite storage error trio Codable extension gap-fill (2nd post-hexa-#4, structural triple-mirror parallel)
+            checkRegistry("六百三十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3815,6 +3821,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十六")!
+                .mNumberLast),
+            // M1928 chapter 637 — BASRuntimeCore SQLite storage error trio Codable extension gap-fill (2nd post-hexa-#4)
+            ("637",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -37,26 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs636() {
+    func testLastChapterIs637() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百三十六",
-            "Chapter 六百三十六:CROSS-MODULE BAS" +
-            "WORLDPRIOR + BASAPPLEADAPTERS ERROR TRIO" +
-            " CODABLE EXTENSION — GAP-FILL,1st post-" +
-            "hexa-#4,FIRST BASWorldPrior touch in any" +
-            " hexa cycle (module entirely untouched" +
-            " through hexa #1+#2+#3+#4) + 2nd BAS" +
-            "AppleAdapters touch overall。 3 Error enums" +
-            " gained Codable + 3 PROOF tests + BASWorld" +
-            "PriorCoreMLErrorTrioCodableExtension" +
-            "Doctrine typed surface + close-out。 NEW" +
-            " kind 'world-prior-coreml-error-trio'" +
-            " opens post-hexa-#4 arc into previously-" +
-            "untouched territory。 177 typed surfaces" +
-            " cumulative。 508 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百三十七",
+            "Chapter 六百三十七:BASRUNTIMECORE SQLITE" +
+            " STORAGE ERROR TRIO CODABLE EXTENSION —" +
+            " GAP-FILL,2nd post-hexa-#4,structural" +
+            " triple-mirror PARALLELS chapter 629" +
+            " BASMemory SQLite trio in a different" +
+            " module。 1st BASRuntimeCore post-hexa-#4" +
+            " touch + 2nd BASRuntimeCore touch overall。" +
+            " 3 Error enums all nested-in-actor gained" +
+            " Codable + 3 PROOF tests + BASRuntimeCore" +
+            "SQLiteErrorTrioCodableExtensionDoctrine" +
+            " typed surface + close-out。 NEW kind" +
+            " 'runtime-core-sqlite-error-trio'。 178" +
+            " typed surfaces cumulative。 512" +
+            " consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range

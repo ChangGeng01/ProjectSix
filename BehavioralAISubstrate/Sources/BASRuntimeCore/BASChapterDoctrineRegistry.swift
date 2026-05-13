@@ -16378,7 +16378,113 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1924。 508 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 637 — BASRuntimeCore SQLite storage
+        // error trio Codable extension (2nd post-hexa-
+        // #4 gap-fill,structural triple-mirror
+        // parallels chapter 629 BASMemory SQLite trio)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十七",
+            mNumberFirst: 1925,
+            mNumberLast: 1928,
+            v1MilestoneMNumber: 1928,
+            v1MilestoneStatus:
+                "chapter-637-runtime-core-sqlite-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1925, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "RuntimeCore SQLite storage" +
+                        " StorageError enums forming a" +
+                        " structural triple-mirror —" +
+                        " BASSQLiteEventLogStorage." +
+                        "StorageError (7-case) + BAS" +
+                        "SQLiteEvalRunStorage.Storage" +
+                        "Error (7-case) + BASSQLite" +
+                        "KnowledgeGraphStorage.Storage" +
+                        "Error (8-case)。 All nested-" +
+                        "in-actor。"),
+                BASChapterKnife(
+                    mNumber: 1926, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1927, knife: "第三刀",
+                    concept: "NEW BASRuntimeCoreSQLite" +
+                        "ErrorTrioCodableExtension" +
+                        "Doctrine + moduleCount = 1" +
+                        " (BASRuntimeCore entirely) +" +
+                        " nestedInActorCount = 3 +" +
+                        " topLevelCount = 0 + kindLabel=" +
+                        "'runtime-core-sqlite-error-" +
+                        "trio' (NEW kind) +" +
+                        " isSecondPostHexaFourGapFill +" +
+                        " isFirstBASRuntimeCorePost" +
+                        "HexaFour + isSecondBASRuntime" +
+                        "CoreTouchOverall +" +
+                        " parallelsChapter629Memory" +
+                        "SQLiteTrioPattern。 typed-" +
+                        "surface count 177 → 178。"),
+                BASChapterKnife(
+                    mNumber: 1928, knife: "第四刀",
+                    concept: "Chapter 637 close-out +" +
+                        " doctrine sync。 512 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2nd post-hexa-#4" +
+                        " gap-fill — structural triple-" +
+                        "mirror pattern reused from" +
+                        " chapter 629 BASMemory SQLite" +
+                        " trio in a different module。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sqlite-event-log-storage-error-non-codable",
+                "bas-sqlite-eval-run-storage-error-non-codable",
+                "bas-sqlite-knowledge-graph-storage-error-non-codable",
+                "runtime-core-sqlite-error-trio-pattern-uncaptured",
+                "second-post-hexa-four-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1928",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "runtime-core-sqlite-error-trio-codable-extension",
+                "second-post-hexa-four-gap-fill",
+                "first-bas-runtime-core-post-hexa-four",
+                "second-bas-runtime-core-touch-overall",
+                "parallels-chapter-629-memory-sqlite-trio",
+                "new-kind-label-runtime-core-sqlite-error-trio",
+                "512-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 4 more gap-fill chapters" +
+                " (638-641) toward chapter 642 hexa #5" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 637 ships BASRuntimeCore" +
+                " SQLite storage error trio Codable" +
+                " extension — 2nd post-hexa-#4 gap-fill" +
+                " chapter,structural triple-mirror" +
+                " pattern reused from chapter 629" +
+                " BASMemory SQLite trio in a different" +
+                " module。 3 Error enums (BASSQLiteEvent" +
+                "LogStorage.StorageError + BASSQLite" +
+                "EvalRunStorage.StorageError + BASSQLite" +
+                "KnowledgeGraphStorage.StorageError) all" +
+                " nested-in-actor gained Codable at" +
+                " M1925 + 3 PROOF tests (M1926) + new" +
+                " typed surface (M1927) + close-out" +
+                " (M1928)。 NEW kind 'runtime-core-sqlite-" +
+                "error-trio' (1 module entirely,all" +
+                " nested-in-actor)。 178 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1928。" +
+                " 512 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

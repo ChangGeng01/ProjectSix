@@ -211,6 +211,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// close-out (M1924)。 NEW kind 'world-prior-
     /// coreml-error-trio' opens post-hexa-#4 arc into
     /// previously-untouched territory。
+    /// Re-captured at chapter 637 close-out。 Chapter
+    /// 637:BASRUNTIMECORE SQLITE STORAGE ERROR TRIO
+    /// CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#4,
+    /// structural triple-mirror PARALLELS chapter 629
+    /// BASMemory SQLite trio in a different module。
+    /// 1st BASRuntimeCore post-hexa-#4 touch + 2nd
+    /// BASRuntimeCore touch overall。 3 Error enums
+    /// (BASSQLiteEventLogStorage.StorageError + BAS
+    /// SQLiteEvalRunStorage.StorageError + BASSQLite
+    /// KnowledgeGraphStorage.StorageError) all nested-
+    /// in-actor gained Codable at M1925 + 3 PROOF
+    /// tests (M1926) + NEW BASRuntimeCoreSQLiteError
+    /// TrioCodableExtensionDoctrine (M1927) + close-
+    /// out (M1928)。 NEW kind 'runtime-core-sqlite-
+    /// error-trio'。
     static let frozenFullRegistrySha256: String =
-        "6d02877bc0e93fd5030026763a6fa55e75c530a79f51576cbc7c97050947fd97"
+        "c92cc939ff43290e276db4447953fe6df017494bb474b9b49f1ad1546795fd85"
 }

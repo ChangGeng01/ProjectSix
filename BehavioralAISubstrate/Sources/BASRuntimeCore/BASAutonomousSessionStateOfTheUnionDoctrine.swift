@@ -110,21 +110,23 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 636
-    /// close-out (M1924 — cross-module BASWorldPrior +
-    /// BASAppleAdapters error trio Codable extension,
-    /// 1st post-hexa-#4 gap-fill,FIRST BASWorldPrior
-    /// touch in any hexa cycle;3 Error enums (BASWorld
-    /// PriorVault.VaultError + BASWorldPriorCounter
-    /// factualSeeder.SeederError + BASCoreMLAdapter
-    /// Error) gained Codable;NEW kind 'world-prior-
-    /// coreml-error-trio' opens post-hexa-#4 arc into
-    /// previously-untouched territory)。
-    public static let typedSurfaceCount: Int = 177
+    /// Cumulative achievement metrics at chapter 637
+    /// close-out (M1928 — BASRuntimeCore SQLite storage
+    /// error trio Codable extension,2nd post-hexa-#4
+    /// gap-fill,structural triple-mirror PARALLELS
+    /// chapter 629 BASMemory SQLite trio in different
+    /// module;1st BASRuntimeCore post-hexa-#4 touch +
+    /// 2nd BASRuntimeCore touch overall;3 Error enums
+    /// (BASSQLiteEventLogStorage.StorageError + BAS
+    /// SQLiteEvalRunStorage.StorageError + BASSQLite
+    /// KnowledgeGraphStorage.StorageError) all nested-
+    /// in-actor gained Codable;NEW kind 'runtime-core-
+    /// sqlite-error-trio')。
+    public static let typedSurfaceCount: Int = 178
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 508
-    public static let phase2CommitsShipped: Int = 969
-    public static let chapter2NumberLast: Int = 1924
+        Int = 512
+    public static let phase2CommitsShipped: Int = 973
+    public static let chapter2NumberLast: Int = 1928
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true
