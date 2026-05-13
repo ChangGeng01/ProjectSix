@@ -71,7 +71,9 @@ public actor BASSovereignIntegritySentinel {
         case runtimeImage
     }
 
-    public struct ScanRequest: Sendable, Equatable {
+    public struct ScanRequest:
+        Sendable, Equatable, Codable
+    {
         public let claims: [ArtifactClaim]
         /// Optional out-of-band sentinel that something outside the
         /// fingerprint store has been observed self-mutating. The
@@ -87,7 +89,7 @@ public actor BASSovereignIntegritySentinel {
         }
     }
 
-    public struct ScanReport: Sendable, Equatable {
+    public struct ScanReport: Sendable, Equatable, Codable {
         public let failedArtifactIDs: [String]
         public let failedKinds: Set<ArtifactKind>
         public let observedSelfMutation: Bool

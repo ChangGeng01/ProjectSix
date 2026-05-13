@@ -28,7 +28,7 @@ import BASRuntimeCore
 /// There is no "union of allowed" — allowance is implicit and
 /// revocation is the only active signal.
 public actor BASSovereignPrivilegeArbiter {
-    public struct ScopeKey: Hashable, Sendable {
+    public struct ScopeKey: Hashable, Sendable, Codable {
         public let sessionID: String
         public let turnID: String?
         public let featureDomain: String?
