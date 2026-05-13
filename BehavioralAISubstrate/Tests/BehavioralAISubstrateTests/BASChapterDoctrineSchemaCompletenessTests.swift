@@ -2213,7 +2213,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十三")!)
+                            "chapter 六百三十三")!),
+            // M1916 chapter 634 — cross-module BASOrgan/BASObservability/BASOrchestration error trio Codable extension gap-fill (6th post-hexa-#3 FINAL before hexa #4)
+            checkRegistry("六百三十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3773,6 +3779,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十三")!
+                .mNumberLast),
+            // M1916 chapter 634 — cross-module BASOrgan/BASObservability/BASOrchestration error trio Codable extension gap-fill (FINAL pre-hexa #4)
+            ("634",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

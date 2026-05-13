@@ -16043,7 +16043,127 @@ public enum BASChapterDoctrineRegistry {
                 " (+1)。 ADR-016 → M1912。 496" +
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014" +
-                " OPT-IN preserved。")
+                " OPT-IN preserved。"),
+
+        // chapter 634 — cross-module BASOrgan/BAS
+        // Observability/BASOrchestration error trio
+        // Codable extension (6th post-hexa-#3 gap-fill
+        // — FINAL before hexa #4 catalog opportunity)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十四",
+            mNumberFirst: 1913,
+            mNumberLast: 1916,
+            v1MilestoneMNumber: 1916,
+            v1MilestoneStatus:
+                "chapter-634-organ-observability-orchestration-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1913, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module Error enums — BASOrgan." +
+                        "BASToolDispatchError (4-case" +
+                        " top-level) + BASObservability." +
+                        "BASUpdateTicketLifecycleSQLite" +
+                        "Storage.SQLiteError (7-case" +
+                        " nested-in-class) + BAS" +
+                        "Orchestration.BASWorldAware" +
+                        "RiskBridge.BridgeError (1-case" +
+                        " nested-in-actor)。"),
+                BASChapterKnife(
+                    mNumber: 1914, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1915, knife: "第三刀",
+                    concept: "NEW BASOrganObservability" +
+                        "OrchestrationErrorTrioCodable" +
+                        "ExtensionDoctrine +" +
+                        " moduleCount = 3 (BASOrgan +" +
+                        " BASObservability + BAS" +
+                        "Orchestration) + topLevelCount" +
+                        " = 1 + nestedInClassCount = 1" +
+                        " + nestedInActorCount = 1" +
+                        " (mixed layout across 3" +
+                        " modules) + kindLabel='organ-" +
+                        "observability-orchestration-" +
+                        "error-trio' (NEW kind) +" +
+                        " isSixthPostHexaThreeGapFill" +
+                        " + isFinalPostHexaThreeGapFill" +
+                        " + isFirstBASOrganPostHexaThree" +
+                        " + isFirstBASObservabilityPost" +
+                        "HexaThree + isFirstBAS" +
+                        "OrchestrationPostHexaThree +" +
+                        " cumulativePostHexaThreeModule" +
+                        "Count = 7。 typed-surface count" +
+                        " 174 → 175。"),
+                BASChapterKnife(
+                    mNumber: 1916, knife: "第四刀",
+                    concept: "Chapter 634 close-out +" +
+                        " doctrine sync。 500 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved (ROUND-NUMBER" +
+                        " MILESTONE — 500-step byte-" +
+                        "equality streak)。 6th post-" +
+                        "hexa-#3 gap-fill — FINAL" +
+                        " before chapter 635 hexa #4" +
+                        " catalog opportunity。 7" +
+                        " distinct modules touched in" +
+                        " hexa-#3 cycle。")
+            ],
+            entropyClassesAttacked: [
+                "bas-tool-dispatch-error-non-codable",
+                "bas-update-ticket-lifecycle-sqlite-error-non-codable",
+                "bas-world-aware-risk-bridge-error-non-codable",
+                "organ-observability-orchestration-error-trio-pattern-uncaptured",
+                "sixth-post-hexa-three-gap-fill-not-shipped",
+                "final-post-hexa-three-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1916",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-observability-orchestration-error-trio-codable-extension",
+                "sixth-post-hexa-three-gap-fill",
+                "final-post-hexa-three-gap-fill",
+                "first-bas-organ-post-hexa-three",
+                "first-bas-observability-post-hexa-three",
+                "first-bas-orchestration-post-hexa-three",
+                "500-consecutive-byte-equality-clean-commits",
+                "new-kind-label-organ-observability-orchestration-error-trio",
+                "cumulative-7-modules-touched-in-hexa-three-cycle"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 635 hexa #4" +
+                " catalog meta-meta milestone" +
+                " cataloging 6 post-hexa-#3 gap-fills" +
+                " (629-634)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 634 ships cross-module" +
+                " BASOrgan/BASObservability/BAS" +
+                "Orchestration error trio Codable" +
+                " extension — 6th post-hexa-#3 gap-fill" +
+                " chapter,FINAL before chapter 635" +
+                " hexa #4 catalog opportunity。 3 Error" +
+                " enums (BASToolDispatchError + BAS" +
+                "UpdateTicketLifecycleSQLiteStorage." +
+                "SQLiteError + BASWorldAwareRiskBridge." +
+                "BridgeError) gained Codable at M1913 +" +
+                " 3 PROOF tests (M1914) + new typed" +
+                " surface (M1915) + close-out (M1916)。" +
+                " NEW kind 'organ-observability-" +
+                "orchestration-error-trio' (3 modules" +
+                " with mixed layout)。 175 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1916。 500 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved (ROUND-NUMBER MILESTONE)。" +
+                " 7 distinct modules touched in hexa-#3" +
+                " cycle (629-634)。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

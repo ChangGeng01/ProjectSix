@@ -37,23 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs633() {
+    func testLastChapterIs634() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百三十三",
-            "Chapter 六百三十三:BASSOVEREIGN ERROR TRIO" +
-            " CODABLE EXTENSION — GAP-FILL,5th post-" +
-            "hexa-#3,1st BASSovereign post-hexa-#3" +
-            " touch covering trust anchor / fingerprint" +
-            " store / token authority / host version" +
-            " tree。 3 Error enums all nested within" +
-            " host types gained Codable + 3 PROOF tests" +
-            " + BASSovereignErrorTrioCodableExtension" +
-            "Doctrine typed surface + close-out。 NEW" +
-            " kind 'sovereign-error-trio'。 174 typed" +
-            " surfaces cumulative。 496 consecutive" +
-            " byte-equality clean commits")
+            "chapter 六百三十四",
+            "Chapter 六百三十四:CROSS-MODULE BASORGAN/" +
+            "BASOBSERVABILITY/BASORCHESTRATION ERROR" +
+            " TRIO CODABLE EXTENSION — GAP-FILL,6th" +
+            " post-hexa-#3 FINAL before hexa #4" +
+            " opportunity,1st BASOrgan + 1st BAS" +
+            "Observability + 1st BASOrchestration" +
+            " post-hexa-#3 touches all in same chapter。" +
+            " 3 Error enums spanning 3 modules with" +
+            " mixed layout gained Codable + 3 PROOF" +
+            " tests + BASOrganObservabilityOrchestration" +
+            "ErrorTrioCodableExtensionDoctrine typed" +
+            " surface + close-out。 NEW kind 'organ-" +
+            "observability-orchestration-error-trio'。" +
+            " 175 typed surfaces cumulative。 500" +
+            " consecutive byte-equality clean commits" +
+            " ROUND-NUMBER MILESTONE")
     }
 
     // MARK: - M-number range

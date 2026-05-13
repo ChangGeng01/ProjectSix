@@ -110,20 +110,21 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 633
-    /// close-out (M1912 — BASSovereign error trio Codable
-    /// extension,5th post-hexa-#3,1st BASSovereign
-    /// post-hexa-#3 touch covering trust anchor /
-    /// fingerprint store / token authority / host
-    /// version tree;3 Error enums all nested within
-    /// host types gained Codable;NEW kind 'sovereign-
-    /// error-trio' with all 3 nested-in-host layout
-    /// entirely within 1 module)。
-    public static let typedSurfaceCount: Int = 174
+    /// Cumulative achievement metrics at chapter 634
+    /// close-out (M1916 — cross-module BASOrgan/BAS
+    /// Observability/BASOrchestration error trio Codable
+    /// extension,6th post-hexa-#3 FINAL before hexa #4
+    /// opportunity;1st BASOrgan + 1st BASObservability
+    /// + 1st BASOrchestration post-hexa-#3 touches all
+    /// in same chapter;3 Error enums spanning 3 modules
+    /// gained Codable;NEW kind 'organ-observability-
+    /// orchestration-error-trio';500 consecutive byte-
+    /// equality clean commits ROUND-NUMBER MILESTONE)。
+    public static let typedSurfaceCount: Int = 175
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 496
-    public static let phase2CommitsShipped: Int = 957
-    public static let chapter2NumberLast: Int = 1912
+        Int = 500
+    public static let phase2CommitsShipped: Int = 961
+    public static let chapter2NumberLast: Int = 1916
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

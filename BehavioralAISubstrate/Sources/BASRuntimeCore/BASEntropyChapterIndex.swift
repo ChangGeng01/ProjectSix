@@ -4068,7 +4068,30 @@ public enum BASEntropyChapterIndex {
                 " + close-out (M1912)。 NEW kind" +
                 " 'sovereign-error-trio'。 174 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1912。 V1 byte-equality preserved。")
+                " M1912。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十四",
+            mNumberFirst: 1913, mNumberLast: 1916,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "CROSS-MODULE BASORGAN/BAS" +
+                "OBSERVABILITY/BASORCHESTRATION ERROR" +
+                " TRIO CODABLE EXTENSION — GAP-FILL," +
+                "6th post-hexa-#3 FINAL before hexa #4" +
+                " opportunity。 1st BASOrgan + 1st BAS" +
+                "Observability + 1st BASOrchestration" +
+                " post-hexa-#3 touches all in same" +
+                " chapter。 3 Error enums spanning 3" +
+                " modules with mixed layout gained" +
+                " Codable at M1913 + 3 PROOF tests" +
+                " (M1914) + new typed surface (M1915)" +
+                " + close-out (M1916)。 NEW kind" +
+                " 'organ-observability-orchestration-" +
+                "error-trio'。 175 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1916。" +
+                " 500 consecutive byte-equality clean" +
+                " commits ROUND-NUMBER MILESTONE。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

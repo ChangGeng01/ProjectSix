@@ -159,6 +159,23 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// Doctrine (M1911) + close-out (M1912)。 NEW
     /// kind 'sovereign-error-trio' with all 3 nested-
     /// in-host layout entirely within 1 module。
+    /// Re-captured at chapter 634 close-out。 Chapter
+    /// 634:CROSS-MODULE BASORGAN/BASOBSERVABILITY/
+    /// BASORCHESTRATION ERROR TRIO CODABLE EXTENSION
+    /// — GAP-FILL,6th post-hexa-#3 FINAL before hexa
+    /// #4 opportunity。 1st BASOrgan + 1st BASObserv
+    /// ability + 1st BASOrchestration post-hexa-#3
+    /// touches。 3 Error enums (BASToolDispatchError
+    /// + BASUpdateTicketLifecycleSQLiteStorage.SQLite
+    /// Error + BASWorldAwareRiskBridge.BridgeError)
+    /// spanning 3 modules with mixed layout gained
+    /// Codable at M1913 + 3 PROOF tests (M1914) + NEW
+    /// BASOrganObservabilityOrchestrationErrorTrio
+    /// CodableExtensionDoctrine (M1915) + close-out
+    /// (M1916)。 NEW kind 'organ-observability-
+    /// orchestration-error-trio'。 500 consecutive
+    /// byte-equality clean commits ROUND-NUMBER
+    /// MILESTONE。
     static let frozenFullRegistrySha256: String =
-        "f585a09b323d2b43dd240e96049f471e920ca01f249fa8c30f8ddfe25975671b"
+        "c4b34fbc1c39945bef894e8387c7a20e25444b31fe5656272ebd67a09e4d4d6b"
 }
