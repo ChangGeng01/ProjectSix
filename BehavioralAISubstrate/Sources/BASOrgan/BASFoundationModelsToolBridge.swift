@@ -123,7 +123,7 @@ public enum BASFoundationModelsToolBridgeStrategy:
 /// later analysis (e.g. detecting that a session ran with
 /// tools dropped before the SDK bridge activated)。
 public enum BASFoundationModelsToolBridgeStatus:
-    Sendable, Equatable, Hashable
+    Sendable, Equatable, Hashable, Codable
 {
     /// Bridge dropped tools[],M870 audit trace emitted。
     /// `traceID` is the full trace ID with the audit suffix

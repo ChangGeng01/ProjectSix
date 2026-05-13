@@ -52,7 +52,7 @@ import Foundation
 // MARK: - Decision
 
 /// Typed gate decision returned by `BASToolInvocationGate.evaluate(...)`。
-public enum BASToolInvocationDecision: Equatable, Sendable {
+public enum BASToolInvocationDecision: Equatable, Sendable, Codable {
     /// Tool may execute。Caller proceeds with handler dispatch。
     case allow
 
