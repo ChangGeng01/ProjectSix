@@ -66,7 +66,7 @@ import Foundation
 /// targets a SPECIFIC graph extractor heuristic (M857-M894) so
 /// callers can systematically exercise each detection path。
 public enum BASEventLogFailureInjectionScenario:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     /// Heuristic 3 (`action repeated → delays edge`)。
     /// Generates `repetitions` invocations of `action` spaced
