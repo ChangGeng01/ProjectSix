@@ -2279,7 +2279,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十四")!)
+                            "chapter 六百四十四")!),
+            // M1960 chapter 645 — BASSovereign contamination-guard trio Codable extension gap-fill (3rd post-hexa-#5, DEEP-COVERAGE single-actor trio)
+            checkRegistry("六百四十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3927,6 +3933,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十四")!
+                .mNumberLast),
+            // M1960 chapter 645 — BASSovereign contamination-guard trio Codable extension gap-fill (3rd post-hexa-#5)
+            ("645",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

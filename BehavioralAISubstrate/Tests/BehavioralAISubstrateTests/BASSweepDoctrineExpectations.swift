@@ -116,22 +116,23 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1956:24 + 20 + 198 = 242 (chapter
-    /// 644 — BASSovereign snapshot+token struct-trio,
-    /// 2nd post-hexa-#5 gap-fill)
-    public static let phase2ChapterCount: Int = 242
+    /// added)。 At M1960:24 + 20 + 199 = 243 (chapter
+    /// 645 — BASSovereign contamination-guard trio,
+    /// 3rd post-hexa-#5 gap-fill,DEEP-COVERAGE single-
+    /// actor trio)
+    public static let phase2ChapterCount: Int = 243
 
-    /// Phase 2 commits shipped。 At M1956:125 + 84 +
-    /// 792 = 1001 (chapter 644 = 4 cuts — sovereign-
-    /// snapshot-token trio + 3 PROOF + typed surface +
-    /// close-out)。 ROUND-NUMBER MILESTONE — Phase 2
-    /// commits crosses 1000。
-    public static let phase2CommitsShipped: Int = 1001
+    /// Phase 2 commits shipped。 At M1960:125 + 84 +
+    /// 796 = 1005 (chapter 645 = 4 cuts — sovereign-
+    /// contamination-guard trio + 3 PROOF + typed
+    /// surface + close-out)。 Past 1000 round-number
+    /// milestone (crossed at chapter 644 close-out)。
+    public static let phase2CommitsShipped: Int = 1005
 
-    /// Phase 2 mNumberLast。 At M1956:chapter 644 —
-    /// BASSovereign snapshot+token struct-trio。 SWEEP
+    /// Phase 2 mNumberLast。 At M1960:chapter 645 —
+    /// BASSovereign contamination-guard trio。 SWEEP
     /// stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1956
+    public static let phase2MNumberLast: Int = 1960
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

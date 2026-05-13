@@ -17312,6 +17312,124 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1956。 540 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 645 — BASSovereign contamination-
+        // guard trio Codable extension (3rd post-hexa-
+        // #5 gap-fill,DEEP-COVERAGE single-actor trio)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十五",
+            mNumberFirst: 1957,
+            mNumberLast: 1960,
+            v1MilestoneMNumber: 1960,
+            v1MilestoneStatus:
+                "chapter-645-sovereign-contamination-guard-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1957, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign struct types all" +
+                        " nested in BASSovereign" +
+                        "ContaminationGuard actor — Key" +
+                        " (uses ArtifactKind from" +
+                        " ch641) + QuarantineRecord" +
+                        " (wraps Key — recursive Codable" +
+                        " proof) + ProbeReport ([String]" +
+                        " arrays)。 DEEP-COVERAGE single-" +
+                        "actor trio。"),
+                BASChapterKnife(
+                    mNumber: 1958, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1959, knife: "第三刀",
+                    concept: "NEW BASSovereignContamination" +
+                        "GuardTrioCodableExtensionDoctrine" +
+                        " + moduleCount = 1 (BASSovereign" +
+                        " entirely) + nestedInActorCount" +
+                        " = 3 + structCount = 3 +" +
+                        " enumCount = 0 + allTypesAreErrors" +
+                        " = false + kindLabel='sovereign-" +
+                        "contamination-guard-trio' (NEW" +
+                        " kind) + isThirdPostHexaFive" +
+                        "GapFill + isSameActorDeep" +
+                        "CoverageTrio + isSixthBAS" +
+                        "SovereignTouchOverall +" +
+                        " cumulativeBASSovereignTyped" +
+                        "Surfaces = 17 + completesBAS" +
+                        "SovereignContaminationGuard" +
+                        "Coverage + hasRecursiveCodable" +
+                        "Proof。 typed-surface count" +
+                        " 185 → 186。"),
+                BASChapterKnife(
+                    mNumber: 1960, knife: "第四刀",
+                    concept: "Chapter 645 close-out +" +
+                        " doctrine sync。 544 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 3rd post-hexa-#5" +
+                        " gap-fill — DEEP-COVERAGE" +
+                        " single-actor trio completes" +
+                        " BASSovereignContaminationGuard" +
+                        " typed-surface coverage。 3" +
+                        " more chapters to chapter 649" +
+                        " hexa #6 catalog opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-contamination-guard-key-non-codable",
+                "bas-sovereign-quarantine-record-non-codable",
+                "bas-sovereign-probe-report-non-codable",
+                "sovereign-contamination-guard-trio-pattern-uncaptured",
+                "third-post-hexa-five-gap-fill-not-shipped",
+                "same-actor-deep-coverage-pattern-uncaptured-post-hexa-five"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1960",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-contamination-guard-trio-codable-extension",
+                "third-post-hexa-five-gap-fill",
+                "same-actor-deep-coverage-trio",
+                "sixth-bas-sovereign-touch-overall",
+                "cumulative-17-bas-sovereign-typed-surfaces",
+                "completes-bas-sovereign-contamination-guard-coverage",
+                "has-recursive-codable-proof",
+                "new-kind-label-sovereign-contamination-guard-trio",
+                "544-consecutive-byte-equality-clean-commits",
+                "past-thousand-phase2-commits-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — 3 more gap-fill chapters" +
+                " (646-648) toward chapter 649 hexa #6" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 645 ships BASSovereign" +
+                " contamination-guard trio Codable" +
+                " extension — 3rd post-hexa-#5 gap-fill" +
+                " chapter,DEEP-COVERAGE single-actor" +
+                " trio (chapters 643 + 644 spanned" +
+                " multiple BASSovereign actors)。 6th" +
+                " BASSovereign touch overall。 3 BAS" +
+                "Sovereign structs all nested in BAS" +
+                "SovereignContaminationGuard actor:Key" +
+                " + QuarantineRecord (wraps Key —" +
+                " recursive Codable proof,3-level depth" +
+                " through ArtifactKind from ch641) +" +
+                " ProbeReport。 Completes Codable" +
+                " coverage of BASSovereignContamination" +
+                "Guard's typed surface。 Gained Codable" +
+                " at M1957 + 3 PROOF tests (M1958) +" +
+                " new typed surface (M1959) + close-out" +
+                " (M1960)。 NEW kind 'sovereign-" +
+                "contamination-guard-trio'。 BAS" +
+                "Sovereign cumulative typed surfaces" +
+                " = 17。 186 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1960。 544 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

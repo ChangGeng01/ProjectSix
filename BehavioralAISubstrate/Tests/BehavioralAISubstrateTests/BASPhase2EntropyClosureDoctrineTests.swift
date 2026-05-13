@@ -37,25 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs644() {
+    func testLastChapterIs645() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十四",
-            "Chapter 六百四十四:BASSOVEREIGN SNAPSHOT+" +
-            "TOKEN STRUCT-TRIO CODABLE EXTENSION — GAP-" +
-            "FILL,2nd post-hexa-#5,PURE STRUCT TRIO" +
-            " (chapter 643 was MIXED enum+struct)。 5th" +
-            " BASSovereign touch overall。 3 BASSovereign" +
-            " structs nested-in-actor gained Codable + 3" +
-            " PROOF tests + BASSovereignSnapshotToken" +
-            "StructTrioCodableExtensionDoctrine typed" +
-            " surface + close-out。 NEW kind 'sovereign-" +
-            "snapshot-token-struct-trio'。 BASSovereign" +
-            " cumulative typed surfaces = 14。 PHASE 2" +
-            " COMMITS CROSSES 1000 ROUND-NUMBER" +
-            " MILESTONE。 185 typed surfaces cumulative。" +
-            " 540 consecutive byte-equality clean commits")
+            "chapter 六百四十五",
+            "Chapter 六百四十五:BASSOVEREIGN" +
+            " CONTAMINATION-GUARD TRIO CODABLE" +
+            " EXTENSION — GAP-FILL,3rd post-hexa-#5," +
+            "DEEP-COVERAGE single-actor trio completing" +
+            " BASSovereignContaminationGuard typed-" +
+            "surface coverage。 6th BASSovereign touch" +
+            " overall。 3 BASSovereign structs all" +
+            " nested in BASSovereignContaminationGuard" +
+            " actor gained Codable + 3 PROOF tests +" +
+            " BASSovereignContaminationGuardTrioCodable" +
+            "ExtensionDoctrine typed surface + close-out。" +
+            " NEW kind 'sovereign-contamination-guard-" +
+            "trio'。 BASSovereign cumulative typed" +
+            " surfaces = 17。 186 typed surfaces" +
+            " cumulative。 544 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

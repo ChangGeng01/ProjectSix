@@ -4355,7 +4355,36 @@ public enum BASEntropyChapterIndex {
                 " byte-equality clean commits。 PHASE 2" +
                 " COMMITS CROSSES 1000 ROUND-NUMBER" +
                 " MILESTONE (997 → 1001)。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十五",
+            mNumberFirst: 1957, mNumberLast: 1960,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "BASSOVEREIGN CONTAMINATION-GUARD" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,3rd" +
+                " post-hexa-#5,DEEP-COVERAGE single-" +
+                "actor trio (chapters 643 + 644 spanned" +
+                " multiple BASSovereign actors)。 6th" +
+                " BASSovereign touch overall。 3 BAS" +
+                "Sovereign structs all nested in BAS" +
+                "SovereignContaminationGuard actor:" +
+                "Key + QuarantineRecord (wraps Key —" +
+                " recursive Codable proof,3-level depth" +
+                " through ArtifactKind from ch641) +" +
+                " ProbeReport gained Codable at M1957" +
+                " + 3 PROOF tests (M1958) + new typed" +
+                " surface (M1959) + close-out (M1960)。" +
+                " NEW kind 'sovereign-contamination-" +
+                "guard-trio'。 Completes BASSovereign" +
+                "ContaminationGuard typed-surface" +
+                " coverage (ArtifactKind in ch641 +" +
+                " 3 structs here)。 BASSovereign" +
+                " cumulative typed surfaces = 17。 186" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1960。 544 consecutive" +
+                " byte-equality clean commits。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
