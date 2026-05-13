@@ -37,24 +37,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs631() {
+    func testLastChapterIs632() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百三十一",
-            "Chapter 六百三十一:BASMEMORY PIPELINE" +
-            " ERROR TRIO CODABLE EXTENSION — GAP-FILL," +
-            " 3rd post-hexa-#3,2nd BASMemory touch in" +
-            " the run covering vector-index/usage-" +
-            "tracker/pipeline domain。 3 nested-in-actor" +
-            " Error enums gained Codable + 3 PROOF" +
-            " tests + BASMemoryPipelineErrorTrioCodable" +
-            "ExtensionDoctrine typed surface + close-" +
-            "out。 NEW kind 'memory-pipeline-error-trio'" +
-            " distinct from chapter 629 'memory-sqlite-" +
-            "error-trio'。 172 typed surfaces" +
-            " cumulative。 488 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百三十二",
+            "Chapter 六百三十二:CROSS-MODULE BCM/HPC/" +
+            "SCHEDULE ERROR TRIO CODABLE EXTENSION —" +
+            " GAP-FILL,4th post-hexa-#3,3rd BAS" +
+            "MetalSubstrate touch + 1st BASLeaseLife" +
+            " post-hexa-#3 touch。 3 Error enums gained" +
+            " Codable + 3 PROOF tests + BASCrossModule" +
+            "BCMHPCScheduleErrorTrioCodableExtension" +
+            "Doctrine typed surface + close-out。 NEW" +
+            " kind 'cross-module-bcm-hpc-schedule-error-" +
+            "trio'。 173 typed surfaces cumulative。 492" +
+            " consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range

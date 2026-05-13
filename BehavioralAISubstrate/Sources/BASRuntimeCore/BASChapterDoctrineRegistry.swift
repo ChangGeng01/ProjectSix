@@ -15849,7 +15849,105 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1904。 488 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 632 — cross-module BCM/HPC/Schedule
+        // error trio Codable extension (4th post-hexa-
+        // #3 gap-fill,3rd BASMetalSubstrate touch + 1st
+        // BASLeaseLife post-hexa-#3 touch)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十二",
+            mNumberFirst: 1905,
+            mNumberLast: 1908,
+            v1MilestoneMNumber: 1908,
+            v1MilestoneStatus:
+                "chapter-632-cross-module-bcm-hpc-schedule-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1905, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module Error enums — BAS" +
+                        "MetalSubstrate.BASBCM" +
+                        "MetaPlasticityError + BAS" +
+                        "MetalSubstrate.BAS" +
+                        "HierarchicalPredictiveCoding" +
+                        "Error + BASLeaseLife.BAS" +
+                        "BreathScheduler.ScheduleError" +
+                        " (4-case nested-in-actor)。"),
+                BASChapterKnife(
+                    mNumber: 1906, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1907, knife: "第三刀",
+                    concept: "NEW BASCrossModuleBCMHPC" +
+                        "ScheduleErrorTrioCodable" +
+                        "ExtensionDoctrine +" +
+                        " moduleCount = 2 (BAS" +
+                        "MetalSubstrate + BASLeaseLife)" +
+                        " + nestedInActorCount = 1 +" +
+                        " topLevelCount = 2 (mixed" +
+                        " layout) + kindLabel='cross-" +
+                        "module-bcm-hpc-schedule-error-" +
+                        "trio' (NEW kind) +" +
+                        " isFourthPostHexaThreeGapFill" +
+                        " + isThirdBASMetalSubstratePost" +
+                        "Hexa + isFirstBASLeaseLifePost" +
+                        "HexaThree。 typed-surface" +
+                        " count 172 → 173。"),
+                BASChapterKnife(
+                    mNumber: 1908, knife: "第四刀",
+                    concept: "Chapter 632 close-out +" +
+                        " doctrine sync。 492 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4th post-hexa-#3" +
+                        " gap-fill — 2 more to chapter" +
+                        " 634 hexa #4 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-bcm-meta-plasticity-error-non-codable",
+                "bas-hierarchical-predictive-coding-error-non-codable",
+                "bas-breath-scheduler-schedule-error-non-codable",
+                "cross-module-bcm-hpc-schedule-error-trio-pattern-uncaptured",
+                "fourth-post-hexa-three-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1908",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "cross-module-bcm-hpc-schedule-error-trio-codable-extension",
+                "fourth-post-hexa-three-gap-fill",
+                "third-bas-metal-substrate-post-hexa",
+                "first-bas-leaselife-post-hexa-three",
+                "new-kind-label-cross-module-bcm-hpc-schedule-error-trio"
+            ],
+            plannedFutureCuts: [
+                "future arc — 2 more gap-fill chapters" +
+                " toward chapter 634 hexa #4" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 632 ships cross-module BCM/" +
+                "HPC/Schedule error trio Codable" +
+                " extension — 4th post-hexa-#3 gap-fill" +
+                " chapter,3rd BASMetalSubstrate touch +" +
+                " 1st BASLeaseLife post-hexa-#3 touch。" +
+                " 3 Error enums (BASBCMMetaPlasticityError" +
+                " + BASHierarchicalPredictiveCodingError" +
+                " + BASBreathScheduler.ScheduleError)" +
+                " gained Codable at M1905 + 3 PROOF" +
+                " tests (M1906) + new typed surface" +
+                " (M1907) + close-out (M1908)。 NEW kind" +
+                " 'cross-module-bcm-hpc-schedule-error-" +
+                "trio' (2 modules with mixed nested/" +
+                "top-level layout)。 173 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1908。" +
+                " 492 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

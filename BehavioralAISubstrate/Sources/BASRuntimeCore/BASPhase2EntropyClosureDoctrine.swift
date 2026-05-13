@@ -285,7 +285,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百二十八",   // M1889-M1892 (3RD GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaThreeCompletionDoctrine cataloging 6 post-hexa-#2 gap-fill chapters (622-627) — 15 types extended / 24 commits / 7 distinct modules touched FAR EXCEEDS hexa #1+#2's 4 each / 6 distinct kind buckets each appearing exactly once + 42 anti-drift PROOF tests + 15 wire-in PROOF tests cross-checking 6 source doctrines + close-out;PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3;169 typed surfaces cumulative;476 consecutive byte-equality clean commits)
         "chapter 六百二十九",   // M1893-M1896 (BASMEMORY SQLITE ERROR TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#3,structural triple-mirror pattern across 3 SQLite storage actors;3 nested-in-actor StorageError enums (BASSQLiteMemoryAtomStore + BASSQLiteUserStateStorage + BASHostConstitutionSQLiteStorage) all sharing 6-case shape gained Codable + 3 PROOF tests + BASMemorySQLiteErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'memory-sqlite-error-trio')
         "chapter 六百三十",     // M1897-M1900 (BASMETALSUBSTRATE BIOMIMETIC ERROR TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#3,2nd BASMetalSubstrate touch covering biomimetic/plasticity/predictive-coding domain;3 Error enums (BASBiomimeticSnapshotError + BASPlasticityError + BASPredictiveCodingError) gained Codable + 3 PROOF tests + BASMetalSubstrateMetalBiomimeticErrorTrioCodableExtensionDoctrine typed surface + close-out;M1900 ROUND-NUMBER MILESTONE reached — 100-step jump since chapter 605 M1800;NEW kind 'metal-biomimetic-error-trio' distinct from chapter 626 'metal-error-trio')
-        "chapter 六百三十一"    // M1901-M1904 (BASMEMORY PIPELINE ERROR TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#3,2nd BASMemory touch covering vector-index/usage-tracker/pipeline domain;3 nested-in-actor Error enums (BASSQLiteVectorIndexStorage + BASMemoryUsageTracker + BASHostCandidatePipeline) gained Codable + 3 PROOF tests + BASMemoryPipelineErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'memory-pipeline-error-trio' distinct from chapter 629 'memory-sqlite-error-trio')
+        "chapter 六百三十一",   // M1901-M1904 (BASMEMORY PIPELINE ERROR TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#3,2nd BASMemory touch covering vector-index/usage-tracker/pipeline domain;3 nested-in-actor Error enums (BASSQLiteVectorIndexStorage + BASMemoryUsageTracker + BASHostCandidatePipeline) gained Codable + 3 PROOF tests + BASMemoryPipelineErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'memory-pipeline-error-trio' distinct from chapter 629 'memory-sqlite-error-trio')
+        "chapter 六百三十二"    // M1905-M1908 (CROSS-MODULE BCM/HPC/SCHEDULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#3,3rd BASMetalSubstrate touch + 1st BASLeaseLife post-hexa-#3 touch;3 Error enums (BASBCMMetaPlasticityError + BASHierarchicalPredictiveCodingError + BASBreathScheduler.ScheduleError) gained Codable + 3 PROOF tests + BASCrossModuleBCMHPCScheduleErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'cross-module-bcm-hpc-schedule-error-trio' with mixed nested/top-level layout across 2 modules)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -302,14 +303,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1904
+    public static let mNumberLast: Int = 1908
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1904)。 Bumped through chapter 631:945 → 949。
-    /// Chapter 631:BASMemory pipeline error trio (3rd
-    /// post-hexa-#3) + 3 PROOF tests + typed surface
-    /// + close-out。
-    public static let commitsShipped: Int = 949
+    /// M1908)。 Bumped through chapter 632:949 → 953。
+    /// Chapter 632:cross-module BCM/HPC/Schedule error
+    /// trio (4th post-hexa-#3) + 3 PROOF tests + typed
+    /// surface + close-out。
+    public static let commitsShipped: Int = 953
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

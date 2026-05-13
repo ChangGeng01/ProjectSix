@@ -4033,7 +4033,24 @@ public enum BASEntropyChapterIndex {
                 " distinct from chapter 629 'memory-" +
                 "sqlite-error-trio'。 172 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1904。 V1 byte-equality preserved。")
+                " M1904。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十二",
+            mNumberFirst: 1905, mNumberLast: 1908,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "CROSS-MODULE BCM/HPC/SCHEDULE" +
+                " ERROR TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,4th post-hexa-#3,3rd BAS" +
+                "MetalSubstrate touch + 1st BASLeaseLife" +
+                " post-hexa-#3 touch。 3 Error enums" +
+                " gained Codable at M1905 + 3 PROOF" +
+                " tests (M1906) + new typed surface" +
+                " (M1907) + close-out (M1908)。 NEW" +
+                " kind 'cross-module-bcm-hpc-schedule-" +
+                "error-trio'。 173 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1908。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

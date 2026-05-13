@@ -132,19 +132,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// + NEW BASMetalSubstrateMetalBiomimeticErrorTrio
     /// CodableExtensionDoctrine (M1899) + close-out
     /// (M1900)。 M1900 ROUND-NUMBER MILESTONE reached
-    /// Re-captured at chapter 631 close-out。 Chapter
-    /// 631:BASMEMORY PIPELINE ERROR TRIO CODABLE
-    /// EXTENSION — GAP-FILL,3rd post-hexa-#3,2nd
-    /// BASMemory touch covering vector-index/usage-
-    /// tracker/pipeline domain。 3 nested-in-actor
-    /// Error enums (BASSQLiteVectorIndexStorage +
-    /// BASMemoryUsageTracker + BASHostCandidate
-    /// Pipeline) gained Codable at M1901 + 3 PROOF
-    /// tests (M1902) + NEW BASMemoryPipelineError
-    /// TrioCodableExtensionDoctrine (M1903) + close-
-    /// out (M1904)。 NEW kind 'memory-pipeline-error-
-    /// trio' distinct from chapter 629 'memory-sqlite-
-    /// error-trio'。
+    /// Re-captured at chapter 632 close-out。 Chapter
+    /// 632:CROSS-MODULE BCM/HPC/SCHEDULE ERROR TRIO
+    /// CODABLE EXTENSION — GAP-FILL,4th post-hexa-#3,
+    /// 3rd BASMetalSubstrate touch + 1st BASLeaseLife
+    /// post-hexa-#3 touch。 3 Error enums (BASBCMMeta
+    /// PlasticityError + BASHierarchicalPredictive
+    /// CodingError + BASBreathScheduler.ScheduleError)
+    /// gained Codable at M1905 + 3 PROOF tests (M1906)
+    /// + NEW BASCrossModuleBCMHPCScheduleErrorTrio
+    /// CodableExtensionDoctrine (M1907) + close-out
+    /// (M1908)。 NEW kind 'cross-module-bcm-hpc-
+    /// schedule-error-trio' with mixed nested/top-
+    /// level layout across 2 modules。
     static let frozenFullRegistrySha256: String =
-        "251d713d0bae572e060314fb2cbd54eb03b75de6e4af75a57f13eb91f3e45816"
+        "cb72c0dbdba4837806fc3e4fb01c4154f9797870bce9dcb6bf6d9b187e916754"
 }

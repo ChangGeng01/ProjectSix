@@ -116,20 +116,20 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1904:24 + 20 + 185 = 229 (chapter
-    /// 631 — BASMemory pipeline error trio Codable
-    /// extension)
-    public static let phase2ChapterCount: Int = 229
+    /// added)。 At M1908:24 + 20 + 186 = 230 (chapter
+    /// 632 — cross-module BCM/HPC/Schedule error trio
+    /// Codable extension)
+    public static let phase2ChapterCount: Int = 230
 
-    /// Phase 2 commits shipped。 At M1904:125 + 84 +
-    /// 740 = 949 (chapter 631 = 4 cuts — pipeline
-    /// error trio + 3 PROOF + typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 949
+    /// Phase 2 commits shipped。 At M1908:125 + 84 +
+    /// 744 = 953 (chapter 632 = 4 cuts — cross-module
+    /// trio + 3 PROOF + typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 953
 
-    /// Phase 2 mNumberLast。 At M1904:chapter 631 —
-    /// BASMemory pipeline error trio。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1904
+    /// Phase 2 mNumberLast。 At M1908:chapter 632 —
+    /// cross-module BCM/HPC/Schedule error trio。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1908
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -2201,7 +2201,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十一")!)
+                            "chapter 六百三十一")!),
+            // M1908 chapter 632 — cross-module BCM/HPC/Schedule error trio Codable extension gap-fill (4th post-hexa-#3)
+            checkRegistry("六百三十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3745,6 +3751,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十一")!
+                .mNumberLast),
+            // M1908 chapter 632 — cross-module BCM/HPC/Schedule error trio Codable extension gap-fill
+            ("632",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

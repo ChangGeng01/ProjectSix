@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1904",
-            "M1904:doctrine version reflects chapter 六百三十一 — BASMEMORY PIPELINE ERROR TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#3,2nd BASMemory touch covering vector-index/usage-tracker/pipeline domain。 3 nested-in-actor Error enums (BASSQLiteVectorIndexStorage.StorageError + BASMemoryUsageTracker.TrackerError + BASHostCandidatePipeline.PipelineError) gained Codable at M1901 + 3 PROOF tests (M1902) + BASMemoryPipelineErrorTrioCodableExtensionDoctrine typed surface (M1903) + close-out (M1904)。 NEW kind 'memory-pipeline-error-trio' distinct from chapter 629 'memory-sqlite-error-trio'。 172 typed surfaces cumulative。 488 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1908",
+            "M1908:doctrine version reflects chapter 六百三十二 — CROSS-MODULE BCM/HPC/SCHEDULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#3,3rd BASMetalSubstrate touch + 1st BASLeaseLife post-hexa-#3 touch。 3 Error enums (BASBCMMetaPlasticityError + BASHierarchicalPredictiveCodingError + BASBreathScheduler.ScheduleError) gained Codable at M1905 + 3 PROOF tests (M1906) + BASCrossModuleBCMHPCScheduleErrorTrioCodableExtensionDoctrine typed surface (M1907) + close-out (M1908)。 NEW kind 'cross-module-bcm-hpc-schedule-error-trio'。 173 typed surfaces cumulative。 492 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
