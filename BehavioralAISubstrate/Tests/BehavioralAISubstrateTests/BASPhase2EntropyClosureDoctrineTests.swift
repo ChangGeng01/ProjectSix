@@ -37,26 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs629() {
+    func testLastChapterIs630() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十九",
-            "Chapter 六百二十九:BASMEMORY SQLITE ERROR" +
-            " TRIO CODABLE EXTENSION — GAP-FILL,1st" +
-            " post-hexa-#3,structural triple-mirror" +
-            " pattern across 3 SQLite storage actors。" +
-            " 3 nested-in-actor StorageError enums" +
-            " (BASSQLiteMemoryAtomStore +" +
-            " BASSQLiteUserStateStorage +" +
-            " BASHostConstitutionSQLiteStorage) all" +
-            " sharing 6-case shape gained Codable + 3" +
-            " PROOF tests + BASMemorySQLiteErrorTrio" +
-            "CodableExtensionDoctrine typed surface +" +
-            " close-out。 NEW kind 'memory-sqlite-" +
-            "error-trio'。 170 typed surfaces" +
-            " cumulative。 480 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百三十",
+            "Chapter 六百三十:BASMETALSUBSTRATE" +
+            " BIOMIMETIC ERROR TRIO CODABLE EXTENSION" +
+            " — GAP-FILL,2nd post-hexa-#3,2nd BAS" +
+            "MetalSubstrate touch covering biomimetic/" +
+            "plasticity/predictive-coding domain。 3" +
+            " Error enums (BASBiomimeticSnapshotError" +
+            " + BASPlasticityError +" +
+            " BASPredictiveCodingError) gained Codable" +
+            " + 3 PROOF tests + BASMetalSubstrateMetal" +
+            "BiomimeticErrorTrioCodableExtensionDoctrine" +
+            " typed surface + close-out。 M1900 ROUND-" +
+            "NUMBER MILESTONE reached — 100-step jump" +
+            " since chapter 605 M1800。 NEW kind" +
+            " 'metal-biomimetic-error-trio'。 171 typed" +
+            " surfaces cumulative。 484 consecutive" +
+            " byte-equality clean commits")
     }
 
     // MARK: - M-number range

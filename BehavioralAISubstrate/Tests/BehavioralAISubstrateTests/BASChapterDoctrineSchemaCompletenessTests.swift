@@ -2189,7 +2189,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二十九")!)
+                            "chapter 六百二十九")!),
+            // M1900 chapter 630 — BASMetalSubstrate biomimetic error trio Codable extension gap-fill (2nd post-hexa-#3, M1900 round-number milestone)
+            checkRegistry("六百三十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3717,6 +3723,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二十九")!
+                .mNumberLast),
+            // M1900 chapter 630 — BASMetalSubstrate biomimetic error trio Codable extension gap-fill
+            ("630",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

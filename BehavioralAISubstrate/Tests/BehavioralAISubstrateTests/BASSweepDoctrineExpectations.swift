@@ -116,20 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1896:24 + 20 + 183 = 227 (chapter
-    /// 629 — BASMemory SQLite error trio Codable
-    /// extension)
-    public static let phase2ChapterCount: Int = 227
+    /// added)。 At M1900:24 + 20 + 184 = 228 (chapter
+    /// 630 — BASMetalSubstrate biomimetic error trio
+    /// Codable extension,M1900 round-number milestone)
+    public static let phase2ChapterCount: Int = 228
 
-    /// Phase 2 commits shipped。 At M1896:125 + 84 +
-    /// 732 = 941 (chapter 629 = 4 cuts — memory-sqlite-
-    /// error-trio + 3 PROOF + typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 941
+    /// Phase 2 commits shipped。 At M1900:125 + 84 +
+    /// 736 = 945 (chapter 630 = 4 cuts — biomimetic
+    /// error trio + 3 PROOF + typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 945
 
-    /// Phase 2 mNumberLast。 At M1896:chapter 629 —
-    /// BASMemory SQLite error trio Codable extension。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1896
+    /// Phase 2 mNumberLast。 At M1900:chapter 630 —
+    /// BASMetalSubstrate biomimetic error trio (M1900
+    /// round-number milestone)。 SWEEP stays frozen at
+    /// 1163。
+    public static let phase2MNumberLast: Int = 1900
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -15663,7 +15663,102 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1896。 480 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 630 — BASMetalSubstrate biomimetic
+        // error trio Codable extension (2nd post-hexa-
+        // #3 gap-fill,2nd BASMetalSubstrate touch,
+        // M1900 ROUND-NUMBER MILESTONE)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十",
+            mNumberFirst: 1897,
+            mNumberLast: 1900,
+            v1MilestoneMNumber: 1900,
+            v1MilestoneStatus:
+                "chapter-630-metal-substrate-biomimetic-error-trio-codable-extension-m1900-round-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1897, knife: "第一刀",
+                    concept: "Add Codable to 3 more BAS" +
+                        "MetalSubstrate Error enums" +
+                        " covering biomimetic/" +
+                        "plasticity/predictive-coding" +
+                        " domain — BASBiomimeticSnapshot" +
+                        "Error + BASPlasticityError +" +
+                        " BASPredictiveCodingError。"),
+                BASChapterKnife(
+                    mNumber: 1898, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1899, knife: "第三刀",
+                    concept: "NEW BASMetalSubstrateMetal" +
+                        "BiomimeticErrorTrioCodable" +
+                        "ExtensionDoctrine + kindLabel=" +
+                        "'metal-biomimetic-error-trio'" +
+                        " (NEW kind distinct from" +
+                        " chapter 626 'metal-error-trio'" +
+                        " — different domain within BAS" +
+                        "MetalSubstrate)。 typed-surface" +
+                        " count 170 → 171。"),
+                BASChapterKnife(
+                    mNumber: 1900, knife: "第四刀",
+                    concept: "Chapter 630 close-out +" +
+                        " doctrine sync。 M1900 ROUND-" +
+                        "NUMBER MILESTONE reached —" +
+                        " 100-step jump since M1800 at" +
+                        " chapter 605。 484 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2nd post-hexa-#3" +
+                        " gap-fill — 4 more to chapter" +
+                        " 634 hexa #4 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-biomimetic-snapshot-error-non-codable",
+                "bas-plasticity-error-non-codable",
+                "bas-predictive-coding-error-non-codable",
+                "bas-metal-biomimetic-error-trio-not-shipped",
+                "biomimetic-domain-error-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1900",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "metal-substrate-metal-biomimetic-error-trio-codable-extension",
+                "second-post-hexa-three-gap-fill",
+                "second-bas-metal-substrate-post-hexa",
+                "new-kind-label-metal-biomimetic-error-trio",
+                "m1900-round-number-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — 4 more gap-fill chapters" +
+                " toward chapter 634 hexa #4" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 630 ships BASMetalSubstrate" +
+                " biomimetic error trio Codable" +
+                " extension — 2nd post-hexa-#3 gap-fill" +
+                " chapter,2nd BASMetalSubstrate touch" +
+                " (after chapter 626 kernel/lookup/ssm" +
+                " domain)。 3 biomimetic/plasticity/" +
+                "predictive-coding Error enums gained" +
+                " Codable at M1897 + 3 PROOF tests" +
+                " (M1898) + new typed surface (M1899) +" +
+                " close-out (M1900)。 M1900 ROUND-NUMBER" +
+                " MILESTONE reached — 100-STEP jump" +
+                " since chapter 605 M1800 round。 NEW" +
+                " kind 'metal-biomimetic-error-trio'" +
+                " distinct from chapter 626 'metal-" +
+                "error-trio' (different domain within" +
+                " same module)。 171 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1900。" +
+                " 484 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

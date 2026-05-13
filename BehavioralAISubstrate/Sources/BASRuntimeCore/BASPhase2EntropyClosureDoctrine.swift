@@ -283,7 +283,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百二十六",   // M1881-M1884 (BASMETALSUBSTRATE METAL ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#2,2nd error-cluster wave in run,1st BASMetalSubstrate touch since chapter 605;3 BASMetalSubstrate Error enums (BASKernelError + BASKernelLookupError + BASMambaSSMError) gained Codable + 3 PROOF tests + BASMetalSubstrateMetalErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'metal-error-trio' distinct from chapter 625 'error-trio' (different module);1 more to chapter 627 hexa #3 opportunity!)
         "chapter 六百二十七",   // M1885-M1888 (CROSS-MODULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,6TH (FINAL) post-hexa-#2,3rd error-cluster wave (1st spanning 2 modules:BASAppleAdapters + BASSovereign);3 Error enums (BASAppleCurrentBrainBootstrapHostResolutionError + BASSovereignAuditLedger.LedgerError + BASSovereignKeychainBinding.KeychainError) gained Codable + 3 PROOF tests + BASCrossModuleErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'cross-module-error-trio';TRIGGERS chapter 628 hexa #3 catalog meta-meta opportunity;7 distinct modules in post-hexa-#2 run far exceeds prior hexa runs' 4)
         "chapter 六百二十八",   // M1889-M1892 (3RD GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaThreeCompletionDoctrine cataloging 6 post-hexa-#2 gap-fill chapters (622-627) — 15 types extended / 24 commits / 7 distinct modules touched FAR EXCEEDS hexa #1+#2's 4 each / 6 distinct kind buckets each appearing exactly once + 42 anti-drift PROOF tests + 15 wire-in PROOF tests cross-checking 6 source doctrines + close-out;PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3;169 typed surfaces cumulative;476 consecutive byte-equality clean commits)
-        "chapter 六百二十九"    // M1893-M1896 (BASMEMORY SQLITE ERROR TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#3,structural triple-mirror pattern across 3 SQLite storage actors;3 nested-in-actor StorageError enums (BASSQLiteMemoryAtomStore + BASSQLiteUserStateStorage + BASHostConstitutionSQLiteStorage) all sharing 6-case shape gained Codable + 3 PROOF tests + BASMemorySQLiteErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'memory-sqlite-error-trio')
+        "chapter 六百二十九",   // M1893-M1896 (BASMEMORY SQLITE ERROR TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#3,structural triple-mirror pattern across 3 SQLite storage actors;3 nested-in-actor StorageError enums (BASSQLiteMemoryAtomStore + BASSQLiteUserStateStorage + BASHostConstitutionSQLiteStorage) all sharing 6-case shape gained Codable + 3 PROOF tests + BASMemorySQLiteErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'memory-sqlite-error-trio')
+        "chapter 六百三十"      // M1897-M1900 (BASMETALSUBSTRATE BIOMIMETIC ERROR TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#3,2nd BASMetalSubstrate touch covering biomimetic/plasticity/predictive-coding domain;3 Error enums (BASBiomimeticSnapshotError + BASPlasticityError + BASPredictiveCodingError) gained Codable + 3 PROOF tests + BASMetalSubstrateMetalBiomimeticErrorTrioCodableExtensionDoctrine typed surface + close-out;M1900 ROUND-NUMBER MILESTONE reached — 100-step jump since chapter 605 M1800;NEW kind 'metal-biomimetic-error-trio' distinct from chapter 626 'metal-error-trio')
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -300,14 +301,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1896
+    public static let mNumberLast: Int = 1900
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1896)。 Bumped through chapter 629:937 → 941。
-    /// Chapter 629:BASMemory SQLite error trio Codable
-    /// extension (1st post-hexa-#3) + 3 PROOF tests +
-    /// typed surface + close-out。
-    public static let commitsShipped: Int = 941
+    /// M1900)。 Bumped through chapter 630:941 → 945。
+    /// Chapter 630:BASMetalSubstrate biomimetic error
+    /// trio (2nd post-hexa-#3,M1900 round milestone) +
+    /// 3 PROOF tests + typed surface + close-out。
+    public static let commitsShipped: Int = 945
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

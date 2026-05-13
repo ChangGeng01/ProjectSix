@@ -121,13 +121,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// Re-captured at chapter 629 close-out。 Chapter
     /// 629:BASMEMORY SQLITE ERROR TRIO CODABLE
     /// EXTENSION — GAP-FILL,1st post-hexa-#3,
-    /// structural triple-mirror pattern across 3 SQLite
-    /// storage actors。 3 nested-in-actor StorageError
-    /// enums all sharing 6-case shape gained Codable
-    /// at M1893 + 3 PROOF tests (M1894) + NEW BAS
-    /// MemorySQLiteErrorTrioCodableExtensionDoctrine
-    /// (M1895) + close-out (M1896)。 NEW kind 'memory-
-    /// sqlite-error-trio'。
+    /// Re-captured at chapter 630 close-out。 Chapter
+    /// 630:BASMETALSUBSTRATE BIOMIMETIC ERROR TRIO
+    /// CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#3,
+    /// 2nd BASMetalSubstrate touch covering biomimetic/
+    /// plasticity/predictive-coding domain。 3 Error
+    /// enums (BASBiomimeticSnapshotError + BAS
+    /// PlasticityError + BASPredictiveCodingError)
+    /// gained Codable at M1897 + 3 PROOF tests (M1898)
+    /// + NEW BASMetalSubstrateMetalBiomimeticErrorTrio
+    /// CodableExtensionDoctrine (M1899) + close-out
+    /// (M1900)。 M1900 ROUND-NUMBER MILESTONE reached
+    /// — 100-step jump since chapter 605 M1800。 NEW
+    /// kind 'metal-biomimetic-error-trio' distinct
+    /// from chapter 626 'metal-error-trio'。
     static let frozenFullRegistrySha256: String =
-        "da7ae89abf414bbc031fee928ceeada801954ae6cc182306238e69001195abc0"
+        "181dcad8b20524ca34f3897aa4ebfed3c90f3267e7087dfe01a1d58470d660cc"
 }

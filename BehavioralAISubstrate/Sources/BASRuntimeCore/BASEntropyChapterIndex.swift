@@ -3988,7 +3988,30 @@ public enum BASEntropyChapterIndex {
                 " kind 'memory-sqlite-error-trio'。" +
                 " 170 typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1896。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十",
+            mNumberFirst: 1897, mNumberLast: 1900,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE BIOMIMETIC" +
+                " ERROR TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,2nd post-hexa-#3,2nd BAS" +
+                "MetalSubstrate touch covering" +
+                " biomimetic/plasticity/predictive-" +
+                "coding domain。 3 Error enums (BAS" +
+                "BiomimeticSnapshotError + BASPlasticity" +
+                "Error + BASPredictiveCodingError)" +
+                " gained Codable at M1897 + 3 PROOF" +
+                " tests (M1898) + new typed surface" +
+                " (M1899) + close-out (M1900)。 M1900" +
+                " ROUND-NUMBER MILESTONE reached —" +
+                " 100-step jump since chapter 605" +
+                " M1800。 NEW kind 'metal-biomimetic-" +
+                "error-trio' distinct from chapter 626" +
+                " 'metal-error-trio'。 171 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1900。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
