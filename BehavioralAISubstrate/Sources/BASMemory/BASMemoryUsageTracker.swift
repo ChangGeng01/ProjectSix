@@ -139,7 +139,9 @@ public struct BASMemoryUsageRecord: BASSchemaVersioned,
 /// signal is known.
 public actor BASMemoryUsageTracker {
 
-    public enum TrackerError: Error, Equatable, Sendable {
+    public enum TrackerError:
+        Error, Equatable, Sendable, Codable
+    {
         case openFailed(code: Int32, message: String)
         case prepareFailed(sql: String, message: String)
         case stepFailed(sql: String, message: String)

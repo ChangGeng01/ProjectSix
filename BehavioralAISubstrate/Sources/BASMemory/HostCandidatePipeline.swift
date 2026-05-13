@@ -47,7 +47,9 @@ public actor BASHostCandidatePipeline {
 
     // MARK: - Errors
 
-    public enum PipelineError: Error, Equatable, Sendable {
+    public enum PipelineError:
+        Error, Equatable, Sendable, Codable
+    {
         case duplicateCandidate(id: String)
         case unknownCandidate(id: String)
         case candidateNotInPreview(id: String)
