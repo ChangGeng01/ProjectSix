@@ -110,21 +110,23 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 634
-    /// close-out (M1916 — cross-module BASOrgan/BAS
-    /// Observability/BASOrchestration error trio Codable
-    /// extension,6th post-hexa-#3 FINAL before hexa #4
-    /// opportunity;1st BASOrgan + 1st BASObservability
-    /// + 1st BASOrchestration post-hexa-#3 touches all
-    /// in same chapter;3 Error enums spanning 3 modules
-    /// gained Codable;NEW kind 'organ-observability-
-    /// orchestration-error-trio';500 consecutive byte-
-    /// equality clean commits ROUND-NUMBER MILESTONE)。
-    public static let typedSurfaceCount: Int = 175
+    /// Cumulative achievement metrics at chapter 635
+    /// close-out (M1920 — 4TH GAP-FILL HEXA CATALOG
+    /// META-META MILESTONE;NEW BASGapFillHexaFour
+    /// CompletionDoctrine cataloging 6 post-hexa-#3
+    /// gap-fill chapters 629-634 — 18 types extended /
+    /// 24 commits / 7 distinct modules touched MATCHES
+    /// hexa #3 and FAR exceeds hexa #1+#2's 4 each;
+    /// FIRST hexa where every entry is an error-trio
+    /// variant — distinctive 'all-error-trio' theme;
+    /// catalog lineage M1805 post-octa → M1833 hexa
+    /// #1 → M1861 hexa #2 → M1889 hexa #3 → M1917
+    /// hexa #4)。
+    public static let typedSurfaceCount: Int = 176
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 500
-    public static let phase2CommitsShipped: Int = 961
-    public static let chapter2NumberLast: Int = 1916
+        Int = 504
+    public static let phase2CommitsShipped: Int = 965
+    public static let chapter2NumberLast: Int = 1920
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

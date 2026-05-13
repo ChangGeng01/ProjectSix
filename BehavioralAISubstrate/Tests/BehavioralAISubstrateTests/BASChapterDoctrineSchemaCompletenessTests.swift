@@ -2219,7 +2219,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十四")!)
+                            "chapter 六百三十四")!),
+            // M1920 chapter 635 — 4TH gap-fill hexa catalog meta-meta milestone (cataloging 629-634)
+            checkRegistry("六百三十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3787,6 +3793,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十四")!
+                .mNumberLast),
+            // M1920 chapter 635 — 4TH gap-fill hexa catalog meta-meta milestone (cataloging 629-634)
+            ("635",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

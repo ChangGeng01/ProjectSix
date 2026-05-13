@@ -176,6 +176,26 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// orchestration-error-trio'。 500 consecutive
     /// byte-equality clean commits ROUND-NUMBER
     /// MILESTONE。
+    /// Re-captured at chapter 635 close-out。 Chapter
+    /// 635:4TH GAP-FILL HEXA CATALOG META-META
+    /// MILESTONE。 NEW BASGapFillHexaFourCompletion
+    /// Doctrine cataloging 6 post-hexa-#3 gap-fill
+    /// chapters (629-634) — 18 types extended / 24
+    /// commits / 7 distinct modules touched MATCHES
+    /// hexa #3 and FAR exceeds hexa #1+#2's 4 each。
+    /// FIRST hexa where every entry is an error-trio
+    /// variant — distinctive 'all-error-trio' theme +
+    /// 6 distinct kind buckets each appearing exactly
+    /// once。 NEW catalog (M1917) + 44 anti-drift
+    /// PROOF tests (M1918) + 15 wire-in PROOF tests
+    /// cross-checking 6 source doctrines (M1919) +
+    /// close-out (M1920)。 PARALLEL structurally to
+    /// chapter 614 hexa #1 + chapter 621 hexa #2 +
+    /// chapter 628 hexa #3。 Catalog lineage M1805
+    /// post-octa → M1833 hexa #1 → M1861 hexa #2 →
+    /// M1889 hexa #3 → M1917 hexa #4。 176 typed
+    /// surfaces cumulative;504 consecutive byte-
+    /// equality clean commits。
     static let frozenFullRegistrySha256: String =
-        "c4b34fbc1c39945bef894e8387c7a20e25444b31fe5656272ebd67a09e4d4d6b"
+        "0c5798c6767afa957c9be05b5508a800df6ff4615acc98cb5eae3ca629085e9c"
 }

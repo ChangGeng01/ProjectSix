@@ -16163,7 +16163,119 @@ public enum BASChapterDoctrineRegistry {
                 " preserved (ROUND-NUMBER MILESTONE)。" +
                 " 7 distinct modules touched in hexa-#3" +
                 " cycle (629-634)。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 635 — 4TH GAP-FILL HEXA CATALOG META-
+        // META MILESTONE — BASGapFillHexaFourCompletion
+        // Doctrine cataloging 6 post-hexa-#3 gap-fill
+        // chapters (629-634)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十五",
+            mNumberFirst: 1917,
+            mNumberLast: 1920,
+            v1MilestoneMNumber: 1920,
+            v1MilestoneStatus:
+                "chapter-635-gap-fill-hexa-four-completion",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1917, knife: "第一刀",
+                    concept: "NEW BASGapFillHexaFour" +
+                        "CompletionDoctrine cataloging" +
+                        " 6 post-hexa-#3 gap-fill" +
+                        " chapters (629-634) — 18 types" +
+                        " extended / 24 commits / 7" +
+                        " distinct modules touched" +
+                        " (matches hexa #3,exceeds hexa" +
+                        " #1+#2's 4 each)。 FIRST hexa" +
+                        " where every entry is an error-" +
+                        "trio variant — distinctive" +
+                        " 'all-error-trio' theme。"),
+                BASChapterKnife(
+                    mNumber: 1918, knife: "第二刀",
+                    concept: "44 anti-drift PROOF tests" +
+                        " for the new catalog (2 identity" +
+                        " + 3 entry count + 7 kind" +
+                        " bucket + 6 per-entry + 7" +
+                        " aggregate + 12 achievement +" +
+                        " 5 cross-doctrine ref + 1" +
+                        " Codable round-trip + 1 400-" +
+                        "byte-equality)。"),
+                BASChapterKnife(
+                    mNumber: 1919, knife: "第三刀",
+                    concept: "15 wire-in PROOF tests" +
+                        " cross-checking the catalog" +
+                        " against the 6 source per-" +
+                        "entry extension doctrines (12" +
+                        " per-entry mNumber+typesExtended" +
+                        " wire-ins + 3 cross-catalog" +
+                        " invariants — entries match," +
+                        " modules match hexa #3 / exceed" +
+                        " #1+#2,types exceed all priors)。"),
+                BASChapterKnife(
+                    mNumber: 1920, knife: "第四刀",
+                    concept: "Chapter 635 close-out +" +
+                        " doctrine sync。 504 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4TH GAP-FILL HEXA" +
+                        " CATALOG META-META MILESTONE" +
+                        " sealed at M1917。 Catalog" +
+                        " lineage M1805 post-octa →" +
+                        " M1833 hexa #1 → M1861 hexa #2" +
+                        " → M1889 hexa #3 → M1917 hexa" +
+                        " #4。 typed-surface count" +
+                        " 175 → 176。")
+            ],
+            entropyClassesAttacked: [
+                "post-hexa-three-gap-fill-cycle-uncataloged",
+                "fourth-gap-fill-hexa-meta-meta-not-shipped",
+                "all-error-trio-hexa-theme-uncaptured",
+                "catalog-lineage-five-step-not-extended",
+                "hexa-four-wire-in-coverage-gap"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1920",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "gap-fill-hexa-four-completion-doctrine",
+                "fourth-gap-fill-hexa-catalog-meta-meta",
+                "all-error-trio-hexa-distinctive-theme",
+                "18-types-extended-exceeds-all-prior-hexas",
+                "7-distinct-modules-matches-hexa-three",
+                "catalog-lineage-5-step-extension",
+                "504-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — post-hexa-#4 gap-fill" +
+                " cycle (chapters 636-641)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 635 ships 4TH GAP-FILL" +
+                " HEXA CATALOG META-META MILESTONE。" +
+                " NEW BASGapFillHexaFourCompletion" +
+                "Doctrine cataloging 6 post-hexa-#3 gap-" +
+                "fill chapters (629-634) — 18 types" +
+                " extended / 24 commits / 7 distinct" +
+                " modules touched (matches hexa #3," +
+                " exceeds hexa #1+#2's 4 each)。 FIRST" +
+                " hexa where EVERY entry is an error-" +
+                "trio variant — distinctive 'all-error-" +
+                "trio' theme。 NEW catalog (M1917) + 44" +
+                " anti-drift PROOF tests (M1918) + 15" +
+                " wire-in PROOF tests cross-checking 6" +
+                " source doctrines (M1919) + close-out" +
+                " (M1920)。 PARALLEL structurally to" +
+                " chapter 614 hexa #1 + chapter 621" +
+                " hexa #2 + chapter 628 hexa #3。 Catalog" +
+                " lineage M1805 post-octa → M1833 hexa" +
+                " #1 → M1861 hexa #2 → M1889 hexa #3 →" +
+                " M1917 hexa #4。 176 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1920。" +
+                " 504 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

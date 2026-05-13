@@ -4091,7 +4091,35 @@ public enum BASEntropyChapterIndex {
                 " cumulative (+1)。 ADR-016 → M1916。" +
                 " 500 consecutive byte-equality clean" +
                 " commits ROUND-NUMBER MILESTONE。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十五",
+            mNumberFirst: 1917, mNumberLast: 1920,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "4TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaFour" +
+                "CompletionDoctrine cataloging 6 post-" +
+                "hexa-#3 gap-fill chapters (629-634)" +
+                " — 18 types extended / 24 commits / 7" +
+                " distinct modules touched MATCHES hexa" +
+                " #3 and FAR exceeds hexa #1+#2's 4" +
+                " each。 FIRST hexa where every entry" +
+                " is an error-trio variant —" +
+                " distinctive 'all-error-trio' theme。" +
+                " NEW catalog (M1917) + 44 anti-drift" +
+                " PROOF tests (M1918) + 15 wire-in" +
+                " PROOF tests cross-checking 6 source" +
+                " doctrines (M1919) + close-out (M1920)。" +
+                " PARALLEL structurally to chapter 614" +
+                " hexa #1 + chapter 621 hexa #2 +" +
+                " chapter 628 hexa #3。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2 → M1889 hexa #3 →" +
+                " M1917 hexa #4。 176 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1920。" +
+                " 504 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
