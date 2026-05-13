@@ -4050,7 +4050,25 @@ public enum BASEntropyChapterIndex {
                 " kind 'cross-module-bcm-hpc-schedule-" +
                 "error-trio'。 173 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1908。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十三",
+            mNumberFirst: 1909, mNumberLast: 1912,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASSOVEREIGN ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,5th post-hexa-#3," +
+                "1st BASSovereign post-hexa-#3 touch" +
+                " covering trust anchor / fingerprint" +
+                " store / token authority / host" +
+                " version tree。 3 Error enums all" +
+                " nested within host types gained" +
+                " Codable at M1909 + 3 PROOF tests" +
+                " (M1910) + new typed surface (M1911)" +
+                " + close-out (M1912)。 NEW kind" +
+                " 'sovereign-error-trio'。 174 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1912。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

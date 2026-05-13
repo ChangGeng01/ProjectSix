@@ -15947,7 +15947,103 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1908。" +
                 " 492 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 633 — BASSovereign error trio Codable
+        // extension (5th post-hexa-#3 gap-fill,1st
+        // BASSovereign post-hexa-#3 touch)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十三",
+            mNumberFirst: 1909,
+            mNumberLast: 1912,
+            v1MilestoneMNumber: 1912,
+            v1MilestoneStatus:
+                "chapter-633-sovereign-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1909, knife: "第一刀",
+                    concept: "Add Codable to 3" +
+                        " BASSovereign Error enums —" +
+                        " BASSovereignHostVersionTree." +
+                        "TreeError (5-case nested-in-" +
+                        "actor) + BASSovereignFingerprint" +
+                        "Store.StoreError (6-case nested-" +
+                        "in-struct) + BASSovereignToken" +
+                        "Authority.AuthorityError (6-" +
+                        "case nested-in-actor)。"),
+                BASChapterKnife(
+                    mNumber: 1910, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1911, knife: "第三刀",
+                    concept: "NEW BASSovereignErrorTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " moduleCount = 1 (BASSovereign" +
+                        " entirely) + nestedInActorCount" +
+                        " = 2 + nestedInStructCount = 1" +
+                        " + topLevelCount = 0 (all nested)" +
+                        " + kindLabel='sovereign-error-" +
+                        "trio' (NEW kind) +" +
+                        " isFifthPostHexaThreeGapFill +" +
+                        " isFirstBASSovereignPostHexa" +
+                        "Three。 typed-surface count" +
+                        " 173 → 174。"),
+                BASChapterKnife(
+                    mNumber: 1912, knife: "第四刀",
+                    concept: "Chapter 633 close-out +" +
+                        " doctrine sync。 496 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 5th post-hexa-#3" +
+                        " gap-fill — 1 more to chapter" +
+                        " 634 hexa #4 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-host-version-tree-error-non-codable",
+                "bas-sovereign-fingerprint-store-error-non-codable",
+                "bas-sovereign-token-authority-error-non-codable",
+                "sovereign-error-trio-pattern-uncaptured",
+                "fifth-post-hexa-three-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1912",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-error-trio-codable-extension",
+                "fifth-post-hexa-three-gap-fill",
+                "first-bas-sovereign-post-hexa-three",
+                "all-three-nested-within-host-types",
+                "new-kind-label-sovereign-error-trio"
+            ],
+            plannedFutureCuts: [
+                "future arc — 1 more gap-fill chapter" +
+                " to chapter 634 hexa #4 opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 633 ships BASSovereign" +
+                " error trio Codable extension — 5th" +
+                " post-hexa-#3 gap-fill chapter,1st" +
+                " BASSovereign post-hexa-#3 touch" +
+                " covering the sovereign subsystem" +
+                " (trust anchor / fingerprint store /" +
+                " token authority / host version tree)。" +
+                " 3 Error enums (BASSovereignHostVersion" +
+                "Tree.TreeError + BASSovereignFingerprint" +
+                "Store.StoreError + BASSovereignToken" +
+                "Authority.AuthorityError) gained" +
+                " Codable at M1909 + 3 PROOF tests" +
+                " (M1910) + new typed surface (M1911)" +
+                " + close-out (M1912)。 NEW kind" +
+                " 'sovereign-error-trio' (1 module" +
+                " entirely,all 3 nested within host" +
+                " types)。 174 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1912。 496" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

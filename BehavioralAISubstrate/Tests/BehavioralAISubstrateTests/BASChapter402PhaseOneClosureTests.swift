@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1908",
-            "M1908:doctrine version reflects chapter 六百三十二 — CROSS-MODULE BCM/HPC/SCHEDULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#3,3rd BASMetalSubstrate touch + 1st BASLeaseLife post-hexa-#3 touch。 3 Error enums (BASBCMMetaPlasticityError + BASHierarchicalPredictiveCodingError + BASBreathScheduler.ScheduleError) gained Codable at M1905 + 3 PROOF tests (M1906) + BASCrossModuleBCMHPCScheduleErrorTrioCodableExtensionDoctrine typed surface (M1907) + close-out (M1908)。 NEW kind 'cross-module-bcm-hpc-schedule-error-trio'。 173 typed surfaces cumulative。 492 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1912",
+            "M1912:doctrine version reflects chapter 六百三十三 — BASSOVEREIGN ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#3,1st BASSovereign post-hexa-#3 touch covering trust anchor / fingerprint store / token authority / host version tree。 3 Error enums (BASSovereignHostVersionTree.TreeError + BASSovereignFingerprintStore.StoreError + BASSovereignTokenAuthority.AuthorityError) all nested within host types gained Codable at M1909 + 3 PROOF tests (M1910) + BASSovereignErrorTrioCodableExtensionDoctrine typed surface (M1911) + close-out (M1912)。 NEW kind 'sovereign-error-trio'。 174 typed surfaces cumulative。 496 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

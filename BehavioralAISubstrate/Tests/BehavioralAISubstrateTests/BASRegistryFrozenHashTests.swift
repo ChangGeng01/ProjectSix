@@ -145,6 +145,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// (M1908)。 NEW kind 'cross-module-bcm-hpc-
     /// schedule-error-trio' with mixed nested/top-
     /// level layout across 2 modules。
+    /// Re-captured at chapter 633 close-out。 Chapter
+    /// 633:BASSOVEREIGN ERROR TRIO CODABLE EXTENSION
+    /// — GAP-FILL,5th post-hexa-#3,1st BASSovereign
+    /// post-hexa-#3 touch covering trust anchor /
+    /// fingerprint store / token authority / host
+    /// version tree。 3 Error enums (BASSovereignHost
+    /// VersionTree.TreeError + BASSovereignFingerprint
+    /// Store.StoreError + BASSovereignTokenAuthority.
+    /// AuthorityError) all nested within host types
+    /// gained Codable at M1909 + 3 PROOF tests (M1910)
+    /// + NEW BASSovereignErrorTrioCodableExtension
+    /// Doctrine (M1911) + close-out (M1912)。 NEW
+    /// kind 'sovereign-error-trio' with all 3 nested-
+    /// in-host layout entirely within 1 module。
     static let frozenFullRegistrySha256: String =
-        "cb72c0dbdba4837806fc3e4fb01c4154f9797870bce9dcb6bf6d9b187e916754"
+        "f585a09b323d2b43dd240e96049f471e920ca01f249fa8c30f8ddfe25975671b"
 }

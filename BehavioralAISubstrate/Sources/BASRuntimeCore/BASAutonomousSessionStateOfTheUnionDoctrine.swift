@@ -110,19 +110,20 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 632
-    /// close-out (M1908 — cross-module BCM/HPC/Schedule
-    /// error trio Codable extension,4th post-hexa-#3,
-    /// 3rd BASMetalSubstrate touch + 1st BASLeaseLife
-    /// post-hexa-#3 touch;3 Error enums gained Codable;
-    /// NEW kind 'cross-module-bcm-hpc-schedule-error-
-    /// trio' with mixed nested/top-level layout across
-    /// 2 modules)。
-    public static let typedSurfaceCount: Int = 173
+    /// Cumulative achievement metrics at chapter 633
+    /// close-out (M1912 — BASSovereign error trio Codable
+    /// extension,5th post-hexa-#3,1st BASSovereign
+    /// post-hexa-#3 touch covering trust anchor /
+    /// fingerprint store / token authority / host
+    /// version tree;3 Error enums all nested within
+    /// host types gained Codable;NEW kind 'sovereign-
+    /// error-trio' with all 3 nested-in-host layout
+    /// entirely within 1 module)。
+    public static let typedSurfaceCount: Int = 174
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 492
-    public static let phase2CommitsShipped: Int = 953
-    public static let chapter2NumberLast: Int = 1908
+        Int = 496
+    public static let phase2CommitsShipped: Int = 957
+    public static let chapter2NumberLast: Int = 1912
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

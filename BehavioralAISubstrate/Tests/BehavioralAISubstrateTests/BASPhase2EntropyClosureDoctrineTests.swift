@@ -37,22 +37,23 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs632() {
+    func testLastChapterIs633() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百三十二",
-            "Chapter 六百三十二:CROSS-MODULE BCM/HPC/" +
-            "SCHEDULE ERROR TRIO CODABLE EXTENSION —" +
-            " GAP-FILL,4th post-hexa-#3,3rd BAS" +
-            "MetalSubstrate touch + 1st BASLeaseLife" +
-            " post-hexa-#3 touch。 3 Error enums gained" +
-            " Codable + 3 PROOF tests + BASCrossModule" +
-            "BCMHPCScheduleErrorTrioCodableExtension" +
+            "chapter 六百三十三",
+            "Chapter 六百三十三:BASSOVEREIGN ERROR TRIO" +
+            " CODABLE EXTENSION — GAP-FILL,5th post-" +
+            "hexa-#3,1st BASSovereign post-hexa-#3" +
+            " touch covering trust anchor / fingerprint" +
+            " store / token authority / host version" +
+            " tree。 3 Error enums all nested within" +
+            " host types gained Codable + 3 PROOF tests" +
+            " + BASSovereignErrorTrioCodableExtension" +
             "Doctrine typed surface + close-out。 NEW" +
-            " kind 'cross-module-bcm-hpc-schedule-error-" +
-            "trio'。 173 typed surfaces cumulative。 492" +
-            " consecutive byte-equality clean commits")
+            " kind 'sovereign-error-trio'。 174 typed" +
+            " surfaces cumulative。 496 consecutive" +
+            " byte-equality clean commits")
     }
 
     // MARK: - M-number range
