@@ -110,23 +110,25 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 640
-    /// close-out (M1940 — cross-module runtime-step
-    /// enum trio Codable extension,5th post-hexa-#4
-    /// gap-fill,FIRST non-Error-trio chapter in post-
-    /// hexa-#4 run — diversification away from the
-    /// error-trio pattern that dominated hexa #3+#4;
-    /// 3 non-Error control-flow step enums (BASEvent
-    /// ReplayRange + BASToolCallingPlanStep + BASShadow
-    /// TrialCoordinator.FinalizeOutcome) spanning 3
-    /// modules gained Codable;NEW kind 'runtime-step-
-    /// enum-trio';BASRuntimeCore+BASOrgan+BASMemory
-    /// all at 3rd-touch overall)。
-    public static let typedSurfaceCount: Int = 181
+    /// Cumulative achievement metrics at chapter 641
+    /// close-out (M1944 — categorization-enum trio
+    /// Codable extension,6th and FINAL post-hexa-#4
+    /// gap-fill,SECOND non-Error-trio chapter in
+    /// post-hexa-#4 run after chapter 640;3 non-Error
+    /// categorization enums (BASSovereignIntegrity
+    /// Sentinel.ArtifactKind + BASSovereignContamination
+    /// Guard.ArtifactKind + BASRoutingOrganAdapter.
+    /// Strategy) spanning 2 modules gained Codable;NEW
+    /// kind 'categorization-enum-trio';3rd BASSovereign
+    /// touch overall + 4th BASOrgan touch overall;
+    /// BASSovereign cumulative typed surfaces = 8 +
+    /// BASOrgan cumulative = 5;chapter 642 hexa #5
+    /// catalog opportunity next)。
+    public static let typedSurfaceCount: Int = 182
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 524
-    public static let phase2CommitsShipped: Int = 985
-    public static let chapter2NumberLast: Int = 1940
+        Int = 528
+    public static let phase2CommitsShipped: Int = 989
+    public static let chapter2NumberLast: Int = 1944
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

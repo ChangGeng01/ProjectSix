@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1940",
-            "M1940:doctrine version reflects chapter 六百四十 — CROSS-MODULE RUNTIME-STEP ENUM TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#4,FIRST non-Error-trio chapter in post-hexa-#4 run — diversification away from error-trio pattern that dominated hexa #3+#4。 3 non-Error control-flow step enums (BASEventReplayRange + BASToolCallingPlanStep + BASShadowTrialCoordinator.FinalizeOutcome) spanning 3 modules gained Codable at M1937 + 3 PROOF tests (M1938) + BASRuntimeStepEnumTrioCodableExtensionDoctrine typed surface (M1939) + close-out (M1940)。 NEW kind 'runtime-step-enum-trio'。 BASRuntimeCore+BASOrgan+BASMemory all at 3rd-touch overall。 181 typed surfaces cumulative。 524 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1944",
+            "M1944:doctrine version reflects chapter 六百四十一 — CATEGORIZATION-ENUM TRIO CODABLE EXTENSION — GAP-FILL,6th and FINAL post-hexa-#4,SECOND non-Error-trio chapter in post-hexa-#4 run after chapter 640。 3 non-Error categorization enums (BASSovereignIntegritySentinel.ArtifactKind + BASSovereignContaminationGuard.ArtifactKind + BASRoutingOrganAdapter.Strategy) spanning 2 modules gained Codable at M1941 + 3 PROOF tests (M1942) + BASCategorizationEnumTrioCodableExtensionDoctrine typed surface (M1943) + close-out (M1944)。 NEW kind 'categorization-enum-trio'。 3rd BASSovereign touch + 4th BASOrgan touch overall。 BASSovereign cumulative = 8 + BASOrgan = 5。 Chapter 642 hexa #5 catalog opportunity next。 182 typed surfaces cumulative。 528 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

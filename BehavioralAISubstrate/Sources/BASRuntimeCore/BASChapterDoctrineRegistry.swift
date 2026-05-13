@@ -16834,6 +16834,128 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1940。 524 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 641 — categorization-enum trio
+        // Codable extension (6th and FINAL post-hexa-#4
+        // gap-fill,SECOND non-Error-trio chapter in
+        // post-hexa-#4 run — chapter 642 hexa #5
+        // catalog opportunity next)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十一",
+            mNumberFirst: 1941,
+            mNumberLast: 1944,
+            v1MilestoneMNumber: 1944,
+            v1MilestoneStatus:
+                "chapter-641-categorization-enum-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1941, knife: "第一刀",
+                    concept: "Add Codable to 3 non-Error" +
+                        " categorization enums spanning" +
+                        " 2 modules — BASSovereign." +
+                        "BASSovereignIntegritySentinel." +
+                        "ArtifactKind (5-case String" +
+                        " enum,maps to BR-01..BR-07) +" +
+                        " BASSovereign.BASSovereign" +
+                        "ContaminationGuard.ArtifactKind" +
+                        " (4-case String enum) +" +
+                        " BASOrgan.BASRoutingOrganAdapter" +
+                        ".Strategy (3-case)。 All nested-" +
+                        "in-actor。"),
+                BASChapterKnife(
+                    mNumber: 1942, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1943, knife: "第三刀",
+                    concept: "NEW BASCategorizationEnum" +
+                        "TrioCodableExtensionDoctrine +" +
+                        " moduleCount = 2 (BASSovereign" +
+                        " + BASOrgan) + nestedInActorCount" +
+                        " = 3 + topLevelCount = 0 +" +
+                        " allTypesAreErrors = false" +
+                        " (SECOND non-Error-trio in" +
+                        " post-hexa-#4 run,after" +
+                        " chapter 640) + kindLabel=" +
+                        "'categorization-enum-trio'" +
+                        " (NEW kind) +" +
+                        " isSixthAndFinalPostHexaFour" +
+                        "GapFill +" +
+                        " isSecondNonErrorTrioPostHexaFour" +
+                        " + isThirdBASSovereignTouch" +
+                        "Overall + isFourthBASOrganTouch" +
+                        "Overall + cumulativeBAS" +
+                        "SovereignTypedSurfaces = 8 +" +
+                        " cumulativeBASOrganTypedSurfaces" +
+                        " = 5。 typed-surface count" +
+                        " 181 → 182。"),
+                BASChapterKnife(
+                    mNumber: 1944, knife: "第四刀",
+                    concept: "Chapter 641 close-out +" +
+                        " doctrine sync。 528 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6th and FINAL post-" +
+                        "hexa-#4 gap-fill — chapter 642" +
+                        " hexa #5 catalog meta-meta" +
+                        " milestone opportunity next。" +
+                        " Post-hexa-#4 arc completes" +
+                        " 18 types extended / 24 commits" +
+                        " / 7 distinct modules touched" +
+                        " across chapters 636-641。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-integrity-sentinel-artifact-kind-non-codable",
+                "bas-sovereign-contamination-guard-artifact-kind-non-codable",
+                "bas-routing-organ-adapter-strategy-non-codable",
+                "categorization-enum-trio-pattern-uncaptured",
+                "sixth-and-final-post-hexa-four-gap-fill-not-shipped",
+                "post-hexa-four-arc-not-closed-out"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1944",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "categorization-enum-trio-codable-extension",
+                "sixth-and-final-post-hexa-four-gap-fill",
+                "second-non-error-trio-post-hexa-four",
+                "third-bas-sovereign-touch-overall",
+                "fourth-bas-organ-touch-overall",
+                "cumulative-8-bas-sovereign-typed-surfaces",
+                "cumulative-5-bas-organ-typed-surfaces",
+                "new-kind-label-categorization-enum-trio",
+                "528-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 642 hexa #5" +
+                " catalog meta-meta milestone" +
+                " cataloging 6 post-hexa-#4 gap-fills" +
+                " (636-641)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 641 ships categorization-" +
+                "enum trio Codable extension — 6th and" +
+                " FINAL post-hexa-#4 gap-fill chapter," +
+                " SECOND non-Error-trio chapter in post-" +
+                "hexa-#4 run (after chapter 640 runtime-" +
+                "step-enum-trio)。 3 non-Error" +
+                " categorization enums (2 ArtifactKind +" +
+                " 1 Strategy) spanning 2 modules gained" +
+                " Codable at M1941 + 3 PROOF tests" +
+                " (M1942) + new typed surface (M1943)" +
+                " + close-out (M1944)。 NEW kind" +
+                " 'categorization-enum-trio'。 BAS" +
+                "Sovereign cumulative typed surfaces" +
+                " = 8 + BASOrgan cumulative = 5。" +
+                " 182 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1944。 528 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 Post-hexa-#4 arc" +
+                " sealed — chapter 642 hexa #5 catalog" +
+                " opportunity next。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

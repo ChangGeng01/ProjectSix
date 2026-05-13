@@ -37,28 +37,29 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs640() {
+    func testLastChapterIs641() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十",
-            "Chapter 六百四十:CROSS-MODULE RUNTIME-STEP" +
-            " ENUM TRIO CODABLE EXTENSION — GAP-FILL," +
-            "5th post-hexa-#4,FIRST non-Error-trio" +
-            " chapter in post-hexa-#4 run —" +
-            " diversification away from error-trio" +
-            " pattern that dominated hexa #3+#4。 3" +
-            " non-Error control-flow step enums" +
-            " (BASEventReplayRange + BASToolCallingPlan" +
-            "Step + BASShadowTrialCoordinator.Finalize" +
-            "Outcome) spanning 3 modules gained Codable" +
-            " + 3 PROOF tests + BASRuntimeStepEnumTrio" +
-            "CodableExtensionDoctrine typed surface +" +
-            " close-out。 NEW kind 'runtime-step-enum-" +
-            "trio'。 BASRuntimeCore+BASOrgan+BASMemory" +
-            " all at 3rd-touch overall。 181 typed" +
-            " surfaces cumulative。 524 consecutive" +
-            " byte-equality clean commits")
+            "chapter 六百四十一",
+            "Chapter 六百四十一:CATEGORIZATION-ENUM TRIO" +
+            " CODABLE EXTENSION — GAP-FILL,6th and" +
+            " FINAL post-hexa-#4,SECOND non-Error-trio" +
+            " chapter in post-hexa-#4 run after chapter" +
+            " 640。 3 non-Error categorization enums" +
+            " (BASSovereignIntegritySentinel.ArtifactKind" +
+            " + BASSovereignContaminationGuard.ArtifactKind" +
+            " + BASRoutingOrganAdapter.Strategy) spanning" +
+            " 2 modules gained Codable + 3 PROOF tests" +
+            " + BASCategorizationEnumTrioCodable" +
+            "ExtensionDoctrine typed surface + close-out。" +
+            " NEW kind 'categorization-enum-trio'。 3rd" +
+            " BASSovereign touch + 4th BASOrgan touch" +
+            " overall。 BASSovereign cumulative = 8 +" +
+            " BASOrgan = 5。 Chapter 642 hexa #5 catalog" +
+            " opportunity next。 182 typed surfaces" +
+            " cumulative。 528 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

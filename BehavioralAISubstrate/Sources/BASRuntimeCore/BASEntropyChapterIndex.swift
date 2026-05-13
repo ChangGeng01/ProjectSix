@@ -4242,7 +4242,33 @@ public enum BASEntropyChapterIndex {
                 "touch overall。 181 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1940。" +
                 " 524 consecutive byte-equality clean" +
-                " commits。 V1 byte-equality preserved。")
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十一",
+            mNumberFirst: 1941, mNumberLast: 1944,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "CATEGORIZATION-ENUM TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,6th and FINAL" +
+                " post-hexa-#4,SECOND non-Error-trio" +
+                " chapter in post-hexa-#4 run after" +
+                " chapter 640。 3 non-Error categorization" +
+                " enums (BASSovereignIntegritySentinel." +
+                "ArtifactKind + BASSovereignContamination" +
+                "Guard.ArtifactKind + BASRoutingOrgan" +
+                "Adapter.Strategy) spanning 2 modules" +
+                " gained Codable at M1941 + 3 PROOF" +
+                " tests (M1942) + new typed surface" +
+                " (M1943) + close-out (M1944)。 NEW kind" +
+                " 'categorization-enum-trio'。 3rd BAS" +
+                "Sovereign touch overall + 4th BASOrgan" +
+                " touch overall。 BASSovereign cumulative" +
+                " typed surfaces = 8 + BASOrgan cumulative" +
+                " = 5。 182 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1944。 528 consecutive" +
+                " byte-equality clean commits。 Chapter" +
+                " 642 hexa #5 catalog opportunity next。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

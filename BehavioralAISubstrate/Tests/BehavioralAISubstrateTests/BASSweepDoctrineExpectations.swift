@@ -116,21 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1940:24 + 20 + 194 = 238 (chapter
-    /// 640 — cross-module runtime-step enum trio
-    /// Codable extension,5th post-hexa-#4,FIRST non-
-    /// Error-trio chapter in post-hexa-#4 run)
-    public static let phase2ChapterCount: Int = 238
+    /// added)。 At M1944:24 + 20 + 195 = 239 (chapter
+    /// 641 — categorization-enum trio Codable extension,
+    /// 6th and FINAL post-hexa-#4 gap-fill — chapter 642
+    /// hexa #5 catalog opportunity next)
+    public static let phase2ChapterCount: Int = 239
 
-    /// Phase 2 commits shipped。 At M1940:125 + 84 +
-    /// 776 = 985 (chapter 640 = 4 cuts — runtime-step-
+    /// Phase 2 commits shipped。 At M1944:125 + 84 +
+    /// 780 = 989 (chapter 641 = 4 cuts — categorization-
     /// enum trio + 3 PROOF + typed surface + close-out)
-    public static let phase2CommitsShipped: Int = 985
+    public static let phase2CommitsShipped: Int = 989
 
-    /// Phase 2 mNumberLast。 At M1940:chapter 640 —
-    /// cross-module runtime-step enum trio。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1940
+    /// Phase 2 mNumberLast。 At M1944:chapter 641 —
+    /// categorization-enum trio。 SWEEP stays frozen
+    /// at 1163。
+    public static let phase2MNumberLast: Int = 1944
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

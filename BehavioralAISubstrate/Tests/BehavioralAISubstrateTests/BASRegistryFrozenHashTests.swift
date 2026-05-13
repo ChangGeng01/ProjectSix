@@ -272,6 +272,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// (M1939) + close-out (M1940)。 NEW kind 'runtime-
     /// step-enum-trio'。 BASRuntimeCore+BASOrgan+BAS
     /// Memory all at 3rd-touch overall。
+    /// Re-captured at chapter 641 close-out。 Chapter
+    /// 641:CATEGORIZATION-ENUM TRIO CODABLE EXTENSION
+    /// — GAP-FILL,6th and FINAL post-hexa-#4,SECOND
+    /// non-Error-trio chapter in post-hexa-#4 run after
+    /// chapter 640。 3 non-Error categorization enums
+    /// (BASSovereignIntegritySentinel.ArtifactKind +
+    /// BASSovereignContaminationGuard.ArtifactKind +
+    /// BASRoutingOrganAdapter.Strategy) spanning 2
+    /// modules gained Codable at M1941 + 3 PROOF tests
+    /// (M1942) + NEW BASCategorizationEnumTrioCodable
+    /// ExtensionDoctrine (M1943) + close-out (M1944)。
+    /// NEW kind 'categorization-enum-trio'。 3rd BAS
+    /// Sovereign touch + 4th BASOrgan touch overall。
+    /// BASSovereign cumulative = 8 + BASOrgan = 5。
+    /// Chapter 642 hexa #5 catalog opportunity next。
     static let frozenFullRegistrySha256: String =
-        "a909efdd1d160c0b3dec781946580dca9ac2eeafb392c4372488a8f0bbb4d338"
+        "8bb01c321683da0c2adb16b86ea48d7560a2c4a6667986a04ac595ff54ab02ac"
 }

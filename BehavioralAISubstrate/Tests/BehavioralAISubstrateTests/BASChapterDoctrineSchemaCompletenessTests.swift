@@ -2255,7 +2255,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十")!)
+                            "chapter 六百四十")!),
+            // M1944 chapter 641 — categorization-enum trio Codable extension gap-fill (6th and FINAL post-hexa-#4, 2nd non-Error-trio in post-hexa-#4 run)
+            checkRegistry("六百四十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3871,6 +3877,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十")!
+                .mNumberLast),
+            // M1944 chapter 641 — categorization-enum trio Codable extension gap-fill (6th and FINAL post-hexa-#4)
+            ("641",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
