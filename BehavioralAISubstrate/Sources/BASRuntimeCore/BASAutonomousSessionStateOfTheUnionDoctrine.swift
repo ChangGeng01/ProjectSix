@@ -110,25 +110,23 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 649
-    /// close-out (M1976 — 6TH GAP-FILL HEXA CATALOG
-    /// META-META MILESTONE;NEW BASGapFillHexaSix
-    /// CompletionDoctrine cataloging 6 post-hexa-#5
-    /// gap-fill chapters 643-648 — 18 BASSovereign
-    /// types extended / 24 commits / 1 module touched;
-    /// DISTINCTIVE FEATURE FIRST entirely-single-module
-    /// hexa (hexa #1-#5 each spanned 4-7 modules);
-    /// DEEPEST recursive Codable proof shipped (3-level
-    /// at ch647);Set<T> composition pattern
-    /// demonstrated;BASSovereign cumulative grew 8 →
-    /// 26 over hexa #6;catalog lineage M1805 post-octa
-    /// → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3
-    /// → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6)。
-    public static let typedSurfaceCount: Int = 190
+    /// Cumulative achievement metrics at chapter 650
+    /// close-out (M1980 — BASRuntimeCore knowledge-mesh
+    /// trio Codable extension,1st post-hexa-#6 gap-fill,
+    /// ROUND-NUMBER chapter 650,returns to multi-module
+    /// coverage after entirely-BASSovereign hexa #6;
+    /// 4th BASRuntimeCore touch overall;3 BASRuntime
+    /// Core types (BASKnowledgeGraphError + SlotDiff +
+    /// BAS14LayerMeshAssemblyReport) gained Codable;
+    /// NEW kind 'runtime-core-knowledge-mesh-trio';
+    /// Dict<Codable-Hashable-Key, V: Codable> + Optional
+    /// <T: Codable> composition patterns demonstrated;
+    /// BASRuntimeCore cumulative typed surfaces = 8)。
+    public static let typedSurfaceCount: Int = 191
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 560
-    public static let phase2CommitsShipped: Int = 1021
-    public static let chapter2NumberLast: Int = 1976
+        Int = 564
+    public static let phase2CommitsShipped: Int = 1025
+    public static let chapter2NumberLast: Int = 1980
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

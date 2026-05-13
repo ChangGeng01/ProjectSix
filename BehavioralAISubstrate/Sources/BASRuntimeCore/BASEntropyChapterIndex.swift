@@ -4498,7 +4498,34 @@ public enum BASEntropyChapterIndex {
                 " (+1) — hits 190-surface milestone。" +
                 " ADR-016 → M1976。 560 consecutive" +
                 " byte-equality clean commits。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十",
+            mNumberFirst: 1977, mNumberLast: 1980,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 18, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE KNOWLEDGE-MESH" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,1st" +
+                " post-hexa-#6,ROUND-NUMBER chapter 650," +
+                "returns to multi-module coverage after" +
+                " entirely-BASSovereign hexa #6 cycle。" +
+                " 4th BASRuntimeCore touch overall。 3" +
+                " BASRuntimeCore types (BASKnowledgeGraph" +
+                "Error + BASMeshSyncFrameApplier.SlotDiff" +
+                " + BAS14LayerMeshAssemblyReport) gained" +
+                " Codable at M1977 + BAS14LayerMeshAssembly" +
+                "Report also gained Equatable + 3 PROOF" +
+                " tests (M1978) + new typed surface" +
+                " (M1979) + close-out (M1980)。 NEW kind" +
+                " 'runtime-core-knowledge-mesh-trio'。" +
+                " Dict<Codable-Hashable-Key, V: Codable>" +
+                " + Optional<T: Codable> composition" +
+                " patterns demonstrated。 BASRuntimeCore" +
+                " cumulative typed surfaces = 8。 191" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1980。 564 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -17918,6 +17918,127 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1976。 560 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 650 — BASRuntimeCore knowledge-mesh
+        // trio Codable extension (1st post-hexa-#6 gap-
+        // fill,ROUND-NUMBER chapter,returns to multi-
+        // module coverage)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十",
+            mNumberFirst: 1977,
+            mNumberLast: 1980,
+            v1MilestoneMNumber: 1980,
+            v1MilestoneStatus:
+                "chapter-650-runtime-core-knowledge-mesh-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1977, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "RuntimeCore types — BAS" +
+                        "KnowledgeGraphError (3-case top-" +
+                        "level enum) + BASMeshSyncFrame" +
+                        "Applier.SlotDiff (5-field nested-" +
+                        "in-actor struct) + BAS14Layer" +
+                        "MeshAssemblyReport (3-field top-" +
+                        "level struct,also gained" +
+                        " Equatable)。 Demonstrates Dict<" +
+                        "Codable-Hashable-Key, V> + Optional" +
+                        "<T: Codable> composition" +
+                        " patterns。"),
+                BASChapterKnife(
+                    mNumber: 1978, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1979, knife: "第三刀",
+                    concept: "NEW BASRuntimeCoreKnowledge" +
+                        "MeshTrioCodableExtensionDoctrine" +
+                        " + moduleCount = 1 + topLevel" +
+                        "Count = 2 + nestedInActorCount" +
+                        " = 1 + structCount = 2 +" +
+                        " enumCount = 1 + allTypesAre" +
+                        "Errors = false + kindLabel=" +
+                        "'runtime-core-knowledge-mesh-" +
+                        "trio' (NEW kind) +" +
+                        " isFirstPostHexaSixGapFill +" +
+                        " isRoundNumberChapter (chapter" +
+                        " 650) + returnsToMultiModule" +
+                        "Coverage + isFourthBAS" +
+                        "RuntimeCoreTouchOverall +" +
+                        " cumulativeBASRuntimeCoreTyped" +
+                        "Surfaces = 8 +" +
+                        " demonstratesDictCodable" +
+                        "Composition +" +
+                        " demonstratesOptionalCodable" +
+                        "Composition。 typed-surface" +
+                        " count 190 → 191。"),
+                BASChapterKnife(
+                    mNumber: 1980, knife: "第四刀",
+                    concept: "Chapter 650 close-out +" +
+                        " doctrine sync。 564 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 ROUND-NUMBER chapter" +
+                        " 650 — opens post-hexa-#6 arc。" +
+                        " 5 more chapters to chapter 655" +
+                        " hexa #7 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-knowledge-graph-error-non-codable",
+                "bas-mesh-sync-slot-diff-non-codable",
+                "bas-14-layer-mesh-assembly-report-non-codable",
+                "runtime-core-knowledge-mesh-trio-pattern-uncaptured",
+                "first-post-hexa-six-gap-fill-not-shipped",
+                "dict-codable-composition-pattern-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1980",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "runtime-core-knowledge-mesh-trio-codable-extension",
+                "first-post-hexa-six-gap-fill",
+                "round-number-chapter-650",
+                "returns-to-multi-module-coverage",
+                "fourth-bas-runtime-core-touch-overall",
+                "cumulative-8-bas-runtime-core-typed-surfaces",
+                "dict-codable-composition-demonstrated",
+                "optional-codable-composition-demonstrated",
+                "new-kind-label-runtime-core-knowledge-mesh-trio",
+                "564-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 5 more gap-fill chapters" +
+                " (651-655) toward chapter 655 hexa #7" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 650 ships BASRuntimeCore" +
+                " knowledge-mesh trio Codable extension" +
+                " — 1st post-hexa-#6 gap-fill chapter," +
+                " ROUND-NUMBER chapter 650,returns to" +
+                " multi-module coverage after entirely-" +
+                "BASSovereign hexa #6 cycle。 4th BAS" +
+                "RuntimeCore touch overall。 3 BAS" +
+                "RuntimeCore types (BASKnowledgeGraph" +
+                "Error + SlotDiff + BAS14LayerMeshAssembly" +
+                "Report) gained Codable at M1977 +" +
+                " BAS14LayerMeshAssemblyReport also" +
+                " gained Equatable + 3 PROOF tests" +
+                " (M1978) + new typed surface (M1979)" +
+                " + close-out (M1980)。 NEW kind" +
+                " 'runtime-core-knowledge-mesh-trio'。" +
+                " Demonstrates Dict<Codable-Hashable-" +
+                "Key, V: Codable> + Optional<T: Codable>" +
+                " composition patterns (NEW pattern" +
+                " demonstrations)。 BASRuntimeCore" +
+                " cumulative typed surfaces = 8。" +
+                " 191 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1980。 564 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

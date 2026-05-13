@@ -37,25 +37,28 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs649() {
+    func testLastChapterIs650() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十九",
-            "Chapter 六百四十九:6TH GAP-FILL HEXA" +
-            " CATALOG META-META MILESTONE。 NEW BASGap" +
-            "FillHexaSixCompletionDoctrine cataloging" +
-            " 6 post-hexa-#5 gap-fill chapters (643-" +
-            "648) — 18 BASSovereign types / 24 commits" +
-            " / 1 module touched。 DISTINCTIVE FEATURE" +
-            " FIRST entirely-single-module hexa。" +
-            " DEEPEST recursive Codable proof shipped" +
-            " + Set<T> composition demonstrated。 NEW" +
-            " catalog + 54 anti-drift PROOF tests + 15" +
-            " wire-in PROOF tests + close-out。 Catalog" +
-            " lineage M1805 → M1833 → M1861 → M1889 →" +
-            " M1917 → M1945 → M1973。 190 typed surfaces" +
-            " — hits 190-surface milestone。 560" +
+            "chapter 六百五十",
+            "Chapter 六百五十:BASRUNTIMECORE KNOWLEDGE-" +
+            "MESH TRIO CODABLE EXTENSION — GAP-FILL,1st" +
+            " post-hexa-#6,ROUND-NUMBER chapter 650," +
+            "returns to multi-module coverage after" +
+            " entirely-BASSovereign hexa #6。 4th BAS" +
+            "RuntimeCore touch overall。 3 BASRuntime" +
+            "Core types (BASKnowledgeGraphError +" +
+            " BASMeshSyncFrameApplier.SlotDiff + BAS14" +
+            "LayerMeshAssemblyReport) gained Codable +" +
+            " 3 PROOF tests + BASRuntimeCoreKnowledge" +
+            "MeshTrioCodableExtensionDoctrine typed" +
+            " surface + close-out。 NEW kind 'runtime-" +
+            "core-knowledge-mesh-trio'。 Dict<Codable-" +
+            "Hashable-Key, V: Codable> + Optional<T:" +
+            " Codable> composition patterns demonstrated。" +
+            " BASRuntimeCore cumulative typed surfaces" +
+            " = 8。 191 typed surfaces cumulative。 564" +
             " consecutive byte-equality clean commits")
     }
 

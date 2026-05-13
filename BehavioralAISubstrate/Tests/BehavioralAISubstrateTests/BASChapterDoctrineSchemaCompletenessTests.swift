@@ -2309,7 +2309,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十九")!)
+                            "chapter 六百四十九")!),
+            // M1980 chapter 650 — BASRuntimeCore knowledge-mesh trio Codable extension gap-fill (1st post-hexa-#6, ROUND-NUMBER chapter)
+            checkRegistry("六百五十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3997,6 +4003,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十九")!
+                .mNumberLast),
+            // M1980 chapter 650 — BASRuntimeCore knowledge-mesh trio Codable extension gap-fill (1st post-hexa-#6, ROUND-NUMBER chapter)
+            ("650",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

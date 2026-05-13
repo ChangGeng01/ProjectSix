@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1976",
-            "M1976:doctrine version reflects chapter 六百四十九 — 6TH GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaSixCompletionDoctrine cataloging 6 post-hexa-#5 gap-fill chapters (643-648) — 18 BASSovereign types extended / 24 commits / 1 module touched。 DISTINCTIVE FEATURE FIRST entirely-single-module hexa (hexa #1-#5 each spanned 4-7 modules)。 DEEPEST recursive Codable proof shipped + Set<T> composition pattern demonstrated。 NEW catalog (M1973) + 54 anti-drift PROOF tests (M1974) + 15 wire-in PROOF tests (M1975) + close-out (M1976)。 Catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6。 190 typed surfaces cumulative — hits 190-surface milestone。 560 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1980",
+            "M1980:doctrine version reflects chapter 六百五十 — BASRUNTIMECORE KNOWLEDGE-MESH TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#6,ROUND-NUMBER chapter 650。 4th BASRuntimeCore touch overall。 3 BASRuntimeCore types (BASKnowledgeGraphError + BASMeshSyncFrameApplier.SlotDiff + BAS14LayerMeshAssemblyReport) gained Codable at M1977 + 3 PROOF tests (M1978) + BASRuntimeCoreKnowledgeMeshTrioCodableExtensionDoctrine typed surface (M1979) + close-out (M1980)。 NEW kind 'runtime-core-knowledge-mesh-trio'。 Dict<Codable-Hashable-Key, V: Codable> + Optional<T: Codable> composition patterns demonstrated。 BASRuntimeCore cumulative typed surfaces = 8。 191 typed surfaces cumulative。 564 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

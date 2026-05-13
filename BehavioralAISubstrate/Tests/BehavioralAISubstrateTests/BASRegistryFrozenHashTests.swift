@@ -414,6 +414,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa
     /// #6。 190 typed surfaces — hits 190-surface
     /// milestone。
+    /// Re-captured at chapter 650 close-out。 Chapter
+    /// 650:BASRUNTIMECORE KNOWLEDGE-MESH TRIO CODABLE
+    /// EXTENSION — GAP-FILL,1st post-hexa-#6,ROUND-
+    /// NUMBER chapter 650。 4th BASRuntimeCore touch
+    /// overall。 3 BASRuntimeCore types (BASKnowledge
+    /// GraphError + BASMeshSyncFrameApplier.SlotDiff +
+    /// BAS14LayerMeshAssemblyReport) gained Codable at
+    /// M1977 + 3 PROOF tests (M1978) + NEW BASRuntime
+    /// CoreKnowledgeMeshTrioCodableExtensionDoctrine
+    /// (M1979) + close-out (M1980)。 NEW kind 'runtime-
+    /// core-knowledge-mesh-trio'。 Dict<Codable-Hashable-
+    /// Key, V: Codable> + Optional<T: Codable>
+    /// composition patterns demonstrated。 BASRuntime
+    /// Core cumulative typed surfaces = 8。
     static let frozenFullRegistrySha256: String =
-        "1e03f38d073494b0ec9a8391ba8025dacde5b94077c308ccf4ea15bc609cb676"
+        "b91749471fb525e1c6d16d86fc106b6076c1745c1683e863cdd296fbba2f34dd"
 }
