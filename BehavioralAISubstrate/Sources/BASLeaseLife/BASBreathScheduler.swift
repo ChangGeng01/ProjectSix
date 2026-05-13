@@ -34,7 +34,9 @@ import BASRuntimeCore
 ///   `.standard` and `.deferred` are pushed out further or rejected.
 /// - Under `.watch` / `.nominal` → anything goes, caller's call.
 public actor BASBreathScheduler {
-    public enum ScheduleError: Error, Equatable, Sendable {
+    public enum ScheduleError:
+        Error, Equatable, Sendable, Codable
+    {
         case thermalEmergencyRejectsAll
         case classRejectedAtGuard(
             guardLevel: BASThermalGuardLevel,

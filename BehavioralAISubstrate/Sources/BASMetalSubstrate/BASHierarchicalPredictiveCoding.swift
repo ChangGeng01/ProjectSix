@@ -245,7 +245,7 @@ public struct BASHierarchicalPredictiveCodingSnapshot:
 // MARK: - Typed errors
 
 public enum BASHierarchicalPredictiveCodingError:
-    Error, Equatable, Sendable
+    Error, Equatable, Sendable, Codable
 {
     case emptyLayers
     case shapeMismatch(reason: String)

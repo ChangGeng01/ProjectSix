@@ -151,7 +151,7 @@ public struct BASBCMMetaPlasticityUpdate:
 // MARK: - Typed error
 
 public enum BASBCMMetaPlasticityError:
-    Error, Equatable, Sendable
+    Error, Equatable, Sendable, Codable
 {
     case shapeMismatch(reason: String)
 }
