@@ -226,7 +226,9 @@ public final class BASUpdateTicketLifecycleJSONFileStorage:
 }
 
 public actor BASUpdateTicketLifecycleCoordinator {
-    public enum LifecycleError: Error, Equatable, Sendable {
+    public enum LifecycleError:
+        Error, Equatable, Sendable, Codable
+    {
         case unknownTicket(id: String)
         case duplicateTicket(id: String)
         case illegalTransition(
@@ -234,7 +236,9 @@ public actor BASUpdateTicketLifecycleCoordinator {
             to: BASUpdateTicketLifecycleState)
     }
 
-    public enum TrialOutcome: Sendable, Equatable {
+    public enum TrialOutcome:
+        Sendable, Equatable, Codable
+    {
         case passed(reasonCodes: [String])
         case failed(reasonCodes: [String])
         case contaminated(reasonCodes: [String])
