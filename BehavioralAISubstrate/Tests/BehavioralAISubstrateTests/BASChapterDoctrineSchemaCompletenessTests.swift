@@ -2237,7 +2237,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十七")!)
+                            "chapter 六百三十七")!),
+            // M1932 chapter 638 — BASSovereign secondary error trio Codable extension gap-fill (3rd post-hexa-#4, complements chapter 633 primary trio)
+            checkRegistry("六百三十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3829,6 +3835,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十七")!
+                .mNumberLast),
+            // M1932 chapter 638 — BASSovereign secondary error trio Codable extension gap-fill (3rd post-hexa-#4)
+            ("638",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

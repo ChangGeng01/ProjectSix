@@ -4164,7 +4164,33 @@ public enum BASEntropyChapterIndex {
                 "error-trio'。 178 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1928。" +
                 " 512 consecutive byte-equality clean" +
-                " commits。 V1 byte-equality preserved。")
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十八",
+            mNumberFirst: 1929, mNumberLast: 1932,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN SECONDARY ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,3rd post-" +
+                "hexa-#4,2nd BASSovereign touch overall" +
+                " complementing chapter 633 primary trio。" +
+                " 1st BASSovereign post-hexa-#4 touch。" +
+                " 3 Error enums (BASSovereignLedger" +
+                "SQLiteStorage.StorageError + BAS" +
+                "SovereignSnapshotManager.ManagerError" +
+                " + BASSovereignIntegritySentinel." +
+                "SentinelError) covering ledger / snapshot" +
+                " / sentinel domains gained Codable at" +
+                " M1929 + StorageError also gained" +
+                " Sendable (was missing) + 3 PROOF tests" +
+                " (M1930) + new typed surface (M1931) +" +
+                " close-out (M1932)。 NEW kind 'sovereign-" +
+                "secondary-error-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 6。 179" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1932。 516 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

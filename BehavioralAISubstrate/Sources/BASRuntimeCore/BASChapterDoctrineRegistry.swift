@@ -16484,6 +16484,124 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1928。" +
                 " 512 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 638 — BASSovereign secondary error
+        // trio Codable extension (3rd post-hexa-#4 gap-
+        // fill,2nd BASSovereign touch overall;
+        // complements chapter 633 primary trio)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十八",
+            mNumberFirst: 1929,
+            mNumberLast: 1932,
+            v1MilestoneMNumber: 1932,
+            v1MilestoneStatus:
+                "chapter-638-sovereign-secondary-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1929, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign Error enums covering" +
+                        " ledger storage / snapshot" +
+                        " manager / integrity sentinel" +
+                        " domains — BASSovereignLedger" +
+                        "SQLiteStorage.StorageError" +
+                        " (5-case nested-in-class) +" +
+                        " BASSovereignSnapshotManager." +
+                        "ManagerError (5-case nested-in-" +
+                        "actor) + BASSovereignIntegrity" +
+                        "Sentinel.SentinelError (1-case" +
+                        " nested-in-actor)。 StorageError" +
+                        " also gained Sendable" +
+                        " conformance (was missing it)。"),
+                BASChapterKnife(
+                    mNumber: 1930, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1931, knife: "第三刀",
+                    concept: "NEW BASSovereignSecondary" +
+                        "ErrorTrioCodableExtension" +
+                        "Doctrine + moduleCount = 1" +
+                        " (BASSovereign entirely) +" +
+                        " nestedInActorCount = 2 +" +
+                        " nestedInClassCount = 1 +" +
+                        " topLevelCount = 0 + kindLabel=" +
+                        "'sovereign-secondary-error-trio'" +
+                        " (NEW kind,complements chapter" +
+                        " 633 'sovereign-error-trio') +" +
+                        " isThirdPostHexaFourGapFill +" +
+                        " isSecondBASSovereignTouch" +
+                        "Overall + isFirstBASSovereign" +
+                        "PostHexaFour +" +
+                        " cumulativeBASSovereignTyped" +
+                        "Surfaces = 6 (ch633's 3 +" +
+                        " ch638's 3)。 typed-surface" +
+                        " count 178 → 179。"),
+                BASChapterKnife(
+                    mNumber: 1932, knife: "第四刀",
+                    concept: "Chapter 638 close-out +" +
+                        " doctrine sync。 516 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 3rd post-hexa-#4" +
+                        " gap-fill — 3 more chapters" +
+                        " (639-641) to chapter 642 hexa" +
+                        " #5 catalog opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-ledger-sqlite-storage-error-non-codable",
+                "bas-sovereign-snapshot-manager-error-non-codable",
+                "bas-sovereign-integrity-sentinel-error-non-codable",
+                "sovereign-secondary-error-trio-pattern-uncaptured",
+                "third-post-hexa-four-gap-fill-not-shipped",
+                "bas-sovereign-storage-error-missing-sendable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1932",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-secondary-error-trio-codable-extension",
+                "third-post-hexa-four-gap-fill",
+                "second-bas-sovereign-touch-overall",
+                "first-bas-sovereign-post-hexa-four",
+                "cumulative-6-bas-sovereign-typed-surfaces",
+                "new-kind-label-sovereign-secondary-error-trio",
+                "sendable-conformance-added-to-storage-error",
+                "516-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 3 more gap-fill chapters" +
+                " (639-641) toward chapter 642 hexa #5" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 638 ships BASSovereign" +
+                " secondary error trio Codable extension" +
+                " — 3rd post-hexa-#4 gap-fill chapter," +
+                " 2nd BASSovereign touch overall" +
+                " (complements chapter 633 primary trio" +
+                " covering trust anchor / fingerprint" +
+                " store / token authority / host version" +
+                " tree)。 3 Error enums (BASSovereign" +
+                "LedgerSQLiteStorage.StorageError +" +
+                " BASSovereignSnapshotManager.ManagerError" +
+                " + BASSovereignIntegritySentinel." +
+                "SentinelError) gained Codable at M1929" +
+                " + StorageError gained Sendable (was" +
+                " missing) + 3 PROOF tests (M1930) +" +
+                " new typed surface (M1931) + close-out" +
+                " (M1932)。 NEW kind 'sovereign-" +
+                "secondary-error-trio' covers ledger /" +
+                " snapshot / sentinel secondary" +
+                " subsystems。 BASSovereign cumulative" +
+                " typed surfaces = 6 (ch633's 3 +" +
+                " ch638's 3)。 179 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1932。" +
+                " 516 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

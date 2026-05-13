@@ -291,7 +291,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百三十四",   // M1913-M1916 (CROSS-MODULE BASORGAN/BASOBSERVABILITY/BASORCHESTRATION ERROR TRIO CODABLE EXTENSION — GAP-FILL,6th post-hexa-#3 FINAL before hexa #4 opportunity,1st BASOrgan + 1st BASObservability + 1st BASOrchestration post-hexa-#3 touches all in same chapter;3 Error enums (BASToolDispatchError + BASUpdateTicketLifecycleSQLiteStorage.SQLiteError + BASWorldAwareRiskBridge.BridgeError) spanning 3 modules with mixed top-level/nested-in-class/nested-in-actor layout gained Codable + 3 PROOF tests + BASOrganObservabilityOrchestrationErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'organ-observability-orchestration-error-trio';500 consecutive byte-equality clean commits ROUND-NUMBER MILESTONE)
         "chapter 六百三十五",   // M1917-M1920 (4TH GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaFourCompletionDoctrine cataloging 6 post-hexa-#3 gap-fill chapters (629-634) — 18 types extended / 24 commits / 7 distinct modules touched matches hexa #3 and FAR exceeds hexa #1+#2's 4 each;FIRST hexa where every entry is an error-trio variant — distinctive 'all-error-trio' theme + 6 distinct kind buckets each appearing exactly once;NEW catalog (M1917) + 44 anti-drift PROOF tests (M1918) + 15 wire-in PROOF tests cross-checking 6 source doctrines (M1919) + close-out (M1920);PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2 + chapter 628 hexa #3;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4;176 typed surfaces cumulative;504 consecutive byte-equality clean commits)
         "chapter 六百三十六",   // M1921-M1924 (CROSS-MODULE BASWORLDPRIOR + BASAPPLEADAPTERS ERROR TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#4,FIRST BASWorldPrior touch in any hexa cycle (module entirely untouched through hexa #1+#2+#3+#4) + 2nd BASAppleAdapters touch overall;3 Error enums (BASWorldPriorVault.VaultError + BASWorldPriorCounterfactualSeeder.SeederError + BASCoreMLAdapterError) gained Codable + 3 PROOF tests + BASWorldPriorCoreMLErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'world-prior-coreml-error-trio' opens post-hexa-#4 arc into previously-untouched territory)
-        "chapter 六百三十七"    // M1925-M1928 (BASRUNTIMECORE SQLITE STORAGE ERROR TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#4,structural triple-mirror that PARALLELS chapter 629 BASMemory SQLite trio in a different module;1st BASRuntimeCore post-hexa-#4 touch + 2nd BASRuntimeCore touch overall;3 Error enums (BASSQLiteEventLogStorage.StorageError + BASSQLiteEvalRunStorage.StorageError + BASSQLiteKnowledgeGraphStorage.StorageError) all nested-in-actor gained Codable + 3 PROOF tests + BASRuntimeCoreSQLiteErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-sqlite-error-trio')
+        "chapter 六百三十七",   // M1925-M1928 (BASRUNTIMECORE SQLITE STORAGE ERROR TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#4,structural triple-mirror that PARALLELS chapter 629 BASMemory SQLite trio in a different module;1st BASRuntimeCore post-hexa-#4 touch + 2nd BASRuntimeCore touch overall;3 Error enums (BASSQLiteEventLogStorage.StorageError + BASSQLiteEvalRunStorage.StorageError + BASSQLiteKnowledgeGraphStorage.StorageError) all nested-in-actor gained Codable + 3 PROOF tests + BASRuntimeCoreSQLiteErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-sqlite-error-trio')
+        "chapter 六百三十八"    // M1929-M1932 (BASSOVEREIGN SECONDARY ERROR TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#4,2nd BASSovereign touch overall complementing chapter 633 primary trio;1st BASSovereign post-hexa-#4 touch;3 Error enums (BASSovereignLedgerSQLiteStorage.StorageError + BASSovereignSnapshotManager.ManagerError + BASSovereignIntegritySentinel.SentinelError) covering ledger/snapshot/sentinel domains gained Codable + StorageError also gained Sendable (was missing) + 3 PROOF tests + BASSovereignSecondaryErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-secondary-error-trio';BASSovereign cumulative typed surfaces = 6)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -308,15 +309,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1928
+    public static let mNumberLast: Int = 1932
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1928)。 Bumped through chapter 637:969 → 973。
-    /// Chapter 637:BASRuntimeCore SQLite storage error
-    /// trio (2nd post-hexa-#4 gap-fill,structural
-    /// triple-mirror parallels chapter 629 BASMemory) +
-    /// 3 PROOF tests + typed surface + close-out。
-    public static let commitsShipped: Int = 973
+    /// M1932)。 Bumped through chapter 638:973 → 977。
+    /// Chapter 638:BASSovereign secondary error trio
+    /// (3rd post-hexa-#4 gap-fill,2nd BASSovereign
+    /// touch overall complementing chapter 633 primary
+    /// trio) + 3 PROOF tests + typed surface + close-out。
+    public static let commitsShipped: Int = 977
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

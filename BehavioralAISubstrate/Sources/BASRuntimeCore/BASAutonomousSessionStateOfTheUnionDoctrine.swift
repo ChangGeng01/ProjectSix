@@ -110,23 +110,24 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 637
-    /// close-out (M1928 — BASRuntimeCore SQLite storage
-    /// error trio Codable extension,2nd post-hexa-#4
-    /// gap-fill,structural triple-mirror PARALLELS
-    /// chapter 629 BASMemory SQLite trio in different
-    /// module;1st BASRuntimeCore post-hexa-#4 touch +
-    /// 2nd BASRuntimeCore touch overall;3 Error enums
-    /// (BASSQLiteEventLogStorage.StorageError + BAS
-    /// SQLiteEvalRunStorage.StorageError + BASSQLite
-    /// KnowledgeGraphStorage.StorageError) all nested-
-    /// in-actor gained Codable;NEW kind 'runtime-core-
-    /// sqlite-error-trio')。
-    public static let typedSurfaceCount: Int = 178
+    /// Cumulative achievement metrics at chapter 638
+    /// close-out (M1932 — BASSovereign secondary error
+    /// trio Codable extension,3rd post-hexa-#4 gap-fill,
+    /// 2nd BASSovereign touch overall complementing
+    /// chapter 633 primary trio;1st BASSovereign post-
+    /// hexa-#4 touch;3 Error enums (BASSovereignLedger
+    /// SQLiteStorage.StorageError + BASSovereign
+    /// SnapshotManager.ManagerError + BASSovereign
+    /// IntegritySentinel.SentinelError) covering ledger
+    /// / snapshot / sentinel domains gained Codable +
+    /// StorageError also gained Sendable;NEW kind
+    /// 'sovereign-secondary-error-trio';BASSovereign
+    /// cumulative typed surfaces = 6)。
+    public static let typedSurfaceCount: Int = 179
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 512
-    public static let phase2CommitsShipped: Int = 973
-    public static let chapter2NumberLast: Int = 1928
+        Int = 516
+    public static let phase2CommitsShipped: Int = 977
+    public static let chapter2NumberLast: Int = 1932
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

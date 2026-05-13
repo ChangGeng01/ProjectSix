@@ -226,6 +226,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// TrioCodableExtensionDoctrine (M1927) + close-
     /// out (M1928)。 NEW kind 'runtime-core-sqlite-
     /// error-trio'。
+    /// Re-captured at chapter 638 close-out。 Chapter
+    /// 638:BASSOVEREIGN SECONDARY ERROR TRIO CODABLE
+    /// EXTENSION — GAP-FILL,3rd post-hexa-#4,2nd
+    /// BASSovereign touch overall complementing chapter
+    /// 633 primary trio。 1st BASSovereign post-hexa-#4
+    /// touch。 3 Error enums (BASSovereignLedgerSQLite
+    /// Storage.StorageError + BASSovereignSnapshot
+    /// Manager.ManagerError + BASSovereignIntegrity
+    /// Sentinel.SentinelError) covering ledger /
+    /// snapshot / sentinel domains gained Codable at
+    /// M1929 + StorageError also gained Sendable +
+    /// 3 PROOF tests (M1930) + NEW BASSovereign
+    /// SecondaryErrorTrioCodableExtensionDoctrine
+    /// (M1931) + close-out (M1932)。 NEW kind
+    /// 'sovereign-secondary-error-trio'。 BASSovereign
+    /// cumulative typed surfaces = 6。
     static let frozenFullRegistrySha256: String =
-        "c92cc939ff43290e276db4447953fe6df017494bb474b9b49f1ad1546795fd85"
+        "1ee61587996c90e40ce5edfe8eea8f256e7408b49e018ed0cdf2284c359a69f2"
 }
