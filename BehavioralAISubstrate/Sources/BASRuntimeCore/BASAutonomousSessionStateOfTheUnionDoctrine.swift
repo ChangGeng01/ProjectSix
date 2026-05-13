@@ -110,20 +110,19 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 628
-    /// close-out (M1892 — 3RD gap-fill hexa catalog
-    /// meta-meta milestone;NEW BASGapFillHexaThree
-    /// CompletionDoctrine cataloging 6 post-hexa-#2
-    /// gap-fill chapters (622-627);PARALLEL
-    /// structurally to chapter 614 hexa #1 + chapter
-    /// 621 hexa #2;15 types / 7 distinct modules / 6
-    /// distinct kind buckets each appearing exactly
-    /// once;FAR EXCEEDS prior hexas in module breadth)。
-    public static let typedSurfaceCount: Int = 169
+    /// Cumulative achievement metrics at chapter 629
+    /// close-out (M1896 — BASMemory SQLite error trio
+    /// Codable extension,1st post-hexa-#3 gap-fill,
+    /// structural triple-mirror pattern across 3
+    /// SQLite storage actors;3 nested-in-actor
+    /// StorageError enums all sharing 6-case shape
+    /// gained Codable;NEW kind 'memory-sqlite-error-
+    /// trio')。
+    public static let typedSurfaceCount: Int = 170
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 476
-    public static let phase2CommitsShipped: Int = 937
-    public static let chapter2NumberLast: Int = 1892
+        Int = 480
+    public static let phase2CommitsShipped: Int = 941
+    public static let chapter2NumberLast: Int = 1896
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

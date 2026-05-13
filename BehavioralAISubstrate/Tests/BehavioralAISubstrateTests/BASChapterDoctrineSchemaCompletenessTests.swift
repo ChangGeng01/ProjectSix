@@ -2183,7 +2183,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二十八")!)
+                            "chapter 六百二十八")!),
+            // M1896 chapter 629 — BASMemory SQLite error trio Codable extension gap-fill (1st post-hexa-#3)
+            checkRegistry("六百二十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百二十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3703,6 +3709,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二十八")!
+                .mNumberLast),
+            // M1896 chapter 629 — BASMemory SQLite error trio Codable extension gap-fill
+            ("629",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

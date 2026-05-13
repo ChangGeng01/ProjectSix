@@ -3967,7 +3967,28 @@ public enum BASEntropyChapterIndex {
                 " hexa #2。 Catalog lineage M1805 →" +
                 " M1833 → M1861 → M1889。 169 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1892。 V1 byte-equality preserved。")
+                " M1892。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十九",
+            mNumberFirst: 1893, mNumberLast: 1896,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASMEMORY SQLITE ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,1st" +
+                " post-hexa-#3 gap-fill,structural" +
+                " triple-mirror pattern across 3" +
+                " SQLite storage actors。 3 nested-in-" +
+                "actor StorageError enums (BASSQLite" +
+                "MemoryAtomStore + BASSQLiteUserState" +
+                "Storage + BASHostConstitutionSQLite" +
+                "Storage) all sharing 6-case shape" +
+                " gained Codable at M1893 + 3 PROOF" +
+                " tests (M1894) + new typed surface" +
+                " (M1895) + close-out (M1896)。 NEW" +
+                " kind 'memory-sqlite-error-trio'。" +
+                " 170 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1896。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

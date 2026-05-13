@@ -118,10 +118,16 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// catalog (M1889) + 42 anti-drift PROOF tests
     /// (M1890) + 15 wire-in PROOF tests cross-checking
     /// 6 source doctrines (M1891) + close-out (M1892)。
-    /// PARALLEL structurally to chapter 614 hexa #1 +
-    /// chapter 621 hexa #2。 Catalog lineage:M1805
-    /// post-octa → M1833 hexa #1 → M1861 hexa #2 →
-    /// M1889 hexa #3。
+    /// Re-captured at chapter 629 close-out。 Chapter
+    /// 629:BASMEMORY SQLITE ERROR TRIO CODABLE
+    /// EXTENSION — GAP-FILL,1st post-hexa-#3,
+    /// structural triple-mirror pattern across 3 SQLite
+    /// storage actors。 3 nested-in-actor StorageError
+    /// enums all sharing 6-case shape gained Codable
+    /// at M1893 + 3 PROOF tests (M1894) + NEW BAS
+    /// MemorySQLiteErrorTrioCodableExtensionDoctrine
+    /// (M1895) + close-out (M1896)。 NEW kind 'memory-
+    /// sqlite-error-trio'。
     static let frozenFullRegistrySha256: String =
-        "1a84dde829e0f9e39f09bcab4e029ab7b9122a3573fcf45a9759c4f7ec9831b4"
+        "da7ae89abf414bbc031fee928ceeada801954ae6cc182306238e69001195abc0"
 }

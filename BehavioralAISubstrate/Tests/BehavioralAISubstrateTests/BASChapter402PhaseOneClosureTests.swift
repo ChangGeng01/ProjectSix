@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1892",
-            "M1892:doctrine version reflects chapter 六百二十八 — 3RD GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaThreeCompletionDoctrine cataloging 6 post-hexa-#2 gap-fill chapters (622-627) — 15 types extended / 24 commits / 7 distinct modules FAR EXCEEDS hexa #1+#2's 4 each / 6 distinct kind buckets each appearing exactly once + 42 anti-drift PROOF + 15 wire-in PROOF + close-out。 PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2。 Catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3。 169 typed surfaces cumulative。 476 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1896",
+            "M1896:doctrine version reflects chapter 六百二十九 — BASMEMORY SQLITE ERROR TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#3,structural triple-mirror pattern across 3 SQLite storage actors。 3 nested-in-actor StorageError enums (BASSQLiteMemoryAtomStore + BASSQLiteUserStateStorage + BASHostConstitutionSQLiteStorage) all sharing 6-case shape gained Codable at M1893 + 3 PROOF tests (M1894) + BASMemorySQLiteErrorTrioCodableExtensionDoctrine typed surface (M1895) + close-out (M1896)。 NEW kind 'memory-sqlite-error-trio'。 170 typed surfaces cumulative。 480 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -15562,6 +15562,107 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1892。 476 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 629 — BASMemory SQLite error trio
+        // Codable extension (1st post-hexa-#3 gap-fill,
+        // NEW kind 'memory-sqlite-error-trio',
+        // structural triple-mirror pattern)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十九",
+            mNumberFirst: 1893,
+            mNumberLast: 1896,
+            v1MilestoneMNumber: 1896,
+            v1MilestoneStatus:
+                "chapter-629-memory-sqlite-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1893, knife: "第一刀",
+                    concept: "Add Codable to 3 BASMemory" +
+                        " nested-in-actor StorageError" +
+                        " enums with structurally" +
+                        " identical 6-case shape —" +
+                        " BASSQLiteMemoryAtomStore +" +
+                        " BASSQLiteUserStateStorage +" +
+                        " BASHostConstitutionSQLite" +
+                        "Storage。 All share open" +
+                        "Failed + prepareFailed +" +
+                        " stepFailed + schemaVersion" +
+                        "Mismatch + encodeFailed +" +
+                        " decodeFailed cases。"),
+                BASChapterKnife(
+                    mNumber: 1894, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1895, knife: "第三刀",
+                    concept: "NEW BASMemorySQLiteError" +
+                        "TrioCodableExtensionDoctrine +" +
+                        " kindLabel='memory-sqlite-" +
+                        "error-trio' (NEW kind:" +
+                        " nested-in-actor error-cluster" +
+                        " with structural triple-" +
+                        "mirror) + typesShareStructural" +
+                        "Pattern + casesPerStorageError" +
+                        " = 6。 typed-surface count 169" +
+                        " → 170。"),
+                BASChapterKnife(
+                    mNumber: 1896, knife: "第四刀",
+                    concept: "Chapter 629 close-out +" +
+                        " doctrine sync。 480 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 1st post-hexa-#3" +
+                        " gap-fill — begins 4th hexa" +
+                        " run toward chapter 634 hexa" +
+                        " #4 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sqlite-memory-atom-store-storage-error-non-codable",
+                "bas-sqlite-user-state-storage-storage-error-non-codable",
+                "bas-host-constitution-sqlite-storage-storage-error-non-codable",
+                "bas-memory-sqlite-error-trio-not-shipped",
+                "structural-triple-mirror-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1896",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "memory-sqlite-error-trio-codable-extension",
+                "first-post-hexa-three-gap-fill",
+                "second-bas-memory-post-hexa-lineage",
+                "new-kind-label-memory-sqlite-error-trio"
+            ],
+            plannedFutureCuts: [
+                "future arc — 5 more gap-fill chapters" +
+                " toward chapter 634 hexa #4" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 629 ships BASMemory SQLite" +
+                " storage error trio Codable extension" +
+                " — 1st post-hexa-#3 gap-fill chapter," +
+                " structural triple-mirror pattern" +
+                " across 3 SQLite storage actors。 3" +
+                " nested-in-actor StorageError enums" +
+                " (BASSQLiteMemoryAtomStore +" +
+                " BASSQLiteUserStateStorage +" +
+                " BASHostConstitutionSQLiteStorage) all" +
+                " sharing 6-case shape (openFailed +" +
+                " prepareFailed + stepFailed +" +
+                " schemaVersionMismatch + encodeFailed" +
+                " + decodeFailed) gained Codable at" +
+                " M1893 + 3 PROOF tests (M1894) + new" +
+                " typed surface (M1895) + close-out" +
+                " (M1896)。 NEW kind 'memory-sqlite-" +
+                "error-trio' distinct from prior error-" +
+                "trio kinds (top-level vs nested + no" +
+                " structural mirroring)。 170 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1896。 480 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
