@@ -304,7 +304,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百四十七",   // M1965-M1968 (BASSOVEREIGN PRIVILEGE-SCAN TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#5,8th BASSovereign touch overall;3 BASSovereign structs (BASSovereignPrivilegeArbiter.ScopeKey + BASSovereignIntegritySentinel.ScanRequest wraps [ArtifactClaim] + BASSovereignIntegritySentinel.ScanReport uses Set<ArtifactKind>) gained Codable + 3 PROOF tests + BASSovereignPrivilegeScanTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-privilege-scan-trio';3-LEVEL recursive Codable proof — ArtifactKind ch641 → ArtifactClaim ch646 → ScanRequest ch647;Set<T> Codable composition pattern demonstrated;BASSovereign cumulative typed surfaces = 23)
         "chapter 六百四十八",   // M1969-M1972 (BASSOVEREIGN TERTIARY ERROR TRIO CODABLE EXTENSION — GAP-FILL,6th and FINAL post-hexa-#5,9th BASSovereign touch overall;THIRD BASSovereign error trio after ch633 primary + ch638 secondary — closes BASSovereign Error enum coverage;3 BASSovereign Error enums (BASSovereignCleanRebootCoordinator.CoordinatorError + BASSovereignVerdictEngine.EngineError + BASSovereignDualKeySigning.SigningError) gained Codable + 3 PROOF tests + BASSovereignTertiaryErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-tertiary-error-trio';BASSovereign cumulative typed surfaces = 26 — past 25-surface milestone;Post-hexa-#5 arc sealed entirely-BASSovereign;chapter 649 hexa #6 catalog opportunity NEXT)
         "chapter 六百四十九",   // M1973-M1976 (6TH GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaSixCompletionDoctrine cataloging 6 post-hexa-#5 gap-fill chapters (643-648) — 18 BASSovereign types extended / 24 commits / 1 module touched;DISTINCTIVE FEATURE FIRST entirely-single-module hexa (hexa #1-#5 each spanned 4-7 modules);DEEPEST recursive Codable proof shipped (3-level at ch647) + Set<T> composition pattern demonstrated;BASSovereign cumulative typed surfaces grew 8 → 26 over hexa #6;NEW catalog (M1973) + 54 anti-drift PROOF tests (M1974) + 15 wire-in PROOF tests (M1975) + close-out (M1976);PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2 + chapter 628 hexa #3 + chapter 635 hexa #4 + chapter 642 hexa #5;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6;190 typed surfaces cumulative — hits 190-surface milestone)
-        "chapter 六百五十"      // M1977-M1980 (BASRUNTIMECORE KNOWLEDGE-MESH TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#6,ROUND-NUMBER chapter 650,returns to multi-module coverage after entirely-BASSovereign hexa #6;4th BASRuntimeCore touch overall;3 BASRuntimeCore types (BASKnowledgeGraphError + BASMeshSyncFrameApplier.SlotDiff + BAS14LayerMeshAssemblyReport) gained Codable + 3 PROOF tests + BASRuntimeCoreKnowledgeMeshTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-knowledge-mesh-trio';Dict<Codable-Hashable-Key, V: Codable> + Optional<T: Codable> composition patterns demonstrated;BASRuntimeCore cumulative typed surfaces = 8;191 typed surfaces cumulative)
+        "chapter 六百五十",     // M1977-M1980 (BASRUNTIMECORE KNOWLEDGE-MESH TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#6,ROUND-NUMBER chapter 650,returns to multi-module coverage after entirely-BASSovereign hexa #6;4th BASRuntimeCore touch overall;3 BASRuntimeCore types (BASKnowledgeGraphError + BASMeshSyncFrameApplier.SlotDiff + BAS14LayerMeshAssemblyReport) gained Codable + 3 PROOF tests + BASRuntimeCoreKnowledgeMeshTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-knowledge-mesh-trio';Dict<Codable-Hashable-Key, V: Codable> + Optional<T: Codable> composition patterns demonstrated;BASRuntimeCore cumulative typed surfaces = 8;191 typed surfaces cumulative)
+        "chapter 六百五十一"    // M1981-M1984 (BASSOVEREIGN REBOOT+VERDICT+LOCK TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#6,11th BASSovereign touch overall;3 BASSovereign structs (BASSovereignCleanRebootCoordinator.RebootPlan + BASSovereignVerdictEngine.VerdictContext + BASSovereignLockManager.ScopeIdentifier) gained Codable + 3 PROOF tests + BASSovereignRebootVerdictLockTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-reboot-verdict-lock-trio';BASSovereign cumulative typed surfaces = 29)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -321,15 +322,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1980
+    public static let mNumberLast: Int = 1984
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1980)。 Bumped through chapter 650:1021 → 1025。
-    /// Chapter 650:BASRuntimeCore knowledge-mesh trio
-    /// (1st post-hexa-#6 gap-fill,ROUND-NUMBER chapter,
-    /// Dict/Optional Codable composition patterns) +
-    /// 3 PROOF tests + typed surface + close-out。
-    public static let commitsShipped: Int = 1025
+    /// M1984)。 Bumped through chapter 651:1025 → 1029。
+    /// Chapter 651:BASSovereign reboot+verdict+lock
+    /// trio (2nd post-hexa-#6 gap-fill,11th BASSovereign
+    /// touch overall) + 3 PROOF tests + typed surface +
+    /// close-out。
+    public static let commitsShipped: Int = 1029
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

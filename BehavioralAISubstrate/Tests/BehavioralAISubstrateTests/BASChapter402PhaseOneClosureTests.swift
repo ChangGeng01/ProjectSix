@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1980",
-            "M1980:doctrine version reflects chapter 六百五十 — BASRUNTIMECORE KNOWLEDGE-MESH TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#6,ROUND-NUMBER chapter 650。 4th BASRuntimeCore touch overall。 3 BASRuntimeCore types (BASKnowledgeGraphError + BASMeshSyncFrameApplier.SlotDiff + BAS14LayerMeshAssemblyReport) gained Codable at M1977 + 3 PROOF tests (M1978) + BASRuntimeCoreKnowledgeMeshTrioCodableExtensionDoctrine typed surface (M1979) + close-out (M1980)。 NEW kind 'runtime-core-knowledge-mesh-trio'。 Dict<Codable-Hashable-Key, V: Codable> + Optional<T: Codable> composition patterns demonstrated。 BASRuntimeCore cumulative typed surfaces = 8。 191 typed surfaces cumulative。 564 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1984",
+            "M1984:doctrine version reflects chapter 六百五十一 — BASSOVEREIGN REBOOT+VERDICT+LOCK TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#6,11th BASSovereign touch overall。 3 BASSovereign structs (RebootPlan + VerdictContext + ScopeIdentifier) gained Codable at M1981 + 3 PROOF tests (M1982) + BASSovereignRebootVerdictLockTrioCodableExtensionDoctrine typed surface (M1983) + close-out (M1984)。 NEW kind 'sovereign-reboot-verdict-lock-trio'。 BASSovereign cumulative typed surfaces = 29。 192 typed surfaces cumulative。 568 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

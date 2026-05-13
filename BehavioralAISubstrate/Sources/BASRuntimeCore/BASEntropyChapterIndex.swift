@@ -4525,6 +4525,28 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1980。 564 consecutive" +
                 " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十一",
+            mNumberFirst: 1981, mNumberLast: 1984,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "BASSOVEREIGN REBOOT+VERDICT+LOCK" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,2nd" +
+                " post-hexa-#6,11th BASSovereign touch" +
+                " overall。 3 BASSovereign structs" +
+                " (BASSovereignCleanRebootCoordinator." +
+                "RebootPlan + BASSovereignVerdictEngine." +
+                "VerdictContext + BASSovereignLockManager" +
+                ".ScopeIdentifier) gained Codable at" +
+                " M1981 + 3 PROOF tests (M1982) + new" +
+                " typed surface (M1983) + close-out" +
+                " (M1984)。 NEW kind 'sovereign-reboot-" +
+                "verdict-lock-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 29。 192" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1984。 568 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
                 "equality preserved。")
     ]
 

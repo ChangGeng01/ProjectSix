@@ -110,23 +110,19 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 650
-    /// close-out (M1980 — BASRuntimeCore knowledge-mesh
-    /// trio Codable extension,1st post-hexa-#6 gap-fill,
-    /// ROUND-NUMBER chapter 650,returns to multi-module
-    /// coverage after entirely-BASSovereign hexa #6;
-    /// 4th BASRuntimeCore touch overall;3 BASRuntime
-    /// Core types (BASKnowledgeGraphError + SlotDiff +
-    /// BAS14LayerMeshAssemblyReport) gained Codable;
-    /// NEW kind 'runtime-core-knowledge-mesh-trio';
-    /// Dict<Codable-Hashable-Key, V: Codable> + Optional
-    /// <T: Codable> composition patterns demonstrated;
-    /// BASRuntimeCore cumulative typed surfaces = 8)。
-    public static let typedSurfaceCount: Int = 191
+    /// Cumulative achievement metrics at chapter 651
+    /// close-out (M1984 — BASSovereign reboot+verdict+
+    /// lock trio Codable extension,2nd post-hexa-#6
+    /// gap-fill,11th BASSovereign touch overall;3
+    /// BASSovereign structs (RebootPlan + VerdictContext
+    /// + ScopeIdentifier) gained Codable;NEW kind
+    /// 'sovereign-reboot-verdict-lock-trio';BASSovereign
+    /// cumulative typed surfaces = 29)。
+    public static let typedSurfaceCount: Int = 192
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 564
-    public static let phase2CommitsShipped: Int = 1025
-    public static let chapter2NumberLast: Int = 1980
+        Int = 568
+    public static let phase2CommitsShipped: Int = 1029
+    public static let chapter2NumberLast: Int = 1984
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

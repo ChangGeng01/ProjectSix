@@ -2315,7 +2315,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十")!)
+                            "chapter 六百五十")!),
+            // M1984 chapter 651 — BASSovereign reboot+verdict+lock trio Codable extension gap-fill (2nd post-hexa-#6)
+            checkRegistry("六百五十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4011,6 +4017,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十")!
+                .mNumberLast),
+            // M1984 chapter 651 — BASSovereign reboot+verdict+lock trio Codable extension gap-fill (2nd post-hexa-#6)
+            ("651",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -116,20 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1980:24 + 20 + 204 = 248 (chapter
-    /// 650 — BASRuntimeCore knowledge-mesh trio, ROUND-
-    /// NUMBER chapter)
-    public static let phase2ChapterCount: Int = 248
+    /// added)。 At M1984:24 + 20 + 205 = 249 (chapter
+    /// 651 — BASSovereign reboot+verdict+lock trio,2nd
+    /// post-hexa-#6 gap-fill)
+    public static let phase2ChapterCount: Int = 249
 
-    /// Phase 2 commits shipped。 At M1980:125 + 84 +
-    /// 816 = 1025 (chapter 650 = 4 cuts — knowledge-
-    /// mesh trio + 3 PROOF + typed surface + close-out)。
-    public static let phase2CommitsShipped: Int = 1025
+    /// Phase 2 commits shipped。 At M1984:125 + 84 +
+    /// 820 = 1029 (chapter 651 = 4 cuts — reboot-
+    /// verdict-lock trio + 3 PROOF + typed surface +
+    /// close-out)。
+    public static let phase2CommitsShipped: Int = 1029
 
-    /// Phase 2 mNumberLast。 At M1980:chapter 650 —
-    /// BASRuntimeCore knowledge-mesh trio (ROUND-NUMBER
-    /// chapter)。 SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1980
+    /// Phase 2 mNumberLast。 At M1984:chapter 651 —
+    /// BASSovereign reboot+verdict+lock trio。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1984
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

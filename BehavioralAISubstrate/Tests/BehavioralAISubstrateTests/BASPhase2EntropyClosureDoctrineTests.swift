@@ -37,29 +37,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs650() {
+    func testLastChapterIs651() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五十",
-            "Chapter 六百五十:BASRUNTIMECORE KNOWLEDGE-" +
-            "MESH TRIO CODABLE EXTENSION — GAP-FILL,1st" +
-            " post-hexa-#6,ROUND-NUMBER chapter 650," +
-            "returns to multi-module coverage after" +
-            " entirely-BASSovereign hexa #6。 4th BAS" +
-            "RuntimeCore touch overall。 3 BASRuntime" +
-            "Core types (BASKnowledgeGraphError +" +
-            " BASMeshSyncFrameApplier.SlotDiff + BAS14" +
-            "LayerMeshAssemblyReport) gained Codable +" +
-            " 3 PROOF tests + BASRuntimeCoreKnowledge" +
-            "MeshTrioCodableExtensionDoctrine typed" +
-            " surface + close-out。 NEW kind 'runtime-" +
-            "core-knowledge-mesh-trio'。 Dict<Codable-" +
-            "Hashable-Key, V: Codable> + Optional<T:" +
-            " Codable> composition patterns demonstrated。" +
-            " BASRuntimeCore cumulative typed surfaces" +
-            " = 8。 191 typed surfaces cumulative。 564" +
-            " consecutive byte-equality clean commits")
+            "chapter 六百五十一",
+            "Chapter 六百五十一:BASSOVEREIGN REBOOT+" +
+            "VERDICT+LOCK TRIO CODABLE EXTENSION — GAP-" +
+            "FILL,2nd post-hexa-#6,11th BASSovereign" +
+            " touch overall。 3 BASSovereign structs" +
+            " (RebootPlan + VerdictContext +" +
+            " ScopeIdentifier) gained Codable + 3 PROOF" +
+            " tests + BASSovereignRebootVerdictLockTrio" +
+            "CodableExtensionDoctrine typed surface +" +
+            " close-out。 NEW kind 'sovereign-reboot-" +
+            "verdict-lock-trio'。 BASSovereign cumulative" +
+            " typed surfaces = 29。 192 typed surfaces" +
+            " cumulative。 568 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

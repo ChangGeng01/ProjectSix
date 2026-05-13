@@ -428,6 +428,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// Key, V: Codable> + Optional<T: Codable>
     /// composition patterns demonstrated。 BASRuntime
     /// Core cumulative typed surfaces = 8。
+    /// Re-captured at chapter 651 close-out。 Chapter
+    /// 651:BASSOVEREIGN REBOOT+VERDICT+LOCK TRIO
+    /// CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#6,
+    /// 11th BASSovereign touch overall。 3 BASSovereign
+    /// structs (RebootPlan + VerdictContext +
+    /// ScopeIdentifier) gained Codable at M1981 + 3
+    /// PROOF tests (M1982) + NEW BASSovereignReboot
+    /// VerdictLockTrioCodableExtensionDoctrine (M1983)
+    /// + close-out (M1984)。 NEW kind 'sovereign-reboot-
+    /// verdict-lock-trio'。 BASSovereign cumulative
+    /// typed surfaces = 29。
     static let frozenFullRegistrySha256: String =
-        "b91749471fb525e1c6d16d86fc106b6076c1745c1683e863cdd296fbba2f34dd"
+        "1edd45e5bcc0068c1632a7248310205c26746b55ec2dc88b751b642f99ea88a4"
 }

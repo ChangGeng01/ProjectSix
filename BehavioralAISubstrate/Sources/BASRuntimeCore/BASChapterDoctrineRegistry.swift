@@ -18039,6 +18039,102 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1980。 564 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 651 — BASSovereign reboot+verdict+
+        // lock trio Codable extension (2nd post-hexa-#6
+        // gap-fill,11th BASSovereign touch overall)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十一",
+            mNumberFirst: 1981,
+            mNumberLast: 1984,
+            v1MilestoneMNumber: 1984,
+            v1MilestoneStatus:
+                "chapter-651-sovereign-reboot-verdict-lock-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1981, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign structs — RebootPlan" +
+                        " (uses RebootAction + BAS" +
+                        "SovereignVerdictLevel) +" +
+                        " VerdictContext (uses Operation" +
+                        "Domain + HardObservations +" +
+                        " SoftSignals) + ScopeIdentifier" +
+                        " (uses BASSovereignLockScope)。" +
+                        " All component types already" +
+                        " Codable via prior ch633/641/" +
+                        "648 extensions or built-in" +
+                        " typed-enum surface。"),
+                BASChapterKnife(
+                    mNumber: 1982, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1983, knife: "第三刀",
+                    concept: "NEW BASSovereignRebootVerdict" +
+                        "LockTrioCodableExtensionDoctrine" +
+                        " + structCount = 3 + enumCount" +
+                        " = 0 + kindLabel='sovereign-" +
+                        "reboot-verdict-lock-trio' (NEW" +
+                        " kind) + isSecondPostHexaSix" +
+                        "GapFill + isEleventhBAS" +
+                        "SovereignTouchOverall +" +
+                        " cumulativeBASSovereignTyped" +
+                        "Surfaces = 29。 typed-surface" +
+                        " count 191 → 192。"),
+                BASChapterKnife(
+                    mNumber: 1984, knife: "第四刀",
+                    concept: "Chapter 651 close-out +" +
+                        " doctrine sync。 568 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2nd post-hexa-#6" +
+                        " gap-fill。 4 more chapters to" +
+                        " chapter 655 hexa #7 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-reboot-plan-non-codable",
+                "bas-sovereign-verdict-context-non-codable",
+                "bas-sovereign-scope-identifier-non-codable",
+                "sovereign-reboot-verdict-lock-trio-pattern-uncaptured",
+                "second-post-hexa-six-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1984",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-reboot-verdict-lock-trio-codable-extension",
+                "second-post-hexa-six-gap-fill",
+                "eleventh-bas-sovereign-touch-overall",
+                "cumulative-29-bas-sovereign-typed-surfaces",
+                "new-kind-label-sovereign-reboot-verdict-lock-trio",
+                "568-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 4 more gap-fill chapters" +
+                " (652-655) toward chapter 655 hexa #7" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 651 ships BASSovereign" +
+                " reboot+verdict+lock trio Codable" +
+                " extension — 2nd post-hexa-#6 gap-fill" +
+                " chapter,11th BASSovereign touch" +
+                " overall。 3 BASSovereign structs" +
+                " (RebootPlan + VerdictContext +" +
+                " ScopeIdentifier) gained Codable at" +
+                " M1981 + 3 PROOF tests (M1982) + new" +
+                " typed surface (M1983) + close-out" +
+                " (M1984)。 NEW kind 'sovereign-reboot-" +
+                "verdict-lock-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 29。 192" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1984。 568 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 
