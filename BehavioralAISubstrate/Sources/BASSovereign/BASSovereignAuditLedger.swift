@@ -44,7 +44,9 @@ import BASRuntimeCore
 /// Callers MUST treat these throws as grounds to abort the commit. The
 /// ledger itself does not try to recover — integrity > availability.
 public actor BASSovereignAuditLedger {
-    public enum LedgerError: Error, Equatable, Sendable {
+    public enum LedgerError:
+        Error, Equatable, Sendable, Codable
+    {
         case invalidEntry(String)
         case missingSigningSecret
         case chainIntegrityBroken(lastVerifiedAuditID: String?)

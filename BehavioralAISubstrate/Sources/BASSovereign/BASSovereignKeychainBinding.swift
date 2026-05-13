@@ -54,7 +54,9 @@ public struct BASSovereignKeychainBinding: Sendable {
     /// structured: `osStatus` is the raw `OSStatus` from Security
     /// framework; `reasonCode` is a stable string identifier hosts
     /// can match on for log copy-library keys.
-    public enum KeychainError: Error, Equatable, Sendable {
+    public enum KeychainError:
+        Error, Equatable, Sendable, Codable
+    {
         /// Security framework not available (Linux, headless CI
         /// without Security.framework). Callers that need a real
         /// Keychain must not reach this case on production paths.

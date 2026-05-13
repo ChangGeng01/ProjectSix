@@ -4,7 +4,9 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
-public enum BASAppleCurrentBrainBootstrapHostResolutionError: Error, Equatable, Sendable {
+public enum BASAppleCurrentBrainBootstrapHostResolutionError:
+    Error, Equatable, Sendable, Codable
+{
     case unsupportedModeID(String)
     case unsupportedTriggerID(String)
     case unsupportedRiskLevelID(String)
