@@ -151,8 +151,8 @@ public enum BASChengluFeatureRefBuilder {
 
 // MARK: - Builder error
 
-public enum BASChengluFeatureRefBuilderError: Error, Equatable,
-    Sendable
+public enum BASChengluFeatureRefBuilderError:
+    Error, Equatable, Sendable, Codable
 {
     /// A categorical field contains the field separator character
     /// (`|`),which would break round-trip with the parser。

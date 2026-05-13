@@ -20,7 +20,9 @@ import BASRuntimeCore
 /// providerID overwrites (so hot-reload in tests is sane) but
 /// un-registration is explicit and logged at the call site.
 public actor BASOrganRegistry {
-    public enum RegistryError: Error, Equatable, Sendable {
+    public enum RegistryError:
+        Error, Equatable, Sendable, Codable
+    {
         case noAdapterForRole(BASOrganRole)
         case unknownProvider(id: String)
     }

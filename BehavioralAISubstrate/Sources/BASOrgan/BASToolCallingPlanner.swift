@@ -149,7 +149,9 @@ public typealias BASToolCallingPlanPolicy =
 
 // MARK: - Errors
 
-public enum BASToolCallingPlanError: Error, Sendable {
+public enum BASToolCallingPlanError:
+    Error, Sendable, Equatable, Codable
+{
     /// Policy returned `.failed` — caller's decision to abort。
     case policyFailed(reason: String)
     /// Planner's internal max-iteration cap hit。Indicates the
