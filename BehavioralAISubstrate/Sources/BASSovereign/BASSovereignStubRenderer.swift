@@ -26,7 +26,7 @@ import BASRuntimeCore
 /// - `.minimalReceipt`: a single-line "not executed + audit ref".
 /// - `.refusalOnly`: a fixed refusal phrase; no audit ref surfaced.
 public actor BASSovereignStubRenderer {
-    public struct StubOutput: Sendable, Equatable {
+    public struct StubOutput: Sendable, Equatable, Codable {
         /// The user-visible text. Safe to show in UI directly.
         public let body: String
         /// Audit reference the caller may log. Only populated when
@@ -44,7 +44,7 @@ public actor BASSovereignStubRenderer {
         }
     }
 
-    public struct RefusalPhrases: Sendable, Equatable {
+    public struct RefusalPhrases: Sendable, Equatable, Codable {
         public let refusalOnly: String
         public let minimalReceiptPrefix: String
 
