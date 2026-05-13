@@ -92,7 +92,7 @@ public enum BASOrganRole: String, Sendable, Equatable, Codable,
     case core
 }
 
-public struct BASOrganCapacity: Sendable, Equatable {
+public struct BASOrganCapacity: Sendable, Equatable, Codable {
     public let availableInputTokens: Int
     public let availableOutputTokens: Int
     public let underPressure: Bool
