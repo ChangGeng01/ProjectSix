@@ -80,7 +80,9 @@ public actor BASSQLiteKnowledgeGraphStorage {
 
     // MARK: - Errors
 
-    public enum StorageError: Error, Equatable, Sendable {
+    public enum StorageError:
+        Error, Equatable, Sendable, Codable
+    {
         case openFailed(code: Int32, message: String)
         case prepareFailed(sql: String, message: String)
         case stepFailed(sql: String, message: String)
