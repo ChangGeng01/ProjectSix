@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1964",
-            "M1964:doctrine version reflects chapter 六百四十六 — BASSOVEREIGN TRUST-RECORD TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#5,MULTI-ACTOR trio across 3 BASSovereign actors。 7th BASSovereign touch overall。 3 BASSovereign structs nested across 3 actors:BASSovereignIntegritySentinel.ArtifactClaim + BASSovereignAuditLedger.AppendedEntry + BASSovereignTokenAuthority.WarrantIntent gained Codable at M1961 + 3 PROOF tests (M1962) + BASSovereignTrustRecordTrioCodableExtensionDoctrine typed surface (M1963) + close-out (M1964)。 NEW kind 'sovereign-trust-record-trio'。 BASSovereign cumulative typed surfaces = 20 — BREAKS 20-SURFACE BARRIER。 187 typed surfaces cumulative。 548 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1968",
+            "M1968:doctrine version reflects chapter 六百四十七 — BASSOVEREIGN PRIVILEGE-SCAN TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#5,8th BASSovereign touch overall。 3 BASSovereign structs (BASSovereignPrivilegeArbiter.ScopeKey + BASSovereignIntegritySentinel.ScanRequest + BASSovereignIntegritySentinel.ScanReport) gained Codable at M1965 + 3 PROOF tests (M1966) + BASSovereignPrivilegeScanTrioCodableExtensionDoctrine typed surface (M1967) + close-out (M1968)。 NEW kind 'sovereign-privilege-scan-trio'。 3-LEVEL recursive Codable proof (ArtifactKind ch641 → ArtifactClaim ch646 → ScanRequest ch647) + Set<T> Codable composition demonstrated。 BASSovereign cumulative typed surfaces = 23。 188 typed surfaces cumulative。 552 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

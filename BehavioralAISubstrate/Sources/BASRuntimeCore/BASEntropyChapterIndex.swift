@@ -4411,7 +4411,31 @@ public enum BASEntropyChapterIndex {
                 " module)。 187 typed surfaces cumulative" +
                 " (+1)。 ADR-016 → M1964。 548" +
                 " consecutive byte-equality clean" +
-                " commits。 V1 byte-equality preserved。")
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十七",
+            mNumberFirst: 1965, mNumberLast: 1968,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN PRIVILEGE-SCAN TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,5th" +
+                " post-hexa-#5,8th BASSovereign touch" +
+                " overall。 3 BASSovereign structs" +
+                " (ScopeKey + ScanRequest + ScanReport)" +
+                " gained Codable at M1965 + 3 PROOF" +
+                " tests (M1966) + new typed surface" +
+                " (M1967) + close-out (M1968)。 NEW kind" +
+                " 'sovereign-privilege-scan-trio'。 3-" +
+                "LEVEL recursive Codable proof:" +
+                "ArtifactKind ch641 → ArtifactClaim" +
+                " ch646 → ScanRequest ch647。 Set<T>" +
+                " Codable composition pattern" +
+                " demonstrated。 BASSovereign cumulative" +
+                " typed surfaces = 23。 188 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1968。 552 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

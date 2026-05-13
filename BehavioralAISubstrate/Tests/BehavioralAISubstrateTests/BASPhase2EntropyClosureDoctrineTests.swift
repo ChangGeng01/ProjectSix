@@ -37,24 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs646() {
+    func testLastChapterIs647() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十六",
-            "Chapter 六百四十六:BASSOVEREIGN TRUST-" +
-            "RECORD TRIO CODABLE EXTENSION — GAP-FILL," +
-            "4th post-hexa-#5,MULTI-ACTOR trio across" +
-            " 3 BASSovereign actors。 7th BASSovereign" +
-            " touch overall。 3 BASSovereign structs" +
-            " nested across 3 actors gained Codable + 3" +
-            " PROOF tests + BASSovereignTrustRecordTrio" +
-            "CodableExtensionDoctrine typed surface +" +
-            " close-out。 NEW kind 'sovereign-trust-" +
-            "record-trio'。 BASSovereign cumulative" +
-            " typed surfaces = 20 — BREAKS 20-SURFACE" +
-            " BARRIER。 187 typed surfaces cumulative。" +
-            " 548 consecutive byte-equality clean commits")
+            "chapter 六百四十七",
+            "Chapter 六百四十七:BASSOVEREIGN PRIVILEGE-" +
+            "SCAN TRIO CODABLE EXTENSION — GAP-FILL,5th" +
+            " post-hexa-#5,8th BASSovereign touch" +
+            " overall。 3 BASSovereign structs (ScopeKey" +
+            " + ScanRequest + ScanReport) gained Codable" +
+            " + 3 PROOF tests + BASSovereignPrivilege" +
+            "ScanTrioCodableExtensionDoctrine typed" +
+            " surface + close-out。 NEW kind 'sovereign-" +
+            "privilege-scan-trio'。 3-LEVEL recursive" +
+            " Codable proof + Set<T> Codable composition" +
+            " demonstrated。 BASSovereign cumulative" +
+            " typed surfaces = 23。 188 typed surfaces" +
+            " cumulative。 552 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

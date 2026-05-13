@@ -2291,7 +2291,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十六")!)
+                            "chapter 六百四十六")!),
+            // M1968 chapter 647 — BASSovereign privilege-scan trio Codable extension gap-fill (5th post-hexa-#5, 3-level recursive Codable proof)
+            checkRegistry("六百四十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3955,6 +3961,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十六")!
+                .mNumberLast),
+            // M1968 chapter 647 — BASSovereign privilege-scan trio Codable extension gap-fill (5th post-hexa-#5)
+            ("647",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

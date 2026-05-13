@@ -300,7 +300,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百四十三",   // M1949-M1952 (BASSOVEREIGN CLOCK+TREE TYPED-TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#5,FIRST mixed enum+struct trio in post-hexa-#5 run (prior 6 chapters 636-641 all had pure-enum-trio shape);4th BASSovereign touch overall;3 BASSovereign types nested-in-actor (1 enum + 2 structs):BASSovereignCrossDeviceClock.Order + BASSovereignHostVersionTree.Node + BASSovereignHostVersionTree.LineagePath gained Codable + 3 PROOF tests + BASSovereignClockTreeTypedTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-clock-tree-typed-trio';rounds out BASSovereignHostVersionTree coverage;BASSovereign cumulative typed surfaces = 11)
         "chapter 六百四十四",   // M1953-M1956 (BASSOVEREIGN SNAPSHOT+TOKEN STRUCT-TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#5,PURE STRUCT TRIO (chapter 643 was MIXED enum+struct);5th BASSovereign touch overall;3 BASSovereign structs nested-in-actor:BASSovereignSnapshotManager.SnapshotAnchor + BASSovereignSnapshotManager.RegisteredSnapshot (wraps SnapshotAnchor — recursive Codable proof) + BASSovereignTokenAuthority.CommitIntent gained Codable + 3 PROOF tests + BASSovereignSnapshotTokenStructTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-snapshot-token-struct-trio';BASSovereign cumulative typed surfaces = 14)
         "chapter 六百四十五",   // M1957-M1960 (BASSOVEREIGN CONTAMINATION-GUARD TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#5,DEEP-COVERAGE single-actor trio;6th BASSovereign touch overall;3 BASSovereign structs all nested in BASSovereignContaminationGuard actor:Key + QuarantineRecord (wraps Key — recursive Codable proof) + ProbeReport gained Codable + 3 PROOF tests + BASSovereignContaminationGuardTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-contamination-guard-trio';completes BASSovereignContaminationGuard typed-surface coverage;BASSovereign cumulative typed surfaces = 17)
-        "chapter 六百四十六"    // M1961-M1964 (BASSOVEREIGN TRUST-RECORD TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#5,MULTI-ACTOR trio across 3 BASSovereign actors (chapter 645 was single-actor deep-coverage);7th BASSovereign touch overall;3 BASSovereign structs nested across 3 actors:BASSovereignIntegritySentinel.ArtifactClaim + BASSovereignAuditLedger.AppendedEntry + BASSovereignTokenAuthority.WarrantIntent gained Codable + 3 PROOF tests + BASSovereignTrustRecordTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-trust-record-trio';BASSovereign cumulative typed surfaces = 20 — BREAKS 20-SURFACE BARRIER)
+        "chapter 六百四十六",   // M1961-M1964 (BASSOVEREIGN TRUST-RECORD TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#5,MULTI-ACTOR trio across 3 BASSovereign actors (chapter 645 was single-actor deep-coverage);7th BASSovereign touch overall;3 BASSovereign structs nested across 3 actors:BASSovereignIntegritySentinel.ArtifactClaim + BASSovereignAuditLedger.AppendedEntry + BASSovereignTokenAuthority.WarrantIntent gained Codable + 3 PROOF tests + BASSovereignTrustRecordTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-trust-record-trio';BASSovereign cumulative typed surfaces = 20 — BREAKS 20-SURFACE BARRIER)
+        "chapter 六百四十七"    // M1965-M1968 (BASSOVEREIGN PRIVILEGE-SCAN TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#5,8th BASSovereign touch overall;3 BASSovereign structs (BASSovereignPrivilegeArbiter.ScopeKey + BASSovereignIntegritySentinel.ScanRequest wraps [ArtifactClaim] + BASSovereignIntegritySentinel.ScanReport uses Set<ArtifactKind>) gained Codable + 3 PROOF tests + BASSovereignPrivilegeScanTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-privilege-scan-trio';3-LEVEL recursive Codable proof — ArtifactKind ch641 → ArtifactClaim ch646 → ScanRequest ch647;Set<T> Codable composition pattern demonstrated;BASSovereign cumulative typed surfaces = 23)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -317,15 +318,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1964
+    public static let mNumberLast: Int = 1968
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1964)。 Bumped through chapter 646:1005 → 1009。
-    /// Chapter 646:BASSovereign trust-record trio (4th
-    /// post-hexa-#5 gap-fill,MULTI-ACTOR trio breaks
-    /// BASSovereign 20-surface barrier) + 3 PROOF
-    /// tests + typed surface + close-out。
-    public static let commitsShipped: Int = 1009
+    /// M1968)。 Bumped through chapter 647:1009 → 1013。
+    /// Chapter 647:BASSovereign privilege-scan trio (5th
+    /// post-hexa-#5 gap-fill,3-level recursive Codable
+    /// proof) + 3 PROOF tests + typed surface + close-out。
+    public static let commitsShipped: Int = 1013
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

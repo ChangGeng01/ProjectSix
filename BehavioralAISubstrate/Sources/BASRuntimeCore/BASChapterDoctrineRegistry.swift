@@ -17548,6 +17548,120 @@ public enum BASChapterDoctrineRegistry {
                 " (+1)。 ADR-016 → M1964。 548 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 647 — BASSovereign privilege-scan
+        // trio Codable extension (5th post-hexa-#5
+        // gap-fill,3-level recursive Codable proof)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十七",
+            mNumberFirst: 1965,
+            mNumberLast: 1968,
+            v1MilestoneMNumber: 1968,
+            v1MilestoneStatus:
+                "chapter-647-sovereign-privilege-scan-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1965, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign struct types across" +
+                        " privilege-arbiter + integrity-" +
+                        "sentinel-scan subsystems — BAS" +
+                        "SovereignPrivilegeArbiter.Scope" +
+                        "Key + BASSovereignIntegrity" +
+                        "Sentinel.ScanRequest (wraps" +
+                        " [ArtifactClaim] from ch646 —" +
+                        " recursive proof) + BAS" +
+                        "SovereignIntegritySentinel." +
+                        "ScanReport (uses Set<Artifact" +
+                        "Kind> from ch641 — Set<T>" +
+                        " Codable composition)。 3-LEVEL" +
+                        " recursive Codable proof:" +
+                        " ArtifactKind (ch641) →" +
+                        " ArtifactClaim (ch646) →" +
+                        " ScanRequest (this chapter)。"),
+                BASChapterKnife(
+                    mNumber: 1966, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1967, knife: "第三刀",
+                    concept: "NEW BASSovereignPrivilege" +
+                        "ScanTrioCodableExtensionDoctrine" +
+                        " + structCount = 3 + enumCount" +
+                        " = 0 + isMultiActorTrio +" +
+                        " isEighthBASSovereignTouch" +
+                        "Overall + cumulativeBAS" +
+                        "SovereignTypedSurfaces = 23 +" +
+                        " hasThreeLevelRecursiveCodable" +
+                        "Proof (NEW pattern) +" +
+                        " demonstratesSetCodable" +
+                        "Composition (NEW pattern)。" +
+                        " typed-surface count 187 → 188。"),
+                BASChapterKnife(
+                    mNumber: 1968, knife: "第四刀",
+                    concept: "Chapter 647 close-out +" +
+                        " doctrine sync。 552 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 5th post-hexa-#5" +
+                        " gap-fill — 3-LEVEL recursive" +
+                        " Codable proof is deepest" +
+                        " shipped in any gap-fill chapter" +
+                        " so far。 1 more chapter to" +
+                        " chapter 649 hexa #6 catalog" +
+                        " opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-privilege-arbiter-scope-key-non-codable",
+                "bas-sovereign-scan-request-non-codable",
+                "bas-sovereign-scan-report-non-codable",
+                "sovereign-privilege-scan-trio-pattern-uncaptured",
+                "fifth-post-hexa-five-gap-fill-not-shipped",
+                "three-level-recursive-codable-proof-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1968",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-privilege-scan-trio-codable-extension",
+                "fifth-post-hexa-five-gap-fill",
+                "multi-actor-trio",
+                "eighth-bas-sovereign-touch-overall",
+                "cumulative-23-bas-sovereign-typed-surfaces",
+                "three-level-recursive-codable-proof",
+                "set-codable-composition-demonstrated",
+                "new-kind-label-sovereign-privilege-scan-trio",
+                "552-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 1 more gap-fill chapter" +
+                " (648) toward chapter 649 hexa #6" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 647 ships BASSovereign" +
+                " privilege-scan trio Codable extension" +
+                " — 5th post-hexa-#5 gap-fill chapter," +
+                " 8th BASSovereign touch overall。 3-" +
+                "LEVEL recursive Codable composition" +
+                " (ArtifactKind ch641 → ArtifactClaim" +
+                " ch646 → ScanRequest this chapter) +" +
+                " Set<T: Codable> composition pattern" +
+                " demonstrated through ScanReport。 3" +
+                " BASSovereign structs (ScopeKey +" +
+                " ScanRequest + ScanReport) gained" +
+                " Codable at M1965 + 3 PROOF tests" +
+                " (M1966) + new typed surface (M1967)" +
+                " + close-out (M1968)。 NEW kind" +
+                " 'sovereign-privilege-scan-trio'。 BAS" +
+                "Sovereign cumulative typed surfaces" +
+                " = 23。 188 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1968。 552 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

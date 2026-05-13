@@ -366,6 +366,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// + close-out (M1964)。 NEW kind 'sovereign-trust-
     /// record-trio'。 BASSovereign cumulative typed
     /// surfaces = 20 — BREAKS 20-SURFACE BARRIER。
+    /// Re-captured at chapter 647 close-out。 Chapter
+    /// 647:BASSOVEREIGN PRIVILEGE-SCAN TRIO CODABLE
+    /// EXTENSION — GAP-FILL,5th post-hexa-#5,8th
+    /// BASSovereign touch overall。 3 BASSovereign
+    /// structs (BASSovereignPrivilegeArbiter.ScopeKey
+    /// + BASSovereignIntegritySentinel.ScanRequest +
+    /// BASSovereignIntegritySentinel.ScanReport) gained
+    /// Codable at M1965 + 3 PROOF tests (M1966) + NEW
+    /// BASSovereignPrivilegeScanTrioCodableExtension
+    /// Doctrine (M1967) + close-out (M1968)。 NEW kind
+    /// 'sovereign-privilege-scan-trio'。 3-LEVEL
+    /// recursive Codable proof (ArtifactKind ch641 →
+    /// ArtifactClaim ch646 → ScanRequest ch647) +
+    /// Set<T> Codable composition demonstrated。 BAS
+    /// Sovereign cumulative typed surfaces = 23。
     static let frozenFullRegistrySha256: String =
-        "1b8601f44b280786f549247ced5aff29e606f8f8f2d72b0c003aa70314c623ca"
+        "b6394dfae67e5dc6f029ac3d43860467a8d05bb8ed2a40e539d5486a512293a7"
 }
