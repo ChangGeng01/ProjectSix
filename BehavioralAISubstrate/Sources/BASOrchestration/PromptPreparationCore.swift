@@ -3,7 +3,7 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 
-public enum BASPromptStateValue: Sendable, Equatable {
+public enum BASPromptStateValue: Sendable, Equatable, Codable {
     case string(String)
     case integer(Int)
     case boolean(Bool)

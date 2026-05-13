@@ -42,7 +42,7 @@ import Foundation
 /// M1003 stage ledger,with a typed `.coherenceIssues()`
 /// method comparing them。
 public struct BASTurnRuntimePlanLedgerCoherence:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
 
     // MARK: - Storage

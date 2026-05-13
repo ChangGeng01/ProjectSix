@@ -42,7 +42,7 @@ import Foundation
 /// Typed enum naming the failure modes when comparing a
 /// plan against an executed ledger。
 public enum BASTurnRuntimePlanLedgerCoherenceIssue:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
     /// One or more stages in the plan have no records in
     /// the ledger。 Associated value is the missing stages
