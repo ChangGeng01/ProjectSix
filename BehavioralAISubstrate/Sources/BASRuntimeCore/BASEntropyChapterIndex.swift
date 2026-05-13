@@ -3835,7 +3835,26 @@ public enum BASEntropyChapterIndex {
                 " chapter 627 hexa #3 opportunity。" +
                 " 163 typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1868。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十三",
+            mNumberFirst: 1869, mNumberLast: 1872,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASOBSERVABILITY NESTED-PAIR" +
+                " CODABLE EXTENSION — GAP-FILL,2nd" +
+                " post-hexa-#2 + 1st BASObservability" +
+                " touch in the run。 2 nested-in-actor" +
+                " enums within BASUpdateTicketLifecycle" +
+                "Coordinator (LifecycleError 3-case +" +
+                " TrialOutcome 3-case) gained Codable" +
+                " at M1869 + 2 PROOF tests (M1870) +" +
+                " new typed surface (M1871) + close-" +
+                "out (M1872)。 NEW kind 'nested-in-" +
+                "actor-pair' distinct from chapter 622" +
+                " 'cross-module-trio'。 164 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1872。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -14970,7 +14970,100 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1868。" +
                 " 452 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 623 — BASObservability nested-pair
+        // Codable extension (2nd post-hexa-#2 gap-fill,
+        // 1st BASObservability touch in run,NEW kind
+        // 'nested-in-actor-pair')。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十三",
+            mNumberFirst: 1869,
+            mNumberLast: 1872,
+            v1MilestoneMNumber: 1872,
+            v1MilestoneStatus:
+                "chapter-623-observability-nested-pair-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1869, knife: "第一刀",
+                    concept: "Add Codable to 2 nested-" +
+                        "in-actor enums within BAS" +
+                        "UpdateTicketLifecycleCoordinator" +
+                        " (BASObservability module) —" +
+                        " LifecycleError (3-case error" +
+                        " enum:unknownTicket(id) +" +
+                        " duplicateTicket(id) +" +
+                        " illegalTransition(from:to:))" +
+                        " + TrialOutcome (3-case:" +
+                        " passed(reasonCodes) +" +
+                        " failed(reasonCodes) +" +
+                        " contaminated(reasonCodes))。"),
+                BASChapterKnife(
+                    mNumber: 1870, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1871, knife: "第三刀",
+                    concept: "NEW BASObservabilityNested" +
+                        "PairCodableExtensionDoctrine +" +
+                        " isGapFillExtension +" +
+                        " typesAreNestedInActor +" +
+                        " kindLabel='nested-in-actor-" +
+                        "pair' (NEW kind for hexa #3) +" +
+                        " isSecondPostHexaTwoGapFill" +
+                        " + isFirstObservabilityPostHexa" +
+                        "Two。 typed-surface count 163" +
+                        " → 164。"),
+                BASChapterKnife(
+                    mNumber: 1872, knife: "第四刀",
+                    concept: "Chapter 623 close-out +" +
+                        " doctrine sync。 456 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2nd post-hexa-#2" +
+                        " gap-fill — 4 more to chapter" +
+                        " 627 hexa #3 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "lifecycle-error-non-codable",
+                "trial-outcome-non-codable",
+                "bas-observability-post-hexa-2-not-shipped",
+                "nested-in-actor-pair-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1872",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "observability-nested-pair-codable-extension",
+                "second-post-hexa-two-gap-fill",
+                "first-observability-post-hexa-two",
+                "new-kind-label-nested-in-actor-pair"
+            ],
+            plannedFutureCuts: [
+                "future arc — 4 more gap-fill chapters" +
+                " toward chapter 627 hexa #3" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 623 ships BASObservability" +
+                " nested-pair Codable extension — 2nd" +
+                " post-hexa-#2 gap-fill chapter,1st" +
+                " BASObservability touch in the post-" +
+                "hexa-#2 run。 2 nested-in-actor enums" +
+                " within BASUpdateTicketLifecycle" +
+                "Coordinator (LifecycleError 3-case +" +
+                " TrialOutcome 3-case) gained Codable" +
+                " at M1869 + 2 PROOF tests (M1870) +" +
+                " new typed surface (M1871) + close-" +
+                "out (M1872)。 NEW kind 'nested-in-" +
+                "actor-pair' distinct from chapter 622" +
+                " 'cross-module-trio'。 164 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1872。 456 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

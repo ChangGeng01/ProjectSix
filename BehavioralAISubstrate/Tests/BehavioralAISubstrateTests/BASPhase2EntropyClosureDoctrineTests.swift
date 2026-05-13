@@ -37,27 +37,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs622() {
+    func testLastChapterIs623() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十二",
-            "Chapter 六百二十二:CROSS-MODULE TRIO" +
-            " CODABLE EXTENSION — GAP-FILL,FIRST" +
-            " post-hexa-#2 + FIRST cross-module wave。" +
-            " 3 types across 2 modules (BAS" +
-            "Orchestration.BASPromptStateValue +" +
-            " BASHostKit.BASTurnRuntimePlanLedger" +
-            "Coherence + BASHostKit.BASTurnRuntime" +
-            "PlanLedgerCoherenceIssue) gained Codable" +
-            " + 3 PROOF tests + BASCrossModuleTrio" +
-            "CodableExtensionDoctrine typed surface" +
-            " + close-out。 NEW kind 'cross-module-" +
-            "trio' (1 struct + 2 enums,2 modules)" +
-            " distinct from hexa #1's 5 kinds and" +
-            " hexa #2's 6 kinds。 Begins 3rd hexa run" +
-            " toward chapter 627 hexa #3 opportunity。" +
-            " 163 typed surfaces cumulative。 452" +
+            "chapter 六百二十三",
+            "Chapter 六百二十三:BASOBSERVABILITY" +
+            " NESTED-PAIR CODABLE EXTENSION — GAP-" +
+            "FILL,2nd post-hexa-#2 + 1st BAS" +
+            "Observability touch in the run。 2 nested-" +
+            "in-actor enums within BASUpdateTicket" +
+            "LifecycleCoordinator (LifecycleError" +
+            " 3-case + TrialOutcome 3-case) gained" +
+            " Codable + 2 PROOF tests + BAS" +
+            "ObservabilityNestedPairCodableExtension" +
+            "Doctrine typed surface + close-out。 NEW" +
+            " kind 'nested-in-actor-pair' distinct" +
+            " from chapter 622 'cross-module-trio'。 164" +
+            " typed surfaces cumulative。 456" +
             " consecutive byte-equality clean commits")
     }
 

@@ -107,19 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 622 close-out。 Chapter
-    /// 622:CROSS-MODULE TRIO CODABLE EXTENSION —
-    /// GAP-FILL,FIRST post-hexa-#2 + FIRST cross-
-    /// module wave。 3 types across 2 modules (BAS
-    /// Orchestration.BASPromptStateValue + BASHostKit
-    /// .BASTurnRuntimePlanLedgerCoherence + BASHostKit
-    /// .BASTurnRuntimePlanLedgerCoherenceIssue) gained
-    /// Codable at M1865 + 3 PROOF tests (M1866) + NEW
-    /// BASCrossModuleTrioCodableExtensionDoctrine
-    /// (M1867) + close-out (M1868)。 NEW kind 'cross-
-    /// module-trio' distinct from hexa #1's 5 kinds
-    /// and hexa #2's 6 kinds。 Begins 3rd hexa run
-    /// toward chapter 627 hexa #3 opportunity。
+    /// Re-captured at chapter 623 close-out。 Chapter
+    /// 623:BASOBSERVABILITY NESTED-PAIR CODABLE
+    /// EXTENSION — GAP-FILL,2nd post-hexa-#2 + 1st
+    /// BASObservability touch in the run。 2 nested-
+    /// in-actor enums within BASUpdateTicketLifecycle
+    /// Coordinator (LifecycleError 3-case + Trial
+    /// Outcome 3-case) gained Codable at M1869 + 2
+    /// PROOF tests (M1870) + NEW BASObservabilityNested
+    /// PairCodableExtensionDoctrine (M1871) + close-
+    /// out (M1872)。 NEW kind 'nested-in-actor-pair'
+    /// distinct from chapter 622 'cross-module-trio'。
     static let frozenFullRegistrySha256: String =
-        "a45495c37a87f2095175eda121cf8b5b4006c5d5216f323e62c248e29b2e921b"
+        "49b454eaeb94250e0b13a52a179a38366c298011707d3b5b5753335062b50d7a"
 }
