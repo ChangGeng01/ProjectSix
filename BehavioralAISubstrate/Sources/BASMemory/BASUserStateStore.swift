@@ -131,7 +131,9 @@ public actor BASInMemoryUserStateStorage: BASUserStateStorage {
 
 public actor BASSQLiteUserStateStorage: BASUserStateStorage {
 
-    public enum StorageError: Error, Equatable, Sendable {
+    public enum StorageError:
+        Error, Equatable, Sendable, Codable
+    {
         case openFailed(code: Int32, message: String)
         case prepareFailed(sql: String, message: String)
         case stepFailed(sql: String, message: String)
