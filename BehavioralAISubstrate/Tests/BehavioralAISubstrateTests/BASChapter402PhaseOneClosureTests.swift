@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1840",
-            "M1840:doctrine version reflects chapter 六百一十五 — BASLEASELIFE CODABLE EXTENSION CONTINUATION — GAP-FILL POST-ARC-SEAL。 2 nested-in-enum String-raw-value enums within BASDeviceRouting (Capability 3-case cpu/gpu/ane + Role 2-case scout/core) gained Codable at M1837 + 2 PROOF tests (M1838) + BASLeaseLifeCodableExtensionContinuationDoctrine typed surface (M1839) + close-out (M1840)。 Combined 9 BASLeaseLife-related types ledger-serializable (7 arc seal + 2 continuation)。 FIRST post-hexa-catalog gap-fill chapter — starts new gap-fill run toward next hexa catalog opportunity。 156 typed surfaces cumulative。 424 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1844",
+            "M1844:doctrine version reflects chapter 六百一十六 — BASORGAN CODABLE EXTENSION WAVE 3 — GAP-FILL via DOMINO EFFECT。 2 BASOrgan types (BASOrganRequest 10-field + BASNeuralHeadEvalPrompt 4-field) gained Codable simultaneously at M1841 (BASOrganRequest unblocked BASNeuralHeadEvalPrompt) + 2 PROOF tests (M1842) + BASOrganCodableExtensionWaveThreeDoctrine typed surface (M1843) + close-out (M1844)。 Combined 5 BASOrgan-related types ledger-serializable (2 wave 1 + 1 wave 2 + 2 wave 3)。 SECOND post-hexa-catalog gap-fill chapter (615 + 616)。 157 typed surfaces cumulative。 428 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

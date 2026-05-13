@@ -107,20 +107,18 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 615 close-out。 Chapter
-    /// 615:BASLEASELIFE CODABLE EXTENSION CONTINUATION
-    /// — GAP-FILL POST-ARC-SEAL。 2 nested-in-enum
-    /// String-raw-value enums within BASDeviceRouting
-    /// (Capability 3-case cpu/gpu/ane + Role 2-case
-    /// scout/core) gained Codable at M1837 via Swift
-    /// automatic synthesis + 2 PROOF tests (M1838) +
-    /// NEW BASLeaseLifeCodableExtensionContinuation
-    /// Doctrine (M1839) + close-out (M1840)。 Combined
-    /// 9 BASLeaseLife-related types ledger-serializable
-    /// (7 arc seal + 2 continuation)。 FIRST post-hexa-
-    /// catalog gap-fill chapter — starts new gap-fill
-    /// run toward next hexa catalog opportunity (around
-    /// chapter 620 if cadence holds)。
+    /// Re-captured at chapter 616 close-out。 Chapter
+    /// 616:BASORGAN CODABLE EXTENSION WAVE 3 — GAP-
+    /// FILL via DOMINO EFFECT。 2 BASOrgan types (BAS
+    /// OrganRequest 10-field + BASNeuralHeadEvalPrompt
+    /// 4-field) gained Codable simultaneously at M1841
+    /// (BASOrganRequest unblocked BASNeuralHeadEval
+    /// Prompt) + 2 PROOF tests (M1842) + NEW BASOrgan
+    /// CodableExtensionWaveThreeDoctrine (M1843) +
+    /// close-out (M1844)。 Combined 5 BASOrgan-related
+    /// types ledger-serializable (2 wave 1 + 1 wave 2
+    /// + 2 wave 3)。 SECOND post-hexa-catalog gap-fill
+    /// chapter (615 + 616)。
     static let frozenFullRegistrySha256: String =
-        "5aa27022dd6615eb0f4ae7c3b538d47f6aa1f492b7fd05251fb8393f4ccccbd7"
+        "9c657c1f5790f5deb664a8a382dd35bd53c7ac490ca4481a1b4476a8b0f76541"
 }

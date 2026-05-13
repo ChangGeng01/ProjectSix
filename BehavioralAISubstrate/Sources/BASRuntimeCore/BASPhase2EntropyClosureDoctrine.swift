@@ -269,7 +269,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百一十二",   // M1825-M1828 (BASSOVEREIGN CODABLE EXTENSION WAVE 3 — GAP-FILL;2 nested-in-engine types (BASSovereignVerdictEngine.HardObservations 12-field Bool + SoftSignals 7-field Double) gained Codable + 2 PROOF tests + BASSovereignCodableExtensionWaveThreeDoctrine typed surface + close-out;combined 8 BASSovereign-related types cumulative (4+2+2);5TH consecutive gap-fill chapter;2nd consecutive BASSovereign gap-fill;ONE SHORT of gap-fill hexa catalog threshold)
         "chapter 六百一十三",   // M1829-M1832 (BASORCHESTRATION CODABLE EXTENSION CONTINUATION WAVE 2 — GAP-FILL;2 nested-in-actor inner types within BASWorldAwareRiskBridge (ProposedIntent 8-field + Decision 3-field) gained Codable + 2 PROOF tests + BASOrchestrationCodableExtensionContinuationWaveTwoDoctrine typed surface + close-out;combined 15 BASOrchestration-related types cumulative (6 arc + 6 post-arc trilogy + 1 continuation wave 1 + 2 continuation wave 2);6TH consecutive gap-fill chapter — TRIGGERS gap-fill hexa catalog meta-meta opportunity at chapter 614;parallel structurally to chapter 607 post-octa fresh-module hexa catalog)
         "chapter 六百一十四",   // M1833-M1836 (GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaCompletionDoctrine cataloging 6 gap-fill chapters (608-613) within already-covered modules — 11 types extended / 24 commits / 4 distinct modules touched / 5 kind buckets (chain-dep + wave-2 ×2 + wave-3 + continuation + continuation-wave-2) + 37 anti-drift PROOF tests + 20 wire-in PROOF tests cross-checking 6 source doctrines + close-out;PARALLEL structurally to chapter 607 post-octa fresh-module hexa catalog;155 typed surfaces cumulative;420 consecutive byte-equality clean commits)
-        "chapter 六百一十五"    // M1837-M1840 (BASLEASELIFE CODABLE EXTENSION CONTINUATION — GAP-FILL POST-ARC-SEAL;2 nested-in-enum String-raw-value enums within BASDeviceRouting (Capability 3-case + Role 2-case) gained Codable via auto-synthesis + 2 PROOF tests + BASLeaseLifeCodableExtensionContinuationDoctrine typed surface + close-out;combined 9 BASLeaseLife-related types cumulative (7 arc seal + 2 continuation);FIRST post-hexa-catalog gap-fill chapter — starts new gap-fill run toward next hexa catalog opportunity)
+        "chapter 六百一十五",   // M1837-M1840 (BASLEASELIFE CODABLE EXTENSION CONTINUATION — GAP-FILL POST-ARC-SEAL;2 nested-in-enum String-raw-value enums within BASDeviceRouting (Capability 3-case + Role 2-case) gained Codable via auto-synthesis + 2 PROOF tests + BASLeaseLifeCodableExtensionContinuationDoctrine typed surface + close-out;combined 9 BASLeaseLife-related types cumulative (7 arc seal + 2 continuation);FIRST post-hexa-catalog gap-fill chapter — starts new gap-fill run toward next hexa catalog opportunity)
+        "chapter 六百一十六"    // M1841-M1844 (BASORGAN CODABLE EXTENSION WAVE 3 — GAP-FILL;2 BASOrgan types (BASOrganRequest 10-field + BASNeuralHeadEvalPrompt 4-field) gained Codable simultaneously via DOMINO EFFECT (BASOrganRequest unblocked BASNeuralHeadEvalPrompt) + 2 PROOF tests + BASOrganCodableExtensionWaveThreeDoctrine typed surface + close-out;combined 5 BASOrgan-related types cumulative (2 wave 1 + 1 wave 2 + 2 wave 3);SECOND post-hexa-catalog gap-fill chapter)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -286,14 +287,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1840
+    public static let mNumberLast: Int = 1844
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1840)。 Bumped through chapter 615:881 → 885。
-    /// Chapter 615:BASLeaseLife Codable extension
-    /// continuation gap-fill + 2 PROOF tests + typed
+    /// M1844)。 Bumped through chapter 616:885 → 889。
+    /// Chapter 616:BASOrgan Codable extension wave 3
+    /// gap-fill (domino effect) + 2 PROOF tests + typed
     /// surface + close-out。
-    public static let commitsShipped: Int = 885
+    public static let commitsShipped: Int = 889
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

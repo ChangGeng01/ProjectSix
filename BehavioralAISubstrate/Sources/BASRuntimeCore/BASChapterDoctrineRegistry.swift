@@ -14207,7 +14207,113 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1840。 424 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 616 — BASOrgan Codable extension
+        // wave 3 (gap-fill,2nd post-hexa-catalog)。
+        // 2 types gained Codable via domino effect
+        // (BASOrganRequest unblocked BASNeuralHeadEval
+        // Prompt)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十六",
+            mNumberFirst: 1841,
+            mNumberLast: 1844,
+            v1MilestoneMNumber: 1844,
+            v1MilestoneStatus:
+                "chapter-616-organ-codable-extension-wave-three",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1841, knife: "第一刀",
+                    concept: "Add Codable to 2 BASOrgan" +
+                        " types — BASOrganRequest (10-" +
+                        "field organ request value:" +
+                        " requestID + role + preset +" +
+                        " instruction + context +" +
+                        " maxOutputTokens +" +
+                        " stopSequences + deadline +" +
+                        " tools + outputSchema) + BAS" +
+                        "NeuralHeadEvalPrompt (4-field" +
+                        " eval prompt:promptID + head" +
+                        " + request + expects)。 Domino" +
+                        " effect — BASOrganRequest" +
+                        " unblocked the prompt。"),
+                BASChapterKnife(
+                    mNumber: 1842, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1843, knife: "第三刀",
+                    concept: "NEW BASOrganCodable" +
+                        "ExtensionWaveThreeDoctrine +" +
+                        " isGapFillExtension flag +" +
+                        " waveNumber = 3 +" +
+                        " combinedOrganCount = 5 +" +
+                        " typesAreTopLevel flag +" +
+                        " isSecondPostHexaCatalogGapFill" +
+                        " flag + extendsViaDominoEffect" +
+                        " flag。 typed-surface count" +
+                        " 156 → 157。"),
+                BASChapterKnife(
+                    mNumber: 1844, knife: "第四刀",
+                    concept: "Chapter 616 close-out +" +
+                        " doctrine sync。 428 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2nd post-hexa-" +
+                        "catalog gap-fill — continues" +
+                        " new gap-fill run toward next" +
+                        " hexa catalog opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-organ-request-non-codable",
+                "bas-neural-head-eval-prompt-non-codable",
+                "bas-organ-wave-3-not-shipped",
+                "domino-effect-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1844",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-wave-3-codable-extension",
+                "5-organ-types-cumulative",
+                "second-post-hexa-catalog-gap-fill",
+                "domino-effect-extension"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional gap-fill" +
+                " chapters heading toward next hexa" +
+                " catalog opportunity (around chapter" +
+                " 620 if cadence holds)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进" +
+                " 10/10)",
+                "future arc — Tier 2 final 60/60 (M1367" +
+                " ssmScan + Tier C ADR-019)"
+            ],
+            summary: "Chapter 616 ships BASOrgan Codable" +
+                " extension wave 3 — gap-fill within" +
+                " already-covered BASOrgan module" +
+                " (chapter 598 first-ever + chapter" +
+                " 609 wave 2)。 2 BASOrgan types gained" +
+                " Codable simultaneously at M1841 via" +
+                " DOMINO EFFECT — BASOrganRequest" +
+                " (10-field organ request) unblocked" +
+                " BASNeuralHeadEvalPrompt (4-field eval" +
+                " prompt held BASOrganRequest)。 + 2" +
+                " PROOF tests (M1842) + new typed" +
+                " surface (M1843) + close-out (M1844)。" +
+                " Combined 5 BASOrgan-related types" +
+                " ledger-serializable (2 wave 1 + 1" +
+                " wave 2 + 2 wave 3)。 SECOND post-" +
+                "hexa-catalog gap-fill chapter (615 +" +
+                " 616) — continues new gap-fill run" +
+                " heading toward next hexa catalog" +
+                " opportunity。 157 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1844。" +
+                " 428 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

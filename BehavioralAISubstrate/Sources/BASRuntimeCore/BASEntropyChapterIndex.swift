@@ -3664,7 +3664,32 @@ public enum BASEntropyChapterIndex {
                 " opportunity (around chapter 620 if" +
                 " cadence holds)。 156 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1840。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十六",
+            mNumberFirst: 1841, mNumberLast: 1844,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORGAN CODABLE EXTENSION WAVE" +
+                " 3 — GAP-FILL。 2 BASOrgan types" +
+                " gained Codable simultaneously at" +
+                " M1841 via DOMINO EFFECT — BASOrgan" +
+                "Request (10-field organ request:" +
+                " requestID + role + preset +" +
+                " instruction + context +" +
+                " maxOutputTokens + stopSequences +" +
+                " deadline + tools + outputSchema)" +
+                " unblocked BASNeuralHeadEvalPrompt" +
+                " (4-field eval prompt held BASOrgan" +
+                "Request)。 + 2 PROOF tests (M1842) +" +
+                " new typed surface (M1843) + close-" +
+                "out (M1844)。 Combined 5 BASOrgan-" +
+                "related types ledger-serializable (2" +
+                " wave 1 + 1 wave 2 + 2 wave 3)。" +
+                " SECOND post-hexa-catalog gap-fill" +
+                " chapter (615 + 616)。 157 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1844。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

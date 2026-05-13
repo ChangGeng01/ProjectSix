@@ -37,26 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs615() {
+    func testLastChapterIs616() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十五",
-            "Chapter 六百一十五:BASLEASELIFE CODABLE" +
-            " EXTENSION CONTINUATION — GAP-FILL POST-" +
-            "ARC-SEAL。 2 nested-in-enum String-raw-" +
-            "value enums within BASDeviceRouting" +
-            " (Capability 3-case + Role 2-case) gained" +
-            " Codable + 2 PROOF tests + BASLeaseLife" +
-            "CodableExtensionContinuationDoctrine typed" +
-            " surface + close-out。 Combined 9 BAS" +
-            "LeaseLife-related types ledger-serializable" +
-            " (7 arc seal + 2 continuation)。 FIRST" +
-            " post-hexa-catalog gap-fill chapter —" +
-            " starts new gap-fill run toward next hexa" +
-            " catalog opportunity。 156 typed surfaces" +
-            " cumulative。 424 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百一十六",
+            "Chapter 六百一十六:BASORGAN CODABLE" +
+            " EXTENSION WAVE 3 — GAP-FILL。 2 BASOrgan" +
+            " types (BASOrganRequest 10-field + BAS" +
+            "NeuralHeadEvalPrompt 4-field) gained" +
+            " Codable simultaneously via DOMINO EFFECT" +
+            " (BASOrganRequest unblocked BASNeuralHead" +
+            "EvalPrompt) + 2 PROOF tests + BASOrgan" +
+            "CodableExtensionWaveThreeDoctrine typed" +
+            " surface + close-out。 Combined 5 BASOrgan-" +
+            "related types ledger-serializable (2 wave" +
+            " 1 + 1 wave 2 + 2 wave 3)。 SECOND post-" +
+            "hexa-catalog gap-fill chapter (615 + 616)。" +
+            " 157 typed surfaces cumulative。 428" +
+            " consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range
