@@ -30,7 +30,9 @@ import BASRuntimeCore
 /// surface the deadStop reason to the host and wait for an explicit
 /// human intervention before booting again.
 public actor BASSovereignCleanRebootCoordinator {
-    public enum CoordinatorError: Error, Equatable, Sendable {
+    public enum CoordinatorError:
+        Error, Equatable, Sendable, Codable
+    {
         case verdictDoesNotRequireReboot(level: BASSovereignVerdictLevel)
         case noKnownGoodAncestor(fromVersionID: String)
         case currentVersionUnknown(id: String)

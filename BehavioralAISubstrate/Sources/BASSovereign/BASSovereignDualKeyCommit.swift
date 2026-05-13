@@ -88,7 +88,9 @@ public enum BASSovereignDualKeySigning {
 
     /// Errors thrown when constructing a commit. Verification
     /// failures do NOT throw — they return false on the verifier.
-    public enum SigningError: Error, Equatable, Sendable {
+    public enum SigningError:
+        Error, Equatable, Sendable, Codable
+    {
         /// Same key ID supplied for both primary and secondary —
         /// dual-key requires two distinct signers.
         case sameKeyIDForBothSlots(String)

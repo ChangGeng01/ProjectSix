@@ -38,7 +38,9 @@ import BASRuntimeCore
 /// count as issued. Callers MUST treat the throw as grounds to abort
 /// the commit, which is exactly the BR-012 semantics we want.
 public actor BASSovereignVerdictEngine {
-    public enum EngineError: Error, Equatable, Sendable {
+    public enum EngineError:
+        Error, Equatable, Sendable, Codable
+    {
         case auditAppendFailed(String)
     }
 
