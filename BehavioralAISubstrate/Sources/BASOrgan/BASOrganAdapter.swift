@@ -180,7 +180,7 @@ public struct BASOrganRequest: Sendable, Equatable, Codable {
     }
 }
 
-public struct BASOrganDraft: Sendable, Equatable {
+public struct BASOrganDraft: Sendable, Equatable, Codable {
     public let requestID: String
     public let providerID: String
     public let role: BASOrganRole

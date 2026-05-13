@@ -124,7 +124,7 @@ public struct BASLLMVerifierFeedback:
 // MARK: - Engine result
 
 public struct BASLLMExtractionResult:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     public let draft: BASOrganDraft
     public let byproducts: BASLLMExtractionByproducts
@@ -149,7 +149,7 @@ public struct BASLLMExtractionResult:
 // MARK: - Engine errors
 
 public enum BASLLMExtractionEngineError:
-    Error, Sendable, Equatable
+    Error, Sendable, Equatable, Codable
 {
     case retrievalFailed(reason: String)
     case adapterFailed(reason: String)
