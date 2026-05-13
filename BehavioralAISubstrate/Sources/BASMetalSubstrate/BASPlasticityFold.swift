@@ -297,7 +297,7 @@ public struct BASPlasticityUpdate:
 // MARK: - Typed errors
 
 public enum BASPlasticityError:
-    Error, Equatable, Sendable
+    Error, Equatable, Sendable, Codable
 {
     case shapeMismatch(reason: String)
 

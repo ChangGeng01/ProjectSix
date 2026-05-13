@@ -224,7 +224,7 @@ public struct BASPredictiveCodingObservation:
 // MARK: - Typed errors
 
 public enum BASPredictiveCodingError:
-    Error, Equatable, Sendable
+    Error, Equatable, Sendable, Codable
 {
     case shapeMismatch(reason: String)
 }

@@ -235,7 +235,7 @@ public struct BASBiomimeticStateSnapshot:
 // MARK: - Snapshot error
 
 public enum BASBiomimeticSnapshotError:
-    Error, Equatable, Sendable
+    Error, Equatable, Sendable, Codable
 {
     /// Imported snapshot's shape doesn't match the
     /// target actor's shape。 Cross-shape import
