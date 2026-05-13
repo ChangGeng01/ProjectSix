@@ -1,7 +1,7 @@
 import Foundation
 import BASPolicy
 
-public struct BASNeuralThoughtMaterialization: Equatable, Sendable {
+public struct BASNeuralThoughtMaterialization: Equatable, Sendable, Codable {
     public var candidateFrontier: BASCandidateFrontier?
     public var counterfactualBundles: [BASCounterfactualBundle]?
     public var critiqueBundles: [BASCritiqueBundle]?
