@@ -107,21 +107,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 619 close-out。 Chapter
-    /// 619:BASMEMORY CODABLE EXTENSION POST-TRILOGY
-    /// — GAP-FILL reopening BASMemory 29 chapters
-    /// after chapter 590 trilogy seal。 3 BASMemory
-    /// types (BASEventSourcedMemoryAtomStoreCachePolicy
-    /// 3-case + BASMemoryTieringReconciliationOutcome
-    /// 9-field + BASMemoryTieringReconcilerOrdering
-    /// 3-case) gained Codable at M1853 + 3 PROOF tests
-    /// (M1854) + NEW BASMemoryCodableExtensionPost
-    /// TrilogyDoctrine (M1855) + close-out (M1856)。
-    /// FIFTH post-hexa-catalog gap-fill chapter
-    /// (615+616+617+618+619) + FIRST non-BASOrgan
-    /// post-hexa gap-fill — diversifying the run。 ONE
-    /// more gap-fill to reach hexa catalog threshold
-    /// at chapter 620。
+    /// Re-captured at chapter 620 close-out。 Chapter
+    /// 620:BASHOSTKIT CODABLE EXTENSION POST-MESH-
+    /// SWEEP — GAP-FILL reopening BASHostKit 12
+    /// chapters after chapter 608 mesh-sweep gap-fill。
+    /// 2 BASHostKit enums (BASHostStorageWireError
+    /// 2-case error + BASShadowPermitUpgradeDecision
+    /// 2-case decision) gained Codable at M1857 + 2
+    /// PROOF tests (M1858) + NEW BASHostKitCodable
+    /// ExtensionPostMeshSweepDoctrine (M1859) + close-
+    /// out (M1860)。 SIXTH post-hexa-catalog gap-fill
+    /// chapter (615+616+617+618+619+620) — TRIGGERS
+    /// 2nd gap-fill hexa catalog meta-meta opportunity
+    /// at chapter 621 (parallel to chapter 614 gap-
+    /// fill hexa #1)。 4 distinct modules in this post-
+    /// hexa run (BASLeaseLife + BASOrgan + BASMemory
+    /// + BASHostKit) matches chapter 614 hexa #1。
     static let frozenFullRegistrySha256: String =
-        "755662e97a40bb8a5866505ab2fe2cf0f04484e4a8157920a69324b3434596cb"
+        "33b2e20c18aeb960cb1f6dce71165ac9d80729aa9c71fdad798b8ff68bcf7682"
 }

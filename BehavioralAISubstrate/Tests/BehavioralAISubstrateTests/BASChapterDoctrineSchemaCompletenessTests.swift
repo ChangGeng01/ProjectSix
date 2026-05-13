@@ -2129,7 +2129,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百一十九")!)
+                            "chapter 六百一十九")!),
+            // M1860 chapter 620 — BASHostKit Codable extension post-mesh-sweep gap-fill (6th post-hexa, triggers hexa #2)
+            checkRegistry("六百二十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百二十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3577,6 +3583,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百一十九")!
+                .mNumberLast),
+            // M1860 chapter 620 — BASHostKit Codable extension post-mesh-sweep gap-fill
+            ("620",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

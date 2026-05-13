@@ -3760,7 +3760,32 @@ public enum BASEntropyChapterIndex {
                 " FIRST non-BASOrgan post-hexa gap-fill" +
                 " — diversifying the run。 160 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1856。 V1 byte-equality preserved。")
+                " M1856。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十",
+            mNumberFirst: 1857, mNumberLast: 1860,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASHOSTKIT CODABLE EXTENSION" +
+                " POST-MESH-SWEEP — GAP-FILL reopening" +
+                " BASHostKit 12 chapters after chapter" +
+                " 608 mesh-sweep gap-fill。 2 BASHostKit" +
+                " enums (BASHostStorageWireError 2-case" +
+                " error + BASShadowPermitUpgradeDecision" +
+                " 2-case decision) gained Codable at" +
+                " M1857 + 2 PROOF tests (M1858) + new" +
+                " typed surface (M1859) + close-out" +
+                " (M1860)。 SIXTH post-hexa-catalog gap-" +
+                "fill chapter (615+616+617+618+619+" +
+                "620) — TRIGGERS 2nd gap-fill hexa" +
+                " catalog meta-meta opportunity at" +
+                " chapter 621。 4 distinct modules in" +
+                " this post-hexa run (BASLeaseLife +" +
+                " BASOrgan + BASMemory + BASHostKit)" +
+                " matches chapter 614 hexa #1 distinct" +
+                " module count。 161 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1860。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

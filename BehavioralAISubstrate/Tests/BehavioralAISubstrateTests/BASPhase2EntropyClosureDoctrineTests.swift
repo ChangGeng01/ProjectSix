@@ -37,26 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs619() {
+    func testLastChapterIs620() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十九",
-            "Chapter 六百一十九:BASMEMORY CODABLE" +
-            " EXTENSION POST-TRILOGY — GAP-FILL" +
-            " reopening BASMemory 29 chapters after" +
-            " chapter 590 trilogy seal。 3 BASMemory" +
-            " types (BASEventSourcedMemoryAtomStore" +
-            "CachePolicy 3-case + BASMemoryTiering" +
-            "ReconciliationOutcome 9-field + BAS" +
-            "MemoryTieringReconcilerOrdering 3-case)" +
-            " gained Codable + 3 PROOF tests +" +
-            " BASMemoryCodableExtensionPostTrilogy" +
-            "Doctrine typed surface + close-out。" +
-            " FIFTH post-hexa-catalog gap-fill" +
-            " (615+616+617+618+619) + FIRST non-BAS" +
-            "Organ post-hexa — diversifying the run。" +
-            " 160 typed surfaces cumulative。 440" +
+            "chapter 六百二十",
+            "Chapter 六百二十:BASHOSTKIT CODABLE" +
+            " EXTENSION POST-MESH-SWEEP — GAP-FILL" +
+            " reopening BASHostKit 12 chapters after" +
+            " chapter 608 mesh-sweep。 2 BASHostKit" +
+            " enums (BASHostStorageWireError 2-case" +
+            " error + BASShadowPermitUpgradeDecision" +
+            " 2-case decision) gained Codable + 2" +
+            " PROOF tests + BASHostKitCodableExtension" +
+            "PostMeshSweepDoctrine typed surface +" +
+            " close-out。 SIXTH post-hexa-catalog gap-" +
+            "fill chapter (615+616+617+618+619+620)" +
+            " — TRIGGERS 2nd gap-fill hexa catalog" +
+            " meta-meta opportunity at chapter 621。" +
+            " 4 distinct modules in this post-hexa" +
+            " run matches chapter 614 hexa #1。 161" +
+            " typed surfaces cumulative。 444" +
             " consecutive byte-equality clean commits")
     }
 

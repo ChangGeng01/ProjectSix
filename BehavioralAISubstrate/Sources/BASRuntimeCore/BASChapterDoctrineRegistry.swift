@@ -14639,7 +14639,114 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1856。 440 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 620 — BASHostKit Codable extension
+        // post-mesh-sweep (gap-fill,6th post-hexa-
+        // catalog,TRIGGERS 2nd gap-fill hexa catalog
+        // meta-meta opportunity at chapter 621)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十",
+            mNumberFirst: 1857,
+            mNumberLast: 1860,
+            v1MilestoneMNumber: 1860,
+            v1MilestoneStatus:
+                "chapter-620-hostkit-codable-extension-post-mesh-sweep",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1857, knife: "第一刀",
+                    concept: "Add Codable to 2 BASHostKit" +
+                        " enums within already-covered" +
+                        " BASHostKit module (post chapter" +
+                        " 608 mesh-sweep) — BASHostStorage" +
+                        "WireError (2-case error enum:" +
+                        " missingSQLiteURL(component:" +
+                        "String) + storageInitFailed" +
+                        "(component:String,message:" +
+                        "String)) + BASShadowPermit" +
+                        "UpgradeDecision (2-case decision" +
+                        " enum:noChange + escalate" +
+                        "(targetMode:BASActionPermitMode," +
+                        " reasonCodes:[String]))。"),
+                BASChapterKnife(
+                    mNumber: 1858, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1859, knife: "第三刀",
+                    concept: "NEW BASHostKitCodable" +
+                        "ExtensionPostMeshSweepDoctrine +" +
+                        " isGapFillExtension +" +
+                        " isSixthPostHexaCatalogGapFill" +
+                        " + triggersGapFillHexa" +
+                        "CatalogTwoOpportunity +" +
+                        " chaptersDormantSinceMeshSweep" +
+                        " = 12 (620 - 608) +" +
+                        " distinctModulesInPostHexaRun" +
+                        " = 4 (BASLeaseLife + BASOrgan" +
+                        " + BASMemory + BASHostKit)。" +
+                        " typed-surface count 160 → 161。"),
+                BASChapterKnife(
+                    mNumber: 1860, knife: "第四刀",
+                    concept: "Chapter 620 close-out +" +
+                        " doctrine sync。 444 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6TH post-hexa-" +
+                        "catalog gap-fill — TRIGGERS" +
+                        " 2nd gap-fill hexa catalog" +
+                        " meta-meta opportunity at" +
+                        " chapter 621 (parallel to" +
+                        " chapter 614 hexa #1)。")
+            ],
+            entropyClassesAttacked: [
+                "bas-host-storage-wire-error-non-codable",
+                "bas-shadow-permit-upgrade-decision-non-codable",
+                "bas-hostkit-post-mesh-sweep-not-shipped",
+                "second-gap-fill-hexa-threshold-not-crossed-yet"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1860",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-post-mesh-sweep-codable-extension",
+                "sixth-post-hexa-catalog-gap-fill",
+                "triggers-gap-fill-hexa-catalog-two-opportunity",
+                "4-distinct-modules-in-post-hexa-run"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 621 NEW gap-fill" +
+                " hexa catalog #2 meta-meta milestone" +
+                " (parallel to chapter 614 hexa #1)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 620 ships BASHostKit Codable" +
+                " extension post-mesh-sweep — gap-fill" +
+                " within already-covered BASHostKit" +
+                " module reopening 12 chapters after" +
+                " chapter 608 mesh-sweep gap-fill。 2" +
+                " BASHostKit enums gained Codable at" +
+                " M1857 (BASHostStorageWireError 2-case" +
+                " error + BASShadowPermitUpgradeDecision" +
+                " 2-case decision) + 2 PROOF tests" +
+                " (M1858) + new typed surface (M1859)" +
+                " + close-out (M1860)。 6TH post-hexa-" +
+                "catalog gap-fill chapter (615+616+" +
+                "617+618+619+620) — TRIGGERS 2ND gap-" +
+                "fill hexa catalog meta-meta" +
+                " opportunity at chapter 621 (parallel" +
+                " to chapter 614 gap-fill hexa #1)。 4" +
+                " distinct modules touched in this post-" +
+                "hexa run (BASLeaseLife + BASOrgan +" +
+                " BASMemory + BASHostKit) — matches" +
+                " chapter 614 hexa #1 distinct module" +
+                " count。 161 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1860。 444" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014 OPT-" +
+                "IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -110,19 +110,22 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 619
-    /// close-out (M1856 — BASMemory Codable extension
-    /// post-trilogy gap-fill reopening BASMemory 29
-    /// chapters after chapter 590 trilogy seal;3
-    /// BASMemory types gained Codable;FIFTH post-
-    /// hexa-catalog gap-fill + FIRST non-BASOrgan
-    /// post-hexa — diversifying the run;1 more to
-    /// next hexa catalog opportunity at chapter 620)。
-    public static let typedSurfaceCount: Int = 160
+    /// Cumulative achievement metrics at chapter 620
+    /// close-out (M1860 — BASHostKit Codable extension
+    /// post-mesh-sweep gap-fill reopening BASHostKit
+    /// 12 chapters after chapter 608 mesh-sweep;2
+    /// BASHostKit enums gained Codable;SIXTH post-
+    /// hexa-catalog gap-fill — TRIGGERS 2nd gap-fill
+    /// hexa catalog meta-meta opportunity at chapter
+    /// 621;4 distinct modules in this post-hexa run
+    /// (BASLeaseLife + BASOrgan + BASMemory +
+    /// BASHostKit) matches chapter 614 hexa #1 distinct
+    /// module count)。
+    public static let typedSurfaceCount: Int = 161
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 440
-    public static let phase2CommitsShipped: Int = 901
-    public static let chapter2NumberLast: Int = 1856
+        Int = 444
+    public static let phase2CommitsShipped: Int = 905
+    public static let chapter2NumberLast: Int = 1860
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true
