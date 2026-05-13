@@ -2273,7 +2273,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十三")!)
+                            "chapter 六百四十三")!),
+            // M1956 chapter 644 — BASSovereign snapshot+token struct-trio Codable extension gap-fill (2nd post-hexa-#5, PURE STRUCT TRIO)
+            checkRegistry("六百四十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3913,6 +3919,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十三")!
+                .mNumberLast),
+            // M1956 chapter 644 — BASSovereign snapshot+token struct-trio Codable extension gap-fill (2nd post-hexa-#5)
+            ("644",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

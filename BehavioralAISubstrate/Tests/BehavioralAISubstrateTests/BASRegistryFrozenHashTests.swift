@@ -321,6 +321,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// tree-typed-trio'。 Rounds out BASSovereignHost
     /// VersionTree coverage。 BASSovereign cumulative
     /// typed surfaces = 11。
+    /// Re-captured at chapter 644 close-out。 Chapter
+    /// 644:BASSOVEREIGN SNAPSHOT+TOKEN STRUCT-TRIO
+    /// CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#5,
+    /// PURE STRUCT TRIO (chapter 643 was MIXED)。 5th
+    /// BASSovereign touch overall。 3 BASSovereign
+    /// structs nested-in-actor:BASSovereignSnapshot
+    /// Manager.SnapshotAnchor + BASSovereignSnapshot
+    /// Manager.RegisteredSnapshot (wraps SnapshotAnchor
+    /// — recursive Codable proof) + BASSovereignToken
+    /// Authority.CommitIntent gained Codable at M1953
+    /// + 3 PROOF tests (M1954) + NEW BASSovereign
+    /// SnapshotTokenStructTrioCodableExtensionDoctrine
+    /// (M1955) + close-out (M1956)。 NEW kind 'sovereign-
+    /// snapshot-token-struct-trio'。 BASSovereign
+    /// cumulative typed surfaces = 14。 PHASE 2 COMMITS
+    /// CROSSES 1000 ROUND-NUMBER MILESTONE。
     static let frozenFullRegistrySha256: String =
-        "9b5ffaa9433a412883ac6cb3eeb4e631b5eead4ce03d35d1cce9064d23411098"
+        "eff578418719a406e76b9fd5ae32a7a2d712c585d096cafaaf1ab938388017df"
 }

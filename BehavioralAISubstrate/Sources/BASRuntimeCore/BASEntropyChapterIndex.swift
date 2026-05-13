@@ -4327,7 +4327,35 @@ public enum BASEntropyChapterIndex {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1952。 536 consecutive byte-equality" +
                 " clean commits。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十四",
+            mNumberFirst: 1953, mNumberLast: 1956,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "BASSOVEREIGN SNAPSHOT+TOKEN" +
+                " STRUCT-TRIO CODABLE EXTENSION — GAP-" +
+                "FILL,2nd post-hexa-#5,PURE STRUCT" +
+                " TRIO (chapter 643 was MIXED enum+" +
+                "struct)。 5th BASSovereign touch" +
+                " overall。 3 BASSovereign structs" +
+                " nested-in-actor:BASSovereignSnapshot" +
+                "Manager.SnapshotAnchor + BASSovereign" +
+                "SnapshotManager.RegisteredSnapshot" +
+                " (wraps SnapshotAnchor — recursive" +
+                " Codable proof) + BASSovereignToken" +
+                "Authority.CommitIntent gained Codable" +
+                " at M1953 + 3 PROOF tests (M1954) +" +
+                " new typed surface (M1955) + close-out" +
+                " (M1956)。 NEW kind 'sovereign-snapshot-" +
+                "token-struct-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 14。 185" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1956。 540 consecutive" +
+                " byte-equality clean commits。 PHASE 2" +
+                " COMMITS CROSSES 1000 ROUND-NUMBER" +
+                " MILESTONE (997 → 1001)。 V1 byte-" +
+                "equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

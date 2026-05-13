@@ -17196,6 +17196,122 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1952。 536 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 644 — BASSovereign snapshot+token
+        // struct-trio Codable extension (2nd post-hexa-
+        // #5 gap-fill,PURE STRUCT TRIO with recursive
+        // Codable proof)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十四",
+            mNumberFirst: 1953,
+            mNumberLast: 1956,
+            v1MilestoneMNumber: 1956,
+            v1MilestoneStatus:
+                "chapter-644-sovereign-snapshot-token-struct-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1953, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign struct types all" +
+                        " nested-in-actor — BAS" +
+                        "SovereignSnapshotManager." +
+                        "SnapshotAnchor (6-field) + BAS" +
+                        "SovereignSnapshotManager." +
+                        "RegisteredSnapshot (3-field," +
+                        " wraps SnapshotAnchor) + BAS" +
+                        "SovereignTokenAuthority." +
+                        "CommitIntent (8-field,uses" +
+                        " BASSovereignCommitScope" +
+                        " already Codable)。 PURE STRUCT" +
+                        " TRIO + recursive Codable" +
+                        " proof。"),
+                BASChapterKnife(
+                    mNumber: 1954, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1955, knife: "第三刀",
+                    concept: "NEW BASSovereignSnapshot" +
+                        "TokenStructTrioCodableExtension" +
+                        "Doctrine + moduleCount = 1" +
+                        " (BASSovereign entirely) +" +
+                        " nestedInActorCount = 3 +" +
+                        " structCount = 3 + enumCount =" +
+                        " 0 (DISTINCTIVE pure-struct" +
+                        " shape) + allTypesAreErrors =" +
+                        " false + kindLabel='sovereign-" +
+                        "snapshot-token-struct-trio'" +
+                        " (NEW kind) +" +
+                        " isSecondPostHexaFiveGapFill +" +
+                        " isPureStructTrio +" +
+                        " isFifthBASSovereignTouch" +
+                        "Overall +" +
+                        " cumulativeBASSovereignTyped" +
+                        "Surfaces = 14 +" +
+                        " hasRecursiveCodableProof。" +
+                        " typed-surface count 184 → 185。"),
+                BASChapterKnife(
+                    mNumber: 1956, knife: "第四刀",
+                    concept: "Chapter 644 close-out +" +
+                        " doctrine sync。 540 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2nd post-hexa-#5" +
+                        " gap-fill — PURE STRUCT TRIO" +
+                        " distinguishes from ch643 mixed" +
+                        " trio。 4 more chapters to" +
+                        " chapter 649 hexa #6 catalog" +
+                        " opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-snapshot-anchor-non-codable",
+                "bas-sovereign-registered-snapshot-non-codable",
+                "bas-sovereign-commit-intent-non-codable",
+                "sovereign-snapshot-token-struct-trio-pattern-uncaptured",
+                "second-post-hexa-five-gap-fill-not-shipped",
+                "pure-struct-trio-pattern-uncaptured-post-hexa-five"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1956",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-snapshot-token-struct-trio-codable-extension",
+                "second-post-hexa-five-gap-fill",
+                "pure-struct-trio",
+                "fifth-bas-sovereign-touch-overall",
+                "cumulative-14-bas-sovereign-typed-surfaces",
+                "has-recursive-codable-proof",
+                "new-kind-label-sovereign-snapshot-token-struct-trio",
+                "540-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 4 more gap-fill chapters" +
+                " (645-648) toward chapter 649 hexa #6" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 644 ships BASSovereign" +
+                " snapshot+token struct-trio Codable" +
+                " extension — 2nd post-hexa-#5 gap-fill" +
+                " chapter,PURE STRUCT TRIO (chapter 643" +
+                " was MIXED enum+struct trio)。 5th BAS" +
+                "Sovereign touch overall。 3 BASSovereign" +
+                " structs all nested-in-actor:Snapshot" +
+                "Anchor + RegisteredSnapshot (wraps" +
+                " Anchor — recursive Codable proof) +" +
+                " CommitIntent。 Gained Codable at" +
+                " M1953 + 3 PROOF tests (M1954) + new" +
+                " typed surface (M1955) + close-out" +
+                " (M1956)。 NEW kind 'sovereign-snapshot-" +
+                "token-struct-trio'。 BASSovereign" +
+                " cumulative typed surfaces = 14。 185" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1956。 540 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

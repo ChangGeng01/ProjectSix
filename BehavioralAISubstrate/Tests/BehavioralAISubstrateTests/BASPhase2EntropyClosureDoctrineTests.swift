@@ -37,27 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs643() {
+    func testLastChapterIs644() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十三",
-            "Chapter 六百四十三:BASSOVEREIGN CLOCK+TREE" +
-            " TYPED-TRIO CODABLE EXTENSION — GAP-FILL," +
-            "1st post-hexa-#5,FIRST mixed enum+struct" +
-            " trio in post-hexa-#5 run (prior 6 chapters" +
-            " 636-641 all had pure-enum-trio shape)。" +
-            " 4th BASSovereign touch overall。 3 BAS" +
-            "Sovereign types nested-in-actor (1 enum +" +
-            " 2 structs) gained Codable + 3 PROOF tests" +
-            " + BASSovereignClockTreeTypedTrioCodable" +
-            "ExtensionDoctrine typed surface + close-out。" +
-            " NEW kind 'sovereign-clock-tree-typed-trio'。" +
-            " Rounds out BASSovereignHostVersionTree" +
-            " coverage。 BASSovereign cumulative typed" +
-            " surfaces = 11。 184 typed surfaces" +
-            " cumulative。 536 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百四十四",
+            "Chapter 六百四十四:BASSOVEREIGN SNAPSHOT+" +
+            "TOKEN STRUCT-TRIO CODABLE EXTENSION — GAP-" +
+            "FILL,2nd post-hexa-#5,PURE STRUCT TRIO" +
+            " (chapter 643 was MIXED enum+struct)。 5th" +
+            " BASSovereign touch overall。 3 BASSovereign" +
+            " structs nested-in-actor gained Codable + 3" +
+            " PROOF tests + BASSovereignSnapshotToken" +
+            "StructTrioCodableExtensionDoctrine typed" +
+            " surface + close-out。 NEW kind 'sovereign-" +
+            "snapshot-token-struct-trio'。 BASSovereign" +
+            " cumulative typed surfaces = 14。 PHASE 2" +
+            " COMMITS CROSSES 1000 ROUND-NUMBER" +
+            " MILESTONE。 185 typed surfaces cumulative。" +
+            " 540 consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range

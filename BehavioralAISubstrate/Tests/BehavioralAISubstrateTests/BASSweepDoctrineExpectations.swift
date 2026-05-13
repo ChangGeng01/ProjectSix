@@ -116,22 +116,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1952:24 + 20 + 197 = 241 (chapter
-    /// 643 — BASSovereign clock+tree typed-trio Codable
-    /// extension,1st post-hexa-#5 gap-fill,FIRST
-    /// mixed enum+struct trio in post-hexa-#5 run)
-    public static let phase2ChapterCount: Int = 241
+    /// added)。 At M1956:24 + 20 + 198 = 242 (chapter
+    /// 644 — BASSovereign snapshot+token struct-trio,
+    /// 2nd post-hexa-#5 gap-fill)
+    public static let phase2ChapterCount: Int = 242
 
-    /// Phase 2 commits shipped。 At M1952:125 + 84 +
-    /// 788 = 997 (chapter 643 = 4 cuts — sovereign-
-    /// clock-tree trio + 3 PROOF + typed surface +
-    /// close-out)
-    public static let phase2CommitsShipped: Int = 997
+    /// Phase 2 commits shipped。 At M1956:125 + 84 +
+    /// 792 = 1001 (chapter 644 = 4 cuts — sovereign-
+    /// snapshot-token trio + 3 PROOF + typed surface +
+    /// close-out)。 ROUND-NUMBER MILESTONE — Phase 2
+    /// commits crosses 1000。
+    public static let phase2CommitsShipped: Int = 1001
 
-    /// Phase 2 mNumberLast。 At M1952:chapter 643 —
-    /// BASSovereign clock+tree typed-trio。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1952
+    /// Phase 2 mNumberLast。 At M1956:chapter 644 —
+    /// BASSovereign snapshot+token struct-trio。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1956
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1952",
-            "M1952:doctrine version reflects chapter 六百四十三 — BASSOVEREIGN CLOCK+TREE TYPED-TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#5,FIRST mixed enum+struct trio in post-hexa-#5 run (prior 6 chapters 636-641 all had pure-enum-trio shape)。 4th BASSovereign touch overall。 3 BASSovereign types nested-in-actor (1 enum + 2 structs):BASSovereignCrossDeviceClock.Order + BASSovereignHostVersionTree.Node + BASSovereignHostVersionTree.LineagePath gained Codable at M1949 + 3 PROOF tests (M1950) + BASSovereignClockTreeTypedTrioCodableExtensionDoctrine typed surface (M1951) + close-out (M1952)。 NEW kind 'sovereign-clock-tree-typed-trio'。 Rounds out BASSovereignHostVersionTree coverage。 BASSovereign cumulative typed surfaces = 11。 184 typed surfaces cumulative。 536 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1956",
+            "M1956:doctrine version reflects chapter 六百四十四 — BASSOVEREIGN SNAPSHOT+TOKEN STRUCT-TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#5,PURE STRUCT TRIO (chapter 643 was MIXED enum+struct)。 5th BASSovereign touch overall。 3 BASSovereign structs nested-in-actor:BASSovereignSnapshotManager.SnapshotAnchor + BASSovereignSnapshotManager.RegisteredSnapshot (wraps SnapshotAnchor — recursive Codable proof) + BASSovereignTokenAuthority.CommitIntent gained Codable at M1953 + 3 PROOF tests (M1954) + BASSovereignSnapshotTokenStructTrioCodableExtensionDoctrine typed surface (M1955) + close-out (M1956)。 NEW kind 'sovereign-snapshot-token-struct-trio'。 BASSovereign cumulative typed surfaces = 14。 PHASE 2 COMMITS CROSSES 1000 ROUND-NUMBER MILESTONE。 185 typed surfaces cumulative。 540 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
