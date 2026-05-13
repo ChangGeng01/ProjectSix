@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1920",
-            "M1920:doctrine version reflects chapter 六百三十五 — 4TH GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaFourCompletionDoctrine cataloging 6 post-hexa-#3 gap-fill chapters (629-634) — 18 types extended / 24 commits / 7 distinct modules touched matches hexa #3 and far exceeds hexa #1+#2's 4 each。 FIRST hexa where every entry is an error-trio variant — distinctive 'all-error-trio' theme + 6 distinct kind buckets each appearing exactly once。 NEW catalog (M1917) + 44 anti-drift PROOF tests (M1918) + 15 wire-in PROOF tests cross-checking 6 source doctrines (M1919) + close-out (M1920)。 PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2 + chapter 628 hexa #3。 Catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4。 176 typed surfaces cumulative。 504 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1924",
+            "M1924:doctrine version reflects chapter 六百三十六 — CROSS-MODULE BASWORLDPRIOR + BASAPPLEADAPTERS ERROR TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#4,FIRST BASWorldPrior touch in any hexa cycle (module entirely untouched through hexa #1+#2+#3+#4) + 2nd BASAppleAdapters touch overall。 3 Error enums (BASWorldPriorVault.VaultError + BASWorldPriorCounterfactualSeeder.SeederError + BASCoreMLAdapterError) gained Codable at M1921 + 3 PROOF tests (M1922) + BASWorldPriorCoreMLErrorTrioCodableExtensionDoctrine typed surface (M1923) + close-out (M1924)。 NEW kind 'world-prior-coreml-error-trio' opens post-hexa-#4 arc into previously-untouched territory。 177 typed surfaces cumulative。 508 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

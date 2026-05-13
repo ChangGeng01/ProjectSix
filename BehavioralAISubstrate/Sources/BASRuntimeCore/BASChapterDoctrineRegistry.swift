@@ -16275,7 +16275,110 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1920。" +
                 " 504 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 636 — cross-module BASWorldPrior +
+        // BASAppleAdapters error trio Codable extension
+        // (1st post-hexa-#4 gap-fill,FIRST BASWorldPrior
+        // touch in any hexa cycle)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十六",
+            mNumberFirst: 1921,
+            mNumberLast: 1924,
+            v1MilestoneMNumber: 1924,
+            v1MilestoneStatus:
+                "chapter-636-world-prior-coreml-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1921, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module Error enums — BASWorld" +
+                        "Prior.BASWorldPriorVault.Vault" +
+                        "Error (8-case nested-in-actor)" +
+                        " + BASWorldPrior.BASWorldPrior" +
+                        "CounterfactualSeeder.SeederError" +
+                        " (1-case nested-in-actor) +" +
+                        " BASAppleAdapters.BASCoreML" +
+                        "AdapterError (1-case top-" +
+                        "level)。"),
+                BASChapterKnife(
+                    mNumber: 1922, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1923, knife: "第三刀",
+                    concept: "NEW BASWorldPriorCoreML" +
+                        "ErrorTrioCodableExtensionDoctrine" +
+                        " + moduleCount = 2 (BASWorld" +
+                        "Prior + BASAppleAdapters) +" +
+                        " nestedInActorCount = 2 +" +
+                        " topLevelCount = 1 + kindLabel=" +
+                        "'world-prior-coreml-error-trio'" +
+                        " (NEW kind) +" +
+                        " isFirstPostHexaFourGapFill +" +
+                        " isFirstBASWorldPriorTouchEver" +
+                        " (module entirely untouched" +
+                        " through hexa #1+#2+#3+#4) +" +
+                        " isSecondBASAppleAdaptersTouch" +
+                        "Overall。 typed-surface count" +
+                        " 176 → 177。"),
+                BASChapterKnife(
+                    mNumber: 1924, knife: "第四刀",
+                    concept: "Chapter 636 close-out +" +
+                        " doctrine sync。 508 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 1st post-hexa-#4" +
+                        " gap-fill — opens new arc into" +
+                        " previously-untouched BASWorld" +
+                        "Prior territory。")
+            ],
+            entropyClassesAttacked: [
+                "bas-world-prior-vault-error-non-codable",
+                "bas-world-prior-counterfactual-seeder-error-non-codable",
+                "bas-coreml-adapter-error-non-codable",
+                "world-prior-coreml-error-trio-pattern-uncaptured",
+                "first-post-hexa-four-gap-fill-not-shipped",
+                "bas-world-prior-never-touched-in-hexa-cycle"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1924",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "world-prior-coreml-error-trio-codable-extension",
+                "first-post-hexa-four-gap-fill",
+                "first-bas-world-prior-touch-ever",
+                "second-bas-apple-adapters-touch-overall",
+                "new-kind-label-world-prior-coreml-error-trio",
+                "508-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 5 more gap-fill chapters" +
+                " (637-641) toward chapter 642 hexa #5" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 636 ships cross-module" +
+                " BASWorldPrior + BASAppleAdapters error" +
+                " trio Codable extension — 1st post-hexa-" +
+                "#4 gap-fill chapter,FIRST BASWorldPrior" +
+                " touch in ANY hexa cycle (module was" +
+                " entirely untouched through hexa" +
+                " #1+#2+#3+#4)。 3 Error enums (BASWorld" +
+                "PriorVault.VaultError + BASWorldPrior" +
+                "CounterfactualSeeder.SeederError +" +
+                " BASCoreMLAdapterError) gained Codable" +
+                " at M1921 + 3 PROOF tests (M1922) +" +
+                " new typed surface (M1923) + close-out" +
+                " (M1924)。 NEW kind 'world-prior-coreml-" +
+                "error-trio' (2 modules,2 nested-in-" +
+                "actor + 1 top-level)。 177 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1924。 508 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

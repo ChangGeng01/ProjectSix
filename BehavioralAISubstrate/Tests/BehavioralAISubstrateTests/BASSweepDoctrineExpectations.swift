@@ -116,20 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1920:24 + 20 + 189 = 233 (chapter
-    /// 635 — 4TH GAP-FILL HEXA CATALOG META-META
-    /// MILESTONE)
-    public static let phase2ChapterCount: Int = 233
+    /// added)。 At M1924:24 + 20 + 190 = 234 (chapter
+    /// 636 — cross-module BASWorldPrior + BASApple
+    /// Adapters error trio Codable extension,1st
+    /// post-hexa-#4 gap-fill)
+    public static let phase2ChapterCount: Int = 234
 
-    /// Phase 2 commits shipped。 At M1920:125 + 84 +
-    /// 756 = 965 (chapter 635 = 4 cuts — NEW catalog
-    /// + 44 anti-drift + 15 wire-in + close-out)
-    public static let phase2CommitsShipped: Int = 965
+    /// Phase 2 commits shipped。 At M1924:125 + 84 +
+    /// 760 = 969 (chapter 636 = 4 cuts — cross-module
+    /// trio + 3 PROOF + typed surface + close-out)
+    public static let phase2CommitsShipped: Int = 969
 
-    /// Phase 2 mNumberLast。 At M1920:chapter 635 —
-    /// 4TH GAP-FILL HEXA CATALOG META-META MILESTONE。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 1920
+    /// Phase 2 mNumberLast。 At M1924:chapter 636 —
+    /// cross-module BASWorldPrior + BASAppleAdapters
+    /// error trio。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1924
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -4119,6 +4119,27 @@ public enum BASEntropyChapterIndex {
                 " M1917 hexa #4。 176 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1920。" +
                 " 504 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十六",
+            mNumberFirst: 1921, mNumberLast: 1924,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "CROSS-MODULE BASWORLDPRIOR + BAS" +
+                "APPLEADAPTERS ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,1st post-hexa-#4," +
+                " FIRST BASWorldPrior touch in any hexa" +
+                " cycle (module entirely untouched" +
+                " through hexa #1+#2+#3+#4) + 2nd BAS" +
+                "AppleAdapters touch overall。 3 Error" +
+                " enums gained Codable at M1921 + 3" +
+                " PROOF tests (M1922) + new typed surface" +
+                " (M1923) + close-out (M1924)。 NEW kind" +
+                " 'world-prior-coreml-error-trio' opens" +
+                " post-hexa-#4 arc into previously-" +
+                "untouched territory。 177 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1924。" +
+                " 508 consecutive byte-equality clean" +
                 " commits。 V1 byte-equality preserved。")
     ]
 

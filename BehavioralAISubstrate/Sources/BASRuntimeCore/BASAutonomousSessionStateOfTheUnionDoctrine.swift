@@ -110,23 +110,21 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 635
-    /// close-out (M1920 — 4TH GAP-FILL HEXA CATALOG
-    /// META-META MILESTONE;NEW BASGapFillHexaFour
-    /// CompletionDoctrine cataloging 6 post-hexa-#3
-    /// gap-fill chapters 629-634 — 18 types extended /
-    /// 24 commits / 7 distinct modules touched MATCHES
-    /// hexa #3 and FAR exceeds hexa #1+#2's 4 each;
-    /// FIRST hexa where every entry is an error-trio
-    /// variant — distinctive 'all-error-trio' theme;
-    /// catalog lineage M1805 post-octa → M1833 hexa
-    /// #1 → M1861 hexa #2 → M1889 hexa #3 → M1917
-    /// hexa #4)。
-    public static let typedSurfaceCount: Int = 176
+    /// Cumulative achievement metrics at chapter 636
+    /// close-out (M1924 — cross-module BASWorldPrior +
+    /// BASAppleAdapters error trio Codable extension,
+    /// 1st post-hexa-#4 gap-fill,FIRST BASWorldPrior
+    /// touch in any hexa cycle;3 Error enums (BASWorld
+    /// PriorVault.VaultError + BASWorldPriorCounter
+    /// factualSeeder.SeederError + BASCoreMLAdapter
+    /// Error) gained Codable;NEW kind 'world-prior-
+    /// coreml-error-trio' opens post-hexa-#4 arc into
+    /// previously-untouched territory)。
+    public static let typedSurfaceCount: Int = 177
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 504
-    public static let phase2CommitsShipped: Int = 965
-    public static let chapter2NumberLast: Int = 1920
+        Int = 508
+    public static let phase2CommitsShipped: Int = 969
+    public static let chapter2NumberLast: Int = 1924
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

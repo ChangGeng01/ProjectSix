@@ -2225,7 +2225,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十五")!)
+                            "chapter 六百三十五")!),
+            // M1924 chapter 636 — cross-module BASWorldPrior + BASAppleAdapters error trio Codable extension gap-fill (1st post-hexa-#4, 1st BASWorldPrior touch ever)
+            checkRegistry("六百三十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3801,6 +3807,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十五")!
+                .mNumberLast),
+            // M1924 chapter 636 — cross-module BASWorldPrior + BASAppleAdapters error trio Codable extension gap-fill (1st post-hexa-#4)
+            ("636",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

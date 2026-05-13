@@ -196,6 +196,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// M1889 hexa #3 → M1917 hexa #4。 176 typed
     /// surfaces cumulative;504 consecutive byte-
     /// equality clean commits。
+    /// Re-captured at chapter 636 close-out。 Chapter
+    /// 636:CROSS-MODULE BASWORLDPRIOR + BASAPPLE
+    /// ADAPTERS ERROR TRIO CODABLE EXTENSION — GAP-
+    /// FILL,1st post-hexa-#4,FIRST BASWorldPrior
+    /// touch in any hexa cycle (module entirely
+    /// untouched through hexa #1+#2+#3+#4) + 2nd
+    /// BASAppleAdapters touch overall。 3 Error enums
+    /// (BASWorldPriorVault.VaultError + BASWorldPrior
+    /// CounterfactualSeeder.SeederError + BASCoreML
+    /// AdapterError) gained Codable at M1921 + 3
+    /// PROOF tests (M1922) + NEW BASWorldPriorCoreML
+    /// ErrorTrioCodableExtensionDoctrine (M1923) +
+    /// close-out (M1924)。 NEW kind 'world-prior-
+    /// coreml-error-trio' opens post-hexa-#4 arc into
+    /// previously-untouched territory。
     static let frozenFullRegistrySha256: String =
-        "0c5798c6767afa957c9be05b5508a800df6ff4615acc98cb5eae3ca629085e9c"
+        "6d02877bc0e93fd5030026763a6fa55e75c530a79f51576cbc7c97050947fd97"
 }
