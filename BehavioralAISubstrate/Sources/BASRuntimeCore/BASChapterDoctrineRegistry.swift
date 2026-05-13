@@ -14869,6 +14869,107 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1864。" +
                 " 448 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 622 — cross-module trio Codable
+        // extension (gap-fill,1st post-hexa-#2,FIRST
+        // wave to span 2 modules simultaneously)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十二",
+            mNumberFirst: 1865,
+            mNumberLast: 1868,
+            v1MilestoneMNumber: 1868,
+            v1MilestoneStatus:
+                "chapter-622-cross-module-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1865, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module types within already-" +
+                        "covered modules — BASOrchestration" +
+                        ".BASPromptStateValue (3-case" +
+                        " enum:string + integer +" +
+                        " boolean) + BASHostKit.BASTurn" +
+                        "RuntimePlanLedgerCoherence (2-" +
+                        "field struct:plan + ledger)" +
+                        " + BASHostKit.BASTurnRuntime" +
+                        "PlanLedgerCoherenceIssue (3-" +
+                        "case enum:planStagesNotIn" +
+                        "Ledger + ledgerStagesNotInPlan" +
+                        " + orderMismatch)。"),
+                BASChapterKnife(
+                    mNumber: 1866, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1867, knife: "第三刀",
+                    concept: "NEW BASCrossModuleTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " isGapFillExtension +" +
+                        " isFirstCrossModuleWave +" +
+                        " isFirstPostHexaTwoGapFill +" +
+                        " moduleCount = 2 (NEW kind" +
+                        " 'cross-module-trio') +" +
+                        " structCount/enumCount split" +
+                        " (1/2)。 typed-surface count" +
+                        " 162 → 163。"),
+                BASChapterKnife(
+                    mNumber: 1868, knife: "第四刀",
+                    concept: "Chapter 622 close-out +" +
+                        " doctrine sync。 452 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 1st post-hexa-#2" +
+                        " gap-fill — begins 3rd hexa" +
+                        " run toward chapter 627 hexa" +
+                        " #3 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-prompt-state-value-non-codable",
+                "bas-turn-runtime-plan-ledger-coherence-non-codable",
+                "bas-turn-runtime-plan-ledger-coherence-issue-non-codable",
+                "cross-module-wave-pattern-uncaptured",
+                "post-hexa-2-narrative-arc-not-started"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1868",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "cross-module-trio-codable-extension",
+                "first-post-hexa-two-gap-fill",
+                "first-cross-module-wave",
+                "new-kind-label-cross-module-trio"
+            ],
+            plannedFutureCuts: [
+                "future arc — 5 more gap-fill chapters" +
+                " toward hexa #3 opportunity at chapter" +
+                " 627",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 622 ships cross-module" +
+                " trio Codable extension — FIRST post-" +
+                "hexa-#2 gap-fill chapter,distinct" +
+                " from all prior post-hexa gap-fills in" +
+                " spanning 2 MODULES simultaneously" +
+                " (BASOrchestration + BASHostKit)。 3" +
+                " types gained Codable at M1865 (BAS" +
+                "PromptStateValue 3-case + BASTurn" +
+                "RuntimePlanLedgerCoherence 2-field +" +
+                " BASTurnRuntimePlanLedgerCoherenceIssue" +
+                " 3-case) + 3 PROOF tests (M1866) +" +
+                " new typed surface (M1867) + close-" +
+                "out (M1868)。 NEW kind 'cross-module-" +
+                "trio' (1 struct + 2 enums,2 modules)" +
+                " distinct from hexa #1's 5 kinds and" +
+                " hexa #2's 6 kinds。 1ST post-hexa-#2" +
+                " gap-fill chapter — begins 3rd hexa" +
+                " run toward chapter 627 hexa #3" +
+                " opportunity。 163 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1868。" +
+                " 452 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

@@ -2141,7 +2141,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二十一")!)
+                            "chapter 六百二十一")!),
+            // M1868 chapter 622 — cross-module trio Codable extension gap-fill (1st post-hexa-#2)
+            checkRegistry("六百二十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百二十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3605,6 +3611,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二十一")!
+                .mNumberLast),
+            // M1868 chapter 622 — cross-module trio Codable extension gap-fill
+            ("622",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

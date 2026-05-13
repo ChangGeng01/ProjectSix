@@ -3811,7 +3811,31 @@ public enum BASEntropyChapterIndex {
                 " M1805 post-octa → M1833 hexa #1 →" +
                 " M1861 hexa #2。 162 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1864。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十二",
+            mNumberFirst: 1865, mNumberLast: 1868,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "CROSS-MODULE TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,FIRST post-" +
+                "hexa-#2 + FIRST cross-module wave。" +
+                " 3 types across 2 modules (BAS" +
+                "Orchestration.BASPromptStateValue +" +
+                " BASHostKit.BASTurnRuntimePlanLedger" +
+                "Coherence + BASHostKit.BASTurn" +
+                "RuntimePlanLedgerCoherenceIssue)" +
+                " gained Codable at M1865 + 3 PROOF" +
+                " tests (M1866) + new typed surface" +
+                " (M1867) + close-out (M1868)。 NEW" +
+                " kind 'cross-module-trio' (1 struct" +
+                " + 2 enums,2 modules) distinct from" +
+                " hexa #1's 5 kinds and hexa #2's 6" +
+                " kinds。 Begins 3rd hexa run toward" +
+                " chapter 627 hexa #3 opportunity。" +
+                " 163 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1868。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

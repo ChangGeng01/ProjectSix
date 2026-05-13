@@ -275,7 +275,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百一十八",   // M1849-M1852 (BASORGAN CODABLE EXTENSION WAVE 5 — GAP-FILL via 2 SIBLING ENUMS;BASFoundationModelsToolBridgeStatus 3-case + BASToolInvocationDecision 2-case gained Codable simultaneously + 2 PROOF tests + BASOrganCodableExtensionWaveFiveDoctrine typed surface + close-out;combined 10 BASOrgan-related types cumulative (2+1+2+3+2) — CROSSES 10-TYPE THRESHOLD;FOURTH post-hexa-catalog gap-fill chapter (615+616+617+618);4th consecutive BASOrgan gap-fill (609+616+617+618);2 more to next hexa catalog opportunity)
         "chapter 六百一十九",   // M1853-M1856 (BASMEMORY CODABLE EXTENSION POST-TRILOGY — GAP-FILL reopening BASMemory 29 chapters after chapter 590 trilogy seal;3 BASMemory types (BASEventSourcedMemoryAtomStoreCachePolicy 3-case + BASMemoryTieringReconciliationOutcome 9-field + BASMemoryTieringReconcilerOrdering 3-case) gained Codable + 3 PROOF tests + BASMemoryCodableExtensionPostTrilogyDoctrine typed surface + close-out;FIFTH post-hexa-catalog gap-fill chapter (615+616+617+618+619);FIRST non-BASOrgan post-hexa gap-fill — diversifying the run;1 more to next hexa catalog opportunity at chapter 620)
         "chapter 六百二十",     // M1857-M1860 (BASHOSTKIT CODABLE EXTENSION POST-MESH-SWEEP — GAP-FILL reopening BASHostKit 12 chapters after chapter 608 mesh-sweep;2 BASHostKit enums (BASHostStorageWireError 2-case error + BASShadowPermitUpgradeDecision 2-case decision) gained Codable + 2 PROOF tests + BASHostKitCodableExtensionPostMeshSweepDoctrine typed surface + close-out;SIXTH post-hexa-catalog gap-fill chapter (615+616+617+618+619+620) — TRIGGERS 2nd gap-fill hexa catalog meta-meta opportunity at chapter 621;4 distinct modules in this post-hexa run matches chapter 614 hexa #1)
-        "chapter 六百二十一"    // M1861-M1864 (2ND GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaTwoCompletionDoctrine cataloging 6 post-hexa-#1 gap-fill chapters (615-620) — 14 types extended / 24 commits / 4 distinct modules touched MATCHES hexa #1 / 6 distinct kind buckets (continuation + wave-3 + wave-4 + wave-5 + post-trilogy + post-mesh-sweep,each appearing exactly once) + 40 anti-drift PROOF tests + 14 wire-in PROOF tests cross-checking 6 source doctrines + close-out;PARALLEL structurally to chapter 614 gap-fill hexa #1;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2;162 typed surfaces cumulative;448 consecutive byte-equality clean commits)
+        "chapter 六百二十一",   // M1861-M1864 (2ND GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaTwoCompletionDoctrine cataloging 6 post-hexa-#1 gap-fill chapters (615-620) — 14 types extended / 24 commits / 4 distinct modules touched MATCHES hexa #1 / 6 distinct kind buckets (continuation + wave-3 + wave-4 + wave-5 + post-trilogy + post-mesh-sweep,each appearing exactly once) + 40 anti-drift PROOF tests + 14 wire-in PROOF tests cross-checking 6 source doctrines + close-out;PARALLEL structurally to chapter 614 gap-fill hexa #1;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2;162 typed surfaces cumulative;448 consecutive byte-equality clean commits)
+        "chapter 六百二十二"    // M1865-M1868 (CROSS-MODULE TRIO CODABLE EXTENSION — GAP-FILL,FIRST post-hexa-#2 + FIRST cross-module wave;3 types across 2 modules (BASOrchestration.BASPromptStateValue + BASHostKit.BASTurnRuntimePlanLedgerCoherence + BASHostKit.BASTurnRuntimePlanLedgerCoherenceIssue) gained Codable + 3 PROOF tests + BASCrossModuleTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'cross-module-trio' (1 struct + 2 enums,2 modules) distinct from hexa #1's 5 kinds and hexa #2's 6 kinds;begins 3rd hexa run toward chapter 627 hexa #3 opportunity)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -292,14 +293,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1864
+    public static let mNumberLast: Int = 1868
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1864)。 Bumped through chapter 621:905 → 909。
-    /// Chapter 621:2nd gap-fill hexa catalog meta-meta
-    /// milestone + 40 anti-drift PROOF + 14 wire-in
-    /// PROOF + close-out。
-    public static let commitsShipped: Int = 909
+    /// M1868)。 Bumped through chapter 622:909 → 913。
+    /// Chapter 622:cross-module trio Codable extension
+    /// (1st post-hexa-#2) + 3 PROOF tests + typed
+    /// surface + close-out。
+    public static let commitsShipped: Int = 913
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

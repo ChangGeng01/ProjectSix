@@ -37,27 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs621() {
+    func testLastChapterIs622() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十一",
-            "Chapter 六百二十一:2ND GAP-FILL HEXA" +
-            " CATALOG META-META MILESTONE。 NEW BAS" +
-            "GapFillHexaTwoCompletionDoctrine" +
-            " cataloging 6 post-hexa-#1 gap-fill" +
-            " chapters (615-620) — 14 types extended" +
-            " / 24 commits / 4 distinct modules" +
-            " MATCHES hexa #1 / 6 distinct kind" +
-            " buckets each appearing exactly once" +
-            " (continuation + wave-3 + wave-4 +" +
-            " wave-5 + post-trilogy + post-mesh-" +
-            "sweep) + 40 anti-drift PROOF + 14 wire-" +
-            "in PROOF + close-out。 PARALLEL" +
-            " structurally to chapter 614 gap-fill" +
-            " hexa #1。 Catalog lineage M1805 post-" +
-            "octa → M1833 hexa #1 → M1861 hexa #2。" +
-            " 162 typed surfaces cumulative。 448" +
+            "chapter 六百二十二",
+            "Chapter 六百二十二:CROSS-MODULE TRIO" +
+            " CODABLE EXTENSION — GAP-FILL,FIRST" +
+            " post-hexa-#2 + FIRST cross-module wave。" +
+            " 3 types across 2 modules (BAS" +
+            "Orchestration.BASPromptStateValue +" +
+            " BASHostKit.BASTurnRuntimePlanLedger" +
+            "Coherence + BASHostKit.BASTurnRuntime" +
+            "PlanLedgerCoherenceIssue) gained Codable" +
+            " + 3 PROOF tests + BASCrossModuleTrio" +
+            "CodableExtensionDoctrine typed surface" +
+            " + close-out。 NEW kind 'cross-module-" +
+            "trio' (1 struct + 2 enums,2 modules)" +
+            " distinct from hexa #1's 5 kinds and" +
+            " hexa #2's 6 kinds。 Begins 3rd hexa run" +
+            " toward chapter 627 hexa #3 opportunity。" +
+            " 163 typed surfaces cumulative。 452" +
             " consecutive byte-equality clean commits")
     }
 

@@ -107,20 +107,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 621 close-out。 Chapter
-    /// 621:2ND GAP-FILL HEXA CATALOG META-META
-    /// MILESTONE。 NEW BASGapFillHexaTwoCompletion
-    /// Doctrine cataloging 6 post-hexa-#1 gap-fill
-    /// chapters (615-620) — 14 types extended / 24
-    /// commits / 4 distinct modules touched MATCHES
-    /// hexa #1 / 6 distinct kind buckets each
-    /// appearing exactly once。 NEW catalog (M1861) +
-    /// 40 anti-drift PROOF tests (M1862) + 14 wire-in
-    /// PROOF tests cross-checking 6 source doctrines
-    /// (M1863) + close-out (M1864)。 PARALLEL
-    /// structurally to chapter 614 hexa #1。 Catalog
-    /// lineage:M1805 post-octa → M1833 hexa #1 →
-    /// M1861 hexa #2。
+    /// Re-captured at chapter 622 close-out。 Chapter
+    /// 622:CROSS-MODULE TRIO CODABLE EXTENSION —
+    /// GAP-FILL,FIRST post-hexa-#2 + FIRST cross-
+    /// module wave。 3 types across 2 modules (BAS
+    /// Orchestration.BASPromptStateValue + BASHostKit
+    /// .BASTurnRuntimePlanLedgerCoherence + BASHostKit
+    /// .BASTurnRuntimePlanLedgerCoherenceIssue) gained
+    /// Codable at M1865 + 3 PROOF tests (M1866) + NEW
+    /// BASCrossModuleTrioCodableExtensionDoctrine
+    /// (M1867) + close-out (M1868)。 NEW kind 'cross-
+    /// module-trio' distinct from hexa #1's 5 kinds
+    /// and hexa #2's 6 kinds。 Begins 3rd hexa run
+    /// toward chapter 627 hexa #3 opportunity。
     static let frozenFullRegistrySha256: String =
-        "d72b5acfa992585422a1447cb5ad26ac9c249e6c554b06a4b9874813ab5914d4"
+        "a45495c37a87f2095175eda121cf8b5b4006c5d5216f323e62c248e29b2e921b"
 }

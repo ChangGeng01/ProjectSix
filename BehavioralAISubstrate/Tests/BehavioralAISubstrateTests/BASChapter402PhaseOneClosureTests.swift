@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1864",
-            "M1864:doctrine version reflects chapter 六百二十一 — 2ND GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaTwoCompletionDoctrine cataloging 6 post-hexa-#1 gap-fill chapters (615-620) — 14 types extended / 24 commits / 4 distinct modules MATCHES hexa #1 / 6 distinct kind buckets each appearing exactly once + 40 anti-drift PROOF + 14 wire-in PROOF + close-out。 PARALLEL structurally to chapter 614 hexa #1。 Catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2。 162 typed surfaces cumulative。 448 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1868",
+            "M1868:doctrine version reflects chapter 六百二十二 — CROSS-MODULE TRIO CODABLE EXTENSION — GAP-FILL,FIRST post-hexa-#2 + FIRST cross-module wave。 3 types across 2 modules (BASOrchestration.BASPromptStateValue + BASHostKit.BASTurnRuntimePlanLedgerCoherence + BASHostKit.BASTurnRuntimePlanLedgerCoherenceIssue) gained Codable at M1865 + 3 PROOF tests (M1866) + BASCrossModuleTrioCodableExtensionDoctrine typed surface (M1867) + close-out (M1868)。 NEW kind 'cross-module-trio' distinct from hexa #1's 5 kinds and hexa #2's 6 kinds。 163 typed surfaces cumulative。 452 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
