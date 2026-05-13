@@ -43,7 +43,9 @@ public actor BASSovereignTokenAuthority {
 
     /// Materialized intent — everything the authority needs to mint a
     /// token. The intent itself is NOT signed; the minted token is.
-    public struct CommitIntent: Sendable, Equatable {
+    public struct CommitIntent:
+        Sendable, Equatable, Codable
+    {
         public let sessionID: String
         public let turnID: String
         public let scope: BASSovereignCommitScope

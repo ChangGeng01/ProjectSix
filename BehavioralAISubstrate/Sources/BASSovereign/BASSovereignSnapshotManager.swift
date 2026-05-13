@@ -42,7 +42,9 @@ public actor BASSovereignSnapshotManager {
     /// (where the upstream type lives) would reverse the architectural
     /// dependency direction. A thin bridge at the integration boundary
     /// (BASHostKit / Qinao façade) converts between the two.
-    public struct SnapshotAnchor: Sendable, Equatable {
+    public struct SnapshotAnchor:
+        Sendable, Equatable, Codable
+    {
         public let anchorID: String
         public let safeSnapshotRef: String
         public let foldRefs: [String]
@@ -82,7 +84,9 @@ public actor BASSovereignSnapshotManager {
     /// it and compares. The `foldRefs` / `hostVersionRef` / `cacheStateRef`
     /// mirror the anchor's fields so lookup doesn't need to cache the
     /// anchor itself.
-    public struct RegisteredSnapshot: Sendable, Equatable {
+    public struct RegisteredSnapshot:
+        Sendable, Equatable, Codable
+    {
         public let anchor: SnapshotAnchor
         public let payloadHash: String
         public let registeredAt: Date
