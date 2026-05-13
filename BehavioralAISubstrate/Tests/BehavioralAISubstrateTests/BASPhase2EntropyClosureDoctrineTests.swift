@@ -37,25 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs638() {
+    func testLastChapterIs639() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百三十八",
-            "Chapter 六百三十八:BASSOVEREIGN SECONDARY" +
-            " ERROR TRIO CODABLE EXTENSION — GAP-FILL," +
-            " 3rd post-hexa-#4,2nd BASSovereign touch" +
-            " overall complementing chapter 633 primary" +
-            " trio。 1st BASSovereign post-hexa-#4 touch。" +
-            " 3 Error enums covering ledger / snapshot" +
-            " / sentinel domains gained Codable +" +
-            " StorageError also gained Sendable + 3" +
-            " PROOF tests + BASSovereignSecondaryError" +
-            "TrioCodableExtensionDoctrine typed surface" +
-            " + close-out。 NEW kind 'sovereign-secondary-" +
-            "error-trio'。 BASSovereign cumulative typed" +
-            " surfaces = 6。 179 typed surfaces" +
-            " cumulative。 516 consecutive byte-equality" +
+            "chapter 六百三十九",
+            "Chapter 六百三十九:CROSS-MODULE ORGAN/TOOL/" +
+            "FEATURE-BUILDER ERROR TRIO CODABLE" +
+            " EXTENSION — GAP-FILL,4th post-hexa-#4," +
+            "2nd BASOrgan + 3rd BASAppleAdapters touch" +
+            " overall。 1st BASOrgan post-hexa-#4 + 2nd" +
+            " BASAppleAdapters post-hexa-#4 touch。 3" +
+            " Error enums covering organ-registry/tool-" +
+            "calling/feature-ref-building domains gained" +
+            " Codable + BASToolCallingPlanError also" +
+            " gained Equatable + 3 PROOF tests + BAS" +
+            "OrganToolFeatureErrorTrioCodableExtension" +
+            "Doctrine typed surface + close-out。 NEW" +
+            " kind 'organ-tool-feature-error-trio'。" +
+            " BASOrgan cumulative = 3 + BASAppleAdapters" +
+            " cumulative = 3。 180 typed surfaces" +
+            " cumulative。 520 consecutive byte-equality" +
             " clean commits")
     }
 

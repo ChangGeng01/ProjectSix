@@ -4190,6 +4190,34 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1932。 516 consecutive" +
                 " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百三十九",
+            mNumberFirst: 1933, mNumberLast: 1936,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 18, futureCutsCount: 3,
+            summary: "CROSS-MODULE ORGAN/TOOL/FEATURE-" +
+                "BUILDER ERROR TRIO CODABLE EXTENSION —" +
+                " GAP-FILL,4th post-hexa-#4,2nd BAS" +
+                "Organ touch + 3rd BASAppleAdapters touch" +
+                " overall。 1st BASOrgan post-hexa-#4" +
+                " touch + 2nd BASAppleAdapters post-" +
+                "hexa-#4 touch。 3 Error enums (BAS" +
+                "OrganRegistry.RegistryError + BASTool" +
+                "CallingPlanError + BASChengluFeatureRef" +
+                "BuilderError) covering organ-registry /" +
+                " tool-calling / feature-ref-building" +
+                " domains gained Codable at M1933 + BAS" +
+                "ToolCallingPlanError also gained" +
+                " Equatable (was missing) + 3 PROOF" +
+                " tests (M1934) + new typed surface" +
+                " (M1935) + close-out (M1936)。 NEW kind" +
+                " 'organ-tool-feature-error-trio'。 BAS" +
+                "Organ cumulative typed surfaces = 3 +" +
+                " BASAppleAdapters cumulative = 3。 180" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1936。 520 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
                 "equality preserved。")
     ]
 

@@ -242,6 +242,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// (M1931) + close-out (M1932)。 NEW kind
     /// 'sovereign-secondary-error-trio'。 BASSovereign
     /// cumulative typed surfaces = 6。
+    /// Re-captured at chapter 639 close-out。 Chapter
+    /// 639:CROSS-MODULE ORGAN/TOOL/FEATURE-BUILDER
+    /// ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th
+    /// post-hexa-#4,2nd BASOrgan + 3rd BASAppleAdapters
+    /// touch overall。 1st BASOrgan post-hexa-#4 + 2nd
+    /// BASAppleAdapters post-hexa-#4 touch。 3 Error
+    /// enums (BASOrganRegistry.RegistryError + BAS
+    /// ToolCallingPlanError + BASChengluFeatureRef
+    /// BuilderError) covering organ-registry / tool-
+    /// calling / feature-ref-building domains gained
+    /// Codable at M1933 + BASToolCallingPlanError also
+    /// gained Equatable + 3 PROOF tests (M1934) + NEW
+    /// BASOrganToolFeatureErrorTrioCodableExtension
+    /// Doctrine (M1935) + close-out (M1936)。 NEW kind
+    /// 'organ-tool-feature-error-trio'。 BASOrgan
+    /// cumulative = 3 + BASAppleAdapters cumulative = 3。
     static let frozenFullRegistrySha256: String =
-        "1ee61587996c90e40ce5edfe8eea8f256e7408b49e018ed0cdf2284c359a69f2"
+        "d1b6c59331e5bfe50093416d0fc1da7e6d3448f55bbc6bacb167c28585c4c633"
 }

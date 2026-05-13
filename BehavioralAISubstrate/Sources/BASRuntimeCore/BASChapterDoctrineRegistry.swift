@@ -16602,7 +16602,120 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1932。" +
                 " 516 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 639 — cross-module organ/tool/feature-
+        // builder error trio Codable extension (4th
+        // post-hexa-#4 gap-fill,2nd BASOrgan touch +
+        // 3rd BASAppleAdapters touch overall)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百三十九",
+            mNumberFirst: 1933,
+            mNumberLast: 1936,
+            v1MilestoneMNumber: 1936,
+            v1MilestoneStatus:
+                "chapter-639-organ-tool-feature-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1933, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module Error enums spanning 2" +
+                        " modules — BASOrgan.BASOrgan" +
+                        "Registry.RegistryError (2-case" +
+                        " nested-in-actor) + BASOrgan." +
+                        "BASToolCallingPlanError (3-case" +
+                        " top-level,also gained" +
+                        " Equatable) + BASAppleAdapters." +
+                        "BASChengluFeatureRefBuilderError" +
+                        " (1-case top-level)。"),
+                BASChapterKnife(
+                    mNumber: 1934, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1935, knife: "第三刀",
+                    concept: "NEW BASOrganToolFeature" +
+                        "ErrorTrioCodableExtension" +
+                        "Doctrine + moduleCount = 2" +
+                        " (BASOrgan + BASAppleAdapters) +" +
+                        " nestedInActorCount = 1 +" +
+                        " topLevelCount = 2 + kindLabel=" +
+                        "'organ-tool-feature-error-trio'" +
+                        " (NEW kind) +" +
+                        " isFourthPostHexaFourGapFill +" +
+                        " isSecondBASOrganTouchOverall +" +
+                        " isFirstBASOrganPostHexaFour +" +
+                        " isThirdBASAppleAdaptersTouch" +
+                        "Overall + isSecondBASApple" +
+                        "AdaptersPostHexaFour +" +
+                        " cumulativeBASOrganTypedSurfaces" +
+                        " = 3 + cumulativeBASApple" +
+                        "AdaptersTypedSurfaces = 3。" +
+                        " typed-surface count 179 → 180。"),
+                BASChapterKnife(
+                    mNumber: 1936, knife: "第四刀",
+                    concept: "Chapter 639 close-out +" +
+                        " doctrine sync。 520 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4th post-hexa-#4" +
+                        " gap-fill — 2 more chapters" +
+                        " (640-641) to chapter 642 hexa" +
+                        " #5 catalog opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-organ-registry-error-non-codable",
+                "bas-tool-calling-plan-error-non-codable",
+                "bas-chenglu-feature-ref-builder-error-non-codable",
+                "organ-tool-feature-error-trio-pattern-uncaptured",
+                "fourth-post-hexa-four-gap-fill-not-shipped",
+                "bas-tool-calling-plan-error-missing-equatable"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1936",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-tool-feature-error-trio-codable-extension",
+                "fourth-post-hexa-four-gap-fill",
+                "second-bas-organ-touch-overall",
+                "first-bas-organ-post-hexa-four",
+                "third-bas-apple-adapters-touch-overall",
+                "second-bas-apple-adapters-post-hexa-four",
+                "cumulative-3-bas-organ-typed-surfaces",
+                "cumulative-3-bas-apple-adapters-typed-surfaces",
+                "equatable-conformance-added-to-tool-calling-plan-error",
+                "new-kind-label-organ-tool-feature-error-trio",
+                "520-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 2 more gap-fill chapters" +
+                " (640-641) toward chapter 642 hexa #5" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 639 ships cross-module" +
+                " organ/tool/feature-builder error trio" +
+                " Codable extension — 4th post-hexa-#4" +
+                " gap-fill chapter,2nd BASOrgan touch +" +
+                " 3rd BASAppleAdapters touch overall。" +
+                " 3 Error enums (BASOrganRegistry." +
+                "RegistryError + BASToolCallingPlanError" +
+                " + BASChengluFeatureRefBuilderError)" +
+                " gained Codable at M1933 + BASTool" +
+                "CallingPlanError also gained Equatable" +
+                " + 3 PROOF tests (M1934) + new typed" +
+                " surface (M1935) + close-out (M1936)。" +
+                " NEW kind 'organ-tool-feature-error-" +
+                "trio' (2 modules,3 subsystems)。 BAS" +
+                "Organ cumulative typed surfaces = 3 +" +
+                " BASAppleAdapters cumulative = 3。" +
+                " 180 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1936。 520 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

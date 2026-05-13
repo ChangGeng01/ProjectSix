@@ -110,24 +110,25 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 638
-    /// close-out (M1932 — BASSovereign secondary error
-    /// trio Codable extension,3rd post-hexa-#4 gap-fill,
-    /// 2nd BASSovereign touch overall complementing
-    /// chapter 633 primary trio;1st BASSovereign post-
-    /// hexa-#4 touch;3 Error enums (BASSovereignLedger
-    /// SQLiteStorage.StorageError + BASSovereign
-    /// SnapshotManager.ManagerError + BASSovereign
-    /// IntegritySentinel.SentinelError) covering ledger
-    /// / snapshot / sentinel domains gained Codable +
-    /// StorageError also gained Sendable;NEW kind
-    /// 'sovereign-secondary-error-trio';BASSovereign
-    /// cumulative typed surfaces = 6)。
-    public static let typedSurfaceCount: Int = 179
+    /// Cumulative achievement metrics at chapter 639
+    /// close-out (M1936 — cross-module organ/tool/
+    /// feature-builder error trio Codable extension,
+    /// 4th post-hexa-#4 gap-fill,2nd BASOrgan touch +
+    /// 3rd BASAppleAdapters touch overall;1st BASOrgan
+    /// post-hexa-#4 + 2nd BASAppleAdapters post-hexa-#4;
+    /// 3 Error enums (BASOrganRegistry.RegistryError +
+    /// BASToolCallingPlanError + BASChengluFeatureRef
+    /// BuilderError) covering organ-registry/tool-
+    /// calling/feature-ref-building domains gained
+    /// Codable + BASToolCallingPlanError also gained
+    /// Equatable;NEW kind 'organ-tool-feature-error-
+    /// trio';BASOrgan cumulative = 3 + BASAppleAdapters
+    /// cumulative = 3)。
+    public static let typedSurfaceCount: Int = 180
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 516
-    public static let phase2CommitsShipped: Int = 977
-    public static let chapter2NumberLast: Int = 1932
+        Int = 520
+    public static let phase2CommitsShipped: Int = 981
+    public static let chapter2NumberLast: Int = 1936
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

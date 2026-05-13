@@ -2243,7 +2243,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百三十八")!)
+                            "chapter 六百三十八")!),
+            // M1936 chapter 639 — cross-module organ/tool/feature-builder error trio Codable extension gap-fill (4th post-hexa-#4, 2nd BASOrgan + 3rd BASAppleAdapters touch)
+            checkRegistry("六百三十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百三十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3843,6 +3849,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百三十八")!
+                .mNumberLast),
+            // M1936 chapter 639 — cross-module organ/tool/feature-builder error trio Codable extension gap-fill (4th post-hexa-#4)
+            ("639",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百三十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

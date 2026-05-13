@@ -116,21 +116,21 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1932:24 + 20 + 192 = 236 (chapter
-    /// 638 — BASSovereign secondary error trio Codable
-    /// extension,3rd post-hexa-#4 gap-fill)
-    public static let phase2ChapterCount: Int = 236
+    /// added)。 At M1936:24 + 20 + 193 = 237 (chapter
+    /// 639 — cross-module organ/tool/feature-builder
+    /// error trio Codable extension,4th post-hexa-#4)
+    public static let phase2ChapterCount: Int = 237
 
-    /// Phase 2 commits shipped。 At M1932:125 + 84 +
-    /// 768 = 977 (chapter 638 = 4 cuts — sovereign-
-    /// secondary trio + 3 PROOF + typed surface +
-    /// close-out)
-    public static let phase2CommitsShipped: Int = 977
+    /// Phase 2 commits shipped。 At M1936:125 + 84 +
+    /// 772 = 981 (chapter 639 = 4 cuts — organ-tool-
+    /// feature trio + 3 PROOF + typed surface + close-
+    /// out)
+    public static let phase2CommitsShipped: Int = 981
 
-    /// Phase 2 mNumberLast。 At M1932:chapter 638 —
-    /// BASSovereign secondary error trio。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1932
+    /// Phase 2 mNumberLast。 At M1936:chapter 639 —
+    /// cross-module organ/tool/feature-builder error
+    /// trio。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1936
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
