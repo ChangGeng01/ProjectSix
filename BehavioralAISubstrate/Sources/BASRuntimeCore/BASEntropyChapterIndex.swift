@@ -3914,7 +3914,34 @@ public enum BASEntropyChapterIndex {
                 " more to chapter 627 hexa #3" +
                 " opportunity。 167 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1884。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十七",
+            mNumberFirst: 1885, mNumberLast: 1888,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "CROSS-MODULE ERROR TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,6TH (FINAL)" +
+                " post-hexa-#2 gap-fill chapter,3rd" +
+                " error-cluster wave (1st spanning 2" +
+                " modules:BASAppleAdapters + BAS" +
+                "Sovereign)。 3 Error enums (BASApple" +
+                "CurrentBrainBootstrapHostResolutionError" +
+                " 8-case + BASSovereignAuditLedger." +
+                "LedgerError 7-case nested-in-actor +" +
+                " BASSovereignKeychainBinding.Keychain" +
+                "Error multi-case nested-in-actor)" +
+                " gained Codable at M1885 + 3 PROOF" +
+                " tests (M1886) + new typed surface" +
+                " (M1887) + close-out (M1888)。 NEW" +
+                " kind 'cross-module-error-trio'。" +
+                " TRIGGERS chapter 628 hexa #3 catalog" +
+                " meta-meta opportunity。 7 distinct" +
+                " modules in post-hexa-#2 run far" +
+                " exceeds chapter 614 hexa #1's 4 and" +
+                " chapter 621 hexa #2's 4。 168 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1888。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -2171,7 +2171,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二十六")!)
+                            "chapter 六百二十六")!),
+            // M1888 chapter 627 — cross-module error trio Codable extension gap-fill (6TH post-hexa-#2, triggers hexa #3)
+            checkRegistry("六百二十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百二十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3675,6 +3681,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二十六")!
+                .mNumberLast),
+            // M1888 chapter 627 — cross-module error trio Codable extension gap-fill
+            ("627",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

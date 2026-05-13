@@ -37,26 +37,29 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs626() {
+    func testLastChapterIs627() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十六",
-            "Chapter 六百二十六:BASMETALSUBSTRATE" +
-            " METAL ERROR TRIO CODABLE EXTENSION —" +
-            " GAP-FILL,5th post-hexa-#2,2nd error-" +
-            "cluster wave,1st BASMetalSubstrate touch" +
-            " since chapter 605 post-octa entry。 3" +
-            " BASMetalSubstrate Error enums (BAS" +
-            "KernelError + BASKernelLookupError +" +
-            " BASMambaSSMError) gained Codable + 3" +
-            " PROOF tests + BASMetalSubstrateMetal" +
-            "ErrorTrioCodableExtensionDoctrine typed" +
-            " surface + close-out。 NEW kind 'metal-" +
-            "error-trio' distinct from chapter 625" +
-            " 'error-trio' (different module)。 167" +
-            " typed surfaces cumulative。 468" +
-            " consecutive byte-equality clean commits")
+            "chapter 六百二十七",
+            "Chapter 六百二十七:CROSS-MODULE ERROR" +
+            " TRIO CODABLE EXTENSION — GAP-FILL,6TH" +
+            " (FINAL) post-hexa-#2,3rd error-cluster" +
+            " wave (1st spanning 2 modules:BASApple" +
+            "Adapters + BASSovereign)。 3 Error enums" +
+            " (BASAppleCurrentBrainBootstrapHost" +
+            "ResolutionError + BASSovereignAuditLedger" +
+            ".LedgerError + BASSovereignKeychainBinding" +
+            ".KeychainError) gained Codable + 3 PROOF" +
+            " tests + BASCrossModuleErrorTrioCodable" +
+            "ExtensionDoctrine typed surface + close-" +
+            "out。 NEW kind 'cross-module-error-trio'。" +
+            " TRIGGERS chapter 628 hexa #3 catalog" +
+            " meta-meta opportunity。 7 distinct modules" +
+            " in post-hexa-#2 run far exceeds prior" +
+            " hexa runs' 4。 168 typed surfaces" +
+            " cumulative。 472 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

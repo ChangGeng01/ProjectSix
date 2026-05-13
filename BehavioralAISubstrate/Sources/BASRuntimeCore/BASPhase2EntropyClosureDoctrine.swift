@@ -280,7 +280,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百二十三",   // M1869-M1872 (BASOBSERVABILITY NESTED-PAIR CODABLE EXTENSION — GAP-FILL,2ND post-hexa-#2,1st BASObservability touch in the post-hexa-#2 run;2 nested-in-actor enums within BASUpdateTicketLifecycleCoordinator (LifecycleError 3-case + TrialOutcome 3-case) gained Codable + 2 PROOF tests + BASObservabilityNestedPairCodableExtensionDoctrine typed surface + close-out;NEW kind 'nested-in-actor-pair' distinct from chapter 622 'cross-module-trio')
         "chapter 六百二十四",   // M1873-M1876 (BASRUNTIMECORE SOLO ENUM CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#2,1st BASRuntimeCore non-doctrine type touched since post-octa narrative began;BASEventLogFailureInjectionScenario (4-case enum) gained Codable + 1 PROOF test + BASRuntimeCoreSoloEnumCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-solo-enum' distinct from prior post-hexa-#2 kinds)
         "chapter 六百二十五",   // M1877-M1880 (BASHOSTKIT ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#2,1st error-enum-cluster wave in the run;3 BASHostKit Error enums (BASTrainingDataExportError 3-case + BASHostMeshError 1-case + BASHostIntegrationError 8-case) gained Codable + 3 PROOF tests + BASHostKitErrorTrioCodableExtensionDoctrine typed surface + close-out;M1880 ROUND-NUMBER MILESTONE reached — 80-step jump since chapter 605 M1800 round;NEW kind 'error-trio' distinct from prior post-hexa-#2 kinds)
-        "chapter 六百二十六"    // M1881-M1884 (BASMETALSUBSTRATE METAL ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#2,2nd error-cluster wave in run,1st BASMetalSubstrate touch since chapter 605;3 BASMetalSubstrate Error enums (BASKernelError + BASKernelLookupError + BASMambaSSMError) gained Codable + 3 PROOF tests + BASMetalSubstrateMetalErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'metal-error-trio' distinct from chapter 625 'error-trio' (different module);1 more to chapter 627 hexa #3 opportunity!)
+        "chapter 六百二十六",   // M1881-M1884 (BASMETALSUBSTRATE METAL ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#2,2nd error-cluster wave in run,1st BASMetalSubstrate touch since chapter 605;3 BASMetalSubstrate Error enums (BASKernelError + BASKernelLookupError + BASMambaSSMError) gained Codable + 3 PROOF tests + BASMetalSubstrateMetalErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'metal-error-trio' distinct from chapter 625 'error-trio' (different module);1 more to chapter 627 hexa #3 opportunity!)
+        "chapter 六百二十七"    // M1885-M1888 (CROSS-MODULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,6TH (FINAL) post-hexa-#2,3rd error-cluster wave (1st spanning 2 modules:BASAppleAdapters + BASSovereign);3 Error enums (BASAppleCurrentBrainBootstrapHostResolutionError + BASSovereignAuditLedger.LedgerError + BASSovereignKeychainBinding.KeychainError) gained Codable + 3 PROOF tests + BASCrossModuleErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'cross-module-error-trio';TRIGGERS chapter 628 hexa #3 catalog meta-meta opportunity;7 distinct modules in post-hexa-#2 run far exceeds prior hexa runs' 4)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -297,14 +298,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1884
+    public static let mNumberLast: Int = 1888
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1884)。 Bumped through chapter 626:925 → 929。
-    /// Chapter 626:BASMetalSubstrate metal error trio
-    /// Codable extension (5th post-hexa-#2) + 3 PROOF
-    /// tests + typed surface + close-out。
-    public static let commitsShipped: Int = 929
+    /// M1888)。 Bumped through chapter 627:929 → 933。
+    /// Chapter 627:cross-module error trio (6TH post-
+    /// hexa-#2,triggers hexa #3) + 3 PROOF tests +
+    /// typed surface + close-out。
+    public static let commitsShipped: Int = 933
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

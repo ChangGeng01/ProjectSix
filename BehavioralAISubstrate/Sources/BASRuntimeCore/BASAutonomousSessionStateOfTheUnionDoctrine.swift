@@ -110,18 +110,20 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 626
-    /// close-out (M1884 — BASMetalSubstrate metal error
-    /// trio Codable extension,5th post-hexa-#2,2nd
-    /// error-cluster wave,1st BASMetalSubstrate touch
-    /// since chapter 605;3 BASMetalSubstrate Error
-    /// enums gained Codable;NEW kind 'metal-error-
-    /// trio' distinct from chapter 625 'error-trio')。
-    public static let typedSurfaceCount: Int = 167
+    /// Cumulative achievement metrics at chapter 627
+    /// close-out (M1888 — cross-module error trio
+    /// Codable extension,6TH (FINAL) post-hexa-#2,3rd
+    /// error-cluster wave (1st spanning 2 modules);3
+    /// Error enums gained Codable;NEW kind 'cross-
+    /// module-error-trio';TRIGGERS chapter 628 hexa
+    /// #3 catalog meta-meta opportunity;7 distinct
+    /// modules in post-hexa-#2 run far exceeds prior
+    /// hexa runs' 4)。
+    public static let typedSurfaceCount: Int = 168
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 468
-    public static let phase2CommitsShipped: Int = 929
-    public static let chapter2NumberLast: Int = 1884
+        Int = 472
+    public static let phase2CommitsShipped: Int = 933
+    public static let chapter2NumberLast: Int = 1888
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

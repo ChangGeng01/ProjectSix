@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1884",
-            "M1884:doctrine version reflects chapter 六百二十六 — BASMETALSUBSTRATE METAL ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#2,2nd error-cluster wave,1st BASMetalSubstrate touch since chapter 605。 3 BASMetalSubstrate Error enums (BASKernelError + BASKernelLookupError + BASMambaSSMError) gained Codable at M1881 + 3 PROOF tests (M1882) + BASMetalSubstrateMetalErrorTrioCodableExtensionDoctrine typed surface (M1883) + close-out (M1884)。 NEW kind 'metal-error-trio' distinct from chapter 625 'error-trio' (different module)。 167 typed surfaces cumulative。 468 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1888",
+            "M1888:doctrine version reflects chapter 六百二十七 — CROSS-MODULE ERROR TRIO CODABLE EXTENSION — GAP-FILL,6TH (FINAL) post-hexa-#2,3rd error-cluster wave (1st spanning 2 modules:BASAppleAdapters + BASSovereign)。 3 Error enums gained Codable at M1885 + 3 PROOF tests (M1886) + BASCrossModuleErrorTrioCodableExtensionDoctrine typed surface (M1887) + close-out (M1888)。 NEW kind 'cross-module-error-trio'。 TRIGGERS chapter 628 hexa #3 catalog meta-meta opportunity。 7 distinct modules in post-hexa-#2 run。 168 typed surfaces cumulative。 472 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

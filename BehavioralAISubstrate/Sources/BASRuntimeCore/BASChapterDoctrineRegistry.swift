@@ -15334,7 +15334,117 @@ public enum BASChapterDoctrineRegistry {
                 " typed surfaces cumulative (+1)。 ADR-" +
                 "016 → M1884。 468 consecutive autonomous" +
                 " commits with V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 627 — cross-module error trio Codable
+        // extension (6TH post-hexa-#2 gap-fill — TRIGGERS
+        // chapter 628 hexa #3 catalog meta-meta
+        // opportunity,NEW kind 'cross-module-error-trio',
+        // 3rd error-cluster wave)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十七",
+            mNumberFirst: 1885,
+            mNumberLast: 1888,
+            v1MilestoneMNumber: 1888,
+            v1MilestoneStatus:
+                "chapter-627-cross-module-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1885, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module Error enums — BASApple" +
+                        "Adapters.BASAppleCurrentBrain" +
+                        "BootstrapHostResolutionError" +
+                        " (8-case) + BASSovereign" +
+                        "AuditLedger.LedgerError (7-" +
+                        "case nested-in-actor) + BAS" +
+                        "SovereignKeychainBinding.Keychain" +
+                        "Error (multi-case nested-in-" +
+                        "actor with Int32+String)。"),
+                BASChapterKnife(
+                    mNumber: 1886, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1887, knife: "第三刀",
+                    concept: "NEW BASCrossModuleError" +
+                        "TrioCodableExtensionDoctrine +" +
+                        " moduleCount = 2 (BASApple" +
+                        "Adapters + BASSovereign) +" +
+                        " kindLabel='cross-module-error-" +
+                        "trio' (NEW kind) +" +
+                        " isSixthPostHexaTwoGapFill +" +
+                        " triggersGapFillHexaCatalogThree" +
+                        "Opportunity +" +
+                        " distinctModulesInPostHexaTwoRun" +
+                        " = 7 (far exceeds hexa #1/#2's" +
+                        " 4)。 typed-surface count 167" +
+                        " → 168。"),
+                BASChapterKnife(
+                    mNumber: 1888, knife: "第四刀",
+                    concept: "Chapter 627 close-out +" +
+                        " doctrine sync。 472 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6TH POST-HEXA-#2" +
+                        " GAP-FILL — TRIGGERS chapter" +
+                        " 628 hexa #3 catalog meta-meta" +
+                        " opportunity (parallel to" +
+                        " chapter 614 hexa #1 + 621" +
+                        " hexa #2)。")
+            ],
+            entropyClassesAttacked: [
+                "bas-apple-current-brain-bootstrap-host-resolution-error-non-codable",
+                "bas-sovereign-audit-ledger-error-non-codable",
+                "bas-sovereign-keychain-binding-error-non-codable",
+                "cross-module-error-trio-pattern-uncaptured",
+                "third-gap-fill-hexa-threshold-not-crossed-yet"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1888",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "cross-module-error-trio-codable-extension",
+                "sixth-post-hexa-two-gap-fill",
+                "third-error-cluster-post-hexa-two",
+                "triggers-gap-fill-hexa-catalog-three-opportunity",
+                "7-distinct-modules-in-post-hexa-two-run"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 628 NEW gap-fill" +
+                " hexa catalog #3 meta-meta milestone" +
+                " (parallel to chapter 614 hexa #1 +" +
+                " chapter 621 hexa #2)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 627 ships cross-module" +
+                " error trio Codable extension — 6TH" +
+                " (FINAL) post-hexa-#2 gap-fill chapter,3rd" +
+                " error-cluster wave (1st spanning 2" +
+                " modules:BASAppleAdapters + BAS" +
+                "Sovereign)。 3 Error enums gained Codable" +
+                " at M1885 + 3 PROOF tests (M1886) + new" +
+                " typed surface (M1887) + close-out" +
+                " (M1888)。 NEW kind 'cross-module-error-" +
+                "trio'。 SIX consecutive post-hexa-#2" +
+                " gap-fill chapters complete (622+623+" +
+                "624+625+626+627) — TRIGGERS chapter 628" +
+                " hexa #3 catalog meta-meta opportunity" +
+                " (parallel to chapter 614 hexa #1 +" +
+                " chapter 621 hexa #2 patterns)。 7" +
+                " distinct modules touched in post-hexa-" +
+                "#2 run (BASOrchestration + BASHostKit +" +
+                " BASObservability + BASRuntimeCore +" +
+                " BASMetalSubstrate + BASAppleAdapters +" +
+                " BASSovereign) — far exceeds chapter" +
+                " 614 hexa #1's 4 and chapter 621 hexa" +
+                " #2's 4。 168 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1888。 472" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014 OPT-" +
+                "IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

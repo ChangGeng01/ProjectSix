@@ -107,19 +107,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 626 close-out。 Chapter
-    /// 626:BASMETALSUBSTRATE METAL ERROR TRIO CODABLE
-    /// EXTENSION — GAP-FILL,5th post-hexa-#2,2nd
-    /// error-cluster wave,1st BASMetalSubstrate touch
-    /// since chapter 605。 3 BASMetalSubstrate Error
-    /// enums (BASKernelError + BASKernelLookupError +
-    /// BASMambaSSMError) gained Codable at M1881 + 3
-    /// PROOF tests (M1882) + NEW BASMetalSubstrate
-    /// MetalErrorTrioCodableExtensionDoctrine (M1883)
-    /// + close-out (M1884)。 NEW kind 'metal-error-
-    /// trio' distinct from chapter 625 'error-trio'。
-    /// 1 more gap-fill to chapter 627 hexa #3
-    /// opportunity!
+    /// Re-captured at chapter 627 close-out。 Chapter
+    /// 627:CROSS-MODULE ERROR TRIO CODABLE EXTENSION
+    /// — GAP-FILL,6TH (FINAL) post-hexa-#2,3rd error-
+    /// cluster wave (1st spanning 2 modules:BASApple
+    /// Adapters + BASSovereign)。 3 Error enums (BAS
+    /// AppleCurrentBrainBootstrapHostResolutionError +
+    /// BASSovereignAuditLedger.LedgerError + BAS
+    /// SovereignKeychainBinding.KeychainError) gained
+    /// Codable at M1885 + 3 PROOF tests (M1886) + NEW
+    /// BASCrossModuleErrorTrioCodableExtensionDoctrine
+    /// (M1887) + close-out (M1888)。 NEW kind 'cross-
+    /// module-error-trio'。 TRIGGERS chapter 628 hexa
+    /// #3 catalog meta-meta opportunity。 7 distinct
+    /// modules in post-hexa-#2 run far exceeds prior
+    /// hexa runs' 4。
     static let frozenFullRegistrySha256: String =
-        "f51465819bd3124fae484f94cfc43dd7f9bc3486cafe0b6e9556634a7b0e8f02"
+        "973a19ead79879bb3869380c33a604f32c50c25beb753907b84e391379658ce8"
 }
