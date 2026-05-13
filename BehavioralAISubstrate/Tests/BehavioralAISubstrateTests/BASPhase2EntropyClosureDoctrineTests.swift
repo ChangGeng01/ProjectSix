@@ -37,27 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs620() {
+    func testLastChapterIs621() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十",
-            "Chapter 六百二十:BASHOSTKIT CODABLE" +
-            " EXTENSION POST-MESH-SWEEP — GAP-FILL" +
-            " reopening BASHostKit 12 chapters after" +
-            " chapter 608 mesh-sweep。 2 BASHostKit" +
-            " enums (BASHostStorageWireError 2-case" +
-            " error + BASShadowPermitUpgradeDecision" +
-            " 2-case decision) gained Codable + 2" +
-            " PROOF tests + BASHostKitCodableExtension" +
-            "PostMeshSweepDoctrine typed surface +" +
-            " close-out。 SIXTH post-hexa-catalog gap-" +
-            "fill chapter (615+616+617+618+619+620)" +
-            " — TRIGGERS 2nd gap-fill hexa catalog" +
-            " meta-meta opportunity at chapter 621。" +
-            " 4 distinct modules in this post-hexa" +
-            " run matches chapter 614 hexa #1。 161" +
-            " typed surfaces cumulative。 444" +
+            "chapter 六百二十一",
+            "Chapter 六百二十一:2ND GAP-FILL HEXA" +
+            " CATALOG META-META MILESTONE。 NEW BAS" +
+            "GapFillHexaTwoCompletionDoctrine" +
+            " cataloging 6 post-hexa-#1 gap-fill" +
+            " chapters (615-620) — 14 types extended" +
+            " / 24 commits / 4 distinct modules" +
+            " MATCHES hexa #1 / 6 distinct kind" +
+            " buckets each appearing exactly once" +
+            " (continuation + wave-3 + wave-4 +" +
+            " wave-5 + post-trilogy + post-mesh-" +
+            "sweep) + 40 anti-drift PROOF + 14 wire-" +
+            "in PROOF + close-out。 PARALLEL" +
+            " structurally to chapter 614 gap-fill" +
+            " hexa #1。 Catalog lineage M1805 post-" +
+            "octa → M1833 hexa #1 → M1861 hexa #2。" +
+            " 162 typed surfaces cumulative。 448" +
             " consecutive byte-equality clean commits")
     }
 

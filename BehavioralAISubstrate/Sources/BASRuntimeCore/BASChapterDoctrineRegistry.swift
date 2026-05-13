@@ -14746,7 +14746,130 @@ public enum BASChapterDoctrineRegistry {
                 " (+1)。 ADR-016 → M1860。 444" +
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014 OPT-" +
-                "IN preserved。")
+                "IN preserved。"),
+
+        // chapter 621 — 2ND GAP-FILL HEXA CATALOG META-
+        // META MILESTONE。 Cataloging 6 post-hexa-#1
+        // gap-fill chapters (615-620) within already-
+        // covered modules。 PARALLEL structurally to
+        // chapter 614 gap-fill hexa #1 catalog。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十一",
+            mNumberFirst: 1861,
+            mNumberLast: 1864,
+            v1MilestoneMNumber: 1864,
+            v1MilestoneStatus:
+                "chapter-621-gap-fill-hexa-two-catalog-meta-meta-milestone",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1861, knife: "第一刀",
+                    concept: "NEW BASGapFillHexaTwo" +
+                        "CompletionDoctrine cataloging" +
+                        " 6 post-hexa-#1 gap-fill" +
+                        " chapters (615-620) within" +
+                        " already-covered modules — 14" +
+                        " types extended / 24 commits" +
+                        " / 4 distinct modules touched" +
+                        " (BASLeaseLife + BASOrgan +" +
+                        " BASMemory + BASHostKit) =" +
+                        " MATCHES chapter 614 hexa #1。" +
+                        " 6 distinct kind buckets" +
+                        " (continuation + wave-3 +" +
+                        " wave-4 + wave-5 + post-" +
+                        "trilogy + post-mesh-sweep,each" +
+                        " appearing exactly once)。" +
+                        " EntryRecord struct mirrors" +
+                        " chapter 614 hexa #1 +" +
+                        " 607 post-octa hexa pattern。"),
+                BASChapterKnife(
+                    mNumber: 1862, knife: "第二刀",
+                    concept: "40 anti-drift PROOF tests" +
+                        " — identity + 6 kind buckets +" +
+                        " 2 nesting buckets + 6 per-" +
+                        "entry identity + 5 aggregate" +
+                        " accessor + 10 achievement" +
+                        " flags + 3 ref pins +" +
+                        " EntryRecord Codable round-" +
+                        "trip。"),
+                BASChapterKnife(
+                    mNumber: 1863, knife: "第三刀",
+                    concept: "14 wire-in PROOF tests" +
+                        " cross-checking the catalog" +
+                        " against each of the 6 per-" +
+                        "entry source doctrines (2" +
+                        " wire-ins per entry:" +
+                        " mNumberFirst +" +
+                        " typesExtended) + 2 cross-" +
+                        "catalog invariants (matches" +
+                        " hexa #1 module count +" +
+                        " entry count)。"),
+                BASChapterKnife(
+                    mNumber: 1864, knife: "第四刀",
+                    concept: "Chapter 621 close-out +" +
+                        " doctrine sync。 448 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2ND gap-fill hexa" +
+                        " catalog sealed (parallel to" +
+                        " chapter 614 hexa #1)。" +
+                        " Catalog lineage:M1805 (post-" +
+                        "octa) → M1833 (hexa #1) →" +
+                        " M1861 (hexa #2)。")
+            ],
+            entropyClassesAttacked: [
+                "second-gap-fill-hexa-pattern-uncataloged",
+                "6-post-hexa-1-gap-fill-run-uncommemorated",
+                "no-cross-hexa-wire-in-protection",
+                "hexa-1-precedent-not-mirrored",
+                "6-distinct-kind-taxonomy-untyped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1864",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "gap-fill-hexa-two-catalog-sealed",
+                "structural-parallel-to-hexa-one",
+                "14-types-via-gap-fill-2-cataloged",
+                "wire-in-protection-active",
+                "every-kind-appears-exactly-once"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional gap-fill" +
+                " chapters could feed a 3rd hexa" +
+                " opportunity (chapter ~627 if cadence" +
+                " holds)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进" +
+                " 10/10)",
+                "future arc — Tier 2 final 60/60 (M1367" +
+                " ssmScan + Tier C ADR-019)"
+            ],
+            summary: "Chapter 621 seals the 2nd gap-fill" +
+                " hexa catalog meta-meta milestone via" +
+                " NEW BASGapFillHexaTwoCompletion" +
+                "Doctrine (M1861) + 40 anti-drift PROOF" +
+                " tests (M1862) + 14 wire-in PROOF" +
+                " tests cross-checking against the 6" +
+                " per-entry source doctrines (M1863) +" +
+                " close-out (M1864)。 Cataloging the 6" +
+                " post-hexa-#1 gap-fill chapters (615-" +
+                "620):BASLeaseLife continuation +" +
+                " BASOrgan wave 3 + BASOrgan wave 4 +" +
+                " BASOrgan wave 5 + BASMemory post-" +
+                "trilogy + BASHostKit post-mesh-sweep。" +
+                " 14 types extended / 24 commits / 4" +
+                " distinct modules touched / 6 distinct" +
+                " kind buckets (each appearing exactly" +
+                " once — maximum kind diversity)。" +
+                " PARALLEL structurally to chapter 614" +
+                " gap-fill hexa #1 catalog (which" +
+                " cataloged 6 ORIGINAL gap-fill entries" +
+                " at M1833)。 162 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1864。" +
+                " 448 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

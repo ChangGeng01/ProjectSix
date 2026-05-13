@@ -3785,6 +3785,32 @@ public enum BASEntropyChapterIndex {
                 " matches chapter 614 hexa #1 distinct" +
                 " module count。 161 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1860。 V1" +
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十一",
+            mNumberFirst: 1861, mNumberLast: 1864,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "2ND GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaTwo" +
+                "CompletionDoctrine (M1861) cataloging" +
+                " 6 post-hexa-#1 gap-fill chapters" +
+                " (615-620):BASLeaseLife continuation" +
+                " + BASOrgan wave 3 + BASOrgan wave 4" +
+                " + BASOrgan wave 5 + BASMemory post-" +
+                "trilogy + BASHostKit post-mesh-sweep" +
+                " = 14 types extended / 24 commits /" +
+                " 4 distinct modules MATCHES hexa #1" +
+                " / 6 distinct kind buckets each" +
+                " appearing exactly once。 40 anti-" +
+                "drift PROOF tests (M1862) + 14 wire-" +
+                "in PROOF tests cross-checking 6" +
+                " source doctrines (M1863) + close-" +
+                "out (M1864)。 PARALLEL structurally to" +
+                " chapter 614 hexa #1。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2。 162 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1864。 V1" +
                 " byte-equality preserved。")
     ]
 

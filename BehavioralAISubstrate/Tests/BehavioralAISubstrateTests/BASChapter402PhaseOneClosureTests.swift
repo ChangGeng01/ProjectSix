@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1860",
-            "M1860:doctrine version reflects chapter 六百二十 — BASHOSTKIT CODABLE EXTENSION POST-MESH-SWEEP — GAP-FILL reopening BASHostKit 12 chapters after chapter 608 mesh-sweep。 2 BASHostKit enums (BASHostStorageWireError 2-case error + BASShadowPermitUpgradeDecision 2-case decision) gained Codable at M1857 + 2 PROOF tests (M1858) + BASHostKitCodableExtensionPostMeshSweepDoctrine typed surface (M1859) + close-out (M1860)。 SIXTH post-hexa-catalog gap-fill chapter (615+616+617+618+619+620) — TRIGGERS 2nd gap-fill hexa catalog meta-meta opportunity at chapter 621。 4 distinct modules in this post-hexa run matches chapter 614 hexa #1。 161 typed surfaces cumulative。 444 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1864",
+            "M1864:doctrine version reflects chapter 六百二十一 — 2ND GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaTwoCompletionDoctrine cataloging 6 post-hexa-#1 gap-fill chapters (615-620) — 14 types extended / 24 commits / 4 distinct modules MATCHES hexa #1 / 6 distinct kind buckets each appearing exactly once + 40 anti-drift PROOF + 14 wire-in PROOF + close-out。 PARALLEL structurally to chapter 614 hexa #1。 Catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2。 162 typed surfaces cumulative。 448 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
