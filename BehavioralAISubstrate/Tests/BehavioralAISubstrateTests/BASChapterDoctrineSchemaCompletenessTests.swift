@@ -2087,7 +2087,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百一十二")!)
+                            "chapter 六百一十二")!),
+            // M1832 chapter 613 — BASOrchestration Codable extension continuation wave 2 gap-fill (6th consecutive — triggers hexa catalog)
+            checkRegistry("六百一十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3479,6 +3485,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百一十二")!
+                .mNumberLast),
+            // M1832 chapter 613 — BASOrchestration Codable extension continuation wave 2 gap-fill (6th consecutive)
+            ("613",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

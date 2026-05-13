@@ -37,25 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs612() {
+    func testLastChapterIs613() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百一十二",
-            "Chapter 六百一十二:BASSOVEREIGN CODABLE" +
-            " EXTENSION WAVE 3 — GAP-FILL within" +
-            " already-covered BASSovereign module。 2" +
-            " nested-in-engine types (BASSovereign" +
-            "VerdictEngine.HardObservations 12-field" +
-            " Bool + SoftSignals 7-field Double)" +
-            " gained Codable + 2 PROOF tests +" +
-            " BASSovereignCodableExtensionWaveThree" +
-            "Doctrine typed surface + close-out。" +
-            " Combined 8 BASSovereign-related types" +
-            " (4+2+2)。 5TH consecutive gap-fill" +
-            " chapter (608+609+610+611+612)。 ONE SHORT" +
-            " of gap-fill hexa catalog threshold。" +
-            " 153 typed surfaces cumulative")
+            "chapter 六百一十三",
+            "Chapter 六百一十三:BASORCHESTRATION CODABLE" +
+            " EXTENSION CONTINUATION WAVE 2 — GAP-FILL" +
+            " within already-covered BASOrchestration" +
+            " module。 2 nested-in-actor inner types" +
+            " within BASWorldAwareRiskBridge" +
+            " (ProposedIntent 8-field + Decision 3-" +
+            "field) gained Codable + 2 PROOF tests +" +
+            " BASOrchestrationCodableExtensionContinuation" +
+            "WaveTwoDoctrine typed surface + close-out。" +
+            " Combined 15 BASOrchestration-related" +
+            " types (6+6+1+2)。 6TH consecutive gap-fill" +
+            " chapter (608+609+610+611+612+613) —" +
+            " TRIGGERS gap-fill hexa catalog meta-meta" +
+            " opportunity at chapter 614 (parallel to" +
+            " chapter 607 post-octa fresh-module hexa)。" +
+            " 154 typed surfaces cumulative")
     }
 
     // MARK: - M-number range

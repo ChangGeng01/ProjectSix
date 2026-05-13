@@ -3583,7 +3583,39 @@ public enum BASEntropyChapterIndex {
                 " catalog threshold (chapter 613 would" +
                 " trigger)。 153 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1828。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十三",
+            mNumberFirst: 1829, mNumberLast: 1832,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORCHESTRATION CODABLE EXTENSION" +
+                " CONTINUATION WAVE 2 — GAP-FILL within" +
+                " already-covered BASOrchestration" +
+                " module。 2 nested-in-actor inner types" +
+                " within BASWorldAwareRiskBridge —" +
+                " ProposedIntent (8-field value:" +
+                " sessionID + turnID + operation +" +
+                " matchedTemplateID + consentAcknowledged" +
+                " + baselineSignals +" +
+                " baselineObservations + snapshotRef) +" +
+                " Decision (3-field value:verdict +" +
+                " assessment + branches) — gained" +
+                " Codable at M1829 + 2 PROOF tests" +
+                " (M1830) + new typed surface (M1831) +" +
+                " close-out (M1832)。 Combined 15 BAS" +
+                "Orchestration-related types ledger-" +
+                "serializable (6 arc + 6 post-arc" +
+                " trilogy + 1 continuation wave 1 + 2" +
+                " continuation wave 2)。 6TH consecutive" +
+                " gap-fill chapter (608 + 609 + 610 +" +
+                " 611 + 612 + 613) — TRIGGERS gap-fill" +
+                " hexa catalog meta-meta opportunity at" +
+                " chapter 614 (parallel to chapter 607" +
+                " post-octa fresh-module hexa catalog)。" +
+                " 154 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1832。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

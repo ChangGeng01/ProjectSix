@@ -107,20 +107,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 612 close-out。 Chapter
-    /// 612:BASSOVEREIGN CODABLE EXTENSION WAVE 3 —
-    /// GAP-FILL within already-covered BASSovereign
-    /// module。 2 nested-in-engine types (BASSovereign
-    /// VerdictEngine.HardObservations 12-field Bool +
-    /// SoftSignals 7-field Double) gained Codable at
-    /// M1825 + 2 PROOF tests (M1826) + NEW BAS
-    /// SovereignCodableExtensionWaveThreeDoctrine
-    /// (M1827) + close-out (M1828)。 Combined 8 BAS
-    /// Sovereign-related types ledger-serializable
-    /// (4+2+2)。 5TH consecutive gap-fill chapter
-    /// (608+609+610+611+612)。 2nd consecutive BAS
-    /// Sovereign gap-fill。 ONE SHORT of gap-fill hexa
-    /// catalog threshold (chapter 613 would trigger)。
+    /// Re-captured at chapter 613 close-out。 Chapter
+    /// 613:BASORCHESTRATION CODABLE EXTENSION
+    /// CONTINUATION WAVE 2 — GAP-FILL within already-
+    /// covered BASOrchestration module。 2 nested-in-
+    /// actor inner types within BASWorldAwareRiskBridge
+    /// (ProposedIntent 8-field + Decision 3-field)
+    /// gained Codable at M1829 + 2 PROOF tests (M1830)
+    /// + NEW BASOrchestrationCodableExtension
+    /// ContinuationWaveTwoDoctrine (M1831) + close-out
+    /// (M1832)。 Combined 15 BASOrchestration-related
+    /// types ledger-serializable (6+6+1+2)。 6TH
+    /// consecutive gap-fill chapter (608+609+610+611+
+    /// 612+613) — TRIGGERS gap-fill hexa catalog meta-
+    /// meta opportunity at chapter 614 (parallel to
+    /// chapter 607 post-octa fresh-module hexa
+    /// catalog)。
     static let frozenFullRegistrySha256: String =
-        "c5eccf95665e0e8b425b39a84ff712c720f6279c9374a716c751033fa41f1d95"
+        "703a545ea7b7a87ff85d49142c0594daa2a1a43dace960c0bb1737e2f6d3263e"
 }

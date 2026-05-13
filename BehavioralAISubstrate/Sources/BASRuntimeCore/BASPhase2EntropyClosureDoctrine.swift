@@ -266,7 +266,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百九",       // M1813-M1816 (BASORGAN CODABLE EXTENSION WAVE 2 — GAP-FILL;1 type (BASOrganCapacity 4-field) gained Codable + 1 PROOF test + BASOrganCodableExtensionWaveTwoDoctrine typed surface + close-out;combined 3 BASOrgan-related types cumulative (2 wave 1 + 1 wave 2);SECOND consecutive gap-fill chapter;400-consecutive-byte-equal-commits milestone reached)
         "chapter 六百一十",     // M1817-M1820 (BASORCHESTRATION CODABLE EXTENSION CONTINUATION — GAP-FILL;1 type (BASNeuralThoughtMaterialization 8-field) gained Codable + 1 PROOF test + BASOrchestrationCodableExtensionContinuationDoctrine typed surface + close-out;combined 13 BASOrchestration-related types cumulative (6 arc + 6 post-arc trilogy + 1 this);THIRD consecutive gap-fill chapter;first chapter past 400-consecutive milestone)
         "chapter 六百一十一",   // M1821-M1824 (BASSOVEREIGN CODABLE EXTENSION WAVE 2 — GAP-FILL;2 nested-in-actor types (BASSovereignStubRenderer.StubOutput + RefusalPhrases) gained Codable + 2 PROOF tests + BASSovereignCodableExtensionWaveTwoDoctrine typed surface + close-out;combined 6 BASSovereign-related types cumulative (4 wave 1 + 2 wave 2);4TH consecutive gap-fill chapter)
-        "chapter 六百一十二"    // M1825-M1828 (BASSOVEREIGN CODABLE EXTENSION WAVE 3 — GAP-FILL;2 nested-in-engine types (BASSovereignVerdictEngine.HardObservations 12-field Bool + SoftSignals 7-field Double) gained Codable + 2 PROOF tests + BASSovereignCodableExtensionWaveThreeDoctrine typed surface + close-out;combined 8 BASSovereign-related types cumulative (4+2+2);5TH consecutive gap-fill chapter;2nd consecutive BASSovereign gap-fill;ONE SHORT of gap-fill hexa catalog threshold)
+        "chapter 六百一十二",   // M1825-M1828 (BASSOVEREIGN CODABLE EXTENSION WAVE 3 — GAP-FILL;2 nested-in-engine types (BASSovereignVerdictEngine.HardObservations 12-field Bool + SoftSignals 7-field Double) gained Codable + 2 PROOF tests + BASSovereignCodableExtensionWaveThreeDoctrine typed surface + close-out;combined 8 BASSovereign-related types cumulative (4+2+2);5TH consecutive gap-fill chapter;2nd consecutive BASSovereign gap-fill;ONE SHORT of gap-fill hexa catalog threshold)
+        "chapter 六百一十三"    // M1829-M1832 (BASORCHESTRATION CODABLE EXTENSION CONTINUATION WAVE 2 — GAP-FILL;2 nested-in-actor inner types within BASWorldAwareRiskBridge (ProposedIntent 8-field + Decision 3-field) gained Codable + 2 PROOF tests + BASOrchestrationCodableExtensionContinuationWaveTwoDoctrine typed surface + close-out;combined 15 BASOrchestration-related types cumulative (6 arc + 6 post-arc trilogy + 1 continuation wave 1 + 2 continuation wave 2);6TH consecutive gap-fill chapter — TRIGGERS gap-fill hexa catalog meta-meta opportunity at chapter 614;parallel structurally to chapter 607 post-octa fresh-module hexa catalog)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -283,14 +284,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1828
+    public static let mNumberLast: Int = 1832
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1828)。 Bumped through chapter 612:869 → 873。
-    /// Chapter 612:BASSovereign Codable extension
-    /// wave 3 gap-fill + 2 PROOF tests + typed surface
-    /// + close-out。
-    public static let commitsShipped: Int = 873
+    /// M1832)。 Bumped through chapter 613:873 → 877。
+    /// Chapter 613:BASOrchestration Codable extension
+    /// continuation wave 2 gap-fill + 2 PROOF tests +
+    /// typed surface + close-out。
+    public static let commitsShipped: Int = 877
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

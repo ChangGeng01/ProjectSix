@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1828",
-            "M1828:doctrine version reflects chapter 六百一十二 — BASSOVEREIGN CODABLE EXTENSION WAVE 3 — GAP-FILL。 2 nested-in-engine types (BASSovereignVerdictEngine.HardObservations 12-field Bool + SoftSignals 7-field Double) gained Codable at M1825 + 2 PROOF tests (M1826) + BASSovereignCodableExtensionWaveThreeDoctrine typed surface (M1827) + close-out (M1828)。 Combined 8 BASSovereign-related types ledger-serializable (4+2+2)。 5TH consecutive gap-fill chapter (608+609+610+611+612)。 2nd consecutive BASSovereign gap-fill。 ONE SHORT of gap-fill hexa catalog threshold。 153 typed surfaces cumulative。 412 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1832",
+            "M1832:doctrine version reflects chapter 六百一十三 — BASORCHESTRATION CODABLE EXTENSION CONTINUATION WAVE 2 — GAP-FILL。 2 nested-in-actor inner types within BASWorldAwareRiskBridge (ProposedIntent 8-field + Decision 3-field) gained Codable at M1829 + 2 PROOF tests (M1830) + BASOrchestrationCodableExtensionContinuationWaveTwoDoctrine typed surface (M1831) + close-out (M1832)。 Combined 15 BASOrchestration-related types ledger-serializable (6+6+1+2)。 6TH consecutive gap-fill chapter (608+609+610+611+612+613) — TRIGGERS gap-fill hexa catalog meta-meta opportunity at chapter 614。 154 typed surfaces cumulative。 416 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

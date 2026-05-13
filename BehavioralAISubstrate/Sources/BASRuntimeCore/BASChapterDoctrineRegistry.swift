@@ -13887,7 +13887,118 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M1828。" +
                 " 412 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 613 — BASOrchestration Codable
+        // extension continuation wave 2 (gap-fill)。
+        // 6TH consecutive gap-fill — TRIGGERS gap-fill
+        // hexa catalog meta-meta opportunity at chapter
+        // 614 (parallel to chapter 607 post-octa hexa)。
+        // 2 nested-in-actor inner types within BAS
+        // WorldAwareRiskBridge gained Codable。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十三",
+            mNumberFirst: 1829,
+            mNumberLast: 1832,
+            v1MilestoneMNumber: 1832,
+            v1MilestoneStatus:
+                "chapter-613-orchestration-codable-extension-continuation-wave-two",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1829, knife: "第一刀",
+                    concept: "Add Codable to 2 BAS" +
+                        "Orchestration nested-in-actor" +
+                        " inner types within BAS" +
+                        "WorldAwareRiskBridge — Proposed" +
+                        "Intent (8-field value:" +
+                        " sessionID + turnID + operation" +
+                        " + matchedTemplateID + consent" +
+                        "Acknowledged + baselineSignals" +
+                        " + baselineObservations +" +
+                        " snapshotRef) + Decision (3-" +
+                        "field value:verdict +" +
+                        " assessment + branches)。"),
+                BASChapterKnife(
+                    mNumber: 1830, knife: "第二刀",
+                    concept: "2 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1831, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionContinuationWaveTwo" +
+                        "Doctrine + isGapFillExtension" +
+                        " flag + waveNumber = 2 +" +
+                        " combinedOrchestrationCount = 15" +
+                        " + typesAreNestedInActor flag" +
+                        " + isSixthConsecutiveGapFill" +
+                        " flag + triggersGapFillHexa" +
+                        "CatalogOpportunity flag +" +
+                        " hexaCatalogPrecedentRef points" +
+                        " to chapter 607 post-octa hexa。" +
+                        " typed-surface count 153 → 154。"),
+                BASChapterKnife(
+                    mNumber: 1832, knife: "第四刀",
+                    concept: "Chapter 613 close-out +" +
+                        " doctrine sync。 416 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6TH consecutive" +
+                        " gap-fill — TRIGGERS gap-fill" +
+                        " hexa catalog meta-meta" +
+                        " opportunity at chapter 614。")
+            ],
+            entropyClassesAttacked: [
+                "proposed-intent-non-codable",
+                "decision-non-codable",
+                "bas-orchestration-continuation-wave-2-not-shipped-yet",
+                "sixth-consecutive-gap-fill-pattern-not-cataloged",
+                "gap-fill-hexa-threshold-not-crossed-yet"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1832",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "orchestration-continuation-wave-2-codable-extension",
+                "15-orchestration-types-cumulative",
+                "sixth-consecutive-gap-fill",
+                "gap-fill-hexa-catalog-opportunity-triggered"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 614 gap-fill hexa" +
+                " catalog meta-meta milestone (parallel" +
+                " to chapter 607 post-octa hexa)",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — Tier 2 final 60/60 (M1367" +
+                " ssmScan + Tier C ADR-019)"
+            ],
+            summary: "Chapter 613 ships BASOrchestration" +
+                " Codable extension continuation wave 2" +
+                " — gap-fill within already-covered BAS" +
+                "Orchestration module。 2 nested-in-" +
+                "actor inner types within BASWorldAware" +
+                "RiskBridge (ProposedIntent 8-field +" +
+                " Decision 3-field) gained Codable at" +
+                " M1829 + 2 PROOF tests (M1830) + new" +
+                " typed surface (M1831) + close-out" +
+                " (M1832)。 Combined 15 BASOrchestration-" +
+                "related types ledger-serializable (6" +
+                " arc seal + 6 post-arc trilogy + 1" +
+                " continuation wave 1 + 2 continuation" +
+                " wave 2)。 6TH consecutive gap-fill" +
+                " chapter (608 mesh-sweep + 609 organ" +
+                " wave 2 + 610 orchestration continuation" +
+                " + 611 sovereign wave 2 + 612 sovereign" +
+                " wave 3 + 613 orchestration continuation" +
+                " wave 2)。 TRIGGERS gap-fill hexa" +
+                " catalog meta-meta opportunity at" +
+                " chapter 614 (parallel to chapter 607" +
+                " post-octa fresh-module hexa)。 154" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M1832。 416 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
