@@ -2069,7 +2069,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九")!)
+                            "chapter 六百九")!),
+            // M1820 chapter 610 — BASOrchestration Codable extension continuation gap-fill
+            checkRegistry("六百一十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百一十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3437,6 +3443,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九")!
+                .mNumberLast),
+            // M1820 chapter 610 — BASOrchestration Codable extension continuation gap-fill
+            ("610",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百一十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -37,22 +37,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs609() {
+    func testLastChapterIs610() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百九",
-            "Chapter 六百九:BASORGAN CODABLE EXTENSION" +
-            " WAVE 2 — GAP-FILL within already-covered" +
-            " BASOrgan module。 1 type (BASOrganCapacity" +
-            " 4-field) gained Codable + 1 PROOF test +" +
-            " BASOrganCodableExtensionWaveTwoDoctrine" +
-            " typed surface + close-out。 Combined 3" +
-            " BASOrgan-related types (2 chapter 598" +
-            " wave 1 + 1 this wave)。 SECOND consecutive" +
-            " gap-fill chapter。 150 typed surfaces" +
-            " cumulative。 400-consecutive-byte-equal-" +
-            "commits milestone reached")
+            "chapter 六百一十",
+            "Chapter 六百一十:BASORCHESTRATION CODABLE" +
+            " EXTENSION CONTINUATION — GAP-FILL within" +
+            " already-covered BASOrchestration module。" +
+            " 1 type (BASNeuralThoughtMaterialization" +
+            " 8-field) gained Codable + 1 PROOF test +" +
+            " BASOrchestrationCodableExtensionContinuation" +
+            "Doctrine typed surface + close-out。" +
+            " Combined 13 BASOrchestration-related" +
+            " types (6 arc + 6 post-arc trilogy + 1" +
+            " this)。 THIRD consecutive gap-fill chapter" +
+            " (608 + 609 + 610)。 151 typed surfaces" +
+            " cumulative。 First chapter past 400-" +
+            "consecutive-byte-equal milestone")
     }
 
     // MARK: - M-number range

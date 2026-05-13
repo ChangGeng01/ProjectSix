@@ -3510,7 +3510,33 @@ public enum BASEntropyChapterIndex {
                 " (+1)。 ADR-016 → M1816。 400-" +
                 "consecutive-byte-equal-commits" +
                 " milestone reached。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百一十",
+            mNumberFirst: 1817, mNumberLast: 1820,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORCHESTRATION CODABLE EXTENSION" +
+                " CONTINUATION — GAP-FILL within already" +
+                "-covered BASOrchestration module" +
+                " (chapter 574 arc + 579 post-arc" +
+                " trilogy)。 1 type (BASNeuralThought" +
+                "Materialization 8-field neural thought" +
+                " materialization with all-Codable-via-" +
+                "BASSchemaVersioned dependencies)" +
+                " gained Codable at M1817 + 1 PROOF" +
+                " test (M1818) + new typed surface" +
+                " (M1819) + close-out (M1820)。 Combined" +
+                " 13 BASOrchestration-related types" +
+                " ledger-serializable (6 arc + 6 post-" +
+                "arc trilogy + 1 this)。 THIRD" +
+                " consecutive gap-fill chapter (608" +
+                " mesh-sweep + 609 organ wave 2 + 610" +
+                " orchestration)。 151 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1820。" +
+                " First chapter past 400-consecutive-" +
+                "byte-equal-commits milestone。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

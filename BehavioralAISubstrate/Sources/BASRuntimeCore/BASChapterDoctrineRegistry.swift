@@ -13593,6 +13593,99 @@ public enum BASChapterDoctrineRegistry {
                 " commits with V1 byte-equality" +
                 " preserved — 4-CONSECUTIVE-HUNDRED" +
                 " byte-equality milestone reached。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 610 — BASOrchestration Codable
+        // extension continuation (gap-fill)。 3rd
+        // consecutive gap-fill chapter (608 + 609 +
+        // 610)。 1 additional BASOrchestration type
+        // (BASNeuralThoughtMaterialization) extends
+        // chapter 574 arc + 579 post-arc trilogy
+        // coverage。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百一十",
+            mNumberFirst: 1817,
+            mNumberLast: 1820,
+            v1MilestoneMNumber: 1820,
+            v1MilestoneStatus:
+                "chapter-610-orchestration-codable-extension-continuation",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1817, knife: "第一刀",
+                    concept: "Add Codable to 1 BAS" +
+                        "Orchestration type — BASNeural" +
+                        "ThoughtMaterialization (8-field" +
+                        " neural thought materialization" +
+                        " value with all-Codable-via-BAS" +
+                        "SchemaVersioned dependencies)。" +
+                        " Trivial addition。"),
+                BASChapterKnife(
+                    mNumber: 1818, knife: "第二刀",
+                    concept: "1 compile-time conformance" +
+                        " PROOF test。"),
+                BASChapterKnife(
+                    mNumber: 1819, knife: "第三刀",
+                    concept: "NEW BASOrchestrationCodable" +
+                        "ExtensionContinuationDoctrine +" +
+                        " isGapFillExtension flag +" +
+                        " combinedOrchestrationCount = 13" +
+                        " + isThirdConsecutiveGapFill" +
+                        " flag。 typed-surface count" +
+                        " 150 → 151。"),
+                BASChapterKnife(
+                    mNumber: 1820, knife: "第四刀",
+                    concept: "Chapter 610 close-out +" +
+                        " doctrine sync。 404 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 First chapter past" +
+                        " 400-consecutive milestone。")
+            ],
+            entropyClassesAttacked: [
+                "neural-thought-materialization-non-codable",
+                "bas-orchestration-gap-not-filled",
+                "post-409-gap-fill-narrative-not-continued",
+                "third-consecutive-gap-fill-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1820",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "orchestration-continuation-codable-extension",
+                "13-orchestration-types-cumulative",
+                "third-consecutive-gap-fill",
+                "first-chapter-past-400-consecutive-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional gap-fill" +
+                " extensions in BASOrchestration or" +
+                " other covered modules",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — BASLeaseLife or BASMemory" +
+                " continuation extensions"
+            ],
+            summary: "Chapter 610 ships BASOrchestration" +
+                " Codable extension continuation —" +
+                " gap-fill within already-covered" +
+                " BASOrchestration module (chapter 574" +
+                " arc + chapter 579 post-arc trilogy)。" +
+                " 1 type (BASNeuralThoughtMaterialization" +
+                " 8-field value) gained Codable at" +
+                " M1817 + 1 PROOF test (M1818) + new" +
+                " typed surface (M1819) + close-out" +
+                " (M1820)。 Combined 13 BASOrchestration-" +
+                "related types ledger-serializable (6" +
+                " arc + 6 post-arc trilogy + 1 this)。" +
+                " THIRD consecutive gap-fill chapter" +
+                " (608 mesh-sweep + 609 organ wave 2" +
+                " + 610 orchestration)。 151 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1820。 404 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 First chapter past 400-" +
+                "consecutive-byte-equal milestone。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

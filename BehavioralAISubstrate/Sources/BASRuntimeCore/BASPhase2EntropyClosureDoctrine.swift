@@ -263,7 +263,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百六",       // M1801-M1804 (BASSOVEREIGN CODABLE EXTENSION WAVE 1 — 12TH MODULE FORMAL ENTRY;4 types/enums (BASSovereignTurnParity + OperationDomain + BASSovereignTurnObservations + BASSovereignTurnVerifierReport) gained Codable + 4 PROOF tests + BASSovereignCodableExtensionDoctrine typed surface (with 7 pre-octa types acknowledged + nested-enums flag) + close-out;BASSovereign formal entry;module count bumped 11→12;6th consecutive post-octa fresh-module advancement;first chapter past M1800 milestone)
         "chapter 六百七",       // M1805-M1808 (POST-OCTA HEXA CATALOG META-META MILESTONE — BASPostOctaModuleExtensionHexaCompletionDoctrine + 30 anti-drift + 14 wire-in PROOF tests cataloging 6 post-octa fresh-module formal-entry chapters (598-606);13 new types/enums via 24 commits;6 distinct modules touched;module count bumped 6→12 across run;parallel to chapter 597 octa-milestone at single-wave-entry level)
         "chapter 六百八",       // M1809-M1812 (BASHOSTKIT MESH-SWEEP CODABLE EXTENSION WAVE 1 — NON-ARC CONTINUATION;3 types (BASHostMeshConsultationResult + BASHostMeshSweepLayerEntry + BASHostMeshSweepResult) gained Codable in chain dependency + 3 PROOF tests + BASHostKitMeshSweepCodableExtensionDoctrine typed surface + close-out;combined 44 BASHostKit-related types cumulative;first chapter post-hexa-catalog pivoting from fresh-module-territory to gap-fill within covered modules)
-        "chapter 六百九"        // M1813-M1816 (BASORGAN CODABLE EXTENSION WAVE 2 — GAP-FILL;1 type (BASOrganCapacity 4-field) gained Codable + 1 PROOF test + BASOrganCodableExtensionWaveTwoDoctrine typed surface + close-out;combined 3 BASOrgan-related types cumulative (2 wave 1 + 1 wave 2);SECOND consecutive gap-fill chapter;400-consecutive-byte-equal-commits milestone reached)
+        "chapter 六百九",       // M1813-M1816 (BASORGAN CODABLE EXTENSION WAVE 2 — GAP-FILL;1 type (BASOrganCapacity 4-field) gained Codable + 1 PROOF test + BASOrganCodableExtensionWaveTwoDoctrine typed surface + close-out;combined 3 BASOrgan-related types cumulative (2 wave 1 + 1 wave 2);SECOND consecutive gap-fill chapter;400-consecutive-byte-equal-commits milestone reached)
+        "chapter 六百一十"      // M1817-M1820 (BASORCHESTRATION CODABLE EXTENSION CONTINUATION — GAP-FILL;1 type (BASNeuralThoughtMaterialization 8-field) gained Codable + 1 PROOF test + BASOrchestrationCodableExtensionContinuationDoctrine typed surface + close-out;combined 13 BASOrchestration-related types cumulative (6 arc + 6 post-arc trilogy + 1 this);THIRD consecutive gap-fill chapter;first chapter past 400-consecutive milestone)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -280,15 +281,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1816
+    public static let mNumberLast: Int = 1820
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1816)。 Bumped through chapter 609:857 → 861。
-    /// Chapter 609:BASOrgan Codable extension wave 2
-    /// gap-fill + 1 PROOF test + typed surface + close-
-    /// out。 400-consecutive-byte-equal-commits
-    /// milestone reached。
-    public static let commitsShipped: Int = 861
+    /// M1820)。 Bumped through chapter 610:861 → 865。
+    /// Chapter 610:BASOrchestration Codable extension
+    /// continuation gap-fill + 1 PROOF test + typed
+    /// surface + close-out。 First chapter past 400-
+    /// consecutive milestone。
+    public static let commitsShipped: Int = 865
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

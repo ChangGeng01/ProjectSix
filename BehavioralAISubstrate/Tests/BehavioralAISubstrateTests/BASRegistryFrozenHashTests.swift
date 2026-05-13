@@ -107,17 +107,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 609 close-out。 Chapter
-    /// 609:BASORGAN CODABLE EXTENSION WAVE 2 — GAP-
-    /// FILL within already-covered BASOrgan module。 1
-    /// type (BASOrganCapacity 4-field) gained Codable
-    /// at M1813 + 1 PROOF test (M1814) + NEW BASOrgan
-    /// CodableExtensionWaveTwoDoctrine (M1815) +
-    /// close-out (M1816)。 Combined 3 BASOrgan-related
-    /// types ledger-serializable (2 chapter 598 wave 1
-    /// + 1 this wave)。 SECOND consecutive gap-fill
-    /// chapter (608 + 609)。 400-consecutive-byte-
-    /// equal-commits milestone reached。
+    /// Re-captured at chapter 610 close-out。 Chapter
+    /// 610:BASORCHESTRATION CODABLE EXTENSION
+    /// CONTINUATION — GAP-FILL within already-covered
+    /// BASOrchestration module (chapter 574 arc + 579
+    /// post-arc trilogy)。 1 type (BASNeuralThought
+    /// Materialization 8-field) gained Codable at
+    /// M1817 + 1 PROOF test (M1818) + NEW BAS
+    /// OrchestrationCodableExtensionContinuationDoctrine
+    /// (M1819) + close-out (M1820)。 Combined 13
+    /// BASOrchestration-related types ledger-
+    /// serializable。 THIRD consecutive gap-fill
+    /// chapter (608 + 609 + 610)。 First chapter past
+    /// 400-consecutive-byte-equal milestone。
     static let frozenFullRegistrySha256: String =
-        "fb9f5d5c9cd100f5a44828011d5a611e0d3db0e2f1d7e517b59c7f5f960a392a"
+        "7876d8f956194a8b1d650e3d59d09e4ffaefcd2523138dd3c7791146a4914525"
 }
