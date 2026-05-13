@@ -352,6 +352,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// ExtensionDoctrine (M1959) + close-out (M1960)。
     /// NEW kind 'sovereign-contamination-guard-trio'。
     /// BASSovereign cumulative typed surfaces = 17。
+    /// Re-captured at chapter 646 close-out。 Chapter
+    /// 646:BASSOVEREIGN TRUST-RECORD TRIO CODABLE
+    /// EXTENSION — GAP-FILL,4th post-hexa-#5,MULTI-
+    /// ACTOR trio across 3 BASSovereign actors。 7th
+    /// BASSovereign touch overall。 3 BASSovereign
+    /// structs nested across 3 actors:BASSovereign
+    /// IntegritySentinel.ArtifactClaim + BASSovereign
+    /// AuditLedger.AppendedEntry + BASSovereignToken
+    /// Authority.WarrantIntent gained Codable at M1961
+    /// + 3 PROOF tests (M1962) + NEW BASSovereign
+    /// TrustRecordTrioCodableExtensionDoctrine (M1963)
+    /// + close-out (M1964)。 NEW kind 'sovereign-trust-
+    /// record-trio'。 BASSovereign cumulative typed
+    /// surfaces = 20 — BREAKS 20-SURFACE BARRIER。
     static let frozenFullRegistrySha256: String =
-        "7ecaa25a2e368d6a5dc74251fb578e591d50531570063d20634bbd19d6574ded"
+        "1b8601f44b280786f549247ced5aff29e606f8f8f2d72b0c003aa70314c623ca"
 }

@@ -110,24 +110,21 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 645
-    /// close-out (M1960 — BASSovereign contamination-
-    /// guard trio Codable extension,3rd post-hexa-#5
-    /// gap-fill,DEEP-COVERAGE single-actor trio
-    /// completing BASSovereignContaminationGuard typed-
-    /// surface coverage;6th BASSovereign touch overall;
-    /// 3 BASSovereign structs all nested in BAS
-    /// SovereignContaminationGuard:Key + QuarantineRecord
-    /// (wraps Key — 3-level recursive Codable proof
-    /// through ArtifactKind from ch641) + ProbeReport
-    /// gained Codable;NEW kind 'sovereign-contamination-
-    /// guard-trio';BASSovereign cumulative typed
-    /// surfaces = 17)。
-    public static let typedSurfaceCount: Int = 186
+    /// Cumulative achievement metrics at chapter 646
+    /// close-out (M1964 — BASSovereign trust-record
+    /// trio Codable extension,4th post-hexa-#5 gap-fill,
+    /// MULTI-ACTOR trio across 3 BASSovereign actors;
+    /// 7th BASSovereign touch overall;3 BASSovereign
+    /// structs nested across 3 actors:ArtifactClaim +
+    /// AppendedEntry + WarrantIntent gained Codable;
+    /// NEW kind 'sovereign-trust-record-trio';BAS
+    /// Sovereign cumulative typed surfaces = 20 —
+    /// BREAKS 20-SURFACE BARRIER)。
+    public static let typedSurfaceCount: Int = 187
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 544
-    public static let phase2CommitsShipped: Int = 1005
-    public static let chapter2NumberLast: Int = 1960
+        Int = 548
+    public static let phase2CommitsShipped: Int = 1009
+    public static let chapter2NumberLast: Int = 1964
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

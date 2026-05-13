@@ -17430,6 +17430,124 @@ public enum BASChapterDoctrineRegistry {
                 " (+1)。 ADR-016 → M1960。 544 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 646 — BASSovereign trust-record trio
+        // Codable extension (4th post-hexa-#5 gap-fill,
+        // multi-actor trio breaks 20-surface barrier)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十六",
+            mNumberFirst: 1961,
+            mNumberLast: 1964,
+            v1MilestoneMNumber: 1964,
+            v1MilestoneStatus:
+                "chapter-646-sovereign-trust-record-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1961, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign struct types spanning" +
+                        " 3 different actors — BAS" +
+                        "SovereignIntegritySentinel." +
+                        "ArtifactClaim (uses ArtifactKind" +
+                        " from ch641) + BASSovereign" +
+                        "AuditLedger.AppendedEntry" +
+                        " (wraps BASSovereignAuditEntry," +
+                        " Codable via BASSchemaVersioned" +
+                        " protocol) + BASSovereignToken" +
+                        "Authority.WarrantIntent (uses" +
+                        " BASSovereignCommitScope from" +
+                        " typed-enum surface)。 MULTI-" +
+                        "ACTOR trio (vs ch645's single-" +
+                        "actor deep-coverage)。"),
+                BASChapterKnife(
+                    mNumber: 1962, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1963, knife: "第三刀",
+                    concept: "NEW BASSovereignTrustRecord" +
+                        "TrioCodableExtensionDoctrine +" +
+                        " moduleCount = 1 (BASSovereign" +
+                        " entirely) + nestedInActorCount" +
+                        " = 3 + structCount = 3 +" +
+                        " enumCount = 0 + allTypesAre" +
+                        "Errors = false + kindLabel=" +
+                        "'sovereign-trust-record-trio'" +
+                        " (NEW kind) + isFourthPostHexa" +
+                        "FiveGapFill + isMultiActorTrio" +
+                        " + isSeventhBASSovereignTouch" +
+                        "Overall +" +
+                        " cumulativeBASSovereignTyped" +
+                        "Surfaces = 20 +" +
+                        " breaksTwentyBASSovereignSurface" +
+                        "Barrier (NEW MILESTONE) +" +
+                        " distinctActorsTouchedInChapter" +
+                        " = 3。 typed-surface count" +
+                        " 186 → 187。"),
+                BASChapterKnife(
+                    mNumber: 1964, knife: "第四刀",
+                    concept: "Chapter 646 close-out +" +
+                        " doctrine sync。 548 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4th post-hexa-#5" +
+                        " gap-fill — BASSovereign" +
+                        " cumulative typed surfaces" +
+                        " breaks 20-surface barrier。 2" +
+                        " more chapters to chapter 649" +
+                        " hexa #6 catalog opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-artifact-claim-non-codable",
+                "bas-sovereign-appended-entry-non-codable",
+                "bas-sovereign-warrant-intent-non-codable",
+                "sovereign-trust-record-trio-pattern-uncaptured",
+                "fourth-post-hexa-five-gap-fill-not-shipped",
+                "multi-actor-trio-pattern-uncaptured-post-hexa-five"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1964",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-trust-record-trio-codable-extension",
+                "fourth-post-hexa-five-gap-fill",
+                "multi-actor-trio",
+                "seventh-bas-sovereign-touch-overall",
+                "cumulative-20-bas-sovereign-typed-surfaces",
+                "breaks-twenty-bas-sovereign-surface-barrier",
+                "distinct-actors-touched-equal-three",
+                "new-kind-label-sovereign-trust-record-trio",
+                "548-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 2 more gap-fill chapters" +
+                " (647-648) toward chapter 649 hexa #6" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 646 ships BASSovereign" +
+                " trust-record trio Codable extension" +
+                " — 4th post-hexa-#5 gap-fill chapter," +
+                " MULTI-ACTOR trio across 3 BASSovereign" +
+                " actors (chapter 645 was single-actor" +
+                " deep-coverage)。 7th BASSovereign" +
+                " touch overall。 3 BASSovereign structs" +
+                " nested across 3 actors:Artifact" +
+                "Claim + AppendedEntry + WarrantIntent。" +
+                " Gained Codable at M1961 + 3 PROOF" +
+                " tests (M1962) + new typed surface" +
+                " (M1963) + close-out (M1964)。 NEW kind" +
+                " 'sovereign-trust-record-trio'。 BAS" +
+                "Sovereign cumulative typed surfaces" +
+                " = 20 — BREAKS 20-SURFACE BARRIER" +
+                " (new milestone for the BASSovereign" +
+                " module)。 187 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1964。 548 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

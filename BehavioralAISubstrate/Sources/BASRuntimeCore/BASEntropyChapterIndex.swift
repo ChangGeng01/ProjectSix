@@ -4384,7 +4384,34 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1960。 544 consecutive" +
                 " byte-equality clean commits。 V1" +
-                " byte-equality preserved。")
+                " byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十六",
+            mNumberFirst: 1961, mNumberLast: 1964,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "BASSOVEREIGN TRUST-RECORD TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,4th" +
+                " post-hexa-#5,MULTI-ACTOR trio across" +
+                " 3 BASSovereign actors (chapter 645" +
+                " was single-actor deep-coverage)。 7th" +
+                " BASSovereign touch overall。 3 BAS" +
+                "Sovereign structs nested across 3" +
+                " actors:BASSovereignIntegritySentinel." +
+                "ArtifactClaim + BASSovereignAudit" +
+                "Ledger.AppendedEntry + BASSovereign" +
+                "TokenAuthority.WarrantIntent gained" +
+                " Codable at M1961 + 3 PROOF tests" +
+                " (M1962) + new typed surface (M1963)" +
+                " + close-out (M1964)。 NEW kind" +
+                " 'sovereign-trust-record-trio'。 BAS" +
+                "Sovereign cumulative typed surfaces" +
+                " = 20 — BREAKS 20-SURFACE BARRIER" +
+                " (new milestone for the BASSovereign" +
+                " module)。 187 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1964。 548" +
+                " consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

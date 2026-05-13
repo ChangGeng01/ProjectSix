@@ -2285,7 +2285,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十五")!)
+                            "chapter 六百四十五")!),
+            // M1964 chapter 646 — BASSovereign trust-record trio Codable extension gap-fill (4th post-hexa-#5, MULTI-ACTOR trio, breaks 20-surface barrier)
+            checkRegistry("六百四十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3941,6 +3947,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十五")!
+                .mNumberLast),
+            // M1964 chapter 646 — BASSovereign trust-record trio Codable extension gap-fill (4th post-hexa-#5)
+            ("646",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

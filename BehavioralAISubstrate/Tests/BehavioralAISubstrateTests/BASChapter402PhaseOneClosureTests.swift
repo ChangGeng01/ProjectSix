@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1960",
-            "M1960:doctrine version reflects chapter 六百四十五 — BASSOVEREIGN CONTAMINATION-GUARD TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#5,DEEP-COVERAGE single-actor trio completing BASSovereignContaminationGuard typed-surface coverage。 6th BASSovereign touch overall。 3 BASSovereign structs all nested in BASSovereignContaminationGuard actor:Key + QuarantineRecord (wraps Key — 3-level recursive Codable proof through ArtifactKind from ch641) + ProbeReport gained Codable at M1957 + 3 PROOF tests (M1958) + BASSovereignContaminationGuardTrioCodableExtensionDoctrine typed surface (M1959) + close-out (M1960)。 NEW kind 'sovereign-contamination-guard-trio'。 BASSovereign cumulative typed surfaces = 17。 186 typed surfaces cumulative。 544 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1964",
+            "M1964:doctrine version reflects chapter 六百四十六 — BASSOVEREIGN TRUST-RECORD TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#5,MULTI-ACTOR trio across 3 BASSovereign actors。 7th BASSovereign touch overall。 3 BASSovereign structs nested across 3 actors:BASSovereignIntegritySentinel.ArtifactClaim + BASSovereignAuditLedger.AppendedEntry + BASSovereignTokenAuthority.WarrantIntent gained Codable at M1961 + 3 PROOF tests (M1962) + BASSovereignTrustRecordTrioCodableExtensionDoctrine typed surface (M1963) + close-out (M1964)。 NEW kind 'sovereign-trust-record-trio'。 BASSovereign cumulative typed surfaces = 20 — BREAKS 20-SURFACE BARRIER。 187 typed surfaces cumulative。 548 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
