@@ -32,7 +32,9 @@ import Foundation
 /// Operations are append-only: versions are registered, never
 /// deleted. Marking bad is a state transition, not a removal.
 public actor BASSovereignHostVersionTree {
-    public enum TreeError: Error, Equatable, Sendable {
+    public enum TreeError:
+        Error, Equatable, Sendable, Codable
+    {
         case unknownVersion(id: String)
         case parentUnknown(parent: String, child: String)
         case parentSelfReference(id: String)

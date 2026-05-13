@@ -138,7 +138,9 @@ public struct BASSovereignFingerprintManifest:
 /// snapshot for downstream trust checks.
 public struct BASSovereignFingerprintStore: Sendable {
 
-    public enum StoreError: Error, Equatable, Sendable {
+    public enum StoreError:
+        Error, Equatable, Sendable, Codable
+    {
         /// File at the given path could not be read.
         case fileUnreadable(path: String, underlying: String)
         /// JSON at the path decoded but is not a valid

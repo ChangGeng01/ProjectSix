@@ -28,7 +28,9 @@ import BASRuntimeCore
 /// done by anyone holding the public key. Tests use a deterministic
 /// seed so signatures are reproducible.
 public actor BASSovereignTokenAuthority {
-    public enum AuthorityError: Error, Equatable, Sendable {
+    public enum AuthorityError:
+        Error, Equatable, Sendable, Codable
+    {
         case invalidIntent(String)
         case expired(tokenID: String)
         case alreadyUsed(tokenID: String)
