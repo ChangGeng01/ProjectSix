@@ -3490,6 +3490,26 @@ public enum BASEntropyChapterIndex {
                 " pivoting from fresh-module-territory" +
                 " narrative to gap-fill within covered" +
                 " modules narrative。 V1 byte-equality" +
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九",
+            mNumberFirst: 1813, mNumberLast: 1816,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASORGAN CODABLE EXTENSION WAVE 2" +
+                " — GAP-FILL within already-covered" +
+                " BASOrgan module。 1 type (BASOrganCapacity" +
+                " 4-field) gained Codable at M1813 + 1" +
+                " PROOF test (M1814) + new typed" +
+                " surface (M1815) + close-out (M1816)。" +
+                " Combined 3 BASOrgan-related types" +
+                " ledger-serializable (2 chapter 598" +
+                " wave 1 + 1 this wave)。 SECOND" +
+                " consecutive gap-fill chapter (608 +" +
+                " 609)。 150 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1816。 400-" +
+                "consecutive-byte-equal-commits" +
+                " milestone reached。 V1 byte-equality" +
                 " preserved。")
     ]
 

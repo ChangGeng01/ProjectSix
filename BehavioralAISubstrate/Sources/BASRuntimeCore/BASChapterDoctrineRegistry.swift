@@ -13503,6 +13503,96 @@ public enum BASChapterDoctrineRegistry {
                 "catalog,marking pivot from fresh-" +
                 "module-territory narrative to gap-fill" +
                 " within covered modules narrative。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 609 — BASOrgan Codable extension
+        // wave 2 (gap-fill)。 Second consecutive gap-
+        // fill chapter (608 + 609)。 1 additional
+        // BASOrgan type (BASOrganCapacity) extends
+        // chapter 598 wave 1 first-ever coverage。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九",
+            mNumberFirst: 1813,
+            mNumberLast: 1816,
+            v1MilestoneMNumber: 1816,
+            v1MilestoneStatus:
+                "chapter-609-organ-codable-extension-wave-two",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1813, knife: "第一刀",
+                    concept: "Add Codable to 1 BASOrgan" +
+                        " type — BASOrganCapacity (4-" +
+                        "field capacity value:" +
+                        " availableInputTokens +" +
+                        " availableOutputTokens +" +
+                        " underPressure + reasonCodes)。" +
+                        " All field types Codable —" +
+                        " trivial addition。"),
+                BASChapterKnife(
+                    mNumber: 1814, knife: "第二刀",
+                    concept: "1 compile-time conformance" +
+                        " PROOF test。"),
+                BASChapterKnife(
+                    mNumber: 1815, knife: "第三刀",
+                    concept: "NEW BASOrganCodable" +
+                        "ExtensionWaveTwoDoctrine +" +
+                        " isGapFillExtension flag +" +
+                        " waveNumber = 2 +" +
+                        " combinedOrganCount = 3 +" +
+                        " isSecondConsecutiveGapFill" +
+                        " flag。 typed-surface count" +
+                        " 149 → 150。"),
+                BASChapterKnife(
+                    mNumber: 1816, knife: "第四刀",
+                    concept: "Chapter 609 close-out +" +
+                        " doctrine sync。 400 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 4-consecutive-" +
+                        "hundred byte-equality milestone" +
+                        " reached。")
+            ],
+            entropyClassesAttacked: [
+                "organ-capacity-non-codable",
+                "bas-organ-wave-2-not-shipped-yet",
+                "post-gap-fill-pivot-not-continued",
+                "byte-equality-clean-commits-near-400-milestone"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1816",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-wave-2-codable-extension",
+                "3-organ-types-cumulative",
+                "second-consecutive-gap-fill",
+                "400-consecutive-byte-equal-commits-milestone"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional gap-fill" +
+                " extensions within covered modules",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — BASOrgan wave 3 or other" +
+                " module wave 2 extensions"
+            ],
+            summary: "Chapter 609 ships BASOrgan Codable" +
+                " extension wave 2 — gap-fill within" +
+                " already-covered BASOrgan module" +
+                " (chapter 598 was wave 1 first-ever)。" +
+                " 1 type (BASOrganCapacity 4-field" +
+                " capacity value) gained Codable at" +
+                " M1813 + 1 PROOF test (M1814) + new" +
+                " typed surface (M1815) + close-out" +
+                " (M1816)。 Combined 3 BASOrgan-related" +
+                " types ledger-serializable (2 wave 1" +
+                " + 1 wave 2)。 SECOND consecutive gap-" +
+                "fill chapter (608 + 609)。 150 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1816。 400 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved — 4-CONSECUTIVE-HUNDRED" +
+                " byte-equality milestone reached。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 

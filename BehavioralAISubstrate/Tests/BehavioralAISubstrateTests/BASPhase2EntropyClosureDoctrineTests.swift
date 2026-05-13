@@ -37,24 +37,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs608() {
+    func testLastChapterIs609() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百八",
-            "Chapter 六百八:BASHOSTKIT MESH-SWEEP" +
-            " CODABLE EXTENSION WAVE 1 — NON-ARC" +
-            " CONTINUATION。 3 types (BASHostMesh" +
-            "ConsultationResult + BASHostMeshSweepLayer" +
-            "Entry + BASHostMeshSweepResult) gained" +
-            " Codable in chain dependency + 3 PROOF" +
-            " tests + BASHostKitMeshSweepCodable" +
-            "ExtensionDoctrine typed surface + close-" +
-            "out。 Combined 44 BASHostKit-related types。" +
-            " 149 typed surfaces cumulative。 First" +
-            " chapter post-hexa-catalog pivoting from" +
-            " fresh-module-territory to gap-fill" +
-            " narrative")
+            "chapter 六百九",
+            "Chapter 六百九:BASORGAN CODABLE EXTENSION" +
+            " WAVE 2 — GAP-FILL within already-covered" +
+            " BASOrgan module。 1 type (BASOrganCapacity" +
+            " 4-field) gained Codable + 1 PROOF test +" +
+            " BASOrganCodableExtensionWaveTwoDoctrine" +
+            " typed surface + close-out。 Combined 3" +
+            " BASOrgan-related types (2 chapter 598" +
+            " wave 1 + 1 this wave)。 SECOND consecutive" +
+            " gap-fill chapter。 150 typed surfaces" +
+            " cumulative。 400-consecutive-byte-equal-" +
+            "commits milestone reached")
     }
 
     // MARK: - M-number range
