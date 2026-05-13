@@ -146,7 +146,9 @@ public struct BASKernelOutputs: Equatable, Hashable, Sendable, Codable {
 
 /// Typed kernel failure modes。 Returned via `throws` from
 /// `BASMetalKernel.evaluate(...)`。
-public enum BASKernelError: Error, Equatable, Sendable {
+public enum BASKernelError:
+    Error, Equatable, Sendable, Codable
+{
 
     /// Input bundle did not match the kernel's expected
     /// shape (e.g. wrong rank,wrong dtype,wrong axis size)。

@@ -228,7 +228,9 @@ public struct BASMambaSSMScanOutputs:
 
 // MARK: - Typed errors
 
-public enum BASMambaSSMError: Error, Equatable, Sendable {
+public enum BASMambaSSMError:
+    Error, Equatable, Sendable, Codable
+{
     case shapeMismatch(reason: String)
     /// Metal device or compute pipeline could not be
     /// constructed。 Thrown by `selectiveScanGPU(...)`

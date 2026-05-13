@@ -88,7 +88,9 @@ public struct BASKernelDispatchResult:
 /// from `BASKernelError` (which the kernel itself throws)
 /// so callers can disambiguate "no kernel registered" vs
 /// "kernel ran + failed"。
-public enum BASKernelLookupError: Error, Equatable, Sendable {
+public enum BASKernelLookupError:
+    Error, Equatable, Sendable, Codable
+{
 
     /// No kernel registered for the requested key。
     case noKernelRegistered(key: BASKernelKey)
