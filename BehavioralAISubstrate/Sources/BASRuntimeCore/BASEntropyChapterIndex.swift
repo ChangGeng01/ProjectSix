@@ -3854,7 +3854,24 @@ public enum BASEntropyChapterIndex {
                 "actor-pair' distinct from chapter 622" +
                 " 'cross-module-trio'。 164 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1872。 V1 byte-equality preserved。")
+                " M1872。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十四",
+            mNumberFirst: 1873, mNumberLast: 1876,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE SOLO ENUM CODABLE" +
+                " EXTENSION — GAP-FILL,3rd post-hexa-" +
+                "#2,1st BASRuntimeCore non-doctrine" +
+                " type touched since post-octa" +
+                " narrative began。 BASEventLogFailure" +
+                "InjectionScenario (4-case enum) gained" +
+                " Codable at M1873 + 1 PROOF test" +
+                " (M1874) + new typed surface (M1875)" +
+                " + close-out (M1876)。 NEW kind" +
+                " 'runtime-core-solo-enum'。 165 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1876。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

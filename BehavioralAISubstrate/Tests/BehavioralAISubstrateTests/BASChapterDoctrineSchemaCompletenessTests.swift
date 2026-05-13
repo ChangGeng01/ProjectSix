@@ -2153,7 +2153,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二十三")!)
+                            "chapter 六百二十三")!),
+            // M1876 chapter 624 — BASRuntimeCore solo enum Codable extension gap-fill (3rd post-hexa-#2)
+            checkRegistry("六百二十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百二十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3633,6 +3639,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二十三")!
+                .mNumberLast),
+            // M1876 chapter 624 — BASRuntimeCore solo enum Codable extension gap-fill
+            ("624",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -37,25 +37,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs623() {
+    func testLastChapterIs624() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十三",
-            "Chapter 六百二十三:BASOBSERVABILITY" +
-            " NESTED-PAIR CODABLE EXTENSION — GAP-" +
-            "FILL,2nd post-hexa-#2 + 1st BAS" +
-            "Observability touch in the run。 2 nested-" +
-            "in-actor enums within BASUpdateTicket" +
-            "LifecycleCoordinator (LifecycleError" +
-            " 3-case + TrialOutcome 3-case) gained" +
-            " Codable + 2 PROOF tests + BAS" +
-            "ObservabilityNestedPairCodableExtension" +
+            "chapter 六百二十四",
+            "Chapter 六百二十四:BASRUNTIMECORE SOLO" +
+            " ENUM CODABLE EXTENSION — GAP-FILL,3rd" +
+            " post-hexa-#2,1st BASRuntimeCore non-" +
+            "doctrine type touched since post-octa" +
+            " narrative began (chapter 597)。 BAS" +
+            "EventLogFailureInjectionScenario (4-case" +
+            " enum) gained Codable + 1 PROOF test +" +
+            " BASRuntimeCoreSoloEnumCodableExtension" +
             "Doctrine typed surface + close-out。 NEW" +
-            " kind 'nested-in-actor-pair' distinct" +
-            " from chapter 622 'cross-module-trio'。 164" +
-            " typed surfaces cumulative。 456" +
-            " consecutive byte-equality clean commits")
+            " kind 'runtime-core-solo-enum' distinct" +
+            " from prior post-hexa-#2 kinds。 165 typed" +
+            " surfaces cumulative。 460 consecutive" +
+            " byte-equality clean commits")
     }
 
     // MARK: - M-number range

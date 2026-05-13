@@ -15063,6 +15063,88 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1872。 456 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 624 — BASRuntimeCore solo enum
+        // Codable extension (3rd post-hexa-#2 gap-fill,
+        // NEW kind 'runtime-core-solo-enum')。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十四",
+            mNumberFirst: 1873,
+            mNumberLast: 1876,
+            v1MilestoneMNumber: 1876,
+            v1MilestoneStatus:
+                "chapter-624-runtime-core-solo-enum-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1873, knife: "第一刀",
+                    concept: "Add Codable to 1 BAS" +
+                        "RuntimeCore enum — BASEventLog" +
+                        "FailureInjectionScenario (4-" +
+                        "case enum:delaysCycle +" +
+                        " contradiction + thermalSpike" +
+                        " + complexityAddictionLoop)。"),
+                BASChapterKnife(
+                    mNumber: 1874, knife: "第二刀",
+                    concept: "1 compile-time conformance" +
+                        " PROOF test。"),
+                BASChapterKnife(
+                    mNumber: 1875, knife: "第三刀",
+                    concept: "NEW BASRuntimeCoreSoloEnum" +
+                        "CodableExtensionDoctrine +" +
+                        " kindLabel='runtime-core-solo" +
+                        "-enum' (NEW kind) +" +
+                        " isThirdPostHexaTwoGapFill +" +
+                        " isFirstRuntimeCoreNonDoctrine" +
+                        "PostOcta。 typed-surface count" +
+                        " 164 → 165。"),
+                BASChapterKnife(
+                    mNumber: 1876, knife: "第四刀",
+                    concept: "Chapter 624 close-out +" +
+                        " doctrine sync。 460 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 3rd post-hexa-#2" +
+                        " gap-fill — 3 more to chapter" +
+                        " 627 hexa #3 opportunity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-event-log-failure-injection-scenario-non-codable",
+                "bas-runtime-core-solo-enum-not-shipped",
+                "runtime-core-non-doctrine-post-octa-untouched",
+                "runtime-core-solo-enum-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1876",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "runtime-core-solo-enum-codable-extension",
+                "third-post-hexa-two-gap-fill",
+                "first-runtime-core-non-doctrine-post-octa",
+                "new-kind-label-runtime-core-solo-enum"
+            ],
+            plannedFutureCuts: [
+                "future arc — 3 more gap-fill chapters" +
+                " toward chapter 627 hexa #3" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 624 ships BASRuntimeCore" +
+                " solo enum Codable extension — 3rd" +
+                " post-hexa-#2 gap-fill chapter,1st" +
+                " BASRuntimeCore non-doctrine type" +
+                " touched since the post-octa narrative" +
+                " began (chapter 597)。 BASEventLog" +
+                "FailureInjectionScenario (4-case enum)" +
+                " gained Codable at M1873 + 1 PROOF" +
+                " test (M1874) + new typed surface" +
+                " (M1875) + close-out (M1876)。 NEW kind" +
+                " 'runtime-core-solo-enum'。 165 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1876。 460 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 

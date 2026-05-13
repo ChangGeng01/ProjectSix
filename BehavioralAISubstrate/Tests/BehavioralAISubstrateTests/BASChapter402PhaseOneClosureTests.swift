@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1872",
-            "M1872:doctrine version reflects chapter 六百二十三 — BASOBSERVABILITY NESTED-PAIR CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#2 + 1st BASObservability touch in the run。 2 nested-in-actor enums within BASUpdateTicketLifecycleCoordinator (LifecycleError + TrialOutcome) gained Codable at M1869 + 2 PROOF tests (M1870) + BASObservabilityNestedPairCodableExtensionDoctrine typed surface (M1871) + close-out (M1872)。 NEW kind 'nested-in-actor-pair' distinct from chapter 622 'cross-module-trio'。 164 typed surfaces cumulative。 456 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1876",
+            "M1876:doctrine version reflects chapter 六百二十四 — BASRUNTIMECORE SOLO ENUM CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#2,1st BASRuntimeCore non-doctrine type touched since post-octa narrative began (chapter 597)。 BASEventLogFailureInjectionScenario (4-case enum) gained Codable at M1873 + 1 PROOF test (M1874) + BASRuntimeCoreSoloEnumCodableExtensionDoctrine typed surface (M1875) + close-out (M1876)。 NEW kind 'runtime-core-solo-enum' distinct from prior post-hexa-#2 kinds。 165 typed surfaces cumulative。 460 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

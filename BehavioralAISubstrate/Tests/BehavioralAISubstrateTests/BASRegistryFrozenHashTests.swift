@@ -107,17 +107,17 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 623 close-out。 Chapter
-    /// 623:BASOBSERVABILITY NESTED-PAIR CODABLE
-    /// EXTENSION — GAP-FILL,2nd post-hexa-#2 + 1st
-    /// BASObservability touch in the run。 2 nested-
-    /// in-actor enums within BASUpdateTicketLifecycle
-    /// Coordinator (LifecycleError 3-case + Trial
-    /// Outcome 3-case) gained Codable at M1869 + 2
-    /// PROOF tests (M1870) + NEW BASObservabilityNested
-    /// PairCodableExtensionDoctrine (M1871) + close-
-    /// out (M1872)。 NEW kind 'nested-in-actor-pair'
-    /// distinct from chapter 622 'cross-module-trio'。
+    /// Re-captured at chapter 624 close-out。 Chapter
+    /// 624:BASRUNTIMECORE SOLO ENUM CODABLE EXTENSION
+    /// — GAP-FILL,3rd post-hexa-#2,1st BASRuntimeCore
+    /// non-doctrine type touched since post-octa
+    /// narrative began (chapter 597)。 BASEventLog
+    /// FailureInjectionScenario (4-case enum) gained
+    /// Codable at M1873 + 1 PROOF test (M1874) + NEW
+    /// BASRuntimeCoreSoloEnumCodableExtensionDoctrine
+    /// (M1875) + close-out (M1876)。 NEW kind 'runtime-
+    /// core-solo-enum' distinct from prior post-hexa-
+    /// #2 kinds。
     static let frozenFullRegistrySha256: String =
-        "49b454eaeb94250e0b13a52a179a38366c298011707d3b5b5753335062b50d7a"
+        "3c4b05b809359b01ad94fbf52d8d5ab9c6fea410b00ccac473d0c6169661ceec"
 }
