@@ -139,7 +139,9 @@ public actor BASSovereignVerdictEngine {
         case rulePromotion    // upgraded to toolCut when evidence insufficient
     }
 
-    public struct VerdictContext: Sendable, Equatable {
+    public struct VerdictContext:
+        Sendable, Equatable, Codable
+    {
         public let sessionID: String
         public let turnID: String
         public let operation: OperationDomain

@@ -30,7 +30,9 @@ import BASRuntimeCore
 /// Both are consulted at gate time. Arbiter says "permission present";
 /// lock manager says "scope not in a halting mode".
 public actor BASSovereignLockManager {
-    public struct ScopeIdentifier: Hashable, Sendable {
+    public struct ScopeIdentifier:
+        Hashable, Sendable, Codable
+    {
         public let scope: BASSovereignLockScope
         /// Context-dependent: for `.turn` this is `"<session>:<turn>"`;
         /// for `.session` it is `"<session>"`; for `.featureDomain` it

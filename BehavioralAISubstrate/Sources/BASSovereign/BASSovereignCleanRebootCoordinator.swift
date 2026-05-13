@@ -52,7 +52,9 @@ public actor BASSovereignCleanRebootCoordinator {
         case haltAndAwaitHostIntervention
     }
 
-    public struct RebootPlan: Sendable, Equatable {
+    public struct RebootPlan:
+        Sendable, Equatable, Codable
+    {
         public let planID: String
         public let sessionID: String
         public let sourceVersionID: String
