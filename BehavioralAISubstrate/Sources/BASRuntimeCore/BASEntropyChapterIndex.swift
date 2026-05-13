@@ -4268,7 +4268,39 @@ public enum BASEntropyChapterIndex {
                 " (+1)。 ADR-016 → M1944。 528 consecutive" +
                 " byte-equality clean commits。 Chapter" +
                 " 642 hexa #5 catalog opportunity next。" +
-                " V1 byte-equality preserved。")
+                " V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十二",
+            mNumberFirst: 1945, mNumberLast: 1948,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 16, futureCutsCount: 3,
+            summary: "5TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE。 NEW BASGapFillHexaFive" +
+                "CompletionDoctrine cataloging 6 post-" +
+                "hexa-#4 gap-fill chapters (636-641)" +
+                " — 18 types extended / 24 commits / 6" +
+                " distinct modules touched (1 fewer" +
+                " than hexa #3+#4's 7 each but exceeds" +
+                " hexa #1+#2's 4 each)。 FIRST hexa to" +
+                " MIX error-trio + non-error-trio kinds" +
+                " (4 error variants + 2 non-error" +
+                " variants) — distinctive feature。" +
+                " ALSO brings BASWorldPrior into typed" +
+                " surface for the FIRST time in any" +
+                " hexa cycle (entry 1)。 NEW catalog" +
+                " (M1945) + 49 anti-drift PROOF tests" +
+                " (M1946) + 15 wire-in PROOF tests" +
+                " (M1947) + close-out (M1948)。 PARALLEL" +
+                " structurally to chapter 614 hexa #1" +
+                " + chapter 621 hexa #2 + chapter 628" +
+                " hexa #3 + chapter 635 hexa #4。" +
+                " Catalog lineage M1805 post-octa →" +
+                " M1833 hexa #1 → M1861 hexa #2 →" +
+                " M1889 hexa #3 → M1917 hexa #4 →" +
+                " M1945 hexa #5。 183 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1948。" +
+                " 532 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

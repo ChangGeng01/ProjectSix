@@ -2261,7 +2261,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十一")!)
+                            "chapter 六百四十一")!),
+            // M1948 chapter 642 — 5TH gap-fill hexa catalog meta-meta milestone (cataloging 636-641)
+            checkRegistry("六百四十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3885,6 +3891,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十一")!
+                .mNumberLast),
+            // M1948 chapter 642 — 5TH gap-fill hexa catalog meta-meta milestone (cataloging 636-641)
+            ("642",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

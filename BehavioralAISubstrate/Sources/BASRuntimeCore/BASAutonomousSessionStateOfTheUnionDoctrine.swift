@@ -110,25 +110,24 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 641
-    /// close-out (M1944 — categorization-enum trio
-    /// Codable extension,6th and FINAL post-hexa-#4
-    /// gap-fill,SECOND non-Error-trio chapter in
-    /// post-hexa-#4 run after chapter 640;3 non-Error
-    /// categorization enums (BASSovereignIntegrity
-    /// Sentinel.ArtifactKind + BASSovereignContamination
-    /// Guard.ArtifactKind + BASRoutingOrganAdapter.
-    /// Strategy) spanning 2 modules gained Codable;NEW
-    /// kind 'categorization-enum-trio';3rd BASSovereign
-    /// touch overall + 4th BASOrgan touch overall;
-    /// BASSovereign cumulative typed surfaces = 8 +
-    /// BASOrgan cumulative = 5;chapter 642 hexa #5
-    /// catalog opportunity next)。
-    public static let typedSurfaceCount: Int = 182
+    /// Cumulative achievement metrics at chapter 642
+    /// close-out (M1948 — 5TH GAP-FILL HEXA CATALOG
+    /// META-META MILESTONE;NEW BASGapFillHexaFive
+    /// CompletionDoctrine cataloging 6 post-hexa-#4
+    /// gap-fill chapters 636-641 — 18 types extended /
+    /// 24 commits / 6 distinct modules touched (1
+    /// fewer than hexa #3+#4's 7 each);FIRST hexa to
+    /// MIX error-trio + non-error-trio kinds (4 error
+    /// variants + 2 non-error variants);ALSO brings
+    /// BASWorldPrior into typed surface for the FIRST
+    /// time in any hexa cycle;catalog lineage M1805
+    /// post-octa → M1833 hexa #1 → M1861 hexa #2 →
+    /// M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5)。
+    public static let typedSurfaceCount: Int = 183
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 528
-    public static let phase2CommitsShipped: Int = 989
-    public static let chapter2NumberLast: Int = 1944
+        Int = 532
+    public static let phase2CommitsShipped: Int = 993
+    public static let chapter2NumberLast: Int = 1948
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

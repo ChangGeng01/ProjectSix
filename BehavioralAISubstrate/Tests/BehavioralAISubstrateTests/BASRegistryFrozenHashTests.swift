@@ -287,6 +287,25 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// Sovereign touch + 4th BASOrgan touch overall。
     /// BASSovereign cumulative = 8 + BASOrgan = 5。
     /// Chapter 642 hexa #5 catalog opportunity next。
+    /// Re-captured at chapter 642 close-out。 Chapter
+    /// 642:5TH GAP-FILL HEXA CATALOG META-META
+    /// MILESTONE。 NEW BASGapFillHexaFiveCompletion
+    /// Doctrine cataloging 6 post-hexa-#4 gap-fill
+    /// chapters (636-641) — 18 types extended / 24
+    /// commits / 6 distinct modules touched (1 fewer
+    /// than hexa #3+#4's 7 each but exceeds hexa #1+#2's
+    /// 4 each)。 FIRST hexa to MIX error-trio + non-
+    /// error-trio kinds (4 error variants + 2 non-
+    /// error variants) — distinctive feature。 ALSO
+    /// brings BASWorldPrior into typed surface for the
+    /// FIRST time in any hexa cycle (entry 1)。 NEW
+    /// catalog (M1945) + 49 anti-drift PROOF tests
+    /// (M1946) + 15 wire-in PROOF tests (M1947) +
+    /// close-out (M1948)。 Catalog lineage M1805 post-
+    /// octa → M1833 hexa #1 → M1861 hexa #2 → M1889
+    /// hexa #3 → M1917 hexa #4 → M1945 hexa #5。 183
+    /// typed surfaces;532 consecutive byte-equality
+    /// clean commits。
     static let frozenFullRegistrySha256: String =
-        "8bb01c321683da0c2adb16b86ea48d7560a2c4a6667986a04ac595ff54ab02ac"
+        "979213d34ac0f85496687ab697281702fba0e27d92b26206180ce6c5e8f2e319"
 }

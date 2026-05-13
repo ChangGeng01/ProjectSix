@@ -37,28 +37,30 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs641() {
+    func testLastChapterIs642() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百四十一",
-            "Chapter 六百四十一:CATEGORIZATION-ENUM TRIO" +
-            " CODABLE EXTENSION — GAP-FILL,6th and" +
-            " FINAL post-hexa-#4,SECOND non-Error-trio" +
-            " chapter in post-hexa-#4 run after chapter" +
-            " 640。 3 non-Error categorization enums" +
-            " (BASSovereignIntegritySentinel.ArtifactKind" +
-            " + BASSovereignContaminationGuard.ArtifactKind" +
-            " + BASRoutingOrganAdapter.Strategy) spanning" +
-            " 2 modules gained Codable + 3 PROOF tests" +
-            " + BASCategorizationEnumTrioCodable" +
-            "ExtensionDoctrine typed surface + close-out。" +
-            " NEW kind 'categorization-enum-trio'。 3rd" +
-            " BASSovereign touch + 4th BASOrgan touch" +
-            " overall。 BASSovereign cumulative = 8 +" +
-            " BASOrgan = 5。 Chapter 642 hexa #5 catalog" +
-            " opportunity next。 182 typed surfaces" +
-            " cumulative。 528 consecutive byte-equality" +
+            "chapter 六百四十二",
+            "Chapter 六百四十二:5TH GAP-FILL HEXA" +
+            " CATALOG META-META MILESTONE。 NEW BASGap" +
+            "FillHexaFiveCompletionDoctrine cataloging" +
+            " 6 post-hexa-#4 gap-fill chapters" +
+            " (636-641) — 18 types extended / 24" +
+            " commits / 6 distinct modules touched (1" +
+            " fewer than hexa #3+#4's 7 each but exceeds" +
+            " hexa #1+#2's 4 each)。 FIRST hexa to MIX" +
+            " error-trio + non-error-trio kinds (4" +
+            " error variants + 2 non-error variants) —" +
+            " distinctive feature。 ALSO brings BAS" +
+            "WorldPrior into typed surface for the" +
+            " FIRST time in any hexa cycle。 NEW catalog" +
+            " + 49 anti-drift PROOF tests + 15 wire-in" +
+            " PROOF tests + close-out。 Catalog lineage" +
+            " M1805 post-octa → M1833 hexa #1 → M1861" +
+            " hexa #2 → M1889 hexa #3 → M1917 hexa #4" +
+            " → M1945 hexa #5。 183 typed surfaces" +
+            " cumulative。 532 consecutive byte-equality" +
             " clean commits")
     }
 
