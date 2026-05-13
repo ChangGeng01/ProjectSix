@@ -2165,7 +2165,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百二十五")!)
+                            "chapter 六百二十五")!),
+            // M1884 chapter 626 — BASMetalSubstrate metal error trio Codable extension gap-fill (5th post-hexa-#2)
+            checkRegistry("六百二十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百二十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3661,6 +3667,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百二十五")!
+                .mNumberLast),
+            // M1884 chapter 626 — BASMetalSubstrate metal error trio Codable extension gap-fill
+            ("626",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百二十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -37,24 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs625() {
+    func testLastChapterIs626() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百二十五",
-            "Chapter 六百二十五:BASHOSTKIT ERROR TRIO" +
-            " CODABLE EXTENSION — GAP-FILL,4th post-" +
-            "hexa-#2,1st error-enum-cluster wave。 3" +
-            " BASHostKit Error enums (BASTrainingData" +
-            "ExportError + BASHostMeshError + BAS" +
-            "HostIntegrationError) gained Codable + 3" +
-            " PROOF tests + BASHostKitErrorTrio" +
-            "CodableExtensionDoctrine typed surface +" +
-            " close-out。 M1880 ROUND-NUMBER MILESTONE" +
-            " reached — 80-step jump since chapter 605" +
-            " M1800 round。 NEW kind 'error-trio'" +
-            " distinct from prior post-hexa-#2 kinds。" +
-            " 166 typed surfaces cumulative。 464" +
+            "chapter 六百二十六",
+            "Chapter 六百二十六:BASMETALSUBSTRATE" +
+            " METAL ERROR TRIO CODABLE EXTENSION —" +
+            " GAP-FILL,5th post-hexa-#2,2nd error-" +
+            "cluster wave,1st BASMetalSubstrate touch" +
+            " since chapter 605 post-octa entry。 3" +
+            " BASMetalSubstrate Error enums (BAS" +
+            "KernelError + BASKernelLookupError +" +
+            " BASMambaSSMError) gained Codable + 3" +
+            " PROOF tests + BASMetalSubstrateMetal" +
+            "ErrorTrioCodableExtensionDoctrine typed" +
+            " surface + close-out。 NEW kind 'metal-" +
+            "error-trio' distinct from chapter 625" +
+            " 'error-trio' (different module)。 167" +
+            " typed surfaces cumulative。 468" +
             " consecutive byte-equality clean commits")
     }
 

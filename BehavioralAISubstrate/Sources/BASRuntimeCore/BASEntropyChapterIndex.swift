@@ -3892,7 +3892,29 @@ public enum BASEntropyChapterIndex {
                 " round。 NEW kind 'error-trio'。 166" +
                 " typed surfaces cumulative (+1)。 ADR-" +
                 "016 → M1880。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百二十六",
+            mNumberFirst: 1881, mNumberLast: 1884,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE METAL ERROR" +
+                " TRIO CODABLE EXTENSION — GAP-FILL," +
+                " 5th post-hexa-#2,2nd error-cluster" +
+                " wave,1st BASMetalSubstrate touch" +
+                " since chapter 605。 3 BASMetalSubstrate" +
+                " Error enums (BASKernelError 5-case +" +
+                " BASKernelLookupError 1-case + BAS" +
+                "MambaSSMError multi-case) gained" +
+                " Codable at M1881 + 3 PROOF tests" +
+                " (M1882) + new typed surface (M1883) +" +
+                " close-out (M1884)。 NEW kind 'metal-" +
+                "error-trio' distinct from chapter 625" +
+                " 'error-trio' (different module)。 1" +
+                " more to chapter 627 hexa #3" +
+                " opportunity。 167 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1884。 V1" +
+                " byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

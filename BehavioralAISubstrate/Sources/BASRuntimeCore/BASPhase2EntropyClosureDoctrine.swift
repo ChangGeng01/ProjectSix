@@ -279,7 +279,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百二十二",   // M1865-M1868 (CROSS-MODULE TRIO CODABLE EXTENSION — GAP-FILL,FIRST post-hexa-#2 + FIRST cross-module wave;3 types across 2 modules (BASOrchestration.BASPromptStateValue + BASHostKit.BASTurnRuntimePlanLedgerCoherence + BASHostKit.BASTurnRuntimePlanLedgerCoherenceIssue) gained Codable + 3 PROOF tests + BASCrossModuleTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'cross-module-trio' (1 struct + 2 enums,2 modules) distinct from hexa #1's 5 kinds and hexa #2's 6 kinds;begins 3rd hexa run toward chapter 627 hexa #3 opportunity)
         "chapter 六百二十三",   // M1869-M1872 (BASOBSERVABILITY NESTED-PAIR CODABLE EXTENSION — GAP-FILL,2ND post-hexa-#2,1st BASObservability touch in the post-hexa-#2 run;2 nested-in-actor enums within BASUpdateTicketLifecycleCoordinator (LifecycleError 3-case + TrialOutcome 3-case) gained Codable + 2 PROOF tests + BASObservabilityNestedPairCodableExtensionDoctrine typed surface + close-out;NEW kind 'nested-in-actor-pair' distinct from chapter 622 'cross-module-trio')
         "chapter 六百二十四",   // M1873-M1876 (BASRUNTIMECORE SOLO ENUM CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#2,1st BASRuntimeCore non-doctrine type touched since post-octa narrative began;BASEventLogFailureInjectionScenario (4-case enum) gained Codable + 1 PROOF test + BASRuntimeCoreSoloEnumCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-solo-enum' distinct from prior post-hexa-#2 kinds)
-        "chapter 六百二十五"    // M1877-M1880 (BASHOSTKIT ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#2,1st error-enum-cluster wave in the run;3 BASHostKit Error enums (BASTrainingDataExportError 3-case + BASHostMeshError 1-case + BASHostIntegrationError 8-case) gained Codable + 3 PROOF tests + BASHostKitErrorTrioCodableExtensionDoctrine typed surface + close-out;M1880 ROUND-NUMBER MILESTONE reached — 80-step jump since chapter 605 M1800 round;NEW kind 'error-trio' distinct from prior post-hexa-#2 kinds)
+        "chapter 六百二十五",   // M1877-M1880 (BASHOSTKIT ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#2,1st error-enum-cluster wave in the run;3 BASHostKit Error enums (BASTrainingDataExportError 3-case + BASHostMeshError 1-case + BASHostIntegrationError 8-case) gained Codable + 3 PROOF tests + BASHostKitErrorTrioCodableExtensionDoctrine typed surface + close-out;M1880 ROUND-NUMBER MILESTONE reached — 80-step jump since chapter 605 M1800 round;NEW kind 'error-trio' distinct from prior post-hexa-#2 kinds)
+        "chapter 六百二十六"    // M1881-M1884 (BASMETALSUBSTRATE METAL ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#2,2nd error-cluster wave in run,1st BASMetalSubstrate touch since chapter 605;3 BASMetalSubstrate Error enums (BASKernelError + BASKernelLookupError + BASMambaSSMError) gained Codable + 3 PROOF tests + BASMetalSubstrateMetalErrorTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'metal-error-trio' distinct from chapter 625 'error-trio' (different module);1 more to chapter 627 hexa #3 opportunity!)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -296,15 +297,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1880
+    public static let mNumberLast: Int = 1884
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1880)。 Bumped through chapter 625:921 → 925。
-    /// Chapter 625:BASHostKit error trio Codable
-    /// extension (4th post-hexa-#2,M1880 round-number
-    /// milestone) + 3 PROOF tests + typed surface +
-    /// close-out。
-    public static let commitsShipped: Int = 925
+    /// M1884)。 Bumped through chapter 626:925 → 929。
+    /// Chapter 626:BASMetalSubstrate metal error trio
+    /// Codable extension (5th post-hexa-#2) + 3 PROOF
+    /// tests + typed surface + close-out。
+    public static let commitsShipped: Int = 929
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

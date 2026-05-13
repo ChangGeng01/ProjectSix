@@ -107,17 +107,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 625 close-out。 Chapter
-    /// 625:BASHOSTKIT ERROR TRIO CODABLE EXTENSION —
-    /// GAP-FILL,4th post-hexa-#2,1st error-enum-
-    /// cluster wave。 3 BASHostKit Error enums (BAS
-    /// TrainingDataExportError 3-case + BASHostMesh
-    /// Error 1-case + BASHostIntegrationError 8-case)
-    /// gained Codable at M1877 + 3 PROOF tests (M1878)
-    /// + NEW BASHostKitErrorTrioCodableExtensionDoctrine
-    /// (M1879) + close-out (M1880)。 M1880 ROUND-
-    /// NUMBER MILESTONE reached — 80-step jump since
-    /// chapter 605 M1800 round。 NEW kind 'error-trio'。
+    /// Re-captured at chapter 626 close-out。 Chapter
+    /// 626:BASMETALSUBSTRATE METAL ERROR TRIO CODABLE
+    /// EXTENSION — GAP-FILL,5th post-hexa-#2,2nd
+    /// error-cluster wave,1st BASMetalSubstrate touch
+    /// since chapter 605。 3 BASMetalSubstrate Error
+    /// enums (BASKernelError + BASKernelLookupError +
+    /// BASMambaSSMError) gained Codable at M1881 + 3
+    /// PROOF tests (M1882) + NEW BASMetalSubstrate
+    /// MetalErrorTrioCodableExtensionDoctrine (M1883)
+    /// + close-out (M1884)。 NEW kind 'metal-error-
+    /// trio' distinct from chapter 625 'error-trio'。
+    /// 1 more gap-fill to chapter 627 hexa #3
+    /// opportunity!
     static let frozenFullRegistrySha256: String =
-        "f113b0aef024b08878117fa5784ec8f9954c8baaa817c1934d704d1eccabbee2"
+        "f51465819bd3124fae484f94cfc43dd7f9bc3486cafe0b6e9556634a7b0e8f02"
 }

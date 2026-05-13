@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1880",
-            "M1880:doctrine version reflects chapter 六百二十五 — BASHOSTKIT ERROR TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#2,1st error-enum-cluster wave。 3 BASHostKit Error enums (BASTrainingDataExportError + BASHostMeshError + BASHostIntegrationError) gained Codable at M1877 + 3 PROOF tests (M1878) + BASHostKitErrorTrioCodableExtensionDoctrine typed surface (M1879) + close-out (M1880)。 M1880 ROUND-NUMBER MILESTONE reached — 80-step jump since chapter 605 M1800 round。 NEW kind 'error-trio'。 166 typed surfaces cumulative。 464 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1884",
+            "M1884:doctrine version reflects chapter 六百二十六 — BASMETALSUBSTRATE METAL ERROR TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#2,2nd error-cluster wave,1st BASMetalSubstrate touch since chapter 605。 3 BASMetalSubstrate Error enums (BASKernelError + BASKernelLookupError + BASMambaSSMError) gained Codable at M1881 + 3 PROOF tests (M1882) + BASMetalSubstrateMetalErrorTrioCodableExtensionDoctrine typed surface (M1883) + close-out (M1884)。 NEW kind 'metal-error-trio' distinct from chapter 625 'error-trio' (different module)。 167 typed surfaces cumulative。 468 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

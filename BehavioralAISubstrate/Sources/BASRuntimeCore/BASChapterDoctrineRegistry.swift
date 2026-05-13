@@ -15240,6 +15240,100 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1880。 464 consecutive autonomous" +
                 " commits with V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 626 — BASMetalSubstrate metal error
+        // trio Codable extension (5th post-hexa-#2 gap-
+        // fill,NEW kind 'metal-error-trio',2nd error-
+        // cluster wave in run,1st BASMetalSubstrate
+        // touch since chapter 605 post-octa entry)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百二十六",
+            mNumberFirst: 1881,
+            mNumberLast: 1884,
+            v1MilestoneMNumber: 1884,
+            v1MilestoneStatus:
+                "chapter-626-metal-substrate-metal-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1881, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "MetalSubstrate Error enums —" +
+                        " BASKernelError (5-case error" +
+                        " enum) + BASKernelLookupError" +
+                        " (1-case with BASKernelKey)" +
+                        " + BASMambaSSMError (multi-case" +
+                        " with Metal dispatch failure" +
+                        " variants)。"),
+                BASChapterKnife(
+                    mNumber: 1882, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1883, knife: "第三刀",
+                    concept: "NEW BASMetalSubstrateMetal" +
+                        "ErrorTrioCodableExtension" +
+                        "Doctrine + kindLabel='metal-" +
+                        "error-trio' (NEW kind) +" +
+                        " isFifthPostHexaTwoGapFill +" +
+                        " isSecondErrorClusterPostHexa" +
+                        "Two + isFirstMetalSubstrate" +
+                        "PostHexaTwo。 typed-surface" +
+                        " count 166 → 167。"),
+                BASChapterKnife(
+                    mNumber: 1884, knife: "第四刀",
+                    concept: "Chapter 626 close-out +" +
+                        " doctrine sync。 468 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 5th post-hexa-#2" +
+                        " gap-fill — 1 more to chapter" +
+                        " 627 hexa #3 opportunity!")
+            ],
+            entropyClassesAttacked: [
+                "bas-kernel-error-non-codable",
+                "bas-kernel-lookup-error-non-codable",
+                "bas-mamba-ssm-error-non-codable",
+                "bas-metal-substrate-error-cluster-not-shipped",
+                "metal-error-trio-pattern-uncaptured"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1884",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "metal-substrate-metal-error-trio-codable-extension",
+                "fifth-post-hexa-two-gap-fill",
+                "second-error-cluster-post-hexa-two",
+                "first-metal-substrate-post-hexa-two",
+                "new-kind-label-metal-error-trio"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 627 will be 6TH" +
+                " post-hexa-#2 gap-fill (triggers hexa" +
+                " #3 catalog opportunity at chapter 628)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 626 ships BASMetalSubstrate" +
+                " metal error trio Codable extension —" +
+                " 5th post-hexa-#2 gap-fill chapter,2nd" +
+                " error-cluster wave in the post-hexa-" +
+                "#2 run (after chapter 625 BASHostKit" +
+                " error trio),1st BASMetalSubstrate" +
+                " touch since chapter 605 post-octa" +
+                " formal entry。 3 BASMetalSubstrate" +
+                " Error enums (BASKernelError 5-case +" +
+                " BASKernelLookupError 1-case + BAS" +
+                "MambaSSMError multi-case) gained" +
+                " Codable at M1881 + 3 PROOF tests" +
+                " (M1882) + new typed surface (M1883) +" +
+                " close-out (M1884)。 NEW kind 'metal-" +
+                "error-trio' distinct from chapter 625" +
+                " 'error-trio' (different module)。 167" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M1884。 468 consecutive autonomous" +
+                " commits with V1 byte-equality" +
                 " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
