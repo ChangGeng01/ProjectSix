@@ -116,7 +116,7 @@ public struct BASOrganCapacity: Sendable, Equatable, Codable {
         underPressure: false)
 }
 
-public struct BASOrganRequest: Sendable, Equatable {
+public struct BASOrganRequest: Sendable, Equatable, Codable {
     public let requestID: String
     public let role: BASOrganRole
     public let preset: BASOrganPreset

@@ -126,7 +126,7 @@ public enum BASNeuralHeadEvalExpectation:
 /// fully Codable because its outcomes only hold primitives —
 /// persist reports, not prompt fixtures.
 public struct BASNeuralHeadEvalPrompt:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     public let promptID: String
     public let head: String
