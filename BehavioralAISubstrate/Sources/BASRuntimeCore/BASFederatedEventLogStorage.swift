@@ -76,7 +76,7 @@ import Foundation
 
 /// Typed errors thrown by `BASFederatedEventLogStorage`。
 public enum BASFederatedEventLogStorageError:
-    Error, Equatable, Sendable
+    Error, Equatable, Sendable, Codable
 {
     /// Caller tried to `append(_:)` but no backends
     /// were registered。 Hosts must construct the actor

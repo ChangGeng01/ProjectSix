@@ -146,7 +146,7 @@ public struct BASMambaSSMShape:
 /// call。 Carries the sequence inputs + the input-
 /// dependent A/B/C/Δ projections。
 public struct BASMambaSSMScanInputs:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Input sequence x: (B, L, D)。 L is sequence
@@ -202,7 +202,7 @@ public struct BASMambaSSMScanInputs:
 /// final post-scan hidden state snapshot (for audit
 /// + replay)。
 public struct BASMambaSSMScanOutputs:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Output sequence y: (B, L, D)。 Each timestep
