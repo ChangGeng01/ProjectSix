@@ -3467,7 +3467,30 @@ public enum BASEntropyChapterIndex {
                 " single-wave-entry level rather than" +
                 " sealed-milestone level。 148 typed" +
                 " surfaces cumulative (+1)。 ADR-016 →" +
-                " M1808。 V1 byte-equality preserved。")
+                " M1808。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八",
+            mNumberFirst: 1809, mNumberLast: 1812,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "BASHOSTKIT MESH-SWEEP CODABLE" +
+                " EXTENSION WAVE 1 — NON-ARC CONTINUATION。" +
+                " 3 types (BASHostMeshConsultationResult" +
+                " + BASHostMeshSweepLayerEntry + BAS" +
+                "HostMeshSweepResult) gained Codable at" +
+                " M1809 in chain dependency + 3 PROOF" +
+                " tests (M1810) + new typed surface" +
+                " (M1811) + close-out (M1812)。 Chain" +
+                " dependency:Result → Entry →" +
+                " Consultation。 Combined 44 BASHostKit-" +
+                "related types ledger-serializable" +
+                " (16+15+2+8+3)。 149 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1812。" +
+                " First chapter post-hexa-catalog" +
+                " pivoting from fresh-module-territory" +
+                " narrative to gap-fill within covered" +
+                " modules narrative。 V1 byte-equality" +
+                " preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

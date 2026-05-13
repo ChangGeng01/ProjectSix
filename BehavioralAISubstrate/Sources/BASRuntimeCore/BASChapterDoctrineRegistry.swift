@@ -13406,7 +13406,104 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1808。 392 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 608 — BASHostKit mesh-sweep Codable
+        // extension wave 1。 NON-ARC CONTINUATION
+        // within already-covered BASHostKit module。
+        // First chapter post-hexa-catalog,marking
+        // pivot from fresh-module-territory narrative
+        // to gap-fill-within-covered-modules narrative。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八",
+            mNumberFirst: 1809,
+            mNumberLast: 1812,
+            v1MilestoneMNumber: 1812,
+            v1MilestoneStatus:
+                "chapter-608-hostkit-mesh-sweep-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1809, knife: "第一刀",
+                    concept: "Add Codable to 3 BASHostKit" +
+                        " mesh-sweep types — BASHostMesh" +
+                        "ConsultationResult + BASHostMesh" +
+                        "SweepLayerEntry + BASHostMeshSweep" +
+                        "Result。 Chain dependency:Result" +
+                        " → Entry → Consultation。 All 3" +
+                        " needed for chain to round-trip" +
+                        " via JSON。"),
+                BASChapterKnife(
+                    mNumber: 1810, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1811, knife: "第三刀",
+                    concept: "NEW BASHostKitMeshSweep" +
+                        "CodableExtensionDoctrine +" +
+                        " isNonArcContinuation flag +" +
+                        " formsCodableChain flag +" +
+                        " combinedHostKitCount = 44 +" +
+                        " isPivotFromFreshModuleNarrative" +
+                        " flag。 typed-surface count" +
+                        " 148 → 149。"),
+                BASChapterKnife(
+                    mNumber: 1812, knife: "第四刀",
+                    concept: "Chapter 608 close-out +" +
+                        " doctrine sync。 396 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 BASHostKit mesh-" +
+                        "sweep chain ledger-serializable。" +
+                        " Pivot from fresh-module-" +
+                        "territory narrative to gap-fill" +
+                        " within covered modules。")
+            ],
+            entropyClassesAttacked: [
+                "host-mesh-consultation-result-non-codable",
+                "host-mesh-sweep-layer-entry-non-codable",
+                "host-mesh-sweep-result-non-codable",
+                "mesh-sweep-chain-not-replay-deterministic"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1812",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "hostkit-mesh-sweep-codable-extension",
+                "44-hostkit-types-cumulative",
+                "non-arc-continuation",
+                "pivot-from-fresh-module-narrative"
+            ],
+            plannedFutureCuts: [
+                "future arc — additional non-arc" +
+                " continuation within covered modules",
+                "future arc — Phase H default mode flip" +
+                " (single remaining step to 最激进 10/10)",
+                "future arc — BASAuditObservationProjections" +
+                " Codable extension when its dependency" +
+                " types audit confirms feasibility"
+            ],
+            summary: "Chapter 608 ships BASHostKit mesh-" +
+                "sweep Codable extension wave 1 — NON-" +
+                "ARC CONTINUATION extension within" +
+                " already-covered BASHostKit module。 3" +
+                " types (BASHostMeshConsultationResult" +
+                " + BASHostMeshSweepLayerEntry + BAS" +
+                "HostMeshSweepResult) gained Codable at" +
+                " M1809 + 3 PROOF tests (M1810) + new" +
+                " typed surface (M1811) + close-out" +
+                " (M1812)。 Chain dependency:Result →" +
+                " Entry → Consultation。 Combined 44" +
+                " BASHostKit-related types ledger-" +
+                "serializable (16+15+2+8+3)。 149 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1812。 396 consecutive autonomous" +
+                " commits with V1 byte-equality" +
+                " preserved。 First chapter post-hexa-" +
+                "catalog,marking pivot from fresh-" +
+                "module-territory narrative to gap-fill" +
+                " within covered modules narrative。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

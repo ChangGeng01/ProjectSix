@@ -37,23 +37,24 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs607() {
+    func testLastChapterIs608() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百七",
-            "Chapter 六百七:POST-OCTA HEXA CATALOG" +
-            " META-META MILESTONE。 NEW BASPostOcta" +
-            "ModuleExtensionHexaCompletionDoctrine" +
-            " (M1805) cataloging 6 post-octa fresh-" +
-            "module formal-entry chapters (598-606)。" +
-            " Aggregate:13 new types/enums via 24" +
-            " commits,6 distinct modules touched," +
-            " module count bumped 6 → 12 across run。" +
-            " 30 anti-drift + 14 wire-in PROOF tests。" +
-            " Parallel doctrine to chapter 597 octa-" +
-            "milestone at single-wave-entry level。" +
-            " 148 typed surfaces cumulative")
+            "chapter 六百八",
+            "Chapter 六百八:BASHOSTKIT MESH-SWEEP" +
+            " CODABLE EXTENSION WAVE 1 — NON-ARC" +
+            " CONTINUATION。 3 types (BASHostMesh" +
+            "ConsultationResult + BASHostMeshSweepLayer" +
+            "Entry + BASHostMeshSweepResult) gained" +
+            " Codable in chain dependency + 3 PROOF" +
+            " tests + BASHostKitMeshSweepCodable" +
+            "ExtensionDoctrine typed surface + close-" +
+            "out。 Combined 44 BASHostKit-related types。" +
+            " 149 typed surfaces cumulative。 First" +
+            " chapter post-hexa-catalog pivoting from" +
+            " fresh-module-territory to gap-fill" +
+            " narrative")
     }
 
     // MARK: - M-number range

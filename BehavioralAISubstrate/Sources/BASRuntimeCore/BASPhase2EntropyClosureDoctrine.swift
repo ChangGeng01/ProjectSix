@@ -261,7 +261,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百四",       // M1793-M1796 (BASAPPLEADAPTERS CODABLE EXTENSION WAVE 1 — 10TH MODULE FORMAL ENTRY;2 types (BASChengluPromptSignature + BASAppleProviderReleaseInput) gained Codable + 2 PROOF tests + BASAppleAdaptersCodableExtensionDoctrine typed surface (with 8 pre-existing Codable types acknowledged) + close-out;BASAppleAdapters formal entry into post-octa narrative;module count bumped 9→10;4th consecutive post-octa fresh-module-territory advancement)
         "chapter 六百五",       // M1797-M1800 (BASMETALSUBSTRATE CODABLE EXTENSION WAVE 1 — 11TH MODULE FORMAL ENTRY;2 types (BASKernelInputs + BASKernelOutputs) gained Codable + 2 PROOF tests + BASMetalSubstrateCodableExtensionDoctrine typed surface (with 10 pre-existing Codable types acknowledged) + close-out;BASMetalSubstrate formal entry;module count bumped 10→11;5th consecutive post-octa fresh-module advancement;reaches M1800 round-number milestone — 100-step jump since chapter 580 M1700)
         "chapter 六百六",       // M1801-M1804 (BASSOVEREIGN CODABLE EXTENSION WAVE 1 — 12TH MODULE FORMAL ENTRY;4 types/enums (BASSovereignTurnParity + OperationDomain + BASSovereignTurnObservations + BASSovereignTurnVerifierReport) gained Codable + 4 PROOF tests + BASSovereignCodableExtensionDoctrine typed surface (with 7 pre-octa types acknowledged + nested-enums flag) + close-out;BASSovereign formal entry;module count bumped 11→12;6th consecutive post-octa fresh-module advancement;first chapter past M1800 milestone)
-        "chapter 六百七"        // M1805-M1808 (POST-OCTA HEXA CATALOG META-META MILESTONE — BASPostOctaModuleExtensionHexaCompletionDoctrine + 30 anti-drift + 14 wire-in PROOF tests cataloging 6 post-octa fresh-module formal-entry chapters (598-606);13 new types/enums via 24 commits;6 distinct modules touched;module count bumped 6→12 across run;parallel to chapter 597 octa-milestone at single-wave-entry level)
+        "chapter 六百七",       // M1805-M1808 (POST-OCTA HEXA CATALOG META-META MILESTONE — BASPostOctaModuleExtensionHexaCompletionDoctrine + 30 anti-drift + 14 wire-in PROOF tests cataloging 6 post-octa fresh-module formal-entry chapters (598-606);13 new types/enums via 24 commits;6 distinct modules touched;module count bumped 6→12 across run;parallel to chapter 597 octa-milestone at single-wave-entry level)
+        "chapter 六百八"        // M1809-M1812 (BASHOSTKIT MESH-SWEEP CODABLE EXTENSION WAVE 1 — NON-ARC CONTINUATION;3 types (BASHostMeshConsultationResult + BASHostMeshSweepLayerEntry + BASHostMeshSweepResult) gained Codable in chain dependency + 3 PROOF tests + BASHostKitMeshSweepCodableExtensionDoctrine typed surface + close-out;combined 44 BASHostKit-related types cumulative;first chapter post-hexa-catalog pivoting from fresh-module-territory to gap-fill within covered modules)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -278,14 +279,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1808
+    public static let mNumberLast: Int = 1812
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1808)。 Bumped through chapter 607:849 → 853。
-    /// Chapter 607:Post-octa hexa catalog meta-meta +
-    /// 30 anti-drift + 14 wire-in PROOF tests + close-
-    /// out。
-    public static let commitsShipped: Int = 853
+    /// M1812)。 Bumped through chapter 608:853 → 857。
+    /// Chapter 608:BASHostKit mesh-sweep Codable
+    /// extension wave 1 + 3 PROOF tests + typed surface
+    /// + close-out。
+    public static let commitsShipped: Int = 857
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -2057,7 +2057,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百七")!)
+                            "chapter 六百七")!),
+            // M1812 chapter 608 — BASHostKit mesh-sweep Codable extension wave 1
+            checkRegistry("六百八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3409,6 +3415,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百七")!
+                .mNumberLast),
+            // M1812 chapter 608 — BASHostKit mesh-sweep Codable extension wave 1
+            ("608",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

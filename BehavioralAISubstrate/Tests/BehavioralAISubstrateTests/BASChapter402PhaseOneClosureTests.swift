@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1808",
-            "M1808:doctrine version reflects chapter 六百七 — POST-OCTA HEXA CATALOG META-META MILESTONE。 NEW BASPostOctaModuleExtensionHexaCompletionDoctrine (M1805) cataloging 6 post-octa fresh-module formal-entry chapters (598-606)。 Aggregate:13 new types/enums via 24 commits,6 distinct modules touched,module count bumped 6 → 12 across run。 30 anti-drift PROOF tests (M1806) + 14 wire-in PROOF tests (M1807) + close-out (M1808)。 Parallel doctrine to chapter 597 octa-milestone at single-wave-entry level。 148 typed surfaces cumulative。 392 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1812",
+            "M1812:doctrine version reflects chapter 六百八 — BASHOSTKIT MESH-SWEEP CODABLE EXTENSION WAVE 1 — NON-ARC CONTINUATION。 3 types (BASHostMeshConsultationResult + BASHostMeshSweepLayerEntry + BASHostMeshSweepResult) gained Codable at M1809 in chain dependency + 3 PROOF tests (M1810) + BASHostKitMeshSweepCodableExtensionDoctrine typed surface (M1811) + close-out (M1812)。 Combined 44 BASHostKit-related types ledger-serializable。 First chapter post-hexa-catalog pivoting from fresh-module-territory to gap-fill within covered modules narrative。 149 typed surfaces cumulative。 396 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

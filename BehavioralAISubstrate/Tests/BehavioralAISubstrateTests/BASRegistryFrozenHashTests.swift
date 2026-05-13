@@ -107,18 +107,18 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// aggregator wire-ins + 505 unified audit emission
     /// M1400 MILESTONE + 506 cluster B fold continues +
     /// 507 Tier C entry + 508 Tier C ADR-019 COMPLETE)。
-    /// Re-captured at chapter 607 close-out。 Chapter
-    /// 607:POST-OCTA HEXA CATALOG META-META MILESTONE。
-    /// NEW BASPostOctaModuleExtensionHexaCompletion
-    /// Doctrine (M1805) cataloging 6 post-octa fresh-
-    /// module formal-entry chapters (598-606)。
-    /// Aggregate:13 new types/enums via 24 commits,
-    /// 6 distinct modules touched,module count bumped
-    /// 6 → 12 across run。 30 anti-drift PROOF tests
-    /// (M1806) + 14 wire-in PROOF tests (M1807) +
-    /// close-out (M1808)。 Parallel doctrine to chapter
-    /// 597 octa-milestone at single-wave-entry level
-    /// rather than sealed-milestone level。
+    /// Re-captured at chapter 608 close-out。 Chapter
+    /// 608:BASHOSTKIT MESH-SWEEP CODABLE EXTENSION
+    /// WAVE 1 — NON-ARC CONTINUATION。 3 types (BAS
+    /// HostMeshConsultationResult + BASHostMeshSweep
+    /// LayerEntry + BASHostMeshSweepResult) gained
+    /// Codable at M1809 in chain dependency + 3 PROOF
+    /// tests (M1810) + NEW BASHostKitMeshSweepCodable
+    /// ExtensionDoctrine (M1811) + close-out (M1812)。
+    /// Combined 44 BASHostKit-related types ledger-
+    /// serializable。 First chapter post-hexa-catalog
+    /// pivoting from fresh-module-territory to gap-
+    /// fill within covered modules narrative。
     static let frozenFullRegistrySha256: String =
-        "8e0271f7f07c522f9d062eeacc102349fbe3cae48b31e4dca4be852f676e817c"
+        "1b36c022b90399f68862a3a27f7634f53869ecbe1a06a5e72ec71d572eb9dd46"
 }
