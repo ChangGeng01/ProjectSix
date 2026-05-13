@@ -42,7 +42,7 @@ public enum BASDeviceRouting {
     /// the set they detect at boot (e.g. via `MTLDevice.shared` /
     /// `MLComputeDevice.allComputeDevices`).
     public enum Capability: String, Sendable, Equatable,
-        CaseIterable, Hashable
+        CaseIterable, Hashable, Codable
     {
         /// CPU is always assumed available; this case is included
         /// for explicit set membership but `recommend(...)`
@@ -55,7 +55,7 @@ public enum BASDeviceRouting {
     /// Role hint matching `BASOrganRole`. Mirrored as a separate
     /// enum here so this routing module stays a leaf — no
     /// dependency on BASOrgan.
-    public enum Role: String, Sendable, Equatable {
+    public enum Role: String, Sendable, Equatable, Codable {
         case scout
         case core
     }
