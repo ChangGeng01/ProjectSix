@@ -40,7 +40,9 @@ public actor BASSovereignIntegritySentinel {
     /// A single claim the runtime is presenting to the sentinel for
     /// verification. The sentinel owns the ground truth (registered
     /// fingerprint) and compares it to the `claimedHash`.
-    public struct ArtifactClaim: Sendable, Equatable {
+    public struct ArtifactClaim:
+        Sendable, Equatable, Codable
+    {
         public let id: String
         public let claimedHash: String
         public let kind: ArtifactKind

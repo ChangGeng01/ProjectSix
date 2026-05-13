@@ -77,7 +77,9 @@ public actor BASSovereignTokenAuthority {
     }
 
     /// Warrant intent — like CommitIntent but wider in scope and time.
-    public struct WarrantIntent: Sendable, Equatable {
+    public struct WarrantIntent:
+        Sendable, Equatable, Codable
+    {
         public let scope: BASSovereignCommitScope
         public let actionDigest: String
         public let jurisdictionRef: String

@@ -65,7 +65,9 @@ public actor BASSovereignAuditLedger {
     /// `BASSovereignAuditEntry` so the in-ledger representation can carry
     /// hash-chain bookkeeping without bleeding those fields into the
     /// schema type exported across layers.
-    public struct AppendedEntry: Sendable, Equatable {
+    public struct AppendedEntry:
+        Sendable, Equatable, Codable
+    {
         public let entry: BASSovereignAuditEntry
         /// SHA-256 of the canonical bytes of the immediately-prior entry,
         /// or the empty-string sentinel `"GENESIS"` for the first entry.
