@@ -2297,7 +2297,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百四十七")!)
+                            "chapter 六百四十七")!),
+            // M1972 chapter 648 — BASSovereign tertiary error trio Codable extension gap-fill (6th and FINAL post-hexa-#5, closes BASSovereign Error enum coverage)
+            checkRegistry("六百四十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百四十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -3969,6 +3975,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百四十七")!
+                .mNumberLast),
+            // M1972 chapter 648 — BASSovereign tertiary error trio Codable extension gap-fill (6th and FINAL post-hexa-#5)
+            ("648",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百四十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

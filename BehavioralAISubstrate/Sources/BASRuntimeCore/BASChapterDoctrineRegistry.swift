@@ -17662,7 +17662,133 @@ public enum BASChapterDoctrineRegistry {
                 " (+1)。 ADR-016 → M1968。 552 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 648 — BASSovereign tertiary error
+        // trio Codable extension (6th and FINAL post-
+        // hexa-#5 gap-fill,closes BASSovereign Error
+        // enum coverage)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百四十八",
+            mNumberFirst: 1969,
+            mNumberLast: 1972,
+            v1MilestoneMNumber: 1972,
+            v1MilestoneStatus:
+                "chapter-648-sovereign-tertiary-error-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1969, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "Sovereign Error enums across" +
+                        " reboot-coordinator + verdict-" +
+                        "engine + dual-key-commit" +
+                        " subsystems — BASSovereignClean" +
+                        "RebootCoordinator.CoordinatorError" +
+                        " (5-case nested-in-actor) +" +
+                        " BASSovereignVerdictEngine." +
+                        "EngineError (1-case nested-in-" +
+                        "actor) + BASSovereignDualKey" +
+                        "Signing.SigningError (1-case" +
+                        " nested in enum namespace)。" +
+                        " THIRD BASSovereign error trio" +
+                        " — closes Error enum coverage。"),
+                BASChapterKnife(
+                    mNumber: 1970, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1971, knife: "第三刀",
+                    concept: "NEW BASSovereignTertiary" +
+                        "ErrorTrioCodableExtensionDoctrine" +
+                        " + moduleCount = 1 +" +
+                        " nestedInActorCount = 2 +" +
+                        " nestedInEnumNamespaceCount = 1" +
+                        " + structCount = 0 + enumCount" +
+                        " = 3 + allTypesAreErrors = true" +
+                        " + kindLabel='sovereign-" +
+                        "tertiary-error-trio' (NEW kind)" +
+                        " + isSixthAndFinalPostHexaFive" +
+                        "GapFill + isThirdBAS" +
+                        "SovereignErrorTrio +" +
+                        " isNinthBASSovereignTouch" +
+                        "Overall +" +
+                        " cumulativeBASSovereignTyped" +
+                        "Surfaces = 26 +" +
+                        " isPastTwentyFiveBASSovereign" +
+                        "SurfacesMilestone。 typed-" +
+                        "surface count 188 → 189。"),
+                BASChapterKnife(
+                    mNumber: 1972, knife: "第四刀",
+                    concept: "Chapter 648 close-out +" +
+                        " doctrine sync。 556 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6th and FINAL" +
+                        " post-hexa-#5 gap-fill — closes" +
+                        " BASSovereign Error enum" +
+                        " coverage。 Chapter 649 hexa #6" +
+                        " catalog meta-meta milestone" +
+                        " opportunity NEXT。 Post-hexa-#5" +
+                        " arc sealed:6 chapters / 24" +
+                        " commits / all 6 chapters touched" +
+                        " BASSovereign (entirely-BAS" +
+                        "Sovereign hexa-#5 cycle)。")
+            ],
+            entropyClassesAttacked: [
+                "bas-sovereign-coordinator-error-non-codable",
+                "bas-sovereign-engine-error-non-codable",
+                "bas-sovereign-signing-error-non-codable",
+                "sovereign-tertiary-error-trio-pattern-uncaptured",
+                "sixth-and-final-post-hexa-five-gap-fill-not-shipped",
+                "third-bas-sovereign-error-trio-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1972",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "sovereign-tertiary-error-trio-codable-extension",
+                "sixth-and-final-post-hexa-five-gap-fill",
+                "third-bas-sovereign-error-trio",
+                "ninth-bas-sovereign-touch-overall",
+                "cumulative-26-bas-sovereign-typed-surfaces",
+                "past-twenty-five-bas-sovereign-surfaces-milestone",
+                "new-kind-label-sovereign-tertiary-error-trio",
+                "556-consecutive-byte-equality-clean-commits",
+                "post-hexa-five-arc-sealed-entirely-bas-sovereign"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 649 hexa #6" +
+                " catalog meta-meta milestone" +
+                " cataloging 6 post-hexa-#5 gap-fills" +
+                " (643-648,all BASSovereign)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 648 ships BASSovereign" +
+                " tertiary error trio Codable extension" +
+                " — 6th and FINAL post-hexa-#5 gap-fill" +
+                " chapter,9th BASSovereign touch" +
+                " overall。 THIRD BASSovereign error" +
+                " trio (after ch633 primary + ch638" +
+                " secondary) — closes BASSovereign" +
+                " Error enum Codable coverage。 3" +
+                " BASSovereign Error enums (Coordinator" +
+                "Error + EngineError + SigningError)" +
+                " gained Codable at M1969 + 3 PROOF" +
+                " tests (M1970) + new typed surface" +
+                " (M1971) + close-out (M1972)。 NEW kind" +
+                " 'sovereign-tertiary-error-trio'。 BAS" +
+                "Sovereign cumulative typed surfaces" +
+                " = 26 — past 25-surface milestone。" +
+                " 189 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1972。 556 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 Post-hexa-#5 arc" +
+                " sealed (entirely-BASSovereign,6" +
+                " chapters / 24 commits) — chapter 649" +
+                " hexa #6 catalog opportunity NEXT。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

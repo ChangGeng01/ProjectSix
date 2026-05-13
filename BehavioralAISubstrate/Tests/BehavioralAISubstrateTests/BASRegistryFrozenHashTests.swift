@@ -381,6 +381,23 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// ArtifactClaim ch646 → ScanRequest ch647) +
     /// Set<T> Codable composition demonstrated。 BAS
     /// Sovereign cumulative typed surfaces = 23。
+    /// Re-captured at chapter 648 close-out。 Chapter
+    /// 648:BASSOVEREIGN TERTIARY ERROR TRIO CODABLE
+    /// EXTENSION — GAP-FILL,6th and FINAL post-hexa-#5,
+    /// 9th BASSovereign touch overall。 THIRD BAS
+    /// Sovereign error trio (after ch633 primary +
+    /// ch638 secondary) — closes BASSovereign Error
+    /// enum Codable coverage。 3 BASSovereign Error
+    /// enums (BASSovereignCleanRebootCoordinator.
+    /// CoordinatorError + BASSovereignVerdictEngine.
+    /// EngineError + BASSovereignDualKeySigning.
+    /// SigningError) gained Codable at M1969 + 3 PROOF
+    /// tests (M1970) + NEW BASSovereignTertiaryError
+    /// TrioCodableExtensionDoctrine (M1971) + close-out
+    /// (M1972)。 NEW kind 'sovereign-tertiary-error-
+    /// trio'。 BASSovereign cumulative typed surfaces
+    /// = 26 — past 25-surface milestone。 Post-hexa-#5
+    /// arc sealed entirely-BASSovereign。
     static let frozenFullRegistrySha256: String =
-        "b6394dfae67e5dc6f029ac3d43860467a8d05bb8ed2a40e539d5486a512293a7"
+        "94f7ae94627e076edf2b59353edf133d16da7ca7d704c769aeebae5feb956700"
 }

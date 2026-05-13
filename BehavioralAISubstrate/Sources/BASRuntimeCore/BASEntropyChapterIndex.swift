@@ -4435,7 +4435,36 @@ public enum BASEntropyChapterIndex {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1968。 552 consecutive byte-equality" +
                 " clean commits。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百四十八",
+            mNumberFirst: 1969, mNumberLast: 1972,
+            knivesCount: 4, entropyClassesCount: 6,
+            pinsCount: 17, futureCutsCount: 3,
+            summary: "BASSOVEREIGN TERTIARY ERROR TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,6th and" +
+                " FINAL post-hexa-#5,9th BASSovereign" +
+                " touch overall。 THIRD BASSovereign" +
+                " error trio (after ch633 primary +" +
+                " ch638 secondary) — closes BASSovereign" +
+                " Error enum Codable coverage。 3" +
+                " BASSovereign Error enums (BAS" +
+                "SovereignCleanRebootCoordinator." +
+                "CoordinatorError + BASSovereignVerdict" +
+                "Engine.EngineError + BASSovereignDual" +
+                "KeySigning.SigningError) gained Codable" +
+                " at M1969 + 3 PROOF tests (M1970) +" +
+                " new typed surface (M1971) + close-out" +
+                " (M1972)。 NEW kind 'sovereign-tertiary-" +
+                "error-trio'。 BASSovereign cumulative" +
+                " typed surfaces = 26 — past 25-surface" +
+                " milestone。 189 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1972。" +
+                " 556 consecutive byte-equality clean" +
+                " commits。 Post-hexa-#5 arc sealed" +
+                " (entirely-BASSovereign)。 Chapter 649" +
+                " hexa #6 catalog opportunity NEXT。" +
+                " V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

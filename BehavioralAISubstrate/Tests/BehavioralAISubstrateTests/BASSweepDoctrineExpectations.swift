@@ -116,22 +116,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1968:24 + 20 + 201 = 245 (chapter
-    /// 647 — BASSovereign privilege-scan trio,5th post-
-    /// hexa-#5 gap-fill,3-level recursive Codable
-    /// proof)
-    public static let phase2ChapterCount: Int = 245
+    /// added)。 At M1972:24 + 20 + 202 = 246 (chapter
+    /// 648 — BASSovereign tertiary error trio,6th and
+    /// FINAL post-hexa-#5 gap-fill)
+    public static let phase2ChapterCount: Int = 246
 
-    /// Phase 2 commits shipped。 At M1968:125 + 84 +
-    /// 804 = 1013 (chapter 647 = 4 cuts — sovereign-
-    /// privilege-scan trio + 3 PROOF + typed surface +
-    /// close-out)。 Past 1000 round-number milestone。
-    public static let phase2CommitsShipped: Int = 1013
+    /// Phase 2 commits shipped。 At M1972:125 + 84 +
+    /// 808 = 1017 (chapter 648 = 4 cuts — sovereign-
+    /// tertiary-error trio + 3 PROOF + typed surface +
+    /// close-out)。 Post-hexa-#5 arc sealed entirely-
+    /// BASSovereign。
+    public static let phase2CommitsShipped: Int = 1017
 
-    /// Phase 2 mNumberLast。 At M1968:chapter 647 —
-    /// BASSovereign privilege-scan trio。 SWEEP stays
+    /// Phase 2 mNumberLast。 At M1972:chapter 648 —
+    /// BASSovereign tertiary error trio。 SWEEP stays
     /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1968
+    public static let phase2MNumberLast: Int = 1972
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

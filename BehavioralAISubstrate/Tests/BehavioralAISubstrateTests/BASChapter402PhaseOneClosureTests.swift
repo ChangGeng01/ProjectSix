@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1968",
-            "M1968:doctrine version reflects chapter 六百四十七 — BASSOVEREIGN PRIVILEGE-SCAN TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#5,8th BASSovereign touch overall。 3 BASSovereign structs (BASSovereignPrivilegeArbiter.ScopeKey + BASSovereignIntegritySentinel.ScanRequest + BASSovereignIntegritySentinel.ScanReport) gained Codable at M1965 + 3 PROOF tests (M1966) + BASSovereignPrivilegeScanTrioCodableExtensionDoctrine typed surface (M1967) + close-out (M1968)。 NEW kind 'sovereign-privilege-scan-trio'。 3-LEVEL recursive Codable proof (ArtifactKind ch641 → ArtifactClaim ch646 → ScanRequest ch647) + Set<T> Codable composition demonstrated。 BASSovereign cumulative typed surfaces = 23。 188 typed surfaces cumulative。 552 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1972",
+            "M1972:doctrine version reflects chapter 六百四十八 — BASSOVEREIGN TERTIARY ERROR TRIO CODABLE EXTENSION — GAP-FILL,6th and FINAL post-hexa-#5,9th BASSovereign touch overall。 THIRD BASSovereign error trio (after ch633 primary + ch638 secondary) — closes BASSovereign Error enum Codable coverage。 3 BASSovereign Error enums (CoordinatorError + EngineError + SigningError) gained Codable at M1969 + 3 PROOF tests (M1970) + BASSovereignTertiaryErrorTrioCodableExtensionDoctrine typed surface (M1971) + close-out (M1972)。 NEW kind 'sovereign-tertiary-error-trio'。 BASSovereign cumulative typed surfaces = 26 — past 25-surface milestone。 Post-hexa-#5 arc sealed entirely-BASSovereign。 189 typed surfaces cumulative。 556 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
