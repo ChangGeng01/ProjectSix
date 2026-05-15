@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1996",
-            "M1996:doctrine version reflects chapter 六百五十四 — BASRUNTIMECORE VALIDATION-RESULT TRIO CODABLE EXTENSION — GAP-FILL,6th and FINAL post-hexa-#6,single-module BASRuntimeCore reach,1 chapter from chapter 六百五十五 hexa #7 catalog opportunity。 3 BASRuntimeCore sibling enum types (BASMambaCheckpointValidationResult + BASCoreMLConversionValidationResult + BASMambaTrainingValidationResult) gained Codable at M1993 + 3 PROOF tests (M1994) + BASValidationResultTrioCodableExtensionDoctrine typed surface (M1995) + close-out (M1996)。 NEW kind 'validation-result-trio'。 FIRST parallel-structural-shape trio。 195 typed surfaces cumulative。 580 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 655 hexa #7 catalog opportunity NEXT")
+            "ADR-016.M2000",
+            "M2000:doctrine version reflects chapter 六百五十五 — CROSS-MODULE VALIDATION-ISSUE TRIO CODABLE EXTENSION — GAP-FILL,6th and TRUE FINAL post-hexa-#6,cross-module BASHostKit + BASRuntimeCore reach。 3 enum types (BASTurnRuntimeStagePlanValidationIssue + BASTurnRuntimeStageLedgerValidationIssue + BASLayerMLHeadRegistrationError) gained Codable at M1997 + 3 PROOF tests (M1998) + BASValidationIssueTrioCodableExtensionDoctrine typed surface (M1999) + close-out (M2000)。 NEW kind 'validation-issue-trio'。 THEME CONTINUATION from chapter 654 (extends validation-result theme to plan-ledger validation-issue)。 196 typed surfaces cumulative。 CLOSE-OUT M2000 CROSSES ROUND-NUMBER MILESTONE — Phase 2 M-number reaches 2000。 584 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 656 hexa #7 catalog opportunity NEXT with symmetric 6-entry run (650-655)")
     }
 
     // MARK: - M-number range matches chapter 四百二

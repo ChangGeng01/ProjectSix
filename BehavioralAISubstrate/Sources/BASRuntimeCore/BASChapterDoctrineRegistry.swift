@@ -18419,7 +18419,125 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive autonomous commits with V1" +
                 " byte-equality preserved。 ADR-014" +
                 " OPT-IN preserved。 Chapter 655 hexa #7" +
-                " catalog opportunity NEXT。")
+                " catalog opportunity NEXT。"),
+
+        // chapter 655 — Cross-module validation-issue
+        // trio Codable extension (6th and TRUE FINAL
+        // post-hexa-#6 gap-fill,cross-module BASHostKit
+        // + BASRuntimeCore reach,close-out CROSSES
+        // M2000 ROUND-NUMBER MILESTONE,chapter 656 hexa
+        // #7 catalog opportunity NEXT)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十五",
+            mNumberFirst: 1997,
+            mNumberLast: 2000,
+            v1MilestoneMNumber: 2000,
+            v1MilestoneStatus:
+                "chapter-655-validation-issue-trio-codable-extension-m2000-round-number",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1997, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module validation-issue / " +
+                        "registration-error enum types —" +
+                        " BASHostKit.BASTurnRuntimeStage" +
+                        "PlanValidationIssue (4-case enum" +
+                        ") + BASHostKit.BASTurnRuntime" +
+                        "StageLedgerValidationIssue (3-" +
+                        "case enum) + BASRuntimeCore.BAS" +
+                        "LayerMLHeadRegistrationError" +
+                        " (3-case Error enum)。 Cases" +
+                        " carry already-Codable nested" +
+                        " types (BASTurnRuntimeStage,BAS" +
+                        "TurnRuntimeStageParallelGroup," +
+                        " String)。"),
+                BASChapterKnife(
+                    mNumber: 1998, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1999, knife: "第三刀",
+                    concept: "NEW BASValidationIssueTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " moduleCount = 2 + structCount" +
+                        " = 0 + enumCount = 3 + isCross" +
+                        "ModuleTrio + isThemeContinuation" +
+                        "FromPrior (extends ch654" +
+                        " validation-result theme to plan" +
+                        "-ledger validation-issue) +" +
+                        " kindLabel='validation-issue-" +
+                        "trio' + isSixthAndTrueFinalPost" +
+                        "HexaSixGapFill + chaptersUntil" +
+                        "NextHexaCatalog = 1 + crossesM" +
+                        "2000RoundNumberMilestone +" +
+                        " basRuntimeCoreCumulativeTyped" +
+                        "Surfaces = 10。 typed-surface" +
+                        " count 195 → 196。"),
+                BASChapterKnife(
+                    mNumber: 2000, knife: "第四刀",
+                    concept: "Chapter 655 close-out +" +
+                        " doctrine sync。 ROUND-NUMBER" +
+                        " ADR-016 MILESTONE:M-number" +
+                        " reaches 2000。 584 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6th and TRUE FINAL" +
+                        " post-hexa-#6 gap-fill — chapter" +
+                        " 656 hexa #7 catalog opportunity" +
+                        " NEXT with symmetric 6-entry" +
+                        " run (650-655)。")
+            ],
+            entropyClassesAttacked: [
+                "bas-turn-runtime-stage-plan-validation-issue-non-codable",
+                "bas-turn-runtime-stage-ledger-validation-issue-non-codable",
+                "bas-layer-ml-head-registration-error-non-codable",
+                "validation-issue-trio-pattern-uncaptured",
+                "sixth-true-final-post-hexa-six-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M2000",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "validation-issue-trio-codable-extension",
+                "sixth-and-true-final-post-hexa-six-gap-fill",
+                "cross-module-trio",
+                "theme-continuation-from-prior",
+                "new-kind-label-validation-issue-trio",
+                "584-consecutive-byte-equality-clean-commits",
+                "m2000-round-number-milestone-crossed"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 六百五十六 hexa #7" +
+                " catalog meta-meta milestone (cataloging" +
+                " 6 post-hexa-#6 gap-fill chapters 650-" +
+                "655 with symmetric 6-entry run)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 655 ships cross-module" +
+                " validation-issue trio Codable extension" +
+                " — 6th and TRUE FINAL post-hexa-#6 gap-" +
+                "fill chapter,cross-module BASHostKit +" +
+                " BASRuntimeCore reach。 3 enum types" +
+                " (BASTurnRuntimeStagePlanValidationIssue" +
+                " + BASTurnRuntimeStageLedgerValidation" +
+                "Issue + BASLayerMLHeadRegistrationError)" +
+                " gained Codable at M1997 + 3 PROOF tests" +
+                " (M1998) + new typed surface (M1999) +" +
+                " close-out (M2000)。 NEW kind" +
+                " 'validation-issue-trio'。 THEME" +
+                " CONTINUATION from chapter 654" +
+                " (extends validation-result theme to" +
+                " plan-ledger validation-issue)。 196" +
+                " typed surfaces cumulative (+1)。" +
+                " CLOSE-OUT CROSSES M2000 ROUND-NUMBER" +
+                " MILESTONE。 ADR-016 → M2000。 584" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。 Chapter 656 hexa #7" +
+                " catalog opportunity NEXT with" +
+                " symmetric 6-entry run (650-655)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

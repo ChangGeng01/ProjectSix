@@ -37,27 +37,26 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs654() {
+    func testLastChapterIs655() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五十四",
-            "Chapter 六百五十四:BASRUNTIMECORE VALIDATION" +
-            "-RESULT TRIO CODABLE EXTENSION — GAP-FILL," +
-            "6th and FINAL post-hexa-#6,single-module" +
-            " BASRuntimeCore reach,1 chapter from" +
-            " chapter 六百五十五 hexa #7 catalog" +
-            " opportunity。 3 BASRuntimeCore sibling" +
-            " enum types (BASMambaCheckpointValidation" +
-            "Result + BASCoreMLConversionValidation" +
-            "Result + BASMambaTrainingValidationResult)" +
-            " gained Codable + 3 PROOF tests + BAS" +
-            "ValidationResultTrioCodableExtensionDoctrine" +
-            " typed surface + close-out。 NEW kind" +
-            " 'validation-result-trio'。 FIRST parallel" +
-            "-structural-shape trio。 195 typed surfaces" +
-            " cumulative。 580 consecutive byte-equality" +
-            " clean commits")
+            "chapter 六百五十五",
+            "Chapter 六百五十五:CROSS-MODULE VALIDATION" +
+            "-ISSUE TRIO CODABLE EXTENSION — GAP-FILL," +
+            "6th and TRUE FINAL post-hexa-#6,cross-" +
+            "module BASHostKit + BASRuntimeCore reach。" +
+            " 3 enum types (BASTurnRuntimeStagePlan" +
+            "ValidationIssue + BASTurnRuntimeStageLedger" +
+            "ValidationIssue + BASLayerMLHeadRegistration" +
+            "Error) gained Codable + 3 PROOF tests +" +
+            " BASValidationIssueTrioCodableExtension" +
+            "Doctrine typed surface + close-out。 NEW" +
+            " kind 'validation-issue-trio'。 THEME" +
+            " CONTINUATION from chapter 654。 196 typed" +
+            " surfaces cumulative。 CLOSE-OUT M2000" +
+            " CROSSES ROUND-NUMBER MILESTONE。 584" +
+            " consecutive byte-equality clean commits")
     }
 
     // MARK: - M-number range

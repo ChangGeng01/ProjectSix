@@ -476,6 +476,21 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// (M1995) + close-out (M1996)。 NEW kind
     /// 'validation-result-trio'。 FIRST parallel-
     /// structural-shape trio。
+    /// Re-captured at chapter 655 close-out。 Chapter
+    /// 655:CROSS-MODULE VALIDATION-ISSUE TRIO CODABLE
+    /// EXTENSION — GAP-FILL,6th and TRUE FINAL post-
+    /// hexa-#6,cross-module BASHostKit + BASRuntime
+    /// Core reach,close-out M2000 CROSSES ROUND-
+    /// NUMBER MILESTONE。 3 enum types (BASTurnRuntime
+    /// StagePlanValidationIssue + BASTurnRuntimeStage
+    /// LedgerValidationIssue + BASLayerMLHeadRegistration
+    /// Error) gained Codable at M1997 + 3 PROOF tests
+    /// (M1998) + NEW BASValidationIssueTrioCodable
+    /// ExtensionDoctrine (M1999) + close-out (M2000)。
+    /// NEW kind 'validation-issue-trio'。 THEME
+    /// CONTINUATION from chapter 654 (extends
+    /// validation-result theme to plan-ledger
+    /// validation-issue)。
     static let frozenFullRegistrySha256: String =
-        "82faf679776924f1d4eddccc7e2ca24ac415babefb536c032ef4ae5f0f98befa"
+        "7bc95aa217399b709ada784c4862f3d141224fda7581d7d87503ebe07a6cda8f"
 }

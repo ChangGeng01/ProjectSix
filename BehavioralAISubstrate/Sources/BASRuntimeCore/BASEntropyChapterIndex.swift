@@ -4611,7 +4611,32 @@ public enum BASEntropyChapterIndex {
                 "016 → M1996。 580 consecutive byte-" +
                 "equality clean commits。 V1 byte-" +
                 "equality preserved。 Chapter 655 hexa" +
-                " #7 catalog opportunity NEXT。")
+                " #7 catalog opportunity NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十五",
+            mNumberFirst: 1997, mNumberLast: 2000,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "CROSS-MODULE VALIDATION-ISSUE TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,6th and" +
+                " TRUE FINAL post-hexa-#6,cross-module" +
+                " BASHostKit + BASRuntimeCore reach。 3" +
+                " enum types (BASTurnRuntimeStagePlan" +
+                "ValidationIssue + BASTurnRuntimeStage" +
+                "LedgerValidationIssue + BASLayerMLHead" +
+                "RegistrationError) gained Codable at" +
+                " M1997 + 3 PROOF tests (M1998) + new" +
+                " typed surface (M1999) + close-out" +
+                " (M2000)。 NEW kind 'validation-issue-" +
+                "trio'。 THEME CONTINUATION from chapter" +
+                " 654。 196 typed surfaces cumulative" +
+                " (+1)。 CLOSE-OUT M2000 CROSSES ROUND-" +
+                "NUMBER MILESTONE。 ADR-016 → M2000。" +
+                " 584 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。" +
+                " Chapter 656 hexa #7 catalog" +
+                " opportunity NEXT with symmetric 6-" +
+                "entry run 650-655。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -2339,7 +2339,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十四")!)
+                            "chapter 六百五十四")!),
+            // M2000 chapter 655 — Cross-module validation-issue trio Codable extension gap-fill (6th and TRUE FINAL post-hexa-#6, cross-module BASHostKit + BASRuntimeCore, M2000 round-number milestone)
+            checkRegistry("六百五十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4067,6 +4073,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十四")!
+                .mNumberLast),
+            // M2000 chapter 655 — Cross-module validation-issue trio Codable extension gap-fill (6th and TRUE FINAL post-hexa-#6, M2000 round-number milestone)
+            ("655",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

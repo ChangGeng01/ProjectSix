@@ -110,22 +110,24 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 654
-    /// close-out (M1996 — BASRuntimeCore validation-
-    /// result trio Codable extension,6th and FINAL
-    /// post-hexa-#6 gap-fill,single-module BASRuntime
-    /// Core reach,1 chapter from chapter 六百五十五
-    /// hexa #7 catalog opportunity;3 BASRuntimeCore
-    /// sibling enum types (BASMambaCheckpointValidation
-    /// Result + BASCoreMLConversionValidationResult +
-    /// BASMambaTrainingValidationResult) gained Codable
-    /// ;FIRST parallel-structural-shape trio;NEW kind
-    /// 'validation-result-trio')。
-    public static let typedSurfaceCount: Int = 195
+    /// Cumulative achievement metrics at chapter 655
+    /// close-out (M2000 — Cross-module validation-issue
+    /// trio Codable extension,6th and TRUE FINAL post-
+    /// hexa-#6 gap-fill,cross-module BASHostKit + BAS
+    /// RuntimeCore reach;3 enum types (BASTurnRuntime
+    /// StagePlanValidationIssue + BASTurnRuntimeStage
+    /// LedgerValidationIssue + BASLayerMLHeadRegistration
+    /// Error) gained Codable;THEME CONTINUATION from
+    /// chapter 654 — extends validation-result theme to
+    /// plan-ledger validation-issue;NEW kind 'validation
+    /// -issue-trio';CLOSE-OUT M2000 CROSSES ROUND-
+    /// NUMBER MILESTONE — Phase 2 M-number reaches
+    /// 2000)。
+    public static let typedSurfaceCount: Int = 196
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 580
-    public static let phase2CommitsShipped: Int = 1041
-    public static let chapter2NumberLast: Int = 1996
+        Int = 584
+    public static let phase2CommitsShipped: Int = 1045
+    public static let chapter2NumberLast: Int = 2000
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true
