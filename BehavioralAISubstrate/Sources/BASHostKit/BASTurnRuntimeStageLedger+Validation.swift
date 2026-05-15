@@ -45,7 +45,7 @@ import Foundation
 /// have。 Audit consumers grep these to filter malformed
 /// ledgers。
 public enum BASTurnRuntimeStageLedgerValidationIssue:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
     /// One or more stages appear in more than one record。
     case duplicateStageRecords([BASTurnRuntimeStage])

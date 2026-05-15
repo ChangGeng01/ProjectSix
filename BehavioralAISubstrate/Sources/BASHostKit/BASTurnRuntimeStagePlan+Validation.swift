@@ -55,7 +55,7 @@ import Foundation
 /// have。 Audit consumers grep these to filter malformed
 /// plans。
 public enum BASTurnRuntimeStagePlanValidationIssue:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
     /// One or more `BASTurnRuntimeStage` cases never appear
     /// in any step。 Associated value is the missing

@@ -120,7 +120,7 @@ public struct BASLayerMLHeadSlot:
 
 /// 3-case typed error for registry operations。
 public enum BASLayerMLHeadRegistrationError:
-    Error, Sendable, Equatable
+    Error, Sendable, Equatable, Codable
 {
     /// Tried to register a head with `headID` already present in
     /// registry. Caller must unregister first.
