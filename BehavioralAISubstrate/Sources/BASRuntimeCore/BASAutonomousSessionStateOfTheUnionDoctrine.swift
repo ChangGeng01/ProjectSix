@@ -110,19 +110,19 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 651
-    /// close-out (M1984 — BASSovereign reboot+verdict+
-    /// lock trio Codable extension,2nd post-hexa-#6
-    /// gap-fill,11th BASSovereign touch overall;3
-    /// BASSovereign structs (RebootPlan + VerdictContext
-    /// + ScopeIdentifier) gained Codable;NEW kind
-    /// 'sovereign-reboot-verdict-lock-trio';BASSovereign
-    /// cumulative typed surfaces = 29)。
-    public static let typedSurfaceCount: Int = 192
+    /// Cumulative achievement metrics at chapter 652
+    /// close-out (M1988 — Mamba+federated-storage trio
+    /// Codable extension,3rd post-hexa-#6 gap-fill,
+    /// cross-module BASMetalSubstrate + BASRuntimeCore;
+    /// 3 types (BASMambaSSMScanInputs + BASMambaSSM
+    /// ScanOutputs + BASFederatedEventLogStorageError)
+    /// gained Codable;NEW kind 'mamba-federated-
+    /// storage-trio')。
+    public static let typedSurfaceCount: Int = 193
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 568
-    public static let phase2CommitsShipped: Int = 1029
-    public static let chapter2NumberLast: Int = 1984
+        Int = 572
+    public static let phase2CommitsShipped: Int = 1033
+    public static let chapter2NumberLast: Int = 1988
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

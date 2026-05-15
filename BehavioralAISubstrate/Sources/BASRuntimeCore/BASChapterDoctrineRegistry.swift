@@ -18135,6 +18135,96 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1984。 568 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。"),
+
+        // chapter 652 — Mamba+federated-storage trio
+        // Codable extension (3rd post-hexa-#6 gap-fill,
+        // cross-module BASMetalSubstrate + BASRuntime
+        // Core)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十二",
+            mNumberFirst: 1985,
+            mNumberLast: 1988,
+            v1MilestoneMNumber: 1988,
+            v1MilestoneStatus:
+                "chapter-652-mamba-federated-storage-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1985, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module types — BASMetalSubstrate" +
+                        ".BASMambaSSMScanInputs (6-field" +
+                        " struct, [Float] arrays) + BAS" +
+                        "MetalSubstrate.BASMambaSSMScan" +
+                        "Outputs (2-field struct) + BAS" +
+                        "RuntimeCore.BASFederatedEventLog" +
+                        "StorageError (1-case top-level" +
+                        " enum)。"),
+                BASChapterKnife(
+                    mNumber: 1986, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1987, knife: "第三刀",
+                    concept: "NEW BASMambaFederatedStorage" +
+                        "TrioCodableExtensionDoctrine +" +
+                        " moduleCount = 2 + structCount" +
+                        " = 2 + enumCount = 1 + kindLabel" +
+                        "='mamba-federated-storage-trio'" +
+                        " + isThirdPostHexaSixGapFill +" +
+                        " isCrossModuleTrio。 typed-" +
+                        "surface count 192 → 193。"),
+                BASChapterKnife(
+                    mNumber: 1988, knife: "第四刀",
+                    concept: "Chapter 652 close-out +" +
+                        " doctrine sync。 572 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 3rd post-hexa-#6" +
+                        " gap-fill — cross-module return" +
+                        " to BASMetalSubstrate after" +
+                        " entirely-BASSovereign hexa #6。")
+            ],
+            entropyClassesAttacked: [
+                "bas-mamba-ssm-scan-inputs-non-codable",
+                "bas-mamba-ssm-scan-outputs-non-codable",
+                "bas-federated-event-log-storage-error-non-codable",
+                "mamba-federated-storage-trio-pattern-uncaptured",
+                "third-post-hexa-six-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1988",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "mamba-federated-storage-trio-codable-extension",
+                "third-post-hexa-six-gap-fill",
+                "cross-module-trio",
+                "new-kind-label-mamba-federated-storage-trio",
+                "572-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 3 more gap-fill chapters" +
+                " (653-655) toward chapter 655 hexa #7" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 652 ships Mamba+federated-" +
+                "storage trio Codable extension — 3rd" +
+                " post-hexa-#6 gap-fill chapter,cross-" +
+                "module BASMetalSubstrate + BASRuntime" +
+                "Core。 3 types (BASMambaSSMScanInputs" +
+                " + BASMambaSSMScanOutputs + BAS" +
+                "FederatedEventLogStorageError) gained" +
+                " Codable at M1985 + 3 PROOF tests" +
+                " (M1986) + new typed surface (M1987)" +
+                " + close-out (M1988)。 NEW kind" +
+                " 'mamba-federated-storage-trio'。 193" +
+                " typed surfaces cumulative (+1)。" +
+                " ADR-016 → M1988。 572 consecutive" +
+                " autonomous commits with V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
                 " preserved。")
     ]
 

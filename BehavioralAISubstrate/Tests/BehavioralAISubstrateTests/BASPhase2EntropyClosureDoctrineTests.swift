@@ -37,23 +37,22 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs651() {
+    func testLastChapterIs652() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五十一",
-            "Chapter 六百五十一:BASSOVEREIGN REBOOT+" +
-            "VERDICT+LOCK TRIO CODABLE EXTENSION — GAP-" +
-            "FILL,2nd post-hexa-#6,11th BASSovereign" +
-            " touch overall。 3 BASSovereign structs" +
-            " (RebootPlan + VerdictContext +" +
-            " ScopeIdentifier) gained Codable + 3 PROOF" +
-            " tests + BASSovereignRebootVerdictLockTrio" +
-            "CodableExtensionDoctrine typed surface +" +
-            " close-out。 NEW kind 'sovereign-reboot-" +
-            "verdict-lock-trio'。 BASSovereign cumulative" +
-            " typed surfaces = 29。 192 typed surfaces" +
-            " cumulative。 568 consecutive byte-equality" +
+            "chapter 六百五十二",
+            "Chapter 六百五十二:MAMBA+FEDERATED-STORAGE" +
+            " TRIO CODABLE EXTENSION — GAP-FILL,3rd" +
+            " post-hexa-#6,cross-module BASMetalSubstrate" +
+            " + BASRuntimeCore。 3 types (BASMambaSSM" +
+            "ScanInputs + BASMambaSSMScanOutputs + BAS" +
+            "FederatedEventLogStorageError) gained" +
+            " Codable + 3 PROOF tests + BASMambaFederated" +
+            "StorageTrioCodableExtensionDoctrine typed" +
+            " surface + close-out。 NEW kind 'mamba-" +
+            "federated-storage-trio'。 193 typed surfaces" +
+            " cumulative。 572 consecutive byte-equality" +
             " clean commits")
     }
 

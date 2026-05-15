@@ -2321,7 +2321,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十一")!)
+                            "chapter 六百五十一")!),
+            // M1988 chapter 652 — Mamba+federated-storage trio Codable extension gap-fill (3rd post-hexa-#6, cross-module)
+            checkRegistry("六百五十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4025,6 +4031,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十一")!
+                .mNumberLast),
+            // M1988 chapter 652 — Mamba+federated-storage trio Codable extension gap-fill (3rd post-hexa-#6)
+            ("652",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

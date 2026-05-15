@@ -439,6 +439,16 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// + close-out (M1984)。 NEW kind 'sovereign-reboot-
     /// verdict-lock-trio'。 BASSovereign cumulative
     /// typed surfaces = 29。
+    /// Re-captured at chapter 652 close-out。 Chapter
+    /// 652:MAMBA+FEDERATED-STORAGE TRIO CODABLE
+    /// EXTENSION — GAP-FILL,3rd post-hexa-#6,cross-
+    /// module BASMetalSubstrate + BASRuntimeCore。 3
+    /// types (BASMambaSSMScanInputs + BASMambaSSMScan
+    /// Outputs + BASFederatedEventLogStorageError)
+    /// gained Codable at M1985 + 3 PROOF tests (M1986)
+    /// + NEW BASMambaFederatedStorageTrioCodable
+    /// ExtensionDoctrine (M1987) + close-out (M1988)。
+    /// NEW kind 'mamba-federated-storage-trio'。
     static let frozenFullRegistrySha256: String =
-        "1edd45e5bcc0068c1632a7248310205c26746b55ec2dc88b751b642f99ea88a4"
+        "1ec40596fdb5c13aeadbeba6cb4614922df48119e230125c50645ba5379f5027"
 }

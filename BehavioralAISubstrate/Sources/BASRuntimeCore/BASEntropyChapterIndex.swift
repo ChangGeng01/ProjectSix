@@ -4547,7 +4547,26 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative (+1)。" +
                 " ADR-016 → M1984。 568 consecutive" +
                 " byte-equality clean commits。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十二",
+            mNumberFirst: 1985, mNumberLast: 1988,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "MAMBA+FEDERATED-STORAGE TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,3rd" +
+                " post-hexa-#6,cross-module BAS" +
+                "MetalSubstrate + BASRuntimeCore。 3" +
+                " types (BASMambaSSMScanInputs + BAS" +
+                "MambaSSMScanOutputs + BASFederatedEvent" +
+                "LogStorageError) gained Codable at" +
+                " M1985 + 3 PROOF tests (M1986) + new" +
+                " typed surface (M1987) + close-out" +
+                " (M1988)。 NEW kind 'mamba-federated-" +
+                "storage-trio'。 193 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M1988。" +
+                " 572 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
