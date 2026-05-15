@@ -64,7 +64,7 @@ public enum BASRoadmapPhase:
 
 /// Typed enum naming the status of a roadmap phase。
 public enum BASRoadmapPhaseStatus:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
     /// Phase complete;all milestones shipped。
     case shipped

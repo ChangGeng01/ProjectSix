@@ -37,7 +37,7 @@ import Foundation
 /// when comparing a freshly submitted candidate。chapter 一百八十五
 /// pin — every strategy has a typed case,not a free-form string。
 public enum BASAutoEvalBaselineMode:
-    Sendable, Equatable, Hashable
+    Sendable, Equatable, Hashable, Codable
 {
     /// Compare against the most-recent run sharing the same
     /// `buildChapter`。Use for "did this commit regress vs prior

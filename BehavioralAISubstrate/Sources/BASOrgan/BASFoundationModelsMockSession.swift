@@ -127,7 +127,7 @@ public struct BASFoundationModelsMockCallRecord:
 // MARK: - Mock errors
 
 public enum BASFoundationModelsMockError:
-    Error, Sendable, Equatable
+    Error, Sendable, Equatable, Codable
 {
     /// Caller exhausted the scripted response sequence。
     case scriptExhausted
