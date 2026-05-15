@@ -18674,7 +18674,116 @@ public enum BASChapterDoctrineRegistry {
                 "。 ADR-014 OPT-IN preserved。 Next hexa" +
                 " #8 catalog opportunity at chapter 六百" +
                 "六十三 (657-662 gap-fill arc + 663" +
-                " catalog)。")
+                " catalog)。"),
+
+        // chapter 657 — Roadmap-eval-mock trio Codable
+        // extension (1st post-hexa-#7 gap-fill,cross-
+        // module BASRuntimeCore + BASOrgan reach,5
+        // chapters until chapter 六百六十三 hexa #8
+        // catalog opportunity)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十七",
+            mNumberFirst: 2005,
+            mNumberLast: 2008,
+            v1MilestoneMNumber: 2008,
+            v1MilestoneStatus:
+                "chapter-657-roadmap-eval-mock-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 2005, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-" +
+                        "module associated-value-enum" +
+                        " types — BASRuntimeCore.BAS" +
+                        "RoadmapPhaseStatus (3-case enum" +
+                        " carrying Int) + BASRuntime" +
+                        "Core.BASAutoEvalBaselineMode" +
+                        " (3-case enum carrying String)" +
+                        " + BASOrgan.BASFoundationModels" +
+                        "MockError (2-case Error enum" +
+                        " carrying String)。 All-" +
+                        "primitive-associated-value trio" +
+                        " — simplest Codable composition" +
+                        " shape。"),
+                BASChapterKnife(
+                    mNumber: 2006, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 2007, knife: "第三刀",
+                    concept: "NEW BASRoadmapEvalMockTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " moduleCount = 2 + enumCount" +
+                        " = 3 + structCount = 0 +" +
+                        " isCrossModuleTrio + isAll" +
+                        "PrimitiveAssociatedValueTrio +" +
+                        " isDomainSpanningTrio +" +
+                        " kindLabel='roadmap-eval-mock-" +
+                        "trio' + isFirstPostHexaSeven" +
+                        "GapFill + chaptersUntilNext" +
+                        "HexaCatalog = 5 + basRuntime" +
+                        "CoreCumulativeTypedSurfaces =" +
+                        " 11。 typed-surface count 197 →" +
+                        " 198。"),
+                BASChapterKnife(
+                    mNumber: 2008, knife: "第四刀",
+                    concept: "Chapter 657 close-out +" +
+                        " doctrine sync。 592 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 1st post-hexa-#7" +
+                        " gap-fill — domain-spanning" +
+                        " trio brings roadmap-status +" +
+                        " eval-baseline-mode + mock-" +
+                        "error together by structural" +
+                        " similarity。")
+            ],
+            entropyClassesAttacked: [
+                "bas-roadmap-phase-status-non-codable",
+                "bas-auto-eval-baseline-mode-non-codable",
+                "bas-foundation-models-mock-error-non-codable",
+                "roadmap-eval-mock-trio-pattern-uncaptured",
+                "first-post-hexa-seven-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M2008",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "roadmap-eval-mock-trio-codable-extension",
+                "first-post-hexa-seven-gap-fill",
+                "cross-module-trio",
+                "all-primitive-associated-value-trio",
+                "domain-spanning-trio",
+                "new-kind-label-roadmap-eval-mock-trio",
+                "592-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 5 more gap-fill chapters" +
+                " (658-662) toward chapter 663 hexa #8" +
+                " catalog opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 657 ships roadmap-eval-" +
+                "mock trio Codable extension — 1st post" +
+                "-hexa-#7 gap-fill chapter,cross-module" +
+                " BASRuntimeCore + BASOrgan reach。 3" +
+                " associated-value-enum types (BAS" +
+                "RoadmapPhaseStatus + BASAutoEvalBaseline" +
+                "Mode + BASFoundationModelsMockError)" +
+                " gained Codable at M2005 + 3 PROOF" +
+                " tests (M2006) + new typed surface" +
+                " (M2007) + close-out (M2008)。 NEW kind" +
+                " 'roadmap-eval-mock-trio'。 ALL-" +
+                "PRIMITIVE-ASSOCIATED-VALUE trio +" +
+                " DOMAIN-SPANNING coherence (roadmap-" +
+                "status + eval-baseline-mode + mock-" +
+                "error brought together by structural" +
+                " similarity)。 198 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2008。" +
+                " 592 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -110,25 +110,21 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 656
-    /// close-out (M2004 — 7TH GAP-FILL HEXA CATALOG
-    /// META-META MILESTONE。 NEW BASGapFillHexaSeven
-    /// CompletionDoctrine commemorating 6 post-hexa-#6
-    /// gap-fill chapters 650-655 — 18 types / 24
-    /// commits / 5 modules touched。 RETURNS to multi-
-    /// module diversity after hexa #6's entirely-
-    /// single-module run。 FIRST hexa with EXPLICIT
-    /// THEME CONTINUATION (654→655)。 FIRST hexa
-    /// containing a ROUND-NUMBER chapter (650) AND
-    /// crossing a ROUND-NUMBER M-milestone (M2000)。
-    /// catalog lineage:M1805 post-octa → M1833 #1 →
-    /// M1861 #2 → M1889 #3 → M1917 #4 → M1945 #5 →
-    /// M1973 #6 → M2001 #7)。
-    public static let typedSurfaceCount: Int = 197
+    /// Cumulative achievement metrics at chapter 657
+    /// close-out (M2008 — ROADMAP-EVAL-MOCK trio
+    /// Codable extension,1st post-hexa-#7 gap-fill,
+    /// cross-module BASRuntimeCore + BASOrgan reach;
+    /// 3 associated-value-enum types (BASRoadmap
+    /// PhaseStatus + BASAutoEvalBaselineMode + BAS
+    /// FoundationModelsMockError) gained Codable;ALL-
+    /// PRIMITIVE-ASSOCIATED-VALUE trio + DOMAIN-
+    /// SPANNING coherence;NEW kind 'roadmap-eval-mock-
+    /// trio')。
+    public static let typedSurfaceCount: Int = 198
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 588
-    public static let phase2CommitsShipped: Int = 1049
-    public static let chapter2NumberLast: Int = 2004
+        Int = 592
+    public static let phase2CommitsShipped: Int = 1053
+    public static let chapter2NumberLast: Int = 2008
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

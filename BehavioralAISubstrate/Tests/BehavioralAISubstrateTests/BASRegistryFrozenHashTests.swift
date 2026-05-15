@@ -507,6 +507,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3
     /// → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa
     /// #6 → M2001 hexa #7。
+    /// Re-captured at chapter 657 close-out。 Chapter
+    /// 657:ROADMAP-EVAL-MOCK TRIO CODABLE EXTENSION
+    /// — GAP-FILL,1st post-hexa-#7,cross-module BAS
+    /// RuntimeCore + BASOrgan reach,5 chapters until
+    /// chapter 六百六十三 hexa #8 catalog opportunity
+    /// 。 3 associated-value-enum types (BASRoadmap
+    /// PhaseStatus + BASAutoEvalBaselineMode + BAS
+    /// FoundationModelsMockError) gained Codable at
+    /// M2005 + 3 PROOF tests (M2006) + NEW BASRoadmap
+    /// EvalMockTrioCodableExtensionDoctrine (M2007) +
+    /// close-out (M2008)。 NEW kind 'roadmap-eval-
+    /// mock-trio'。 ALL-PRIMITIVE-ASSOCIATED-VALUE
+    /// trio + DOMAIN-SPANNING coherence。
     static let frozenFullRegistrySha256: String =
-        "b92edbd25785be4f33a585181067acf2ed5ee5e5e1e859a9c6ee67a0ed778c9d"
+        "739da1d224733bbd01531068b94dce0862fd784113dcba37dc4248c23cc99300"
 }

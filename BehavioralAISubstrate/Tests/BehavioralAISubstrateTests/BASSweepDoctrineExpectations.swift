@@ -116,22 +116,22 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M2004:24 + 20 + 210 = 254 (chapter
-    /// 656 — 7TH GAP-FILL HEXA CATALOG META-META
-    /// MILESTONE,cataloging 6 post-hexa-#6 gap-fill
-    /// chapters 650-655)
-    public static let phase2ChapterCount: Int = 254
+    /// added)。 At M2008:24 + 20 + 211 = 255 (chapter
+    /// 657 — Roadmap-eval-mock trio,1st post-hexa-#7
+    /// gap-fill,cross-module BASRuntimeCore + BAS
+    /// Organ reach)
+    public static let phase2ChapterCount: Int = 255
 
-    /// Phase 2 commits shipped。 At M2004:125 + 84 +
-    /// 840 = 1049 (chapter 656 = 4 cuts — NEW hexa #7
-    /// catalog + 64 anti-drift + 18 wire-in + close-
-    /// out)。
-    public static let phase2CommitsShipped: Int = 1049
+    /// Phase 2 commits shipped。 At M2008:125 + 84 +
+    /// 844 = 1053 (chapter 657 = 4 cuts — roadmap-
+    /// eval-mock trio + 3 PROOF + typed surface +
+    /// close-out)。
+    public static let phase2CommitsShipped: Int = 1053
 
-    /// Phase 2 mNumberLast。 At M2004:chapter 656 —
-    /// 7th gap-fill hexa catalog meta-meta milestone。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 2004
+    /// Phase 2 mNumberLast。 At M2008:chapter 657 —
+    /// Roadmap-eval-mock trio。 SWEEP stays frozen at
+    /// 1163。
+    public static let phase2MNumberLast: Int = 2008
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

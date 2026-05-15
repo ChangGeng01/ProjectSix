@@ -4664,6 +4664,30 @@ public enum BASEntropyChapterIndex {
                 " hexa #7。 197 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M2004。" +
                 " 588 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十七",
+            mNumberFirst: 2005, mNumberLast: 2008,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "ROADMAP-EVAL-MOCK TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,1st post-hexa-#7" +
+                ",cross-module BASRuntimeCore +" +
+                " BASOrgan reach,5 chapters until" +
+                " chapter 六百六十三 hexa #8 catalog" +
+                " opportunity。 3 associated-value-enum" +
+                " types (BASRoadmapPhaseStatus + BASAuto" +
+                "EvalBaselineMode + BASFoundationModels" +
+                "MockError) gained Codable at M2005 +" +
+                " 3 PROOF tests (M2006) + new typed" +
+                " surface (M2007) + close-out (M2008)。" +
+                " NEW kind 'roadmap-eval-mock-trio'。" +
+                " ALL-PRIMITIVE-ASSOCIATED-VALUE trio +" +
+                " DOMAIN-SPANNING coherence (roadmap-" +
+                "status + eval-baseline-mode + mock-" +
+                "error)。 198 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M2008。 592" +
+                " consecutive byte-equality clean" +
                 " commits。 V1 byte-equality preserved。")
     ]
 

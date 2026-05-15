@@ -2351,7 +2351,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十六")!)
+                            "chapter 六百五十六")!),
+            // M2008 chapter 657 — Roadmap-eval-mock trio Codable extension gap-fill (1st post-hexa-#7, cross-module BASRuntimeCore + BASOrgan)
+            checkRegistry("六百五十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4095,6 +4101,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十六")!
+                .mNumberLast),
+            // M2008 chapter 657 — Roadmap-eval-mock trio Codable extension gap-fill (1st post-hexa-#7)
+            ("657",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

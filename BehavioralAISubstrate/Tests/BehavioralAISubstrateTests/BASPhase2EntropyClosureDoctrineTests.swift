@@ -37,25 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs656() {
+    func testLastChapterIs657() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五十六",
-            "Chapter 六百五十六:7TH GAP-FILL HEXA" +
-            " CATALOG META-META MILESTONE — commemorates" +
-            " 6 post-hexa-#6 gap-fill chapters (650-655)" +
-            "。 18 types extended / 24 commits / 5" +
-            " distinct modules touched。 RETURNS to" +
-            " multi-module diversity after hexa #6's" +
-            " entirely-single-module run。 FIRST hexa" +
-            " with EXPLICIT THEME CONTINUATION (654→655)" +
-            " + FIRST hexa containing ROUND-NUMBER" +
-            " chapter (650) AND crossing ROUND-NUMBER" +
-            " M-milestone (M2000)。 NEW BASGapFillHexa" +
-            "SevenCompletionDoctrine + 64 anti-drift" +
-            " tests + 18 wire-in tests + close-out。" +
-            " 197 typed surfaces cumulative。 588" +
+            "chapter 六百五十七",
+            "Chapter 六百五十七:ROADMAP-EVAL-MOCK TRIO" +
+            " CODABLE EXTENSION — GAP-FILL,1st post-" +
+            "hexa-#7,cross-module BASRuntimeCore +" +
+            " BASOrgan reach,5 chapters until chapter" +
+            " 六百六十三 hexa #8 catalog opportunity。" +
+            " 3 associated-value-enum types (BAS" +
+            "RoadmapPhaseStatus + BASAutoEvalBaselineMode" +
+            " + BASFoundationModelsMockError) gained" +
+            " Codable + 3 PROOF tests + BASRoadmapEval" +
+            "MockTrioCodableExtensionDoctrine typed" +
+            " surface + close-out。 NEW kind 'roadmap-" +
+            "eval-mock-trio'。 ALL-PRIMITIVE-ASSOCIATED" +
+            "-VALUE trio + DOMAIN-SPANNING coherence。" +
+            " 198 typed surfaces cumulative。 592" +
             " consecutive byte-equality clean commits")
     }
 

@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2004",
-            "M2004:doctrine version reflects chapter 六百五十六 — 7TH GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaSevenCompletionDoctrine commemorating 6 post-hexa-#6 gap-fill chapters (650-655) — 18 types extended / 24 commits / 5 distinct modules touched。 RETURNS to multi-module diversity after hexa #6's entirely-single-module run。 FIRST hexa with EXPLICIT THEME CONTINUATION (654→655) + FIRST hexa containing a ROUND-NUMBER chapter (650) AND crossing a ROUND-NUMBER M-milestone (M2000)。 NEW catalog (M2001) + 64 anti-drift PROOF tests (M2002) + 18 wire-in PROOF tests (M2003) + close-out (M2004)。 197 typed surfaces cumulative。 588 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6 → M2001 hexa #7")
+            "ADR-016.M2008",
+            "M2008:doctrine version reflects chapter 六百五十七 — ROADMAP-EVAL-MOCK TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#7,cross-module BASRuntimeCore + BASOrgan reach,5 chapters until chapter 六百六十三 hexa #8 catalog opportunity。 3 associated-value-enum types (BASRoadmapPhaseStatus + BASAutoEvalBaselineMode + BASFoundationModelsMockError) gained Codable at M2005 + 3 PROOF tests (M2006) + BASRoadmapEvalMockTrioCodableExtensionDoctrine typed surface (M2007) + close-out (M2008)。 NEW kind 'roadmap-eval-mock-trio'。 ALL-PRIMITIVE-ASSOCIATED-VALUE trio + DOMAIN-SPANNING coherence。 198 typed surfaces cumulative。 592 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
