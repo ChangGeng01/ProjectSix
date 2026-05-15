@@ -2333,7 +2333,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十三")!)
+                            "chapter 六百五十三")!),
+            // M1996 chapter 654 — BASRuntimeCore validation-result trio Codable extension gap-fill (6th and FINAL post-hexa-#6, single-module BASRuntimeCore)
+            checkRegistry("六百五十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4053,6 +4059,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十三")!
+                .mNumberLast),
+            // M1996 chapter 654 — BASRuntimeCore validation-result trio Codable extension gap-fill (6th and FINAL post-hexa-#6)
+            ("654",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

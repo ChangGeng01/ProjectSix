@@ -4587,7 +4587,31 @@ public enum BASEntropyChapterIndex {
                 "hexa-#6。 194 typed surfaces cumulative" +
                 " (+1)。 ADR-016 → M1992。 576" +
                 " consecutive byte-equality clean commits" +
-                "。 V1 byte-equality preserved。")
+                "。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十四",
+            mNumberFirst: 1993, mNumberLast: 1996,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "BASRUNTIMECORE VALIDATION-RESULT" +
+                " TRIO CODABLE EXTENSION — GAP-FILL,6th" +
+                " and FINAL post-hexa-#6,single-module" +
+                " BASRuntimeCore reach,1 chapter from" +
+                " chapter 六百五十五 hexa #7 catalog" +
+                " opportunity。 3 BASRuntimeCore sibling" +
+                " enum types (BASMambaCheckpointValidation" +
+                "Result + BASCoreMLConversionValidation" +
+                "Result + BASMambaTrainingValidation" +
+                "Result) gained Codable at M1993 + 3" +
+                " PROOF tests (M1994) + new typed surface" +
+                " (M1995) + close-out (M1996)。 NEW kind" +
+                " 'validation-result-trio'。 FIRST" +
+                " parallel-structural-shape trio。 195" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M1996。 580 consecutive byte-" +
+                "equality clean commits。 V1 byte-" +
+                "equality preserved。 Chapter 655 hexa" +
+                " #7 catalog opportunity NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

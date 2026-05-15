@@ -462,6 +462,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// (M1992)。 NEW kind 'organ-llm-cache-mock-trio'。
     /// FIRST all-associated-value-enum trio post-
     /// hexa-#6。
+    /// Re-captured at chapter 654 close-out。 Chapter
+    /// 654:BASRUNTIMECORE VALIDATION-RESULT TRIO
+    /// CODABLE EXTENSION — GAP-FILL,6th and FINAL
+    /// post-hexa-#6,single-module BASRuntimeCore
+    /// reach,1 chapter from chapter 六百五十五 hexa
+    /// #7 catalog opportunity。 3 BASRuntimeCore
+    /// sibling enum types (BASMambaCheckpointValidation
+    /// Result + BASCoreMLConversionValidationResult +
+    /// BASMambaTrainingValidationResult) gained Codable
+    /// at M1993 + 3 PROOF tests (M1994) + NEW BAS
+    /// ValidationResultTrioCodableExtensionDoctrine
+    /// (M1995) + close-out (M1996)。 NEW kind
+    /// 'validation-result-trio'。 FIRST parallel-
+    /// structural-shape trio。
     static let frozenFullRegistrySha256: String =
-        "4f55efe14366f1cd4e0eab5ec938e15fd0103fd49aadc144ebaecb5aad1e1f3a"
+        "82faf679776924f1d4eddccc7e2ca24ac415babefb536c032ef4ae5f0f98befa"
 }

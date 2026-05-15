@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M1992",
-            "M1992:doctrine version reflects chapter 六百五十三 — BASORGAN LLM-CACHE-MOCK TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#6,single-module BASOrgan reach,2 chapters from chapter 六百五十五 hexa #7 opportunity。 3 BASOrgan enum types (BASLLMModelRouterError + BASLLMPromptCacheOutcome + BASFoundationModelsMockResponse) gained Codable at M1989 + 3 PROOF tests (M1990) + BASOrganLLMCacheMockTrioCodableExtensionDoctrine typed surface (M1991) + close-out (M1992)。 NEW kind 'organ-llm-cache-mock-trio'。 FIRST all-associated-value-enum trio post-hexa-#6。 194 typed surfaces cumulative。 576 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M1996",
+            "M1996:doctrine version reflects chapter 六百五十四 — BASRUNTIMECORE VALIDATION-RESULT TRIO CODABLE EXTENSION — GAP-FILL,6th and FINAL post-hexa-#6,single-module BASRuntimeCore reach,1 chapter from chapter 六百五十五 hexa #7 catalog opportunity。 3 BASRuntimeCore sibling enum types (BASMambaCheckpointValidationResult + BASCoreMLConversionValidationResult + BASMambaTrainingValidationResult) gained Codable at M1993 + 3 PROOF tests (M1994) + BASValidationResultTrioCodableExtensionDoctrine typed surface (M1995) + close-out (M1996)。 NEW kind 'validation-result-trio'。 FIRST parallel-structural-shape trio。 195 typed surfaces cumulative。 580 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 655 hexa #7 catalog opportunity NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二

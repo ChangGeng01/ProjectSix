@@ -116,23 +116,23 @@ public enum BASSweepDoctrineExpectations {
     ///   - POST-SWEEP:          chapters 447+      = (grows)
     /// At M1307:24 + 20 + 36 = 80 (chapter 482 —
     /// 5-of-5 primitive coverage + KV cache surface
-    /// added)。 At M1992:24 + 20 + 207 = 251 (chapter
-    /// 653 — BASOrgan LLM-cache-mock trio,5th post-
-    /// hexa-#6 gap-fill,single-module BASOrgan reach,
-    /// 2 chapters from chapter 六百五十五 hexa #7
-    /// opportunity)
-    public static let phase2ChapterCount: Int = 251
+    /// added)。 At M1996:24 + 20 + 208 = 252 (chapter
+    /// 654 — BASRuntimeCore validation-result trio,
+    /// 6th and FINAL post-hexa-#6 gap-fill,single-
+    /// module BASRuntimeCore reach,1 chapter from
+    /// chapter 六百五十五 hexa #7 catalog opportunity)
+    public static let phase2ChapterCount: Int = 252
 
-    /// Phase 2 commits shipped。 At M1992:125 + 84 +
-    /// 828 = 1037 (chapter 653 = 4 cuts — BASOrgan
-    /// LLM-cache-mock trio + 3 PROOF + typed surface
-    /// + close-out)。
-    public static let phase2CommitsShipped: Int = 1037
+    /// Phase 2 commits shipped。 At M1996:125 + 84 +
+    /// 832 = 1041 (chapter 654 = 4 cuts — BAS
+    /// RuntimeCore validation-result trio + 3 PROOF +
+    /// typed surface + close-out)。
+    public static let phase2CommitsShipped: Int = 1041
 
-    /// Phase 2 mNumberLast。 At M1992:chapter 653 —
-    /// BASOrgan LLM-cache-mock trio。 SWEEP stays
-    /// frozen at 1163。
-    public static let phase2MNumberLast: Int = 1992
+    /// Phase 2 mNumberLast。 At M1996:chapter 654 —
+    /// BASRuntimeCore validation-result trio。 SWEEP
+    /// stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 1996
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

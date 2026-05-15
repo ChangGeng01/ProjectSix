@@ -37,25 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs653() {
+    func testLastChapterIs654() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五十三",
-            "Chapter 六百五十三:BASORGAN LLM-CACHE-MOCK" +
-            " TRIO CODABLE EXTENSION — GAP-FILL,5th" +
-            " post-hexa-#6,single-module BASOrgan reach" +
-            ",2 chapters from chapter 六百五十五 hexa" +
-            " #7 opportunity。 3 BASOrgan enum types" +
-            " (BASLLMModelRouterError + BASLLMPromptCache" +
-            "Outcome + BASFoundationModelsMockResponse)" +
-            " gained Codable + 3 PROOF tests + BASOrgan" +
-            "LLMCacheMockTrioCodableExtensionDoctrine" +
+            "chapter 六百五十四",
+            "Chapter 六百五十四:BASRUNTIMECORE VALIDATION" +
+            "-RESULT TRIO CODABLE EXTENSION — GAP-FILL," +
+            "6th and FINAL post-hexa-#6,single-module" +
+            " BASRuntimeCore reach,1 chapter from" +
+            " chapter 六百五十五 hexa #7 catalog" +
+            " opportunity。 3 BASRuntimeCore sibling" +
+            " enum types (BASMambaCheckpointValidation" +
+            "Result + BASCoreMLConversionValidation" +
+            "Result + BASMambaTrainingValidationResult)" +
+            " gained Codable + 3 PROOF tests + BAS" +
+            "ValidationResultTrioCodableExtensionDoctrine" +
             " typed surface + close-out。 NEW kind" +
-            " 'organ-llm-cache-mock-trio'。 FIRST all-" +
-            "associated-value-enum trio post-hexa-#6。" +
-            " 194 typed surfaces cumulative。 576" +
-            " consecutive byte-equality clean commits")
+            " 'validation-result-trio'。 FIRST parallel" +
+            "-structural-shape trio。 195 typed surfaces" +
+            " cumulative。 580 consecutive byte-equality" +
+            " clean commits")
     }
 
     // MARK: - M-number range

@@ -18317,7 +18317,109 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative (+1)。 ADR-016 →" +
                 " M1992。 576 consecutive autonomous" +
                 " commits with V1 byte-equality preserved" +
-                "。 ADR-014 OPT-IN preserved。")
+                "。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 654 — BASRuntimeCore validation-result
+        // trio Codable extension (6th and FINAL post-
+        // hexa-#6 gap-fill,single-module BASRuntimeCore
+        // reach,1 chapter from chapter 六百五十五 hexa
+        // #7 catalog opportunity)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十四",
+            mNumberFirst: 1993,
+            mNumberLast: 1996,
+            v1MilestoneMNumber: 1996,
+            v1MilestoneStatus:
+                "chapter-654-validation-result-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1993, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "RuntimeCore validation-result" +
+                        " enum types — BASMambaCheckpoint" +
+                        "ValidationResult + BASCoreML" +
+                        "ConversionValidationResult + BAS" +
+                        "MambaTrainingValidationResult。" +
+                        " All three are 2-case enums" +
+                        " (.valid + .invalid(reason:))" +
+                        " carrying already-Codable" +
+                        " ValidationFailure enums。"),
+                BASChapterKnife(
+                    mNumber: 1994, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1995, knife: "第三刀",
+                    concept: "NEW BASValidationResultTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " moduleCount = 1 + structCount" +
+                        " = 0 + enumCount = 3 + isAll" +
+                        "TypesAreEnums + isParallel" +
+                        "StructuralShape + kindLabel=" +
+                        "'validation-result-trio' +" +
+                        " isSixthAndFinalPostHexaSixGap" +
+                        "Fill + chaptersUntilNextHexa" +
+                        "Catalog = 1 + basRuntimeCore" +
+                        "CumulativeTypedSurfaces = 9。" +
+                        " typed-surface count 194 → 195。"),
+                BASChapterKnife(
+                    mNumber: 1996, knife: "第四刀",
+                    concept: "Chapter 654 close-out +" +
+                        " doctrine sync。 580 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 6th and FINAL post-" +
+                        "hexa-#6 gap-fill — FIRST" +
+                        " parallel-structural-shape trio" +
+                        " (all 3 share .valid + .invalid" +
+                        "(reason:) shape across 3" +
+                        " validation domains)。")
+            ],
+            entropyClassesAttacked: [
+                "bas-mamba-checkpoint-validation-result-non-codable",
+                "bas-coreml-conversion-validation-result-non-codable",
+                "bas-mamba-training-validation-result-non-codable",
+                "validation-result-trio-pattern-uncaptured",
+                "sixth-final-post-hexa-six-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1996",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "validation-result-trio-codable-extension",
+                "sixth-and-final-post-hexa-six-gap-fill",
+                "single-module-trio",
+                "parallel-structural-shape-trio",
+                "new-kind-label-validation-result-trio",
+                "580-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 六百五十五 hexa #7" +
+                " catalog meta-meta milestone (cataloging" +
+                " 6 post-hexa-#6 gap-fill chapters 650-" +
+                "655)",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 654 ships BASRuntimeCore" +
+                " validation-result trio Codable extension" +
+                " — 6th and FINAL post-hexa-#6 gap-fill" +
+                " chapter,single-module BASRuntimeCore" +
+                " reach。 3 sibling enum types (BASMamba" +
+                "CheckpointValidationResult + BASCoreML" +
+                "ConversionValidationResult + BASMamba" +
+                "TrainingValidationResult) gained Codable" +
+                " at M1993 + 3 PROOF tests (M1994) + new" +
+                " typed surface (M1995) + close-out" +
+                " (M1996)。 NEW kind 'validation-result-" +
+                "trio'。 FIRST parallel-structural-shape" +
+                " trio。 195 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1996。 580" +
+                " consecutive autonomous commits with V1" +
+                " byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。 Chapter 655 hexa #7" +
+                " catalog opportunity NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
