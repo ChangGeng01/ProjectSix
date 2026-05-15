@@ -18225,7 +18225,99 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-016 → M1988。 572 consecutive" +
                 " autonomous commits with V1 byte-" +
                 "equality preserved。 ADR-014 OPT-IN" +
-                " preserved。")
+                " preserved。"),
+
+        // chapter 653 — BASOrgan LLM-cache-mock trio
+        // Codable extension (5th post-hexa-#6 gap-fill,
+        // single-module BASOrgan reach,2 chapters from
+        // chapter 六百五十五 hexa #7 opportunity)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十三",
+            mNumberFirst: 1989,
+            mNumberLast: 1992,
+            v1MilestoneMNumber: 1992,
+            v1MilestoneStatus:
+                "chapter-653-organ-llm-cache-mock-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 1989, knife: "第一刀",
+                    concept: "Add Codable to 3 BASOrgan" +
+                        "-module enum types — BASLLMModel" +
+                        "RouterError (2-case associated-" +
+                        "value enum carrying BASLLMModel" +
+                        "Class) + BASLLMPromptCacheOutcome" +
+                        " (3-case enum carrying BASOrgan" +
+                        "Draft + UInt64) + BASFoundation" +
+                        "ModelsMockResponse (3-case enum" +
+                        " carrying BASToolInvocation +" +
+                        " String)。"),
+                BASChapterKnife(
+                    mNumber: 1990, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 1991, knife: "第三刀",
+                    concept: "NEW BASOrganLLMCacheMockTrio" +
+                        "CodableExtensionDoctrine +" +
+                        " moduleCount = 1 + structCount" +
+                        " = 0 + enumCount = 3 + isAll" +
+                        "AssociatedValueEnumTrio +" +
+                        " kindLabel='organ-llm-cache-" +
+                        "mock-trio' + isFifthPostHexaSix" +
+                        "GapFill + chaptersUntilNextHexa" +
+                        "Catalog = 2。 typed-surface" +
+                        " count 193 → 194。"),
+                BASChapterKnife(
+                    mNumber: 1992, knife: "第四刀",
+                    concept: "Chapter 653 close-out +" +
+                        " doctrine sync。 576 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 5th post-hexa-#6" +
+                        " gap-fill — first all-enum" +
+                        " all-associated-value trio in" +
+                        " the post-hexa-#6 arc。")
+            ],
+            entropyClassesAttacked: [
+                "bas-llm-model-router-error-non-codable",
+                "bas-llm-prompt-cache-outcome-non-codable",
+                "bas-foundation-models-mock-response-non-codable",
+                "organ-llm-cache-mock-trio-pattern-uncaptured",
+                "fifth-post-hexa-six-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M1992",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "organ-llm-cache-mock-trio-codable-extension",
+                "fifth-post-hexa-six-gap-fill",
+                "single-module-trio",
+                "all-associated-value-enum-trio",
+                "new-kind-label-organ-llm-cache-mock-trio",
+                "576-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 2 more gap-fill chapters" +
+                " (654-655) toward chapter 655 hexa #7" +
+                " opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 653 ships BASOrgan LLM-" +
+                "cache-mock trio Codable extension — 5th" +
+                " post-hexa-#6 gap-fill chapter,single-" +
+                "module BASOrgan reach。 3 enum types" +
+                " (BASLLMModelRouterError + BASLLMPrompt" +
+                "CacheOutcome + BASFoundationModelsMock" +
+                "Response) gained Codable at M1989 + 3" +
+                " PROOF tests (M1990) + new typed surface" +
+                " (M1991) + close-out (M1992)。 NEW kind" +
+                " 'organ-llm-cache-mock-trio'。 194 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M1992。 576 consecutive autonomous" +
+                " commits with V1 byte-equality preserved" +
+                "。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

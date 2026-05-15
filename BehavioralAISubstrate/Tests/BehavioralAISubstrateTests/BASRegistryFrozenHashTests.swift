@@ -449,6 +449,19 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// + NEW BASMambaFederatedStorageTrioCodable
     /// ExtensionDoctrine (M1987) + close-out (M1988)。
     /// NEW kind 'mamba-federated-storage-trio'。
+    /// Re-captured at chapter 653 close-out。 Chapter
+    /// 653:BASORGAN LLM-CACHE-MOCK TRIO CODABLE
+    /// EXTENSION — GAP-FILL,5th post-hexa-#6,single-
+    /// module BASOrgan reach,2 chapters from chapter
+    /// 六百五十五 hexa #7 opportunity。 3 BASOrgan
+    /// enum types (BASLLMModelRouterError + BASLLM
+    /// PromptCacheOutcome + BASFoundationModelsMock
+    /// Response) gained Codable at M1989 + 3 PROOF
+    /// tests (M1990) + NEW BASOrganLLMCacheMockTrio
+    /// CodableExtensionDoctrine (M1991) + close-out
+    /// (M1992)。 NEW kind 'organ-llm-cache-mock-trio'。
+    /// FIRST all-associated-value-enum trio post-
+    /// hexa-#6。
     static let frozenFullRegistrySha256: String =
-        "1ec40596fdb5c13aeadbeba6cb4614922df48119e230125c50645ba5379f5027"
+        "4f55efe14366f1cd4e0eab5ec938e15fd0103fd49aadc144ebaecb5aad1e1f3a"
 }

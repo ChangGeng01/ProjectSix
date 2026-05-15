@@ -306,7 +306,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百四十九",   // M1973-M1976 (6TH GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaSixCompletionDoctrine cataloging 6 post-hexa-#5 gap-fill chapters (643-648) — 18 BASSovereign types extended / 24 commits / 1 module touched;DISTINCTIVE FEATURE FIRST entirely-single-module hexa (hexa #1-#5 each spanned 4-7 modules);DEEPEST recursive Codable proof shipped (3-level at ch647) + Set<T> composition pattern demonstrated;BASSovereign cumulative typed surfaces grew 8 → 26 over hexa #6;NEW catalog (M1973) + 54 anti-drift PROOF tests (M1974) + 15 wire-in PROOF tests (M1975) + close-out (M1976);PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2 + chapter 628 hexa #3 + chapter 635 hexa #4 + chapter 642 hexa #5;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6;190 typed surfaces cumulative — hits 190-surface milestone)
         "chapter 六百五十",     // M1977-M1980 (BASRUNTIMECORE KNOWLEDGE-MESH TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#6,ROUND-NUMBER chapter 650,returns to multi-module coverage after entirely-BASSovereign hexa #6;4th BASRuntimeCore touch overall;3 BASRuntimeCore types (BASKnowledgeGraphError + BASMeshSyncFrameApplier.SlotDiff + BAS14LayerMeshAssemblyReport) gained Codable + 3 PROOF tests + BASRuntimeCoreKnowledgeMeshTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'runtime-core-knowledge-mesh-trio';Dict<Codable-Hashable-Key, V: Codable> + Optional<T: Codable> composition patterns demonstrated;BASRuntimeCore cumulative typed surfaces = 8;191 typed surfaces cumulative)
         "chapter 六百五十一",   // M1981-M1984 (BASSOVEREIGN REBOOT+VERDICT+LOCK TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#6,11th BASSovereign touch overall;3 BASSovereign structs (BASSovereignCleanRebootCoordinator.RebootPlan + BASSovereignVerdictEngine.VerdictContext + BASSovereignLockManager.ScopeIdentifier) gained Codable + 3 PROOF tests + BASSovereignRebootVerdictLockTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'sovereign-reboot-verdict-lock-trio';BASSovereign cumulative typed surfaces = 29)
-        "chapter 六百五十二"    // M1985-M1988 (MAMBA+FEDERATED-STORAGE TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#6,cross-module BASMetalSubstrate + BASRuntimeCore;3 types (BASMambaSSMScanInputs + BASMambaSSMScanOutputs + BASFederatedEventLogStorageError) gained Codable + 3 PROOF tests + BASMambaFederatedStorageTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'mamba-federated-storage-trio')
+        "chapter 六百五十二",   // M1985-M1988 (MAMBA+FEDERATED-STORAGE TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#6,cross-module BASMetalSubstrate + BASRuntimeCore;3 types (BASMambaSSMScanInputs + BASMambaSSMScanOutputs + BASFederatedEventLogStorageError) gained Codable + 3 PROOF tests + BASMambaFederatedStorageTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'mamba-federated-storage-trio')
+        "chapter 六百五十三"    // M1989-M1992 (BASORGAN LLM-CACHE-MOCK TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#6,single-module BASOrgan reach,2 chapters from chapter 六百五十五 hexa #7 opportunity;3 BASOrgan enum types (BASLLMModelRouterError + BASLLMPromptCacheOutcome + BASFoundationModelsMockResponse) gained Codable + 3 PROOF tests + BASOrganLLMCacheMockTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'organ-llm-cache-mock-trio';FIRST all-associated-value-enum trio post-hexa-#6;194 typed surfaces cumulative)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -323,15 +324,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 1988
+    public static let mNumberLast: Int = 1992
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M1988)。 Bumped through chapter 652:1029 → 1033。
-    /// Chapter 652:Mamba+federated-storage trio (3rd
-    /// post-hexa-#6 gap-fill,cross-module BAS
-    /// MetalSubstrate + BASRuntimeCore) + 3 PROOF
-    /// tests + typed surface + close-out。
-    public static let commitsShipped: Int = 1033
+    /// M1992)。 Bumped through chapter 653:1033 → 1037。
+    /// Chapter 653:BASOrgan LLM-cache-mock trio (5th
+    /// post-hexa-#6 gap-fill,single-module BASOrgan
+    /// reach) + 3 PROOF tests + typed surface +
+    /// close-out。
+    public static let commitsShipped: Int = 1037
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

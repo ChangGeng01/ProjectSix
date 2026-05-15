@@ -110,19 +110,21 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 652
-    /// close-out (M1988 — Mamba+federated-storage trio
-    /// Codable extension,3rd post-hexa-#6 gap-fill,
-    /// cross-module BASMetalSubstrate + BASRuntimeCore;
-    /// 3 types (BASMambaSSMScanInputs + BASMambaSSM
-    /// ScanOutputs + BASFederatedEventLogStorageError)
-    /// gained Codable;NEW kind 'mamba-federated-
-    /// storage-trio')。
-    public static let typedSurfaceCount: Int = 193
+    /// Cumulative achievement metrics at chapter 653
+    /// close-out (M1992 — BASOrgan LLM-cache-mock trio
+    /// Codable extension,5th post-hexa-#6 gap-fill,
+    /// single-module BASOrgan reach,2 chapters from
+    /// chapter 六百五十五 hexa #7 opportunity;3 BAS
+    /// Organ enum types (BASLLMModelRouterError + BAS
+    /// LLMPromptCacheOutcome + BASFoundationModelsMock
+    /// Response) gained Codable;FIRST all-associated-
+    /// value-enum trio post-hexa-#6;NEW kind 'organ-
+    /// llm-cache-mock-trio')。
+    public static let typedSurfaceCount: Int = 194
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 572
-    public static let phase2CommitsShipped: Int = 1033
-    public static let chapter2NumberLast: Int = 1988
+        Int = 576
+    public static let phase2CommitsShipped: Int = 1037
+    public static let chapter2NumberLast: Int = 1992
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

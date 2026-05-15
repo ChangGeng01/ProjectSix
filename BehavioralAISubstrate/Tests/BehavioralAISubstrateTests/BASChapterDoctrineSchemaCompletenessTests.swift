@@ -2327,7 +2327,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十二")!)
+                            "chapter 六百五十二")!),
+            // M1992 chapter 653 — BASOrgan LLM-cache-mock trio Codable extension gap-fill (5th post-hexa-#6, single-module BASOrgan)
+            checkRegistry("六百五十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4039,6 +4045,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十二")!
+                .mNumberLast),
+            // M1992 chapter 653 — BASOrgan LLM-cache-mock trio Codable extension gap-fill (5th post-hexa-#6)
+            ("653",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

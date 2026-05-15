@@ -4566,7 +4566,28 @@ public enum BASEntropyChapterIndex {
                 "storage-trio'。 193 typed surfaces" +
                 " cumulative (+1)。 ADR-016 → M1988。" +
                 " 572 consecutive byte-equality clean" +
-                " commits。 V1 byte-equality preserved。")
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十三",
+            mNumberFirst: 1989, mNumberLast: 1992,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "BASORGAN LLM-CACHE-MOCK TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,5th post-" +
+                "hexa-#6,single-module BASOrgan reach,2" +
+                " chapters from chapter 六百五十五 hexa" +
+                " #7 opportunity。 3 BASOrgan enum types" +
+                " (BASLLMModelRouterError + BASLLMPrompt" +
+                "CacheOutcome + BASFoundationModelsMock" +
+                "Response) gained Codable at M1989 + 3" +
+                " PROOF tests (M1990) + new typed surface" +
+                " (M1991) + close-out (M1992)。 NEW kind" +
+                " 'organ-llm-cache-mock-trio'。 FIRST" +
+                " all-associated-value-enum trio post-" +
+                "hexa-#6。 194 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M1992。 576" +
+                " consecutive byte-equality clean commits" +
+                "。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
