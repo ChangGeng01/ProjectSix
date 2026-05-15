@@ -37,25 +37,25 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs655() {
+    func testLastChapterIs656() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五十五",
-            "Chapter 六百五十五:CROSS-MODULE VALIDATION" +
-            "-ISSUE TRIO CODABLE EXTENSION — GAP-FILL," +
-            "6th and TRUE FINAL post-hexa-#6,cross-" +
-            "module BASHostKit + BASRuntimeCore reach。" +
-            " 3 enum types (BASTurnRuntimeStagePlan" +
-            "ValidationIssue + BASTurnRuntimeStageLedger" +
-            "ValidationIssue + BASLayerMLHeadRegistration" +
-            "Error) gained Codable + 3 PROOF tests +" +
-            " BASValidationIssueTrioCodableExtension" +
-            "Doctrine typed surface + close-out。 NEW" +
-            " kind 'validation-issue-trio'。 THEME" +
-            " CONTINUATION from chapter 654。 196 typed" +
-            " surfaces cumulative。 CLOSE-OUT M2000" +
-            " CROSSES ROUND-NUMBER MILESTONE。 584" +
+            "chapter 六百五十六",
+            "Chapter 六百五十六:7TH GAP-FILL HEXA" +
+            " CATALOG META-META MILESTONE — commemorates" +
+            " 6 post-hexa-#6 gap-fill chapters (650-655)" +
+            "。 18 types extended / 24 commits / 5" +
+            " distinct modules touched。 RETURNS to" +
+            " multi-module diversity after hexa #6's" +
+            " entirely-single-module run。 FIRST hexa" +
+            " with EXPLICIT THEME CONTINUATION (654→655)" +
+            " + FIRST hexa containing ROUND-NUMBER" +
+            " chapter (650) AND crossing ROUND-NUMBER" +
+            " M-milestone (M2000)。 NEW BASGapFillHexa" +
+            "SevenCompletionDoctrine + 64 anti-drift" +
+            " tests + 18 wire-in tests + close-out。" +
+            " 197 typed surfaces cumulative。 588" +
             " consecutive byte-equality clean commits")
     }
 

@@ -18537,7 +18537,144 @@ public enum BASChapterDoctrineRegistry {
                 " byte-equality preserved。 ADR-014" +
                 " OPT-IN preserved。 Chapter 656 hexa #7" +
                 " catalog opportunity NEXT with" +
-                " symmetric 6-entry run (650-655)。")
+                " symmetric 6-entry run (650-655)。"),
+
+        // chapter 656 — 7TH GAP-FILL HEXA CATALOG META-
+        // META MILESTONE,cataloging 6 post-hexa-#6 gap-
+        // fill chapters (650-655)。 18 types / 24
+        // commits / 5 modules touched。 RETURNS to multi-
+        // module diversity after hexa #6's entirely-
+        // single-module run。 FIRST hexa with EXPLICIT
+        // THEME CONTINUATION between entries (654→655)。
+        // FIRST hexa crossing a ROUND-NUMBER M-milestone
+        // within its run (M2000 at chapter 655)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十六",
+            mNumberFirst: 2001,
+            mNumberLast: 2004,
+            v1MilestoneMNumber: 2004,
+            v1MilestoneStatus:
+                "chapter-656-gap-fill-hexa-seven-catalog",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 2001, knife: "第一刀",
+                    concept: "NEW BASGapFillHexaSeven" +
+                        "CompletionDoctrine cataloging" +
+                        " 6 post-hexa-#6 gap-fill" +
+                        " chapters (650-655) via typed" +
+                        " EntryRecord struct + 6 kind" +
+                        " bucket accessors + 18 total" +
+                        " types extended + 24 commits" +
+                        " + 5 distinct modules touched" +
+                        " + theme-continuation flag +" +
+                        " round-number-chapter flag +" +
+                        " round-number-M-milestone-" +
+                        "crossed flag + Dict/Optional/" +
+                        "parallel-structural-shape" +
+                        " pattern demonstration flags +" +
+                        " substrate cumulative 190 →" +
+                        " 196。"),
+                BASChapterKnife(
+                    mNumber: 2002, knife: "第二刀",
+                    concept: "64 anti-drift PROOF tests" +
+                        " pinning every literal value" +
+                        " in the catalog — identity," +
+                        " entry counts,6 kind buckets," +
+                        " aggregate computed,achievement" +
+                        " flags,distinctive features," +
+                        " substrate growth,cross-doctrine" +
+                        " refs,milestone flags,per-entry" +
+                        " chapter tags,per-entry mNumber" +
+                        "First,Codable round-trip on" +
+                        " EntryRecord。"),
+                BASChapterKnife(
+                    mNumber: 2003, knife: "第三刀",
+                    concept: "18 wire-in PROOF tests" +
+                        " cross-checking each catalog" +
+                        " entry against its 6 source" +
+                        " per-entry extension doctrine" +
+                        " — mNumberFirst,typesExtended" +
+                        ",chapterTag wired in via" +
+                        " direct equality assertions" +
+                        " (catches doctrine drift via" +
+                        " test-time mismatch)。"),
+                BASChapterKnife(
+                    mNumber: 2004, knife: "第四刀",
+                    concept: "Chapter 656 close-out +" +
+                        " doctrine sync。 588 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 hexa #7 sealed —" +
+                        " catalog lineage M1805 post-" +
+                        "octa → M1833 hexa #1 → M1861" +
+                        " hexa #2 → M1889 hexa #3 →" +
+                        " M1917 hexa #4 → M1945 hexa" +
+                        " #5 → M1973 hexa #6 → M2001" +
+                        " hexa #7。 typed-surface count" +
+                        " 196 → 197。 next hexa #8" +
+                        " catalog opportunity at" +
+                        " chapter 六百六十三 (656+7=663)" +
+                        "。")
+            ],
+            entropyClassesAttacked: [
+                "hexa-seven-catalog-not-shipped",
+                "post-hexa-six-run-not-commemorated",
+                "theme-continuation-pattern-not-captured",
+                "multi-module-return-not-pinned",
+                "round-number-m-milestone-crossing-not-recorded"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M2004",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "gap-fill-hexa-seven-catalog",
+                "18-types-extended-across-6-entries",
+                "5-distinct-modules-touched",
+                "explicit-theme-continuation",
+                "round-number-chapter-contained",
+                "round-number-m-milestone-crossed",
+                "588-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 6 more post-hexa-#7 gap-" +
+                "fill chapters 657-662",
+                "future arc — chapter 六百六十三 hexa #8" +
+                " catalog opportunity",
+                "future arc — Phase H default mode flip"
+            ],
+            summary: "Chapter 656 ships the 7TH GAP-FILL" +
+                " HEXA CATALOG META-META MILESTONE —" +
+                " commemorates the 6 post-hexa-#6 gap-" +
+                "fill chapters (650-655) shipped between" +
+                " hexa #6 seal at M1973 and now。 18" +
+                " types extended / 24 commits / 5" +
+                " distinct modules touched (BASRuntime" +
+                "Core + BASSovereign + BASMetalSubstrate" +
+                " + BASOrgan + BASHostKit)。 RETURNS to" +
+                " multi-module diversity after hexa #6's" +
+                " entirely-single-module BASSovereign" +
+                " run。 FIRST hexa with EXPLICIT THEME" +
+                " CONTINUATION between two entries (654→" +
+                "655 validation-result → validation-" +
+                "issue)。 FIRST hexa containing a ROUND-" +
+                "NUMBER chapter (650) AND crossing a" +
+                " ROUND-NUMBER M-milestone (M2000) within" +
+                " its 6-entry run。 Catalog lineage" +
+                " M1805 post-octa → M1833 hexa #1 →" +
+                " M1861 hexa #2 → M1889 hexa #3 → M1917" +
+                " hexa #4 → M1945 hexa #5 → M1973 hexa" +
+                " #6 → M2001 hexa #7。 NEW catalog" +
+                " (M2001) + 64 anti-drift PROOF tests" +
+                " (M2002) + 18 wire-in PROOF tests" +
+                " (M2003) + close-out (M2004)。 197 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M2004。 588 consecutive autonomous" +
+                " commits with V1 byte-equality preserved" +
+                "。 ADR-014 OPT-IN preserved。 Next hexa" +
+                " #8 catalog opportunity at chapter 六百" +
+                "六十三 (657-662 gap-fill arc + 663" +
+                " catalog)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

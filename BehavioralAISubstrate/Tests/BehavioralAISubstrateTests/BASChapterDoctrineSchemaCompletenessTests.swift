@@ -2345,7 +2345,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十五")!)
+                            "chapter 六百五十五")!),
+            // M2004 chapter 656 — 7TH GAP-FILL HEXA CATALOG META-META MILESTONE cataloging post-hexa-#6 chapters 650-655
+            checkRegistry("六百五十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4081,6 +4087,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十五")!
+                .mNumberLast),
+            // M2004 chapter 656 — 7TH GAP-FILL HEXA CATALOG META-META MILESTONE
+            ("656",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

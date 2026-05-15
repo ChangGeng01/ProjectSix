@@ -4636,7 +4636,35 @@ public enum BASEntropyChapterIndex {
                 " commits。 V1 byte-equality preserved。" +
                 " Chapter 656 hexa #7 catalog" +
                 " opportunity NEXT with symmetric 6-" +
-                "entry run 650-655。")
+                "entry run 650-655。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十六",
+            mNumberFirst: 2001, mNumberLast: 2004,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "7TH GAP-FILL HEXA CATALOG META-" +
+                "META MILESTONE — commemorates 6 post-" +
+                "hexa-#6 gap-fill chapters (650-655)。" +
+                " 18 types extended / 24 commits / 5" +
+                " distinct modules touched。 RETURNS to" +
+                " multi-module diversity after hexa #6's" +
+                " entirely-single-module run。 FIRST" +
+                " hexa with EXPLICIT THEME CONTINUATION" +
+                " (654→655) + FIRST hexa containing a" +
+                " ROUND-NUMBER chapter (650) AND" +
+                " crossing a ROUND-NUMBER M-milestone" +
+                " (M2000)。 NEW BASGapFillHexaSeven" +
+                "CompletionDoctrine (M2001) + 64 anti-" +
+                "drift PROOF tests (M2002) + 18 wire-in" +
+                " PROOF tests (M2003) + close-out" +
+                " (M2004)。 catalog lineage M1805 post-" +
+                "octa → M1833 hexa #1 → M1861 hexa #2" +
+                " → M1889 hexa #3 → M1917 hexa #4 →" +
+                " M1945 hexa #5 → M1973 hexa #6 → M2001" +
+                " hexa #7。 197 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2004。" +
+                " 588 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

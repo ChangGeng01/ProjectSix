@@ -491,6 +491,22 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// CONTINUATION from chapter 654 (extends
     /// validation-result theme to plan-ledger
     /// validation-issue)。
+    /// Re-captured at chapter 656 close-out。 Chapter
+    /// 656:7TH GAP-FILL HEXA CATALOG META-META
+    /// MILESTONE — commemorates 6 post-hexa-#6 gap-
+    /// fill chapters (650-655)。 18 types extended /
+    /// 24 commits / 5 distinct modules touched。 NEW
+    /// BASGapFillHexaSevenCompletionDoctrine (M2001)
+    /// + 64 anti-drift PROOF tests (M2002) + 18 wire-
+    /// in PROOF tests (M2003) + close-out (M2004)。
+    /// RETURNS to multi-module diversity。 FIRST hexa
+    /// with EXPLICIT THEME CONTINUATION (654→655) +
+    /// FIRST hexa containing ROUND-NUMBER chapter
+    /// (650) AND crossing ROUND-NUMBER M-milestone
+    /// (M2000)。 catalog lineage M1805 post-octa →
+    /// M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3
+    /// → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa
+    /// #6 → M2001 hexa #7。
     static let frozenFullRegistrySha256: String =
-        "7bc95aa217399b709ada784c4862f3d141224fda7581d7d87503ebe07a6cda8f"
+        "b92edbd25785be4f33a585181067acf2ed5ee5e5e1e859a9c6ee67a0ed778c9d"
 }
