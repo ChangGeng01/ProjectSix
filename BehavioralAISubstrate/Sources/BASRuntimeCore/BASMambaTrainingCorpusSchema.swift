@@ -209,7 +209,7 @@ public struct BASMambaTrainingCorpusManifest:
 /// against the schema。Trainer aggregates these across the
 /// corpus to decide whether to proceed。
 public enum BASMambaTrainingValidationResult:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     case valid
     case invalid(reason: BASMambaTrainingValidationFailure)

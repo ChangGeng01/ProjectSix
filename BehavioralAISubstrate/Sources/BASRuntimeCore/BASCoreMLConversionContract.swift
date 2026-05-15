@@ -375,7 +375,7 @@ public struct BASCoreMLConversionResult:
 /// Typed result of validating a `BASCoreMLConversionRequest`
 /// before sending it to the converter。
 public enum BASCoreMLConversionValidationResult:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     case valid
     case invalid(reason: BASCoreMLConversionValidationFailure)

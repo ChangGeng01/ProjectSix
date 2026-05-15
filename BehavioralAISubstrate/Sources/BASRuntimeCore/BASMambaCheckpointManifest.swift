@@ -191,7 +191,7 @@ public struct BASMambaCheckpointManifest:
 // MARK: - Validation
 
 public enum BASMambaCheckpointValidationResult:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     case valid
     case invalid(reason:
