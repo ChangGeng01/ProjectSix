@@ -85,7 +85,7 @@ public struct BASLLMPromptCacheKey:
 /// Typed enum of cache lookup results。Telemetry-class —
 /// hosts surface in observability。
 public enum BASLLMPromptCacheOutcome:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     case miss
     /// Prefix matched, suffix did not — caller can re-issue

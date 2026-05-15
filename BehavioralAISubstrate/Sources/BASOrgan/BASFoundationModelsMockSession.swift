@@ -72,7 +72,7 @@ import BASRuntimeCore
 /// pre-loads a sequence of these;each `draft(...)` call
 /// consumes the next entry。
 public enum BASFoundationModelsMockResponse:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     /// Plain-text response (no tool calls)。
     case text(body: String)

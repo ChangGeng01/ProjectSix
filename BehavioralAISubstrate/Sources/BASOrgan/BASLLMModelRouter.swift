@@ -176,7 +176,7 @@ public typealias BASLLMModelRoutingPolicy =
 // MARK: - Errors
 
 public enum BASLLMModelRouterError:
-    Error, Sendable, Equatable
+    Error, Sendable, Equatable, Codable
 {
     case noAdapterRegisteredForClass(BASLLMModelClass)
     case duplicateAdapterRegistration(BASLLMModelClass)
