@@ -259,4 +259,41 @@ public enum BASSignalTenIntegrationTestTriageDoctrine {
         "HONEST TRIAGE — name the problem,document the bucket,don't pretend it's fixed"
 
     public static let purelyAdditive: Bool = true
+
+    // MARK: - Swift-Testing concurrent-run flakiness
+    //         (M2144 第三刀 amendment)
+
+    /// SwiftPM `swift test` invocations run XCTest +
+    /// swift-testing in parallel processes。 The swift-
+    /// testing helper can crash with signal-10 when
+    /// running concurrently with a large XCTest sweep
+    /// (e.g. 11000+ tests),even though the SAME swift-
+    /// testing suites PASS when run in isolation。
+    ///
+    /// Observed:`BASAppleObservabilityAdapterTests`
+    /// (Swift Testing `@Suite` with 10 `@Test` cases)
+    /// passes in isolation。 Crashes intermittently in
+    /// the full-sweep concurrent path with signal-10
+    /// in the swiftpm-testing-helper process。
+    ///
+    /// Classified as:flakiness in the swiftpm-testing-
+    /// helper concurrent-runner,NOT a substrate bug。
+    /// Recovery path:run XCTest + Swift Testing in
+    /// separate invocations (e.g. via
+    /// `swift test --testing-library xctest` then
+    /// `swift test --testing-library swift-testing`)
+    /// or wait for SwiftPM to stabilize the
+    /// concurrent runner。
+    public static let swiftTestingConcurrentRunFlakinessKnown:
+        Bool = true
+
+    /// Affected swift-testing suite for the documented
+    /// flakiness。
+    public static let knownFlakySwiftTestingSuite: String =
+        "BASAppleObservabilityAdapterTests"
+
+    /// Recovery candidate for swift-testing flakiness。
+    public static let swiftTestingFlakinessRecovery:
+        String =
+        "run XCTest + Swift Testing in separate `swift test --testing-library` invocations"
 }

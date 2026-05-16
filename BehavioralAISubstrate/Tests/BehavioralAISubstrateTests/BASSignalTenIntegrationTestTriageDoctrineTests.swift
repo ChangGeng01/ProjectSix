@@ -210,6 +210,33 @@ final class BASSignalTenIntegrationTestTriageDoctrineTests: XCTestCase {
         }
     }
 
+    // MARK: - M2144 amendment — swift-testing flakiness
+
+    func testSwiftTestingConcurrentRunFlakinessKnown() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingConcurrentRunFlakinessKnown)
+    }
+
+    func testKnownFlakySwiftTestingSuite() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .knownFlakySwiftTestingSuite,
+            "BASAppleObservabilityAdapterTests")
+    }
+
+    func testSwiftTestingFlakinessRecoveryMentionsSeparateInvocations()
+    {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingFlakinessRecovery.contains(
+                    "separate"))
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingFlakinessRecovery.contains(
+                    "testing-library"))
+    }
+
     func testInventoryCoverageMatches6Plus3Plus3() {
         // 6 from BASSubstrateReauditShadowEvaluatorTests
         // + 3 from BASMemoryClosedLoopApplierHostRuntime
