@@ -240,14 +240,30 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
             biomimeticCheckpointEveryNTurns
     }
 
-    /// Default config: no event log,UUID factory,system clock,
-    /// V1-byte-equal runtime mode,no kernel registry,no ANE
-    /// capability。 Matches the V2 actor's M968 init defaults
-    /// + ADR-014 OPT-IN compliance (V1 byte-equality preserved
-    /// out-of-the-box)。
+    /// Default config:no event log,UUID factory,system clock,
+    /// no kernel registry,no ANE capability。
+    ///
+    /// **PRE-M2073 (M968 baseline)**:`.default()` returned a
+    /// config with `runtimeMode = .v1ByteEqual` (V1 byte-
+    /// equality preserved out-of-the-box for all
+    /// `.default()`-using hosts)。
+    ///
+    /// **M2073 chapter 六百七十四 第一刀** prepares for the
+    /// M2074 flip:doctrine note added,no behavior change
+    /// yet。 The actual flip lands at M2074 — `runtimeMode`
+    /// changes from `.v1ByteEqual` to `.nativeV2`。
+    ///
+    /// ADR-014 OPT-OUT path:hosts that need V1 semantics
+    /// after the flip construct the config explicitly:
+    /// `BASTurnRuntimeEngineConfiguration(runtimeMode:` +
+    /// `.v1ByteEqual)`。 Init parameter default for
+    /// `runtimeMode` remains `.v1ByteEqual` per back-compat
+    /// contract with explicit callers。
     public static func `default`()
         -> BASTurnRuntimeEngineConfiguration
     {
+        // M2073 preparatory commit — no behavior change。
+        // M2074 will flip the implicit runtimeMode here。
         BASTurnRuntimeEngineConfiguration()
     }
 
