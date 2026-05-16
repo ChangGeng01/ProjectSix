@@ -673,6 +673,57 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// followup arcs OPTIONAL — TTL/never policy impls
     /// + BASTensor MTLBuffer zero-copy + self-tuning
     /// scheduler all candidates。
+    /// Re-captured at chapter 691 close-out。 Post-FINAL-
+    /// SEAL second follow-up arc。 RESOLVES REMAINING
+    /// POST-SEAL ITEMS IN ONE ARC:TTL eviction + .never
+    /// semantic + comprehensive catalog。 NEW BASKVCache
+    /// TTLEvictor pure-function at M2134 + BASKVCacheTTL
+    /// EvictionDecision typed result struct + default
+    /// TtlMs=300000 (5min) + isExpired helper + 14 anti-
+    /// drift PROOF tests。 BASKVCacheRegistry TTL wire-
+    /// in at M2135 with ttlMs:Int64? + timestamps:
+    /// [String:Int64] tracking + Sendable ClockMillis
+    /// Provider typealias (testable clock abstraction) +
+    /// totalTTLEvictions audit + new init(invalidation
+    /// Policy:capacity:ttlMs:clockMillisProvider:) +
+    /// cachedSession/storeSession/appendToken/invalidate
+    /// methods updated for TTL path + .never semantic
+    /// clarified (capacity+ttlMs hints IGNORED) + 9 TTL
+    /// integration tests + 14 doctrine tests (now 4-of-4
+    /// implemented)。 NEW BASPostSealFollowupCatalog
+    /// Doctrine at M2136 cataloguing 3 SHIPPED items
+    /// (LRU + TTL + .never) + 4 DEFERRED items (BAS
+    /// Tensor MTLBuffer zero-copy + multi-host runtime
+    /// federation + MLX→CoreML CLI driver + self-tuning
+    /// scheduler from dispatch-outcome history) with
+    /// HONEST per-item rationale (>50 chars each,
+    /// substantive) + 30-chapter total deferred scope
+    /// estimate + 4 deferral categories + isSubstrate
+    /// SeleAtRest=true claim + 27 anti-drift PROOF
+    /// tests。 Chapter 691 close-out (M2137) + 13-file
+    /// standard sync。 64 chapter 691 PROOF tests total
+    /// (14 evictor + 23 wire-in + 27 catalog = 64) +
+    /// close-out contributions。 *** chapter 500 / M1379
+    /// FULL 4-POLICY GAP CLOSED at chapter 691 ***:
+    /// 4-of-4 KV invalidation policies now implemented
+    /// (.explicitOnly + .lru + .ttl + .never semantic
+    /// clarified)。 contractOnlyPolicies set is now
+    /// EMPTY。 ADR-014 OPT-OUT preserved (all paths
+    /// additive,default init M1306 behavior unchanged)。
+    /// ADR-016 → M2137。 720 consecutive byte-equality
+    /// clean commits。 258 typed surfaces cumulative
+    /// (+3:BASKVCacheTTLEvictor + BASKVCacheTTLEviction
+    /// Decision + BASPostSealFollowupCatalogDoctrine)。
+    /// 60/60 score unchanged (saturation invariant —
+    /// post-seal arcs ship production value not score
+    /// deltas)。 *** Substrate declared AT-REST ***:no
+    /// urgent doctrine gaps,no urgent test gaps,no
+    /// urgent directive gaps;future work OPTIONAL
+    /// ENHANCEMENT not REQUIRED COMPLETION。 4 remaining
+    /// stretch goals catalogued with deferral categories
+    /// spanning production-api-redesign / external-
+    /// architecture / external-tooling / adaptive-
+    /// optimization。
     static let frozenFullRegistrySha256: String =
-        "e91dfb9476640bb6e1a59c4bad928c59d7fab4ba17e215d1b67ac9ffb016a228"
+        "dd5f99e320a61bfc6b1c8111c689e1d6793b0dae8c27c9d46dc610afc2bef37a"
 }

@@ -5404,7 +5404,48 @@ public enum BASEntropyChapterIndex {
                 " not score deltas)。 Post-seal followup" +
                 " OPTIONAL — TTL/never implementations," +
                 "BASTensor MTLBuffer zero-copy,self-tuning" +
-                " scheduler all candidates。")
+                " scheduler all candidates。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十一",
+            mNumberFirst: 2134, mNumberLast: 2137,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 1,
+            summary: "Post-FINAL-SEAL second follow-up" +
+                " arc。 RESOLVES REMAINING POST-SEAL ITEMS" +
+                " IN ONE ARC:TTL + .never + comprehensive" +
+                " catalog of remaining stretch goals。" +
+                " NEW BASKVCacheTTLEvictor pure-function" +
+                " + decision struct at M2134 + 14 anti-" +
+                "drift tests。 BASKVCacheRegistry TTL" +
+                " wire-in at M2135 with ttlMs:Int64? +" +
+                " timestamps tracking + Sendable" +
+                " ClockMillisProvider + .never semantic" +
+                " clarified (typed declaration distinct" +
+                " from .explicitOnly but runtime-equivalent" +
+                " — capacity+ttlMs hints IGNORED) + 23" +
+                " tests。 NEW BASPostSealFollowupCatalog" +
+                "Doctrine at M2136 cataloguing 3 SHIPPED" +
+                " (LRU+TTL+.never) + 4 DEFERRED items" +
+                " (BASTensor zero-copy + multi-host" +
+                " federation + MLX→CoreML CLI + self-" +
+                "tuning scheduler) with HONEST per-item" +
+                " rationale + 30-chapter deferred scope" +
+                " estimate + substrate AT-REST claim +" +
+                " 27 anti-drift tests。 Chapter 691" +
+                " close-out (M2137) + 13-file standard" +
+                " sync。 chapter 500 / M1379 FULL 4-POLICY" +
+                " GAP CLOSED:4-of-4 policies now" +
+                " implemented (.explicitOnly + .lru +" +
+                " .ttl + .never semantic clarified)。 ADR-" +
+                "014 OPT-OUT preserved (default init" +
+                " unchanged,M1306 behavior preserved)。" +
+                " ADR-016 → M2137。 720 consecutive byte-" +
+                "equality clean commits。 258 typed" +
+                " surfaces cumulative (+3:BASKVCache" +
+                "TTLEvictor + BASKVCacheTTLEvictionDecision" +
+                " + BASPostSealFollowupCatalogDoctrine)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate declared AT-REST。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

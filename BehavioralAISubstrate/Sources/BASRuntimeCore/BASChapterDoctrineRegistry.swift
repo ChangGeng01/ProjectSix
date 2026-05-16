@@ -21145,7 +21145,111 @@ public enum BASChapterDoctrineRegistry {
                 " BASKVCacheLRUEvictionDecision)。 60/60" +
                 " score unchanged (post-seal arcs ship" +
                 " production value not score deltas)。 Post-" +
-                "seal followup OPTIONAL.")
+                "seal followup OPTIONAL."),
+
+        // chapter 691 — post-FINAL-SEAL second follow-up
+        // arc。 RESOLVES REMAINING POST-SEAL ITEMS IN ONE
+        // ARC:TTL + .never + comprehensive catalog of
+        // remaining stretch goals。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十一",
+            mNumberFirst: 2134,
+            mNumberLast: 2137,
+            v1MilestoneMNumber: 2137,
+            v1MilestoneStatus:
+                "chapter-691-post-seal-ttl-never-catalog-one-shot-resolution",
+            knives: [
+                BASChapterKnife(mNumber: 2134, knife: "第一刀",
+                    concept: "NEW BASKVCacheTTLEvictor" +
+                        " pure-function + decision struct" +
+                        " + defaultTtlMs=300000 (5min) +" +
+                        " isExpired helper + 14 tests。"),
+                BASChapterKnife(mNumber: 2135, knife: "第二刀",
+                    concept: "BASKVCacheRegistry TTL" +
+                        " wire-in (ttlMs + timestamps +" +
+                        " Sendable ClockMillisProvider +" +
+                        " totalTTLEvictions) + .never" +
+                        " semantic clarification + 4-of-4" +
+                        " policies promoted to implemented" +
+                        " + 23 tests (9 TTL integration +" +
+                        " 14 doctrine)。"),
+                BASChapterKnife(mNumber: 2136, knife: "第三刀",
+                    concept: "NEW BASPostSealFollowup" +
+                        "CatalogDoctrine cataloguing 3" +
+                        " SHIPPED (LRU+TTL+.never) + 4" +
+                        " DEFERRED items (BASTensor zero-" +
+                        "copy + multi-host federation +" +
+                        " MLX→CoreML CLI + self-tuning" +
+                        " scheduler) with HONEST per-item" +
+                        " rationale + 30-chapter deferred" +
+                        " scope estimate + substrate AT-" +
+                        "REST claim + 27 anti-drift tests。"),
+                BASChapterKnife(mNumber: 2137, knife: "第四刀",
+                    concept: "Chapter 691 close-out + 13-" +
+                        "file standard sync。 720" +
+                        " consecutive byte-equality clean" +
+                        " commits。 chapter 500 / M1379" +
+                        " FULL 4-policy gap CLOSED。 4-of-" +
+                        "4 KV invalidation policies now" +
+                        " implemented (.explicitOnly +" +
+                        " .lru + .ttl + .never)。 Substrate" +
+                        " declared AT-REST。")
+            ],
+            entropyClassesAttacked: [
+                "kv-cache-no-ttl-eviction",
+                "never-policy-semantic-ambiguous",
+                "no-post-seal-catalog-doctrine",
+                "remaining-stretch-goals-not-typed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (default" +
+                    " init unchanged,TTL+.never opt-in only)",
+                "ADR-016 → M2137",
+                "chapter-500-full-4-policy-gap-closed",
+                "4-of-4-kv-policies-implemented",
+                "substrate-at-rest",
+                "saturation-invariant-preserved",
+                "720-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "Post-seal followup arcs OPTIONAL — 4 deferred items catalogued with honest rationale (30 chapter scope estimate if all shipped;substrate is AT-REST)"
+            ],
+            summary: "Post-FINAL-SEAL SECOND follow-up" +
+                " arc。 RESOLVES REMAINING POST-SEAL ITEMS" +
+                " IN ONE ARC:NEW BASKVCacheTTLEvictor +" +
+                " decision struct at M2134 + 14 tests。" +
+                " BASKVCacheRegistry TTL wire-in at M2135" +
+                " with Sendable ClockMillisProvider +" +
+                " .never semantic clarification + 4-of-4" +
+                " policies promoted + 23 tests。 NEW BAS" +
+                "PostSealFollowupCatalogDoctrine at M2136" +
+                " cataloguing 3 SHIPPED (LRU+TTL+.never)" +
+                " + 4 DEFERRED items + isSubstrateSeleAt" +
+                "Rest=true claim + 27 anti-drift tests。" +
+                " Chapter 691 close-out (M2137) + 13-file" +
+                " standard sync。 64 chapter 691 PROOF" +
+                " tests total (14+23+27) + close-out" +
+                " additions。 chapter 500 / M1379 FULL" +
+                " 4-POLICY GAP CLOSED at chapter 691。" +
+                " 4-of-4 KV invalidation policies now" +
+                " implemented (.explicitOnly + .lru + .ttl" +
+                " + .never semantic clarified)。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2137。" +
+                " 720 consecutive byte-equality clean" +
+                " commits。 258 typed surfaces cumulative" +
+                " (+3:BASKVCacheTTLEvictor + decision" +
+                " struct + BASPostSealFollowupCatalog" +
+                "Doctrine)。 60/60 score unchanged" +
+                " (saturation invariant)。 Substrate" +
+                " declared AT-REST — no urgent gaps;" +
+                " future work OPTIONAL ENHANCEMENT not" +
+                " REQUIRED COMPLETION。 4 remaining" +
+                " stretch goals catalogued with honest" +
+                " deferral rationale spanning production-" +
+                "api-redesign / external-architecture /" +
+                " external-tooling / adaptive-" +
+                "optimization categories。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

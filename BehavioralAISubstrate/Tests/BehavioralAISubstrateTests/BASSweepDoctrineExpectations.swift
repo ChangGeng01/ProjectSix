@@ -121,17 +121,18 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 286
+    public static let phase2ChapterCount: Int = 287
 
-    /// Phase 2 commits shipped。 At M2133:125 + 84 +
-    /// 969 = 1178 (chapter 690 — post-FINAL-SEAL
-    /// follow-up arc:LRU eviction for BASKVCacheRegistry
-    /// closing the chapter 500 / M1379 LRU-deferred gap)
-    public static let phase2CommitsShipped: Int = 1178
+    /// Phase 2 commits shipped。 At M2137:125 + 84 +
+    /// 973 = 1182 (chapter 691 — post-FINAL-SEAL second
+    /// follow-up arc:TTL + .never + post-seal catalog
+    /// in one arc;chapter 500 / M1379 FULL 4-policy
+    /// gap closed)
+    public static let phase2CommitsShipped: Int = 1182
 
-    /// Phase 2 mNumberLast。 At M2133:chapter 690 —
-    /// post-FINAL-SEAL follow-up。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2133
+    /// Phase 2 mNumberLast。 At M2137:chapter 691 —
+    /// post-seal second follow-up。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2137
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
