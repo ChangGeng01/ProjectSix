@@ -203,4 +203,40 @@ final class BASSubstrateMaximallyResolvedDoctrineTests: XCTestCase {
             BASSubstrateMaximallyResolvedDoctrine
                 .directiveScoreImpact, 0)
     }
+
+    // MARK: - M2155 chapter 696 terminal-state
+    //         amendment pins
+
+    func testM2152TerminalStateClaimQualifiedPostM2154() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .m2152TerminalStateClaimQualifiedPostM2154)
+    }
+
+    func testQualifiedStateDescriptionMentionsRecovery() {
+        let desc = BASSubstrateMaximallyResolvedDoctrine
+            .qualifiedStateDescription
+        XCTAssertTrue(desc.contains("HIGHLY RESOLVED"))
+        XCTAssertTrue(desc.contains("sync-surface"))
+        XCTAssertTrue(desc.contains("6-of-12"))
+    }
+
+    func testReactivePathStillOpen() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .reactivePathStillOpen)
+    }
+
+    func testChapter696RecoveryProofExists() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .chapter696RecoveryProofExists)
+    }
+
+    func testChapter696RecoveryDoctrineRef() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .chapter696RecoveryDoctrineRef.contains(
+                    "BASChapter696RecoveryProgressDoctrine"))
+    }
 }

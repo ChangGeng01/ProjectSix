@@ -426,4 +426,76 @@ public enum BASSignalTenIntegrationTestTriageDoctrine {
     /// Empirical-diagnosis test file ref。
     public static let empiricalDiagnosisTestFile: String =
         "Tests/BehavioralAISubstrateTests/BASSignal10EmpiricalDiagnosisTests.swift"
+
+    // MARK: - M2155 chapter 六百九十六 第二刀 — sync-surface
+    //         recovery correction
+    //
+    // M2146 ORIGINAL claim:wrapperBasedRecoveryViable =
+    // false。 Empirical truth at M2146 was that
+    // Task.detached + DispatchSemaphore/expectation
+    // wrappers all crashed (Diagnostic E)。
+    //
+    // M2154 chapter 696 SHIPPED a DIFFERENT recovery
+    // pattern that DOES work:SUBSTRATE-LEVEL SYNC
+    // SURFACE。 Adding `evaluateSync(...)` to
+    // BASSubstrateReauditShadowEvaluator (no Task.detached
+    // internally) + migrating tests to sync test methods
+    // (no async/throws) UN-SKIPPED 6-of-12 SIGBUS tests。
+    //
+    // Recovery pattern signature:
+    //   - Substrate ships SYNC method alongside async
+    //   - Test migrates from `async throws` → sync
+    //   - Test calls sync method directly
+    //   - Matches Diagnostic A (sync+sync) → PASSES
+    //
+    // REMAINING 6 tests (BASMemoryClosedLoop 3 + M306 3)
+    // require ACTOR-SURFACE refactor (the failing tests
+    // call into `public actor` methods that are async by
+    // Swift's actor model)。 This is a BIGGER refactor
+    // beyond chapter 696 scope。
+    //
+    // M2146 wrapperBasedRecoveryViable pin RETAINED for
+    // history (it was correct for wrapper patterns at
+    // the time);M2155 adds SYNC SURFACE recovery
+    // viability as a SEPARATE pin。
+
+    /// M2155 CORRECTION:sync-surface recovery IS viable
+    /// (different pattern than wrapper-based)。
+    public static let syncSurfaceRecoveryViable: Bool =
+        true
+
+    /// 6 of 12 originally-skipped SIGBUS tests RECOVERED
+    /// at chapter 696 / M2154 via sync-surface refactor。
+    public static let signal10TestsRecoveredAtChapter696:
+        Int = 6
+
+    /// 6 of 12 originally-skipped SIGBUS tests REMAIN
+    /// skipped — they call into `public actor` methods
+    /// requiring async (BASMemoryClosedLoopApplier +
+    /// BASSovereignAuditLedger)。
+    public static let signal10TestsRemainingSkippedPostM2154:
+        Int = 6
+
+    public static var signal10RecoveredPlusRemainingTotal:
+        Int {
+        return signal10TestsRecoveredAtChapter696
+            + signal10TestsRemainingSkippedPostM2154
+    }
+    // = 12
+
+    /// Recovery pattern signature for the 6 tests
+    /// recovered at M2154。
+    public static let chapter696RecoveryPattern: String =
+        "substrate ships sync method alongside async;test migrates `async throws` → sync;test calls sync method directly (Diagnostic A pattern)"
+
+    /// Affected substrate surface for the recovery
+    /// shipped at M2154。
+    public static let chapter696RecoveryShipsSurface:
+        String =
+        "BASSubstrateReauditShadowEvaluator.evaluateSync(prompt:body:prePermitMode:sessionRef:turnRef:)"
+
+    /// Why the remaining 6 tests cannot use the same
+    /// pattern。
+    public static let remaining6BlockedReason: String =
+        "BASMemoryClosedLoopApplier + BASMemoryUsageTracker + BASSovereignAuditLedger are `public actor` types — Swift's actor model enforces async access。 Sync surfaces would require breaking actor isolation。"
 }

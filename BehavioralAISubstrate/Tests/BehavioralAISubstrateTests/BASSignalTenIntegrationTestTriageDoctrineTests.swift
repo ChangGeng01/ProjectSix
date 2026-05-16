@@ -289,6 +289,54 @@ final class BASSignalTenIntegrationTestTriageDoctrineTests: XCTestCase {
                 .swiftTestingCompletedBeforeCrash)
     }
 
+    // MARK: - M2155 chapter 696 sync-surface recovery
+    //         correction pins
+
+    func testSyncSurfaceRecoveryViable() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .syncSurfaceRecoveryViable)
+    }
+
+    func testSignal10TestsRecoveredAtChapter696Is6() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .signal10TestsRecoveredAtChapter696, 6)
+    }
+
+    func testSignal10TestsRemainingSkippedPostM2154Is6() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .signal10TestsRemainingSkippedPostM2154, 6)
+    }
+
+    func testRecoveredPlusRemainingEquals12() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .signal10RecoveredPlusRemainingTotal, 12)
+    }
+
+    func testChapter696RecoveryPatternMentionsSyncSurface() {
+        let pattern =
+            BASSignalTenIntegrationTestTriageDoctrine
+                .chapter696RecoveryPattern
+        XCTAssertTrue(pattern.contains("sync"))
+        XCTAssertTrue(pattern.contains("Diagnostic A"))
+    }
+
+    func testChapter696RecoveryShipsEvaluateSync() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .chapter696RecoveryShipsSurface.contains(
+                    "evaluateSync"))
+    }
+
+    func testRemaining6BlockedByActorModel() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .remaining6BlockedReason.contains("actor"))
+    }
+
     // MARK: - M2146 empirical diagnosis pins
 
     func testEmpiricalDiagnosisRunAtM2146() {

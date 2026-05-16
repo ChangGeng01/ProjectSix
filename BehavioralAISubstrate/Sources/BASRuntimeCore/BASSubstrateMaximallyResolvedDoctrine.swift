@@ -207,4 +207,66 @@ public enum BASSubstrateMaximallyResolvedDoctrine {
     public static let purelyAdditive: Bool = true
 
     public static let directiveScoreImpact: Int = 0
+
+    // MARK: - M2155 chapter 六百九十六 第二刀 — terminal-
+    //         state amendment
+    //
+    // M2152 ORIGINAL claim:substrateTerminalStateReached
+    // = true,substrateActionableItemsRemaining = 0。
+    //
+    // M2154 chapter 696 SHIPPED a sync-surface recovery
+    // for 6-of-12 SIGBUS tests via BASSubstrateReaudit
+    // ShadowEvaluator.evaluateSync — proving that
+    // SUBSTRATE-SIDE ACTION can still recover items
+    // previously catalogued as "external-blocked"。
+    //
+    // CORRECTION:the M2152 "terminal state" was reached
+    // for the SPECIFIC SCOPE of items audited at chapter
+    // 695。 Chapter 696 found a NEW substrate-actionable
+    // path (sync-surface refactor pattern) that was not
+    // considered at M2152。
+    //
+    // True terminal-state requires:
+    //   1. All ORIGINAL chapter 695 audit items resolved
+    //      OR catalogued (held at M2152)
+    //   2. AND no new substrate-actionable patterns
+    //      discoverable
+    //
+    // M2154 discovered a new pattern。 So the "terminal
+    // state" is now QUALIFIED:reached for chapter-695-
+    // scope items,but the chapter 696 finding shows new
+    // patterns can emerge from empirical investigation。
+    //
+    // HONEST FRAMING POST-M2155:substrate is at HIGHLY
+    // RESOLVED STATE,not absolute terminal state。 New
+    // empirical investigations CAN unblock previously-
+    // catalogued items。
+
+    /// M2155 CORRECTION:M2152 "terminal state" qualified
+    /// post-M2154 sync-surface recovery discovery。
+    public static let m2152TerminalStateClaimQualifiedPostM2154:
+        Bool = true
+
+    /// Refined state description post-M2155 chapter 696
+    /// recovery progress。
+    public static let qualifiedStateDescription: String =
+        "HIGHLY RESOLVED — chapter-695-scope items resolved or catalogued;empirical investigations CAN unblock previously-catalogued items (chapter 696 / M2154 ships sync-surface recovery for 6-of-12 SIGBUS tests)"
+
+    /// Reactive paths still apply:future empirical
+    /// investigations may discover more substrate-
+    /// actionable patterns。
+    public static let reactivePathStillOpen: Bool = true
+
+    /// Concrete progress made post-M2152 terminal claim:
+    /// 6 of 12 SIGBUS tests recovered。 Substrate-
+    /// actionable count is no longer absolute 0 — it
+    /// depends on whether new empirical investigation
+    /// happens。
+    public static let chapter696RecoveryProofExists: Bool =
+        true
+
+    /// Reference to the chapter 696 recovery doctrine。
+    public static let chapter696RecoveryDoctrineRef:
+        String =
+        "BASChapter696RecoveryProgressDoctrine (chapter 696 / M2156) + BASSignalTenIntegrationTestTriageDoctrine M2155 amendment"
 }
