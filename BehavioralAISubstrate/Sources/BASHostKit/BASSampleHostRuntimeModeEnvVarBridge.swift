@@ -57,6 +57,16 @@ public enum BASSampleHostRuntimeModeEnvVarBridge {
     public static let envVarName: String =
         "BAS_RUNTIME_MODE"
 
+    /// M2065 chapter 六百七十二 第一刀:emergency
+    /// override env var。 If set,takes PRIORITY over
+    /// `BAS_RUNTIME_MODE` AND over any
+    /// `BASTurnRuntimeEngineConfiguration.default()`
+    /// — production hosts can roll back Phase L's
+    /// M2074 default flip without redeploy by setting
+    /// `BAS_RUNTIME_MODE_OVERRIDE=v1-byte-equal`。
+    public static let overrideEnvVarName: String =
+        "BAS_RUNTIME_MODE_OVERRIDE"
+
     /// Default mode when env var is absent or invalid。
     /// Phase K contract:safe default = M2032 baseline。
     /// Phase L (chapter 674 / M2074) flips this default
@@ -71,6 +81,11 @@ public enum BASSampleHostRuntimeModeEnvVarBridge {
     /// `defaultModeWhenAbsent` (= `.v1ByteEqual`) when
     /// the env var is missing OR has an unrecognized
     /// value。
+    ///
+    /// Does NOT consult `BAS_RUNTIME_MODE_OVERRIDE` —
+    /// callers wanting override precedence call
+    /// `currentRuntimeModeRespectingOverride(environment:)`
+    /// instead (M2065 chapter 六百七十二 第一刀)。
     public static func currentRuntimeMode(
         environment:
             [String: String] = ProcessInfo
@@ -81,6 +96,60 @@ public enum BASSampleHostRuntimeModeEnvVarBridge {
         }
         return BASTurnRuntimeMode(rawValue: raw)
             ?? defaultModeWhenAbsent
+    }
+
+    // MARK: - M2065 chapter 六百七十二 第一刀 — override path
+
+    /// Override-aware mode resolution。
+    ///
+    /// Priority order:
+    ///   1. `BAS_RUNTIME_MODE_OVERRIDE` if set + valid
+    ///   2. `BAS_RUNTIME_MODE` if set + valid
+    ///   3. `defaultModeWhenAbsent` (.v1ByteEqual)
+    ///
+    /// Phase L (chapter 674 / M2074) flips the
+    /// `BASTurnRuntimeEngineConfiguration.default()`
+    /// runtime mode value from `.v1ByteEqual` →
+    /// `.nativeV2`。 After that flip,production hosts
+    /// experiencing V2 regressions can set
+    /// `BAS_RUNTIME_MODE_OVERRIDE=v1-byte-equal` to
+    /// instantly roll back without redeploy。 The
+    /// override path is the FAIL-SAFE for Phase L。
+    public static func currentRuntimeModeRespectingOverride(
+        environment:
+            [String: String] = ProcessInfo
+                .processInfo.environment
+    ) -> BASTurnRuntimeMode {
+        // Priority 1:override env var
+        if let overrideRaw =
+            environment[overrideEnvVarName],
+           let overrideMode = BASTurnRuntimeMode(
+            rawValue: overrideRaw)
+        {
+            return overrideMode
+        }
+        // Priority 2:standard env var
+        if let raw = environment[envVarName],
+           let mode = BASTurnRuntimeMode(rawValue: raw)
+        {
+            return mode
+        }
+        // Priority 3:safe default
+        return defaultModeWhenAbsent
+    }
+
+    /// Did the override env var resolve to a valid
+    /// runtime mode?
+    public static func isOverrideActive(
+        environment:
+            [String: String] = ProcessInfo
+                .processInfo.environment
+    ) -> Bool {
+        guard let overrideRaw =
+                environment[overrideEnvVarName]
+        else { return false }
+        return BASTurnRuntimeMode(rawValue: overrideRaw)
+            != nil
     }
 
     /// Did the env var resolve to a non-default mode?
