@@ -112,7 +112,7 @@ import Foundation
 /// fields skip the corresponding primitive (allowing
 /// hosts to drive only the primitives they populated)。
 public struct BASBiomimeticTurnSignal:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Predictive-coding observation vector。 When non-
@@ -203,7 +203,7 @@ public struct BASBiomimeticTurnSignal:
 /// primitive was either not populated on the observer
 /// OR the signal didn't drive it。
 public struct BASBiomimeticTurnObservation:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Predictive-coding observation result (if probe

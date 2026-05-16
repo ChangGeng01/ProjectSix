@@ -96,7 +96,7 @@ public enum BASFoundationModelsMockResponse:
 /// Tests inspect these to verify the planner / dispatcher
 /// passed the right request。
 public struct BASFoundationModelsMockCallRecord:
-    Sendable, Equatable
+    Sendable, Equatable, Codable
 {
     /// The full request the mock received (after substrate
     /// composition,e.g. M915 planner concatenated tool
