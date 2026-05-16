@@ -2411,7 +2411,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十六")!)
+                            "chapter 六百六十六")!),
+            // M2048 chapter 667 — PHASE J COMPLETE (conv2D + 5x speedup benchmark + Phase J close-out doctrine)
+            checkRegistry("六百六十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4235,6 +4241,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十六")!
+                .mNumberLast),
+            // M2048 chapter 667 — PHASE J COMPLETE (conv2D + 5x speedup benchmark + Phase J close-out doctrine)
+            ("667",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

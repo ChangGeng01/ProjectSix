@@ -4887,7 +4887,32 @@ public enum BASEntropyChapterIndex {
                 " clean commits。 V1 byte-equality preserved" +
                 "。 ADR-014 OPT-IN preserved。 Chapter 667" +
                 " wires conv2D + 5× speedup benchmark +" +
-                " seals Phase J。")
+                " seals Phase J。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十七",
+            mNumberFirst: 2045, mNumberLast: 2048,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE J COMPLETE。 Final BASMPSGraph" +
+                "Conv2DKernel wired at M2045 (2 PROOF" +
+                " tests)。 NEW BASMPSGraphCacheBenchmark" +
+                "Tests asserting ≥5× speedup on 1000-" +
+                "dispatch loop PASSES on real Apple" +
+                " Silicon GPU at M2046 — Phase J's" +
+                " falsifiable promise delivered。 NEW BAS" +
+                "PhaseJKernelCacheCompletionDoctrine + 37" +
+                " anti-drift tests sealing 6-of-6 kernel" +
+                " achievement at M2047。 close-out at" +
+                " M2048。 90 total Phase J tests PASS (17" +
+                " kernel + 72 anti-drift + 1 benchmark)。" +
+                " 209 typed surfaces cumulative (+2)。" +
+                " ADR-016 → M2048。 632 consecutive byte-" +
+                "equality clean commits。 V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。" +
+                " Phase J score-delta +6 on 原生利用神经" +
+                "引擎 directive。 Phase K chapters 668-671" +
+                " NEXT — runtimeMode toggle + dual-mode" +
+                " CI for Phase L default flip readiness。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

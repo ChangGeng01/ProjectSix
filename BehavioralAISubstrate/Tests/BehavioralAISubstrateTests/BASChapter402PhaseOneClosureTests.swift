@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2044",
-            "M2044:doctrine version reflects chapter 六百六十六 — PHASE J kernel wiring continues — 3 more kernels wired。 attention at M2041 (2 PROOF tests) + softmax + layerNorm batched at M2042 (4 PROOF tests across both)。 NEW BASKernelCacheWiringPhaseJChapter666Doctrine + 13 anti-drift tests at M2043。 close-out at M2044。 207 typed surfaces cumulative。 628 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 5 of 6 Phase J kernels wired。 Chapter 667 wires conv2D + 5× speedup benchmark + seals Phase J")
+            "ADR-016.M2048",
+            "M2048:doctrine version reflects chapter 六百六十七 — PHASE J COMPLETE。 Final BASMPSGraphConv2DKernel wired at M2045 (2 PROOF tests)。 NEW BASMPSGraphCacheBenchmarkTests asserting ≥5× speedup on 1000-dispatch loop PASSES on real Apple Silicon GPU at M2046。 NEW BASPhaseJKernelCacheCompletionDoctrine + 37 anti-drift tests at M2047。 close-out at M2048。 90 total Phase J tests PASS (17 kernel + 72 anti-drift + 1 benchmark)。 209 typed surfaces cumulative。 632 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Phase J score-delta +6 on 原生利用神经引擎。 6 of 6 MPSGraph kernels wired with byte-equality preserved。 Phase K chapters 668-671 NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二
