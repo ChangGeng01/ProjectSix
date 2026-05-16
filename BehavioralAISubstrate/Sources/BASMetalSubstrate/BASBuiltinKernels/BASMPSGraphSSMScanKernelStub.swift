@@ -1,64 +1,75 @@
 // MARK: - BASMPSGraphSSMScanKernelStub
-// chapter 四百九十六 / M1361-M1362 — typed ssmScan kernel STUB
+// chapter 四百九十六 / M1361 — Tier 2 entry typed STUB
+// chapter 六百八十一 / M2101 — REPURPOSED as .cpuBytes
+//                              sibling delegating to
+//                              BASSSMScanCPUReference for
+//                              correct math (no longer
+//                              identity-scan)
 //
-// HONEST DOCTRINE NOTE — chapter 四百九十六 / Tier 2 entry:
-// =============================================================
-// Mamba SSM selective scan is NOT natively supported by
-// MPSGraph。 Real production implementations require ONE of:
+// ## chapter 681 / M2101 repurpose (Phase M)
 //
-//   (a) Custom Metal compute shader implementing parallel
-//       prefix-scan (Blelloch-style work-efficient algorithm
-//       adapted for selective gating)
-//   (b) MLX-swift bridge via vendored mlx-swift-lm package
-//   (c) CoreML ML Program with cumsum_v2 + element-wise scan
+// The chapter 496 / M1361 stub originally registered at
+// `(ssmScan, float32, metalBuffer)` with identity-scan
+// stub semantics (output = input)。 Chapter 六百七十八 /
+// M2089 shipped REAL Metal compute kernel at the
+// metalBuffer slot via BASMetalSSMScanKernel。 That
+// collision required this stub to repurpose:
 //
-// All three paths are EXTERNAL implementation work outside
-// the substrate's pure-Swift scope。 Chapter 496 ships:
-//   - This typed STUB conforming to BASMetalKernel
-//   - Pure-Swift identity-scan reference (output = input)
-//   - HONEST documentation that this is NOT production-ready
+//   - Key MOVED to `(ssmScan, float32, cpuBytes)` —
+//     sibling slot,no collision
+//   - Implementation MOVED from identity-scan to actual
+//     CPU computation via BASSSMScanCPUReference
+//   - Production-readiness flag flipped to TRUE
+//   - implementationStatus enum case now resolves to
+//     `.cpuSwiftReferenceProduction`
 //
-// Production wiring is scheduled for follow-up Tier 2 phase
-// K (chapter 497+) with explicit revert path if all 3
-// external paths fail。
+// The repurposed kernel is a CPU-bytes fallback path
+// that produces the SAME math as the GPU kernel,suitable
+// for:
+//   - Platforms without Metal (Linux,watchOS)
+//   - Cross-validation in tests (proven oracle)
+//   - Substrate-level integration tests where GPU
+//     isn't available
 //
-// The STUB is useful for:
-//   - Substrate-level integration testing (registry slot
-//     populated;dispatcher routing works)
-//   - Protocol conformance proof (BASMetalKernel surface
-//     contract held)
-//   - Coverage doctrine (chapter 四百九十六 snapshot can
-//     pin 7-of-8 native MPSGraph + 1-of-1 stub)
+// ## Honest doctrine
 //
-// HONEST SCOPE: The stub does NOT implement selective gating。
-// It returns identity (output = input)。 Callers that use the
-// stub for real ssmScan computation will get incorrect results。
-// Use BASMPSGraphSSMScanKernelStub.isProductionReady ==
-// false to gate against accidental production use。
+// The actor is RENAMED from "Stub" to a more accurate
+// name in chapter 681 / M2102 — but the type name stays
+// `BASMPSGraphSSMScanKernelStub` for backward source-
+// compatibility。 A typealias bridge at chapter 682 will
+// expose the new accurate name `BASCPUSSMScanKernel`。
 
 import Foundation
 
-/// Sendable + Equatable wrapper for the production-readiness
-/// flag。 Exposed as a typed property on the stub so callers
-/// can pattern-match against it。
+/// Implementation status flag enum。 chapter 681 / M2101
+/// adds `.cpuSwiftReferenceProduction` for the repurposed
+/// stub。
 public enum BASSSMScanKernelImplementationStatus:
     String, Codable, Sendable, Equatable, Hashable, CaseIterable
 {
-    /// Pure-Swift identity-scan reference for testing only。
-    /// Returns inputs verbatim。 Not for production use。
+    /// chapter 496-680 era:identity-scan stub。 No longer
+    /// used post-chapter 681 / M2101 — kept in enum for
+    /// historical anti-drift。
     case stubIdentityScan = "stub-identity-scan"
 
-    /// Custom Metal compute shader implementing parallel
-    /// prefix-scan with selective gating。 Reserved for
-    /// Tier 2 phase K (chapter 497+)。
+    /// chapter 681 / M2101:CPU-Swift reference
+    /// production implementation delegating to
+    /// BASSSMScanCPUReference。 Real selective-scan math,
+    /// not identity-scan。 Production-ready for hosts
+    /// that don't need GPU dispatch。
+    case cpuSwiftReferenceProduction =
+        "cpu-swift-reference-production"
+
+    /// chapter 678 / M2089:Real Metal compute shader
+    /// production implementation。 Reserved enum case
+    /// pointing at BASMetalSSMScanKernel (which lives
+    /// under a different key)。
     case metalShaderProduction = "metal-shader-production"
 
-    /// MLX-swift bridge implementation (vendored
-    /// mlx-swift-lm)。 Reserved for Tier 2 phase K fallback。
+    /// Reserved:MLX-swift bridge (not implemented)。
     case mlxBridgeProduction = "mlx-bridge-production"
 
-    /// CoreML ML Program with cumsum_v2 + element-wise
-    /// scan。 Reserved for Tier 2 phase K fallback。
+    /// Reserved:CoreML ML Program (not implemented)。
     case coremlMlProgramProduction =
         "coreml-ml-program-production"
 
@@ -66,7 +77,8 @@ public enum BASSSMScanKernelImplementationStatus:
         switch self {
         case .stubIdentityScan:
             return false
-        case .metalShaderProduction,
+        case .cpuSwiftReferenceProduction,
+             .metalShaderProduction,
              .mlxBridgeProduction,
              .coremlMlProgramProduction:
             return true
@@ -74,26 +86,52 @@ public enum BASSSMScanKernelImplementationStatus:
     }
 }
 
+/// CPU-bytes sibling of `BASMetalSSMScanKernel`。 Delegates
+/// to `BASSSMScanCPUReference` for the actual scan math。
+///
+/// Type name stays `BASMPSGraphSSMScanKernelStub` for
+/// backward source-compatibility。 Semantically post-
+/// chapter 681 / M2101,this is no longer a stub — it's
+/// a real CPU implementation。 An accurate-name
+/// typealias `BASCPUSSMScanKernel` is exposed at chapter
+/// 682 for future call sites。
 public actor BASMPSGraphSSMScanKernelStub: BASMetalKernel {
 
+    /// chapter 681 / M2101 repurpose:key moved from
+    /// `(ssmScan, float32, metalBuffer)` to
+    /// `(ssmScan, float32, cpuBytes)` to avoid collision
+    /// with chapter 678 / M2089 BASMetalSSMScanKernel
+    /// which now owns the metalBuffer slot。
     public nonisolated let key: BASKernelKey =
         BASKernelKey(
             operation: .ssmScan,
             dataType: .float32,
-            backingKind: .metalBuffer)
+            backingKind: .cpuBytes)
 
-    /// Implementation status flag。 STUB always returns
-    /// `.stubIdentityScan`。
+    /// chapter 681 / M2101:status flipped from
+    /// `.stubIdentityScan` to
+    /// `.cpuSwiftReferenceProduction`。
     public nonisolated let implementationStatus:
         BASSSMScanKernelImplementationStatus =
-        .stubIdentityScan
+        .cpuSwiftReferenceProduction
 
     public init() {}
 
     public func evaluate(
         inputs: BASKernelInputs
     ) async throws -> BASKernelOutputs {
-        // Validate descriptors against the stub's typed key
+        // chapter 681 / M2101 contract:5 inputs (x, delta,
+        // A, B, C) matching the GPU kernel surface。 The
+        // chapter 496 stub accepted any descriptor count
+        // (identity-scan was shape-agnostic);post-repurpose
+        // we enforce the same 5-input contract as the GPU
+        // kernel。
+        guard inputs.descriptors.count == 5 else {
+            throw BASKernelError.shapeMismatch(
+                reason: "ssmScan (CPU sibling) expects 5 " +
+                "inputs (x,delta,A,B,C);got " +
+                "\(inputs.descriptors.count)")
+        }
         for descriptor in inputs.descriptors {
             guard descriptor.dataType == .float32 else {
                 throw BASKernelError.dataTypeMismatch(
@@ -101,20 +139,56 @@ public actor BASMPSGraphSSMScanKernelStub: BASMetalKernel {
                     actual: descriptor.dataType)
             }
         }
-        // Identity scan:emit each input descriptor + payload
-        // verbatim as outputs。 Mirrors a no-op scan (state-
-        // space matrix = identity,no gating)。 HONEST: this
-        // produces incorrect results vs. real ssmScan;use
-        // only for substrate integration testing。
+        let descX = inputs.descriptors[0]
+        guard descX.shape.count == 3 else {
+            throw BASKernelError.shapeMismatch(
+                reason: "ssmScan (CPU sibling) x must be " +
+                "rank-3 (B,L,D)")
+        }
+        let batch = descX.shape[0]
+        let length = descX.shape[1]
+        let channels = descX.shape[2]
+
+        let shape = try BASSSMScanShape.validated(
+            B: UInt32(batch),
+            L: UInt32(length),
+            D: UInt32(channels))
+
+        let startTick = DispatchTime.now()
+            .uptimeNanoseconds
+
+        // Delegate to the proven-correct CPU reference
+        let yData = try BASSSMScanCPUReference.scan(
+            xData: inputs.payloads[0],
+            deltaData: inputs.payloads[1],
+            aData: inputs.payloads[2],
+            bData: inputs.payloads[3],
+            cData: inputs.payloads[4],
+            shape: shape)
+
+        let endTick = DispatchTime.now().uptimeNanoseconds
+
+        let yDescriptor = BASTensorDescriptor.contiguous(
+            shape: descX.shape,
+            dataType: .float32,
+            backingKind: .cpuBytes,
+            rankTag: descX.rankTag)
+
         return BASKernelOutputs(
-            descriptors: inputs.descriptors,
-            payloads: inputs.payloads,
-            executionNanos: 0)
+            descriptors: [yDescriptor],
+            payloads: [yData],
+            executionNanos: endTick - startTick)
     }
 
-    /// Convenience class-level constant exposing the
-    /// production-readiness flag。 Callers should gate
-    /// against this before wiring the stub into production
-    /// dispatch paths。
-    public static let isProductionReady: Bool = false
+    /// chapter 681 / M2101:production-readiness flipped
+    /// from false to true。 Pre-repurpose this was false
+    /// (identity-scan stub);post-repurpose this CPU
+    /// sibling is production-grade。
+    public static let isProductionReady: Bool = true
 }
+
+/// chapter 681 / M2102:accurate-name typealias for the
+/// repurposed CPU sibling。 Hosts should prefer this
+/// name for new call sites。
+public typealias BASCPUSSMScanKernel =
+    BASMPSGraphSSMScanKernelStub
