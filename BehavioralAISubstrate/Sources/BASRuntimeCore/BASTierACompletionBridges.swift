@@ -239,4 +239,47 @@ public enum BASTierACompletionDoctrine {
     /// typealias for BASBundle<Item>。
     public static let patternParityWithChapter683: Bool =
         true
+
+    // MARK: - M2148 amendment — bridge-not-adoption honesty
+
+    /// HONEST SCOPE FLAG (M2148 amendment):
+    ///
+    /// "Tier A 8-of-8 SHIPPED" means the 8 typed Item
+    /// struct + BASBundle<Item> typealias bridges EXIST
+    /// as compilable typed surfaces in BASRuntimeCore。
+    ///
+    /// It does NOT mean the 8 original Tier A Bundle
+    /// types have been MIGRATED to consume these bridges。
+    /// Migration adoption requires host-side action — see
+    /// chapter 683 BASTierAMigrationStrategyDoctrine for
+    /// the additive-bridge methodology rationale (the
+    /// 8 bundles have multi-field shapes that resist
+    /// pure-item-list migration)。
+    ///
+    /// Production code as of chapter 694:0 call sites
+    /// consume the 6 new Item structs shipped at M2138。
+    /// The bridges are TYPED SURFACES WAITING FOR
+    /// CONSUMERS。
+    ///
+    /// This pin makes that honest scope FIRST-CLASS so
+    /// "Tier A shipped" is never misread as "migration
+    /// complete"。
+    public static let typedSurfacesExistButNotAdopted:
+        Bool = true
+
+    /// Production call sites consuming the 6 new M2138
+    /// Item structs。 Verified at M2148 via grep of
+    /// Sources/。
+    public static let chapter692ItemStructProductionCallSiteCount:
+        Int = 0
+
+    /// chapter 683 BASTierAMigrationStrategyDoctrine
+    /// methodology pin (additive bridge,not pure-item-
+    /// list migration)。
+    public static let migrationMethodologyRef: String =
+        "chapter 683 BASTierAMigrationStrategyDoctrine — additive bridge pattern"
+
+    /// True semantic of "Tier A 8-of-8 SHIPPED"。
+    public static let shippedSemantic: String =
+        "8 typed Item struct + BASBundle<Item> typealias bridges EXIST as compilable typed surfaces;production-code adoption is host-app responsibility"
 }

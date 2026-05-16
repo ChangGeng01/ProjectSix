@@ -199,6 +199,35 @@ final class BASTierACompletionBridgesTests: XCTestCase {
                 .patternParityWithChapter683)
     }
 
+    // MARK: - M2148 amendment — bridge-not-adoption pins
+
+    func testTypedSurfacesExistButNotAdopted() {
+        XCTAssertTrue(
+            BASTierACompletionDoctrine
+                .typedSurfacesExistButNotAdopted)
+    }
+
+    func testChapter692ItemStructProductionCallSiteCountIsZero() {
+        XCTAssertEqual(
+            BASTierACompletionDoctrine
+                .chapter692ItemStructProductionCallSiteCount,
+            0)
+    }
+
+    func testMigrationMethodologyRef() {
+        XCTAssertTrue(
+            BASTierACompletionDoctrine
+                .migrationMethodologyRef.contains(
+                    "BASTierAMigrationStrategyDoctrine"))
+    }
+
+    func testShippedSemanticIsClarifyingNotMisleading() {
+        let sem = BASTierACompletionDoctrine.shippedSemantic
+        XCTAssertTrue(sem.contains("EXIST as compilable"))
+        XCTAssertTrue(sem.contains(
+            "host-app responsibility"))
+    }
+
     // MARK: - All 6 new items + bundles also share
     //         BASBundle's standard behavior
 
