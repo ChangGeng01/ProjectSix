@@ -72,6 +72,10 @@
 //   - 红线 7 — audit projection is observation only
 
 import Foundation
+import BASOrchestration
+import BASPolicy
+import BASRuntimeCore
+import BASWorldPrior
 
 /// Sendable bundle consolidating the 3 *Two/*Penta
 /// cluster results carried as separate locals in
@@ -128,5 +132,89 @@ public struct BASTurnAuditProjectionsLateClusterFinalBundle:
             kunlunHexaTwo,
             cthulhuPenta,
             ontologyFog)
+    }
+
+    // MARK: - Compose factory (chapter 六百八十七 / M2118
+    //         第一刀 wire-in candidate)
+    //
+    /// Convenience static factory that invokes the 3
+    /// sub-cluster compute() methods + assembles the
+    /// final bundle in a single call。 Mirrors the
+    /// concatenation of:
+    ///
+    ///   BASTurnAuditProjectionsKunlunTrioTwo.compute(...)
+    ///   BASTurnAuditProjectionsKunlunHexaTwo.compute(...)
+    ///   BASTurnAuditProjectionsCthulhuPenta.compute(...)
+    ///
+    /// currently at +RunTurn.swift lines 585 + 600 + 617。
+    /// The chapter 687 第二刀 (M2119) wire-in replaces
+    /// the 3 separate compute calls + 1 derived field
+    /// in +RunTurn.swift body with a single .compose()
+    /// invocation。 Byte-equality preserved because the
+    /// sub-compute args are passed verbatim。
+    public static func compose(
+        // Inputs threaded through to trioTwo.compute
+        trioTwoRunMode: BASEBrainRunMode,
+        trioTwoRiskLevel: BASBrainRiskLevel,
+        trioTwoCandidates: [BASCandidatePath],
+        trioTwoOrganRefMorph: String,
+        trioTwoTurnID: String,
+        trioTwoSessionID: String,
+        // Inputs threaded through to hexaTwo.compute
+        hexaTwoHostID: String,
+        hexaTwoSessionID: String,
+        hexaTwoTurnID: String,
+        hexaTwoUnknownRefs: [String],
+        hexaTwoAssertionCeiling:
+            BASUnknownAssertionCeiling,
+        hexaTwoRiskLevel: BASBrainRiskLevel,
+        hexaTwoCandidates: [BASCandidatePath],
+        // Inputs threaded through to cthulhuPenta.compute
+        pentaRoutedBudget: BASBudgetFrame,
+        pentaRunMode: BASEBrainRunMode,
+        pentaHostID: String,
+        pentaRiskLevel: BASBrainRiskLevel,
+        pentaMemoryTemperatureLayer:
+            BASMemoryTemperatureLayer,
+        pentaCandidates: [BASCandidatePath],
+        pentaUnknownRefs: [String],
+        pentaAssertionCeilingRaw: String,
+        pentaTurnID: String
+    ) -> BASTurnAuditProjectionsLateClusterFinalBundle {
+        let trio = BASTurnAuditProjectionsKunlunTrioTwo
+            .compute(
+                runMode: trioTwoRunMode,
+                riskLevel: trioTwoRiskLevel,
+                candidates: trioTwoCandidates,
+                organRefMorph: trioTwoOrganRefMorph,
+                turnID: trioTwoTurnID,
+                sessionID: trioTwoSessionID)
+        let hexa = BASTurnAuditProjectionsKunlunHexaTwo
+            .compute(
+                hostID: hexaTwoHostID,
+                sessionID: hexaTwoSessionID,
+                turnID: hexaTwoTurnID,
+                unknownRefs: hexaTwoUnknownRefs,
+                assertionCeiling:
+                    hexaTwoAssertionCeiling,
+                riskLevel: hexaTwoRiskLevel,
+                candidates: hexaTwoCandidates)
+        let penta = BASTurnAuditProjectionsCthulhuPenta
+            .compute(
+                routedBudget: pentaRoutedBudget,
+                runMode: pentaRunMode,
+                hostID: pentaHostID,
+                riskLevel: pentaRiskLevel,
+                memoryTemperatureLayer:
+                    pentaMemoryTemperatureLayer,
+                candidates: pentaCandidates,
+                unknownRefs: pentaUnknownRefs,
+                assertionCeilingRaw:
+                    pentaAssertionCeilingRaw,
+                turnID: pentaTurnID)
+        return BASTurnAuditProjectionsLateClusterFinalBundle(
+            kunlunTrioTwo: trio,
+            kunlunHexaTwo: hexa,
+            cthulhuPenta: penta)
     }
 }
