@@ -296,4 +296,85 @@ public enum BASSignalTenIntegrationTestTriageDoctrine {
     public static let swiftTestingFlakinessRecovery:
         String =
         "run XCTest + Swift Testing in separate `swift test --testing-library` invocations"
+
+    // MARK: - M2146 第一刀 empirical diagnosis update
+    //
+    // Chapter 694 / M2146 empirically tested 4 isolation
+    // diagnostics (BASSignal10EmpiricalDiagnosisTests) to
+    // narrow the bucket from the 3 original hypotheses。
+    //
+    // Diagnostic outcomes:
+    //   A (sync test + direct startSession)         → PASS
+    //   C (async test + direct startSession)        → CRASH
+    //   D (async test + Task.detached startSession) → CRASH
+    //   E (sync test + Task.detached startSession)  → CRASH
+    //
+    // Conclusions:
+    //   - Task.detached itself is SUFFICIENT to trigger
+    //     SIGBUS (Diagnostic E,sync test method)
+    //   - async XCTestCase + sync startSession is ALSO
+    //     sufficient (Diagnostic C,no Task.detached)
+    //   - The ONLY passing pattern is sync test method
+    //     + direct sync startSession invocation
+    //   - Hypothesis #2 (V2 path) FALSIFIED by code
+    //     inspection — BASHostRuntime.startSession()
+    //     uses V1 sync path,does not touch V2 engine
+    //   - Hypothesis #1 (Task.detached bridging)
+    //     PARTIALLY CONFIRMED but narrower:both
+    //     Task.detached AND async test method are
+    //     independently sufficient triggers
+    //   - Hypothesis #3 (macOS 26 SDK linkage) still
+    //     UNVERIFIABLE without toolchain bisection
+
+    /// Empirical diagnosis ran at chapter 694 / M2146。
+    public static let empiricalDiagnosisRunAtMNumber: Int =
+        2146
+
+    /// 4 diagnostics ran (A/C/D/E)。
+    public static let empiricalDiagnosticCount: Int = 4
+
+    /// 1 of 4 diagnostics PASSED (sync test + direct
+    /// startSession);3 of 4 CRASHED。
+    public static let empiricalDiagnosticsPassed: Int = 1
+    public static let empiricalDiagnosticsCrashed: Int = 3
+
+    /// Refined pattern signature post-M2146 empirical
+    /// diagnosis。 The ORIGINAL pattern signature
+    /// (`async XCTestCase method + Task.detached +
+    /// startSession`) was too restrictive — Task.detached
+    /// + sync test method ALSO crashes,and async test
+    /// + direct call (no Task) ALSO crashes。
+    public static let refinedPatternSignaturePostM2146:
+        String =
+        "Task.detached invoking startSession OR async XCTestCase method invoking startSession → SIGBUS。 Only sync test method + direct sync startSession passes。"
+
+    /// Hypothesis #2 (V2 path) FALSIFIED at M2146 via
+    /// code inspection of HostRuntimeCore.swift。 The V2
+    /// path is opt-in via `buildEBrainTurnWithRuntimeMode
+    /// (...)` async surface;BASHostRuntime.startSession()
+    /// uses V1 sync `makeEBrainTurn(...)` path。 V2
+    /// engine never executes in the failing tests。
+    public static let hypothesisTwoV2PathFalsified: Bool =
+        true
+
+    /// Hypothesis #1 (Task.detached bridging) PARTIALLY
+    /// CONFIRMED at M2146 + REFINED:Task.detached is one
+    /// of two independent triggers;async test method is
+    /// the other。
+    public static let hypothesisOneTaskDetachedRefined:
+        Bool = true
+
+    /// Recovery via test refactor (sync method + Task
+    /// + expectation) does NOT work — Task.detached
+    /// trigger fires regardless of test method type
+    /// (Diagnostic E)。 No wrapper-based recovery exists;
+    /// the 12 SIGBUS tests CANNOT be un-skipped via test
+    /// code changes alone — substrate or toolchain fix
+    /// required。
+    public static let wrapperBasedRecoveryViable: Bool =
+        false
+
+    /// Empirical-diagnosis test file ref。
+    public static let empiricalDiagnosisTestFile: String =
+        "Tests/BehavioralAISubstrateTests/BASSignal10EmpiricalDiagnosisTests.swift"
 }

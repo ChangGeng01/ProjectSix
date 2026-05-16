@@ -237,6 +237,76 @@ final class BASSignalTenIntegrationTestTriageDoctrineTests: XCTestCase {
                     "testing-library"))
     }
 
+    // MARK: - M2146 empirical diagnosis pins
+
+    func testEmpiricalDiagnosisRunAtM2146() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .empiricalDiagnosisRunAtMNumber, 2146)
+    }
+
+    func testEmpiricalDiagnosticCountIs4() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .empiricalDiagnosticCount, 4)
+    }
+
+    func testEmpiricalDiagnosticsPassedIsOne() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .empiricalDiagnosticsPassed, 1)
+    }
+
+    func testEmpiricalDiagnosticsCrashedIsThree() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .empiricalDiagnosticsCrashed, 3)
+    }
+
+    func testEmpiricalCountsAddTo4() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .empiricalDiagnosticsPassed
+                + BASSignalTenIntegrationTestTriageDoctrine
+                    .empiricalDiagnosticsCrashed,
+            BASSignalTenIntegrationTestTriageDoctrine
+                .empiricalDiagnosticCount)
+    }
+
+    func testRefinedPatternSignatureMentionsBothTriggers() {
+        let sig = BASSignalTenIntegrationTestTriageDoctrine
+            .refinedPatternSignaturePostM2146
+        XCTAssertTrue(sig.contains("Task.detached"))
+        XCTAssertTrue(sig.contains("async"))
+        XCTAssertTrue(sig.contains("startSession"))
+        XCTAssertTrue(sig.contains("SIGBUS"))
+    }
+
+    func testHypothesisTwoV2PathFalsified() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .hypothesisTwoV2PathFalsified)
+    }
+
+    func testHypothesisOneTaskDetachedRefined() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .hypothesisOneTaskDetachedRefined)
+    }
+
+    func testWrapperBasedRecoveryNotViable() {
+        XCTAssertFalse(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .wrapperBasedRecoveryViable)
+    }
+
+    func testEmpiricalDiagnosisTestFileRef() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .empiricalDiagnosisTestFile.contains(
+                    "BASSignal10EmpiricalDiagnosisTests.swift"))
+    }
+
     func testInventoryCoverageMatches6Plus3Plus3() {
         // 6 from BASSubstrateReauditShadowEvaluatorTests
         // + 3 from BASMemoryClosedLoopApplierHostRuntime
