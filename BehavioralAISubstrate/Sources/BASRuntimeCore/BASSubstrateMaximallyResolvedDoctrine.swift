@@ -265,10 +265,14 @@ public enum BASSubstrateMaximallyResolvedDoctrine {
     public static let chapter696RecoveryProofExists: Bool =
         true
 
-    /// Reference to the chapter 696 recovery doctrine。
+    /// Reference to the chapter 696 recovery progress
+    /// pins。 M2164 chapter 699 CONSOLIDATED the former
+    /// BASChapter696RecoveryProgressDoctrine into this
+    /// doctrine (recovery_* prefixed pins below) per
+    /// chapter 698 anti-sprawl discipline。
     public static let chapter696RecoveryDoctrineRef:
         String =
-        "BASChapter696RecoveryProgressDoctrine (chapter 696 / M2156) + BASSignalTenIntegrationTestTriageDoctrine M2155 amendment"
+        "Consolidated into THIS doctrine at M2164 chapter 699 (recovery_* pins below);previously BASChapter696RecoveryProgressDoctrine (chapter 696 / M2156) + BASSignalTenIntegrationTestTriageDoctrine M2155 amendment"
 
     // MARK: - M2162 chapter 六百九十八 第一刀 — HONEST
     //         SELF-CRITIQUE amendment
@@ -349,4 +353,115 @@ public enum BASSubstrateMaximallyResolvedDoctrine {
     /// directive that needs a typed audit。
     public static let futureNewDoctrineGate: String =
         "production-code-typed-surface OR explicit-user-directive-requiring-typed-audit"
+
+    // MARK: - M2164 chapter 六百九十九 第一刀 — CONSOLIDATED
+    //         from former BASChapter696RecoveryProgress
+    //         Doctrine (deleted at M2164 per chapter 698
+    //         anti-sprawl discipline)。
+    //
+    // User directive 「完成 1」 at chapter 699 explicitly
+    // authorized consolidating BASChapter696Recovery
+    // ProgressDoctrine into this doctrine (the chapter
+    // 698 discipline gate satisfied by option b:
+    // explicit-user-directive-requiring-typed-audit)。
+    //
+    // All pins from the deleted doctrine are preserved
+    // here with `recovery_` prefix to avoid name
+    // collisions with existing pins。 The chapter 698
+    // self-critique pins above already cover the
+    // antipattern context;these pins below preserve
+    // the CONCRETE recovery progress data。
+
+    public static let recovery_consolidatedFromChapter696Doctrine:
+        Bool = true
+
+    public static let recovery_consolidatedAtMNumber: Int =
+        2164
+
+    // MARK: - Recovery counts(consolidated)
+
+    public static let recovery_totalSignal10TestsAtTriage:
+        Int = 12
+
+    public static let recovery_testsRecoveredAtM2154: Int =
+        6
+
+    public static let recovery_testsRemainingSkipped: Int =
+        6
+
+    public static var recovery_recoveryPercentage: Double {
+        return Double(recovery_testsRecoveredAtM2154)
+            / Double(recovery_totalSignal10TestsAtTriage)
+            * 100.0
+    }
+    // = 50.0%
+
+    public static var recovery_arithmeticHolds: Bool {
+        return recovery_testsRecoveredAtM2154
+            + recovery_testsRemainingSkipped
+            == recovery_totalSignal10TestsAtTriage
+    }
+
+    // MARK: - Recovery pattern(consolidated)
+
+    public static let recovery_patternSteps: [String] = [
+        "1. Identify substrate API the test calls into",
+        "2. Check if API is async because of (a) genuine actor isolation or (b) historical off-MainActor wrapping",
+        "3. For (b),ship SYNC SURFACE alongside async (purely additive,ADR-014 OPT-IN preserved)",
+        "4. Migrate test from `async throws` to sync",
+        "5. Replace `await asyncMethod(...)` with `syncMethod(...)`",
+        "6. Test now follows Diagnostic A pattern → PASSES"
+    ]
+
+    public static var recovery_patternStepCount: Int {
+        return recovery_patternSteps.count
+    }
+
+    // MARK: - Substrate surfaces shipped(consolidated)
+
+    public static let recovery_substrateSyncSurfacesShippedAtChapter696:
+        Int = 1
+
+    public static let recovery_syncSurfaceInventory:
+        [String] = [
+        "BASSubstrateReauditShadowEvaluator.evaluateSync(prompt:body:prePermitMode:sessionRef:turnRef:) -> BASShadowEvaluationResult"
+    ]
+
+    // MARK: - Actor-blocked remaining(consolidated)
+    // NOTE:chapter 697 / M2158 + M2159 falsified the
+    // "actor-blocked recovery requires isolation break"
+    // claim via Diagnostic F pattern (sync test + non-
+    // detached Task + actor calls)。 The inventory pin
+    // below is RETAINED as the snapshot at M2156;chapter
+    // 697 BASSignalTenIntegrationTestTriageDoctrine
+    // recovery pins (allTwelveSignal10TestsRecovered
+    // AtChapter697) carry the actual post-M2158 state。
+
+    public static let recovery_actorBlockedAPIsAtM2156:
+        [String] = [
+        "BASMemoryClosedLoopApplier (public actor)",
+        "BASMemoryUsageTracker (public actor)",
+        "BASSovereignAuditLedger (public actor)"
+    ]
+
+    public static var recovery_actorBlockedAPICountAtM2156:
+        Int {
+        return recovery_actorBlockedAPIsAtM2156.count
+    }
+
+    public static let recovery_actorBlockedClaimFalsifiedAtChapter697:
+        Bool = true
+
+    // MARK: - Honest framing(consolidated)
+
+    public static let recovery_chapter695TerminalStateScopeBounded:
+        Bool = true
+
+    public static let recovery_futureRecoveryPathsMayExist:
+        Bool = true
+
+    // MARK: - Methodology(consolidated)
+
+    public static let recovery_methodology: String =
+        "EMPIRICAL RECOVERY PATTERN DISCOVERY — when prior claim was 'not viable' or 'terminal',test NEW patterns;document new findings as additive amendments;don't accept catalog as permanent"
 }

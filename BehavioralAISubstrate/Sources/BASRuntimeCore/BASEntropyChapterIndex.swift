@@ -5753,7 +5753,44 @@ public enum BASEntropyChapterIndex {
                 " tests count -3 (39 → 36)。 Methodology" +
                 " — HONEST SELF-CRITIQUE → reduce doctrine" +
                 " sprawl,acknowledge antipatterns," +
-                " discipline future commits。")
+                " discipline future commits。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十九",
+            mNumberFirst: 2164, mNumberLast: 2164,
+            knivesCount: 1, entropyClassesCount: 1,
+            pinsCount: 9, futureCutsCount: 0,
+            summary: "CONSOLIDATION arc。 User directive" +
+                " 「完成 1」 explicit-authorized executing" +
+                " chapter 698 recommended action #1。" +
+                " Discipline gate from M2162 (future" +
+                "NewDoctrineGate) satisfied via option-b" +
+                " 'explicit-user-directive-requiring-" +
+                "typed-audit'。 M2164 single-knife:" +
+                " (a) migrate 17 pins from BASChapter696" +
+                "RecoveryProgressDoctrine into BASSubstrate" +
+                "MaximallyResolvedDoctrine with `recovery_`" +
+                " prefix (avoids name collision);(b)" +
+                " move 22 anti-drift tests into BAS" +
+                "SubstrateMaximallyResolvedDoctrineTests;" +
+                " (c) DELETE BASChapter696RecoveryProgress" +
+                "Doctrine.swift + its test file (-368 LOC);" +
+                " (d) amend chapter696RecoveryDoctrineRef" +
+                " pin to reflect consolidation。 Chapter" +
+                " 699 close-out (M2164) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved。 ADR-" +
+                "016 → M2164。 746 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces (-1 doctrine consolidated)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery preserved。" +
+                " BASSubstrateMaximallyResolvedDoctrineTests" +
+                ":54 tests (was 32 + 22 migrated)。" +
+                " Methodology — DOCTRINE CONSOLIDATION via" +
+                " merge,not delete;preserve anti-drift" +
+                " coverage via prefix renaming;respect" +
+                " chapter 698 discipline gate via explicit-" +
+                "user-directive。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

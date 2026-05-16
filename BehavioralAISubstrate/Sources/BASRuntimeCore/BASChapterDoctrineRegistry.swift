@@ -21982,7 +21982,90 @@ public enum BASChapterDoctrineRegistry {
                 " recovery preserved。 Methodology —" +
                 " HONEST SELF-CRITIQUE → reduce doctrine" +
                 " sprawl,acknowledge antipatterns," +
-                " discipline future commits via gate pin。")
+                " discipline future commits via gate pin。"),
+        // chapter 699 — CONSOLIDATION arc。 User directive
+        // 「完成 1」 explicit-authorized executing chapter
+        // 698 recommended action #1。 Discipline gate
+        // satisfied via explicit-user-directive option。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十九",
+            mNumberFirst: 2164,
+            mNumberLast: 2164,
+            v1MilestoneMNumber: 2164,
+            v1MilestoneStatus:
+                "chapter-699-doctrine-consolidation",
+            knives: [
+                BASChapterKnife(mNumber: 2164, knife: "第一刀",
+                    concept: "DOCTRINE CONSOLIDATION:" +
+                        " migrate 17 pins from" +
+                        " BASChapter696RecoveryProgress" +
+                        "Doctrine into BASSubstrate" +
+                        "MaximallyResolvedDoctrine with" +
+                        " `recovery_` prefix;move 22" +
+                        " anti-drift tests;DELETE the" +
+                        " consolidated doctrine + its" +
+                        " test file (-368 LOC);amend" +
+                        " chapter696RecoveryDoctrineRef" +
+                        " pin。 Chapter 699 close-out +" +
+                        " 13-file sync。")
+            ],
+            entropyClassesAttacked: [
+                "doctrine-sprawl-chapter-specific-naming-redundant"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2164",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "746-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-satisfied-via-explicit-user-directive",
+                "doctrine-consolidation-applied"
+            ],
+            plannedFutureCuts: [
+                "Future consolidation candidates (deferred" +
+                    " pending user authorization):" +
+                    " merging BASTypedSurfaceCountAudit" +
+                    "Doctrine + BASSprawlScopeAudit" +
+                    "Doctrine into BASSubstrateExternal" +
+                    "DependencyCatalogDoctrine (3 audit" +
+                    " doctrines could become 1)。"
+            ],
+            summary: "CONSOLIDATION arc per user directive" +
+                " 「完成 1」 — explicit-authorized executing" +
+                " chapter 698 recommended action #1。" +
+                " Discipline gate from M2162 (futureNew" +
+                "DoctrineGate) satisfied via option-b" +
+                " 'explicit-user-directive-requiring-typed-" +
+                "audit'。 M2164 single-knife:(a) migrate" +
+                " 17 pins from BASChapter696RecoveryProgress" +
+                "Doctrine into BASSubstrateMaximally" +
+                "ResolvedDoctrine with `recovery_` prefix" +
+                " (avoids name collision);(b) move 22" +
+                " anti-drift tests;(c) DELETE BAS" +
+                "Chapter696RecoveryProgressDoctrine.swift" +
+                " + BASChapter696RecoveryProgressDoctrine" +
+                "Tests.swift (-368 LOC);(d) amend" +
+                " chapter696RecoveryDoctrineRef pin to" +
+                " reflect consolidation。 Chapter 699" +
+                " close-out (M2164) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2164。 746 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces (-1 doctrine consolidated)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery preserved。" +
+                " BASSubstrateMaximallyResolvedDoctrineTests" +
+                ":54 tests (was 32 + 22 migrated)。" +
+                " Methodology — DOCTRINE CONSOLIDATION via" +
+                " merge,not delete;preserve anti-drift" +
+                " coverage via prefix renaming;respect" +
+                " chapter 698 discipline gate via explicit-" +
+                "user-directive。 First time doctrine count" +
+                " DECREASED in substrate history。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -234,10 +234,124 @@ final class BASSubstrateMaximallyResolvedDoctrineTests: XCTestCase {
     }
 
     func testChapter696RecoveryDoctrineRef() {
+        // M2164 consolidation:ref string now mentions
+        // "Consolidated into THIS doctrine" + retains
+        // original BASChapter696RecoveryProgressDoctrine
+        // history note。
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .chapter696RecoveryDoctrineRef.contains(
+                    "Consolidated into THIS doctrine"))
         XCTAssertTrue(
             BASSubstrateMaximallyResolvedDoctrine
                 .chapter696RecoveryDoctrineRef.contains(
                     "BASChapter696RecoveryProgressDoctrine"))
+    }
+
+    // MARK: - M2164 consolidated chapter 696 recovery
+    //         progress pins (moved from former
+    //         BASChapter696RecoveryProgressDoctrine)
+
+    func testRecoveryConsolidatedFromChapter696Doctrine() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_consolidatedFromChapter696Doctrine)
+    }
+
+    func testRecoveryConsolidatedAtMNumberIs2164() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_consolidatedAtMNumber, 2164)
+    }
+
+    func testRecoveryTotalSignal10TestsAtTriageIs12() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_totalSignal10TestsAtTriage, 12)
+    }
+
+    func testRecoveryTestsRecoveredAtM2154Is6() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_testsRecoveredAtM2154, 6)
+    }
+
+    func testRecoveryTestsRemainingSkippedIs6() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_testsRemainingSkipped, 6)
+    }
+
+    func testRecoveryPercentageIs50() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_recoveryPercentage, 50.0)
+    }
+
+    func testRecoveryArithmeticHolds() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_arithmeticHolds)
+    }
+
+    func testRecoveryPatternStepCountIs6() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_patternStepCount, 6)
+    }
+
+    func testRecoveryPatternStepsIncludeSyncSurface() {
+        let combined =
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_patternSteps
+                .joined(separator: " ")
+        XCTAssertTrue(combined.contains("SYNC SURFACE"))
+        XCTAssertTrue(combined.contains("Diagnostic A"))
+    }
+
+    func testRecoverySubstrateSyncSurfacesShippedAtChapter696Is1() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_substrateSyncSurfacesShippedAtChapter696,
+            1)
+    }
+
+    func testRecoverySyncSurfaceInventoryMentionsEvaluateSync() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_syncSurfaceInventory.first?
+                .contains("evaluateSync") ?? false)
+    }
+
+    func testRecoveryActorBlockedAPICountAtM2156Is3() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_actorBlockedAPICountAtM2156, 3)
+    }
+
+    func testRecoveryActorBlockedClaimFalsifiedAtChapter697() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_actorBlockedClaimFalsifiedAtChapter697)
+    }
+
+    func testRecoveryChapter695TerminalStateScopeBounded() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_chapter695TerminalStateScopeBounded)
+    }
+
+    func testRecoveryFutureRecoveryPathsMayExist() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_futureRecoveryPathsMayExist)
+    }
+
+    func testRecoveryMethodologyIsEmpiricalDiscovery() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .recovery_methodology.contains(
+                    "EMPIRICAL RECOVERY PATTERN DISCOVERY"))
     }
 
     // MARK: - M2162 honest self-critique amendment pins
