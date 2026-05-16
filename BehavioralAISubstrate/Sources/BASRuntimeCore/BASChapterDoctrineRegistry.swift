@@ -21068,7 +21068,84 @@ public enum BASChapterDoctrineRegistry {
                 " surfaces cumulative。 ADR-016 → M2129。" +
                 " 712 consecutive byte-equality clean" +
                 " commits。 Chapter 477 baseline doctrine" +
-                " PRESERVED。 PLAN SEALED。")
+                " PRESERVED。 PLAN SEALED。"),
+
+        // chapter 690 — post-FINAL-SEAL follow-up arc:
+        // LRU eviction for BASKVCacheRegistry,closing
+        // the chapter 500 / M1379 LRU-deferred gap。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十",
+            mNumberFirst: 2130,
+            mNumberLast: 2133,
+            v1MilestoneMNumber: 2133,
+            v1MilestoneStatus:
+                "chapter-690-post-seal-lru-eviction-wire-in",
+            knives: [
+                BASChapterKnife(mNumber: 2130, knife: "第一刀",
+                    concept: "NEW BASKVCacheLRUEvictor" +
+                        " pure-function algorithm + BAS" +
+                        "KVCacheLRUEvictionDecision typed" +
+                        " result struct + defaultCapacity" +
+                        " 64 + 15 anti-drift PROOF tests。"),
+                BASChapterKnife(mNumber: 2131, knife: "第二刀",
+                    concept: "BASKVCacheRegistry WIRE-IN" +
+                        " with capacity:Int? property +" +
+                        " accessTicks tracking + auto-" +
+                        "eviction when policy==.lru + 11" +
+                        " LRU integration tests on real" +
+                        " actor。"),
+                BASChapterKnife(mNumber: 2132, knife: "第三刀",
+                    concept: "BASKVCacheInvalidationPolicy" +
+                        "Doctrine PROMOTION:.lru moved" +
+                        " from contractOnly to implemented" +
+                        " + 3 new count constants + 13" +
+                        " updated/new tests。"),
+                BASChapterKnife(mNumber: 2133, knife: "第四刀",
+                    concept: "Chapter 690 close-out + 13-" +
+                        "file standard sync。 716 consecutive" +
+                        " byte-equality clean commits。" +
+                        " chapter 500 / M1379 LRU-DEFERRED" +
+                        " GAP CLOSED post-FINAL-SEAL。")
+            ],
+            entropyClassesAttacked: [
+                "kv-cache-no-lru-eviction",
+                "implemented-policies-set-stale",
+                "lru-deferral-evidence-stale",
+                "no-typed-policy-count-cross-mirror"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (default init" +
+                    " unchanged,LRU opt-in only)",
+                "ADR-016 → M2133",
+                "chapter-500-lru-deferred-gap-closed",
+                "2-of-4-kv-policies-implemented",
+                "post-final-seal-followup-arc-shipped",
+                "716-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "post-seal followup arcs OPTIONAL — TTL/never policy implementations + BASTensor MTLBuffer zero-copy + self-tuning scheduler all candidates"
+            ],
+            summary: "Post-FINAL-SEAL follow-up arc:LRU" +
+                " eviction for BASKVCacheRegistry shipped。" +
+                " NEW BASKVCacheLRUEvictor + decision struct" +
+                " at M2130 + 15 tests。 Wire-in at M2131 +" +
+                " 11 actor tests。 Doctrine promotion at" +
+                " M2132 + 13 tests。 Chapter close-out" +
+                " (M2133) + 13-file sync。 39 chapter 690" +
+                " PROOF tests + close-out tests。 Chapter" +
+                " 500 / M1379 LRU-DEFERRED GAP CLOSED。 2-" +
+                "of-4 KV policies now implemented" +
+                " (.explicitOnly + .lru)。 ADR-014 OPT-OUT" +
+                " preserved (default init M1306 behavior" +
+                " unchanged,LRU is opt-in)。 ADR-016 →" +
+                " M2133。 716 consecutive byte-equality" +
+                " clean commits。 255 typed surfaces" +
+                " cumulative (+2:BASKVCacheLRUEvictor +" +
+                " BASKVCacheLRUEvictionDecision)。 60/60" +
+                " score unchanged (post-seal arcs ship" +
+                " production value not score deltas)。 Post-" +
+                "seal followup OPTIONAL.")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -643,6 +643,36 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// sealed at 10/10。 Aggregate score 60/60 FORMALLY
     /// ACHIEVED。 Plan SUBSTANTIVELY COMPLETE。 Post-seal
     /// followup arcs OPTIONAL。 *** PLAN SEALED ***。
+    /// Re-captured at chapter 690 close-out。 Post-FINAL-
+    /// SEAL follow-up arc:LRU eviction for BASKVCache
+    /// Registry shipped。 NEW BASKVCacheLRUEvictor pure-
+    /// function algorithm at M2130 + 15 anti-drift PROOF
+    /// tests。 BASKVCacheRegistry actor WIRE-IN at M2131
+    /// with capacity:Int? property + accessTicks tracking
+    /// + auto-eviction when policy==.lru + totalLRU
+    /// Evictions audit accessor + 11 LRU integration
+    /// tests on real actor。 BASKVCacheInvalidationPolicy
+    /// Doctrine PROMOTION at M2132 (.lru moved from
+    /// contractOnly to implemented + 3 new count
+    /// constants:implementedPolicyCount=2 /
+    /// contractOnlyPolicyCount=2 / totalPolicyCount=4) +
+    /// 13 updated/new tests。 Chapter 690 close-out
+    /// (M2133) + 13-file standard sync。 39 chapter 690
+    /// PROOF tests + close-out tests。 chapter 500 /
+    /// M1379 LRU-DEFERRED GAP CLOSED post-FINAL-SEAL。
+    /// 2-of-4 KV invalidation policies now implemented
+    /// (.explicitOnly + .lru;.ttl + .never remain typed
+    /// contract only)。 ADR-014 OPT-OUT preserved
+    /// (default init unchanged,M1306 behavior preserved,
+    /// LRU is opt-in via explicit init only)。 ADR-016
+    /// → M2133。 716 consecutive byte-equality clean
+    /// commits。 255 typed surfaces cumulative (+2:
+    /// BASKVCacheLRUEvictor + BASKVCacheLRUEvictionDecision)。
+    /// 60/60 score unchanged (post-seal arcs ship
+    /// production value not score deltas)。 Post-seal
+    /// followup arcs OPTIONAL — TTL/never policy impls
+    /// + BASTensor MTLBuffer zero-copy + self-tuning
+    /// scheduler all candidates。
     static let frozenFullRegistrySha256: String =
-        "d4cba5edf56ca3d0f415c6fd30a335aaf94fb205b16ca249df69f735b5ce9e77"
+        "e91dfb9476640bb6e1a59c4bad928c59d7fab4ba17e215d1b67ac9ffb016a228"
 }

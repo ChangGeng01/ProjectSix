@@ -2537,7 +2537,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百八十九")!)
+                            "chapter 六百八十九")!),
+            // M2133 chapter 690 — post-seal LRU eviction
+            checkRegistry("六百九十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4529,6 +4535,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百八十九")!
+                .mNumberLast),
+            // M2133 chapter 690 — post-seal LRU eviction
+            ("690",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

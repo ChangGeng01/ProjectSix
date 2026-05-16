@@ -5365,7 +5365,46 @@ public enum BASEntropyChapterIndex {
                 " acknowledgments documented (Phase N" +
                 " reduced + Phase O V1 deletion deferred" +
                 " + Phase P entirely deferred)。 Post-" +
-                "seal followup arcs OPTIONAL。 PLAN SEALED。")
+                "seal followup arcs OPTIONAL。 PLAN SEALED。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十",
+            mNumberFirst: 2130, mNumberLast: 2133,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 1,
+            summary: "Post-FINAL-SEAL follow-up arc:LRU" +
+                " eviction for BASKVCacheRegistry。 NEW" +
+                " BASKVCacheLRUEvictor pure-function" +
+                " algorithm + BASKVCacheLRUEvictionDecision" +
+                " typed result struct + defaultCapacity 64" +
+                " at M2130 + 15 anti-drift PROOF tests。" +
+                " BASKVCacheRegistry actor WIRE-IN at M2131" +
+                " with capacity:Int? property + accessTicks" +
+                " tracking + auto-eviction when policy==" +
+                ".lru + 11 LRU integration tests。 BAS" +
+                "KVCacheInvalidationPolicyDoctrine PROMOTION" +
+                " at M2132 (.lru moved from contractOnly" +
+                " to implemented + 3 new count constants" +
+                " implementedPolicyCount=2/contractOnly" +
+                "PolicyCount=2/totalPolicyCount=4) + 13" +
+                " updated/new tests。 Chapter 690 close-out" +
+                " (M2133) + 13-file standard sync。 39" +
+                " chapter PROOF tests + close-out tests。" +
+                " chapter 500 / M1379 LRU-DEFERRED GAP" +
+                " CLOSED post-FINAL-SEAL。 2-of-4 KV" +
+                " invalidation policies now implemented" +
+                " (.explicitOnly + .lru;.ttl + .never" +
+                " remain typed contract only)。 ADR-014" +
+                " OPT-OUT preserved (default init unchanged" +
+                ",LRU is opt-in only)。 ADR-016 → M2133。" +
+                " 716 consecutive byte-equality clean" +
+                " commits。 255 typed surfaces cumulative" +
+                " (+2:BASKVCacheLRUEvictor + BASKVCacheLRU" +
+                "EvictionDecision)。 60/60 score unchanged" +
+                " (post-seal arcs ship production value" +
+                " not score deltas)。 Post-seal followup" +
+                " OPTIONAL — TTL/never implementations," +
+                "BASTensor MTLBuffer zero-copy,self-tuning" +
+                " scheduler all candidates。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
