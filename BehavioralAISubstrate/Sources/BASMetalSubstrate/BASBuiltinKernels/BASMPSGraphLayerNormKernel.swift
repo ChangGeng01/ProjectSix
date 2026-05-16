@@ -49,7 +49,13 @@ public actor BASMPSGraphLayerNormKernel: BASMetalKernel {
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
 
-    public init(epsilon: Float = 1e-5) throws {
+    /// M2042:optional MPSGraphExecutable cache。
+    private let cache: BASMPSGraphExecutableCache?
+
+    public init(
+        epsilon: Float = 1e-5,
+        cache: BASMPSGraphExecutableCache? = nil
+    ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()
         else {
             throw BASKernelError.frameworkUnavailable(
@@ -63,6 +69,53 @@ public actor BASMPSGraphLayerNormKernel: BASMetalKernel {
         self.device = dev
         self.commandQueue = queue
         self.epsilon = epsilon
+        self.cache = cache
+    }
+
+    private nonisolated func buildGraph(
+        batch: Int, hidden: Int
+    ) -> (
+        graph: MPSGraph,
+        xP: MPSGraphTensor,
+        gP: MPSGraphTensor,
+        bP: MPSGraphTensor,
+        output: MPSGraphTensor
+    ) {
+        let graph = MPSGraph()
+        let xP = graph.placeholder(
+            shape: [NSNumber(value: batch),
+                    NSNumber(value: hidden)],
+            dataType: .float32, name: "x")
+        let gP = graph.placeholder(
+            shape: [NSNumber(value: hidden)],
+            dataType: .float32, name: "gamma")
+        let bP = graph.placeholder(
+            shape: [NSNumber(value: hidden)],
+            dataType: .float32, name: "beta")
+        let mean = graph.mean(
+            of: xP, axes: [NSNumber(value: 1)],
+            name: "mean")
+        let centered = graph.subtraction(
+            xP, mean, name: "centered")
+        let centeredSq = graph.multiplication(
+            centered, centered, name: "centeredSq")
+        let variance = graph.mean(
+            of: centeredSq, axes: [NSNumber(value: 1)],
+            name: "variance")
+        let epsTensor = graph.constant(
+            Double(epsilon), shape: [1, 1],
+            dataType: .float32)
+        let varEps = graph.addition(
+            variance, epsTensor, name: "varEps")
+        let stddev = graph.squareRoot(
+            with: varEps, name: "stddev")
+        let normalized = graph.division(
+            centered, stddev, name: "normalized")
+        let scaled = graph.multiplication(
+            normalized, gP, name: "scaled")
+        let output = graph.addition(
+            scaled, bP, name: "output")
+        return (graph, xP, gP, bP, output)
     }
 
     public func evaluate(
@@ -148,54 +201,6 @@ public actor BASMPSGraphLayerNormKernel: BASMetalKernel {
                 reason: "alloc out failed")
         }
 
-        // Build the layerNorm graph fresh per call
-        // (caching deferred to chapter 480 M1296)
-        let graph = MPSGraph()
-        let xPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: batch),
-                    NSNumber(value: hidden)],
-            dataType: .float32, name: "x")
-        let gPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: hidden)],
-            dataType: .float32, name: "gamma")
-        let bPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: hidden)],
-            dataType: .float32, name: "beta")
-
-        // mean_i = mean(x_i) per row
-        let mean = graph.mean(
-            of: xPlaceholder,
-            axes: [NSNumber(value: 1)],
-            name: "mean")
-        // centered = x - mean (broadcasts)
-        let centered = graph.subtraction(
-            xPlaceholder, mean, name: "centered")
-        // variance = mean(centered²) per row
-        let centeredSq = graph.multiplication(
-            centered, centered, name: "centeredSq")
-        let variance = graph.mean(
-            of: centeredSq,
-            axes: [NSNumber(value: 1)],
-            name: "variance")
-        let epsTensor = graph.constant(
-            Double(epsilon),
-            shape: [1, 1],
-            dataType: .float32)
-        let varEps = graph.addition(
-            variance, epsTensor, name: "varEps")
-        let stddev = graph.squareRoot(
-            with: varEps, name: "stddev")
-        // normalized = centered / stddev
-        let normalized = graph.division(
-            centered, stddev, name: "normalized")
-        // scaled = normalized * gamma (broadcasts)
-        let scaled = graph.multiplication(
-            normalized, gPlaceholder, name: "scaled")
-        // output = scaled + beta (broadcasts)
-        let output = graph.addition(
-            scaled, bPlaceholder, name: "output")
-
-        // Wrap MTLBuffers in MPSGraphTensorData
         let xTensorData = MPSGraphTensorData(
             bufferX,
             shape: [NSNumber(value: batch),
@@ -215,15 +220,72 @@ public actor BASMPSGraphLayerNormKernel: BASMetalKernel {
                     NSNumber(value: hidden)],
             dataType: .float32)
 
-        graph.run(
-            with: commandQueue,
-            feeds: [
-                xPlaceholder: xTensorData,
-                gPlaceholder: gTensorData,
-                bPlaceholder: bTensorData
-            ],
-            targetOperations: nil,
-            resultsDictionary: [output: outTensorData])
+        // M2042 chapter 666 第二刀:cache-on/off branching
+        if let cache = self.cache {
+            let cacheKey = BASMPSGraphCacheKey(
+                operation: .layerNorm,
+                dataType: .float32,
+                inputShapes: [
+                    [batch, hidden],
+                    [hidden],
+                    [hidden]
+                ])
+            let executable: MPSGraphExecutable
+            if let cached = await cache.cachedExecutable(
+                forKey: cacheKey)
+            {
+                executable = cached
+                await cache.recordHit(key: cacheKey)
+            } else {
+                let built = buildGraph(
+                    batch: batch, hidden: hidden)
+                let xShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: batch),
+                            NSNumber(value: hidden)],
+                    dataType: .float32)
+                let gShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: hidden)],
+                    dataType: .float32)
+                let bShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: hidden)],
+                    dataType: .float32)
+                executable = built.graph.compile(
+                    with: nil,
+                    feeds: [
+                        built.xP: xShape,
+                        built.gP: gShape,
+                        built.bP: bShape
+                    ],
+                    targetTensors: [built.output],
+                    targetOperations: nil,
+                    compilationDescriptor: nil)
+                await cache.storeExecutable(
+                    executable, forKey: cacheKey)
+                await cache.recordMiss(key: cacheKey)
+            }
+            let _ = executable.run(
+                with: commandQueue,
+                inputs: [
+                    xTensorData, gTensorData, bTensorData
+                ],
+                results: [outTensorData],
+                executionDescriptor: nil)
+        } else {
+            // M1293 baseline path — byte-equality preserved
+            let built = buildGraph(
+                batch: batch, hidden: hidden)
+            built.graph.run(
+                with: commandQueue,
+                feeds: [
+                    built.xP: xTensorData,
+                    built.gP: gTensorData,
+                    built.bP: bTensorData
+                ],
+                targetOperations: nil,
+                resultsDictionary: [
+                    built.output: outTensorData
+                ])
+        }
 
         let outBytes = Data(
             bytes: bufferOut.contents(),

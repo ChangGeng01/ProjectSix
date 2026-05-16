@@ -44,11 +44,15 @@ public actor BASMPSGraphSoftmaxKernel: BASMetalKernel {
 
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
+    private let cache: BASMPSGraphExecutableCache?
 
     /// Construct the kernel against the system default
-    /// `MTLDevice`。 Throws `.frameworkUnavailable`
-    /// when Metal is unavailable。
-    public init() throws {
+    /// `MTLDevice`。 M2042:optional cache parameter for
+    /// compile-cost amortization。 Default nil preserves
+    /// M1292 baseline byte-equality。
+    public init(
+        cache: BASMPSGraphExecutableCache? = nil
+    ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()
         else {
             throw BASKernelError.frameworkUnavailable(
@@ -61,6 +65,7 @@ public actor BASMPSGraphSoftmaxKernel: BASMetalKernel {
         }
         self.device = dev
         self.commandQueue = queue
+        self.cache = cache
     }
 
     public func evaluate(
@@ -118,22 +123,7 @@ public actor BASMPSGraphSoftmaxKernel: BASMetalKernel {
                     " MTLBuffer output")
         }
 
-        // Build the softmax graph fresh per call
-        // (caching deferred to chapter 480 M1296)
-        let graph = MPSGraph()
-        let xPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: rows),
-                    NSNumber(value: cols)],
-            dataType: .float32,
-            name: "x")
-        // MPSGraph.softMax applies softmax along the
-        // given axis。 axis=1 = row-wise
-        let output = graph.softMax(
-            with: xPlaceholder,
-            axis: 1,
-            name: "output")
-
-        // Wrap MTLBuffers in MPSGraphTensorData
+        // Wrap MTLBuffers in MPSGraphTensorData (shared)
         let xTensorData = MPSGraphTensorData(
             bufferX,
             shape: [NSNumber(value: rows),
@@ -145,12 +135,64 @@ public actor BASMPSGraphSoftmaxKernel: BASMetalKernel {
                     NSNumber(value: cols)],
             dataType: .float32)
 
-        // Dispatch
-        graph.run(
-            with: commandQueue,
-            feeds: [xPlaceholder: xTensorData],
-            targetOperations: nil,
-            resultsDictionary: [output: outTensorData])
+        // M2042 chapter 六百六十六 第二刀:cache-on/off
+        // branching。 cache=nil → M1292 baseline path
+        // UNCHANGED。 cache=non-nil → compile + cache +
+        // executable.run fast path。
+        if let cache = self.cache {
+            let cacheKey = BASMPSGraphCacheKey(
+                operation: .softmax,
+                dataType: .float32,
+                inputShapes: [[rows, cols]])
+            let executable: MPSGraphExecutable
+            if let cached = await cache.cachedExecutable(
+                forKey: cacheKey)
+            {
+                executable = cached
+                await cache.recordHit(key: cacheKey)
+            } else {
+                let graph = MPSGraph()
+                let xPlaceholder = graph.placeholder(
+                    shape: [NSNumber(value: rows),
+                            NSNumber(value: cols)],
+                    dataType: .float32, name: "x")
+                let output = graph.softMax(
+                    with: xPlaceholder, axis: 1,
+                    name: "output")
+                let xShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: rows),
+                            NSNumber(value: cols)],
+                    dataType: .float32)
+                executable = graph.compile(
+                    with: nil,
+                    feeds: [xPlaceholder: xShape],
+                    targetTensors: [output],
+                    targetOperations: nil,
+                    compilationDescriptor: nil)
+                await cache.storeExecutable(
+                    executable, forKey: cacheKey)
+                await cache.recordMiss(key: cacheKey)
+            }
+            let _ = executable.run(
+                with: commandQueue,
+                inputs: [xTensorData],
+                results: [outTensorData],
+                executionDescriptor: nil)
+        } else {
+            // M1292 baseline path — byte-equality preserved
+            let graph = MPSGraph()
+            let xPlaceholder = graph.placeholder(
+                shape: [NSNumber(value: rows),
+                        NSNumber(value: cols)],
+                dataType: .float32, name: "x")
+            let output = graph.softMax(
+                with: xPlaceholder, axis: 1, name: "output")
+            graph.run(
+                with: commandQueue,
+                feeds: [xPlaceholder: xTensorData],
+                targetOperations: nil,
+                resultsDictionary: [output: outTensorData])
+        }
 
         // Download result
         let outBytes = Data(
