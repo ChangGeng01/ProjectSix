@@ -225,16 +225,68 @@ final class BASSignalTenIntegrationTestTriageDoctrineTests: XCTestCase {
             "BASAppleObservabilityAdapterTests")
     }
 
-    func testSwiftTestingFlakinessRecoveryMentionsSeparateInvocations()
+    // M2147 CORRECTION:recovery framing rewritten;
+    // separate-invocations claim was inaccurate。
+    func testSwiftTestingFlakinessRecoveryMentionsFilter()
     {
         XCTAssertTrue(
             BASSignalTenIntegrationTestTriageDoctrine
                 .swiftTestingFlakinessRecovery.contains(
-                    "separate"))
+                    "filter"))
+    }
+
+    // MARK: - M2147 swift-testing framing correction
+
+    func testM2147CorrectionApplied() {
         XCTAssertTrue(
             BASSignalTenIntegrationTestTriageDoctrine
-                .swiftTestingFlakinessRecovery.contains(
-                    "testing-library"))
+                .m2147CorrectionApplied)
+    }
+
+    func testSwiftTestingFailureFramingMentionsFullSuite() {
+        let framing = BASSignalTenIntegrationTestTriageDoctrine
+            .swiftTestingFailureFraming
+        XCTAssertTrue(framing.contains("full-suite"))
+        XCTAssertTrue(framing.contains("SIGBUS"))
+        XCTAssertTrue(framing.contains("swiftpm-testing-helper"))
+    }
+
+    func testFullSuiteCrashesEvenWithXCTestDisabled() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .fullSuiteCrashesEvenWithXCTestDisabled)
+    }
+
+    func testSwiftTestingTestCountIs419() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingTestCount, 419)
+    }
+
+    func testSwiftTestingSuiteCountIs67() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingSuiteCount, 67)
+    }
+
+    func testSwiftTestingStartedBeforeCrashIs398() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingStartedBeforeCrash, 398)
+    }
+
+    func testSwiftTestingCompletedBeforeCrashIsZero() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingCompletedBeforeCrash, 0)
+    }
+
+    func testStartedExceedsCompletedDueToCrash() {
+        XCTAssertGreaterThan(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingStartedBeforeCrash,
+            BASSignalTenIntegrationTestTriageDoctrine
+                .swiftTestingCompletedBeforeCrash)
     }
 
     // MARK: - M2146 empirical diagnosis pins

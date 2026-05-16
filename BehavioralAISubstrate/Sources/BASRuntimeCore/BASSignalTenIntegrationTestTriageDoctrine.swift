@@ -260,42 +260,91 @@ public enum BASSignalTenIntegrationTestTriageDoctrine {
 
     public static let purelyAdditive: Bool = true
 
-    // MARK: - Swift-Testing concurrent-run flakiness
-    //         (M2144 第三刀 amendment)
+    // MARK: - Swift-Testing full-suite scheduling SIGBUS
+    //         (M2144 amendment ORIGINAL + M2147 CORRECTION)
+    //
+    // M2144 ORIGINAL framing:claimed swift-testing
+    // "passes in isolation,crashes only when concurrent
+    // with the 11000+ XCTest sweep"。
+    //
+    // M2147 EMPIRICAL CORRECTION:full-suite Swift Testing
+    // ALSO crashes when run in isolation via
+    // `swift test --enable-swift-testing --disable-xctest`。
+    // 398 of 419 `@Test` cases (across 67 `@Suite`s) start
+    // before SIGBUS,ZERO complete (no `✔ passed` markers)。
+    //
+    // CORRECTED ROOT-CAUSE FRAMING:swiftpm-testing-helper
+    // crashes during full-suite scheduling regardless of
+    // concurrent XCTest presence。 Narrow filter
+    // (`--filter <SuiteName>`) DOES pass — the issue is
+    // scope-correlated,not concurrency-correlated。
+    //
+    // Classified as:full-suite scheduling bug in the
+    // swiftpm-testing-helper process,NOT a substrate bug
+    // AND NOT a concurrent-runner flakiness。
+    //
+    // Recovery candidates:
+    //   1. Filter to narrower scope (`swift test --filter
+    //      <specific-suite-name>`) for partial coverage
+    //   2. Wait for SwiftPM/swift-testing toolchain fix
+    //   3. Toolchain bisect to find when full-suite
+    //      scheduling broke
+    //
+    // The M2144 ORIGINAL framing pins below are PRESERVED
+    // for history tracking but the boolean shifts to
+    // false-with-correction semantics — see
+    // M2147CorrectionApplied flag below。
 
-    /// SwiftPM `swift test` invocations run XCTest +
-    /// swift-testing in parallel processes。 The swift-
-    /// testing helper can crash with signal-10 when
-    /// running concurrently with a large XCTest sweep
-    /// (e.g. 11000+ tests),even though the SAME swift-
-    /// testing suites PASS when run in isolation。
-    ///
-    /// Observed:`BASAppleObservabilityAdapterTests`
-    /// (Swift Testing `@Suite` with 10 `@Test` cases)
-    /// passes in isolation。 Crashes intermittently in
-    /// the full-sweep concurrent path with signal-10
-    /// in the swiftpm-testing-helper process。
-    ///
-    /// Classified as:flakiness in the swiftpm-testing-
-    /// helper concurrent-runner,NOT a substrate bug。
-    /// Recovery path:run XCTest + Swift Testing in
-    /// separate invocations (e.g. via
-    /// `swift test --testing-library xctest` then
-    /// `swift test --testing-library swift-testing`)
-    /// or wait for SwiftPM to stabilize the
-    /// concurrent runner。
+    /// M2144 ORIGINAL claim:swift-testing concurrent-run
+    /// flakiness。 PRESERVED for history tracking; the
+    /// claim was empirically incorrect per M2147。
     public static let swiftTestingConcurrentRunFlakinessKnown:
         Bool = true
 
+    /// M2147 CORRECTION:the M2144 framing was empirically
+    /// incorrect。 Real root cause is full-suite scheduling
+    /// crash regardless of XCTest concurrency。 This pin
+    /// flags that the M2144 framing has been superseded。
+    public static let m2147CorrectionApplied: Bool = true
+
+    /// Refined swift-testing failure framing post-M2147。
+    public static let swiftTestingFailureFraming: String =
+        "full-suite scheduling SIGBUS in swiftpm-testing-helper,independent of XCTest concurrency。 398 of 419 @Test cases start before crash,ZERO complete。 Narrow `--filter` scope passes。"
+
     /// Affected swift-testing suite for the documented
-    /// flakiness。
+    /// flakiness (narrow-scope passes,full-suite crashes)。
     public static let knownFlakySwiftTestingSuite: String =
         "BASAppleObservabilityAdapterTests"
 
-    /// Recovery candidate for swift-testing flakiness。
+    /// Recovery candidate for swift-testing failure
+    /// (CORRECTED post-M2147)。
     public static let swiftTestingFlakinessRecovery:
         String =
-        "run XCTest + Swift Testing in separate `swift test --testing-library` invocations"
+        "narrow `--filter` scope for partial coverage,or await SwiftPM/swift-testing toolchain fix"
+
+    /// Empirical evidence pin:full-suite Swift Testing
+    /// crashes even with XCTest disabled (verified at
+    /// M2147 via `swift test --enable-swift-testing
+    /// --disable-xctest`)。
+    public static let fullSuiteCrashesEvenWithXCTestDisabled:
+        Bool = true
+
+    /// Total `@Test` cases across all `@Suite`s。
+    public static let swiftTestingTestCount: Int = 419
+
+    /// Total `@Suite` cases。
+    public static let swiftTestingSuiteCount: Int = 67
+
+    /// `@Test` cases observed starting before SIGBUS
+    /// (M2147 empirical observation)。
+    public static let swiftTestingStartedBeforeCrash: Int =
+        398
+
+    /// `@Test` cases observed completing before SIGBUS
+    /// (M2147:zero — process aborts before any
+    /// completes)。
+    public static let swiftTestingCompletedBeforeCrash:
+        Int = 0
 
     // MARK: - M2146 第一刀 empirical diagnosis update
     //
