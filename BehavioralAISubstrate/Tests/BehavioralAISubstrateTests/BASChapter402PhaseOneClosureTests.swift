@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2012",
-            "M2012:doctrine version reflects chapter 六百五十八 — BASMETALSUBSTRATE BIOMIMETIC-OBSERVATION TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#7,single-module BASMetalSubstrate reach,4 chapters until chapter 六百六十三 hexa #8 catalog opportunity。 3 observation struct types (BASPredictiveCodingObservation + BASPlasticityUpdate + BASHierarchicalObservation) gained Codable at M2009 + 3 PROOF tests (M2010) + BASBiomimeticObservationTrioCodableExtensionDoctrine typed surface (M2011) + close-out (M2012)。 NEW kind 'biomimetic-observation-trio'。 FIRST ALL-STRUCT trio in autonomous loop history (every prior gap-fill trio had ≥1 enum)。 Coherent biomimetic theme。 199 typed surfaces cumulative。 596 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M2016",
+            "M2016:doctrine version reflects chapter 六百五十九 — KERNEL-RESULT TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#7,single-module BASMetalSubstrate reach,2nd consecutive all-struct trio,3 chapters until chapter 六百六十三 hexa #8 catalog。 200 typed surfaces cumulative。 600 consecutive byte-equality clean commits — 600-COMMIT MILESTONE。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

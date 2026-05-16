@@ -121,18 +121,15 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 256
+    public static let phase2ChapterCount: Int = 257
 
-    /// Phase 2 commits shipped。 At M2012:125 + 84 +
-    /// 848 = 1057 (chapter 658 = 4 cuts — biomimetic-
-    /// observation trio + 3 PROOF + typed surface +
-    /// close-out)。
-    public static let phase2CommitsShipped: Int = 1057
+    /// Phase 2 commits shipped。 At M2016:125 + 84 +
+    /// 852 = 1061 (chapter 659 — 600-COMMIT MILESTONE)
+    public static let phase2CommitsShipped: Int = 1061
 
-    /// Phase 2 mNumberLast。 At M2012:chapter 658 —
-    /// BASMetalSubstrate biomimetic-observation trio。
-    /// SWEEP stays frozen at 1163。
-    public static let phase2MNumberLast: Int = 2012
+    /// Phase 2 mNumberLast。 At M2016:chapter 659 —
+    /// kernel-result trio。 SWEEP stays frozen at 1163。
+    public static let phase2MNumberLast: Int = 2016
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

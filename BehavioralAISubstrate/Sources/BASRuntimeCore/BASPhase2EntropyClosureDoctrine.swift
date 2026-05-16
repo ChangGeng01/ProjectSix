@@ -312,7 +312,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百五十五",   // M1997-M2000 (CROSS-MODULE VALIDATION-ISSUE TRIO CODABLE EXTENSION — GAP-FILL,6th and TRUE FINAL post-hexa-#6,cross-module BASHostKit + BASRuntimeCore reach;3 enum types (BASTurnRuntimeStagePlanValidationIssue + BASTurnRuntimeStageLedgerValidationIssue + BASLayerMLHeadRegistrationError) gained Codable + 3 PROOF tests + BASValidationIssueTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'validation-issue-trio';THEME CONTINUATION from chapter 654 (extends validation-result to plan-ledger validation-issue);BASRuntimeCore cumulative typed surfaces = 10;196 typed surfaces cumulative;CLOSE-OUT M2000 CROSSES ROUND-NUMBER MILESTONE;chapter 656 hexa #7 catalog opportunity NEXT with symmetric 6-entry run 650-655)
         "chapter 六百五十六",   // M2001-M2004 (7TH GAP-FILL HEXA CATALOG META-META MILESTONE;NEW BASGapFillHexaSevenCompletionDoctrine cataloging 6 post-hexa-#6 gap-fill chapters (650-655) — 18 types extended / 24 commits / 5 distinct modules touched;DISTINCTIVE FEATURES — RETURNS to multi-module diversity after hexa #6's entirely-single-module run + FIRST hexa with EXPLICIT THEME CONTINUATION (654→655) + FIRST hexa containing a ROUND-NUMBER chapter (650) AND crossing a ROUND-NUMBER M-milestone (M2000) within its run + Dict/Optional/parallel-structural-shape composition patterns;NEW catalog (M2001) + 64 anti-drift PROOF tests (M2002) + 18 wire-in PROOF tests (M2003) + close-out (M2004);PARALLEL structurally to chapter 614 hexa #1 + chapter 621 hexa #2 + chapter 628 hexa #3 + chapter 635 hexa #4 + chapter 642 hexa #5 + chapter 649 hexa #6;catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6 → M2001 hexa #7;197 typed surfaces cumulative — hits 197-surface)
         "chapter 六百五十七",   // M2005-M2008 (ROADMAP-EVAL-MOCK TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#7,cross-module BASRuntimeCore + BASOrgan reach,5 chapters until chapter 六百六十三 hexa #8 catalog opportunity;3 associated-value-enum types (BASRoadmapPhaseStatus + BASAutoEvalBaselineMode + BASFoundationModelsMockError) gained Codable + 3 PROOF tests + BASRoadmapEvalMockTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'roadmap-eval-mock-trio';ALL-PRIMITIVE-ASSOCIATED-VALUE trio + DOMAIN-SPANNING coherence;BASRuntimeCore cumulative typed surfaces = 11;198 typed surfaces cumulative)
-        "chapter 六百五十八"    // M2009-M2012 (BASMETALSUBSTRATE BIOMIMETIC-OBSERVATION TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#7,single-module BASMetalSubstrate reach,4 chapters until chapter 六百六十三 hexa #8 catalog opportunity;3 observation struct types (BASPredictiveCodingObservation + BASPlasticityUpdate + BASHierarchicalObservation) gained Codable + 3 PROOF tests + BASBiomimeticObservationTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'biomimetic-observation-trio';FIRST ALL-STRUCT trio in autonomous loop history;coherent biomimetic theme;199 typed surfaces cumulative)
+        "chapter 六百五十八",   // M2009-M2012 (BASMETALSUBSTRATE BIOMIMETIC-OBSERVATION TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#7,single-module BASMetalSubstrate reach,4 chapters until chapter 六百六十三 hexa #8 catalog opportunity;3 observation struct types (BASPredictiveCodingObservation + BASPlasticityUpdate + BASHierarchicalObservation) gained Codable + 3 PROOF tests + BASBiomimeticObservationTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'biomimetic-observation-trio';FIRST ALL-STRUCT trio in autonomous loop history;coherent biomimetic theme;199 typed surfaces cumulative)
+        "chapter 六百五十九"    // M2013-M2016 (KERNEL-RESULT TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#7,single-module BASMetalSubstrate reach,2nd consecutive all-struct trio,3 chapters until chapter 六百六十三 hexa #8 catalog opportunity;3 kernel-result struct types (BASKernelEvaluateLatencyProbeResult + BASKernelDispatchResult + BASBCMMetaPlasticityUpdate) gained Codable + 3 PROOF tests + BASKernelResultTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'kernel-result-trio';200 typed surfaces cumulative;600 consecutive byte-equality clean commits — 600-COMMIT MILESTONE)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -329,16 +330,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2012
+    public static let mNumberLast: Int = 2016
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2012)。 Bumped through chapter 658:1053 → 1057。
-    /// Chapter 658:BASMetalSubstrate biomimetic-
-    /// observation trio (2nd post-hexa-#7 gap-fill,
-    /// single-module BASMetalSubstrate reach) + 3 PROOF
-    /// tests + typed surface + close-out。 FIRST ALL-
-    /// STRUCT trio in autonomous loop history。
-    public static let commitsShipped: Int = 1057
+    /// M2016)。 Bumped through chapter 659:1057 → 1061。
+    /// Chapter 659:BASMetalSubstrate kernel-result trio
+    /// (3rd post-hexa-#7 gap-fill,single-module BAS
+    /// MetalSubstrate reach) + 3 PROOF tests + typed
+    /// surface + close-out。 600-COMMIT MILESTONE crossed。
+    public static let commitsShipped: Int = 1061
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

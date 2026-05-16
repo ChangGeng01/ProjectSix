@@ -2363,7 +2363,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十八")!)
+                            "chapter 六百五十八")!),
+            // M2016 chapter 659 — kernel-result trio Codable extension gap-fill (3rd post-hexa-#7, 2nd consecutive all-struct trio, 600-COMMIT MILESTONE)
+            checkRegistry("六百五十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4123,6 +4129,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十八")!
+                .mNumberLast),
+            // M2016 chapter 659 — kernel-result trio Codable extension gap-fill (3rd post-hexa-#7)
+            ("659",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

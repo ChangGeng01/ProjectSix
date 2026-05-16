@@ -18890,7 +18890,68 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M2012。" +
                 " 596 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
-                " ADR-014 OPT-IN preserved。")
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 659 — kernel-result trio Codable extension
+        // (3rd post-hexa-#7 gap-fill,single-module BAS
+        // MetalSubstrate reach,2nd consecutive all-struct
+        // trio,3 chapters until chapter 663 hexa #8 catalog)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十九",
+            mNumberFirst: 2013,
+            mNumberLast: 2016,
+            v1MilestoneMNumber: 2016,
+            v1MilestoneStatus:
+                "chapter-659-kernel-result-trio-codable-extension",
+            knives: [
+                BASChapterKnife(mNumber: 2013, knife: "第一刀",
+                    concept: "Add Codable to 3 BASMetalSubstrate" +
+                        " kernel-result struct types — BAS" +
+                        "KernelEvaluateLatencyProbeResult + BAS" +
+                        "KernelDispatchResult + BASBCMMetaPlasticity" +
+                        "Update。 2nd consecutive all-struct trio。"),
+                BASChapterKnife(mNumber: 2014, knife: "第二刀",
+                    concept: "3 compile-time conformance PROOF tests。"),
+                BASChapterKnife(mNumber: 2015, knife: "第三刀",
+                    concept: "NEW BASKernelResultTrioCodable" +
+                        "ExtensionDoctrine + 27 anti-drift tests。" +
+                        " typed-surface 199 → 200。"),
+                BASChapterKnife(mNumber: 2016, knife: "第四刀",
+                    concept: "Chapter 659 close-out + doctrine" +
+                        " sync。 600 consecutive byte-equality" +
+                        " clean commits — 600-COMMIT MILESTONE。")
+            ],
+            entropyClassesAttacked: [
+                "bas-kernel-evaluate-latency-probe-result-non-codable",
+                "bas-kernel-dispatch-result-non-codable",
+                "bas-bcm-meta-plasticity-update-non-codable",
+                "kernel-result-trio-pattern-uncaptured",
+                "third-post-hexa-seven-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2016",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "kernel-result-trio-codable-extension",
+                "third-post-hexa-seven-gap-fill",
+                "single-module-trio",
+                "second-consecutive-all-struct-trio",
+                "new-kind-label-kernel-result-trio",
+                "600-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 3 more gap-fills (660-662)",
+                "future arc — chapter 663 hexa #8 catalog",
+                "future arc — Phase H default mode flip"
+            ],
+            summary: "Chapter 659 ships BASMetalSubstrate" +
+                " kernel-result trio Codable extension —" +
+                " 3rd post-hexa-#7 gap-fill,2nd consecutive" +
+                " all-struct trio。 NEW kind 'kernel-result-" +
+                "trio'。 200 typed surfaces cumulative。" +
+                " 600 consecutive byte-equality clean commits" +
+                " — 600-COMMIT MILESTONE。 ADR-016 → M2016。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
