@@ -61,7 +61,7 @@ import Foundation
 // MARK: - Single-record
 
 public struct BASMambaInferenceLatencyRecord:
-    Sendable, Equatable, Hashable
+    Sendable, Equatable, Hashable, Codable
 {
     public let latencyMs: Double
     public let thermalBand: BASEventLogRiskBand

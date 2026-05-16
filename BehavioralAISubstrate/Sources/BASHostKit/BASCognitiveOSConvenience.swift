@@ -97,7 +97,7 @@ public enum BASCognitiveOSThermalSensitivity:
 /// Typed Sendable struct holding the convenience helper's cadence。
 /// Defaults mirror M862 SampleHost observer values (1 / 100 / 1000)。
 public struct BASCognitiveOSConvenienceCadence:
-    Sendable, Equatable, Hashable
+    Sendable, Equatable, Hashable, Codable
 {
     /// State reducer fold interval (in `observe(event:)` calls)。
     /// Default 100 — fold once per 100 events to keep state
@@ -223,7 +223,7 @@ public struct BASCognitiveOSConvenienceCadence:
 /// Typed Sendable struct reporting which primitives fired during
 /// one `observe(event:)` call。Hosts surface these to UI / logs。
 public struct BASCognitiveOSConvenienceResult:
-    Sendable, Equatable, Hashable
+    Sendable, Equatable, Hashable, Codable
 {
     /// True iff the event was appended to the event log
     /// (false when `eventLog` is nil in the bundle)。
