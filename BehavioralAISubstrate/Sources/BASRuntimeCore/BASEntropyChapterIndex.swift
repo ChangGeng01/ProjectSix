@@ -4912,7 +4912,35 @@ public enum BASEntropyChapterIndex {
                 " Phase J score-delta +6 on 原生利用神经" +
                 "引擎 directive。 Phase K chapters 668-671" +
                 " NEXT — runtimeMode toggle + dual-mode" +
-                " CI for Phase L default flip readiness。")
+                " CI for Phase L default flip readiness。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十八",
+            mNumberFirst: 2049, mNumberLast: 2052,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE K first chapter。 BASHost" +
+                "Runtime gains async opt-in surface" +
+                " `buildEBrainTurnWithRuntimeMode(...)`" +
+                " at M2049 threading BASTurnRuntimeMode" +
+                " knob to engine config。 Default" +
+                " `.v1ByteEqual` preserves M2032 sync" +
+                " buildEBrainTurn byte-equality;" +
+                " .nativeV2 / .stressSweepDual wrap" +
+                " coordinator in BASTurnRuntimeEngine。" +
+                " Private buildCoordinator helper" +
+                " extracted as single source-of-truth" +
+                " for V1 service wiring。 7 PROOF tests" +
+                " pinning BASTurnRuntimeMode enum (M2050)" +
+                "。 NEW BASRuntimeModeToggleWiring" +
+                "Doctrine + 33 anti-drift tests (M2051)。" +
+                " close-out (M2052)。 210 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2052。" +
+                " 636 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。 Phase L flip" +
+                " target chapter 六百七十四 / M2074。" +
+                " Chapter 669 ships dual-mode stress" +
+                " sweep test NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

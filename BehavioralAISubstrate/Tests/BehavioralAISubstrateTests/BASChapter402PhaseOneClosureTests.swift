@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2048",
-            "M2048:doctrine version reflects chapter 六百六十七 — PHASE J COMPLETE。 Final BASMPSGraphConv2DKernel wired at M2045 (2 PROOF tests)。 NEW BASMPSGraphCacheBenchmarkTests asserting ≥5× speedup on 1000-dispatch loop PASSES on real Apple Silicon GPU at M2046。 NEW BASPhaseJKernelCacheCompletionDoctrine + 37 anti-drift tests at M2047。 close-out at M2048。 90 total Phase J tests PASS (17 kernel + 72 anti-drift + 1 benchmark)。 209 typed surfaces cumulative。 632 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Phase J score-delta +6 on 原生利用神经引擎。 6 of 6 MPSGraph kernels wired with byte-equality preserved。 Phase K chapters 668-671 NEXT")
+            "ADR-016.M2052",
+            "M2052:doctrine version reflects chapter 六百六十八 — PHASE K first chapter — BASHostRuntime gains async opt-in surface `buildEBrainTurnWithRuntimeMode(...)` at M2049 threading BASTurnRuntimeMode knob to engine config。 Default `.v1ByteEqual` preserves M2032 sync buildEBrainTurn byte-equality。 7 PROOF tests pinning BASTurnRuntimeMode enum (M2050)。 NEW BASRuntimeModeToggleWiringDoctrine + 33 anti-drift tests (M2051)。 close-out (M2052)。 210 typed surfaces cumulative。 636 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Phase L flip target chapter 六百七十四 / M2074。 Chapter 669 ships dual-mode stress sweep test NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二

@@ -19585,7 +19585,101 @@ public enum BASChapterDoctrineRegistry {
                 "用神经引擎 directive。 NEXT:Phase K" +
                 " chapters 668-671 ships runtimeMode toggle" +
                 " + dual-mode CI for Phase L default flip" +
-                " readiness。")
+                " readiness。"),
+
+        // chapter 668 — Phase K kicks off。 BASHostRuntime
+        // gains async opt-in surface buildEBrainTurnWith
+        // RuntimeMode threading the BASTurnRuntimeMode
+        // knob to engine config。 ADR-014 OPT-IN preserved:
+        // sync buildEBrainTurn UNCHANGED, default .v1Byte
+        // Equal preserves M2032 baseline。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十八",
+            mNumberFirst: 2049,
+            mNumberLast: 2052,
+            v1MilestoneMNumber: 2052,
+            v1MilestoneStatus:
+                "chapter-668-phase-k-runtime-mode-toggle-knob",
+            knives: [
+                BASChapterKnife(mNumber: 2049, knife: "第一刀",
+                    concept: "BASHostRuntime gains async" +
+                        " opt-in surface `buildEBrainTurn" +
+                        "WithRuntimeMode(request:current" +
+                        "Brain:projection:deviceState" +
+                        "Override:runtimeMode:now:)`。" +
+                        " Default `.v1ByteEqual` preserves" +
+                        " M2032 sync path byte-equality;" +
+                        " .nativeV2 / .stressSweepDual" +
+                        " wrap coordinator in BASTurn" +
+                        "RuntimeEngine。 Private helper" +
+                        " buildCoordinator extracted as" +
+                        " single source-of-truth for V1" +
+                        " service wiring。"),
+                BASChapterKnife(mNumber: 2050, knife: "第二刀",
+                    concept: "7 PROOF tests pinning the" +
+                        " BASTurnRuntimeMode enum surface" +
+                        " — 3 cases,raw values,Codable" +
+                        " round-trip,Hashable+Equatable" +
+                        " conformances,V1ByteEqual=default" +
+                        " contract。"),
+                BASChapterKnife(mNumber: 2051, knife: "第三刀",
+                    concept: "NEW BASRuntimeModeToggleWiring" +
+                        "Doctrine + 33 anti-drift tests。" +
+                        " Pins Phase K goal,4-knife M-" +
+                        "numbers,async surface params (6)" +
+                        ",extracted helper,7 PROOF count," +
+                        " 3 modes' behaviors,Phase L flip" +
+                        " readiness target chapter 六百" +
+                        "七十四 / M2074。"),
+                BASChapterKnife(mNumber: 2052, knife: "第四刀",
+                    concept: "Chapter 668 close-out +" +
+                        " doctrine sync。 636 consecutive" +
+                        " byte-equality clean commits。" +
+                        " Phase K 第一章 sealed — chapter" +
+                        " 669 dual-mode stress sweep test" +
+                        " ships next。")
+            ],
+            entropyClassesAttacked: [
+                "runtime-mode-knob-not-exposed-to-hosts",
+                "v2-path-not-opt-in-callable",
+                "engine-config-runtime-mode-stranded",
+                "phase-l-flip-no-readiness-gate",
+                "host-runtime-sync-async-coordinator-not-deduped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2052",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-k-runtime-mode-toggle-knob-shipped",
+                "sync-build-ebrain-turn-unchanged",
+                "buildCoordinator-helper-single-source-of-truth",
+                "default-mode-v1ByteEqual-pinned",
+                "phase-l-flip-target-chapter-674",
+                "636-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 669 — dual-mode stress sweep test",
+                "chapter 670 — SampleHost BAS_RUNTIME_MODE env var bridge",
+                "chapter 671 — Phase K close-out doctrine"
+            ],
+            summary: "Phase K kicks off。 Chapter 668 ships" +
+                " the runtimeMode knob via BASHostRuntime" +
+                ".buildEBrainTurnWithRuntimeMode async opt-" +
+                "in surface (M2049) + 7 PROOF tests pinning" +
+                " BASTurnRuntimeMode enum (M2050) + NEW" +
+                " BASRuntimeModeToggleWiringDoctrine + 33" +
+                " anti-drift tests (M2051) + close-out" +
+                " (M2052)。 ADR-014 OPT-IN preserved:" +
+                " sync buildEBrainTurn UNCHANGED + default" +
+                " .v1ByteEqual = M2032 byte-equal。 210" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M2052。 636 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality preserved。" +
+                " Chapter 669 ships dual-mode stress sweep" +
+                " test asserting V1+V2 paths byte-equal" +
+                " under canonical60 fixtures。 Phase L" +
+                " flip target:chapter 六百七十四 / M2074。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

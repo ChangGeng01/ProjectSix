@@ -321,7 +321,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百六十四",  // M2033-M2036 (PHASE J 第一刀 — wild-rolling-meerkat REAL HOT-PATH ATTACK PLAN RESUMPTION FIRST CHAPTER after 186 chapters of Codable gap-fill drift;BASMPSGraphExecutableCache gains MPSGraphExecutable storage slot enabling per-kernel compile-cost amortization;3 new accessors at M2033 (cachedExecutable + storeExecutable + executableCount) + 7 PROOF tests at M2034 + NEW BASMPSGraphExecutableCacheWiringDoctrine + 30 anti-drift tests at M2035 + close-out at M2036;6 MPSGraph kernels target for chapters 665-667 wiring (matMul excluded — uses MPS direct,not MPSGraph);5.0× speedup target on 1000-dispatch loops;Phase J score-delta target +6 on 原生利用神经引擎;205 typed surfaces cumulative;620 consecutive byte-equality clean commits;V1 byte-equality preserved)
         "chapter 六百六十五",  // M2037-M2040 (PHASE J kernel wiring continues — first 2 of 6 MPSGraph kernels wired to consume M2033 cache storage slot;BASMPSGraphRMSNormKernel (M2037) + BASMPSGraphRotaryEmbeddingKernel (M2038) gain optional cache parameter with cache-on fast path using compile-once + executable.run;cache=nil falls through to M1169/M1190 baseline graph.run paths UNCHANGED — ADR-014 OPT-IN guarantee preserved;9 kernel PROOF tests including byte-equality assertions between cache-on/off paths;NEW BASKernelCacheWiringPhaseJChapter665Doctrine + 29 anti-drift tests at M2039;close-out at M2040;206 typed surfaces cumulative;624 consecutive byte-equality clean commits;V1 byte-equality preserved;4 kernels remaining for chapters 666-667 — attention,softmax,layerNorm,conv2D)
         "chapter 六百六十六",  // M2041-M2044 (PHASE J kernel wiring continues — 3 more kernels wired;attention (M2041) + softmax + layerNorm (M2042 combined commit) gain optional cache parameter with cache-on fast path;6 PROOF tests (2 per kernel);NEW BASKernelCacheWiringPhaseJChapter666Doctrine + 13 anti-drift tests at M2043;close-out at M2044;207 typed surfaces cumulative;628 consecutive byte-equality clean commits;V1 byte-equality preserved;5 of 6 Phase J kernels wired;1 kernel (conv2D) remaining for chapter 667 + 5× speedup benchmark + Phase J close-out)
-        "chapter 六百六十七"   // M2045-M2048 (PHASE J COMPLETE — final BASMPSGraphConv2DKernel wired (M2045) + NEW BASMPSGraphCacheBenchmarkTests asserting ≥5× speedup on 1000-dispatch loop PASSES on real Apple Silicon GPU (M2046) + NEW BASPhaseJKernelCacheCompletionDoctrine + 37 anti-drift tests sealing achievement (M2047) + close-out (M2048);6 of 6 Phase J kernels wired with byte-equality preserved;90 total Phase J tests PASS (17 kernel + 72 anti-drift + 1 benchmark);209 typed surfaces cumulative;632 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;PHASE J achievement +6 on 原生利用神经引擎 directive;Phase K chapters 668-671 NEXT — runtimeMode toggle + dual-mode CI for Phase L default flip readiness)
+        "chapter 六百六十七",  // M2045-M2048 (PHASE J COMPLETE — final BASMPSGraphConv2DKernel wired (M2045) + NEW BASMPSGraphCacheBenchmarkTests asserting ≥5× speedup on 1000-dispatch loop PASSES on real Apple Silicon GPU (M2046) + NEW BASPhaseJKernelCacheCompletionDoctrine + 37 anti-drift tests sealing achievement (M2047) + close-out (M2048);6 of 6 Phase J kernels wired with byte-equality preserved;90 total Phase J tests PASS (17 kernel + 72 anti-drift + 1 benchmark);209 typed surfaces cumulative;632 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;PHASE J achievement +6 on 原生利用神经引擎 directive;Phase K chapters 668-671 NEXT — runtimeMode toggle + dual-mode CI for Phase L default flip readiness)
+        "chapter 六百六十八"   // M2049-M2052 (PHASE K 第一章 — BASHostRuntime gains async opt-in surface `buildEBrainTurnWithRuntimeMode(request:currentBrain:projection:deviceStateOverride:runtimeMode:now:)` threading BASTurnRuntimeMode knob;default `.v1ByteEqual` preserves M2032 sync buildEBrainTurn byte-equality;.nativeV2 / .stressSweepDual wrap coordinator in BASTurnRuntimeEngine;private buildCoordinator helper extracted as single source-of-truth for V1 service wiring;7 PROOF tests pinning BASTurnRuntimeMode enum surface (M2050);NEW BASRuntimeModeToggleWiringDoctrine + 33 anti-drift tests (M2051);close-out (M2052);210 typed surfaces cumulative;636 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;Phase L flip target chapter 六百七十四 / M2074)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -338,14 +339,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2048
+    public static let mNumberLast: Int = 2052
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2048)。 Bumped through chapter 667:1089 → 1093。
-    /// Chapter 667:PHASE J COMPLETE。 conv2D wired + 5×
-    /// speedup benchmark PASSES + Phase J completion
-    /// doctrine sealed。 6 of 6 MPSGraph kernels wired。
-    public static let commitsShipped: Int = 1093
+    /// M2052)。 Bumped through chapter 668:1093 → 1097。
+    /// Chapter 668:Phase K first chapter — runtimeMode
+    /// knob shipped + 7 PROOF tests + NEW BASRuntimeMode
+    /// ToggleWiringDoctrine + close-out。
+    public static let commitsShipped: Int = 1097
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
