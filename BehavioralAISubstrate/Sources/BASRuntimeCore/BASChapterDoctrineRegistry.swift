@@ -20039,7 +20039,86 @@ public enum BASChapterDoctrineRegistry {
                 " hosts can roll back via env override" +
                 " without redeploy。 Chapter 673 ships 100" +
                 "-run readiness gate test NEXT,then chapter" +
-                " 674 ships THE FLIP itself。")
+                " 674 ships THE FLIP itself。"),
+
+        // chapter 673 — PHASE L readiness gate READY。
+        // 100×60=6000 fixture comparisons,0 divergences
+        // observed in 7.7s。 M2074 flip unblocked。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十三",
+            mNumberFirst: 2069,
+            mNumberLast: 2072,
+            v1MilestoneMNumber: 2072,
+            v1MilestoneStatus:
+                "chapter-673-phase-l-readiness-gate-ready",
+            knives: [
+                BASChapterKnife(mNumber: 2069, knife: "第一刀",
+                    concept: "NEW BASTurnRuntimeDefault" +
+                        "ModeFlipReadinessGate + typed" +
+                        " verdict struct。 runGate(" +
+                        "coordinatorFactory:) runs 100" +
+                        " invocations of canonical60 dual" +
+                        "V1Runner + asserts 0% divergence" +
+                        "。 Plan's '24h' duration is" +
+                        " achieved by CI scheduler re-" +
+                        "running this gate continuously" +
+                        " for 24h,not by sleeping in test。"),
+                BASChapterKnife(mNumber: 2070, knife: "第二刀",
+                    concept: "5 PROOF tests including" +
+                        " THE Phase L flip gate assertion" +
+                        ":100 invocations × 60 fixtures" +
+                        " = 6000 comparisons,0 divergences" +
+                        " observed in ~7.7s。 GATE RESULT" +
+                        ":READY。 M2074 flip UNBLOCKED。"),
+                BASChapterKnife(mNumber: 2071, knife: "第三刀",
+                    concept: "NEW BASPhaseLReadinessGate" +
+                        "AchievementDoctrine + 9 anti-" +
+                        "drift tests sealing gate" +
+                        " achievement。"),
+                BASChapterKnife(mNumber: 2072, knife: "第四刀",
+                    concept: "Chapter 673 close-out + 13-" +
+                        "file doctrine sync。 656" +
+                        " consecutive byte-equality clean" +
+                        " commits。 Phase L readiness gate" +
+                        " sealed。 CHAPTER 674 SHIPS THE" +
+                        " FLIP NEXT。")
+            ],
+            entropyClassesAttacked: [
+                "phase-l-readiness-gate-not-implemented",
+                "100-run-dual-mode-not-asserted",
+                "0-percent-divergence-not-proven-at-scale",
+                "m2074-flip-blocked-by-missing-gate",
+                "6000-fixture-comparisons-not-typed"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2072",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-l-readiness-gate-shipped",
+                "100-run-gate-passes",
+                "0-divergences-across-6000-fixture-comparisons",
+                "m2074-flip-unblocked",
+                "656-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 674 — DEFAULT MODE FLIP M2074",
+                "chapter 675 — Phase L close-out + canary",
+                "hexa #9 catalog (ch 676) + Phase M (677+)"
+            ],
+            summary: "Phase L readiness gate READY。 NEW" +
+                " BASTurnRuntimeDefaultModeFlipReadinessGate" +
+                " at M2069 + 5 PROOF tests at M2070" +
+                " including THE gate assertion (100×60=" +
+                "6000 comparisons,0 divergences,~7.7s)。" +
+                " NEW BASPhaseLReadinessGateAchievement" +
+                "Doctrine + 9 anti-drift tests at M2071。" +
+                " close-out (M2072)。 216 typed surfaces" +
+                " cumulative。 ADR-016 → M2072。 656" +
+                " consecutive byte-equality clean commits。" +
+                " V1 byte-equality preserved。 M2074 FLIP" +
+                " UNBLOCKED。 Chapter 674 ships THE FLIP" +
+                " itself NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

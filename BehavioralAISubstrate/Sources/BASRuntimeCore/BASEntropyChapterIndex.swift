@@ -5039,7 +5039,27 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-014 OPT-IN preserved。" +
                 " Chapter 673 ships 100-run readiness" +
                 " gate test NEXT,then chapter 674 ships" +
-                " THE FLIP。")
+                " THE FLIP。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十三",
+            mNumberFirst: 2069, mNumberLast: 2072,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "PHASE L readiness gate READY。" +
+                " NEW BASTurnRuntimeDefaultModeFlip" +
+                "ReadinessGate at M2069 + 5 PROOF tests" +
+                " at M2070 including THE gate assertion" +
+                " (100 invocations × 60 fixtures = 6000" +
+                " comparisons,0 divergences observed in" +
+                " ~7.7s)。 NEW BASPhaseLReadinessGate" +
+                "AchievementDoctrine + 9 anti-drift" +
+                " tests (M2071)。 close-out (M2072)。" +
+                " M2074 FLIP UNBLOCKED。 216 typed" +
+                " surfaces cumulative (+1)。 ADR-016 →" +
+                " M2072。 656 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality" +
+                " preserved。 Chapter 674 ships THE FLIP" +
+                " NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

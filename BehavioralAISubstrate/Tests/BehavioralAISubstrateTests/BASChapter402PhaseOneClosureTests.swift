@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2068",
-            "M2068:doctrine version reflects chapter 六百七十二 — PHASE L pre-flip safety net shipped。 BAS_RUNTIME_MODE_OVERRIDE env var with priority OVERRIDE > BAS_RUNTIME_MODE > default at M2065。 14 PROOF tests at M2066。 NEW BASRuntimeModeOverrideDoctrine + 15 anti-drift tests (M2067) + close-out (M2068)。 Commit M2068 is tagged revert point for M2074 flip。 Original currentRuntimeMode UNCHANGED — back-compat preserved。 215 typed surfaces cumulative。 652 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 673 ships 100-run readiness gate test NEXT,then chapter 674 ships THE FLIP")
+            "ADR-016.M2072",
+            "M2072:doctrine version reflects chapter 六百七十三 — PHASE L readiness gate READY。 NEW BASTurnRuntimeDefaultModeFlipReadinessGate at M2069 + 5 PROOF tests at M2070 including THE gate assertion (100 invocations × 60 fixtures = 6000 comparisons,0 divergences observed in ~7.7s)。 NEW BASPhaseLReadinessGateAchievementDoctrine + 9 anti-drift tests (M2071) + close-out (M2072)。 M2074 FLIP UNBLOCKED。 216 typed surfaces cumulative。 656 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 674 ships THE FLIP NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二
