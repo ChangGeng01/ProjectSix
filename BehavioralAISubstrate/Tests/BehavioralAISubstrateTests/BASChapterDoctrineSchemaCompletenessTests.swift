@@ -2577,7 +2577,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九十五")!)
+                            "chapter 六百九十五")!),
+            // M2157 chapter 696 — RECOVERY OF TERMINAL
+            // arc
+            checkRegistry("六百九十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4620,6 +4627,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九十五")!
+                .mNumberLast),
+            // M2157 chapter 696 — RECOVERY OF TERMINAL
+            // arc
+            ("696",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

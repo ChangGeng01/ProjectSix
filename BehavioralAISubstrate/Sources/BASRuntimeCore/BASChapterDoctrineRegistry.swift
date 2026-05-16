@@ -21636,7 +21636,11 @@ public enum BASChapterDoctrineRegistry {
                     " unblocking substrate adoption,or" +
                     " (b) react to new user directive。" +
                     " Pro-active substrate gap-filling is" +
-                    " EXHAUSTED at chapter 695。"
+                    " EXHAUSTED at chapter 695。 (NOTE:" +
+                    " chapter 696 / M2154 FALSIFIED this" +
+                    " claim by finding sync-surface" +
+                    " recovery pattern — terminal claim" +
+                    " now QUALIFIED per M2155 amendment。)"
             ],
             summary: "TERMINAL HONEST STATE arc。 User" +
                 " directive 「继续 解决 为解决的 一次性" +
@@ -21675,7 +21679,118 @@ public enum BASChapterDoctrineRegistry {
                 " Methodology — honest empirical audit +" +
                 " explicit owner attribution + terminal-" +
                 "state pin → no busy-work commits after" +
-                " this。")
+                " this。"),
+        // chapter 696 — RECOVERY OF TERMINAL arc。 User
+        // directive 「全面 完成 尚未解决 项目」 found a
+        // NEW substrate-actionable pattern (sync-surface
+        // refactor) that recovers 6-of-12 SIGBUS tests。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十六",
+            mNumberFirst: 2154,
+            mNumberLast: 2157,
+            v1MilestoneMNumber: 2157,
+            v1MilestoneStatus:
+                "chapter-696-recovery-of-terminal",
+            knives: [
+                BASChapterKnife(mNumber: 2154, knife: "第一刀",
+                    concept: "NEW BASSubstrateReaudit" +
+                        "ShadowEvaluator.evaluateSync sync" +
+                        " surface (additive,ADR-014 OPT-" +
+                        "IN preserved) + 6-of-12 SIGBUS" +
+                        " tests un-skipped via Diagnostic" +
+                        " A pattern。"),
+                BASChapterKnife(mNumber: 2155, knife: "第二刀",
+                    concept: "Doctrine corrections —" +
+                        " BASSignalTen triage +7 pins +" +
+                        " BASSubstrateMaximallyResolved" +
+                        " +5 pins qualifying terminal" +
+                        " claim。 M2146 + M2152 originals" +
+                        " RETAINED for history。"),
+                BASChapterKnife(mNumber: 2156, knife: "第三刀",
+                    concept: "NEW BASChapter696Recovery" +
+                        "ProgressDoctrine pinning 50%" +
+                        " recovery + 6-step reusable" +
+                        " pattern + 1 sync surface + 3" +
+                        " actor-blocked APIs + 24 anti-" +
+                        "drift tests。"),
+                BASChapterKnife(mNumber: 2157, knife: "第四刀",
+                    concept: "Chapter 696 close-out + 13-" +
+                        "file standard sync。 740" +
+                        " consecutive byte-equality clean" +
+                        " commits。 60/60 score unchanged" +
+                        " (saturation invariant)。")
+            ],
+            entropyClassesAttacked: [
+                "chapter-693-sigbus-bucket-50-percent-recoverable",
+                "chapter-695-terminal-state-claim-scope-bounded",
+                "sync-surface-recovery-pattern-undocumented"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (sync surface" +
+                    " purely additive)",
+                "ADR-016 → M2157",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "740-consecutive-byte-equality-clean-commits",
+                "empirical-recovery-pattern-discovered",
+                "terminal-state-claim-qualified-honestly"
+            ],
+            plannedFutureCuts: [
+                "Optional follow-up:if Swift actor model" +
+                    " evolves to allow safe sync surfaces" +
+                    " on actors OR if BASMemoryClosedLoop" +
+                    "Applier + BASMemoryUsageTracker +" +
+                    " BASSovereignAuditLedger are" +
+                    " refactored to non-actor types,the" +
+                    " remaining 6 SIGBUS-skipped tests" +
+                    " can be un-skipped via the same" +
+                    " sync-surface refactor pattern" +
+                    " (M2156 BASChapter696RecoveryProgress" +
+                    "Doctrine documents the reusable" +
+                    " pattern)。"
+            ],
+            summary: "RECOVERY OF TERMINAL arc。 User" +
+                " directive 「全面 完成 尚未解决 项目」" +
+                " falsified chapter 695 / M2152" +
+                " 'terminal state' claim by finding a" +
+                " NEW substrate-actionable pattern。 M2154" +
+                " 第一刀 NEW BASSubstrateReauditShadow" +
+                "Evaluator.evaluateSync sync surface" +
+                " (additive,ADR-014 OPT-IN preserved) +" +
+                " 6-of-12 SIGBUS tests un-skipped via" +
+                " sync test method + sync invocation" +
+                " pattern (Diagnostic A pattern)。 M2155" +
+                " 第二刀 doctrine corrections — BAS" +
+                "SignalTen triage +7 pins documenting" +
+                " sync-surface viability + 50% recovery;" +
+                " BASSubstrateMaximallyResolved +5 pins" +
+                " qualifying M2152 terminal claim post-" +
+                "M2154 discovery;M2146 + M2152 originals" +
+                " RETAINED for history。 M2156 第三刀 NEW" +
+                " BASChapter696RecoveryProgressDoctrine" +
+                " pinning 50% recovery + 6-step reusable" +
+                " recovery pattern + 1 sync surface" +
+                " inventory + 3 actor-blocked APIs + 2" +
+                " cross-mirror invariants + 24 anti-drift" +
+                " tests。 Chapter 696 close-out (M2157) +" +
+                " 13-file standard sync。 ADR-014 OPT-" +
+                "OUT preserved。 ADR-016 → M2157。 740" +
+                " consecutive byte-equality clean commits。" +
+                " 274 typed surfaces cumulative (+1:" +
+                "BASChapter696RecoveryProgressDoctrine;" +
+                " evaluateSync is a method on existing" +
+                " type per M2148 counting convention)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C complete + TERMINAL claim" +
+                " QUALIFIED preserved end-of-chapter-696。" +
+                " Methodology — empirical recovery-pattern" +
+                " discovery → when prior claims are" +
+                " tested with NEW patterns,document" +
+                " findings as additive amendments not" +
+                " history rewrites。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

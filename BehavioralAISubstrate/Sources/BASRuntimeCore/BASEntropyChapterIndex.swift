@@ -5630,7 +5630,56 @@ public enum BASEntropyChapterIndex {
                 " end-of-chapter-695。 Methodology —" +
                 " honest empirical audit + explicit owner" +
                 " attribution + terminal-state pin → no" +
-                " busy-work commits after this。")
+                " busy-work commits after this。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十六",
+            mNumberFirst: 2154, mNumberLast: 2157,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 12, futureCutsCount: 0,
+            summary: "RECOVERY OF TERMINAL arc。 User" +
+                " directive 「全面 完成 尚未解决 项目」" +
+                " falsified chapter 695 / M2152" +
+                " 'terminal state' claim by finding a" +
+                " NEW substrate-actionable pattern。 M2154" +
+                " 第一刀 NEW BASSubstrateReauditShadow" +
+                "Evaluator.evaluateSync sync surface" +
+                " (additive,ADR-014 OPT-IN preserved) +" +
+                " 6-of-12 SIGBUS-bucketed tests un-" +
+                "skipped via sync test method + sync" +
+                " invocation pattern (Diagnostic A" +
+                " pattern) — was SKIPPED per chapter 693" +
+                " / M2143 triage,now PASS。 M2155 第二刀" +
+                " doctrine corrections — BASSignalTen" +
+                "IntegrationTestTriageDoctrine +7 pins" +
+                " documenting sync-surface viability +" +
+                " 50% recovery + remaining-6 actor-" +
+                "blocked reason;BASSubstrateMaximally" +
+                "ResolvedDoctrine +5 pins qualifying" +
+                " M2152 'terminal' claim post-M2154" +
+                " discovery。 M2146 + M2152 original" +
+                " claims RETAINED for history。 M2156" +
+                " 第三刀 NEW BASChapter696RecoveryProgress" +
+                "Doctrine pinning 50% recovery + 6-step" +
+                " reusable recovery pattern + sync" +
+                " surface inventory + 3 actor-blocked" +
+                " APIs + 2 cross-mirror invariants + 24" +
+                " anti-drift tests。 Chapter 696 close-" +
+                "out (M2157) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2157。 740 consecutive byte-equality" +
+                " clean commits。 274 typed surfaces" +
+                " cumulative (+1:BASChapter696Recovery" +
+                "ProgressDoctrine;evaluateSync is a" +
+                " method on existing type,not new" +
+                " typed surface per M2148 convention)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C complete + TERMINAL claim" +
+                " QUALIFIED preserved。 Methodology —" +
+                " empirical recovery-pattern discovery" +
+                " → when prior claims are tested with NEW" +
+                " patterns,document findings as additive" +
+                " amendments not history rewrites。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
