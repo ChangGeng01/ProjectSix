@@ -559,33 +559,28 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// checkpoint cataloging Phase J + K + L + THE FLIP
     /// as 4 EntryRecords。
     /// Re-captured at chapter 682 close-out。 PHASE M
-    /// SEALED。 6 chapters (677-682) / 24 commits
-    /// Phase M complete。 Substrate's FIRST raw Metal
-    /// compute kernel (Mamba selective-scan) shipped at
-    /// chapter 678 / M2089 + numerically proven via 5
-    /// correctness oracles (CPU↔GPU random cross-val +
-    /// CPU↔analytic + GPU↔analytic + extended fixture
-    /// cross-val + numerical-stability cross-val)。
-    /// 8-of-8 native kernel coverage MILESTONE achieved
-    /// at chapter 681 / M2102 (NEW BASCanonicalKernel
-    /// Coverage.chapter681Snapshot;chapter 496 7-of-8
-    /// historical snapshot preserved unchanged for
-    /// history immutability)。 Phase M score progression
-    /// 58→60 documented in BASPhaseMScoreImpactDoctrine
-    /// at M2107 (PRELIMINARY 60/60 ahead of formal
-    /// chapter 708 tier 1 + chapter 709 tier 2
-    /// achievement seals per the wild-rolling-meerkat
-    /// plan)。 NEW BASPhaseMRealSSMScanKernelCompletion
-    /// Doctrine at M2105 sealing the 6-chapter / 24-
-    /// commit arc。 240 typed surfaces cumulative (+20
-    /// across Phase M);692 consecutive byte-equality
-    /// clean commits。 V1 byte-equality preserved。
-    /// ADR-014 OPT-OUT preserved。 ADR-016 → M2108。
-    /// Phase M total 422 PROOF tests cumulative across
-    /// 6 chapters。 NEXT:Phase N Tier A sprawl
-    /// migration (chapters 683-685 / M2109-M2120) — 8
-    /// load-bearing bundle types migrated to BASBundle
-    /// <Item> via typealias bridges。
+    /// SEALED at M2108。 8-of-8 native coverage + 60/60
+    /// preliminary achievement。 (Full provenance in
+    /// chapter 682 close-out commit)。
+    /// Re-captured at chapter 683 close-out。 PHASE N
+    /// scope-reduced — Tier A bundle migration via
+    /// ADDITIVE BRIDGES (not full struct replacement)。
+    /// NEW BASMicroStep + BASMicroStepBundle = BASBundle
+    /// <BASMicroStep> typealias at M2109 + 18 PROOF tests。
+    /// NEW BASEventLogReplayItemKind enum (8 cases) +
+    /// 16 anti-drift tests at M2110。 NEW BASTierA
+    /// MigrationStrategyDoctrine + 25 tests at M2111
+    /// documenting honest scope reduction (8 planned →
+    /// 2 shipped + 6 deferred,66.7% scope drop)。
+    /// Chapter 683 close-out (M2112) + Phase N close-out
+    /// under reduced scope。 17+ existing call sites
+    /// intact (additive-only,no breaking changes)。
+    /// Score-delta 0 (低熵复杂系统 already at 10/10 post-
+    /// Phase-J/L/M)。 244 typed surfaces cumulative (+4)
+    /// 。 696 consecutive byte-equality clean commits。
+    /// V1 byte-equality preserved。 ADR-014 OPT-OUT
+    /// preserved。 ADR-016 → M2112。 Phase O V1 monolith
+    /// DELETION (chapters 686-688) NEXT。
     static let frozenFullRegistrySha256: String =
-        "acda867632dd4c67b12271c84151c3f546cdbcc7f694766e1181e26feb67d978"
+        "c774886418a3c978a754a5dd76cc39dff56578d3fe1bb7ba617c90ddc2d275fb"
 }

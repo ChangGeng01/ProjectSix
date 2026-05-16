@@ -5223,7 +5223,30 @@ public enum BASEntropyChapterIndex {
                 " surfaces cumulative (+20 across Phase M)" +
                 "。 ADR-016 → M2108。 692 consecutive" +
                 " byte-equality clean commits。 Phase N" +
-                " Tier A sprawl (ch 683-685) NEXT。")
+                " Tier A sprawl (ch 683-685) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十三",
+            mNumberFirst: 2109, mNumberLast: 2112,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 10, futureCutsCount: 1,
+            summary: "PHASE N scope-reduced — Tier A bundle" +
+                " migration via ADDITIVE BRIDGES。 NEW BAS" +
+                "MicroStep + BASMicroStepBundle = BASBundle" +
+                "<BASMicroStep> typealias at M2109 + 18" +
+                " tests。 NEW BASEventLogReplayItemKind" +
+                " enum + 16 tests at M2110。 NEW BASTierA" +
+                "MigrationStrategyDoctrine + 25 tests at" +
+                " M2111 documenting 66.7% scope reduction" +
+                " (8 planned → 2 shipped + 6 deferred)。" +
+                " Chapter 683 close-out (M2112) + Phase N" +
+                " close-out under reduced scope。 17+" +
+                " existing call sites intact (additive-" +
+                "only,no breaking changes)。 Score-delta" +
+                " 0 (低熵复杂系统 already at 10/10)。 244" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M2112。 696 consecutive byte-equality" +
+                " clean commits。 Phase O V1 monolith" +
+                " DELETION (chapters 686-688) NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

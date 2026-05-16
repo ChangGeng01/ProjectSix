@@ -20696,7 +20696,77 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+20 across Phase M)。 ADR-" +
                 "016 → M2108。 692 consecutive byte-equality" +
                 " clean commits。 Phase N Tier A sprawl" +
-                " (chapters 683-685) NEXT。")
+                " (chapters 683-685) NEXT。"),
+
+        // chapter 683 — Phase N (scope-reduced) — Tier A
+        // additive bridge approach。 Original plan: 8
+        // bundles across 3 chapters。 Actual: 2 bridges in
+        // 1 chapter + 6 deferred。 ADR-014 OPT-IN preserved
+        // throughout — no breaking changes to existing
+        // call sites。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八十三",
+            mNumberFirst: 2109,
+            mNumberLast: 2112,
+            v1MilestoneMNumber: 2112,
+            v1MilestoneStatus:
+                "chapter-683-phase-n-scope-reduced-tier-a-bridges",
+            knives: [
+                BASChapterKnife(mNumber: 2109, knife: "第一刀",
+                    concept: "NEW BASMicroStep typed struct" +
+                        " + BASMicroStepBundle = BASBundle" +
+                        "<BASMicroStep> typealias bridge" +
+                        " for BASStepBundle.microSteps slot" +
+                        " + 18 PROOF tests。"),
+                BASChapterKnife(mNumber: 2110, knife: "第二刀",
+                    concept: "NEW BASEventLogReplayItemKind" +
+                        " enum (8 cases) + provenance" +
+                        " accessors + 16 anti-drift tests。"),
+                BASChapterKnife(mNumber: 2111, knife: "第三刀",
+                    concept: "NEW BASTierAMigrationStrategy" +
+                        "Doctrine + 25 anti-drift tests" +
+                        " documenting honest scope reduction" +
+                        " (8 planned → 2 shipped + 6 deferred" +
+                        ",66.7% scope drop) + rationale。"),
+                BASChapterKnife(mNumber: 2112, knife: "第四刀",
+                    concept: "Chapter 683 close-out + 13-" +
+                        "file standard doctrine sync (also" +
+                        " serves as Phase N close-out under" +
+                        " reduced scope)。 696 consecutive" +
+                        " byte-equality clean commits。")
+            ],
+            entropyClassesAttacked: [
+                "no-additive-bridge-pattern-for-multi-field-bundles",
+                "no-typed-event-kind-taxonomy",
+                "no-honest-scope-reduction-doctrine"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2112",
+                "17-plus-existing-call-sites-intact",
+                "additive-only-no-breaking-changes",
+                "honest-scope-reduction-documented",
+                "696-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 686 — Phase O V1 monolith DELETION (first cut)"
+            ],
+            summary: "PHASE N scope-reduced — Tier A bundle" +
+                " migration via ADDITIVE BRIDGES (not full" +
+                " struct replacement) due to multi-field" +
+                " bundle shapes incompatible with BASBundle" +
+                "<Item> pattern。 2 bridges shipped" +
+                " (BASMicroStep + BASEventLogReplayItemKind)" +
+                " + strategy doctrine + 59 PROOF tests +" +
+                " chapter close-out。 Original plan: 8" +
+                " bundles in 3 chapters → actual: 2 bridges" +
+                " in 1 chapter + 6 deferred。 Score-delta" +
+                " 0 (低熵复杂系统 already at 10/10)。 244" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M2112。 696 consecutive byte-equality" +
+                " clean commits。 Phase O V1 monolith" +
+                " DELETION (chapters 686-688) NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

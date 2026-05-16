@@ -336,7 +336,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百七十九",  // M2093-M2096 (PHASE M triangulation — 6 JSON canonical fixtures in Vendor/mamba-ssm-fixtures/ with honestly-documented analytic-derivation provenance + NEW BASSSMScanFixtureRegistry Swift mirror + 14 fixture-validation PROOF tests asserting CPU + GPU outputs match analytic canonical math within 1e-5 + 67 PROOF tests total;3 correctness oracles in place (CPU↔GPU + CPU↔analytic + GPU↔analytic);ADR-014 OPT-OUT preserved;ADR-016 → M2096;680 consecutive byte-equality clean commits;230 typed surfaces cumulative;chapter 680 extended fixtures NEXT),
         "chapter 六百八十",    // M2097-M2100 (PHASE M coverage extension — NEW BASSSMScanExtendedFixtureRegistry with 6 larger-scale + edge-case fixtures + 4 GPU vs CPU wallclock characterization tests (honest observation:GPU break-even at B*D≈256 parallel threads;0.25ms amortized per-dispatch) + 8 numerical-stability PROOF tests (tiny inputs + strong decay + alternating signs + long sequence + no-NaN/Inf) + 59 PROOF tests total;triangulation tier expanded to 5 oracles;ADR-014 OPT-OUT preserved;ADR-016 → M2100;684 consecutive byte-equality clean commits;233 typed surfaces cumulative;chapter 681 stub repurpose NEXT),
         "chapter 六百八十一",  // M2101-M2104 (PHASE M 8-of-8 MILESTONE — repurpose chapter 496 BASMPSGraphSSMScanKernelStub from .metalBuffer/identity-scan to .cpuBytes/BASSSMScanCPUReference-delegated production sibling + new BASCPUSSMScanKernel typealias + NEW chapter681Snapshot in BASCanonicalKernelCoverage reflecting 8-of-8 native (chapter 496 7-of-8 historical snapshot preserved unchanged) + NEW BASEightOfEightNativeKernelCoverageMilestoneDoctrine documenting 5 correctness oracles + score-delta 58→60 + 67 PROOF tests total;ADR-014 OPT-OUT preserved;ADR-016 → M2104;688 consecutive byte-equality clean commits;237 typed surfaces cumulative;chapter 682 Phase M close-out NEXT),
-        "chapter 六百八十二"   // M2105-M2108 (PHASE M SEALED — NEW BASPhaseMRealSSMScanKernelCompletionDoctrine sealing 6-chapter/24-commit Phase M arc + 44 anti-drift tests + NEW BASPhaseMScoreImpactDoctrine + 26 tests documenting score progression 45→51→54→58→58→60 across J/K/L/Hexa9/M (60/60 PRELIMINARY ahead of formal chapter 708 tier 1 seal) + chapter 682 close-out via 13-file standard doctrine sync + 70 PROOF tests total;substrate's FIRST 60/60 aggregate score achievement;ADR-014 OPT-OUT preserved;ADR-016 → M2108;692 consecutive byte-equality clean commits;240 typed surfaces cumulative (+20 across Phase M);Phase M total 422 PROOF tests cumulative;Phase N Tier A sprawl chapters 683-685 NEXT)
+        "chapter 六百八十二",  // M2105-M2108 (PHASE M SEALED — NEW BASPhaseMRealSSMScanKernelCompletionDoctrine sealing 6-chapter/24-commit Phase M arc + 44 anti-drift tests + NEW BASPhaseMScoreImpactDoctrine + 26 tests documenting score progression 45→51→54→58→58→60 across J/K/L/Hexa9/M (60/60 PRELIMINARY ahead of formal chapter 708 tier 1 seal) + chapter 682 close-out via 13-file standard doctrine sync + 70 PROOF tests total;substrate's FIRST 60/60 aggregate score achievement;ADR-014 OPT-OUT preserved;ADR-016 → M2108;692 consecutive byte-equality clean commits;240 typed surfaces cumulative (+20 across Phase M);Phase M total 422 PROOF tests cumulative;Phase N Tier A sprawl chapters 683-685 NEXT),
+        "chapter 六百八十三"   // M2109-M2112 (PHASE N scope-reduced to 1 chapter — additive bridge approach for Tier A bundle migration;NEW BASMicroStep + BASMicroStepBundle = BASBundle<BASMicroStep> typealias at M2109 + 18 tests for BASStepBundle.microSteps slot;NEW BASEventLogReplayItemKind enum + 16 tests at M2110 typed taxonomy over 8 event-payload-kind lists;NEW BASTierAMigrationStrategyDoctrine + 25 tests at M2111 documenting honest scope reduction (8 planned → 2 shipped + 6 deferred,scope reduction 66.7%);chapter 683 close-out (M2112) + Phase N close-out under reduced scope;0/8 Tier A bundles were pure-item-list eligible for full migration,8/8 had multi-field shapes requiring additive bridges;ADR-014 OPT-OUT preserved + 17+ existing call sites intact;Phase N score-delta 0 (低熵复杂系统 already at 10/10);ADR-014 OPT-OUT preserved;ADR-016 → M2112;696 consecutive byte-equality clean commits;244 typed surfaces cumulative;Phase O V1 monolith DELETION (chapter 686+) NEXT)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -353,13 +354,13 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2108
+    public static let mNumberLast: Int = 2112
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2108)。 Bumped through chapter 682:1129 → 1153。
-    /// Chapters 677-682:PHASE M complete — real Mamba SSM
-    /// kernel + 8-of-8 native + 60/60 preliminary。
-    public static let commitsShipped: Int = 1153
+    /// M2112)。 Bumped through chapter 683:1153 → 1157。
+    /// Chapter 683:PHASE N (scope-reduced) — Tier A
+    /// additive bridge approach + honest scope acknowledgment。
+    public static let commitsShipped: Int = 1157
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
