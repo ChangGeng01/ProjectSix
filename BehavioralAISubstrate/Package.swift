@@ -123,6 +123,19 @@ let package = Package(
         .target(
             name: "BASMetalSubstrate",
             dependencies: ["BASRuntimeCore"],
+            // M2163 chapter 六百九十九 第一刀 — exclude the
+            // SSMScan.metal reference shader file from
+            // SPM build。 SPM doesn't compile .metal
+            // sources natively (Xcode build system does)。
+            // The file ships as reference for hosts that
+            // integrate via Xcode project + custom Metal
+            // compilation step。 Excluding silences the
+            // persistent "unhandled file" warning that
+            // has been present since chapter 六百七十七
+            // / M2089 when Phase M SSM kernel landed。
+            exclude: [
+                "BASBuiltinKernels/SSMScan.metal"
+            ],
             linkerSettings: [
                 .linkedFramework(
                     "Metal",
