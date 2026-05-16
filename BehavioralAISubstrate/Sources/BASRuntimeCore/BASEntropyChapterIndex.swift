@@ -4688,7 +4688,31 @@ public enum BASEntropyChapterIndex {
                 "error)。 198 typed surfaces cumulative" +
                 " (+1)。 ADR-016 → M2008。 592" +
                 " consecutive byte-equality clean" +
-                " commits。 V1 byte-equality preserved。")
+                " commits。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百五十八",
+            mNumberFirst: 2009, mNumberLast: 2012,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "BASMETALSUBSTRATE BIOMIMETIC-" +
+                "OBSERVATION TRIO CODABLE EXTENSION —" +
+                " GAP-FILL,2nd post-hexa-#7,single-" +
+                "module BASMetalSubstrate reach,4" +
+                " chapters until chapter 六百六十三" +
+                " hexa #8 catalog opportunity。 3" +
+                " observation struct types (BASPredictive" +
+                "CodingObservation + BASPlasticityUpdate" +
+                " + BASHierarchicalObservation) gained" +
+                " Codable at M2009 + 3 PROOF tests" +
+                " (M2010) + new typed surface (M2011) +" +
+                " close-out (M2012)。 NEW kind" +
+                " 'biomimetic-observation-trio'。 FIRST" +
+                " ALL-STRUCT trio in autonomous loop" +
+                " history。 Coherent biomimetic theme。" +
+                " 199 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M2012。 596 consecutive" +
+                " byte-equality clean commits。 V1 byte" +
+                "-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

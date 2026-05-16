@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2008",
-            "M2008:doctrine version reflects chapter 六百五十七 — ROADMAP-EVAL-MOCK TRIO CODABLE EXTENSION — GAP-FILL,1st post-hexa-#7,cross-module BASRuntimeCore + BASOrgan reach,5 chapters until chapter 六百六十三 hexa #8 catalog opportunity。 3 associated-value-enum types (BASRoadmapPhaseStatus + BASAutoEvalBaselineMode + BASFoundationModelsMockError) gained Codable at M2005 + 3 PROOF tests (M2006) + BASRoadmapEvalMockTrioCodableExtensionDoctrine typed surface (M2007) + close-out (M2008)。 NEW kind 'roadmap-eval-mock-trio'。 ALL-PRIMITIVE-ASSOCIATED-VALUE trio + DOMAIN-SPANNING coherence。 198 typed surfaces cumulative。 592 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M2012",
+            "M2012:doctrine version reflects chapter 六百五十八 — BASMETALSUBSTRATE BIOMIMETIC-OBSERVATION TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#7,single-module BASMetalSubstrate reach,4 chapters until chapter 六百六十三 hexa #8 catalog opportunity。 3 observation struct types (BASPredictiveCodingObservation + BASPlasticityUpdate + BASHierarchicalObservation) gained Codable at M2009 + 3 PROOF tests (M2010) + BASBiomimeticObservationTrioCodableExtensionDoctrine typed surface (M2011) + close-out (M2012)。 NEW kind 'biomimetic-observation-trio'。 FIRST ALL-STRUCT trio in autonomous loop history (every prior gap-fill trio had ≥1 enum)。 Coherent biomimetic theme。 199 typed surfaces cumulative。 596 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

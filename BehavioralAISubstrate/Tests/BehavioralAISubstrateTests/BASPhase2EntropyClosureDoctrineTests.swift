@@ -37,26 +37,27 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs657() {
+    func testLastChapterIs658() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百五十七",
-            "Chapter 六百五十七:ROADMAP-EVAL-MOCK TRIO" +
-            " CODABLE EXTENSION — GAP-FILL,1st post-" +
-            "hexa-#7,cross-module BASRuntimeCore +" +
-            " BASOrgan reach,5 chapters until chapter" +
-            " 六百六十三 hexa #8 catalog opportunity。" +
-            " 3 associated-value-enum types (BAS" +
-            "RoadmapPhaseStatus + BASAutoEvalBaselineMode" +
-            " + BASFoundationModelsMockError) gained" +
-            " Codable + 3 PROOF tests + BASRoadmapEval" +
-            "MockTrioCodableExtensionDoctrine typed" +
-            " surface + close-out。 NEW kind 'roadmap-" +
-            "eval-mock-trio'。 ALL-PRIMITIVE-ASSOCIATED" +
-            "-VALUE trio + DOMAIN-SPANNING coherence。" +
-            " 198 typed surfaces cumulative。 592" +
-            " consecutive byte-equality clean commits")
+            "chapter 六百五十八",
+            "Chapter 六百五十八:BASMETALSUBSTRATE" +
+            " BIOMIMETIC-OBSERVATION TRIO CODABLE" +
+            " EXTENSION — GAP-FILL,2nd post-hexa-#7," +
+            "single-module BASMetalSubstrate reach,4" +
+            " chapters until chapter 六百六十三 hexa" +
+            " #8 catalog opportunity。 3 observation" +
+            " struct types (BASPredictiveCodingObservation" +
+            " + BASPlasticityUpdate + BASHierarchical" +
+            "Observation) gained Codable + 3 PROOF" +
+            " tests + BASBiomimeticObservationTrio" +
+            "CodableExtensionDoctrine typed surface +" +
+            " close-out。 NEW kind 'biomimetic-" +
+            "observation-trio'。 FIRST ALL-STRUCT trio" +
+            " in autonomous loop history。 199 typed" +
+            " surfaces cumulative。 596 consecutive" +
+            " byte-equality clean commits")
     }
 
     // MARK: - M-number range

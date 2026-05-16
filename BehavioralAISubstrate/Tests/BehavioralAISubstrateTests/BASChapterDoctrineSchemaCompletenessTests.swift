@@ -2357,7 +2357,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十七")!)
+                            "chapter 六百五十七")!),
+            // M2012 chapter 658 — BASMetalSubstrate biomimetic-observation trio Codable extension gap-fill (2nd post-hexa-#7, FIRST all-struct trio in autonomous loop)
+            checkRegistry("六百五十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百五十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4109,6 +4115,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十七")!
+                .mNumberLast),
+            // M2012 chapter 658 — BASMetalSubstrate biomimetic-observation trio Codable extension gap-fill (2nd post-hexa-#7, FIRST all-struct trio)
+            ("658",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百五十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

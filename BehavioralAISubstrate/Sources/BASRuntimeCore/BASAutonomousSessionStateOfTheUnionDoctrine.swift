@@ -110,21 +110,23 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// arcs + Tier 1/2 items still outstanding。
     public static let remainingKindCount: Int = 5
 
-    /// Cumulative achievement metrics at chapter 657
-    /// close-out (M2008 — ROADMAP-EVAL-MOCK trio
-    /// Codable extension,1st post-hexa-#7 gap-fill,
-    /// cross-module BASRuntimeCore + BASOrgan reach;
-    /// 3 associated-value-enum types (BASRoadmap
-    /// PhaseStatus + BASAutoEvalBaselineMode + BAS
-    /// FoundationModelsMockError) gained Codable;ALL-
-    /// PRIMITIVE-ASSOCIATED-VALUE trio + DOMAIN-
-    /// SPANNING coherence;NEW kind 'roadmap-eval-mock-
-    /// trio')。
-    public static let typedSurfaceCount: Int = 198
+    /// Cumulative achievement metrics at chapter 658
+    /// close-out (M2012 — BASMetalSubstrate biomimetic-
+    /// observation trio Codable extension,2nd post-
+    /// hexa-#7 gap-fill,single-module BAS
+    /// MetalSubstrate reach;3 observation struct types
+    /// (BASPredictiveCodingObservation + BASPlasticity
+    /// Update + BASHierarchicalObservation) gained
+    /// Codable;FIRST ALL-STRUCT trio in autonomous
+    /// loop history — every prior gap-fill trio had ≥1
+    /// enum,this one is all-struct shape;coherent
+    /// biomimetic theme;NEW kind 'biomimetic-
+    /// observation-trio')。
+    public static let typedSurfaceCount: Int = 199
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 592
-    public static let phase2CommitsShipped: Int = 1053
-    public static let chapter2NumberLast: Int = 2008
+        Int = 596
+    public static let phase2CommitsShipped: Int = 1057
+    public static let chapter2NumberLast: Int = 2012
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

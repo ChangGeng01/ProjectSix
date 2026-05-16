@@ -520,6 +520,20 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// close-out (M2008)。 NEW kind 'roadmap-eval-
     /// mock-trio'。 ALL-PRIMITIVE-ASSOCIATED-VALUE
     /// trio + DOMAIN-SPANNING coherence。
+    /// Re-captured at chapter 658 close-out。 Chapter
+    /// 658:BASMETALSUBSTRATE BIOMIMETIC-OBSERVATION
+    /// TRIO CODABLE EXTENSION — GAP-FILL,2nd post-
+    /// hexa-#7,single-module BASMetalSubstrate reach,
+    /// 4 chapters until chapter 六百六十三 hexa #8
+    /// catalog opportunity。 3 observation struct
+    /// types (BASPredictiveCodingObservation + BAS
+    /// PlasticityUpdate + BASHierarchicalObservation)
+    /// gained Codable at M2009 + 3 PROOF tests (M2010)
+    /// + NEW BASBiomimeticObservationTrioCodable
+    /// ExtensionDoctrine (M2011) + close-out (M2012)。
+    /// NEW kind 'biomimetic-observation-trio'。 FIRST
+    /// ALL-STRUCT trio in autonomous loop history。
+    /// Coherent biomimetic theme。
     static let frozenFullRegistrySha256: String =
-        "739da1d224733bbd01531068b94dce0862fd784113dcba37dc4248c23cc99300"
+        "75bc8925e47708d56be36b4a95a8d043eed11b4881c783c148e89b04fda7f496"
 }

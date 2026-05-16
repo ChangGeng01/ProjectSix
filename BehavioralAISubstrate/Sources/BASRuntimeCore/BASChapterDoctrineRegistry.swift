@@ -18783,6 +18783,113 @@ public enum BASChapterDoctrineRegistry {
                 " cumulative (+1)。 ADR-016 → M2008。" +
                 " 592 consecutive autonomous commits" +
                 " with V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。"),
+
+        // chapter 658 — BASMetalSubstrate biomimetic-
+        // observation trio Codable extension (2nd post-
+        // hexa-#7 gap-fill,single-module BASMetalSubstrate
+        // reach,4 chapters until chapter 六百六十三 hexa
+        // #8 catalog opportunity)。 FIRST all-struct trio
+        // in autonomous loop。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百五十八",
+            mNumberFirst: 2009,
+            mNumberLast: 2012,
+            v1MilestoneMNumber: 2012,
+            v1MilestoneStatus:
+                "chapter-658-biomimetic-observation-trio-codable-extension",
+            knives: [
+                BASChapterKnife(
+                    mNumber: 2009, knife: "第一刀",
+                    concept: "Add Codable to 3 BAS" +
+                        "MetalSubstrate biomimetic" +
+                        " observation struct types —" +
+                        " BASPredictiveCodingObservation" +
+                        " (6-field struct,all primitives)" +
+                        " + BASPlasticityUpdate (8-field" +
+                        " struct,all primitives) + BAS" +
+                        "HierarchicalObservation (4-field" +
+                        " struct,recursive composition" +
+                        " via [PredictiveCodingObservation" +
+                        "])。"),
+                BASChapterKnife(
+                    mNumber: 2010, knife: "第二刀",
+                    concept: "3 compile-time conformance" +
+                        " PROOF tests。"),
+                BASChapterKnife(
+                    mNumber: 2011, knife: "第三刀",
+                    concept: "NEW BASBiomimeticObservation" +
+                        "TrioCodableExtensionDoctrine +" +
+                        " structCount = 3 + enumCount" +
+                        " = 0 + isFirstAllStructTrio" +
+                        " (FIRST trio in autonomous loop" +
+                        " where all 3 types are public" +
+                        " structs,not enums) +" +
+                        " isCoherentBiomimeticTheme +" +
+                        " kindLabel='biomimetic-" +
+                        "observation-trio' + isSecondPost" +
+                        "HexaSevenGapFill +" +
+                        " chaptersUntilNextHexaCatalog = 4。" +
+                        " typed-surface count 198 → 199。"),
+                BASChapterKnife(
+                    mNumber: 2012, knife: "第四刀",
+                    concept: "Chapter 658 close-out +" +
+                        " doctrine sync。 596 consecutive" +
+                        " commits with V1 byte-equality" +
+                        " preserved。 2nd post-hexa-#7" +
+                        " gap-fill — first all-struct" +
+                        " trio shape in autonomous loop。")
+            ],
+            entropyClassesAttacked: [
+                "bas-predictive-coding-observation-non-codable",
+                "bas-plasticity-update-non-codable",
+                "bas-hierarchical-observation-non-codable",
+                "biomimetic-observation-trio-pattern-uncaptured",
+                "second-post-hexa-seven-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3",
+                "红线 7", "ADR-014 OPT-IN",
+                "ADR-016 → M2012",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "biomimetic-observation-trio-codable-extension",
+                "second-post-hexa-seven-gap-fill",
+                "single-module-trio",
+                "first-all-struct-trio",
+                "coherent-biomimetic-theme",
+                "new-kind-label-biomimetic-observation-trio",
+                "596-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 4 more gap-fill chapters" +
+                " (659-662) toward chapter 663 hexa #8" +
+                " catalog opportunity",
+                "future arc — Phase H default mode flip",
+                "future arc — Tier 2 final 60/60"
+            ],
+            summary: "Chapter 658 ships BASMetalSubstrate" +
+                " biomimetic-observation trio Codable" +
+                " extension — 2nd post-hexa-#7 gap-fill" +
+                " chapter,single-module BASMetalSubstrate" +
+                " reach。 3 observation struct types" +
+                " (BASPredictiveCodingObservation +" +
+                " BASPlasticityUpdate +" +
+                " BASHierarchicalObservation) gained" +
+                " Codable at M2009 + 3 PROOF tests" +
+                " (M2010) + new typed surface (M2011) +" +
+                " close-out (M2012)。 NEW kind" +
+                " 'biomimetic-observation-trio'。 FIRST" +
+                " ALL-STRUCT trio in autonomous loop" +
+                " history (every prior gap-fill trio" +
+                " had ≥1 enum;this one is all-struct" +
+                " shape)。 Coherent biomimetic theme —" +
+                " all three are observation/update result" +
+                " bundles emitted by probe/fold/actor" +
+                " surfaces。 199 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2012。" +
+                " 596 consecutive autonomous commits" +
+                " with V1 byte-equality preserved。" +
                 " ADR-014 OPT-IN preserved。")
     ]
 
