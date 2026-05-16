@@ -175,7 +175,7 @@ public enum BASTrainingExampleSublimationTrigger:
 /// source session ID (so the sublimator knows where it
 /// came from for the per-session histogram)。
 public struct BASTrainingExampleSubmission:
-    Sendable, Equatable
+    Sendable, Equatable, Hashable, Codable
 {
     public let candidate: BASTrainingExampleCandidate
     public let sourceSessionID: String

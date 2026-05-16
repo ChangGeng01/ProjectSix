@@ -59,7 +59,7 @@ import BASPolicy
 /// raw shadow evaluation,the upgrade decision,and the (possibly
 /// upgraded) final permit。
 public struct BASShadowEvaluateThenUpgradeOutcome:
-    Equatable, Sendable
+    Equatable, Sendable, Codable
 {
     /// Raw shadow evaluation result from the evaluator stage。
     /// Useful for audit emission + observability even when the

@@ -178,7 +178,7 @@ public enum BASEventLogProjectors {
 /// trainer + causal graph extractor) read once and
 /// consume each kind directly。
 public struct BASEventLogTurnProjection:
-    Equatable, Sendable, Hashable
+    Equatable, Sendable, Hashable, Codable
 {
 
     public let turnID: String
