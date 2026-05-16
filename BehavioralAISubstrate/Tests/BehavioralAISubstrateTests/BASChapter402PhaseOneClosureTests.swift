@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2036",
-            "M2036:doctrine version reflects chapter 六百六十四 — PHASE J 第一刀 — wild-rolling-meerkat REAL HOT-PATH ATTACK PLAN RESUMPTION FIRST CHAPTER after 186 chapters of Codable gap-fill drift。 BASMPSGraphExecutableCache gains MPSGraphExecutable storage slot enabling per-kernel compile-cost amortization。 3 new accessors at M2033 (cachedExecutable + storeExecutable + executableCount) + 7 PROOF tests at M2034 + NEW BASMPSGraphExecutableCacheWiringDoctrine + 30 anti-drift tests at M2035 + close-out at M2036。 6 MPSGraph kernels target for chapters 665-667 wiring。 5.0× speedup target on 1000-dispatch loops。 Phase J score-delta target +6 on 原生利用神经引擎。 205 typed surfaces cumulative。 620 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M2040",
+            "M2040:doctrine version reflects chapter 六百六十五 — PHASE J kernel wiring continues — first 2 of 6 MPSGraph kernels (rmsNorm + rotaryEmbedding) wired to BASMPSGraphExecutableCache storage slot at M2037/M2038。 9 kernel PROOF tests including byte-equality assertions between cache-on/off paths。 NEW BASKernelCacheWiringPhaseJChapter665Doctrine + 29 anti-drift tests at M2039。 cache=nil preserves M1169/M1190 baseline byte-equality UNCHANGED;cache=non-nil uses compile-once + executable.run fast path。 206 typed surfaces cumulative。 624 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapters 666-667 wire 4 remaining kernels + 5× speedup benchmark")
     }
 
     // MARK: - M-number range matches chapter 四百二

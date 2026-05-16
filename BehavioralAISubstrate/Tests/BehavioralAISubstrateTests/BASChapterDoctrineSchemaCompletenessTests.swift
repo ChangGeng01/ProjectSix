@@ -2399,7 +2399,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十四")!)
+                            "chapter 六百六十四")!),
+            // M2040 chapter 665 — PHASE J kernel wiring continues (rmsNorm + rotaryEmbedding)
+            checkRegistry("六百六十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4207,6 +4213,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十四")!
+                .mNumberLast),
+            // M2040 chapter 665 — PHASE J kernel wiring (rmsNorm + rotaryEmbedding)
+            ("665",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

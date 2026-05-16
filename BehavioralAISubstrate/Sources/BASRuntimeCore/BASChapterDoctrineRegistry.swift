@@ -19336,7 +19336,97 @@ public enum BASChapterDoctrineRegistry {
                 "667 wire 6 MPSGraph kernels (rmsNorm +" +
                 " rotaryEmbedding + attention + softmax +" +
                 " layerNorm + conv2D) to consume the slot +" +
-                " ship 5× speedup wallclock benchmark。")
+                " ship 5× speedup wallclock benchmark。"),
+
+        // chapter 665 — Phase J kernel wiring continues。
+        // First 2 of 6 MPSGraph kernels (rmsNorm + rotary
+        // Embedding) wired to consume the M2033 cache
+        // storage slot with byte-equality preserved。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十五",
+            mNumberFirst: 2037,
+            mNumberLast: 2040,
+            v1MilestoneMNumber: 2040,
+            v1MilestoneStatus:
+                "chapter-665-phase-j-rmsnorm-rotary-embedding-cache-wired",
+            knives: [
+                BASChapterKnife(mNumber: 2037, knife: "第一刀",
+                    concept: "BASMPSGraphRMSNormKernel" +
+                        " wired to BASMPSGraphExecutable" +
+                        "Cache。 Init adds optional cache" +
+                        " param (default nil preserves" +
+                        " M1169 baseline)。 evaluate()" +
+                        " branches:cache=nil falls through" +
+                        " to baseline graph.run path" +
+                        " UNCHANGED;cache=non-nil uses" +
+                        " compile-once + cached-executable" +
+                        ".run fast path。 5 PROOF tests" +
+                        " including byte-equality" +
+                        " assertion between paths。"),
+                BASChapterKnife(mNumber: 2038, knife: "第二刀",
+                    concept: "BASMPSGraphRotaryEmbedding" +
+                        "Kernel wired same pattern。" +
+                        " Extracted buildGraph helper for" +
+                        " 80-LOC rotation op composition" +
+                        " shared across paths。 4 PROOF" +
+                        " tests including byte-equality" +
+                        " assertion。"),
+                BASChapterKnife(mNumber: 2039, knife: "第三刀",
+                    concept: "NEW BASKernelCacheWiringPhase" +
+                        "JChapter665Doctrine + 29 anti-" +
+                        "drift tests。 Tracks 2 kernels" +
+                        " wired this chapter,4 remaining" +
+                        " for chapters 666-667 (attention," +
+                        " softmax,layerNorm,conv2D)。" +
+                        " typed-surface 205 → 206。"),
+                BASChapterKnife(mNumber: 2040, knife: "第四刀",
+                    concept: "Chapter 665 close-out + 13-" +
+                        "file doctrine sync。 624" +
+                        " consecutive byte-equality clean" +
+                        " commits。 2 of 6 Phase J kernels" +
+                        " wired with byte-equality" +
+                        " preserved。")
+            ],
+            entropyClassesAttacked: [
+                "rmsnorm-kernel-graph-build-per-call-unamortized",
+                "rotary-embedding-kernel-graph-build-per-call-unamortized",
+                "byte-equality-pathway-divergence-risk-uncaught",
+                "phase-j-progress-untracked",
+                "kernel-wiring-pattern-uncodified"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2040",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "rmsnorm-cache-wired-byte-equal",
+                "rotary-embedding-cache-wired-byte-equal",
+                "phase-j-2-of-6-kernels-wired",
+                "same-wiring-pattern-across-kernels",
+                "cache-off-path-unchanged-from-baselines",
+                "624-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 666 — wire attention + softmax + layerNorm",
+                "chapter 667 — wire conv2D + 5× speedup benchmark",
+                "chapter 667 — Phase J close-out doctrine"
+            ],
+            summary: "Chapter 665 wires first 2 of 6" +
+                " MPSGraph kernels to BASMPSGraphExecutable" +
+                "Cache。 BASMPSGraphRMSNormKernel (5 PROOF" +
+                " tests) + BASMPSGraphRotaryEmbeddingKernel" +
+                " (4 PROOF tests) consume the M2033 storage" +
+                " slot via cache-on fast path while preserving" +
+                " M1169/M1190 baseline byte-equality when" +
+                " cache=nil。 NEW BASKernelCacheWiringPhaseJ" +
+                "Chapter665Doctrine + 29 anti-drift tests。" +
+                " 206 typed surfaces cumulative。 ADR-016 →" +
+                " M2040。 624 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。 Chapters 666-" +
+                "667 wire remaining 4 kernels (attention," +
+                " softmax,layerNorm,conv2D) + ship the" +
+                " 5× speedup wallclock benchmark。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -4839,7 +4839,34 @@ public enum BASEntropyChapterIndex {
                 "equality preserved。 First chapter after" +
                 " 186 chapters of Codable gap-fill drift" +
                 " executing real production-value work" +
-                " against the 6 directives。")
+                " against the 6 directives。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十五",
+            mNumberFirst: 2037, mNumberLast: 2040,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE J kernel wiring continues。" +
+                " First 2 of 6 MPSGraph kernels wired to" +
+                " M2033 BASMPSGraphExecutableCache storage" +
+                " slot。 BASMPSGraphRMSNormKernel at M2037" +
+                " (5 PROOF tests) + BASMPSGraphRotary" +
+                "EmbeddingKernel at M2038 (4 PROOF tests)" +
+                " gain optional cache parameter;cache=nil" +
+                " preserves M1169/M1190 baseline byte-" +
+                "equality UNCHANGED;cache=non-nil uses" +
+                " compile-once + executable.run fast path" +
+                "。 NEW BASKernelCacheWiringPhaseJChapter" +
+                "665Doctrine + 29 anti-drift tests at" +
+                " M2039。 close-out at M2040。 9 kernel" +
+                " PROOF tests including byte-equality" +
+                " assertions between cache-on/off paths。" +
+                " 206 typed surfaces cumulative (+1)。" +
+                " ADR-016 → M2040。 624 consecutive byte-" +
+                "equality clean commits。 V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。" +
+                " Chapters 666-667 wire 4 remaining" +
+                " kernels (attention,softmax,layerNorm," +
+                " conv2D) + ship 5× speedup benchmark。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
