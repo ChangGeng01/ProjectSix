@@ -2393,7 +2393,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十三")!)
+                            "chapter 六百六十三")!),
+            // M2036 chapter 664 — PHASE J 第一刀 wild-rolling-meerkat plan resumption first chapter
+            checkRegistry("六百六十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4193,6 +4199,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十三")!
+                .mNumberLast),
+            // M2036 chapter 664 — PHASE J 第一刀 plan resumption
+            ("664",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -19246,7 +19246,97 @@ public enum BASChapterDoctrineRegistry {
                 " (M2032)。 204 typed surfaces cumulative。" +
                 " ADR-016 → M2032。 616 consecutive byte-" +
                 "equality clean commits。 V1 byte-equality" +
-                " preserved。 ADR-014 OPT-IN preserved。")
+                " preserved。 ADR-014 OPT-IN preserved。"),
+
+        // chapter 664 — Phase J 第一刀 plan resumption。
+        // wild-rolling-meerkat REAL HOT-PATH ATTACK arc
+        // resumes after 186 chapters of Codable gap-fill
+        // drift (chapters 478-663)。 First chapter targeting
+        // 60/60 score via production-value work。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十四",
+            mNumberFirst: 2033,
+            mNumberLast: 2036,
+            v1MilestoneMNumber: 2036,
+            v1MilestoneStatus:
+                "chapter-664-phase-j-mpsgraph-cache-wiring-storage-slot",
+            knives: [
+                BASChapterKnife(mNumber: 2033, knife: "第一刀",
+                    concept: "BASMPSGraphExecutableCache" +
+                        " gains MPSGraphExecutable storage" +
+                        " slot — `cachedExecutable(forKey:)`" +
+                        " + `storeExecutable(_:forKey:)` +" +
+                        " `executableCount` accessors added。" +
+                        " reset() now drops cached" +
+                        " executables alongside observations。"),
+                BASChapterKnife(mNumber: 2034, knife: "第二刀",
+                    concept: "7 PROOF tests via real" +
+                        " MPSGraphExecutable compile + store" +
+                        " + retrieve round-trip。 Includes" +
+                        " M1297 observation regression guard。"),
+                BASChapterKnife(mNumber: 2035, knife: "第三刀",
+                    concept: "NEW BASMPSGraphExecutableCache" +
+                        "WiringDoctrine + 30 anti-drift tests。" +
+                        " Pins Phase J goal,4-knife M-numbers," +
+                        " 3 new accessors,7 PROOF count,6-" +
+                        "kernel wiring scope ahead," +
+                        " matMulExcludedFromCaching flag,5.0×" +
+                        " speedup target,plan resumption" +
+                        " markers。"),
+                BASChapterKnife(mNumber: 2036, knife: "第四刀",
+                    concept: "Chapter 664 close-out +" +
+                        " 13-file doctrine sync。 Phase J 第一" +
+                        "刀 sealed — kernels in chapters 665-" +
+                        "667 will consume the storage slot。" +
+                        " typed-surface 204 → 205。 V1 byte-" +
+                        "equality preserved (cache is" +
+                        " observation + amortization,not" +
+                        " commitment)。")
+            ],
+            entropyClassesAttacked: [
+                "mpsgraph-executable-cache-observation-only",
+                "kernel-compile-overhead-unamortized",
+                "phase-j-never-executed",
+                "plan-resumption-marker-missing",
+                "post-hexa-eight-catalog-drift"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2036",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-j-storage-slot-shipped",
+                "plan-resumption-first-chapter",
+                "wild-rolling-meerkat-resumption",
+                "180-of-186-codable-drift-chapters-recovered",
+                "620-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapters 665-667 — wire 6 MPSGraph kernels" +
+                " to consult cache + 5× benchmark",
+                "chapter 667 — Phase J close-out doctrine",
+                "chapters 668-671 — Phase K runtimeMode toggle"
+            ],
+            summary: "Chapter 664 ships Phase J 第一刀 of" +
+                " wild-rolling-meerkat REAL HOT-PATH ATTACK" +
+                " resumption — `BASMPSGraphExecutableCache`" +
+                " gains MPSGraphExecutable storage slot" +
+                " enabling per-kernel compile-cost" +
+                " amortization。 3 new accessors at M2033" +
+                " (cachedExecutable + storeExecutable +" +
+                " executableCount) + 7 PROOF tests at M2034" +
+                " + NEW BASMPSGraphExecutableCacheWiring" +
+                "Doctrine at M2035 + close-out at M2036。" +
+                " First plan-resumption chapter after 186" +
+                " chapters of Codable gap-fill drift。 205" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M2036。 620 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。 Chapters 665-" +
+                "667 wire 6 MPSGraph kernels (rmsNorm +" +
+                " rotaryEmbedding + attention + softmax +" +
+                " layerNorm + conv2D) to consume the slot +" +
+                " ship 5× speedup wallclock benchmark。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

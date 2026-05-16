@@ -4814,7 +4814,32 @@ public enum BASEntropyChapterIndex {
                 " 204 typed surfaces cumulative (+1)。" +
                 " ADR-016 → M2032。 616 consecutive byte" +
                 "-equality clean commits。 V1 byte-" +
-                "equality preserved。")
+                "equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十四",
+            mNumberFirst: 2033, mNumberLast: 2036,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "PHASE J 第一刀 — wild-rolling-" +
+                "meerkat REAL HOT-PATH ATTACK PLAN" +
+                " RESUMPTION FIRST CHAPTER。 BASMPSGraph" +
+                "ExecutableCache gains MPSGraphExecutable" +
+                " storage slot at M2033;7 PROOF tests at" +
+                " M2034;NEW BASMPSGraphExecutableCache" +
+                "WiringDoctrine + 30 anti-drift tests at" +
+                " M2035;close-out at M2036。 6 MPSGraph" +
+                " kernels target for chapters 665-667" +
+                " wiring (matMul excluded — uses MPS" +
+                " direct,not MPSGraph)。 5.0× speedup" +
+                " target on 1000-dispatch loops。 Phase J" +
+                " score-delta target +6 on 原生利用神经" +
+                "引擎。 205 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M2036。 620 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。 First chapter after" +
+                " 186 chapters of Codable gap-fill drift" +
+                " executing real production-value work" +
+                " against the 6 directives。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

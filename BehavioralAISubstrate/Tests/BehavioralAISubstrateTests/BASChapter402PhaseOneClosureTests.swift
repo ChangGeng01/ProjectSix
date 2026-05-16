@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2032",
-            "M2032:doctrine version reflects chapter 六百六十三 — 8TH GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaEightCompletionDoctrine commemorating 6 post-hexa-#7 gap-fill chapters (657-662) — 18 types extended / 24 commits / 4 distinct modules touched。 DISTINCTIVE FEATURES:FIRST hexa with FIVE CONSECUTIVE ALL-STRUCT TRIOS;FIRST hexa containing 600-COMMIT MILESTONE crossing within its run。 NEW catalog (M2029) + 44 anti-drift PROOF tests (M2030) + 18 wire-in PROOF tests (M2031) + close-out (M2032)。 204 typed surfaces cumulative。 616 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6 → M2001 hexa #7 → M2029 hexa #8")
+            "ADR-016.M2036",
+            "M2036:doctrine version reflects chapter 六百六十四 — PHASE J 第一刀 — wild-rolling-meerkat REAL HOT-PATH ATTACK PLAN RESUMPTION FIRST CHAPTER after 186 chapters of Codable gap-fill drift。 BASMPSGraphExecutableCache gains MPSGraphExecutable storage slot enabling per-kernel compile-cost amortization。 3 new accessors at M2033 (cachedExecutable + storeExecutable + executableCount) + 7 PROOF tests at M2034 + NEW BASMPSGraphExecutableCacheWiringDoctrine + 30 anti-drift tests at M2035 + close-out at M2036。 6 MPSGraph kernels target for chapters 665-667 wiring。 5.0× speedup target on 1000-dispatch loops。 Phase J score-delta target +6 on 原生利用神经引擎。 205 typed surfaces cumulative。 620 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二
