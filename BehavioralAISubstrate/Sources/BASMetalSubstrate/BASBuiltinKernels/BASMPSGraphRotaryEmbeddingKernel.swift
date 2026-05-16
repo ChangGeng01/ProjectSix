@@ -70,7 +70,15 @@ public actor BASMPSGraphRotaryEmbeddingKernel:
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
 
-    public init() throws {
+    /// M2038 chapter 六百六十五 第二刀:optional cache
+    /// for `MPSGraphExecutable` amortization。 Default nil
+    /// preserves M1190 byte-equality (graph.run path
+    /// unchanged when cache=nil)。
+    private let cache: BASMPSGraphExecutableCache?
+
+    public init(
+        cache: BASMPSGraphExecutableCache? = nil
+    ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()
         else {
             throw BASKernelError.frameworkUnavailable(
@@ -83,6 +91,96 @@ public actor BASMPSGraphRotaryEmbeddingKernel:
         }
         self.device = dev
         self.commandQueue = queue
+        self.cache = cache
+    }
+
+    // MARK: - Graph build (shared between cache-on + cache-off)
+
+    /// Build the rotaryEmbedding compute graph + return
+    /// placeholders + output for binding。 Shared helper
+    /// extracted at M2038 to avoid duplicating 80 LOC of
+    /// op composition across cache-on / cache-off paths。
+    private nonisolated func buildGraph(
+        seqLen: Int,
+        headDim: Int,
+        halfDim: Int
+    ) -> (
+        graph: MPSGraph,
+        xPlaceholder: MPSGraphTensor,
+        cosPlaceholder: MPSGraphTensor,
+        sinPlaceholder: MPSGraphTensor,
+        output: MPSGraphTensor
+    ) {
+        let graph = MPSGraph()
+        let xPlaceholder = graph.placeholder(
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: headDim)],
+            dataType: .float32, name: "x")
+        let cosPlaceholder = graph.placeholder(
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: halfDim)],
+            dataType: .float32, name: "cos")
+        let sinPlaceholder = graph.placeholder(
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: halfDim)],
+            dataType: .float32, name: "sin")
+
+        let xReshape = graph.reshape(
+            xPlaceholder,
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: halfDim),
+                    NSNumber(value: 2)],
+            name: "xReshape")
+        let xEven3D = graph.sliceTensor(
+            xReshape, dimension: 2,
+            start: 0, length: 1, name: "xEven3D")
+        let xOdd3D = graph.sliceTensor(
+            xReshape, dimension: 2,
+            start: 1, length: 1, name: "xOdd3D")
+        let xEvenFlat = graph.reshape(
+            xEven3D,
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: halfDim)],
+            name: "xEvenFlat")
+        let xOddFlat = graph.reshape(
+            xOdd3D,
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: halfDim)],
+            name: "xOddFlat")
+        let evenMulCos = graph.multiplication(
+            xEvenFlat, cosPlaceholder, name: "evenMulCos")
+        let oddMulSin = graph.multiplication(
+            xOddFlat, sinPlaceholder, name: "oddMulSin")
+        let newEven = graph.subtraction(
+            evenMulCos, oddMulSin, name: "newEven")
+        let evenMulSin = graph.multiplication(
+            xEvenFlat, sinPlaceholder, name: "evenMulSin")
+        let oddMulCos = graph.multiplication(
+            xOddFlat, cosPlaceholder, name: "oddMulCos")
+        let newOdd = graph.addition(
+            evenMulSin, oddMulCos, name: "newOdd")
+        let newEvenE = graph.reshape(
+            newEven,
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: halfDim),
+                    NSNumber(value: 1)],
+            name: "newEvenE")
+        let newOddE = graph.reshape(
+            newOdd,
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: halfDim),
+                    NSNumber(value: 1)],
+            name: "newOddE")
+        let outPair = graph.concatTensors(
+            [newEvenE, newOddE],
+            dimension: 2, name: "outPair")
+        let output = graph.reshape(
+            outPair,
+            shape: [NSNumber(value: seqLen),
+                    NSNumber(value: headDim)],
+            name: "output")
+        return (graph, xPlaceholder, cosPlaceholder,
+                sinPlaceholder, output)
     }
 
     public func evaluate(
@@ -178,95 +276,8 @@ public actor BASMPSGraphRotaryEmbeddingKernel:
                     reason: "alloc out failed")
         }
 
-        let graph = MPSGraph()
-        let xPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: headDim)],
-            dataType: .float32, name: "x")
-        let cosPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: halfDim)],
-            dataType: .float32, name: "cos")
-        let sinPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: halfDim)],
-            dataType: .float32, name: "sin")
-
-        // Reshape x: (seq, headDim) → (seq, halfDim, 2)
-        let xReshape = graph.reshape(
-            xPlaceholder,
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: halfDim),
-                    NSNumber(value: 2)],
-            name: "xReshape")
-        // Slice even (dim 2, [0..1))
-        let xEven3D = graph.sliceTensor(
-            xReshape,
-            dimension: 2,
-            start: 0,
-            length: 1,
-            name: "xEven3D")
-        // Slice odd (dim 2, [1..2))
-        let xOdd3D = graph.sliceTensor(
-            xReshape,
-            dimension: 2,
-            start: 1,
-            length: 1,
-            name: "xOdd3D")
-        // Squeeze (seq, halfDim, 1) → (seq, halfDim)
-        let xEvenFlat = graph.reshape(
-            xEven3D,
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: halfDim)],
-            name: "xEvenFlat")
-        let xOddFlat = graph.reshape(
-            xOdd3D,
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: halfDim)],
-            name: "xOddFlat")
-        // newEven = xEven * cos - xOdd * sin
-        let evenMulCos = graph.multiplication(
-            xEvenFlat, cosPlaceholder,
-            name: "evenMulCos")
-        let oddMulSin = graph.multiplication(
-            xOddFlat, sinPlaceholder,
-            name: "oddMulSin")
-        let newEven = graph.subtraction(
-            evenMulCos, oddMulSin, name: "newEven")
-        // newOdd = xEven * sin + xOdd * cos
-        let evenMulSin = graph.multiplication(
-            xEvenFlat, sinPlaceholder,
-            name: "evenMulSin")
-        let oddMulCos = graph.multiplication(
-            xOddFlat, cosPlaceholder,
-            name: "oddMulCos")
-        let newOdd = graph.addition(
-            evenMulSin, oddMulCos, name: "newOdd")
-        // Expand to (seq, halfDim, 1) each
-        let newEvenE = graph.reshape(
-            newEven,
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: halfDim),
-                    NSNumber(value: 1)],
-            name: "newEvenE")
-        let newOddE = graph.reshape(
-            newOdd,
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: halfDim),
-                    NSNumber(value: 1)],
-            name: "newOddE")
-        // Concat along dim 2 → (seq, halfDim, 2)
-        let outPair = graph.concatTensors(
-            [newEvenE, newOddE],
-            dimension: 2,
-            name: "outPair")
-        // Reshape back to (seq, headDim)
-        let output = graph.reshape(
-            outPair,
-            shape: [NSNumber(value: seqLen),
-                    NSNumber(value: headDim)],
-            name: "output")
-
+        // Wrap MTLBuffers in MPSGraphTensorData (shared
+        // across both cache-on and cache-off paths)
         let xTD = MPSGraphTensorData(
             bufferX,
             shape: [NSNumber(value: seqLen),
@@ -288,15 +299,78 @@ public actor BASMPSGraphRotaryEmbeddingKernel:
                     NSNumber(value: headDim)],
             dataType: .float32)
 
-        graph.run(
-            with: commandQueue,
-            feeds: [
-                xPlaceholder: xTD,
-                cosPlaceholder: cosTD,
-                sinPlaceholder: sinTD
-            ],
-            targetOperations: nil,
-            resultsDictionary: [output: outTD])
+        // M2038 chapter 六百六十五 第二刀:cache-on fast
+        // path or cache-off baseline。 Cache-off branch
+        // preserves M1190 byte-equality semantics for
+        // hosts that haven't opted in (cache=nil)。
+        if let cache = self.cache {
+            let cacheKey = BASMPSGraphCacheKey(
+                operation: .rotaryEmbedding,
+                dataType: .float32,
+                inputShapes: [
+                    [seqLen, headDim],
+                    [seqLen, halfDim],
+                    [seqLen, halfDim]
+                ])
+            let executable: MPSGraphExecutable
+            if let cached = await cache.cachedExecutable(
+                forKey: cacheKey)
+            {
+                executable = cached
+                await cache.recordHit(key: cacheKey)
+            } else {
+                let built = buildGraph(
+                    seqLen: seqLen,
+                    headDim: headDim,
+                    halfDim: halfDim)
+                let xShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: seqLen),
+                            NSNumber(value: headDim)],
+                    dataType: .float32)
+                let cosShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: seqLen),
+                            NSNumber(value: halfDim)],
+                    dataType: .float32)
+                let sinShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: seqLen),
+                            NSNumber(value: halfDim)],
+                    dataType: .float32)
+                executable = built.graph.compile(
+                    with: nil,
+                    feeds: [
+                        built.xPlaceholder: xShape,
+                        built.cosPlaceholder: cosShape,
+                        built.sinPlaceholder: sinShape
+                    ],
+                    targetTensors: [built.output],
+                    targetOperations: nil,
+                    compilationDescriptor: nil)
+                await cache.storeExecutable(
+                    executable, forKey: cacheKey)
+                await cache.recordMiss(key: cacheKey)
+            }
+            let _ = executable.run(
+                with: commandQueue,
+                inputs: [xTD, cosTD, sinTD],
+                results: [outTD],
+                executionDescriptor: nil)
+        } else {
+            // Chapter 449 M1190 baseline path — graph.run
+            // — byte-equality preserved
+            let built = buildGraph(
+                seqLen: seqLen,
+                headDim: headDim,
+                halfDim: halfDim)
+            built.graph.run(
+                with: commandQueue,
+                feeds: [
+                    built.xPlaceholder: xTD,
+                    built.cosPlaceholder: cosTD,
+                    built.sinPlaceholder: sinTD
+                ],
+                targetOperations: nil,
+                resultsDictionary: [built.output: outTD])
+        }
 
         let outBytes = Data(
             bytes: bufferOut.contents(),
