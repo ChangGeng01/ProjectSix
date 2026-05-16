@@ -31,37 +31,37 @@ final class BASKVCacheInvalidationPolicyTests:
             " M1337 shipped this;LRU/TTL deferred)")
     }
 
-    // MARK: - 3) implementedPolicies contains
-    //             .explicitOnly + .lru (chapter 690 / M2131
-    //             promoted .lru from contract-only to
-    //             implemented)
+    // MARK: - 3) implementedPolicies contains all 4
+    //             (chapter 691 / M2135 promoted .ttl from
+    //             contract-only to implemented + clarified
+    //             .never semantic)
 
-    func testImplementedPoliciesContainsExplicitOnlyAndLRU() {
+    func testImplementedPoliciesContainsAllFour() {
         let implemented =
             BASKVCacheInvalidationPolicyDoctrine
                 .implementedPolicies
-        XCTAssertEqual(implemented.count, 2)
+        XCTAssertEqual(implemented.count, 4)
         XCTAssertTrue(implemented
             .contains(.explicitOnly))
-        XCTAssertTrue(implemented.contains(.lru),
-            "chapter 690 / M2131 wire-in promoted .lru" +
+        XCTAssertTrue(implemented.contains(.lru))
+        XCTAssertTrue(implemented.contains(.ttl),
+            "chapter 691 / M2135 wire-in promoted .ttl" +
             " from contract-only to implemented")
-        XCTAssertFalse(implemented.contains(.ttl))
-        XCTAssertFalse(implemented.contains(.never))
+        XCTAssertTrue(implemented.contains(.never),
+            "chapter 691 / M2135 semantic clarified" +
+            " .never — distinct from .explicitOnly")
     }
 
-    // MARK: - 4) Contract-only policies are 2 (post-M2132)
+    // MARK: - 4) Contract-only policies are EMPTY post-M2135
 
-    func testContractOnlyPoliciesAreTwo() {
+    func testContractOnlyPoliciesAreEmpty() {
         let contract =
             BASKVCacheInvalidationPolicyDoctrine
                 .contractOnlyPolicies
-        XCTAssertEqual(contract.count, 2)
-        XCTAssertFalse(contract.contains(.lru),
-            "chapter 690 / M2132 removed .lru from" +
-            " contractOnly (now implemented)")
-        XCTAssertTrue(contract.contains(.ttl))
-        XCTAssertTrue(contract.contains(.never))
+        XCTAssertTrue(contract.isEmpty,
+            "chapter 691 / M2135 emptied the contract-" +
+            "only set — all 4 policies now implemented" +
+            " or semantically clarified")
     }
 
     // MARK: - 5) implementedPolicies ∩ contractOnly = ∅
@@ -112,52 +112,33 @@ final class BASKVCacheInvalidationPolicyTests:
         }
     }
 
-    // MARK: - 8) deferralEvidence: nil for implemented
-    //             policies (.explicitOnly + .lru),
-    //             non-empty for contract-only (.ttl, .never)
+    // MARK: - 8) deferralEvidence:nil for all 4 policies
+    //             post-M2135 (all implemented or clarified)
 
-    func testDeferralEvidencePresentForUnimplemented() {
-        // Implemented policies return nil
-        XCTAssertNil(
-            BASKVCacheInvalidationPolicyDoctrine
-                .deferralEvidence(for: .explicitOnly))
-        XCTAssertNil(
-            BASKVCacheInvalidationPolicyDoctrine
-                .deferralEvidence(for: .lru),
-            "chapter 690 / M2132: .lru deferralEvidence" +
-            " should now return nil (implemented)")
-
-        // Contract-only policies still return evidence
-        for policy in [.ttl, .never]
-            as [BASKVCacheInvalidationPolicy]
+    func testDeferralEvidenceNilForAllPolicies() {
+        for policy in BASKVCacheInvalidationPolicy
+            .allCases
         {
-            guard let evidence =
+            XCTAssertNil(
                 BASKVCacheInvalidationPolicyDoctrine
-                    .deferralEvidence(for: policy)
-            else {
-                XCTFail(
-                    "policy \(policy) should have" +
-                    " deferral evidence")
-                continue
-            }
-            XCTAssertFalse(evidence.isEmpty,
-                "evidence for \(policy) must be" +
-                " non-empty")
+                    .deferralEvidence(for: policy),
+                "chapter 691 / M2135: all 4 policies" +
+                " now return nil deferralEvidence")
         }
     }
 
-    // MARK: - 10) New count constants (chapter 690 / M2132)
+    // MARK: - 10) Updated count constants (chapter 691 / M2135)
 
-    func testImplementedPolicyCountIs2() {
+    func testImplementedPolicyCountIs4() {
         XCTAssertEqual(
             BASKVCacheInvalidationPolicyDoctrine
-                .implementedPolicyCount, 2)
+                .implementedPolicyCount, 4)
     }
 
-    func testContractOnlyPolicyCountIs2() {
+    func testContractOnlyPolicyCountIs0() {
         XCTAssertEqual(
             BASKVCacheInvalidationPolicyDoctrine
-                .contractOnlyPolicyCount, 2)
+                .contractOnlyPolicyCount, 0)
     }
 
     func testTotalPolicyCountIs4() {
@@ -174,6 +155,21 @@ final class BASKVCacheInvalidationPolicyTests:
                     .contractOnlyPolicyCount,
             BASKVCacheInvalidationPolicyDoctrine
                 .totalPolicyCount)
+    }
+
+    // MARK: - 11) chapter 691 / M2135 — all 4 policies
+    //             are now implemented
+
+    func testAllPoliciesAreImplemented() {
+        for policy in BASKVCacheInvalidationPolicy
+            .allCases
+        {
+            XCTAssertTrue(
+                BASKVCacheInvalidationPolicyDoctrine
+                    .isImplemented(policy),
+                "All 4 policies should be implemented" +
+                " at chapter 691 / M2135")
+        }
     }
 
     // MARK: - 9) Codable round-trip on policy enum

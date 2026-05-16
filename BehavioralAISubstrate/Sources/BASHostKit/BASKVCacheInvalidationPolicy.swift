@@ -53,13 +53,24 @@ public enum BASKVCacheInvalidationPolicy:
     case lru = "lru"
 
     /// Cache entries expire after a time-to-live elapses。
-    /// NOT yet implemented — typed contract only。
+    /// IMPLEMENTED at chapter 691 / M2135 via BASKVCache
+    /// TTLEvictor + BASKVCacheRegistry ttlMs wire-in。
+    /// Was typed contract only at chapter 500 / M1379;
+    /// the follow-up arc landed at chapter 691 post-
+    /// FINAL-SEAL of the wild-rolling-meerkat plan。
     case ttl = "ttl"
 
-    /// Cache entries never invalidated (caller manages
-    /// session lifecycle elsewhere)。 NOT yet wired —
-    /// `.explicitOnly` is the implemented zero-config
-    /// equivalent。 Typed contract only。
+    /// Cache entries never invalidated by the registry。
+    /// SEMANTIC clarification at chapter 691 / M2135:
+    /// `.never` is the typed declaration "this cache must
+    /// not be auto-evicted under ANY policy" — distinct
+    /// from `.explicitOnly` which permits future host-
+    /// driven invalidation but defaults to retention。
+    /// Runtime behavior is identical to `.explicitOnly`
+    /// (no auto-eviction) but the typed surface lets
+    /// callers express stronger intent (e.g.,"this
+    /// session represents user-authored ground truth
+    /// that must persist until explicit user reset")。
     case never = "never"
 }
 
@@ -84,23 +95,24 @@ public enum BASKVCacheInvalidationPolicyDoctrine {
         BASKVCacheInvalidationPolicy = .explicitOnly
 
     /// Set of policies the substrate currently HONORS at
-    /// runtime。 chapter 690 / M2132 promotes `.lru` from
-    /// contract-only to implemented。
+    /// runtime。 chapter 691 / M2135 promotes `.ttl` from
+    /// contract-only to implemented + clarifies `.never`
+    /// semantic (semantically-distinct from .explicitOnly
+    /// but runtime-equivalent — never auto-evicts)。
     public static let implementedPolicies:
         Set<BASKVCacheInvalidationPolicy> = [
         .explicitOnly,
-        .lru,  // chapter 690 / M2131 wire-in
+        .lru,    // chapter 690 / M2131 wire-in
+        .ttl,    // chapter 691 / M2135 wire-in
+        .never,  // chapter 691 / M2135 semantic clarified
     ]
 
     /// Set of policies whose typed contract is shipped
-    /// but implementation is still deferred。 chapter 690
-    /// / M2132 removes `.lru` from this list (now
-    /// implemented)。
+    /// but implementation is still deferred。 chapter 691
+    /// / M2135:EMPTY — all 4 policies now implemented
+    /// or semantically clarified。
     public static let contractOnlyPolicies:
-        Set<BASKVCacheInvalidationPolicy> = [
-        .ttl,
-        .never,
-    ]
+        Set<BASKVCacheInvalidationPolicy> = []
 
     /// Indicates whether the given policy is implemented
     /// at the current close-out。
@@ -111,7 +123,11 @@ public enum BASKVCacheInvalidationPolicyDoctrine {
     }
 
     /// Honest deferral evidence per non-implemented
-    /// policy (suitable for audit emission)。
+    /// policy (suitable for audit emission)。 chapter 691
+    /// / M2135:all 4 policies now implemented or
+    /// semantically clarified — function returns nil
+    /// for every case。 Retained for API compatibility
+    /// (audit walkers may still query it)。
     public static func deferralEvidence(
         for policy: BASKVCacheInvalidationPolicy
     ) -> String? {
@@ -119,31 +135,29 @@ public enum BASKVCacheInvalidationPolicyDoctrine {
         case .explicitOnly:
             return nil
         case .lru:
-            // chapter 690 / M2131 wire-in: no longer
-            // deferred
+            // chapter 690 / M2131 wire-in
             return nil
         case .ttl:
-            return "ttl:typed contract only;requires" +
-                " per-entry timestamp + periodic sweep" +
-                " task (follow-up arc)"
+            // chapter 691 / M2135 wire-in
+            return nil
         case .never:
-            return "never:typed contract only;identical" +
-                " to .explicitOnly absent host eviction" +
-                " hooks (follow-up arc)"
+            // chapter 691 / M2135 semantic clarified
+            return nil
         }
     }
 
-    /// chapter 六百九十 / M2132 — total count of
-    /// implemented policies at chapter 690 close-out。
-    /// 2-of-4 (50% of policy coverage)。
-    public static let implementedPolicyCount: Int = 2
+    /// chapter 六百九十一 / M2135 — total count of
+    /// implemented policies at chapter 691 close-out。
+    /// 4-of-4 (100% policy coverage)。
+    public static let implementedPolicyCount: Int = 4
 
-    /// chapter 六百九十 / M2132 — total count of
+    /// chapter 六百九十一 / M2135 — total count of
     /// contract-only policies awaiting future
-    /// implementation arcs。 2-of-4 (.ttl + .never)。
-    public static let contractOnlyPolicyCount: Int = 2
+    /// implementation arcs。 0 — all 4 policies now
+    /// implemented or semantically clarified。
+    public static let contractOnlyPolicyCount: Int = 0
 
-    /// chapter 六百九十 / M2132 — total policy count
+    /// chapter 六百九十一 / M2135 — total policy count
     /// (implemented + contract-only)。 Should equal
     /// BASKVCacheInvalidationPolicy.allCases.count。
     public static let totalPolicyCount: Int = 4

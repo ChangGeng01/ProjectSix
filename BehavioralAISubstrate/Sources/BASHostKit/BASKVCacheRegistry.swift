@@ -86,6 +86,36 @@ public actor BASKVCacheRegistry {
     /// capacity bound。
     public nonisolated let capacity: Int?
 
+    /// chapter 六百九十一 / M2135 第二刀 — TTL window in
+    /// milliseconds for the .ttl policy。 nil = no TTL
+    /// (M1306 behavior preserved for non-.ttl policies)。
+    /// When invalidationPolicy == .ttl AND ttlMs != nil,
+    /// the registry consults BASKVCacheTTLEvictor on
+    /// each storeSession / cachedSession / appendToken
+    /// to lazily evict expired sessions。
+    public nonisolated let ttlMs: Int64?
+
+    /// chapter 六百九十一 / M2135 第二刀 — per-session
+    /// timestamps for TTL eviction。 Updated on each
+    /// access when invalidationPolicy == .ttl。
+    private var timestamps: [String: Int64] = [:]
+
+    /// chapter 六百九十一 / M2135 第二刀 — TTL eviction
+    /// counter (audit observation)。 Bumped each time
+    /// the registry evicts at least one session via
+    /// TTL policy。
+    private var ttlEvictionCount: Int = 0
+
+    /// chapter 六百九十一 / M2135 第二刀 — Sendable clock
+    /// for TTL timestamps。 Defaults to system clock
+    /// (Date()) but can be overridden at construction
+    /// for replay-deterministic tests。 Pure function;
+    /// no side effects beyond reading wall-clock time。
+    public typealias ClockMillisProvider =
+        @Sendable () -> Int64
+    private let clockMillisProvider:
+        ClockMillisProvider
+
     /// Backward-compatible default init — preserves
     /// chapter 482 / M1306 behavior。 The invalidation
     /// policy defaults to `.explicitOnly` matching the
@@ -93,6 +123,9 @@ public actor BASKVCacheRegistry {
     public init() {
         self.invalidationPolicy = .explicitOnly
         self.capacity = nil
+        self.ttlMs = nil
+        self.clockMillisProvider =
+            BASKVCacheRegistry.defaultClockMillisProvider
     }
 
     /// chapter 五百二 / M1385 — typed init accepting a
@@ -103,20 +136,13 @@ public actor BASKVCacheRegistry {
     ) {
         self.invalidationPolicy = invalidationPolicy
         self.capacity = nil
+        self.ttlMs = nil
+        self.clockMillisProvider =
+            BASKVCacheRegistry.defaultClockMillisProvider
     }
 
     /// chapter 六百九十 / M2131 第二刀 — typed init
-    /// accepting BOTH policy AND capacity。 When the
-    /// registry's `invalidationPolicy == .lru` AND
-    /// `capacity != nil`,LRU eviction is active —
-    /// storeSession + appendToken automatically evict
-    /// the LRU sessions when capacity is exceeded。
-    ///
-    /// Honest scope at M2131:
-    ///   - `.lru` + capacity: FULLY implemented (new)
-    ///   - `.explicitOnly` + capacity: capacity stored
-    ///     but not enforced (still M1306 behavior)
-    ///   - `.ttl` / `.never` + capacity: same as above
+    /// accepting BOTH policy AND capacity (LRU path)。
     public init(
         invalidationPolicy:
             BASKVCacheInvalidationPolicy,
@@ -124,6 +150,51 @@ public actor BASKVCacheRegistry {
     ) {
         self.invalidationPolicy = invalidationPolicy
         self.capacity = capacity
+        self.ttlMs = nil
+        self.clockMillisProvider =
+            BASKVCacheRegistry.defaultClockMillisProvider
+    }
+
+    /// chapter 六百九十一 / M2135 第二刀 — typed init
+    /// accepting policy + capacity + TTL + clock。 When
+    /// `invalidationPolicy == .ttl` AND `ttlMs != nil`,
+    /// the registry lazily evicts expired sessions on
+    /// each access。 The clock provider defaults to the
+    /// system clock but can be overridden for replay-
+    /// deterministic tests。
+    ///
+    /// Honest scope at M2135:
+    ///   - `.lru` + capacity: FULLY implemented (M2131)
+    ///   - `.ttl` + ttlMs:    FULLY implemented (this)
+    ///   - `.explicitOnly`:    M1306 behavior preserved
+    ///   - `.never`:           semantically equivalent
+    ///     to `.explicitOnly` (no auto-eviction);typed
+    ///     surface for hosts that want explicit "never
+    ///     touch this cache" intent
+    public init(
+        invalidationPolicy:
+            BASKVCacheInvalidationPolicy,
+        capacity: Int? = nil,
+        ttlMs: Int64? = nil,
+        clockMillisProvider:
+            ClockMillisProvider? = nil
+    ) {
+        self.invalidationPolicy = invalidationPolicy
+        self.capacity = capacity
+        self.ttlMs = ttlMs
+        self.clockMillisProvider = clockMillisProvider
+            ?? BASKVCacheRegistry
+                .defaultClockMillisProvider
+    }
+
+    /// Default clock provider — reads system wall-clock
+    /// in milliseconds since the unix epoch。 Sendable
+    /// closure so it crosses actor boundaries cleanly。
+    public static let defaultClockMillisProvider:
+        ClockMillisProvider = {
+        @Sendable () -> Int64 in
+        return Int64(
+            Date().timeIntervalSince1970 * 1000)
     }
 
     // MARK: - Lookup / store
@@ -138,11 +209,20 @@ public actor BASKVCacheRegistry {
     public func cachedSession(
         for sessionID: String
     ) -> BASTransformerKVCacheSession? {
+        // chapter 六百九十一 / M2135:lazy TTL sweep on
+        // access — evict any stale sessions BEFORE
+        // returning the requested session。
+        if invalidationPolicy == .ttl {
+            enforceTTLIfNeeded()
+        }
         if let session = sessions[sessionID] {
             hitCount += 1
             if invalidationPolicy == .lru {
                 accessTicks[sessionID] = nextAccessTick
                 nextAccessTick += 1
+            } else if invalidationPolicy == .ttl {
+                timestamps[sessionID] =
+                    clockMillisProvider()
             }
             return session
         }
@@ -157,6 +237,9 @@ public actor BASKVCacheRegistry {
     /// chapter 六百九十 / M2131:when invalidationPolicy
     /// is `.lru` AND capacity is set,evicts LRU sessions
     /// after the store to enforce the capacity bound。
+    /// chapter 六百九十一 / M2135:when policy is `.ttl`,
+    /// records the per-session timestamp + lazily evicts
+    /// expired sessions。
     public func storeSession(
         _ session: BASTransformerKVCacheSession
     ) {
@@ -165,6 +248,10 @@ public actor BASKVCacheRegistry {
             accessTicks[session.sessionID] = nextAccessTick
             nextAccessTick += 1
             enforceLRUCapacityIfNeeded()
+        } else if invalidationPolicy == .ttl {
+            timestamps[session.sessionID] =
+                clockMillisProvider()
+            enforceTTLIfNeeded()
         }
     }
 
@@ -189,7 +276,30 @@ public actor BASKVCacheRegistry {
             accessTicks[sessionID] = nextAccessTick
             nextAccessTick += 1
             enforceLRUCapacityIfNeeded()
+        } else if invalidationPolicy == .ttl {
+            timestamps[sessionID] = clockMillisProvider()
+            enforceTTLIfNeeded()
         }
+    }
+
+    // MARK: - TTL enforcement (chapter 六百九十一 / M2135)
+
+    /// Internal helper:consult BASKVCacheTTLEvictor +
+    /// apply the eviction decision when policy is .ttl
+    /// and ttlMs is set。 No-op when ttlMs is nil。
+    private func enforceTTLIfNeeded() {
+        guard let ttl = ttlMs else { return }
+        let now = clockMillisProvider()
+        let decision = BASKVCacheTTLEvictor.decide(
+            timestamps: timestamps,
+            nowMs: now,
+            ttlMs: ttl)
+        guard decision.evictionCount > 0 else { return }
+        for evictedID in decision.evictedSessionIDs {
+            sessions.removeValue(forKey: evictedID)
+            timestamps.removeValue(forKey: evictedID)
+        }
+        ttlEvictionCount += decision.evictionCount
     }
 
     // MARK: - LRU enforcement (chapter 六百九十 / M2131)
@@ -222,6 +332,7 @@ public actor BASKVCacheRegistry {
     ) {
         sessions.removeValue(forKey: sessionID)
         accessTicks.removeValue(forKey: sessionID)
+        timestamps.removeValue(forKey: sessionID)
     }
 
     /// Invalidate ALL sessions。 Used by tests + host
@@ -229,6 +340,7 @@ public actor BASKVCacheRegistry {
     public func invalidateAll() {
         sessions.removeAll()
         accessTicks.removeAll()
+        timestamps.removeAll()
     }
 
     /// chapter 六百九十 / M2131 — total LRU evictions
@@ -237,6 +349,14 @@ public actor BASKVCacheRegistry {
     /// policy != .lru。
     public var totalLRUEvictions: Int {
         return lruEvictionCount
+    }
+
+    /// chapter 六百九十一 / M2135 — total TTL evictions
+    /// performed since registry construction。 Audit
+    /// observation surface。 Always 0 when invalidation
+    /// policy != .ttl。
+    public var totalTTLEvictions: Int {
+        return ttlEvictionCount
     }
 
     // MARK: - Observation accessors
