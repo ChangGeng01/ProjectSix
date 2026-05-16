@@ -65,18 +65,12 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
     /// Closes the self-assessment gap "infrastructure ready,
     /// no consumer wired" — this test IS the consumer.
     func testHostRuntimeDrivesClosedLoopWithRealSessions()
-        async throws
+        throws
     {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
-        // Atom seeded as cold; expect promotion to warm after
-        // ample recent helped retrievals.
+        // M2159 — migrated to sync test + non-detached Task
+        // (Diagnostic F pattern) to bypass SIGBUS bucket。
         let promoteAtom = makeAtom(
             tier: .cold, content: "important-cold-atom")
-        // Atom seeded as hot; expect demotion to warm after
-        // stale single retrieval.
         let demoteAtom = makeAtom(
             tier: .hot, content: "stale-hot-atom")
 
@@ -92,11 +86,15 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
         let runtime = BASHostRuntime(
             configuration: .fixtureGeneric)
 
-        // Drive 5 sessions through the substrate runtime.
-        // Each session produces a substrate session result;
-        // we extract substrate-produced refs (via the
-        // sovereignAuditEntry's session/turn IDs when present)
-        // for the applier.
+        // SYNC PART:run 5 sessions via startSession + extract
+        // session/turn refs for actor calls in async Task。
+        struct SessionRefs {
+            let sessionRef: String
+            let turnRef: String
+            let permitMode: String
+            let sessionIndex: Int
+        }
+        var allSessionRefs: [SessionRefs] = []
         for sessionIndex in 0..<5 {
             let request = BASHostSessionRequest(
                 kind: .interactive,
@@ -108,10 +106,6 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
                 request,
                 now: referenceNow.addingTimeInterval(
                     Double(sessionIndex * 60)))
-
-            // Extract substrate-produced refs. Audit entry's
-            // session/turn IDs are the canonical ones; fall
-            // back to the request prompt as session label.
             let sessionRef =
                 result.eBrainTurn?.sovereignAuditEntry?
                     .sessionID
@@ -122,72 +116,87 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
             let permitMode =
                 result.eBrainTurn?.actionPermit.mode.rawValue
                 ?? "answer"
-
-            // Record 3 retrievals against the promote atom
-            // per session (high frequency + recent + helped).
-            for _ in 0..<3 {
-                let recordID = try await applier
-                    .recordRetrieval(
-                        atomID: promoteAtom.id.uuidString,
-                        sessionRef: sessionRef,
-                        turnRef: turnRef,
-                        permitMode: permitMode,
-                        retrievedAt: referenceNow
-                            .addingTimeInterval(
-                                Double(sessionIndex * 60)))
-                try await applier.markHelped(
-                    recordID: recordID, helped: true)
-            }
-            // Demote atom: only 1 stale retrieval far in the
-            // past — cumulative frequency low + age high.
-            if sessionIndex == 0 {
-                _ = try await applier.recordRetrieval(
-                    atomID: demoteAtom.id.uuidString,
-                    sessionRef: sessionRef,
-                    turnRef: turnRef,
-                    permitMode: permitMode,
-                    retrievedAt: referenceNow
-                        .addingTimeInterval(
-                            -7 * 86_400))
-            }
+            allSessionRefs.append(SessionRefs(
+                sessionRef: sessionRef,
+                turnRef: turnRef,
+                permitMode: permitMode,
+                sessionIndex: sessionIndex))
         }
 
-        // Apply importance report. Snapshot current tiers from
-        // the store.
-        let tierSnapshot: [String: BASMemoryTier] = [
-            promoteAtom.id.uuidString: .cold,
-            demoteAtom.id.uuidString: .hot
-        ]
-        let outcome = await applier.applyImportanceReport(
-            atomTiers: tierSnapshot,
-            now: referenceNow.addingTimeInterval(60 * 5))
+        let referenceNowCopy = referenceNow
+        let promoteIDCopy = promoteAtom.id.uuidString
+        let demoteIDCopy = demoteAtom.id.uuidString
 
-        // Promote atom: should mutate cold → warm
-        XCTAssertEqual(
-            outcome.appliedMutations[
-                promoteAtom.id.uuidString],
-            .warm,
-            "promote atom should be tier-mutated to .warm")
-        // Demote atom: should mutate hot → warm
-        XCTAssertEqual(
-            outcome.appliedMutations[
-                demoteAtom.id.uuidString],
-            .warm,
-            "stale hot atom should be tier-mutated to .warm")
+        let exp = expectation(
+            description: "BASMemoryClosedLoop-actor-flow")
+        Task {
+            do {
+                for refs in allSessionRefs {
+                    for _ in 0..<3 {
+                        let recordID = try await applier
+                            .recordRetrieval(
+                                atomID: promoteIDCopy,
+                                sessionRef: refs.sessionRef,
+                                turnRef: refs.turnRef,
+                                permitMode: refs.permitMode,
+                                retrievedAt: referenceNowCopy
+                                    .addingTimeInterval(
+                                        Double(
+                                            refs.sessionIndex
+                                                * 60)))
+                        try await applier.markHelped(
+                            recordID: recordID, helped: true)
+                    }
+                    if refs.sessionIndex == 0 {
+                        _ = try await applier
+                            .recordRetrieval(
+                                atomID: demoteIDCopy,
+                                sessionRef: refs.sessionRef,
+                                turnRef: refs.turnRef,
+                                permitMode: refs.permitMode,
+                                retrievedAt: referenceNowCopy
+                                    .addingTimeInterval(
+                                        -7 * 86_400))
+                    }
+                }
 
-        // Verify the atom store actually reflects the mutation
-        // (proves applier.applyImportanceReport called
-        // store.updateTier rather than just returning a report).
-        let promoteAfter = await store.atom(
-            forID: promoteAtom.id.uuidString)
-        let demoteAfter = await store.atom(
-            forID: demoteAtom.id.uuidString)
-        XCTAssertEqual(
-            promoteAfter?.tier, .warm,
-            "store reflects promote mutation")
-        XCTAssertEqual(
-            demoteAfter?.tier, .warm,
-            "store reflects demote mutation")
+                let tierSnapshot: [String: BASMemoryTier] = [
+                    promoteIDCopy: .cold,
+                    demoteIDCopy: .hot
+                ]
+                let outcome = await applier
+                    .applyImportanceReport(
+                        atomTiers: tierSnapshot,
+                        now: referenceNowCopy
+                            .addingTimeInterval(60 * 5))
+
+                XCTAssertEqual(
+                    outcome.appliedMutations[promoteIDCopy],
+                    .warm,
+                    "promote atom should be tier-mutated to .warm")
+                XCTAssertEqual(
+                    outcome.appliedMutations[demoteIDCopy],
+                    .warm,
+                    "stale hot atom should be tier-mutated to .warm")
+
+                let promoteAfter = await store.atom(
+                    forID: promoteIDCopy)
+                let demoteAfter = await store.atom(
+                    forID: demoteIDCopy)
+                XCTAssertEqual(
+                    promoteAfter?.tier, .warm,
+                    "store reflects promote mutation")
+                XCTAssertEqual(
+                    demoteAfter?.tier, .warm,
+                    "store reflects demote mutation")
+                exp.fulfill()
+            } catch {
+                XCTFail(
+                    "BASMemoryClosedLoop flow failed: \(error)")
+                exp.fulfill()
+            }
+        }
+        wait(for: [exp], timeout: 10.0)
     }
 
     // MARK: - 2. Cross-session: SQLite store + tracker preserve
@@ -198,12 +207,10 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
     /// `BASHostRuntime`, the closed-loop mutations applied in
     /// one runtime session persist to the next.
     func testSQLiteBackedClosedLoopSurvivesRuntimeRestart()
-        async throws
+        throws
     {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+        // M2159 — migrated to sync test + non-detached Task
+        // (Diagnostic F pattern)。
         let storeURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(
                 "applier-runtime-store-" +
@@ -229,78 +236,111 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
             content: "cross-runtime-survives")
         let atomID = atom.id.uuidString
 
-        // Runtime session 1: drive 3 substrate sessions, record
-        // helped retrievals, apply report.
-        do {
-            let store = try BASSQLiteMemoryAtomStore(
-                databaseURL: storeURL,
-                initial: [atom])
-            let tracker = try BASMemoryUsageTracker(
-                databaseURL: trackerURL)
-            let applier = BASMemoryClosedLoopApplier(
-                store: store, tracker: tracker)
-            let runtime = BASHostRuntime(
-                configuration: .fixtureGeneric)
-
-            for i in 0..<3 {
-                let request = BASHostSessionRequest(
-                    kind: .interactive,
-                    workflowProfile: .reflective,
-                    surface: .application,
-                    prompt: "ssn-\(i)",
-                    riskLevel: .medium)
-                let result = try runtime.startSession(
-                    request,
-                    now: referenceNow.addingTimeInterval(
-                        Double(i * 30)))
-                let sessionRef =
-                    result.eBrainTurn?.sovereignAuditEntry?
-                        .sessionID ?? "s-\(i)"
-
-                // 10 helped retrievals per session = 30 helped
-                // → strong promotion signal.
-                for _ in 0..<10 {
-                    let recordID = try await applier
-                        .recordRetrieval(
-                            atomID: atomID,
-                            sessionRef: sessionRef,
-                            turnRef: "t-\(i)",
-                            permitMode: "answer",
-                            retrievedAt: referenceNow
-                                .addingTimeInterval(
-                                    Double(i * 30)))
-                    try await applier.markHelped(
-                        recordID: recordID, helped: true)
-                }
-            }
-
-            let outcome = await applier
-                .applyImportanceReport(
-                    atomTiers: [atomID: .cold],
-                    now: referenceNow.addingTimeInterval(120))
-            XCTAssertEqual(
-                outcome.appliedMutations[atomID], .warm)
+        // SYNC PART:run 3 substrate sessions + collect refs。
+        struct SessionRef {
+            let sessionRef: String
+            let turnRef: String
+            let index: Int
+        }
+        var sessionRefs: [SessionRef] = []
+        let runtime = BASHostRuntime(
+            configuration: .fixtureGeneric)
+        for i in 0..<3 {
+            let request = BASHostSessionRequest(
+                kind: .interactive,
+                workflowProfile: .reflective,
+                surface: .application,
+                prompt: "ssn-\(i)",
+                riskLevel: .medium)
+            let result = try runtime.startSession(
+                request,
+                now: referenceNow.addingTimeInterval(
+                    Double(i * 30)))
+            let sessionRef =
+                result.eBrainTurn?.sovereignAuditEntry?
+                    .sessionID ?? "s-\(i)"
+            sessionRefs.append(SessionRef(
+                sessionRef: sessionRef,
+                turnRef: "t-\(i)",
+                index: i))
         }
 
-        // Runtime session 2: reopen store + verify mutation
-        // persisted.
-        let store2 = try BASSQLiteMemoryAtomStore(
-            databaseURL: storeURL)
-        let after = await store2.atom(forID: atomID)
-        XCTAssertEqual(
-            after?.tier, .warm,
-            "tier mutation persists across runtime restart " +
-            "via SQLite-backed store")
+        let referenceNowCopy = referenceNow
 
-        // Verify tracker history also persisted
-        let tracker2 = try BASMemoryUsageTracker(
-            databaseURL: trackerURL)
-        let usageCount = await tracker2.usageCount(
-            forAtomID: atomID)
-        XCTAssertEqual(
-            usageCount, 30,
-            "tracker preserves all 30 retrieval events " +
-            "across runtime restart")
+        let exp = expectation(
+            description: "BASMemoryClosedLoop-sqlite-flow")
+        Task {
+            do {
+                // Runtime 1 — apply closed loop。 Scope braces
+                // ensure store/tracker/applier go out of scope
+                // (and SQLite handles released) before runtime
+                // 2 reopens the same files。
+                do {
+                    let store =
+                        try BASSQLiteMemoryAtomStore(
+                            databaseURL: storeURL,
+                            initial: [atom])
+                    let tracker = try BASMemoryUsageTracker(
+                        databaseURL: trackerURL)
+                    let applier = BASMemoryClosedLoopApplier(
+                        store: store, tracker: tracker)
+
+                    for refs in sessionRefs {
+                        for _ in 0..<10 {
+                            let recordID = try await applier
+                                .recordRetrieval(
+                                    atomID: atomID,
+                                    sessionRef:
+                                        refs.sessionRef,
+                                    turnRef: refs.turnRef,
+                                    permitMode: "answer",
+                                    retrievedAt:
+                                        referenceNowCopy
+                                            .addingTimeInterval(
+                                                Double(
+                                                    refs.index
+                                                    * 30)))
+                            try await applier.markHelped(
+                                recordID: recordID,
+                                helped: true)
+                        }
+                    }
+
+                    let outcome = await applier
+                        .applyImportanceReport(
+                            atomTiers: [atomID: .cold],
+                            now: referenceNowCopy
+                                .addingTimeInterval(120))
+                    XCTAssertEqual(
+                        outcome.appliedMutations[atomID],
+                        .warm)
+                }
+
+                // Runtime 2 — reopen + verify。 SQLite handles
+                // from runtime 1 released at end of scope above。
+                let store2 = try BASSQLiteMemoryAtomStore(
+                    databaseURL: storeURL)
+                let after = await store2.atom(
+                    forID: atomID)
+                XCTAssertEqual(
+                    after?.tier, .warm,
+                    "tier mutation persists across runtime restart")
+
+                let tracker2 = try BASMemoryUsageTracker(
+                    databaseURL: trackerURL)
+                let usageCount = await tracker2
+                    .usageCount(forAtomID: atomID)
+                XCTAssertEqual(
+                    usageCount, 30,
+                    "tracker preserves all 30 retrieval events")
+                exp.fulfill()
+            } catch {
+                XCTFail(
+                    "SQLite closed-loop flow failed: \(error)")
+                exp.fulfill()
+            }
+        }
+        wait(for: [exp], timeout: 10.0)
     }
 
     // MARK: - 3. Empty session run leaves applier idle
@@ -310,12 +350,10 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
     /// substrate sessions. The closed loop is observation-driven
     /// — silent sessions = silent loop.
     func testRuntimeWithoutRetrievalRecordingProducesNoMutations()
-        async throws
+        throws
     {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+        // M2159 — migrated to sync test + non-detached Task
+        // (Diagnostic F pattern)。
         let atom = makeAtom(tier: .warm)
         let store = BASInMemoryMemoryAtomStore(
             initial: [atom])
@@ -325,7 +363,8 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
         let runtime = BASHostRuntime(
             configuration: .fixtureGeneric)
 
-        // Drive 3 sessions but DO NOT record any retrievals.
+        // SYNC PART:drive 3 sessions WITHOUT recording any
+        // retrievals。
         for i in 0..<3 {
             let request = BASHostSessionRequest(
                 kind: .interactive,
@@ -337,25 +376,25 @@ final class BASMemoryClosedLoopApplierHostRuntimeIntegrationTests:
                 request, now: referenceNow)
         }
 
-        let outcome = await applier.applyImportanceReport(
-            atomTiers: [atom.id.uuidString: .warm],
-            now: referenceNow)
-        // Hot atom with NO usage signal → may demote per
-        // scorer's tier-decay rule. But the .warm tier is the
-        // middle; no hot-to-warm or cold-to-warm tick, so
-        // either hold or warm-to-cold based on baseline scoring.
-        // Either way the store should not show any unrecorded
-        // retrieval impact.
-        let trackerCount = await tracker.recordCount
-        XCTAssertEqual(
-            trackerCount, 0,
-            "tracker has zero records when host doesn't call " +
-            "recordRetrieval")
-        // Applier still ran (report computed) but on zero
-        // tracker history.
-        XCTAssertEqual(
-            outcome.report.scores.count, 1,
-            "scorer evaluates the warm atom even with zero " +
-            "retrieval history (returns baseline-only score)")
+        let referenceNowCopy = referenceNow
+        let atomIDCopy = atom.id.uuidString
+
+        let exp = expectation(
+            description: "BASMemoryClosedLoop-silent-sessions")
+        Task {
+            let outcome = await applier
+                .applyImportanceReport(
+                    atomTiers: [atomIDCopy: .warm],
+                    now: referenceNowCopy)
+            let trackerCount = await tracker.recordCount
+            XCTAssertEqual(
+                trackerCount, 0,
+                "tracker has zero records when host doesn't call recordRetrieval")
+            XCTAssertEqual(
+                outcome.report.scores.count, 1,
+                "scorer evaluates the warm atom even with zero retrieval history")
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 10.0)
     }
 }
