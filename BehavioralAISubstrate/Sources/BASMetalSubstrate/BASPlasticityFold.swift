@@ -125,7 +125,7 @@ public enum BASPlasticityRule:
 /// Typed STDP curve parameters。 chapter 457 / M1205。
 /// Defaults match canonical Bi & Poo 1998 values:
 /// A_+ = A_- = 1.0,τ_+ = τ_- = 20 ms。 Asymmetric
-/// values shift the LTP/LTD balance (e.g. A_+ > A_-
+/// values shift the LTP/LTD amplitude ratio (e.g. A_+ > A_-
 /// biases toward potentiation;τ_- > τ_+ widens the
 /// LTD window relative to LTP)。
 public struct BASPlasticitySTDPParams:

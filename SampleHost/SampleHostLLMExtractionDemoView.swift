@@ -42,7 +42,19 @@
 
 import SwiftUI
 import BASOrgan
-import BASRuntimeCore
+// M2049 chapter 六百六十八 第一刀 fix:`SampleHost` hosts must
+// not import low-level BAS modules directly。 BASHostKit
+// `@_exported import`s BASRuntimeCore (see HostRuntimeCore
+// .swift line 33),so swapping the import preserves every
+// symbol this file references (BASLLMExtractionResult,
+// BASFoundationModelsMockSession, BASInMemoryEventLogStorage,
+// BASLLMOutputParserPolicy, BASLLMExtractionByproducts,
+// BASMemoryUpdateCandidate, BASTaskCandidate,
+// BASEvalCaseCandidate, BASTrainingExampleCandidate,
+// BASLLMExtractionEngine, BASLLMRawInput) without changing
+// behavior。 scripts/check_sdk_import_boundaries.sh now
+// passes on this file。
+import BASHostKit
 
 @MainActor
 final class SampleHostLLMExtractionDemoModel:
