@@ -5582,7 +5582,55 @@ public enum BASEntropyChapterIndex {
                 " 694 gaps addressed via empirical-" +
                 "correction methodology — name the gap," +
                 " verify empirically,supersede prior" +
-                " framing if needed。")
+                " framing if needed。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十五",
+            mNumberFirst: 2150, mNumberLast: 2153,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 11, futureCutsCount: 0,
+            summary: "TERMINAL HONEST STATE arc。 User" +
+                " directive 「继续 解决 为解决的 一次性 解决掉」" +
+                " resolved via 3 audit/catalog/terminal" +
+                " doctrines。 M2150 第一刀 NEW BASSprawl" +
+                "ScopeAuditDoctrine empirically counted" +
+                " actual sprawl (37 *Result + 22 *Frame +" +
+                " 2 *Permit + 3 *Card = 64,vs chapter" +
+                " 691 estimate 42) + classified 0-of-64" +
+                " as Tier-B-migratable (rich-domain" +
+                " shapes,not single-payload wrappers) +" +
+                " chapter 691 overestimate acknowledged" +
+                " + Tier B primitives remain valuable" +
+                " for new types + 24 anti-drift tests。" +
+                " M2151 第二刀 NEW BASSubstrateExternal" +
+                "DependencyCatalogDoctrine catalogued 4" +
+                " external-owner categories with per-" +
+                "category blocked-item counts:434" +
+                " toolchain-blocked tests + 11 host-app/" +
+                "architecture/tooling items + substrate-" +
+                "actionable count EXPLICITLY ZERO + 28" +
+                " anti-drift tests。 M2152 第三刀 NEW" +
+                " BASSubstrateMaximallyResolvedDoctrine" +
+                " declaring substrate TERMINAL HONEST" +
+                " STATE — 7-stage completion journey +" +
+                " all invariants-held flags + 8 cross-" +
+                "doctrine refs + 5 future-commit-" +
+                "semantics + cross-mirror with M2151" +
+                " actionable=0 + 27 anti-drift tests。" +
+                " Chapter 695 close-out (M2153) + 13-" +
+                "file standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2153。 736" +
+                " consecutive byte-equality clean commits" +
+                "。 273 typed surfaces cumulative (+3:" +
+                "BASSprawl + BASSubstrateExternal +" +
+                " BASSubstrateMaximallyResolved)。 60/60" +
+                " score unchanged (saturation invariant" +
+                " holds at terminal state)。 Substrate" +
+                " AT-REST + Tier A+B+C complete +" +
+                " TERMINAL HONEST STATE all preserved" +
+                " end-of-chapter-695。 Methodology —" +
+                " honest empirical audit + explicit owner" +
+                " attribution + terminal-state pin → no" +
+                " busy-work commits after this。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

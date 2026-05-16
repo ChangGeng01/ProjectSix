@@ -21571,7 +21571,111 @@ public enum BASChapterDoctrineRegistry {
                 " gaps addressed via empirical-correction" +
                 " methodology — name the gap,verify" +
                 " empirically,supersede prior framing if" +
-                " needed。")
+                " needed。"),
+        // chapter 695 — TERMINAL HONEST STATE arc。 User
+        // directive 「继续 解决 为解决的 一次性 解决掉」。
+        // 3 audit/catalog/terminal doctrines + chapter
+        // close-out。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十五",
+            mNumberFirst: 2150,
+            mNumberLast: 2153,
+            v1MilestoneMNumber: 2153,
+            v1MilestoneStatus:
+                "chapter-695-terminal-honest-state",
+            knives: [
+                BASChapterKnife(mNumber: 2150, knife: "第一刀",
+                    concept: "NEW BASSprawlScopeAudit" +
+                        "Doctrine empirically counted" +
+                        " actual sprawl (64 vs estimate" +
+                        " 42) + classified 0-of-64" +
+                        " Tier-B-migratable + 24 anti-" +
+                        "drift tests。"),
+                BASChapterKnife(mNumber: 2151, knife: "第二刀",
+                    concept: "NEW BASSubstrateExternal" +
+                        "DependencyCatalogDoctrine" +
+                        " catalogued 4 external-owner" +
+                        " categories + substrate-" +
+                        "actionable count EXPLICITLY" +
+                        " ZERO + 28 anti-drift tests。"),
+                BASChapterKnife(mNumber: 2152, knife: "第三刀",
+                    concept: "NEW BASSubstrate" +
+                        "MaximallyResolvedDoctrine" +
+                        " declaring substrate TERMINAL" +
+                        " HONEST STATE + 7-stage" +
+                        " completion journey + 8 cross-" +
+                        "doctrine refs + 27 anti-drift" +
+                        " tests。"),
+                BASChapterKnife(mNumber: 2153, knife: "第四刀",
+                    concept: "Chapter 695 close-out +" +
+                        " 13-file standard sync。 736" +
+                        " consecutive byte-equality clean" +
+                        " commits。 60/60 score unchanged" +
+                        " (saturation invariant at" +
+                        " terminal state)。")
+            ],
+            entropyClassesAttacked: [
+                "chapter-691-sprawl-estimate-overestimate-unverified",
+                "remaining-items-unowned-vague",
+                "substrate-terminal-state-implicit-not-pinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (3 doctrines" +
+                    " purely additive)",
+                "ADR-016 → M2153",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "736-consecutive-byte-equality-clean-commits",
+                "terminal-honest-state-pinned"
+            ],
+            plannedFutureCuts: [
+                "FUTURE SUBSTRATE COMMITS REACTIVE ONLY:" +
+                    " (a) react to external owner fix" +
+                    " unblocking substrate adoption,or" +
+                    " (b) react to new user directive。" +
+                    " Pro-active substrate gap-filling is" +
+                    " EXHAUSTED at chapter 695。"
+            ],
+            summary: "TERMINAL HONEST STATE arc。 User" +
+                " directive 「继续 解决 为解决的 一次性" +
+                " 解决掉」 resolved via 3 audit/catalog/" +
+                "terminal doctrines。 M2150 第一刀 NEW" +
+                " BASSprawlScopeAuditDoctrine empirically" +
+                " audited 64-type sprawl,classified" +
+                " 0-of-64 as Tier-B-migratable + chapter" +
+                " 691 overestimate acknowledged + 24" +
+                " anti-drift tests。 M2151 第二刀 NEW" +
+                " BASSubstrateExternalDependencyCatalog" +
+                "Doctrine catalogued 4 external-owner" +
+                " categories with per-category blocked-" +
+                "item counts:434 toolchain-blocked tests" +
+                " + 11 host-app/architecture/tooling" +
+                " items + substrate-actionable count" +
+                " EXPLICITLY ZERO + 28 anti-drift tests。" +
+                " M2152 第三刀 NEW BASSubstrateMaximally" +
+                "ResolvedDoctrine declaring substrate" +
+                " TERMINAL HONEST STATE — 7-stage" +
+                " completion journey (689→690→691→692→" +
+                "693→694→695) + invariants-held flags +" +
+                " 8 cross-doctrine refs + 5 future-" +
+                "commit-semantics + cross-mirror with" +
+                " M2151 actionable=0 + 27 anti-drift" +
+                " tests。 Chapter 695 close-out (M2153)" +
+                " + 13-file standard sync。 ADR-014 OPT-" +
+                "OUT preserved。 ADR-016 → M2153。 736" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces cumulative (+3" +
+                " honest-audit doctrines)。 60/60 score" +
+                " unchanged (saturation invariant holds" +
+                " at terminal state)。 Substrate AT-REST" +
+                " + Tier A+B+C complete + TERMINAL HONEST" +
+                " STATE all preserved end-of-chapter-695。" +
+                " Methodology — honest empirical audit +" +
+                " explicit owner attribution + terminal-" +
+                "state pin → no busy-work commits after" +
+                " this。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

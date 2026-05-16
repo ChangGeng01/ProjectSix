@@ -2570,7 +2570,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九十四")!)
+                            "chapter 六百九十四")!),
+            // M2153 chapter 695 — TERMINAL HONEST STATE
+            // arc
+            checkRegistry("六百九十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4604,6 +4611,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九十四")!
+                .mNumberLast),
+            // M2153 chapter 695 — TERMINAL HONEST STATE
+            // arc
+            ("695",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

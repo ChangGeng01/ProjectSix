@@ -121,20 +121,18 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 290
+    public static let phase2ChapterCount: Int = 291
 
-    /// Phase 2 commits shipped。 At M2149:125 + 84 +
-    /// 985 = 1194 (chapter 694 — COMPREHENSIVE GAP
-    /// REMEDIATION:empirical signal-10 diagnosis +
-    /// swift-testing framing correction +
-    /// typedSurfaceCount audit + Tier A bridge-not-
-    /// adoption pin)
-    public static let phase2CommitsShipped: Int = 1194
+    /// Phase 2 commits shipped。 At M2153:125 + 84 +
+    /// 989 = 1198 (chapter 695 — TERMINAL HONEST STATE:
+    /// sprawl scope audit + external dependency catalog
+    /// + substrate-maximally-resolved declaration +
+    /// chapter close-out)
+    public static let phase2CommitsShipped: Int = 1198
 
-    /// Phase 2 mNumberLast。 At M2149:chapter 694 —
-    /// comprehensive gap remediation arc。 SWEEP frozen
-    /// at 1163。
-    public static let phase2MNumberLast: Int = 2149
+    /// Phase 2 mNumberLast。 At M2153:chapter 695 —
+    /// terminal honest state arc。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2153
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
