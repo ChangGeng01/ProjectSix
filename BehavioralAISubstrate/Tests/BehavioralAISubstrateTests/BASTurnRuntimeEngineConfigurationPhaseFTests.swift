@@ -12,18 +12,24 @@ final class BASTurnRuntimeEngineConfigurationPhaseFTests:
     // MARK: - Default has v1ByteEqual + nil registry +
     // nil capability
 
-    func testDefaultIsV1ByteEqualNoRegistry() {
+    func testDefaultIsNativeV2PostFlipNoRegistry() {
+        // M2074 chapter 六百七十四 第二刀 THE FLIP:
+        // BASTurnRuntimeEngineConfiguration.default() now
+        // returns runtimeMode=.nativeV2 (was .v1ByteEqual
+        // pre-M2074)。 Hosts needing V1 semantics opt out
+        // explicitly via init(runtimeMode: .v1ByteEqual)
+        // or BAS_RUNTIME_MODE_OVERRIDE=v1-byte-equal env
+        // var per BASRuntimeModeOverrideDoctrine M2067。
         let config = BASTurnRuntimeEngineConfiguration
             .default()
-        XCTAssertEqual(config.runtimeMode, .v1ByteEqual,
-            "default mode preserves V1 byte-equality" +
-            " (ADR-014 OPT-IN)")
+        XCTAssertEqual(config.runtimeMode, .nativeV2,
+            "default mode FLIPPED to .nativeV2 at M2074" +
+            " (Phase L)。 ADR-014 OPT-OUT path:explicit" +
+            " init(runtimeMode: .v1ByteEqual) preserved。")
         XCTAssertNil(config.metalKernelRegistry,
-            "default has no kernel registry — V1 path" +
-            " takes over")
+            "default has no kernel registry")
         XCTAssertNil(config.aneCapability,
-            "default has no ANE capability — scheduler" +
-            " falls back to .conservative")
+            "default has no ANE capability")
     }
 
     // MARK: - All M998 originals still accessible
@@ -59,12 +65,16 @@ final class BASTurnRuntimeEngineConfigurationPhaseFTests:
     // MARK: - Immutable updates per slot
 
     func testWithRuntimeMode() {
+        // M2074 chapter 674 第二刀 THE FLIP:default() now
+        // returns nativeV2。 with(runtimeMode:) to v1Byte
+        // Equal demonstrates the OPT-OUT pivot path。
         let base = BASTurnRuntimeEngineConfiguration
             .default()
-        let updated = base.with(runtimeMode: .nativeV2)
-        XCTAssertEqual(base.runtimeMode, .v1ByteEqual,
-            "base unchanged")
-        XCTAssertEqual(updated.runtimeMode, .nativeV2)
+        let updated = base.with(runtimeMode: .v1ByteEqual)
+        XCTAssertEqual(base.runtimeMode, .nativeV2,
+            "base unchanged from post-flip default")
+        XCTAssertEqual(updated.runtimeMode, .v1ByteEqual,
+            "with(runtimeMode:) pivots to OPT-OUT V1 path")
     }
 
     func testWithMetalKernelRegistry() async {
@@ -130,6 +140,9 @@ final class BASTurnRuntimeEngineConfigurationPhaseFTests:
             let _: BASTurnRuntimeEngineConfiguration =
                 config
         }
-        XCTAssertEqual(config.runtimeMode, .v1ByteEqual)
+        // M2074 chapter 674 第二刀 THE FLIP:default()
+        // now returns .nativeV2 (was .v1ByteEqual pre-
+        // M2074)。
+        XCTAssertEqual(config.runtimeMode, .nativeV2)
     }
 }

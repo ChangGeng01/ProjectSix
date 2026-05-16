@@ -248,23 +248,31 @@ public struct BASTurnRuntimeEngineConfiguration: Sendable {
     /// equality preserved out-of-the-box for all
     /// `.default()`-using hosts)。
     ///
-    /// **M2073 chapter 六百七十四 第一刀** prepares for the
-    /// M2074 flip:doctrine note added,no behavior change
-    /// yet。 The actual flip lands at M2074 — `runtimeMode`
-    /// changes from `.v1ByteEqual` to `.nativeV2`。
+    /// **M2073 chapter 六百七十四 第一刀** prepared for the
+    /// M2074 flip:doctrine annotation added。
     ///
-    /// ADR-014 OPT-OUT path:hosts that need V1 semantics
-    /// after the flip construct the config explicitly:
+    /// **M2074 chapter 六百七十四 第二刀 — THE FLIP**:
+    /// `.default()` now returns a config with `runtimeMode =
+    /// .nativeV2`。 wild-rolling-meerkat Phase L sealed。
+    /// All 4 Phase L safety nets active:
+    ///   - BASPhaseLPreFlipGateContractDoctrine M2063 ✓
+    ///   - BAS_RUNTIME_MODE_OVERRIDE env override M2065 ✓
+    ///   - Tagged commit pre-default-flip-M2068 ✓
+    ///   - 100×60=6000 readiness gate READY M2070 ✓
+    ///
+    /// ADR-014 OPT-OUT path remains active for hosts needing
+    /// V1 semantics after the flip:
     /// `BASTurnRuntimeEngineConfiguration(runtimeMode:` +
     /// `.v1ByteEqual)`。 Init parameter default for
     /// `runtimeMode` remains `.v1ByteEqual` per back-compat
-    /// contract with explicit callers。
+    /// contract with explicit init callers。
     public static func `default`()
         -> BASTurnRuntimeEngineConfiguration
     {
-        // M2073 preparatory commit — no behavior change。
-        // M2074 will flip the implicit runtimeMode here。
-        BASTurnRuntimeEngineConfiguration()
+        // M2074 chapter 六百七十四 第二刀 — THE FLIP
+        // v1ByteEqual → nativeV2 for default()-using hosts。
+        BASTurnRuntimeEngineConfiguration(
+            runtimeMode: .nativeV2)
     }
 
     // MARK: - Immutable updates (M998 originals)
