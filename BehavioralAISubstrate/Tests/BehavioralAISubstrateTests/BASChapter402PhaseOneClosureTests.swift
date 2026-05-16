@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2024",
-            "M2024:doctrine version reflects chapter 六百六十一 — CONVENIENCE-CADENCE-RECORD TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#7,cross-module BASHostKit + BASRuntimeCore reach,4th consecutive all-struct trio,1 chapter until chapter 六百六十三 hexa #8 catalog。 202 typed surfaces cumulative。 608 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M2028",
+            "M2028:doctrine version reflects chapter 六百六十二 — BIOMIMETIC-SIGNAL-RECORD TRIO CODABLE EXTENSION — GAP-FILL,6th and TRUE FINAL post-hexa-#7,cross-module BASMetalSubstrate + BASOrgan reach,5th consecutive all-struct trio (closes the all-struct streak),closes 6-chapter post-hexa-#7 run。 203 typed surfaces cumulative。 612 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 663 hexa #8 catalog opportunity NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二

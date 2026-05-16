@@ -315,7 +315,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百五十八",   // M2009-M2012 (BASMETALSUBSTRATE BIOMIMETIC-OBSERVATION TRIO CODABLE EXTENSION — GAP-FILL,2nd post-hexa-#7,single-module BASMetalSubstrate reach,4 chapters until chapter 六百六十三 hexa #8 catalog opportunity;3 observation struct types (BASPredictiveCodingObservation + BASPlasticityUpdate + BASHierarchicalObservation) gained Codable + 3 PROOF tests + BASBiomimeticObservationTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'biomimetic-observation-trio';FIRST ALL-STRUCT trio in autonomous loop history;coherent biomimetic theme;199 typed surfaces cumulative)
         "chapter 六百五十九",   // M2013-M2016 (KERNEL-RESULT TRIO CODABLE EXTENSION — GAP-FILL,3rd post-hexa-#7,single-module BASMetalSubstrate reach,2nd consecutive all-struct trio,3 chapters until chapter 六百六十三 hexa #8 catalog opportunity;3 kernel-result struct types (BASKernelEvaluateLatencyProbeResult + BASKernelDispatchResult + BASBCMMetaPlasticityUpdate) gained Codable + 3 PROOF tests + BASKernelResultTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'kernel-result-trio';200 typed surfaces cumulative;600 consecutive byte-equality clean commits — 600-COMMIT MILESTONE)
         "chapter 六百六十",    // M2017-M2020 (HOST-PROJECTION TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#7,single-module BASHostKit reach,3rd consecutive all-struct trio,2 chapters until chapter 六百六十三 hexa #8 catalog opportunity;3 BASHostKit struct types (BASEventLogTurnProjection + BASTrainingExampleSubmission + BASShadowEvaluateThenUpgradeOutcome) gained Codable + 3 PROOF tests + BASHostProjectionTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'host-projection-trio';201 typed surfaces cumulative;604 consecutive byte-equality clean commits)
-        "chapter 六百六十一"   // M2021-M2024 (CONVENIENCE-CADENCE-RECORD TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#7,cross-module BASHostKit + BASRuntimeCore reach,4th consecutive all-struct trio,1 chapter until chapter 六百六十三 hexa #8 catalog opportunity;3 cross-module struct types (BASCognitiveOSConvenienceCadence + BASCognitiveOSConvenienceResult + BASMambaInferenceLatencyRecord) gained Codable + 3 PROOF tests + BASConvenienceCadenceRecordTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'convenience-cadence-record-trio';202 typed surfaces cumulative;608 consecutive byte-equality clean commits)
+        "chapter 六百六十一",  // M2021-M2024 (CONVENIENCE-CADENCE-RECORD TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#7,cross-module BASHostKit + BASRuntimeCore reach,4th consecutive all-struct trio,1 chapter until chapter 六百六十三 hexa #8 catalog opportunity;3 cross-module struct types (BASCognitiveOSConvenienceCadence + BASCognitiveOSConvenienceResult + BASMambaInferenceLatencyRecord) gained Codable + 3 PROOF tests + BASConvenienceCadenceRecordTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'convenience-cadence-record-trio';202 typed surfaces cumulative;608 consecutive byte-equality clean commits)
+        "chapter 六百六十二"   // M2025-M2028 (BIOMIMETIC-SIGNAL-RECORD TRIO CODABLE EXTENSION — GAP-FILL,6th and TRUE FINAL post-hexa-#7,cross-module BASMetalSubstrate + BASOrgan reach,5th consecutive all-struct trio (closes the all-struct streak),closes 6-chapter post-hexa-#7 run;3 cross-module struct types (BASBiomimeticTurnSignal + BASBiomimeticTurnObservation + BASFoundationModelsMockCallRecord) gained Codable + 3 PROOF tests + BASBiomimeticSignalRecordTrioCodableExtensionDoctrine typed surface + close-out;NEW kind 'biomimetic-signal-record-trio';2-level recursive Codable composition;203 typed surfaces cumulative;612 consecutive byte-equality clean commits;chapter 663 hexa #8 catalog opportunity NEXT)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -332,15 +333,17 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2024
+    public static let mNumberLast: Int = 2028
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2024)。 Bumped through chapter 661:1065 → 1069。
-    /// Chapter 661:Convenience-cadence-record trio
-    /// (5th post-hexa-#7 gap-fill,cross-module BASHostKit
-    /// + BASRuntimeCore reach) + 3 PROOF tests + typed
-    /// surface + close-out。
-    public static let commitsShipped: Int = 1069
+    /// M2028)。 Bumped through chapter 662:1069 → 1073。
+    /// Chapter 662:Biomimetic-signal-record trio
+    /// (6th and TRUE FINAL post-hexa-#7 gap-fill,cross-
+    /// module BASMetalSubstrate + BASOrgan reach,closes
+    /// 5-consecutive-all-struct streak) + 3 PROOF tests
+    /// + typed surface + close-out。 Chapter 663 hexa #8
+    /// catalog opportunity NEXT。
+    public static let commitsShipped: Int = 1073
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

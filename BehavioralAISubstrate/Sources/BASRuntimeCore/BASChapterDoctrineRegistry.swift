@@ -19073,7 +19073,86 @@ public enum BASChapterDoctrineRegistry {
                 "struct trio。 NEW kind 'convenience-cadence-" +
                 "record-trio'。 202 typed surfaces cumulative。" +
                 " 608 consecutive byte-equality clean commits。" +
-                " ADR-016 → M2024。 V1 byte-equality preserved。")
+                " ADR-016 → M2024。 V1 byte-equality preserved。"),
+
+        // chapter 662 — biomimetic-signal-record trio
+        // (6th and TRUE FINAL post-hexa-#7,cross-module BAS
+        // MetalSubstrate + BASOrgan reach,5th consecutive
+        // all-struct trio,closes 6-chapter post-hexa-#7 run,
+        // chapter 663 hexa #8 catalog NEXT)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十二",
+            mNumberFirst: 2025,
+            mNumberLast: 2028,
+            v1MilestoneMNumber: 2028,
+            v1MilestoneStatus:
+                "chapter-662-biomimetic-signal-record-trio-codable-extension",
+            knives: [
+                BASChapterKnife(mNumber: 2025, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-module" +
+                        " struct types — BASBiomimeticTurnSignal" +
+                        " + BASBiomimeticTurnObservation (BAS" +
+                        "MetalSubstrate) + BASFoundationModels" +
+                        "MockCallRecord (BASOrgan)。 5th consecutive" +
+                        " all-struct trio — closes the all-" +
+                        "struct streak。 2-level recursive" +
+                        " Codable composition (every nested" +
+                        " field type Codable from earlier" +
+                        " chapters)。"),
+                BASChapterKnife(mNumber: 2026, knife: "第二刀",
+                    concept: "3 PROOF tests。"),
+                BASChapterKnife(mNumber: 2027, knife: "第三刀",
+                    concept: "NEW BASBiomimeticSignalRecord" +
+                        "TrioCodableExtensionDoctrine + 30" +
+                        " anti-drift tests。 typed-surface" +
+                        " 202 → 203。"),
+                BASChapterKnife(mNumber: 2028, knife: "第四刀",
+                    concept: "Chapter 662 close-out。 612" +
+                        " consecutive byte-equality clean commits。" +
+                        " 6-chapter post-hexa-#7 run COMPLETE" +
+                        " (chapters 657-662)。 Chapter 663" +
+                        " hexa #8 catalog NEXT with symmetric" +
+                        " 6-entry run。")
+            ],
+            entropyClassesAttacked: [
+                "bas-biomimetic-turn-signal-non-codable",
+                "bas-biomimetic-turn-observation-non-codable",
+                "bas-foundation-models-mock-call-record-non-codable",
+                "biomimetic-signal-record-trio-pattern-uncaptured",
+                "sixth-true-final-post-hexa-seven-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2028",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "biomimetic-signal-record-trio-codable-extension",
+                "sixth-and-true-final-post-hexa-seven-gap-fill",
+                "cross-module-trio",
+                "fifth-consecutive-all-struct-trio",
+                "closes-all-struct-streak",
+                "recursive-composition",
+                "new-kind-label-biomimetic-signal-record-trio",
+                "612-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — chapter 663 hexa #8 catalog" +
+                " (symmetric 6-entry run cataloging chapters" +
+                " 657-662)",
+                "future arc — Phase H default mode flip"
+            ],
+            summary: "Chapter 662 ships biomimetic-signal-" +
+                "record trio Codable extension — 6th and" +
+                " TRUE FINAL post-hexa-#7 gap-fill,cross-" +
+                "module BASMetalSubstrate + BASOrgan reach," +
+                "5th consecutive all-struct trio (closes the" +
+                " all-struct streak)。 NEW kind 'biomimetic-" +
+                "signal-record-trio'。 203 typed surfaces" +
+                " cumulative。 612 consecutive byte-equality" +
+                " clean commits。 ADR-016 → M2028。 V1 byte-" +
+                "equality preserved。 Chapter 663 hexa #8" +
+                " catalog opportunity NEXT with symmetric" +
+                " 6-entry run cataloging chapters 657-662。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

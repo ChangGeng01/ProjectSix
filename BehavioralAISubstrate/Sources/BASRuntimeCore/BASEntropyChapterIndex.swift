@@ -4766,7 +4766,29 @@ public enum BASEntropyChapterIndex {
                 " 202 typed surfaces cumulative。 608" +
                 " consecutive byte-equality clean commits" +
                 "。 ADR-016 → M2024。 V1 byte-equality" +
-                " preserved。")
+                " preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十二",
+            mNumberFirst: 2025, mNumberLast: 2028,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 17, futureCutsCount: 2,
+            summary: "BIOMIMETIC-SIGNAL-RECORD TRIO" +
+                " CODABLE EXTENSION — GAP-FILL,6th and" +
+                " TRUE FINAL post-hexa-#7,cross-module" +
+                " BASMetalSubstrate + BASOrgan reach,5th" +
+                " consecutive all-struct trio (closes the" +
+                " all-struct streak)。 3 cross-module" +
+                " struct types gained Codable + 3 PROOF" +
+                " tests + new typed surface + close-out。" +
+                " NEW kind 'biomimetic-signal-record-" +
+                "trio'。 2-level recursive Codable" +
+                " composition。 203 typed surfaces" +
+                " cumulative。 612 consecutive byte-" +
+                "equality clean commits。 ADR-016 →" +
+                " M2028。 V1 byte-equality preserved。" +
+                " Chapter 663 hexa #8 catalog opportunity" +
+                " NEXT with symmetric 6-entry run" +
+                " cataloging chapters 657-662。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

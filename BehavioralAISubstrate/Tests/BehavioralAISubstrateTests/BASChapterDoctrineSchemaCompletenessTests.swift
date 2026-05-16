@@ -2381,7 +2381,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十一")!)
+                            "chapter 六百六十一")!),
+            // M2028 chapter 662 — biomimetic-signal-record trio Codable extension gap-fill (6th and TRUE FINAL post-hexa-#7, 5th consecutive all-struct trio, closes 6-chapter run)
+            checkRegistry("六百六十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4165,6 +4171,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十一")!
+                .mNumberLast),
+            // M2028 chapter 662 — biomimetic-signal-record trio Codable extension gap-fill (6th and TRUE FINAL post-hexa-#7)
+            ("662",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
