@@ -61,7 +61,12 @@ public actor BASMPSGraphAttentionKernel: BASMetalKernel {
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
 
-    public init() throws {
+    /// M2041 chapter 六百六十六 第一刀:optional cache。
+    private let cache: BASMPSGraphExecutableCache?
+
+    public init(
+        cache: BASMPSGraphExecutableCache? = nil
+    ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()
         else {
             throw BASKernelError.frameworkUnavailable(
@@ -74,6 +79,46 @@ public actor BASMPSGraphAttentionKernel: BASMetalKernel {
         }
         self.device = dev
         self.commandQueue = queue
+        self.cache = cache
+    }
+
+    // Shared graph builder for cache-on + cache-off paths
+    private nonisolated func buildGraph(
+        seqQ: Int, seqK: Int, dim: Int
+    ) -> (
+        graph: MPSGraph,
+        qP: MPSGraphTensor,
+        kP: MPSGraphTensor,
+        vP: MPSGraphTensor,
+        output: MPSGraphTensor
+    ) {
+        let graph = MPSGraph()
+        let qP = graph.placeholder(
+            shape: [NSNumber(value: seqQ),
+                    NSNumber(value: dim)],
+            dataType: .float32, name: "Q")
+        let kP = graph.placeholder(
+            shape: [NSNumber(value: seqK),
+                    NSNumber(value: dim)],
+            dataType: .float32, name: "K")
+        let vP = graph.placeholder(
+            shape: [NSNumber(value: seqK),
+                    NSNumber(value: dim)],
+            dataType: .float32, name: "V")
+        let kT = graph.transposeTensor(
+            kP, dimension: 0, withDimension: 1, name: "kT")
+        let scoresRaw = graph.matrixMultiplication(
+            primary: qP, secondary: kT, name: "scoresRaw")
+        let scale = graph.constant(
+            1.0 / sqrt(Double(dim)),
+            shape: [1, 1], dataType: .float32)
+        let scores = graph.multiplication(
+            scoresRaw, scale, name: "scores")
+        let attn = graph.softMax(
+            with: scores, axis: 1, name: "attn")
+        let output = graph.matrixMultiplication(
+            primary: attn, secondary: vP, name: "output")
+        return (graph, qP, kP, vP, output)
     }
 
     public func evaluate(
@@ -164,47 +209,6 @@ public actor BASMPSGraphAttentionKernel: BASMetalKernel {
                     reason: "alloc output failed")
         }
 
-        // Build attention graph
-        let graph = MPSGraph()
-        let qP = graph.placeholder(
-            shape: [NSNumber(value: seqQ),
-                    NSNumber(value: dim)],
-            dataType: .float32, name: "Q")
-        let kP = graph.placeholder(
-            shape: [NSNumber(value: seqK),
-                    NSNumber(value: dim)],
-            dataType: .float32, name: "K")
-        let vP = graph.placeholder(
-            shape: [NSNumber(value: seqK),
-                    NSNumber(value: dim)],
-            dataType: .float32, name: "V")
-        // K^T: (dim, seqK)
-        let kT = graph.transposeTensor(
-            kP,
-            dimension: 0,
-            withDimension: 1,
-            name: "kT")
-        // scoresRaw = Q · K^T: (seqQ, seqK)
-        let scoresRaw = graph.matrixMultiplication(
-            primary: qP,
-            secondary: kT,
-            name: "scoresRaw")
-        // scale = 1 / sqrt(dim)
-        let scale = graph.constant(
-            1.0 / sqrt(Double(dim)),
-            shape: [1, 1],
-            dataType: .float32)
-        let scores = graph.multiplication(
-            scoresRaw, scale, name: "scores")
-        // softmax row-wise (axis=-1 → axis=1 for rank-2)
-        let attn = graph.softMax(
-            with: scores, axis: 1, name: "attn")
-        // output = attn · V: (seqQ, dim)
-        let output = graph.matrixMultiplication(
-            primary: attn,
-            secondary: vP,
-            name: "output")
-
         let qTD = MPSGraphTensorData(
             qBuf,
             shape: [NSNumber(value: seqQ),
@@ -226,15 +230,68 @@ public actor BASMPSGraphAttentionKernel: BASMetalKernel {
                     NSNumber(value: dim)],
             dataType: .float32)
 
-        graph.run(
-            with: commandQueue,
-            feeds: [
-                qP: qTD,
-                kP: kTD,
-                vP: vTD
-            ],
-            targetOperations: nil,
-            resultsDictionary: [output: outTD])
+        if let cache = self.cache {
+            let cacheKey = BASMPSGraphCacheKey(
+                operation: .attention,
+                dataType: .float32,
+                inputShapes: [
+                    [seqQ, dim],
+                    [seqK, dim],
+                    [seqK, dim]
+                ])
+            let executable: MPSGraphExecutable
+            if let cached = await cache.cachedExecutable(
+                forKey: cacheKey)
+            {
+                executable = cached
+                await cache.recordHit(key: cacheKey)
+            } else {
+                let built = buildGraph(
+                    seqQ: seqQ, seqK: seqK, dim: dim)
+                let qShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: seqQ),
+                            NSNumber(value: dim)],
+                    dataType: .float32)
+                let kShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: seqK),
+                            NSNumber(value: dim)],
+                    dataType: .float32)
+                let vShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: seqK),
+                            NSNumber(value: dim)],
+                    dataType: .float32)
+                executable = built.graph.compile(
+                    with: nil,
+                    feeds: [
+                        built.qP: qShape,
+                        built.kP: kShape,
+                        built.vP: vShape
+                    ],
+                    targetTensors: [built.output],
+                    targetOperations: nil,
+                    compilationDescriptor: nil)
+                await cache.storeExecutable(
+                    executable, forKey: cacheKey)
+                await cache.recordMiss(key: cacheKey)
+            }
+            let _ = executable.run(
+                with: commandQueue,
+                inputs: [qTD, kTD, vTD],
+                results: [outTD],
+                executionDescriptor: nil)
+        } else {
+            let built = buildGraph(
+                seqQ: seqQ, seqK: seqK, dim: dim)
+            built.graph.run(
+                with: commandQueue,
+                feeds: [
+                    built.qP: qTD,
+                    built.kP: kTD,
+                    built.vP: vTD
+                ],
+                targetOperations: nil,
+                resultsDictionary: [built.output: outTD])
+        }
 
         let outData = Data(
             bytes: outBuf.contents(),
