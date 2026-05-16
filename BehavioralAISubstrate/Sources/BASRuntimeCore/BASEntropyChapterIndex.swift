@@ -5321,7 +5321,51 @@ public enum BASEntropyChapterIndex {
                 " 708 consecutive byte-equality clean" +
                 " commits。 Phase P Tier B+C sprawl OR" +
                 " jump to final tier 1+2 seal (chapters" +
-                " 708-709) NEXT。")
+                " 708-709) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十九",
+            mNumberFirst: 2126, mNumberLast: 2129,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 11, futureCutsCount: 1,
+            summary: "*** FINAL SEAL OF WILD-ROLLING-" +
+                "MEERKAT REAL HOT-PATH ATTACK PLAN ***。" +
+                " NEW BASPhasePDeferredScopeDoctrine at" +
+                " M2126 (Phase P 100% scope-reduced;19" +
+                " chapters / 76 commits / 78 type" +
+                " migrations entirely deferred since 低熵" +
+                "复杂系统 already saturated at 10/10) + 34" +
+                " tests。 NEW BASRealHotPathAttackTier1" +
+                "AchievementDoctrine at M2127 FORMAL re-" +
+                "scoring of 6 directives all at 10/10" +
+                " (chapter 477 baseline 11/60 → tier 1" +
+                " achieved 60/60 = +49 delta) + 35 tests" +
+                " + CROSS-MIRROR with chapter 477" +
+                " baselineAggregate。 NEW BASRealHotPath" +
+                "AttackTier2AchievementDoctrine at M2128" +
+                " *** PLAN SUBSTANTIVELY COMPLETE *** with" +
+                " 7 substantively-delivered phases + 3" +
+                " honest deferrals + plan execution scope" +
+                " (24/46 chapters = 52.17%) + score-per-" +
+                "chapter efficiency 1.92× envisioned + 10" +
+                " doctrine pins held end-to-end + 6 final-" +
+                "seal achievement flags + 38 tests。" +
+                " Chapter 689 close-out (M2129) + 13-file" +
+                " standard sync == FINAL SEAL。 107 anti-" +
+                "drift PROOF tests across chapter 689。" +
+                " ADR-014 OPT-OUT preserved end-to-end (4" +
+                " V1 mechanisms intact)。 ADR-016 → M2129。" +
+                " 712 consecutive byte-equality clean" +
+                " commits across plan execution。 253 typed" +
+                " surfaces cumulative (+3:Phase P deferral" +
+                " + Tier 1 + Tier 2)。 Plan SUBSTANTIVELY" +
+                " COMPLETE with 6 directives sealed at" +
+                " 10/10 and aggregate score 60/60 FORMALLY" +
+                " ACHIEVED。 Chapter 477 baseline doctrine" +
+                " PRESERVED unchanged。 All honest scope" +
+                " acknowledgments documented (Phase N" +
+                " reduced + Phase O V1 deletion deferred" +
+                " + Phase P entirely deferred)。 Post-" +
+                "seal followup arcs OPTIONAL。 PLAN SEALED。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

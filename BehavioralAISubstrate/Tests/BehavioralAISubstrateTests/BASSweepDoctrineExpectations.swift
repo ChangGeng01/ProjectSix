@@ -121,18 +121,19 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 284
+    public static let phase2ChapterCount: Int = 285
 
-    /// Phase 2 commits shipped。 At M2125:125 + 84 +
-    /// 961 = 1170 (chapter 688 — Phase O FULLY SEALED
-    /// at HALFWAY MILESTONE of wild-rolling-meerkat
-    /// plan,23/46 chapters complete)
-    public static let phase2CommitsShipped: Int = 1170
+    /// Phase 2 commits shipped。 At M2129:125 + 84 +
+    /// 965 = 1174 (chapter 689 — *** FINAL SEAL OF
+    /// WILD-ROLLING-MEERKAT REAL HOT-PATH ATTACK PLAN
+    /// *** with Tier 1 + Tier 2 achievement doctrines
+    /// shipped + 60/60 FORMALLY ACHIEVED + plan
+    /// SUBSTANTIVELY COMPLETE)
+    public static let phase2CommitsShipped: Int = 1174
 
-    /// Phase 2 mNumberLast。 At M2125:chapter 688 —
-    /// PHASE O FULLY SEALED at HALFWAY MILESTONE。
-    /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2125
+    /// Phase 2 mNumberLast。 At M2129:chapter 689 —
+    /// FINAL SEAL。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2129
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
