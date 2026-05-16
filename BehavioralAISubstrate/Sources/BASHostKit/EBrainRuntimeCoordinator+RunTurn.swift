@@ -633,8 +633,25 @@ extension BASEBrainRuntimeCoordinator {
         // sealedMemory + cosmicScaleView) never read
         // downstream。 Deleted。 ontologyFogForAudit
         // remains as it IS consumed below。
-        let ontologyFogForAudit = cthulhuPentaForAudit
-            .ontologyFog
+        // chapter 六百八十七 / M2119 第二刀 — Phase O
+        // WIRE-IN: the 3 *Two/*Penta cluster locals now
+        // also flow through BASTurnAuditProjectionsLate
+        // ClusterFinalBundle (chapter 686 / M2114) as
+        // typed groundwork for the chapter 688 V1-only
+        // helper deletion。 The 3 original locals (kunlun
+        // TrioTwoForAudit + kunlunHexaTwoForAudit +
+        // cthulhuPentaForAudit) remain unchanged — only
+        // the ontologyFog DERIVED local now reads from
+        // the bundle's typed accessor。 V1 byte-equality
+        // preserved (bundle.ontologyFog ==
+        // cthulhuPentaForAudit.ontologyFog by construction)。
+        let lateClusterFinalBundleForAudit =
+            BASTurnAuditProjectionsLateClusterFinalBundle(
+                kunlunTrioTwo: kunlunTrioTwoForAudit,
+                kunlunHexaTwo: kunlunHexaTwoForAudit,
+                cthulhuPenta: cthulhuPentaForAudit)
+        let ontologyFogForAudit =
+            lateClusterFinalBundleForAudit.ontologyFog
         // M452 (chapter 一百十九) — derive L9 retention loop from
         // unknown reserve. Closes the chapter 一百十八 nil
         // placeholder for `retentionLoop:` in M449. Returns nil
