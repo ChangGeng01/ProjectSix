@@ -2519,7 +2519,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百八十六")!)
+                            "chapter 六百八十六")!),
+            // M2121 chapter 687 — Phase O wire-in
+            checkRegistry("六百八十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百八十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4487,6 +4493,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百八十六")!
+                .mNumberLast),
+            // M2121 chapter 687 — Phase O wire-in
+            ("687",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -566,30 +566,33 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// scope-reduced。 (Full provenance in chapter 683
     /// close-out commit M2112)。
     /// Re-captured at chapter 686 close-out。 PHASE O
-    /// OPENING (risk-free)。 NEW BASTurnAuditProjections
-    /// LateClusterFinalBundle Sendable bundle at M2114
-    /// wrapping 3 *Two/*Penta cluster results + ontology
-    /// Fog derived accessor + 11 structural anti-drift
-    /// PROOF tests at M2115。 NEW BASPhaseOV1Monolith
-    /// DeletionPlanDoctrine at M2116 documenting 3-chapter
-    /// staged plan (chapter 686 risk-free + chapter 687
-    /// wire-in medium-risk + chapter 688 deletion medium-
-    /// high-risk) + honest 1803→80 aspirational LOC target
-    /// + V1 OPT-OUT impact 4→2 mechanisms + 6 pre-flight
-    /// checks all clear + 33 anti-drift tests。 Chapter
-    /// 686 close-out (M2117) + 13-file standard sync。
-    /// 44 total anti-drift PROOF tests across chapter 686。
-    /// +RunTurn.swift body UNCHANGED at chapter 686
-    /// (purely additive bundle TYPE + plan doctrine —
-    /// wire-in lands at chapter 687)。 247 typed surfaces
-    /// cumulative (+3 across chapter 686)。 700 consecutive
-    /// byte-equality clean commits — ROUND-NUMBER MILESTONE。
-    /// V1 byte-equality preserved。 ADR-014 OPT-OUT
-    /// preserved (will reduce 4→2 mechanisms at chapter
-    /// 688)。 ADR-016 → M2117。 Phase O 60/60 PRELIMINARY
-    /// score maintained (structural-only contribution)。
-    /// Chapter 687 WIRE-IN (replace 4 locals with bundle
-    /// factory call) NEXT。
+    /// OPENING (risk-free)。 (Full provenance in chapter
+    /// 686 close-out commit)。
+    /// Re-captured at chapter 687 close-out。 PHASE O
+    /// WIRE-IN — Bundle .compose() factory at M2118 + +RunTurn
+    /// .swift body additive wire-in at M2119 (bundle
+    /// construction + ontologyFog redirect through
+    /// bundle.ontologyFog,LOC delta +11) + NEW BAS
+    /// PhaseOWireInByteEqualityProofDoctrine at M2120
+    /// documenting definitional-equality byte-preservation
+    /// + 26 regression tests across 3 suites (canonical60
+    /// + V1-callability + PhaseF) all pass with 0
+    /// divergences。 Chapter 687 close-out (M2121) + 13-
+    /// file standard sync。 30 anti-drift tests for the
+    /// proof doctrine。 Conservative additive approach
+    /// (LOC delta +11 not -200) — risk realized LOWER
+    /// than plan estimate (medium → low)。 V1 byte-
+    /// equality preserved BY CONSTRUCTION (bundle
+    /// .ontologyFog ≡ cthulhuPentaForAudit.ontologyFog
+    /// by definitional equality on the derived accessor)。
+    /// +RunTurn.swift LOC:1803 → 1814 (+11)。 4 *Two/
+    /// *Penta locals intact (3 main + 1 redirected
+    /// derived)。 248 typed surfaces cumulative (+1)。
+    /// 704 consecutive byte-equality clean commits。
+    /// ADR-014 OPT-OUT preserved。 ADR-016 → M2121。
+    /// Phase O score remains 60/60 PRELIMINARY
+    /// (structural-only contribution)。 Chapter 688
+    /// DELETION + Phase O CLOSE-OUT NEXT。
     static let frozenFullRegistrySha256: String =
-        "43db5a82190e514197984740226ae35dd11f9a6b7cb1b585c905716fec8f726d"
+        "8974e805807df690b77fedb8a6fe602cb0f6b1bbb294d8636189f054d8b2897f"
 }

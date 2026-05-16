@@ -121,16 +121,17 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 282
+    public static let phase2ChapterCount: Int = 283
 
-    /// Phase 2 commits shipped。 At M2117:125 + 84 +
-    /// 953 = 1162 (chapter 686 — Phase O OPENING
-    /// risk-free bundle + deletion plan)
-    public static let phase2CommitsShipped: Int = 1162
+    /// Phase 2 commits shipped。 At M2121:125 + 84 +
+    /// 957 = 1166 (chapter 687 — Phase O WIRE-IN
+    /// additive bundle construction + byte-equality
+    /// PROOF doctrine)
+    public static let phase2CommitsShipped: Int = 1166
 
-    /// Phase 2 mNumberLast。 At M2117:chapter 686 —
-    /// PHASE O OPENING。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2117
+    /// Phase 2 mNumberLast。 At M2121:chapter 687 —
+    /// PHASE O WIRE-IN。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2121
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

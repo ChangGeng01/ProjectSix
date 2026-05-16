@@ -5270,7 +5270,32 @@ public enum BASEntropyChapterIndex {
                 "in lands at chapter 687)。 247 typed" +
                 " surfaces cumulative。 ADR-016 → M2117。" +
                 " 700 consecutive byte-equality clean" +
-                " commits。 Chapter 687 WIRE-IN NEXT。")
+                " commits。 Chapter 687 WIRE-IN NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十七",
+            mNumberFirst: 2118, mNumberLast: 2121,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 9, futureCutsCount: 1,
+            summary: "PHASE O WIRE-IN — Bundle .compose()" +
+                " factory at M2118 + +RunTurn.swift body" +
+                " additive wire-in at M2119 (bundle" +
+                " construction + ontologyFog redirect to" +
+                " bundle.ontologyFog,LOC delta +11) +" +
+                " NEW BASPhaseOWireInByteEqualityProof" +
+                "Doctrine + 30 anti-drift tests at M2120" +
+                " documenting definitional-equality byte-" +
+                "preservation + 26 regression tests across" +
+                " 3 suites all pass with 0 divergences。" +
+                " Chapter 687 close-out (M2121) + 13-file" +
+                " standard sync。 Conservative additive" +
+                " approach (LOC delta +11 not -200);risk" +
+                " realized LOWER than plan estimate (medium" +
+                " → low)。 4 *Two/*Penta locals preserved" +
+                " (3 main + 1 derived redirected)。 248" +
+                " typed surfaces cumulative。 ADR-016 →" +
+                " M2121。 704 consecutive byte-equality" +
+                " clean commits。 Chapter 688 DELETION +" +
+                " Phase O CLOSE-OUT NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

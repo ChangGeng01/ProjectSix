@@ -20837,7 +20837,87 @@ public enum BASChapterDoctrineRegistry {
                 " 247 typed surfaces cumulative。 ADR-016" +
                 " → M2117。 700 consecutive byte-equality" +
                 " clean commits。 Chapter 687 WIRE-IN" +
-                " NEXT。")
+                " NEXT。"),
+
+        // chapter 687 — Phase O WIRE-IN: +RunTurn.swift
+        // body wire-in with byte-equality preservation
+        // by construction。 Conservative additive
+        // approach (risk realized LOWER than plan estimate)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八十七",
+            mNumberFirst: 2118,
+            mNumberLast: 2121,
+            v1MilestoneMNumber: 2121,
+            v1MilestoneStatus:
+                "chapter-687-phase-o-wire-in-byte-equality-preserved",
+            knives: [
+                BASChapterKnife(mNumber: 2118, knife: "第一刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "LateClusterFinalBundle.compose()" +
+                        " static factory invoking the 3" +
+                        " sub-cluster compute() methods" +
+                        " + assembling the bundle。 22" +
+                        " typed params。"),
+                BASChapterKnife(mNumber: 2119, knife: "第二刀",
+                    concept: "+RunTurn.swift body wire-in" +
+                        ":bundle construction after the 3" +
+                        " *Two/*Penta compute calls +" +
+                        " redirect ontologyFogForAudit to" +
+                        " read from bundle.ontologyFog" +
+                        " (LOC delta +11,byte-equality" +
+                        " preserved BY CONSTRUCTION)。"),
+                BASChapterKnife(mNumber: 2120, knife: "第三刀",
+                    concept: "NEW BASPhaseOWireInByte" +
+                        "EqualityProofDoctrine + 30 anti-" +
+                        "drift tests documenting" +
+                        " definitional equality:bundle." +
+                        "ontologyFog ≡ cthulhuPentaForAudit" +
+                        ".ontologyFog。 26 regression tests" +
+                        " across 3 suites all pass with" +
+                        " 0 divergences。"),
+                BASChapterKnife(mNumber: 2121, knife: "第四刀",
+                    concept: "Chapter 687 close-out + 13-" +
+                        "file standard doctrine sync。 704" +
+                        " consecutive byte-equality clean" +
+                        " commits。")
+            ],
+            entropyClassesAttacked: [
+                "no-bundle-compose-factory",
+                "v1-monolith-not-bundle-aware",
+                "no-typed-byte-equality-proof-doctrine"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2121",
+                "byte-equality-preserved-by-construction",
+                "phase-o-wire-in-risk-realized-low",
+                "704-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 688 — Phase O DELETION + close-out"
+            ],
+            summary: "PHASE O WIRE-IN — Bundle .compose()" +
+                " factory at M2118 + +RunTurn.swift body" +
+                " additive wire-in at M2119 + byte-equality" +
+                " PROOF doctrine at M2120 (with definitional-" +
+                "equality argument) + chapter close-out at" +
+                " M2121。 Conservative additive approach" +
+                " (LOC delta +11 not -200);risk realized" +
+                " LOWER than plan estimate (medium → low)。" +
+                " 30 + 26 = 56 anti-drift + regression" +
+                " tests all pass with 0 divergences。 V1" +
+                " byte-equality preserved BY CONSTRUCTION" +
+                " (bundle.ontologyFog ≡ cthulhuPentaForAudit" +
+                ".ontologyFog)。 +RunTurn.swift LOC:" +
+                " 1803 → 1814 (+11)。 4 *Two/*Penta locals" +
+                " preserved (3 main + 1 derived,redirected)" +
+                "。 248 typed surfaces cumulative。 ADR-016" +
+                " → M2121。 704 consecutive byte-equality" +
+                " clean commits。 Phase O score remains" +
+                " 60/60 PRELIMINARY (structural-only" +
+                " contribution)。 Chapter 688 DELETION +" +
+                " Phase O CLOSE-OUT NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
