@@ -208,4 +208,96 @@ public struct BASSubstrateReauditShadowEvaluator:
             reasonCodes: reasonCodes,
             evaluatorVersion: evaluatorVersion)
     }
+
+    // MARK: - M2154 chapter 六百九十六 第一刀 — sync surface
+    //
+    // Synchronous evaluation path that bypasses Task
+    // .detached。 Hosts that don't need off-MainActor
+    // dispatch (e.g. test harnesses,sync call sites)
+    // can use this directly。
+    //
+    // Per chapter 694 / M2146 empirical diagnostic A:
+    // sync test method + direct sync startSession PASSES
+    // (no SIGBUS)。 This surface unblocks the 12 chapter
+    // 693 / M2143 SIGBUS-bucketed tests once they migrate
+    // to sync test methods + evaluateSync(...)。
+    //
+    // ADR-014 OPT-IN preserved:async evaluate(...)
+    // remains the default;evaluateSync(...) is opt-in
+    // for hosts that need it。
+
+    /// Synchronous variant of `evaluate(...)`。 Bypasses
+    /// Task.detached;runs startSession() directly on the
+    /// caller's thread。 Use when off-MainActor dispatch
+    /// is not required (sync call sites,test harnesses)。
+    public func evaluateSync(
+        prompt: String,
+        body: String,
+        prePermitMode: String,
+        sessionRef: String,
+        turnRef: String
+    ) -> BASShadowEvaluationResult {
+        // Skip path — empty body has nothing to re-audit。
+        guard !body.isEmpty else {
+            return BASShadowEvaluationResult.skipped(
+                evaluatorVersion: evaluatorVersion)
+        }
+
+        // Truncate body at cap (chapter 一百八十五 / M676
+        // doctrine).
+        let truncatedBody: String
+        if body.count > bodyTruncationChars {
+            truncatedBody =
+                String(body.prefix(bodyTruncationChars))
+                + "...[truncated]"
+        } else {
+            truncatedBody = body
+        }
+
+        let observeText = "Original: \(prompt)\n\nResponse: \(truncatedBody)"
+        let request = BASHostSessionRequest(
+            kind: .interactive,
+            workflowProfile: workflowProfile,
+            surface: surface,
+            prompt: observeText,
+            riskLevel: riskLevel)
+
+        let observedResult: BASHostSessionResult? =
+            try? runtime.startSession(request)
+
+        guard let observed = observedResult?.eBrainTurn else {
+            return BASShadowEvaluationResult(
+                postPermitMode: nil,
+                postAuditCodeCount: nil,
+                shifted: false,
+                reasonCodes: [
+                    "evaluator:substrate-reaudit-failed"
+                ],
+                evaluatorVersion: evaluatorVersion)
+        }
+
+        let postPermitMode = observed.actionPermit.mode.rawValue
+        let postAuditCount = observed
+            .sovereignAuditEntry?.signalRefs.count ?? 0
+        let shifted = postPermitMode != prePermitMode
+
+        var reasonCodes: [String] = [
+            "evaluator:substrate-reaudit"
+        ]
+        if shifted {
+            reasonCodes.append(
+                "shadow:permit-shifted:" +
+                "from-\(prePermitMode):to-\(postPermitMode)")
+        }
+        if body.count > bodyTruncationChars {
+            reasonCodes.append("shadow:body-truncated")
+        }
+
+        return BASShadowEvaluationResult(
+            postPermitMode: postPermitMode,
+            postAuditCodeCount: postAuditCount,
+            shifted: shifted,
+            reasonCodes: reasonCodes,
+            evaluatorVersion: evaluatorVersion)
+    }
 }

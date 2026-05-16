@@ -64,15 +64,12 @@ final class BASSubstrateReauditShadowEvaluatorTests: XCTestCase {
     // MARK: - 3. Non-empty body produces substrate-reaudit result
 
     func testEvaluateNonEmptyBodyProducesReauditReasonCode()
-        async throws
     {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+        // M2154 — migrated to sync + evaluateSync to bypass
+        // SIGBUS bucket (chapter 694 Diagnostic A pattern)。
         let evaluator = BASSubstrateReauditShadowEvaluator(
             runtime: makeRuntime())
-        let result = await evaluator.evaluate(
+        let result = evaluator.evaluateSync(
             prompt: "what's the weather",
             body: "It's sunny today.",
             prePermitMode: "answer",
@@ -90,17 +87,14 @@ final class BASSubstrateReauditShadowEvaluatorTests: XCTestCase {
 
     // MARK: - 4. Long body triggers truncation reason code
 
-    func testEvaluateLongBodyEmitsTruncationCode() async throws {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+    func testEvaluateLongBodyEmitsTruncationCode() {
+        // M2154 — migrated to sync + evaluateSync。
         let evaluator = BASSubstrateReauditShadowEvaluator(
             runtime: makeRuntime(),
             bodyTruncationChars: 64)
         // Build a 200-char body so 64-char cap kicks in.
         let longBody = String(repeating: "x", count: 200)
-        let result = await evaluator.evaluate(
+        let result = evaluator.evaluateSync(
             prompt: "test",
             body: longBody,
             prePermitMode: "answer",
@@ -116,17 +110,12 @@ final class BASSubstrateReauditShadowEvaluatorTests: XCTestCase {
     // MARK: - 5. Body truncation cap respected (no truncation
     //               below cap)
 
-    func testEvaluateShortBodyDoesNotEmitTruncationCode()
-        async throws
-    {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+    func testEvaluateShortBodyDoesNotEmitTruncationCode() {
+        // M2154 — migrated to sync + evaluateSync。
         let evaluator = BASSubstrateReauditShadowEvaluator(
             runtime: makeRuntime(),
             bodyTruncationChars: 4096)
-        let result = await evaluator.evaluate(
+        let result = evaluator.evaluateSync(
             prompt: "test",
             body: "small body",
             prePermitMode: "answer",
@@ -141,15 +130,12 @@ final class BASSubstrateReauditShadowEvaluatorTests: XCTestCase {
 
     // MARK: - 6. Custom evaluatorVersion propagates
 
-    func testCustomEvaluatorVersionPropagates() async throws {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+    func testCustomEvaluatorVersionPropagates() {
+        // M2154 — migrated to sync + evaluateSync。
         let evaluator = BASSubstrateReauditShadowEvaluator(
             runtime: makeRuntime(),
             evaluatorVersion: "custom-reaudit-v2")
-        let result = await evaluator.evaluate(
+        let result = evaluator.evaluateSync(
             prompt: "x",
             body: "y",
             prePermitMode: "answer",
@@ -162,17 +148,14 @@ final class BASSubstrateReauditShadowEvaluatorTests: XCTestCase {
     // MARK: - 7. Custom workflowProfile / riskLevel / surface
     //               accepted (no crash)
 
-    func testCustomWorkflowAndRiskAccepted() async throws {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+    func testCustomWorkflowAndRiskAccepted() {
+        // M2154 — migrated to sync + evaluateSync。
         let evaluator = BASSubstrateReauditShadowEvaluator(
             runtime: makeRuntime(),
             workflowProfile: .reflective,
             riskLevel: .high,
             surface: .application)
-        let result = await evaluator.evaluate(
+        let result = evaluator.evaluateSync(
             prompt: "test",
             body: "body content",
             prePermitMode: "answer",
@@ -185,18 +168,15 @@ final class BASSubstrateReauditShadowEvaluatorTests: XCTestCase {
 
     // MARK: - 8. Body-truncation init clamps below 64 chars
 
-    func testBodyTruncationInitClampsBelow64() async throws {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+    func testBodyTruncationInitClampsBelow64() {
+        // M2154 — migrated to sync + evaluateSync。
         // Init clamps to max(64, value). Cap of 0 should resolve
         // to 64 so the evaluator stays usable.
         let evaluator = BASSubstrateReauditShadowEvaluator(
             runtime: makeRuntime(),
             bodyTruncationChars: 0)
         let body = String(repeating: "x", count: 100)
-        let result = await evaluator.evaluate(
+        let result = evaluator.evaluateSync(
             prompt: "x",
             body: body,
             prePermitMode: "answer",
