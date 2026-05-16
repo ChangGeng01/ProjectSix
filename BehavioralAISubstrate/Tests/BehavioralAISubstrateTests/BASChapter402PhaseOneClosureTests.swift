@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2056",
-            "M2056:doctrine version reflects chapter 六百六十九 — PHASE K dual-mode stress sweep tests shipped。 5 stub-based BASTurnRuntimeEngineRunWithPlanDualModeStressSweepTests at M2053 + 2 real-coordinator BASTurnRuntimeEngineRunWithPlanRealCoordinatorDualModeTests at M2054 driving BASCoordinatorTestStubs through dualV1Runner across canonical60 with 3× flake-detection。 NEW BASPhaseKDualModeStressSweepDoctrine + 27 anti-drift tests (M2055)。 close-out (M2056)。 360 fixture comparisons per CI build。 V1↔V1 determinism PROVEN across canonical60。 0 divergences observed。 211 typed surfaces cumulative。 640 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Phase L readiness gate target chapter 六百七十三 / M2069 (100×24h variant)")
+            "ADR-016.M2060",
+            "M2060:doctrine version reflects chapter 六百七十 — PHASE K env var bridge shipped。 NEW BASSampleHostRuntimeModeEnvVarBridge reads BAS_RUNTIME_MODE env var via ProcessInfo + maps to BASTurnRuntimeMode at M2057。 4-method API。 13 PROOF tests (M2058)。 NEW BASEnvVarBridgeDoctrine + 12 anti-drift tests (M2059)。 close-out (M2060)。 Default .v1ByteEqual preserves M2032 per ADR-014。 212 typed surfaces cumulative。 644 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 671 ships Phase K close-out doctrine NEXT。 Phase L flip target chapter 六百七十四 / M2074")
     }
 
     // MARK: - M-number range matches chapter 四百二

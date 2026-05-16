@@ -4968,7 +4968,30 @@ public enum BASEntropyChapterIndex {
                 "。 V1 byte-equality preserved。 ADR-014" +
                 " OPT-IN preserved。 Phase L readiness" +
                 " gate target chapter 六百七十三 / M2069" +
-                " (100×24h variant)。")
+                " (100×24h variant)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十",
+            mNumberFirst: 2057, mNumberLast: 2060,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE K env var bridge shipped。" +
+                " NEW BASSampleHostRuntimeModeEnvVar" +
+                "Bridge reads BAS_RUNTIME_MODE env var" +
+                " via ProcessInfo + maps to BASTurn" +
+                "RuntimeMode at M2057。 4-method API:" +
+                " envVarName + defaultModeWhenAbsent +" +
+                " currentRuntimeMode(environment:) +" +
+                " isOptedInToNonDefault(environment:)。" +
+                " 13 PROOF tests at M2058。 NEW BAS" +
+                "EnvVarBridgeDoctrine + 12 anti-drift" +
+                " tests at M2059。 close-out (M2060)。" +
+                " Default .v1ByteEqual preserves M2032" +
+                " per ADR-014。 212 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2060。" +
+                " 644 consecutive byte-equality clean" +
+                " commits。 V1 byte-equality preserved。" +
+                " Chapter 671 ships Phase K close-out" +
+                " doctrine NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

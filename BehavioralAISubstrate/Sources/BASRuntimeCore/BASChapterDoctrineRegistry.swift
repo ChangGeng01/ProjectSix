@@ -19767,7 +19767,89 @@ public enum BASChapterDoctrineRegistry {
                 "IN preserved。 360 fixture comparisons per" +
                 " CI build。 V1↔V1 determinism PROVEN across" +
                 " canonical60。 Phase L readiness gate at" +
-                " chapter 673 / M2069 (100×24h variant)。")
+                " chapter 673 / M2069 (100×24h variant)。"),
+
+        // chapter 670 — Phase K env var bridge。 SampleHost
+        // (or any host) picks up BAS_RUNTIME_MODE env var
+        // and routes to BASTurnRuntimeMode for opt-in V2。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十",
+            mNumberFirst: 2057,
+            mNumberLast: 2060,
+            v1MilestoneMNumber: 2060,
+            v1MilestoneStatus:
+                "chapter-670-phase-k-env-var-bridge",
+            knives: [
+                BASChapterKnife(mNumber: 2057, knife: "第一刀",
+                    concept: "NEW BASSampleHostRuntimeMode" +
+                        "EnvVarBridge reads `BAS_RUNTIME_" +
+                        "MODE` env var via ProcessInfo + " +
+                        "maps to BASTurnRuntimeMode。 4-" +
+                        "method API:envVarName +" +
+                        " defaultModeWhenAbsent +" +
+                        " currentRuntimeMode(environment:)" +
+                        " + isOptedInToNonDefault(" +
+                        "environment:)。 Default .v1Byte" +
+                        "Equal preserves M2032 per ADR-014。"),
+                BASChapterKnife(mNumber: 2058, knife: "第二刀",
+                    concept: "13 PROOF tests covering env" +
+                        " var name pin,default mode pin," +
+                        " absent fallback,3 valid raw" +
+                        " value resolutions,unrecognized" +
+                        "/empty fallback,5 isOptedInToNon" +
+                        "Default cases。"),
+                BASChapterKnife(mNumber: 2059, knife: "第三刀",
+                    concept: "NEW BASEnvVarBridgeDoctrine" +
+                        " + 12 anti-drift tests pinning" +
+                        " bridge type name,env var name," +
+                        " 3 valid raw values,4 API surfaces" +
+                        ",13 PROOF count,Phase K flags。"),
+                BASChapterKnife(mNumber: 2060, knife: "第四刀",
+                    concept: "Chapter 670 close-out + 13-" +
+                        "file doctrine sync。 644" +
+                        " consecutive byte-equality clean" +
+                        " commits。 Phase K 3 of 4 chapters" +
+                        " done。 Phase K close-out doctrine" +
+                        " (ch671) NEXT。")
+            ],
+            entropyClassesAttacked: [
+                "bas-runtime-mode-env-var-not-readable",
+                "sample-host-cannot-opt-into-v2",
+                "process-info-env-var-not-typed",
+                "ci-cannot-toggle-mode-without-redeploy",
+                "phase-l-flip-no-env-override-path"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2060",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "bas-runtime-mode-env-var-bridge-shipped",
+                "default-falls-to-v1-byte-equal",
+                "unrecognized-falls-to-v1-byte-equal",
+                "typed-bridge-no-inline-strings",
+                "13-proof-tests-pass",
+                "644-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 671 — Phase K close-out doctrine",
+                "chapter 672-675 — Phase L DEFAULT FLIP",
+                "chapter 676 — mid-plan hexa anti-drift checkpoint"
+            ],
+            summary: "Phase K env var bridge shipped。 NEW" +
+                " BASSampleHostRuntimeModeEnvVarBridge" +
+                " reads BAS_RUNTIME_MODE env var via" +
+                " ProcessInfo + maps to BASTurnRuntimeMode。" +
+                " 13 PROOF tests at M2058 + NEW BAS" +
+                "EnvVarBridgeDoctrine + 12 anti-drift" +
+                " tests at M2059 + close-out at M2060。" +
+                " 212 typed surfaces cumulative。 ADR-016" +
+                " → M2060。 644 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality preserved" +
+                "。 ADR-014 OPT-IN preserved。 Chapter 671" +
+                " ships Phase K close-out doctrine NEXT。" +
+                " Phase L flip target chapter 六百七十四" +
+                " / M2074。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

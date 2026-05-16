@@ -323,7 +323,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百六十六",  // M2041-M2044 (PHASE J kernel wiring continues — 3 more kernels wired;attention (M2041) + softmax + layerNorm (M2042 combined commit) gain optional cache parameter with cache-on fast path;6 PROOF tests (2 per kernel);NEW BASKernelCacheWiringPhaseJChapter666Doctrine + 13 anti-drift tests at M2043;close-out at M2044;207 typed surfaces cumulative;628 consecutive byte-equality clean commits;V1 byte-equality preserved;5 of 6 Phase J kernels wired;1 kernel (conv2D) remaining for chapter 667 + 5× speedup benchmark + Phase J close-out)
         "chapter 六百六十七",  // M2045-M2048 (PHASE J COMPLETE — final BASMPSGraphConv2DKernel wired (M2045) + NEW BASMPSGraphCacheBenchmarkTests asserting ≥5× speedup on 1000-dispatch loop PASSES on real Apple Silicon GPU (M2046) + NEW BASPhaseJKernelCacheCompletionDoctrine + 37 anti-drift tests sealing achievement (M2047) + close-out (M2048);6 of 6 Phase J kernels wired with byte-equality preserved;90 total Phase J tests PASS (17 kernel + 72 anti-drift + 1 benchmark);209 typed surfaces cumulative;632 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;PHASE J achievement +6 on 原生利用神经引擎 directive;Phase K chapters 668-671 NEXT — runtimeMode toggle + dual-mode CI for Phase L default flip readiness)
         "chapter 六百六十八",  // M2049-M2052 (PHASE K 第一章 — BASHostRuntime gains async opt-in surface `buildEBrainTurnWithRuntimeMode(request:currentBrain:projection:deviceStateOverride:runtimeMode:now:)` threading BASTurnRuntimeMode knob;default `.v1ByteEqual` preserves M2032 sync buildEBrainTurn byte-equality;.nativeV2 / .stressSweepDual wrap coordinator in BASTurnRuntimeEngine;private buildCoordinator helper extracted as single source-of-truth for V1 service wiring;7 PROOF tests pinning BASTurnRuntimeMode enum surface (M2050);NEW BASRuntimeModeToggleWiringDoctrine + 33 anti-drift tests (M2051);close-out (M2052);210 typed surfaces cumulative;636 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;Phase L flip target chapter 六百七十四 / M2074)
-        "chapter 六百六十九"   // M2053-M2056 (PHASE K dual-mode stress sweep tests shipped — 7 dual-mode tests across canonical60 with 3× flake-detection;5 stub-based BASTurnRuntimeEngineRunWithPlanDualModeStressSweepTests at M2053 + 2 real-coordinator BASTurnRuntimeEngineRunWithPlanRealCoordinatorDualModeTests at M2054 driving BASCoordinatorTestStubs through dualV1Runner;NEW BASPhaseKDualModeStressSweepDoctrine + 27 anti-drift tests at M2055;close-out (M2056);360 fixture comparisons per CI build;V1↔V1 determinism PROVEN across canonical60;0 divergences observed;harness detection capability proven via deterministic divergence stub;211 typed surfaces cumulative;640 consecutive byte-equality clean commits;V1 byte-equality preserved;Phase L readiness gate target chapter 六百七十三 / M2069 (100×24h variant))
+        "chapter 六百六十九",  // M2053-M2056 (PHASE K dual-mode stress sweep tests shipped — 7 dual-mode tests across canonical60 with 3× flake-detection;5 stub-based BASTurnRuntimeEngineRunWithPlanDualModeStressSweepTests at M2053 + 2 real-coordinator BASTurnRuntimeEngineRunWithPlanRealCoordinatorDualModeTests at M2054 driving BASCoordinatorTestStubs through dualV1Runner;NEW BASPhaseKDualModeStressSweepDoctrine + 27 anti-drift tests at M2055;close-out (M2056);360 fixture comparisons per CI build;V1↔V1 determinism PROVEN across canonical60;0 divergences observed;harness detection capability proven via deterministic divergence stub;211 typed surfaces cumulative;640 consecutive byte-equality clean commits;V1 byte-equality preserved;Phase L readiness gate target chapter 六百七十三 / M2069 (100×24h variant))
+        "chapter 六百七十"     // M2057-M2060 (PHASE K env var bridge shipped — NEW BASSampleHostRuntimeModeEnvVarBridge reads BAS_RUNTIME_MODE env var via ProcessInfo + maps to BASTurnRuntimeMode at M2057;13 PROOF tests at M2058;NEW BASEnvVarBridgeDoctrine + 12 anti-drift tests at M2059;close-out at M2060;default .v1ByteEqual preserves M2032 per ADR-014;212 typed surfaces cumulative;644 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;chapter 671 ships Phase K close-out doctrine NEXT)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -340,14 +341,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2056
+    public static let mNumberLast: Int = 2060
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2056)。 Bumped through chapter 669:1097 → 1101。
-    /// Chapter 669:Phase K dual-mode stress sweep tests
-    /// shipped — 7 dual-mode tests across canonical60
-    /// with 3× flake-detection。
-    public static let commitsShipped: Int = 1101
+    /// M2060)。 Bumped through chapter 670:1101 → 1105。
+    /// Chapter 670:Phase K env var bridge shipped — NEW
+    /// BASSampleHostRuntimeModeEnvVarBridge reads
+    /// BAS_RUNTIME_MODE env var + maps to BASTurnRuntime
+    /// Mode。
+    public static let commitsShipped: Int = 1105
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

@@ -2429,7 +2429,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十九")!)
+                            "chapter 六百六十九")!),
+            // M2060 chapter 670 — PHASE K env var bridge
+            checkRegistry("六百七十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百七十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4277,6 +4283,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十九")!
+                .mNumberLast),
+            // M2060 chapter 670 — PHASE K env var bridge
+            ("670",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
