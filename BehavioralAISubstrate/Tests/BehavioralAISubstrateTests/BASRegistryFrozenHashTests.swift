@@ -534,6 +534,26 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// NEW kind 'biomimetic-observation-trio'。 FIRST
     /// ALL-STRUCT trio in autonomous loop history。
     /// Coherent biomimetic theme。
+    /// Re-captured at chapter 675 close-out。 Chapter
+    /// 六百七十五:PHASE L SEALED。 NEW BASPhaseLPost
+    /// FlipCanaryWindowDoctrine (M2077) + 9 anti-drift
+    /// tests + NEW BASPhaseLCumulativeCompletion
+    /// Doctrine (M2078) + 15 anti-drift tests + 7
+    /// V1-callability PROOF tests (M2079) at BAS
+    /// PhaseLPostFlipV1PathCallabilityProofTests +
+    /// close-out (M2080)。 4 chapters / 16 commits
+    /// Phase L complete (chapters 六百七十二-六百七十五
+    /// covering M2065-M2080)。 84 total Phase L tests
+    /// PASS。 V1 path callable post-flip via 4 OPT-OUT
+    /// mechanisms (explicit init,with(runtimeMode:),
+    /// BAS_RUNTIME_MODE_OVERRIDE env var,bridge
+    /// default unchanged)。 ADR-014 preserved。 219
+    /// typed surfaces cumulative;664 consecutive
+    /// byte-equality clean commits。 Score-delta +8
+    /// on 最激进 + 最创新 (54→58/60 aggregate score)。
+    /// hexa #9 catalog (chapter 676 / M2081-M2084) +
+    /// Phase M real Mamba SSM kernel (chapters
+    /// 677-682 / M2085-M2108) NEXT。
     static let frozenFullRegistrySha256: String =
-        "da1774c9501171582d5eb05cafb8a252c886b0cb267b60c63fad1416432eb5a9"
+        "ade30dc3d1d40a21c1c1383e75bff5db3de52ed70a6dd8434b015330199fdb55"
 }

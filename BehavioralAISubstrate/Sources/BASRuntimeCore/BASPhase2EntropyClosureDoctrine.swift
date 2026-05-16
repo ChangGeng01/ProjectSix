@@ -328,7 +328,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 六百七十一",  // M2061-M2064 (PHASE K COMPLETE — NEW BASPhaseKRuntimeModeToggleCompletionDoctrine + 44 anti-drift tests sealing 4-chapter Phase K arc (M2061+M2062);NEW BASPhaseLPreFlipGateContractDoctrine + 23 anti-drift tests defining Phase L readiness gate contract (M2063);close-out (M2064);Phase K achievement summary — 4 chapters / 16 commits / 1 new async surface / 1 env var bridge / 7 dual-mode tests / 4 doctrines / 99 total Phase K tests / V1↔V1 determinism PROVEN across canonical60 / 0 divergences observed / Score-delta +3 on 低熵复杂系统 + 最激进 (cumulative 51 → 54 / 60);Phase L flip target chapter 六百七十四 / M2074;Pre-flip gate target chapter 六百七十三 / M2069 (100×24h variant);214 typed surfaces cumulative;648 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;Phase L chapters 672-675 NEXT — DEFAULT MODE FLIP after readiness gate clears),
         "chapter 六百七十二",  // M2065-M2068 (PHASE L pre-flip safety net — BAS_RUNTIME_MODE_OVERRIDE env var with priority OVERRIDE > BAS_RUNTIME_MODE > default;new API currentRuntimeModeRespectingOverride + isOverrideActive at M2065;14 PROOF tests at M2066;NEW BASRuntimeModeOverrideDoctrine + 15 anti-drift tests at M2067;close-out (M2068);commit M2068 is tagged revert point for M2074 flip;original currentRuntimeMode UNCHANGED — back-compat preserved;215 typed surfaces cumulative;652 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;chapter 673 ships 100-run readiness gate test NEXT),
         "chapter 六百七十三",  // M2069-M2072 (PHASE L readiness gate READY — NEW BASTurnRuntimeDefaultModeFlipReadinessGate at M2069 + 5 PROOF tests at M2070 including THE gate assertion (100 invocations × 60 fixtures = 6000 comparisons,0 divergences,~7.7s);NEW BASPhaseLReadinessGateAchievementDoctrine + 9 anti-drift tests at M2071;close-out (M2072);M2074 FLIP UNBLOCKED;216 typed surfaces cumulative;656 consecutive byte-equality clean commits;V1 byte-equality preserved;ADR-014 OPT-IN preserved;chapter 674 ships THE FLIP itself NEXT),
-        "chapter 六百七十四"   // M2073-M2076 (THE FLIP — wild-rolling-meerkat Phase L highest-risk single commit;BASTurnRuntimeEngineConfiguration.default() flipped from v1ByteEqual to nativeV2 at M2074;pre-flip annotation at M2073;NEW BASPhaseLDefaultFlipCompletionDoctrine + 32 anti-drift tests at M2075;close-out (M2076);all 4 Phase L safety nets active — M2063 contract,M2065 env override,M2068 tag,M2070 100-run gate;post-flip verification 23 tests PASS in 7.2s;3 PhaseF tests updated;ADR-014 OPT-OUT path preserved via explicit init(runtimeMode:) OR BAS_RUNTIME_MODE_OVERRIDE env;217 typed surfaces cumulative;660 consecutive byte-equality clean commits;V1 byte-equality preserved via engine delegation at BASEBrainTurnResult level;Score-delta +8 on 最激进 + 最创新 (54→58/60);Phase O V1 deletion eligible at chapter 686 after 5-chapter post-flip canary window)
+        "chapter 六百七十四",  // M2073-M2076 (THE FLIP — wild-rolling-meerkat Phase L highest-risk single commit;BASTurnRuntimeEngineConfiguration.default() flipped from v1ByteEqual to nativeV2 at M2074;pre-flip annotation at M2073;NEW BASPhaseLDefaultFlipCompletionDoctrine + 32 anti-drift tests at M2075;close-out (M2076);all 4 Phase L safety nets active — M2063 contract,M2065 env override,M2068 tag,M2070 100-run gate;post-flip verification 23 tests PASS in 7.2s;3 PhaseF tests updated;ADR-014 OPT-OUT path preserved via explicit init(runtimeMode:) OR BAS_RUNTIME_MODE_OVERRIDE env;217 typed surfaces cumulative;660 consecutive byte-equality clean commits;V1 byte-equality preserved via engine delegation at BASEBrainTurnResult level;Score-delta +8 on 最激进 + 最创新 (54→58/60);Phase O V1 deletion eligible at chapter 686 after 5-chapter post-flip canary window),
+        "chapter 六百七十五"   // M2077-M2080 (PHASE L SEALED — NEW BASPhaseLPostFlipCanaryWindowDoctrine + 9 anti-drift at M2077;NEW BASPhaseLCumulativeCompletionDoctrine + 15 anti-drift at M2078;7 V1-callability PROOF tests at M2079;close-out (M2080);4 chapters/16 commits Phase L complete;84 total Phase L tests PASS;V1 path callable via 4 OPT-OUT mechanisms;5-chapter canary window active;219 typed surfaces cumulative;664 consecutive byte-equality clean commits;Score-delta +8 on 最激进 + 最创新 (54→58/60);hexa #9 catalog ch 676 + Phase M real Mamba SSM kernel ch 677-682 NEXT)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -345,15 +346,14 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2076
+    public static let mNumberLast: Int = 2080
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2076)。 Bumped through chapter 674:1117 → 1121。
-    /// Chapter 674:THE FLIP shipped at M2074 — default
-    /// runtime mode v1ByteEqual → nativeV2。 Pre-flip
-    /// annotation M2073 + flip M2074 + completion
-    /// doctrine M2075 + close-out M2076。
-    public static let commitsShipped: Int = 1121
+    /// M2080)。 Bumped through chapter 675:1121 → 1125。
+    /// Chapter 675:PHASE L SEALED。 NEW post-flip canary
+    /// + cumulative completion + V1 callability proofs
+    /// + close-out。
+    public static let commitsShipped: Int = 1125
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

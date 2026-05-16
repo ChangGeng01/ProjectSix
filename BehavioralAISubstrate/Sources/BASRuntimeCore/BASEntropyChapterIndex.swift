@@ -5085,7 +5085,28 @@ public enum BASEntropyChapterIndex {
                 "equality preserved via engine delegation。" +
                 " Score-delta +8 on 最激进 + 最创新 (54→" +
                 "58/60)。 Chapter 675 ships Phase L full" +
-                " close-out doctrine NEXT。")
+                " close-out doctrine NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十五",
+            mNumberFirst: 2077, mNumberLast: 2080,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE L SEALED。 NEW BASPhaseL" +
+                "PostFlipCanaryWindowDoctrine + 9 anti-" +
+                "drift tests at M2077。 NEW BASPhaseL" +
+                "CumulativeCompletionDoctrine + 15 anti-" +
+                "drift tests at M2078。 7 V1-callability" +
+                " PROOF tests at M2079。 close-out (M2080)" +
+                "。 4 chapters/16 commits Phase L" +
+                " complete。 84 total Phase L tests PASS" +
+                "。 V1 path callable via 4 OPT-OUT" +
+                " mechanisms。 5-chapter canary window" +
+                " active。 219 typed surfaces cumulative" +
+                " (+2)。 ADR-016 → M2080。 664 consecutive" +
+                " byte-equality clean commits。 Score-" +
+                "delta +8 on 最激进 + 最创新 (54→58/60)" +
+                "。 hexa #9 catalog (ch 676) + Phase M" +
+                " real Mamba SSM kernel (ch 677-682) NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

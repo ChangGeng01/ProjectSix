@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2076",
-            "M2076:doctrine version reflects chapter 六百七十四 — THE FLIP shipped。 BASTurnRuntimeEngineConfiguration.default() flipped from v1ByteEqual to nativeV2 at M2074 — highest-risk single commit in wild-rolling-meerkat plan resumption。 Pre-flip annotation (M2073)。 NEW BASPhaseLDefaultFlipCompletionDoctrine + 32 anti-drift tests (M2075) + close-out (M2076)。 All 4 Phase L safety nets active。 Post-flip verification 23 tests PASS in 7.2s。 ADR-014 OPT-OUT path preserved。 217 typed surfaces cumulative。 660 consecutive byte-equality clean commits。 Score-delta +8 on 最激进 + 最创新 (54→58/60)。 Chapter 675 ships Phase L full close-out doctrine NEXT")
+            "ADR-016.M2080",
+            "M2080:doctrine version reflects chapter 六百七十五 — PHASE L SEALED。 NEW BASPhaseLPostFlipCanaryWindowDoctrine + 9 anti-drift tests at M2077。 NEW BASPhaseLCumulativeCompletionDoctrine + 15 anti-drift tests at M2078。 7 V1-callability PROOF tests at M2079。 close-out (M2080)。 4 chapters/16 commits Phase L complete。 84 total Phase L tests PASS。 V1 path callable via 4 OPT-OUT mechanisms。 219 typed surfaces cumulative。 664 consecutive byte-equality clean commits。 Score-delta +8 on 最激进 + 最创新 (54→58/60)。 hexa #9 catalog (ch 676) + Phase M real Mamba SSM kernel (ch 677-682) NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二

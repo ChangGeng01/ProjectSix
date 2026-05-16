@@ -20221,7 +20221,88 @@ public enum BASChapterDoctrineRegistry {
                 " commits。 Score-delta +8 on 最激进 +" +
                 " 最创新 directives (54 → 58 / 60)。" +
                 " Chapter 675 ships Phase L full close-" +
-                "out doctrine NEXT。")
+                "out doctrine NEXT。"),
+
+        // chapter 675 — PHASE L SEALED. Post-flip canary
+        // window doctrine + cumulative completion + V1
+        // path callability proof tests + close-out。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十五",
+            mNumberFirst: 2077,
+            mNumberLast: 2080,
+            v1MilestoneMNumber: 2080,
+            v1MilestoneStatus:
+                "chapter-675-phase-l-sealed",
+            knives: [
+                BASChapterKnife(mNumber: 2077, knife: "第一刀",
+                    concept: "NEW BASPhaseLPostFlipCanary" +
+                        "WindowDoctrine + 9 anti-drift" +
+                        " tests pinning 5-chapter canary" +
+                        " window (ch 675-680) before V1" +
+                        " deletion (Phase O ch 686)。"),
+                BASChapterKnife(mNumber: 2078, knife: "第二刀",
+                    concept: "NEW BASPhaseLCumulative" +
+                        "CompletionDoctrine + 15 anti-" +
+                        "drift tests sealing 4-chapter" +
+                        " Phase L arc。 5 doctrines,2 new" +
+                        " types,3 new API methods,84 total" +
+                        " Phase L tests,score +8 on 最激进" +
+                        " + 最创新。"),
+                BASChapterKnife(mNumber: 2079, knife: "第三刀",
+                    concept: "7 PROOF tests verifying V1" +
+                        " path remains callable post-flip" +
+                        " via 4 OPT-OUT mechanisms。"),
+                BASChapterKnife(mNumber: 2080, knife: "第四刀",
+                    concept: "Chapter 675 + Phase L FULL" +
+                        " close-out + 13-file doctrine" +
+                        " sync。 664 consecutive byte-" +
+                        "equality clean commits。 PHASE L" +
+                        " SEALED — hexa #9 catalog (ch" +
+                        " 676) + Phase M real Mamba SSM" +
+                        " kernel (ch 677-682) NEXT。")
+            ],
+            entropyClassesAttacked: [
+                "phase-l-post-flip-canary-window-not-pinned",
+                "phase-l-cumulative-achievement-not-sealed",
+                "v1-path-callability-post-flip-not-proven",
+                "opt-out-mechanisms-not-verified",
+                "phase-l-completion-doctrine-missing"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2080",
+                "v1-byte-equality-via-engine-delegation",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-l-complete-4-of-4-chapters",
+                "phase-l-84-tests-pass",
+                "v1-path-callable-via-4-mechanisms-post-flip",
+                "5-chapter-canary-window-active",
+                "v1-deletion-eligible-at-chapter-686",
+                "664-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 676 — hexa #9 mid-plan catalog",
+                "chapter 677-682 — Phase M real Mamba SSM kernel",
+                "chapter 683-685 — Phase N Tier A sprawl"
+            ],
+            summary: "PHASE L SEALED。 Chapter 675 ships" +
+                " NEW BASPhaseLPostFlipCanaryWindowDoctrine" +
+                " (M2077) + NEW BASPhaseLCumulative" +
+                "CompletionDoctrine (M2078) + 7 V1-" +
+                "callability PROOF tests (M2079) +" +
+                " close-out (M2080)。 4 chapters / 16" +
+                " commits Phase L complete。 84 total" +
+                " Phase L tests PASS。 V1 path callable" +
+                " via 4 OPT-OUT mechanisms post-flip。" +
+                " 5-chapter canary window active before" +
+                " Phase O V1 deletion at ch 686。 219" +
+                " typed surfaces cumulative (+2)。 ADR-" +
+                "016 → M2080。 664 consecutive byte-" +
+                "equality clean commits。 Score-delta +8" +
+                " on 最激进 + 最创新 (54 → 58 / 60)。" +
+                " Hexa #9 catalog (ch 676) + Phase M" +
+                " real Mamba SSM kernel (ch 677-682) NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
