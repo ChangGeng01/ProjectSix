@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2028",
-            "M2028:doctrine version reflects chapter 六百六十二 — BIOMIMETIC-SIGNAL-RECORD TRIO CODABLE EXTENSION — GAP-FILL,6th and TRUE FINAL post-hexa-#7,cross-module BASMetalSubstrate + BASOrgan reach,5th consecutive all-struct trio (closes the all-struct streak),closes 6-chapter post-hexa-#7 run。 203 typed surfaces cumulative。 612 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 663 hexa #8 catalog opportunity NEXT")
+            "ADR-016.M2032",
+            "M2032:doctrine version reflects chapter 六百六十三 — 8TH GAP-FILL HEXA CATALOG META-META MILESTONE。 NEW BASGapFillHexaEightCompletionDoctrine commemorating 6 post-hexa-#7 gap-fill chapters (657-662) — 18 types extended / 24 commits / 4 distinct modules touched。 DISTINCTIVE FEATURES:FIRST hexa with FIVE CONSECUTIVE ALL-STRUCT TRIOS;FIRST hexa containing 600-COMMIT MILESTONE crossing within its run。 NEW catalog (M2029) + 44 anti-drift PROOF tests (M2030) + 18 wire-in PROOF tests (M2031) + close-out (M2032)。 204 typed surfaces cumulative。 616 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 catalog lineage M1805 post-octa → M1833 hexa #1 → M1861 hexa #2 → M1889 hexa #3 → M1917 hexa #4 → M1945 hexa #5 → M1973 hexa #6 → M2001 hexa #7 → M2029 hexa #8")
     }
 
     // MARK: - M-number range matches chapter 四百二

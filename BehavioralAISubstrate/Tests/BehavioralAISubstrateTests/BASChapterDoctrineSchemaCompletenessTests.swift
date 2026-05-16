@@ -2387,7 +2387,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十二")!)
+                            "chapter 六百六十二")!),
+            // M2032 chapter 663 — 8TH GAP-FILL HEXA CATALOG META-META MILESTONE cataloging post-hexa-#7 chapters 657-662
+            checkRegistry("六百六十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4179,6 +4185,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十二")!
+                .mNumberLast),
+            // M2032 chapter 663 — 8TH GAP-FILL HEXA CATALOG META-META MILESTONE
+            ("663",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

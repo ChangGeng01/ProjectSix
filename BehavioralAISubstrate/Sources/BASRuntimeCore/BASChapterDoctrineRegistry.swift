@@ -19152,7 +19152,101 @@ public enum BASChapterDoctrineRegistry {
                 " clean commits。 ADR-016 → M2028。 V1 byte-" +
                 "equality preserved。 Chapter 663 hexa #8" +
                 " catalog opportunity NEXT with symmetric" +
-                " 6-entry run cataloging chapters 657-662。")
+                " 6-entry run cataloging chapters 657-662。"),
+
+        // chapter 663 — 8TH GAP-FILL HEXA CATALOG META-
+        // META MILESTONE,cataloging 6 post-hexa-#7 gap-
+        // fill chapters (657-662)。 18 types / 24 commits
+        // / 4 distinct modules touched。 FIRST hexa with
+        // FIVE CONSECUTIVE ALL-STRUCT TRIOS。 FIRST hexa
+        // crossing 600-COMMIT MILESTONE within its run。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十三",
+            mNumberFirst: 2029,
+            mNumberLast: 2032,
+            v1MilestoneMNumber: 2032,
+            v1MilestoneStatus:
+                "chapter-663-gap-fill-hexa-eight-catalog",
+            knives: [
+                BASChapterKnife(mNumber: 2029, knife: "第一刀",
+                    concept: "NEW BASGapFillHexaEightCompletion" +
+                        "Doctrine cataloging 6 post-hexa-#7 gap-" +
+                        "fill chapters (657-662) via typed" +
+                        " EntryRecord struct + 6 kind buckets" +
+                        " + 18 total types + 24 commits + 4" +
+                        " distinct modules + 5-consecutive-all-" +
+                        "struct flag + 600-commit-milestone-" +
+                        "crossed flag + substrate cumulative" +
+                        " 197 → 203。"),
+                BASChapterKnife(mNumber: 2030, knife: "第二刀",
+                    concept: "44 anti-drift PROOF tests pinning" +
+                        " every literal value in the catalog —" +
+                        " identity,counts,kind buckets,aggregates" +
+                        ",achievement flags,distinctive features," +
+                        " substrate growth,cross-doctrine refs," +
+                        " milestone flags,per-entry chapter tags," +
+                        " Codable round-trip。"),
+                BASChapterKnife(mNumber: 2031, knife: "第三刀",
+                    concept: "18 wire-in PROOF tests cross-" +
+                        "checking each catalog entry against its" +
+                        " 6 source per-entry extension doctrine —" +
+                        " mNumberFirst,typesExtended,chapterTag" +
+                        " wired in via direct equality assertions。"),
+                BASChapterKnife(mNumber: 2032, knife: "第四刀",
+                    concept: "Chapter 663 close-out + doctrine" +
+                        " sync。 616 consecutive commits with V1" +
+                        " byte-equality preserved。 hexa #8 sealed" +
+                        " — catalog lineage M1805 post-octa →" +
+                        " M1833 #1 → M1861 #2 → M1889 #3 → M1917" +
+                        " #4 → M1945 #5 → M1973 #6 → M2001 #7 →" +
+                        " M2029 #8。 typed-surface 203 → 204。")
+            ],
+            entropyClassesAttacked: [
+                "hexa-eight-catalog-not-shipped",
+                "post-hexa-seven-run-not-commemorated",
+                "five-consecutive-all-struct-trios-not-captured",
+                "600-commit-crossing-not-recorded",
+                "all-struct-streak-closure-not-pinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2032",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "gap-fill-hexa-eight-catalog",
+                "18-types-extended-across-6-entries",
+                "4-distinct-modules-touched",
+                "five-consecutive-all-struct-trios",
+                "600-commit-milestone-crossed-within-run",
+                "616-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 6 more post-hexa-#8 gap-fills" +
+                " (chapters 664-669)",
+                "future arc — chapter 六百七十 hexa #9 catalog",
+                "future arc — Phase H default mode flip"
+            ],
+            summary: "Chapter 663 ships the 8TH GAP-FILL" +
+                " HEXA CATALOG META-META MILESTONE —" +
+                " commemorates 6 post-hexa-#7 gap-fill" +
+                " chapters (657-662)。 18 types extended /" +
+                " 24 commits / 4 distinct modules touched" +
+                " (BASRuntimeCore + BASOrgan + BAS" +
+                "MetalSubstrate + BASHostKit)。 DISTINCTIVE" +
+                " FEATURES:FIRST hexa with FIVE CONSECUTIVE" +
+                " ALL-STRUCT TRIOS (entries 2-6 = chapters" +
+                " 658-662);FIRST hexa containing a 600-" +
+                "COMMIT MILESTONE crossing within its 6-" +
+                "entry run (chapter 659)。 Catalog lineage" +
+                " M1805 post-octa → M1833 #1 → M1861 #2" +
+                " → M1889 #3 → M1917 #4 → M1945 #5 → M1973" +
+                " #6 → M2001 #7 → M2029 #8。 NEW catalog" +
+                " (M2029) + 44 anti-drift tests (M2030) +" +
+                " 18 wire-in tests (M2031) + close-out" +
+                " (M2032)。 204 typed surfaces cumulative。" +
+                " ADR-016 → M2032。 616 consecutive byte-" +
+                "equality clean commits。 V1 byte-equality" +
+                " preserved。 ADR-014 OPT-IN preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
