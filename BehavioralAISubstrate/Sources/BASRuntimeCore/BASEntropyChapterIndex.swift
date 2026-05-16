@@ -4940,7 +4940,35 @@ public enum BASEntropyChapterIndex {
                 " ADR-014 OPT-IN preserved。 Phase L flip" +
                 " target chapter 六百七十四 / M2074。" +
                 " Chapter 669 ships dual-mode stress" +
-                " sweep test NEXT。")
+                " sweep test NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十九",
+            mNumberFirst: 2053, mNumberLast: 2056,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE K dual-mode stress sweep" +
+                " tests shipped。 5 stub-based BASTurn" +
+                "RuntimeEngineRunWithPlanDualMode" +
+                "StressSweepTests at M2053 + 2 real-" +
+                "coordinator BASTurnRuntimeEngineRunWith" +
+                "PlanRealCoordinatorDualModeTests at" +
+                " M2054 driving BASCoordinatorTestStubs" +
+                " through dualV1Runner across canonical60" +
+                " with 3× flake-detection。 NEW BAS" +
+                "PhaseKDualModeStressSweepDoctrine + 27" +
+                " anti-drift tests (M2055)。 close-out" +
+                " (M2056)。 360 fixture comparisons per" +
+                " CI build。 V1↔V1 determinism PROVEN" +
+                " across canonical60。 0 divergences" +
+                " observed。 Harness detection capability" +
+                " proven via deterministic divergence" +
+                " stub。 211 typed surfaces cumulative" +
+                " (+1)。 ADR-016 → M2056。 640" +
+                " consecutive byte-equality clean commits" +
+                "。 V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。 Phase L readiness" +
+                " gate target chapter 六百七十三 / M2069" +
+                " (100×24h variant)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

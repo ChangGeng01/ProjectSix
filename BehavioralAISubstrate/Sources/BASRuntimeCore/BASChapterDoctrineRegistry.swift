@@ -19679,7 +19679,95 @@ public enum BASChapterDoctrineRegistry {
                 " Chapter 669 ships dual-mode stress sweep" +
                 " test asserting V1+V2 paths byte-equal" +
                 " under canonical60 fixtures。 Phase L" +
-                " flip target:chapter 六百七十四 / M2074。")
+                " flip target:chapter 六百七十四 / M2074。"),
+
+        // chapter 669 — Phase K dual-mode stress sweep
+        // tests shipped。 5 stub-based + 2 real-coordinator
+        // tests assert V1/V2 byte-equality + 3× flake
+        // detection across canonical60 fixtures。 360
+        // fixture comparisons per CI build。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十九",
+            mNumberFirst: 2053,
+            mNumberLast: 2056,
+            v1MilestoneMNumber: 2056,
+            v1MilestoneStatus:
+                "chapter-669-phase-k-dual-mode-stress-sweep",
+            knives: [
+                BASChapterKnife(mNumber: 2053, knife: "第一刀",
+                    concept: "NEW BASTurnRuntimeEngineRun" +
+                        "WithPlanDualModeStressSweepTests" +
+                        " — 5 stub-based PROOF tests over" +
+                        " canonical60 fixtures。 0" +
+                        " divergences across 180 fixture" +
+                        " comparisons (60 × 3 runs)。" +
+                        " Divergence-detection capability" +
+                        " proven via deterministic" +
+                        " divergence stub。"),
+                BASChapterKnife(mNumber: 2054, knife: "第二刀",
+                    concept: "NEW BASTurnRuntimeEngineRun" +
+                        "WithPlanRealCoordinatorDualMode" +
+                        "Tests — drives real coordinator" +
+                        " (BASCoordinatorTestStubs.makeStub)" +
+                        " through dualV1Runner across" +
+                        " canonical60 + 3× flake-detect。" +
+                        " V1↔V1 determinism PROVEN。"),
+                BASChapterKnife(mNumber: 2055, knife: "第三刀",
+                    concept: "NEW BASPhaseKDualModeStress" +
+                        "SweepDoctrine + 27 anti-drift" +
+                        " tests。 Pins 7 dual-mode test" +
+                        " classes,360 fixture comparisons" +
+                        "/build,Phase L readiness gate" +
+                        " target chapter 673,Phase L flip" +
+                        " target chapter 674。"),
+                BASChapterKnife(mNumber: 2056, knife: "第四刀",
+                    concept: "Chapter 669 close-out + 13-" +
+                        "file doctrine sync。 640" +
+                        " consecutive byte-equality clean" +
+                        " commits。 Phase K 2 of 4" +
+                        " chapters done。 SampleHost env" +
+                        " var bridge (ch670) + Phase K" +
+                        " close-out (ch671) NEXT。")
+            ],
+            entropyClassesAttacked: [
+                "dual-mode-stress-sweep-not-tested",
+                "v1-v1-determinism-not-asserted-across-canonical60",
+                "harness-detection-capability-not-proven",
+                "phase-l-readiness-no-test-baseline",
+                "3x-flake-detection-not-active"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2056",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-k-dual-mode-tests-shipped",
+                "7-dual-mode-tests-pass",
+                "360-fixture-comparisons-per-ci-build",
+                "v1-v1-determinism-proven-across-canonical60",
+                "harness-detection-capability-proven",
+                "640-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 670 — SampleHost BAS_RUNTIME_MODE env var bridge",
+                "chapter 671 — Phase K close-out doctrine",
+                "chapter 672-675 — Phase L DEFAULT FLIP"
+            ],
+            summary: "Phase K dual-mode stress sweep test" +
+                " infrastructure shipped。 7 dual-mode tests" +
+                " (5 stub-based M2053 + 2 real-coordinator" +
+                " M2054) assert 0 divergences across" +
+                " canonical60 with 3× flake-detection。" +
+                " NEW BASPhaseKDualModeStressSweepDoctrine" +
+                " + 27 anti-drift tests at M2055。 close-" +
+                "out at M2056。 211 typed surfaces" +
+                " cumulative。 ADR-016 → M2056。 640" +
+                " consecutive byte-equality clean commits。" +
+                " V1 byte-equality preserved。 ADR-014 OPT-" +
+                "IN preserved。 360 fixture comparisons per" +
+                " CI build。 V1↔V1 determinism PROVEN across" +
+                " canonical60。 Phase L readiness gate at" +
+                " chapter 673 / M2069 (100×24h variant)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

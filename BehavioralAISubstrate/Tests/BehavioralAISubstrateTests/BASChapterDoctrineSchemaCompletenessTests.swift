@@ -2423,7 +2423,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十八")!)
+                            "chapter 六百六十八")!),
+            // M2056 chapter 669 — PHASE K dual-mode stress sweep tests
+            checkRegistry("六百六十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4263,6 +4269,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十八")!
+                .mNumberLast),
+            // M2056 chapter 669 — PHASE K dual-mode stress sweep tests
+            ("669",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
