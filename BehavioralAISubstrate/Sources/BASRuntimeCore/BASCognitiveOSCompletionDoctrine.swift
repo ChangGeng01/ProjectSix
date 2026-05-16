@@ -1118,7 +1118,7 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// preserved (conservativeReader() factory for
     /// explicit opt-out)。 V1 byte-equality preserved。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2064"
+    public static let doctrineVersion: String = "ADR-016.M2068"
 
     /// Query the typed status of a specific gap。
     public static func status(

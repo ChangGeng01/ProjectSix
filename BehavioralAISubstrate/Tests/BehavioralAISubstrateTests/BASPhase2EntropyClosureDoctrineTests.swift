@@ -37,11 +37,11 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs671() {
+    func testLastChapterIs672() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百七十一",
+            "chapter 六百七十二",
             "Chapter 六百五十八:BASMETALSUBSTRATE" +
             " BIOMIMETIC-OBSERVATION TRIO CODABLE" +
             " EXTENSION — GAP-FILL,2nd post-hexa-#7," +

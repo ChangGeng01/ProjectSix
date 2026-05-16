@@ -19948,7 +19948,98 @@ public enum BASChapterDoctrineRegistry {
                 " 低熵复杂系统 + 最激进 directives" +
                 " (cumulative 51 → 54 / 60)。 PHASE L" +
                 " chapters 672-675 NEXT — DEFAULT MODE" +
-                " FLIP after readiness gate clears。")
+                " FLIP after readiness gate clears。"),
+
+        // chapter 672 — Phase L pre-flip safety net。
+        // BAS_RUNTIME_MODE_OVERRIDE env var ships +
+        // tagged commit pre-default-flip-M2068。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十二",
+            mNumberFirst: 2065,
+            mNumberLast: 2068,
+            v1MilestoneMNumber: 2068,
+            v1MilestoneStatus:
+                "chapter-672-phase-l-pre-flip-safety-net",
+            knives: [
+                BASChapterKnife(mNumber: 2065, knife: "第一刀",
+                    concept: "BASSampleHostRuntimeModeEnv" +
+                        "VarBridge gains BAS_RUNTIME_MODE_" +
+                        "OVERRIDE env var support。 New" +
+                        " API:`currentRuntimeModeRespect" +
+                        "ingOverride(environment:)` +" +
+                        " `isOverrideActive(environment:)`" +
+                        "。 Priority OVERRIDE > BAS_RUNTIME" +
+                        "_MODE > default。 Zero-redeploy" +
+                        " rollback path for Phase L flip。" +
+                        " Original currentRuntimeMode" +
+                        " UNCHANGED — back-compat preserved。"),
+                BASChapterKnife(mNumber: 2066, knife: "第二刀",
+                    concept: "14 PROOF tests pinning" +
+                        " override priority contract:" +
+                        " override beats BAS_RUNTIME_MODE," +
+                        " absent override falls through," +
+                        " invalid override falls through," +
+                        " 3 valid override values resolve," +
+                        " isOverrideActive flag,original" +
+                        " currentRuntimeMode UNCHANGED。"),
+                BASChapterKnife(mNumber: 2067, knife: "第三刀",
+                    concept: "NEW BASRuntimeModeOverride" +
+                        "Doctrine + 15 anti-drift tests" +
+                        " pinning override env var name," +
+                        " priority order,API methods,14" +
+                        " PROOF count,back-compat flag," +
+                        " tagged commit name pre-default-" +
+                        "flip-M2068,zero-redeploy rollback。"),
+                BASChapterKnife(mNumber: 2068, knife: "第四刀",
+                    concept: "Chapter 672 close-out。 652" +
+                        " consecutive byte-equality clean" +
+                        " commits。 PHASE L safety net" +
+                        " sealed — readiness gate (ch673)" +
+                        " + FLIP (ch674) + close-out" +
+                        " (ch675) NEXT。 Commit M2068 is" +
+                        " the tagged revert point for the" +
+                        " M2074 flip per Phase L contract。")
+            ],
+            entropyClassesAttacked: [
+                "phase-l-pre-flip-safety-net-not-shipped",
+                "bas-runtime-mode-override-env-var-missing",
+                "zero-redeploy-rollback-path-undefined",
+                "pre-flip-tagged-commit-marker-missing",
+                "override-priority-contract-untyped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2068",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-l-pre-flip-safety-net-shipped",
+                "bas-runtime-mode-override-env-var-shipped",
+                "override-priority-3-level",
+                "original-current-runtime-mode-unchanged",
+                "tagged-commit-pre-default-flip-M2068",
+                "zero-redeploy-rollback-path-active",
+                "652-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 673 — 100-run readiness gate test",
+                "chapter 674 — DEFAULT MODE FLIP",
+                "chapter 675 — Phase L close-out"
+            ],
+            summary: "Phase L pre-flip safety net shipped。" +
+                " BAS_RUNTIME_MODE_OVERRIDE env var with" +
+                " priority OVERRIDE > BAS_RUNTIME_MODE >" +
+                " default。 14 PROOF tests + NEW BASRuntime" +
+                "ModeOverrideDoctrine + 15 anti-drift tests" +
+                "。 215 typed surfaces cumulative。 ADR-016" +
+                " → M2068。 652 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality preserved。" +
+                " ADR-014 OPT-IN preserved。 Commit M2068" +
+                " is the tagged revert point for Phase L's" +
+                " M2074 default mode flip — production" +
+                " hosts can roll back via env override" +
+                " without redeploy。 Chapter 673 ships 100" +
+                "-run readiness gate test NEXT,then chapter" +
+                " 674 ships THE FLIP itself。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
