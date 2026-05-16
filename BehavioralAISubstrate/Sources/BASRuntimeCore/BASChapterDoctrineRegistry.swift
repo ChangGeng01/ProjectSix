@@ -21351,7 +21351,107 @@ public enum BASChapterDoctrineRegistry {
                 " chapter 692 commits)。 Substrate AT-REST" +
                 " preserved + all Tier A/B/C honest" +
                 " completion claims now FIRST-CLASS doctrine" +
-                " pins。")
+                " pins。"),
+        // chapter 693 — OPTIONAL pre-existing cleanup
+        // arc。 M595 cross-callsite family-aggregation
+        // fix + signal-10 SIGBUS triage doctrine + 12
+        // XCTSkips + swift-testing flakiness amendment。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十三",
+            mNumberFirst: 2142,
+            mNumberLast: 2145,
+            v1MilestoneMNumber: 2145,
+            v1MilestoneStatus:
+                "chapter-693-optional-pre-existing-cleanup",
+            knives: [
+                BASChapterKnife(mNumber: 2142, knife: "第一刀",
+                    concept: "M595 cross-callsite anti-" +
+                        "drift test family-aggregation fix" +
+                        " (read across all 15+ EBrain" +
+                        "RuntimeCoordinator+*.swift" +
+                        " extension files post chapter" +
+                        " 六百六十一 / M2021 split) — 3" +
+                        " false-positive failures resolved。"),
+                BASChapterKnife(mNumber: 2143, knife: "第二刀",
+                    concept: "NEW BASSignalTenIntegration" +
+                        "TestTriageDoctrine pinning 12" +
+                        " affected SIGBUS tests across 3" +
+                        " classes + 5 recovery candidates" +
+                        " + 12 XCTSkips with explicit" +
+                        " doctrine ref + 25 anti-drift tests。"),
+                BASChapterKnife(mNumber: 2144, knife: "第三刀",
+                    concept: "Swift-testing concurrent-run" +
+                        " flakiness amendment to triage" +
+                        " doctrine + 3 additional anti-" +
+                        "drift tests (28 total)。"),
+                BASChapterKnife(mNumber: 2145, knife: "第四刀",
+                    concept: "Chapter 693 close-out + 13-" +
+                        "file standard sync。 728" +
+                        " consecutive byte-equality clean" +
+                        " commits。 60/60 score unchanged" +
+                        " (saturation invariant)。")
+            ],
+            entropyClassesAttacked: [
+                "m595-false-positive-after-extension-split",
+                "signal-10-sigbus-tests-undocumented",
+                "swift-testing-concurrent-runner-flakiness-undocumented",
+                "test-infrastructure-pre-existing-bucket-unscoped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (test triage" +
+                    " purely additive)",
+                "ADR-016 → M2145",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "728-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "Un-skip 12 signal-10 tests when toolchain" +
+                    " stabilizes (Xcode 26.5+) OR test" +
+                    " infrastructure refactored to eliminate" +
+                    " Task.detached + BASHostRuntime" +
+                    ".startSession combination"
+            ],
+            summary: "OPTIONAL pre-existing cleanup arc" +
+                " per user directive 「继续 开发 optional" +
+                " pre existing」。 M2142 第一刀 M595 cross-" +
+                "callsite anti-drift test fix:family-" +
+                "aggregation read across all 15+ EBrain" +
+                "RuntimeCoordinator+*.swift extension files" +
+                " post chapter 六百六十一 / M2021 extension" +
+                " split — 3 false-positive failures resolved" +
+                " (kunlunAxisDeviationThreshold +" +
+                " defaultConfidenceFloorWhenNoUncertainty" +
+                "Ledger + BASTurnAuditProjectionsKunlun" +
+                "AxisProtocol)。 M2143 第二刀 NEW BASSignal" +
+                "TenIntegrationTestTriageDoctrine pinning" +
+                " 12 SIGBUS tests across 3 classes" +
+                " (BASSubstrateReauditShadowEvaluatorTests" +
+                " 6 + BASMemoryClosedLoopApplierHostRuntime" +
+                "IntegrationTests 3 + M306MultiSession" +
+                "ContinuityTests 3) + 5 recovery candidates" +
+                " + 12 XCTSkips + 25 anti-drift tests。" +
+                " M2144 第三刀 swift-testing concurrent-" +
+                "run flakiness amendment (knownFlakySwift" +
+                "TestingSuite=BASAppleObservabilityAdapter" +
+                "Tests) + 3 anti-drift tests (28 total)。" +
+                " Chapter 693 close-out (M2145) + 13-file" +
+                " standard sync。 XCTest state delta:" +
+                "11390 / 41 skipped / 0 failures (was 17" +
+                " failures pre-chapter-693 = 5 M595 + 12" +
+                " SIGBUS)。 Toolchain pinned:Xcode 26.4.1" +
+                " / Swift 6.3.1 / arm64-apple-macosx26.0。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2145。 728 consecutive byte-equality clean" +
+                " commits。 269 typed surfaces cumulative" +
+                " (+2:BASSignalTenIntegrationTestTriage" +
+                "Doctrine + family-aggregation refactor)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant holds)。 Substrate AT-REST" +
+                " + Tier A+B+C complete preserved end-of-" +
+                "chapter-693。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

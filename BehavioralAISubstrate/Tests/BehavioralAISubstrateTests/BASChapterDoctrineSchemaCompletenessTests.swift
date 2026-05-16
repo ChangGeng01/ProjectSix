@@ -2556,7 +2556,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九十二")!)
+                            "chapter 六百九十二")!),
+            // M2145 chapter 693 — OPTIONAL pre-existing
+            // cleanup arc
+            checkRegistry("六百九十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4572,6 +4579,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九十二")!
+                .mNumberLast),
+            // M2145 chapter 693 — OPTIONAL pre-existing
+            // cleanup arc
+            ("693",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

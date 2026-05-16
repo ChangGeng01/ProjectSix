@@ -5492,7 +5492,50 @@ public enum BASEntropyChapterIndex {
                 " + BASTierBGenericPrimitivesDoctrine + BAS" +
                 "TierCADR019CompletionDoctrine)。 60/60 score" +
                 " unchanged (saturation invariant holds across" +
-                " all 4 chapter 692 commits)。")
+                " all 4 chapter 692 commits)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十三",
+            mNumberFirst: 2142, mNumberLast: 2145,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 0,
+            summary: "OPTIONAL pre-existing cleanup arc。" +
+                " M2142 第一刀 M595 cross-callsite anti-" +
+                "drift test fix:family-aggregation read" +
+                " across all 15+ EBrainRuntimeCoordinator+" +
+                "*.swift extension files post chapter 六百" +
+                "六十一 / M2021 split — 3 false-positive" +
+                " failures resolved (kunlunAxisDeviationThreshold" +
+                " + defaultConfidenceFloorWhenNoUncertainty" +
+                "Ledger + BASTurnAuditProjectionsKunlunAxis" +
+                "Protocol)。 M2143 第二刀 NEW BASSignalTen" +
+                "IntegrationTestTriageDoctrine pinning 12" +
+                " affected SIGBUS tests across 3 classes" +
+                " (BASSubstrateReauditShadowEvaluatorTests 6" +
+                " + BASMemoryClosedLoopApplierHostRuntime" +
+                "IntegrationTests 3 + M306MultiSessionContinuity" +
+                "Tests 3) + 5 recovery candidates documented" +
+                " + 12 XCTSkips added with explicit doctrine" +
+                " reference + 25 anti-drift tests。 M2144" +
+                " 第三刀 swift-testing concurrent-run flakiness" +
+                " amendment — knownFlakySwiftTestingSuite=" +
+                "BASAppleObservabilityAdapterTests + recovery" +
+                " via separate `--testing-library`" +
+                " invocations + 3 additional anti-drift tests" +
+                " (28 total)。 Chapter 693 close-out (M2145)" +
+                " + 13-file standard sync。 Toolchain context" +
+                " pinned:Xcode 26.4.1 / Swift 6.3.1 / arm64-" +
+                "apple-macosx26.0。 XCTest state:11390 tests" +
+                " / 41 skipped / 0 failures (was 17 failures" +
+                " pre-chapter-693)。 ADR-014 OPT-OUT preserved" +
+                " (test triage purely additive)。 ADR-016 →" +
+                " M2145。 728 consecutive byte-equality clean" +
+                " commits。 269 typed surfaces cumulative" +
+                " (+2:BASSignalTenIntegrationTestTriageDoctrine" +
+                " + family-aggregation refactor in M595" +
+                " test)。 60/60 score unchanged (saturation" +
+                " invariant holds across all 4 chapter 693" +
+                " commits)。 Substrate AT-REST + Tier A+B+C" +
+                " complete preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
