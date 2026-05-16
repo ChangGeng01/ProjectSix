@@ -20302,7 +20302,96 @@ public enum BASChapterDoctrineRegistry {
                 "equality clean commits。 Score-delta +8" +
                 " on 最激进 + 最创新 (54 → 58 / 60)。" +
                 " Hexa #9 catalog (ch 676) + Phase M" +
-                " real Mamba SSM kernel (ch 677-682) NEXT。")
+                " real Mamba SSM kernel (ch 677-682) NEXT。"),
+
+        // chapter 676 — Hexa #9 catalog (mid-plan anti-drift
+        // checkpoint cataloging Phase J + K + L + THE FLIP)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十六",
+            mNumberFirst: 2081,
+            mNumberLast: 2084,
+            v1MilestoneMNumber: 2084,
+            v1MilestoneStatus:
+                "chapter-676-hexa-9-catalog-mid-plan-anti-drift-checkpoint",
+            knives: [
+                BASChapterKnife(mNumber: 2081, knife: "第一刀",
+                    concept: "NEW BASPhaseJKLCompletionHexa" +
+                        "CatalogDoctrine — 9th hexa catalog" +
+                        " meta-meta milestone INSERTED" +
+                        " between Phase L and Phase M as" +
+                        " anti-drift checkpoint。 FIRST" +
+                        " phase-catalog (not gap-fill)," +
+                        " 4 entries (Phase J + K + L + THE" +
+                        " FLIP)。 3 phases / 12 chapters /" +
+                        " 48 commits / 13 typed surfaces /" +
+                        " score-delta 45→58 (+13 aggregate)。"),
+                BASChapterKnife(mNumber: 2082, knife: "第二刀",
+                    concept: "57 anti-drift PROOF tests" +
+                        " covering catalog identity + entry" +
+                        " list size + per-entry deep" +
+                        " equality + aggregates + score" +
+                        " progression + 6 distinctive" +
+                        " feature flags + Codable round-" +
+                        "trip。"),
+                BASChapterKnife(mNumber: 2083, knife: "第三刀",
+                    concept: "42 wire-in PROOF tests cross-" +
+                        "checking catalog entries against" +
+                        " 4 source phase-completion" +
+                        " doctrines (J/K/L/FLIP) + score-" +
+                        "progression chain + aggregate" +
+                        " consistency + range contiguity" +
+                        " proof + next-phase pointer wire-" +
+                        "in。"),
+                BASChapterKnife(mNumber: 2084, knife: "第四刀",
+                    concept: "Chapter 676 close-out + 13-" +
+                        "file doctrine sync。 668 consecutive" +
+                        " byte-equality clean commits。" +
+                        " Hexa cadence resumes at hexa #10" +
+                        " AFTER 60/60 seal at chapter 709。" +
+                        " Phase M real Mamba SSM kernel" +
+                        " (ch 677-682) NEXT。")
+            ],
+            entropyClassesAttacked: [
+                "no-phase-arc-meta-doctrine",
+                "phase-j-k-l-not-cross-cataloged",
+                "default-flip-not-meta-recorded",
+                "plan-progress-not-typed",
+                "score-progression-not-typed-meta"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2084",
+                "phase-j-k-l-cataloged-as-4-entries",
+                "63-phase-catalog-tests-pass",
+                "wire-in-cross-checks-source-doctrines",
+                "hexa-cadence-paused-until-60-of-60-seal",
+                "single-mid-plan-hexa-per-user-choice",
+                "668-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 677-682 — Phase M real Mamba SSM kernel",
+                "chapter 683-685 — Phase N Tier A sprawl",
+                "chapter 686-688 — Phase O V1 monolith DELETION"
+            ],
+            summary: "HEXA #9 CATALOG。 Chapter 676 ships NEW" +
+                " BASPhaseJKLCompletionHexaCatalogDoctrine" +
+                " (M2081) cataloging Phase J + K + L + THE" +
+                " FLIP as 4 EntryRecords + 57 anti-drift" +
+                " tests (M2082) + 42 wire-in PROOF tests" +
+                " (M2083) + close-out (M2084)。 FIRST hexa" +
+                " cataloging PHASES (not gap-fill chapters)。" +
+                " FIRST hexa with 4 entries instead of 6。" +
+                " FIRST hexa explicitly inserted as anti-" +
+                "drift checkpoint at user direction。 FIRST" +
+                " hexa within wild-rolling-meerkat plan" +
+                " execution arc。 220 typed surfaces" +
+                " cumulative (+1 catalog doctrine)。 ADR-" +
+                "016 → M2084。 668 consecutive byte-equality" +
+                " clean commits。 Catalog lineage M1805" +
+                " post-octa → M2029 hexa #8 → M2081 hexa" +
+                " #9。 Phase M real Mamba SSM kernel" +
+                " (chapters 六百七十七-六百八十二) NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

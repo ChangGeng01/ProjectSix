@@ -554,6 +554,30 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// hexa #9 catalog (chapter 676 / M2081-M2084) +
     /// Phase M real Mamba SSM kernel (chapters
     /// 677-682 / M2085-M2108) NEXT。
+    /// Re-captured at chapter 676 close-out。 Chapter
+    /// 六百七十六:HEXA #9 CATALOG mid-plan anti-drift
+    /// checkpoint。 NEW BASPhaseJKLCompletionHexa
+    /// CatalogDoctrine (M2081) cataloging Phase J +
+    /// Phase K + Phase L + THE FLIP as 4 EntryRecords
+    /// + 57 anti-drift PROOF tests (M2082) + 42 wire-
+    /// in PROOF tests (M2083) cross-checking against
+    /// 4 source phase-completion doctrines + close-
+    /// out (M2084)。 FIRST hexa cataloging PHASES (not
+    /// gap-fill chapters)。 FIRST hexa with 4 entries
+    /// instead of 6。 FIRST hexa explicitly inserted
+    /// as anti-drift checkpoint at user direction。
+    /// 3 phases / 12 chapters / 48 commits / 13 typed
+    /// surfaces / score-delta 45→58 (+13 aggregate)。
+    /// Catalog lineage M1805 post-octa → M1833 hexa
+    /// #1 → M1861 #2 → M1889 #3 → M1917 #4 → M1945
+    /// #5 → M1973 #6 → M2001 #7 → M2029 #8 → M2081
+    /// hexa #9。 220 typed surfaces cumulative;668
+    /// consecutive byte-equality clean commits。 V1
+    /// byte-equality preserved。 ADR-014 OPT-OUT
+    /// preserved。 Hexa cadence PAUSED until 60/60
+    /// seal at chapter 709 per user choice。 Phase M
+    /// real Mamba SSM kernel via Metal compute shader
+    /// (chapters 677-682) NEXT。
     static let frozenFullRegistrySha256: String =
-        "ade30dc3d1d40a21c1c1383e75bff5db3de52ed70a6dd8434b015330199fdb55"
+        "0dc55d91fbb7b7736d0bf14686ef8bc65b6773d186dc6598e7dccbc3984d9f08"
 }

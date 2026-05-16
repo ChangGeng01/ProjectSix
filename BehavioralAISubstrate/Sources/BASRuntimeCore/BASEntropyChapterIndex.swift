@@ -5106,7 +5106,37 @@ public enum BASEntropyChapterIndex {
                 " byte-equality clean commits。 Score-" +
                 "delta +8 on 最激进 + 最创新 (54→58/60)" +
                 "。 hexa #9 catalog (ch 676) + Phase M" +
-                " real Mamba SSM kernel (ch 677-682) NEXT。")
+                " real Mamba SSM kernel (ch 677-682) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十六",
+            mNumberFirst: 2081, mNumberLast: 2084,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 12, futureCutsCount: 3,
+            summary: "HEXA #9 CATALOG (mid-plan anti-drift" +
+                " checkpoint)。 NEW BASPhaseJKLCompletion" +
+                "HexaCatalogDoctrine at M2081 — 9th hexa-" +
+                "equivalent meta-milestone cataloging" +
+                " Phase J + K + L + THE FLIP as 4 Entry" +
+                "Records。 57 anti-drift PROOF tests at" +
+                " M2082。 42 wire-in PROOF tests at M2083" +
+                " cross-checking against 4 source doctrines" +
+                "。 close-out (M2084)。 FIRST hexa cataloging" +
+                " PHASES (not gap-fill chapters)。 FIRST" +
+                " hexa with 4 entries instead of 6。 FIRST" +
+                " hexa explicitly inserted as anti-drift" +
+                " checkpoint at user direction。 3 phases" +
+                " / 12 chapters / 48 commits / 13 typed" +
+                " surfaces / score-delta 45→58 (+13" +
+                " aggregate)。 220 typed surfaces" +
+                " cumulative (+1)。 ADR-016 → M2084。 668" +
+                " consecutive byte-equality clean commits" +
+                "。 V1 byte-equality preserved。 ADR-014" +
+                " OPT-OUT preserved。 Hexa cadence PAUSED" +
+                " until 60/60 seal at chapter 709 per" +
+                " user choice。 Catalog lineage M1805" +
+                " post-octa → M2029 hexa #8 → M2081 hexa" +
+                " #9。 Phase M real Mamba SSM kernel" +
+                " (ch 677-682) NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

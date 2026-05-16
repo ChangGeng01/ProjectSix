@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2080",
-            "M2080:doctrine version reflects chapter 六百七十五 — PHASE L SEALED。 NEW BASPhaseLPostFlipCanaryWindowDoctrine + 9 anti-drift tests at M2077。 NEW BASPhaseLCumulativeCompletionDoctrine + 15 anti-drift tests at M2078。 7 V1-callability PROOF tests at M2079。 close-out (M2080)。 4 chapters/16 commits Phase L complete。 84 total Phase L tests PASS。 V1 path callable via 4 OPT-OUT mechanisms。 219 typed surfaces cumulative。 664 consecutive byte-equality clean commits。 Score-delta +8 on 最激进 + 最创新 (54→58/60)。 hexa #9 catalog (ch 676) + Phase M real Mamba SSM kernel (ch 677-682) NEXT")
+            "ADR-016.M2084",
+            "M2084:doctrine version reflects chapter 六百七十六 — HEXA #9 CATALOG mid-plan anti-drift checkpoint。 NEW BASPhaseJKLCompletionHexaCatalogDoctrine cataloging Phase J + K + L + THE FLIP as 4 EntryRecords at M2081。 57 anti-drift PROOF tests at M2082。 42 wire-in PROOF tests at M2083 cross-checking against 4 source phase-completion doctrines。 close-out (M2084)。 FIRST hexa cataloging PHASES (not gap-fill chapters)。 FIRST hexa with 4 entries instead of 6。 FIRST hexa explicitly inserted as anti-drift checkpoint at user direction。 3 phases / 12 chapters / 48 commits / 13 typed surfaces / score-delta 45→58 (+13 aggregate)。 220 typed surfaces cumulative。 668 consecutive byte-equality clean commits。 Hexa cadence PAUSED until 60/60 seal at chapter 709 per user choice。 Catalog lineage M1805 post-octa → M2029 hexa #8 → M2081 hexa #9。 Phase M real Mamba SSM kernel (chapters 六百七十七-六百八十二) NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二

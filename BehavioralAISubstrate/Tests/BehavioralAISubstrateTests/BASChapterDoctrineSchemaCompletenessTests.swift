@@ -2465,7 +2465,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百七十五")!)
+                            "chapter 六百七十五")!),
+            // M2084 chapter 676 — HEXA #9 CATALOG (mid-plan)
+            checkRegistry("六百七十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百七十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4361,6 +4367,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百七十五")!
+                .mNumberLast),
+            // M2084 chapter 676 — HEXA #9 CATALOG (mid-plan)
+            ("676",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

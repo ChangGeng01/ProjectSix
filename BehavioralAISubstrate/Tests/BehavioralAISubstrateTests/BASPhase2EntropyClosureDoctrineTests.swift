@@ -37,27 +37,29 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs675() {
+    func testLastChapterIs676() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 六百七十五",
-            "Chapter 六百五十八:BASMETALSUBSTRATE" +
-            " BIOMIMETIC-OBSERVATION TRIO CODABLE" +
-            " EXTENSION — GAP-FILL,2nd post-hexa-#7," +
-            "single-module BASMetalSubstrate reach,4" +
-            " chapters until chapter 六百六十三 hexa" +
-            " #8 catalog opportunity。 3 observation" +
-            " struct types (BASPredictiveCodingObservation" +
-            " + BASPlasticityUpdate + BASHierarchical" +
-            "Observation) gained Codable + 3 PROOF" +
-            " tests + BASBiomimeticObservationTrio" +
-            "CodableExtensionDoctrine typed surface +" +
-            " close-out。 NEW kind 'biomimetic-" +
-            "observation-trio'。 FIRST ALL-STRUCT trio" +
-            " in autonomous loop history。 199 typed" +
-            " surfaces cumulative。 596 consecutive" +
-            " byte-equality clean commits")
+            "chapter 六百七十六",
+            "Chapter 六百七十六:HEXA #9 CATALOG mid-plan" +
+            " anti-drift checkpoint。 NEW BASPhaseJKL" +
+            "CompletionHexaCatalogDoctrine cataloging" +
+            " Phase J + K + L + THE FLIP as 4 EntryRecords" +
+            " at M2081。 57 anti-drift PROOF tests at M2082" +
+            "。 42 wire-in PROOF tests at M2083 cross-" +
+            "checking against 4 source phase-completion" +
+            " doctrines。 close-out (M2084)。 FIRST hexa" +
+            " cataloging PHASES (not gap-fill chapters)。" +
+            " FIRST hexa with 4 entries instead of 6。" +
+            " FIRST hexa explicitly inserted as anti-" +
+            "drift checkpoint at user direction。 3" +
+            " phases / 12 chapters / 48 commits / 13" +
+            " typed surfaces / score-delta 45→58 (+13" +
+            " aggregate)。 220 typed surfaces cumulative" +
+            "。 668 consecutive byte-equality clean" +
+            " commits。 Hexa cadence PAUSED until 60/60" +
+            " seal at chapter 709 per user choice")
     }
 
     // MARK: - M-number range
