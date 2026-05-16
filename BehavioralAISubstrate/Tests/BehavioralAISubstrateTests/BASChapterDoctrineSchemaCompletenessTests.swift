@@ -2584,7 +2584,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九十六")!)
+                            "chapter 六百九十六")!),
+            // M2161 chapter 697 — 100% SIGBUS RECOVERY arc
+            checkRegistry("六百九十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4636,6 +4642,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九十六")!
+                .mNumberLast),
+            // M2161 chapter 697 — 100% SIGBUS RECOVERY
+            ("697",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -337,6 +337,56 @@ final class BASSignalTenIntegrationTestTriageDoctrineTests: XCTestCase {
                 .remaining6BlockedReason.contains("actor"))
     }
 
+    // MARK: - M2160 chapter 697 100% recovery correction
+
+    func testAllTwelveSignal10TestsRecoveredAtChapter697() {
+        XCTAssertTrue(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .allTwelveSignal10TestsRecoveredAtChapter697)
+    }
+
+    func testSignal10TestsRecoveredAtChapter697Is6() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .signal10TestsRecoveredAtChapter697, 6)
+    }
+
+    func testTotalRecoveryEqualsTwelve() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .totalSignal10TestsRecoveredAfterChapter697,
+            12)
+    }
+
+    func testNoSignal10TestsRemainSkippedPostChapter697() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .signal10TestsRemainingSkippedPostChapter697,
+            0)
+    }
+
+    func testChapter697RecoveryPatternMentionsNonDetached() {
+        let p = BASSignalTenIntegrationTestTriageDoctrine
+            .chapter697RecoveryPattern
+        XCTAssertTrue(p.contains("non-detached"))
+        XCTAssertTrue(p.contains("Diagnostic F"))
+    }
+
+    func testRecoveryPatternCountIs2() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .recoveryPatternCount, 2)
+    }
+
+    func testRecoveryPatternInventoryHasBothPatterns() {
+        let combined =
+            BASSignalTenIntegrationTestTriageDoctrine
+                .recoveryPatternInventory
+                .joined(separator: " ")
+        XCTAssertTrue(combined.contains("sync-surface"))
+        XCTAssertTrue(combined.contains("non-detached"))
+    }
+
     // MARK: - M2146 empirical diagnosis pins
 
     func testEmpiricalDiagnosisRunAtM2146() {

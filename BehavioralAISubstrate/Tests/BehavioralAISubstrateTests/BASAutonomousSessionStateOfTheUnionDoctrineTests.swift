@@ -43,25 +43,25 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
             274)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs740() {
+    func testConsecutiveByteEqualityCleanCommitsIs744() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            740)
+            744)
     }
 
-    func testPhase2CommitsShippedIs1202() {
+    func testPhase2CommitsShippedIs1206() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            1202)
+            1206)
     }
 
-    func testChapter2NumberLastIs2157() {
+    func testChapter2NumberLastIs2161() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            2157)
+            2161)
     }
 
     // MARK: - Quality invariants

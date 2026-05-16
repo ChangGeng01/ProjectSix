@@ -21790,7 +21790,116 @@ public enum BASChapterDoctrineRegistry {
                 " discovery → when prior claims are" +
                 " tested with NEW patterns,document" +
                 " findings as additive amendments not" +
-                " history rewrites。")
+                " history rewrites。"),
+        // chapter 697 — 100% SIGBUS RECOVERY arc。 User
+        // directive 「完全 修复」 → all 12 SIGBUS tests
+        // recovered via 2 patterns (M2154 sync-surface
+        // + M2158/M2159 non-detached-Task)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十七",
+            mNumberFirst: 2158,
+            mNumberLast: 2161,
+            v1MilestoneMNumber: 2161,
+            v1MilestoneStatus:
+                "chapter-697-100-percent-sigbus-recovery",
+            knives: [
+                BASChapterKnife(mNumber: 2158, knife: "第一刀",
+                    concept: "NEW Diagnostic F (sync test" +
+                        " + non-detached Task + actor" +
+                        " calls,NO startSession in Task" +
+                        " → PASS) discovered;3 M306" +
+                        " tests un-skipped using" +
+                        " Diagnostic F pattern。"),
+                BASChapterKnife(mNumber: 2159, knife: "第二刀",
+                    concept: "BASMemoryClosedLoop 3" +
+                        " tests un-skipped via same" +
+                        " Diagnostic F pattern + SQLite-" +
+                        "lock gotcha fix (single combined" +
+                        " Task with explicit `do { }`" +
+                        " scopes to release actor handles" +
+                        " inline before reopening)。"),
+                BASChapterKnife(mNumber: 2160, knife: "第三刀",
+                    concept: "Doctrine corrections —" +
+                        " BASSignalTenIntegrationTest" +
+                        "TriageDoctrine +8 pins documenting" +
+                        " 100% recovery + 2 recovery" +
+                        " patterns + 0 remaining;M2155 +" +
+                        " M2156 prior pins RETAINED for" +
+                        " history。"),
+                BASChapterKnife(mNumber: 2161, knife: "第四刀",
+                    concept: "Chapter 697 close-out + 13-" +
+                        "file standard sync。 744" +
+                        " consecutive byte-equality clean" +
+                        " commits。 60/60 score unchanged" +
+                        " (saturation invariant)。 100%" +
+                        " SIGBUS RECOVERY ACHIEVED。")
+            ],
+            entropyClassesAttacked: [
+                "chapter-696-50-percent-recovery-stops-too-early",
+                "actor-blocked-tests-not-recoverable-claim-falsified"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (Diagnostic F" +
+                    " test pattern purely additive)",
+                "ADR-016 → M2161",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "744-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-achieved"
+            ],
+            plannedFutureCuts: [
+                "100% SIGBUS bucket recovery ACHIEVED at" +
+                    " chapter 697。 Future commits remain" +
+                    " REACTIVE — when external owners" +
+                    " ship fixes for the remaining" +
+                    " external-blocked items (toolchain" +
+                    " swift-testing infra,host-app" +
+                    " adoption,external architecture/" +
+                    "tooling),substrate-side adoption" +
+                    " work follows reactively。"
+            ],
+            summary: "100% SIGBUS RECOVERY arc。 User" +
+                " directive 「完全 修复」 pushed for 12-" +
+                "of-12 recovery beyond chapter 696's 50%。" +
+                " M2158 第一刀 NEW Diagnostic F discovered:" +
+                " sync test method + non-detached" +
+                " `Task { ... }` + actor calls (NO" +
+                " startSession in Task) → PASS。 3 M306" +
+                " tests un-skipped using this pattern。" +
+                " M2159 第二刀 BASMemoryClosedLoop 3 tests" +
+                " un-skipped using same Diagnostic F" +
+                " pattern + SQLite-lock gotcha fix (single" +
+                " combined Task with explicit `do { }`" +
+                " scopes to release actor handles inline" +
+                " before reopening)。 M2160 第三刀 doctrine" +
+                " corrections — BASSignalTenIntegration" +
+                "TestTriageDoctrine +8 pins documenting" +
+                " 100% recovery + 2 recovery patterns" +
+                " (M2154 sync-surface + M2158/M2159 non-" +
+                "detached-Task) + 0 remaining;M2155 +" +
+                " M2156 prior pins RETAINED for history。" +
+                " Chapter 697 close-out (M2161) + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT preserved" +
+                " (Diagnostic F test pattern purely" +
+                " additive — sync test methods + Task" +
+                " wrapper,no production code change)。" +
+                " ADR-016 → M2161。 744 consecutive byte-" +
+                "equality clean commits。 274 typed" +
+                " surfaces cumulative (test code changes" +
+                " don't change typed-surface count per" +
+                " M2148 convention)。 60/60 score unchanged" +
+                " (saturation invariant)。 ALL 12 SIGBUS" +
+                " BUCKET TESTS NOW PASS — 100% recovery" +
+                " from chapter 693 / M2143 triage state。" +
+                " Substrate AT-REST + Tier A+B+C complete" +
+                " + TERMINAL claim FULLY-FALSIFIED-VIA-" +
+                "RECOVERY preserved end-of-chapter-697。" +
+                " Methodology — second empirical recovery-" +
+                "pattern discovery via Diagnostic F →" +
+                " 「完全 修复」 of substrate-side test-" +
+                "coverage gap。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -498,4 +498,68 @@ public enum BASSignalTenIntegrationTestTriageDoctrine {
     /// pattern。
     public static let remaining6BlockedReason: String =
         "BASMemoryClosedLoopApplier + BASMemoryUsageTracker + BASSovereignAuditLedger are `public actor` types — Swift's actor model enforces async access。 Sync surfaces would require breaking actor isolation。"
+
+    // MARK: - M2160 chapter 六百九十七 第三刀 — 100%
+    //         recovery correction
+    //
+    // M2155 claimed 6 of 12 RECOVERED + 6 REMAINING actor-
+    // blocked。 Chapter 697 M2158 + M2159 falsified the
+    // "remaining 6 cannot follow sync-surface pattern"
+    // claim by finding a SECOND recovery pattern:
+    //
+    //   Diagnostic F (sync test + non-detached Task +
+    //   actor calls,NO startSession in Task) → PASS
+    //
+    // M2158 migrated 3 M306 tests using Diagnostic F →
+    // PASSED。 M2159 migrated 3 BASMemoryClosedLoop tests
+    // using Diagnostic F → PASSED。
+    //
+    // 100% SIGBUS BUCKET RECOVERY ACHIEVED:
+    //   - 6 of 12 via sync-surface (chapter 696 M2154)
+    //   - 6 of 12 via non-detached-Task (chapter 697
+    //     M2158 + M2159)
+    //   - 12 of 12 = 100%
+    //
+    // M2155 pins RETAINED for history (correct at the
+    // time of M2155);M2160 adds new pins documenting
+    // the additional recovery。
+
+    /// M2160 CORRECTION:remaining 6 ALSO recoverable via
+    /// Diagnostic F pattern (non-detached Task)。
+    public static let allTwelveSignal10TestsRecoveredAtChapter697:
+        Bool = true
+
+    /// 6 additional tests recovered at chapter 697 / M2158
+    /// + M2159 (above the 6 already recovered at chapter
+    /// 696 / M2154)。
+    public static let signal10TestsRecoveredAtChapter697:
+        Int = 6
+
+    /// Total post-chapter-697 recovery = 12 of 12 = 100%。
+    public static var totalSignal10TestsRecoveredAfterChapter697:
+        Int {
+        return signal10TestsRecoveredAtChapter696
+            + signal10TestsRecoveredAtChapter697
+    }
+    // = 12
+
+    /// 0 tests remain skipped post-chapter-697 (the 3
+    /// Diagnostic C/D/E tests are intentional bucket-
+    /// boundary documentation,not the original 12)。
+    public static let signal10TestsRemainingSkippedPostChapter697:
+        Int = 0
+
+    /// Recovery pattern shipped at chapter 697 (M2158 +
+    /// M2159)。
+    public static let chapter697RecoveryPattern: String =
+        "sync test method + non-detached `Task { ... }` + actor calls (NO startSession inside the Task) → PASS (Diagnostic F pattern)"
+
+    /// 2 distinct recovery patterns now exist for the
+    /// SIGBUS bucket。
+    public static let recoveryPatternCount: Int = 2
+
+    public static let recoveryPatternInventory: [String] = [
+        "M2154 sync-surface pattern (chapter 696):substrate ships sync method alongside async;test migrates to sync。 Used for 6 evaluator tests。",
+        "M2158/M2159 non-detached-Task pattern (chapter 697):sync test + `Task { ... }` for actor calls + XCTestExpectation。 Used for 6 actor-using tests (M306 + BASMemoryClosedLoop)。"
+    ]
 }

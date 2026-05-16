@@ -121,18 +121,18 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 292
+    public static let phase2ChapterCount: Int = 293
 
-    /// Phase 2 commits shipped。 At M2157:125 + 84 +
-    /// 993 = 1202 (chapter 696 — RECOVERY OF TERMINAL:
-    /// evaluateSync sync surface + 6-of-12 SIGBUS tests
-    /// un-skipped + doctrine corrections + recovery
-    /// progress doctrine + chapter close-out)
-    public static let phase2CommitsShipped: Int = 1202
+    /// Phase 2 commits shipped。 At M2161:125 + 84 +
+    /// 997 = 1206 (chapter 697 — 100% SIGBUS RECOVERY:
+    /// Diagnostic F discovery + 6 actor-blocked tests
+    /// un-skipped + doctrine corrections + chapter
+    /// close-out)
+    public static let phase2CommitsShipped: Int = 1206
 
-    /// Phase 2 mNumberLast。 At M2157:chapter 696 —
-    /// recovery of terminal arc。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2157
+    /// Phase 2 mNumberLast。 At M2161:chapter 697 —
+    /// 100% SIGBUS recovery arc。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2161
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

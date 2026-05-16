@@ -5679,7 +5679,44 @@ public enum BASEntropyChapterIndex {
                 " empirical recovery-pattern discovery" +
                 " → when prior claims are tested with NEW" +
                 " patterns,document findings as additive" +
-                " amendments not history rewrites。")
+                " amendments not history rewrites。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十七",
+            mNumberFirst: 2158, mNumberLast: 2161,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 10, futureCutsCount: 0,
+            summary: "100% SIGBUS RECOVERY arc。 User" +
+                " directive 「完全 修复」 pushed for 12-" +
+                "of-12 recovery beyond chapter 696 50%。" +
+                " M2158 第一刀 NEW Diagnostic F (sync" +
+                " test + non-detached Task + actor calls," +
+                " NO startSession in Task → PASS);3 M306" +
+                " tests un-skipped。 M2159 第二刀 BAS" +
+                "MemoryClosedLoop 3 tests un-skipped via" +
+                " same Diagnostic F pattern + SQLite-lock" +
+                " gotcha fix。 M2160 第三刀 doctrine" +
+                " corrections — BASSignalTenIntegration" +
+                "TestTriageDoctrine +8 pins documenting" +
+                " 100% recovery + 2 recovery patterns +" +
+                " 0 remaining;M2155 + M2156 prior pins" +
+                " RETAINED for history。 Chapter 697" +
+                " close-out (M2161) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved。 ADR-" +
+                "016 → M2161。 744 consecutive byte-" +
+                "equality clean commits。 274 typed" +
+                " surfaces cumulative (test code changes" +
+                " don't change typed-surface count per" +
+                " M2148 convention)。 60/60 score" +
+                " unchanged (saturation invariant)。 ALL" +
+                " 12 SIGBUS BUCKET TESTS NOW PASS — 100%" +
+                " recovery from chapter 693 / M2143 triage" +
+                " state。 Substrate AT-REST + Tier A+B+C" +
+                " complete + TERMINAL claim FULLY-" +
+                "FALSIFIED-VIA-RECOVERY preserved。" +
+                " Methodology — second empirical recovery-" +
+                "pattern discovery via Diagnostic F →" +
+                " 「完全 修复」 of substrate-side test-" +
+                "coverage gap。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
