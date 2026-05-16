@@ -44,8 +44,12 @@ public enum BASKVCacheInvalidationPolicy:
     case explicitOnly = "explicit-only"
 
     /// Cache entries evicted least-recently-used when
-    /// the cache exceeds capacity。 NOT yet implemented
-    /// at chapter 500 close-out — typed contract only。
+    /// the cache exceeds capacity。 IMPLEMENTED at
+    /// chapter 690 / M2131 via BASKVCacheLRUEvictor +
+    /// BASKVCacheRegistry capacity wire-in。 Was typed
+    /// contract only at chapter 500 / M1379;the
+    /// follow-up arc landed at chapter 690 post-FINAL-
+    /// SEAL of the wild-rolling-meerkat plan。
     case lru = "lru"
 
     /// Cache entries expire after a time-to-live elapses。
@@ -64,31 +68,42 @@ public enum BASKVCacheInvalidationPolicy:
 /// Doctrine namespace declaring which policies the
 /// substrate actually implements + honest evidence
 /// for the gap to full 4-policy coverage。
+///
+/// chapter 六百九十 / M2132 第三刀 update:`.lru` promoted
+/// from contract-only to IMPLEMENTED。 At chapter 690
+/// close-out the substrate has 2-of-4 policies fully
+/// wired (`.explicitOnly` + `.lru`);`.ttl` + `.never`
+/// remain typed contract only。
 public enum BASKVCacheInvalidationPolicyDoctrine {
 
-    /// The policy actually wired into BASKVCacheRegistry
-    /// at chapter 500 close-out。 ALWAYS `.explicitOnly`。
+    /// The default policy when no explicit policy is
+    /// provided at construction。 ALWAYS `.explicitOnly`
+    /// per ADR-014 OPT-OUT (default behavior matches the
+    /// M1306 baseline)。
     public static let activeImplementedPolicy:
         BASKVCacheInvalidationPolicy = .explicitOnly
 
-    /// Set of policies the substrate currently honors。
-    /// At chapter 500 close-out:only `.explicitOnly`。
+    /// Set of policies the substrate currently HONORS at
+    /// runtime。 chapter 690 / M2132 promotes `.lru` from
+    /// contract-only to implemented。
     public static let implementedPolicies:
         Set<BASKVCacheInvalidationPolicy> = [
         .explicitOnly,
+        .lru,  // chapter 690 / M2131 wire-in
     ]
 
     /// Set of policies whose typed contract is shipped
-    /// but implementation is deferred。
+    /// but implementation is still deferred。 chapter 690
+    /// / M2132 removes `.lru` from this list (now
+    /// implemented)。
     public static let contractOnlyPolicies:
         Set<BASKVCacheInvalidationPolicy> = [
-        .lru,
         .ttl,
         .never,
     ]
 
     /// Indicates whether the given policy is implemented
-    /// at chapter 500 close-out。
+    /// at the current close-out。
     public static func isImplemented(
         _ policy: BASKVCacheInvalidationPolicy
     ) -> Bool {
@@ -104,10 +119,9 @@ public enum BASKVCacheInvalidationPolicyDoctrine {
         case .explicitOnly:
             return nil
         case .lru:
-            return "lru:typed contract only;requires" +
-                " capacity tracking + sorted access-order" +
-                " state in BASKVCacheRegistry actor" +
-                " (follow-up arc)"
+            // chapter 690 / M2131 wire-in: no longer
+            // deferred
+            return nil
         case .ttl:
             return "ttl:typed contract only;requires" +
                 " per-entry timestamp + periodic sweep" +
@@ -118,4 +132,19 @@ public enum BASKVCacheInvalidationPolicyDoctrine {
                 " hooks (follow-up arc)"
         }
     }
+
+    /// chapter 六百九十 / M2132 — total count of
+    /// implemented policies at chapter 690 close-out。
+    /// 2-of-4 (50% of policy coverage)。
+    public static let implementedPolicyCount: Int = 2
+
+    /// chapter 六百九十 / M2132 — total count of
+    /// contract-only policies awaiting future
+    /// implementation arcs。 2-of-4 (.ttl + .never)。
+    public static let contractOnlyPolicyCount: Int = 2
+
+    /// chapter 六百九十 / M2132 — total policy count
+    /// (implemented + contract-only)。 Should equal
+    /// BASKVCacheInvalidationPolicy.allCases.count。
+    public static let totalPolicyCount: Int = 4
 }
