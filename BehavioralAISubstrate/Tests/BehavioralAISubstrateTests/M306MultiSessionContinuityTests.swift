@@ -171,12 +171,10 @@ final class M306MultiSessionContinuityTests: XCTestCase {
     /// unmodified entry throws; clearing the signature
     /// succeeds.
     func testAppendRejectsRuntimeSignatureAndAcceptsCleared()
-        async throws
+        throws
     {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+        // M2158 — migrated to sync test + non-detached Task
+        // (Diagnostic F pattern) to bypass SIGBUS bucket。
         let root = makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let locations = try BASUnifiedStorageLocator.locate(
@@ -195,28 +193,39 @@ final class M306MultiSessionContinuityTests: XCTestCase {
             signingSecret: signingSecret(),
             storage: storage)
 
-        // Step a: append with runtime signature intact → throws.
-        do {
-            _ = try await ledger.append(entry)
-            XCTFail(
-                "expected signatureMismatch when runtime " +
-                "signature is intact")
-        } catch let err as BASSovereignAuditLedger.LedgerError {
-            switch err {
-            case .signatureMismatch(let auditID):
-                XCTAssertEqual(auditID, entry.auditID)
-            default:
-                XCTFail("expected signatureMismatch, got \(err)")
+        let exp = expectation(
+            description: "M306-append-reject-then-accept")
+        Task {
+            // Step a: append with runtime signature intact → throws.
+            do {
+                _ = try await ledger.append(entry)
+                XCTFail(
+                    "expected signatureMismatch when runtime " +
+                    "signature is intact")
+            } catch let err as BASSovereignAuditLedger.LedgerError {
+                switch err {
+                case .signatureMismatch(let auditID):
+                    XCTAssertEqual(auditID, entry.auditID)
+                default:
+                    XCTFail("expected signatureMismatch, got \(err)")
+                }
             }
-        }
 
-        // Step b: clear signature → ledger signs canonically.
-        var draft = entry
-        draft.signature = ""
-        let appended = try await ledger.append(draft)
-        XCTAssertFalse(
-            appended.entry.signature.isEmpty,
-            "ledger must fill in HMAC signature on append")
+            // Step b: clear signature → ledger signs canonically.
+            var draft = entry
+            draft.signature = ""
+            do {
+                let appended = try await ledger.append(draft)
+                XCTAssertFalse(
+                    appended.entry.signature.isEmpty,
+                    "ledger must fill in HMAC signature on append")
+            } catch {
+                XCTFail(
+                    "unexpected error on cleared-signature append: \(error)")
+            }
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 10.0)
     }
 
     // MARK: - 3. Cross-session rehydration: ledger2 sees
@@ -225,48 +234,44 @@ final class M306MultiSessionContinuityTests: XCTestCase {
     /// Open storage1 + ledger1, append, close. Open storage2
     /// + ledger2 against same SQLite path → ledger2.count() == 1
     /// (M91 rehydration loaded the entry).
-    func testRehydrationLoadsPreviousSessionEntries()
-        async throws
-    {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+    func testRehydrationLoadsPreviousSessionEntries() throws {
+        // M2158 — migrated to sync test + non-detached Task
+        // (Diagnostic F pattern)。
         let root = makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let locations = try BASUnifiedStorageLocator.locate(
             in: root)
         let secret = signingSecret()
 
-        // Session A
-        do {
-            let turnA = try runTurn(
-                label: "A",
-                kind: .interactive,
-                workflowProfile: .primary,
-                prompt: "Session A")
-            let entryA = try XCTUnwrap(turnA.sovereignAuditEntry)
-            var draftA = entryA
-            draftA.signature = ""
-            let storage1 = try BASSovereignLedgerSQLiteStorage(
-                path: locations.auditLedgerURL.path)
-            let ledger1 = BASSovereignAuditLedger(
-                signingSecret: secret, storage: storage1)
-            _ = try await ledger1.append(draftA)
-            // Both go out of scope at end of block.
+        // Session A — sync part first
+        let turnA = try runTurn(
+            label: "A",
+            kind: .interactive,
+            workflowProfile: .primary,
+            prompt: "Session A")
+        let entryA = try XCTUnwrap(turnA.sovereignAuditEntry)
+        var draftA = entryA
+        draftA.signature = ""
+
+        let exp1 = expectation(
+            description: "M306-rehydration-step1")
+        Task {
+            do {
+                let storage1 = try BASSovereignLedgerSQLiteStorage(
+                    path: locations.auditLedgerURL.path)
+                let ledger1 = BASSovereignAuditLedger(
+                    signingSecret: secret,
+                    storage: storage1)
+                _ = try await ledger1.append(draftA)
+                exp1.fulfill()
+            } catch {
+                XCTFail("session A append failed: \(error)")
+                exp1.fulfill()
+            }
         }
+        wait(for: [exp1], timeout: 10.0)
 
-        // Session B — opens fresh storage2, should see 1
-        // pre-existing entry.
-        let storage2 = try BASSovereignLedgerSQLiteStorage(
-            path: locations.auditLedgerURL.path)
-        let ledger2 = BASSovereignAuditLedger(
-            signingSecret: secret, storage: storage2)
-        let preCount = await ledger2.count()
-        XCTAssertEqual(
-            preCount, 1,
-            "ledger2 must rehydrate session A's entry")
-
+        // Session B sync part (runTurn)
         let turnB = try runTurn(
             label: "B",
             kind: .ambient,
@@ -275,9 +280,30 @@ final class M306MultiSessionContinuityTests: XCTestCase {
         let entryB = try XCTUnwrap(turnB.sovereignAuditEntry)
         var draftB = entryB
         draftB.signature = ""
-        _ = try await ledger2.append(draftB)
-        let postCount = await ledger2.count()
-        XCTAssertEqual(postCount, 2)
+
+        let exp2 = expectation(
+            description: "M306-rehydration-step2")
+        Task {
+            do {
+                let storage2 = try BASSovereignLedgerSQLiteStorage(
+                    path: locations.auditLedgerURL.path)
+                let ledger2 = BASSovereignAuditLedger(
+                    signingSecret: secret,
+                    storage: storage2)
+                let preCount = await ledger2.count()
+                XCTAssertEqual(
+                    preCount, 1,
+                    "ledger2 must rehydrate session A's entry")
+                _ = try await ledger2.append(draftB)
+                let postCount = await ledger2.count()
+                XCTAssertEqual(postCount, 2)
+                exp2.fulfill()
+            } catch {
+                XCTFail("session B sequence failed: \(error)")
+                exp2.fulfill()
+            }
+        }
+        wait(for: [exp2], timeout: 10.0)
     }
 
     // MARK: - 4. Verification ledger sees both entries + chain
@@ -288,11 +314,9 @@ final class M306MultiSessionContinuityTests: XCTestCase {
     ///   - count() == 2
     ///   - verifyChainIntegrity() does not throw
     ///   - both audit IDs are readable in snapshot order
-    func testVerificationLedgerSeesBothEntries() async throws {
-        throw XCTSkip(
-            "Pre-existing signal-10 SIGBUS — see " +
-            "BASSignalTenIntegrationTestTriageDoctrine " +
-            "(chapter 693 / M2143)")
+    func testVerificationLedgerSeesBothEntries() throws {
+        // M2158 — migrated to sync test + non-detached Task
+        // (Diagnostic F pattern)。
         let root = makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let locations = try BASUnifiedStorageLocator.locate(
@@ -312,41 +336,59 @@ final class M306MultiSessionContinuityTests: XCTestCase {
         let entryA = try XCTUnwrap(turnA.sovereignAuditEntry)
         let entryB = try XCTUnwrap(turnB.sovereignAuditEntry)
 
-        // Session A append.
-        do {
-            let storage1 = try BASSovereignLedgerSQLiteStorage(
-                path: locations.auditLedgerURL.path)
-            let ledger1 = BASSovereignAuditLedger(
-                signingSecret: secret, storage: storage1)
-            var draft = entryA
-            draft.signature = ""
-            _ = try await ledger1.append(draft)
+        let exp = expectation(
+            description: "M306-verification-ledger")
+        Task {
+            do {
+                // Session A append.
+                let storage1 =
+                    try BASSovereignLedgerSQLiteStorage(
+                        path: locations.auditLedgerURL.path)
+                let ledger1 = BASSovereignAuditLedger(
+                    signingSecret: secret,
+                    storage: storage1)
+                var draftA = entryA
+                draftA.signature = ""
+                _ = try await ledger1.append(draftA)
+
+                // Session B append.
+                let storage2 =
+                    try BASSovereignLedgerSQLiteStorage(
+                        path: locations.auditLedgerURL.path)
+                let ledger2 = BASSovereignAuditLedger(
+                    signingSecret: secret,
+                    storage: storage2)
+                var draftB = entryB
+                draftB.signature = ""
+                _ = try await ledger2.append(draftB)
+
+                // Verification ledger.
+                let storage3 =
+                    try BASSovereignLedgerSQLiteStorage(
+                        path: locations.auditLedgerURL.path)
+                let ledger3 = BASSovereignAuditLedger(
+                    signingSecret: secret,
+                    storage: storage3)
+                let count = await ledger3.count()
+                XCTAssertEqual(count, 2)
+                try await ledger3.verifyChainIntegrity()
+
+                let snapshot = await ledger3.snapshot()
+                XCTAssertEqual(snapshot.count, 2)
+                XCTAssertEqual(
+                    snapshot[0].entry.auditID,
+                    entryA.auditID)
+                XCTAssertEqual(
+                    snapshot[1].entry.auditID,
+                    entryB.auditID)
+                exp.fulfill()
+            } catch {
+                XCTFail(
+                    "verification ledger sequence failed: \(error)")
+                exp.fulfill()
+            }
         }
-
-        // Session B append.
-        do {
-            let storage2 = try BASSovereignLedgerSQLiteStorage(
-                path: locations.auditLedgerURL.path)
-            let ledger2 = BASSovereignAuditLedger(
-                signingSecret: secret, storage: storage2)
-            var draft = entryB
-            draft.signature = ""
-            _ = try await ledger2.append(draft)
-        }
-
-        // Verification ledger.
-        let storage3 = try BASSovereignLedgerSQLiteStorage(
-            path: locations.auditLedgerURL.path)
-        let ledger3 = BASSovereignAuditLedger(
-            signingSecret: secret, storage: storage3)
-        let count = await ledger3.count()
-        XCTAssertEqual(count, 2)
-        try await ledger3.verifyChainIntegrity()
-
-        let snapshot = await ledger3.snapshot()
-        XCTAssertEqual(snapshot.count, 2)
-        XCTAssertEqual(snapshot[0].entry.auditID, entryA.auditID)
-        XCTAssertEqual(snapshot[1].entry.auditID, entryB.auditID)
+        wait(for: [exp], timeout: 10.0)
     }
 
     // MARK: - 5. Both session entries carry the M298-M305 audit

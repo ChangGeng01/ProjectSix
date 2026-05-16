@@ -101,6 +101,39 @@ final class BASSignal10EmpiricalDiagnosisTests: XCTestCase {
         XCTAssertNotNil(observedResult)
     }
 
+    /// Diagnostic F (M2158 chapter 697):SYNC test method
+    /// + expectation + NON-DETACHED `Task { ... }` calling
+    /// an actor method (NO startSession)。 Probes whether
+    /// non-detached Task + actor-only calls is a viable
+    /// recovery pattern for the 6 remaining SIGBUS tests
+    /// (BASMemoryClosedLoop 3 + M306 3) that call into
+    /// `public actor` types。
+    /// Expected:if PASSES → the 6 remaining tests
+    /// recoverable via this pattern。 If CRASHES → actor
+    /// boundary itself is not safe in test context。
+    func testSyncMethodNonDetachedTaskActorOnly() throws {
+        // Use a simple actor for the probe — not
+        // BASSovereignAuditLedger or BASMemoryClosedLoop
+        // Applier to isolate the pattern from those
+        // specific actor's internals。
+        actor ProbeActor {
+            private var counter: Int = 0
+            func increment() async -> Int {
+                counter += 1
+                return counter
+            }
+        }
+        let probe = ProbeActor()
+        let exp = expectation(
+            description: "actor-call-non-detached-task")
+        Task {
+            let value = await probe.increment()
+            XCTAssertEqual(value, 1)
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 5.0)
+    }
+
     /// Diagnostic E:SYNC test method + expectation +
     /// detached Task calling startSession。
     /// EMPIRICAL OUTCOME (M2146):CRASHES with SIGBUS。
