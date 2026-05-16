@@ -19849,7 +19849,106 @@ public enum BASChapterDoctrineRegistry {
                 "。 ADR-014 OPT-IN preserved。 Chapter 671" +
                 " ships Phase K close-out doctrine NEXT。" +
                 " Phase L flip target chapter 六百七十四" +
-                " / M2074。")
+                " / M2074。"),
+
+        // chapter 671 — PHASE K COMPLETE。 Phase K close-
+        // out doctrine + forward-looking Phase L pre-flip
+        // gate contract sealed。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十一",
+            mNumberFirst: 2061,
+            mNumberLast: 2064,
+            v1MilestoneMNumber: 2064,
+            v1MilestoneStatus:
+                "chapter-671-phase-k-complete",
+            knives: [
+                BASChapterKnife(mNumber: 2061, knife: "第一刀",
+                    concept: "NEW BASPhaseKRuntimeMode" +
+                        "ToggleCompletionDoctrine — seals" +
+                        " 4-chapter Phase K arc (668-671)" +
+                        " / M2049-M2064 / 16 commits。" +
+                        " 1 new async surface,1 env var" +
+                        " bridge,7 dual-mode tests,4" +
+                        " doctrines,99 total Phase K tests" +
+                        "。 V1↔V1 determinism PROVEN" +
+                        " across canonical60。 Score" +
+                        " delta +3 on 低熵复杂系统 + 最" +
+                        "激进。"),
+                BASChapterKnife(mNumber: 2062, knife: "第二刀",
+                    concept: "44 anti-drift PROOF tests" +
+                        " pinning every Phase K achievement" +
+                        " literal — phase range,artifacts," +
+                        " test counts,score deltas," +
+                        " Phase L flip + readiness gate" +
+                        " targets。"),
+                BASChapterKnife(mNumber: 2063, knife: "第三刀",
+                    concept: "NEW BASPhaseLPreFlipGate" +
+                        "ContractDoctrine + 23 anti-drift" +
+                        " tests。 Forward-looking contract" +
+                        " for Phase L's pre-flip readiness" +
+                        " gate:100×24h dual-mode,0%" +
+                        " divergence tolerance,8 required" +
+                        " infrastructure + 7 required" +
+                        " preceding tests (all already" +
+                        " shipped),BAS_RUNTIME_MODE_" +
+                        "OVERRIDE env path + tagged" +
+                        " commit revert path,5-chapter" +
+                        " post-flip canary window。"),
+                BASChapterKnife(mNumber: 2064, knife: "第四刀",
+                    concept: "Chapter 671 close-out +" +
+                        " 13-file doctrine sync。 PHASE K" +
+                        " SEALED。 648 consecutive byte-" +
+                        "equality clean commits。 Phase L" +
+                        " chapters 672-675 NEXT — DEFAULT" +
+                        " MODE FLIP after readiness gate" +
+                        " clears。")
+            ],
+            entropyClassesAttacked: [
+                "phase-k-completion-not-sealed",
+                "phase-l-readiness-gate-contract-undefined",
+                "default-flip-revert-path-not-specified",
+                "post-flip-canary-window-not-specified",
+                "phase-k-score-delta-not-pinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2064",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-k-complete-4-of-4-chapters",
+                "phase-k-99-tests-pass",
+                "phase-l-readiness-gate-contract-typed",
+                "phase-l-revert-path-specified",
+                "5-chapter-post-flip-canary-window",
+                "score-delta-+3-on-low-entropy-most-aggressive",
+                "648-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 672 — BAS_RUNTIME_MODE_OVERRIDE env var + tagged commit",
+                "chapter 673 — 100x24h readiness gate test",
+                "chapter 674 — DEFAULT MODE FLIP",
+                "chapter 675 — Phase L close-out"
+            ],
+            summary: "PHASE K COMPLETE。 Chapter 671 ships" +
+                " NEW BASPhaseKRuntimeModeToggleCompletion" +
+                "Doctrine + 44 anti-drift tests sealing" +
+                " 4-chapter Phase K arc (M2061+M2062) +" +
+                " NEW BASPhaseLPreFlipGateContractDoctrine" +
+                " + 23 anti-drift tests defining Phase L" +
+                " readiness gate contract (M2063) +" +
+                " close-out (M2064)。 4 chapters / 16" +
+                " commits sealed。 99 Phase K tests PASS。" +
+                " Phase L flip target chapter 六百七十四" +
+                " / M2074。 Pre-flip gate target chapter" +
+                " 六百七十三 / M2069。 214 typed surfaces" +
+                " cumulative。 ADR-016 → M2064。 648" +
+                " consecutive byte-equality clean commits。" +
+                " V1 byte-equality preserved。 ADR-014" +
+                " OPT-IN preserved。 Score-delta +3 on" +
+                " 低熵复杂系统 + 最激进 directives" +
+                " (cumulative 51 → 54 / 60)。 PHASE L" +
+                " chapters 672-675 NEXT — DEFAULT MODE" +
+                " FLIP after readiness gate clears。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

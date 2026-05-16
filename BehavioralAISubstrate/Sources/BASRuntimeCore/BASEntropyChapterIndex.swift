@@ -4991,7 +4991,33 @@ public enum BASEntropyChapterIndex {
                 " 644 consecutive byte-equality clean" +
                 " commits。 V1 byte-equality preserved。" +
                 " Chapter 671 ships Phase K close-out" +
-                " doctrine NEXT。")
+                " doctrine NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十一",
+            mNumberFirst: 2061, mNumberLast: 2064,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 4,
+            summary: "PHASE K COMPLETE。 NEW BASPhaseK" +
+                "RuntimeModeToggleCompletionDoctrine" +
+                " (M2061) seals 4-chapter Phase K arc" +
+                " (668-671)。 44 anti-drift tests (M2062)" +
+                "。 NEW BASPhaseLPreFlipGateContract" +
+                "Doctrine + 23 anti-drift tests (M2063)" +
+                " defining Phase L readiness gate" +
+                " contract (100×24h dual-mode,0%" +
+                " divergence,BAS_RUNTIME_MODE_OVERRIDE" +
+                " revert path,5-chapter post-flip canary" +
+                " window)。 close-out (M2064)。 99 total" +
+                " Phase K tests PASS。 V1↔V1 determinism" +
+                " PROVEN across canonical60。 Score-delta" +
+                " +3 on 低熵复杂系统 + 最激进 (51→54/60)。" +
+                " 214 typed surfaces cumulative (+2)。" +
+                " ADR-016 → M2064。 648 consecutive byte" +
+                "-equality clean commits。 V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN" +
+                " preserved。 Phase L chapters 672-675" +
+                " NEXT — DEFAULT MODE FLIP after readiness" +
+                " gate clears at chapter 673 / M2069。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

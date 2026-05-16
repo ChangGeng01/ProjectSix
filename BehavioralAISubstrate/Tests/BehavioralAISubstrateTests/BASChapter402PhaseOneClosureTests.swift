@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2060",
-            "M2060:doctrine version reflects chapter 六百七十 — PHASE K env var bridge shipped。 NEW BASSampleHostRuntimeModeEnvVarBridge reads BAS_RUNTIME_MODE env var via ProcessInfo + maps to BASTurnRuntimeMode at M2057。 4-method API。 13 PROOF tests (M2058)。 NEW BASEnvVarBridgeDoctrine + 12 anti-drift tests (M2059)。 close-out (M2060)。 Default .v1ByteEqual preserves M2032 per ADR-014。 212 typed surfaces cumulative。 644 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 671 ships Phase K close-out doctrine NEXT。 Phase L flip target chapter 六百七十四 / M2074")
+            "ADR-016.M2064",
+            "M2064:doctrine version reflects chapter 六百七十一 — PHASE K COMPLETE。 NEW BASPhaseKRuntimeModeToggleCompletionDoctrine + 44 anti-drift tests sealing 4-chapter Phase K arc (M2061+M2062) + NEW BASPhaseLPreFlipGateContractDoctrine + 23 anti-drift tests defining Phase L readiness gate contract (M2063) + close-out (M2064)。 99 total Phase K tests PASS。 V1↔V1 determinism PROVEN across canonical60。 Score-delta +3 on 低熵复杂系统 + 最激进 (cumulative 51→54/60)。 214 typed surfaces cumulative。 648 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Phase L flip target chapter 六百七十四 / M2074。 Pre-flip gate target chapter 六百七十三 / M2069 (100×24h variant)")
     }
 
     // MARK: - M-number range matches chapter 四百二
