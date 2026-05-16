@@ -5246,7 +5246,31 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M2112。 696 consecutive byte-equality" +
                 " clean commits。 Phase O V1 monolith" +
-                " DELETION (chapters 686-688) NEXT。")
+                " DELETION (chapters 686-688) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十六",
+            mNumberFirst: 2114, mNumberLast: 2117,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 9, futureCutsCount: 2,
+            summary: "PHASE O OPENING (risk-free)。 NEW" +
+                " BASTurnAuditProjectionsLateClusterFinal" +
+                "Bundle Sendable bundle at M2114 wrapping" +
+                " 3 *Two/*Penta cluster results + ontology" +
+                "Fog derived accessor + 11 structural" +
+                " anti-drift tests at M2115。 NEW BAS" +
+                "PhaseOV1MonolithDeletionPlanDoctrine at" +
+                " M2116 documenting 3-chapter staged plan" +
+                " + honest 1803→80 aspirational LOC target" +
+                " + V1 OPT-OUT impact 4→2 mechanisms + 6" +
+                " pre-flight checks all clear + 33 anti-" +
+                "drift tests。 Chapter 686 close-out" +
+                " (M2117) + 13-file standard sync。 44" +
+                " total anti-drift PROOF tests。 +RunTurn" +
+                ".swift body UNCHANGED at chapter 686 (wire-" +
+                "in lands at chapter 687)。 247 typed" +
+                " surfaces cumulative。 ADR-016 → M2117。" +
+                " 700 consecutive byte-equality clean" +
+                " commits。 Chapter 687 WIRE-IN NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

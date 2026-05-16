@@ -20766,7 +20766,78 @@ public enum BASChapterDoctrineRegistry {
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M2112。 696 consecutive byte-equality" +
                 " clean commits。 Phase O V1 monolith" +
-                " DELETION (chapters 686-688) NEXT。")
+                " DELETION (chapters 686-688) NEXT。"),
+
+        // chapter 686 — Phase O OPENING (risk-free)。
+        // Bundle TYPE + staged-deletion plan doctrine
+        // shipped + 11 + 33 = 44 anti-drift PROOF tests。
+        // +RunTurn.swift body UNCHANGED at chapter 686
+        // (wire-in lands at chapter 687)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八十六",
+            mNumberFirst: 2114,
+            mNumberLast: 2117,
+            v1MilestoneMNumber: 2117,
+            v1MilestoneStatus:
+                "chapter-686-phase-o-opening-risk-free",
+            knives: [
+                BASChapterKnife(mNumber: 2114, knife: "第一刀",
+                    concept: "NEW BASTurnAuditProjections" +
+                        "LateClusterFinalBundle Sendable" +
+                        " bundle wrapping 3 *Two/*Penta" +
+                        " cluster results + ontologyFog" +
+                        " derived accessor。"),
+                BASChapterKnife(mNumber: 2115, knife: "第二刀",
+                    concept: "11 structural anti-drift" +
+                        " PROOF tests (compile-time" +
+                        " conformance + KeyPath presence" +
+                        " + MemoryLayout sanity + chapter" +
+                        " origin pin)。"),
+                BASChapterKnife(mNumber: 2116, knife: "第三刀",
+                    concept: "NEW BASPhaseOV1MonolithDeletion" +
+                        "PlanDoctrine + 33 anti-drift" +
+                        " tests documenting 3-chapter" +
+                        " staged plan + honest LOC delta" +
+                        " (1803→80 aspirational) + V1" +
+                        " OPT-OUT impact 4→2 mechanisms。"),
+                BASChapterKnife(mNumber: 2117, knife: "第四刀",
+                    concept: "Chapter 686 close-out + 13-" +
+                        "file standard doctrine sync。 700" +
+                        " consecutive byte-equality clean" +
+                        " commits。")
+            ],
+            entropyClassesAttacked: [
+                "no-cluster-final-bundle-for-v1-fold",
+                "no-typed-deletion-plan-doctrine",
+                "no-honest-risk-profile-for-phase-o"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2117",
+                "plus-runturn-body-unchanged-at-chapter-686",
+                "phase-o-opening-risk-free",
+                "700-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 687 — Phase O WIRE-IN (replace 4 locals)",
+                "chapter 688 — Phase O DELETION + close-out"
+            ],
+            summary: "PHASE O OPENING (risk-free)。 NEW BAS" +
+                "TurnAuditProjectionsLateClusterFinalBundle" +
+                " Sendable bundle at M2114 wrapping 3" +
+                " *Two/*Penta cluster results。 NEW BAS" +
+                "PhaseOV1MonolithDeletionPlanDoctrine at" +
+                " M2116 with honest 3-chapter staged plan" +
+                " + 1803→80 aspirational LOC target + 4→2" +
+                " V1 OPT-OUT impact + 6 pre-flight checks" +
+                " all clear。 44 anti-drift PROOF tests" +
+                " (11 + 33)。 +RunTurn.swift body" +
+                " UNCHANGED — wire-in at chapter 687。" +
+                " 247 typed surfaces cumulative。 ADR-016" +
+                " → M2117。 700 consecutive byte-equality" +
+                " clean commits。 Chapter 687 WIRE-IN" +
+                " NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

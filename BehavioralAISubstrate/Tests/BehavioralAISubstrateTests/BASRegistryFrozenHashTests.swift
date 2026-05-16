@@ -563,24 +563,33 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// preliminary achievement。 (Full provenance in
     /// chapter 682 close-out commit)。
     /// Re-captured at chapter 683 close-out。 PHASE N
-    /// scope-reduced — Tier A bundle migration via
-    /// ADDITIVE BRIDGES (not full struct replacement)。
-    /// NEW BASMicroStep + BASMicroStepBundle = BASBundle
-    /// <BASMicroStep> typealias at M2109 + 18 PROOF tests。
-    /// NEW BASEventLogReplayItemKind enum (8 cases) +
-    /// 16 anti-drift tests at M2110。 NEW BASTierA
-    /// MigrationStrategyDoctrine + 25 tests at M2111
-    /// documenting honest scope reduction (8 planned →
-    /// 2 shipped + 6 deferred,66.7% scope drop)。
-    /// Chapter 683 close-out (M2112) + Phase N close-out
-    /// under reduced scope。 17+ existing call sites
-    /// intact (additive-only,no breaking changes)。
-    /// Score-delta 0 (低熵复杂系统 already at 10/10 post-
-    /// Phase-J/L/M)。 244 typed surfaces cumulative (+4)
-    /// 。 696 consecutive byte-equality clean commits。
+    /// scope-reduced。 (Full provenance in chapter 683
+    /// close-out commit M2112)。
+    /// Re-captured at chapter 686 close-out。 PHASE O
+    /// OPENING (risk-free)。 NEW BASTurnAuditProjections
+    /// LateClusterFinalBundle Sendable bundle at M2114
+    /// wrapping 3 *Two/*Penta cluster results + ontology
+    /// Fog derived accessor + 11 structural anti-drift
+    /// PROOF tests at M2115。 NEW BASPhaseOV1Monolith
+    /// DeletionPlanDoctrine at M2116 documenting 3-chapter
+    /// staged plan (chapter 686 risk-free + chapter 687
+    /// wire-in medium-risk + chapter 688 deletion medium-
+    /// high-risk) + honest 1803→80 aspirational LOC target
+    /// + V1 OPT-OUT impact 4→2 mechanisms + 6 pre-flight
+    /// checks all clear + 33 anti-drift tests。 Chapter
+    /// 686 close-out (M2117) + 13-file standard sync。
+    /// 44 total anti-drift PROOF tests across chapter 686。
+    /// +RunTurn.swift body UNCHANGED at chapter 686
+    /// (purely additive bundle TYPE + plan doctrine —
+    /// wire-in lands at chapter 687)。 247 typed surfaces
+    /// cumulative (+3 across chapter 686)。 700 consecutive
+    /// byte-equality clean commits — ROUND-NUMBER MILESTONE。
     /// V1 byte-equality preserved。 ADR-014 OPT-OUT
-    /// preserved。 ADR-016 → M2112。 Phase O V1 monolith
-    /// DELETION (chapters 686-688) NEXT。
+    /// preserved (will reduce 4→2 mechanisms at chapter
+    /// 688)。 ADR-016 → M2117。 Phase O 60/60 PRELIMINARY
+    /// score maintained (structural-only contribution)。
+    /// Chapter 687 WIRE-IN (replace 4 locals with bundle
+    /// factory call) NEXT。
     static let frozenFullRegistrySha256: String =
-        "c774886418a3c978a754a5dd76cc39dff56578d3fe1bb7ba617c90ddc2d275fb"
+        "43db5a82190e514197984740226ae35dd11f9a6b7cb1b585c905716fec8f726d"
 }
