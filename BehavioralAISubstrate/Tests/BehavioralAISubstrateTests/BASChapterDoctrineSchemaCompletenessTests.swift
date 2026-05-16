@@ -2549,7 +2549,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九十一")!)
+                            "chapter 六百九十一")!),
+            // M2141 chapter 692 — FULL Tier A/B/C
+            // completion via HONEST DISCOVERY
+            checkRegistry("六百九十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4557,6 +4564,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九十一")!
+                .mNumberLast),
+            // M2141 chapter 692 — FULL Tier A/B/C
+            ("692",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -121,18 +121,19 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 287
+    public static let phase2ChapterCount: Int = 288
 
-    /// Phase 2 commits shipped。 At M2137:125 + 84 +
-    /// 973 = 1182 (chapter 691 — post-FINAL-SEAL second
-    /// follow-up arc:TTL + .never + post-seal catalog
-    /// in one arc;chapter 500 / M1379 FULL 4-policy
-    /// gap closed)
-    public static let phase2CommitsShipped: Int = 1182
+    /// Phase 2 commits shipped。 At M2141:125 + 84 +
+    /// 977 = 1186 (chapter 692 — FULL DEVELOPMENT post-
+    /// substrate-AT-REST:Tier A complete + Tier B/C
+    /// completion doctrines via HONEST DISCOVERY +
+    /// REFRAMED CONTRACT)
+    public static let phase2CommitsShipped: Int = 1186
 
-    /// Phase 2 mNumberLast。 At M2137:chapter 691 —
-    /// post-seal second follow-up。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2137
+    /// Phase 2 mNumberLast。 At M2141:chapter 692 — full
+    /// Tier A/B/C completion via HONEST DISCOVERY。 SWEEP
+    /// frozen at 1163。
+    public static let phase2MNumberLast: Int = 2141
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

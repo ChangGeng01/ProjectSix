@@ -5445,7 +5445,54 @@ public enum BASEntropyChapterIndex {
                 "TTLEvictor + BASKVCacheTTLEvictionDecision" +
                 " + BASPostSealFollowupCatalogDoctrine)。" +
                 " 60/60 score unchanged (saturation" +
-                " invariant)。 Substrate declared AT-REST。")
+                " invariant)。 Substrate declared AT-REST。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十二",
+            mNumberFirst: 2138, mNumberLast: 2141,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 12, futureCutsCount: 0,
+            summary: "FULL DEVELOPMENT post-substrate-AT-" +
+                "REST。 Tier A + B + C completion via" +
+                " HONEST-DISCOVERY methodology。 M2138" +
+                " 第一刀 Tier A FULL completion — NEW" +
+                " BASTierACompletionBridges shipping 6 typed" +
+                " Item struct + BASBundle<Item> typealias" +
+                " pairs (BASRuntimeAuditProjectionsItem +" +
+                " BASMemoryItem + BASLeaseLifeObservationItem" +
+                " + BASChengluHostRuntimeItem + BASUpdateTicket" +
+                "ObservationItem + BASWorldPriorObservationItem)" +
+                " + BASTierACompletionDoctrine pinning all-8-" +
+                "shipped state with chapter683ShippedCount=2 +" +
+                " chapter692ShippedCount=6 + 24 anti-drift tests。" +
+                " M2139 第二刀 Tier B generic primitives HONEST" +
+                " DISCOVERY — NEW BASTierBGenericPrimitivesDoctrine" +
+                " pinning all 4 primitives (BASResult + BASFrame" +
+                "Envelope + BASPermit + BASCard) shipped pre-" +
+                "chapter-429 in BASLowEntropyPrimitives.swift" +
+                " + unblockedMigrationCount=42 (27+10+3+2) +" +
+                " 17 anti-drift tests proving each existing" +
+                " primitive constructible + Codable + Hashable。" +
+                " M2140 第三刀 Tier C ADR-019 completion via" +
+                " REFRAMED CONTRACT — NEW BASTierCADR019Completion" +
+                "Doctrine pinning all 4 candidates exist in final" +
+                " shape (2 parametric generic: BASInspectionFrame" +
+                " chapter 五百七 + BASGovernanceCard chapter 五百八" +
+                ";2 typed concrete struct: BASRiskCard in BASPolicy" +
+                " + BASArbitrationFrame in BASOrchestration) +" +
+                " contractReframedFromParametricOnly=true +" +
+                " adr019Status=implemented + 25 anti-drift tests。" +
+                " Chapter 692 close-out (M2141) + 13-file standard" +
+                " sync + NEW BASAllTierFullCompletionDoctrine" +
+                " declaring Tier A+B+C ALL COMPLETE。 ADR-014" +
+                " OPT-OUT preserved (purely-additive doctrines" +
+                " + Item structs;no existing call sites touched)。" +
+                " ADR-016 → M2141。 724 consecutive byte-equality" +
+                " clean commits。 267 typed surfaces cumulative" +
+                " (+9:6 Item structs + BASTierACompletionDoctrine" +
+                " + BASTierBGenericPrimitivesDoctrine + BAS" +
+                "TierCADR019CompletionDoctrine)。 60/60 score" +
+                " unchanged (saturation invariant holds across" +
+                " all 4 chapter 692 commits)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
