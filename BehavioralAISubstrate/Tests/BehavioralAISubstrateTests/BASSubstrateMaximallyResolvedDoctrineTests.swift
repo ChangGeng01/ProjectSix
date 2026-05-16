@@ -239,4 +239,48 @@ final class BASSubstrateMaximallyResolvedDoctrineTests: XCTestCase {
                 .chapter696RecoveryDoctrineRef.contains(
                     "BASChapter696RecoveryProgressDoctrine"))
     }
+
+    // MARK: - M2162 honest self-critique amendment pins
+
+    func testM2162HonestSelfCritiqueApplied() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .m2162HonestSelfCritiqueApplied)
+    }
+
+    func testAntipatternCountIs5() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .antipatternCount, 5)
+    }
+
+    func testAntipatternInventoryCountIs5() {
+        XCTAssertEqual(
+            BASSubstrateMaximallyResolvedDoctrine
+                .antipatternInventoryCount, 5)
+    }
+
+    func testAntipatternInventoryMentionsSprawl() {
+        let combined =
+            BASSubstrateMaximallyResolvedDoctrine
+                .antipatternInventory
+                .joined(separator: " ")
+        XCTAssertTrue(combined.contains("sprawl"))
+        XCTAssertTrue(combined.contains("claim-then-falsify"))
+        XCTAssertTrue(combined.contains(
+            "branch proliferation"))
+    }
+
+    func testChapter698ShipsZeroNewDoctrines() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .chapter698ShipsZeroNewDoctrines)
+    }
+
+    func testFutureNewDoctrineGateRequiresJustification() {
+        XCTAssertTrue(
+            BASSubstrateMaximallyResolvedDoctrine
+                .futureNewDoctrineGate.contains(
+                    "production-code-typed-surface"))
+    }
 }

@@ -2590,7 +2590,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九十七")!)
+                            "chapter 六百九十七")!),
+            // M2162 chapter 698 — HONEST SELF-CRITIQUE
+            checkRegistry("六百九十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4650,6 +4656,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九十七")!
+                .mNumberLast),
+            // M2162 chapter 698 — HONEST SELF-CRITIQUE
+            ("698",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

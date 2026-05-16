@@ -5716,7 +5716,44 @@ public enum BASEntropyChapterIndex {
                 " Methodology — second empirical recovery-" +
                 "pattern discovery via Diagnostic F →" +
                 " 「完全 修复」 of substrate-side test-" +
-                "coverage gap。")
+                "coverage gap。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十八",
+            mNumberFirst: 2162, mNumberLast: 2162,
+            knivesCount: 1, entropyClassesCount: 1,
+            pinsCount: 8, futureCutsCount: 0,
+            summary: "HONEST SELF-CRITIQUE arc。 User" +
+                " directive 「目前 整体而言 你满意吗 严查" +
+                " 最最 苛刻 全面 修复」 pushed for hardest" +
+                " self-critique。 M2162 single-knife" +
+                " consolidates 3 fixes:(a) remove 3" +
+                " placeholder XCTSkip diagnostics from" +
+                " BASSignal10EmpiricalDiagnosisTests (C/" +
+                "D/E) — findings already FIRST-CLASS" +
+                " pinned in triage doctrine,placeholders" +
+                " were doctrine sprawl;(b) amend" +
+                " BASSignalTenIntegrationTestTriage" +
+                "Doctrine with cleanup metadata pins;" +
+                " (c) amend BASSubstrateMaximallyResolved" +
+                "Doctrine with HONEST self-critique pins" +
+                " documenting 5 antipatterns (doctrine" +
+                " sprawl + claim-then-falsify cycle +" +
+                " incomplete empirical enumeration +" +
+                " placeholder XCTSkip sprawl + branch" +
+                " proliferation) + chapter698ShipsZero" +
+                "NewDoctrines=true + futureNewDoctrine" +
+                "Gate discipline pin。 Chapter 698 close-" +
+                "out (M2162) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2162。 745 consecutive byte-equality" +
+                " clean commits。 274 typed surfaces" +
+                " unchanged (ZERO new doctrines per" +
+                " discipline pin)。 60/60 score unchanged" +
+                " (saturation invariant)。 XCTest skipped" +
+                " tests count -3 (39 → 36)。 Methodology" +
+                " — HONEST SELF-CRITIQUE → reduce doctrine" +
+                " sprawl,acknowledge antipatterns," +
+                " discipline future commits。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

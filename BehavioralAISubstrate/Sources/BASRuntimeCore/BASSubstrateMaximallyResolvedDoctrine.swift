@@ -269,4 +269,84 @@ public enum BASSubstrateMaximallyResolvedDoctrine {
     public static let chapter696RecoveryDoctrineRef:
         String =
         "BASChapter696RecoveryProgressDoctrine (chapter 696 / M2156) + BASSignalTenIntegrationTestTriageDoctrine M2155 amendment"
+
+    // MARK: - M2162 chapter 六百九十八 第一刀 — HONEST
+    //         SELF-CRITIQUE amendment
+    //
+    // User directive 「目前 整体而言 你满意吗 严查 最最
+    // 苛刻 全面 修复」 (chapter 698 / 2026-05-16) pushed
+    // for harshest self-critique。 Honest acknowledgments:
+    //
+    // ANTIPATTERN #1:doctrine sprawl
+    //   Chapters 693-697 shipped 6 NEW meta-doctrines
+    //   (BASSignalTenIntegrationTestTriageDoctrine +
+    //   BASTypedSurfaceCountAuditDoctrine +
+    //   BASSprawlScopeAuditDoctrine +
+    //   BASSubstrateExternalDependencyCatalogDoctrine +
+    //   BASSubstrateMaximallyResolvedDoctrine [this file]
+    //   + BASChapter696RecoveryProgressDoctrine)。
+    //   ~3000 LOC of pure meta-bookkeeping。 This IS
+    //   substrate antipattern。
+    //
+    // ANTIPATTERN #2:claim-then-falsify cycle
+    //   M2152 (this doctrine) claimed TERMINAL state
+    //   then M2154 (next chapter) falsified it。 M2156
+    //   claimed actor-blocked unrecoverable,M2158 (next
+    //   chapter) falsified it。 Pattern of strong claims
+    //   getting self-falsified by next chapter = bad。
+    //
+    // ANTIPATTERN #3:incomplete empirical enumeration
+    //   M2146 ran 4 diagnostics (A/C/D/E) but missed
+    //   non-detached `Task {}` variant (Diagnostic F)。
+    //   Discovered only at M2158 (chapter 697)。 If
+    //   enumerated at M2146,12/12 recovery shipped at
+    //   chapter 694 instead of chapter 697。
+    //
+    // ANTIPATTERN #4:placeholder XCTSkip sprawl
+    //   M2146 left 3 skipped diagnostics (C/D/E) "for
+    //   documentation"。 Documentation already lived in
+    //   doctrine pins。 M2162 (this chapter) removes the
+    //   placeholders。
+    //
+    // ANTIPATTERN #5:branch proliferation
+    //   User said "上传" once;5 remote branches created
+    //   (chapter 693/694/695/696/697 branches),all
+    //   pointing at same recent HEAD。 Pollution。
+    //
+    // Pin this honest critique so future maintainers
+    // can see the substrate is aware of its own
+    // tendency toward doctrine sprawl。
+
+    public static let m2162HonestSelfCritiqueApplied: Bool =
+        true
+
+    public static let antipatternCount: Int = 5
+
+    public static let antipatternInventory: [String] = [
+        "doctrine sprawl — 6 new meta-doctrines in 5 chapters with ~3000 LOC",
+        "claim-then-falsify cycle — M2152 terminal claim falsified by M2154;M2156 actor-unrecoverable falsified by M2158",
+        "incomplete empirical enumeration — M2146 missed Diagnostic F (non-detached Task) which was found 3 chapters later",
+        "placeholder XCTSkip sprawl — M2146 left 3 skipped diagnostics duplicating doctrine pins (removed at M2162)",
+        "branch proliferation — 5 remote branches all pointing at same HEAD"
+    ]
+
+    public static var antipatternInventoryCount: Int {
+        return antipatternInventory.count
+    }
+
+    /// Discipline pin:NO new meta-doctrines without
+    /// concrete production-code change after M2162。
+    /// Chapter 698 ships ZERO new doctrines — only
+    /// amendment + diagnostic cleanup + chapter close-
+    /// out。
+    public static let chapter698ShipsZeroNewDoctrines:
+        Bool = true
+
+    /// Discipline pin:future chapters must justify
+    /// any new doctrine by either (a) shipping
+    /// production-code typed surface AT THE SAME TIME,
+    /// or (b) being explicitly requested by user
+    /// directive that needs a typed audit。
+    public static let futureNewDoctrineGate: String =
+        "production-code-typed-surface OR explicit-user-directive-requiring-typed-audit"
 }

@@ -387,6 +387,36 @@ final class BASSignalTenIntegrationTestTriageDoctrineTests: XCTestCase {
         XCTAssertTrue(combined.contains("non-detached"))
     }
 
+    // MARK: - M2162 chapter 698 placeholder cleanup pins
+
+    func testActiveDiagnosticCountPostM2162Is2() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .activeDiagnosticCountPostM2162, 2)
+    }
+
+    func testSkipPlaceholdersRemovedAtM2162Is3() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .skipPlaceholdersRemovedAtM2162, 3)
+    }
+
+    func testOriginalDiagnosticCountM2146Is4() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .originalDiagnosticCountM2146, 4)
+    }
+
+    func testPostCleanupActivePlusRemovedTotalIs5() {
+        XCTAssertEqual(
+            BASSignalTenIntegrationTestTriageDoctrine
+                .postCleanupActivePlusRemovedTotal,
+            BASSignalTenIntegrationTestTriageDoctrine
+                .activeDiagnosticCountPostM2162
+                + BASSignalTenIntegrationTestTriageDoctrine
+                    .skipPlaceholdersRemovedAtM2162)
+    }
+
     // MARK: - M2146 empirical diagnosis pins
 
     func testEmpiricalDiagnosisRunAtM2146() {

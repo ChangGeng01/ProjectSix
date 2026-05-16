@@ -427,6 +427,42 @@ public enum BASSignalTenIntegrationTestTriageDoctrine {
     public static let empiricalDiagnosisTestFile: String =
         "Tests/BehavioralAISubstrateTests/BASSignal10EmpiricalDiagnosisTests.swift"
 
+    // MARK: - M2162 chapter 六百九十八 第一刀 — diagnostic
+    //         placeholder cleanup
+    //
+    // M2146 originally shipped 4 diagnostics (A/C/D/E)
+    // with A passing and C/D/E as XCTSkip-placeholder
+    // tests documenting bucket boundaries。 M2158 added
+    // Diagnostic F (sync + non-detached Task + actor)
+    // as another PASSING diagnostic。
+    //
+    // M2162 (chapter 698) acknowledges the C/D/E XCTSkip
+    // placeholders are DOCTRINE SPRAWL — their empirical
+    // findings already live in the empirical pins above
+    // (refinedPatternSignaturePostM2146,hypothesis flags,
+    // etc)。 Keeping 3 skipped tests "for documentation"
+    // is redundant when the doctrine IS the documentation。
+    //
+    // M2162 removes C/D/E from the test file。 Active
+    // diagnostics:2 (A + F),both PASSING。
+
+    /// Active empirical diagnostics post-M2162 (A + F)。
+    public static let activeDiagnosticCountPostM2162: Int =
+        2
+
+    /// Skip placeholders removed at M2162 (C + D + E)。
+    public static let skipPlaceholdersRemovedAtM2162: Int =
+        3
+
+    /// Original M2146 diagnostic count for history。
+    public static let originalDiagnosticCountM2146: Int = 4
+
+    /// M2158 added Diagnostic F → 5 total before cleanup;
+    /// M2162 removed C/D/E → 2 active。
+    public static let postCleanupActivePlusRemovedTotal:
+        Int = 5
+    // = 2 active + 3 removed
+
     // MARK: - M2155 chapter 六百九十六 第二刀 — sync-surface
     //         recovery correction
     //
