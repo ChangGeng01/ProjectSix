@@ -62,7 +62,7 @@ import Foundation
 /// can verify which kernel ran without holding a separate
 /// reference。
 public struct BASKernelDispatchResult:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// The key that routed this dispatch (mirrors the

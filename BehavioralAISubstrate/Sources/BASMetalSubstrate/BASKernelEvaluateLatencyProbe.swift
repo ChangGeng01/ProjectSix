@@ -33,7 +33,7 @@ import BASRuntimeCore
 /// Typed result pair returned by the probe — original
 /// kernel outputs + typed latency observation。
 public struct BASKernelEvaluateLatencyProbeResult:
-    Sendable
+    Sendable, Equatable, Hashable, Codable
 {
     public let outputs: BASKernelOutputs
     public let latency: BASMPSGraphKernelBuildLatencyResult

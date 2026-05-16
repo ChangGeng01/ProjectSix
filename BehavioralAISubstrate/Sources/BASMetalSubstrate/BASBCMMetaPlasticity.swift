@@ -106,7 +106,7 @@ public struct BASBCMMetaPlasticityShape:
 // MARK: - Typed update bundle
 
 public struct BASBCMMetaPlasticityUpdate:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     public let pre: [Float]
