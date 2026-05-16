@@ -265,4 +265,98 @@ public enum BASCanonicalKernelCoverage {
         ],
         recordedAt:
             Date(timeIntervalSince1970: 1_812_000_000))
+
+    /// Snapshot of MPSGraph kernel coverage at chapter
+    /// 六百八十一 / M2102 — 8-of-8 native coverage
+    /// milestone post-Phase-M-stub-repurpose。
+    ///
+    /// All 8 BASNeuralOp cases now have native production-
+    /// grade implementations with numerical correctness
+    /// proof:
+    ///   - matMul、rmsNorm、rotaryEmbedding、attention
+    ///     (chapter 477)
+    ///   - softmax、layerNorm、conv2D (chapter 479)
+    ///   - ssmScan via real Metal compute shader
+    ///     (chapter 678 / M2089) + CPU sibling
+    ///     (chapter 681 / M2101) — 5 correctness oracles
+    ///     proven (CPU↔GPU cross-val + CPU↔analytic +
+    ///     GPU↔analytic + extended-fixture cross-val +
+    ///     numerical-stability cross-val)
+    public static let chapter681Snapshot:
+        BASMPSGraphKernelCoverageBundle =
+    BASMPSGraphKernelCoverageBundle(
+        bundleID: "mpsgraph-coverage-chapter-681",
+        schemaVersion: "1.0.0",
+        items: [
+            BASMPSGraphKernelCoverageItem(
+                operation: .matMul,
+                provenInChapter: 475,
+                provenAtMNumber: 1277,
+                testCaseCount: 5,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .rmsNorm,
+                provenInChapter: 476,
+                provenAtMNumber: 1280,
+                testCaseCount: 5,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .rotaryEmbedding,
+                provenInChapter: 476,
+                provenAtMNumber: 1282,
+                testCaseCount: 5,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .attention,
+                provenInChapter: 477,
+                provenAtMNumber: 1284,
+                testCaseCount: 4,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .softmax,
+                provenInChapter: 479,
+                provenAtMNumber: 1292,
+                testCaseCount: 4,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .layerNorm,
+                provenInChapter: 479,
+                provenAtMNumber: 1293,
+                testCaseCount: 4,
+                hasNumericalCorrectnessProof: true),
+            BASMPSGraphKernelCoverageItem(
+                operation: .conv2D,
+                provenInChapter: 479,
+                provenAtMNumber: 1294,
+                testCaseCount: 3,
+                hasNumericalCorrectnessProof: true),
+            // ssmScan — chapter 678 / M2089 shipped REAL
+            // Metal compute kernel + chapter 679-680
+            // fixture validation + chapter 681 / M2101
+            // CPU sibling repurpose。 39 PROOF tests
+            // covering the kernel:5 basic + 11 CPU ref
+            // + 9 cross-val + 14 fixture-validation。
+            BASMPSGraphKernelCoverageItem(
+                operation: .ssmScan,
+                provenInChapter: 678,
+                provenAtMNumber: 2089,
+                testCaseCount: 39,
+                hasNumericalCorrectnessProof: true)
+        ],
+        metadata: [
+            "coverage-target":
+                "8-of-8-native",
+            "ssm-scan-status":
+                "metal-shader-production-plus-cpu-sibling",
+            "ssm-scan-gpu-impl":
+                "BASMetalSSMScanKernel (chapter 678 / M2089)",
+            "ssm-scan-cpu-impl":
+                "BASCPUSSMScanKernel (chapter 681 / M2101)",
+            "ssm-scan-correctness-oracle-count":
+                "5",
+            "evaluation-doctrine":
+                "BASRealHotPathAttackEvaluationDoctrine"
+        ],
+        recordedAt:
+            Date(timeIntervalSince1970: 1_820_000_000))
 }
