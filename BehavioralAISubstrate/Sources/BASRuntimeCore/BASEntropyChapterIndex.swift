@@ -5295,7 +5295,33 @@ public enum BASEntropyChapterIndex {
                 " typed surfaces cumulative。 ADR-016 →" +
                 " M2121。 704 consecutive byte-equality" +
                 " clean commits。 Chapter 688 DELETION +" +
-                " Phase O CLOSE-OUT NEXT。")
+                " Phase O CLOSE-OUT NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十八",
+            mNumberFirst: 2122, mNumberLast: 2125,
+            knivesCount: 4, entropyClassesCount: 4,
+            pinsCount: 10, futureCutsCount: 1,
+            summary: "PHASE O FULLY SEALED at HALFWAY" +
+                " MILESTONE。 NEW BASPhaseOCompletion" +
+                "Doctrine at M2122 documenting honest" +
+                " scope (V1 deletion DEFERRED to preserve" +
+                " V1 OPT-OUT contract) + 8 doctrine pins" +
+                " held + 35 anti-drift tests at M2123。" +
+                " NEW BASMostExtremeDirectiveStatusDoctrine" +
+                " at M2124 typed-pinning 最极致 saturated" +
+                " at 10/10 since Phase M + 7 score" +
+                " checkpoints + 5 deferred work items + 31" +
+                " anti-drift tests。 Chapter 688 close-out" +
+                " (M2125) + 13-file standard sync。 23/46" +
+                " chapters of wild-rolling-meerkat plan" +
+                " complete (50.0%) — HALFWAY MILESTONE。" +
+                " 4 V1 OPT-OUT mechanisms intact。 60/60" +
+                " PRELIMINARY score maintained。 250 typed" +
+                " surfaces cumulative。 ADR-016 → M2125。" +
+                " 708 consecutive byte-equality clean" +
+                " commits。 Phase P Tier B+C sprawl OR" +
+                " jump to final tier 1+2 seal (chapters" +
+                " 708-709) NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

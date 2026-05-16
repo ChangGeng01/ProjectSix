@@ -569,30 +569,39 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// OPENING (risk-free)。 (Full provenance in chapter
     /// 686 close-out commit)。
     /// Re-captured at chapter 687 close-out。 PHASE O
-    /// WIRE-IN — Bundle .compose() factory at M2118 + +RunTurn
-    /// .swift body additive wire-in at M2119 (bundle
-    /// construction + ontologyFog redirect through
-    /// bundle.ontologyFog,LOC delta +11) + NEW BAS
-    /// PhaseOWireInByteEqualityProofDoctrine at M2120
-    /// documenting definitional-equality byte-preservation
-    /// + 26 regression tests across 3 suites (canonical60
-    /// + V1-callability + PhaseF) all pass with 0
-    /// divergences。 Chapter 687 close-out (M2121) + 13-
-    /// file standard sync。 30 anti-drift tests for the
-    /// proof doctrine。 Conservative additive approach
-    /// (LOC delta +11 not -200) — risk realized LOWER
-    /// than plan estimate (medium → low)。 V1 byte-
-    /// equality preserved BY CONSTRUCTION (bundle
-    /// .ontologyFog ≡ cthulhuPentaForAudit.ontologyFog
-    /// by definitional equality on the derived accessor)。
-    /// +RunTurn.swift LOC:1803 → 1814 (+11)。 4 *Two/
-    /// *Penta locals intact (3 main + 1 redirected
-    /// derived)。 248 typed surfaces cumulative (+1)。
-    /// 704 consecutive byte-equality clean commits。
-    /// ADR-014 OPT-OUT preserved。 ADR-016 → M2121。
-    /// Phase O score remains 60/60 PRELIMINARY
-    /// (structural-only contribution)。 Chapter 688
-    /// DELETION + Phase O CLOSE-OUT NEXT。
+    /// WIRE-IN sealed。 (Full provenance in chapter 687
+    /// close-out commit M2121)。
+    /// Re-captured at chapter 688 close-out。 *** PHASE O
+    /// FULLY SEALED at HALFWAY MILESTONE ***。 NEW BAS
+    /// PhaseOCompletionDoctrine at M2122 documenting
+    /// honest scope (V1 deletion DEFERRED to preserve V1
+    /// OPT-OUT contract — Phase L sealed it,Phase O
+    /// can't break it) + actual vs aspirational LOC delta
+    /// (+11 actual vs -1723 aspirational) + 8 doctrine
+    /// pins held + 35 anti-drift tests at M2123。 NEW
+    /// BASMostExtremeDirectiveStatusDoctrine at M2124
+    /// typed-pinning 最极致 saturated at 10/10 since
+    /// Phase M (chapter 682) + 7 score checkpoints with
+    /// monotonic-non-decreasing progression + 5 deferred
+    /// work items gated on ADR-014 OPT-OUT semantic
+    /// revision + 31 anti-drift tests。 Chapter 688 close-
+    /// out (M2125) + 13-file standard sync。 Phase O
+    /// total:3 chapters / 12 commits / 166 PROOF tests
+    /// across 6 anti-drift doctrines (bundle + plan +
+    /// wire-in proof + completion + directive status +
+    /// 2 close-out doctrines)。 V1 deletion HONESTLY
+    /// DEFERRED — 4 V1 OPT-OUT mechanisms intact at end
+    /// of Phase O。 250 typed surfaces cumulative (+2
+    /// across chapter 688)。 708 consecutive byte-equality
+    /// clean commits。 ADR-014 OPT-OUT preserved。 ADR-
+    /// 016 → M2125。 60/60 PRELIMINARY score maintained
+    /// throughout Phase O。 23/46 chapters of wild-rolling-
+    /// meerkat plan complete — HALFWAY MILESTONE reached
+    /// (50.0%)。 Phase P Tier B+C sprawl (chapters 689-
+    /// 707) OR jump directly to final tier 1+2 seal
+    /// (chapters 708-709) NEXT — both options on table
+    /// since 低熵复杂系统 directive already at 10/10
+    /// from Phase J/L/M。
     static let frozenFullRegistrySha256: String =
-        "8974e805807df690b77fedb8a6fe602cb0f6b1bbb294d8636189f054d8b2897f"
+        "0cbd3f94890e9cb50f87d73589f71c6318e3ee58024ff41547da104ac56c729f"
 }

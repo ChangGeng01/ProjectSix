@@ -2525,7 +2525,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百八十七")!)
+                            "chapter 六百八十七")!),
+            // M2125 chapter 688 — Phase O FULLY SEALED
+            checkRegistry("六百八十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百八十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4501,6 +4507,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百八十七")!
+                .mNumberLast),
+            // M2125 chapter 688 — Phase O FULLY SEALED
+            ("688",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

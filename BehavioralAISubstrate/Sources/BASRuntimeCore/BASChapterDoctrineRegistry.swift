@@ -20917,7 +20917,87 @@ public enum BASChapterDoctrineRegistry {
                 " clean commits。 Phase O score remains" +
                 " 60/60 PRELIMINARY (structural-only" +
                 " contribution)。 Chapter 688 DELETION +" +
-                " Phase O CLOSE-OUT NEXT。")
+                " Phase O CLOSE-OUT NEXT。"),
+
+        // chapter 688 — Phase O FULLY SEALED at HALFWAY
+        // MILESTONE。 V1 deletion HONESTLY DEFERRED to
+        // preserve the V1 OPT-OUT contract that Phase L
+        // sealed。 23/46 chapters of wild-rolling-meerkat
+        // plan complete (50.0%)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八十八",
+            mNumberFirst: 2122,
+            mNumberLast: 2125,
+            v1MilestoneMNumber: 2125,
+            v1MilestoneStatus:
+                "chapter-688-phase-o-sealed-at-halfway-milestone",
+            knives: [
+                BASChapterKnife(mNumber: 2122, knife: "第一刀",
+                    concept: "NEW BASPhaseOCompletion" +
+                        "Doctrine documenting actual vs" +
+                        " aspirational Phase O achievements" +
+                        " + 8 doctrine pins held + honest" +
+                        " V1-deletion-deferred acknowledgment。"),
+                BASChapterKnife(mNumber: 2123, knife: "第二刀",
+                    concept: "35 anti-drift PROOF tests for" +
+                        " Phase O completion doctrine + 50%" +
+                        " plan-progress HALFWAY MILESTONE" +
+                        " assertion。"),
+                BASChapterKnife(mNumber: 2124, knife: "第三刀",
+                    concept: "NEW BASMostExtremeDirective" +
+                        "StatusDoctrine + 31 anti-drift tests" +
+                        " typed-pinning 最极致 saturated at" +
+                        " 10/10 since Phase M + 7 score" +
+                        " checkpoints + 5 deferred work items" +
+                        " gated on ADR-014 revision。"),
+                BASChapterKnife(mNumber: 2125, knife: "第四刀",
+                    concept: "Chapter 688 close-out + 13-" +
+                        "file standard doctrine sync。" +
+                        " PHASE O FULLY SEALED at HALFWAY" +
+                        " MILESTONE。 708 consecutive byte-" +
+                        "equality clean commits。")
+            ],
+            entropyClassesAttacked: [
+                "no-phase-o-completion-doctrine",
+                "no-honest-scope-acknowledgment",
+                "no-typed-directive-status-doctrine",
+                "no-halfway-milestone-typed-pin"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2125",
+                "v1-deletion-honestly-deferred",
+                "60-of-60-preliminary-maintained",
+                "halfway-milestone-23-of-46-chapters",
+                "708-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 689+ — Phase P Tier B+C sprawl OR final tier 1+2 seal at chapters 708-709"
+            ],
+            summary: "PHASE O FULLY SEALED at HALFWAY" +
+                " MILESTONE。 NEW 2 doctrines (Phase O" +
+                " completion + 最极致 directive status)" +
+                " + 66 anti-drift PROOF tests across" +
+                " M2123 + M2124。 chapter 688 close-out" +
+                " (M2125) + 13-file standard sync。 Phase" +
+                " O total:3 chapters / 12 commits / 166" +
+                " PROOF tests + close-out tests。 V1" +
+                " deletion HONESTLY DEFERRED to preserve" +
+                " V1 OPT-OUT contract (Phase L sealed it" +
+                ",Phase O can't break it)。 4 V1 OPT-OUT" +
+                " mechanisms intact at end of Phase O。" +
+                " 60/60 PRELIMINARY score maintained。" +
+                " 23/46 chapters complete (50.0% — HALFWAY" +
+                " MILESTONE of wild-rolling-meerkat plan" +
+                ")。 250 typed surfaces cumulative (+2)。" +
+                " ADR-016 → M2125。 708 consecutive byte-" +
+                "equality clean commits。 Phase P Tier" +
+                " B+C sprawl (chapters 689-707) NEXT OR" +
+                " jump directly to final tier 1+2 seal" +
+                " (chapters 708-709) — both options on" +
+                " table since 低熵复杂系统 already at" +
+                " 10/10 from Phase J/L/M。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
