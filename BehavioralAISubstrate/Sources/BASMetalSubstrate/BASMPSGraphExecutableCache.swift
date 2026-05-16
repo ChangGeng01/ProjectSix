@@ -61,6 +61,7 @@
 
 import Foundation
 import BASRuntimeCore
+@preconcurrency import MetalPerformanceShadersGraph
 
 // MARK: - Typed cache key
 
@@ -170,7 +171,50 @@ public actor BASMPSGraphExecutableCache {
         [BASMPSGraphCacheHitObservationItem] = []
     private var nextSequenceIndex: Int = 0
 
+    /// M2033 chapter 六百六十四 第一刀:per-key compiled
+    /// `MPSGraphExecutable` storage slot。 Kernel actors
+    /// consult `cachedExecutable(forKey:)` first;on miss
+    /// they compile a fresh executable and call
+    /// `storeExecutable(_:forKey:)` to amortize across
+    /// subsequent dispatches。 Non-Sendable executable
+    /// references stay isolated to this actor — kernel
+    /// callers always go through `async` accessors。
+    private var executables:
+        [BASMPSGraphCacheKey: MPSGraphExecutable] = [:]
+
     public init() {}
+
+    // MARK: - M2033 MPSGraphExecutable storage slot
+
+    /// Look up a compiled executable for the given key。
+    /// Returns nil on cache miss — caller should compile
+    /// the executable and `storeExecutable(_:forKey:)` it。
+    public func cachedExecutable(
+        forKey key: BASMPSGraphCacheKey
+    ) -> MPSGraphExecutable? {
+        return executables[key]
+    }
+
+    /// Store a compiled executable under the given key。
+    /// Subsequent `cachedExecutable(forKey:)` calls with
+    /// the same key return this executable instead of
+    /// recompiling。 Per-thermal-state-cache-key contract
+    /// per chapter 二百四:callers compose the thermal
+    /// band into the cache key when thermal-sensitive
+    /// pipelines must invalidate on transitions。
+    public func storeExecutable(
+        _ executable: MPSGraphExecutable,
+        forKey key: BASMPSGraphCacheKey
+    ) {
+        executables[key] = executable
+    }
+
+    /// Number of compiled executables stored。 Useful
+    /// for tests asserting "1000 dispatches with 7 unique
+    /// shapes left 7 executables in the cache"。
+    public var executableCount: Int {
+        return executables.count
+    }
 
     /// Record a cache hit for the given key。
     public func recordHit(
@@ -236,11 +280,13 @@ public actor BASMPSGraphExecutableCache {
                 timeIntervalSince1970: 1_704_067_200))
     }
 
-    /// Reset the observation set。 Useful for tests +
-    /// per-turn cache instrumentation that wants fresh
-    /// counters per turn。
+    /// Reset the observation set + drop compiled
+    /// executables。 Useful for tests + per-turn cache
+    /// instrumentation that wants fresh counters per turn
+    /// + GPU memory release on thermal-state transitions。
     public func reset() {
         observations.removeAll()
         nextSequenceIndex = 0
+        executables.removeAll()
     }
 }
