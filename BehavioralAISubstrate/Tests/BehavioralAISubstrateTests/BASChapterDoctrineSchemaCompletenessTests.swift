@@ -2563,7 +2563,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百九十三")!)
+                            "chapter 六百九十三")!),
+            // M2149 chapter 694 — COMPREHENSIVE GAP
+            // REMEDIATION arc
+            checkRegistry("六百九十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百九十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4588,6 +4595,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百九十三")!
+                .mNumberLast),
+            // M2149 chapter 694 — COMPREHENSIVE GAP
+            // REMEDIATION arc
+            ("694",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百九十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

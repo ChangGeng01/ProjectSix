@@ -5535,7 +5535,54 @@ public enum BASEntropyChapterIndex {
                 " test)。 60/60 score unchanged (saturation" +
                 " invariant holds across all 4 chapter 693" +
                 " commits)。 Substrate AT-REST + Tier A+B+C" +
-                " complete preserved。")
+                " complete preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百九十四",
+            mNumberFirst: 2146, mNumberLast: 2149,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 11, futureCutsCount: 0,
+            summary: "COMPREHENSIVE GAP REMEDIATION arc。" +
+                " Chapter 693 sealed pre-existing test" +
+                " failures but left 3 honest-scope gaps:" +
+                " A2 swift-testing framing,A3 typed" +
+                "SurfaceCount arithmetic,B1 Tier A bridge-" +
+                "not-adoption ambiguity。 M2146 第一刀" +
+                " EMPIRICAL signal-10 diagnosis:NEW" +
+                " BASSignal10EmpiricalDiagnosisTests + 4" +
+                " isolated diagnostics (A sync-direct PASS," +
+                " C async-direct CRASH,D async-Task" +
+                ".detached CRASH,E sync-Task.detached" +
+                " CRASH) → hypothesis #2 V2 path FALSIFIED" +
+                " via code inspection,hypothesis #1" +
+                " narrowed to dual triggers,wrapper-based" +
+                " recovery NOT VIABLE per Diagnostic E。" +
+                " Triage doctrine +10 empirical pins。" +
+                " M2147 第二刀 swift-testing framing" +
+                " CORRECTION:M2144 'concurrent flakiness'" +
+                " claim falsified by empirical test;" +
+                " refined to 'full-suite scheduling SIGBUS" +
+                " in swiftpm-testing-helper,scope-" +
+                "correlated not concurrency-correlated';" +
+                " 398 of 419 @Test cases start before" +
+                " crash,0 complete;recovery candidates" +
+                " rewritten;+8 pins。 M2148 第三刀 NEW" +
+                " BASTypedSurfaceCountAuditDoctrine pinning" +
+                " explicit counting convention + per-" +
+                "chapter audit + Tier A bridge-not-" +
+                "adoption amendment + 28+4 anti-drift" +
+                " tests。 Chapter 694 close-out (M2149) +" +
+                " 13-file standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2149。 732" +
+                " consecutive byte-equality clean commits。" +
+                " 270 typed surfaces cumulative (+1:" +
+                "BASTypedSurfaceCountAuditDoctrine)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C complete preserved。 All 3 chapter" +
+                " 694 gaps addressed via empirical-" +
+                "correction methodology — name the gap," +
+                " verify empirically,supersede prior" +
+                " framing if needed。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

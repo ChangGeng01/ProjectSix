@@ -21451,7 +21451,127 @@ public enum BASChapterDoctrineRegistry {
                 " 60/60 score unchanged (saturation" +
                 " invariant holds)。 Substrate AT-REST" +
                 " + Tier A+B+C complete preserved end-of-" +
-                "chapter-693。")
+                "chapter-693。"),
+        // chapter 694 — COMPREHENSIVE GAP REMEDIATION arc。
+        // Empirical signal-10 diagnosis + swift-testing
+        // framing correction + typedSurfaceCount audit +
+        // Tier A bridge-not-adoption pin。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百九十四",
+            mNumberFirst: 2146,
+            mNumberLast: 2149,
+            v1MilestoneMNumber: 2149,
+            v1MilestoneStatus:
+                "chapter-694-comprehensive-gap-remediation",
+            knives: [
+                BASChapterKnife(mNumber: 2146, knife: "第一刀",
+                    concept: "Empirical signal-10" +
+                        " diagnosis:NEW BASSignal10" +
+                        "EmpiricalDiagnosisTests + 4" +
+                        " isolated diagnostics → V2 path" +
+                        " FALSIFIED,refined pattern" +
+                        " (Task.detached OR async test" +
+                        " method),wrapper-based recovery" +
+                        " NOT VIABLE。 Triage doctrine +10" +
+                        " empirical pins。"),
+                BASChapterKnife(mNumber: 2147, knife: "第二刀",
+                    concept: "Swift-testing framing" +
+                        " CORRECTION:M2144 'concurrent" +
+                        " flakiness' framing falsified by" +
+                        " empirical test;refined to" +
+                        " 'full-suite scheduling SIGBUS'" +
+                        " with empirical pins (419 @Test/" +
+                        "67 @Suite,398 started/0" +
+                        " completed) + 8 anti-drift tests。"),
+                BASChapterKnife(mNumber: 2148, knife: "第三刀",
+                    concept: "NEW BASTypedSurfaceCount" +
+                        "AuditDoctrine pinning explicit" +
+                        " counting convention + per-" +
+                        "chapter audit (chapter 692/693/" +
+                        "694 +10/+1/+1) + Tier A bridge-" +
+                        "not-adoption amendment + 28+4" +
+                        " anti-drift tests。"),
+                BASChapterKnife(mNumber: 2149, knife: "第四刀",
+                    concept: "Chapter 694 close-out + 13-" +
+                        "file standard sync。 732" +
+                        " consecutive byte-equality clean" +
+                        " commits。 60/60 score unchanged" +
+                        " (saturation invariant)。")
+            ],
+            entropyClassesAttacked: [
+                "signal-10-triage-doctrine-empirical-truth-undocumented",
+                "swift-testing-framing-inaccurate",
+                "typed-surface-count-per-chapter-attribution-off-by-1",
+                "tier-a-shipped-semantic-ambiguous"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (gap remediation" +
+                    " purely additive)",
+                "ADR-016 → M2149",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "732-consecutive-byte-equality-clean-commits",
+                "empirical-correction-methodology-applied"
+            ],
+            plannedFutureCuts: [
+                "Optional follow-up:if Xcode 26.5+ ships" +
+                    " or SwiftPM swiftpm-testing-helper" +
+                    " full-suite scheduling stabilizes," +
+                    " un-skip the 12 + 3 SIGBUS tests" +
+                    " (BASSubstrateReauditShadowEvaluator" +
+                    "Tests + BASMemoryClosedLoopApplier" +
+                    "HostRuntimeIntegrationTests +" +
+                    " M306MultiSessionContinuityTests +" +
+                    " BASSignal10EmpiricalDiagnosisTests" +
+                    " C/D/E)"
+            ],
+            summary: "COMPREHENSIVE GAP REMEDIATION arc。" +
+                " Chapter 693 sealed pre-existing test" +
+                " failures but left 3 honest-scope gaps:" +
+                " A2 swift-testing framing,A3 typedSurface" +
+                "Count arithmetic,B1 Tier A bridge-not-" +
+                "adoption ambiguity。 M2146 第一刀 NEW" +
+                " BASSignal10EmpiricalDiagnosisTests + 4" +
+                " isolated diagnostics empirically narrowed" +
+                " the SIGBUS bucket:Diagnostic A (sync" +
+                " direct) PASSES,C/D/E (async direct," +
+                " async Task.detached,sync Task.detached)" +
+                " all CRASH → V2 path FALSIFIED,Task" +
+                ".detached AND async test method are" +
+                " independent triggers,wrapper-based" +
+                " recovery NOT VIABLE。 Triage doctrine +10" +
+                " empirical pins。 M2147 第二刀 swift-" +
+                "testing framing CORRECTION — M2144" +
+                " 'concurrent flakiness' claim falsified" +
+                " by `swift test --enable-swift-testing" +
+                " --disable-xctest` ALSO crashes;refined" +
+                " to 'full-suite scheduling SIGBUS in" +
+                " swiftpm-testing-helper';419 @Test/67" +
+                " @Suite,398 started,0 completed;recovery" +
+                " candidates rewritten;+8 pins。 M2148" +
+                " 第三刀 NEW BASTypedSurfaceCountAudit" +
+                "Doctrine pinning explicit counting" +
+                " convention (5 counted kinds + 4 excluded" +
+                " categories) + per-chapter audit (chapter" +
+                " 692 audited +10 vs comment +9,chapter" +
+                " 693 audited +1 vs comment +2,errors" +
+                " cancel,cumulative 269 correct) + Tier A" +
+                " bridge-not-adoption amendment + 28+4" +
+                " anti-drift tests。 Chapter 694 close-out" +
+                " (M2149) + 13-file standard sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2149。 732" +
+                " consecutive byte-equality clean commits。" +
+                " 270 typed surfaces cumulative (+1:" +
+                "BASTypedSurfaceCountAuditDoctrine)。 60/60" +
+                " score unchanged (saturation invariant" +
+                " holds)。 Substrate AT-REST + Tier A+B+C" +
+                " complete preserved。 All 3 chapter 694" +
+                " gaps addressed via empirical-correction" +
+                " methodology — name the gap,verify" +
+                " empirically,supersede prior framing if" +
+                " needed。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
