@@ -1,0 +1,15 @@
+{
+  "name": "two_batch_independence",
+  "description": "Two batches with different x inputs (x=1 vs x=7) yield independent outputs y=1 and y=7. PROOF that the kernel doesn't contaminate batches.",
+  "derivation": "Batch 0 (x=1.0): A_bar=exp(1*0)=1, B_bar=1, h_0=1*0+1*1=1, y_0=1*1=1.0. Batch 1 (x=7.0): same params, h_0=0+7=7, y_0=1*7=7.0.",
+  "shape": { "B": 2, "L": 1, "D": 1 },
+  "inputs": {
+    "x":     [1.0, 7.0],
+    "delta": [1.0, 1.0],
+    "A":     [0.0],
+    "B":     [1.0, 1.0],
+    "C":     [1.0, 1.0]
+  },
+  "expected_y": [1.0, 7.0],
+  "tolerance": 1e-5
+}

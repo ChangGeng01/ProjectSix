@@ -1,0 +1,15 @@
+{
+  "name": "zero_delta_zero_output",
+  "description": "delta=0 across all positions forces A_bar=exp(0)=1 and B_bar=0*B=0, so h stays at h_0=0 indefinitely and y=C*0=0. Boundary fixture proving the kernel handles the zero-input edge correctly.",
+  "derivation": "A_bar = exp(delta_t * A_d) = exp(0 * A_d) = exp(0) = 1.0 (for all t). B_bar = delta_t * B_t = 0 * B_t = 0 (for all t). h_t = 1.0 * h_{t-1} + 0 * x_t = h_{t-1}. Since h_0 = 0, h stays 0 forever. y_t = C_t * 0 = 0.",
+  "shape": { "B": 1, "L": 4, "D": 2 },
+  "inputs": {
+    "x":     [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+    "delta": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "A":     [-1.0, -0.5],
+    "B":     [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    "C":     [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+  },
+  "expected_y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  "tolerance": 1e-5
+}

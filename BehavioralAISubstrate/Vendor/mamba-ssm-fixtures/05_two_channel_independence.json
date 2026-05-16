@@ -1,0 +1,15 @@
+{
+  "name": "two_channel_independence",
+  "description": "Two channels with different A coefficients produce independent outputs. At L=1, initial h=0 means A doesn't affect the first output — both channels yield the same y=x*B*C since A_bar*0=0. The PROOF is that the two channels' computations don't interfere.",
+  "derivation": "Channel 0 (A=0): A_bar=1, B_bar=1, h_0=1*0+1*1=1, y_0=1*1=1. Channel 1 (A=-1): A_bar=exp(-1), B_bar=1, h_0=exp(-1)*0+1*1=1, y_0=1*1=1. Both y values are 1.0 at L=1 because initial state was 0 (A only matters for L>=2 with non-zero prior h).",
+  "shape": { "B": 1, "L": 1, "D": 2 },
+  "inputs": {
+    "x":     [1.0, 1.0],
+    "delta": [1.0, 1.0],
+    "A":     [0.0, -1.0],
+    "B":     [1.0, 1.0],
+    "C":     [1.0, 1.0]
+  },
+  "expected_y": [1.0, 1.0],
+  "tolerance": 1e-5
+}

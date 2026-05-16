@@ -1,0 +1,15 @@
+{
+  "name": "two_step_decay",
+  "description": "Two-step decay scan: A=-1, delta=1, x=[1,0]. Step 0 deposits 1 into h, step 1 decays it by factor exp(-1).",
+  "derivation": "t=0: A_bar=exp(1*-1)=exp(-1), B_bar=1*1=1. h_0 = exp(-1)*0 + 1*1 = 1. y_0 = 1*1 = 1.0. t=1: A_bar=exp(-1), B_bar=1. h_1 = exp(-1)*1 + 1*0 = exp(-1). y_1 = 1 * exp(-1) = 0.36787944117144233 (single-precision float32 expf result).",
+  "shape": { "B": 1, "L": 2, "D": 1 },
+  "inputs": {
+    "x":     [1.0, 0.0],
+    "delta": [1.0, 1.0],
+    "A":     [-1.0],
+    "B":     [1.0, 1.0],
+    "C":     [1.0, 1.0]
+  },
+  "expected_y": [1.0, 0.36787944],
+  "tolerance": 1e-5
+}
