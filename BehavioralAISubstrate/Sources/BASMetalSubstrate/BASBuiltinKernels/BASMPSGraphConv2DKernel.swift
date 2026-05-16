@@ -42,7 +42,12 @@ public actor BASMPSGraphConv2DKernel: BASMetalKernel {
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
 
-    public init() throws {
+    /// M2045:optional MPSGraphExecutable cache。
+    private let cache: BASMPSGraphExecutableCache?
+
+    public init(
+        cache: BASMPSGraphExecutableCache? = nil
+    ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()
         else {
             throw BASKernelError.frameworkUnavailable(
@@ -55,6 +60,42 @@ public actor BASMPSGraphConv2DKernel: BASMetalKernel {
         }
         self.device = dev
         self.commandQueue = queue
+        self.cache = cache
+    }
+
+    private nonisolated func buildGraph(
+        n: Int, h: Int, w: Int, cin: Int,
+        hk: Int, wk: Int, cout: Int
+    ) -> (
+        graph: MPSGraph,
+        inP: MPSGraphTensor,
+        wP: MPSGraphTensor,
+        output: MPSGraphTensor
+    ) {
+        let graph = MPSGraph()
+        let inP = graph.placeholder(
+            shape: [NSNumber(value: n),
+                    NSNumber(value: h),
+                    NSNumber(value: w),
+                    NSNumber(value: cin)],
+            dataType: .float32, name: "in")
+        let wP = graph.placeholder(
+            shape: [NSNumber(value: hk),
+                    NSNumber(value: wk),
+                    NSNumber(value: cin),
+                    NSNumber(value: cout)],
+            dataType: .float32, name: "weights")
+        let convDesc = MPSGraphConvolution2DOpDescriptor(
+            strideInX: 1, strideInY: 1,
+            dilationRateInX: 1, dilationRateInY: 1,
+            groups: 1,
+            paddingStyle: .TF_VALID,
+            dataLayout: .NHWC,
+            weightsLayout: .HWIO)!
+        let output = graph.convolution2D(
+            inP, weights: wP,
+            descriptor: convDesc, name: "output")
+        return (graph, inP, wP, output)
     }
 
     public func evaluate(
@@ -143,37 +184,6 @@ public actor BASMPSGraphConv2DKernel: BASMetalKernel {
                 reason: "alloc output failed")
         }
 
-        // Build the conv2D graph fresh per call
-        // (caching deferred to chapter 480 M1296)
-        let graph = MPSGraph()
-        let inPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: n),
-                    NSNumber(value: h),
-                    NSNumber(value: w),
-                    NSNumber(value: cin)],
-            dataType: .float32, name: "in")
-        let wPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: hk),
-                    NSNumber(value: wk),
-                    NSNumber(value: cin),
-                    NSNumber(value: cout)],
-            dataType: .float32, name: "weights")
-        let convDesc = MPSGraphConvolution2DOpDescriptor(
-            strideInX: 1,
-            strideInY: 1,
-            dilationRateInX: 1,
-            dilationRateInY: 1,
-            groups: 1,
-            paddingStyle: .TF_VALID,
-            dataLayout: .NHWC,
-            weightsLayout: .HWIO)!
-        let output = graph.convolution2D(
-            inPlaceholder,
-            weights: wPlaceholder,
-            descriptor: convDesc,
-            name: "output")
-
-        // Wrap MTLBuffers
         let inTensorData = MPSGraphTensorData(
             bufferIn,
             shape: [NSNumber(value: n),
@@ -196,14 +206,69 @@ public actor BASMPSGraphConv2DKernel: BASMetalKernel {
                     NSNumber(value: cout)],
             dataType: .float32)
 
-        graph.run(
-            with: commandQueue,
-            feeds: [
-                inPlaceholder: inTensorData,
-                wPlaceholder: wTensorData
-            ],
-            targetOperations: nil,
-            resultsDictionary: [output: outTensorData])
+        if let cache = self.cache {
+            let cacheKey = BASMPSGraphCacheKey(
+                operation: .conv2D,
+                dataType: .float32,
+                inputShapes: [
+                    [n, h, w, cin],
+                    [hk, wk, cin, cout]
+                ])
+            let executable: MPSGraphExecutable
+            if let cached = await cache.cachedExecutable(
+                forKey: cacheKey)
+            {
+                executable = cached
+                await cache.recordHit(key: cacheKey)
+            } else {
+                let built = buildGraph(
+                    n: n, h: h, w: w, cin: cin,
+                    hk: hk, wk: wk, cout: cout)
+                let inShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: n),
+                            NSNumber(value: h),
+                            NSNumber(value: w),
+                            NSNumber(value: cin)],
+                    dataType: .float32)
+                let wShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: hk),
+                            NSNumber(value: wk),
+                            NSNumber(value: cin),
+                            NSNumber(value: cout)],
+                    dataType: .float32)
+                executable = built.graph.compile(
+                    with: nil,
+                    feeds: [
+                        built.inP: inShape,
+                        built.wP: wShape
+                    ],
+                    targetTensors: [built.output],
+                    targetOperations: nil,
+                    compilationDescriptor: nil)
+                await cache.storeExecutable(
+                    executable, forKey: cacheKey)
+                await cache.recordMiss(key: cacheKey)
+            }
+            let _ = executable.run(
+                with: commandQueue,
+                inputs: [inTensorData, wTensorData],
+                results: [outTensorData],
+                executionDescriptor: nil)
+        } else {
+            let built = buildGraph(
+                n: n, h: h, w: w, cin: cin,
+                hk: hk, wk: wk, cout: cout)
+            built.graph.run(
+                with: commandQueue,
+                feeds: [
+                    built.inP: inTensorData,
+                    built.wP: wTensorData
+                ],
+                targetOperations: nil,
+                resultsDictionary: [
+                    built.output: outTensorData
+                ])
+        }
 
         let outData = Data(
             bytes: bufferOut.contents(),
