@@ -237,7 +237,7 @@ public struct BASPlasticityFoldShape:
 // MARK: - Typed update result bundle
 
 public struct BASPlasticityUpdate:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// The pre-synaptic vector caller passed in。

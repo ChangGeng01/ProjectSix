@@ -180,7 +180,7 @@ public struct BASHierarchicalPredictiveCodingShape:
 /// `BASPredictiveCodingObservation` + the top-layer
 /// error (irreducible surprise) + observation index。
 public struct BASHierarchicalObservation:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// Per-layer observation results,bottom-up order。

@@ -176,7 +176,7 @@ public struct BASPredictiveCodingProbeShape:
 /// update),the prediction error,the post-update
 /// prediction,and the running MSE adaptation signal。
 public struct BASPredictiveCodingObservation:
-    Equatable, Hashable, Sendable
+    Equatable, Hashable, Sendable, Codable
 {
 
     /// The observation vector caller passed in。
