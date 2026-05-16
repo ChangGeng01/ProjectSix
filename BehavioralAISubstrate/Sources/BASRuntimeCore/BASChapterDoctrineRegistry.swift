@@ -19426,7 +19426,79 @@ public enum BASChapterDoctrineRegistry {
                 " ADR-014 OPT-IN preserved。 Chapters 666-" +
                 "667 wire remaining 4 kernels (attention," +
                 " softmax,layerNorm,conv2D) + ship the" +
-                " 5× speedup wallclock benchmark。")
+                " 5× speedup wallclock benchmark。"),
+
+        // chapter 666 — Phase J kernel wiring continues。
+        // attention + softmax + layerNorm wired。 5 of 6
+        // MPSGraph kernels done after this chapter。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十六",
+            mNumberFirst: 2041,
+            mNumberLast: 2044,
+            v1MilestoneMNumber: 2044,
+            v1MilestoneStatus:
+                "chapter-666-phase-j-attention-softmax-layernorm-cache-wired",
+            knives: [
+                BASChapterKnife(mNumber: 2041, knife: "第一刀",
+                    concept: "BASMPSGraphAttentionKernel" +
+                        " wired (Q+K+V 3-input scaled dot-" +
+                        "product attention with softmax)。" +
+                        " 2 PROOF tests。"),
+                BASChapterKnife(mNumber: 2042, knife: "第二刀",
+                    concept: "BASMPSGraphSoftmaxKernel +" +
+                        " BASMPSGraphLayerNormKernel wired" +
+                        " in one commit。 4 PROOF tests" +
+                        " across both kernels (byte-equality" +
+                        " + cache-hit verification)。"),
+                BASChapterKnife(mNumber: 2043, knife: "第三刀",
+                    concept: "NEW BASKernelCacheWiringPhase" +
+                        "JChapter666Doctrine + 13 anti-drift" +
+                        " tests。 Tracks 3 kernels wired" +
+                        " this chapter,1 remaining for" +
+                        " chapter 667 (conv2D)。"),
+                BASChapterKnife(mNumber: 2044, knife: "第四刀",
+                    concept: "Chapter 666 close-out。 628" +
+                        " consecutive byte-equality clean" +
+                        " commits。 5 of 6 Phase J kernels" +
+                        " wired with byte-equality preserved。")
+            ],
+            entropyClassesAttacked: [
+                "attention-kernel-graph-build-per-call-unamortized",
+                "softmax-kernel-graph-build-per-call-unamortized",
+                "layernorm-kernel-graph-build-per-call-unamortized",
+                "phase-j-multi-kernel-batch-commit-pattern-not-established",
+                "5-of-6-kernels-still-uncached"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2044",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "attention-cache-wired-byte-equal",
+                "softmax-cache-wired-byte-equal",
+                "layernorm-cache-wired-byte-equal",
+                "phase-j-5-of-6-kernels-wired",
+                "all-cache-off-paths-unchanged-from-baselines",
+                "628-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 667 — wire conv2D + 5× speedup benchmark",
+                "chapter 667 — Phase J close-out doctrine",
+                "chapter 668-671 — Phase K runtimeMode toggle"
+            ],
+            summary: "Chapter 666 wires 3 more Phase J" +
+                " MPSGraph kernels — attention + softmax +" +
+                " layerNorm — bringing total Phase J coverage" +
+                " to 5 of 6。 Cache-on/off byte-equality" +
+                " preserved across all kernels。 NEW BASKernel" +
+                "CacheWiringPhaseJChapter666Doctrine + 13" +
+                " anti-drift tests。 207 typed surfaces" +
+                " cumulative。 ADR-016 → M2044。 628 consecutive" +
+                " byte-equality clean commits。 V1 byte-" +
+                "equality preserved。 ADR-014 OPT-IN preserved" +
+                "。 Chapter 667 wires final conv2D kernel +" +
+                " ships 5× speedup wallclock benchmark +" +
+                " seals Phase J。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

@@ -4866,7 +4866,28 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-014 OPT-IN preserved。" +
                 " Chapters 666-667 wire 4 remaining" +
                 " kernels (attention,softmax,layerNorm," +
-                " conv2D) + ship 5× speedup benchmark。")
+                " conv2D) + ship 5× speedup benchmark。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十六",
+            mNumberFirst: 2041, mNumberLast: 2044,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 14, futureCutsCount: 3,
+            summary: "PHASE J kernel wiring continues。" +
+                " 3 more kernels wired — attention at" +
+                " M2041 (2 PROOF tests) + softmax +" +
+                " layerNorm batched at M2042 (4 PROOF" +
+                " tests)。 NEW BASKernelCacheWiringPhaseJ" +
+                "Chapter666Doctrine + 13 anti-drift tests" +
+                " at M2043。 close-out at M2044。 6 kernel" +
+                " PROOF tests across 3 kernels;cache-on" +
+                " byte-equality verified per kernel。 5 of" +
+                " 6 Phase J MPSGraph kernels wired。 207" +
+                " typed surfaces cumulative (+1)。 ADR-016" +
+                " → M2044。 628 consecutive byte-equality" +
+                " clean commits。 V1 byte-equality preserved" +
+                "。 ADR-014 OPT-IN preserved。 Chapter 667" +
+                " wires conv2D + 5× speedup benchmark +" +
+                " seals Phase J。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

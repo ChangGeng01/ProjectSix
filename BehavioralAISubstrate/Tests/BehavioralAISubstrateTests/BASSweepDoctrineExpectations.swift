@@ -121,17 +121,16 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 263
+    public static let phase2ChapterCount: Int = 264
 
-    /// Phase 2 commits shipped。 At M2040:125 + 84 +
-    /// 876 = 1085 (chapter 665 — Phase J kernel wiring
-    /// continues, 2 of 6 kernels wired)
-    public static let phase2CommitsShipped: Int = 1085
+    /// Phase 2 commits shipped。 At M2044:125 + 84 +
+    /// 880 = 1089 (chapter 666 — 5 of 6 Phase J kernels)
+    public static let phase2CommitsShipped: Int = 1089
 
-    /// Phase 2 mNumberLast。 At M2040:chapter 665 —
-    /// rmsNorm + rotaryEmbedding kernels wired to cache。
+    /// Phase 2 mNumberLast。 At M2044:chapter 666 —
+    /// attention + softmax + layerNorm wired。
     /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2040
+    public static let phase2MNumberLast: Int = 2044
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
