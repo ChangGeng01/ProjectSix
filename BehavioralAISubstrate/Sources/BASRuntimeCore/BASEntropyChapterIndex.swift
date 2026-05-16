@@ -4730,7 +4730,24 @@ public enum BASEntropyChapterIndex {
                 "trio'。 200 typed surfaces cumulative。" +
                 " 600 consecutive byte-equality clean" +
                 " commits — 600-COMMIT MILESTONE。 ADR-" +
-                "016 → M2016。 V1 byte-equality preserved。")
+                "016 → M2016。 V1 byte-equality preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百六十",
+            mNumberFirst: 2017, mNumberLast: 2020,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 15, futureCutsCount: 3,
+            summary: "HOST-PROJECTION TRIO CODABLE" +
+                " EXTENSION — GAP-FILL,4th post-hexa-#7" +
+                ",single-module BASHostKit reach,3rd" +
+                " consecutive all-struct trio,2 chapters" +
+                " until chapter 六百六十三 hexa #8 catalog" +
+                " opportunity。 3 BASHostKit struct types" +
+                " gained Codable + 3 PROOF tests + new" +
+                " typed surface + close-out。 NEW kind" +
+                " 'host-projection-trio'。 201 typed" +
+                " surfaces cumulative。 604 consecutive" +
+                " byte-equality clean commits。 ADR-016" +
+                " → M2020。 V1 byte-equality preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

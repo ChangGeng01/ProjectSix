@@ -18951,7 +18951,67 @@ public enum BASChapterDoctrineRegistry {
                 " all-struct trio。 NEW kind 'kernel-result-" +
                 "trio'。 200 typed surfaces cumulative。" +
                 " 600 consecutive byte-equality clean commits" +
-                " — 600-COMMIT MILESTONE。 ADR-016 → M2016。")
+                " — 600-COMMIT MILESTONE。 ADR-016 → M2016。"),
+
+        // chapter 660 — host-projection trio Codable extension
+        // (4th post-hexa-#7,single-module BASHostKit reach,
+        // 3rd consecutive all-struct trio,2 chapters until
+        // chapter 663 hexa #8 catalog)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十",
+            mNumberFirst: 2017,
+            mNumberLast: 2020,
+            v1MilestoneMNumber: 2020,
+            v1MilestoneStatus:
+                "chapter-660-host-projection-trio-codable-extension",
+            knives: [
+                BASChapterKnife(mNumber: 2017, knife: "第一刀",
+                    concept: "Add Codable to 3 BASHostKit struct" +
+                        " types — BASEventLogTurnProjection +" +
+                        " BASTrainingExampleSubmission +" +
+                        " BASShadowEvaluateThenUpgradeOutcome。" +
+                        " 3rd consecutive all-struct trio。"),
+                BASChapterKnife(mNumber: 2018, knife: "第二刀",
+                    concept: "3 PROOF tests。"),
+                BASChapterKnife(mNumber: 2019, knife: "第三刀",
+                    concept: "NEW BASHostProjectionTrioCodable" +
+                        "ExtensionDoctrine + 28 anti-drift tests。" +
+                        " typed-surface 200 → 201。"),
+                BASChapterKnife(mNumber: 2020, knife: "第四刀",
+                    concept: "Chapter 660 close-out。 604" +
+                        " consecutive byte-equality clean commits。")
+            ],
+            entropyClassesAttacked: [
+                "bas-event-log-turn-projection-non-codable",
+                "bas-training-example-submission-non-codable",
+                "bas-shadow-evaluate-then-upgrade-outcome-non-codable",
+                "host-projection-trio-pattern-uncaptured",
+                "fourth-post-hexa-seven-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2020",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "host-projection-trio-codable-extension",
+                "fourth-post-hexa-seven-gap-fill",
+                "single-module-trio",
+                "third-consecutive-all-struct-trio",
+                "new-kind-label-host-projection-trio",
+                "604-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 2 more gap-fills (661-662)",
+                "future arc — chapter 663 hexa #8 catalog",
+                "future arc — Phase H default mode flip"
+            ],
+            summary: "Chapter 660 ships BASHostKit host-" +
+                "projection trio Codable extension —" +
+                " 4th post-hexa-#7 gap-fill,3rd consecutive" +
+                " all-struct trio。 NEW kind 'host-projection" +
+                "-trio'。 201 typed surfaces cumulative。" +
+                " 604 consecutive byte-equality clean commits。" +
+                " ADR-016 → M2020。 V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

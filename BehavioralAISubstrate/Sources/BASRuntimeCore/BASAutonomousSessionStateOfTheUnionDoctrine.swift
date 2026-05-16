@@ -122,11 +122,11 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// enum,this one is all-struct shape;coherent
     /// biomimetic theme;NEW kind 'biomimetic-
     /// observation-trio')。
-    public static let typedSurfaceCount: Int = 200
+    public static let typedSurfaceCount: Int = 201
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 600
-    public static let phase2CommitsShipped: Int = 1061
-    public static let chapter2NumberLast: Int = 2016
+        Int = 604
+    public static let phase2CommitsShipped: Int = 1065
+    public static let chapter2NumberLast: Int = 2020
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true

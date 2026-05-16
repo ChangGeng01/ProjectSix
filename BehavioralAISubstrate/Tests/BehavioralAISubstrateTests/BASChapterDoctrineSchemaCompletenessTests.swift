@@ -2369,7 +2369,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百五十九")!)
+                            "chapter 六百五十九")!),
+            // M2020 chapter 660 — host-projection trio Codable extension gap-fill (4th post-hexa-#7, 3rd consecutive all-struct trio)
+            checkRegistry("六百六十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4137,6 +4143,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百五十九")!
+                .mNumberLast),
+            // M2020 chapter 660 — host-projection trio Codable extension gap-fill (4th post-hexa-#7)
+            ("660",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
