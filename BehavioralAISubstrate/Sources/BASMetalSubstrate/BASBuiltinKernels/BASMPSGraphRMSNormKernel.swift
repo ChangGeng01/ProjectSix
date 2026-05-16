@@ -101,10 +101,28 @@ public actor BASMPSGraphRMSNormKernel: BASMetalKernel {
     private let device: any MTLDevice
     private let commandQueue: any MTLCommandQueue
 
+    /// M2037 chapter 六百六十五 第一刀:optional cache
+    /// for `MPSGraphExecutable` amortization across
+    /// dispatches。 Default `nil` preserves byte-equality
+    /// with chapter 448 / M1169 baseline:when nil,the
+    /// `graph.run(...)` path is unchanged from M1169。
+    /// When non-nil,the kernel compiles to executable on
+    /// first call,caches it,and uses `executable.run(...)`
+    /// on subsequent calls with the same `(op, dtype,
+    /// inputShapes)` key — amortizing graph build cost
+    /// across 1000-dispatch loops。
+    private let cache: BASMPSGraphExecutableCache?
+
     /// Construct the kernel against the system default
     /// `MTLDevice`。 Throws `.frameworkUnavailable`
-    /// when Metal is unavailable。
-    public init(epsilon: Float = 1e-6) throws {
+    /// when Metal is unavailable。 Pass `cache:` to opt
+    /// into Phase J MPSGraph executable caching;default
+    /// `nil` preserves M1169 byte-equality semantics for
+    /// hosts that haven't opted in。
+    public init(
+        epsilon: Float = 1e-6,
+        cache: BASMPSGraphExecutableCache? = nil
+    ) throws {
         guard let dev = MTLCreateSystemDefaultDevice()
         else {
             throw BASKernelError.frameworkUnavailable(
@@ -118,6 +136,7 @@ public actor BASMPSGraphRMSNormKernel: BASMetalKernel {
         self.device = dev
         self.commandQueue = queue
         self.epsilon = epsilon
+        self.cache = cache
     }
 
     public func evaluate(
@@ -198,40 +217,8 @@ public actor BASMPSGraphRMSNormKernel: BASMetalKernel {
                     " MTLBuffer output")
         }
 
-        // Build the rmsNorm graph fresh per call (graphs
-        // are lightweight + caching them across batch
-        // sizes is a future optimization in chapter
-        // 451+)。
-        let graph = MPSGraph()
-        let xPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: batch),
-                    NSNumber(value: hidden)],
-            dataType: .float32,
-            name: "x")
-        let wPlaceholder = graph.placeholder(
-            shape: [NSNumber(value: hidden)],
-            dataType: .float32,
-            name: "weight")
-        let squared = graph.multiplication(
-            xPlaceholder, xPlaceholder, name: "sq")
-        let meanSquares = graph.mean(
-            of: squared,
-            axes: [NSNumber(value: 1)],
-            name: "mean")
-        let epsTensor = graph.constant(
-            Double(epsilon),
-            shape: [1, 1],
-            dataType: .float32)
-        let shifted = graph.addition(
-            meanSquares, epsTensor, name: "shifted")
-        let rms = graph.squareRoot(
-            with: shifted, name: "rms")
-        let normalized = graph.division(
-            xPlaceholder, rms, name: "normalized")
-        let output = graph.multiplication(
-            normalized, wPlaceholder, name: "output")
-
-        // Wrap MTLBuffers in MPSGraphTensorData
+        // Wrap MTLBuffers in MPSGraphTensorData (shared
+        // across both cache-on and cache-off paths)
         let xTensorData = MPSGraphTensorData(
             bufferX,
             shape: [NSNumber(value: batch),
@@ -247,16 +234,135 @@ public actor BASMPSGraphRMSNormKernel: BASMetalKernel {
                     NSNumber(value: hidden)],
             dataType: .float32)
 
-        // Dispatch:run the graph into pre-allocated
-        // output buffer
-        graph.run(
-            with: commandQueue,
-            feeds: [
-                xPlaceholder: xTensorData,
-                wPlaceholder: wTensorData
-            ],
-            targetOperations: nil,
-            resultsDictionary: [output: outTensorData])
+        // M2037 chapter 六百六十五 第一刀:cache-on fast
+        // path consults `BASMPSGraphExecutableCache` for
+        // a pre-compiled `MPSGraphExecutable`。 On hit:
+        // skip graph build + skip compile,run cached
+        // executable directly。 On miss:build graph +
+        // compile + store + run executable。 When cache
+        // is nil:fall through to chapter 448 M1169
+        // baseline `graph.run(...)` path (byte-equality
+        // preserved)。
+        if let cache = self.cache {
+            let cacheKey = BASMPSGraphCacheKey(
+                operation: .rmsNorm,
+                dataType: .float32,
+                inputShapes: [
+                    [batch, hidden],
+                    [hidden]
+                ])
+            let executable: MPSGraphExecutable
+            if let cached = await cache.cachedExecutable(
+                forKey: cacheKey)
+            {
+                executable = cached
+                await cache.recordHit(key: cacheKey)
+            } else {
+                // Build graph (same op composition as
+                // baseline path)
+                let graph = MPSGraph()
+                let xPlaceholder = graph.placeholder(
+                    shape: [NSNumber(value: batch),
+                            NSNumber(value: hidden)],
+                    dataType: .float32,
+                    name: "x")
+                let wPlaceholder = graph.placeholder(
+                    shape: [NSNumber(value: hidden)],
+                    dataType: .float32,
+                    name: "weight")
+                let squared = graph.multiplication(
+                    xPlaceholder, xPlaceholder,
+                    name: "sq")
+                let meanSquares = graph.mean(
+                    of: squared,
+                    axes: [NSNumber(value: 1)],
+                    name: "mean")
+                let epsTensor = graph.constant(
+                    Double(epsilon),
+                    shape: [1, 1],
+                    dataType: .float32)
+                let shifted = graph.addition(
+                    meanSquares, epsTensor,
+                    name: "shifted")
+                let rms = graph.squareRoot(
+                    with: shifted, name: "rms")
+                let normalized = graph.division(
+                    xPlaceholder, rms,
+                    name: "normalized")
+                let output = graph.multiplication(
+                    normalized, wPlaceholder,
+                    name: "output")
+
+                // Compile to executable for caching
+                let xShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: batch),
+                            NSNumber(value: hidden)],
+                    dataType: .float32)
+                let wShape = MPSGraphShapedType(
+                    shape: [NSNumber(value: hidden)],
+                    dataType: .float32)
+                executable = graph.compile(
+                    with: nil,
+                    feeds: [
+                        xPlaceholder: xShape,
+                        wPlaceholder: wShape
+                    ],
+                    targetTensors: [output],
+                    targetOperations: nil,
+                    compilationDescriptor: nil)
+                await cache.storeExecutable(
+                    executable, forKey: cacheKey)
+                await cache.recordMiss(key: cacheKey)
+            }
+            // Dispatch:run cached executable with
+            // ordered inputs/results
+            let _ = executable.run(
+                with: commandQueue,
+                inputs: [xTensorData, wTensorData],
+                results: [outTensorData],
+                executionDescriptor: nil)
+        } else {
+            // Chapter 448 M1169 baseline path (cache=nil)
+            // — byte-equality preserved。
+            let graph = MPSGraph()
+            let xPlaceholder = graph.placeholder(
+                shape: [NSNumber(value: batch),
+                        NSNumber(value: hidden)],
+                dataType: .float32,
+                name: "x")
+            let wPlaceholder = graph.placeholder(
+                shape: [NSNumber(value: hidden)],
+                dataType: .float32,
+                name: "weight")
+            let squared = graph.multiplication(
+                xPlaceholder, xPlaceholder, name: "sq")
+            let meanSquares = graph.mean(
+                of: squared,
+                axes: [NSNumber(value: 1)],
+                name: "mean")
+            let epsTensor = graph.constant(
+                Double(epsilon),
+                shape: [1, 1],
+                dataType: .float32)
+            let shifted = graph.addition(
+                meanSquares, epsTensor, name: "shifted")
+            let rms = graph.squareRoot(
+                with: shifted, name: "rms")
+            let normalized = graph.division(
+                xPlaceholder, rms, name: "normalized")
+            let output = graph.multiplication(
+                normalized, wPlaceholder, name: "output")
+            graph.run(
+                with: commandQueue,
+                feeds: [
+                    xPlaceholder: xTensorData,
+                    wPlaceholder: wTensorData
+                ],
+                targetOperations: nil,
+                resultsDictionary: [
+                    output: outTensorData
+                ])
+        }
 
         // Download result MTLBuffer → CPU bytes
         let outBytes = Data(
