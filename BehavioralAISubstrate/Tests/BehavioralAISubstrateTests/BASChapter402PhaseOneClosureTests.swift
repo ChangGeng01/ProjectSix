@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2084",
-            "M2084:doctrine version reflects chapter 六百七十六 — HEXA #9 CATALOG mid-plan anti-drift checkpoint。 NEW BASPhaseJKLCompletionHexaCatalogDoctrine cataloging Phase J + K + L + THE FLIP as 4 EntryRecords at M2081。 57 anti-drift PROOF tests at M2082。 42 wire-in PROOF tests at M2083 cross-checking against 4 source phase-completion doctrines。 close-out (M2084)。 FIRST hexa cataloging PHASES (not gap-fill chapters)。 FIRST hexa with 4 entries instead of 6。 FIRST hexa explicitly inserted as anti-drift checkpoint at user direction。 3 phases / 12 chapters / 48 commits / 13 typed surfaces / score-delta 45→58 (+13 aggregate)。 220 typed surfaces cumulative。 668 consecutive byte-equality clean commits。 Hexa cadence PAUSED until 60/60 seal at chapter 709 per user choice。 Catalog lineage M1805 post-octa → M2029 hexa #8 → M2081 hexa #9。 Phase M real Mamba SSM kernel (chapters 六百七十七-六百八十二) NEXT")
+            "ADR-016.M2108",
+            "M2108:doctrine version reflects chapter 六百八十二 — PHASE M SEALED。 6 chapters / 24 commits Phase M complete。 substrate's FIRST raw Metal compute kernel (Mamba selective-scan) numerically proven against CPU reference + 6 canonical fixtures + 6 extended fixtures + 8 numerical-stability tests + wallclock characterization + 8-of-8 native coverage MILESTONE。 NEW BASPhaseMRealSSMScanKernelCompletionDoctrine (M2105) + 44 tests (M2106) + NEW BASPhaseMScoreImpactDoctrine (M2107) + 26 tests + chapter 682 close-out (M2108)。 Score progression 45→51→54→58→58→60 across J/K/L/Hexa9/M (60/60 PRELIMINARY ahead of formal chapter 708 tier 1 seal)。 5 correctness oracles for ssmScan kernel。 Phase M total 422 PROOF tests cumulative。 240 typed surfaces cumulative (+20 across Phase M)。 692 consecutive byte-equality clean commits。 ADR-014 OPT-OUT preserved。 Phase N Tier A sprawl (chapters 683-685) NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二

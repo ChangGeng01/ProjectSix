@@ -5136,7 +5136,94 @@ public enum BASEntropyChapterIndex {
                 " user choice。 Catalog lineage M1805" +
                 " post-octa → M2029 hexa #8 → M2081 hexa" +
                 " #9。 Phase M real Mamba SSM kernel" +
-                " (ch 677-682) NEXT。")
+                " (ch 677-682) NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十七",
+            mNumberFirst: 2085, mNumberLast: 2088,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M opening — substrate's FIRST" +
+                " raw Metal compute shader (SSMScan.metal" +
+                " for Mamba selective-scan)。 NEW Swift" +
+                " source mirror + typed 12-byte shape" +
+                " struct + 88 PROOF tests。 ADR-016 →" +
+                " M2088。 672 consecutive byte-equality" +
+                " clean commits。 223 typed surfaces" +
+                " cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十八",
+            mNumberFirst: 2089, mNumberLast: 2092,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M hardest challenge RESOLVED —" +
+                " NEW BASMetalSSMScanKernel actor + BAS" +
+                "SSMScanCPUReference + 9 GPU↔CPU cross-" +
+                "validation tests (MAE ≤ 1e-5 across 8" +
+                " fixtures) + 71 PROOF tests。 ADR-016 →" +
+                " M2092。 676 consecutive byte-equality" +
+                " clean commits。 227 typed surfaces" +
+                " cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十九",
+            mNumberFirst: 2093, mNumberLast: 2096,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M triangulation — 6 canonical" +
+                " mamba-ssm fixtures (analytic-derivation" +
+                " honest provenance) + BASSSMScanFixture" +
+                "Registry Swift mirror + 14 fixture-" +
+                "validation tests + 67 PROOF tests。 3" +
+                " correctness oracles in place。 ADR-016" +
+                " → M2096。 680 consecutive byte-equality" +
+                " clean commits。 230 typed surfaces" +
+                " cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十",
+            mNumberFirst: 2097, mNumberLast: 2100,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 6, futureCutsCount: 1,
+            summary: "PHASE M coverage extension — 6" +
+                " extended fixtures + 4 wallclock tests" +
+                " (honest characterization;GPU break-even" +
+                " at B*D≈256) + 8 numerical-stability" +
+                " tests + 59 PROOF tests。 5 correctness" +
+                " oracles。 ADR-016 → M2100。 684" +
+                " consecutive byte-equality clean commits" +
+                "。 233 typed surfaces cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十一",
+            mNumberFirst: 2101, mNumberLast: 2104,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 7, futureCutsCount: 1,
+            summary: "PHASE M 8-of-8 MILESTONE — chapter" +
+                " 496 stub repurposed as CPU-bytes sibling" +
+                " + chapter681Snapshot 8-of-8 native (496" +
+                " 7-of-8 historical preserved) + NEW BAS" +
+                "EightOfEightNativeKernelCoverageMilestone" +
+                "Doctrine + 67 PROOF tests。 Score 58→60" +
+                " preliminary。 ADR-016 → M2104。 688" +
+                " consecutive byte-equality clean commits" +
+                "。 237 typed surfaces cumulative。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百八十二",
+            mNumberFirst: 2105, mNumberLast: 2108,
+            knivesCount: 4, entropyClassesCount: 3,
+            pinsCount: 10, futureCutsCount: 4,
+            summary: "PHASE M SEALED — NEW BASPhaseMReal" +
+                "SSMScanKernelCompletionDoctrine sealing" +
+                " 6-chapter/24-commit arc + 44 anti-drift" +
+                " tests + NEW BASPhaseMScoreImpactDoctrine" +
+                " + 26 tests documenting score progression" +
+                " 45→51→54→58→58→60 (PRELIMINARY ahead of" +
+                " formal chapter 708 tier 1 seal) +" +
+                " chapter 682 close-out via 13-file" +
+                " standard sync + 70 PROOF tests。 Phase M" +
+                " total:6 chapters / 24 commits / 422" +
+                " PROOF tests cumulative。 240 typed" +
+                " surfaces cumulative (+20 across Phase M)" +
+                "。 ADR-016 → M2108。 692 consecutive" +
+                " byte-equality clean commits。 Phase N" +
+                " Tier A sprawl (ch 683-685) NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

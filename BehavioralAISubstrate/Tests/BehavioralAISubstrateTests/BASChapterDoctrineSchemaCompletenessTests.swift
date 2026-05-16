@@ -2471,7 +2471,43 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百七十六")!)
+                            "chapter 六百七十六")!),
+            // M2088 chapter 677 — Phase M SSMScan.metal ship
+            checkRegistry("六百七十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百七十七")!),
+            // M2092 chapter 678 — Phase M GPU+CPU+cross-val
+            checkRegistry("六百七十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百七十八")!),
+            // M2096 chapter 679 — Phase M canonical fixtures
+            checkRegistry("六百七十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百七十九")!),
+            // M2100 chapter 680 — Phase M extended + wallclock
+            checkRegistry("六百八十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百八十")!),
+            // M2104 chapter 681 — Phase M 8-of-8 milestone
+            checkRegistry("六百八十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百八十一")!),
+            // M2108 chapter 682 — PHASE M SEALED
+            checkRegistry("六百八十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百八十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4375,6 +4411,54 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百七十六")!
+                .mNumberLast),
+            // M2088 chapter 677
+            ("677",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十七")!
+                .mNumberLast),
+            // M2092 chapter 678
+            ("678",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十八")!
+                .mNumberLast),
+            // M2096 chapter 679
+            ("679",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百七十九")!
+                .mNumberLast),
+            // M2100 chapter 680
+            ("680",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十")!
+                .mNumberLast),
+            // M2104 chapter 681
+            ("681",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十一")!
+                .mNumberLast),
+            // M2108 chapter 682 — PHASE M SEALED
+            ("682",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百八十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

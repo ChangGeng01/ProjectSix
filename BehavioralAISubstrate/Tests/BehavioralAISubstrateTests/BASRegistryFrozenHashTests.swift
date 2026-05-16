@@ -556,28 +556,36 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// 677-682 / M2085-M2108) NEXT。
     /// Re-captured at chapter 676 close-out。 Chapter
     /// 六百七十六:HEXA #9 CATALOG mid-plan anti-drift
-    /// checkpoint。 NEW BASPhaseJKLCompletionHexa
-    /// CatalogDoctrine (M2081) cataloging Phase J +
-    /// Phase K + Phase L + THE FLIP as 4 EntryRecords
-    /// + 57 anti-drift PROOF tests (M2082) + 42 wire-
-    /// in PROOF tests (M2083) cross-checking against
-    /// 4 source phase-completion doctrines + close-
-    /// out (M2084)。 FIRST hexa cataloging PHASES (not
-    /// gap-fill chapters)。 FIRST hexa with 4 entries
-    /// instead of 6。 FIRST hexa explicitly inserted
-    /// as anti-drift checkpoint at user direction。
-    /// 3 phases / 12 chapters / 48 commits / 13 typed
-    /// surfaces / score-delta 45→58 (+13 aggregate)。
-    /// Catalog lineage M1805 post-octa → M1833 hexa
-    /// #1 → M1861 #2 → M1889 #3 → M1917 #4 → M1945
-    /// #5 → M1973 #6 → M2001 #7 → M2029 #8 → M2081
-    /// hexa #9。 220 typed surfaces cumulative;668
-    /// consecutive byte-equality clean commits。 V1
-    /// byte-equality preserved。 ADR-014 OPT-OUT
-    /// preserved。 Hexa cadence PAUSED until 60/60
-    /// seal at chapter 709 per user choice。 Phase M
-    /// real Mamba SSM kernel via Metal compute shader
-    /// (chapters 677-682) NEXT。
+    /// checkpoint cataloging Phase J + K + L + THE FLIP
+    /// as 4 EntryRecords。
+    /// Re-captured at chapter 682 close-out。 PHASE M
+    /// SEALED。 6 chapters (677-682) / 24 commits
+    /// Phase M complete。 Substrate's FIRST raw Metal
+    /// compute kernel (Mamba selective-scan) shipped at
+    /// chapter 678 / M2089 + numerically proven via 5
+    /// correctness oracles (CPU↔GPU random cross-val +
+    /// CPU↔analytic + GPU↔analytic + extended fixture
+    /// cross-val + numerical-stability cross-val)。
+    /// 8-of-8 native kernel coverage MILESTONE achieved
+    /// at chapter 681 / M2102 (NEW BASCanonicalKernel
+    /// Coverage.chapter681Snapshot;chapter 496 7-of-8
+    /// historical snapshot preserved unchanged for
+    /// history immutability)。 Phase M score progression
+    /// 58→60 documented in BASPhaseMScoreImpactDoctrine
+    /// at M2107 (PRELIMINARY 60/60 ahead of formal
+    /// chapter 708 tier 1 + chapter 709 tier 2
+    /// achievement seals per the wild-rolling-meerkat
+    /// plan)。 NEW BASPhaseMRealSSMScanKernelCompletion
+    /// Doctrine at M2105 sealing the 6-chapter / 24-
+    /// commit arc。 240 typed surfaces cumulative (+20
+    /// across Phase M);692 consecutive byte-equality
+    /// clean commits。 V1 byte-equality preserved。
+    /// ADR-014 OPT-OUT preserved。 ADR-016 → M2108。
+    /// Phase M total 422 PROOF tests cumulative across
+    /// 6 chapters。 NEXT:Phase N Tier A sprawl
+    /// migration (chapters 683-685 / M2109-M2120) — 8
+    /// load-bearing bundle types migrated to BASBundle
+    /// <Item> via typealias bridges。
     static let frozenFullRegistrySha256: String =
-        "0dc55d91fbb7b7736d0bf14686ef8bc65b6773d186dc6598e7dccbc3984d9f08"
+        "acda867632dd4c67b12271c84151c3f546cdbcc7f694766e1181e26feb67d978"
 }

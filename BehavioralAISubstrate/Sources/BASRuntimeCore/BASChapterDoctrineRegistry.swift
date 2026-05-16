@@ -20391,7 +20391,312 @@ public enum BASChapterDoctrineRegistry {
                 " clean commits。 Catalog lineage M1805" +
                 " post-octa → M2029 hexa #8 → M2081 hexa" +
                 " #9。 Phase M real Mamba SSM kernel" +
-                " (chapters 六百七十七-六百八十二) NEXT。")
+                " (chapters 六百七十七-六百八十二) NEXT。"),
+
+        // chapters 677-682:Phase M real Mamba SSM scan
+        // kernel — substrate FIRST raw Metal compute
+        // kernel + 8-of-8 native coverage + 60/60 score
+        // milestone。 All 6 chapters share knife-count 4
+        // (4-knife cadence)。 See chapter close-out
+        // doctrines for per-chapter knife concepts。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十七",
+            mNumberFirst: 2085,
+            mNumberLast: 2088,
+            v1MilestoneMNumber: 2088,
+            v1MilestoneStatus:
+                "chapter-677-ssmscan-metal-shader-ship",
+            knives: [
+                BASChapterKnife(mNumber: 2085, knife: "第一刀",
+                    concept: "NEW SSMScan.metal MSL kernel" +
+                        " — first raw Metal compute shader" +
+                        " for selective state-space scan。"),
+                BASChapterKnife(mNumber: 2086, knife: "第二刀",
+                    concept: "NEW BASSSMScanMetalShader" +
+                        "Source Swift mirror + 22 anti-" +
+                        "drift PROOF tests。"),
+                BASChapterKnife(mNumber: 2087, knife: "第三刀",
+                    concept: "NEW BASSSMScanShape typed" +
+                        " 12-byte struct + 24 layout-" +
+                        "invariant tests。"),
+                BASChapterKnife(mNumber: 2088, knife: "第四刀",
+                    concept: "Chapter 677 close-out" +
+                        " doctrine + 42 anti-drift tests。")
+            ],
+            entropyClassesAttacked: [
+                "no-real-metal-compute-shader-in-substrate",
+                "no-typed-shape-struct-for-msl-binding",
+                "msl-source-not-mirrored-for-spm-runtime"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "msl-shader-canonical-reference",
+                "12-byte-shape-struct-invariant"
+            ],
+            plannedFutureCuts: [
+                "chapter 678 — actor wrapper + CPU reference"
+            ],
+            summary: "Phase M opening — first raw Metal" +
+                " compute kernel for Mamba selective-scan" +
+                " (substrate's first non-MPSGraph kernel)。" +
+                " 1 MSL file + 2 Swift sources + 2 test" +
+                " files + 88 PROOF tests。 ADR-016 →" +
+                " M2088。"),
+
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十八",
+            mNumberFirst: 2089,
+            mNumberLast: 2092,
+            v1MilestoneMNumber: 2092,
+            v1MilestoneStatus:
+                "chapter-678-real-gpu-kernel-proven-correct",
+            knives: [
+                BASChapterKnife(mNumber: 2089, knife: "第一刀",
+                    concept: "NEW BASMetalSSMScanKernel" +
+                        " actor wrapping MSL via runtime" +
+                        " MTLDevice.makeLibrary(source:) +" +
+                        " 5 PROOF tests on real GPU。"),
+                BASChapterKnife(mNumber: 2090, knife: "第二刀",
+                    concept: "NEW BASSSMScanCPUReference" +
+                        " pure-Swift implementation + 11" +
+                        " mathematical-recurrence PROOF" +
+                        " tests。"),
+                BASChapterKnife(mNumber: 2091, knife: "第三刀",
+                    concept: "9 GPU↔CPU cross-validation" +
+                        " tests asserting MAE ≤ 1e-5 across" +
+                        " 8 fixtures (B=1..8, L=1..128," +
+                        " D=1..64) + GPU determinism PROOF。"),
+                BASChapterKnife(mNumber: 2092, knife: "第四刀",
+                    concept: "Chapter 678 close-out + 46" +
+                        " anti-drift tests sealing the" +
+                        " arc where Phase M's hardest" +
+                        " challenge was resolved。")
+            ],
+            entropyClassesAttacked: [
+                "ssm-kernel-no-real-gpu-implementation",
+                "no-cpu-reference-oracle-for-cross-val",
+                "no-numerical-correctness-proof-for-ssmscan"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "gpu-cpu-mae-tolerance-1e-minus-5",
+                "first-raw-metal-compute-kernel-shipped"
+            ],
+            plannedFutureCuts: [
+                "chapter 679 — canonical fixtures"
+            ],
+            summary: "Phase M hardest challenge RESOLVED —" +
+                " substrate FIRST raw Metal compute kernel" +
+                " numerically proven against independent" +
+                " CPU reference。 25 PROOF tests across" +
+                " GPU + CPU + 8-fixture cross-validation。" +
+                " ADR-016 → M2092。"),
+
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十九",
+            mNumberFirst: 2093,
+            mNumberLast: 2096,
+            v1MilestoneMNumber: 2096,
+            v1MilestoneStatus:
+                "chapter-679-canonical-mamba-fixtures",
+            knives: [
+                BASChapterKnife(mNumber: 2093, knife: "第一刀",
+                    concept: "NEW 6 JSON fixtures in" +
+                        " Vendor/mamba-ssm-fixtures/ with" +
+                        " analytically-derived expected_y" +
+                        " + honest provenance README。"),
+                BASChapterKnife(mNumber: 2094, knife: "第二刀",
+                    concept: "NEW BASSSMScanFixtureRegistry" +
+                        " Swift mirror + 18 anti-drift" +
+                        " tests。"),
+                BASChapterKnife(mNumber: 2095, knife: "第三刀",
+                    concept: "14 fixture-validation tests" +
+                        " asserting CPU + GPU outputs match" +
+                        " analytic canonical math。"),
+                BASChapterKnife(mNumber: 2096, knife: "第四刀",
+                    concept: "Chapter 679 close-out + 35" +
+                        " anti-drift tests sealing the" +
+                        " chapter。")
+            ],
+            entropyClassesAttacked: [
+                "no-canonical-fixture-oracle",
+                "ssm-correctness-not-triangulated",
+                "fixtures-no-honest-provenance-doc"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "fixture-provenance-honestly-documented",
+                "3-correctness-oracles-shipped"
+            ],
+            plannedFutureCuts: [
+                "chapter 680 — extended fixtures + wallclock"
+            ],
+            summary: "Triangulation achieved — 3 correctness" +
+                " oracles (CPU↔GPU + CPU↔analytic + GPU↔" +
+                "analytic)。 6 canonical fixtures + Swift" +
+                " registry + 67 PROOF tests。 ADR-016 →" +
+                " M2096。"),
+
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八十",
+            mNumberFirst: 2097,
+            mNumberLast: 2100,
+            v1MilestoneMNumber: 2100,
+            v1MilestoneStatus:
+                "chapter-680-extended-fixtures-and-wallclock",
+            knives: [
+                BASChapterKnife(mNumber: 2097, knife: "第一刀",
+                    concept: "NEW BASSSMScanExtendedFixture" +
+                        "Registry — 6 larger-scale + edge-" +
+                        "case fixtures + 13 anti-drift" +
+                        " tests。"),
+                BASChapterKnife(mNumber: 2098, knife: "第二刀",
+                    concept: "4 GPU vs CPU wallclock" +
+                        " characterization tests (honest" +
+                        " observation:GPU break-even at" +
+                        " B*D≈256 parallel threads)。"),
+                BASChapterKnife(mNumber: 2099, knife: "第三刀",
+                    concept: "8 numerical-stability PROOF" +
+                        " tests (tiny inputs + strong decay" +
+                        " + alternating signs + long" +
+                        " sequence + no-NaN/Inf)。"),
+                BASChapterKnife(mNumber: 2100, knife: "第四刀",
+                    concept: "Chapter 680 close-out + 34" +
+                        " anti-drift tests sealing the" +
+                        " 5-oracle triangulation tier。")
+            ],
+            entropyClassesAttacked: [
+                "no-larger-scale-fixture-coverage",
+                "wallclock-not-characterized",
+                "numerical-stability-edge-cases-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "5-correctness-oracles-shipped"
+            ],
+            plannedFutureCuts: [
+                "chapter 681 — stub repurpose + 8-of-8"
+            ],
+            summary: "Triangulation expanded to 5 oracles。" +
+                " 6 extended fixtures + wallclock honest" +
+                " observation + 8 numerical-stability" +
+                " tests。 59 PROOF tests。 ADR-016 → M2100。"),
+
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八十一",
+            mNumberFirst: 2101,
+            mNumberLast: 2104,
+            v1MilestoneMNumber: 2104,
+            v1MilestoneStatus:
+                "chapter-681-stub-repurpose-and-8-of-8",
+            knives: [
+                BASChapterKnife(mNumber: 2101, knife: "第一刀",
+                    concept: "Repurpose chapter 496 stub" +
+                        " from .metalBuffer/identity-scan" +
+                        " to .cpuBytes/CPU-ref-delegating" +
+                        " sibling + BASCPUSSMScanKernel" +
+                        " typealias + 9 updated tests。"),
+                BASChapterKnife(mNumber: 2102, knife: "第二刀",
+                    concept: "NEW chapter681Snapshot in" +
+                        " BASCanonicalKernelCoverage —" +
+                        " 8-of-8 native milestone + 13" +
+                        " PROOF tests + chapter 496" +
+                        " historical preservation。"),
+                BASChapterKnife(mNumber: 2103, knife: "第三刀",
+                    concept: "NEW BASEightOfEightNative" +
+                        "KernelCoverageMilestoneDoctrine +" +
+                        " 23 anti-drift tests documenting" +
+                        " 5 correctness oracles + score-" +
+                        "delta 58→60。"),
+                BASChapterKnife(mNumber: 2104, knife: "第四刀",
+                    concept: "Chapter 681 close-out + 22" +
+                        " anti-drift tests sealing the" +
+                        " 8-of-8 milestone arc。")
+            ],
+            entropyClassesAttacked: [
+                "stub-still-pinned-as-not-production-ready",
+                "kernel-coverage-still-7-of-8",
+                "no-8-of-8-milestone-doctrine"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "8-of-8-native-coverage-achieved",
+                "historical-chapter-496-snapshot-preserved"
+            ],
+            plannedFutureCuts: [
+                "chapter 682 — Phase M final close-out"
+            ],
+            summary: "8-of-8 native coverage MILESTONE。" +
+                " Stub repurposed as proven CPU sibling。" +
+                " 5 correctness oracles documented。" +
+                " Score reaches 60/60 preliminary。 67" +
+                " PROOF tests。 ADR-016 → M2104。"),
+
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百八十二",
+            mNumberFirst: 2105,
+            mNumberLast: 2108,
+            v1MilestoneMNumber: 2108,
+            v1MilestoneStatus:
+                "chapter-682-phase-m-sealed-60-of-60",
+            knives: [
+                BASChapterKnife(mNumber: 2105, knife: "第一刀",
+                    concept: "NEW BASPhaseMRealSSMScan" +
+                        "KernelCompletionDoctrine sealing" +
+                        " 6-chapter/24-commit Phase M arc。"),
+                BASChapterKnife(mNumber: 2106, knife: "第二刀",
+                    concept: "44 anti-drift PROOF tests" +
+                        " for Phase M completion doctrine。"),
+                BASChapterKnife(mNumber: 2107, knife: "第三刀",
+                    concept: "NEW BASPhaseMScoreImpact" +
+                        "Doctrine + 26 tests — 60/60" +
+                        " score progression documented" +
+                        " (PRELIMINARY ahead of formal" +
+                        " chapter 708 tier 1 seal)。"),
+                BASChapterKnife(mNumber: 2108, knife: "第四刀",
+                    concept: "Chapter 682 close-out +" +
+                        " 13-file standard doctrine sync。" +
+                        " Phase M SEALED。 692 consecutive" +
+                        " byte-equality clean commits。")
+            ],
+            entropyClassesAttacked: [
+                "phase-m-not-formally-sealed",
+                "score-progression-not-typed-cross-doctrine",
+                "no-13-file-sync-for-phase-m-close-out"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2108",
+                "phase-m-fully-sealed",
+                "60-of-60-preliminary-reached",
+                "692-consecutive-byte-equality-clean-commits",
+                "8-of-8-native-kernel-coverage-final"
+            ],
+            plannedFutureCuts: [
+                "chapter 683-685 — Phase N Tier A sprawl",
+                "chapter 686-688 — Phase O V1 monolith DELETION",
+                "chapter 689-707 — Phase P Tier B+C sprawl",
+                "chapter 708-709 — final 60/60 seal"
+            ],
+            summary: "PHASE M SEALED。 Real Mamba SSM scan" +
+                " kernel + 8-of-8 native coverage + 60/60" +
+                " preliminary milestone reached。 NEW 3" +
+                " doctrines (Phase M completion + Score" +
+                " impact + close-out via chapter doctrine" +
+                " sync)。 Chapter 682 ships 70 anti-drift" +
+                " PROOF tests (44 + 26)。 Phase M total:" +
+                " 6 chapters / 24 commits / 422 PROOF" +
+                " tests cumulative。 240 typed surfaces" +
+                " cumulative (+20 across Phase M)。 ADR-" +
+                "016 → M2108。 692 consecutive byte-equality" +
+                " clean commits。 Phase N Tier A sprawl" +
+                " (chapters 683-685) NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
