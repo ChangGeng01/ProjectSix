@@ -27,6 +27,21 @@
 // registry with any other policy stores the value but
 // does NOT change runtime behavior — the LRU/TTL impl
 // is a follow-up arc per the policy doctrine。
+//
+// chapter 六百九十 / M2131 第二刀 (post-seal follow-up):
+// the deferred LRU implementation lands。 The registry
+// gains:
+//   - `capacity:` init parameter (defaults to nil =
+//     unlimited,preserving M1306 behavior)
+//   - access-tick tracking (incremented per storeSession
+//     / cachedSession call)
+//   - automatic LRU eviction when capacity reached AND
+//     invalidationPolicy == .lru
+//
+// ADR-014 OPT-IN preserved:default init still
+// .explicitOnly with no capacity limit (M1306 behavior)。
+// LRU only activates when host explicitly opts in via
+// `init(invalidationPolicy: .lru, capacity: N)`。
 
 import Foundation
 import BASRuntimeCore
@@ -45,14 +60,31 @@ public actor BASKVCacheRegistry {
     private var hitCount: Int = 0
     private var missCount: Int = 0
 
+    /// chapter 六百九十 / M2131 第二刀 — per-session
+    /// access-tick tracking for LRU eviction。 Incremented
+    /// monotonically on each cachedSession / storeSession
+    /// / appendToken call。 Used by the LRU evictor to
+    /// determine which sessions are least-recently-used。
+    private var accessTicks: [String: Int] = [:]
+    private var nextAccessTick: Int = 1
+
+    /// chapter 六百九十 / M2131 第二刀 — LRU eviction
+    /// counter (audit observation)。 Bumped each time the
+    /// registry evicts at least one session via LRU policy。
+    private var lruEvictionCount: Int = 0
+
     /// chapter 五百二 / M1385 — typed invalidation policy
-    /// captured at construction。 Currently informational
-    /// only;the registry's actual invalidation behavior
-    /// is gated by BASKVCacheInvalidationPolicyDoctrine
-    /// .activeImplementedPolicy (which is `.explicitOnly`
-    /// at chapter 502 close-out)。
+    /// captured at construction。
     public nonisolated let invalidationPolicy:
         BASKVCacheInvalidationPolicy
+
+    /// chapter 六百九十 / M2131 第二刀 — capacity limit
+    /// for LRU eviction。 nil = unlimited (M1306 behavior)。
+    /// When invalidationPolicy == .lru AND capacity != nil,
+    /// the registry consults BASKVCacheLRUEvictor after
+    /// each storeSession / appendToken to enforce the
+    /// capacity bound。
+    public nonisolated let capacity: Int?
 
     /// Backward-compatible default init — preserves
     /// chapter 482 / M1306 behavior。 The invalidation
@@ -60,24 +92,38 @@ public actor BASKVCacheRegistry {
     /// implemented runtime behavior。
     public init() {
         self.invalidationPolicy = .explicitOnly
+        self.capacity = nil
     }
 
     /// chapter 五百二 / M1385 — typed init accepting a
-    /// host-declared invalidation policy。 At chapter
-    /// 502 close-out the policy is stored for audit
-    /// emission but does NOT yet change runtime
-    /// behavior for non-`.explicitOnly` values。
-    /// Per honest scope:
-    ///   - `.explicitOnly` is FULLY implemented
-    ///   - `.lru` / `.ttl` / `.never` are typed contract
-    ///     only — registry stores the value but invalidation
-    ///     still follows `.explicitOnly` semantics until
-    ///     follow-up arc wires the LRU/TTL paths
+    /// host-declared invalidation policy。
     public init(
         invalidationPolicy:
             BASKVCacheInvalidationPolicy
     ) {
         self.invalidationPolicy = invalidationPolicy
+        self.capacity = nil
+    }
+
+    /// chapter 六百九十 / M2131 第二刀 — typed init
+    /// accepting BOTH policy AND capacity。 When the
+    /// registry's `invalidationPolicy == .lru` AND
+    /// `capacity != nil`,LRU eviction is active —
+    /// storeSession + appendToken automatically evict
+    /// the LRU sessions when capacity is exceeded。
+    ///
+    /// Honest scope at M2131:
+    ///   - `.lru` + capacity: FULLY implemented (new)
+    ///   - `.explicitOnly` + capacity: capacity stored
+    ///     but not enforced (still M1306 behavior)
+    ///   - `.ttl` / `.never` + capacity: same as above
+    public init(
+        invalidationPolicy:
+            BASKVCacheInvalidationPolicy,
+        capacity: Int?
+    ) {
+        self.invalidationPolicy = invalidationPolicy
+        self.capacity = capacity
     }
 
     // MARK: - Lookup / store
@@ -85,11 +131,19 @@ public actor BASKVCacheRegistry {
     /// Look up the cached session for a sessionID。
     /// Records hit/miss observation。 Returns nil when
     /// no cache exists for the given session。
+    ///
+    /// chapter 六百九十 / M2131:bumps the per-session
+    /// access tick when LRU policy is active (so future
+    /// eviction decisions reflect this access)。
     public func cachedSession(
         for sessionID: String
     ) -> BASTransformerKVCacheSession? {
         if let session = sessions[sessionID] {
             hitCount += 1
+            if invalidationPolicy == .lru {
+                accessTicks[sessionID] = nextAccessTick
+                nextAccessTick += 1
+            }
             return session
         }
         missCount += 1
@@ -99,16 +153,28 @@ public actor BASKVCacheRegistry {
     /// Store (or replace) a session cache。 Hosts call
     /// this after each turn to persist new KV tokens
     /// for cross-turn reuse。
+    ///
+    /// chapter 六百九十 / M2131:when invalidationPolicy
+    /// is `.lru` AND capacity is set,evicts LRU sessions
+    /// after the store to enforce the capacity bound。
     public func storeSession(
         _ session: BASTransformerKVCacheSession
     ) {
         sessions[session.sessionID] = session
+        if invalidationPolicy == .lru {
+            accessTicks[session.sessionID] = nextAccessTick
+            nextAccessTick += 1
+            enforceLRUCapacityIfNeeded()
+        }
     }
 
     /// Append a single token cache entry at a specific
     /// layer for an existing session。 Creates the
     /// session on first call。 Convenience for the
     /// common per-token-per-layer flow。
+    ///
+    /// chapter 六百九十 / M2131:bumps the access tick
+    /// and triggers LRU enforcement when applicable。
     public func appendToken(
         _ token: BASTransformerKVCacheToken,
         atLayer layer: Int,
@@ -119,6 +185,31 @@ public actor BASKVCacheRegistry {
                 sessionID: sessionID)
         sessions[sessionID] = existing.appending(
             token: token, atLayer: layer)
+        if invalidationPolicy == .lru {
+            accessTicks[sessionID] = nextAccessTick
+            nextAccessTick += 1
+            enforceLRUCapacityIfNeeded()
+        }
+    }
+
+    // MARK: - LRU enforcement (chapter 六百九十 / M2131)
+
+    /// Internal helper:consult BASKVCacheLRUEvictor +
+    /// apply the eviction decision when capacity is set
+    /// and exceeded。 No-op when capacity is nil or
+    /// session count is within bounds。
+    private func enforceLRUCapacityIfNeeded() {
+        guard let cap = capacity, sessions.count > cap
+        else { return }
+        let decision = BASKVCacheLRUEvictor.decide(
+            accessTicks: accessTicks,
+            capacity: cap)
+        guard decision.evictionCount > 0 else { return }
+        for evictedID in decision.evictedSessionIDs {
+            sessions.removeValue(forKey: evictedID)
+            accessTicks.removeValue(forKey: evictedID)
+        }
+        lruEvictionCount += decision.evictionCount
     }
 
     // MARK: - Invalidation
@@ -130,12 +221,22 @@ public actor BASKVCacheRegistry {
         sessionID: String
     ) {
         sessions.removeValue(forKey: sessionID)
+        accessTicks.removeValue(forKey: sessionID)
     }
 
     /// Invalidate ALL sessions。 Used by tests + host
     /// teardown paths。
     public func invalidateAll() {
         sessions.removeAll()
+        accessTicks.removeAll()
+    }
+
+    /// chapter 六百九十 / M2131 — total LRU evictions
+    /// performed since registry construction。 Audit
+    /// observation surface。 Always 0 when invalidation
+    /// policy != .lru。
+    public var totalLRUEvictions: Int {
+        return lruEvictionCount
     }
 
     // MARK: - Observation accessors
