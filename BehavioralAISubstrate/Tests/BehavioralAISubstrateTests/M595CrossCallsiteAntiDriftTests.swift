@@ -23,8 +23,10 @@ import XCTest
 /// references, assert 0 matches.
 final class M595CrossCallsiteAntiDriftTests: XCTestCase {
 
-    /// Path to the coordinator source file.
-    private var coordinatorSourcePath: String {
+    /// Path to the BASHostKit source directory containing the
+    /// coordinator family (main file + all `+*.swift` extension
+    /// splits per chapter 六百六十一 / M2021 doctrine)。
+    private var coordinatorSourceDirectory: String {
         // Resolve via bundle path-up from test bundle
         // (Swift Package Manager test convention).
         let testFile = #filePath
@@ -37,22 +39,62 @@ final class M595CrossCallsiteAntiDriftTests: XCTestCase {
             .deletingLastPathComponent()
         return packageRoot
             .appendingPathComponent("Sources/BASHostKit")
-            .appendingPathComponent(
-                "EBrainRuntimeCoordinator.swift")
             .path
     }
 
-    /// Read coordinator source as string. Skips test if path
-    /// resolution fails (e.g. running tests via different layout).
+    /// Read the concatenated text of the coordinator family
+    /// (main file `EBrainRuntimeCoordinator.swift` PLUS all
+    /// extension splits `EBrainRuntimeCoordinator+*.swift`)。
+    ///
+    /// Chapter 六百六十一 / M2021 EBrainRuntimeCoordinator
+    /// extension split moved the body code from the main file
+    /// (now ~196 LOC) into typed feature extensions:
+    ///   - EBrainRuntimeCoordinator+RunTurn.swift
+    ///   - EBrainRuntimeCoordinator+CoreHelpers.swift
+    ///   - EBrainRuntimeCoordinator+AuditProjectionHelpers.swift
+    ///   - …plus ~10 more feature-scoped extension files
+    ///
+    /// The anti-drift grep MUST scan the whole family,not just
+    /// the main file,otherwise call-site relocations look like
+    /// regressions when they're just architectural moves。
+    ///
+    /// Skips test if directory resolution fails (e.g. running
+    /// tests via a different layout)。
     private func readCoordinatorSource() throws -> String {
-        let path = coordinatorSourcePath
-        guard FileManager.default.fileExists(atPath: path) else {
+        let dir = coordinatorSourceDirectory
+        var isDir: ObjCBool = false
+        let exists = FileManager.default.fileExists(
+            atPath: dir, isDirectory: &isDir)
+        guard exists && isDir.boolValue else {
             throw XCTSkip(
-                "Coordinator source not found at \(path); " +
-                "test layout may differ.")
+                "Coordinator source directory not found" +
+                " at \(dir); test layout may differ.")
         }
-        return try String(
-            contentsOfFile: path, encoding: .utf8)
+        let contents = try FileManager.default
+            .contentsOfDirectory(atPath: dir)
+        // Pick the coordinator family: main + `+*.swift`
+        // extension splits。
+        let familyFiles = contents.filter { name in
+            return (name == "EBrainRuntimeCoordinator.swift")
+                || (name.hasPrefix(
+                    "EBrainRuntimeCoordinator+")
+                    && name.hasSuffix(".swift"))
+        }.sorted()
+        guard !familyFiles.isEmpty else {
+            throw XCTSkip(
+                "No EBrainRuntimeCoordinator family files" +
+                " found at \(dir); test layout may differ.")
+        }
+        var aggregated = ""
+        for name in familyFiles {
+            let path = (dir as NSString)
+                .appendingPathComponent(name)
+            aggregated += "\n// === \(name) ===\n"
+            aggregated += (try? String(
+                contentsOfFile: path,
+                encoding: .utf8)) ?? ""
+        }
+        return aggregated
     }
 
     /// Pin: `deviationThreshold: 0.7` inline literal MUST NOT
