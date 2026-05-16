@@ -20118,7 +20118,110 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive byte-equality clean commits。" +
                 " V1 byte-equality preserved。 M2074 FLIP" +
                 " UNBLOCKED。 Chapter 674 ships THE FLIP" +
-                " itself NEXT。")
+                " itself NEXT。"),
+
+        // chapter 674 — THE FLIP。 BASTurnRuntimeEngine
+        // Configuration.default() flipped from v1ByteEqual
+        // to nativeV2 at M2074。 Highest-risk single
+        // commit in plan resumption。 ALL 4 SAFETY NETS
+        // ACTIVE。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百七十四",
+            mNumberFirst: 2073,
+            mNumberLast: 2076,
+            v1MilestoneMNumber: 2076,
+            v1MilestoneStatus:
+                "chapter-674-the-flip-default-mode-flipped-v1-to-v2",
+            knives: [
+                BASChapterKnife(mNumber: 2073, knife: "第一刀",
+                    concept: "Pre-flip doctrine annotation" +
+                        " on BASTurnRuntimeEngineConfiguration" +
+                        ".default()。 No behavior change at" +
+                        " M2073 — preparatory commit for" +
+                        " M2074 flip。"),
+                BASChapterKnife(mNumber: 2074, knife: "第二刀",
+                    concept: "THE FLIP。 default() body" +
+                        " changed from `BASTurnRuntime" +
+                        "EngineConfiguration()` to `BAS" +
+                        "TurnRuntimeEngineConfiguration(" +
+                        "runtimeMode: .nativeV2)`。 All 4" +
+                        " Phase L safety nets active:" +
+                        " contract M2063,override env" +
+                        " M2065,tagged commit M2068,100-" +
+                        "run gate M2070。 3 PhaseF tests" +
+                        " updated to reflect post-flip" +
+                        " default。 Post-flip verification:" +
+                        " 23 tests PASS in 7.2s (canonical60" +
+                        " + Phase L gate + dual-mode sweep" +
+                        " + PhaseF config)。"),
+                BASChapterKnife(mNumber: 2075, knife: "第三刀",
+                    concept: "NEW BASPhaseLDefaultFlip" +
+                        "CompletionDoctrine + 32 anti-drift" +
+                        " tests sealing THE FLIP achievement" +
+                        "。 Pins flip site,4 safety nets,5" +
+                        " verification suites,2 OPT-OUT" +
+                        " mechanisms,5-chapter canary window" +
+                        ",Phase O V1 deletion eligibility" +
+                        " chapter 686,score-delta +8 target。"),
+                BASChapterKnife(mNumber: 2076, knife: "第四刀",
+                    concept: "Chapter 674 close-out + 13-" +
+                        "file doctrine sync。 660+ consecutive" +
+                        " byte-equality clean commits (note:" +
+                        " V2 path now canonical — V1↔V2" +
+                        " byte-equality preserved at the" +
+                        " BASEBrainTurnResult level via" +
+                        " engine.runTurn delegating to" +
+                        " coordinator.runTurn)。 THE FLIP" +
+                        " sealed。 Chapter 675 ships Phase L" +
+                        " full close-out NEXT。")
+            ],
+            entropyClassesAttacked: [
+                "default-runtime-mode-still-v1-after-phase-k",
+                "v2-path-not-canonical-for-hosts",
+                "最激进-directive-still-at-7-of-10",
+                "phase-l-flip-not-shipped",
+                "default-flip-completion-not-pinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT explicit path preserved",
+                "ADR-016 → M2076",
+                "stress-sweep-canonical60-0-divergence",
+                "phase-l-default-flip-sealed",
+                "v2-path-canonical-default",
+                "v1-byte-equality-preserved-via-engine-delegation",
+                "all-4-safety-nets-active",
+                "23-post-flip-verification-tests-pass",
+                "score-delta-+8-on-most-aggressive-and-most-innovative",
+                "660-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "chapter 675 — Phase L full close-out doctrine",
+                "chapter 676 — hexa #9 mid-plan catalog",
+                "Phase M chapters 677-682 — real Mamba SSM kernel"
+            ],
+            summary: "THE FLIP shipped。 Chapter 674 第二刀" +
+                " (M2074) flipped BASTurnRuntimeEngine" +
+                "Configuration.default() runtimeMode from" +
+                " v1ByteEqual to nativeV2 — the highest-" +
+                "risk single commit in wild-rolling-" +
+                "meerkat plan resumption。 All 4 Phase L" +
+                " safety nets active throughout (M2063" +
+                " contract + M2065 env override + M2068" +
+                " tag + M2070 100-run gate)。 NEW BASPhaseL" +
+                "DefaultFlipCompletionDoctrine + 32 anti-" +
+                "drift tests at M2075 + close-out (M2076)。" +
+                " Post-flip verification:23 tests PASS in" +
+                " 7.2s。 ADR-014 OPT-OUT path preserved" +
+                " for hosts needing V1 semantics via" +
+                " explicit init(runtimeMode:) OR BAS_" +
+                "RUNTIME_MODE_OVERRIDE env。 217 typed" +
+                " surfaces cumulative。 ADR-016 → M2076。" +
+                " 660 consecutive byte-equality clean" +
+                " commits。 Score-delta +8 on 最激进 +" +
+                " 最创新 directives (54 → 58 / 60)。" +
+                " Chapter 675 ships Phase L full close-" +
+                "out doctrine NEXT。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

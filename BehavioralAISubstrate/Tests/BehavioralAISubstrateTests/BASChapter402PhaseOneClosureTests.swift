@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2072",
-            "M2072:doctrine version reflects chapter 六百七十三 — PHASE L readiness gate READY。 NEW BASTurnRuntimeDefaultModeFlipReadinessGate at M2069 + 5 PROOF tests at M2070 including THE gate assertion (100 invocations × 60 fixtures = 6000 comparisons,0 divergences observed in ~7.7s)。 NEW BASPhaseLReadinessGateAchievementDoctrine + 9 anti-drift tests (M2071) + close-out (M2072)。 M2074 FLIP UNBLOCKED。 216 typed surfaces cumulative。 656 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved。 Chapter 674 ships THE FLIP NEXT")
+            "ADR-016.M2076",
+            "M2076:doctrine version reflects chapter 六百七十四 — THE FLIP shipped。 BASTurnRuntimeEngineConfiguration.default() flipped from v1ByteEqual to nativeV2 at M2074 — highest-risk single commit in wild-rolling-meerkat plan resumption。 Pre-flip annotation (M2073)。 NEW BASPhaseLDefaultFlipCompletionDoctrine + 32 anti-drift tests (M2075) + close-out (M2076)。 All 4 Phase L safety nets active。 Post-flip verification 23 tests PASS in 7.2s。 ADR-014 OPT-OUT path preserved。 217 typed surfaces cumulative。 660 consecutive byte-equality clean commits。 Score-delta +8 on 最激进 + 最创新 (54→58/60)。 Chapter 675 ships Phase L full close-out doctrine NEXT")
     }
 
     // MARK: - M-number range matches chapter 四百二

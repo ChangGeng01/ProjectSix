@@ -5059,7 +5059,33 @@ public enum BASEntropyChapterIndex {
                 " M2072。 656 consecutive byte-equality" +
                 " clean commits。 V1 byte-equality" +
                 " preserved。 Chapter 674 ships THE FLIP" +
-                " NEXT。")
+                " NEXT。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 六百七十四",
+            mNumberFirst: 2073, mNumberLast: 2076,
+            knivesCount: 4, entropyClassesCount: 5,
+            pinsCount: 13, futureCutsCount: 3,
+            summary: "THE FLIP shipped。 BASTurnRuntime" +
+                "EngineConfiguration.default() flipped" +
+                " from v1ByteEqual to nativeV2 at M2074" +
+                " — the highest-risk single commit in" +
+                " wild-rolling-meerkat plan resumption。" +
+                " Pre-flip annotation (M2073)。 NEW BAS" +
+                "PhaseLDefaultFlipCompletionDoctrine +" +
+                " 32 anti-drift tests (M2075)。 close-" +
+                "out (M2076)。 All 4 Phase L safety nets" +
+                " active throughout。 Post-flip" +
+                " verification 23 tests PASS in 7.2s。" +
+                " 3 PhaseF tests updated。 ADR-014 OPT-" +
+                "OUT path preserved via explicit init" +
+                " OR BAS_RUNTIME_MODE_OVERRIDE env。 217" +
+                " typed surfaces cumulative (+1)。 ADR-" +
+                "016 → M2076。 660 consecutive byte-" +
+                "equality clean commits。 V1 byte-" +
+                "equality preserved via engine delegation。" +
+                " Score-delta +8 on 最激进 + 最创新 (54→" +
+                "58/60)。 Chapter 675 ships Phase L full" +
+                " close-out doctrine NEXT。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
