@@ -535,5 +535,5 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// ALL-STRUCT trio in autonomous loop history。
     /// Coherent biomimetic theme。
     static let frozenFullRegistrySha256: String =
-        "e3cdf141bbc2b6d1730dc7293d7124ebfb360eb6ad4cd81a6df2b2bdc632252b"
+        "48717688e526b5a29ce9a7a3808d8d6c4d19809a67a3e0fa08c3fdf84dfc364c"
 }

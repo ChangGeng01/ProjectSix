@@ -2375,7 +2375,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 record: BASChapterDoctrineRegistry
                     .recordFor(
                         chapterTag:
-                            "chapter 六百六十")!)
+                            "chapter 六百六十")!),
+            // M2024 chapter 661 — convenience-cadence-record trio Codable extension gap-fill (5th post-hexa-#7, 4th consecutive all-struct trio)
+            checkRegistry("六百六十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag:
+                            "chapter 六百六十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4151,6 +4157,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 六百六十")!
+                .mNumberLast),
+            // M2024 chapter 661 — convenience-cadence-record trio Codable extension gap-fill (5th post-hexa-#7)
+            ("661",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 六百六十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

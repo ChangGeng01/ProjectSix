@@ -24,8 +24,8 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2020",
-            "M2020:doctrine version reflects chapter 六百六十 — HOST-PROJECTION TRIO CODABLE EXTENSION — GAP-FILL,4th post-hexa-#7,single-module BASHostKit reach,3rd consecutive all-struct trio,2 chapters until chapter 六百六十三 hexa #8 catalog。 201 typed surfaces cumulative。 604 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
+            "ADR-016.M2024",
+            "M2024:doctrine version reflects chapter 六百六十一 — CONVENIENCE-CADENCE-RECORD TRIO CODABLE EXTENSION — GAP-FILL,5th post-hexa-#7,cross-module BASHostKit + BASRuntimeCore reach,4th consecutive all-struct trio,1 chapter until chapter 六百六十三 hexa #8 catalog。 202 typed surfaces cumulative。 608 consecutive byte-equality clean commits。 V1 byte-equality preserved。 ADR-014 OPT-IN preserved")
     }
 
     // MARK: - M-number range matches chapter 四百二

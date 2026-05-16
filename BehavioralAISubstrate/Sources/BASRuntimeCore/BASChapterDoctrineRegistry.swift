@@ -19011,7 +19011,69 @@ public enum BASChapterDoctrineRegistry {
                 " all-struct trio。 NEW kind 'host-projection" +
                 "-trio'。 201 typed surfaces cumulative。" +
                 " 604 consecutive byte-equality clean commits。" +
-                " ADR-016 → M2020。 V1 byte-equality preserved。")
+                " ADR-016 → M2020。 V1 byte-equality preserved。"),
+
+        // chapter 661 — convenience-cadence-record trio
+        // (5th post-hexa-#7,cross-module BASHostKit + BAS
+        // RuntimeCore reach,4th consecutive all-struct trio,
+        // 1 chapter until chapter 663 hexa #8 catalog)
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 六百六十一",
+            mNumberFirst: 2021,
+            mNumberLast: 2024,
+            v1MilestoneMNumber: 2024,
+            v1MilestoneStatus:
+                "chapter-661-convenience-cadence-record-trio-codable-extension",
+            knives: [
+                BASChapterKnife(mNumber: 2021, knife: "第一刀",
+                    concept: "Add Codable to 3 cross-module" +
+                        " struct types — BASCognitiveOSConvenience" +
+                        "Cadence + BASCognitiveOSConvenienceResult" +
+                        " (BASHostKit) + BASMambaInferenceLatency" +
+                        "Record (BASRuntimeCore)。 4th consecutive" +
+                        " all-struct trio。"),
+                BASChapterKnife(mNumber: 2022, knife: "第二刀",
+                    concept: "3 PROOF tests。"),
+                BASChapterKnife(mNumber: 2023, knife: "第三刀",
+                    concept: "NEW BASConvenienceCadenceRecord" +
+                        "TrioCodableExtensionDoctrine + 28 anti-" +
+                        "drift tests。 typed-surface 201 → 202。"),
+                BASChapterKnife(mNumber: 2024, knife: "第四刀",
+                    concept: "Chapter 661 close-out。 608" +
+                        " consecutive byte-equality clean commits。")
+            ],
+            entropyClassesAttacked: [
+                "bas-cognitive-os-convenience-cadence-non-codable",
+                "bas-cognitive-os-convenience-result-non-codable",
+                "bas-mamba-inference-latency-record-non-codable",
+                "convenience-cadence-record-trio-pattern-uncaptured",
+                "fifth-post-hexa-seven-gap-fill-not-shipped"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-IN", "ADR-016 → M2024",
+                "v1-byte-equality-preserved",
+                "stress-sweep-canonical60-0-divergence",
+                "convenience-cadence-record-trio-codable-extension",
+                "fifth-post-hexa-seven-gap-fill",
+                "cross-module-trio",
+                "fourth-consecutive-all-struct-trio",
+                "new-kind-label-convenience-cadence-record-trio",
+                "608-consecutive-byte-equality-clean-commits"
+            ],
+            plannedFutureCuts: [
+                "future arc — 1 more gap-fill (chapter 662)",
+                "future arc — chapter 663 hexa #8 catalog",
+                "future arc — Phase H default mode flip"
+            ],
+            summary: "Chapter 661 ships convenience-cadence-" +
+                "record trio Codable extension — 5th post-" +
+                "hexa-#7 gap-fill,cross-module BASHostKit +" +
+                " BASRuntimeCore reach,4th consecutive all-" +
+                "struct trio。 NEW kind 'convenience-cadence-" +
+                "record-trio'。 202 typed surfaces cumulative。" +
+                " 608 consecutive byte-equality clean commits。" +
+                " ADR-016 → M2024。 V1 byte-equality preserved。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
