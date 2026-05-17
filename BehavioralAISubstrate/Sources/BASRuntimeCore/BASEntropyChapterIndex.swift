@@ -6454,7 +6454,32 @@ public enum BASEntropyChapterIndex {
                 " OPT-OUT preserved。 ADR-016 → M2216。" +
                 " 798 consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
-                " 60/60 score unchanged。")
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十九",
+            mNumberFirst: 2217, mNumberLast: 2218,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "SENDABLE CROSS-TASK TRANSFER" +
+                " MATRIX — 2-knife。 M2217 第一刀 NEW" +
+                " BASFivePilotErrorSendableTransfer" +
+                "MatrixTests.swift with 6 tests:proves" +
+                " each pilot error enum survives ACTUAL" +
+                " `Task { }.value` boundary transfer at" +
+                " RUNTIME (not just compile-time witness" +
+                " like chapter 717's cross-pilot test)" +
+                " + mixed FivePilotErrorReport struct" +
+                " with one error per pilot transferred +" +
+                " unpacked。 assertSendableTransferRound" +
+                "Trip<T: Sendable & Equatable> enforces" +
+                " Sendable conformance at capture site" +
+                " AND verifies runtime Equatable round-" +
+                "trip。 M2218 第二刀 close-out + 13-file" +
+                " sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2218。 800 consecutive byte-" +
+                "equality clean commits — MILESTONE。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

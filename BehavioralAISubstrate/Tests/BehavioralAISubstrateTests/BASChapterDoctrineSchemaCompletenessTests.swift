@@ -2722,7 +2722,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十八",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十八")!)
+                        chapterTag: "chapter 七百十八")!),
+            // M2218 chapter 719 — ERROR SENDABLE CROSS-TASK
+            // TRANSFER MATRIX
+            checkRegistry("七百十九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4957,6 +4963,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十八")!
+                .mNumberLast),
+            // M2218 chapter 719 — ERROR SENDABLE TRANSFER
+            ("719",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

@@ -24010,7 +24010,84 @@ public enum BASChapterDoctrineRegistry {
                 " 798 consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
                 " 60/60 score unchanged。 Auto-mode 1min" +
-                " cadence loop continues。")
+                " cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十九",
+            mNumberFirst: 2217,
+            mNumberLast: 2218,
+            v1MilestoneMNumber: 2218,
+            v1MilestoneStatus:
+                "chapter-719-error-sendable-cross-task-transfer-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2217, knife: "第一刀",
+                    concept: "NEW BASFivePilotError" +
+                        "SendableTransferMatrixTests" +
+                        ".swift with 6 tests:proves each" +
+                        " of 5 pilot error enums survives" +
+                        " ACTUAL `Task { }.value`" +
+                        " boundary transfer at RUNTIME" +
+                        " (not just compile-time witness" +
+                        " like chapter 717 cross-pilot" +
+                        " test) + mixed FivePilotError" +
+                        "Report struct with one error" +
+                        " per pilot transferred +" +
+                        " unpacked。 assertSendable" +
+                        "TransferRoundTrip<T: Sendable" +
+                        " & Equatable> enforces Sendable" +
+                        " at capture site AND verifies" +
+                        " runtime Equatable round-trip" +
+                        "。 Real-world contract for" +
+                        " telemetry pipelines aggregating" +
+                        " errors across async boundaries" +
+                        "。 All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2218, knife: "第二刀",
+                    concept: "Chapter 719 close-out +" +
+                        " 13-file sync。 800 consecutive" +
+                        " byte-equality clean commits —" +
+                        " MILESTONE。 ADR-016 → M2218。" +
+                        " 60/60 score unchanged。 273" +
+                        " typed surfaces unchanged。 NO" +
+                        " new doctrines (option-a:" +
+                        " tests-only knife exercising" +
+                        " existing Sendable conformance" +
+                        " from chapters 702-706 under" +
+                        " actual concurrency boundary)。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-sendable-runtime-transfer-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2218",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "800-consecutive-byte-equality-clean-commits-MILESTONE",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "sendable-cross-task-transfer-pinned-5-pilot-error-enums",
+                "mixed-collection-runtime-transfer-verified"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR SENDABLE CROSS-TASK TRANSFER" +
+                " MATRIX for 5 pilots。 2-knife chapter。" +
+                " M2217 第一刀 6 new tests proving each" +
+                " pilot error enum survives ACTUAL Task" +
+                " boundary transfer at RUNTIME (not just" +
+                " compile-time) + mixed-collection" +
+                " transfer。 M2218 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT preserved" +
+                "。 ADR-016 → M2218。 800 consecutive" +
+                " byte-equality clean commits — MILESTONE" +
+                "。 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 Auto-mode 1min cadence" +
+                " loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

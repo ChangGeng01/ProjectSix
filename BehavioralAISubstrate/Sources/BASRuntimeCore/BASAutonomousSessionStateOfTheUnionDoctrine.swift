@@ -124,9 +124,9 @@ public enum BASAutonomousSessionStateOfTheUnionDoctrine {
     /// observation-trio')。
     public static let typedSurfaceCount: Int = 273
     public static let consecutiveByteEqualityCleanCommits:
-        Int = 798
-    public static let phase2CommitsShipped: Int = 1260
-    public static let chapter2NumberLast: Int = 2216
+        Int = 800
+    public static let phase2CommitsShipped: Int = 1262
+    public static let chapter2NumberLast: Int = 2218
 
     /// Both Sources/ and Tests/ build warning-free。
     public static let substrateIsWarningFree: Bool = true
