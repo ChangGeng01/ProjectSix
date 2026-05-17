@@ -23806,7 +23806,65 @@ public enum BASChapterDoctrineRegistry {
                 " unchanged (purely additive tests)。" +
                 " 60/60 score unchanged。 Auto-mode" +
                 " 1min cadence loop active。 Next:" +
-                " continue per loop directive。")
+                " continue per loop directive。"),
+        // chapter 716 — BOUNDARY + ERROR-PATH TESTS
+        // for 5 pilots。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十六",
+            mNumberFirst: 2211,
+            mNumberLast: 2212,
+            v1MilestoneMNumber: 2212,
+            v1MilestoneStatus:
+                "chapter-716-boundary-and-error-path-tests",
+            knives: [
+                BASChapterKnife(mNumber: 2211, knife: "第一刀",
+                    concept: "NEW BASFivePilotBoundary" +
+                        "AndErrorPathTests.swift with 7" +
+                        " tests covering edge inputs:" +
+                        " empty fields,1KB/10KB strings," +
+                        " monotonic clock 1000-iter" +
+                        " non-decreasing stress,non-" +
+                        "ASCII UTF-8 round-trip via" +
+                        " Rust C ABI。 All pass。"),
+                BASChapterKnife(mNumber: 2212, knife: "第二刀",
+                    concept: "Chapter 716 close-out +" +
+                        " 13-file sync。 794 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2212。 60/60 score" +
+                        " unchanged。 NO new doctrines。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-boundary-conditions-and-error-paths-unverified"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2212",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "794-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "non-ascii-utf8-round-trip-verified-rust-c-abi",
+                "monotonic-clock-1000-iter-non-decreasing-stress-passed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "BOUNDARY + ERROR-PATH TESTS for 5" +
+                " pilots。 2-knife chapter。 M2211 第一刀" +
+                " 7 new tests covering edge inputs +" +
+                " stress + UTF-8。 M2212 第二刀 close-out" +
+                " + 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2212。 794" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 Auto-mode 1min cadence" +
+                " loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

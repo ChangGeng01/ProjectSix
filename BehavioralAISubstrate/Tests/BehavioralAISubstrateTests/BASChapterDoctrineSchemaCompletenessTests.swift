@@ -2704,7 +2704,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十五",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十五")!)
+                        chapterTag: "chapter 七百十五")!),
+            // M2212 chapter 716 — BOUNDARY + ERROR-PATH
+            // TESTS
+            checkRegistry("七百十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4915,6 +4921,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十五")!
+                .mNumberLast),
+            // M2212 chapter 716 — BOUNDARY + ERROR PATHS
+            ("716",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

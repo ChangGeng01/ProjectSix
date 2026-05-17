@@ -121,10 +121,9 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2210:24 + 20 + 267 = 311 (chapter 七百十五 —
-    /// concurrent stress tests for 5-pilot factories,
-    /// thread-safety validated)。
-    public static let phase2ChapterCount: Int = 311
+    /// At M2212:24 + 20 + 268 = 312 (chapter 七百十六 —
+    /// boundary + error-path tests across 5 pilots)。
+    public static let phase2ChapterCount: Int = 312
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -144,9 +143,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2204:1246 + 2 = 1248 (chapter 七百十二)。 At
     /// M2206:1248 + 2 = 1250 (chapter 七百十三)。 At
     /// M2208:1250 + 2 = 1252 (chapter 七百十四)。 At
-    /// M2210:1252 + 2 = 1254 (chapter 七百十五 — 2-knife
-    /// concurrent stress tests)
-    public static let phase2CommitsShipped: Int = 1254
+    /// M2210:1252 + 2 = 1254 (chapter 七百十五)。 At
+    /// M2212:1254 + 2 = 1256 (chapter 七百十六 — 2-knife
+    /// boundary + error-path tests)
+    public static let phase2CommitsShipped: Int = 1256
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -165,9 +165,10 @@ public enum BASSweepDoctrineExpectations {
     /// (makeWithDefaults factories for all 5 pilots)。
     /// At M2208:chapter 714 — substrate adoption audit
     /// + e2e integration test。 At M2210:chapter 715 —
-    /// concurrent stress tests for 5-pilot factories
-    /// (thread-safety validated)。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2210
+    /// concurrent stress tests for 5-pilot factories。
+    /// At M2212:chapter 716 — boundary + error-path
+    /// tests across 5 pilots。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2212
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

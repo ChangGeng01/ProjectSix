@@ -6395,7 +6395,24 @@ public enum BASEntropyChapterIndex {
                 " M2210。 792 consecutive byte-equality" +
                 " clean commits。 273 typed surfaces" +
                 " unchanged。 60/60 score unchanged。" +
-                " Auto-mode 1min cadence loop active。")
+                " Auto-mode 1min cadence loop active。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十六",
+            mNumberFirst: 2211, mNumberLast: 2212,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "BOUNDARY + ERROR-PATH TESTS —" +
+                " 2-knife chapter。 M2211 第一刀 NEW" +
+                " BASFivePilotBoundaryAndErrorPathTests" +
+                ".swift with 7 tests:empty fields +" +
+                " 1KB/10KB strings + 1000-iter monotonic" +
+                " clock stress + non-ASCII UTF-8 round-" +
+                "trip via Rust C ABI。 M2212 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2212。" +
+                " 794 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
