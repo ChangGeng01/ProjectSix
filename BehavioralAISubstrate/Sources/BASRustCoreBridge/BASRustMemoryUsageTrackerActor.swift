@@ -362,4 +362,13 @@ extension BASRustMemoryUsageTrackerActor {
         return try BASRustMemoryUsageTrackerActor(
             useRustCore: useRust)
     }
+
+    /// M2205 chapter 七百十三 第一刀 — host adoption
+    /// convenience。 Returns the V2 Rust-backed path
+    /// because chapter 七百十二 production wire-in
+    /// flipped `rustCoreEnabled` to default-true。
+    public static func makeWithDefaults() async throws -> BASRustMemoryUsageTrackerActor {
+        let flags = BASLanguageAugmentationFeatureFlags()
+        return try await make(flags: flags)
+    }
 }

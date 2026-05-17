@@ -168,6 +168,15 @@ extension BASMonotonicNanos {
         let useCBridge = await flags.isEnabled(.cBridgeEnabled)
         return BASMonotonicNanos(useCBridge: useCBridge)
     }
+
+    /// M2205 chapter 七百十三 第一刀 — host adoption
+    /// convenience。 Returns the V2 C-bridge path
+    /// because chapter 七百十二 production wire-in
+    /// flipped `cBridgeEnabled` to default-true。
+    public static func makeWithDefaults() async -> BASMonotonicNanos {
+        let flags = BASLanguageAugmentationFeatureFlags()
+        return await make(flags: flags)
+    }
 }
 
 // MARK: - Equivalence bound pin

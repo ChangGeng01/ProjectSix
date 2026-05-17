@@ -224,6 +224,15 @@ extension BASMetalKernelLibraryLoader {
         return BASMetalKernelLibraryLoader(
             useMetalKernelV2: useV2)
     }
+
+    /// M2205 chapter 七百十三 第一刀 — host adoption
+    /// convenience。 Returns the V2 path because
+    /// chapter 七百十二 production wire-in flipped
+    /// `metalKernelV2Enabled` to default-true。
+    public static func makeWithDefaults() async -> BASMetalKernelLibraryLoader {
+        let flags = BASLanguageAugmentationFeatureFlags()
+        return await make(flags: flags)
+    }
 }
 
 // MARK: - Resource availability introspection

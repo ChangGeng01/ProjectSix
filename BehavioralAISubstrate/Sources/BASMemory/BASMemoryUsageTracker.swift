@@ -428,6 +428,26 @@ public actor BASMemoryUsageTracker {
             useGeneratedSchema: useGenerated)
     }
 
+    /// M2205 chapter 七百十三 第一刀 — host adoption
+    /// convenience factory。 Constructs a fresh default-
+    /// init `BASLanguageAugmentationFeatureFlags` actor
+    /// and routes through `make(databaseURL:flags:)`,
+    /// returning the V2-generated-schema path because
+    /// chapter 七百十一 production wire-in flipped
+    /// `sqlMigratorEnabled` to default-true。
+    ///
+    /// Hosts that want flag control should use
+    /// `make(databaseURL:flags:)` directly。 Hosts that
+    /// want "just give me the recommended SQL pilot
+    /// configuration" use this。
+    public static func makeWithDefaults(
+        databaseURL: URL
+    ) async throws -> BASMemoryUsageTracker {
+        let flags = BASLanguageAugmentationFeatureFlags()
+        return try await make(
+            databaseURL: databaseURL, flags: flags)
+    }
+
     private static func verifySchemaVersion(
         db: OpaquePointer
     ) throws {

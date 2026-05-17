@@ -208,4 +208,13 @@ extension BASMPSGraphExecutableCacheCxxBridge {
         return BASMPSGraphExecutableCacheCxxBridge(
             useCxxCache: useCxx)
     }
+
+    /// M2205 chapter 七百十三 第一刀 — host adoption
+    /// convenience。 Returns the V2 cache path because
+    /// chapter 七百十二 production wire-in flipped
+    /// `cxxMpsCacheEnabled` to default-true。
+    public static func makeWithDefaults() async -> BASMPSGraphExecutableCacheCxxBridge {
+        let flags = BASLanguageAugmentationFeatureFlags()
+        return await make(flags: flags)
+    }
 }
