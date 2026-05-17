@@ -87,6 +87,25 @@ public enum BASMetalKernelLibraryLoaderError:
     /// `MTLLibrary.makeLibrary(source:options:)` threw
     /// (shader compile error)。
     case metalCompilationFailed(message: String)
+
+    /// Stable telemetry-friendly identifier for the error
+    /// case discriminator,independent of associated value
+    /// data。 See chapter 七百二十 / M2219 for the cross-
+    /// pilot caseIdentifier contract。
+    public var caseIdentifier: String {
+        switch self {
+        case .metalUnavailableOnPlatform:
+            return "metalUnavailableOnPlatform"
+        case .mtlDeviceUnavailable:
+            return "mtlDeviceUnavailable"
+        case .resourceURLMissing:
+            return "resourceURLMissing"
+        case .resourceReadFailed:
+            return "resourceReadFailed"
+        case .metalCompilationFailed:
+            return "metalCompilationFailed"
+        }
+    }
 }
 
 /// Loader actor。

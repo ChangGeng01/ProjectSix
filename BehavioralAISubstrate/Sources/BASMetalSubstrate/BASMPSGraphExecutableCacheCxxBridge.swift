@@ -63,6 +63,21 @@ public enum BASMPSGraphExecutableCacheCxxBridgeError:
     /// side grows new error codes,callers see a typed
     /// surface immediately。
     case unknownReturnCode(Int32)
+
+    /// Stable telemetry-friendly identifier for the error
+    /// case discriminator,independent of associated value
+    /// data。 See chapter 七百二十 / M2219 for the cross-
+    /// pilot caseIdentifier contract。
+    public var caseIdentifier: String {
+        switch self {
+        case .nullPointer:
+            return "nullPointer"
+        case .cxxInternalException:
+            return "cxxInternalException"
+        case .unknownReturnCode:
+            return "unknownReturnCode"
+        }
+    }
 }
 
 /// Swift actor wrapping the chapter 七百五 C++ cache。

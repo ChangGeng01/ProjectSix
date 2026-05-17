@@ -96,6 +96,27 @@ public enum BASRustMemoryUsageTrackerActorError:
 
     /// Rust returned an unknown non-zero status code。
     case unknownReturnCode(Int32)
+
+    /// Stable telemetry-friendly identifier for the error
+    /// case discriminator,independent of associated value
+    /// data。 See chapter 七百二十 / M2219 for the cross-
+    /// pilot caseIdentifier contract。
+    public var caseIdentifier: String {
+        switch self {
+        case .rustBridgeUnavailableOnPlatform:
+            return "rustBridgeUnavailableOnPlatform"
+        case .initFailed:
+            return "initFailed"
+        case .nullPointer:
+            return "nullPointer"
+        case .rustInternalException:
+            return "rustInternalException"
+        case .jsonDecodeFailed:
+            return "jsonDecodeFailed"
+        case .unknownReturnCode:
+            return "unknownReturnCode"
+        }
+    }
 }
 
 #if os(iOS) || os(macOS)

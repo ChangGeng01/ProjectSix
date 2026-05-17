@@ -75,6 +75,24 @@ public enum BASMonotonicNanosError:
     /// a typed surface immediately instead of silently
     /// treating the result as success。
     case unknownReturnCode(Int32)
+
+    /// Stable telemetry-friendly identifier for the error
+    /// case discriminator,independent of associated value
+    /// data。 Useful for aggregating errors by case in
+    /// telemetry pipelines WITHOUT leaking PII or
+    /// implementation-specific message text into the
+    /// aggregation key。 Format:lowerCamelCase case name
+    /// (matches Swift case label convention)。
+    public var caseIdentifier: String {
+        switch self {
+        case .nullOutPointer:
+            return "nullOutPointer"
+        case .clockGetTimeSyscallFailed:
+            return "clockGetTimeSyscallFailed"
+        case .unknownReturnCode:
+            return "unknownReturnCode"
+        }
+    }
 }
 
 /// Actor wrapping `bas_monotonic_nanos`。 Opt-in via

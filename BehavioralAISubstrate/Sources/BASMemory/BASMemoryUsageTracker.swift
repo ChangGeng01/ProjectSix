@@ -147,6 +147,26 @@ public actor BASMemoryUsageTracker {
         case stepFailed(sql: String, message: String)
         case schemaVersionMismatch(found: Int, expected: Int)
         case unknownRecord(id: String)
+
+        /// Stable telemetry-friendly identifier for the
+        /// error case discriminator,independent of
+        /// associated value data。 See chapter 七百二十 /
+        /// M2219 for the cross-pilot caseIdentifier
+        /// contract。
+        public var caseIdentifier: String {
+            switch self {
+            case .openFailed:
+                return "openFailed"
+            case .prepareFailed:
+                return "prepareFailed"
+            case .stepFailed:
+                return "stepFailed"
+            case .schemaVersionMismatch:
+                return "schemaVersionMismatch"
+            case .unknownRecord:
+                return "unknownRecord"
+            }
+        }
     }
 
     public static let schemaVersion: Int = 1
