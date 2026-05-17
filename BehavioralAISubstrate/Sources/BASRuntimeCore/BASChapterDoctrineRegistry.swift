@@ -24523,7 +24523,73 @@ public enum BASChapterDoctrineRegistry {
                 "equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
                 " unchanged。 Auto-mode 1min cadence" +
-                " loop continues。")
+                " loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十六",
+            mNumberFirst: 2231,
+            mNumberLast: 2232,
+            v1MilestoneMNumber: 2232,
+            v1MilestoneStatus:
+                "chapter-726-pilot-actor-count-invariant-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2231, knife: "第一刀",
+                    concept: "Second pillar of 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotActorCountInvariantTests" +
+                        ".swift with 6 tests (5 per-" +
+                        "pilot reachability + 1 cross-" +
+                        "pilot total count = 5)。" +
+                        " Tripwire for accidental" +
+                        " additions/removals of pilot" +
+                        " actors。 Actor-side analog" +
+                        " of chapter 724's error case-" +
+                        "count tripwire。 All 6 tests" +
+                        " pass。"),
+                BASChapterKnife(mNumber: 2232, knife: "第二刀",
+                    concept: "Chapter 726 close-out +" +
+                        " 13-file sync。 814 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2232。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines。" +
+                        " Dual safety nets:cron" +
+                        " caa2938c every-min + Schedule" +
+                        "Wakeup d6c37d6f one-shot.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-actor-count-not-pinned-no-tripwire"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2232",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "814-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "pilot-actor-count-invariant-pinned-5-actors",
+                "second-pillar-of-5-pilot-actor-contract-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ACTOR COUNT INVARIANT MATRIX for" +
+                " 5 pilots。 2-knife chapter。 M2231" +
+                " 第一刀 6 new tests (5 reachability +" +
+                " 1 total count = 5 tripwire)。 Second" +
+                " pillar of 5-pilot ACTOR contract" +
+                " sealing trajectory。 M2232 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2232。" +
+                " 814 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
+                "。 60/60 score unchanged。 Auto-mode" +
+                " 1min cadence loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

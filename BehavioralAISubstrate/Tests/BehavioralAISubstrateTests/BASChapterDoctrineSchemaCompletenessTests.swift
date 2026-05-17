@@ -2761,7 +2761,12 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百二十五",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百二十五")!)
+                        chapterTag: "chapter 七百二十五")!),
+            // M2232 chapter 726 — ACTOR COUNT INVARIANT
+            checkRegistry("七百二十六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百二十六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -5052,6 +5057,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百二十五")!
+                .mNumberLast),
+            // M2232 chapter 726 — ACTOR COUNT INVARIANT
+            ("726",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

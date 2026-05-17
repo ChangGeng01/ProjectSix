@@ -6645,6 +6645,29 @@ public enum BASEntropyChapterIndex {
                 " OPT-OUT preserved。 ADR-016 → M2230。" +
                 " 812 consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged" +
+                "。 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十六",
+            mNumberFirst: 2231, mNumberLast: 2232,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR COUNT INVARIANT" +
+                " MATRIX — 2-knife。 Second pillar of" +
+                " 5-pilot ACTOR contract。 M2231 第一刀" +
+                " NEW BASFivePilotActorCountInvariant" +
+                "Tests.swift with 6 tests (5 per-pilot" +
+                " reachability + 1 cross-pilot total" +
+                " count = 5)。 Tripwire for accidental" +
+                " additions or removals。 Per-actor" +
+                " tests would still PASS if a 6th pilot" +
+                " was added — count invariant catches" +
+                " additive changes。 Actor-side analog" +
+                " of chapter 724's error case-count" +
+                " tripwire。 M2232 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2232。 814" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
                 "。 60/60 score unchanged。")
     ]
 

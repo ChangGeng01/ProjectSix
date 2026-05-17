@@ -149,7 +149,10 @@ public enum BASSweepDoctrineExpectations {
     /// — pilot ACTOR type-name introspection matrix —
     /// PIVOT from 5-pilot ERROR contract to ACTOR
     /// contract)。
-    public static let phase2ChapterCount: Int = 321
+    /// At M2232:24 + 20 + 278 = 322 (chapter 七百二十六
+    /// — pilot ACTOR count invariant matrix — second
+    /// pillar of 5-pilot ACTOR contract)。
+    public static let phase2ChapterCount: Int = 322
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -188,8 +191,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2228:1270 + 2 = 1272 (chapter 七百二十四 —
     /// 2-knife case count invariant matrix)。 At M2230:
     /// 1272 + 2 = 1274 (chapter 七百二十五 — 2-knife
-    /// actor type-name introspection matrix)。
-    public static let phase2CommitsShipped: Int = 1274
+    /// actor type-name introspection matrix)。 At M2232:
+    /// 1274 + 2 = 1276 (chapter 七百二十六 — 2-knife
+    /// actor count invariant matrix)。
+    public static let phase2CommitsShipped: Int = 1276
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -222,9 +227,10 @@ public enum BASSweepDoctrineExpectations {
     /// description (payload-inclusive) matrix。 At M2228:
     /// chapter 724 — case count invariant matrix。 At
     /// M2230:chapter 725 — actor type-name introspection
-    /// matrix (PIVOT to ACTOR contract)。 SWEEP frozen
-    /// at 1163。
-    public static let phase2MNumberLast: Int = 2230
+    /// matrix (PIVOT to ACTOR contract)。 At M2232:
+    /// chapter 726 — actor count invariant matrix。
+    /// SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2232
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
