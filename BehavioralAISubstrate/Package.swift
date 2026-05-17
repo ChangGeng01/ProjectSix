@@ -293,6 +293,39 @@ let package = Package(
             name: "BASRustCoreBridge",
             path: "Sources/BASRustCoreBridge"),
 
+        // M2171 chapter 七百二 第一刀 — SQL pilot core +
+        // tool + plugin。 Three-target pattern:
+        //
+        //   BASSQLSchemaGenCore  — pure-Swift codegen
+        //                          function;tests import
+        //                          this directly。
+        //   BASSQLSchemaGenTool  — executable;parses argv,
+        //                          delegates to core。
+        //                          Invoked by the build
+        //                          plugin per `.sql` file。
+        //   BASSQLSchemaGen      — plugin manifest;tells
+        //                          SPM which command to
+        //                          run per input file。
+        //
+        // Consumers attach the plugin via target.plugins
+        // (see BASMemory target at M2173 第三刀)。 Targets
+        // without a `SQL/` subdirectory see the plugin
+        // become a no-op。
+        .target(
+            name: "BASSQLSchemaGenCore",
+            path: "Sources/BASSQLSchemaGenCore"),
+        .executableTarget(
+            name: "BASSQLSchemaGenTool",
+            dependencies: ["BASSQLSchemaGenCore"],
+            path: "Sources/BASSQLSchemaGenTool"),
+        .plugin(
+            name: "BASSQLSchemaGen",
+            capability: .buildTool(),
+            dependencies: [
+                .target(name: "BASSQLSchemaGenTool")
+            ],
+            path: "Plugins/BASSQLSchemaGen"),
+
         .testTarget(name: "BehavioralAISubstrateTests", dependencies: [
             "BASHostKit",
             "BASRuntimeCore",
@@ -309,7 +342,12 @@ let package = Package(
             "BASAppleAdapters",
             "BASChatCompletionsAdapter",
             "BASMLXAdapter",
-            "BASMetalSubstrate"
+            "BASMetalSubstrate",
+            // M2171 chapter 七百二 第一刀 — codegen core
+            // exposed to tests so BASSQLSchemaGenCoreTests
+            // can validate pure-function behavior without
+            // spawning the executable tool。
+            "BASSQLSchemaGenCore"
         ])
     ]
 )
