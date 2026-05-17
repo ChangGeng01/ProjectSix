@@ -164,7 +164,10 @@ public enum BASSweepDoctrineExpectations {
     /// At M2240:24 + 20 + 282 = 326 (chapter 七百三十
     /// — pilot makeWithDefaults factory existence matrix
     /// — sixth pillar of 5-pilot ACTOR contract)。
-    public static let phase2ChapterCount: Int = 326
+    /// At M2242:24 + 20 + 283 = 327 (chapter 七百三十一
+    /// — feature flag actor surface contract matrix —
+    /// seventh pillar,cross-cutting flag actor)。
+    public static let phase2ChapterCount: Int = 327
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -214,8 +217,10 @@ public enum BASSweepDoctrineExpectations {
     /// actor distinct-instance separation matrix)。 At
     /// M2240:1282 + 2 = 1284 (chapter 七百三十 —
     /// 2-knife makeWithDefaults factory existence
-    /// matrix)。
-    public static let phase2CommitsShipped: Int = 1284
+    /// matrix)。 At M2242:1284 + 2 = 1286 (chapter
+    /// 七百三十一 — 2-knife flag actor surface
+    /// contract matrix)。
+    public static let phase2CommitsShipped: Int = 1286
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -255,8 +260,10 @@ public enum BASSweepDoctrineExpectations {
     /// module-qualified name matrix。 At M2238:chapter
     /// 729 — actor distinct-instance separation matrix。
     /// At M2240:chapter 730 — makeWithDefaults factory
-    /// existence matrix。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2240
+    /// existence matrix。 At M2242:chapter 731 — flag
+    /// actor surface contract matrix。 SWEEP frozen at
+    /// 1163。
+    public static let phase2MNumberLast: Int = 2242
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

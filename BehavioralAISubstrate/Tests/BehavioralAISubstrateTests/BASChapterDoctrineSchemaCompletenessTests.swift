@@ -2786,7 +2786,12 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百三十",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百三十")!)
+                        chapterTag: "chapter 七百三十")!),
+            // M2242 chapter 731 — FLAG ACTOR SURFACE
+            checkRegistry("七百三十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百三十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -5117,6 +5122,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百三十")!
+                .mNumberLast),
+            // M2242 chapter 731 — FLAG ACTOR SURFACE
+            ("731",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百三十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百三十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

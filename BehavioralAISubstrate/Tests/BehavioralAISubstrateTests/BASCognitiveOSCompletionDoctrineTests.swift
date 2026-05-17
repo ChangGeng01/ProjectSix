@@ -25,7 +25,7 @@ final class BASCognitiveOSCompletionDoctrineTests:
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2240",
+            "ADR-016.M2242",
             "Doctrine version pin。 M1299 chapter 四百" +
             "八十 Phase C ANE default + MPSGraph cache:" +
             " bumped through chapters 453-480 —" +

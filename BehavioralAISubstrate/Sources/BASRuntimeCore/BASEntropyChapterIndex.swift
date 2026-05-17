@@ -6762,7 +6762,29 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-016 → M2240。 822" +
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged" +
-                "。 60/60 score unchanged。")
+                "。 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十一",
+            mNumberFirst: 2241, mNumberLast: 2242,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FEATURE FLAG ACTOR SURFACE" +
+                " CONTRACT MATRIX — 2-knife。 Seventh" +
+                " pillar (cross-cutting flag actor)。" +
+                " M2241 第一刀 NEW BASLanguageAugment" +
+                "ationFeatureFlagsSurfaceContractTests" +
+                ".swift with 6 tests pinning shared" +
+                " BASLanguageAugmentationFeatureFlags" +
+                " actor surface (all 5 pilots consult" +
+                " this single actor)。 Widens trajectory" +
+                " from per-pilot pillars (725-730) to" +
+                " the cross-cutting flag actor。 M2242" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2242。 824 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

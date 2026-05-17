@@ -24857,7 +24857,67 @@ public enum BASChapterDoctrineRegistry {
                 " 822 consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged" +
                 "。 60/60 score unchanged。 Auto-mode" +
-                " loop continues non-stop per directive。")
+                " loop continues non-stop per directive。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百三十一",
+            mNumberFirst: 2241,
+            mNumberLast: 2242,
+            v1MilestoneMNumber: 2242,
+            v1MilestoneStatus:
+                "chapter-731-feature-flag-actor-surface-contract-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2241, knife: "第一刀",
+                    concept: "Seventh pillar (cross-" +
+                        "cutting flag actor)。 NEW BAS" +
+                        "LanguageAugmentationFeature" +
+                        "FlagsSurfaceContractTests.swift" +
+                        " with 6 tests pinning shared" +
+                        " flag actor surface (5 flag" +
+                        " cases + effectiveDefault +" +
+                        " isEnabled + setFlag round-" +
+                        "trip + snapshot all-5 +" +
+                        " resetAll restores defaults)。" +
+                        " All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2242, knife: "第二刀",
+                    concept: "Chapter 731 close-out +" +
+                        " 13-file sync。 824 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2242。 NO new" +
+                        " doctrines。")
+            ],
+            entropyClassesAttacked: [
+                "feature-flag-actor-surface-contract-unpinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2242",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "824-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "feature-flag-actor-surface-pinned",
+                "seventh-pillar-cross-cutting-flag-actor-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "FEATURE FLAG ACTOR SURFACE" +
+                " CONTRACT MATRIX。 2-knife chapter。" +
+                " M2241 第一刀 6 new tests pinning" +
+                " shared flag actor surface。 Seventh" +
+                " pillar (cross-cutting,not per-pilot)。" +
+                " M2242 第二刀 close-out + 13-file sync" +
+                "。 ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2242。 824 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
