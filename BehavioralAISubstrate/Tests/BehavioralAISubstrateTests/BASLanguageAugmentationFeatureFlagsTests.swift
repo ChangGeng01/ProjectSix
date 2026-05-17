@@ -264,4 +264,139 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
                 "flag \(flag) must default false to preserve ADR-014 OPT-OUT V1 byte-equality")
         }
     }
+
+    // MARK: - M2199 chapter 七百十 第一刀 — per-flag
+    //         defaults mechanism (CURRENTLY empty,
+    //         enables future granular wire-in)
+
+    func testPerFlagDefaultsConstantIsEmptyAtChapter710() {
+        // CRITICAL anti-drift pin:adding any entry to
+        // perFlagDefaults flips that flag's default
+        // semantically。 This test guards against
+        // accidental flips。 A deliberate flip would
+        // require ALSO updating this test。
+        XCTAssertEqual(
+            BASLanguageAugmentationFeatureFlags
+                .perFlagDefaults.count, 0,
+            "perFlagDefaults must stay empty until a" +
+            " deliberate production-wire-in chapter" +
+            " explicitly flips one flag's default。" +
+            " Adding an entry here is a doctrine review" +
+            " trigger。")
+    }
+
+    func testEffectiveDefaultFallsBackToGlobalDefault() {
+        // While perFlagDefaults is empty,every flag's
+        // effective default equals the global defaultValue
+        // (false)。
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            let eff = BASLanguageAugmentationFeatureFlags
+                .effectiveDefault(for: flag)
+            XCTAssertEqual(eff,
+                BASLanguageAugmentationFeatureFlags
+                    .defaultValue,
+                "effectiveDefault for \(flag) must fall" +
+                " back to global defaultValue while" +
+                " perFlagDefaults is empty。")
+        }
+    }
+
+    func testEffectiveDefaultEqualsFalseForAllFlags() {
+        // Direct value pin — at chapter 七百十 every flag
+        // effectively defaults to FALSE。 If a future
+        // chapter adds an entry to perFlagDefaults setting
+        // one to true,this test fails for that flag
+        // and the doctrine-review process kicks in。
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            XCTAssertFalse(
+                BASLanguageAugmentationFeatureFlags
+                    .effectiveDefault(for: flag),
+                "flag \(flag) effectiveDefault must be" +
+                " false at chapter 七百十 / M2199。 If" +
+                " true,a deliberate production-wire-in" +
+                " happened and this test must be updated。")
+        }
+    }
+
+    func testInitConsultsPerFlagDefaults() async {
+        // Sampled-once init mechanism:if perFlagDefaults
+        // changes between two init() calls,both instances
+        // reflect the dict at THEIR construction time。
+        // While dict is empty,every flag inits to false。
+        let a = BASLanguageAugmentationFeatureFlags()
+        let b = BASLanguageAugmentationFeatureFlags()
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            let aVal = await a.isEnabled(flag)
+            let bVal = await b.isEnabled(flag)
+            XCTAssertFalse(aVal)
+            XCTAssertFalse(bVal)
+            XCTAssertEqual(aVal, bVal,
+                "two instances must agree on the same" +
+                " per-flag-default-derived initial state")
+        }
+    }
+
+    func testInitWithStateRespectsPerFlagDefaultForUnset() async {
+        // initialState only sets ONE flag explicitly;
+        // the other 4 fall back to effectiveDefault
+        // (currently false)。
+        let flags = BASLanguageAugmentationFeatureFlags(
+            initialState: [.sqlMigratorEnabled: true])
+        let sql = await flags.isEnabled(.sqlMigratorEnabled)
+        let c = await flags.isEnabled(.cBridgeEnabled)
+        let metal = await flags.isEnabled(
+            .metalKernelV2Enabled)
+        let cxx = await flags.isEnabled(.cxxMpsCacheEnabled)
+        let rust = await flags.isEnabled(.rustCoreEnabled)
+        XCTAssertTrue(sql)
+        XCTAssertFalse(c)
+        XCTAssertFalse(metal)
+        XCTAssertFalse(cxx)
+        XCTAssertFalse(rust)
+    }
+
+    func testResetAllRespectsPerFlagDefault() async {
+        // Set every flag to true,then resetAll → every
+        // flag returns to its effectiveDefault (currently
+        // all false while perFlagDefaults is empty)。
+        let flags = BASLanguageAugmentationFeatureFlags()
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            await flags.setFlag(flag, to: true)
+        }
+        await flags.resetAll()
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            let v = await flags.isEnabled(flag)
+            XCTAssertFalse(v,
+                "after resetAll(),flag \(flag) must" +
+                " match effectiveDefault (false at" +
+                " chapter 七百十)")
+        }
+    }
+
+    func testAllDefaultReturnsTrueOnFreshInit() async {
+        let flags = BASLanguageAugmentationFeatureFlags()
+        let isAllDefault = await flags.allDefault()
+        XCTAssertTrue(isAllDefault,
+            "fresh init() means every flag matches" +
+            " effectiveDefault → allDefault() == true")
+    }
+
+    func testAllDefaultReturnsFalseAfterAnyFlip() async {
+        let flags = BASLanguageAugmentationFeatureFlags()
+        await flags.setFlag(.sqlMigratorEnabled, to: true)
+        let isAllDefault = await flags.allDefault()
+        XCTAssertFalse(isAllDefault,
+            "after one flag flipped away from default," +
+            " allDefault() must return false")
+    }
 }

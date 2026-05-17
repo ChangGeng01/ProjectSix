@@ -89,8 +89,41 @@ public actor BASLanguageAugmentationFeatureFlags {
         case rustCoreEnabled
     }
 
-    /// Default state for every flag is FALSE。
+    /// Global fallback default — used by flags that
+    /// have NO entry in `perFlagDefaults`。 Currently
+    /// FALSE,preserving ADR-014 OPT-IN discipline across
+    /// the entire pilot family。
     public static let defaultValue: Bool = false
+
+    /// Per-flag default override map。 M2199 chapter 七百十
+    /// 第一刀 introduces this mechanism as a typed-surface
+    /// pin enabling future granular wire-in:set
+    /// `perFlagDefaults[.sqlMigratorEnabled] = true` (in
+    /// a future commit) to flip JUST the SQL pilot default
+    /// to ON without changing other pilots。
+    ///
+    /// Currently EMPTY — every flag inherits the global
+    /// `defaultValue` (false)。 chapter 698 discipline
+    /// honored:this is a NEW typed-surface constant on
+    /// an existing actor (option-a),NOT a new doctrine。
+    ///
+    /// **V1 byte-equality preserved**:while this map is
+    /// empty,every `isEnabled(...)` call returns the
+    /// same false as before chapter 七百十 → no caller
+    /// observes a behavior change → 780-clean-commits
+    /// chain holds (chapter 七百九 baseline preserved)。
+    public static let perFlagDefaults: [Flag: Bool] = [:]
+
+    /// Effective default for a specific flag。 Consults
+    /// `perFlagDefaults` first,falls back to
+    /// `defaultValue`。 This is the SINGLE SOURCE OF
+    /// TRUTH for "what is this flag's default if no one
+    /// has called setFlag yet?"
+    public static func effectiveDefault(
+        for flag: Flag
+    ) -> Bool {
+        return perFlagDefaults[flag] ?? defaultValue
+    }
 
     /// Total flag count = 5 (one per pilot chapter)。
     public static let totalFlagCount: Int = Flag.allCases.count
@@ -99,12 +132,16 @@ public actor BASLanguageAugmentationFeatureFlags {
 
     private var state: [Flag: Bool]
 
-    /// Default-off initializer:every flag false。 ADR-014
-    /// OPT-OUT preserved。
+    /// Default-off initializer:every flag's value derived
+    /// from `effectiveDefault(for:)`。 ADR-014 OPT-OUT
+    /// preserved AS LONG AS `perFlagDefaults` stays empty。
+    /// A future commit that sets a per-flag default to
+    /// true will flip THAT flag's init value (the desired
+    /// production-wire-in semantic)。
     public init() {
         var initial: [Flag: Bool] = [:]
         for flag in Flag.allCases {
-            initial[flag] = Self.defaultValue
+            initial[flag] = Self.effectiveDefault(for: flag)
         }
         self.state = initial
     }
@@ -112,21 +149,25 @@ public actor BASLanguageAugmentationFeatureFlags {
     /// Test-only initializer accepting an explicit
     /// override map (e.g. for dual-mode pilot tests)。
     /// Production callers should use `init()` and call
-    /// `setFlag(_:to:)`。
+    /// `setFlag(_:to:)`。 Unspecified flags fall back to
+    /// `effectiveDefault(for:)`,not the global
+    /// `defaultValue`,so this initializer respects
+    /// per-flag defaults too。
     public init(initialState: [Flag: Bool]) {
         var initial: [Flag: Bool] = [:]
         for flag in Flag.allCases {
             initial[flag] = initialState[flag]
-                ?? Self.defaultValue
+                ?? Self.effectiveDefault(for: flag)
         }
         self.state = initial
     }
 
     // MARK: - Read accessors
 
-    /// Read a single flag。
+    /// Read a single flag。 Falls back to the per-flag
+    /// effective default if not explicitly set。
     public func isEnabled(_ flag: Flag) -> Bool {
-        return state[flag] ?? Self.defaultValue
+        return state[flag] ?? Self.effectiveDefault(for: flag)
     }
 
     /// Read all flags as a snapshot dict。
@@ -139,9 +180,20 @@ public actor BASLanguageAugmentationFeatureFlags {
         return state.values.contains(where: { $0 })
     }
 
-    /// True if ALL flags are at default (false)。
+    /// True if EVERY flag matches its effective default
+    /// (per-flag default if defined,else global false)。
+    /// Renamed semantic since M2199:was "every flag is
+    /// false";now "every flag is at its effective default"。
+    /// Behavior identical while `perFlagDefaults` is empty。
     public func allDefault() -> Bool {
-        return state.values.allSatisfy({ $0 == false })
+        for flag in Flag.allCases {
+            let current = state[flag]
+                ?? Self.effectiveDefault(for: flag)
+            if current != Self.effectiveDefault(for: flag) {
+                return false
+            }
+        }
+        return true
     }
 
     // MARK: - Write accessors
@@ -151,10 +203,11 @@ public actor BASLanguageAugmentationFeatureFlags {
         state[flag] = value
     }
 
-    /// Reset all flags to default (false)。
+    /// Reset all flags to their effective default
+    /// (per-flag default if defined,else global false)。
     public func resetAll() {
         for flag in Flag.allCases {
-            state[flag] = Self.defaultValue
+            state[flag] = Self.effectiveDefault(for: flag)
         }
     }
 
