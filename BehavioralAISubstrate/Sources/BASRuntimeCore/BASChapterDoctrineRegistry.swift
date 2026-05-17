@@ -23067,7 +23067,104 @@ public enum BASChapterDoctrineRegistry {
                 " Rust pilot。 Next:user direction —" +
                 " possibilities include production wire-" +
                 "in of a flag-gated pilot,specialize C++" +
-                " cache,or new feature arc。")
+                " cache,or new feature arc。"),
+        // chapter 708 — ZERO-WARNING BUILD (chapter 707
+        // planned-future-cut #1 fulfilled)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百八",
+            mNumberFirst: 2195,
+            mNumberLast: 2196,
+            v1MilestoneMNumber: 2196,
+            v1MilestoneStatus:
+                "chapter-708-zero-warning-build",
+            knives: [
+                BASChapterKnife(mNumber: 2195, knife: "第一刀",
+                    concept: "Plugins/BASSQLSchemaGen/" +
+                        "Plugin.swift replaces `source" +
+                        "Target.directory.string`" +
+                        " (deprecated since chapter" +
+                        " 七百二 / M2172) with `String" +
+                        "(describing: sourceTarget" +
+                        ".directory)` — Path conforms" +
+                        " to CustomStringConvertible so" +
+                        " this returns the same path" +
+                        " string WITHOUT triggering" +
+                        " deprecation。 Eliminates all" +
+                        " 3 SPM Path.string warnings;" +
+                        " substrate build is now TRULY" +
+                        " zero-warning。 Plugin runtime" +
+                        " behavior unchanged (30 SQL-" +
+                        "pilot tests still pass)。"),
+                BASChapterKnife(mNumber: 2196, knife: "第二刀",
+                    concept: "Chapter 708 close-out +" +
+                        " 13-file standard sync。 778" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2196。 60/60 score unchanged。" +
+                        " NO new doctrines per chapter" +
+                        " 698 discipline。")
+            ],
+            entropyClassesAttacked: [
+                "persistent-spm-path-string-deprecation-warning"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (no production behavior change)",
+                "ADR-016 → M2196",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "778-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-707-planned-future-cut-1-fulfilled",
+                "build-is-truly-zero-warning",
+                "chapter-699-no-persistent-warnings-lesson-honored"
+            ],
+            plannedFutureCuts: [
+                "2 remaining planned-future-cuts from" +
+                    " chapter 707 still available:" +
+                    " specialize chapter 705 generic" +
+                    " C++ cache for MPSGraphExecutable" +
+                    " variant (needs host demand for" +
+                    " MPSGraph + Foundation framework" +
+                    " coupling) + wire one flag-gated" +
+                    " pilot to production default-ON" +
+                    " (lowest-risk candidate:" +
+                    " sqlMigratorEnabled — chapter 702" +
+                    " byte-equality proven via PRAGMA" +
+                    " table_info)。",
+                "Audit substrate doctrines for additional" +
+                    " consolidation opportunities" +
+                    " (chapter 699+700 trajectory could" +
+                    " extend if more audit/catalog" +
+                    " doctrines surface)。"
+            ],
+            summary: "ZERO-WARNING BUILD — chapter 七百七" +
+                " planned-future-cut #1 fulfilled。" +
+                " 2-knife chapter (smallest honest scope" +
+                " per chapter 699 precedent)。 M2195" +
+                " 第一刀 Path.description workaround in" +
+                " BASSQLSchemaGen/Plugin.swift eliminates" +
+                " 3 SPM Path.string deprecation warnings;" +
+                " substrate build TRULY zero-warning。" +
+                " M2196 第二刀 close-out + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved (no production behavior" +
+                " change — only compiler warning" +
+                " eliminated)。 ADR-016 → M2196。 778" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged (Path" +
+                " .description workaround is a tiny" +
+                " syntactic change)。 60/60 score" +
+                " unchanged (saturation invariant)。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 Chapter 699" +
+                " lesson (persistent warnings are bad)" +
+                " honored via long-standing 3-warning" +
+                " surface eliminated。 Next:user" +
+                " direction。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

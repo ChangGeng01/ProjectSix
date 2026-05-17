@@ -1336,7 +1336,26 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// is now FULLY iOS-deployable for the Rust pilot
     /// — completes the chapter 七百六 planned-future-
     /// cut。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2194"
+    ///
+    /// **M2196 chapter 七百八 第二刀**:zero-warning
+    /// build close-out (chapter 七百七 planned-future-
+    /// cut #1 fulfilled)。 2-knife chapter — smallest
+    /// honest scope:(1) M2195 Plugins/BASSQLSchemaGen/
+    /// Plugin.swift replaces `sourceTarget.directory
+    /// .string` (deprecated) with `String(describing:
+    /// sourceTarget.directory)` (Path conforms to
+    /// CustomStringConvertible);eliminates all 3 SPM
+    /// Path.string deprecation warnings present since
+    /// chapter 七百二 / M2172。 Build is now truly
+    /// zero-warning。 (2) M2196 close-out + 13-file
+    /// sync。 ADR-014 OPT-IN preserved (no production
+    /// behavior change — only compiler warning
+    /// eliminated;plugin runtime behavior identical)。
+    /// V1 byte-equality preserved (778 consecutive
+    /// clean commits after this lands)。 273 typed
+    /// surfaces unchanged。 60/60 score unchanged。 No
+    /// G-status change。
+    public static let doctrineVersion: String = "ADR-016.M2196"
 
     /// Query the typed status of a specific gap。
     public static func status(

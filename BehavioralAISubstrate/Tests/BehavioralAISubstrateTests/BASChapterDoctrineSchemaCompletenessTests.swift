@@ -2651,7 +2651,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百七",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百七")!)
+                        chapterTag: "chapter 七百七")!),
+            // M2196 chapter 708 — ZERO-WARNING BUILD
+            // (chapter 707 planned-future-cut #1 fulfilled)
+            checkRegistry("七百八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4798,6 +4804,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百七")!
+                .mNumberLast),
+            // M2196 chapter 708 — ZERO-WARNING BUILD
+            ("708",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

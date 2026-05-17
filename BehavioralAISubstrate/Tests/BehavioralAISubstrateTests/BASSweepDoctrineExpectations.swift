@@ -121,11 +121,11 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2194:24 + 20 + 259 = 303 (chapter 七百七 —
-    /// Rust XCFramework iOS-slice expansion;chapter
-    /// 七百六 planned-future-cut fulfilled。 Substrate
-    /// now fully iOS-deployable for Rust pilot)。
-    public static let phase2ChapterCount: Int = 303
+    /// At M2196:24 + 20 + 260 = 304 (chapter 七百八 —
+    /// zero-warning build achieved via Path.description
+    /// workaround;chapter 七百七 planned-future-cut #1
+    /// fulfilled)。
+    public static let phase2ChapterCount: Int = 304
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -136,13 +136,12 @@ public enum BASSweepDoctrineExpectations {
     /// (chapter 七百三 — C pilot)。 At M2182:1222 + 4
     /// = 1226 (chapter 七百四 — Metal pilot)。 At M2186:
     /// 1226 + 4 = 1230 (chapter 七百五 — C++ pilot)。
-    /// At M2190:1230 + 4 = 1234 (chapter 七百六 — Rust
-    /// pilot FINAL of 5-language arc)。 At M2194:
-    /// 1234 + 4 = 1238 (chapter 七百七 — Rust XCFramework
-    /// iOS-slice expansion;chapter 七百六 planned-
-    /// future-cut fulfilled;substrate fully iOS-
-    /// deployable)
-    public static let phase2CommitsShipped: Int = 1238
+    /// At M2190:1230 + 4 = 1234 (chapter 七百六)。 At
+    /// M2194:1234 + 4 = 1238 (chapter 七百七)。 At
+    /// M2196:1238 + 2 = 1240 (chapter 七百八 — 2-knife
+    /// zero-warning build chapter,smallest honest
+    /// scope per chapter 699 precedent)
+    public static let phase2CommitsShipped: Int = 1240
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -150,9 +149,10 @@ public enum BASSweepDoctrineExpectations {
     /// chapter 704 — Metal pilot。 At M2186:chapter
     /// 705 — C++ pilot。 At M2190:chapter 706 — Rust
     /// pilot + 5-language arc SEALED。 At M2194:
-    /// chapter 707 — Rust iOS slices expansion。
+    /// chapter 707 — Rust iOS slices expansion。 At
+    /// M2196:chapter 708 — zero-warning build。
     /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2194
+    public static let phase2MNumberLast: Int = 2196
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -6147,7 +6147,41 @@ public enum BASEntropyChapterIndex {
                 " clean commits。 273 typed surfaces" +
                 " UNCHANGED (chapter 698 honored)。" +
                 " 60/60 score unchanged。 Substrate now" +
-                " FULLY iOS-deployable for Rust pilot。")
+                " FULLY iOS-deployable for Rust pilot。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百八",
+            mNumberFirst: 2195, mNumberLast: 2196,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "ZERO-WARNING BUILD — chapter 七百七" +
+                " planned-future-cut #1 fulfilled。" +
+                " 2-knife chapter (smallest honest scope" +
+                " per chapter 699 precedent)。 M2195" +
+                " 第一刀 Plugins/BASSQLSchemaGen/Plugin" +
+                ".swift replaces `sourceTarget.directory" +
+                ".string` (deprecated since chapter 七百二" +
+                " / M2172) with `String(describing:" +
+                " sourceTarget.directory)` — Path conforms" +
+                " to CustomStringConvertible so this" +
+                " returns the same path string WITHOUT" +
+                " triggering deprecation。 Eliminates all" +
+                " 3 SPM Path.string warnings (the LAST" +
+                " remaining warnings in the entire" +
+                " build);substrate build is now TRULY" +
+                " zero-warning。 Plugin runtime behavior" +
+                " unchanged。 M2196 第二刀 chapter 708" +
+                " close-out + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved (no" +
+                " production behavior change)。 ADR-016" +
+                " → M2196。 778 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 chapter 699" +
+                " lesson (persistent warnings are bad)" +
+                " honored via long-standing 3-warning" +
+                " surface eliminated。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
