@@ -23,25 +23,34 @@
 # Hashes MUST match for the chapter 七百六 byte-equality
 # invariant to hold。
 #
-# ## Cross-compilation scope (HONEST acknowledgment)
+# ## Cross-compilation scope
 #
-# THIS SCRIPT currently builds the HOST-NATIVE slice only
-# (arm64-apple-darwin) to keep the M2187-M2190 sequence
-# self-contained on a single Apple Silicon dev machine。
+# **M2191 chapter 七百七 第一刀**:TARGETS array
+# expanded from host-only (arm64-apple-darwin) to
+# include arm64-apple-ios + arm64-apple-ios-sim per
+# the chapter 七百六 / M2190 planned-future-cut。
+# Requires rustup targets `aarch64-apple-ios` +
+# `aarch64-apple-ios-sim` installed on the maintainer
+# machine。 Substrate now ships iOS-deployable Rust
+# pilot binaries。
 #
-# Cross-compiling to arm64-apple-ios + arm64-apple-ios-sim
-# requires:
-#   1. `rustup target add aarch64-apple-ios`
-#   2. `rustup target add aarch64-apple-ios-sim`
-#   3. Re-run this script with TARGETS array expanded
-#
-# The XCFramework structure supports those slices being
-# added later without breaking the host slice。 Substrate
-# CI runs on macOS arm64 only today (per chapter 七百一
-# plan honest-scope note),so host-only slice is
-# sufficient for current PR validation。
+# Reverting to host-only:reduce TARGETS to one entry
+# + rerun。 The XCFramework structure supports any
+# subset of the three slices。
 
 set -euo pipefail
+
+# M2191 chapter 七百七 第一刀 — prefer rustup-managed
+# cargo at `~/.cargo/bin/cargo` if available。 Homebrew's
+# `/opt/homebrew/bin/cargo` does NOT see rustup-installed
+# cross-compile targets (aarch64-apple-ios + aarch64-
+# apple-ios-sim),so the iOS slices only build when this
+# script picks up rustup's cargo first。 rust-toolchain
+# .toml in repo root pins the rustup channel to stable
+# 1.84+。
+if [ -x "${HOME}/.cargo/bin/cargo" ]; then
+    export PATH="${HOME}/.cargo/bin:${PATH}"
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CARGO_ROOT="${REPO_ROOT}/Cargo"
@@ -63,11 +72,12 @@ export SOURCE_DATE_EPOCH="${SDE}"
 export RUSTFLAGS="-C codegen-units=1 -C strip=symbols"
 export CARGO_TERM_COLOR=always
 
-# Targets shipped。 Add cross-compile targets here:
-#   "aarch64-apple-ios"     (iOS device)
-#   "aarch64-apple-ios-sim" (iOS simulator)
+# Targets shipped。 Three slices since M2191 chapter
+# 七百七 第一刀 (expanded from host-only at M2187)。
 TARGETS=(
   "aarch64-apple-darwin"
+  "aarch64-apple-ios"
+  "aarch64-apple-ios-sim"
 )
 
 echo "==> SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
