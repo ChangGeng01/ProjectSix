@@ -6350,7 +6350,34 @@ public enum BASEntropyChapterIndex {
                 " 273 typed surfaces unchanged (5 new" +
                 " methods on existing actors per option-a" +
                 " discipline)。 60/60 score unchanged。" +
-                " Zero-warning build invariant preserved。")
+                " Zero-warning build invariant preserved。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十四",
+            mNumberFirst: 2207, mNumberLast: 2208,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 6, futureCutsCount: 0,
+            summary: "SUBSTRATE ADOPTION AUDIT + 5-PILOT" +
+                " E2E INTEGRATION TEST。 chapter 七百十三" +
+                " planned-future-cut #2 fulfilled。" +
+                " 2-knife chapter。 M2207 第一刀 audit" +
+                " found ZERO substrate-internal direct-" +
+                "init OR factory call sites for any of 5" +
+                " pilots (substrate is library not" +
+                " consumer)。 NEW BASFivePilotEndToEnd" +
+                "IntegrationTests.swift with 2 tests" +
+                " (testAllFivePilotsComposeViaMakeWith" +
+                "Defaults + testNoSubstrateInternalDirect" +
+                "InitCallersFinding)。 6 new typed pins" +
+                " on BASMultiLanguageScaffoldDoctrine" +
+                " (post-hoc amendment per chapter 695/" +
+                "696/697 precedent)。 M2208 第二刀 close-" +
+                "out + 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2208。 790" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 「全面 转向」 substrate-" +
+                "side maximum formally pinned。 Further" +
+                " actual turn requires HOST code adoption。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

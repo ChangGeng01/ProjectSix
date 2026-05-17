@@ -2692,7 +2692,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十三",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十三")!)
+                        chapterTag: "chapter 七百十三")!),
+            // M2208 chapter 714 — SUBSTRATE ADOPTION
+            // AUDIT + 5-pilot e2e integration test
+            checkRegistry("七百十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4887,6 +4893,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十三")!
+                .mNumberLast),
+            // M2208 chapter 714 — SUBSTRATE ADOPTION AUDIT
+            ("714",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

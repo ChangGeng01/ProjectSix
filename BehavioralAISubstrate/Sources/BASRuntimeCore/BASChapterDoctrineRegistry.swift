@@ -23651,7 +23651,92 @@ public enum BASChapterDoctrineRegistry {
                 " 60/60 score unchanged。 Substrate AT-" +
                 "REST + Tier A+B+C + 100% SIGBUS recovery" +
                 " + counter-sprawl + zero-warning all" +
-                " preserved。 Next:user direction。")
+                " preserved。 Next:user direction。"),
+        // chapter 714 — SUBSTRATE ADOPTION AUDIT + 5-
+        // PILOT E2E INTEGRATION TEST (chapter 713
+        // planned-future-cut #2 fulfilled)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十四",
+            mNumberFirst: 2207,
+            mNumberLast: 2208,
+            v1MilestoneMNumber: 2208,
+            v1MilestoneStatus:
+                "chapter-714-substrate-adoption-audit-and-e2e-integration",
+            knives: [
+                BASChapterKnife(mNumber: 2207, knife: "第一刀",
+                    concept: "Audit finding:ZERO" +
+                        " substrate-internal direct-init" +
+                        " OR factory call sites for any" +
+                        " of 5 pilots (grep Sources/" +
+                        " confirms)。 NEW BASFivePilot" +
+                        "EndToEndIntegrationTests.swift" +
+                        " with 2 tests:test all 5 pilots" +
+                        " compose via makeWithDefaults +" +
+                        " test audit-finding pin。 6 new" +
+                        " typed pins on BASMultiLanguage" +
+                        "ScaffoldDoctrine (post-hoc" +
+                        " amendment per chapter 695/696" +
+                        "/697 precedent):substrate" +
+                        "InternalDirectInitCallSiteCount" +
+                        "=0 + substrateInternalFactoryCall" +
+                        "SiteCount=0 + audit conclusion" +
+                        " strings + hostAdoptionRequired" +
+                        "ForActualTurn=true。"),
+                BASChapterKnife(mNumber: 2208, knife: "第二刀",
+                    concept: "Chapter 714 close-out +" +
+                        " 13-file standard sync。 790" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2208。 60/60 score unchanged。" +
+                        " Zero-warning preserved。 NO" +
+                        " new doctrines per chapter 698。")
+            ],
+            entropyClassesAttacked: [
+                "substrate-internal-adoption-status-undocumented"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2208",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "790-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "5-pilot-e2e-integration-test-proven",
+                "audit-finding-zero-substrate-internal-callers-pinned"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。",
+                "Host adoption work — outside substrate" +
+                    " scope (substrate cannot self-adopt;" +
+                    " pilots become valuable when HOST" +
+                    " code calls .makeWithDefaults())。"
+            ],
+            summary: "SUBSTRATE ADOPTION AUDIT + 5-PILOT" +
+                " E2E INTEGRATION TEST — chapter 七百十三" +
+                " planned-future-cut #2 fulfilled。 2-" +
+                "knife chapter。 M2207 第一刀 honest audit" +
+                " finding (ZERO substrate-internal callers" +
+                " for any pilot) + NEW e2e integration" +
+                " test exercising all 5 pilots via" +
+                " makeWithDefaults() + 6 typed pins" +
+                " documenting audit conclusion。 M2208" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2208。 790 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged (6 new pins on existing" +
+                " BASMultiLanguageScaffoldDoctrine per" +
+                " chapter 698 option-a)。 60/60 score" +
+                " unchanged。 「全面 转向」 substrate-side" +
+                " maximum formally pinned。 Further" +
+                " turn requires HOST adoption。 Next:" +
+                " user direction。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

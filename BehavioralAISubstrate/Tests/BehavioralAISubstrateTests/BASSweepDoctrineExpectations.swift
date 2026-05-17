@@ -121,11 +121,11 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2206:24 + 20 + 265 = 309 (chapter 七百十三 —
-    /// host adoption convenience makeWithDefaults()
-    /// factories added to all 5 pilots,1-line adoption
-    /// for hosts that don't need flag control)。
-    public static let phase2ChapterCount: Int = 309
+    /// At M2208:24 + 20 + 266 = 310 (chapter 七百十四 —
+    /// substrate adoption audit + e2e integration test;
+    /// honest finding ZERO substrate-internal callers,
+    /// host adoption required for actual turn)。
+    public static let phase2ChapterCount: Int = 310
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -143,9 +143,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2200:1242 + 2 = 1244 (chapter 七百十)。 At
     /// M2202:1244 + 2 = 1246 (chapter 七百十一)。 At
     /// M2204:1246 + 2 = 1248 (chapter 七百十二)。 At
-    /// M2206:1248 + 2 = 1250 (chapter 七百十三 — 2-knife
-    /// host adoption convenience factories)
-    public static let phase2CommitsShipped: Int = 1250
+    /// M2206:1248 + 2 = 1250 (chapter 七百十三)。 At
+    /// M2208:1250 + 2 = 1252 (chapter 七百十四 — 2-knife
+    /// substrate adoption audit + e2e integration test)
+    public static let phase2CommitsShipped: Int = 1252
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -162,8 +163,10 @@ public enum BASSweepDoctrineExpectations {
     /// FULL「全面 转向」 (remaining 4 pilots wired)。
     /// At M2206:chapter 713 — host adoption convenience
     /// (makeWithDefaults factories for all 5 pilots)。
-    /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2206
+    /// At M2208:chapter 714 — substrate adoption audit
+    /// + e2e integration test (honest ZERO internal
+    /// callers finding)。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2208
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
