@@ -1,27 +1,71 @@
 // SPDX:internal
 // MARK: - BASMPSGraphExecutableCacheCxx
 // chapter 七百一 / M2167 第一刀 — C++ pilot target
-//                                  SCAFFOLD placeholder
-//                                  header。
-//
-// Real `bas_mps_cache_lookup` / `bas_mps_cache_insert`
-// land at chapter 705 / M2183 第一刀。 This scaffold
-// ships a minimal no-op declaration so SPM resolves the
-// .cxxTarget and proves the multi-language scaffold
-// works end-to-end at chapter 701 / M2167 第一刀。
+//                                  SCAFFOLD placeholder (orig)
+// chapter 七百五 / M2183 第一刀 — first real functions
+//                                  added (bas_mps_cache_insert
+//                                  / lookup / size / clear /
+//                                  free_value / version)。
 
 #ifndef BAS_MPS_CACHE_H
 #define BAS_MPS_CACHE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/// Scaffold placeholder — returns 0 always。 Real
-/// implementation arrives at chapter 705 / M2183。
+/// Scaffold-version sentinel from M2167。 Returns 0
+/// always。 Kept for backward source compatibility so a
+/// future caller pinned on it does not silently break。
+/// New callers should use `bas_mps_cache_version()`。
 int32_t bas_mps_cache_placeholder_version(void);
+
+/// Insert (or overwrite) `key` → `value`。
+///
+/// - Parameters:`key` + `value` are NUL-terminated UTF-8
+///   C strings,owned by the caller。 Cache copies into
+///   internal `std::string` storage so the caller can
+///   free the inputs immediately。
+/// - Returns:0 on success,-1 if either pointer is null,
+///   -2 on internal allocation failure。
+int32_t bas_mps_cache_insert(const char* key,
+                              const char* value);
+
+/// Look up `key`。 If present,allocates a heap copy of
+/// the value into `*out_value` and returns 1。 Caller MUST
+/// call `bas_mps_cache_free_value(*out_value)` to release。
+///
+/// - Returns:
+///   - 1  = found,*out_value filled
+///   - 0  = not found,*out_value left untouched
+///   - -1 = null `key` OR null `out_value` pointer
+///   - -2 = internal exception (allocation failure)
+int32_t bas_mps_cache_lookup(const char* key,
+                              char** out_value);
+
+/// Release a value buffer returned by
+/// `bas_mps_cache_lookup`。 Null pointer is a no-op。
+void bas_mps_cache_free_value(char* value);
+
+/// Current cache size (number of entries)。 Returns -1
+/// on internal exception (extremely rare;cache
+/// implementation only throws on memory allocation
+/// failure during size())。
+int64_t bas_mps_cache_size(void);
+
+/// Empty the cache。 Returns 0 on success,-2 on internal
+/// exception。
+int32_t bas_mps_cache_clear(void);
+
+/// ABI / behavior version pin。 Currently 1。 Bumping
+/// requires updating `BASMPSGraphExecutableCacheCxxBridge
+/// Tests.testCxxBridgeABIVersion` simultaneously so a
+/// future Swift-side caller cannot silently observe a
+/// behavior change。
+int32_t bas_mps_cache_version(void);
 
 #ifdef __cplusplus
 }
