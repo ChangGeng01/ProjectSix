@@ -6692,6 +6692,32 @@ public enum BASEntropyChapterIndex {
                 " ADR-016 → M2234。 816 consecutive" +
                 " byte-equality clean commits。 273" +
                 " typed surfaces unchanged。 60/60" +
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十八",
+            mNumberFirst: 2235, mNumberLast: 2236,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR MODULE-QUALIFIED" +
+                " NAME MATRIX — 2-knife。 Fourth pillar" +
+                " of 5-pilot ACTOR contract。 M2235" +
+                " 第一刀 NEW BASFivePilotActorModule" +
+                "QualifiedNameMatrixTests.swift with 6" +
+                " tests pinning String(reflecting:" +
+                " PilotActor.self) which returns" +
+                " 'Module.TypeName' format + cross-" +
+                "pilot module mapping pin。 Complement" +
+                " to chapter 725 (bare type name):" +
+                " chapter 725 = UI-friendly log label," +
+                " chapter 728 = crash-report" +
+                " symbolication disambiguation。 5" +
+                " pilots decompose into 4 modules" +
+                " (Metal + C++ share BASMetalSubstrate)" +
+                "。 M2236 第二刀 close-out + 13-file" +
+                " sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2236。 818 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60" +
                 " score unchanged。")
     ]
 

@@ -24658,7 +24658,75 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged" +
                 "。 60/60 score unchanged。 Auto-mode" +
-                " 1min cadence loop continues。")
+                " 1min cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十八",
+            mNumberFirst: 2235,
+            mNumberLast: 2236,
+            v1MilestoneMNumber: 2236,
+            v1MilestoneStatus:
+                "chapter-728-pilot-actor-module-qualified-name-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2235, knife: "第一刀",
+                    concept: "Fourth pillar of 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotActorModuleQualifiedName" +
+                        "MatrixTests.swift with 6 tests" +
+                        " pinning String(reflecting:" +
+                        " PilotActor.self) which" +
+                        " returns 'Module.TypeName'" +
+                        " format + cross-pilot module" +
+                        " mapping pin。 Complement to" +
+                        " chapter 725 (bare type name):" +
+                        " UI log labels vs crash report" +
+                        " symbolication。 5 pilots" +
+                        " decompose into 4 modules" +
+                        " (Metal + C++ share BAS" +
+                        "MetalSubstrate)。 All 6 tests" +
+                        " pass。"),
+                BASChapterKnife(mNumber: 2236, knife: "第二刀",
+                    concept: "Chapter 728 close-out +" +
+                        " 13-file sync。 818 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2236。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-actor-module-qualified-name-unpinned-crash-report-symbolication-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2236",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "818-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "actor-module-qualified-name-pinned-5-pilots",
+                "fourth-pillar-of-5-pilot-actor-contract-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ACTOR MODULE-QUALIFIED NAME MATRIX" +
+                " for 5 pilots。 2-knife chapter。 M2235" +
+                " 第一刀 6 new tests pinning String" +
+                "(reflecting:) + module mapping。" +
+                " Fourth pillar of 5-pilot ACTOR" +
+                " contract sealing trajectory。 M2236" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2236。 818 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。 Auto-mode 1min cadence" +
+                " loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
