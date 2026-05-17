@@ -24317,7 +24317,79 @@ public enum BASChapterDoctrineRegistry {
                 " 806 consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
                 " 60/60 score unchanged。 Auto-mode 1min" +
-                " cadence loop continues。")
+                " cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十三",
+            mNumberFirst: 2225,
+            mNumberLast: 2226,
+            v1MilestoneMNumber: 2226,
+            v1MilestoneStatus:
+                "chapter-723-error-description-payload-inclusive-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2225, knife: "第一刀",
+                    concept: "NEW BASFivePilotError" +
+                        "DescriptionMatrixTests.swift" +
+                        " with 6 tests pinning String" +
+                        "(describing: errorValue)" +
+                        " format for each pilot's error" +
+                        " cases + cross-pilot subset" +
+                        " invariant (caseIdentifier ⊆" +
+                        " description)。 Complement to" +
+                        " chapter 720 caseIdentifier:" +
+                        " caseIdentifier is PII-SAFE" +
+                        " telemetry key,description is" +
+                        " PAYLOAD-INCLUSIVE debug log" +
+                        " key (includes associated" +
+                        " values for crash reports /" +
+                        " audit trails)。 Stable-output" +
+                        " pin proves no clock/PID/random" +
+                        " injection。 All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2226, knife: "第二刀",
+                    concept: "Chapter 723 close-out +" +
+                        " 13-file sync。 808 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2226。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines。" +
+                        " Cron caa2938c every-minute" +
+                        " safety-net trigger active.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-description-format-stability-unpinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2226",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "808-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "description-format-pinned-5-pilot-error-enums",
+                "caseIdentifier-subset-of-description-invariant-pinned"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR DESCRIPTION (PAYLOAD-" +
+                "INCLUSIVE) MATRIX for 5 pilots。 2-knife" +
+                " chapter。 M2225 第一刀 6 new tests" +
+                " pinning String(describing:) format +" +
+                " cross-pilot subset invariant" +
+                " (caseIdentifier ⊆ description)。" +
+                " Complement to chapter 720 caseIdentifier" +
+                " — gives telemetry/debug-log pair。" +
+                " M2226 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2226。 808 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。" +
+                " Auto-mode 1min cadence loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

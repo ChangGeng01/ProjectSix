@@ -2746,7 +2746,12 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百二十二",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百二十二")!)
+                        chapterTag: "chapter 七百二十二")!),
+            // M2226 chapter 723 — DESCRIPTION MATRIX
+            checkRegistry("七百二十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百二十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -5013,6 +5018,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百二十二")!
+                .mNumberLast),
+            // M2226 chapter 723 — DESCRIPTION MATRIX
+            ("723",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

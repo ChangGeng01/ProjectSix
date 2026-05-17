@@ -6562,7 +6562,33 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-016 → M2224。 806" +
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
-                " 60/60 score unchanged。")
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十三",
+            mNumberFirst: 2225, mNumberLast: 2226,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "DESCRIPTION (PAYLOAD-INCLUSIVE)" +
+                " MATRIX — 2-knife。 M2225 第一刀 NEW" +
+                " BASFivePilotErrorDescriptionMatrix" +
+                "Tests.swift with 6 tests pinning" +
+                " String(describing: errorValue) format" +
+                " for each pilot + cross-pilot subset" +
+                " invariant (caseIdentifier ⊆" +
+                " description)。 Complement to chapter" +
+                " 720 caseIdentifier:caseIdentifier is" +
+                " PII-SAFE telemetry key (no payload)," +
+                " description is PAYLOAD-INCLUSIVE" +
+                " debug log key (includes associated" +
+                " values for crash reports / audit" +
+                " trails)。 Stable-output pin proves no" +
+                " clock/PID/random injection。 M2226" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2226。 808 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
