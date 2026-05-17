@@ -37,11 +37,11 @@ final class BASPhase2EntropyClosureDoctrineTests:
             "chapter 四百三")
     }
 
-    func testLastChapterIs726() {
+    func testLastChapterIs727() {
         XCTAssertEqual(
             BASPhase2EntropyClosureDoctrine
                 .chapterTagsShipped.last,
-            "chapter 七百二十六",
+            "chapter 七百二十七",
             "Chapter 六百七十六:HEXA #9 CATALOG mid-plan" +
             " anti-drift checkpoint。 NEW BASPhaseJKL" +
             "CompletionHexaCatalogDoctrine cataloging" +

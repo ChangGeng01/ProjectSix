@@ -24589,6 +24589,75 @@ public enum BASChapterDoctrineRegistry {
                 " 814 consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged" +
                 "。 60/60 score unchanged。 Auto-mode" +
+                " 1min cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十七",
+            mNumberFirst: 2233,
+            mNumberLast: 2234,
+            v1MilestoneMNumber: 2234,
+            v1MilestoneStatus:
+                "chapter-727-pilot-actor-sendable-cross-task-transfer-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2233, knife: "第一刀",
+                    concept: "Third pillar of 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotActorSendableTransfer" +
+                        "MatrixTests.swift with 6 tests" +
+                        " proving actor INSTANCES" +
+                        " (reference-type Sendable)" +
+                        " survive Task boundary with" +
+                        " === identity preserved +" +
+                        " mixed FivePilotActorBundle" +
+                        " struct。 Actor-side analog of" +
+                        " chapter 719's error Sendable" +
+                        " transfer。 Future commits" +
+                        " introducing non-Sendable" +
+                        " state into any pilot actor" +
+                        " fail at COMPILE time。 All 6" +
+                        " tests pass。"),
+                BASChapterKnife(mNumber: 2234, knife: "第二刀",
+                    concept: "Chapter 727 close-out +" +
+                        " 13-file sync。 816 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2234。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines。" +
+                        " Dual safety nets armed.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-actor-sendable-runtime-identity-preservation-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2234",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "816-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "actor-sendable-cross-task-identity-preserved-5-pilots",
+                "third-pillar-of-5-pilot-actor-contract-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ACTOR SENDABLE CROSS-TASK TRANSFER" +
+                " MATRIX for 5 pilots。 2-knife chapter。" +
+                " M2233 第一刀 6 new tests proving actor" +
+                " instances survive Task transfer with" +
+                " === identity preserved。 Third pillar" +
+                " of 5-pilot ACTOR contract sealing" +
+                " trajectory。 M2234 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2234。 816" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
+                "。 60/60 score unchanged。 Auto-mode" +
                 " 1min cadence loop continues。")
     ]
 

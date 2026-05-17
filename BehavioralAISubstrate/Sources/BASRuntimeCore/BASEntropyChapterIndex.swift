@@ -6668,7 +6668,31 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-016 → M2232。 814" +
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged" +
-                "。 60/60 score unchanged。")
+                "。 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十七",
+            mNumberFirst: 2233, mNumberLast: 2234,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR SENDABLE CROSS-TASK" +
+                " TRANSFER MATRIX — 2-knife。 Third" +
+                " pillar of 5-pilot ACTOR contract。" +
+                " M2233 第一刀 NEW BASFivePilotActor" +
+                "SendableTransferMatrixTests.swift with" +
+                " 6 tests proving actor INSTANCES" +
+                " (reference-type Sendable) survive" +
+                " Task boundary with === identity" +
+                " preserved + mixed FivePilotActor" +
+                "Bundle struct。 Actor-side analog of" +
+                " chapter 719's error Sendable" +
+                " transfer。 Future commits introducing" +
+                " non-Sendable state fail at COMPILE" +
+                " time。 M2234 第二刀 close-out + 13-" +
+                "file sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2234。 816 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60" +
+                " score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

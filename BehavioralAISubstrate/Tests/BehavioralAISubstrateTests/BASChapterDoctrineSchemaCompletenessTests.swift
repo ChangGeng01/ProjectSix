@@ -2766,7 +2766,12 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百二十六",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百二十六")!)
+                        chapterTag: "chapter 七百二十六")!),
+            // M2234 chapter 727 — ACTOR SENDABLE TRANSFER
+            checkRegistry("七百二十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百二十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -5065,6 +5070,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百二十六")!
+                .mNumberLast),
+            // M2234 chapter 727 — ACTOR SENDABLE TRANSFER
+            ("727",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
