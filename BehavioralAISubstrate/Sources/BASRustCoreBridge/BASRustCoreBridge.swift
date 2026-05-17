@@ -1,34 +1,114 @@
 // MARK: - BASRustCoreBridge
 // chapter 七百一 / M2167 第一刀 — Rust bridge Swift
-//                                  wrapper SCAFFOLD
-//                                  placeholder。
+//                                  wrapper SCAFFOLD (orig)
+// chapter 七百六 / M2188 第二刀 — XCFramework wired in,
+//                                  ABI surface declarations
+//                                  added。 Real actor
+//                                  wrapper (BASRustMemory
+//                                  UsageTrackerActor)
+//                                  lands at M2189 第三刀
+//                                  in a separate file。
 //
-// Real `BASRustMemoryUsageTrackerActor` (wrapping the
-// Cargo/bas-memory-usage-tracker crate via .binaryTarget
-// XCFramework in Vendor/bas-rust-binaries/) lands at
-// chapter 706 / M2187+。
+// ## What this namespace pins
 //
-// This scaffold ships a minimal empty enum so SPM
-// resolves the target and the multi-language scaffold
-// proves end-to-end at chapter 701 / M2167 第一刀。
+// Cross-doctrine refs + version constants for the chapter
+// 七百六 Rust pilot。 Tests pin against these constants
+// to catch ABI / scaffold drift。 The actual ABI calls
+// happen in BASRustMemoryUsageTrackerActor.swift
+// (M2189)。
 //
-// Default behavior:NO Rust functions exposed yet。 V1
-// Swift path on BASMemoryUsageTracker remains the only
-// caller-visible storage actor。
+// ## Module gating
+//
+// `import BASRustMemoryTrackerBinary` is gated to
+// `#if canImport(BASRustMemoryTrackerBinary)` so the
+// target compiles on watchOS (which has no XCFramework
+// slice) — that branch reports the Rust path as
+// unavailable rather than failing the build。
 
 import Foundation
+#if canImport(BASRustMemoryTrackerBinary)
+import BASRustMemoryTrackerBinary
+#endif
 
-/// Namespace placeholder for the chapter 706 Rust bridge。
-/// Real surface ships when `Vendor/bas-rust-binaries/
-/// BASRustMemoryTracker.xcframework` lands。
+/// Namespace for the chapter 706 Rust pilot constants
+/// + ABI version probe。
 public enum BASRustCoreBridge {
 
-    /// Scaffold-version sentinel:0 means "scaffold only,
-    /// no Rust XCFramework wired yet"。
-    public static let scaffoldVersion: Int = 0
+    /// Scaffold-version sentinel — bumped from 0 to 1 at
+    /// M2188 when the XCFramework actually wired in。
+    public static let scaffoldVersion: Int = 1
 
     /// Cross-doctrine ref to the chapter 701 scaffold
     /// + chapter 706 pilot landing。
-    public static let plannedPilotChapter: String =
-        "chapter 七百六 / M2187 第一刀"
+    public static let pilotChapter: String =
+        "chapter 七百六 / M2187-M2190"
+
+    /// Swift-side ABI version pin matching the Rust-side
+    /// `bas_rust_tracker_version` constant。 Bumping the
+    /// Rust ABI_VERSION constant requires bumping this
+    /// AND updating BASRustMemoryUsageTrackerActorTests
+    /// .testRustABIVersion simultaneously。
+    public static let rustABIVersion: Int32 = 1
+
+    /// Whether the Rust XCFramework is reachable at
+    /// build time on this platform。 watchOS / Linux
+    /// build hosts get false (no XCFramework slice)。
+    public static var isRustBridgeAvailable: Bool {
+        #if canImport(BASRustMemoryTrackerBinary)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// Live read of the Rust ABI version。 Returns nil
+    /// when Rust bridge is unavailable on this platform
+    /// (canImport false)。 Tests cross-mirror this
+    /// against `rustABIVersion` to catch any future
+    /// Rust-side bump that doesn't update the Swift pin。
+    public static func liveRustABIVersion() -> Int32? {
+        #if canImport(BASRustMemoryTrackerBinary)
+        return bas_rust_tracker_version()
+        #else
+        return nil
+        #endif
+    }
+
+    /// Cargo crate semantic version pin。 Bumping the
+    /// Cargo/Cargo.toml workspace.package.version
+    /// requires updating this AND the corresponding
+    /// test pin。
+    public static let cargoCrateVersion: String = "0.1.0"
+
+    /// Rust toolchain channel pin matching
+    /// rust-toolchain.toml。 Bumping requires
+    /// re-verifying the Vendor/bas-rust-binaries
+    /// XCFramework reproducibility via two clean
+    /// rebuilds (chapter 七百一 RED FLAG #1)。
+    public static let rustToolchainChannel: String =
+        "stable"
+
+    /// XCFramework binary blob expected on-disk path
+    /// (relative to repo root)。 Tests pin against this
+    /// constant to catch a Vendor/ rename。
+    public static let xcframeworkVendorPath: String =
+        "Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework"
+
+    /// XCFramework slices currently shipped。 Today only
+    /// macos-arm64;iOS device + simulator slices
+    /// documented as planned-future-cuts in
+    /// `scripts/build-rust-xcframework.sh`。
+    public static let shippedSlices: [String] = [
+        "macos-arm64"
+    ]
+
+    /// XCFramework byte-equality SHA256 captured during
+    /// reproducibility verification at M2187。 If a
+    /// future commit rebuilds the XCFramework with
+    /// different toolchain / flags this hash WILL
+    /// change — and that's a doctrine review trigger
+    /// (chapter 七百一 RED FLAG #1 mitigation:two
+    /// clean rebuilds must yield byte-identical .a)。
+    public static let macosArm64SliceSHA256: String =
+        "7557c7dadb6d411deaba54212bec350d248a80723c688cf0b94447bf291d772e"
 }

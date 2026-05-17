@@ -333,15 +333,33 @@ let package = Package(
                 .headerSearchPath("include")
             ]),
 
-        // Rust bridge Swift wrapper placeholder (chapter
-        // 706 / M2187+ adds real BASRustMemoryUsageTracker
-        // Actor)。 binaryTarget for the Rust .xcframework
-        // added at chapter 706 第二刀 along with the actual
-        // XCFramework artifact in Vendor/bas-rust-binaries/。
-        // Scaffold ships minimal empty Swift enum proving
-        // target wiring works。
+        // M2188 chapter 七百六 第二刀 — Rust pilot wired in。
+        // BASRustMemoryTracker.xcframework committed at
+        // M2187 第一刀 to Vendor/bas-rust-binaries/;this
+        // commit declares the binaryTarget + adds
+        // BASRustMemoryTrackerBinary as dependency of
+        // BASRustCoreBridge so the Swift bridge actor
+        // (M2189 第三刀) can `import BASRustMemoryTrackerBinary`。
+        //
+        // Platform-gated to iOS + macOS (no watchOS slice
+        // — rustc cannot cross-compile to
+        // arm64-apple-watchos)。 At present the XCFramework
+        // ships ONLY the macos-arm64 slice;iOS device +
+        // simulator slices documented as planned-future-
+        // cuts in scripts/build-rust-xcframework.sh
+        // TARGETS array。
+        .binaryTarget(
+            name: "BASRustMemoryTrackerBinary",
+            path: "Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework"),
         .target(
             name: "BASRustCoreBridge",
+            dependencies: [
+                "BASRuntimeCore",
+                .target(
+                    name: "BASRustMemoryTrackerBinary",
+                    condition: .when(
+                        platforms: [.iOS, .macOS]))
+            ],
             path: "Sources/BASRustCoreBridge"),
 
         // M2171 chapter 七百二 第一刀 — SQL pilot core +
