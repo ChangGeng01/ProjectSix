@@ -24,7 +24,7 @@ final class BASChapter402PhaseOneClosureTests: XCTestCase {
         XCTAssertEqual(
             BASCognitiveOSCompletionDoctrine
                 .doctrineVersion,
-            "ADR-016.M2174",
+            "ADR-016.M2178",
             "M2108:doctrine version reflects chapter 六百八十二 — PHASE M SEALED。 6 chapters / 24 commits Phase M complete。 substrate's FIRST raw Metal compute kernel (Mamba selective-scan) numerically proven against CPU reference + 6 canonical fixtures + 6 extended fixtures + 8 numerical-stability tests + wallclock characterization + 8-of-8 native coverage MILESTONE。 NEW BASPhaseMRealSSMScanKernelCompletionDoctrine (M2105) + 44 tests (M2106) + NEW BASPhaseMScoreImpactDoctrine (M2107) + 26 tests + chapter 682 close-out (M2108)。 Score progression 45→51→54→58→58→60 across J/K/L/Hexa9/M (60/60 PRELIMINARY ahead of formal chapter 708 tier 1 seal)。 5 correctness oracles for ssmScan kernel。 Phase M total 422 PROOF tests cumulative。 240 typed surfaces cumulative (+20 across Phase M)。 692 consecutive byte-equality clean commits。 ADR-014 OPT-OUT preserved。 Phase N Tier A sprawl (chapters 683-685) NEXT")
     }
 

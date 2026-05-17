@@ -22406,7 +22406,117 @@ public enum BASChapterDoctrineRegistry {
                 " Substrate AT-REST + Tier A+B+C + 100%" +
                 " SIGBUS recovery + counter-sprawl" +
                 " trajectory preserved。 Next:chapter" +
-                " 七百三 C pilot M2175-M2178。")
+                " 七百三 C pilot M2175-M2178。"),
+        // chapter 703 — MULTI-LANGUAGE AUGMENTATION ARC
+        // C PILOT。 2nd of 5 per-language pilots。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百三",
+            mNumberFirst: 2175,
+            mNumberLast: 2178,
+            v1MilestoneMNumber: 2178,
+            v1MilestoneStatus:
+                "chapter-703-c-pilot-shipped",
+            knives: [
+                BASChapterKnife(mNumber: 2175, knife: "第一刀",
+                    concept: "NEW Sources/BASCSystemBridge" +
+                        "/bas_monotonic_nanos.c real C" +
+                        " function wrapping `clock_" +
+                        "gettime_nsec_np(CLOCK_UPTIME_RAW)`" +
+                        " on Apple platforms (XNU userspace" +
+                        " fast-path no syscall on iOS/macOS" +
+                        "/watchOS) + Linux fallback for" +
+                        " cross-compile inspection;header" +
+                        " expanded with 2 new declarations" +
+                        " + ABI version sentinel pin。" +
+                        " Placeholder PRESERVED for" +
+                        " backward source compat."),
+                BASChapterKnife(mNumber: 2176, knife: "第二刀",
+                    concept: "NEW Sources/BASRuntimeCore/" +
+                        "BASMonotonicNanos.swift Swift" +
+                        " actor wrapping the C function:" +
+                        " 3 typed error cases + Codable +" +
+                        " defaultV1Nanos DispatchTime" +
+                        " baseline + rawCNanos V2 surface" +
+                        " + cBridgeABIVersion pin +" +
+                        " equivalenceBoundNanos 1_000_000" +
+                        " (1ms 10× headroom) + async make" +
+                        "(flags:) factory consulting" +
+                        " cBridgeEnabled。 Package.swift" +
+                        " wires BASRuntimeCore →" +
+                        " BASCSystemBridge dep."),
+                BASChapterKnife(mNumber: 2177, knife: "第三刀",
+                    concept: "18 anti-drift tests:C ABI" +
+                        " (3) + V1 baseline (2) + V2" +
+                        " raw C (3) + dual-mode" +
+                        " equivalence (2:V1↔V2 delta<1ms" +
+                        " BYTE-EQUALITY-CLASS PROOF) +" +
+                        " actor + factory (6) + error" +
+                        " typing (2);Diagnostic F" +
+                        " pattern for actor tests。"),
+                BASChapterKnife(mNumber: 2178, knife: "第四刀",
+                    concept: "Chapter 703 close-out + 13-" +
+                        "file standard sync。 760" +
+                        " consecutive byte-equality clean" +
+                        " commits。 ADR-016 → M2178。" +
+                        " 60/60 score unchanged。 NO new" +
+                        " doctrines per chapter 698" +
+                        " discipline。")
+            ],
+            entropyClassesAttacked: [
+                "swift-monotonic-time-no-direct-clock-uptime-raw-surface"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (cBridgeEnabled defaults false → V1 DispatchTime path)",
+                "ADR-016 → M2178",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "760-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "c-pilot-shipped-flag-gated",
+                "dual-mode-equivalence-v1-v2-delta-under-1ms-proven"
+            ],
+            plannedFutureCuts: [
+                "Chapter 704 Metal pilot M2179-M2182 re-" +
+                    "activates Sources/BASMetalSubstrate/" +
+                    "BASBuiltinKernels/SSMScan.metal via" +
+                    " SPM `.process()` resource + NEW" +
+                    " BASMetalKernelLibraryLoader actor +" +
+                    " 22 anti-drift tests + metalKernelV2" +
+                    "Enabled flag gating。",
+                "Chapter 705 C++ pilot M2183-M2186 +" +
+                    " Chapter 706 Rust pilot M2187-M2190" +
+                    " round out the 5-language" +
+                    " augmentation arc。"
+            ],
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC C" +
+                " PILOT。 2nd of 5 risk-ascending per-" +
+                "language pilots。 M2175 第一刀 NEW" +
+                " Sources/BASCSystemBridge/bas_monotonic_" +
+                "nanos.c real C function (clock_gettime_" +
+                "nsec_np Apple fast-path + Linux fallback)" +
+                " + header expansion。 M2176 第二刀 NEW" +
+                " Sources/BASRuntimeCore/BASMonotonic" +
+                "Nanos.swift Swift actor + 3 typed error" +
+                " cases + equivalence bound 1ms + async" +
+                " make(flags:);Package.swift wires" +
+                " dep。 M2177 第三刀 18 anti-drift tests" +
+                " including dual-mode V1↔V2 equivalence-" +
+                "delta < 1ms (BYTE-EQUALITY-CLASS PROOF)" +
+                " + C ABI version cross-mirror。 Chapter" +
+                " 703 close-out (M2178) + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2178。 760" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces UNCHANGED (chapter" +
+                " 698 discipline honored across BOTH 702" +
+                " + 703 pilots)。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 Next:chapter" +
+                " 七百四 Metal pilot M2179-M2182.")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

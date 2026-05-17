@@ -1145,7 +1145,39 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// 5 languages plan progresses 1/5:SQL pilot
     /// shipped;next pilots C / Metal / C++ / Rust at
     /// chapters 七百三-七百六。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2174"
+    ///
+    /// **M2178 chapter 七百三 第四刀**:C pilot close-out
+    /// (MULTI-LANGUAGE AUGMENTATION ARC progress)。
+    /// 4 commits shipped:(1) M2175 NEW Sources/
+    /// BASCSystemBridge/bas_monotonic_nanos.c real C
+    /// function wrapping clock_gettime_nsec_np(CLOCK_
+    /// UPTIME_RAW) on Apple platforms (userspace fast-
+    /// path,no syscall on iOS/macOS/watchOS) + Linux
+    /// fallback via clock_gettime(CLOCK_MONOTONIC) for
+    /// cross-compile inspection;header expanded with
+    /// 2 new declarations + ABI version sentinel pin;
+    /// (2) M2176 NEW Sources/BASRuntimeCore/
+    /// BASMonotonicNanos.swift actor wrapping the C
+    /// function,opt-in via cBridgeEnabled flag,
+    /// default-V1 = DispatchTime.now().uptimeNanoseconds
+    /// path;3 typed error cases + Codable;equivalence
+    /// bound pinned at 1ms (10× empirical headroom);
+    /// Package.swift wires BASRuntimeCore →
+    /// BASCSystemBridge dependency;(3) M2177 18 anti-
+    /// drift tests including C ABI version cross-mirror,
+    /// monotonic-non-decreasing for both V1 + V2,
+    /// dual-mode V1↔V2 equivalence-delta < 1ms,actor
+    /// init flag honoring (Diagnostic F pattern),
+    /// async make(flags:) factory honoring default-off,
+    /// error Codable round-trip;(4) M2178 close-out。
+    /// ADR-014 OPT-IN preserved (cBridgeEnabled defaults
+    /// false → V1 DispatchTime path)。 V1 byte-equality
+    /// preserved (760 consecutive clean commits after
+    /// this lands)。 5 languages plan progresses 2/5:
+    /// SQL + C pilots shipped;next pilots Metal / C++ /
+    /// Rust at chapters 七百四-七百六。 No G-status
+    /// change。
+    public static let doctrineVersion: String = "ADR-016.M2178"
 
     /// Query the typed status of a specific gap。
     public static func status(

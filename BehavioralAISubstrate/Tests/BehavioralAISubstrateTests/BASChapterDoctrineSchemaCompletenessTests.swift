@@ -2619,7 +2619,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百二",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百二")!)
+                        chapterTag: "chapter 七百二")!),
+            // M2178 chapter 703 — MULTI-LANGUAGE
+            // AUGMENTATION ARC C pilot
+            checkRegistry("七百三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4721,6 +4727,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百二")!
+                .mNumberLast),
+            // M2178 chapter 703 — MULTI-LANGUAGE
+            // AUGMENTATION C PILOT
+            ("703",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

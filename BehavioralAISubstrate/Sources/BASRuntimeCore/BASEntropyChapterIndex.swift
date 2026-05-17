@@ -5914,7 +5914,52 @@ public enum BASEntropyChapterIndex {
                 " trajectory preserved。 Next:chapter" +
                 " 七百三 C pilot M2175-M2178 — bas_" +
                 "monotonic_nanos C function via Sources/" +
-                "BASCSystemBridge.")
+                "BASCSystemBridge."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三",
+            mNumberFirst: 2175, mNumberLast: 2178,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC C" +
+                " PILOT。 2nd of 5 risk-ascending per-" +
+                "language pilots (SQL→C→Metal→C++→Rust)。" +
+                " M2175 第一刀 NEW Sources/BASCSystem" +
+                "Bridge/bas_monotonic_nanos.c real C" +
+                " function wrapping `clock_gettime_nsec" +
+                "_np(CLOCK_UPTIME_RAW)` on Apple platforms" +
+                " (XNU userspace fast-path no syscall on" +
+                " iOS/macOS/watchOS) + Linux fallback for" +
+                " cross-compile inspection;header expanded" +
+                " with 2 new declarations + ABI version" +
+                " sentinel pin。 M2176 第二刀 NEW Sources/" +
+                "BASRuntimeCore/BASMonotonicNanos.swift" +
+                " Swift actor wrapping the C function +" +
+                " 3 typed error cases + equivalence bound" +
+                " pin (1ms 10× headroom) + async make(" +
+                "flags:) factory consulting cBridgeEnabled" +
+                " flag。 Package.swift wires BASRuntime" +
+                "Core → BASCSystemBridge dependency。" +
+                " M2177 第三刀 18 anti-drift tests:C ABI" +
+                " surface (3) + V1 baseline (2) + V2 raw" +
+                " C surface (3) + dual-mode equivalence" +
+                " (2:V1↔V2 delta<1ms is the BYTE-EQUALITY-" +
+                "CLASS PROOF) + actor + factory (6) +" +
+                " error case typing (2);Diagnostic F" +
+                " pattern for actor tests。 Chapter 703" +
+                " close-out (M2178) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved" +
+                " (cBridgeEnabled defaults FALSE → V1" +
+                " DispatchTime path)。 ADR-016 → M2178。" +
+                " 760 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces UNCHANGED" +
+                " (chapter 698 honored:BASMonotonicNanos" +
+                " + error enum + 2 new C functions are" +
+                " production-code-typed-surfaces NOT" +
+                " doctrines)。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " preserved。 Next:chapter 七百四 Metal" +
+                " pilot M2179-M2182.")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

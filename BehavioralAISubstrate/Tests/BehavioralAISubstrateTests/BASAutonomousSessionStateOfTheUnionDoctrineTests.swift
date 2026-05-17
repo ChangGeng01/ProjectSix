@@ -36,39 +36,40 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
 
     // MARK: - Cumulative metric pins
 
-    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter702() {
-        // chapter 702 SQL pilot honored the chapter 698
-        // zero-new-doctrine commitment:all new types
-        // (BASSQLSchemaGenCore + Tool + Plugin +
-        // MemoryUsageRecordsSchema generated enum) are
-        // production-code-typed-surfaces per chapter 698
-        // option-a discipline,NOT new doctrines。 Count
-        // stays at 273。
+    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter703() {
+        // chapters 702 + 703 BOTH honored the chapter
+        // 698 zero-new-doctrine commitment:all new
+        // types (BASSQLSchemaGenCore + Tool + Plugin +
+        // MemoryUsageRecordsSchema at 702;BASMonotonic
+        // Nanos + BASMonotonicNanosError at 703) are
+        // production-code-typed-surfaces per chapter
+        // 698 option-a discipline,NOT new doctrines。
+        // Count stays at 273 across the 2 pilots so far。
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .typedSurfaceCount,
             273)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs756() {
+    func testConsecutiveByteEqualityCleanCommitsIs760() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            756)
+            760)
     }
 
-    func testPhase2CommitsShippedIs1218() {
+    func testPhase2CommitsShippedIs1222() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            1218)
+            1222)
     }
 
-    func testChapter2NumberLastIs2174() {
+    func testChapter2NumberLastIs2178() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            2174)
+            2178)
     }
 
     // MARK: - Quality invariants
