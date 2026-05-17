@@ -2685,7 +2685,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十二",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十二")!)
+                        chapterTag: "chapter 七百十二")!),
+            // M2206 chapter 713 — HOST ADOPTION
+            // CONVENIENCE (makeWithDefaults() factories
+            // for all 5 pilots)
+            checkRegistry("七百十三",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十三")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4872,6 +4879,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十二")!
+                .mNumberLast),
+            // M2206 chapter 713 — HOST ADOPTION CONVENIENCE
+            ("713",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十三")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十三")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

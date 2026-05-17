@@ -6323,7 +6323,34 @@ public enum BASEntropyChapterIndex {
                 " substrate-side maximum fulfillment:" +
                 " 5/5 pilots production-default-ON at" +
                 " factory pattern;further turn requires" +
-                " HOST adoption of factory pattern。")
+                " HOST adoption of factory pattern。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十三",
+            mNumberFirst: 2205, mNumberLast: 2206,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "HOST ADOPTION CONVENIENCE — chapter" +
+                " 七百十二 planned-future-cut #1 fulfilled。" +
+                " 2-knife chapter。 M2205 第一刀 adds" +
+                " `makeWithDefaults()` static factory to" +
+                " all 5 pilot actors (SQL/C/Metal/C++/" +
+                "Rust)。 Each delegates to existing" +
+                " make(flags:) with a fresh default-init" +
+                " BASLanguageAugmentationFeatureFlags()。" +
+                " Pure sugar — no new behavior。 Hosts" +
+                " adoption goes from 3 lines to 1 line。" +
+                " 6 new anti-drift tests in shared" +
+                " BASMakeWithDefaultsConvenienceFactories" +
+                "Tests file (single file per chapter 七百" +
+                "八 counter-sprawl discipline)。 M2206" +
+                " 第二刀 chapter 713 close-out + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2206。 788" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged (5 new" +
+                " methods on existing actors per option-a" +
+                " discipline)。 60/60 score unchanged。" +
+                " Zero-warning build invariant preserved。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

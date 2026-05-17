@@ -23568,7 +23568,90 @@ public enum BASChapterDoctrineRegistry {
                 " substrate-side maximum fulfillment:" +
                 " 5/5 pilots production-default-ON;" +
                 " further turn requires HOST adoption。" +
-                " Next:user direction。")
+                " Next:user direction。"),
+        // chapter 713 — HOST ADOPTION CONVENIENCE
+        // FACTORIES (chapter 712 planned-future-cut #1
+        // fulfilled)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十三",
+            mNumberFirst: 2205,
+            mNumberLast: 2206,
+            v1MilestoneMNumber: 2206,
+            v1MilestoneStatus:
+                "chapter-713-host-adoption-convenience-factories",
+            knives: [
+                BASChapterKnife(mNumber: 2205, knife: "第一刀",
+                    concept: "Add `makeWithDefaults()`" +
+                        " static factory to all 5 pilot" +
+                        " actors (SQL/C/Metal/C++/Rust)。" +
+                        " Each delegates to existing" +
+                        " make(flags:) with a fresh" +
+                        " default-init BASLanguage" +
+                        "AugmentationFeatureFlags()。" +
+                        " Pure sugar — no new behavior。" +
+                        " 6 new anti-drift tests in" +
+                        " single shared BASMakeWith" +
+                        "DefaultsConvenienceFactories" +
+                        "Tests file per chapter 七百八" +
+                        " counter-sprawl discipline。"),
+                BASChapterKnife(mNumber: 2206, knife: "第二刀",
+                    concept: "Chapter 713 close-out +" +
+                        " 13-file standard sync。 788" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2206。 60/60 score unchanged。" +
+                        " Zero-warning preserved。 NO" +
+                        " new doctrines per chapter 698。")
+            ],
+            entropyClassesAttacked: [
+                "host-adoption-friction-three-lines-to-construct-default-pilot"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (makeWithDefaults is sugar over existing factories)",
+                "ADR-016 → M2206",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "788-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "host-adoption-now-one-line-per-pilot"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。",
+                "Substrate-internal adoption of factory" +
+                    " pattern — replace any internal" +
+                    " direct-init call sites with" +
+                    " makeWithDefaults() to convert" +
+                    " 4 symbolic pilot wire-ins into" +
+                    " real substrate-side V2 path" +
+                    " exercise (needs audit of substrate" +
+                    " for such call sites)。"
+            ],
+            summary: "HOST ADOPTION CONVENIENCE FACTORIES" +
+                " — chapter 七百十二 planned-future-cut" +
+                " #1 fulfilled。 2-knife chapter。 M2205" +
+                " 第一刀 adds `makeWithDefaults()` static" +
+                " factory to each of 5 pilot actors。" +
+                " Each is sugar over existing make" +
+                "(flags:) with fresh default-init flag" +
+                " actor。 Hosts now adopt with 1 line" +
+                " instead of 3。 6 new anti-drift tests" +
+                " in single shared file。 M2206 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2206。" +
+                " 788 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
+                " (5 new methods on existing actors per" +
+                " chapter 698 option-a discipline)。" +
+                " 60/60 score unchanged。 Substrate AT-" +
+                "REST + Tier A+B+C + 100% SIGBUS recovery" +
+                " + counter-sprawl + zero-warning all" +
+                " preserved。 Next:user direction。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
