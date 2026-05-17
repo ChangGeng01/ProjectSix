@@ -5819,7 +5819,51 @@ public enum BASEntropyChapterIndex {
                 " A+B+C + 100% SIGBUS recovery preserved。" +
                 " Counter-sprawl trajectory:3 audit/" +
                 "catalog doctrines → 1 across chapters" +
-                " 699+700。")
+                " 699+700。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百一",
+            mNumberFirst: 2167, mNumberLast: 2170,
+            knivesCount: 4, entropyClassesCount: 2,
+            pinsCount: 11, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " BUILD-SYSTEM SCAFFOLD。 User directive" +
+                " 「全面 转向 多个 语言:Swift + Metal," +
+                "Rust,SQL,C,C++」 (2026-05-17) →" +
+                " 6-chapter arc 七百一-七百六 / M2167-" +
+                "M2190 augments Swift with 5 native" +
+                " layers under ADR-014 OPT-IN。 Chapter" +
+                " 698 / M2162 discipline gate satisfied" +
+                " via option-b explicit-user-directive。" +
+                " M2167 第一刀 Package.swift evolution +" +
+                " 3 NEW SPM targets (BASCSystemBridge" +
+                " .cTarget,BASMPSGraphExecutableCacheCxx" +
+                " .cxxTarget,BASRustCoreBridge Swift" +
+                " wrapper) + minimal no-op placeholder" +
+                " sources;build resolves cleanly proving" +
+                " SPM 6.0 hosts C+C+++Swift simultaneously" +
+                "。 M2168 第二刀 NEW BASLanguageAugmentation" +
+                "FeatureFlags actor with 5 default-off" +
+                " boolean flags + 23 anti-drift tests。" +
+                " M2169 第三刀 NEW BASMultiLanguageScaffold" +
+                "Doctrine pinning scaffold + 5-pilot" +
+                " roadmap + chapter 698 discipline-gate" +
+                " satisfaction + counter-sprawl inversion" +
+                " honesty (-3 chapters 699+700 + 1 this" +
+                " scaffold = net -2) + 37 anti-drift" +
+                " tests including cross-mirror to feature-" +
+                "flag Flag enum。 Chapter 701 close-out" +
+                " (M2170) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2170。 752 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " (+2:scaffold doctrine + feature-flag" +
+                " actor;SPM targets aren't counted per" +
+                " M2148 convention)。 60/60 score" +
+                " unchanged。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery preserved。" +
+                " Next:chapter 七百二 SQL pilot M2171-" +
+                "M2174 (NO new doctrine per chapter 698" +
+                " discipline)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -121,17 +121,19 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 296
+    public static let phase2ChapterCount: Int = 297
 
-    /// Phase 2 commits shipped。 At M2166:125 + 84 +
-    /// 1001 = 1210 (chapter 700 — FURTHER CONSOLIDATION:
-    /// 3 audit/catalog doctrines → 1,counter-sprawl
-    /// trajectory across chapters 699+700)
-    public static let phase2CommitsShipped: Int = 1210
+    /// Phase 2 commits shipped。 At M2170:125 + 84 +
+    /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
+    /// AUGMENTATION ARC scaffold opens:Package.swift
+    /// +3 SPM targets + feature-flag actor + scaffold
+    /// doctrine)
+    public static let phase2CommitsShipped: Int = 1214
 
-    /// Phase 2 mNumberLast。 At M2166:chapter 700 —
-    /// further consolidation arc。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2166
+    /// Phase 2 mNumberLast。 At M2170:chapter 701 —
+    /// multi-language augmentation arc scaffold。
+    /// SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2170
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

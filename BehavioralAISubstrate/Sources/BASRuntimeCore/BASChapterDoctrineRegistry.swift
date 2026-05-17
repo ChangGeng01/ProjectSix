@@ -22147,7 +22147,122 @@ public enum BASChapterDoctrineRegistry {
                 " option-b explicit-user-directive。" +
                 " Counter-sprawl trajectory established:" +
                 " 3 audit/catalog doctrines → 1 across" +
-                " chapters 699+700。")
+                " chapters 699+700。"),
+        // chapter 701 — MULTI-LANGUAGE AUGMENTATION ARC
+        // BUILD-SYSTEM SCAFFOLD。 User directive 「全面
+        // 转向 多个 语言」 → 6-chapter arc opens here。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百一",
+            mNumberFirst: 2167,
+            mNumberLast: 2170,
+            v1MilestoneMNumber: 2170,
+            v1MilestoneStatus:
+                "chapter-701-multi-language-augmentation-scaffold",
+            knives: [
+                BASChapterKnife(mNumber: 2167, knife: "第一刀",
+                    concept: "Package.swift evolution +" +
+                        " 3 NEW SPM targets (BAS" +
+                        "CSystemBridge .cTarget +" +
+                        " BASMPSGraphExecutableCacheCxx" +
+                        " .cxxTarget + BASRustCoreBridge" +
+                        " Swift wrapper) + minimal no-op" +
+                        " placeholder sources。 Build" +
+                        " resolves cleanly proving SPM 6.0" +
+                        " hosts C+C+++Swift simultaneously。"),
+                BASChapterKnife(mNumber: 2168, knife: "第二刀",
+                    concept: "NEW BASLanguageAugmentation" +
+                        "FeatureFlags actor with 5" +
+                        " default-off boolean flags" +
+                        " (sqlMigratorEnabled +" +
+                        " cBridgeEnabled +" +
+                        " metalKernelV2Enabled +" +
+                        " cxxMpsCacheEnabled +" +
+                        " rustCoreEnabled) gating chapters" +
+                        " 702-706 pilots。 23 anti-drift" +
+                        " tests including ADR-014 OPT-OUT" +
+                        " default-off preservation。"),
+                BASChapterKnife(mNumber: 2169, knife: "第三刀",
+                    concept: "NEW BASMultiLanguageScaffold" +
+                        "Doctrine pinning scaffold + 5-" +
+                        "pilot roadmap + chapter 698" +
+                        " discipline-gate satisfaction" +
+                        " (option-b explicit-user-" +
+                        "directive) + counter-sprawl" +
+                        " inversion honesty + 5 pilot" +
+                        " chapters without new doctrines" +
+                        " per discipline + 37 anti-drift" +
+                        " tests including cross-mirror" +
+                        " to feature-flag Flag enum。"),
+                BASChapterKnife(mNumber: 2170, knife: "第四刀",
+                    concept: "Chapter 701 close-out + 13-" +
+                        "file standard sync。 752" +
+                        " consecutive byte-equality clean" +
+                        " commits。 60/60 score unchanged" +
+                        " (saturation invariant)。")
+            ],
+            entropyClassesAttacked: [
+                "single-language-substrate-spm-monolingual"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (feature flags default-off)",
+                "ADR-016 → M2170",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "752-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-satisfied-via-explicit-user-directive",
+                "multi-language-scaffold-shipped",
+                "counter-sprawl-inversion-honestly-acknowledged"
+            ],
+            plannedFutureCuts: [
+                "Chapter 702-706 ship 5 per-language" +
+                    " pilots (SQL,C,Metal,C++,Rust)" +
+                    " one per chapter,each behind its" +
+                    " feature flag,each WITHOUT a new" +
+                    " doctrine (production-code-typed-" +
+                    "surface satisfies chapter 698" +
+                    " discipline gate)。 Total arc 6" +
+                    " chapters / 24 commits / M2167-" +
+                    "M2190。"
+            ],
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " BUILD-SYSTEM SCAFFOLD per user directive" +
+                " 「全面 转向 多个 语言:Swift + Metal," +
+                "Rust,SQL,C,C++」 (2026-05-17)。" +
+                " 6-chapter arc opens at 七百一。 Chapter" +
+                " 698 / M2162 discipline gate satisfied" +
+                " via option-b explicit-user-directive。" +
+                " M2167 第一刀 Package.swift +3 NEW SPM" +
+                " targets (.cTarget + .cxxTarget + Swift" +
+                " bridge) + no-op placeholder sources;" +
+                " build proves SPM hosts C+C+++Swift" +
+                " simultaneously。 M2168 第二刀 NEW BAS" +
+                "LanguageAugmentationFeatureFlags actor" +
+                " (5 default-off flags) + 23 anti-drift" +
+                " tests。 M2169 第三刀 NEW BASMultiLanguage" +
+                "ScaffoldDoctrine + 37 anti-drift tests" +
+                " including cross-mirror to feature-flag" +
+                " Flag enum。 Chapter 701 close-out" +
+                " (M2170) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved (feature" +
+                " flags default-off → V1 Swift path" +
+                " unchanged)。 ADR-016 → M2170。 752" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces cumulative (+2:" +
+                "scaffold doctrine + feature-flag actor;" +
+                " SPM targets aren't counted per M2148" +
+                " convention)。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery preserved。 Counter-" +
+                "sprawl inversion (-3 chapters 699+700" +
+                " + 1 this scaffold = net -2) honestly" +
+                " acknowledged in scaffold doctrine pin。" +
+                " Chapters 702-706 pilots ADD ZERO new" +
+                " doctrines per chapter 698 discipline" +
+                " (each has production-code-typed-surface" +
+                " justification)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
