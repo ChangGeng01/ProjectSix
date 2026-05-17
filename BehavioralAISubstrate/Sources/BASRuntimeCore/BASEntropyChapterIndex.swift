@@ -6214,7 +6214,40 @@ public enum BASEntropyChapterIndex {
                 " honest-engineer pattern:remove cruft" +
                 " once it stops earning its keep。 chapter" +
                 " 七百八 strict-review's 'dead code'" +
-                " acknowledgment addressed。")
+                " acknowledgment addressed。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十",
+            mNumberFirst: 2199, mNumberLast: 2200,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PER-FLAG-DEFAULTS REFACTOR —" +
+                " chapter 七百九 planned-future-cut #3" +
+                " fulfilled。 2-knife chapter。 M2199" +
+                " 第一刀 BASLanguageAugmentationFeature" +
+                "Flags.swift gains NEW perFlagDefaults:" +
+                " [Flag: Bool] = [:] typed-surface" +
+                " constant + NEW effectiveDefault(for:)" +
+                " static function;init() + init(initial" +
+                "State:) + isEnabled(_:) + resetAll() +" +
+                " allDefault() all consult effective" +
+                "Default instead of raw defaultValue。" +
+                " ENABLES future granular production" +
+                " wire-in (set perFlagDefaults entry to" +
+                " flip JUST one flag's default)。 8 new" +
+                " anti-drift tests including CRITICAL" +
+                " testPerFlagDefaultsConstantIsEmptyAt" +
+                "Chapter710 doctrine-review trigger。" +
+                " M2200 第二刀 chapter 710 close-out +" +
+                " 13-file standard sync。 ADR-014 OPT-" +
+                "OUT preserved (perFlagDefaults default-" +
+                "empty)。 ADR-016 → M2200。 782" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 Zero-warning build" +
+                " invariant preserved (chapter 七百八)。" +
+                " Production wire-in now READY (future" +
+                " commit sets a perFlagDefaults entry" +
+                " to actually flip)。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

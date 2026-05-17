@@ -2664,7 +2664,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百九",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百九")!)
+                        chapterTag: "chapter 七百九")!),
+            // M2200 chapter 710 — PER-FLAG-DEFAULTS
+            // REFACTOR (chapter 709 planned-future-cut
+            // #3 fulfilled;unblocks production wire-in)
+            checkRegistry("七百十",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4827,6 +4834,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百九")!
+                .mNumberLast),
+            // M2200 chapter 710 — PER-FLAG-DEFAULTS REFACTOR
+            ("710",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

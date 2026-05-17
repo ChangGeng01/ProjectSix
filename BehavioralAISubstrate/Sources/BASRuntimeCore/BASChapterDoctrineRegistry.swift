@@ -23269,7 +23269,101 @@ public enum BASChapterDoctrineRegistry {
                 " stops earning its keep。 Next:user" +
                 " direction (2 chapter-707 + 1 new" +
                 " chapter-709 planned-future-cuts" +
-                " available)。")
+                " available)。"),
+        // chapter 710 — PER-FLAG-DEFAULTS REFACTOR
+        // (chapter 709 planned-future-cut #3 fulfilled)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十",
+            mNumberFirst: 2199,
+            mNumberLast: 2200,
+            v1MilestoneMNumber: 2200,
+            v1MilestoneStatus:
+                "chapter-710-per-flag-defaults-refactor",
+            knives: [
+                BASChapterKnife(mNumber: 2199, knife: "第一刀",
+                    concept: "BASLanguageAugmentation" +
+                        "FeatureFlags.swift gains NEW" +
+                        " perFlagDefaults: [Flag: Bool]" +
+                        " = [:] typed-surface constant" +
+                        " + NEW effectiveDefault(for:)" +
+                        " static function。 init() +" +
+                        " init(initialState:) +" +
+                        " isEnabled(_:) + resetAll() +" +
+                        " allDefault() all consult" +
+                        " effectiveDefault instead of" +
+                        " raw defaultValue。 Enables" +
+                        " granular future production" +
+                        " wire-in。 Currently dict is" +
+                        " EMPTY → V1 byte-equality" +
+                        " preserved by construction。" +
+                        " 8 new anti-drift tests" +
+                        " including CRITICAL test" +
+                        "PerFlagDefaultsConstantIsEmpty" +
+                        "AtChapter710 doctrine-review" +
+                        " trigger。"),
+                BASChapterKnife(mNumber: 2200, knife: "第二刀",
+                    concept: "Chapter 710 close-out +" +
+                        " 13-file standard sync。 782" +
+                        " consecutive byte-equality clean" +
+                        " commits。 ADR-016 → M2200。" +
+                        " 60/60 score unchanged。 Zero-" +
+                        "warning build invariant preserved。" +
+                        " NO new doctrines per chapter" +
+                        " 698 discipline。")
+            ],
+            entropyClassesAttacked: [
+                "single-shared-default-blocks-per-flag-granular-wire-in"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (perFlagDefaults default-empty)",
+                "ADR-016 → M2200",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "782-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "production-wire-in-ready-via-perFlagDefaults",
+                "doctrine-review-trigger-pinned-via-testPerFlagDefaultsConstantIsEmptyAtChapter710"
+            ],
+            plannedFutureCuts: [
+                "Wire ONE pilot to production default-ON" +
+                    " via perFlagDefaults entry (lowest-" +
+                    "risk:sqlMigratorEnabled — chapter" +
+                    " 702 byte-equality proven via" +
+                    " PRAGMA table_info)。 Requires" +
+                    " updating testPerFlagDefaultsConstant" +
+                    "IsEmptyAtChapter710 to count==1 +" +
+                    " naming the new chapter that did it。",
+                "Specialize chapter 705 generic C++ cache" +
+                    " for MPSGraphExecutable variant" +
+                    " (needs host demand)。"
+            ],
+            summary: "PER-FLAG-DEFAULTS REFACTOR —" +
+                " chapter 七百九 planned-future-cut #3" +
+                " fulfilled。 2-knife chapter。 M2199" +
+                " 第一刀 BASLanguageAugmentationFeature" +
+                "Flags gains perFlagDefaults dict +" +
+                " effectiveDefault function + all init/" +
+                "read/reset methods consult them。" +
+                " Currently empty → V1 byte-equality" +
+                " preserved。 8 new anti-drift tests" +
+                " including CRITICAL doctrine-review" +
+                " trigger pin on perFlagDefaults.count" +
+                " == 0。 M2200 第二刀 close-out + 13-" +
+                "file sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2200。 782 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60 score" +
+                " unchanged。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery +" +
+                " counter-sprawl + zero-warning all" +
+                " preserved。 Production wire-in now" +
+                " READY:future chapter sets a perFlag" +
+                "Defaults entry to actually flip a" +
+                " default。 Next:user direction。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
