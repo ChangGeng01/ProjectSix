@@ -289,14 +289,18 @@ final class BASMPSGraphExecutableCacheCxxBridgeTests:
 
     // MARK: - Flag-aware factory
 
-    func testMakeFactoryDefaultOffChoosesV1() async {
+    func testMakeFactoryDefaultChoosesV2AtChapter712() async {
+        // M2203 chapter 七百十二 — cxxMpsCacheEnabled
+        // flipped default-true。 Factory now picks V2。
         let flags = BASLanguageAugmentationFeatureFlags()
         let defaultValue = await flags.isEnabled(
             .cxxMpsCacheEnabled)
-        XCTAssertFalse(defaultValue)
+        XCTAssertTrue(defaultValue,
+            "M2203 wire-in:cxxMpsCacheEnabled now" +
+            " defaults TRUE")
         let bridge = await BASMPSGraphExecutableCacheCxxBridge.make(flags: flags)
         let using = await bridge.isUsingCxxCache
-        XCTAssertFalse(using)
+        XCTAssertTrue(using)
     }
 
     func testMakeFactoryExplicitlyOnChoosesV2() async {

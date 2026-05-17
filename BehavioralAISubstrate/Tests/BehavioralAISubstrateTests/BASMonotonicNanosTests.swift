@@ -210,20 +210,23 @@ final class BASMonotonicNanosTests: XCTestCase {
         wait(for: [exp], timeout: 1)
     }
 
-    func testMakeWithFlagsDefaultOffChoosesV1() {
-        let exp = expectation(description: "make default-off")
+    func testMakeWithFlagsDefaultChoosesV2AtChapter712() {
+        // M2203 chapter 七百十二 — cBridgeEnabled flipped
+        // default-true。 Factory now picks V2 C path。
+        let exp = expectation(description: "make default")
         Task {
             let flags = BASLanguageAugmentationFeatureFlags()
-            // Default-off discipline pin。
             let defaultValue = await flags.isEnabled(
                 .cBridgeEnabled)
-            XCTAssertFalse(defaultValue)
+            XCTAssertTrue(defaultValue,
+                "M2203 wire-in:cBridgeEnabled now" +
+                " defaults TRUE")
             let actor = await BASMonotonicNanos.make(
                 flags: flags)
             let isUsing = await actor.isUsingCBridge
-            XCTAssertFalse(isUsing,
-                "make(flags:) with default-off cBridge" +
-                "Enabled must pick V1 path。")
+            XCTAssertTrue(isUsing,
+                "make(flags:) with default cBridge" +
+                "Enabled (true) picks V2 C path。")
             exp.fulfill()
         }
         wait(for: [exp], timeout: 1)

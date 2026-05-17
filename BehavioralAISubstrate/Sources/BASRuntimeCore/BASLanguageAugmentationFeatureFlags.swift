@@ -99,6 +99,51 @@ public actor BASLanguageAugmentationFeatureFlags {
     /// 第一刀 introduced this mechanism as a typed-surface
     /// pin enabling granular wire-in。
     ///
+    /// **M2203 chapter 七百十二 第一刀** — full
+    /// 「全面 转向」 completion:remaining 4 pilots
+    /// (cBridgeEnabled + metalKernelV2Enabled +
+    /// cxxMpsCacheEnabled + rustCoreEnabled) flipped
+    /// to default-true。 All 5 pilots now production-
+    /// default-ON。
+    ///
+    /// ## Honest scope acknowledgment
+    ///
+    /// SQL pilot (M2201) has REAL substrate-internal
+    /// impact:`BASMemoryUsageTracker.make(databaseURL:
+    /// flags:)` now defaults to V2 generated-schema
+    /// path。
+    ///
+    /// The other 4 pilots (M2203) flip is largely
+    /// SYMBOLIC at the substrate level:
+    ///   - cBridge:no substrate caller of
+    ///     `BASMonotonicNanos.make(flags:)` exists;
+    ///     flag flip changes nothing in the substrate
+    ///   - metalKernelV2:no substrate caller of
+    ///     `BASMetalKernelLibraryLoader.make(flags:)`;
+    ///     V1 kernel registry path unchanged
+    ///   - cxxMpsCache:no substrate caller of
+    ///     `BASMPSGraphExecutableCacheCxxBridge.make
+    ///     (flags:)`;cache stays empty
+    ///   - rustCore:no substrate caller of
+    ///     `BASRustMemoryUsageTrackerActor.make(flags:)`;
+    ///     Rust crate stays latent (50MB Vendor blob)
+    ///
+    /// Hosts using these factory patterns now get V2
+    /// paths by default。 Hosts using direct init
+    /// patterns (BASMemoryUsageTracker(databaseURL:)
+    /// etc) stay on V1 paths。
+    ///
+    /// ## What「全面 转向」 means after M2203
+    ///
+    /// 5/5 pilots are "production-default-ON when
+    /// accessed via factory pattern"。 ZERO pilots have
+    /// a substrate-internal caller actually exercising
+    /// the V2 path。 The「全面 转向 多个 语言」 directive
+    /// is now substrate-side-fulfilled to the maximum
+    /// extent possible without HOST adoption —
+    /// further "actual turn" requires host code that
+    /// adopts the factory pattern。
+    ///
     /// **M2201 chapter 七百十一 第一刀** — FIRST production
     /// wire-in:`.sqlMigratorEnabled = true`。
     ///
@@ -148,7 +193,11 @@ public actor BASLanguageAugmentationFeatureFlags {
     /// commit changes the DEFAULT,not the V1 path semantics。
     /// Chain extends to 783 after this lands。
     public static let perFlagDefaults: [Flag: Bool] = [
-        .sqlMigratorEnabled: true
+        .sqlMigratorEnabled: true,
+        .cBridgeEnabled: true,
+        .metalKernelV2Enabled: true,
+        .cxxMpsCacheEnabled: true,
+        .rustCoreEnabled: true
     ]
 
     /// Effective default for a specific flag。 Consults

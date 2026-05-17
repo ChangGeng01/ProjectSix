@@ -128,25 +128,20 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
 
     // MARK: - Default-off behavior
 
-    func testDefaultInitFlagsMatchPerFlagDefaultsAtChapter711() async {
-        // M2201 chapter 七百十一 — renamed from
-        // testDefaultInitAllFlagsFalse。 sqlMigratorEnabled
-        // now defaults TRUE,other 4 still false。
+    func testDefaultInitFlagsMatchPerFlagDefaultsAtChapter712() async {
+        // M2203 chapter 七百十二 — all 5 pilots wired
+        // to default-true。 Renamed from chapter 711's
+        // testDefaultInitFlagsMatchPerFlagDefaultsAt
+        // Chapter711 which pinned 1-true-4-false。
         let flags = BASLanguageAugmentationFeatureFlags()
-        let sql = await flags.isEnabled(.sqlMigratorEnabled)
-        XCTAssertTrue(sql)
-        for flag in [
-            BASLanguageAugmentationFeatureFlags.Flag
-                .cBridgeEnabled,
-            .metalKernelV2Enabled,
-            .cxxMpsCacheEnabled,
-            .rustCoreEnabled
-        ] {
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
             let val = await flags.isEnabled(flag)
-            XCTAssertFalse(val,
-                "flag \(flag) still defaults false at" +
-                " chapter 七百十一 (only sqlMigrator" +
-                "Enabled wired in)")
+            XCTAssertTrue(val,
+                "flag \(flag) now defaults TRUE at" +
+                " chapter 七百十二 (all 5 pilots wired" +
+                " to default-on)")
         }
     }
 
@@ -160,28 +155,29 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
             " flags are wired in。")
     }
 
-    func testDefaultInitAnyEnabledIsTrueAtChapter711() async {
-        // M2201 chapter 七百十一 — renamed。 sqlMigrator
-        // Enabled now defaults TRUE → anyEnabled() = TRUE。
+    func testDefaultInitAnyEnabledIsTrueAtChapter712() async {
+        // M2203 chapter 七百十二 — all 5 pilots wired
+        // → anyEnabled() = TRUE (5 of 5 true)。
         let flags = BASLanguageAugmentationFeatureFlags()
         let any = await flags.anyEnabled()
         XCTAssertTrue(any,
-            "anyEnabled() = true at chapter 七百十一" +
-            " because sqlMigratorEnabled = true by" +
-            " default (M2201 production wire-in)")
+            "anyEnabled() = true at chapter 七百十二" +
+            " because all 5 pilots default-true")
     }
 
-    func testDefaultSnapshotReturnsOneTrueFourFalseAtChapter711() async {
-        // M2201 chapter 七百十一 — renamed。 1 of 5 flags
-        // is true (sqlMigratorEnabled);other 4 false。
+    func testDefaultSnapshotReturnsAllFiveTrueAtChapter712() async {
+        // M2203 chapter 七百十二 — all 5 pilots default-
+        // true。 Renamed from chapter 711's
+        // testDefaultSnapshotReturnsOneTrueFourFalse
+        // AtChapter711 which pinned 1-true-4-false。
         let flags = BASLanguageAugmentationFeatureFlags()
         let snap = await flags.snapshot()
         XCTAssertEqual(snap.count, 5)
         XCTAssertEqual(snap[.sqlMigratorEnabled], true)
-        XCTAssertEqual(snap[.cBridgeEnabled], false)
-        XCTAssertEqual(snap[.metalKernelV2Enabled], false)
-        XCTAssertEqual(snap[.cxxMpsCacheEnabled], false)
-        XCTAssertEqual(snap[.rustCoreEnabled], false)
+        XCTAssertEqual(snap[.cBridgeEnabled], true)
+        XCTAssertEqual(snap[.metalKernelV2Enabled], true)
+        XCTAssertEqual(snap[.cxxMpsCacheEnabled], true)
+        XCTAssertEqual(snap[.rustCoreEnabled], true)
     }
 
     // MARK: - Write semantics
@@ -194,9 +190,13 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
         XCTAssertTrue(val)
     }
 
-    func testSetSingleFlagDoesNotAffectOthers() async {
+    func testSetSingleFlagDoesNotAffectOthersAtChapter712() async {
+        // M2203 chapter 七百十二 — all 5 pilots wired
+        // default-true。 Setting one explicitly to false
+        // doesn't affect the OTHER 4 staying at their
+        // default (true)。
         let flags = BASLanguageAugmentationFeatureFlags()
-        await flags.setFlag(.sqlMigratorEnabled, to: true)
+        await flags.setFlag(.sqlMigratorEnabled, to: false)
         let cBridge = await flags.isEnabled(
             .cBridgeEnabled)
         let metalV2 = await flags.isEnabled(
@@ -204,10 +204,11 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
         let cxxMps = await flags.isEnabled(
             .cxxMpsCacheEnabled)
         let rust = await flags.isEnabled(.rustCoreEnabled)
-        XCTAssertFalse(cBridge)
-        XCTAssertFalse(metalV2)
-        XCTAssertFalse(cxxMps)
-        XCTAssertFalse(rust)
+        XCTAssertTrue(cBridge,
+            "other flags stay at their default (true)")
+        XCTAssertTrue(metalV2)
+        XCTAssertTrue(cxxMps)
+        XCTAssertTrue(rust)
     }
 
     func testToggleBackToFalse() async {
@@ -278,147 +279,95 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
 
     // MARK: - Cross-doctrine invariant
 
-    func testAdr014OptOutPreservedForFourPilotsAtChapter711() async {
-        // M2201 chapter 七百十一 第一刀 — sqlMigratorEnabled
-        // flipped to default-true (FIRST production wire-
-        // in)。 The OTHER 4 pilots (c/metal/cxx/rust) must
-        // still default-false to preserve ADR-014 OPT-OUT
-        // for those。
+    func testAdr014OptOutSemanticAfterFullWireInAtChapter712() async {
+        // M2203 chapter 七百十二 — ALL 5 pilots flipped
+        // to default-true。 ADR-014 OPT-OUT semantic now
+        // means:every flag is opt-OUT instead of opt-IN
+        // (host can still explicitly setFlag false)。
+        // Renamed from chapter 711's testAdr014OptOut
+        // PreservedForFourPilotsAtChapter711 which pinned
+        // 1-wired-in 4-still-opt-in。
         let flags = BASLanguageAugmentationFeatureFlags()
-        let sql = await flags.isEnabled(.sqlMigratorEnabled)
-        XCTAssertTrue(sql,
-            "sqlMigratorEnabled now defaults TRUE at" +
-            " chapter 七百十一。 M2173 PRAGMA byte-" +
-            "equality proved V2 produces identical" +
-            " on-disk schema as V1。")
-        let c = await flags.isEnabled(.cBridgeEnabled)
-        let metal = await flags.isEnabled(
-            .metalKernelV2Enabled)
-        let cxx = await flags.isEnabled(.cxxMpsCacheEnabled)
-        let rust = await flags.isEnabled(.rustCoreEnabled)
-        XCTAssertFalse(c,
-            "cBridgeEnabled still default-off (no" +
-            " production wire-in for chapter 七百三)")
-        XCTAssertFalse(metal,
-            "metalKernelV2Enabled still default-off")
-        XCTAssertFalse(cxx,
-            "cxxMpsCacheEnabled still default-off")
-        XCTAssertFalse(rust,
-            "rustCoreEnabled still default-off")
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            let val = await flags.isEnabled(flag)
+            XCTAssertTrue(val,
+                "\(flag) defaults TRUE at chapter 七百十二" +
+                " — opt-OUT semantic via setFlag false")
+        }
     }
 
     // MARK: - M2199 chapter 七百十 第一刀 — per-flag
     //         defaults mechanism (CURRENTLY empty,
     //         enables future granular wire-in)
 
-    func testPerFlagDefaultsHasOneEntryAtChapter711() {
-        // M2201 chapter 七百十一 第一刀 — FIRST production
-        // wire-in。 sqlMigratorEnabled flipped to true。
-        // testPerFlagDefaultsConstantIsEmptyAtChapter710
-        // FROM CHAPTER 710 has been retired (M2201
-        // deliberately flipped the gate)。 Future flips
-        // require updating this test AGAIN to reference
-        // the wire-in chapter that did it。
+    func testPerFlagDefaultsHasAllFiveEntriesAtChapter712() {
+        // M2203 chapter 七百十二 — ALL 5 pilots wired。
+        // Renamed from chapter 711's testPerFlagDefaults
+        // HasOneEntryAtChapter711 which pinned 1。
         XCTAssertEqual(
             BASLanguageAugmentationFeatureFlags
-                .perFlagDefaults.count, 1,
-            "perFlagDefaults count == 1 at chapter 七百" +
-            "十一 (sqlMigratorEnabled = true)。 Future" +
-            " wire-ins increment this + rename the test。")
+                .perFlagDefaults.count, 5,
+            "perFlagDefaults count == 5 at chapter 七百" +
+            "十二 (all 5 pilots wired)。 Future revert" +
+            " would decrement + rename this test。")
     }
 
-    func testPerFlagDefaultsHasSqlMigratorEnabledTrue() {
-        XCTAssertEqual(
-            BASLanguageAugmentationFeatureFlags
-                .perFlagDefaults[.sqlMigratorEnabled],
-            true,
-            "M2201 chapter 七百十一 FIRST production" +
-            " wire-in:sqlMigratorEnabled = true。" +
-            " chapter 七百二 / M2173 byte-equality proven" +
-            " via PRAGMA table_info。")
-    }
-
-    func testEffectiveDefaultForSqlMigratorEnabledIsTrue() {
-        XCTAssertTrue(
-            BASLanguageAugmentationFeatureFlags
-                .effectiveDefault(for: .sqlMigratorEnabled),
-            "M2201 wire-in:sqlMigratorEnabled" +
-            " effectiveDefault flipped from false to" +
-            " true。 V2 (generated schema) is now the" +
-            " production default。")
-    }
-
-    func testEffectiveDefaultForOtherFlagsStillFalse() {
-        // Other 4 flags still default-off at chapter
-        // 七百十一。 Only SQL pilot wired in。
-        XCTAssertFalse(
-            BASLanguageAugmentationFeatureFlags
-                .effectiveDefault(for: .cBridgeEnabled))
-        XCTAssertFalse(
-            BASLanguageAugmentationFeatureFlags
-                .effectiveDefault(for: .metalKernelV2Enabled))
-        XCTAssertFalse(
-            BASLanguageAugmentationFeatureFlags
-                .effectiveDefault(for: .cxxMpsCacheEnabled))
-        XCTAssertFalse(
-            BASLanguageAugmentationFeatureFlags
-                .effectiveDefault(for: .rustCoreEnabled))
-    }
-
-    func testInitConsultsPerFlagDefaults() async {
-        // Two fresh init() instances both see the new
-        // per-flag default → sqlMigratorEnabled true
-        // on both,others false on both。
-        let a = BASLanguageAugmentationFeatureFlags()
-        let b = BASLanguageAugmentationFeatureFlags()
-        let aSql = await a.isEnabled(.sqlMigratorEnabled)
-        let bSql = await b.isEnabled(.sqlMigratorEnabled)
-        XCTAssertTrue(aSql)
-        XCTAssertTrue(bSql)
-        let aC = await a.isEnabled(.cBridgeEnabled)
-        let bC = await b.isEnabled(.cBridgeEnabled)
-        XCTAssertFalse(aC)
-        XCTAssertFalse(bC)
-    }
-
-    func testInitWithStateRespectsPerFlagDefaultForUnset() async {
-        // initialState explicitly sets cBridgeEnabled
-        // = true;sqlMigratorEnabled is UNSET in the
-        // initialState dict so it falls back to
-        // effectiveDefault (=true,M2201 wire-in)。
-        let flags = BASLanguageAugmentationFeatureFlags(
-            initialState: [.cBridgeEnabled: true])
-        let sql = await flags.isEnabled(.sqlMigratorEnabled)
-        let c = await flags.isEnabled(.cBridgeEnabled)
-        let metal = await flags.isEnabled(
-            .metalKernelV2Enabled)
-        let cxx = await flags.isEnabled(.cxxMpsCacheEnabled)
-        let rust = await flags.isEnabled(.rustCoreEnabled)
-        XCTAssertTrue(sql,
-            "unset sqlMigratorEnabled falls back to" +
-            " effectiveDefault = true (M2201 wire-in)")
-        XCTAssertTrue(c,
-            "explicitly-set cBridgeEnabled honored")
-        XCTAssertFalse(metal)
-        XCTAssertFalse(cxx)
-        XCTAssertFalse(rust)
-    }
-
-    func testResetAllRespectsPerFlagDefault() async {
-        // Set every flag to false,then resetAll → every
-        // flag returns to its effectiveDefault。 After
-        // M2201,sqlMigratorEnabled comes back as true。
-        let flags = BASLanguageAugmentationFeatureFlags()
+    func testPerFlagDefaultsAllFiveFlagsTrue() {
+        // M2203 verifies each entry。
         for flag in BASLanguageAugmentationFeatureFlags
             .Flag.allCases
         {
-            await flags.setFlag(flag, to: false)
+            XCTAssertEqual(
+                BASLanguageAugmentationFeatureFlags
+                    .perFlagDefaults[flag], true,
+                "\(flag) wired to default-true at" +
+                " chapter 七百十二")
         }
-        await flags.resetAll()
+    }
+
+    func testEffectiveDefaultForAllFlagsTrue() {
+        // M2203 — all 5 pilots default-true at chapter
+        // 七百十二。 Renamed from chapter 711's split
+        // testEffectiveDefaultForSqlMigratorEnabledIsTrue
+        // + testEffectiveDefaultForOtherFlagsStillFalse。
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            XCTAssertTrue(
+                BASLanguageAugmentationFeatureFlags
+                    .effectiveDefault(for: flag),
+                "\(flag) effectiveDefault = true at" +
+                " chapter 七百十二")
+        }
+    }
+
+    func testInitConsultsPerFlagDefaults() async {
+        // Two fresh init() instances both see all 5
+        // pilots default-true。
+        let a = BASLanguageAugmentationFeatureFlags()
+        let b = BASLanguageAugmentationFeatureFlags()
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            let aVal = await a.isEnabled(flag)
+            let bVal = await b.isEnabled(flag)
+            XCTAssertTrue(aVal)
+            XCTAssertTrue(bVal)
+        }
+    }
+
+    func testInitWithStateRespectsPerFlagDefaultForUnset() async {
+        // initialState explicitly sets sqlMigratorEnabled
+        // = false (overrides default-true);other 4
+        // unset fall back to effectiveDefault = true。
+        let flags = BASLanguageAugmentationFeatureFlags(
+            initialState: [.sqlMigratorEnabled: false])
         let sql = await flags.isEnabled(.sqlMigratorEnabled)
-        XCTAssertTrue(sql,
-            "after resetAll(),sqlMigratorEnabled must" +
-            " return to effectiveDefault = true")
+        XCTAssertFalse(sql,
+            "explicitly-set sqlMigratorEnabled = false" +
+            " honored")
         for flag in [
             BASLanguageAugmentationFeatureFlags.Flag
                 .cBridgeEnabled,
@@ -427,9 +376,30 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
             .rustCoreEnabled
         ] {
             let v = await flags.isEnabled(flag)
-            XCTAssertFalse(v,
-                "after resetAll(),flag \(flag) must" +
-                " match effectiveDefault (false)")
+            XCTAssertTrue(v,
+                "unset \(flag) falls back to" +
+                " effectiveDefault = true (M2203 wire-in)")
+        }
+    }
+
+    func testResetAllRespectsPerFlagDefault() async {
+        // Set every flag to false,then resetAll → every
+        // flag returns to its effectiveDefault = true
+        // (all 5 wired at chapter 七百十二)。
+        let flags = BASLanguageAugmentationFeatureFlags()
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            await flags.setFlag(flag, to: false)
+        }
+        await flags.resetAll()
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            let v = await flags.isEnabled(flag)
+            XCTAssertTrue(v,
+                "after resetAll(),\(flag) must return" +
+                " to effectiveDefault = true")
         }
     }
 
@@ -455,15 +425,20 @@ final class BASLanguageAugmentationFeatureFlagsTests: XCTestCase {
             " allDefault() must return false")
     }
 
-    func testSqlPilotIsProductionWiredAtChapter711() {
-        // Anti-drift pin documenting the wire-in chapter。
-        // Future chapter that REVERTS the wire-in must
-        // update this test name + assertion。
-        XCTAssertTrue(
-            BASLanguageAugmentationFeatureFlags
-                .effectiveDefault(for: .sqlMigratorEnabled),
-            "SQL pilot is in production at chapter 七百" +
-            "十一。 Reverting requires explicit doctrine" +
-            " review + rename of this test。")
+    func testAllFivePilotsProductionWiredAtChapter712() {
+        // M2203 chapter 七百十二 — all 5 pilots production-
+        // wired。 Renamed from chapter 711's testSqlPilot
+        // IsProductionWiredAtChapter711。 Future revert
+        // of any pilot requires explicit doctrine review
+        // + rename of this test (or split per-pilot)。
+        for flag in BASLanguageAugmentationFeatureFlags
+            .Flag.allCases
+        {
+            XCTAssertTrue(
+                BASLanguageAugmentationFeatureFlags
+                    .effectiveDefault(for: flag),
+                "\(flag) is production-wired at chapter" +
+                " 七百十二")
+        }
     }
 }

@@ -339,17 +339,21 @@ final class BASMetalKernelLibraryLoaderTests: XCTestCase {
 
     // MARK: - Flag-aware factory
 
-    func testMakeFactoryDefaultOffChoosesV1() {
-        let exp = expectation(description: "make default-off")
+    func testMakeFactoryDefaultChoosesV2AtChapter712() {
+        // M2203 chapter 七百十二 — metalKernelV2Enabled
+        // flipped default-true。 Factory now picks V2。
+        let exp = expectation(description: "make default")
         Task {
             let flags = BASLanguageAugmentationFeatureFlags()
             let defaultValue = await flags.isEnabled(
                 .metalKernelV2Enabled)
-            XCTAssertFalse(defaultValue)
+            XCTAssertTrue(defaultValue,
+                "M2203 wire-in:metalKernelV2Enabled" +
+                " now defaults TRUE")
             let actor = await BASMetalKernelLibraryLoader
                 .make(flags: flags)
             let v2 = await actor.isUsingV2
-            XCTAssertFalse(v2)
+            XCTAssertTrue(v2)
             exp.fulfill()
         }
         wait(for: [exp], timeout: 1)

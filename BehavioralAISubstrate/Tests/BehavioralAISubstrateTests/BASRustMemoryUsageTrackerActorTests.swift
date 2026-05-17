@@ -451,23 +451,30 @@ final class BASRustMemoryUsageTrackerActorTests:
 
     // MARK: - Flag-aware factory
 
-    func testMakeFactoryHonorsDefaultOffAndExplicitOn() async throws {
+    func testMakeFactoryHonorsDefaultOnAndExplicitOffAtChapter712() async throws {
+        // M2203 chapter 七百十二 — rustCoreEnabled flipped
+        // default-true。 Renamed from chapter 706's
+        // testMakeFactoryHonorsDefaultOffAndExplicitOn。
         let flags = BASLanguageAugmentationFeatureFlags()
 
-        // Default off → V1
+        // Default ON → V2
         let defaultValue = await flags.isEnabled(
             .rustCoreEnabled)
-        XCTAssertFalse(defaultValue)
-        let v1 = try await BASRustMemoryUsageTrackerActor
-            .make(flags: flags)
-        let v1using = await v1.isUsingRustCore
-        XCTAssertFalse(v1using)
-
-        // Explicit on → V2
-        await flags.setFlag(.rustCoreEnabled, to: true)
+        XCTAssertTrue(defaultValue,
+            "M2203 wire-in:rustCoreEnabled now" +
+            " defaults TRUE")
         let v2 = try await BASRustMemoryUsageTrackerActor
             .make(flags: flags)
         let v2using = await v2.isUsingRustCore
         XCTAssertTrue(v2using)
+
+        // Explicit off → V1
+        await flags.setFlag(.rustCoreEnabled, to: false)
+        let v1 = try await BASRustMemoryUsageTrackerActor
+            .make(flags: flags)
+        let v1using = await v1.isUsingRustCore
+        XCTAssertFalse(v1using,
+            "explicit setFlag false honored — V1" +
+            " (Swift in-memory) path still reachable")
     }
 }
