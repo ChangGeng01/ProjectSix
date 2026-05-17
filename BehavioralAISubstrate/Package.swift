@@ -152,18 +152,30 @@ let package = Package(
         .target(
             name: "BASMetalSubstrate",
             dependencies: ["BASRuntimeCore"],
-            // M2163 chapter 六百九十九 第一刀 — exclude the
-            // SSMScan.metal reference shader file from
-            // SPM build。 SPM doesn't compile .metal
-            // sources natively (Xcode build system does)。
-            // The file ships as reference for hosts that
-            // integrate via Xcode project + custom Metal
-            // compilation step。 Excluding silences the
-            // persistent "unhandled file" warning that
-            // has been present since chapter 六百七十七
-            // / M2089 when Phase M SSM kernel landed。
-            exclude: [
-                "BASBuiltinKernels/SSMScan.metal"
+            // M2179 chapter 七百四 第一刀 — switch from
+            // `exclude` (chapter 699 / M2163) to
+            // `resources: [.process(...)]` so SPM bundles
+            // the SSMScan.metal source into the target's
+            // Bundle.module。 BASMetalKernelLibraryLoader
+            // (M2180) loads + compiles it at runtime via
+            // MTLLibrary.makeLibrary(source:options:)。
+            //
+            // Platform gating:Metal is unavailable on
+            // watchOS,so the resource is gated to iOS +
+            // macOS — matches the linkerSettings gating
+            // for the Metal / MPS / MPSGraph frameworks
+            // below。 watchOS continues to compile this
+            // target as a thin schema-only stub。
+            //
+            // ADR-014 OPT-IN preserved:metalKernelV2Enabled
+            // flag default-off → V1 kernel selection
+            // (BASMPSGraphSSMScanKernelStub +
+            // BASSSMScanCPUReference) remains the live
+            // dispatch path until a caller opts in。
+            resources: [
+                .process(
+                    "BASBuiltinKernels/SSMScan.metal",
+                    localization: nil)
             ],
             linkerSettings: [
                 .linkedFramework(
