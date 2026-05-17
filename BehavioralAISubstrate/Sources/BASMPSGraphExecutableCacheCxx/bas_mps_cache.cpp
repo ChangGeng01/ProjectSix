@@ -133,14 +133,10 @@ private:
 
 extern "C" {
 
-int32_t bas_mps_cache_placeholder_version(void) {
-    // Scaffold-version sentinel from M2167。 Returns 0
-    // always。 Kept for backward source compatibility
-    // so a future caller pinned on it does not silently
-    // break。 New callers should use
-    // `bas_mps_cache_version()` instead。
-    return 0;
-}
+// M2197 chapter 七百九 第一刀 — placeholder function
+// `bas_mps_cache_placeholder_version` removed (zero
+// callers in the substrate;the "backward source compat"
+// comment never had a real caller to protect)。
 
 int32_t bas_mps_cache_insert(const char* key,
                               const char* value) {

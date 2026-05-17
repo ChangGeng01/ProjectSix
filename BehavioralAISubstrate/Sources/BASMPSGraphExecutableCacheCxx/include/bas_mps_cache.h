@@ -6,6 +6,12 @@
 //                                  added (bas_mps_cache_insert
 //                                  / lookup / size / clear /
 //                                  free_value / version)。
+// chapter 七百九 / M2197 第一刀 — placeholder declaration
+//                                  removed (zero callers
+//                                  in the substrate;the
+//                                  "backward source compat"
+//                                  comment never had a
+//                                  real caller to protect)。
 
 #ifndef BAS_MPS_CACHE_H
 #define BAS_MPS_CACHE_H
@@ -16,12 +22,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/// Scaffold-version sentinel from M2167。 Returns 0
-/// always。 Kept for backward source compatibility so a
-/// future caller pinned on it does not silently break。
-/// New callers should use `bas_mps_cache_version()`。
-int32_t bas_mps_cache_placeholder_version(void);
 
 /// Insert (or overwrite) `key` → `value`。
 ///

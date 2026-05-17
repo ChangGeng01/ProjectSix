@@ -6,6 +6,12 @@
 //                                  added (bas_monotonic_nanos
 //                                  + bas_monotonic_nanos
 //                                  _version)。
+// chapter 七百九 / M2197 第一刀 — placeholder declaration
+//                                  removed (zero callers
+//                                  in the substrate;the
+//                                  "backward source compat"
+//                                  comment never had a
+//                                  real caller to protect)。
 
 #ifndef BAS_CSYSTEM_BRIDGE_H
 #define BAS_CSYSTEM_BRIDGE_H
@@ -15,12 +21,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/// Scaffold-version sentinel from M2167。 Returns 0 always。
-/// Kept for backward source compatibility so a future
-/// caller pinned on it does not silently break。 New
-/// callers should use `bas_monotonic_nanos_version()` instead。
-int32_t bas_csystem_bridge_placeholder_version(void);
 
 /// Read a monotonic-clock nanosecond timestamp from the
 /// host OS into `*out`。
