@@ -23474,7 +23474,101 @@ public enum BASChapterDoctrineRegistry {
                 " for factory-pattern hosts。 Next:" +
                 " user direction — wire remaining 4" +
                 " pilots OR specialize C++ cache OR" +
-                " pivot to different work。")
+                " pivot to different work。"),
+        // chapter 712 — FULL「全面 转向」 COMPLETION
+        // (chapter 711 planned-future-cut #1 fulfilled
+        // for all 4 remaining pilots)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十二",
+            mNumberFirst: 2203,
+            mNumberLast: 2204,
+            v1MilestoneMNumber: 2204,
+            v1MilestoneStatus:
+                "chapter-712-full-quan-mian-zhuan-xiang-completion",
+            knives: [
+                BASChapterKnife(mNumber: 2203, knife: "第一刀",
+                    concept: "BASLanguageAugmentation" +
+                        "FeatureFlags.perFlagDefaults" +
+                        " expanded from 1 entry (chapter" +
+                        " 711 sqlMigratorEnabled) to all" +
+                        " 5 entries true (cBridgeEnabled" +
+                        " + metalKernelV2Enabled +" +
+                        " cxxMpsCacheEnabled + rustCore" +
+                        "Enabled added)。 13 anti-drift" +
+                        " tests updated/renamed across" +
+                        " 5 test files。 HONEST scope:" +
+                        " SQL pilot M2201 had REAL" +
+                        " substrate-internal impact;" +
+                        " these 4 flips are SYMBOLIC at" +
+                        " substrate level (no substrate" +
+                        " caller of .make(flags:)" +
+                        " factories exists)。"),
+                BASChapterKnife(mNumber: 2204, knife: "第二刀",
+                    concept: "Chapter 712 close-out +" +
+                        " 13-file standard sync。 786" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2204。 60/60 score unchanged。" +
+                        " Zero-warning preserved。 NO" +
+                        " new doctrines per chapter 698。")
+            ],
+            entropyClassesAttacked: [
+                "four-remaining-pilots-still-default-off-after-chapter-711-partial-wire-in"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT semantic for all 5 pilots (was opt-IN for 4, opt-OUT for 1 at chapter 711)",
+                "ADR-016 → M2204",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "786-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "quan-mian-zhuan-xiang-substrate-side-maximum-fulfillment-5-of-5",
+                "honest-scope-4-of-5-wire-ins-symbolic-no-substrate-caller"
+            ],
+            plannedFutureCuts: [
+                "Host adoption strategy work — encourage" +
+                    " hosts to adopt factory pattern" +
+                    " (BASMemoryUsageTracker.make /" +
+                    " BASMonotonicNanos.make / etc) to" +
+                    " actually exercise the V2 paths" +
+                    " in production runtime。",
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " variant (needs host demand)。"
+            ],
+            summary: "FULL「全面 转向」 COMPLETION — 4" +
+                " remaining pilots wired to default-ON" +
+                " in single chapter。 chapter 七百十一" +
+                " planned-future-cut #1 fulfilled for" +
+                " all 4 remaining。 2-knife chapter。" +
+                " M2203 第一刀 perFlagDefaults expanded" +
+                " from `[.sqlMigratorEnabled: true]` to" +
+                " all 5 entries true。 HONEST scope:" +
+                " SQL pilot (M2201) had real impact;" +
+                " these 4 (C/Metal/C++/Rust) flips are" +
+                " SYMBOLIC at substrate level because" +
+                " NO substrate caller of the respective" +
+                " factory patterns exists。 Hosts using" +
+                " factory pattern now get V2 by default" +
+                " for all 5 pilots。 13 anti-drift tests" +
+                " updated/renamed。 M2204 第二刀 close-" +
+                "out + 13-file sync。 ADR-014 OPT-OUT" +
+                " semantic across all 5。 ADR-016 →" +
+                " M2204。 786 consecutive byte-equality" +
+                " clean commits (V1 paths unchanged)。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 Substrate AT-REST +" +
+                " Tier A+B+C + 100% SIGBUS recovery +" +
+                " counter-sprawl + zero-warning all" +
+                " preserved。 「全面 转向 多个 语言」" +
+                " substrate-side maximum fulfillment:" +
+                " 5/5 pilots production-default-ON;" +
+                " further turn requires HOST adoption。" +
+                " Next:user direction。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

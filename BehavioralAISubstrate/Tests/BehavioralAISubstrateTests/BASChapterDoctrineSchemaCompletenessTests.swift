@@ -2678,7 +2678,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十一",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十一")!)
+                        chapterTag: "chapter 七百十一")!),
+            // M2204 chapter 712 — FULL「全面 转向」
+            // COMPLETION (remaining 4 pilots wired,
+            // 5/5 default-ON at factory pattern)
+            checkRegistry("七百十二",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十二")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4857,6 +4864,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十一")!
+                .mNumberLast),
+            // M2204 chapter 712 — FULL「全面 转向」
+            ("712",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十二")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十二")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

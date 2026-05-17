@@ -121,10 +121,11 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2202:24 + 20 + 263 = 307 (chapter 七百十一 —
-    /// FIRST production wire-in;sqlMigratorEnabled
-    /// flipped to default-true,「全面 转向」 1/5 fulfilled)。
-    public static let phase2ChapterCount: Int = 307
+    /// At M2204:24 + 20 + 264 = 308 (chapter 七百十二 —
+    /// FULL「全面 转向」 completion;4 remaining pilots
+    /// wired default-ON,5/5 fulfilled at substrate
+    /// factory-pattern level)。
+    public static let phase2ChapterCount: Int = 308
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -140,9 +141,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2196:1238 + 2 = 1240 (chapter 七百八)。 At
     /// M2198:1240 + 2 = 1242 (chapter 七百九)。 At
     /// M2200:1242 + 2 = 1244 (chapter 七百十)。 At
-    /// M2202:1244 + 2 = 1246 (chapter 七百十一 — 2-knife
-    /// FIRST production wire-in)
-    public static let phase2CommitsShipped: Int = 1246
+    /// M2202:1244 + 2 = 1246 (chapter 七百十一)。 At
+    /// M2204:1246 + 2 = 1248 (chapter 七百十二 — 2-knife
+    /// FULL「全面 转向」 completion)
+    public static let phase2CommitsShipped: Int = 1248
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -155,9 +157,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2198:chapter 709 — dead-code cleanup。 At
     /// M2200:chapter 710 — per-flag-defaults refactor。
     /// At M2202:chapter 711 — FIRST production wire-in
-    /// (sqlMigratorEnabled flipped default-true)。
+    /// (sqlMigratorEnabled)。 At M2204:chapter 712 —
+    /// FULL「全面 转向」 (remaining 4 pilots wired)。
     /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2202
+    public static let phase2MNumberLast: Int = 2204
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

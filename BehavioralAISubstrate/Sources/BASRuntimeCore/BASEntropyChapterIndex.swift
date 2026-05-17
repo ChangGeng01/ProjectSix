@@ -6287,7 +6287,43 @@ public enum BASEntropyChapterIndex {
                 " using factory pattern。 「全面 转向 多个" +
                 " 语言」 progress:1 of 5 pilots default-" +
                 "ON;4 remaining (C / Metal / C++ / Rust)" +
-                " still latent opt-in。")
+                " still latent opt-in。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十二",
+            mNumberFirst: 2203, mNumberLast: 2204,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FULL「全面 转向」 COMPLETION — 4" +
+                " remaining pilots wired to default-ON" +
+                " in single chapter。 2-knife chapter。" +
+                " M2203 第一刀 BASLanguageAugmentation" +
+                "FeatureFlags.perFlagDefaults expanded" +
+                " from 1 entry (chapter 711 SQL) to all" +
+                " 5 entries true (cBridgeEnabled +" +
+                " metalKernelV2Enabled + cxxMpsCache" +
+                "Enabled + rustCoreEnabled added)。" +
+                " HONEST scope:SQL pilot M2201 had REAL" +
+                " substrate-internal impact (BASMemory" +
+                "UsageTracker.make goes V2);these 4" +
+                " flips are SYMBOLIC at substrate level" +
+                " because NO substrate caller of the" +
+                " respective .make(flags:) factories" +
+                " exists。 Hosts using factory pattern" +
+                " now get V2 for all 5;hosts using" +
+                " direct init stay V1。 13 anti-drift" +
+                " tests updated/renamed across 5 test" +
+                " files。 M2204 第二刀 chapter 712" +
+                " close-out + 13-file standard sync。" +
+                " ADR-014 OPT-OUT semantic across all 5" +
+                " pilots。 ADR-016 → M2204。 786" +
+                " consecutive byte-equality clean commits" +
+                " (V1 path code unchanged across all 5" +
+                " pilots)。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 「全面 转向」" +
+                " substrate-side maximum fulfillment:" +
+                " 5/5 pilots production-default-ON at" +
+                " factory pattern;further turn requires" +
+                " HOST adoption of factory pattern。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
