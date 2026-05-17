@@ -100,21 +100,56 @@ public enum BASRustCoreBridge {
     public static let xcframeworkVendorPath: String =
         "Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework"
 
-    /// XCFramework slices currently shipped。 Today only
-    /// macos-arm64;iOS device + simulator slices
-    /// documented as planned-future-cuts in
-    /// `scripts/build-rust-xcframework.sh`。
+    /// XCFramework slices currently shipped。 At M2191
+    /// chapter 七百七 第一刀:expanded from host-only
+    /// (macos-arm64) to all 3 Apple deployment targets
+    /// per chapter 七百六 / M2190 planned-future-cut。
     public static let shippedSlices: [String] = [
+        "ios-arm64",
+        "ios-arm64-simulator",
         "macos-arm64"
     ]
 
-    /// XCFramework byte-equality SHA256 captured during
-    /// reproducibility verification at M2187。 If a
-    /// future commit rebuilds the XCFramework with
-    /// different toolchain / flags this hash WILL
-    /// change — and that's a doctrine review trigger
-    /// (chapter 七百一 RED FLAG #1 mitigation:two
-    /// clean rebuilds must yield byte-identical .a)。
+    /// XCFramework macos-arm64 slice byte-equality
+    /// SHA256。 Bumped at M2191 chapter 七百七 第一刀
+    /// because the build script switched from Homebrew
+    /// rustc (1.95.0) to rustup-managed stable rustc
+    /// (the only path that has the iOS cross-compile
+    /// targets installed)。 Reproducibility invariant
+    /// preserved within the new toolchain (2 clean
+    /// rebuilds yield byte-identical .a)。
     public static let macosArm64SliceSHA256: String =
-        "7557c7dadb6d411deaba54212bec350d248a80723c688cf0b94447bf291d772e"
+        "9abcda722a4abb23b6607375004c82c62f12ff75b495e87ed69c6d1c9cd4f3aa"
+
+    /// XCFramework ios-arm64 slice byte-equality SHA256。
+    /// Captured at M2191 chapter 七百七 第一刀 during
+    /// the 3-slice rebuild via the rustup-managed stable
+    /// rustc toolchain。 Reproducibility verified across
+    /// 2 clean rebuilds。
+    public static let iosArm64SliceSHA256: String =
+        "57a30761eb30bebec1666563736594d5f72e61ff09749f57509e711ddfa7aa0f"
+
+    /// XCFramework ios-arm64-simulator slice byte-
+    /// equality SHA256。 Captured at M2191 chapter 七百七
+    /// 第一刀。 Reproducibility verified across 2 clean
+    /// rebuilds。
+    public static let iosArm64SimulatorSliceSHA256: String =
+        "ed329d3fc2d60609dbda10f04226b3d2848d2e53b687bba071cd264f8f198702"
+
+    /// Total per-slice SHA256 count = shippedSlices
+    /// .count。 Cross-mirror invariant pinned in tests
+    /// so a future commit that adds a new slice must
+    /// also add the corresponding SHA pin。
+    public static let sliceSHA256Count: Int = 3
+
+    /// Whether the Rust pilot is fully iOS-deployable
+    /// (both iOS device + simulator slices present)。
+    /// Toggles automatically with the shippedSlices
+    /// composition — anti-drift test pins True here so
+    /// a future revert to host-only fails CI。
+    public static var isIOSDeployable: Bool {
+        return shippedSlices.contains("ios-arm64")
+            && shippedSlices.contains(
+                "ios-arm64-simulator")
+    }
 }
