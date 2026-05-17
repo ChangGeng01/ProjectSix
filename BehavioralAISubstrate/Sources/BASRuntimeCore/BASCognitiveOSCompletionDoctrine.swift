@@ -1177,7 +1177,33 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// SQL + C pilots shipped;next pilots Metal / C++ /
     /// Rust at chapters 七百四-七百六。 No G-status
     /// change。
-    public static let doctrineVersion: String = "ADR-016.M2178"
+    ///
+    /// **M2182 chapter 七百四 第四刀**:Metal pilot
+    /// close-out。 4 commits shipped:(1) M2179
+    /// Package.swift switches BASMetalSubstrate from
+    /// `exclude SSMScan.metal` (chapter 699) to
+    /// `resources: [.process(...)]`;(2) M2180 NEW
+    /// Sources/BASMetalSubstrate/BASMetalKernelLibrary
+    /// Loader.swift actor loading SSMScan.metal from
+    /// Bundle.module + compiling via MTLLibrary.make
+    /// Library(source:options:) lazily on first request;
+    /// 5 typed error cases + Codable + memoization +
+    /// #if canImport(Metal) gated for watchOS stub +
+    /// async make(flags:) factory consulting
+    /// metalKernelV2Enabled;(3) M2181 22 anti-drift
+    /// tests:resource bundling (7) + actor init flag
+    /// honoring (3) + V1 path throws/no-memoize-pollute
+    /// (2) + V2 GPU-gated compile/memoize/identical-ref
+    /// (3) + error Codable round-trips (5) + flag
+    /// factory (2);Diagnostic F pattern;(4) M2182
+    /// close-out。 ADR-014 OPT-IN preserved
+    /// (metalKernelV2Enabled defaults false → V1 kernel
+    /// selection unchanged)。 V1 byte-equality preserved
+    /// (764 consecutive clean commits after this lands)。
+    /// 5 languages plan progresses 3/5:SQL + C + Metal
+    /// pilots shipped;next C++ + Rust at chapters
+    /// 七百五-七百六。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M2182"
 
     /// Query the typed status of a specific gap。
     public static func status(

@@ -36,40 +36,42 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
 
     // MARK: - Cumulative metric pins
 
-    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter703() {
-        // chapters 702 + 703 BOTH honored the chapter
-        // 698 zero-new-doctrine commitment:all new
-        // types (BASSQLSchemaGenCore + Tool + Plugin +
-        // MemoryUsageRecordsSchema at 702;BASMonotonic
-        // Nanos + BASMonotonicNanosError at 703) are
-        // production-code-typed-surfaces per chapter
-        // 698 option-a discipline,NOT new doctrines。
-        // Count stays at 273 across the 2 pilots so far。
+    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter704() {
+        // chapters 702 + 703 + 704 ALL honored the
+        // chapter 698 zero-new-doctrine commitment:
+        // all new types (SQL pilot + C pilot + Metal
+        // pilot:BASSQLSchemaGenCore + Tool + Plugin +
+        // MemoryUsageRecordsSchema;BASMonotonicNanos +
+        // BASMonotonicNanosError;BASMetalKernelLibrary
+        // Loader + BASMetalKernelLibraryLoaderError) are
+        // production-code-typed-surfaces per chapter 698
+        // option-a discipline,NOT new doctrines。 Count
+        // stays at 273 across the 3 pilots so far。
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .typedSurfaceCount,
             273)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs760() {
+    func testConsecutiveByteEqualityCleanCommitsIs764() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            760)
+            764)
     }
 
-    func testPhase2CommitsShippedIs1222() {
+    func testPhase2CommitsShippedIs1226() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            1222)
+            1226)
     }
 
-    func testChapter2NumberLastIs2178() {
+    func testChapter2NumberLastIs2182() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            2178)
+            2182)
     }
 
     // MARK: - Quality invariants

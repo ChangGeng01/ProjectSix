@@ -22516,7 +22516,143 @@ public enum BASChapterDoctrineRegistry {
                 " Substrate AT-REST + Tier A+B+C + 100%" +
                 " SIGBUS recovery + counter-sprawl" +
                 " trajectory preserved。 Next:chapter" +
-                " 七百四 Metal pilot M2179-M2182.")
+                " 七百四 Metal pilot M2179-M2182."),
+        // chapter 704 — MULTI-LANGUAGE AUGMENTATION ARC
+        // METAL PILOT。 3rd of 5 per-language pilots。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百四",
+            mNumberFirst: 2179,
+            mNumberLast: 2182,
+            v1MilestoneMNumber: 2182,
+            v1MilestoneStatus:
+                "chapter-704-metal-pilot-shipped",
+            knives: [
+                BASChapterKnife(mNumber: 2179, knife: "第一刀",
+                    concept: "Package.swift switches" +
+                        " BASMetalSubstrate target's" +
+                        " SSMScan.metal from `exclude:" +
+                        " [...]` (chapter 699 silenced" +
+                        " unhandled-file warning) to" +
+                        " `resources: [.process(...)]`" +
+                        " so SPM bundles the .metal" +
+                        " source into Bundle.module。" +
+                        " Metal frameworks already" +
+                        " platform-gated via linker" +
+                        "Settings;SPM .process()" +
+                        " follows the same implicit" +
+                        " gate via Bundle.module" +
+                        " fallback on watchOS。"),
+                BASChapterKnife(mNumber: 2180, knife: "第二刀",
+                    concept: "NEW Sources/BASMetal" +
+                        "Substrate/BASMetalKernelLibrary" +
+                        "Loader.swift actor loading" +
+                        " SSMScan.metal from Bundle" +
+                        ".module + compiling via" +
+                        " MTLLibrary.makeLibrary(source:" +
+                        "options:) lazily on first" +
+                        " request + memoization;5" +
+                        " typed BASMetalKernelLibrary" +
+                        "LoaderError cases + Codable;" +
+                        " #if canImport(Metal) gated" +
+                        " stub for watchOS;async make" +
+                        "(flags:) factory consulting" +
+                        " metalKernelV2Enabled flag;" +
+                        " V1 path throws .metalUnavailable" +
+                        "OnPlatform to prevent accidental" +
+                        " V2 library use。"),
+                BASChapterKnife(mNumber: 2181, knife: "第三刀",
+                    concept: "22 anti-drift tests in" +
+                        " BASMetalKernelLibraryLoader" +
+                        "Tests:resource bundling SPM" +
+                        " .process() contract (7) +" +
+                        " actor init flag honoring (3)" +
+                        " + V1 path correctness (2:" +
+                        " throws + no-memoize-pollute)" +
+                        " + V2 GPU-gated compile/" +
+                        "memoize/identical-reference" +
+                        " (3 XCTSkipIf no-GPU) + error" +
+                        " Codable round-trips preserve" +
+                        " 5 cases + associated values" +
+                        " (5) + flag factory (2);" +
+                        " Diagnostic F pattern for 13" +
+                        " actor-touching tests。"),
+                BASChapterKnife(mNumber: 2182, knife: "第四刀",
+                    concept: "Chapter 704 close-out +" +
+                        " 13-file standard sync。 764" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2182。 60/60 score unchanged。" +
+                        " NO new doctrines per chapter" +
+                        " 698 discipline。")
+            ],
+            entropyClassesAttacked: [
+                "spm-metal-shader-source-unhandled-at-build"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (metalKernelV2Enabled defaults false → V1 kernel selection unchanged)",
+                "ADR-016 → M2182",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "764-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "metal-pilot-shipped-flag-gated",
+                "spm-process-resource-bundling-proven-via-7-tests"
+            ],
+            plannedFutureCuts: [
+                "Chapter 705 C++ pilot M2183-M2186" +
+                    " ships .cxxTarget Objective-C++" +
+                    " wrapper around std::unordered_map" +
+                    "<std::string,id<MPSGraphExecutable>>" +
+                    " for the RMSNorm hot kernel + Swift" +
+                    " bridge actor + 25 anti-drift tests" +
+                    " + cxxMpsCacheEnabled flag gating" +
+                    " + cache-hit ≥5× speedup proof。",
+                "Chapter 706 Rust pilot M2187-M2190" +
+                    " ships bas-memory-usage-tracker" +
+                    " crate as XCFramework in Vendor/" +
+                    "bas-rust-binaries/ + Swift bridge" +
+                    " actor + 28 anti-drift tests +" +
+                    " rustCoreEnabled flag + Codable" +
+                    " wire-format byte-equality proof。"
+            ],
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " METAL PILOT。 3rd of 5 risk-ascending" +
+                " per-language pilots。 M2179 第一刀" +
+                " Package.swift switches BASMetalSubstrate" +
+                " target's SSMScan.metal from exclude" +
+                " (chapter 699) to `resources: [.process" +
+                "(...)]` so SPM bundles .metal source" +
+                " into Bundle.module。 M2180 第二刀 NEW" +
+                " Sources/BASMetalSubstrate/BASMetalKernel" +
+                "LibraryLoader.swift actor loading +" +
+                " compiling via MTLLibrary.makeLibrary" +
+                "(source:options:) lazily + 5 typed" +
+                " error cases + memoization + #if can" +
+                "Import(Metal) watchOS stub + async" +
+                " make(flags:) factory。 M2181 第三刀" +
+                " 22 anti-drift tests including SPM" +
+                " .process() contract proof + V2 GPU-" +
+                "gated compile + memoization +" +
+                " identical-reference + 5 error case" +
+                " Codable round-trips;Diagnostic F" +
+                " pattern。 Chapter 704 close-out" +
+                " (M2182) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved" +
+                " (metalKernelV2Enabled defaults FALSE" +
+                " → V1 kernel selection unchanged)。" +
+                " ADR-016 → M2182。 764 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces UNCHANGED (chapter 698" +
+                " discipline honored across BOTH 702 +" +
+                " 703 + 704 pilots)。 60/60 score" +
+                " unchanged。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery +" +
+                " counter-sprawl trajectory preserved。" +
+                " Next:chapter 七百五 C++ pilot M2183-" +
+                "M2186.")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

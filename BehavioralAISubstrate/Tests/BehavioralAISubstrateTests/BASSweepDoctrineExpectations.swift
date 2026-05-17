@@ -121,12 +121,12 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2178:24 + 20 + 255 = 299 (chapter 七百三 —
-    /// C pilot shipped via Sources/BASCSystemBridge/
-    /// bas_monotonic_nanos C function + BAS
-    /// MonotonicNanos Swift actor + dual-mode V1↔V2
-    /// equivalence < 1ms proven)。
-    public static let phase2ChapterCount: Int = 299
+    /// At M2182:24 + 20 + 256 = 300 (chapter 七百四 —
+    /// Metal pilot shipped via SSMScan.metal .process()
+    /// SPM resource + BASMetalKernelLibraryLoader actor
+    /// loading from Bundle.module + V2 GPU-gated compile/
+    /// memoize proven)。
+    public static let phase2ChapterCount: Int = 300
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -134,16 +134,18 @@ public enum BASSweepDoctrineExpectations {
     /// +3 SPM targets + feature-flag actor + scaffold
     /// doctrine)。 At M2174:1214 + 4 = 1218 (chapter
     /// 七百二 — SQL pilot)。 At M2178:1218 + 4 = 1222
-    /// (chapter 七百三 — C pilot ships bas_monotonic
-    /// _nanos + BASMonotonicNanos actor + 18 anti-
-    /// drift tests + dual-mode equivalence proven)
-    public static let phase2CommitsShipped: Int = 1222
+    /// (chapter 七百三 — C pilot)。 At M2182:1222 + 4
+    /// = 1226 (chapter 七百四 — Metal pilot ships
+    /// SSMScan.metal .process() resource + BAS
+    /// MetalKernelLibraryLoader actor + 22 anti-drift
+    /// tests including V2 GPU compile proof)
+    public static let phase2CommitsShipped: Int = 1226
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
-    /// At M2178:chapter 703 — C pilot。
-    /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2178
+    /// At M2178:chapter 703 — C pilot。 At M2182:
+    /// chapter 704 — Metal pilot。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2182
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

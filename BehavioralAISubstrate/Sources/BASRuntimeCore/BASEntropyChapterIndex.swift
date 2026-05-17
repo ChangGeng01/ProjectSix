@@ -5959,7 +5959,52 @@ public enum BASEntropyChapterIndex {
                 " Substrate AT-REST + Tier A+B+C + 100%" +
                 " SIGBUS recovery + counter-sprawl" +
                 " preserved。 Next:chapter 七百四 Metal" +
-                " pilot M2179-M2182.")
+                " pilot M2179-M2182."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百四",
+            mNumberFirst: 2179, mNumberLast: 2182,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " METAL PILOT。 3rd of 5 risk-ascending" +
+                " per-language pilots。 M2179 第一刀" +
+                " Package.swift switches BASMetalSubstrate" +
+                " target's SSMScan.metal from exclude" +
+                " (chapter 699 / M2163 silenced" +
+                " unhandled-file warning) to `resources:" +
+                " [.process(...)]` so SPM bundles the" +
+                " .metal source into Bundle.module。" +
+                " M2180 第二刀 NEW Sources/BAS" +
+                "MetalSubstrate/BASMetalKernelLibrary" +
+                "Loader.swift actor loading SSMScan" +
+                ".metal from Bundle.module + compiling" +
+                " via MTLLibrary.makeLibrary(source:" +
+                "options:) lazily on first request +" +
+                " memoization + 5 typed error cases +" +
+                " #if canImport(Metal) watchOS stub +" +
+                " async make(flags:) factory consulting" +
+                " metalKernelV2Enabled。 M2181 第三刀" +
+                " 22 anti-drift tests:resource bundling" +
+                " contract (7) + actor init flag (3) +" +
+                " V1 path correctness (2) + V2 path" +
+                " GPU-gated compile/memoize/identical-" +
+                "reference (3) + error Codable round-" +
+                "trips (5) + flag factory (2);Diagnostic" +
+                " F pattern for actor tests。 Chapter" +
+                " 704 close-out (M2182) + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved (metalKernelV2Enabled" +
+                " defaults FALSE → V1 kernel selection" +
+                " BASMPSGraphSSMScanKernelStub +" +
+                " BASSSMScanCPUReference unchanged)。" +
+                " ADR-016 → M2182。 764 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces UNCHANGED (chapter 698" +
+                " honored across BOTH 702 + 703 + 704)。" +
+                " 60/60 score unchanged。 Substrate AT-" +
+                "REST + Tier A+B+C + 100% SIGBUS recovery" +
+                " + counter-sprawl preserved。 Next:" +
+                " chapter 七百五 C++ pilot M2183-M2186.")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
