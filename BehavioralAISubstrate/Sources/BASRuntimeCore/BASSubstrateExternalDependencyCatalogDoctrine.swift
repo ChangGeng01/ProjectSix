@@ -193,4 +193,212 @@ public enum BASSubstrateExternalDependencyCatalogDoctrine {
     /// Substrate AT-REST + Tier A+B+C complete preserved
     /// at chapter 695。
     public static let substrateAtRestPreserved: Bool = true
+
+    // MARK: - M2165 chapter 七百 第一刀 — CONSOLIDATED
+    //         from former BASTypedSurfaceCountAuditDoctrine
+    //         (deleted at M2165 per chapter 698 anti-
+    //         sprawl discipline + chapter 699 + 700
+    //         user-authorized consolidation precedent)。
+    //
+    // User directive 「全面 完成」 at chapter 700
+    // explicit-authorized executing chapter 699
+    // plannedFutureCuts:merge BASTypedSurfaceCountAudit
+    // Doctrine + BASSprawlScopeAuditDoctrine into this
+    // doctrine。 Discipline gate from chapter 698 / M2162
+    // satisfied via option-b explicit-user-directive。
+    //
+    // All pins from BASTypedSurfaceCountAuditDoctrine
+    // migrated here with `typedAudit_` prefix to avoid
+    // name collisions。
+
+    public static let typedAudit_consolidatedFromTypedSurfaceCountAuditDoctrine:
+        Bool = true
+
+    public static let typedAudit_consolidatedAtMNumber:
+        Int = 2165
+
+    // MARK: - Counting convention (consolidated)
+
+    public static let typedAudit_countedTypeKinds: [String] = [
+        "public struct",
+        "public enum",
+        "public class",
+        "public actor",
+        "public protocol"
+    ]
+
+    public static var typedAudit_countedTypeKindCount:
+        Int {
+        return typedAudit_countedTypeKinds.count
+    }
+
+    public static let typedAudit_excludedCategories:
+        [String] = [
+        "public typealias (no new memory layout)",
+        "nested types inside outer typed surfaces",
+        "test-only types under Tests/",
+        "test refactors that don't add Sources/ public types"
+    ]
+
+    public static var typedAudit_excludedCategoryCount:
+        Int {
+        return typedAudit_excludedCategories.count
+    }
+
+    // MARK: - Per-chapter contribution audit (consolidated)
+
+    public static let typedAudit_chapter692AuditedContribution:
+        Int = 10
+    public static let typedAudit_chapter692CommentClaim:
+        Int = 9
+
+    public static let typedAudit_chapter693AuditedContribution:
+        Int = 1
+    public static let typedAudit_chapter693CommentClaim:
+        Int = 2
+
+    public static let typedAudit_chapter694AuditedContribution:
+        Int = 1
+
+    public static let typedAudit_auditedContributionSum:
+        Int = 11
+    public static let typedAudit_commentClaimSum: Int = 11
+
+    public static let typedAudit_perChapterAttributionsOffBy1ButCanceling:
+        Bool = true
+
+    // MARK: - Cumulative totals (consolidated)
+
+    public static let typedAudit_preChapter692TypedSurfaceCount:
+        Int = 258
+    public static let typedAudit_postChapter694TypedSurfaceCount:
+        Int = 270
+
+    public static var typedAudit_verifiedCumulativeMatch:
+        Bool {
+        return typedAudit_postChapter694TypedSurfaceCount
+            == typedAudit_preChapter692TypedSurfaceCount
+            + typedAudit_chapter692AuditedContribution
+            + typedAudit_chapter693AuditedContribution
+            + typedAudit_chapter694AuditedContribution
+    }
+
+    // MARK: - Methodology (consolidated)
+
+    public static let typedAudit_methodology: String =
+        "EXPLICIT COUNTING CONVENTION — pin what counts and what doesn't,don't infer from inline comments"
+
+    // MARK: - M2165 chapter 七百 第一刀 — CONSOLIDATED
+    //         from former BASSprawlScopeAuditDoctrine
+    //         (deleted at M2165)。
+    //
+    // All pins from BASSprawlScopeAuditDoctrine migrated
+    // here with `sprawl_` prefix。
+
+    public static let sprawl_consolidatedFromSprawlScopeAuditDoctrine:
+        Bool = true
+
+    public static let sprawl_consolidatedAtMNumber: Int =
+        2165
+
+    // MARK: - Actual sprawl counts (consolidated)
+
+    public static let sprawl_resultStructCount: Int = 37
+    public static let sprawl_frameStructCount: Int = 22
+    public static let sprawl_permitStructCount: Int = 2
+    public static let sprawl_cardStructCount: Int = 3
+
+    public static var sprawl_totalSprawlStructCount: Int {
+        return sprawl_resultStructCount
+            + sprawl_frameStructCount
+            + sprawl_permitStructCount
+            + sprawl_cardStructCount
+    }
+
+    // MARK: - Chapter 691 estimates + delta (consolidated)
+
+    public static let sprawl_chapter691EstimatedResultCount:
+        Int = 27
+    public static let sprawl_chapter691EstimatedFrameCount:
+        Int = 10
+    public static let sprawl_chapter691EstimatedPermitCount:
+        Int = 3
+    public static let sprawl_chapter691EstimatedCardCount:
+        Int = 2
+
+    public static var sprawl_chapter691EstimatedTotalCount:
+        Int {
+        return sprawl_chapter691EstimatedResultCount
+            + sprawl_chapter691EstimatedFrameCount
+            + sprawl_chapter691EstimatedPermitCount
+            + sprawl_chapter691EstimatedCardCount
+    }
+
+    public static var sprawl_actualMinusEstimatedDelta:
+        Int {
+        return sprawl_totalSprawlStructCount
+            - sprawl_chapter691EstimatedTotalCount
+    }
+
+    // MARK: - Migratability (consolidated)
+
+    public static let sprawl_migratableToTierBCount: Int =
+        0
+
+    public static var sprawl_domainComplexPreservedCount:
+        Int {
+        return sprawl_totalSprawlStructCount
+            - sprawl_migratableToTierBCount
+    }
+
+    public static var sprawl_migrationPercentage: Double {
+        return Double(sprawl_migratableToTierBCount)
+            / Double(sprawl_totalSprawlStructCount)
+            * 100.0
+    }
+
+    public static let sprawl_categorizationRationale:
+        [String: String] = [
+        "*Result":
+            "rich-domain output bundles with 5-20+ typed " +
+            "fields,custom Codable contracts,pinned " +
+            "Equatable for replay determinism — NOT a " +
+            "single-payload wrapper shape",
+        "*Frame":
+            "schema-versioned envelope structs with " +
+            "BASSchemaVersioned conformance + multiple " +
+            "domain-specific fields per frame kind — " +
+            "NOT a Body wrapper",
+        "*Permit":
+            "BASActionPermit + BASHeavenGatePermit carry " +
+            "mode + reason + scope + caller-defined " +
+            "policy refs — multi-field,not Decision-" +
+            "wrapped",
+        "*Card":
+            "BASRiskCard + BASGovernanceCard already use " +
+            "domain-tuned shapes;BASCard<Kind,Body> " +
+            "would lose typed risk-level + governance-" +
+            "scope semantics"
+    ]
+
+    public static var sprawl_categorizationRationaleCount:
+        Int {
+        return sprawl_categorizationRationale.count
+    }
+
+    // MARK: - Honest framing (consolidated)
+
+    public static let sprawl_chapter691OverestimateAcknowledged:
+        Bool = true
+
+    public static let sprawl_tierBPrimitivesRemainValuableForNewTypes:
+        Bool = true
+
+    public static let sprawl_tierBDoctrineUnblockedClaimRetainedForHistory:
+        Bool = true
+
+    // MARK: - Methodology (consolidated)
+
+    public static let sprawl_methodology: String =
+        "EMPIRICAL SPRAWL AUDIT — grep-confirm actual scope,classify each category by shape compatibility,reclassify plan overestimates with honest counts"
 }

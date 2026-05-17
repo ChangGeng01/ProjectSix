@@ -5790,7 +5790,36 @@ public enum BASEntropyChapterIndex {
                 " merge,not delete;preserve anti-drift" +
                 " coverage via prefix renaming;respect" +
                 " chapter 698 discipline gate via explicit-" +
-                "user-directive。")
+                "user-directive。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百",
+            mNumberFirst: 2165, mNumberLast: 2166,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 10, futureCutsCount: 0,
+            summary: "FURTHER CONSOLIDATION arc。 User" +
+                " directive 「全面 完成」 explicit-" +
+                "authorized executing chapter 699 planned" +
+                "FutureCuts:merge BASTypedSurfaceCount" +
+                "AuditDoctrine + BASSprawlScopeAudit" +
+                "Doctrine into BASSubstrateExternal" +
+                "DependencyCatalogDoctrine。 M2165 第一刀" +
+                " single-knife consolidates BOTH:(a)" +
+                " migrate 22 pins with `typedAudit_`" +
+                " prefix + 25 pins with `sprawl_` prefix" +
+                " into the dest doctrine;(b) move 30" +
+                " anti-drift tests into dest test file" +
+                " (28 → 58);(c) DELETE 4 source/test" +
+                " files (-398 LOC,-2 doctrines)。 M2166" +
+                " chapter 700 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2166。 748 consecutive byte-equality" +
+                " clean commits。 271 typed surfaces (-2)。" +
+                " 60/60 score unchanged (saturation" +
+                " invariant)。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery preserved。" +
+                " Counter-sprawl trajectory:3 audit/" +
+                "catalog doctrines → 1 across chapters" +
+                " 699+700。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

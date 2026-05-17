@@ -206,4 +206,201 @@ final class BASSubstrateExternalDependencyCatalogDoctrineTests: XCTestCase {
             BASSubstrateExternalDependencyCatalogDoctrine
                 .substrateAtRestPreserved)
     }
+
+    // MARK: - M2165 consolidated typedAudit_* pins
+    //         (migrated from former
+    //         BASTypedSurfaceCountAuditDoctrine)
+
+    func testTypedAuditConsolidatedFromAuditDoctrine() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_consolidatedFromTypedSurfaceCountAuditDoctrine)
+    }
+
+    func testTypedAuditConsolidatedAtMNumberIs2165() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_consolidatedAtMNumber, 2165)
+    }
+
+    func testTypedAuditCountedTypeKindCountIs5() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_countedTypeKindCount, 5)
+    }
+
+    func testTypedAuditExcludedCategoryCountIs4() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_excludedCategoryCount, 4)
+    }
+
+    func testTypedAuditChapter692ContributionIs10() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_chapter692AuditedContribution,
+            10)
+    }
+
+    func testTypedAuditChapter692CommentClaimIs9() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_chapter692CommentClaim, 9)
+    }
+
+    func testTypedAuditChapter693ContributionIs1() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_chapter693AuditedContribution,
+            1)
+    }
+
+    func testTypedAuditChapter693CommentClaimIs2() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_chapter693CommentClaim, 2)
+    }
+
+    func testTypedAuditChapter694ContributionIs1() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_chapter694AuditedContribution,
+            1)
+    }
+
+    func testTypedAuditContributionSumEqualsCommentClaimSum() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_auditedContributionSum,
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_commentClaimSum)
+    }
+
+    func testTypedAuditPerChapterAttributionsOffBy1ButCanceling() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_perChapterAttributionsOffBy1ButCanceling)
+    }
+
+    func testTypedAuditPreChapter692CountIs258() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_preChapter692TypedSurfaceCount,
+            258)
+    }
+
+    func testTypedAuditPostChapter694CountIs270() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_postChapter694TypedSurfaceCount,
+            270)
+    }
+
+    func testTypedAuditVerifiedCumulativeMatch() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_verifiedCumulativeMatch)
+    }
+
+    func testTypedAuditMethodologyExplicitConvention() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .typedAudit_methodology.contains(
+                    "EXPLICIT COUNTING CONVENTION"))
+    }
+
+    // MARK: - M2165 consolidated sprawl_* pins
+    //         (migrated from former
+    //         BASSprawlScopeAuditDoctrine)
+
+    func testSprawlConsolidatedFromSprawlAuditDoctrine() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_consolidatedFromSprawlScopeAuditDoctrine)
+    }
+
+    func testSprawlResultStructCountIs37() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_resultStructCount, 37)
+    }
+
+    func testSprawlFrameStructCountIs22() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_frameStructCount, 22)
+    }
+
+    func testSprawlPermitStructCountIs2() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_permitStructCount, 2)
+    }
+
+    func testSprawlCardStructCountIs3() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_cardStructCount, 3)
+    }
+
+    func testSprawlTotalSprawlStructCountIs64() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_totalSprawlStructCount, 64)
+    }
+
+    func testSprawlChapter691EstimatedTotalIs42() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_chapter691EstimatedTotalCount, 42)
+    }
+
+    func testSprawlActualMinusEstimatedDeltaIsPlus22() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_actualMinusEstimatedDelta, 22)
+    }
+
+    func testSprawlMigratableToTierBCountIsZero() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_migratableToTierBCount, 0)
+    }
+
+    func testSprawlDomainComplexPreservedCountIs64() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_domainComplexPreservedCount, 64)
+    }
+
+    func testSprawlMigrationPercentageIsZero() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_migrationPercentage, 0.0)
+    }
+
+    func testSprawlCategorizationRationaleCountIs4() {
+        XCTAssertEqual(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_categorizationRationaleCount, 4)
+    }
+
+    func testSprawlChapter691OverestimateAcknowledged() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_chapter691OverestimateAcknowledged)
+    }
+
+    func testSprawlTierBPrimitivesRemainValuableForNewTypes() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_tierBPrimitivesRemainValuableForNewTypes)
+    }
+
+    func testSprawlMethodologyEmpiricalAudit() {
+        XCTAssertTrue(
+            BASSubstrateExternalDependencyCatalogDoctrine
+                .sprawl_methodology.contains(
+                    "EMPIRICAL SPRAWL AUDIT"))
+    }
 }
