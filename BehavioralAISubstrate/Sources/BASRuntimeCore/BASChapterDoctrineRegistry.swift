@@ -24726,6 +24726,76 @@ public enum BASChapterDoctrineRegistry {
                 "equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
                 " unchanged。 Auto-mode 1min cadence" +
+                " loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十九",
+            mNumberFirst: 2237,
+            mNumberLast: 2238,
+            v1MilestoneMNumber: 2238,
+            v1MilestoneStatus:
+                "chapter-729-pilot-actor-distinct-instance-separation-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2237, knife: "第一刀",
+                    concept: "Fifth pillar of 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotActorDistinctInstance" +
+                        "SeparationMatrixTests.swift" +
+                        " with 6 tests proving two" +
+                        " separately-constructed" +
+                        " instances of same pilot are" +
+                        " DISTINCT references (=== false)" +
+                        " + cross-pilot mutual" +
+                        " distinctness。 Complement to" +
+                        " chapter 727:727 = identity" +
+                        " preservation,729 = instance" +
+                        " separation。 Catches" +
+                        " singleton-cache regressions。" +
+                        " All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2238, knife: "第二刀",
+                    concept: "Chapter 729 close-out +" +
+                        " 13-file sync。 820 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2238。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines。" +
+                        " Honest mode disclosure shipped" +
+                        " — no force-wake in harness.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-actor-singleton-cache-regression-unpinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2238",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "820-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "actor-distinct-instance-separation-pinned-5-pilots",
+                "fifth-pillar-of-5-pilot-actor-contract-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ACTOR DISTINCT-INSTANCE SEPARATION" +
+                " MATRIX for 5 pilots。 2-knife chapter。" +
+                " M2237 第一刀 6 new tests proving two" +
+                " init() calls return distinct refs per" +
+                " pilot + cross-pilot mutual" +
+                " distinctness。 Fifth pillar of 5-pilot" +
+                " ACTOR contract sealing trajectory。" +
+                " M2238 第二刀 close-out + 13-file sync" +
+                "。 ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2238。 820 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。 Auto-mode 1min cadence" +
                 " loop continues。")
     ]
 

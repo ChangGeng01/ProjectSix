@@ -6718,7 +6718,31 @@ public enum BASEntropyChapterIndex {
                 " ADR-016 → M2236。 818 consecutive" +
                 " byte-equality clean commits。 273" +
                 " typed surfaces unchanged。 60/60" +
-                " score unchanged。")
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十九",
+            mNumberFirst: 2237, mNumberLast: 2238,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR DISTINCT-INSTANCE" +
+                " SEPARATION MATRIX — 2-knife。 Fifth" +
+                " pillar of 5-pilot ACTOR contract。" +
+                " M2237 第一刀 NEW BASFivePilotActor" +
+                "DistinctInstanceSeparationMatrixTests" +
+                ".swift with 6 tests proving two" +
+                " separately-constructed instances of" +
+                " same pilot are DISTINCT references" +
+                " (=== false) + cross-pilot mutual" +
+                " distinctness。 Complement to chapter" +
+                " 727:727 = identity preservation," +
+                " 729 = instance separation。 Catches" +
+                " singleton-cache regressions。 M2238" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2238。 820 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
