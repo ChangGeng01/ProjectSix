@@ -222,4 +222,55 @@ public enum BASMultiLanguageScaffoldDoctrine {
     public static let purelyAdditive: Bool = true
 
     public static let directiveScoreImpact: Int = 0
+
+    // MARK: - chapter 七百十四 / M2207 audit findings
+    //
+    // After chapters 七百二-七百十三 shipped 5 pilots +
+    // mechanism refactor + production wire-in + host
+    // adoption convenience,chapter 七百十四 audited
+    // for substrate-internal adoption of the pilots。
+    //
+    // Method:grep Sources/ for direct-init call sites
+    // of each pilot's primary type。 Result:zero hits
+    // outside each pilot's own file。 All other
+    // references are doc-comments + doctrine text。
+    //
+    // Implication:substrate cannot "self-adopt" the
+    // pilots — it's a library,not a consumer。 The
+    // 4 symbolic wire-ins from chapter 七百十二 (C/
+    // Metal/C++/Rust) remain symbolic at substrate
+    // level until host code adopts the factory pattern。
+
+    /// Number of substrate-internal direct-init call
+    /// sites for any of the 5 pilots。 Zero at chapter
+    /// 七百十四 audit time。
+    public static let substrateInternalDirectInitCallSiteCount:
+        Int = 0
+
+    /// Number of substrate-internal `.make(flags:)` /
+    /// `.makeWithDefaults()` factory call sites。 Zero
+    /// at chapter 七百十四 audit time。
+    public static let substrateInternalFactoryCallSiteCount:
+        Int = 0
+
+    /// chapter 七百十四 audit conclusion in typed form。
+    public static let chapter714AuditConclusion: String =
+        "substrate-cannot-self-adopt-pilots-library-not-consumer"
+
+    /// M-number when the audit ran。
+    public static let chapter714AuditMNumber: Int = 2207
+
+    /// What「全面 转向」 substrate-side maximum looks
+    /// like after chapters 702-714 — pinned as
+    /// typed-surface so future maintainers see it
+    /// without re-running the audit。
+    public static let quanMianZhuanXiangSubstrateMaximum:
+        String =
+        "5/5 pilots production-default-ON at factory pattern + makeWithDefaults() host-adoption convenience + ZERO substrate-internal callers (library limitation)"
+
+    /// Whether host adoption is REQUIRED for actual
+    /// transition completion (vs substrate-side
+    /// completion which is maximal at chapter 714)。
+    public static let hostAdoptionRequiredForActualTurn:
+        Bool = true
 }
