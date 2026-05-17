@@ -6377,7 +6377,25 @@ public enum BASEntropyChapterIndex {
                 " 273 typed surfaces unchanged。 60/60" +
                 " score unchanged。 「全面 转向」 substrate-" +
                 "side maximum formally pinned。 Further" +
-                " actual turn requires HOST code adoption。")
+                " actual turn requires HOST code adoption。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十五",
+            mNumberFirst: 2209, mNumberLast: 2210,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "CONCURRENT-CONSTRUCTION STRESS" +
+                " TESTS — 2-knife chapter。 M2209 第一刀" +
+                " NEW BASFivePilotConcurrentStressTests" +
+                ".swift with 5 tests:50 concurrent" +
+                " makeWithDefaults() for 4 non-SQL pilots" +
+                " + 10 concurrent for SQL pilot。 All" +
+                " tests pass — no races no deadlocks。" +
+                " M2210 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2210。 792 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。" +
+                " Auto-mode 1min cadence loop active。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

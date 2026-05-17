@@ -2698,7 +2698,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十四",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十四")!)
+                        chapterTag: "chapter 七百十四")!),
+            // M2210 chapter 715 — CONCURRENT-CONSTRUCTION
+            // STRESS TESTS
+            checkRegistry("七百十五",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十五")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4901,6 +4907,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十四")!
+                .mNumberLast),
+            // M2210 chapter 715 — CONCURRENT STRESS
+            ("715",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十五")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十五")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

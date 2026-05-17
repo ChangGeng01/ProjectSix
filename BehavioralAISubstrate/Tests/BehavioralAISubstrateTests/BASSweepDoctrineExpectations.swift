@@ -121,11 +121,10 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2208:24 + 20 + 266 = 310 (chapter 七百十四 —
-    /// substrate adoption audit + e2e integration test;
-    /// honest finding ZERO substrate-internal callers,
-    /// host adoption required for actual turn)。
-    public static let phase2ChapterCount: Int = 310
+    /// At M2210:24 + 20 + 267 = 311 (chapter 七百十五 —
+    /// concurrent stress tests for 5-pilot factories,
+    /// thread-safety validated)。
+    public static let phase2ChapterCount: Int = 311
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -144,9 +143,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2202:1244 + 2 = 1246 (chapter 七百十一)。 At
     /// M2204:1246 + 2 = 1248 (chapter 七百十二)。 At
     /// M2206:1248 + 2 = 1250 (chapter 七百十三)。 At
-    /// M2208:1250 + 2 = 1252 (chapter 七百十四 — 2-knife
-    /// substrate adoption audit + e2e integration test)
-    public static let phase2CommitsShipped: Int = 1252
+    /// M2208:1250 + 2 = 1252 (chapter 七百十四)。 At
+    /// M2210:1252 + 2 = 1254 (chapter 七百十五 — 2-knife
+    /// concurrent stress tests)
+    public static let phase2CommitsShipped: Int = 1254
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -164,9 +164,10 @@ public enum BASSweepDoctrineExpectations {
     /// At M2206:chapter 713 — host adoption convenience
     /// (makeWithDefaults factories for all 5 pilots)。
     /// At M2208:chapter 714 — substrate adoption audit
-    /// + e2e integration test (honest ZERO internal
-    /// callers finding)。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2208
+    /// + e2e integration test。 At M2210:chapter 715 —
+    /// concurrent stress tests for 5-pilot factories
+    /// (thread-safety validated)。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2210
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

@@ -23736,7 +23736,77 @@ public enum BASChapterDoctrineRegistry {
                 " unchanged。 「全面 转向」 substrate-side" +
                 " maximum formally pinned。 Further" +
                 " turn requires HOST adoption。 Next:" +
-                " user direction。")
+                " user direction。"),
+        // chapter 715 — CONCURRENT-CONSTRUCTION STRESS
+        // TESTS for 5 pilot factories。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十五",
+            mNumberFirst: 2209,
+            mNumberLast: 2210,
+            v1MilestoneMNumber: 2210,
+            v1MilestoneStatus:
+                "chapter-715-concurrent-construction-stress-tests",
+            knives: [
+                BASChapterKnife(mNumber: 2209, knife: "第一刀",
+                    concept: "NEW BASFivePilot" +
+                        "ConcurrentStressTests.swift with" +
+                        " 5 tests:50 concurrent" +
+                        " makeWithDefaults() for 4 non-" +
+                        "SQL pilots (C/Metal/C++/Rust)" +
+                        " asserting all instances in V2" +
+                        " mode + 10 concurrent for SQL" +
+                        " pilot with separate temp files。" +
+                        " All tests pass — no races,no" +
+                        " deadlocks。"),
+                BASChapterKnife(mNumber: 2210, knife: "第二刀",
+                    concept: "Chapter 715 close-out +" +
+                        " 13-file standard sync。 792" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2210。 60/60 score unchanged。" +
+                        " Zero-warning preserved。 NO" +
+                        " new doctrines per chapter 698。")
+            ],
+            entropyClassesAttacked: [
+                "makeWithDefaults-thread-safety-unverified"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2210",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "792-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "5-pilot-concurrent-construction-thread-safe"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。",
+                "Additional pilot test coverage:error-" +
+                    " path validation,boundary conditions" +
+                    " (very large keys,empty inputs)。"
+            ],
+            summary: "CONCURRENT-CONSTRUCTION STRESS" +
+                " TESTS for 5 pilot factories。 2-knife" +
+                " chapter。 M2209 第一刀 NEW BASFivePilot" +
+                "ConcurrentStressTests.swift with 5 tests" +
+                " validating thread-safety of make" +
+                "WithDefaults() factories under load (50" +
+                " concurrent for 4 simple pilots + 10" +
+                " concurrent for SQL pilot)。 All pass。" +
+                " M2210 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2210。 792 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged (purely additive tests)。" +
+                " 60/60 score unchanged。 Auto-mode" +
+                " 1min cadence loop active。 Next:" +
+                " continue per loop directive。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns
