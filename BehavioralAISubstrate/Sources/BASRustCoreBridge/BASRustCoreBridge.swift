@@ -26,7 +26,13 @@
 // unavailable rather than failing the build。
 
 import Foundation
-#if canImport(BASRustMemoryTrackerBinary)
+// M2189 第三刀 — module map added to XCFramework's
+// Headers/ slice exposes `BASRustMemoryTrackerBinary`
+// as a Swift-importable C module。 Platform gate
+// matches Package.swift `.when(platforms: [.iOS,
+// .macOS])` — on watchOS / Linux the slice is not
+// shipped so the import + symbols are unavailable。
+#if os(iOS) || os(macOS)
 import BASRustMemoryTrackerBinary
 #endif
 
@@ -54,7 +60,7 @@ public enum BASRustCoreBridge {
     /// build time on this platform。 watchOS / Linux
     /// build hosts get false (no XCFramework slice)。
     public static var isRustBridgeAvailable: Bool {
-        #if canImport(BASRustMemoryTrackerBinary)
+        #if os(iOS) || os(macOS)
         return true
         #else
         return false
@@ -67,7 +73,7 @@ public enum BASRustCoreBridge {
     /// against `rustABIVersion` to catch any future
     /// Rust-side bump that doesn't update the Swift pin。
     public static func liveRustABIVersion() -> Int32? {
-        #if canImport(BASRustMemoryTrackerBinary)
+        #if os(iOS) || os(macOS)
         return bas_rust_tracker_version()
         #else
         return nil

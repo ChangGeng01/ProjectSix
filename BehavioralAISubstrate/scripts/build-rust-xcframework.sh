@@ -103,6 +103,12 @@ for t in "${TARGETS[@]}"; do
             "-headers" "${CARGO_ROOT}/bas-memory-usage-tracker/include")
 done
 
+# M2189 第三刀 — `module.modulemap` ships in include/
+# alongside the header so each slice's Headers/
+# directory automatically gets it via the `-headers`
+# arg above。 Swift consumers can then
+# `import BASRustMemoryTrackerBinary`。
+
 echo ""
 echo "==> xcodebuild -create-xcframework"
 xcodebuild -create-xcframework \

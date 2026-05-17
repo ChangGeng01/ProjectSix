@@ -1,0 +1,21 @@
+// chapter 七百六 / M2189 第三刀 — module map enabling
+//                                  Swift `import BASRust
+//                                  MemoryTrackerBinary`
+//                                  to bring the C ABI
+//                                  surface into scope。
+//
+// SPM's `.binaryTarget(...).xcframework` only exposes
+// a Swift-importable module when the slice's Headers/
+// directory contains a `module.modulemap`。 This file
+// is copied into each XCFramework slice by
+// `scripts/build-rust-xcframework.sh` via the
+// `-headers` argument to `xcodebuild -create-xcframework`。
+//
+// Module name MUST match the Package.swift binary
+// target name (BASRustMemoryTrackerBinary)。
+
+module BASRustMemoryTrackerBinary {
+    header "bas_rust_memory_tracker.h"
+    link "bas_memory_usage_tracker"
+    export *
+}

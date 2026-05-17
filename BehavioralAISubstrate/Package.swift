@@ -353,8 +353,14 @@ let package = Package(
             path: "Vendor/bas-rust-binaries/BASRustMemoryTracker.xcframework"),
         .target(
             name: "BASRustCoreBridge",
+            // M2189 chapter 七百六 第三刀 — BASRustMemory
+            // UsageTrackerActor mirrors the V1 BASMemory
+            // UsageTracker shape,so we depend on
+            // BASMemory to reach the shared
+            // BASMemoryUsageRecord type。
             dependencies: [
                 "BASRuntimeCore",
+                "BASMemory",
                 .target(
                     name: "BASRustMemoryTrackerBinary",
                     condition: .when(
@@ -416,7 +422,12 @@ let package = Package(
             // exposed to tests so BASSQLSchemaGenCoreTests
             // can validate pure-function behavior without
             // spawning the executable tool。
-            "BASSQLSchemaGenCore"
+            "BASSQLSchemaGenCore",
+            // M2189 chapter 七百六 第三刀 — Rust bridge
+            // exposed to tests so BASRustMemoryUsage
+            // TrackerActorTests can validate ABI surface +
+            // Codable wire-format byte-equality vs V1。
+            "BASRustCoreBridge"
         ])
     ]
 )

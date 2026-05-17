@@ -1,0 +1,5 @@
+module BASRustMemoryTrackerBinary {
+    header "bas_rust_memory_tracker.h"
+    link "bas_memory_usage_tracker"
+    export *
+}
