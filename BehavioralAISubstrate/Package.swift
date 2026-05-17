@@ -151,7 +151,17 @@ let package = Package(
         // on watchOS so BASRuntimeCore consumers stay portable。
         .target(
             name: "BASMetalSubstrate",
-            dependencies: ["BASRuntimeCore"],
+            // M2184 chapter 七百五 第二刀 — BASMetalSubstrate
+            // gains BASMPSGraphExecutableCacheCxxBridge.swift
+            // Swift actor wrapping the C++ cache from
+            // BASMPSGraphExecutableCacheCxx (chapter 七百五
+            // 第一刀)。 Dependency added so the import
+            // resolves。 Opt-in via cxxMpsCacheEnabled flag
+            // (default false → V1 path unchanged)。
+            dependencies: [
+                "BASRuntimeCore",
+                "BASMPSGraphExecutableCacheCxx"
+            ],
             // M2179 chapter 七百四 第一刀 — switch from
             // `exclude` (chapter 699 / M2163) to
             // `resources: [.process(...)]` so SPM bundles
