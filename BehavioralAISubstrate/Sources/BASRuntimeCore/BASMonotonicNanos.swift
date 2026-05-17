@@ -56,7 +56,7 @@ import BASCSystemBridge
 
 /// Typed error cases for the C bridge。
 public enum BASMonotonicNanosError:
-    Error, Equatable, Sendable, Codable
+    Error, Equatable, Hashable, Sendable, Codable
 {
     /// `bas_monotonic_nanos` returned -1 (defensive null
     /// guard fired)。 Should never happen in the wrapper

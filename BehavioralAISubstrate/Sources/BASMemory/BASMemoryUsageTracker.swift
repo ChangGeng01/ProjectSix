@@ -140,7 +140,7 @@ public struct BASMemoryUsageRecord: BASSchemaVersioned,
 public actor BASMemoryUsageTracker {
 
     public enum TrackerError:
-        Error, Equatable, Sendable, Codable
+        Error, Equatable, Hashable, Sendable, Codable
     {
         case openFailed(code: Int32, message: String)
         case prepareFailed(sql: String, message: String)

@@ -46,7 +46,7 @@ import BASMPSGraphExecutableCacheCxx
 
 /// Typed bridge errors mirroring the C ABI return codes。
 public enum BASMPSGraphExecutableCacheCxxBridgeError:
-    Error, Equatable, Sendable, Codable
+    Error, Equatable, Hashable, Sendable, Codable
 {
     /// `bas_mps_cache_insert/lookup` returned -1 (null
     /// pointer guard fired)。 Bridge always supplies

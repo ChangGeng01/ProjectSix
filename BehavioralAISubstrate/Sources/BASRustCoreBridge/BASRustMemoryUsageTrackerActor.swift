@@ -66,7 +66,7 @@ import BASRustMemoryTrackerBinary
 /// codes + adding Swift-side platform-availability
 /// case。
 public enum BASRustMemoryUsageTrackerActorError:
-    Error, Equatable, Sendable, Codable
+    Error, Equatable, Hashable, Sendable, Codable
 {
     /// Rust XCFramework unavailable on this build host
     /// (watchOS,Linux,or a host where the .binaryTarget

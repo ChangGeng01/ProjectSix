@@ -59,7 +59,7 @@ import Metal
 
 /// Typed loader errors。
 public enum BASMetalKernelLibraryLoaderError:
-    Error, Equatable, Sendable, Codable
+    Error, Equatable, Hashable, Sendable, Codable
 {
     /// Compilation host does not have the Metal framework
     /// (watchOS,Linux build hosts)。 Loader returns
