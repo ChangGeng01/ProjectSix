@@ -22652,7 +22652,133 @@ public enum BASChapterDoctrineRegistry {
                 " A+B+C + 100% SIGBUS recovery +" +
                 " counter-sprawl trajectory preserved。" +
                 " Next:chapter 七百五 C++ pilot M2183-" +
-                "M2186.")
+                "M2186."),
+        // chapter 705 — MULTI-LANGUAGE AUGMENTATION ARC
+        // C++ PILOT。 4th of 5 per-language pilots。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百五",
+            mNumberFirst: 2183,
+            mNumberLast: 2186,
+            v1MilestoneMNumber: 2186,
+            v1MilestoneStatus:
+                "chapter-705-cpp-pilot-shipped",
+            knives: [
+                BASChapterKnife(mNumber: 2183, knife: "第一刀",
+                    concept: "NEW Sources/BASMPSGraph" +
+                        "ExecutableCacheCxx/bas_mps_cache" +
+                        ".cpp real C++ implementation —" +
+                        " generic thread-safe cache via" +
+                        " std::unordered_map<std::string," +
+                        "std::string> + std::mutex (C++11" +
+                        " no shared_mutex requirement);" +
+                        " Meyers singleton + 6 public C" +
+                        " ABI functions (insert/lookup/" +
+                        "free_value/size/clear/version);" +
+                        " HONEST scope (generic cache" +
+                        " instead of MPSGraph-specific" +
+                        " to avoid framework coupling)。"),
+                BASChapterKnife(mNumber: 2184, knife: "第二刀",
+                    concept: "NEW Sources/BASMetal" +
+                        "Substrate/BASMPSGraphExecutable" +
+                        "CacheCxxBridge.swift Swift" +
+                        " actor wrapping the C++ cache:" +
+                        " 3 typed error cases + Codable;" +
+                        " V1 path throws unknownReturnCode" +
+                        "(-99) on insert/lookup;V1 clear" +
+                        " no-op + V1 size returns 0;" +
+                        " process-global cache contract" +
+                        " documented;async make(flags:)" +
+                        " factory consulting cxxMpsCache" +
+                        "Enabled;Package.swift wires" +
+                        " BASMetalSubstrate → cxx dep。"),
+                BASChapterKnife(mNumber: 2185, knife: "第三刀",
+                    concept: "25 anti-drift tests in" +
+                        " BASMPSGraphExecutableCacheCxx" +
+                        "BridgeTests:C ABI version" +
+                        " cross-mirror (3) + V1 path" +
+                        " correctness — isUsing + insert" +
+                        "/lookup throws + clear no-op +" +
+                        " size returns 0 (5) + V2 path" +
+                        " correctness — round-trip +" +
+                        " miss + overwrite + size +" +
+                        " clear + idempotent (7) +" +
+                        " process-global cache contract" +
+                        " (2:two-bridges-share-store" +
+                        " + clear-via-A-clears-B) +" +
+                        " error Codable (3) + flag" +
+                        " factory (2) + concurrency" +
+                        " stress (3:20 inserts + 100" +
+                        " lookups + workload)。"),
+                BASChapterKnife(mNumber: 2186, knife: "第四刀",
+                    concept: "Chapter 705 close-out +" +
+                        " 13-file standard sync。 768" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2186。 60/60 score unchanged。" +
+                        " NO new doctrines per chapter" +
+                        " 698 discipline。")
+            ],
+            entropyClassesAttacked: [
+                "spm-cxx-stdlib-not-proven-via-real-usage"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (cxxMpsCacheEnabled defaults false → V1 path unchanged)",
+                "ADR-016 → M2186",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "768-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "cpp-pilot-shipped-flag-gated",
+                "honest-scope-acknowledged-generic-cache-not-mpsgraph-specific"
+            ],
+            plannedFutureCuts: [
+                "Chapter 706 Rust pilot M2187-M2190" +
+                    " ships bas-memory-usage-tracker" +
+                    " crate as XCFramework in Vendor/" +
+                    "bas-rust-binaries/ + Swift bridge" +
+                    " actor + 28 anti-drift tests +" +
+                    " rustCoreEnabled flag + Codable" +
+                    " wire-format byte-equality proof。",
+                "Future specialization of the generic" +
+                    " C++ cache into id<MPSGraphExecutable>" +
+                    " variant when host demand justifies" +
+                    " the framework coupling cost."
+            ],
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " C++ PILOT。 4th of 5 risk-ascending" +
+                " per-language pilots。 HONEST SCOPE:" +
+                " plan originally Objective-C++ wrapping" +
+                " id<MPSGraphExecutable>;actual ship is" +
+                " generic std::unordered_map<std::string," +
+                "std::string> cache to avoid coupling" +
+                " C++ target to MPSGraph + Foundation" +
+                " frameworks。 M2183 第一刀 NEW Sources/" +
+                "BASMPSGraphExecutableCacheCxx/bas_mps" +
+                "_cache.cpp real C++ implementation +" +
+                " 6 public C ABI functions + Meyers" +
+                " singleton。 M2184 第二刀 NEW Sources/" +
+                "BASMetalSubstrate/BASMPSGraphExecutable" +
+                "CacheCxxBridge.swift Swift actor + 3" +
+                " typed error cases + async make(flags:)" +
+                " + Package.swift wires dep。 M2185" +
+                " 第三刀 25 anti-drift tests including" +
+                " process-global cache contract proof" +
+                " + concurrency stress (20 concurrent" +
+                " inserts + 100 concurrent lookups)。" +
+                " Chapter 705 close-out (M2186) + 13-" +
+                "file standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2186。 768" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces UNCHANGED" +
+                " (chapter 698 discipline honored across" +
+                " ALL 4 pilots so far)。 60/60 score" +
+                " unchanged。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery +" +
+                " counter-sprawl preserved。 Next:" +
+                " chapter 七百六 Rust pilot M2187-M2190.")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

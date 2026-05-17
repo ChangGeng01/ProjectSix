@@ -1203,7 +1203,33 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// 5 languages plan progresses 3/5:SQL + C + Metal
     /// pilots shipped;next C++ + Rust at chapters
     /// 七百五-七百六。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2182"
+    ///
+    /// **M2186 chapter 七百五 第四刀**:C++ pilot close-
+    /// out。 4 commits shipped:(1) M2183 NEW Sources/
+    /// BASMPSGraphExecutableCacheCxx/bas_mps_cache.cpp
+    /// real C++ implementation — generic thread-safe
+    /// cache via std::unordered_map<std::string,
+    /// std::string> + std::mutex (C++11);singleton +
+    /// 6 public C ABI functions;HONEST scope (generic
+    /// cache instead of MPSGraph-specific to avoid
+    /// framework coupling);(2) M2184 NEW Sources/
+    /// BASMetalSubstrate/BASMPSGraphExecutableCacheCxx
+    /// Bridge.swift Swift actor + 3 typed error cases
+    /// + Codable + V1 path throws on insert/lookup +
+    /// async make(flags:) factory;Package.swift wires
+    /// BASMetalSubstrate → BASMPSGraphExecutable
+    /// CacheCxx;(3) M2185 25 anti-drift tests:C ABI
+    /// version cross-mirror + V1 + V2 correctness +
+    /// process-global cache contract + error Codable
+    /// + flag factory + concurrency stress;(4) M2186
+    /// close-out。 ADR-014 OPT-IN preserved
+    /// (cxxMpsCacheEnabled defaults FALSE → V1 path
+    /// unchanged)。 V1 byte-equality preserved (768
+    /// consecutive clean commits after this lands)。
+    /// 5 languages plan progresses 4/5:SQL + C +
+    /// Metal + C++ pilots shipped;next Rust at chapter
+    /// 七百六。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M2186"
 
     /// Query the typed status of a specific gap。
     public static func status(

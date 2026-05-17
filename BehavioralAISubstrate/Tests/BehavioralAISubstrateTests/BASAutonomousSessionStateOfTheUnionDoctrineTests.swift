@@ -36,42 +36,39 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
 
     // MARK: - Cumulative metric pins
 
-    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter704() {
-        // chapters 702 + 703 + 704 ALL honored the
-        // chapter 698 zero-new-doctrine commitment:
+    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter705() {
+        // chapters 702 + 703 + 704 + 705 ALL honored
+        // the chapter 698 zero-new-doctrine commitment:
         // all new types (SQL pilot + C pilot + Metal
-        // pilot:BASSQLSchemaGenCore + Tool + Plugin +
-        // MemoryUsageRecordsSchema;BASMonotonicNanos +
-        // BASMonotonicNanosError;BASMetalKernelLibrary
-        // Loader + BASMetalKernelLibraryLoaderError) are
-        // production-code-typed-surfaces per chapter 698
-        // option-a discipline,NOT new doctrines。 Count
-        // stays at 273 across the 3 pilots so far。
+        // pilot + C++ pilot) are production-code-typed-
+        // surfaces per chapter 698 option-a discipline,
+        // NOT new doctrines。 Count stays at 273 across
+        // the 4 pilots so far。
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .typedSurfaceCount,
             273)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs764() {
+    func testConsecutiveByteEqualityCleanCommitsIs768() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            764)
+            768)
     }
 
-    func testPhase2CommitsShippedIs1226() {
+    func testPhase2CommitsShippedIs1230() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            1226)
+            1230)
     }
 
-    func testChapter2NumberLastIs2182() {
+    func testChapter2NumberLastIs2186() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            2182)
+            2186)
     }
 
     // MARK: - Quality invariants

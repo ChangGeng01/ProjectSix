@@ -6004,7 +6004,48 @@ public enum BASEntropyChapterIndex {
                 " 60/60 score unchanged。 Substrate AT-" +
                 "REST + Tier A+B+C + 100% SIGBUS recovery" +
                 " + counter-sprawl preserved。 Next:" +
-                " chapter 七百五 C++ pilot M2183-M2186.")
+                " chapter 七百五 C++ pilot M2183-M2186."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百五",
+            mNumberFirst: 2183, mNumberLast: 2186,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " C++ PILOT。 4th of 5 risk-ascending" +
+                " per-language pilots。 HONEST SCOPE:" +
+                " plan originally Objective-C++ wrapping" +
+                " id<MPSGraphExecutable>;actual ship is" +
+                " generic std::unordered_map<std::string," +
+                "std::string> cache to avoid coupling" +
+                " C++ target to MPSGraph + Foundation" +
+                " frameworks。 M2183 第一刀 NEW Sources/" +
+                "BASMPSGraphExecutableCacheCxx/bas_mps_" +
+                "cache.cpp real C++:std::unordered_map" +
+                " + std::mutex (C++11) + Meyers singleton" +
+                " + 6 public C ABI functions。 M2184" +
+                " 第二刀 NEW Sources/BASMetalSubstrate/" +
+                "BASMPSGraphExecutableCacheCxxBridge" +
+                ".swift Swift actor + 3 typed error" +
+                " cases + Codable + V1 throws on insert/" +
+                "lookup + async make(flags:) factory +" +
+                " Package.swift wires dep。 M2185 第三刀" +
+                " 25 anti-drift tests:C ABI cross-mirror" +
+                " (3) + V1 path (5) + V2 path (7) +" +
+                " process-global cache contract (2) +" +
+                " error Codable (3) + flag factory (2)" +
+                " + concurrency stress (3)。 Chapter 705" +
+                " close-out (M2186) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved" +
+                " (cxxMpsCacheEnabled defaults FALSE →" +
+                " V1 path unchanged)。 ADR-016 → M2186。" +
+                " 768 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces UNCHANGED" +
+                " (chapter 698 discipline honored across" +
+                " ALL 4 pilots so far)。 60/60 score" +
+                " unchanged。 Substrate AT-REST + Tier" +
+                " A+B+C + 100% SIGBUS recovery +" +
+                " counter-sprawl preserved。 Next:" +
+                " chapter 七百六 Rust pilot M2187-M2190.")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

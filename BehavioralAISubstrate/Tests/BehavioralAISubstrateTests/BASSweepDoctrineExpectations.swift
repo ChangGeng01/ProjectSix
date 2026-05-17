@@ -121,12 +121,12 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2182:24 + 20 + 256 = 300 (chapter 七百四 —
-    /// Metal pilot shipped via SSMScan.metal .process()
-    /// SPM resource + BASMetalKernelLibraryLoader actor
-    /// loading from Bundle.module + V2 GPU-gated compile/
-    /// memoize proven)。
-    public static let phase2ChapterCount: Int = 300
+    /// At M2186:24 + 20 + 257 = 301 (chapter 七百五 —
+    /// C++ pilot shipped via SPM .cxxTarget + std::
+    /// unordered_map cache + Swift bridge actor +
+    /// concurrency stress + process-global cache
+    /// contract proven)。
+    public static let phase2ChapterCount: Int = 301
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -135,17 +135,19 @@ public enum BASSweepDoctrineExpectations {
     /// doctrine)。 At M2174:1214 + 4 = 1218 (chapter
     /// 七百二 — SQL pilot)。 At M2178:1218 + 4 = 1222
     /// (chapter 七百三 — C pilot)。 At M2182:1222 + 4
-    /// = 1226 (chapter 七百四 — Metal pilot ships
-    /// SSMScan.metal .process() resource + BAS
-    /// MetalKernelLibraryLoader actor + 22 anti-drift
-    /// tests including V2 GPU compile proof)
-    public static let phase2CommitsShipped: Int = 1226
+    /// = 1226 (chapter 七百四 — Metal pilot)。 At M2186:
+    /// 1226 + 4 = 1230 (chapter 七百五 — C++ pilot ships
+    /// generic std::unordered_map cache + Swift bridge
+    /// actor + 25 anti-drift tests + concurrency stress
+    /// + process-global contract proof)
+    public static let phase2CommitsShipped: Int = 1230
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
     /// At M2178:chapter 703 — C pilot。 At M2182:
-    /// chapter 704 — Metal pilot。 SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2182
+    /// chapter 704 — Metal pilot。 At M2186:chapter
+    /// 705 — C++ pilot。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2186
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
