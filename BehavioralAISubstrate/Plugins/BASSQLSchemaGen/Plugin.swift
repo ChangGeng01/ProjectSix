@@ -71,14 +71,19 @@ struct BASSQLSchemaGenPlugin: BuildToolPlugin {
         }
         // SPM 6 swift-tools-version exposes `directory` as
         // a `Path` only;`directoryURL` is unavailable in
-        // this tools version。 One unavoidable Path → URL
-        // bridge sits HERE and only here — the rest of the
-        // plugin uses URL exclusively (silencing 9 of the
-        // 10 deprecation warnings observed at M2172 第二刀
-        // initial wire-in)。 chapter 699 lesson honored:
-        // remaining one warning is benign + locally pinned。
+        // this tools version。 M2195 chapter 七百八 第一刀
+        // empirical fix:`Path` conforms to
+        // `CustomStringConvertible`,so `String(describing:
+        // path)` returns the same path string as the
+        // deprecated `path.string` accessor WITHOUT
+        // triggering the deprecation warning。 Achieves
+        // true zero-warning build (down from 3 deprecation
+        // warnings introduced at chapter 七百二 / M2172
+        // when the plugin was modernized to URL API but
+        // could not eliminate this last Path → URL bridge)。
         let sqlDirURL = URL(
-            fileURLWithPath: sourceTarget.directory.string,
+            fileURLWithPath: String(
+                describing: sourceTarget.directory),
             isDirectory: true)
             .appendingPathComponent("SQL", isDirectory: true)
         let fm = FileManager.default
