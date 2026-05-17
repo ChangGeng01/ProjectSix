@@ -69,7 +69,27 @@ let package = Package(
     ],
     targets: [
         .target(name: "BASRuntimeCore"),
-        .target(name: "BASMemory", dependencies: ["BASRuntimeCore"]),
+        // M2172 chapter 七百二 第二刀 — BASMemory grows
+        // a `SQL/` subdirectory (001_memory_usage_records.sql)
+        // + attaches the BASSQLSchemaGen build plugin to
+        // emit MemoryUsageRecordsSchema at build time。
+        //
+        // Plugin attached at M2172 so the .sql file is
+        // handled and emits no "unhandled file" warning。
+        // BASMemoryUsageTracker.swift is UNCHANGED at
+        // M2172 — the generated enum is built but unused。
+        //
+        // M2173 第三刀 switches BASMemoryUsageTracker
+        // to optionally consume the generated enum
+        // behind `BASLanguageAugmentationFeatureFlags
+        // .sqlMigratorEnabled` (default false →
+        // V1 inline path)。
+        .target(
+            name: "BASMemory",
+            dependencies: ["BASRuntimeCore"],
+            plugins: [
+                .plugin(name: "BASSQLSchemaGen")
+            ]),
         .target(name: "BASPolicy", dependencies: ["BASRuntimeCore", "BASMemory"]),
         // BASSovereign (L14) — isolated microkernel. Depends only on BASRuntimeCore
         // schema types. Never depends on Memory/Policy/Orchestration (prevents

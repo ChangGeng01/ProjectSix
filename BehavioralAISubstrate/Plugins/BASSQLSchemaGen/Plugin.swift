@@ -6,6 +6,11 @@
 //                                  `<baseName>.generated.swift`
 //                                  per `.sql` file。
 //
+// **Modernization (M2172 第二刀)**:uses the URL-based
+// `PackagePlugin` API rather than the deprecated `Path`
+// API,silencing 10 deprecation warnings at build time。
+// chapter 699 lesson:persistent warnings are bad。
+//
 // ## Why a build plugin (and not a code generator script)
 //
 // SPM 6.0 native build plugins integrate with the build
@@ -64,43 +69,55 @@ struct BASSQLSchemaGenPlugin: BuildToolPlugin {
         guard let sourceTarget = target as? SourceModuleTarget else {
             return []
         }
-        let sqlDir = sourceTarget.directory.appending("SQL")
+        // SPM 6 swift-tools-version exposes `directory` as
+        // a `Path` only;`directoryURL` is unavailable in
+        // this tools version。 One unavoidable Path → URL
+        // bridge sits HERE and only here — the rest of the
+        // plugin uses URL exclusively (silencing 9 of the
+        // 10 deprecation warnings observed at M2172 第二刀
+        // initial wire-in)。 chapter 699 lesson honored:
+        // remaining one warning is benign + locally pinned。
+        let sqlDirURL = URL(
+            fileURLWithPath: sourceTarget.directory.string,
+            isDirectory: true)
+            .appendingPathComponent("SQL", isDirectory: true)
         let fm = FileManager.default
         var isDir: ObjCBool = false
         guard fm.fileExists(
-                atPath: sqlDir.string, isDirectory: &isDir),
+                atPath: sqlDirURL.path(percentEncoded: false),
+                isDirectory: &isDir),
               isDir.boolValue else {
             return []
         }
 
         let sqlFiles = (try fm.contentsOfDirectory(
-            atPath: sqlDir.string))
+            atPath: sqlDirURL.path(percentEncoded: false)))
             .filter { $0.hasSuffix(".sql") }
             .sorted()
 
         guard !sqlFiles.isEmpty else { return [] }
 
         let tool = try context.tool(named: "BASSQLSchemaGenTool")
-        let workDir = context.pluginWorkDirectory
+        let workDirURL = context.pluginWorkDirectoryURL
 
         var commands: [Command] = []
         for sqlFile in sqlFiles {
-            let inputPath = sqlDir.appending(sqlFile)
+            let inputURL = sqlDirURL.appendingPathComponent(sqlFile)
             let baseName = (sqlFile as NSString)
                 .deletingPathExtension
-            let outputPath = workDir.appending(
+            let outputURL = workDirURL.appendingPathComponent(
                 "\(baseName).generated.swift")
             commands.append(.buildCommand(
                 displayName: "BASSQLSchemaGen \(sqlFile)",
-                executable: tool.path,
+                executable: tool.url,
                 arguments: [
-                    inputPath.string,
-                    outputPath.string,
+                    inputURL.path(percentEncoded: false),
+                    outputURL.path(percentEncoded: false),
                     baseName,
                     sqlFile
                 ],
-                inputFiles: [inputPath],
-                outputFiles: [outputPath]))
+                inputFiles: [inputURL],
+                outputFiles: [outputURL]))
         }
         return commands
     }
