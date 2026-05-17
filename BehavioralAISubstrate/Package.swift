@@ -68,7 +68,16 @@ let package = Package(
         .package(path: "Vendor/swift-huggingface")
     ],
     targets: [
-        .target(name: "BASRuntimeCore"),
+        // M2176 chapter 七百三 第二刀 — BASRuntimeCore
+        // grows BASMonotonicNanos.swift Swift actor wrapping
+        // the M2175 C function `bas_monotonic_nanos` in
+        // BASCSystemBridge。 Opt-in via cBridgeEnabled
+        // feature flag (default false → V1 DispatchTime path)。
+        // Dependency added so `import BASCSystemBridge`
+        // resolves in BASMonotonicNanos。
+        .target(
+            name: "BASRuntimeCore",
+            dependencies: ["BASCSystemBridge"]),
         // M2172 chapter 七百二 第二刀 — BASMemory grows
         // a `SQL/` subdirectory (001_memory_usage_records.sql)
         // + attaches the BASSQLSchemaGen build plugin to
