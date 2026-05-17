@@ -6784,7 +6784,29 @@ public enum BASEntropyChapterIndex {
                 " → M2242。 824 consecutive byte-" +
                 "equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
-                " unchanged。")
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十二",
+            mNumberFirst: 2243, mNumberLast: 2244,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FACTORY FLAG-SAMPLING DETERMINISM" +
+                " MATRIX — 2-knife。 Eighth pillar of" +
+                " 5-pilot ACTOR contract。 M2243 第一刀" +
+                " NEW BASFivePilotFactoryFlagSampling" +
+                "DeterminismMatrixTests.swift with 6" +
+                " tests pinning sampled-once-at-" +
+                "construction contract per pilot +" +
+                " cross-pilot summary。 Critical for" +
+                " chapter 392 IEEE Float32 replay" +
+                " determinism — pilot mid-stream flag" +
+                " flip must NOT change behavior。" +
+                " M2244 第二刀 close-out + 13-file" +
+                " sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2244。 826 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces unchanged。 60/60" +
+                " score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

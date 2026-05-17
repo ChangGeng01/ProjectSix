@@ -24917,6 +24917,68 @@ public enum BASChapterDoctrineRegistry {
                 " → M2242。 824 consecutive byte-" +
                 "equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
+                " unchanged。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百三十二",
+            mNumberFirst: 2243,
+            mNumberLast: 2244,
+            v1MilestoneMNumber: 2244,
+            v1MilestoneStatus:
+                "chapter-732-factory-flag-sampling-determinism-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2243, knife: "第一刀",
+                    concept: "Eighth pillar of 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotFactoryFlagSampling" +
+                        "DeterminismMatrixTests.swift" +
+                        " with 6 tests pinning sampled-" +
+                        "once-at-construction contract" +
+                        " per pilot + cross-pilot" +
+                        " summary。 Critical for chapter" +
+                        " 392 IEEE Float32 replay" +
+                        " determinism。 All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2244, knife: "第二刀",
+                    concept: "Chapter 732 close-out +" +
+                        " 13-file sync。 826 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2244。 60/60 score" +
+                        " unchanged。 NO new doctrines。" +
+                        " Per user 「等待 1 分钟 继续 开发」" +
+                        " — end-of-response ScheduleWakeup" +
+                        " armed for 60s post-response.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-factory-flag-sampling-determinism-contract-unpinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2244",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "826-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "factory-flag-sampling-determinism-pinned-5-pilots",
+                "eighth-pillar-of-5-pilot-actor-contract-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "FACTORY FLAG-SAMPLING DETERMINISM" +
+                " MATRIX。 2-knife chapter。 M2243 第一刀" +
+                " 6 new tests pinning sampled-once-at-" +
+                "construction contract。 Eighth pillar" +
+                " of 5-pilot ACTOR contract。 M2244" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2244。 826 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
                 " unchanged。")
     ]
 
