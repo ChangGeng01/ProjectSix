@@ -6247,7 +6247,47 @@ public enum BASEntropyChapterIndex {
                 " invariant preserved (chapter 七百八)。" +
                 " Production wire-in now READY (future" +
                 " commit sets a perFlagDefaults entry" +
-                " to actually flip)。")
+                " to actually flip)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十一",
+            mNumberFirst: 2201, mNumberLast: 2202,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FIRST PRODUCTION WIRE-IN — chapter" +
+                " 七百十 planned-future-cut #1 fulfilled。" +
+                " 「全面 转向」 step 1/5 delivered。 2-" +
+                "knife chapter。 M2201 第一刀 BASLanguage" +
+                "AugmentationFeatureFlags.perFlagDefaults" +
+                " flipped from `[:]` (empty,chapter 710" +
+                " mechanism) to `[.sqlMigratorEnabled:" +
+                " true]` (FIRST production-wire-in entry)。" +
+                " Effect:hosts calling BASMemoryUsage" +
+                "Tracker.make(databaseURL:flags:) with" +
+                " default-init flag actor now get V2" +
+                " path (generated multi-statement schema)" +
+                " instead of V1 path (3 inline runExec)。" +
+                " V1 still reachable via direct init or" +
+                " explicit setFlag false。 Safety:" +
+                " chapter 七百二 / M2173 PRAGMA byte-" +
+                "equality proven。 12 anti-drift tests" +
+                " updated/renamed including ADR-014" +
+                " discipline test now pinning 4-of-5" +
+                " pilots default-off (SQL flipped to" +
+                " opt-OUT instead of opt-IN)。 M2202" +
+                " 第二刀 chapter 711 close-out + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved for 4 pilots;SQL pilot now" +
+                " opt-OUT instead of opt-IN。 ADR-016 →" +
+                " M2202。 784 consecutive byte-equality" +
+                " clean commits (V1 path code unchanged)。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 FIRST commit since" +
+                " chapter 七百一 / M2167 where a non-V1" +
+                " code path runs in production for hosts" +
+                " using factory pattern。 「全面 转向 多个" +
+                " 语言」 progress:1 of 5 pilots default-" +
+                "ON;4 remaining (C / Metal / C++ / Rust)" +
+                " still latent opt-in。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -121,11 +121,10 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2200:24 + 20 + 262 = 306 (chapter 七百十 —
-    /// per-flag-defaults refactor;BASLanguageAugmentation
-    /// FeatureFlags gains perFlagDefaults + effective
-    /// Default enabling granular future wire-in)。
-    public static let phase2ChapterCount: Int = 306
+    /// At M2202:24 + 20 + 263 = 307 (chapter 七百十一 —
+    /// FIRST production wire-in;sqlMigratorEnabled
+    /// flipped to default-true,「全面 转向」 1/5 fulfilled)。
+    public static let phase2ChapterCount: Int = 307
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -140,9 +139,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2194:1234 + 4 = 1238 (chapter 七百七)。 At
     /// M2196:1238 + 2 = 1240 (chapter 七百八)。 At
     /// M2198:1240 + 2 = 1242 (chapter 七百九)。 At
-    /// M2200:1242 + 2 = 1244 (chapter 七百十 — 2-knife
-    /// per-flag-defaults refactor)
-    public static let phase2CommitsShipped: Int = 1244
+    /// M2200:1242 + 2 = 1244 (chapter 七百十)。 At
+    /// M2202:1244 + 2 = 1246 (chapter 七百十一 — 2-knife
+    /// FIRST production wire-in)
+    public static let phase2CommitsShipped: Int = 1246
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -154,8 +154,10 @@ public enum BASSweepDoctrineExpectations {
     /// M2196:chapter 708 — zero-warning build。 At
     /// M2198:chapter 709 — dead-code cleanup。 At
     /// M2200:chapter 710 — per-flag-defaults refactor。
+    /// At M2202:chapter 711 — FIRST production wire-in
+    /// (sqlMigratorEnabled flipped default-true)。
     /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2200
+    public static let phase2MNumberLast: Int = 2202
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

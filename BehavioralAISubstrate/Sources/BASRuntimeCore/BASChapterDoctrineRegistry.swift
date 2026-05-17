@@ -23363,7 +23363,118 @@ public enum BASChapterDoctrineRegistry {
                 " preserved。 Production wire-in now" +
                 " READY:future chapter sets a perFlag" +
                 "Defaults entry to actually flip a" +
-                " default。 Next:user direction。")
+                " default。 Next:user direction。"),
+        // chapter 711 — FIRST PRODUCTION WIRE-IN
+        // (chapter 710 planned-future-cut #1 fulfilled,
+        // 「全面 转向」 step 1/5 delivered)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十一",
+            mNumberFirst: 2201,
+            mNumberLast: 2202,
+            v1MilestoneMNumber: 2202,
+            v1MilestoneStatus:
+                "chapter-711-first-production-wire-in-sqlmigratorenabled",
+            knives: [
+                BASChapterKnife(mNumber: 2201, knife: "第一刀",
+                    concept: "BASLanguageAugmentation" +
+                        "FeatureFlags.perFlagDefaults" +
+                        " flipped from `[:]` empty" +
+                        " (chapter 710 mechanism) to" +
+                        " `[.sqlMigratorEnabled: true]`" +
+                        " (FIRST production-wire-in)。" +
+                        " Hosts using BASMemoryUsage" +
+                        "Tracker.make(databaseURL:flags:)" +
+                        " with default-init flag actor" +
+                        " now get V2 path (generated" +
+                        " multi-statement schema) by" +
+                        " default。 V1 still reachable" +
+                        " via direct init or explicit" +
+                        " setFlag false。 chapter 七百二" +
+                        " / M2173 PRAGMA byte-equality" +
+                        " proven。 12 anti-drift tests" +
+                        " updated/renamed。"),
+                BASChapterKnife(mNumber: 2202, knife: "第二刀",
+                    concept: "Chapter 711 close-out +" +
+                        " 13-file standard sync。 784" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2202。 60/60 score unchanged。" +
+                        " Zero-warning build invariant" +
+                        " preserved。 NO new doctrines" +
+                        " per chapter 698 discipline。")
+            ],
+            entropyClassesAttacked: [
+                "all-multi-language-pilots-latent-zero-production-wire-in"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved for 4 pilots (C/Metal/C++/Rust still default-off)",
+                "ADR-014 SQL pilot now opt-OUT instead of opt-IN (default flipped + setFlag false still works)",
+                "ADR-016 → M2202",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "784-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "first-production-wire-in-since-chapter-701",
+                "quan-mian-zhuan-xiang-progress-1-of-5-pilots"
+            ],
+            plannedFutureCuts: [
+                "Wire ANOTHER pilot to production default" +
+                    "-ON。 Candidates by risk-ascending:" +
+                    " cBridgeEnabled (chapter 703 dual-" +
+                    "mode equivalence <1ms proven);" +
+                    " metalKernelV2Enabled (chapter 704" +
+                    " GPU compile/memoize proven);" +
+                    " cxxMpsCacheEnabled (chapter 705" +
+                    " process-global contract proven);" +
+                    " rustCoreEnabled (chapter 706" +
+                    " Codable wire-format byte-equality" +
+                    " proven)。 Each wire-in is a 2-knife" +
+                    " chapter following M2201 pattern。",
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " variant (needs host demand for" +
+                    " MPSGraph + Foundation framework" +
+                    " coupling)。"
+            ],
+            summary: "FIRST PRODUCTION WIRE-IN — chapter" +
+                " 七百十 planned-future-cut #1 fulfilled。" +
+                " 「全面 转向 多个 语言」 step 1 of 5" +
+                " delivered。 2-knife chapter。 M2201" +
+                " 第一刀 perFlagDefaults flipped to" +
+                " `[.sqlMigratorEnabled: true]`。 Effect:" +
+                " hosts using factory pattern get V2" +
+                " (generated schema) by default。 V1" +
+                " still reachable via direct init or" +
+                " explicit opt-out。 chapter 七百二 PRAGMA" +
+                " byte-equality already proven safe。" +
+                " 12 anti-drift tests updated:default-" +
+                "init expectations + ADR-014 discipline" +
+                " test (now 4-of-5 pilots default-off)" +
+                " + factory test (V2-as-default + V1-" +
+                "reachable-via-explicit-opt-out) + 1" +
+                " NEW production-wired pin acting as" +
+                " doctrine-review trigger for future" +
+                " revert。 M2202 第二刀 close-out + 13-" +
+                "file sync。 ADR-014 OPT-OUT preserved" +
+                " for 4 pilots;SQL pilot now opt-OUT" +
+                " not opt-IN。 ADR-016 → M2202。 784" +
+                " consecutive byte-equality clean commits" +
+                " (V1 path code unchanged — chain measures" +
+                " V1 baseline)。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl +" +
+                " zero-warning all preserved。 FIRST" +
+                " commit since chapter 七百一 / M2167" +
+                " where non-V1 code runs in production" +
+                " for factory-pattern hosts。 Next:" +
+                " user direction — wire remaining 4" +
+                " pilots OR specialize C++ cache OR" +
+                " pivot to different work。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

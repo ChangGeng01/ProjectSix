@@ -725,5 +725,5 @@ final class BASRegistryFrozenHashTests: XCTestCase {
     /// architecture / external-tooling / adaptive-
     /// optimization。
     static let frozenFullRegistrySha256: String =
-        "4703fbbcfae221505252fe2a9183fd7a49900fec70847273210df5ff551a6811"
+        "be5255c75f1d5512a7f9993e6a55316be67076de394e51c5fdcb68d669a353ee"
 }

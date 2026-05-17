@@ -2671,7 +2671,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十")!)
+                        chapterTag: "chapter 七百十")!),
+            // M2202 chapter 711 — FIRST PRODUCTION
+            // WIRE-IN (chapter 710 planned-future-cut
+            // #1 fulfilled, 「全面 转向」 1/5 delivered)
+            checkRegistry("七百十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4842,6 +4849,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十")!
+                .mNumberLast),
+            // M2202 chapter 711 — FIRST PRODUCTION WIRE-IN
+            ("711",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
