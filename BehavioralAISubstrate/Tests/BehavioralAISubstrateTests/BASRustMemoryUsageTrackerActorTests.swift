@@ -102,20 +102,88 @@ final class BASRustMemoryUsageTrackerActorTests:
     }
 
     func testShippedSlicesPin() {
+        // M2191 chapter 七百七 第一刀 — expanded from
+        // host-only (1 entry) to all 3 Apple slices。
         XCTAssertEqual(
             BASRustCoreBridge.shippedSlices,
-            ["macos-arm64"])
+            [
+                "ios-arm64",
+                "ios-arm64-simulator",
+                "macos-arm64"
+            ])
     }
 
     func testMacosArm64SliceSHA256Pin() {
+        // M2191 chapter 七百七 第一刀 — bumped because
+        // build script switched Homebrew rustc (1.95.0)
+        // → rustup-managed stable rustc。 Reproducibility
+        // invariant within the new toolchain preserved
+        // (2 clean rebuilds yield byte-identical .a)。
         XCTAssertEqual(
             BASRustCoreBridge.macosArm64SliceSHA256,
-            "7557c7dadb6d411deaba54212bec350d248a80723c688cf0b94447bf291d772e",
+            "9abcda722a4abb23b6607375004c82c62f12ff75b495e87ed69c6d1c9cd4f3aa",
             "Chapter 七百一 RED FLAG #1 reproducibility-" +
             "verification pin。 If this hash changes," +
             "a future commit rebuilt the XCFramework " +
             "with different toolchain / flags — that's " +
             "a doctrine review trigger。")
+    }
+
+    // MARK: - M2191 NEW iOS-slice pins (chapter 七百七)
+
+    func testIosArm64SliceSHA256Pin() {
+        XCTAssertEqual(
+            BASRustCoreBridge.iosArm64SliceSHA256,
+            "57a30761eb30bebec1666563736594d5f72e61ff09749f57509e711ddfa7aa0f",
+            "iOS device slice byte-equality pin。")
+    }
+
+    func testIosArm64SimulatorSliceSHA256Pin() {
+        XCTAssertEqual(
+            BASRustCoreBridge.iosArm64SimulatorSliceSHA256,
+            "ed329d3fc2d60609dbda10f04226b3d2848d2e53b687bba071cd264f8f198702",
+            "iOS simulator slice byte-equality pin。")
+    }
+
+    func testSliceSHA256CountIsThree() {
+        XCTAssertEqual(
+            BASRustCoreBridge.sliceSHA256Count, 3,
+            "Cross-mirror invariant:every slice in" +
+            " shippedSlices must have a corresponding" +
+            " SHA pin。 Adding a new slice without" +
+            " adding its SHA constant drifts this count。")
+    }
+
+    func testSliceSHA256CountEqualsShippedSlicesCount() {
+        // The CRITICAL cross-mirror — adding a slice
+        // to shippedSlices without adding its SHA pin
+        // (or vice versa) fails this test。
+        XCTAssertEqual(
+            BASRustCoreBridge.sliceSHA256Count,
+            BASRustCoreBridge.shippedSlices.count)
+    }
+
+    func testIsIOSDeployableReturnsTrue() {
+        XCTAssertTrue(
+            BASRustCoreBridge.isIOSDeployable,
+            "M2191 ships both iOS slices (device +" +
+            " simulator) — if either is removed,this" +
+            " flips false。")
+    }
+
+    func testEachShippedSliceHasUniqueSHA() {
+        let allSHAs = [
+            BASRustCoreBridge.macosArm64SliceSHA256,
+            BASRustCoreBridge.iosArm64SliceSHA256,
+            BASRustCoreBridge
+                .iosArm64SimulatorSliceSHA256
+        ]
+        XCTAssertEqual(Set(allSHAs).count, allSHAs.count,
+            "Three slices,three distinct SHAs — if" +
+            " any two match,either the build is non-" +
+            "deterministic per-target (impossible with" +
+            " our flags) OR the constants got copy-" +
+            "pasted。")
     }
 
     func testPilotChapterPin() {
