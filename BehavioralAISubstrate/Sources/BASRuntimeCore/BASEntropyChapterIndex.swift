@@ -6479,7 +6479,35 @@ public enum BASEntropyChapterIndex {
                 " ADR-016 → M2218。 800 consecutive byte-" +
                 "equality clean commits — MILESTONE。" +
                 " 273 typed surfaces unchanged。 60/60" +
-                " score unchanged。")
+                " score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十",
+            mNumberFirst: 2219, mNumberLast: 2220,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "CASE-IDENTIFIER INTROSPECTION" +
+                " MATRIX — 2-knife。 M2219 第一刀 added" +
+                " `var caseIdentifier: String` computed" +
+                " property to all 5 pilot error enums" +
+                " returning lowerCamelCase case name" +
+                " independent of associated value data" +
+                " + NEW BASFivePilotErrorCaseIdentifier" +
+                "MatrixTests.swift with 6 tests covering" +
+                " full 22-case matrix (5+3+5+3+6) per-" +
+                "case identifier match + PII non-leakage" +
+                " (associated value samples MUST NOT" +
+                " appear in identifier) + same-case-" +
+                "different-payload stability + per-enum" +
+                " identifier-Set cardinality matches" +
+                " case count。 Real-world value:safe-for" +
+                "-aggregation telemetry key alternative" +
+                " to String(describing:) which leaks" +
+                " full payload。 M2220 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2220。 802" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

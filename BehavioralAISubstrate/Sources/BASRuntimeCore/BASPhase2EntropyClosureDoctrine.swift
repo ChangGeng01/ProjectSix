@@ -371,7 +371,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 七百十六",  // M2211-M2212 (BOUNDARY + ERROR-PATH TESTS — 2-knife chapter。 M2211 第一刀 NEW BASFivePilotBoundaryAndErrorPathTests.swift with 7 tests covering boundary inputs (empty fields,1KB+10KB strings,non-ASCII UTF-8) + error-path edges (monotonic clock non-decreasing under 1000-iter stress)。 All pass。 M2212 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2212。 794 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
         "chapter 七百十七",  // M2213-M2214 (ERROR ENUM CODABLE MATRIX — 2-knife。 M2213 第一刀 NEW BASFivePilotErrorCodableMatrixTests.swift with 6 tests:full case-matrix Codable round-trip for all 5 pilot error enums (25 distinct error instances total) + 1 cross-pilot Error/Equatable/Sendable/Codable conformance contract compile-time check。 Each round-trip asserts decode(encode(x))==x AND re-encode byte-identical (idempotence)。 M2214 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2214。 796 byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。)
         "chapter 七百十八",  // M2215-M2216 (ERROR ENUM HASHABLE MATRIX — 2-knife。 M2215 第一刀 single-token `: Hashable` addition to all 5 pilot error enums (Swift auto-synthesizes — all associated value types are Int32/String) + NEW BASFivePilotErrorHashableMatrixTests.swift with 6 tests:Set-based deduplication semantics for each pilot's error enum (identical instances collapse,distinct instances stay distinct,Hashable contract law a.k.a. Equatable-equal ⇒ hashValue-equal) + 1 cross-pilot joint conformance compile-time witness (Error + Equatable + Hashable + Sendable + Codable)。 Useful for telemetry pipelines deduplicating identical error instances ("have I seen this exact failure before?")。 M2216 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2216。 798 byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
-        "chapter 七百十九"   // M2217-M2218 (SENDABLE CROSS-TASK TRANSFER MATRIX — 2-knife。 M2217 第一刀 NEW BASFivePilotErrorSendableTransferMatrixTests.swift with 6 tests:proves each pilot error enum survives ACTUAL `Task { }.value` boundary transfer at RUNTIME (not just compile-time witness like chapter 717's cross-pilot test) + mixed FivePilotErrorReport struct with one error per pilot transferred + unpacked。 assertSendableTransferRoundTrip<T: Sendable & Equatable> enforces Sendable conformance at capture site (non-Sendable values fail to compile in Task closure) AND verifies runtime Equatable round-trip preserves identity (no silent concurrency corruption)。 Real-world contract:enables substrate to ship multi-pilot error reports across async boundaries for telemetry pipelines aggregating errors from multiple pilots。 M2218 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2218。 800 byte-equality clean commits — MILESTONE。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
+        "chapter 七百十九",  // M2217-M2218 (SENDABLE CROSS-TASK TRANSFER MATRIX — 2-knife。 M2217 第一刀 NEW BASFivePilotErrorSendableTransferMatrixTests.swift with 6 tests:proves each pilot error enum survives ACTUAL `Task { }.value` boundary transfer at RUNTIME (not just compile-time witness like chapter 717's cross-pilot test) + mixed FivePilotErrorReport struct with one error per pilot transferred + unpacked。 assertSendableTransferRoundTrip<T: Sendable & Equatable> enforces Sendable conformance at capture site (non-Sendable values fail to compile in Task closure) AND verifies runtime Equatable round-trip preserves identity (no silent concurrency corruption)。 Real-world contract:enables substrate to ship multi-pilot error reports across async boundaries for telemetry pipelines aggregating errors from multiple pilots。 M2218 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2218。 800 byte-equality clean commits — MILESTONE。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
+        "chapter 七百二十"   // M2219-M2220 (CASE-IDENTIFIER INTROSPECTION MATRIX — 2-knife。 M2219 第一刀 added `var caseIdentifier: String` computed property to all 5 pilot error enums returning lowerCamelCase case name independent of associated value data + NEW BASFivePilotErrorCaseIdentifierMatrixTests.swift with 6 tests covering full 22-case matrix (5+3+5+3+6 cases across 5 enums):per-case identifier match + PII non-leakage (associated value sample MUST NOT appear in identifier) + same-case-different-payload stability + per-enum identifier-Set cardinality matches case count。 Real-world value:enables telemetry pipelines to aggregate errors by case discriminator WITHOUT leaking PII (SQLite messages,record IDs,shader compile messages) into the aggregation key — safe-for-aggregation alternative to String(describing:)。 M2220 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2220。 802 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -388,16 +389,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2218
+    public static let mNumberLast: Int = 2220
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2218)。 Bumped through chapter 719:1260 → 1262
-    /// (2-knife chapter)。 Chapter 719 (SENDABLE CROSS-
-    /// TASK TRANSFER MATRIX):6 new tests proving each
-    /// pilot error survives ACTUAL Task boundary +
-    /// mixed-collection transfer。 V1 byte-equality chain
-    /// extends to 800 — MILESTONE。
-    public static let commitsShipped: Int = 1262
+    /// M2220)。 Bumped through chapter 720:1262 → 1264
+    /// (2-knife chapter)。 Chapter 720 (CASE-IDENTIFIER
+    /// INTROSPECTION MATRIX):6 new tests covering full
+    /// 22-case matrix + PII non-leakage proofs。 V1 byte-
+    /// equality chain extends to 802。
+    public static let commitsShipped: Int = 1264
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

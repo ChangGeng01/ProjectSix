@@ -24087,7 +24087,84 @@ public enum BASChapterDoctrineRegistry {
                 " byte-equality clean commits — MILESTONE" +
                 "。 273 typed surfaces unchanged。 60/60" +
                 " score unchanged。 Auto-mode 1min cadence" +
-                " loop continues。")
+                " loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十",
+            mNumberFirst: 2219,
+            mNumberLast: 2220,
+            v1MilestoneMNumber: 2220,
+            v1MilestoneStatus:
+                "chapter-720-error-case-identifier-introspection-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2219, knife: "第一刀",
+                    concept: "Added `var caseIdentifier:" +
+                        " String` computed property to" +
+                        " all 5 pilot error enums" +
+                        " returning lowerCamelCase case" +
+                        " name independent of associated" +
+                        " value data + NEW BASFivePilot" +
+                        "ErrorCaseIdentifierMatrixTests" +
+                        ".swift with 6 tests covering" +
+                        " full 22-case matrix (5+3+5+3" +
+                        "+6 cases across 5 enums):per-" +
+                        "case identifier match + PII" +
+                        " non-leakage (associated value" +
+                        " samples MUST NOT appear in" +
+                        " identifier) + same-case-" +
+                        "different-payload stability +" +
+                        " per-enum identifier-Set" +
+                        " cardinality matches case count" +
+                        "。 Real-world value:safe-for-" +
+                        "aggregation telemetry key" +
+                        " alternative to String(" +
+                        "describing:) which leaks full" +
+                        " payload。 All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2220, knife: "第二刀",
+                    concept: "Chapter 720 close-out +" +
+                        " 13-file sync。 802 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2220。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines" +
+                        " (option-a:production-code-" +
+                        "typed-surfaces — single computed" +
+                        " property per enum,no new types" +
+                        " or actors)。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-case-name-introspection-pii-leakage-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2220",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "802-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "case-identifier-introspection-pinned-5-pilot-error-enums",
+                "pii-non-leakage-verified-22-case-matrix"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR CASE-IDENTIFIER INTROSPECTION" +
+                " MATRIX for 5 pilots。 2-knife chapter。" +
+                " M2219 第一刀 added caseIdentifier" +
+                " computed property to all 5 error enums" +
+                " + 6 new tests covering full 22-case" +
+                " matrix with PII non-leakage proofs。" +
+                " M2220 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016 →" +
+                " M2220。 802 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。" +
+                " Auto-mode 1min cadence loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

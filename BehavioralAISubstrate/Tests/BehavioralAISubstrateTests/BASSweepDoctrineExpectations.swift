@@ -130,7 +130,10 @@ public enum BASSweepDoctrineExpectations {
     /// At M2218:24 + 20 + 271 = 315 (chapter 七百十九 —
     /// Sendable cross-Task transfer matrix across 5
     /// pilot error enums)。
-    public static let phase2ChapterCount: Int = 315
+    /// At M2220:24 + 20 + 272 = 316 (chapter 七百二十 —
+    /// caseIdentifier introspection matrix across 5
+    /// pilot error enums)。
+    public static let phase2ChapterCount: Int = 316
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -157,8 +160,10 @@ public enum BASSweepDoctrineExpectations {
     /// 1258 + 2 = 1260 (chapter 七百十八 — 2-knife error
     /// Hashable matrix + Set deduplication)。 At M2218:
     /// 1260 + 2 = 1262 (chapter 七百十九 — 2-knife error
-    /// Sendable cross-Task transfer matrix)。
-    public static let phase2CommitsShipped: Int = 1262
+    /// Sendable cross-Task transfer matrix)。 At M2220:
+    /// 1262 + 2 = 1264 (chapter 七百二十 — 2-knife error
+    /// caseIdentifier introspection matrix)。
+    public static let phase2CommitsShipped: Int = 1264
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -182,9 +187,10 @@ public enum BASSweepDoctrineExpectations {
     /// tests。 At M2214:chapter 717 — error Codable
     /// matrix。 At M2216:chapter 718 — error Hashable
     /// matrix + Set deduplication。 At M2218:chapter 719
-    /// — error Sendable cross-Task transfer matrix。
-    /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2218
+    /// — error Sendable cross-Task transfer matrix。 At
+    /// M2220:chapter 720 — error caseIdentifier
+    /// introspection matrix。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2220
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
