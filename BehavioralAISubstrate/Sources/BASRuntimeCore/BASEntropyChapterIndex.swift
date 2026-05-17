@@ -6181,7 +6181,40 @@ public enum BASEntropyChapterIndex {
                 " trajectory preserved。 chapter 699" +
                 " lesson (persistent warnings are bad)" +
                 " honored via long-standing 3-warning" +
-                " surface eliminated。")
+                " surface eliminated。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百九",
+            mNumberFirst: 2197, mNumberLast: 2198,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "DEAD-CODE CLEANUP — chapter 七百一" +
+                " scaffold's 2 placeholder C/C++" +
+                " functions removed after empirical" +
+                " 0-callers finding。 2-knife chapter。" +
+                " M2197 第一刀 delete Sources/" +
+                "BASCSystemBridge/bas_csystem_bridge_" +
+                "placeholder.c (21 LOC) + remove" +
+                " bas_csystem_bridge_placeholder_version" +
+                "() declaration from bas_csystem_bridge" +
+                ".h + remove bas_mps_cache_placeholder_" +
+                "version() definition from bas_mps_cache" +
+                ".cpp + declaration from bas_mps_cache" +
+                ".h;net deletion ~40 LOC。 Placeholders" +
+                " shipped at chapter 七百一 / M2167 as" +
+                " scaffold sentinels 'kept for backward" +
+                " source compat' but real functions at" +
+                " M2175/M2183 obviated them before any" +
+                " consumer pinned on the placeholders。" +
+                " M2198 第二刀 chapter 709 close-out" +
+                " + 13-file standard sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2198。" +
+                " 780 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 Substrate" +
+                " honest-engineer pattern:remove cruft" +
+                " once it stops earning its keep。 chapter" +
+                " 七百八 strict-review's 'dead code'" +
+                " acknowledgment addressed。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

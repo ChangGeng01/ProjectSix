@@ -23164,7 +23164,112 @@ public enum BASChapterDoctrineRegistry {
                 " lesson (persistent warnings are bad)" +
                 " honored via long-standing 3-warning" +
                 " surface eliminated。 Next:user" +
-                " direction。")
+                " direction。"),
+        // chapter 709 — DEAD-CODE CLEANUP (chapter 七百八
+        // strict-review acknowledgment of "dead code"
+        // addressed)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百九",
+            mNumberFirst: 2197,
+            mNumberLast: 2198,
+            v1MilestoneMNumber: 2198,
+            v1MilestoneStatus:
+                "chapter-709-dead-code-cleanup",
+            knives: [
+                BASChapterKnife(mNumber: 2197, knife: "第一刀",
+                    concept: "DELETE `Sources/" +
+                        "BASCSystemBridge/bas_csystem_" +
+                        "bridge_placeholder.c` (21 LOC" +
+                        " standalone file) + REMOVE" +
+                        " `bas_csystem_bridge_placeholder" +
+                        "_version()` declaration from" +
+                        " `bas_csystem_bridge.h` +" +
+                        " REMOVE `bas_mps_cache_" +
+                        "placeholder_version()` definition" +
+                        " from `bas_mps_cache.cpp` +" +
+                        " declaration from `bas_mps_cache" +
+                        ".h`。 ~40 LOC net deletion。" +
+                        " Placeholders shipped at chapter" +
+                        " 七百一 / M2167 as scaffold" +
+                        " sentinels 'kept for backward" +
+                        " source compat' but real functions" +
+                        " at M2175/M2183 arrived before" +
+                        " any consumer pinned on the" +
+                        " placeholders。 Empirical 0-" +
+                        "callers finding via grep across" +
+                        " Sources/ + Tests/。"),
+                BASChapterKnife(mNumber: 2198, knife: "第二刀",
+                    concept: "Chapter 709 close-out +" +
+                        " 13-file standard sync。 780" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2198。 60/60 score unchanged。" +
+                        " Zero-warning build invariant" +
+                        " preserved (chapter 七百八)。" +
+                        " NO new doctrines per chapter" +
+                        " 698 discipline。")
+            ],
+            entropyClassesAttacked: [
+                "scaffold-placeholder-dead-code-accumulation"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (no production behavior change)",
+                "ADR-016 → M2198",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "780-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "honest-engineer-pattern-remove-cruft-once-stops-earning-keep",
+                "dead-code-strict-review-acknowledgment-addressed"
+            ],
+            plannedFutureCuts: [
+                "2 remaining planned-future-cuts from" +
+                    " chapter 707 still available:" +
+                    " specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable variant" +
+                    " + wire one flag-gated pilot to" +
+                    " production default-ON (lowest-risk" +
+                    " candidate:sqlMigratorEnabled —" +
+                    " chapter 702 byte-equality proven" +
+                    " via PRAGMA table_info)。",
+                "Potential future cleanup chapter:" +
+                    " refactor BASLanguageAugmentationFeature" +
+                    "Flags to support per-flag default" +
+                    " values (currently single static" +
+                    " defaultValue shared by all 5 flags," +
+                    " limits production wire-in granularity)。"
+            ],
+            summary: "DEAD-CODE CLEANUP — chapter 七百一" +
+                " scaffold's 2 placeholder C/C++" +
+                " functions removed after empirical" +
+                " 0-callers finding。 2-knife chapter。" +
+                " M2197 第一刀 DELETE bas_csystem_bridge" +
+                "_placeholder.c (21 LOC) + remove" +
+                " bas_csystem_bridge_placeholder_version" +
+                " + bas_mps_cache_placeholder_version" +
+                " declarations and definitions across 3" +
+                " other files。 ~40 LOC net deletion。" +
+                " M2198 第二刀 close-out + 13-file" +
+                " standard sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2198。 780" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged (no Swift" +
+                " bindings existed for the placeholders)。" +
+                " 60/60 score unchanged。 Substrate AT-" +
+                "REST + Tier A+B+C + 100% SIGBUS recovery" +
+                " + counter-sprawl + zero-warning build" +
+                " (chapter 708) all preserved。 chapter" +
+                " 七百八 strict-review's 'dead code'" +
+                " acknowledgment addressed。 Honest-" +
+                "engineer pattern:remove cruft once it" +
+                " stops earning its keep。 Next:user" +
+                " direction (2 chapter-707 + 1 new" +
+                " chapter-709 planned-future-cuts" +
+                " available)。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

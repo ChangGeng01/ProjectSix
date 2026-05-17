@@ -2657,7 +2657,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百八",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百八")!)
+                        chapterTag: "chapter 七百八")!),
+            // M2198 chapter 709 — DEAD-CODE CLEANUP
+            // (chapter 708 strict-review acknowledgment
+            // addressed)
+            checkRegistry("七百九",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百九")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4812,6 +4819,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百八")!
+                .mNumberLast),
+            // M2198 chapter 709 — DEAD-CODE CLEANUP
+            ("709",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百九")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百九")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

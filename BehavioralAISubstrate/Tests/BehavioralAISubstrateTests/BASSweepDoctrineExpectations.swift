@@ -121,11 +121,11 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2196:24 + 20 + 260 = 304 (chapter 七百八 —
-    /// zero-warning build achieved via Path.description
-    /// workaround;chapter 七百七 planned-future-cut #1
-    /// fulfilled)。
-    public static let phase2ChapterCount: Int = 304
+    /// At M2198:24 + 20 + 261 = 305 (chapter 七百九 —
+    /// dead-code cleanup;chapter 七百一 scaffold's 2
+    /// placeholder C/C++ functions removed after
+    /// empirical 0-callers finding)。
+    public static let phase2ChapterCount: Int = 305
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -138,10 +138,10 @@ public enum BASSweepDoctrineExpectations {
     /// 1226 + 4 = 1230 (chapter 七百五 — C++ pilot)。
     /// At M2190:1230 + 4 = 1234 (chapter 七百六)。 At
     /// M2194:1234 + 4 = 1238 (chapter 七百七)。 At
-    /// M2196:1238 + 2 = 1240 (chapter 七百八 — 2-knife
-    /// zero-warning build chapter,smallest honest
-    /// scope per chapter 699 precedent)
-    public static let phase2CommitsShipped: Int = 1240
+    /// M2196:1238 + 2 = 1240 (chapter 七百八)。 At
+    /// M2198:1240 + 2 = 1242 (chapter 七百九 — 2-knife
+    /// dead-code cleanup)
+    public static let phase2CommitsShipped: Int = 1242
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -150,9 +150,10 @@ public enum BASSweepDoctrineExpectations {
     /// 705 — C++ pilot。 At M2190:chapter 706 — Rust
     /// pilot + 5-language arc SEALED。 At M2194:
     /// chapter 707 — Rust iOS slices expansion。 At
-    /// M2196:chapter 708 — zero-warning build。
+    /// M2196:chapter 708 — zero-warning build。 At
+    /// M2198:chapter 709 — dead-code cleanup。
     /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2196
+    public static let phase2MNumberLast: Int = 2198
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

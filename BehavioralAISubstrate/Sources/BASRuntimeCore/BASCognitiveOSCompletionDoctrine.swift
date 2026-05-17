@@ -1355,7 +1355,29 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// clean commits after this lands)。 273 typed
     /// surfaces unchanged。 60/60 score unchanged。 No
     /// G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2196"
+    ///
+    /// **M2198 chapter 七百九 第二刀**:dead-code
+    /// cleanup close-out。 2-knife chapter。 (1) M2197
+    /// delete Sources/BASCSystemBridge/bas_csystem_
+    /// bridge_placeholder.c (21 LOC) + remove
+    /// bas_csystem_bridge_placeholder_version()
+    /// declaration from bas_csystem_bridge.h + remove
+    /// bas_mps_cache_placeholder_version() definition
+    /// from bas_mps_cache.cpp + declaration from
+    /// bas_mps_cache.h。 Empirical finding:placeholders
+    /// had ZERO callers in Sources/ or Tests/ despite
+    /// "backward source compat" comment;real functions
+    /// at M2175/M2183 obviated the placeholders before
+    /// any consumer pinned on them。 (2) M2198 close-
+    /// out + 13-file sync。 ADR-014 OPT-OUT preserved
+    /// (no production behavior change — only dead
+    /// scaffold code removed)。 V1 byte-equality
+    /// preserved (780 consecutive clean commits after
+    /// this lands)。 273 typed surfaces unchanged。
+    /// 60/60 score unchanged。 Substrate honest-engineer
+    /// pattern:remove cruft once it stops earning its
+    /// keep。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M2198"
 
     /// Query the typed status of a specific gap。
     public static func status(
