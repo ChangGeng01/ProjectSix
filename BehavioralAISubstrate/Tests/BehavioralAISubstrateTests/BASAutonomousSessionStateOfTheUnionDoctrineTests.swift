@@ -36,32 +36,39 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
 
     // MARK: - Cumulative metric pins
 
-    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter701() {
+    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter702() {
+        // chapter 702 SQL pilot honored the chapter 698
+        // zero-new-doctrine commitment:all new types
+        // (BASSQLSchemaGenCore + Tool + Plugin +
+        // MemoryUsageRecordsSchema generated enum) are
+        // production-code-typed-surfaces per chapter 698
+        // option-a discipline,NOT new doctrines。 Count
+        // stays at 273。
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .typedSurfaceCount,
             273)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs752() {
+    func testConsecutiveByteEqualityCleanCommitsIs756() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            752)
+            756)
     }
 
-    func testPhase2CommitsShippedIs1214() {
+    func testPhase2CommitsShippedIs1218() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            1214)
+            1218)
     }
 
-    func testChapter2NumberLastIs2170() {
+    func testChapter2NumberLastIs2174() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            2170)
+            2174)
     }
 
     // MARK: - Quality invariants

@@ -121,19 +121,28 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    public static let phase2ChapterCount: Int = 297
+    /// At M2174:24 + 20 + 254 = 298 (chapter 七百二 —
+    /// SQL pilot shipped via BASSQLSchemaGen build
+    /// plugin + flag-gated dual-mode in
+    /// BASMemoryUsageTracker + byte-equality proven)。
+    public static let phase2ChapterCount: Int = 298
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
     /// AUGMENTATION ARC scaffold opens:Package.swift
     /// +3 SPM targets + feature-flag actor + scaffold
-    /// doctrine)
-    public static let phase2CommitsShipped: Int = 1214
+    /// doctrine)。 At M2174:1214 + 4 = 1218 (chapter
+    /// 七百二 — SQL pilot ships BASSQLSchemaGen build
+    /// plugin + Sources/BASMemory/SQL/001_memory_usage
+    /// _records.sql + flag-gated dual-mode in
+    /// BASMemoryUsageTracker + 10 byte-equality tests)
+    public static let phase2CommitsShipped: Int = 1218
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// multi-language augmentation arc scaffold。
+    /// At M2174:chapter 702 — SQL pilot complete。
     /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2170
+    public static let phase2MNumberLast: Int = 2174
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

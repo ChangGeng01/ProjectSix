@@ -22262,7 +22262,151 @@ public enum BASChapterDoctrineRegistry {
                 " Chapters 702-706 pilots ADD ZERO new" +
                 " doctrines per chapter 698 discipline" +
                 " (each has production-code-typed-surface" +
-                " justification)。")
+                " justification)。"),
+        // chapter 702 — MULTI-LANGUAGE AUGMENTATION ARC
+        // SQL PILOT。 First per-language pilot;risk-
+        // ascending order (SQL → C → Metal → C++ → Rust)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二",
+            mNumberFirst: 2171,
+            mNumberLast: 2174,
+            v1MilestoneMNumber: 2174,
+            v1MilestoneStatus:
+                "chapter-702-sql-pilot-shipped",
+            knives: [
+                BASChapterKnife(mNumber: 2171, knife: "第一刀",
+                    concept: "NEW Plugins/BASSQLSchemaGen" +
+                        " SPM BuildToolPlugin + NEW Sources/" +
+                        "BASSQLSchemaGenCore pure-Swift" +
+                        " codegen library + NEW Sources/" +
+                        "BASSQLSchemaGenTool executable" +
+                        " wrapper。 Three-target separation" +
+                        " so core is testable without" +
+                        " spawning the tool subprocess。" +
+                        " 13 anti-drift tests including" +
+                        " byte-equality determinism +" +
+                        " schemaName CamelCase derivation" +
+                        " + comment-aware statement count。"),
+                BASChapterKnife(mNumber: 2172, knife: "第二刀",
+                    concept: "NEW Sources/BASMemory/SQL/001_" +
+                        "memory_usage_records.sql extracted" +
+                        " VERBATIM from BASMemoryUsageTracker" +
+                        " schema (3 stmts:CREATE TABLE + 2" +
+                        " CREATE INDEX) + BASMemory target" +
+                        " attaches the BASSQLSchemaGen" +
+                        " plugin。 Plugin modernized from" +
+                        " deprecated Path API → URL API" +
+                        " silencing 9 of 10 deprecation" +
+                        " warnings。 7 generated-enum" +
+                        " reachability tests force plugin" +
+                        " to actually emit + enum to be a" +
+                        " real call site."),
+                BASChapterKnife(mNumber: 2173, knife: "第三刀",
+                    concept: "BASMemoryUsageTracker gains" +
+                        " flag-gated dual-mode:`init(" +
+                        "databaseURL:useGeneratedSchema:" +
+                        "Bool=false)` parameter + static" +
+                        " async make(databaseURL:flags:)" +
+                        " factory consulting sqlMigrator" +
+                        "Enabled feature flag。 10 byte-" +
+                        "equality tests prove V1 + V2" +
+                        " paths produce IDENTICAL PRAGMA" +
+                        " table_info / index_info + record" +
+                        " round-trip."),
+                BASChapterKnife(mNumber: 2174, knife: "第四刀",
+                    concept: "Chapter 702 close-out + 13-" +
+                        "file standard sync。 756" +
+                        " consecutive byte-equality clean" +
+                        " commits。 ADR-016 → M2174。" +
+                        " 60/60 score unchanged。 NO new" +
+                        " doctrines per chapter 698" +
+                        " discipline (all new types are" +
+                        " production-code-typed-surfaces)。")
+            ],
+            entropyClassesAttacked: [
+                "embedded-sql-not-first-class-build-artifact"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (sqlMigratorEnabled defaults false → V1 inline path)",
+                "ADR-016 → M2174",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "756-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "sql-pilot-shipped-flag-gated",
+                "byte-equality-proven-v1-v2-pragma-info-byte-equal"
+            ],
+            plannedFutureCuts: [
+                "Chapter 703 C pilot M2175-M2178 ships" +
+                    " bas_monotonic_nanos(uint64_t*out)" +
+                    " via Sources/BASCSystemBridge .cTarget" +
+                    " + Swift wrapper + 18 anti-drift" +
+                    " tests + cBridgeEnabled flag gating。",
+                "Chapter 704 Metal pilot M2179-M2182" +
+                    " activates existing SSMScan.metal as" +
+                    " .process() resource + MTLLibrary" +
+                    " loader actor + 22 anti-drift tests" +
+                    " + metalKernelV2Enabled gating。",
+                "Chapter 705 C++ pilot M2183-M2186 ships" +
+                    " BASMPSGraphExecutableCacheCxx wrap" +
+                    " for RMSNorm hot kernel + 25 anti-" +
+                    "drift tests + cxxMpsCacheEnabled" +
+                    " gating + cache-hit ≥5× speedup proof。",
+                "Chapter 706 Rust pilot M2187-M2190 ships" +
+                    " bas-memory-usage-tracker Rust crate" +
+                    " as XCFramework in Vendor/bas-rust-" +
+                    "binaries/ + Swift bridge actor + 28" +
+                    " anti-drift tests + rustCoreEnabled" +
+                    " gating + Codable byte-equality proof."
+            ],
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC SQL" +
+                " PILOT。 First per-language pilot,risk-" +
+                "ascending order (SQL → C → Metal → C++" +
+                " → Rust)。 M2171 第一刀 NEW Plugins/" +
+                "BASSQLSchemaGen SPM BuildToolPlugin +" +
+                " NEW Sources/BASSQLSchemaGenCore pure-" +
+                "Swift codegen library + NEW Sources/" +
+                "BASSQLSchemaGenTool executable;three-" +
+                "target separation;13 anti-drift tests" +
+                " including byte-equality determinism +" +
+                " schemaName CamelCase derivation +" +
+                " comment-aware statement count。 M2172" +
+                " 第二刀 NEW Sources/BASMemory/SQL/001_" +
+                "memory_usage_records.sql extracted" +
+                " VERBATIM from BASMemoryUsageTracker (3" +
+                " stmts) + BASMemory target attaches the" +
+                " plugin;plugin modernized to URL API" +
+                " silencing 9 of 10 SPM deprecation" +
+                " warnings (one unavoidable Path bridge" +
+                " until SPM exposes directoryURL);7" +
+                " generated-enum reachability tests。" +
+                " M2173 第三刀 BASMemoryUsageTracker" +
+                " gains flag-gated dual-mode (useGenerated" +
+                "Schema:Bool=false param + async make(" +
+                "databaseURL:flags:) factory);10 byte-" +
+                "equality tests prove V1 + V2 produce" +
+                " IDENTICAL PRAGMA table_info / index_info" +
+                " + record round-trip。 Chapter 702" +
+                " close-out (M2174) + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved" +
+                " (sqlMigratorEnabled defaults FALSE →" +
+                " V1 inline path)。 ADR-016 → M2174。" +
+                " 756 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces UNCHANGED" +
+                " (chapter 701 commitment honored:all" +
+                " new types — BASSQLSchemaGenCore + Tool" +
+                " + Plugin + MemoryUsageRecordsSchema" +
+                " generated enum — are production-code-" +
+                "typed-surfaces per chapter 698 option-a" +
+                " discipline,NOT doctrines)。 60/60" +
+                " score unchanged (saturation invariant)。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 Next:chapter" +
+                " 七百三 C pilot M2175-M2178。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

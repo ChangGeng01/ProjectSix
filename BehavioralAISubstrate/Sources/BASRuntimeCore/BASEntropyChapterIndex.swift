@@ -5863,7 +5863,58 @@ public enum BASEntropyChapterIndex {
                 " A+B+C + 100% SIGBUS recovery preserved。" +
                 " Next:chapter 七百二 SQL pilot M2171-" +
                 "M2174 (NO new doctrine per chapter 698" +
-                " discipline)。")
+                " discipline)。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二",
+            mNumberFirst: 2171, mNumberLast: 2174,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC SQL" +
+                " PILOT。 Chapters 七百二-七百六 pilot" +
+                " rollout begins with SQL,risk-ascending" +
+                " order (SQL→C→Metal→C++→Rust)。" +
+                " M2171 第一刀 NEW Plugins/BASSQLSchemaGen" +
+                " SPM BuildToolPlugin + NEW Sources/" +
+                "BASSQLSchemaGenCore pure-Swift codegen" +
+                " library + NEW Sources/BASSQLSchemaGenTool" +
+                " executable;three-target separation so" +
+                " core is testable without spawning tool" +
+                " subprocess;13 anti-drift tests including" +
+                " byte-equality determinism + schemaName" +
+                " CamelCase derivation + comment-aware" +
+                " statement count。 M2172 第二刀 NEW" +
+                " Sources/BASMemory/SQL/001_memory_usage_" +
+                "records.sql extracted VERBATIM from" +
+                " BASMemoryUsageTracker schema (3 stmts:" +
+                " CREATE TABLE + 2 CREATE INDEX) +" +
+                " BASMemory target attaches the plugin;" +
+                " plugin modernized to URL API silencing 9" +
+                " of 10 deprecation warnings;7 generated-" +
+                "enum reachability tests。 M2173 第三刀" +
+                " BASMemoryUsageTracker gains flag-gated" +
+                " dual-mode (useGeneratedSchema: Bool =" +
+                " false param + async make(databaseURL:" +
+                "flags:) factory consulting" +
+                " sqlMigratorEnabled);10 byte-equality" +
+                " tests prove V1 + V2 produce IDENTICAL" +
+                " PRAGMA table_info / index_info + record" +
+                " round-trip。 Chapter 702 close-out" +
+                " (M2174) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved (flag default" +
+                " false → V1 inline path)。 ADR-016 →" +
+                " M2174。 756 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " UNCHANGED (chapter 701 commitment" +
+                " honored:all new types are production-" +
+                "code-typed-surfaces per chapter 698" +
+                " option-a,NOT doctrines)。 60/60 score" +
+                " unchanged (saturation invariant);" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 Next:chapter" +
+                " 七百三 C pilot M2175-M2178 — bas_" +
+                "monotonic_nanos C function via Sources/" +
+                "BASCSystemBridge.")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

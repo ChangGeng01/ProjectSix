@@ -1118,7 +1118,34 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// preserved (conservativeReader() factory for
     /// explicit opt-out)。 V1 byte-equality preserved。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2170"
+    ///
+    /// **M2174 chapter 七百二 第四刀**:SQL pilot close-out
+    /// (MULTI-LANGUAGE AUGMENTATION ARC progress)。
+    /// 4 commits shipped:(1) M2171 SPM build plugin
+    /// `BASSQLSchemaGen` + `BASSQLSchemaGenCore` codegen
+    /// library + `BASSQLSchemaGenTool` executable + 13
+    /// anti-drift tests;(2) M2172 NEW
+    /// `Sources/BASMemory/SQL/001_memory_usage_records.sql`
+    /// extracted verbatim from BASMemoryUsageTracker
+    /// schema + plugin attached to BASMemory target +
+    /// 7 generated-enum reachability tests;(3) M2173
+    /// flag-gated dual-mode in BASMemoryUsageTracker
+    /// (`useGeneratedSchema: Bool = false` parameter +
+    /// `static func make(databaseURL:flags:)` async
+    /// factory consulting `BASLanguageAugmentationFeature
+    /// Flags.sqlMigratorEnabled`)+ 10 byte-equality
+    /// tests proving V1 (inline runExec ×3)+ V2 (single
+    /// runExec on generated multi-statement string)
+    /// produce IDENTICAL on-disk schema (PRAGMA
+    /// table_info / index_info byte-equal)+ identical
+    /// record round-trip;(4) M2174 close-out。 ADR-014
+    /// OPT-IN preserved (sqlMigratorEnabled defaults
+    /// false → V1 path)。 V1 byte-equality preserved
+    /// (756 consecutive clean commits after this lands)。
+    /// 5 languages plan progresses 1/5:SQL pilot
+    /// shipped;next pilots C / Metal / C++ / Rust at
+    /// chapters 七百三-七百六。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M2174"
 
     /// Query the typed status of a specific gap。
     public static func status(
