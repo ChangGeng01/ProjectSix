@@ -1,0 +1,25 @@
+# rust-toolchain.toml
+# chapter 七百六 / M2187 第一刀 — pin the Rust toolchain
+#                                 for reproducible
+#                                 XCFramework builds。
+#
+# Stable 1.84+ supports `panic = "abort"` LTO interactions
+# the substrate relies on for tiny static libraries +
+# the deterministic codegen-units=1 flag combination
+# required for SOURCE_DATE_EPOCH-driven byte-equality
+# across clean rebuilds (per the chapter 七百一 plan's
+# RED FLAG #1 mitigation)。
+#
+# Bumping this version requires:
+#   1. Rebuilding Vendor/bas-rust-binaries/BASRust
+#      MemoryTracker.xcframework via scripts/
+#      build-rust-xcframework.sh
+#   2. Verifying shasum -a 256 matches across two
+#      clean rebuilds (reproducibility invariant)
+#   3. Updating BASRustCoreBridge.swift rustToolchain
+#      Version + corresponding test pin
+
+[toolchain]
+channel = "stable"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

@@ -1,0 +1,16 @@
+# Cargo manifest for bas-memory-usage-tracker
+# chapter 七百六 / M2187 第一刀
+
+[package]
+name = "bas-memory-usage-tracker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+# `staticlib` so xcodebuild can wrap the `.a` into an
+# XCFramework via -create-xcframework -library。
+crate-type = ["staticlib"]
+name = "bas_memory_usage_tracker"
+path = "src/lib.rs"

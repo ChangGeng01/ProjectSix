@@ -1,0 +1,40 @@
+# .gitignore — chapter 七百六 / M2187 第一刀
+#
+# Created when the Rust pilot's Cargo target/ tree
+# accidentally landed in a commit and had to be reset。
+# Same patterns also cover Swift Package Manager .build/
+# and the legacy Xcode build/ directory the substrate
+# had been tracking via implicit `git add` discipline
+# rather than a .gitignore — formalize the contract here。
+
+# ============================================================
+# Swift Package Manager
+# ============================================================
+.build/
+.swiftpm/xcode/
+DerivedData/
+
+# ============================================================
+# Cargo (chapter 七百六 Rust pilot)
+# ============================================================
+Cargo/target/
+**/target/CACHEDIR.TAG
+**/*.rs.bk
+
+# ============================================================
+# Xcode user state
+# ============================================================
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+
+# ============================================================
+# macOS Finder
+# ============================================================
+.DS_Store
+
+# ============================================================
+# Editor
+# ============================================================
+*.swp
+*~

@@ -1,0 +1,41 @@
+# Cargo workspace for BehavioralAISubstrate Rust crates
+# chapter 七百六 / M2187 第一刀 — MULTI-LANGUAGE
+#                                  AUGMENTATION ARC Rust
+#                                  pilot opens here。
+#
+# All Rust code shipped by the substrate lives under
+# this workspace。 Each crate produces a `staticlib` (.a)
+# that the maintainer-side `scripts/build-rust-xcframework
+# .sh` packages into an XCFramework committed to
+# `Vendor/bas-rust-binaries/`。
+#
+# Substrate consumers see only the XCFramework — they
+# never invoke cargo directly。 Reproducibility flags
+# (SOURCE_DATE_EPOCH + codegen-units=1 + panic=abort +
+# strip=symbols) live in the build script so the
+# committed binary stays byte-identical across clean
+# rebuilds。
+
+[workspace]
+members = [
+    "bas-memory-usage-tracker",
+]
+resolver = "2"
+
+[workspace.package]
+# Workspace-level version pin。 Bumping requires
+# updating BASRustCoreBridge.swift cargoCrateVersion +
+# corresponding tests simultaneously。
+version = "0.1.0"
+edition = "2021"
+license = "internal"
+rust-version = "1.84"
+
+[profile.release]
+# Reproducibility-friendly defaults (also pinned per-
+# invocation via RUSTFLAGS in build-rust-xcframework.sh
+# for explicit-ness)。
+codegen-units = 1
+panic = "abort"
+lto = false
+strip = "symbols"
