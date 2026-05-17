@@ -136,7 +136,10 @@ public enum BASSweepDoctrineExpectations {
     /// At M2222:24 + 20 + 273 = 317 (chapter 七百二十一
     /// — wire-format canonical SHA256 fingerprint
     /// matrix across 5 pilot error enums)。
-    public static let phase2ChapterCount: Int = 317
+    /// At M2224:24 + 20 + 274 = 318 (chapter 七百二十二
+    /// — (type, caseIdentifier) global uniqueness
+    /// matrix across 5 pilot error enums)。
+    public static let phase2ChapterCount: Int = 318
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -168,7 +171,10 @@ public enum BASSweepDoctrineExpectations {
     /// caseIdentifier introspection matrix)。 At M2222:
     /// 1264 + 2 = 1266 (chapter 七百二十一 — 2-knife
     /// wire-format canonical SHA256 fingerprint matrix)。
-    public static let phase2CommitsShipped: Int = 1266
+    /// At M2224:1266 + 2 = 1268 (chapter 七百二十二 —
+    /// 2-knife (type, caseIdentifier) global uniqueness
+    /// matrix)。
+    public static let phase2CommitsShipped: Int = 1268
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
@@ -196,8 +202,9 @@ public enum BASSweepDoctrineExpectations {
     /// M2220:chapter 720 — error caseIdentifier
     /// introspection matrix。 At M2222:chapter 721 —
     /// wire-format canonical SHA256 fingerprint matrix。
-    /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2222
+    /// At M2224:chapter 722 — (type, caseIdentifier)
+    /// global uniqueness matrix。 SWEEP frozen at 1163。
+    public static let phase2MNumberLast: Int = 2224
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2

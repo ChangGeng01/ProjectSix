@@ -24239,6 +24239,84 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
                 " 60/60 score unchanged。 Auto-mode 1min" +
+                " cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十二",
+            mNumberFirst: 2223,
+            mNumberLast: 2224,
+            v1MilestoneMNumber: 2224,
+            v1MilestoneStatus:
+                "chapter-722-error-type-case-identifier-global-uniqueness-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2223, knife: "第一刀",
+                    concept: "NEW BASFivePilotErrorType" +
+                        "CaseIdentifierGlobalUniqueness" +
+                        "Tests.swift with 6 tests" +
+                        " verifying the (typeName," +
+                        " caseIdentifier) tuple is" +
+                        " globally unique across all" +
+                        " 22 cases of the 5 pilot error" +
+                        " enums。 Chapter 720 proved" +
+                        " per-pilot identifier" +
+                        " uniqueness but identifiers" +
+                        " CAN collide ACROSS enums" +
+                        " (e.g. both C++ and Rust have" +
+                        " `.nullPointer` case)。 Type-" +
+                        "prefixed tuple via String" +
+                        "(describing: T.self) resolves" +
+                        " cross-pilot collisions" +
+                        " enabling telemetry pipelines" +
+                        " to aggregate without losing" +
+                        " per-pilot granularity。 All" +
+                        " 6 tests pass。"),
+                BASChapterKnife(mNumber: 2224, knife: "第二刀",
+                    concept: "Chapter 722 close-out +" +
+                        " 13-file sync。 806 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2224。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines" +
+                        " (option-a:tests-only knife)。" +
+                        " Cron caa2938c every-minute" +
+                        " safety-net trigger active.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-cross-pilot-identifier-collisions-unresolved"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2224",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "806-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "type-case-identifier-tuple-global-uniqueness-pinned-22-cases",
+                "cross-pilot-collision-resolution-verified-cxx-rust-nullpointer"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR (TYPE, CASE-IDENTIFIER)" +
+                " GLOBAL UNIQUENESS MATRIX for 5 pilots。" +
+                " 2-knife chapter。 M2223 第一刀 6 new" +
+                " tests verifying 22 type-prefixed" +
+                " tuples are globally unique + sanity" +
+                " check that known C++/Rust nullPointer" +
+                " collision is resolved by type prefix。" +
+                " Extension of chapter 720 caseIdentifier" +
+                " work with cross-pilot disambiguation" +
+                " for telemetry pipelines。 M2224 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2224。" +
+                " 806 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 Auto-mode 1min" +
                 " cadence loop continues。")
     ]
 

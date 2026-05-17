@@ -6535,6 +6535,33 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-016 → M2222。 804" +
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十二",
+            mNumberFirst: 2223, mNumberLast: 2224,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "TYPE-CASE-IDENTIFIER GLOBAL" +
+                " UNIQUENESS MATRIX — 2-knife。 M2223" +
+                " 第一刀 NEW BASFivePilotErrorTypeCase" +
+                "IdentifierGlobalUniquenessTests.swift" +
+                " with 6 tests verifying (typeName," +
+                " caseIdentifier) tuple is globally" +
+                " unique across all 22 cases of 5 pilot" +
+                " error enums。 Chapter 720 proved per-" +
+                "pilot identifier uniqueness but" +
+                " identifiers CAN collide across enums" +
+                " (e.g. both C++ and Rust have" +
+                " `.nullPointer` case)。 Type-prefixed" +
+                " tuple via String(describing: T.self)" +
+                " resolves cross-pilot collisions" +
+                " enabling telemetry pipelines to" +
+                " aggregate without losing per-pilot" +
+                " granularity。 M2224 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2224。 806" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
                 " 60/60 score unchanged。")
     ]
 
