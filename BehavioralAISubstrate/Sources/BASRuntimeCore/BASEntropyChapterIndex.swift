@@ -6588,7 +6588,35 @@ public enum BASEntropyChapterIndex {
                 " → M2226。 808 consecutive byte-" +
                 "equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
-                " unchanged。")
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十四",
+            mNumberFirst: 2227, mNumberLast: 2228,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "CASE COUNT INVARIANT MATRIX —" +
+                " 2-knife。 M2227 第一刀 NEW BASFive" +
+                "PilotErrorCaseCountInvariantTests" +
+                ".swift with 6 tests pinning exact" +
+                " case count per pilot enum (SQL 5 /" +
+                " C 3 / Metal 5 / C++ 3 / Rust 6) +" +
+                " cross-pilot total (22)。 Swift enums" +
+                " with associated values don't auto-" +
+                "conform to CaseIterable — case count" +
+                " is not introspectable at runtime,so" +
+                " test manually enumerates" +
+                " representatives + counts via Set<" +
+                "caseIdentifier>。 Tripwire:adding/" +
+                "removing a case to ANY pilot enum" +
+                " without updating test makes change" +
+                " visible at PR time。 EIGHTH PILLAR of" +
+                " 5-pilot error typed-contract" +
+                " trajectory。 M2228 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2228。 810" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

@@ -24389,7 +24389,77 @@ public enum BASChapterDoctrineRegistry {
                 " M2226。 808 consecutive byte-equality" +
                 " clean commits。 273 typed surfaces" +
                 " unchanged。 60/60 score unchanged。" +
-                " Auto-mode 1min cadence loop continues。")
+                " Auto-mode 1min cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十四",
+            mNumberFirst: 2227,
+            mNumberLast: 2228,
+            v1MilestoneMNumber: 2228,
+            v1MilestoneStatus:
+                "chapter-724-error-case-count-invariant-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2227, knife: "第一刀",
+                    concept: "NEW BASFivePilotError" +
+                        "CaseCountInvariantTests.swift" +
+                        " with 6 tests pinning exact" +
+                        " case count per pilot enum" +
+                        " (SQL 5 / C 3 / Metal 5 / C++" +
+                        " 3 / Rust 6) + cross-pilot" +
+                        " total (22)。 Swift enums with" +
+                        " associated values don't auto-" +
+                        "conform to CaseIterable — test" +
+                        " manually enumerates" +
+                        " representatives + counts via" +
+                        " Set<caseIdentifier>。 Tripwire" +
+                        " for case additions/removals。" +
+                        " EIGHTH PILLAR of 5-pilot" +
+                        " typed-contract trajectory。" +
+                        " All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2228, knife: "第二刀",
+                    concept: "Chapter 724 close-out +" +
+                        " 13-file sync。 810 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2228。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines。" +
+                        " Cron caa2938c every-minute" +
+                        " safety-net trigger active.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-case-count-unpinned-no-tripwire"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2228",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "810-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "case-count-invariant-pinned-5-pilot-enums",
+                "22-total-cases-tripwire-armed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR CASE COUNT INVARIANT MATRIX" +
+                " for 5 pilots。 2-knife chapter。 M2227" +
+                " 第一刀 6 new tests pinning per-pilot" +
+                " case counts (5+3+5+3+6 = 22 total)" +
+                " + global tripwire。 EIGHTH PILLAR of" +
+                " 5-pilot error typed-contract sealing" +
+                " trajectory。 M2228 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2228。 810" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 Auto-mode 1min" +
+                " cadence loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

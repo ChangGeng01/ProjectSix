@@ -2751,7 +2751,12 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百二十三",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百二十三")!)
+                        chapterTag: "chapter 七百二十三")!),
+            // M2228 chapter 724 — CASE COUNT INVARIANT
+            checkRegistry("七百二十四",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百二十四")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -5026,6 +5031,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百二十三")!
+                .mNumberLast),
+            // M2228 chapter 724 — CASE COUNT INVARIANT
+            ("724",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十四")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十四")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
