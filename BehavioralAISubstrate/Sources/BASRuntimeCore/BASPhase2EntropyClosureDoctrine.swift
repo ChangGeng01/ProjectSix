@@ -381,7 +381,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 七百二十六",// M2231-M2232 (PILOT ACTOR COUNT INVARIANT MATRIX — 2-knife。 Second pillar of 5-pilot ACTOR contract。 M2231 第一刀 NEW BASFivePilotActorCountInvariantTests.swift with 6 tests (5 per-pilot reachability + 1 cross-pilot total count = 5)。 Tripwire for accidental additions or removals of pilot actors。 Per-actor tests would still PASS if a 6th pilot was added — the count invariant is the cross-cutting catch。 Chapter 698 anti-sprawl requires explicit user authorization for new pilot surfaces;this test enforces visibility。 Actor-side analog of chapter 724's error case-count tripwire。 M2232 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2232。 814 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues — dual safety nets armed (cron caa2938c + ScheduleWakeup d6c37d6f)。)
         "chapter 七百二十七",// M2233-M2234 (PILOT ACTOR SENDABLE CROSS-TASK TRANSFER MATRIX — 2-knife。 Third pillar of 5-pilot ACTOR contract。 M2233 第一刀 NEW BASFivePilotActorSendableTransferMatrixTests.swift with 6 tests proving pilot actor INSTANCES (reference-type Sendable) survive Task boundary transfer with === identity preserved + mixed FivePilotActorBundle struct with all 5 actor refs。 assertActorSendableTransferPreservesIdentity<T: AnyObject & Sendable> uses === reference identity check (vs chapter 719's value-type Equatable comparison for errors) — actor-reference contract requires SAME instance not a copy。 Future commits introducing non-Sendable state into any pilot actor fail at COMPILE time in Task closures。 Actor-side analog of chapter 719's error Sendable transfer。 M2234 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2234。 816 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
         "chapter 七百二十八",// M2235-M2236 (PILOT ACTOR MODULE-QUALIFIED NAME MATRIX — 2-knife。 Fourth pillar of 5-pilot ACTOR contract。 M2235 第一刀 NEW BASFivePilotActorModuleQualifiedNameMatrixTests.swift with 6 tests pinning String(reflecting: PilotActor.self) which returns "Module.TypeName" format + cross-pilot module mapping pin。 Complement to chapter 725 (bare type name):chapter 725 = UI-friendly log line label,chapter 728 = crash-report symbolication disambiguation。 5 pilots decompose into 4 modules (Metal + C++ share BASMetalSubstrate)。 Future commits moving pilots between modules fail this test at PR time。 M2236 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2236。 818 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
-        "chapter 七百二十九" // M2237-M2238 (PILOT ACTOR DISTINCT-INSTANCE SEPARATION MATRIX — 2-knife。 Fifth pillar of 5-pilot ACTOR contract。 M2237 第一刀 NEW BASFivePilotActorDistinctInstanceSeparationMatrixTests.swift with 6 tests proving two separately-constructed instances of the same pilot are DISTINCT references (=== false) + cross-pilot mutual distinctness for [AnyObject] of all 5 pilots。 Complement to chapter 727 (identity preservation):727 = same instance survives transfer,729 = different instances stay different。 Catches singleton-cache regressions that would silently break callers expecting independent state。 M2238 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2238。 820 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues — Honest mode disclosed:no force-wake mechanism in harness,both ScheduleWakeup and CronCreate are idle-gated per system docs;continuous inline execution is the actual non-stop loop。)
+        "chapter 七百二十九",// M2237-M2238 (PILOT ACTOR DISTINCT-INSTANCE SEPARATION MATRIX — 2-knife。 Fifth pillar of 5-pilot ACTOR contract。 M2237 第一刀 NEW BASFivePilotActorDistinctInstanceSeparationMatrixTests.swift with 6 tests proving two separately-constructed instances of the same pilot are DISTINCT references (=== false) + cross-pilot mutual distinctness for [AnyObject] of all 5 pilots。 Complement to chapter 727 (identity preservation):727 = same instance survives transfer,729 = different instances stay different。 Catches singleton-cache regressions that would silently break callers expecting independent state。 M2238 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2238。 820 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues — Honest mode disclosed:no force-wake mechanism in harness,both ScheduleWakeup and CronCreate are idle-gated per system docs;continuous inline execution is the actual non-stop loop。)
+        "chapter 七百三十" // M2239-M2240 (PILOT makeWithDefaults() FACTORY EXISTENCE MATRIX — 2-knife。 Sixth pillar of 5-pilot ACTOR contract。 M2239 第一刀 NEW BASFivePilotActorMakeWithDefaultsExistenceMatrixTests.swift with 6 tests pinning makeWithDefaults() async factory existence per pilot + cross-pilot return-type distinctness。 Surface tripwire:future removal/rename of makeWithDefaults on any pilot fails at PR time。 M2240 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2240。 822 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode loop continues non-stop per directive。)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -398,16 +399,15 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2238
+    public static let mNumberLast: Int = 2240
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2238)。 Bumped through chapter 729:1280 → 1282
-    /// (2-knife chapter)。 Chapter 729 (ACTOR DISTINCT-
-    /// INSTANCE SEPARATION MATRIX):6 new tests proving
-    /// fresh allocations on each init() + cross-pilot
-    /// distinctness。 V1 byte-equality chain extends to
-    /// 820。
-    public static let commitsShipped: Int = 1282
+    /// M2240)。 Bumped through chapter 730:1282 → 1284
+    /// (2-knife chapter)。 Chapter 730 (makeWithDefaults
+    /// FACTORY EXISTENCE MATRIX):6 new tests pinning
+    /// async factory existence per pilot。 V1 byte-
+    /// equality chain extends to 822。
+    public static let commitsShipped: Int = 1284
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。
