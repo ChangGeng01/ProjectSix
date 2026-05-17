@@ -24164,7 +24164,82 @@ public enum BASChapterDoctrineRegistry {
                 " M2220。 802 consecutive byte-equality" +
                 " clean commits。 273 typed surfaces" +
                 " unchanged。 60/60 score unchanged。" +
-                " Auto-mode 1min cadence loop continues。")
+                " Auto-mode 1min cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十一",
+            mNumberFirst: 2221,
+            mNumberLast: 2222,
+            v1MilestoneMNumber: 2222,
+            v1MilestoneStatus:
+                "chapter-721-error-wire-format-sha256-fingerprint-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2221, knife: "第一刀",
+                    concept: "NEW BASFivePilotError" +
+                        "WireFormatSHA256MatrixTests" +
+                        ".swift with 6 tests pinning" +
+                        " SHA256 of `.sortedKeys` JSON" +
+                        " encoding for representative" +
+                        " case from each of 5 pilot" +
+                        " error enums + cross-pilot" +
+                        " total-byte-count pin (220" +
+                        " bytes total across 5 cases)。" +
+                        " Catches future commits that" +
+                        " change wire format (CodingKey" +
+                        " rename,associated value type" +
+                        " change) which would silently" +
+                        " pass chapter 717 Codable" +
+                        " idempotence but break" +
+                        " downstream consumers reading" +
+                        " bytes saved by prior builds。" +
+                        " FIFTH PILLAR of 5-pilot" +
+                        " typed-contract sealing。"),
+                BASChapterKnife(mNumber: 2222, knife: "第二刀",
+                    concept: "Chapter 721 close-out +" +
+                        " 13-file sync。 804 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2222。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines" +
+                        " (option-a:tests-only knife)。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-wire-format-byte-sequence-unpinned"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2222",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "804-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "wire-format-canonical-sha256-pinned-5-pilot-error-enums",
+                "fifth-pillar-typed-contract-sealing-completed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR WIRE-FORMAT CANONICAL SHA256" +
+                " FINGERPRINT MATRIX for 5 pilots。" +
+                " 2-knife chapter。 M2221 第一刀 6 new" +
+                " tests pinning SHA256 of JSON encoding" +
+                " for representative case from each" +
+                " pilot + total-byte-count cross-pilot" +
+                " pin。 FIFTH PILLAR of 5-pilot typed-" +
+                "contract sealing trajectory (Codable/" +
+                "Hashable/Sendable/caseIdentifier/wire-" +
+                "format-SHA256)。 M2222 第二刀 close-out" +
+                " + 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2222。 804" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 Auto-mode 1min" +
+                " cadence loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

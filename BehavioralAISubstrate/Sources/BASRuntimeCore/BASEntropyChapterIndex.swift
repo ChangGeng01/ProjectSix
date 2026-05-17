@@ -6507,6 +6507,34 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-016 → M2220。 802" +
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十一",
+            mNumberFirst: 2221, mNumberLast: 2222,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "WIRE-FORMAT CANONICAL SHA256" +
+                " FINGERPRINT MATRIX — 2-knife。 M2221" +
+                " 第一刀 NEW BASFivePilotErrorWireFormat" +
+                "SHA256MatrixTests.swift with 6 tests" +
+                " pinning SHA256 of `.sortedKeys` JSON" +
+                " encoding for representative case from" +
+                " each of 5 pilot error enums + cross-" +
+                "pilot total-byte-count pin (220 bytes" +
+                " total)。 Chapter 717 Codable matrix" +
+                " proved decode(encode(x))==x but did" +
+                " NOT pin specific bytes of encode(x);" +
+                " future CodingKey/associated-value" +
+                " type changes would silently change" +
+                " wire format while passing 717" +
+                " idempotence。 SHA256 tripwire catches" +
+                " this LOUDLY at PR time。 FIFTH PILLAR" +
+                " of 5-pilot error typed-contract" +
+                " sealing。 M2222 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2222。 804" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
                 " 60/60 score unchanged。")
     ]
 

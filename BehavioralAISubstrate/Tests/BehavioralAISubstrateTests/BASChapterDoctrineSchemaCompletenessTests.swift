@@ -2734,7 +2734,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百二十",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百二十")!)
+                        chapterTag: "chapter 七百二十")!),
+            // M2222 chapter 721 — WIRE-FORMAT SHA256
+            // FINGERPRINT MATRIX
+            checkRegistry("七百二十一",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百二十一")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4985,6 +4991,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百二十")!
+                .mNumberLast),
+            // M2222 chapter 721 — WIRE-FORMAT SHA256 MATRIX
+            ("721",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十一")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百二十一")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

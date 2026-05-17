@@ -1377,7 +1377,7 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// 60/60 score unchanged。 Substrate honest-engineer
     /// pattern:remove cruft once it stops earning its
     /// keep。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2220"
+    public static let doctrineVersion: String = "ADR-016.M2222"
 
     /// Query the typed status of a specific gap。
     public static func status(
