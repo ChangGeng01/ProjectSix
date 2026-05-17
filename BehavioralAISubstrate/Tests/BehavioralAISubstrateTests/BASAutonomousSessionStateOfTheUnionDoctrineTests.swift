@@ -36,7 +36,7 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
 
     // MARK: - Cumulative metric pins
 
-    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter716() {
+    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter717() {
         // 5-LANGUAGE AUGMENTATION ARC SEALED at chapter
         // 七百六。 chapter 707 fulfills chapter 七百六
         // planned-future-cut (iOS slice expansion) +
@@ -51,25 +51,25 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
             273)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs794() {
+    func testConsecutiveByteEqualityCleanCommitsIs796() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            794)
+            796)
     }
 
-    func testPhase2CommitsShippedIs1256() {
+    func testPhase2CommitsShippedIs1258() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            1256)
+            1258)
     }
 
-    func testChapter2NumberLastIs2212() {
+    func testChapter2NumberLastIs2214() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            2212)
+            2214)
     }
 
     // MARK: - Quality invariants

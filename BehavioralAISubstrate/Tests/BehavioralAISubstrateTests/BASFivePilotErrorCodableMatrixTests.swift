@@ -36,7 +36,19 @@ import XCTest
 
 final class BASFivePilotErrorCodableMatrixTests: XCTestCase {
 
-    private let encoder = JSONEncoder()
+    /// JSONEncoder with `.sortedKeys` so re-encode is
+    /// byte-deterministic。 Swift's default JSONEncoder
+    /// emits dictionary keys in unspecified order;
+    /// `.sortedKeys` pins lexicographic ordering which
+    /// is what wire-format consumers see when they save
+    /// + reload the bytes。 The idempotence test then
+    /// becomes a true contract:given identical input,
+    /// the bytes round-trip exactly。
+    private let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.outputFormatting = [.sortedKeys]
+        return e
+    }()
     private let decoder = JSONDecoder()
 
     /// Helper:assert encode → decode → re-encode is

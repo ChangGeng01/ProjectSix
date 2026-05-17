@@ -23864,6 +23864,78 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive byte-equality clean commits。" +
                 " 273 typed surfaces unchanged。 60/60" +
                 " score unchanged。 Auto-mode 1min cadence" +
+                " loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十七",
+            mNumberFirst: 2213,
+            mNumberLast: 2214,
+            v1MilestoneMNumber: 2214,
+            v1MilestoneStatus:
+                "chapter-717-error-codable-matrix-and-conformance",
+            knives: [
+                BASChapterKnife(mNumber: 2213, knife: "第一刀",
+                    concept: "NEW BASFivePilotErrorCodable" +
+                        "MatrixTests.swift with 6 tests" +
+                        " covering full Codable round-" +
+                        "trip matrix for all 5 pilot" +
+                        " error enums (BASSQLMigrator" +
+                        "Error,BASCBridgeError,BAS" +
+                        "MetalKernelError,BASMPSGraph" +
+                        "ExecutableCacheError,BASRust" +
+                        "MemoryUsageTrackerError) +" +
+                        " cross-pilot conformance" +
+                        " contract proof。 25 distinct" +
+                        " error instances tested。 Each" +
+                        " verifies decode(encode(x))==x" +
+                        " AND re-encode byte-identical" +
+                        " (Codable idempotence)。 All" +
+                        " 6 tests pass。"),
+                BASChapterKnife(mNumber: 2214, knife: "第二刀",
+                    concept: "Chapter 717 close-out +" +
+                        " 13-file sync。 796 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2214。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines" +
+                        "(option-a:tests-only knife" +
+                        " hardening Codable contract" +
+                        " on existing error enums per" +
+                        " chapter 698 anti-sprawl" +
+                        " gate)。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-codable-conformance-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2214",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "796-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "codable-round-trip-idempotence-pinned-5-pilot-error-enums",
+                "25-distinct-error-instances-codable-verified"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR CODABLE MATRIX + CONFORMANCE" +
+                " for 5 pilots。 2-knife chapter。 M2213" +
+                " 第一刀 6 new tests covering 25 distinct" +
+                " error instances + Codable idempotence" +
+                " proof + cross-pilot conformance" +
+                " contract。 M2214 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT preserved" +
+                "。 ADR-016 → M2214。 796 consecutive" +
+                " byte-equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。 Auto-mode 1min cadence" +
                 " loop continues。")
     ]
 

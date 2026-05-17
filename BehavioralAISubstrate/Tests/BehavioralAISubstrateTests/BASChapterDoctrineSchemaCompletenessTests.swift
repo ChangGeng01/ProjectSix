@@ -2710,7 +2710,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十六",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十六")!)
+                        chapterTag: "chapter 七百十六")!),
+            // M2214 chapter 717 — ERROR CODABLE MATRIX +
+            // CONFORMANCE
+            checkRegistry("七百十七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4929,6 +4935,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十六")!
+                .mNumberLast),
+            // M2214 chapter 717 — ERROR CODABLE MATRIX
+            ("717",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

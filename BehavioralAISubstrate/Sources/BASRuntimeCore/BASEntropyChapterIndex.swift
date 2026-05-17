@@ -6412,7 +6412,26 @@ public enum BASEntropyChapterIndex {
                 " OPT-OUT preserved。 ADR-016 → M2212。" +
                 " 794 consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
-                " 60/60 score unchanged。")
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十七",
+            mNumberFirst: 2213, mNumberLast: 2214,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "ERROR ENUM CODABLE MATRIX —" +
+                " 2-knife。 M2213 第一刀 NEW BASFivePilot" +
+                "ErrorCodableMatrixTests.swift with 6" +
+                " tests:full case-matrix round-trip" +
+                " across all 5 pilot error enums (25" +
+                " distinct error instances) + cross-" +
+                "pilot conformance contract compile-time" +
+                " check (Error+Equatable+Sendable+" +
+                "Codable)。 M2214 第二刀 close-out + 13-" +
+                "file sync。 ADR-014 OPT-OUT preserved。" +
+                " ADR-016 → M2214。 796 consecutive" +
+                " byte-equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
