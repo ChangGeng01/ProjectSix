@@ -2644,7 +2644,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百六",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百六")!)
+                        chapterTag: "chapter 七百六")!),
+            // M2194 chapter 707 — RUST XCFRAMEWORK iOS-
+            // SLICE EXPANSION (chapter 七百六 planned-
+            // future-cut fulfilled)
+            checkRegistry("七百七",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百七")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4782,6 +4789,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百六")!
+                .mNumberLast),
+            // M2194 chapter 707 — RUST XCFRAMEWORK iOS-
+            // SLICE EXPANSION
+            ("707",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百七")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百七")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079

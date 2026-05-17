@@ -22939,7 +22939,135 @@ public enum BASChapterDoctrineRegistry {
                 " Sources/ + Vendor/ + Cargo/ + Plugins/。" +
                 " User directive 「全面 转向 多个 语言:" +
                 "Swift + Metal,Rust,SQL,C,C++」 " +
-                "(2026-05-17) FULFILLED。")
+                "(2026-05-17) FULFILLED。"),
+        // chapter 707 — RUST XCFRAMEWORK iOS-SLICE
+        // EXPANSION (chapter 七百六 planned-future-cut
+        // fulfilled)。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百七",
+            mNumberFirst: 2191,
+            mNumberLast: 2194,
+            v1MilestoneMNumber: 2194,
+            v1MilestoneStatus:
+                "chapter-707-rust-ios-slices-shipped",
+            knives: [
+                BASChapterKnife(mNumber: 2191, knife: "第一刀",
+                    concept: "scripts/build-rust-" +
+                        "xcframework.sh TARGETS array" +
+                        " expanded from 1 to 3 slices" +
+                        " (macos-arm64 + ios-arm64 +" +
+                        " ios-arm64-simulator) + PATH" +
+                        " prefix fix preferring rustup-" +
+                        "managed cargo over Homebrew" +
+                        " (CRITICAL empirical finding:" +
+                        " Homebrew rust does NOT see" +
+                        " rustup-installed cross-compile" +
+                        " targets);XCFramework rebuilt" +
+                        " with rustup stable rustc;all" +
+                        " 3 slice SHAs verified BYTE-" +
+                        "IDENTICAL across 2 clean" +
+                        " rebuilds;Vendor/bas-rust-" +
+                        "binaries grew from ~7MB to" +
+                        " ~50MB。"),
+                BASChapterKnife(mNumber: 2192, knife: "第二刀",
+                    concept: "BASRustCoreBridge.swift" +
+                        " constants resync:shippedSlices" +
+                        " 1→3 entries alphabetical;" +
+                        " macosArm64SliceSHA256 bumped" +
+                        " from M2187 Homebrew-rustc hash" +
+                        " to M2191 rustup-rustc hash;" +
+                        " NEW iosArm64SliceSHA256 + ios" +
+                        "Arm64SimulatorSliceSHA256 +" +
+                        " sliceSHA256Count=3 cross-mirror" +
+                        " constant + isIOSDeployable" +
+                        " computed property。"),
+                BASChapterKnife(mNumber: 2193, knife: "第三刀",
+                    concept: "BASRustMemoryUsageTracker" +
+                        "ActorTests.swift gains 6 new" +
+                        " anti-drift tests + 2 updated" +
+                        " pins:testShippedSlicesPin" +
+                        " (3-entry expected) + testMacos" +
+                        "Arm64SliceSHA256Pin (new hash)" +
+                        " + NEW testIosArm64SliceSHA256" +
+                        "Pin + testIosArm64Simulator" +
+                        "SliceSHA256Pin + testSlice" +
+                        "SHA256CountIsThree + testSlice" +
+                        "SHA256CountEqualsShippedSlices" +
+                        "Count (CRITICAL cross-mirror)" +
+                        " + testIsIOSDeployableReturns" +
+                        "True + testEachShippedSliceHas" +
+                        "UniqueSHA (copy-paste guard)。"),
+                BASChapterKnife(mNumber: 2194, knife: "第四刀",
+                    concept: "Chapter 707 close-out +" +
+                        " 13-file standard sync。 776" +
+                        " consecutive byte-equality" +
+                        " clean commits。 ADR-016 →" +
+                        " M2194。 60/60 score unchanged。" +
+                        " NO new doctrines per chapter" +
+                        " 698 discipline。 Substrate" +
+                        " now FULLY iOS-deployable for" +
+                        " Rust pilot。")
+            ],
+            entropyClassesAttacked: [
+                "rust-xcframework-host-only-slice-blocks-ios-host-deployment"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (rustCoreEnabled defaults false → V1 path unchanged)",
+                "ADR-016 → M2194",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "776-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "rust-ios-deployable",
+                "rust-xcframework-3-slices-byte-identical-across-2-clean-rebuilds",
+                "chapter-706-planned-future-cut-fulfilled",
+                "empirical-finding-homebrew-rust-does-not-see-rustup-cross-targets"
+            ],
+            plannedFutureCuts: [
+                "Address remaining SPM Path.string" +
+                    " deprecation warning in BASSQLSchemaGen" +
+                    " plugin once SPM exposes directoryURL" +
+                    " on SourceModuleTarget。",
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable when" +
+                    " host demand justifies framework" +
+                    " coupling cost。",
+                "Wire one flag-gated pilot to production" +
+                    " default-ON to validate the arc" +
+                    " delivers measurable value (highest-" +
+                    "value candidate:metalKernelV2Enabled" +
+                    " for hot kernels)。"
+            ],
+            summary: "RUST XCFRAMEWORK iOS-SLICE EXPANSION" +
+                " — chapter 七百六 planned-future-cut" +
+                " fulfilled。 M2191 第一刀 build script" +
+                " TARGETS 1→3 slices + PATH prefix fix" +
+                " (rustup cargo preferred over Homebrew);" +
+                " XCFramework rebuilt;all 3 slices SHA-" +
+                "verified byte-identical across 2 clean" +
+                " rebuilds;Vendor grew ~7MB→~50MB。" +
+                " M2192 第二刀 BASRustCoreBridge resync:" +
+                " shippedSlices 3 entries + 3 SHA pins +" +
+                " sliceSHA256Count + isIOSDeployable。" +
+                " M2193 第三刀 6 new anti-drift tests +" +
+                " 2 updated pins including CRITICAL" +
+                " cross-mirror catching add-slice-forget-" +
+                "SHA drift。 Chapter 707 close-out (M2194)" +
+                " + 13-file standard sync。 ADR-014 OPT-" +
+                "OUT preserved。 ADR-016 → M2194。 776" +
+                " consecutive byte-equality clean commits。" +
+                " 273 typed surfaces unchanged。 60/60" +
+                " score unchanged。 Substrate AT-REST +" +
+                " Tier A+B+C + 100% SIGBUS recovery +" +
+                " counter-sprawl trajectory preserved。" +
+                " Substrate now FULLY iOS-deployable for" +
+                " Rust pilot。 Next:user direction —" +
+                " possibilities include production wire-" +
+                "in of a flag-gated pilot,specialize C++" +
+                " cache,or new feature arc。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

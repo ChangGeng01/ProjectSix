@@ -1297,7 +1297,46 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// unchanged across 5 pilots。 substrate AT-REST
     /// + Tier A+B+C + 100% SIGBUS recovery preserved。
     /// No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2190"
+    ///
+    /// **M2194 chapter 七百七 第四刀**:Rust XCFramework
+    /// iOS-slice expansion close-out (chapter 七百六
+    /// planned-future-cut fulfilled)。 4 commits
+    /// shipped:(1) M2191 build script TARGETS
+    /// expanded from 1 to 3 slices (macos-arm64 +
+    /// ios-arm64 + ios-arm64-simulator) + PATH prefix
+    /// fix preferring rustup-managed cargo over
+    /// Homebrew (CRITICAL empirical finding:Homebrew
+    /// rust does NOT see rustup-installed cross-compile
+    /// targets — `rustup target list --installed` lies
+    /// from Homebrew cargo's perspective);XCFramework
+    /// rebuilt with rustup stable rustc;all 3 slice
+    /// SHAs verified BYTE-IDENTICAL across 2 clean
+    /// rebuilds with the new toolchain;Vendor/bas-rust
+    /// -binaries grew from ~7MB to ~50MB (~16MB per
+    /// slice after toolchain switch)。 (2) M2192
+    /// BASRustCoreBridge.swift constants resync:
+    /// shippedSlices 1→3 entries + macosArm64SliceSHA256
+    /// bumped to new-toolchain hash + NEW iosArm64
+    /// SliceSHA256 + iosArm64SimulatorSliceSHA256 +
+    /// sliceSHA256Count=3 + isIOSDeployable computed
+    /// property。 (3) M2193 6 new anti-drift tests +
+    /// 2 updated pins:per-slice SHA pins (3 total) +
+    /// sliceSHA256Count cross-mirror against shipped
+    /// Slices.count (CRITICAL — catches future add-
+    /// slice-forget-SHA or vice-versa drift) +
+    /// isIOSDeployable=true + each-slice-has-unique-SHA
+    /// guard。 (4) M2194 close-out + 13-file sync。
+    /// ADR-014 OPT-IN preserved (rustCoreEnabled
+    /// defaults FALSE)。 V1 byte-equality preserved
+    /// (776 consecutive clean commits after this lands)。
+    /// 273 typed surfaces unchanged (4 new bridge
+    /// constants + 1 computed property + 6 new tests
+    /// are production-code-typed-surfaces per chapter
+    /// 698 option-a)。 60/60 score unchanged。 Substrate
+    /// is now FULLY iOS-deployable for the Rust pilot
+    /// — completes the chapter 七百六 planned-future-
+    /// cut。 No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M2194"
 
     /// Query the typed status of a specific gap。
     public static func status(

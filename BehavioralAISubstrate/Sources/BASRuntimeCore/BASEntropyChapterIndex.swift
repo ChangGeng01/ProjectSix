@@ -6107,7 +6107,47 @@ public enum BASEntropyChapterIndex {
                 " AUGMENTATION ARC SEALED:Swift + SQL" +
                 " + C + Metal + C++ + Rust all live。" +
                 " User directive 「全面 转向 多个 语言」" +
-                " (2026-05-17) FULFILLED。")
+                " (2026-05-17) FULFILLED。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百七",
+            mNumberFirst: 2191, mNumberLast: 2194,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "RUST XCFRAMEWORK iOS-SLICE" +
+                " EXPANSION — chapter 七百六 planned-" +
+                "future-cut fulfilled。 M2191 第一刀" +
+                " scripts/build-rust-xcframework.sh" +
+                " TARGETS array expanded from 1 to 3" +
+                " slices (macos-arm64 + ios-arm64 +" +
+                " ios-arm64-simulator);PATH prefix fix" +
+                " preferring rustup-managed cargo over" +
+                " Homebrew (CRITICAL empirical finding:" +
+                " Homebrew rust does NOT see rustup-" +
+                "installed cross-compile targets);" +
+                " XCFramework rebuilt with rustup stable" +
+                " rustc;all 3 slice SHAs verified BYTE-" +
+                "IDENTICAL across 2 clean rebuilds;" +
+                " Vendor/bas-rust-binaries grew from" +
+                " ~7MB to ~50MB。 M2192 第二刀 BASRust" +
+                "CoreBridge.swift constants resync:" +
+                " shippedSlices 1→3 entries +" +
+                " macosArm64SliceSHA256 bumped to new" +
+                " toolchain hash + NEW iosArm64SliceSHA256" +
+                " + iosArm64SimulatorSliceSHA256 +" +
+                " sliceSHA256Count=3 + isIOSDeployable" +
+                " computed property。 M2193 第三刀 6 new" +
+                " anti-drift tests + 2 updated pins:" +
+                " per-slice SHA pins + sliceSHA256Count" +
+                " cross-mirror against shippedSlices" +
+                ".count (CRITICAL) + isIOSDeployable +" +
+                " unique-SHA guard。 Chapter 707 close-" +
+                "out (M2194) + 13-file standard sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2194。 776 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " UNCHANGED (chapter 698 honored)。" +
+                " 60/60 score unchanged。 Substrate now" +
+                " FULLY iOS-deployable for Rust pilot。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

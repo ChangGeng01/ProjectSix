@@ -121,12 +121,11 @@ public enum BASSweepDoctrineExpectations {
     /// trio,2nd post-hexa-#7 gap-fill,single-module
     /// BASMetalSubstrate reach;FIRST ALL-STRUCT trio
     /// in autonomous loop history)
-    /// At M2190:24 + 20 + 258 = 302 (chapter 七百六 —
-    /// Rust pilot FINAL of 5-language arc;XCFramework
-    /// + Swift bridge actor + V1↔V2 Codable wire-format
-    /// byte-equality proven。 5-LANGUAGE AUGMENTATION
-    /// ARC SEALED)。
-    public static let phase2ChapterCount: Int = 302
+    /// At M2194:24 + 20 + 259 = 303 (chapter 七百七 —
+    /// Rust XCFramework iOS-slice expansion;chapter
+    /// 七百六 planned-future-cut fulfilled。 Substrate
+    /// now fully iOS-deployable for Rust pilot)。
+    public static let phase2ChapterCount: Int = 303
 
     /// Phase 2 commits shipped。 At M2170:125 + 84 +
     /// 1005 = 1214 (chapter 701 — MULTI-LANGUAGE
@@ -138,20 +137,22 @@ public enum BASSweepDoctrineExpectations {
     /// = 1226 (chapter 七百四 — Metal pilot)。 At M2186:
     /// 1226 + 4 = 1230 (chapter 七百五 — C++ pilot)。
     /// At M2190:1230 + 4 = 1234 (chapter 七百六 — Rust
-    /// pilot FINAL of 5-language arc;XCFramework +
-    /// Swift bridge actor + Codable wire-format byte-
-    /// equality proven。 5-LANGUAGE AUGMENTATION ARC
-    /// SEALED)
-    public static let phase2CommitsShipped: Int = 1234
+    /// pilot FINAL of 5-language arc)。 At M2194:
+    /// 1234 + 4 = 1238 (chapter 七百七 — Rust XCFramework
+    /// iOS-slice expansion;chapter 七百六 planned-
+    /// future-cut fulfilled;substrate fully iOS-
+    /// deployable)
+    public static let phase2CommitsShipped: Int = 1238
 
     /// Phase 2 mNumberLast。 At M2170:chapter 701 —
     /// scaffold。 At M2174:chapter 702 — SQL pilot。
     /// At M2178:chapter 703 — C pilot。 At M2182:
     /// chapter 704 — Metal pilot。 At M2186:chapter
     /// 705 — C++ pilot。 At M2190:chapter 706 — Rust
-    /// pilot AND 5-language augmentation arc SEALED。
+    /// pilot + 5-language arc SEALED。 At M2194:
+    /// chapter 707 — Rust iOS slices expansion。
     /// SWEEP frozen at 1163。
-    public static let phase2MNumberLast: Int = 2190
+    public static let phase2MNumberLast: Int = 2194
 
     /// Phase 2 first M-number = chapter 四百三 entry
     /// (Phase 1 chapter 四百二 ends at M952;Phase 2
