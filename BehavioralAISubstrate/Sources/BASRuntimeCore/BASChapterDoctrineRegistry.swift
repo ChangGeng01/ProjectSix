@@ -24459,7 +24459,71 @@ public enum BASChapterDoctrineRegistry {
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
                 " 60/60 score unchanged。 Auto-mode 1min" +
-                " cadence loop continues。")
+                " cadence loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百二十五",
+            mNumberFirst: 2229,
+            mNumberLast: 2230,
+            v1MilestoneMNumber: 2230,
+            v1MilestoneStatus:
+                "chapter-725-pilot-actor-type-name-introspection-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2229, knife: "第一刀",
+                    concept: "PIVOT from 5-pilot ERROR" +
+                        " contract (8 pillars sealed in" +
+                        " chapters 717-724) to 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotActorTypeNameIntrospection" +
+                        "MatrixTests.swift with 6 tests" +
+                        " pinning String(describing:" +
+                        " PilotActor.self) for each of" +
+                        " 5 pilot actors + cross-pilot" +
+                        " uniqueness。 All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2230, knife: "第二刀",
+                    concept: "Chapter 725 close-out +" +
+                        " 13-file sync。 812 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2230。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines。" +
+                        " Cron caa2938c every-minute" +
+                        " safety-net trigger active.")
+            ],
+            entropyClassesAttacked: [
+                "pilot-actor-type-name-unpinned-no-introspection-contract"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2230",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "812-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "actor-type-name-pinned-5-pilot-actors",
+                "pivot-from-error-contract-to-actor-contract"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "PIVOT to 5-pilot ACTOR contract:" +
+                " actor type-name introspection matrix。" +
+                " 2-knife chapter。 M2229 第一刀 6 new" +
+                " tests pinning String(describing:" +
+                " PilotActor.self) for 5 pilot actors" +
+                " + cross-pilot uniqueness。 M2230" +
+                " 第二刀 close-out + 13-file sync。" +
+                " ADR-014 OPT-OUT preserved。 ADR-016" +
+                " → M2230。 812 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。 Auto-mode 1min cadence" +
+                " loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

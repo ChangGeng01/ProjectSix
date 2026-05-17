@@ -6616,7 +6616,36 @@ public enum BASEntropyChapterIndex {
                 " preserved。 ADR-016 → M2228。 810" +
                 " consecutive byte-equality clean" +
                 " commits。 273 typed surfaces unchanged。" +
-                " 60/60 score unchanged。")
+                " 60/60 score unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百二十五",
+            mNumberFirst: 2229, mNumberLast: 2230,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "PILOT ACTOR TYPE-NAME" +
+                " INTROSPECTION MATRIX — 2-knife。" +
+                " PIVOT from 5-pilot ERROR contract" +
+                " (chapters 717-724,8 pillars sealed)" +
+                " to 5-pilot ACTOR contract。 M2229" +
+                " 第一刀 NEW BASFivePilotActorTypeName" +
+                "IntrospectionMatrixTests.swift with 6" +
+                " tests pinning String(describing:" +
+                " PilotActor.self) for each of 5 pilot" +
+                " actors (BASMemoryUsageTracker / BAS" +
+                "MonotonicNanos / BASMetalKernelLibrary" +
+                "Loader / BASMPSGraphExecutableCache" +
+                "CxxBridge / BASRustMemoryUsageTracker" +
+                "Actor) + cross-pilot uniqueness。" +
+                " Real-world value:crash reports" +
+                " tagging actor source,migration" +
+                " scripts selecting by stable type" +
+                " name,log lines paired with actor-" +
+                "source identification。 M2230 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2230。" +
+                " 812 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged" +
+                "。 60/60 score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
