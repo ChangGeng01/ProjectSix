@@ -23936,7 +23936,81 @@ public enum BASChapterDoctrineRegistry {
                 " byte-equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
                 " unchanged。 Auto-mode 1min cadence" +
-                " loop continues。")
+                " loop continues。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百十八",
+            mNumberFirst: 2215,
+            mNumberLast: 2216,
+            v1MilestoneMNumber: 2216,
+            v1MilestoneStatus:
+                "chapter-718-error-hashable-matrix-and-set-deduplication",
+            knives: [
+                BASChapterKnife(mNumber: 2215, knife: "第一刀",
+                    concept: "Single-token `: Hashable`" +
+                        " addition to all 5 pilot error" +
+                        " enums (Swift auto-synthesizes" +
+                        " — all associated value types" +
+                        " are Int32/String) + NEW BAS" +
+                        "FivePilotErrorHashableMatrix" +
+                        "Tests.swift with 6 tests:Set-" +
+                        "based deduplication semantics" +
+                        " per pilot (Hashable contract" +
+                        " law:Equatable-equal ⇒ hash" +
+                        "Value-equal) + cross-pilot" +
+                        " joint conformance witness" +
+                        " (Error+Equatable+Hashable+" +
+                        "Sendable+Codable)。 Useful for" +
+                        " telemetry pipelines that need" +
+                        " to deduplicate identical error" +
+                        " instances。 All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2216, knife: "第二刀",
+                    concept: "Chapter 718 close-out +" +
+                        " 13-file sync。 798 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2216。 60/60 score" +
+                        " unchanged。 273 typed surfaces" +
+                        " unchanged。 NO new doctrines" +
+                        "(option-a:single-token" +
+                        " conformance addition on 5" +
+                        " existing error enums per" +
+                        " chapter 698 anti-sprawl" +
+                        " gate)。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-error-enum-hashable-conformance-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2216",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "798-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "hashable-contract-law-pinned-5-pilot-error-enums",
+                "set-deduplication-semantics-verified-cross-pilot"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "ERROR HASHABLE MATRIX + SET" +
+                " DEDUPLICATION for 5 pilots。 2-knife" +
+                " chapter。 M2215 第一刀 single-token" +
+                " `: Hashable` addition + 6 new tests" +
+                " covering Set-based deduplication" +
+                " semantics + cross-pilot joint" +
+                " conformance witness。 M2216 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2216。" +
+                " 798 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。 Auto-mode 1min" +
+                " cadence loop continues。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

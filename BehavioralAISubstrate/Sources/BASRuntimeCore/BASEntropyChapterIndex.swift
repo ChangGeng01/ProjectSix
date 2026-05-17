@@ -6431,7 +6431,30 @@ public enum BASEntropyChapterIndex {
                 " ADR-016 → M2214。 796 consecutive" +
                 " byte-equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
-                " unchanged。")
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百十八",
+            mNumberFirst: 2215, mNumberLast: 2216,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "ERROR ENUM HASHABLE MATRIX —" +
+                " 2-knife。 M2215 第一刀 single-token" +
+                " `: Hashable` addition to all 5 pilot" +
+                " error enums (Swift auto-synthesizes —" +
+                " all associated value types are Int32/" +
+                "String) + NEW BASFivePilotErrorHashable" +
+                "MatrixTests.swift with 6 tests:Set-" +
+                "based deduplication semantics per pilot" +
+                " (Hashable contract law:Equatable-equal" +
+                " ⇒ hashValue-equal) + cross-pilot joint" +
+                " conformance witness (Error+Equatable+" +
+                "Hashable+Sendable+Codable)。 Useful for" +
+                " telemetry deduplication。 M2216 第二刀" +
+                " close-out + 13-file sync。 ADR-014" +
+                " OPT-OUT preserved。 ADR-016 → M2216。" +
+                " 798 consecutive byte-equality clean" +
+                " commits。 273 typed surfaces unchanged。" +
+                " 60/60 score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

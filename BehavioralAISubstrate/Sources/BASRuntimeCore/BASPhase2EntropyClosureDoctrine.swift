@@ -369,7 +369,8 @@ public enum BASPhase2EntropyClosureDoctrine {
         "chapter 七百十四",  // M2207-M2208 (SUBSTRATE ADOPTION AUDIT + 5-PILOT INTEGRATION TEST — chapter 七百十三 planned-future-cut #2 fulfilled。 2-knife chapter。 M2207 第一刀 honest finding from substrate-internal audit:ZERO direct-init OR factory call sites for any of the 5 pilots in Sources/ (substrate is library,not consumer)。 NEW BASFivePilotEndToEndIntegrationTests.swift with 2 tests:testAllFivePilotsComposeViaMakeWithDefaults (constructs all 5 via chapter 713 makeWithDefaults() factories,exercises each,asserts V2 mode) + testNoSubstrateInternalDirectInitCallersFinding (typed audit-conclusion pin)。 6 new typed-surface pins added to BASMultiLanguageScaffoldDoctrine namespace (substrateInternalDirectInitCallSiteCount = 0 + substrateInternalFactoryCallSiteCount = 0 + chapter714AuditConclusion + chapter714AuditMNumber = 2207 + quanMianZhuanXiangSubstrateMaximum string + hostAdoptionRequiredForActualTurn = true)。 Post-hoc amendment to chapter 七百一 doctrine following chapter 695/696/697 precedent。 M2208 第二刀 chapter 714 close-out + 13-file standard sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2208。 790 consecutive byte-equality clean commits。 273 typed surfaces unchanged (6 new pins on existing doctrine per option-a discipline)。 60/60 score unchanged。 Substrate AT-REST + Tier A+B+C + 100% SIGBUS recovery + counter-sprawl + zero-warning all preserved。 「全面 转向 多个 语言」 substrate-side maximum fulfillment formally pinned:5/5 pilots default-ON + makeWithDefaults() convenience + e2e integration test + audit pin。 Further actual turn requires HOST code adoption。 Next:user direction。)
         "chapter 七百十五",  // M2209-M2210 (CONCURRENT-CONSTRUCTION STRESS TESTS — 2-knife chapter。 M2209 第一刀 NEW BASFivePilotConcurrentStressTests.swift with 5 tests (50 concurrent makeWithDefaults() per non-SQL pilot + 10 concurrent makeWithDefaults(databaseURL:) for SQL pilot) validating thread-safety of all 5 pilot factories under load。 All tests pass — no races,no deadlocks,all 50 instances per non-SQL pilot consistently in V2 mode。 M2210 第二刀 chapter 715 close-out + 13-file standard sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2210。 792 consecutive byte-equality clean commits。 273 typed surfaces unchanged (purely additive tests)。 60/60 score unchanged。 Substrate AT-REST + Tier A+B+C + 100% SIGBUS recovery + counter-sprawl + zero-warning all preserved。 Next:user direction (1min cadence loop active)。)
         "chapter 七百十六",  // M2211-M2212 (BOUNDARY + ERROR-PATH TESTS — 2-knife chapter。 M2211 第一刀 NEW BASFivePilotBoundaryAndErrorPathTests.swift with 7 tests covering boundary inputs (empty fields,1KB+10KB strings,non-ASCII UTF-8) + error-path edges (monotonic clock non-decreasing under 1000-iter stress)。 All pass。 M2212 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2212。 794 consecutive byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
-        "chapter 七百十七"   // M2213-M2214 (ERROR ENUM CODABLE MATRIX — 2-knife。 M2213 第一刀 NEW BASFivePilotErrorCodableMatrixTests.swift with 6 tests:full case-matrix Codable round-trip for all 5 pilot error enums (25 distinct error instances total) + 1 cross-pilot Error/Equatable/Sendable/Codable conformance contract compile-time check。 Each round-trip asserts decode(encode(x))==x AND re-encode byte-identical (idempotence)。 M2214 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2214。 796 byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。)
+        "chapter 七百十七",  // M2213-M2214 (ERROR ENUM CODABLE MATRIX — 2-knife。 M2213 第一刀 NEW BASFivePilotErrorCodableMatrixTests.swift with 6 tests:full case-matrix Codable round-trip for all 5 pilot error enums (25 distinct error instances total) + 1 cross-pilot Error/Equatable/Sendable/Codable conformance contract compile-time check。 Each round-trip asserts decode(encode(x))==x AND re-encode byte-identical (idempotence)。 M2214 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2214。 796 byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。)
+        "chapter 七百十八"   // M2215-M2216 (ERROR ENUM HASHABLE MATRIX — 2-knife。 M2215 第一刀 single-token `: Hashable` addition to all 5 pilot error enums (Swift auto-synthesizes — all associated value types are Int32/String) + NEW BASFivePilotErrorHashableMatrixTests.swift with 6 tests:Set-based deduplication semantics for each pilot's error enum (identical instances collapse,distinct instances stay distinct,Hashable contract law a.k.a. Equatable-equal ⇒ hashValue-equal) + 1 cross-pilot joint conformance compile-time witness (Error + Equatable + Hashable + Sendable + Codable)。 Useful for telemetry pipelines deduplicating identical error instances ("have I seen this exact failure before?")。 M2216 第二刀 close-out + 13-file sync。 ADR-014 OPT-OUT preserved。 ADR-016 → M2216。 798 byte-equality clean commits。 273 typed surfaces unchanged。 60/60 score unchanged。 Auto-mode 1min cadence loop continues。)
     ]
 
     /// First M-number of Phase 2 entropy work。
@@ -386,15 +387,16 @@ public enum BASPhase2EntropyClosureDoctrine {
     /// (chapter 四百八十二 — 5-of-5 primitive coverage
     /// + cross-turn KV cache substrate surface)。
     /// M1078-M1079 reserved for post-Phase-A follow-up。
-    public static let mNumberLast: Int = 2214
+    public static let mNumberLast: Int = 2216
 
     /// Cumulative commits shipped during Phase 2 (M953-
-    /// M2214)。 Bumped through chapter 717:1256 → 1258
-    /// (2-knife chapter)。 Chapter 717 (ERROR ENUM
-    /// CODABLE MATRIX):6 new tests covering full error
-    /// case matrix + cross-pilot conformance contract。
-    /// V1 byte-equality chain extends to 796。
-    public static let commitsShipped: Int = 1258
+    /// M2216)。 Bumped through chapter 718:1258 → 1260
+    /// (2-knife chapter)。 Chapter 718 (ERROR ENUM
+    /// HASHABLE MATRIX):6 new tests covering Set-based
+    /// deduplication semantics + cross-pilot joint
+    /// conformance witness。 V1 byte-equality chain
+    /// extends to 798。
+    public static let commitsShipped: Int = 1260
 
     /// Number of V2 FOUNDATION milestones shipped during
     /// Phase 2 (chapters 四百九-四百二十 = 12 foundations)。

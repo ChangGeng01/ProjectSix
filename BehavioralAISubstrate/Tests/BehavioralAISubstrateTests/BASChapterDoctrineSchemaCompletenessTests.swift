@@ -2716,7 +2716,13 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百十七",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百十七")!)
+                        chapterTag: "chapter 七百十七")!),
+            // M2216 chapter 718 — ERROR HASHABLE MATRIX +
+            // SET DEDUPLICATION
+            checkRegistry("七百十八",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百十八")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4943,6 +4949,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百十七")!
+                .mNumberLast),
+            // M2216 chapter 718 — ERROR HASHABLE MATRIX
+            ("718",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十八")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百十八")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
