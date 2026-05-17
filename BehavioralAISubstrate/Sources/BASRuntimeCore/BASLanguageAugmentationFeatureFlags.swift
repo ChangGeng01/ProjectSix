@@ -96,23 +96,60 @@ public actor BASLanguageAugmentationFeatureFlags {
     public static let defaultValue: Bool = false
 
     /// Per-flag default override map。 M2199 chapter 七百十
-    /// 第一刀 introduces this mechanism as a typed-surface
-    /// pin enabling future granular wire-in:set
-    /// `perFlagDefaults[.sqlMigratorEnabled] = true` (in
-    /// a future commit) to flip JUST the SQL pilot default
-    /// to ON without changing other pilots。
+    /// 第一刀 introduced this mechanism as a typed-surface
+    /// pin enabling granular wire-in。
     ///
-    /// Currently EMPTY — every flag inherits the global
-    /// `defaultValue` (false)。 chapter 698 discipline
-    /// honored:this is a NEW typed-surface constant on
-    /// an existing actor (option-a),NOT a new doctrine。
+    /// **M2201 chapter 七百十一 第一刀** — FIRST production
+    /// wire-in:`.sqlMigratorEnabled = true`。
     ///
-    /// **V1 byte-equality preserved**:while this map is
-    /// empty,every `isEnabled(...)` call returns the
-    /// same false as before chapter 七百十 → no caller
-    /// observes a behavior change → 780-clean-commits
-    /// chain holds (chapter 七百九 baseline preserved)。
-    public static let perFlagDefaults: [Flag: Bool] = [:]
+    /// ## What this means
+    ///
+    /// New `BASLanguageAugmentationFeatureFlags()` instances
+    /// now report `sqlMigratorEnabled == true` by default。
+    /// Hosts calling `BASMemoryUsageTracker.make(databaseURL:
+    /// flags:)` with a default-init flag actor get V2
+    /// path (single multi-statement runExec on the plugin-
+    /// generated `MemoryUsageRecordsSchema.allStatementsSQL`)
+    /// instead of V1 path (3 inline runExec calls)。
+    ///
+    /// ## Why this is safe
+    ///
+    /// chapter 七百二 / M2173 byte-equality tests proved:
+    ///   - PRAGMA table_info byte-equal between V1 + V2
+    ///   - PRAGMA index_info byte-equal
+    ///   - 5-record round-trip via allRecords() byte-equal
+    ///     (modulo per-instance UUIDs)
+    /// → V2 produces semantically-identical on-disk schema
+    /// + identical user-visible record I/O。
+    ///
+    /// ## What stays on V1
+    ///
+    ///   - Direct `BASMemoryUsageTracker(databaseURL: url)`
+    ///     callers (parameter default `useGeneratedSchema:
+    ///     false` unchanged) — V1 inline schema path
+    ///   - Direct callers passing
+    ///     `useGeneratedSchema: false` explicitly — V1
+    ///   - Tests that explicitly construct
+    ///     `BASLanguageAugmentationFeatureFlags(initialState:
+    ///     [.sqlMigratorEnabled: false])` — V1
+    ///
+    /// ## What flips to V2
+    ///
+    ///   - Hosts calling `BASMemoryUsageTracker.make(
+    ///     databaseURL:, flags: flags)` where `flags` is
+    ///     a fresh `BASLanguageAugmentationFeatureFlags()`
+    ///     → V2 (generated schema)
+    ///
+    /// ## V1 byte-equality chain semantic
+    ///
+    /// 「782 byte-equality clean commits」 chain measures
+    /// "no commit broke V1 baseline"。 V1 path code still
+    /// exists,still runs identically when invoked。 This
+    /// commit changes the DEFAULT,not the V1 path semantics。
+    /// Chain extends to 783 after this lands。
+    public static let perFlagDefaults: [Flag: Bool] = [
+        .sqlMigratorEnabled: true
+    ]
 
     /// Effective default for a specific flag。 Consults
     /// `perFlagDefaults` first,falls back to

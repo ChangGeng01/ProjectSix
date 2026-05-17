@@ -308,25 +308,57 @@ final class BASMemoryUsageTrackerSqlPilotByteEqualityTests:
 
     // MARK: - Flag-aware factory
 
-    func testMakeWithFlagsDefaultOffChoosesV1Path() async throws {
-        let url = tempDatabaseURL(suffix: "factory_off")
+    func testMakeWithFlagsDefaultChoosesV2PathAtChapter711() async throws {
+        // M2201 chapter 七百十一 FIRST production wire-
+        // in:sqlMigratorEnabled flipped to default-true。
+        // Renamed from testMakeWithFlagsDefaultOffChooses
+        // V1Path which pinned the pre-wire-in behavior。
+        let url = tempDatabaseURL(suffix: "factory_default")
         defer { removeIfExists(url) }
         let flags = BASLanguageAugmentationFeatureFlags()
-        // Default = false。 No explicit setFlag needed。
         let defaultValue = await flags.isEnabled(
             .sqlMigratorEnabled)
-        XCTAssertFalse(defaultValue,
-            "Default-off discipline pin (chapter 477" +
-            " ADR-014 OPT-IN)。")
+        XCTAssertTrue(defaultValue,
+            "M2201 chapter 七百十一 production wire-in:" +
+            " sqlMigratorEnabled now defaults TRUE。" +
+            " Hosts using `make(flags:)` with default-" +
+            "init flag actor get V2 path (generated" +
+            " schema)。 chapter 七百二 PRAGMA byte-" +
+            "equality proves V1+V2 produce identical" +
+            " on-disk schema。")
         let tracker = try await BASMemoryUsageTracker.make(
             databaseURL: url, flags: flags)
-        // V1 path produces the same on-disk schema as V2,
-        // so we just smoke-test reachability。
+        // V2 path now reached by default。 Schema is
+        // byte-equal to V1 (PRAGMA-verified at M2173)。
         _ = try await tracker.record(
             atomID: "atom-x",
             sessionRef: "session-x",
             turnRef: "turn-x",
             permitMode: "allow")
+        let count = await tracker.recordCount
+        XCTAssertEqual(count, 1)
+    }
+
+    func testMakeWithFlagsExplicitlyOffChoosesV1Path() async throws {
+        // M2201 chapter 七百十一 — V1 path still reachable
+        // via explicit opt-out。 Production hosts that
+        // need V1 for byte-equality investigations can
+        // explicitly set the flag false。
+        let url = tempDatabaseURL(suffix: "factory_explicit_off")
+        defer { removeIfExists(url) }
+        let flags = BASLanguageAugmentationFeatureFlags()
+        await flags.setFlag(.sqlMigratorEnabled, to: false)
+        let v = await flags.isEnabled(.sqlMigratorEnabled)
+        XCTAssertFalse(v,
+            "explicit setFlag(.sqlMigratorEnabled," +
+            " to: false) overrides perFlagDefaults" +
+            " entry → V1 path reachable for hosts" +
+            " that need byte-equality investigation。")
+        let tracker = try await BASMemoryUsageTracker.make(
+            databaseURL: url, flags: flags)
+        _ = try await tracker.record(
+            atomID: "atom-y", sessionRef: "s",
+            turnRef: "t", permitMode: "allow")
         let count = await tracker.recordCount
         XCTAssertEqual(count, 1)
     }
