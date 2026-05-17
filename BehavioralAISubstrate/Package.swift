@@ -232,6 +232,67 @@ let package = Package(
                 "BASMetalSubstrate"
             ]
         ),
+        // M2167 chapter 七百一 第一刀 — MULTI-LANGUAGE
+        // AUGMENTATION ARC scaffold (per user directive
+        // 「全面 转向 多个 语言:Swift + Metal,Rust,
+        // SQL,C,C++」 2026-05-17)。
+        //
+        // 4 EMPTY scaffold targets reserved for chapters
+        // 702-706 per-language pilots。 Each target ships
+        // with a `.gitkeep` placeholder source so SPM
+        // resolves cleanly。 No production code yet。
+        //
+        // Targets:
+        //   BASCSystemBridge          — chapter 703 C pilot
+        //   BASMPSGraphExecutableCacheCxx — chapter 705 C++ pilot
+        //   BASRustCoreBridge         — chapter 706 Rust bridge
+        //
+        // SQL pilot (chapter 702) uses a build PLUGIN,
+        // not a target — slot reserved in Plugins/
+        // directory at chapter 702 第一刀。
+        //
+        // Metal pilot (chapter 704) modifies existing
+        // BASMetalSubstrate target (exclude → resources)
+        // not a new target。
+        //
+        // ADR-014 OPT-IN preserved:no existing target
+        // depends on these scaffolds;all consumers gated
+        // by BASLanguageAugmentationFeatureFlags actor
+        // (default-off,shipped at M2168 第二刀)。
+
+        // C pilot target placeholder (chapter 703 / M2175+
+        // adds real function bas_monotonic_nanos)。 Scaffold
+        // ships minimal no-op C source proving SPM
+        // .cTarget integration works in this repo。
+        .target(
+            name: "BASCSystemBridge",
+            path: "Sources/BASCSystemBridge",
+            publicHeadersPath: "include"),
+
+        // C++ pilot target placeholder (chapter 705 / M2183+
+        // adds real MPS cache wrapper)。 Scaffold ships
+        // minimal no-op C++ source proving SPM .cxxTarget
+        // integration works (mirrors Vendor/mlx-swift/Cmlx
+        // precedent)。
+        .target(
+            name: "BASMPSGraphExecutableCacheCxx",
+            path: "Sources/BASMPSGraphExecutableCacheCxx",
+            publicHeadersPath: "include",
+            cxxSettings: [
+                .headerSearchPath("include")
+            ]),
+
+        // Rust bridge Swift wrapper placeholder (chapter
+        // 706 / M2187+ adds real BASRustMemoryUsageTracker
+        // Actor)。 binaryTarget for the Rust .xcframework
+        // added at chapter 706 第二刀 along with the actual
+        // XCFramework artifact in Vendor/bas-rust-binaries/。
+        // Scaffold ships minimal empty Swift enum proving
+        // target wiring works。
+        .target(
+            name: "BASRustCoreBridge",
+            path: "Sources/BASRustCoreBridge"),
+
         .testTarget(name: "BehavioralAISubstrateTests", dependencies: [
             "BASHostKit",
             "BASRuntimeCore",

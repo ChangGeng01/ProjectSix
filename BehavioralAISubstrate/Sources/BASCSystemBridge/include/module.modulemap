@@ -1,0 +1,4 @@
+module BASCSystemBridge {
+    header "bas_csystem_bridge.h"
+    export *
+}
