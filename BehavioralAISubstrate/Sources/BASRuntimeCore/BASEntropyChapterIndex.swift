@@ -6045,7 +6045,69 @@ public enum BASEntropyChapterIndex {
                 " unchanged。 Substrate AT-REST + Tier" +
                 " A+B+C + 100% SIGBUS recovery +" +
                 " counter-sprawl preserved。 Next:" +
-                " chapter 七百六 Rust pilot M2187-M2190.")
+                " chapter 七百六 Rust pilot M2187-M2190."),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百六",
+            mNumberFirst: 2187, mNumberLast: 2190,
+            knivesCount: 4, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " RUST PILOT。 5th AND FINAL of risk-" +
+                "ascending per-language pilots。 5-" +
+                "LANGUAGE AUGMENTATION ARC SEALED。" +
+                " M2187 第一刀 NEW Cargo workspace +" +
+                " bas-memory-usage-tracker crate" +
+                " (in-memory mode mirror of M738" +
+                " BASMemoryUsageTracker) + 7 public" +
+                " C ABI functions + hand-written" +
+                " header + rust-toolchain.toml +" +
+                " reproducible build script;Vendor/" +
+                "bas-rust-binaries XCFramework macos-" +
+                "arm64 slice committed (~7MB,SHA256" +
+                " verified BYTE-IDENTICAL across 2" +
+                " clean rebuilds — chapter 七百一 RED" +
+                " FLAG #1 mitigation verified)。 M2188" +
+                " 第二刀 Package.swift wires .binary" +
+                "Target + BASRustCoreBridge target" +
+                " conditional dep gated to iOS + macOS" +
+                " (no watchOS — rustc cannot cross-" +
+                "compile to arm64-apple-watchos) +" +
+                " BASRustCoreBridge.swift expanded" +
+                " from scaffold to 10 typed constants" +
+                " namespace。 M2189 第三刀 NEW Sources/" +
+                "BASRustCoreBridge/BASRustMemoryUsage" +
+                "TrackerActor.swift Swift actor mirror" +
+                " of V1 shape + Codable wire-format" +
+                " bridge + 6 typed error cases + #if" +
+                " os(iOS) || os(macOS) gate + async" +
+                " make(flags:) factory;ALSO NEW" +
+                " module.modulemap in XCFramework +" +
+                " Cargo/include (CRITICAL empirical" +
+                " finding:SPM binaryTarget XCFrameworks" +
+                " only expose Swift module via slice-" +
+                "level module.modulemap;canImport()" +
+                " does NOT reliably detect — use" +
+                " #if os(iOS) || os(macOS) instead);" +
+                " 28 anti-drift tests including V1↔V2" +
+                " Codable wire-format BYTE-EQUALITY-" +
+                "CLASS PROOF + Rust ABI version cross-" +
+                "mirror + reproducibility SHA256 pin。" +
+                " Chapter 706 close-out (M2190) + 13-" +
+                "file standard sync。 ADR-014 OPT-OUT" +
+                " preserved (rustCoreEnabled defaults" +
+                " FALSE → V1 Swift path unchanged)。" +
+                " ADR-016 → M2190。 772 consecutive" +
+                " byte-equality clean commits。 273" +
+                " typed surfaces UNCHANGED (chapter 698" +
+                " discipline honored across ALL FIVE" +
+                " pilots)。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C +" +
+                " 100% SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 5-LANGUAGE" +
+                " AUGMENTATION ARC SEALED:Swift + SQL" +
+                " + C + Metal + C++ + Rust all live。" +
+                " User directive 「全面 转向 多个 语言」" +
+                " (2026-05-17) FULFILLED。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters

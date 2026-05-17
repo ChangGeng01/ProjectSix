@@ -22778,7 +22778,168 @@ public enum BASChapterDoctrineRegistry {
                 " unchanged。 Substrate AT-REST + Tier" +
                 " A+B+C + 100% SIGBUS recovery +" +
                 " counter-sprawl preserved。 Next:" +
-                " chapter 七百六 Rust pilot M2187-M2190.")
+                " chapter 七百六 Rust pilot M2187-M2190."),
+        // chapter 706 — MULTI-LANGUAGE AUGMENTATION ARC
+        // RUST PILOT。 5th AND FINAL of per-language
+        // pilots。 5-LANGUAGE ARC SEALED。
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百六",
+            mNumberFirst: 2187,
+            mNumberLast: 2190,
+            v1MilestoneMNumber: 2190,
+            v1MilestoneStatus:
+                "chapter-706-rust-pilot-sealed-arc-complete",
+            knives: [
+                BASChapterKnife(mNumber: 2187, knife: "第一刀",
+                    concept: "NEW Cargo workspace +" +
+                        " bas-memory-usage-tracker crate" +
+                        " (in-memory mode mirror of M738" +
+                        " BASMemoryUsageTracker;Rust impl" +
+                        " via HashMap<String,Record> +" +
+                        " RwLock;7 public C ABI functions:" +
+                        " init/append/query/free_buffer/" +
+                        "size/close/version;manual JSON" +
+                        " writer no serde dep);hand-" +
+                        "written bas_rust_memory_tracker.h;" +
+                        " rust-toolchain.toml pinning" +
+                        " stable 1.84+;scripts/build-rust" +
+                        "-xcframework.sh with reproducibility" +
+                        " flags (SOURCE_DATE_EPOCH + codegen" +
+                        "-units=1 + panic=abort);Vendor/" +
+                        "bas-rust-binaries XCFramework" +
+                        " macos-arm64 slice committed" +
+                        " (SHA256 verified byte-identical" +
+                        " across 2 clean rebuilds);" +
+                        " .gitignore formalized;HONEST" +
+                        " scope acknowledgments documented。"),
+                BASChapterKnife(mNumber: 2188, knife: "第二刀",
+                    concept: "Package.swift wires .binary" +
+                        "Target BASRustMemoryTrackerBinary" +
+                        " + BASRustCoreBridge target's" +
+                        " conditional dep gated to iOS +" +
+                        " macOS (no watchOS — rustc cannot" +
+                        " cross-compile to arm64-apple-" +
+                        "watchos);BASRustCoreBridge.swift" +
+                        " expanded from scaffold to 10" +
+                        " typed constants namespace" +
+                        " (rustABIVersion + cargoCrate" +
+                        "Version + rustToolchainChannel +" +
+                        " xcframeworkVendorPath + shipped" +
+                        "Slices + macosArm64SliceSHA256" +
+                        " reproducibility pin + others)。"),
+                BASChapterKnife(mNumber: 2189, knife: "第三刀",
+                    concept: "NEW Sources/BASRustCore" +
+                        "Bridge/BASRustMemoryUsageTracker" +
+                        "Actor.swift Swift actor (V2" +
+                        " mirrors V1 BASMemoryUsageTracker" +
+                        " shape;Codable wire-format bridge" +
+                        " translates Rust JSON retrievedAtMs" +
+                        " ↔ Swift Date;6 typed error cases" +
+                        " + Codable;nonisolated(unsafe)" +
+                        " handle for deinit access;#if" +
+                        " os(iOS) || os(macOS) gate with" +
+                        " watchOS stub;async make(flags:)" +
+                        " factory);ALSO NEW module.modulemap" +
+                        " in BOTH XCFramework Headers/" +
+                        " AND Cargo/include/ — CRITICAL" +
+                        " empirical finding:SPM .binary" +
+                        "Target XCFrameworks only expose" +
+                        " Swift module via slice-level" +
+                        " module.modulemap;canImport()" +
+                        " does NOT reliably detect。 28" +
+                        " anti-drift tests including V1↔V2" +
+                        " Codable wire-format BYTE-EQUALITY" +
+                        "-CLASS PROOF + Rust ABI version" +
+                        " cross-mirror + reproducibility" +
+                        " SHA256 pin。"),
+                BASChapterKnife(mNumber: 2190, knife: "第四刀",
+                    concept: "Chapter 706 close-out +" +
+                        " 5-LANGUAGE AUGMENTATION ARC" +
+                        " SEALED + 13-file standard sync。" +
+                        " 772 consecutive byte-equality" +
+                        " clean commits。 ADR-016 → M2190。" +
+                        " 60/60 score unchanged。 NO new" +
+                        " doctrines per chapter 698" +
+                        " discipline。 User directive 「全面" +
+                        " 转向 多个 语言」 FULFILLED。")
+            ],
+            entropyClassesAttacked: [
+                "spm-cannot-host-rust-via-xcframework-with-byte-equal-rebuilds"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved (rustCoreEnabled defaults false → V1 path unchanged)",
+                "ADR-016 → M2190",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "772-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "rust-pilot-shipped-flag-gated",
+                "5-language-augmentation-arc-sealed",
+                "xcframework-byte-identical-across-2-clean-rebuilds-proven",
+                "v1-v2-codable-wire-format-byte-equality-proven",
+                "user-directive-quan-mian-zhuan-xiang-fulfilled"
+            ],
+            plannedFutureCuts: [
+                "Cross-compile XCFramework to arm64-apple" +
+                    "-ios + arm64-apple-ios-sim slices" +
+                    " when iOS host runtime demands Rust" +
+                    " path (today macOS only)。",
+                "Specialize generic C++ cache from" +
+                    " chapter 705 into id<MPSGraphExecutable>" +
+                    " variant when host demand justifies" +
+                    " MPSGraph framework coupling cost。",
+                "Future per-language pilots beyond the" +
+                    " 5-language arc may include:" +
+                    " WebAssembly (.wasm) for portable" +
+                    " sandboxed compute,Lua/Wren for" +
+                    " host-side scripting,etc — all" +
+                    " behind feature-flag opt-in per" +
+                    " chapter 477 ADR-014 discipline。"
+            ],
+            summary: "MULTI-LANGUAGE AUGMENTATION ARC" +
+                " RUST PILOT — 5th AND FINAL of 5 risk-" +
+                "ascending per-language pilots。 5-" +
+                "LANGUAGE AUGMENTATION ARC SEALED。" +
+                " M2187 第一刀 Cargo workspace + Rust" +
+                " crate (in-memory mirror of M738" +
+                " BASMemoryUsageTracker) + 7 public C" +
+                " ABI functions + hand-written header" +
+                " + reproducible build script;Vendor/" +
+                "bas-rust-binaries XCFramework macos-" +
+                "arm64 slice (~7MB,SHA256 verified" +
+                " byte-identical across 2 clean rebuilds)。" +
+                " M2188 第二刀 Package.swift wires" +
+                " .binaryTarget + 10 typed constants" +
+                " namespace in BASRustCoreBridge。 M2189" +
+                " 第三刀 NEW Swift actor wrapping the" +
+                " Rust ABI + Codable wire-format bridge" +
+                " + module.modulemap CRITICAL empirical" +
+                " finding documented + 28 anti-drift" +
+                " tests including V1↔V2 Codable byte-" +
+                "equality BYTE-EQUALITY-CLASS PROOF。" +
+                " Chapter 706 close-out (M2190) + 5-" +
+                "LANGUAGE ARC SEALED + 13-file standard" +
+                " sync。 ADR-014 OPT-OUT preserved" +
+                " (rustCoreEnabled defaults FALSE → V1" +
+                " Swift path unchanged)。 ADR-016 →" +
+                " M2190。 772 consecutive byte-equality" +
+                " clean commits。 273 typed surfaces" +
+                " UNCHANGED (chapter 698 discipline" +
+                " honored across ALL FIVE pilots — 702" +
+                " SQL + 703 C + 704 Metal + 705 C++ +" +
+                " 706 Rust)。 60/60 score unchanged。" +
+                " Substrate AT-REST + Tier A+B+C + 100%" +
+                " SIGBUS recovery + counter-sprawl" +
+                " trajectory preserved。 5-LANGUAGE" +
+                " AUGMENTATION ARC SEALED:Swift + SQL" +
+                " + C + Metal + C++ + Rust all live in" +
+                " Sources/ + Vendor/ + Cargo/ + Plugins/。" +
+                " User directive 「全面 转向 多个 语言:" +
+                "Swift + Metal,Rust,SQL,C,C++」 " +
+                "(2026-05-17) FULFILLED。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

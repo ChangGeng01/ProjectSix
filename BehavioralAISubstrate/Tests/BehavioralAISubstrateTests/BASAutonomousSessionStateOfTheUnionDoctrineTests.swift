@@ -36,39 +36,39 @@ final class BASAutonomousSessionStateOfTheUnionDoctrineTests:
 
     // MARK: - Cumulative metric pins
 
-    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter705() {
-        // chapters 702 + 703 + 704 + 705 ALL honored
-        // the chapter 698 zero-new-doctrine commitment:
-        // all new types (SQL pilot + C pilot + Metal
-        // pilot + C++ pilot) are production-code-typed-
-        // surfaces per chapter 698 option-a discipline,
-        // NOT new doctrines。 Count stays at 273 across
-        // the 4 pilots so far。
+    func testTypedSurfaceCountIsTwoHundredSeventyThreePostChapter706() {
+        // 5-LANGUAGE AUGMENTATION ARC SEALED at chapter
+        // 七百六 / M2190。 ALL 5 pilots (SQL + C + Metal
+        // + C++ + Rust) honored the chapter 698 zero-
+        // new-doctrine commitment:every new type is a
+        // PRODUCTION-CODE-TYPED-SURFACE per option-a
+        // discipline,NOT a new doctrine。 Count stays
+        // at 273 across the entire 5-pilot arc。
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .typedSurfaceCount,
             273)
     }
 
-    func testConsecutiveByteEqualityCleanCommitsIs768() {
+    func testConsecutiveByteEqualityCleanCommitsIs772() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .consecutiveByteEqualityCleanCommits,
-            768)
+            772)
     }
 
-    func testPhase2CommitsShippedIs1230() {
+    func testPhase2CommitsShippedIs1234() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .phase2CommitsShipped,
-            1230)
+            1234)
     }
 
-    func testChapter2NumberLastIs2186() {
+    func testChapter2NumberLastIs2190() {
         XCTAssertEqual(
             BASAutonomousSessionStateOfTheUnionDoctrine
                 .chapter2NumberLast,
-            2186)
+            2190)
     }
 
     // MARK: - Quality invariants

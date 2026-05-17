@@ -1229,7 +1229,75 @@ public enum BASCognitiveOSCompletionDoctrine {
     /// 5 languages plan progresses 4/5:SQL + C +
     /// Metal + C++ pilots shipped;next Rust at chapter
     /// 七百六。 No G-status change。
-    public static let doctrineVersion: String = "ADR-016.M2186"
+    ///
+    /// **M2190 chapter 七百六 第四刀**:Rust pilot close-
+    /// out AND MULTI-LANGUAGE AUGMENTATION ARC SEALED。
+    /// 5 of 5 per-language pilots shipped。 4 commits
+    /// shipped:(1) M2187 NEW Cargo/Cargo.toml workspace
+    /// + Cargo/bas-memory-usage-tracker crate
+    /// (in-memory mode mirror of M738 BASMemoryUsage
+    /// Tracker;Rust impl via HashMap<String,Record> +
+    /// RwLock;7 public C ABI functions;manual JSON
+    /// writer no serde dep);hand-written
+    /// `bas_rust_memory_tracker.h` (no cbindgen dep);
+    /// `rust-toolchain.toml` pinning stable 1.84+;
+    /// `scripts/build-rust-xcframework.sh` with
+    /// SOURCE_DATE_EPOCH + codegen-units=1 + panic=abort
+    /// + strip=symbols reproducibility flags;
+    /// `Vendor/bas-rust-binaries/BASRustMemoryTracker
+    /// .xcframework/` macos-arm64 slice committed (
+    /// ~7MB,SHA256 7557c7da...c91d772e verified
+    /// byte-identical across 2 clean rebuilds);
+    /// `.gitignore` formalizing Cargo target/ + SPM
+    /// .build/ exclusions;5 Rust unit tests pass;
+    /// HONEST scope (host-only slice + in-memory mode
+    /// + 7MB binary acknowledged);chapter 七百一 RED
+    /// FLAG #1 mitigation verified。 (2) M2188 Package
+    /// .swift wires .binaryTarget BASRustMemoryTracker
+    /// Binary + BASRustCoreBridge target's conditional
+    /// dep gated to iOS + macOS (no watchOS slice —
+    /// rustc cannot cross-compile to arm64-apple-
+    /// watchos);BASRustCoreBridge.swift expanded from
+    /// scaffold to real namespace with 10 typed
+    /// constants (rustABIVersion + cargoCrateVersion +
+    /// rustToolchainChannel + xcframeworkVendorPath +
+    /// shippedSlices + macosArm64SliceSHA256 +
+    /// pilotChapter + scaffoldVersion + isRustBridge
+    /// Available + liveRustABIVersion())。 (3) M2189
+    /// NEW Sources/BASRustCoreBridge/BASRustMemoryUsage
+    /// TrackerActor.swift Swift actor (V2 path mirrors
+    /// V1 BASMemoryUsageTracker shape;Codable wire-
+    /// format bridge translates Rust JSON
+    /// retrievedAtMs ↔ Swift Date;6 typed error cases
+    /// + Codable;`nonisolated(unsafe) var handle`
+    /// mirrors M735 SQLite pattern;#if os(iOS) ||
+    /// os(macOS) gate with watchOS stub;async make
+    /// (flags:) factory);ALSO NEW module.modulemap in
+    /// XCFramework + Cargo/include/ (CRITICAL empirical
+    /// finding:SPM binaryTarget XCFrameworks only
+    /// expose Swift module when slice contains module
+    /// .modulemap;canImport() does NOT reliably detect
+    /// binary target modules);28 anti-drift tests in
+    /// BASRustMemoryUsageTrackerActorTests including
+    /// V1↔V2 Codable wire-format byte-equality
+    /// (BYTE-EQUALITY-CLASS PROOF) + Rust ABI version
+    /// cross-mirror + reproducibility SHA256 pin。
+    /// (4) M2190 close-out + ARC SEALED。 ADR-014
+    /// OPT-IN preserved (rustCoreEnabled defaults FALSE
+    /// → V1 Swift BASMemoryUsageTracker in-memory path
+    /// unchanged)。 V1 byte-equality preserved (772
+    /// consecutive clean commits after this lands)。
+    /// **5-LANGUAGE AUGMENTATION ARC COMPLETE**:
+    /// Swift + SQL + C + Metal + C++ + Rust all live
+    /// in Sources/ + Vendor/ + Cargo/ + Plugins/。
+    /// Counter-sprawl trajectory honored:chapters
+    /// 702 + 703 + 704 + 705 + 706 ALL added ZERO new
+    /// doctrines per chapter 698 option-a discipline。
+    /// 60/60 score unchanged。 273 typed surfaces
+    /// unchanged across 5 pilots。 substrate AT-REST
+    /// + Tier A+B+C + 100% SIGBUS recovery preserved。
+    /// No G-status change。
+    public static let doctrineVersion: String = "ADR-016.M2190"
 
     /// Query the typed status of a specific gap。
     public static func status(

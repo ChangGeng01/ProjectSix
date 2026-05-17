@@ -2637,7 +2637,14 @@ final class BASChapterDoctrineSchemaCompletenessTests:
             checkRegistry("七百五",
                 record: BASChapterDoctrineRegistry
                     .recordFor(
-                        chapterTag: "chapter 七百五")!)
+                        chapterTag: "chapter 七百五")!),
+            // M2190 chapter 706 — MULTI-LANGUAGE
+            // AUGMENTATION ARC Rust pilot (FINAL of 5,
+            // ARC SEALED)
+            checkRegistry("七百六",
+                record: BASChapterDoctrineRegistry
+                    .recordFor(
+                        chapterTag: "chapter 七百六")!)
         ]
         XCTAssertEqual(
             allChapterIntegrityChecks.count,
@@ -4766,6 +4773,15 @@ final class BASChapterDoctrineSchemaCompletenessTests:
                 .mNumberFirst,
              BASChapterDoctrineRegistry.recordFor(
                 chapterTag: "chapter 七百五")!
+                .mNumberLast),
+            // M2190 chapter 706 — MULTI-LANGUAGE
+            // AUGMENTATION RUST PILOT (FINAL, ARC SEALED)
+            ("706",
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百六")!
+                .mNumberFirst,
+             BASChapterDoctrineRegistry.recordFor(
+                chapterTag: "chapter 七百六")!
                 .mNumberLast)
             ]
         // chapter 427 starts at M1080 (skipping M1078-M1079
