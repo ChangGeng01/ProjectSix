@@ -73,12 +73,33 @@ public struct BASMLContextService: BASContextServicing,
         /// Replaced by Phase C+ host-relevance ranker。
         public static let neutralHostRelevance: Double = 0.5
 
-        /// Ambiguity-score fallback when the ML classifier
-        /// throws (model load fail / predict fail)。 0.5
-        /// communicates honest uncertainty rather than
-        /// faking high or low ambiguity。
+        /// Ambiguity-score on classifier failure。 1.0 =
+        /// MAXIMUM ambiguity = "we have no information"。
+        /// Previously 0.5 ("medium uncertainty") which
+        /// was wrong — when the classifier throws,we
+        /// have no output, not partial output, so the
+        /// honest value is maximum ambiguity。 This
+        /// translates to confidence = 0 which keeps the
+        /// safety-verdict below the threshold (= .safe)
+        /// while accurately representing the failure。
         public static let fallbackAmbiguityOnClassifierFailure:
-            Double = 0.5
+            Double = 1.0
+
+        /// Manipulation-hint emitted when the ML
+        /// classifier throws。 Hosts can grep for this
+        /// prefix in `contextFrame.manipulationHints` to
+        /// distinguish "model returned .chat with low
+        /// confidence" from "model died, defaulted to
+        /// .chat"。
+        public static let classifierErrorHintPrefix:
+            String = "ml.classifier.error="
+
+        /// Manipulation-hint prefix surfaced when the
+        /// classifier successfully labels input as
+        /// .manipulationRisk。 Carries the confidence
+        /// value for downstream gating logic。
+        public static let manipulationConfidenceHintPrefix:
+            String = "ml.classifier.confidence="
     }
 
     /// Lower bound for the clamped ambiguity-score range。
@@ -155,20 +176,27 @@ public struct BASMLContextService: BASContextServicing,
             // confidence as a hint。 Otherwise empty。
             if taskType == .manipulationRisk {
                 manipulationHints = [
-                    "ml.classifier.confidence=" +
-                    String(format: "%.3f", confidence)
+                    Placeholders
+                        .manipulationConfidenceHintPrefix
+                    + String(format: "%.3f", confidence)
                 ]
             } else {
                 manipulationHints = []
             }
         } catch {
-            // Honest fallback: model failed. Don't crash
-            // the cognitive pipeline; degrade to neutral
-            // signals + log via future audit event.
+            // Honest fallback: model failed。 Surface the
+            // failure via manipulationHints so hosts can
+            // distinguish "real .chat classification" from
+            // "model died, defaulted to .chat"。 Maximum
+            // ambiguity → confidence 0 → safety verdict
+            // remains .safe (no false block on infra failure)。
             taskType = .chat
             ambiguityScore = Placeholders
                 .fallbackAmbiguityOnClassifierFailure
-            manipulationHints = []
+            manipulationHints = [
+                Placeholders.classifierErrorHintPrefix
+                + "\(error)"
+            ]
         }
 
         return BASContextFrame(
