@@ -164,6 +164,22 @@ public actor BASCognitiveBrain {
     public let healthHistory:
         BASCognitiveBrainHealthSnapshotHistory?
 
+    /// 持续性 发展 — auto-capture cadence。 When > 0,
+    /// brain.summary records a healthSnapshot every
+    /// Nth call (e.g. 10 = every 10 summaries)。 0
+    /// (default) disables auto-capture — hosts call
+    /// brain.recordHealthSnapshot() manually。
+    ///
+    /// Effective only when healthHistory is non-nil
+    /// (a ring buffer exists to append to)。
+    fileprivate let healthSnapshotAutoCaptureEvery: Int
+
+    /// 持续性 发展 — counter for auto-capture cadence。
+    /// Increments on every brain.summary call; modulo
+    /// `healthSnapshotAutoCaptureEvery` triggers a
+    /// capture。
+    fileprivate var summaryCallCount: Int = 0
+
     /// Per-instance safety confidence threshold for verdict
     /// escalation。 Defaults to
     /// `BASCognitiveBrain.safetyConfidenceThreshold`
@@ -280,7 +296,8 @@ public actor BASCognitiveBrain {
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
             (any BASHostProfileServicing)? = nil,
-        healthSnapshotHistoryCapacity: Int = 0
+        healthSnapshotHistoryCapacity: Int = 0,
+        healthSnapshotAutoCaptureEvery: Int = 0
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -298,7 +315,9 @@ public actor BASCognitiveBrain {
                 safetyConfidenceThreshold,
             hostProfileService: hostProfileService,
             healthSnapshotHistoryCapacity:
-                healthSnapshotHistoryCapacity)
+                healthSnapshotHistoryCapacity,
+            healthSnapshotAutoCaptureEvery:
+                healthSnapshotAutoCaptureEvery)
     }
 
     /// 主线 加强 实用性 — fully-wired brain factory。
@@ -344,7 +363,8 @@ public actor BASCognitiveBrain {
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
             (any BASHostProfileServicing)? = nil,
-        healthSnapshotHistoryCapacity: Int = 0
+        healthSnapshotHistoryCapacity: Int = 0,
+        healthSnapshotAutoCaptureEvery: Int = 0
     ) async throws -> BASCognitiveBrain {
         let sqlTracker = BASMemoryUsageTracker()
         let sqlStore = BASSQLBrainHistoryStore(
@@ -372,7 +392,9 @@ public actor BASCognitiveBrain {
                 safetyConfidenceThreshold,
             hostProfileService: hostProfileService,
             healthSnapshotHistoryCapacity:
-                healthSnapshotHistoryCapacity)
+                healthSnapshotHistoryCapacity,
+            healthSnapshotAutoCaptureEvery:
+                healthSnapshotAutoCaptureEvery)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -396,7 +418,8 @@ public actor BASCognitiveBrain {
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
             (any BASHostProfileServicing)? = nil,
-        healthSnapshotHistoryCapacity: Int = 0
+        healthSnapshotHistoryCapacity: Int = 0,
+        healthSnapshotAutoCaptureEvery: Int = 0
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -406,6 +429,8 @@ public actor BASCognitiveBrain {
         self.rustHistoryStore = rustHistoryStore
         self.metalLibraryLoader = metalLibraryLoader
         self.cxxSummaryCache = cxxSummaryCache
+        self.healthSnapshotAutoCaptureEvery =
+            max(0, healthSnapshotAutoCaptureEvery)
         // 主线 继续 开发 — allocate the ring buffer when
         // capacity > 0,otherwise leave nil to avoid the
         // actor allocation for brains that don't use it。
@@ -530,7 +555,8 @@ public actor BASCognitiveBrain {
             BASMetalKernelLibraryLoader? = nil,
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold,
-        healthSnapshotHistoryCapacity: Int = 0
+        healthSnapshotHistoryCapacity: Int = 0,
+        healthSnapshotAutoCaptureEvery: Int = 0
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -540,6 +566,8 @@ public actor BASCognitiveBrain {
         self.rustHistoryStore = rustHistoryStore
         self.metalLibraryLoader = metalLibraryLoader
         self.cxxSummaryCache = cxxSummaryCache
+        self.healthSnapshotAutoCaptureEvery =
+            max(0, healthSnapshotAutoCaptureEvery)
         if healthSnapshotHistoryCapacity > 0 {
             self.healthHistory =
                 BASCognitiveBrainHealthSnapshotHistory(
@@ -1325,6 +1353,7 @@ extension BASCognitiveBrain {
                         nativeSignals.crossSessionEcho,
                     metalDerivedSignal: metalSignal)
             await recordSummaryObservation(layered)
+            await maybeAutoCaptureHealthSnapshot()
             return layered
         }
         let result = await process(
@@ -1403,7 +1432,25 @@ extension BASCognitiveBrain {
             _ = try? await cache.cacheSummaryIfAbsent(
                 summary)
         }
+        await maybeAutoCaptureHealthSnapshot()
         return summary
+    }
+
+    /// 持续性 发展 — increments the per-summary counter
+    /// and captures a healthSnapshot when the counter hits
+    /// a multiple of `healthSnapshotAutoCaptureEvery`。
+    /// No-op when auto-capture disabled (0) OR when no
+    /// healthHistory ring buffer is allocated。
+    private func maybeAutoCaptureHealthSnapshot() async {
+        summaryCallCount += 1
+        guard healthSnapshotAutoCaptureEvery > 0,
+              healthHistory != nil
+        else { return }
+        if summaryCallCount
+            % healthSnapshotAutoCaptureEvery == 0
+        {
+            _ = await recordHealthSnapshot()
+        }
     }
 
     private func cxxCachedSummary(
@@ -1486,54 +1533,64 @@ extension BASCognitiveBrain {
     /// Same input → identical signature across runs。
     /// Hosts can use this as a cross-language fingerprint
     /// without re-running CoreML。
+    ///
+    /// 持续性 发展 — D bumped from 2 to 8。 Uses the FULL
+    /// SHA256 output (32 bytes → 8 channels × 4 bytes
+    /// each)。 Richer signature without changing the
+    /// deterministic property — same input still produces
+    /// identical signature。 8D L2-norm reduction
+    /// preserves the original "sign-invariant scalar
+    /// magnitude" semantics from D=2。
     private func computeMetalDerivedSignal(
         forInput input: String
     ) async -> Float? {
         guard metalLibraryLoader != nil else {
             return nil
         }
-        // Derive 2-channel x[] from SHA256 prefix。 D=2
-        // gives 8 bytes of seed,sufficient for input
-        // sensitivity without blowing up dispatch cost。
+        // Derive 8-channel x[] from full SHA256 (32 bytes)。
         let digest = SHA256.hash(
             data: Data(input.utf8))
-        var seedBytes = [UInt8]()
-        seedBytes.reserveCapacity(8)
-        for (i, byte) in digest.enumerated() {
-            if i >= 8 { break }
-            seedBytes.append(byte)
+        let seedBytes = Array(digest)
+        guard seedBytes.count >= 32 else { return nil }
+        var channels: [Float] = []
+        channels.reserveCapacity(8)
+        for i in 0..<8 {
+            let base = i * 4
+            let u = (UInt32(seedBytes[base]) << 24)
+                | (UInt32(seedBytes[base + 1]) << 16)
+                | (UInt32(seedBytes[base + 2]) << 8)
+                | UInt32(seedBytes[base + 3])
+            channels.append(
+                Float(u) / Float(UInt32.max) - 0.5)
         }
-        // Decode 8 bytes → 2 UInt32 → 2 Float32 in [-0.5, 0.5)
-        let u0 = (UInt32(seedBytes[0]) << 24)
-            | (UInt32(seedBytes[1]) << 16)
-            | (UInt32(seedBytes[2]) << 8)
-            | UInt32(seedBytes[3])
-        let u1 = (UInt32(seedBytes[4]) << 24)
-            | (UInt32(seedBytes[5]) << 16)
-            | (UInt32(seedBytes[6]) << 8)
-            | UInt32(seedBytes[7])
-        let ch0 = Float(u0) / Float(UInt32.max) - 0.5
-        let ch1 = Float(u1) / Float(UInt32.max) - 0.5
-        // Build (B=1, L=1, D=2) inputs。 The math:
+        // Build (B=1, L=1, D=8) inputs。 Math per channel:
         //   A_bar[d] = exp(delta[d] * A[d])
         //   B_bar[d] = delta[d] * B[d]
         //   h_1[d]   = B_bar[d] * x[0,d]
         //   y_1[d]   = C[d] * h_1[d]
-        let shape = BASSSMScanShape(B: 1, L: 1, D: 2)
-        let x: [Float] = [ch0, ch1]
-        let delta: [Float] = [
-            abs(ch0) + 0.5, abs(ch1) + 0.5]
-        let A: [Float] = [-0.5, -0.5]
-        let B: [Float] = [1.0, 1.0]
-        let C: [Float] = [1.0, 1.0]
+        let shape = BASSSMScanShape(B: 1, L: 1, D: 8)
+        let x: [Float] = channels
+        let delta: [Float] = channels.map {
+            abs($0) + 0.5
+        }
+        let A: [Float] = [Float](
+            repeating: -0.5, count: 8)
+        let B: [Float] = [Float](
+            repeating: 1.0, count: 8)
+        let C: [Float] = [Float](
+            repeating: 1.0, count: 8)
         do {
             let y = try await dispatchSSMScan(
                 x: x, delta: delta, A: A, B: B, C: C,
                 shape: shape)
-            guard y.count == 2 else { return nil }
-            // 2D magnitude — single deterministic scalar
-            // signature with sign invariance。
-            return sqrt(y[0] * y[0] + y[1] * y[1])
+            guard y.count == 8 else { return nil }
+            // 8D L2 norm — single deterministic scalar
+            // signature with sign invariance。 Richer
+            // input-sensitivity than D=2 while keeping
+            // the same scalar return type。
+            var sumSq: Float = 0
+            for v in y { sumSq += v * v }
+            return sqrt(sumSq)
         } catch {
             return nil
         }
@@ -2176,6 +2233,15 @@ extension BASCognitiveBrain {
         // that were created but never consumed。 Query each
         // probe;best-effort,failures surface as nil。
         let cProbes = await captureCSystemProbes()
+        // 持续性 发展 — top-K leaderboard via Rust pilot's
+        // native top_k_atoms FFI。 Best-effort:nil when
+        // Rust not wired or query fails。 Top-5 is small
+        // enough to include unconditionally without
+        // bloating the snapshot。
+        let topAtoms: [BASTopAtomEntry]?
+        if let store = rustHistoryStore {
+            topAtoms = try? await store.topKAtoms(limit: 5)
+        } else { topAtoms = nil }
         return BASCognitiveBrainHealthSnapshot(
             pilotStatus: status,
             pilotMetrics: metrics,
@@ -2184,6 +2250,7 @@ extension BASCognitiveBrain {
             cxxTelemetry: cxxTele,
             warmupResult: warmupResult,
             cSystemProbes: cProbes,
+            topAtoms: topAtoms,
             collectedAt: Date())
     }
 
@@ -2393,6 +2460,15 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
     public let cSystemProbes:
         BASCognitiveBrainCSystemProbeSnapshot?
 
+    /// 持续性 发展 — top-K most-frequent atoms via the
+    /// Rust pilot's native top-K FFI。 Nil when Rust
+    /// pilot is not wired。 Empty array when wired but
+    /// no records yet。 Hosts use this for "most-
+    /// repeated input" dashboards without re-running
+    /// the Rust query separately。 Default nil for
+    /// backward-compat。
+    public let topAtoms: [BASTopAtomEntry]?
+
     /// When the snapshot was collected (host clock)。
     public let collectedAt: Date
 
@@ -2409,6 +2485,7 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
             BASCognitiveBrainPilotWarmupResult?,
         cSystemProbes:
             BASCognitiveBrainCSystemProbeSnapshot? = nil,
+        topAtoms: [BASTopAtomEntry]? = nil,
         collectedAt: Date
     ) {
         self.pilotStatus = pilotStatus
@@ -2418,6 +2495,7 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
         self.cxxTelemetry = cxxTelemetry
         self.warmupResult = warmupResult
         self.cSystemProbes = cSystemProbes
+        self.topAtoms = topAtoms
         self.collectedAt = collectedAt
     }
 
