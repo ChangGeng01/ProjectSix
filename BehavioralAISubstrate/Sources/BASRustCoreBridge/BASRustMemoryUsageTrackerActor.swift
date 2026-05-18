@@ -267,6 +267,116 @@ public actor BASRustMemoryUsageTrackerActor {
         return try queryRecords(forAtomID: atomID)
     }
 
+    // MARK: - 主线 全面 开发: Rust-native aggregation FFI
+
+    /// Aggregation ABI version pin matching the Rust-side
+    /// `bas_rust_tracker_aggregation_version`。 Distinct
+    /// from `cargoCrateABIVersion` so future aggregation
+    /// surface changes don't bump the main pin (which
+    /// would invalidate existing wire-format byte-equality
+    /// tests)。
+    public static let aggregationABIVersion: Int32 = 1
+
+    /// Live Rust-side aggregation ABI version read。
+    public static func liveAggregationABIVersion() -> Int32 {
+        return bas_rust_tracker_aggregation_version()
+    }
+
+    /// 主线 全面 开发 — native Rust-side aggregation。
+    /// Iterates the HashMap inside Rust under one read
+    /// lock,emits a JSON `{"permit_mode": count, ...}`
+    /// map sorted alphabetically by key (byte-equality
+    /// deterministic across runs)。
+    ///
+    /// Before this commit,
+    /// `BASRustBrainHistoryStore.recordCountByPermitMode`
+    /// did `tracker.allRecords()` (full record query)
+    /// then folded in Swift。 This commit pushes the
+    /// aggregation into Rust where the data lives。
+    public func recordCountByPermitMode() throws
+        -> [String: Int]
+    {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        return try fetchCountMap { outBuf, outLen in
+            bas_rust_tracker_count_by_permit_mode(
+                h, outBuf, outLen)
+        }
+    }
+
+    /// Counterpart of `recordCountByPermitMode` grouping
+    /// by session_ref instead of permit_mode。
+    public func recordCountBySession() throws
+        -> [String: Int]
+    {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        return try fetchCountMap { outBuf, outLen in
+            bas_rust_tracker_count_by_session(
+                h, outBuf, outLen)
+        }
+    }
+
+    /// Number of distinct session_ref values across all
+    /// records, computed by a HashSet pass inside Rust
+    /// under one read lock。 Throws if the Rust core is
+    /// unavailable or if the call returns negative。
+    public func distinctSessionCount() throws -> Int {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        let n = bas_rust_tracker_distinct_sessions(h)
+        if n < 0 {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        }
+        return Int(n)
+    }
+
+    /// Internal helper for the two count-map FFI calls。
+    /// Both emit JSON `{"key": count, ...}` byte buffers
+    /// that need the same decode + free-buffer wrap。
+    private func fetchCountMap(
+        ffiCall: (UnsafeMutablePointer<
+            UnsafeMutablePointer<UInt8>?>,
+            UnsafeMutablePointer<Int>) -> Int32
+    ) throws -> [String: Int] {
+        var outBuf: UnsafeMutablePointer<UInt8>?
+        var outLen: Int = 0
+        let rc = ffiCall(&outBuf, &outLen)
+        switch rc {
+        case 0: break
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        case -2:
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+        guard let outBuf else { return [:] }
+        defer { bas_rust_tracker_free_buffer(outBuf, outLen) }
+        let data = Data(bytes: outBuf, count: outLen)
+        do {
+            // Rust emits JSON `{"key": 123, ...}`。 i64
+            // values fit Swift Int on 64-bit platforms,
+            // so decoding as [String: Int] is lossless。
+            return try JSONDecoder().decode(
+                [String: Int].self, from: data)
+        } catch {
+            throw BASRustMemoryUsageTrackerActorError
+                .jsonDecodeFailed(
+                    message: String(describing: error))
+        }
+    }
+
     /// Internal helper shared by `allRecords` (empty atomID)
     /// and `recordsForAtom` (specific atomID)。 Calls the
     /// Rust FFI with the atom_id arg + decodes the JSON
@@ -397,6 +507,25 @@ public actor BASRustMemoryUsageTrackerActor {
     public func recordsForAtom(
         atomID: String
     ) throws -> [BASMemoryUsageRecord] {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func recordCountByPermitMode() throws
+        -> [String: Int]
+    {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func recordCountBySession() throws
+        -> [String: Int]
+    {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func distinctSessionCount() throws -> Int {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }

@@ -124,6 +124,64 @@ impl Tracker {
             Err(_) => -1,
         }
     }
+
+    // 主线 全面 开发 — Rust-side native aggregation。
+    // Iterates the HashMap inside Rust under a single
+    // read lock,emits JSON `{"key": count, ...}` map。
+    // No Swift-side fold over allRecords()。
+    fn count_by_permit_mode_json(&self) -> Result<Vec<u8>, ()> {
+        let r = self.inner.read().map_err(|_| ())?;
+        let mut counts: HashMap<String, i64> = HashMap::new();
+        for rec in r.values() {
+            *counts
+                .entry(rec.permit_mode.clone())
+                .or_insert(0) += 1;
+        }
+        Ok(emit_count_json(&counts))
+    }
+
+    fn count_by_session_json(&self) -> Result<Vec<u8>, ()> {
+        let r = self.inner.read().map_err(|_| ())?;
+        let mut counts: HashMap<String, i64> = HashMap::new();
+        for rec in r.values() {
+            *counts
+                .entry(rec.session_ref.clone())
+                .or_insert(0) += 1;
+        }
+        Ok(emit_count_json(&counts))
+    }
+
+    fn distinct_sessions(&self) -> i64 {
+        match self.inner.read() {
+            Ok(r) => {
+                let mut set: std::collections::HashSet<&str> =
+                    std::collections::HashSet::new();
+                for rec in r.values() {
+                    set.insert(rec.session_ref.as_str());
+                }
+                set.len() as i64
+            }
+            Err(_) => -1,
+        }
+    }
+}
+
+// 主线 全面 开发 — manual JSON emitter for HashMap<String, i64>。
+// Keys ordered alphabetically for byte-equality determinism (so
+// repeated calls with the same data produce identical bytes)。
+fn emit_count_json(counts: &HashMap<String, i64>) -> Vec<u8> {
+    let mut keys: Vec<&String> = counts.keys().collect();
+    keys.sort();
+    let mut out = Vec::new();
+    out.push(b'{');
+    for (i, k) in keys.iter().enumerate() {
+        if i > 0 {
+            out.push(b',');
+        }
+        write_kv_int(&mut out, k.as_str(), counts[*k]);
+    }
+    out.push(b'}');
+    out
 }
 
 /// Manual JSON writer for one record。 Avoids serde
@@ -342,6 +400,83 @@ pub extern "C" fn bas_rust_tracker_size(
         return -1;
     }
     unsafe { (*tracker).size() }
+}
+
+// 主线 全面 开发 — Rust-side native aggregation FFI surfaces。
+// All three iterate the HashMap inside Rust under one read lock,
+// returning either a JSON byte buffer (count maps) or an i64
+// (distinct count)。
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_count_by_permit_mode(
+    tracker: *mut Tracker,
+    out_buf: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if tracker.is_null()
+        || out_buf.is_null()
+        || out_len.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let bytes = match tref.count_by_permit_mode_json() {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let mut boxed = bytes.into_boxed_slice();
+    unsafe {
+        *out_buf = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+        std::mem::forget(boxed);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_count_by_session(
+    tracker: *mut Tracker,
+    out_buf: *mut *mut c_uchar,
+    out_len: *mut usize,
+) -> c_int {
+    if tracker.is_null()
+        || out_buf.is_null()
+        || out_len.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let bytes = match tref.count_by_session_json() {
+        Ok(v) => v,
+        Err(_) => return -2,
+    };
+    let mut boxed = bytes.into_boxed_slice();
+    unsafe {
+        *out_buf = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+        std::mem::forget(boxed);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_distinct_sessions(
+    tracker: *mut Tracker,
+) -> i64 {
+    if tracker.is_null() {
+        return -1;
+    }
+    unsafe { (*tracker).distinct_sessions() }
+}
+
+// ABI version pin for the aggregation surface added this
+// commit。 Currently 1。 Separate version pin so future
+// changes to the aggregation surface don't force a bump
+// on the main version pin (which would invalidate
+// existing wire-format byte-equality tests)。
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_aggregation_version() -> c_int {
+    1
 }
 
 // MARK: - Tests

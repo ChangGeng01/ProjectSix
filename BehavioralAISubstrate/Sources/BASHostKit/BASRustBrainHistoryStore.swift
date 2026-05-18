@@ -177,54 +177,49 @@ public actor BASRustBrainHistoryStore {
     ///   - "how many .warn?"
     ///   - "how many .safe?"
     ///
-    /// Goes through the Rust core's `allRecords()` then
-    /// aggregates Swift-side。 Future commits could push
-    /// the aggregation into Rust for true zero-copy hot
-    /// paths,but the Swift fold is fast enough at the
-    /// current corpus sizes。
+    /// 主线 全面 开发:now uses the Rust-native aggregation
+    /// FFI (`bas_rust_tracker_count_by_permit_mode`) —
+    /// iterates the HashMap inside Rust under one read
+    /// lock,returns a JSON map,Swift decodes that map
+    /// instead of folding over the full record set。
     public func recordCountByPermitMode() async throws
         -> [String: Int]
     {
-        let all = try await tracker.allRecords()
-        var counts: [String: Int] = [:]
-        for record in all {
-            counts[record.permitMode, default: 0] += 1
-        }
-        return counts
+        return try await tracker
+            .recordCountByPermitMode()
     }
 
     /// Records grouped by session reference。 Useful for
     /// multi-session brain hosts that want to report
     /// "how many turns per session" without scanning
     /// the records array manually。
+    ///
+    /// 主线 全面 开发:Rust-side native aggregation via
+    /// `bas_rust_tracker_count_by_session`。
     public func recordCountBySession() async throws
         -> [String: Int]
     {
-        let all = try await tracker.allRecords()
-        var counts: [String: Int] = [:]
-        for record in all {
-            counts[record.sessionRef, default: 0] += 1
-        }
-        return counts
+        return try await tracker.recordCountBySession()
     }
 
     /// Codable aggregation snapshot — bundles the two
     /// rollups + total count for one-call telemetry。
+    /// 主线 全面 开发:每个 sub-aggregation 走 Rust 原生 FFI。
     public func aggregationSnapshot() async throws
         -> BASRustBrainHistoryStoreAggregation
     {
-        let all = try await tracker.allRecords()
-        var byPermit: [String: Int] = [:]
-        var bySession: [String: Int] = [:]
-        for record in all {
-            byPermit[record.permitMode, default: 0] += 1
-            bySession[record.sessionRef, default: 0] += 1
-        }
+        let total = try await tracker.recordCount()
+        let byPermit = try await tracker
+            .recordCountByPermitMode()
+        let bySession = try await tracker
+            .recordCountBySession()
+        let distinctSessions = try await tracker
+            .distinctSessionCount()
         return BASRustBrainHistoryStoreAggregation(
-            totalRecords: all.count,
+            totalRecords: total,
             recordsByPermitMode: byPermit,
             recordsBySession: bySession,
-            distinctSessions: bySession.count)
+            distinctSessions: distinctSessions)
     }
 }
 

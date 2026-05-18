@@ -103,6 +103,41 @@ void bas_rust_tracker_free_buffer(uint8_t* buf, size_t len);
 /// poisoned (extremely rare)。
 int64_t bas_rust_tracker_size(Tracker* tracker);
 
+/// 主线 全面 开发 — Rust-side native aggregation FFI。
+/// Iterates the HashMap inside Rust under one read lock,
+/// emits JSON `{"permit_mode": count, ...}` map sorted
+/// alphabetically by key (byte-equality deterministic)。
+/// Caller MUST call `bas_rust_tracker_free_buffer` to
+/// release。
+///
+/// Returns:
+///   - 0  = success
+///   - -1 = null pointer
+///   - -2 = internal error (lock poisoned)
+int32_t bas_rust_tracker_count_by_permit_mode(
+    Tracker* tracker,
+    uint8_t** out_buf,
+    size_t* out_len);
+
+/// Counterpart of `count_by_permit_mode` grouping by
+/// session_ref instead of permit_mode。
+int32_t bas_rust_tracker_count_by_session(
+    Tracker* tracker,
+    uint8_t** out_buf,
+    size_t* out_len);
+
+/// Number of distinct `session_ref` values across all
+/// records。 Returns -1 if `tracker` is null OR lock
+/// poisoned。
+int64_t bas_rust_tracker_distinct_sessions(
+    Tracker* tracker);
+
+/// ABI version pin for the aggregation surface added
+/// this commit。 Currently 1。 Separate from
+/// `bas_rust_tracker_version` so future aggregation-
+/// surface changes don't force a bump on the main pin。
+int32_t bas_rust_tracker_aggregation_version(void);
+
 #ifdef __cplusplus
 }
 #endif
