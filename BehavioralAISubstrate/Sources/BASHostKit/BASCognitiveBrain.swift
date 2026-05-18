@@ -144,6 +144,25 @@ public actor BASCognitiveBrain {
     public let metalLibraryLoader:
         BASMetalKernelLibraryLoader?
 
+    /// 主线 继续 开发 — memoized SSMScan dispatcher built
+    /// on first `brain.dispatchSSMScan(...)` call。 nil
+    /// until the host actually invokes dispatch。 Cheap
+    /// to construct,but lazily-built so the dispatcher
+    /// isn't created for brains that never compute Metal
+    /// (most cases)。
+    fileprivate var metalSSMScanDispatcher:
+        BASMetalSSMScanDispatcher?
+
+    /// 主线 继续 开发 — optional brain-owned health
+    /// snapshot history。 Configured at init via the
+    /// `healthSnapshotHistoryCapacity` parameter。 nil
+    /// when capacity is 0 (default) — historical brains
+    /// don't allocate the ring buffer they never use。
+    /// Hosts call `brain.recordHealthSnapshot()` to
+    /// capture + append in one call。
+    public let healthHistory:
+        BASCognitiveBrainHealthSnapshotHistory?
+
     /// Per-instance safety confidence threshold for verdict
     /// escalation。 Defaults to
     /// `BASCognitiveBrain.safetyConfidenceThreshold`
@@ -259,7 +278,8 @@ public actor BASCognitiveBrain {
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
-            (any BASHostProfileServicing)? = nil
+            (any BASHostProfileServicing)? = nil,
+        healthSnapshotHistoryCapacity: Int = 0
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -275,7 +295,9 @@ public actor BASCognitiveBrain {
             metalLibraryLoader: metalLibraryLoader,
             safetyConfidenceThreshold:
                 safetyConfidenceThreshold,
-            hostProfileService: hostProfileService)
+            hostProfileService: hostProfileService,
+            healthSnapshotHistoryCapacity:
+                healthSnapshotHistoryCapacity)
     }
 
     /// 主线 加强 实用性 — fully-wired brain factory。
@@ -320,7 +342,8 @@ public actor BASCognitiveBrain {
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
-            (any BASHostProfileServicing)? = nil
+            (any BASHostProfileServicing)? = nil,
+        healthSnapshotHistoryCapacity: Int = 0
     ) async throws -> BASCognitiveBrain {
         let sqlTracker = BASMemoryUsageTracker()
         let sqlStore = BASSQLBrainHistoryStore(
@@ -346,7 +369,9 @@ public actor BASCognitiveBrain {
             metalLibraryLoader: metalLoader,
             safetyConfidenceThreshold:
                 safetyConfidenceThreshold,
-            hostProfileService: hostProfileService)
+            hostProfileService: hostProfileService,
+            healthSnapshotHistoryCapacity:
+                healthSnapshotHistoryCapacity)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -369,7 +394,8 @@ public actor BASCognitiveBrain {
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold,
         hostProfileService:
-            (any BASHostProfileServicing)? = nil
+            (any BASHostProfileServicing)? = nil,
+        healthSnapshotHistoryCapacity: Int = 0
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -379,6 +405,16 @@ public actor BASCognitiveBrain {
         self.rustHistoryStore = rustHistoryStore
         self.metalLibraryLoader = metalLibraryLoader
         self.cxxSummaryCache = cxxSummaryCache
+        // 主线 继续 开发 — allocate the ring buffer when
+        // capacity > 0,otherwise leave nil to avoid the
+        // actor allocation for brains that don't use it。
+        if healthSnapshotHistoryCapacity > 0 {
+            self.healthHistory =
+                BASCognitiveBrainHealthSnapshotHistory(
+                    capacity: healthSnapshotHistoryCapacity)
+        } else {
+            self.healthHistory = nil
+        }
         self.instanceSafetyConfidenceThreshold =
             BASCognitiveBrain
                 .clampedThreshold(
@@ -492,7 +528,8 @@ public actor BASCognitiveBrain {
         metalLibraryLoader:
             BASMetalKernelLibraryLoader? = nil,
         safetyConfidenceThreshold: Double =
-            BASCognitiveBrain.safetyConfidenceThreshold
+            BASCognitiveBrain.safetyConfidenceThreshold,
+        healthSnapshotHistoryCapacity: Int = 0
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -502,6 +539,13 @@ public actor BASCognitiveBrain {
         self.rustHistoryStore = rustHistoryStore
         self.metalLibraryLoader = metalLibraryLoader
         self.cxxSummaryCache = cxxSummaryCache
+        if healthSnapshotHistoryCapacity > 0 {
+            self.healthHistory =
+                BASCognitiveBrainHealthSnapshotHistory(
+                    capacity: healthSnapshotHistoryCapacity)
+        } else {
+            self.healthHistory = nil
+        }
         self.instanceSafetyConfidenceThreshold =
             BASCognitiveBrain
                 .clampedThreshold(
@@ -1296,8 +1340,20 @@ extension BASCognitiveBrain {
         // C++ pilot integration:persist to process-global
         // cache so subsequent calls with the same input
         // get cache hits。 Non-fatal on encode/bridge error。
+        //
+        // 主线 继续 开发 — switched from
+        // `cacheSummary` (unconditional overwrite) to
+        // `cacheSummaryIfAbsent` (first-write-wins via
+        // C++ lookupOrInsert)。 Eliminates the TOCTOU
+        // window where two concurrent brain.summary
+        // calls with the same input both insert,with
+        // the second clobbering the first。 First write
+        // wins;subsequent identical-input misses see
+        // the first inserter's value via the cache hit
+        // path on next call。
         if let cache = cxxSummaryCache {
-            try? await cache.cacheSummary(summary)
+            _ = try? await cache.cacheSummaryIfAbsent(
+                summary)
         }
         return summary
     }
@@ -1709,6 +1765,88 @@ extension BASCognitiveBrain {
         #else
         return false
         #endif
+    }
+
+    /// 主线 继续 开发 — warmup overload that ALSO runs
+    /// the kernel self-test (a tiny B=1,L=1,D=1
+    /// dispatch with known inputs,verifying the GPU
+    /// returns the expected value within 1e-5)。 Moves
+    /// Metal warmup from "compile only" to "compile +
+    /// PROVE the kernel actually runs"。
+    ///
+    /// Returns a typed BASMetalKernelSelfTestResult。
+    /// `.skipped` when no loader wired / V1 mode /
+    /// non-Apple host。
+    public func warmMetalKernelWithSelfTest() async
+        -> BASMetalKernelSelfTestResult
+    {
+        guard let loader = metalLibraryLoader else {
+            return BASMetalKernelSelfTestResult(
+                status: .skipped,
+                reason: "no metalLibraryLoader wired",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
+        }
+        return await loader.runKernelSelfTest()
+    }
+
+    /// 主线 继续 开发 — capture a healthSnapshot and
+    /// append to the brain's owned ring buffer。 No-op
+    /// when `healthHistory` is nil (capacity was 0 at
+    /// init)。 Returns the captured snapshot so callers
+    /// can also use it directly。
+    ///
+    /// Pass an optional `warmupResult` to include the
+    /// Metal warmup state — same parameter as
+    /// `healthSnapshot(warmupResult:)`。
+    @discardableResult
+    public func recordHealthSnapshot(
+        warmupResult: BASCognitiveBrainPilotWarmupResult? = nil
+    ) async -> BASCognitiveBrainHealthSnapshot {
+        let snap = await healthSnapshot(
+            warmupResult: warmupResult)
+        if let history = healthHistory {
+            await history.append(snap)
+        }
+        return snap
+    }
+
+    /// 主线 继续 开发 — public Metal compute entry point。
+    /// Lets brain hosts dispatch the SSMScan kernel
+    /// without constructing a dispatcher themselves。
+    /// Throws if no Metal loader is wired OR if the
+    /// kernel dispatch fails (any
+    /// BASMetalSSMScanDispatcherError case)。
+    ///
+    /// Memoizes the dispatcher across calls so the
+    /// pipeline state + command queue are reused — same
+    /// amortization story as warmMetalKernel()。
+    public func dispatchSSMScan(
+        x: [Float],
+        delta: [Float],
+        A: [Float],
+        B: [Float],
+        C: [Float],
+        shape: BASSSMScanShape
+    ) async throws -> [Float] {
+        guard let loader = metalLibraryLoader else {
+            throw BASMetalSSMScanDispatcherError
+                .libraryUnavailable(
+                    message:
+                        "no metalLibraryLoader wired")
+        }
+        if metalSSMScanDispatcher == nil {
+            metalSSMScanDispatcher =
+                BASMetalSSMScanDispatcher(loader: loader)
+        }
+        guard let d = metalSSMScanDispatcher else {
+            throw BASMetalSSMScanDispatcherError
+                .libraryUnavailable(
+                    message: "dispatcher init failed")
+        }
+        return try await d.dispatch(
+            x: x, delta: delta, A: A, B: B, C: C,
+            shape: shape)
     }
 
     /// Pre-warm all warmable pilots in one call。

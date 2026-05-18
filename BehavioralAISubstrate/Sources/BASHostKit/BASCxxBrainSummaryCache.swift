@@ -70,7 +70,9 @@ public actor BASCxxBrainSummaryCache {
     }
 
     /// Persist a summary into the C++ cache。 Throws if
-    /// encoding or bridge insertion fails。
+    /// encoding or bridge insertion fails。 Unconditional
+    /// overwrite — if an entry exists for the same input,
+    /// it gets replaced。
     public func cacheSummary(
         _ summary: BASCognitiveBrainSummary
     ) async throws {
@@ -80,6 +82,68 @@ public actor BASCxxBrainSummaryCache {
         else { return }
         try await bridge.insert(
             key: summary.input, value: valueStr)
+    }
+
+    /// 主线 继续 开发 — first-write-wins cache insert。
+    /// Uses the C++-side atomic `lookupOrInsert` primitive
+    /// to insert under one mutex acquisition,returning
+    /// the existing entry if one was already there。
+    ///
+    /// Eliminates the TOCTOU window present in
+    /// `cacheSummary()` where two concurrent
+    /// `brain.summary("identical input")` calls can both
+    /// miss the cache,both compute,both insert,with the
+    /// second clobbering the first。 Under
+    /// `cacheSummaryIfAbsent`,the first inserter wins;
+    /// the second's compute result is discarded in favor
+    /// of the first's already-cached value。
+    ///
+    /// Returns a tuple of:
+    ///   - the BASCognitiveBrainSummary that's now in
+    ///     the cache (either the just-inserted `summary`
+    ///     or a previously-cached one if the cache had a
+    ///     race winner)
+    ///   - wasPresent: true if an entry was already there
+    ///     (this call did NOT insert); false if this call
+    ///     was the one that inserted
+    ///
+    /// Throws on encode failure or bridge error。 Best-
+    /// effort decode of the existing-entry case — if the
+    /// existing entry fails to decode (cache corruption /
+    /// schema drift),falls back to returning the provided
+    /// `summary` as if this call had been first。
+    @discardableResult
+    public func cacheSummaryIfAbsent(
+        _ summary: BASCognitiveBrainSummary
+    ) async throws
+        -> (summary: BASCognitiveBrainSummary,
+            wasPresent: Bool)
+    {
+        let data = try encoder.encode(summary)
+        guard let valueStr =
+            String(data: data, encoding: .utf8)
+        else {
+            return (summary: summary, wasPresent: false)
+        }
+        let result = try await bridge.lookupOrInsert(
+            key: summary.input, defaultValue: valueStr)
+        if !result.wasPresent {
+            // We are the inserter
+            return (summary: summary, wasPresent: false)
+        }
+        // Cache already had an entry — try to decode it
+        // and return that。 On decode failure,fall back
+        // to returning ours (correctness preserved;the
+        // existing entry is just opaque to this caller)。
+        guard let existingData =
+                result.value.data(using: .utf8),
+              let decoded = try? decoder.decode(
+                BASCognitiveBrainSummary.self,
+                from: existingData)
+        else {
+            return (summary: summary, wasPresent: true)
+        }
+        return (summary: decoded, wasPresent: true)
     }
 
     /// Process-global cache size (across all brain

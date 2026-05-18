@@ -264,6 +264,223 @@ public actor BASMetalKernelLibraryLoader {
         return 0
         #endif
     }
+
+    /// 主线 继续 开发 — actually run the compiled kernel
+    /// on a tiny known-input dispatch, returning a typed
+    /// self-test result。 Moves the Metal pilot from
+    /// "compile + memoize only" to "compile + memoize +
+    /// PROVE EXECUTION on every warmup that opts in"。
+    ///
+    /// Uses a (B=1, L=1, D=1) input shape so the dispatch
+    /// is sub-millisecond on Apple silicon。 The result
+    /// is computed against an inline-pinned expected
+    /// value derived from the same SSM recurrence:
+    ///
+    ///   A_d = -0.5, delta_t = 1.0, x_t = 1.0,
+    ///   B_t = 1.0, C_t = 1.0
+    ///   A_bar = exp(delta_t * A_d) = exp(-0.5)
+    ///   B_bar = delta_t * B_t = 1.0
+    ///   h_1   = A_bar * 0.0 + B_bar * x_t = 1.0
+    ///   y_1   = C_t * h_1 = 1.0
+    ///
+    /// V1 path / non-Apple host returns `.skipped`。
+    /// Compile failure returns `.failed`。 Math mismatch
+    /// > 1e-5 returns `.failed`。 Success returns
+    /// `.passed` with measuredOutput == 1.0 (within
+    /// tolerance)。
+    public func runKernelSelfTest() async
+        -> BASMetalKernelSelfTestResult
+    {
+        #if canImport(Metal)
+        guard useMetalKernelV2 else {
+            return BASMetalKernelSelfTestResult(
+                status: .skipped,
+                reason: "V1 path — kernel not compiled",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
+        }
+        // Memoized compile (re-uses existing library
+        // if already compiled)。
+        let lib: MTLLibrary
+        do {
+            lib = try library()
+        } catch {
+            return BASMetalKernelSelfTestResult(
+                status: .failed,
+                reason: "library() threw: \(error)",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
+        }
+        guard let function = lib.makeFunction(
+            name: "ssm_scan_float32")
+        else {
+            return BASMetalKernelSelfTestResult(
+                status: .failed,
+                reason:
+                    "ssm_scan_float32 function not found",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
+        }
+        let pipeline: MTLComputePipelineState
+        do {
+            pipeline = try await lib.device
+                .makeComputePipelineState(
+                    function: function)
+        } catch {
+            return BASMetalKernelSelfTestResult(
+                status: .failed,
+                reason:
+                    "pipeline creation threw: \(error)",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
+        }
+        guard let queue =
+            lib.device.makeCommandQueue()
+        else {
+            return BASMetalKernelSelfTestResult(
+                status: .failed,
+                reason: "makeCommandQueue returned nil",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
+        }
+        // Tiny (B=1, L=1, D=1) inputs。 Math:
+        //   A_bar = exp(1.0 * -0.5) = ~0.6065
+        //   B_bar = 1.0 * 1.0 = 1.0
+        //   h_1   = 0 + 1.0 * 1.0 = 1.0
+        //   y_1   = 1.0 * 1.0 = 1.0
+        let x: [Float] = [1.0]
+        let delta: [Float] = [1.0]
+        let A: [Float] = [-0.5]
+        let B: [Float] = [1.0]
+        let C: [Float] = [1.0]
+        var y: [Float] = [0.0]
+        var shapeValues: [UInt32] = [1, 1, 1]
+        let dev = lib.device
+        guard let xBuf = dev.makeBuffer(
+            bytes: x, length: 4, options: []),
+            let dBuf = dev.makeBuffer(
+                bytes: delta, length: 4, options: []),
+            let aBuf = dev.makeBuffer(
+                bytes: A, length: 4, options: []),
+            let bBuf = dev.makeBuffer(
+                bytes: B, length: 4, options: []),
+            let cBuf = dev.makeBuffer(
+                bytes: C, length: 4, options: []),
+            let yBuf = dev.makeBuffer(
+                bytes: &y, length: 4, options: []),
+            let sBuf = dev.makeBuffer(
+                bytes: &shapeValues, length: 12,
+                options: []),
+            let cmd = queue.makeCommandBuffer(),
+            let enc = cmd.makeComputeCommandEncoder()
+        else {
+            return BASMetalKernelSelfTestResult(
+                status: .failed,
+                reason: "buffer / encoder allocation" +
+                    " failed",
+                measuredOutput: 0,
+                expectedOutput: 1.0)
+        }
+        enc.setComputePipelineState(pipeline)
+        enc.setBuffer(xBuf, offset: 0, index: 0)
+        enc.setBuffer(dBuf, offset: 0, index: 1)
+        enc.setBuffer(aBuf, offset: 0, index: 2)
+        enc.setBuffer(bBuf, offset: 0, index: 3)
+        enc.setBuffer(cBuf, offset: 0, index: 4)
+        enc.setBuffer(yBuf, offset: 0, index: 5)
+        enc.setBuffer(sBuf, offset: 0, index: 6)
+        enc.dispatchThreads(
+            MTLSize(width: 1, height: 1, depth: 1),
+            threadsPerThreadgroup: MTLSize(
+                width: 1, height: 1, depth: 1))
+        enc.endEncoding()
+        // Bridge addCompletedHandler to async without
+        // crossing actor boundaries with MTLCommandBuffer
+        // (not Sendable)。
+        await withCheckedContinuation {
+            (cont: CheckedContinuation<Void, Never>) in
+            cmd.addCompletedHandler { _ in
+                cont.resume()
+            }
+            cmd.commit()
+        }
+        let outPtr = yBuf.contents().bindMemory(
+            to: Float.self, capacity: 1)
+        let measured = outPtr[0]
+        let expected: Float = 1.0
+        let absErr = abs(measured - expected)
+        if absErr > 1e-5 {
+            return BASMetalKernelSelfTestResult(
+                status: .failed,
+                reason:
+                    "math mismatch:|y - 1.0| = \(absErr)",
+                measuredOutput: measured,
+                expectedOutput: expected)
+        }
+        return BASMetalKernelSelfTestResult(
+            status: .passed,
+            reason:
+                "y_1 within 1e-5 of expected 1.0",
+            measuredOutput: measured,
+            expectedOutput: expected)
+        #else
+        return BASMetalKernelSelfTestResult(
+            status: .skipped,
+            reason: "canImport(Metal) is false",
+            measuredOutput: 0,
+            expectedOutput: 1.0)
+        #endif
+    }
+}
+
+/// 主线 继续 开发 — typed Codable result of
+/// `BASMetalKernelLibraryLoader.runKernelSelfTest()`。
+/// Hosts can inspect status + measured/expected outputs
+/// without parsing free-text。
+public struct BASMetalKernelSelfTestResult: Codable,
+    Equatable, Sendable, Hashable
+{
+    public enum Status: String, Codable, Sendable,
+        Hashable
+    {
+        /// V1 path / non-Apple host / Metal unavailable。
+        /// Not a failure — just not applicable。
+        case skipped
+        /// GPU dispatched, output within 1e-5 of
+        /// expected value。
+        case passed
+        /// Compile or dispatch threw,or output diverged。
+        case failed
+    }
+
+    public let status: Status
+
+    /// Human-readable reason — useful in audit logs。
+    public let reason: String
+
+    /// What the GPU returned。 0 on skipped。
+    public let measuredOutput: Float
+
+    /// What the math says the answer should be。
+    public let expectedOutput: Float
+
+    public init(
+        status: Status,
+        reason: String,
+        measuredOutput: Float,
+        expectedOutput: Float
+    ) {
+        self.status = status
+        self.reason = reason
+        self.measuredOutput = measuredOutput
+        self.expectedOutput = expectedOutput
+    }
+
+    /// Absolute error |measured - expected|。 0 on
+    /// skipped (no measurement taken)。
+    public var absoluteError: Float {
+        return abs(measuredOutput - expectedOutput)
+    }
 }
 
 // MARK: - Flag-aware factory
