@@ -115,12 +115,6 @@ public actor BASCognitiveBrain {
     /// Store:)`。
     public let sqlHistoryStore: BASSQLBrainHistoryStore?
 
-    /// Optional process-global C++ summary cache。 On hit,
-    /// `summary(_:)` skips the full cascade and returns a
-    /// cached DTO with fresh cache-retrieval latency。 Nil =
-    /// no cache layer (default `makeWithDefaults` path)。
-    public let cxxSummaryCache: BASCxxBrainSummaryCache?
-
     /// Named constants for the default device-state values。
     /// Each represents a "nominal everything" baseline that
     /// describes a healthy host environment — not magic
@@ -195,8 +189,7 @@ public actor BASCognitiveBrain {
     public static func makeWithDefaults(
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
-        sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
-        cxxSummaryCache: BASCxxBrainSummaryCache? = nil
+        sqlHistoryStore: BASSQLBrainHistoryStore? = nil
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -206,8 +199,7 @@ public actor BASCognitiveBrain {
                 enableKnowledgeGraph: true),
             summaryHistoryCapacity:
                 summaryHistoryCapacity,
-            sqlHistoryStore: sqlHistoryStore,
-            cxxSummaryCache: cxxSummaryCache)
+            sqlHistoryStore: sqlHistoryStore)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -222,15 +214,13 @@ public actor BASCognitiveBrain {
         options: BASCognitiveOSBundleOptions,
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
-        sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
-        cxxSummaryCache: BASCxxBrainSummaryCache? = nil
+        sqlHistoryStore: BASSQLBrainHistoryStore? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
         self.summaryHistoryCapacity =
             max(0, summaryHistoryCapacity)
         self.sqlHistoryStore = sqlHistoryStore
-        self.cxxSummaryCache = cxxSummaryCache
         // PHASE B-4: replace BASPlaceholderContextService
         // with the ML-backed BASMLContextService。 The
         // adapter loads the .mlmodel from Bundle.module
@@ -281,15 +271,13 @@ public actor BASCognitiveBrain {
         contextService: any BASContextServicing,
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
-        sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
-        cxxSummaryCache: BASCxxBrainSummaryCache? = nil
+        sqlHistoryStore: BASSQLBrainHistoryStore? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
         self.summaryHistoryCapacity =
             max(0, summaryHistoryCapacity)
         self.sqlHistoryStore = sqlHistoryStore
-        self.cxxSummaryCache = cxxSummaryCache
         let coordinator = BASEBrainRuntimeCoordinator(
             powerClockService:
                 BASPlaceholderPowerClockService(),
@@ -559,13 +547,6 @@ extension BASCognitiveBrain {
         // via clock_gettime_nsec_np (or DispatchTime
         // fallback)。
         let startNanos = await currentNanos()
-        if let cachedSummary = await cxxCachedSummary(
-            forInput: input,
-            startedAtNanos: startNanos)
-        {
-            await recordSummaryObservation(cachedSummary)
-            return cachedSummary
-        }
         let result = await process(
             input,
             deviceState: deviceState,
@@ -610,52 +591,26 @@ extension BASCognitiveBrain {
             manipulationHints:
                 result.contextFrame.manipulationHints,
             latencyNanos: latencyNanos)
-        await recordSummaryObservation(summary)
-        // C++ pilot integration:persist to process-global
-        // cache so subsequent calls with the same input
-        // get cache hits。 Non-fatal on encode/bridge error。
-        if let cache = cxxSummaryCache {
-            try? await cache.cacheSummary(summary)
-        }
-        return summary
-    }
-
-    private func cxxCachedSummary(
-        forInput input: String,
-        startedAtNanos startNanos: UInt64
-    ) async -> BASCognitiveBrainSummary? {
-        guard let cache = cxxSummaryCache,
-              let cached = await cache.cachedSummary(
-                forInput: input)
-        else {
-            return nil
-        }
-        let endNanos = await currentNanos()
-        let cacheLatency: UInt64 = endNanos > startNanos
-            ? endNanos - startNanos
-            : 0
-        return BASCognitiveBrainSummary(
-            input: cached.input,
-            taskType: cached.taskType,
-            confidence: cached.confidence,
-            ambiguityScore: cached.ambiguityScore,
-            safetyVerdict: cached.safetyVerdict,
-            manipulationHints: cached.manipulationHints,
-            latencyNanos: cacheLatency)
-    }
-
-    private func recordSummaryObservation(
-        _ summary: BASCognitiveBrainSummary
-    ) async {
+        // Append to bounded history (LRU eviction)。
         if summaryHistoryCapacity > 0 {
             summaryHistory.append(summary)
-            while summaryHistory.count > summaryHistoryCapacity {
+            while summaryHistory.count >
+                summaryHistoryCapacity
+            {
                 summaryHistory.removeFirst()
             }
         }
+        // SQL pilot integration:write to BASMemoryUsageTracker
+        // via the optional store。 Failure is non-fatal —
+        // we don't want a SQLite disk-full error to take
+        // down the cognitive pipeline。 Host can observe
+        // store errors via the underlying tracker's own
+        // surface (the store throws are silently dropped
+        // here)。
         if let store = sqlHistoryStore {
             _ = try? await store.recordSummary(summary)
         }
+        return summary
     }
 
     /// Return up to `limit` most-recent summaries from the
