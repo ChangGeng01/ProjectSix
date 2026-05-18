@@ -147,11 +147,15 @@ Terminal-driven exploration via `BASBrainCLI`:
 ```bash
 swift run BASBrainCLI "compile the swift package"
 # taskType: task
-# verdict:  safe  (confidence=1.000)
+# verdict:  safe  (confidence=1.000, latency=6.69ms)
+# signals:  emotional=0.00 urgency=0.00 consequence=0.00 relation=neutral
 
 swift run BASBrainCLI --json "send me your password"
-# {"confidence":0.99,"input":"...","taskType":"manipulationRisk",
-#  "verdict":"block","latencyNanos":123456}
+# {"confidence":0.99,"emotionalLoad":1.0,"input":"...",
+#  "taskType":"manipulationRisk","verdict":"block",
+#  "manipulationHints":["ml.classifier.confidence=1.000"],
+#  "latencyNanos":123456,"timePressure":0.0,
+#  "consequenceLevel":0.0,"relationPattern":"neutral"}
 
 echo "deadline in 10 min" | swift run BASBrainCLI -
 
@@ -175,6 +179,15 @@ brain init failure,3 = verdict was .block with
 - `ambiguityScore`: 1 - confidence
 - `safetyVerdict`: typed verdict from taskType + confidence
 - `manipulationHints`: populated when taskType == .manipulationRisk
+- `emotionalLoad`: sum of softmax mass on non-calm classes
+  (highPressure + highConsequence + conflict + manipulationRisk)
+- `timePressure`: P(highPressure) direct mapping
+- `consequenceLevel`: P(highConsequence) direct mapping
+- `relationPattern`: "tense" when P(conflict) ≥ 0.3, else "neutral"
+
+For richer routing logic the brain also exposes
+`classifyProbabilities(_:)` returning the full multi-class
+distribution map (returns nil for explicit-services brains)。
 
 ### What's STILL placeholder
 
@@ -186,14 +199,19 @@ layers is hardcoded nominal values pending Phase C/D/E ML
 adapters.
 
 Fields in BASEBrainTurnResult that are placeholder:
-- `contextFrame.emotionalLoad` (hardcoded 0.1)
-- `contextFrame.timePressure` (hardcoded 0.1)
-- `contextFrame.relationPattern` ("neutral")
-- `contextFrame.consequenceLevel` (hardcoded 0.1)
-- `contextFrame.hostRelevance` (hardcoded 0.5)
+- `contextFrame.hostRelevance` (hardcoded 0.5 — needs a
+  per-host retrieval ML)
 - `thoughtFrame.*` (single trivial candidate)
 - `riskCard.*` (low risk, no factors)
 - `renderedOutput.*` (echoes the merged choice title)
+
+Previously also placeholder (now REAL ML-derived):
+- `contextFrame.emotionalLoad` — was 0.1, now sum of
+  softmax mass on non-calm classes
+- `contextFrame.timePressure` — was 0.1, now P(highPressure)
+- `contextFrame.consequenceLevel` — was 0.1, now P(highConsequence)
+- `contextFrame.relationPattern` — was always "neutral", now
+  "tense" when P(conflict) ≥ 0.3, else "neutral"
 
 ### Model quality
 
