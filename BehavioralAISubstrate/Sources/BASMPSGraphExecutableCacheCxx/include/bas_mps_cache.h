@@ -115,6 +115,37 @@ int64_t bas_mps_cache_max_entry_byte_size(void);
 /// `bas_mps_cache_max_entry_byte_size`。 Currently 1。
 int32_t bas_mps_cache_max_entry_byte_size_version(void);
 
+/// 主线 全面 开发 — atomic check-then-act under one mutex
+/// acquisition。 Looks up `key`;if present,returns the
+/// stored value via `out_value` (caller frees with
+/// `bas_mps_cache_free_value`)。 If absent,inserts the
+/// `default_value` and returns IT via `out_value`。 Either
+/// way the caller observes a consistent value AND the
+/// cache ends up populated。
+///
+/// **Eliminates TOCTOU race**:doing this from Swift as
+/// "lookup then maybe insert" leaves a window where two
+/// threads can both miss and both insert,with the second
+/// winner overwriting the first。 Under one C++ mutex
+/// acquisition,this is impossible。 The C++ side owns
+/// the container — it should own the atomic operation。
+///
+/// - Returns:
+///   - 1  = found,*out_value filled with EXISTING value
+///   - 2  = not found,inserted default,*out_value filled
+///          with default
+///   - -1 = null `key` OR null `default_value` OR null
+///          `out_value` pointer
+///   - -2 = internal exception (allocation failure)
+int32_t bas_mps_cache_lookup_or_insert(
+    const char* key,
+    const char* default_value,
+    char** out_value);
+
+/// ABI / behavior version pin for
+/// `bas_mps_cache_lookup_or_insert`。 Currently 1。
+int32_t bas_mps_cache_lookup_or_insert_version(void);
+
 #ifdef __cplusplus
 }
 #endif

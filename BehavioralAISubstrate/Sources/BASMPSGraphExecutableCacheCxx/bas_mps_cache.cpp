@@ -146,6 +146,30 @@ public:
         return maxSize;
     }
 
+    // 主线 全面 开发 — atomic check-then-act。 Looks up
+    // `key`;if present,returns the existing value in
+    // `out` + the `found` flag set to true。 If absent,
+    // inserts the `default_value` and returns it via
+    // `out` + `found` false。 Single mutex acquisition
+    // means no other thread can observe the cache in a
+    // partial state between the lookup and the insert。
+    void lookup_or_insert(
+        const std::string& key,
+        const std::string& default_value,
+        std::string& out,
+        bool& found) {
+        std::lock_guard<std::mutex> w(rw_);
+        auto it = store_.find(key);
+        if (it != store_.end()) {
+            out = it->second;
+            found = true;
+            return;
+        }
+        store_[key] = default_value;
+        out = default_value;
+        found = false;
+    }
+
     void clear() {
         std::lock_guard<std::mutex> w(rw_);
         store_.clear();
@@ -274,6 +298,43 @@ int64_t bas_mps_cache_max_entry_byte_size(void) {
 }
 
 int32_t bas_mps_cache_max_entry_byte_size_version(void) {
+    return 1;
+}
+
+int32_t bas_mps_cache_lookup_or_insert(
+    const char* key,
+    const char* default_value,
+    char** out_value) {
+    if (key == nullptr || default_value == nullptr
+        || out_value == nullptr) {
+        return -1;
+    }
+    std::string out;
+    bool found = false;
+    try {
+        BasMpsCache::instance().lookup_or_insert(
+            std::string(key),
+            std::string(default_value),
+            out,
+            found);
+    } catch (...) {
+        return -2;
+    }
+    // Allocate C buffer the caller frees with
+    // bas_mps_cache_free_value (same lifecycle as
+    // bas_mps_cache_lookup)。
+    size_t n = out.size();
+    char* buf = static_cast<char*>(std::malloc(n + 1));
+    if (buf == nullptr) {
+        return -2;
+    }
+    std::memcpy(buf, out.data(), n);
+    buf[n] = '\0';
+    *out_value = buf;
+    return found ? 1 : 2;
+}
+
+int32_t bas_mps_cache_lookup_or_insert_version(void) {
     return 1;
 }
 

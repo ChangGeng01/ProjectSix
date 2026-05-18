@@ -251,6 +251,56 @@ public actor BASMPSGraphExecutableCacheCxxBridge {
         }
         return bytes
     }
+
+    /// 主线 全面 开发 — atomic check-then-act。 If `key` is
+    /// present in the cache,returns the existing value
+    /// (no write happens)。 If absent,inserts
+    /// `defaultValue` and returns the value just inserted。
+    /// Single C++ mutex acquisition,no TOCTOU race
+    /// window with concurrent callers。
+    ///
+    /// Returned tuple:
+    ///   - value:the cached value (either pre-existing or
+    ///     the newly-inserted default)
+    ///   - wasPresent:true if the lookup hit an existing
+    ///     entry,false if the default was inserted
+    ///
+    /// V1 path throws `.unknownReturnCode(-99)` matching
+    /// other V1-gated methods。
+    public func lookupOrInsert(
+        key: String, defaultValue: String
+    ) throws -> (value: String, wasPresent: Bool) {
+        guard useCxxCache else {
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .unknownReturnCode(-99)
+        }
+        var outPtr: UnsafeMutablePointer<CChar>?
+        let rc = key.withCString { keyPtr in
+            defaultValue.withCString { defPtr in
+                bas_mps_cache_lookup_or_insert(
+                    keyPtr, defPtr, &outPtr)
+            }
+        }
+        switch rc {
+        case 1, 2:
+            guard let outPtr else {
+                throw BASMPSGraphExecutableCacheCxxBridgeError
+                    .nullPointer
+            }
+            let value = String(cString: outPtr)
+            bas_mps_cache_free_value(outPtr)
+            return (value: value, wasPresent: rc == 1)
+        case -1:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .nullPointer
+        case -2:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .cxxInternalException
+        default:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .unknownReturnCode(rc)
+        }
+    }
 }
 
 // MARK: - Flag-aware factory
