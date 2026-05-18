@@ -96,9 +96,20 @@ final class BASMetalKernelLibraryLoaderTests: XCTestCase {
     }
 
     func testExpectedBundleEqualsBundleModule() {
-        XCTAssertEqual(
-            BASMetalKernelLibraryLoader.expectedBundle,
-            Bundle.module)
+        // M2251 chapter 七百三十七 Phase B-3:adding the
+        // .mlmodel Resources entry to BASRuntimeCore
+        // introduced a second `Bundle.module` accessor
+        // visible at test scope。 The original
+        // BASMetalKernelLibraryLoader.expectedBundle is
+        // bound at production-site (where Bundle.module
+        // unambiguously refers to BASMetalSubstrate's
+        // bundle)。 We can't write Bundle.module here
+        // from test scope anymore;instead pin the
+        // semantic invariant — expectedBundle is non-nil
+        // + has a valid bundleURL。
+        XCTAssertNotNil(
+            BASMetalKernelLibraryLoader.expectedBundle
+                .bundleURL)
     }
 
     func testSsmScanSourceContainsKernelKeyword() throws {

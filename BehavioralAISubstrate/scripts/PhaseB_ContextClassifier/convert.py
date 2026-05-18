@@ -60,7 +60,7 @@ class ContextClassifier(nn.Module):
 
 SCRIPT_DIR = Path(__file__).parent
 CHECKPOINT_PATH = SCRIPT_DIR / "context_classifier.pt"
-OUTPUT_PATH = SCRIPT_DIR / "BASContextClassifier.mlpackage"
+OUTPUT_PATH = SCRIPT_DIR / "BASContextClassifier.mlmodel"
 
 
 def main():
@@ -98,20 +98,22 @@ def main():
     # 3. Convert via coremltools
     # Input: 1×NUM_BUCKETS float32 bag-of-buckets vector
     # Output: 1×NUM_CLASSES logits (Swift takes argmax)
+    # Note: convert_to="neuralnetwork" produces .mlmodel
+    # instead of .mlpackage to avoid coremltools 9.0
+    # BlobWriter issue on Python 3.14+。 Swift CoreML
+    # runtime loads .mlmodel transparently — Phase B-3
+    # adapter uses the same MLModel API regardless of
+    # format。 Phase B-2+ can revisit mlprogram once
+    # coremltools / Python compatibility settles。
     mlmodel = ct.convert(
         traced,
         inputs=[
             ct.TensorType(
                 name="bag_of_buckets",
                 shape=(1, num_buckets),
-                dtype=float,
             )
         ],
-        outputs=[
-            ct.TensorType(name="logits", dtype=float)
-        ],
-        convert_to="mlprogram",  # .mlpackage format
-        minimum_deployment_target=ct.target.iOS17,
+        convert_to="neuralnetwork",
     )
 
     # 4. Add metadata so Swift can introspect
@@ -127,8 +129,11 @@ def main():
 
     # 5. Save
     if OUTPUT_PATH.exists():
-        import shutil
-        shutil.rmtree(OUTPUT_PATH)
+        if OUTPUT_PATH.is_dir():
+            import shutil
+            shutil.rmtree(OUTPUT_PATH)
+        else:
+            OUTPUT_PATH.unlink()
     mlmodel.save(str(OUTPUT_PATH))
     print(f"Wrote {OUTPUT_PATH}")
 

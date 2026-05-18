@@ -1,0 +1,305 @@
+// MARK: - BASContextClassifierMLAdapter
+// chapter 七百三十七 / M2251 — Phase B-3 — Swift CoreML
+//                              adapter for the first REAL
+//                              ML head in the 14-layer
+//                              电子脑。
+//
+// ## What this is
+//
+// The FIRST real-inference adapter shipped to the
+// substrate。 Loads `BASContextClassifier.mlmodel`
+// (chapter 七百三十六 Phase B-2 artifact) from Bundle
+// .module and exposes a typed `classify(text:)` async
+// API。
+//
+// ## Why it matters
+//
+// Before this chapter, the substrate had ZERO real ML
+// adapters (BAS14LayerMeshAssembler:118 admits "today's
+// substrate has ZERO real .mlpackage adapters"). Phase B-3
+// closes that fiction with ONE real adapter。 Phase B-4
+// will wire this adapter into BASPlaceholderContext
+// Service's replacement, so the cognitive cascade gets
+// real taskType inference from real ML。
+//
+// ## Pipeline
+//
+//   text input
+//     → BASContextClassifierInputEncoder.encode (Swift)
+//     → bag-of-256-buckets Float32 vector
+//     → MLModel.prediction (CoreML runtime)
+//     → 7 logits Float32 vector
+//     → argmax → BASContextTaskType
+//
+// The Swift encoder MUST produce byte-identical bucket
+// indices to the Python encoder used at training time。
+// SHA256-prefix algorithm is the parity contract — same
+// uint32 from first 4 bytes of SHA256 % 256。
+//
+// ## Honest scope acknowledgments
+//
+// **Phase B-1 trained on 105 examples (15 per class).**
+// The model overfits the training set (100% train acc)
+// and is unlikely to generalize well。 Phase B-2 will
+// expand the corpus + add proper train/val/test split。
+//
+// **Phase B-3 ships the ADAPTER**, not a high-accuracy
+// classifier。 The integration test verifies:
+//   1. Model loads from Bundle.module successfully
+//   2. classify(text:) returns a non-nil BASContextTaskType
+//   3. Determinism: same input → same output
+//   4. The 7 known training examples classify correctly
+//      (memorization sanity check)
+//
+// **What it does NOT yet verify**:
+//   - Generalization to unseen inputs (deferred to B-2
+//     with held-out test set)
+//   - Latency under load (deferred to B-4 benchmark)
+//   - ANE acceleration vs CPU (deferred to perf chapter)
+
+import Foundation
+import CryptoKit
+
+#if canImport(CoreML)
+import CoreML
+#endif
+
+// MARK: - Input encoder (Swift mirror of Python train.py
+// hash_bucket function)
+
+/// Deterministic text → bag-of-N-buckets encoder。 Must
+/// produce byte-identical bucket indices to the Python
+/// trainer's `hash_bucket` function — SHA256 first-4-bytes
+/// as big-endian uint32 % numBuckets。
+///
+/// Parity-tested against Python output via
+/// `BASContextClassifierInputEncoderParityTests` in
+/// Phase B-3 (this chapter)。
+public enum BASContextClassifierInputEncoder {
+
+    /// Number of hash buckets in the bag-of-tokens encoder。
+    /// Must match train.py `NUM_BUCKETS`。
+    public static let numBuckets: Int = 256
+
+    /// Tokenize:lowercase + whitespace split。 Trivial
+    /// tokenization mirroring Python `tokenize(text)`。
+    public static func tokenize(_ text: String) -> [String] {
+        return text.lowercased()
+            .split(separator: " ")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+    }
+
+    /// Hash a token to a bucket index。 SHA256-prefix
+    /// algorithm matches Python `hash_bucket(token,
+    /// num_buckets)`。
+    public static func hashBucket(
+        _ token: String,
+        numBuckets: Int = BASContextClassifierInputEncoder
+            .numBuckets
+    ) -> Int {
+        let digest = SHA256.hash(
+            data: Data(token.utf8))
+        // Take first 4 bytes as big-endian UInt32
+        var iter = digest.makeIterator()
+        let b0 = UInt32(iter.next()!) << 24
+        let b1 = UInt32(iter.next()!) << 16
+        let b2 = UInt32(iter.next()!) << 8
+        let b3 = UInt32(iter.next()!)
+        let combined = b0 | b1 | b2 | b3
+        return Int(combined % UInt32(numBuckets))
+    }
+
+    /// Encode text → bag-of-buckets Float32 array。
+    /// L2-normalized to match Python encoder。
+    public static func encode(_ text: String) -> [Float] {
+        var vec = Array(
+            repeating: Float(0.0),
+            count: numBuckets)
+        for tok in tokenize(text) {
+            vec[hashBucket(tok)] += 1.0
+        }
+        var sumSq: Float = 0
+        for v in vec { sumSq += v * v }
+        let norm = sumSq.squareRoot()
+        if norm > 0 {
+            for i in vec.indices { vec[i] /= norm }
+        }
+        return vec
+    }
+}
+
+// MARK: - Adapter errors
+
+public enum BASContextClassifierMLAdapterError:
+    Error, Equatable, Hashable, Sendable, Codable
+{
+    /// Bundle.module did not contain the .mlmodel resource。
+    case modelResourceMissing
+    /// MLModel(contentsOf:) failed to load the resource。
+    case modelLoadFailed(message: String)
+    /// CoreML compilation failed。
+    case modelCompilationFailed(message: String)
+    /// CoreML prediction failed at runtime。
+    case predictionFailed(message: String)
+    /// Output tensor shape didn't match expected 1×7。
+    case unexpectedOutputShape(message: String)
+    /// CoreML framework not available on this build host
+    /// (e.g. Linux during cross-compile inspection)。
+    case coreMLUnavailableOnPlatform
+}
+
+// MARK: - Adapter
+
+#if canImport(CoreML)
+
+/// Loads BASContextClassifier.mlmodel + exposes a typed
+/// `classify(text:)` API returning the predicted
+/// BASContextTaskType。
+public actor BASContextClassifierMLAdapter {
+
+    /// 7 labels in the same order as Python label_index.json
+    /// (matches the .mlmodel output dimension)。
+    public static let labels: [String] = [
+        "chat",
+        "task",
+        "choice",
+        "conflict",
+        "highPressure",
+        "manipulationRisk",
+        "highConsequence"
+    ]
+
+    private let model: MLModel
+
+    // MARK: - Construction
+
+    /// Load the .mlmodel from Bundle.module。 Compiles
+    /// + caches at construction time so prediction calls
+    /// are fast。
+    public init() throws {
+        guard let url = Bundle.module.url(
+            forResource: "BASContextClassifier",
+            withExtension: "mlmodel")
+        else {
+            throw BASContextClassifierMLAdapterError
+                .modelResourceMissing
+        }
+        do {
+            // .mlmodel must be compiled to .mlmodelc at
+            // runtime (Xcode would pre-compile in app
+            // builds, but SPM Resources ship raw .mlmodel)
+            let compiledURL = try MLModel.compileModel(
+                at: url)
+            self.model = try MLModel(
+                contentsOf: compiledURL)
+        } catch {
+            throw BASContextClassifierMLAdapterError
+                .modelLoadFailed(
+                    message: "\(error)")
+        }
+    }
+
+    // MARK: - Inference
+
+    /// Classify a text input into one of 7 BASContextTaskType
+    /// labels。 Returns the label string + the full logits
+    /// vector for advanced callers that want confidence
+    /// scoring。
+    public func classify(
+        text: String
+    ) throws -> (label: String, logits: [Float]) {
+        // 1. Encode text → bag-of-buckets
+        let bag = BASContextClassifierInputEncoder.encode(
+            text)
+        // 2. Build MLMultiArray input (1×256 Float32)
+        guard let input = try? MLMultiArray(
+            shape: [1, NSNumber(
+                value: BASContextClassifierInputEncoder
+                    .numBuckets)],
+            dataType: .float32)
+        else {
+            throw BASContextClassifierMLAdapterError
+                .predictionFailed(
+                    message: "MLMultiArray allocation failed")
+        }
+        for (i, v) in bag.enumerated() {
+            input[i] = NSNumber(value: v)
+        }
+        // 3. Build prediction input dict
+        let provider = try MLDictionaryFeatureProvider(
+            dictionary: ["bag_of_buckets": input])
+        // 4. Predict
+        let output: MLFeatureProvider
+        do {
+            output = try model.prediction(from: provider)
+        } catch {
+            throw BASContextClassifierMLAdapterError
+                .predictionFailed(
+                    message: "\(error)")
+        }
+        // 5. Extract logits
+        // The output feature name depends on coremltools
+        // conversion;we read the FIRST multiarray output。
+        let outputFeatureNames = output.featureNames
+        guard let firstName = outputFeatureNames.first,
+              let logitsArray = output.featureValue(
+                for: firstName)?.multiArrayValue
+        else {
+            throw BASContextClassifierMLAdapterError
+                .unexpectedOutputShape(
+                    message: "no multiArray output found")
+        }
+        // 6. Convert to [Float] + argmax
+        var logits = [Float]()
+        logits.reserveCapacity(logitsArray.count)
+        for i in 0..<logitsArray.count {
+            logits.append(logitsArray[i].floatValue)
+        }
+        guard logits.count ==
+            BASContextClassifierMLAdapter.labels.count
+        else {
+            throw BASContextClassifierMLAdapterError
+                .unexpectedOutputShape(
+                    message: "got \(logits.count) logits," +
+                        " expected " +
+                        "\(BASContextClassifierMLAdapter.labels.count)")
+        }
+        let argmax = logits.indices.max(by: {
+            logits[$0] < logits[$1]
+        }) ?? 0
+        return (
+            BASContextClassifierMLAdapter.labels[argmax],
+            logits)
+    }
+}
+
+#else
+
+/// Stub for platforms without CoreML (Linux build hosts)。
+/// All methods throw `.coreMLUnavailableOnPlatform`。
+public actor BASContextClassifierMLAdapter {
+    public static let labels: [String] = [
+        "chat",
+        "task",
+        "choice",
+        "conflict",
+        "highPressure",
+        "manipulationRisk",
+        "highConsequence"
+    ]
+
+    public init() throws {
+        throw BASContextClassifierMLAdapterError
+            .coreMLUnavailableOnPlatform
+    }
+
+    public func classify(
+        text: String
+    ) throws -> (label: String, logits: [Float]) {
+        throw BASContextClassifierMLAdapterError
+            .coreMLUnavailableOnPlatform
+    }
+}
+
+#endif

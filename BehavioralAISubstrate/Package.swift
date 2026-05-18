@@ -77,7 +77,17 @@ let package = Package(
         // resolves in BASMonotonicNanos。
         .target(
             name: "BASRuntimeCore",
-            dependencies: ["BASCSystemBridge"]),
+            dependencies: ["BASCSystemBridge"],
+            // M2250 chapter 七百三十六 PHASE B-2 —
+            // BASContextClassifier.mlmodel is the first
+            // REAL ML adapter (G11 / G8 fulfillment).
+            // Bundle.module.url(forResource: "BAS Context
+            // Classifier", withExtension: "mlmodel")
+            // serves it at runtime. The Swift adapter
+            // (Phase B-3) loads it via MLModel(contentsOf:)。
+            resources: [
+                .process("Resources/BASContextClassifier.mlmodel")
+            ]),
         // M2172 chapter 七百二 第二刀 — BASMemory grows
         // a `SQL/` subdirectory (001_memory_usage_records.sql)
         // + attaches the BASSQLSchemaGen build plugin to
