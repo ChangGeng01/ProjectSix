@@ -314,6 +314,37 @@ public actor BASSQLBrainHistoryStore {
         try await tracker.markHelped(
             recordID: recordID, helped: helped)
     }
+
+    /// 全面 开发 — atomic batch summary insert via SQLite
+    /// `BEGIN TRANSACTION ... COMMIT`。 Either all
+    /// summaries commit or none。 Returns the minted
+    /// recordIDs in insertion order。
+    ///
+    /// Use case:host has a batch of N summaries (e.g.
+    /// from a queue / file replay) and wants them
+    /// inserted with one fsync,not N。 SQL transaction
+    /// is the right primitive here。
+    @discardableResult
+    public func recordSummaryBatch(
+        _ summaries: [BASCognitiveBrainSummary]
+    ) async throws -> [String] {
+        if summaries.isEmpty { return [] }
+        var entries: [BASMemoryUsageTracker.BatchEntry] =
+            []
+        entries.reserveCapacity(summaries.count)
+        for s in summaries {
+            turnCounter += 1
+            entries.append(
+                BASMemoryUsageTracker.BatchEntry(
+                    atomID: Self.atomID(
+                        forInput: s.input),
+                    sessionRef: sessionRef,
+                    turnRef: String(turnCounter),
+                    permitMode:
+                        s.safetyVerdict.rawValue))
+        }
+        return try await tracker.recordBatch(entries)
+    }
 }
 
 /// Codable aggregation snapshot from

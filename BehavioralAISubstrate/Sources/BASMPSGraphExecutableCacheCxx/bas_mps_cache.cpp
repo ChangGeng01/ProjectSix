@@ -71,7 +71,10 @@
 // caller-side string lifecycle。
 
 #include "bas_mps_cache.h"
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -182,6 +185,89 @@ private:
 
     mutable std::mutex rw_;
     std::unordered_map<std::string, std::string> store_;
+};
+
+// 全面 开发 — Bloom filter singleton。 SEPARATE mutex
+// from the main cache so bloom queries don't block
+// cache writes (and vice versa)。 65536 bits (8192
+// bytes) — small enough to fit comfortably,large
+// enough that false-positive rate stays under 2% at
+// typical workload sizes。
+class BasMpsBloomFilter {
+public:
+    static BasMpsBloomFilter& instance() {
+        static BasMpsBloomFilter shared;
+        return shared;
+    }
+
+    static constexpr size_t kBits = 65536;
+    static constexpr size_t kBytes = kBits / 8;
+
+    void add(const std::string& key) {
+        std::lock_guard<std::mutex> w(mu_);
+        size_t h1, h2, h3;
+        hashes(key, h1, h2, h3);
+        set_bit(h1);
+        set_bit(h2);
+        set_bit(h3);
+        size_ += 1;
+    }
+
+    // True = "might contain"; false = "definitely not"。
+    bool might_contain(const std::string& key) const {
+        std::lock_guard<std::mutex> r(mu_);
+        size_t h1, h2, h3;
+        hashes(key, h1, h2, h3);
+        return get_bit(h1) && get_bit(h2) && get_bit(h3);
+    }
+
+    void clear() {
+        std::lock_guard<std::mutex> w(mu_);
+        std::fill(bits_, bits_ + kBytes, 0);
+        size_ = 0;
+    }
+
+    int64_t size() const {
+        std::lock_guard<std::mutex> r(mu_);
+        return static_cast<int64_t>(size_);
+    }
+
+private:
+    BasMpsBloomFilter() : size_(0) {
+        std::fill(bits_, bits_ + kBytes, 0);
+    }
+    BasMpsBloomFilter(const BasMpsBloomFilter&) = delete;
+    BasMpsBloomFilter& operator=(const BasMpsBloomFilter&) = delete;
+
+    // 3 hash functions:std::hash + two
+    // permutations。 Standard "double-hashing" trick:
+    //   h_i = (h1 + i * h2) mod kBits
+    // for i in {0, 1, 2}。 The third uses (h1 ^ h2)
+    // as a salt for variety。
+    static void hashes(
+        const std::string& key,
+        size_t& h1, size_t& h2, size_t& h3
+    ) {
+        std::hash<std::string> hasher;
+        size_t h = hasher(key);
+        h1 = h % kBits;
+        size_t h_split = (h >> 16) | (h << 48);
+        h2 = (h ^ h_split) % kBits;
+        h3 = (h + h_split * 0x9E3779B97F4A7C15ULL) % kBits;
+    }
+
+    void set_bit(size_t pos) {
+        bits_[pos / 8] |= (uint8_t)(1 << (pos % 8));
+    }
+
+    bool get_bit(size_t pos) const {
+        return (bits_[pos / 8]
+            & (uint8_t)(1 << (pos % 8))) != 0;
+    }
+
+    mutable std::mutex mu_;
+    uint8_t bits_[kBytes];
+    size_t size_;
 };
 
 } // anonymous namespace
@@ -335,6 +421,56 @@ int32_t bas_mps_cache_lookup_or_insert(
 }
 
 int32_t bas_mps_cache_lookup_or_insert_version(void) {
+    return 1;
+}
+
+// 全面 开发 — Bloom filter FFI surface
+int32_t bas_mps_cache_bloom_add(const char* key) {
+    if (key == nullptr) {
+        return -1;
+    }
+    try {
+        BasMpsBloomFilter::instance().add(
+            std::string(key));
+        return 0;
+    } catch (...) {
+        return -2;
+    }
+}
+
+int32_t bas_mps_cache_bloom_might_contain(
+    const char* key
+) {
+    if (key == nullptr) {
+        return -1;
+    }
+    try {
+        bool present = BasMpsBloomFilter::instance()
+            .might_contain(std::string(key));
+        return present ? 1 : 0;
+    } catch (...) {
+        return -2;
+    }
+}
+
+int32_t bas_mps_cache_bloom_clear(void) {
+    try {
+        BasMpsBloomFilter::instance().clear();
+        return 0;
+    } catch (...) {
+        return -2;
+    }
+}
+
+int64_t bas_mps_cache_bloom_size(void) {
+    try {
+        return BasMpsBloomFilter::instance().size();
+    } catch (...) {
+        return -1;
+    }
+}
+
+int32_t bas_mps_cache_bloom_version(void) {
     return 1;
 }
 

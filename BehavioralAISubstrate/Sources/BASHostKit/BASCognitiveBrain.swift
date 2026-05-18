@@ -2096,6 +2096,43 @@ extension BASCognitiveBrain {
         return accepted
     }
 
+    /// 全面 开发 — export the brain's health snapshot
+    /// history as NDJSON (one JSON object per line)。
+    /// Returns an empty string when no history is
+    /// configured (capacity 0) or the buffer is empty。
+    ///
+    /// Hosts use this for:
+    ///   - one-line dump to file / pipe / stdout
+    ///   - upload to dashboards expecting NDJSON
+    ///   - persisting brain state between sessions
+    ///
+    /// Date encoding uses `.millisecondsSince1970` to
+    /// match SQL ms-precision (the same strategy the
+    /// healthSnapshot Codable round-trip test uses)。
+    /// Each line is one BASCognitiveBrainHealthSnapshot
+    /// emitted in oldest-first order。
+    public func exportHealthHistoryJSON() async -> String {
+        guard let history = healthHistory else {
+            return ""
+        }
+        let snaps = await history.all
+        if snaps.isEmpty { return "" }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy =
+            .millisecondsSince1970
+        encoder.outputFormatting = [.sortedKeys]
+        var lines: [String] = []
+        lines.reserveCapacity(snaps.count)
+        for snap in snaps {
+            guard let data = try? encoder.encode(snap),
+                  let line = String(
+                    data: data, encoding: .utf8)
+            else { continue }
+            lines.append(line)
+        }
+        return lines.joined(separator: "\n")
+    }
+
     /// 主线 继续 开发 — capture a healthSnapshot and
     /// append to the brain's owned ring buffer。 No-op
     /// when `healthHistory` is nil (capacity was 0 at

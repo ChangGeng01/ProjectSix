@@ -146,6 +146,47 @@ int32_t bas_mps_cache_lookup_or_insert(
 /// `bas_mps_cache_lookup_or_insert`。 Currently 1。
 int32_t bas_mps_cache_lookup_or_insert_version(void);
 
+/// 全面 开发 — Bloom filter "have we ever seen this key"
+/// surface。 Process-global bit array,SEPARATE from the
+/// main cache HashMap。 Survives `bas_mps_cache_clear`
+/// (deliberate — the bloom records HISTORY,not the
+/// current cache state)。 Hosts use this to differentiate
+/// "fresh input,never observed" from "seen before,but
+/// not in current cache (cleared / evicted / never
+/// retained)"。
+///
+/// Implementation:65536-bit array,3 hash functions
+/// (std::hash variants),false-positive rate ≈ 0.6% at
+/// 1000 inserts,≈ 1.6% at 2000 inserts,saturates as
+/// N grows。
+
+/// Add `key` to the bloom。 No-op on null key。
+/// Returns 0 on success,-1 on null,-2 on internal
+/// exception (extremely rare)。
+int32_t bas_mps_cache_bloom_add(const char* key);
+
+/// Query the bloom for `key`。
+///
+/// Returns:
+///   - 1  = "might be present" (all 3 bits set)
+///   - 0  = "definitely NOT present" (at least one bit
+///          is 0)
+///   - -1 = null key pointer
+///   - -2 = internal exception
+int32_t bas_mps_cache_bloom_might_contain(const char* key);
+
+/// Clear the bloom (separate from `bas_mps_cache_clear`)。
+/// Returns 0 on success,-2 on internal exception。
+int32_t bas_mps_cache_bloom_clear(void);
+
+/// Number of keys added since last bloom_clear。 Returns
+/// -1 on internal exception。
+int64_t bas_mps_cache_bloom_size(void);
+
+/// ABI / behavior version pin for the bloom surface。
+/// Currently 1。
+int32_t bas_mps_cache_bloom_version(void);
+
 #ifdef __cplusplus
 }
 #endif

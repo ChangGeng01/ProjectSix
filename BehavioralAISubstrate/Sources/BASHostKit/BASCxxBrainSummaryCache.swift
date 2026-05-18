@@ -73,6 +73,11 @@ public actor BASCxxBrainSummaryCache {
     /// encoding or bridge insertion fails。 Unconditional
     /// overwrite — if an entry exists for the same input,
     /// it gets replaced。
+    ///
+    /// 全面 开发 — also registers the input in the bloom
+    /// filter so `hasEverBeenCached(forInput:)` can
+    /// answer "yes" even after the entry is cleared from
+    /// the main cache。
     public func cacheSummary(
         _ summary: BASCognitiveBrainSummary
     ) async throws {
@@ -82,6 +87,20 @@ public actor BASCxxBrainSummaryCache {
         else { return }
         try await bridge.insert(
             key: summary.input, value: valueStr)
+        try? await bridge.bloomAdd(key: summary.input)
+    }
+
+    /// 全面 开发 — bloom-filter check:has this input
+    /// EVER been cached during this process's lifetime
+    /// (possibly cleared from the main cache since)?
+    /// False = definitely never;true = might have been。
+    /// Hosts use this to differentiate "first-time
+    /// observation" from "cleared / evicted previously"。
+    public func hasEverBeenCached(
+        forInput input: String
+    ) async -> Bool {
+        return (try? await bridge.bloomMightContain(
+            key: input)) ?? false
     }
 
     /// 主线 继续 开发 — first-write-wins cache insert。
@@ -127,6 +146,10 @@ public actor BASCxxBrainSummaryCache {
         }
         let result = try await bridge.lookupOrInsert(
             key: summary.input, defaultValue: valueStr)
+        // 全面 开发 — always add to bloom regardless of
+        // which side of the race won;both observed the
+        // input。
+        try? await bridge.bloomAdd(key: summary.input)
         if !result.wasPresent {
             // We are the inserter
             return (summary: summary, wasPresent: false)

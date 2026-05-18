@@ -237,6 +237,30 @@ int32_t bas_rust_tracker_forget_candidates(
 /// `bas_rust_tracker_forget_candidates`。
 int32_t bas_rust_tracker_forget_candidates_version(void);
 
+/// 全面 开发 — retrieval-interval distribution
+/// percentiles via Rust-native sort + delta + percentile
+/// computation under one read lock。 Out-params filled
+/// with p50 / p95 / p99 of the gap-between-consecutive-
+/// retrievals distribution (milliseconds)。 Reveals
+/// traffic rhythm:typical gap between brain.summary
+/// calls。
+///
+/// Returns -1 for all three when fewer than 2 records
+/// exist (no interval can be computed from one point)。
+///
+/// Returns:
+///   - 0  = success (out-params filled)
+///   - -1 = null pointer (any of 4)
+int32_t bas_rust_tracker_retrieval_interval_percentiles(
+    Tracker* tracker,
+    int64_t* p50_out,
+    int64_t* p95_out,
+    int64_t* p99_out);
+
+/// ABI version pin for
+/// `bas_rust_tracker_retrieval_interval_percentiles`。
+int32_t bas_rust_tracker_retrieval_interval_percentiles_version(void);
+
 #ifdef __cplusplus
 }
 #endif

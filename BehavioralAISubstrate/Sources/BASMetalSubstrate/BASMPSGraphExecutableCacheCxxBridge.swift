@@ -265,6 +265,73 @@ public actor BASMPSGraphExecutableCacheCxxBridge {
     ///   - wasPresent:true if the lookup hit an existing
     ///     entry,false if the default was inserted
     ///
+    // MARK: - 全面 开发: Bloom filter "ever seen" surface
+
+    /// 全面 开发 — register `key` in the process-global
+    /// bloom filter。 V1 path is no-op。
+    public func bloomAdd(key: String) throws {
+        guard useCxxCache else { return }
+        let rc = key.withCString {
+            bas_mps_cache_bloom_add($0)
+        }
+        switch rc {
+        case 0: return
+        case -1:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .nullPointer
+        case -2:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .cxxInternalException
+        default:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .unknownReturnCode(rc)
+        }
+    }
+
+    /// Returns true if the bloom filter MIGHT contain
+    /// `key` (false positives possible, false negatives
+    /// impossible)。 Returns false on V1 path。
+    public func bloomMightContain(key: String) throws
+        -> Bool
+    {
+        guard useCxxCache else { return false }
+        let rc = key.withCString {
+            bas_mps_cache_bloom_might_contain($0)
+        }
+        switch rc {
+        case 1: return true
+        case 0: return false
+        case -1:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .nullPointer
+        case -2:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .cxxInternalException
+        default:
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .unknownReturnCode(rc)
+        }
+    }
+
+    /// Clear the bloom filter (separate from the main
+    /// cache clear — the bloom records HISTORY,not the
+    /// current cache state)。
+    public func bloomClear() throws {
+        guard useCxxCache else { return }
+        let rc = bas_mps_cache_bloom_clear()
+        if rc != 0 {
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .cxxInternalException
+        }
+    }
+
+    /// Number of keys added to the bloom filter since
+    /// last `bloomClear`。 Returns 0 on V1 path。
+    public func bloomSize() -> Int64 {
+        guard useCxxCache else { return 0 }
+        return bas_mps_cache_bloom_size()
+    }
+
     /// V1 path throws `.unknownReturnCode(-99)` matching
     /// other V1-gated methods。
     public func lookupOrInsert(

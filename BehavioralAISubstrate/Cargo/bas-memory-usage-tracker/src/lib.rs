@@ -393,6 +393,49 @@ impl Tracker {
         Ok(out)
     }
 
+    // 全面 开发 — retrieval-interval distribution
+    // percentiles。 Collects retrieved_at_ms across all
+    // records,sorts ascending,computes deltas between
+    // consecutive timestamps,then percentile-summarizes
+    // the delta distribution via nearest-rank。 Reveals
+    // traffic rhythm:typical gap between brain.summary
+    // calls。
+    //
+    // Returns (-1, -1, -1) when fewer than 2 records (no
+    // interval can be computed from a single point)。
+    fn retrieval_interval_percentiles(&self) -> (i64, i64, i64) {
+        let r = match self.inner.read() {
+            Ok(g) => g,
+            Err(_) => return (-1, -1, -1),
+        };
+        if r.len() < 2 {
+            return (-1, -1, -1);
+        }
+        let mut timestamps: Vec<i64> = r
+            .values()
+            .map(|rec| rec.retrieved_at_ms)
+            .collect();
+        timestamps.sort();
+        let mut intervals: Vec<i64> = Vec::with_capacity(
+            timestamps.len() - 1);
+        for i in 1..timestamps.len() {
+            intervals.push(
+                timestamps[i] - timestamps[i - 1]);
+        }
+        intervals.sort();
+        let n = intervals.len() as f64;
+        let idx = |p: f64| -> usize {
+            let raw = (n * p).ceil() as i64 - 1;
+            let clamped = raw.max(0).min(
+                intervals.len() as i64 - 1);
+            clamped as usize
+        };
+        let p50 = intervals[idx(0.50)];
+        let p95 = intervals[idx(0.95)];
+        let p99 = intervals[idx(0.99)];
+        (p50, p95, p99)
+    }
+
     // 持续性 发展 — atom-count distribution percentiles。
     // Counts occurrences per atom_id (HashMap pass),
     // sorts the count values ascending,returns
@@ -951,6 +994,39 @@ pub extern "C" fn bas_rust_tracker_forget_candidates(
 
 #[no_mangle]
 pub extern "C" fn bas_rust_tracker_forget_candidates_version() -> c_int {
+    1
+}
+
+// 全面 开发 — retrieval-interval distribution percentiles
+// FFI。 Out-params filled with p50 / p95 / p99 of the
+// retrieved-at delta distribution (milliseconds)。
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_retrieval_interval_percentiles(
+    tracker: *mut Tracker,
+    p50_out: *mut i64,
+    p95_out: *mut i64,
+    p99_out: *mut i64,
+) -> c_int {
+    if tracker.is_null()
+        || p50_out.is_null()
+        || p95_out.is_null()
+        || p99_out.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let (p50, p95, p99) =
+        tref.retrieval_interval_percentiles();
+    unsafe {
+        *p50_out = p50;
+        *p95_out = p95;
+        *p99_out = p99;
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_retrieval_interval_percentiles_version() -> c_int {
     1
 }
 

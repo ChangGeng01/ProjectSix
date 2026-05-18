@@ -135,6 +135,43 @@ public struct BASAtomImportanceEntry: Codable, Equatable,
     }
 }
 
+/// 全面 开发 — three percentiles of the retrieval-
+/// interval distribution computed inside the Rust
+/// tracker。 Values are millisecond gaps between
+/// consecutive retrievals。 Sentinel value -1 means
+/// "fewer than 2 records — no interval available"。
+public struct BASRetrievalIntervalPercentiles: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// 50th-percentile (median) gap between consecutive
+    /// retrievals,milliseconds。
+    public let p50Millis: Int64
+
+    /// 95th-percentile gap,milliseconds。
+    public let p95Millis: Int64
+
+    /// 99th-percentile gap,milliseconds。
+    public let p99Millis: Int64
+
+    public init(
+        p50Millis: Int64,
+        p95Millis: Int64,
+        p99Millis: Int64
+    ) {
+        self.p50Millis = p50Millis
+        self.p95Millis = p95Millis
+        self.p99Millis = p99Millis
+    }
+
+    /// True when all three are -1 (no interval signal
+    /// available)。
+    public var isEmpty: Bool {
+        return p50Millis == -1
+            && p95Millis == -1
+            && p99Millis == -1
+    }
+}
+
 /// 持续性 发展 — three percentiles of the count-per-atom
 /// distribution computed inside the Rust tracker。 Each
 /// value is the count threshold at the percentile rank。
@@ -555,6 +592,46 @@ public actor BASRustMemoryUsageTrackerActor {
         }
     }
 
+    /// 全面 开发 — retrieval-interval distribution
+    /// percentiles via Rust-native sort + delta +
+    /// percentile under one read lock。 Returns p50 /
+    /// p95 / p99 of the milliseconds-between-consecutive-
+    /// retrievals distribution。
+    ///
+    /// Hosts use this to characterize traffic rhythm:
+    /// p50 = typical inter-call gap,p99 = "what's the
+    /// longest quiet period" outlier。
+    ///
+    /// Sentinel -1 for all three when fewer than 2
+    /// records (no interval can be computed)。
+    public func retrievalIntervalPercentiles() throws
+        -> BASRetrievalIntervalPercentiles
+    {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        var p50: Int64 = 0
+        var p95: Int64 = 0
+        var p99: Int64 = 0
+        let rc =
+            bas_rust_tracker_retrieval_interval_percentiles(
+                h, &p50, &p95, &p99)
+        switch rc {
+        case 0:
+            return BASRetrievalIntervalPercentiles(
+                p50Millis: p50,
+                p95Millis: p95,
+                p99Millis: p99)
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+    }
+
     /// 持续性 发展 — atom-count distribution percentiles
     /// via Rust-native sort under one read lock。 Returns
     /// p50 / p95 / p99 of count-per-atom values。
@@ -847,6 +924,13 @@ public actor BASRustMemoryUsageTrackerActor {
         halfLife: TimeInterval,
         retainFraction: Double
     ) throws -> [String] {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func retrievalIntervalPercentiles() throws
+        -> BASRetrievalIntervalPercentiles
+    {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }
