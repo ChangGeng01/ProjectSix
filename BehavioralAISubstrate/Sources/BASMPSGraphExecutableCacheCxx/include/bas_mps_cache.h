@@ -94,6 +94,27 @@ int64_t bas_mps_cache_byte_size_estimate(void);
 /// `bas_mps_cache_byte_size_estimate`。 Currently 1。
 int32_t bas_mps_cache_byte_size_estimate_version(void);
 
+/// 主线 解构 重构 Round 3 — find the largest (key.size +
+/// value.size) entry in the cache。 Single container pass
+/// under one mutex acquisition computes the max。 Doing
+/// this from Swift would require enumerate-keys-then-
+/// lookup-each-value (N+1 lock acquisitions)。
+///
+/// Returns the byte sum of the largest entry's
+/// key + value lengths,or 0 on empty cache。 Returns -1
+/// on internal exception (extremely rare,allocation-
+/// failure-during-iteration)。
+///
+/// Hosts use this to detect "is the cache being abused
+/// by oversized entries" — a single huge entry can
+/// dominate `byte_size_estimate` while masking a small
+/// total entry count。
+int64_t bas_mps_cache_max_entry_byte_size(void);
+
+/// ABI / behavior version pin for
+/// `bas_mps_cache_max_entry_byte_size`。 Currently 1。
+int32_t bas_mps_cache_max_entry_byte_size_version(void);
+
 #ifdef __cplusplus
 }
 #endif

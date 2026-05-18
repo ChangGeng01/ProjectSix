@@ -129,6 +129,23 @@ public:
         return total;
     }
 
+    // 主线 解构 重构 Round 3 — single-pass max。 One lock
+    // acquisition,one pass over the container,return
+    // the largest (key.size + value.size) sum。 Hosts use
+    // this to detect oversized-entry abuse。
+    size_t max_entry_byte_size() const {
+        std::lock_guard<std::mutex> r(rw_);
+        size_t maxSize = 0;
+        for (const auto& kv : store_) {
+            size_t entrySize =
+                kv.first.size() + kv.second.size();
+            if (entrySize > maxSize) {
+                maxSize = entrySize;
+            }
+        }
+        return maxSize;
+    }
+
     void clear() {
         std::lock_guard<std::mutex> w(rw_);
         store_.clear();
@@ -244,6 +261,19 @@ int64_t bas_mps_cache_byte_size_estimate(void) {
 }
 
 int32_t bas_mps_cache_byte_size_estimate_version(void) {
+    return 1;
+}
+
+int64_t bas_mps_cache_max_entry_byte_size(void) {
+    try {
+        return static_cast<int64_t>(
+            BasMpsCache::instance().max_entry_byte_size());
+    } catch (...) {
+        return -1;
+    }
+}
+
+int32_t bas_mps_cache_max_entry_byte_size_version(void) {
     return 1;
 }
 

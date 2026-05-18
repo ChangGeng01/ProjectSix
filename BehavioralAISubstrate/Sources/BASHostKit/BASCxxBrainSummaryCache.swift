@@ -129,7 +129,9 @@ public actor BASCxxBrainSummaryCache {
     ///
     /// 主线 解构 重构 — also includes
     /// `contentByteSizeEstimate` (sum of stored key+value
-    /// bytes computed in C++ under one mutex acquisition)。
+    /// bytes computed in C++ under one mutex acquisition)
+    /// AND `maxEntryByteSize` (largest single entry's
+    /// key+value sum,Round 3)。
     /// Best-effort: 0 on bridge failure (V1 path or rare
     /// allocation-failure-during-iteration)。
     public func telemetrySnapshot() async
@@ -138,11 +140,14 @@ public actor BASCxxBrainSummaryCache {
         let sz = await bridge.size()
         let bytes: Int64 =
             (try? await bridge.byteSizeEstimate()) ?? 0
+        let maxBytes: Int64 =
+            (try? await bridge.maxEntryByteSize()) ?? 0
         return BASCxxBrainSummaryCacheTelemetry(
             hits: hitCount,
             misses: missCount,
             cacheSize: Int(sz),
-            contentByteSizeEstimate: Int(bytes))
+            contentByteSizeEstimate: Int(bytes),
+            maxEntryByteSize: Int(maxBytes))
     }
 }
 
@@ -172,6 +177,14 @@ public struct BASCxxBrainSummaryCacheTelemetry: Codable,
     /// before this field landed)。
     public let contentByteSizeEstimate: Int
 
+    /// 主线 解构 重构 Round 3 — largest single entry's
+    /// key.size + value.size sum,computed via a single-
+    /// pass max scan in C++ under the same mutex。 Hosts
+    /// use this to detect oversized-entry abuse (one huge
+    /// entry can dominate `contentByteSizeEstimate`)。 Set
+    /// to 0 by the default initializer for backward-compat。
+    public let maxEntryByteSize: Int
+
     /// Total lookups (hits + misses)。
     public var totalLookups: Int { hits + misses }
 
@@ -189,16 +202,30 @@ public struct BASCxxBrainSummaryCacheTelemetry: Codable,
         return contentByteSizeEstimate / cacheSize
     }
 
+    /// 主线 解构 重构 Round 3 — entry-skew ratio。 Returns
+    /// `maxEntryByteSize / averageBytesPerEntry` as a
+    /// Double。 Values near 1.0 mean entries are roughly
+    /// uniform; values >> 1.0 mean a few outsized entries
+    /// dominate the cache。 Returns 0.0 when the cache is
+    /// empty (no division by zero)。
+    public var entrySkewRatio: Double {
+        let avg = averageBytesPerEntry
+        guard avg > 0 else { return 0.0 }
+        return Double(maxEntryByteSize) / Double(avg)
+    }
+
     public init(
         hits: Int,
         misses: Int,
         cacheSize: Int,
-        contentByteSizeEstimate: Int = 0
+        contentByteSizeEstimate: Int = 0,
+        maxEntryByteSize: Int = 0
     ) {
         self.hits = hits
         self.misses = misses
         self.cacheSize = cacheSize
         self.contentByteSizeEstimate =
             contentByteSizeEstimate
+        self.maxEntryByteSize = maxEntryByteSize
     }
 }

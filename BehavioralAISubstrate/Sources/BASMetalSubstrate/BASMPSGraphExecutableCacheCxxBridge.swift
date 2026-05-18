@@ -232,6 +232,25 @@ public actor BASMPSGraphExecutableCacheCxxBridge {
         }
         return bytes
     }
+
+    /// 主线 解构 重构 Round 3 — single-pass max entry byte
+    /// size。 Returns the largest (key.size + value.size)
+    /// sum in the cache,or 0 on empty。 Single mutex
+    /// acquisition,one container pass。
+    ///
+    /// Hosts use this to detect oversized-entry abuse:
+    /// a few huge entries can dominate `byteSizeEstimate`
+    /// while masking a small entry count — the max
+    /// surfaces the outlier。
+    public func maxEntryByteSize() throws -> Int64 {
+        guard useCxxCache else { return 0 }
+        let bytes = bas_mps_cache_max_entry_byte_size()
+        if bytes < 0 {
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .cxxInternalException
+        }
+        return bytes
+    }
 }
 
 // MARK: - Flag-aware factory
