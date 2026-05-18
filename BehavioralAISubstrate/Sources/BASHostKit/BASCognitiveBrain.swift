@@ -589,6 +589,32 @@ public struct BASCognitiveBrainSummary: Codable,
     /// Always non-zero for a successful summary call。
     public let latencyNanos: UInt64
 
+    /// ML-derived emotional-load score in [0, 1]。
+    /// Sum of softmax probability mass on the four
+    /// "non-calm" classes (highPressure + highConsequence
+    /// + conflict + manipulationRisk)。 High value = input
+    /// is emotionally charged。 0.0 for pre-derived-signals
+    /// summaries (default value preserves backwards-compat
+    /// for hosts that constructed summaries by hand)。
+    public let emotionalLoad: Double
+
+    /// ML-derived urgency score in [0, 1]。 Direct
+    /// softmax probability for the highPressure class。
+    /// High value = input expresses time pressure。
+    public let timePressure: Double
+
+    /// ML-derived consequence score in [0, 1]。 Direct
+    /// softmax probability for the highConsequence class。
+    /// High value = input describes stakes / consequential
+    /// decisions。
+    public let consequenceLevel: Double
+
+    /// ML-derived relation-pattern tag。 Either "tense"
+    /// (P(conflict) above threshold 0.3) or "neutral"
+    /// (otherwise)。 Hosts use this for relationship-
+    /// aware UI affordances。
+    public let relationPattern: String
+
     public init(
         input: String,
         taskType: BASContextTaskType,
@@ -596,7 +622,11 @@ public struct BASCognitiveBrainSummary: Codable,
         ambiguityScore: Double,
         safetyVerdict: BASCognitiveSafetyVerdict,
         manipulationHints: [String],
-        latencyNanos: UInt64
+        latencyNanos: UInt64,
+        emotionalLoad: Double = 0.0,
+        timePressure: Double = 0.0,
+        consequenceLevel: Double = 0.0,
+        relationPattern: String = "neutral"
     ) {
         self.input = input
         self.taskType = taskType
@@ -605,6 +635,10 @@ public struct BASCognitiveBrainSummary: Codable,
         self.safetyVerdict = safetyVerdict
         self.manipulationHints = manipulationHints
         self.latencyNanos = latencyNanos
+        self.emotionalLoad = emotionalLoad
+        self.timePressure = timePressure
+        self.consequenceLevel = consequenceLevel
+        self.relationPattern = relationPattern
     }
 }
 
@@ -681,7 +715,15 @@ extension BASCognitiveBrain {
             safetyVerdict: verdict,
             manipulationHints:
                 result.contextFrame.manipulationHints,
-            latencyNanos: latencyNanos)
+            latencyNanos: latencyNanos,
+            emotionalLoad:
+                result.contextFrame.emotionalLoad,
+            timePressure:
+                result.contextFrame.timePressure,
+            consequenceLevel:
+                result.contextFrame.consequenceLevel,
+            relationPattern:
+                result.contextFrame.relationPattern)
         await recordSummaryObservation(summary)
         // C++ pilot integration:persist to process-global
         // cache so subsequent calls with the same input
@@ -713,7 +755,11 @@ extension BASCognitiveBrain {
             ambiguityScore: cached.ambiguityScore,
             safetyVerdict: cached.safetyVerdict,
             manipulationHints: cached.manipulationHints,
-            latencyNanos: cacheLatency)
+            latencyNanos: cacheLatency,
+            emotionalLoad: cached.emotionalLoad,
+            timePressure: cached.timePressure,
+            consequenceLevel: cached.consequenceLevel,
+            relationPattern: cached.relationPattern)
     }
 
     private func recordSummaryObservation(
