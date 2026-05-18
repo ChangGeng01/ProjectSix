@@ -210,3 +210,68 @@ int32_t bas_cpu_count_logical(int32_t *out) {
 int32_t bas_cpu_count_logical_version(void) {
     return 1;
 }
+
+#if __APPLE__
+#include <sys/time.h>
+#endif
+
+// MARK: - bas_system_uptime_seconds
+// 主线 解构 重构 Round 3 — host uptime via
+// sysctl(KERN_BOOTTIME) + gettimeofday delta。
+int32_t bas_system_uptime_seconds(int64_t *out) {
+    if (out == 0) {
+        return -1;
+    }
+#if __APPLE__
+    struct timeval boottime;
+    int mib[2] = { CTL_KERN, KERN_BOOTTIME };
+    size_t size = sizeof(boottime);
+    if (sysctl(mib, 2, &boottime, &size, 0, 0) != 0) {
+        *out = 0;
+        return -2;
+    }
+    struct timeval now;
+    if (gettimeofday(&now, 0) != 0) {
+        *out = 0;
+        return -2;
+    }
+    *out = (int64_t)(now.tv_sec - boottime.tv_sec);
+    return 0;
+#else
+    *out = 0;
+    return -3;
+#endif
+}
+
+int32_t bas_system_uptime_seconds_version(void) {
+    return 1;
+}
+
+// MARK: - bas_physical_memory_bytes
+// 主线 解构 重构 Round 3 — total physical RAM via
+// sysctl(HW_MEMSIZE)。 64-bit value on Apple silicon
+// (the legacy HW_PHYSMEM is 32-bit and tops at 4 GB —
+// HW_MEMSIZE is the modern replacement)。
+int32_t bas_physical_memory_bytes(uint64_t *out) {
+    if (out == 0) {
+        return -1;
+    }
+#if __APPLE__
+    int mib[2] = { CTL_HW, HW_MEMSIZE };
+    uint64_t value = 0;
+    size_t size = sizeof(value);
+    if (sysctl(mib, 2, &value, &size, 0, 0) != 0) {
+        *out = 0;
+        return -2;
+    }
+    *out = value;
+    return 0;
+#else
+    *out = 0;
+    return -3;
+#endif
+}
+
+int32_t bas_physical_memory_bytes_version(void) {
+    return 1;
+}

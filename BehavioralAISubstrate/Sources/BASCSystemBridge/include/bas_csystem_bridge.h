@@ -137,6 +137,46 @@ int32_t bas_cpu_count_logical(int32_t *out);
 /// Currently 1。
 int32_t bas_cpu_count_logical_version(void);
 
+/// 主线 解构 重构 Round 3 — read host uptime in seconds
+/// since boot via `sysctl(CTL_KERN, KERN_BOOTTIME)`。
+/// Computed by subtracting boot time from the current
+/// wall-clock。 Useful for cascade telemetry / cross-
+/// process correlation in long-running brain hosts。
+///
+/// **Apple platforms only**:Non-Apple fallback returns -3。
+///
+/// - Parameter out:non-null pointer to receive the
+///   uptime in seconds。
+/// - Returns:0 on success,negative on error。
+///   - -1 = null `out` pointer
+///   - -2 = `sysctl` call failed OR `gettimeofday` failed
+///   - -3 = unsupported platform
+int32_t bas_system_uptime_seconds(int64_t *out);
+
+/// ABI / behavior version pin for
+/// `bas_system_uptime_seconds`。 Currently 1。
+int32_t bas_system_uptime_seconds_version(void);
+
+/// 主线 解构 重构 Round 3 — read total physical RAM
+/// in bytes via `sysctl(CTL_HW, HW_MEMSIZE)`。
+/// Counterpart to `bas_process_resident_memory_bytes`:
+/// RSS tells you how much YOU use,physical memory tells
+/// you the total available。 Hosts use the ratio for
+/// memory-pressure dashboards。
+///
+/// **Apple platforms only**:Non-Apple fallback returns -3。
+///
+/// - Parameter out:non-null pointer to receive bytes。
+/// - Returns:0 on success,negative on error。
+///   - -1 = null `out` pointer
+///   - -2 = `sysctl` call failed
+///   - -3 = unsupported platform
+int32_t bas_physical_memory_bytes(uint64_t *out);
+
+/// ABI / behavior version pin for
+/// `bas_physical_memory_bytes`。 Currently 1。
+int32_t bas_physical_memory_bytes_version(void);
+
 #ifdef __cplusplus
 }
 #endif
