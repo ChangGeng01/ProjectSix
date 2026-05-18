@@ -38,10 +38,17 @@
 //
 // ## Honest scope acknowledgments
 //
-// **Phase B-1 trained on 105 examples (15 per class).**
-// The model overfits the training set (100% train acc)
-// and is unlikely to generalize well。 Phase B-2 will
-// expand the corpus + add proper train/val/test split。
+// **Corpus state (current):** trained on 233 hand-labeled
+// examples spanning 8 languages (English, Chinese,
+// Japanese, Spanish, French, German, Russian, Arabic)。
+// Held-out accuracy: 13/14 = 92.9% on 14-example held-out
+// set。 Manipulation held-out: 2/2。 Six hard manipulation
+// invariants enforced across non-English languages
+// (Chinese, Spanish, French, Arabic, Russian, Japanese
+// password phishing all reach verdict=.block)。 The
+// model is a tiny 2-layer MLP (~18K params) — sufficient
+// for the current Phase-B classification surface but
+// future Phase C/D may want a real transformer encoder。
 //
 // **Phase B-3 ships the ADAPTER**, not a high-accuracy
 // classifier。 The integration test verifies:

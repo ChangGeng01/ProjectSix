@@ -30,8 +30,12 @@
 // chapter 一百七十七 vision describes ~50 ML heads across 14
 // layers (P0 ChengluPreflight 7 heads + P1 ChengluMemory 5 +
 // P3 ChengluShadow 6 + L1-L14 specialized heads)。Today's
-// substrate has ZERO real .mlpackage adapters shipped — only
-// the rules-tier wrappers and cascade infrastructure。
+// substrate has ONE real .mlmodel adapter shipped — the
+// BASContextClassifier serving the context-classification
+// entry point — and ZERO in the 14-layer-mesh head
+// registries described by this map。 Rules-tier wrappers and
+// cascade infrastructure are in place for every canonical
+// slot but the heads themselves remain placeholders。
 //
 // This map encodes **which slots SHOULD exist** when the vision
 // is fully realized。Hosts use this as:
