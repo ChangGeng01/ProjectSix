@@ -1370,6 +1370,107 @@ extension BASCognitiveBrain {
             rustActive: rustHistoryStore != nil,
             metalActive: metalLibraryLoader != nil)
     }
+
+    /// Operational metrics snapshot — per-pilot record /
+    /// cache counts captured at call time。 Hosts use
+    /// this for dashboards / health monitoring without
+    /// needing to chase the optional pilot fields and
+    /// query each backend individually。
+    ///
+    /// All counts are best-effort: bridge failures (e.g.
+    /// Rust core unavailable on a platform missing the
+    /// XCFramework slice) surface as 0 rather than
+    /// propagating the error。 Hosts that need
+    /// distinguishing "0 records" from "bridge failed"
+    /// should query each pilot's underlying store
+    /// directly。
+    public func pilotMetrics() async
+        -> BASCognitiveBrainPilotMetrics
+    {
+        let sqlCount: Int
+        if let store = sqlHistoryStore {
+            sqlCount = await store.recordCount
+        } else { sqlCount = 0 }
+        let rustCount: Int
+        if let store = rustHistoryStore {
+            rustCount = await store.recordCount
+        } else { rustCount = 0 }
+        let cxxSize: Int
+        if let cache = cxxSummaryCache {
+            cxxSize = Int(await cache.size())
+        } else { cxxSize = 0 }
+        return BASCognitiveBrainPilotMetrics(
+            sqlRecordCount: sqlCount,
+            rustRecordCount: rustCount,
+            cxxCacheSize: cxxSize,
+            inMemorySummaryCount: summaryHistory.count)
+    }
+
+    /// Clear pilot-owned storage in one call。 Affects:
+    ///   - In-memory summary history buffer
+    ///   - C++ summary cache (process-global!  Other
+    ///     brain instances sharing the same bridge
+    ///     also lose their cached entries)
+    ///   - SQL / Rust stores: NOT cleared (durable
+    ///     persistence is intentional;hosts wanting
+    ///     to wipe SQL/Rust must call the underlying
+    ///     tracker APIs directly)
+    ///
+    /// Use for session boundaries / testing teardown
+    /// where you want to reset the in-process pilot
+    /// state without touching durable history。
+    public func clearVolatilePilotStorage() async {
+        clearSummaryHistory()
+        if let cache = cxxSummaryCache {
+            try? await cache.clear()
+        }
+    }
+}
+
+/// Codable snapshot of per-pilot operational counts。
+/// Returned by `brain.pilotMetrics()`。 Hosts use this
+/// for dashboards / health monitoring。
+public struct BASCognitiveBrainPilotMetrics: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// Number of records currently persisted in the
+    /// SQL pilot's backing store。 0 when SQL pilot
+    /// is not wired or query failed。
+    public let sqlRecordCount: Int
+
+    /// Number of records currently held in the Rust
+    /// pilot's tracker。 0 when Rust pilot not wired or
+    /// query failed (e.g. XCFramework slice missing)。
+    public let rustRecordCount: Int
+
+    /// Number of entries in the C++ pilot's process-
+    /// global summary cache。 0 when C++ pilot not
+    /// wired。
+    public let cxxCacheSize: Int
+
+    /// Number of summaries currently held in the
+    /// brain's in-memory bounded LRU history buffer。
+    public let inMemorySummaryCount: Int
+
+    public init(
+        sqlRecordCount: Int,
+        rustRecordCount: Int,
+        cxxCacheSize: Int,
+        inMemorySummaryCount: Int
+    ) {
+        self.sqlRecordCount = sqlRecordCount
+        self.rustRecordCount = rustRecordCount
+        self.cxxCacheSize = cxxCacheSize
+        self.inMemorySummaryCount = inMemorySummaryCount
+    }
+
+    /// Total persisted/cached events across the four
+    /// storage-shaped pilots。 Useful single-number
+    /// "how busy is this brain" metric for dashboards。
+    public var totalStorageEvents: Int {
+        return sqlRecordCount + rustRecordCount
+            + cxxCacheSize + inMemorySummaryCount
+    }
 }
 
 /// Codable snapshot of which pilots are wired into a
