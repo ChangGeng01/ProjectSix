@@ -57,6 +57,36 @@ int32_t bas_monotonic_nanos(uint64_t *out);
 /// a behavior change。
 int32_t bas_monotonic_nanos_version(void);
 
+/// Read the calling process's resident memory size
+/// (RSS) in bytes into `*out`。 Wraps
+/// `mach_task_basic_info` on Apple platforms (XNU
+/// task-port query,no syscall in the userspace fast
+/// path)。 Useful for cascade telemetry / leak
+/// detection in long-running brain hosts。
+///
+/// **Apple platforms only**: substrate ships
+/// Apple-only in production。 Non-Apple fallback
+/// returns -3 (unsupported platform) — substrate's
+/// production deployment never hits this branch but
+/// the contract is documented for cross-compile
+/// inspection。
+///
+/// - Parameter out:non-null pointer to receive the
+///   resident-memory byte count。
+/// - Returns:0 on success,negative on error。
+///   - -1 = null `out` pointer
+///   - -2 = `task_info` Mach call failed
+///   - -3 = unsupported platform (non-Apple build host)
+///
+/// **Thread-safety**:reentrant + lock-free。 The
+/// Mach task port is a process-wide handle that
+/// task_info() may safely query from any thread。
+int32_t bas_process_resident_memory_bytes(uint64_t *out);
+
+/// ABI / behavior version pin for
+/// `bas_process_resident_memory_bytes`。 Currently 1。
+int32_t bas_process_resident_memory_bytes_version(void);
+
 #ifdef __cplusplus
 }
 #endif

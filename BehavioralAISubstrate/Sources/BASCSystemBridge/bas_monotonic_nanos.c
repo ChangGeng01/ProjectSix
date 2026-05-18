@@ -97,3 +97,46 @@ int32_t bas_monotonic_nanos(uint64_t *out) {
 int32_t bas_monotonic_nanos_version(void) {
     return 1;
 }
+
+#if __APPLE__
+#include <mach/mach.h>
+#include <mach/task.h>
+#include <mach/task_info.h>
+#include <mach/mach_init.h>
+#endif
+
+// MARK: - bas_process_resident_memory_bytes
+// 主线 全面 提升 — C pilot second function。 Wraps
+// mach_task_basic_info to expose the calling process's
+// resident memory size (RSS) for cascade telemetry。
+// Useful for brain hosts running long-lived sessions
+// (leak detection,memory pressure monitoring)。
+int32_t bas_process_resident_memory_bytes(uint64_t *out) {
+    if (out == 0) {
+        return -1;
+    }
+#if __APPLE__
+    mach_task_basic_info_data_t info;
+    mach_msg_type_number_t count =
+        MACH_TASK_BASIC_INFO_COUNT;
+    kern_return_t kr = task_info(
+        mach_task_self(),
+        MACH_TASK_BASIC_INFO,
+        (task_info_t)&info,
+        &count);
+    if (kr != KERN_SUCCESS) {
+        return -2;
+    }
+    *out = (uint64_t)info.resident_size;
+    return 0;
+#else
+    // Non-Apple build hosts: substrate ships
+    // Apple-only,this branch is documentation only。
+    (void)out;
+    return -3;
+#endif
+}
+
+int32_t bas_process_resident_memory_bytes_version(void) {
+    return 1;
+}

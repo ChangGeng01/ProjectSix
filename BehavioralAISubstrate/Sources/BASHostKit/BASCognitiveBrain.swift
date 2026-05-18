@@ -1450,6 +1450,109 @@ extension BASCognitiveBrain {
                 instanceSafetyConfidenceThreshold,
             pilotStatus: pilotStatus)
     }
+
+    /// Pre-warm the Metal pilot's MTLLibrary compile —
+    /// amortizes the kernel JIT-compile cost so the
+    /// first downstream Mamba/SSM inference does NOT
+    /// pay it。 No-op when metalLibraryLoader is nil。
+    ///
+    /// 主线 全面 提升:Metal pilot now has a real
+    /// brain-side consumer instead of accessor-only。
+    /// Hosts call this at app launch / brain init to
+    /// move Metal compile latency off the first user
+    /// turn。
+    ///
+    /// Returns true when the library was compiled (or
+    /// already memoized) successfully,false on any
+    /// failure (V1 mode,resource missing,compile
+    /// error)。 Hosts that need the typed error case
+    /// should call `metalLibraryLoader?.library()`
+    /// directly。
+    @discardableResult
+    public func warmMetalKernel() async -> Bool {
+        guard let loader = metalLibraryLoader else {
+            return false
+        }
+        return await warmMetalLibrary(loader)
+    }
+
+    /// Internal helper splits out the Metal warm so
+    /// the optional handling stays in one place。
+    private func warmMetalLibrary(
+        _ loader: BASMetalKernelLibraryLoader
+    ) async -> Bool {
+        #if canImport(Metal)
+        do {
+            _ = try await loader.library()
+            return true
+        } catch {
+            return false
+        }
+        #else
+        return false
+        #endif
+    }
+
+    /// Pre-warm all warmable pilots in one call。
+    /// Currently warms:
+    ///   - Metal kernel compile (when loader wired)
+    /// Other pilots either have no warmup cost (C is
+    /// stateless,SQL opens connection at construction)
+    /// or warm themselves on first access (C++ singleton
+    /// init,Rust handle from constructor)。
+    ///
+    /// Returns a typed bundle reporting which warmups
+    /// were attempted + which succeeded。 Hosts call
+    /// this at brain init to amortize warm cost off
+    /// the first user-facing turn。
+    @discardableResult
+    public func warmPilots() async
+        -> BASCognitiveBrainPilotWarmupResult
+    {
+        let metalAttempted = metalLibraryLoader != nil
+        let metalSucceeded: Bool
+        if metalAttempted {
+            metalSucceeded = await warmMetalKernel()
+        } else {
+            metalSucceeded = false
+        }
+        return BASCognitiveBrainPilotWarmupResult(
+            metalAttempted: metalAttempted,
+            metalSucceeded: metalSucceeded)
+    }
+}
+
+/// Codable result of `brain.warmPilots()`。 Reports
+/// which pilots had a warmable surface and which
+/// succeeded。 Hosts use this to detect pilot wire-up
+/// issues at startup (e.g. Metal loader present but
+/// fails to compile = device-side problem)。
+public struct BASCognitiveBrainPilotWarmupResult:
+    Codable, Equatable, Sendable, Hashable
+{
+    /// True when the Metal pilot was wired into the
+    /// brain (metalLibraryLoader != nil)。
+    public let metalAttempted: Bool
+
+    /// True when the Metal library compiled successfully
+    /// (either fresh compile or already memoized)。
+    /// False when metalAttempted is true but the compile
+    /// failed,or when metalAttempted is false。
+    public let metalSucceeded: Bool
+
+    public init(
+        metalAttempted: Bool,
+        metalSucceeded: Bool
+    ) {
+        self.metalAttempted = metalAttempted
+        self.metalSucceeded = metalSucceeded
+    }
+
+    /// All warmable pilots succeeded (or were not
+    /// wired,which is not a failure)。
+    public var allSucceeded: Bool {
+        return !metalAttempted || metalSucceeded
+    }
 }
 
 /// Codable runtime-configuration snapshot of the brain。
