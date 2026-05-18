@@ -283,6 +283,101 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
             " Distinct: \(distinctTime)s")
     }
 
+    // MARK: - Concurrent stress (verify NSLock cache is safe)
+
+    /// 100 concurrent classify() calls must all succeed
+    /// without crashing。 Counters must satisfy the
+    /// conservation invariant:hits + misses == calls。
+    /// If the NSLock-guarded cache has a race condition,
+    /// counter writes will be lost or the dictionary will
+    /// crash with concurrent modification。
+    func testConcurrentClassifyDoesNotRaceCacheState() async throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        let inputs = [
+            "alpha", "beta", "gamma", "delta",
+            "epsilon", "zeta", "eta", "theta",
+            "iota", "kappa", "lambda", "mu"
+        ]
+        // Warm cache so we get a mix of hits + misses
+        for inp in inputs.prefix(6) {
+            _ = try adapter.classify(text: inp)
+        }
+        let initialMissCount = adapter.cacheMissCount
+
+        // 100 concurrent tasks each does 5 classify() calls
+        await withTaskGroup(of: Void.self) { group in
+            for taskIdx in 0..<100 {
+                group.addTask {
+                    for callIdx in 0..<5 {
+                        // Deterministic input selection
+                        // so we can reason about the
+                        // hit/miss split
+                        let inputIdx =
+                            (taskIdx + callIdx) %
+                            inputs.count
+                        do {
+                            _ = try adapter.classify(
+                                text: inputs[inputIdx])
+                        } catch {
+                            XCTFail(
+                                "concurrent classify" +
+                                " threw: \(error)")
+                        }
+                    }
+                }
+            }
+        }
+
+        // 100 tasks × 5 calls = 500 total invocations
+        // Conservation invariant: any new hit or miss
+        // since the warmup must total exactly 500.
+        let totalNew =
+            (adapter.cacheHitCount - 0) +
+            (adapter.cacheMissCount - initialMissCount)
+        XCTAssertEqual(totalNew, 500,
+            "Conservation invariant broken: 500 calls" +
+            " should produce 500 counter increments" +
+            " total (got hit=\(adapter.cacheHitCount)," +
+            " miss=\(adapter.cacheMissCount)," +
+            " miss_baseline=\(initialMissCount))")
+    }
+
+    /// 20 concurrent tasks each request the SAME input
+    /// → expected:1 miss + 19 hits (cache fills on
+    /// first miss,subsequent are all hits)。 Bounds:
+    /// 1-20 misses depending on race timing,but
+    /// hit+miss must still sum to 20。
+    func testConcurrentSameInputCacheConvergesToHits() async throws {
+        let adapter = try BASContextClassifierMLAdapter()
+        let baseHit = adapter.cacheHitCount
+        let baseMiss = adapter.cacheMissCount
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<20 {
+                group.addTask {
+                    do {
+                        _ = try adapter.classify(
+                            text: "same input")
+                    } catch {
+                        XCTFail("classify threw: \(error)")
+                    }
+                }
+            }
+        }
+
+        let newHits = adapter.cacheHitCount - baseHit
+        let newMisses = adapter.cacheMissCount - baseMiss
+        XCTAssertEqual(newHits + newMisses, 20,
+            "20 concurrent calls must produce 20 counter" +
+            " increments (hit=\(newHits)," +
+            " miss=\(newMisses))")
+        XCTAssertGreaterThanOrEqual(newMisses, 1,
+            "First call must miss")
+        XCTAssertLessThanOrEqual(newMisses, 20,
+            "Worst case all 20 miss (if all race the" +
+            " cache-write window simultaneously)")
+    }
+
     // MARK: - Memorization sanity: trained inputs predict correctly
 
     /// Pin that the model CORRECTLY classifies its
