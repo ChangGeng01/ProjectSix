@@ -115,6 +115,22 @@ public actor BASCognitiveBrain {
     /// Store:)`。
     public let sqlHistoryStore: BASSQLBrainHistoryStore?
 
+    /// Per-instance safety confidence threshold for verdict
+    /// escalation。 Defaults to
+    /// `BASCognitiveBrain.safetyConfidenceThreshold`
+    /// (0.6),but hosts can override per-brain to match
+    /// their risk profile:
+    ///   - Child-safety hosts may pass 0.4 (more
+    ///     aggressive blocking — block on weaker
+    ///     evidence)
+    ///   - Developer-tool hosts may pass 0.8 (less
+    ///     aggressive — require stronger evidence
+    ///     before blocking)
+    /// The instance value is consulted by both
+    /// `safetyVerdict(_:)` and `summary(_:)` so the
+    /// rule chain stays consistent。
+    public let instanceSafetyConfidenceThreshold: Double
+
     /// Optional process-global C++ summary cache。 On hit,
     /// `summary(_:)` skips the full cascade and returns a
     /// cached DTO with fresh cache-retrieval latency。 Nil =
@@ -196,7 +212,9 @@ public actor BASCognitiveBrain {
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
-        cxxSummaryCache: BASCxxBrainSummaryCache? = nil
+        cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
+        safetyConfidenceThreshold: Double =
+            BASCognitiveBrain.safetyConfidenceThreshold
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -207,7 +225,9 @@ public actor BASCognitiveBrain {
             summaryHistoryCapacity:
                 summaryHistoryCapacity,
             sqlHistoryStore: sqlHistoryStore,
-            cxxSummaryCache: cxxSummaryCache)
+            cxxSummaryCache: cxxSummaryCache,
+            safetyConfidenceThreshold:
+                safetyConfidenceThreshold)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -223,7 +243,9 @@ public actor BASCognitiveBrain {
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
-        cxxSummaryCache: BASCxxBrainSummaryCache? = nil
+        cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
+        safetyConfidenceThreshold: Double =
+            BASCognitiveBrain.safetyConfidenceThreshold
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -231,6 +253,10 @@ public actor BASCognitiveBrain {
             max(0, summaryHistoryCapacity)
         self.sqlHistoryStore = sqlHistoryStore
         self.cxxSummaryCache = cxxSummaryCache
+        self.instanceSafetyConfidenceThreshold =
+            BASCognitiveBrain
+                .clampedThreshold(
+                    safetyConfidenceThreshold)
         // PHASE B-4: replace BASPlaceholderContextService
         // with the ML-backed BASMLContextService。 The
         // adapter loads the .mlmodel from Bundle.module
@@ -282,7 +308,9 @@ public actor BASCognitiveBrain {
         summaryHistoryCapacity: Int =
             BASCognitiveBrain.defaultSummaryHistoryCapacity,
         sqlHistoryStore: BASSQLBrainHistoryStore? = nil,
-        cxxSummaryCache: BASCxxBrainSummaryCache? = nil
+        cxxSummaryCache: BASCxxBrainSummaryCache? = nil,
+        safetyConfidenceThreshold: Double =
+            BASCognitiveBrain.safetyConfidenceThreshold
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -290,6 +318,10 @@ public actor BASCognitiveBrain {
             max(0, summaryHistoryCapacity)
         self.sqlHistoryStore = sqlHistoryStore
         self.cxxSummaryCache = cxxSummaryCache
+        self.instanceSafetyConfidenceThreshold =
+            BASCognitiveBrain
+                .clampedThreshold(
+                    safetyConfidenceThreshold)
         let coordinator = BASEBrainRuntimeCoordinator(
             powerClockService:
                 BASPlaceholderPowerClockService(),
@@ -393,6 +425,18 @@ public actor BASCognitiveBrain {
     /// the other。
     public static let ambiguityComplement: Double = 1.0
 
+    /// Clamp a host-supplied safety threshold into the
+    /// valid [0, 1] confidence range。 Out-of-range values
+    /// are not errors — they're treated as the nearest
+    /// boundary。 An input of -0.5 becomes 0 (always
+    /// escalate);1.5 becomes 1 (never escalate)。
+    public static func clampedThreshold(
+        _ raw: Double
+    ) -> Double {
+        if raw.isNaN { return safetyConfidenceThreshold }
+        return min(max(raw, 0.0), 1.0)
+    }
+
     /// Compute a typed safety verdict for a user input。
     /// Uses the ML context classifier internally。
     ///
@@ -430,7 +474,7 @@ public actor BASCognitiveBrain {
                 - result.contextFrame.ambiguityScore
         let verdict: BASCognitiveSafetyVerdict
         if confidence >=
-            BASCognitiveBrain.safetyConfidenceThreshold
+            instanceSafetyConfidenceThreshold
         {
             switch taskType {
             case .manipulationRisk:
@@ -586,7 +630,7 @@ extension BASCognitiveBrain {
                 - result.contextFrame.ambiguityScore
         let verdict: BASCognitiveSafetyVerdict
         if confidence >=
-            BASCognitiveBrain.safetyConfidenceThreshold
+            instanceSafetyConfidenceThreshold
         {
             switch result.contextFrame.taskType {
             case .manipulationRisk:
