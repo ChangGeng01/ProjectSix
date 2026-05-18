@@ -172,23 +172,29 @@ struct JSONOutput: Codable {
     let verdict: String
     let confidence: Double
     let latencyNanos: UInt64
+    let emotionalLoad: Double
+    let timePressure: Double
+    let consequenceLevel: Double
+    let relationPattern: String
+    let manipulationHints: [String]
 }
 
 func printResult(
-    input: String,
-    taskType: BASContextTaskType,
-    verdict: BASCognitiveSafetyVerdict,
-    confidence: Double,
-    latencyNanos: UInt64,
+    summary: BASCognitiveBrainSummary,
     json: Bool
 ) {
     if json {
         let payload = JSONOutput(
-            input: input,
-            taskType: taskType.rawValue,
-            verdict: verdict.rawValue,
-            confidence: confidence,
-            latencyNanos: latencyNanos)
+            input: summary.input,
+            taskType: summary.taskType.rawValue,
+            verdict: summary.safetyVerdict.rawValue,
+            confidence: summary.confidence,
+            latencyNanos: summary.latencyNanos,
+            emotionalLoad: summary.emotionalLoad,
+            timePressure: summary.timePressure,
+            consequenceLevel: summary.consequenceLevel,
+            relationPattern: summary.relationPattern,
+            manipulationHints: summary.manipulationHints)
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys]
         if let data = try? enc.encode(payload),
@@ -197,17 +203,34 @@ func printResult(
             print(str)
         }
     } else {
-        print("taskType: \(taskType.rawValue)")
+        print("taskType: \(summary.taskType.rawValue)")
         let confStr = String(
-            format: "%.3f", confidence)
+            format: "%.3f", summary.confidence)
         let latencyMs =
-            Double(latencyNanos) / 1_000_000.0
+            Double(summary.latencyNanos) / 1_000_000.0
         let latencyStr = String(
             format: "%.2f", latencyMs)
         print(
-            "verdict:  \(verdict.rawValue)" +
+            "verdict:  \(summary.safetyVerdict.rawValue)" +
             "  (confidence=\(confStr)," +
             " latency=\(latencyStr)ms)")
+        // Show derived signals on a second line for
+        // visibility during CLI exploration。
+        let emo = String(
+            format: "%.2f", summary.emotionalLoad)
+        let urg = String(
+            format: "%.2f", summary.timePressure)
+        let con = String(
+            format: "%.2f", summary.consequenceLevel)
+        print(
+            "signals:  emotional=\(emo)" +
+            " urgency=\(urg) consequence=\(con)" +
+            " relation=\(summary.relationPattern)")
+        if !summary.manipulationHints.isEmpty {
+            let joined = summary.manipulationHints
+                .joined(separator: ", ")
+            print("hints:    \(joined)")
+        }
     }
 }
 
@@ -246,11 +269,7 @@ func runCLI() async {
         // Use brain.summary() to capture latency too
         let summary = await brain.summary(args.input)
         printResult(
-            input: args.input,
-            taskType: summary.taskType,
-            verdict: summary.safetyVerdict,
-            confidence: summary.confidence,
-            latencyNanos: summary.latencyNanos,
+            summary: summary,
             json: args.jsonOutput)
         // --fail-on-block:exit code 3 when verdict
         // is .block。 Allows shell pipelines to halt

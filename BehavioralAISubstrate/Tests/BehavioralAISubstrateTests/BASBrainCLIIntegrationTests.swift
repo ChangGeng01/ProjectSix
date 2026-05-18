@@ -245,4 +245,81 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
             "Verdict must downgrade to safe at" +
             " threshold 1.0. stdout: \(result.stdout)")
     }
+
+    // MARK: - Derived signals surfaced in CLI output
+
+    func testCLIHumanOutputContainsDerivedSignals() throws {
+        let result = try runCLI(args: [
+            "the deadline is in one hour I must ship now",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(
+            result.stdout.contains("signals:"),
+            "Human output must contain 'signals:' line." +
+            " stdout: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains("emotional="),
+            "Output must show emotional= signal")
+        XCTAssertTrue(
+            result.stdout.contains("urgency="),
+            "Output must show urgency= signal")
+        XCTAssertTrue(
+            result.stdout.contains("consequence="),
+            "Output must show consequence= signal")
+        XCTAssertTrue(
+            result.stdout.contains("relation="),
+            "Output must show relation= signal")
+    }
+
+    func testCLIManipulationOutputShowsHints() throws {
+        let result = try runCLI(args: [
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(
+            result.stdout.contains("hints:"),
+            "Manipulation input must surface hints" +
+            " in CLI output. stdout: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains(
+                "ml.classifier.confidence="),
+            "Manipulation hint must include the" +
+            " confidence-prefixed signal")
+    }
+
+    func testCLIChatOutputOmitsHints() throws {
+        let result = try runCLI(args: ["hello"])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertFalse(
+            result.stdout.contains("hints:"),
+            "Chat input should NOT print 'hints:'" +
+            " line (no manipulation flagged)" +
+            " stdout: \(result.stdout)")
+    }
+
+    func testCLIJSONIncludesAllDerivedSignals() throws {
+        let result = try runCLI(args: [
+            "--json", "we disagree about the approach",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        guard let data = result.stdout
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            .data(using: .utf8),
+              let parsed = try JSONSerialization
+                .jsonObject(with: data) as? [String: Any]
+        else {
+            return XCTFail(
+                "stdout not valid JSON: \(result.stdout)")
+        }
+        XCTAssertNotNil(parsed["emotionalLoad"] as? Double,
+            "JSON must include emotionalLoad field")
+        XCTAssertNotNil(parsed["timePressure"] as? Double)
+        XCTAssertNotNil(
+            parsed["consequenceLevel"] as? Double)
+        XCTAssertNotNil(
+            parsed["relationPattern"] as? String)
+        XCTAssertNotNil(
+            parsed["manipulationHints"] as? [String])
+    }
 }
