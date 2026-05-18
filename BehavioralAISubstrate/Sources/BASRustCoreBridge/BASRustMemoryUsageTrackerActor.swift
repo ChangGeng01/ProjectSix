@@ -592,6 +592,46 @@ public actor BASRustMemoryUsageTrackerActor {
         }
     }
 
+    /// 主线 Integrity 抽取 — validator variant of the
+    /// chain hash。 Compares the live tracker against
+    /// an expected 32-byte hash inside Rust,saving
+    /// hosts the byte-by-byte comparison。
+    ///
+    /// Returns true on match,false on mismatch
+    /// (tamper / drift detected)。 Throws on null /
+    /// internal errors。
+    public func verifyChainHash(
+        expected: Data
+    ) throws -> Bool {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        guard expected.count == 32 else {
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(-99)
+        }
+        let rc = expected.withUnsafeBytes { raw -> Int32 in
+            let ptr = raw.bindMemory(to: UInt8.self)
+                .baseAddress!
+            return bas_rust_tracker_verify_chain_hash(
+                h, ptr)
+        }
+        switch rc {
+        case 1: return true
+        case 0: return false
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        case -2:
+            throw BASRustMemoryUsageTrackerActorError
+                .rustInternalException
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+    }
+
     /// 主线 Integrity 抽取 — compute the canonical chain
     /// hash over all records inside Rust。 Returns the
     /// 32-byte SHA256 digest as Data。 Hosts compare this
@@ -976,6 +1016,13 @@ public actor BASRustMemoryUsageTrackerActor {
     }
 
     public func computeChainHash() throws -> Data {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func verifyChainHash(
+        expected: Data
+    ) throws -> Bool {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }

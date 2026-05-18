@@ -235,6 +235,37 @@ public actor BASRustBrainHistoryStore {
         return hex
     }
 
+    /// 主线 Integrity 抽取 — validator variant。 Compares
+    /// the live tracker against the supplied hex hash
+    /// (64 lowercase hex chars or `Data` with 32 bytes)
+    /// inside Rust,returning the boolean result。
+    /// Throws on hex-parse failure or Rust error。
+    public func verifyChainHash(
+        expectedHex: String
+    ) async throws -> Bool {
+        guard expectedHex.count == 64 else {
+            throw BASRustLedgerCoreError
+                .invalidInputSize
+        }
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(32)
+        var index = expectedHex.startIndex
+        for _ in 0..<32 {
+            let next = expectedHex.index(
+                index, offsetBy: 2)
+            let byteHex = String(expectedHex[index..<next])
+            guard let b = UInt8(byteHex, radix: 16)
+            else {
+                throw BASRustLedgerCoreError
+                    .invalidInputSize
+            }
+            bytes.append(b)
+            index = next
+        }
+        return try await tracker.verifyChainHash(
+            expected: Data(bytes))
+    }
+
     // MARK: - 主线 全面 提升: Rust-side aggregations
 
     /// Records grouped by permit mode (i.e. by safety

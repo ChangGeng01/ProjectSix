@@ -286,6 +286,40 @@ int32_t bas_rust_tracker_compute_chain_hash(
 /// `bas_rust_tracker_compute_chain_hash`。
 int32_t bas_rust_tracker_compute_chain_hash_version(void);
 
+/// 主线 Integrity 抽取 — validator variant。 Compares
+/// the tracker's live chain hash against a provided
+/// expected 32-byte hash。
+///
+/// Returns:
+///   - 1  = match
+///   - 0  = mismatch (tamper / drift detected)
+///   - -1 = null pointer
+///   - -2 = internal error (lock poisoned)
+int32_t bas_rust_tracker_verify_chain_hash(
+    Tracker* tracker,
+    const uint8_t* expected_hash);
+
+int32_t bas_rust_tracker_verify_chain_hash_version(void);
+
+/// 主线 Ledger 抽取 — stateless append-only chain step。
+/// Given prev_hash + payload bytes,returns the next
+/// chain hash via SHA256(prev_hash || length(payload)
+/// big-endian || payload)。 Pure function — no tracker
+/// state involved。 Hosts use this for ledger append
+/// while keeping their own storage / state machine。
+///
+/// Returns:
+///   - 0  = success (out_hash filled with 32 bytes)
+///   - -1 = null pointer (prev_hash,out_hash,or
+///          payload when payload_len > 0)
+int32_t bas_rust_ledger_append_step(
+    const uint8_t* prev_hash,
+    const uint8_t* payload,
+    size_t payload_len,
+    uint8_t* out_hash);
+
+int32_t bas_rust_ledger_append_step_version(void);
+
 #ifdef __cplusplus
 }
 #endif

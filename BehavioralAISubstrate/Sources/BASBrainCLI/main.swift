@@ -78,6 +78,20 @@ struct CLIArgs {
     /// Pass `--bare-brain` to revert to the legacy
     /// single-pilot behavior。
     var bareBrain: Bool = false
+    /// 主线 全面 — print C++ bloom filter size +
+    /// "ever seen" cache stats,exit。 Skips input
+    /// processing。
+    var showBloomStatus: Bool = false
+    /// 主线 全面 — print all Rust-native percentile +
+    /// top-K + interval stats from the wired Rust
+    /// history pilot,exit。 No-op if Rust not wired
+    /// (default brain has it)。
+    var showRustPercentile: Bool = false
+    /// 主线 全面 — dump healthHistory NDJSON to stdout,
+    /// exit。 Requires brain to be configured with
+    /// healthSnapshotHistoryCapacity > 0,which CLI
+    /// will do when this flag is set。
+    var exportNDJSON: Bool = false
 }
 
 func parseArgs(_ argv: [String]) throws -> CLIArgs {
@@ -101,6 +115,12 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
             args.showHealthSnapshot = true
         case "--bare-brain":
             args.bareBrain = true
+        case "--bloom-status":
+            args.showBloomStatus = true
+        case "--rust-percentile":
+            args.showRustPercentile = true
+        case "--export-ndjson":
+            args.exportNDJSON = true
         case "--threshold":
             i += 1
             guard i < argv.count else {
@@ -137,6 +157,9 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
     }
     if !args.showHelp && !args.showPilotStatus
         && !args.showHealthSnapshot
+        && !args.showBloomStatus
+        && !args.showRustPercentile
+        && !args.exportNDJSON
         && args.input.isEmpty
     {
         throw CLIError.missingInput
@@ -196,6 +219,9 @@ func printHelp() {
       BASBrainCLI --pilot-status --json  # same, JSON format
       BASBrainCLI --health-snapshot      # dump unified health JSON
       BASBrainCLI --health-snapshot > snap.json  # for ops dashboards
+      BASBrainCLI --bloom-status         # C++ bloom + cache telemetry
+      BASBrainCLI --rust-percentile      # Rust top-K + percentiles + chain hash
+      BASBrainCLI --export-ndjson        # healthHistory as NDJSON to stdout
 
     Exit codes:
       0 — input processed successfully (any verdict)
@@ -362,6 +388,67 @@ func printPilotStatus(
     print(" [\(mark(status.metalActive))] Metal — SSMScan kernel accessor")
 }
 
+// MARK: - --bloom-status output
+
+func printBloomStatus(
+    _ snap: BASCognitiveBrainHealthSnapshot
+) {
+    // Pull the C++ telemetry; bloom size lives in
+    // the bridge, not the telemetry — but we can show
+    // the cache size + estimate "ever seen" via the
+    // healthSnapshot's cxxTelemetry。
+    guard let tele = snap.cxxTelemetry else {
+        print("C++ pilot not wired — bloom status" +
+            " unavailable")
+        return
+    }
+    print("C++ bloom + cache status:")
+    print("  cacheSize:            \(tele.cacheSize)")
+    print("  contentByteSizeEstimate:" +
+        " \(tele.contentByteSizeEstimate) B")
+    print("  maxEntryByteSize:      " +
+        " \(tele.maxEntryByteSize) B")
+    print("  entrySkewRatio:       " +
+        " \(String(format: "%.3f", tele.entrySkewRatio))")
+    print("  hitRate:              " +
+        " \(String(format: "%.4f", tele.hitRate))")
+    print("  totalLookups:         \(tele.totalLookups)")
+}
+
+// MARK: - --rust-percentile output
+
+func printRustPercentile(
+    _ snap: BASCognitiveBrainHealthSnapshot
+) {
+    guard let agg = snap.rustAggregation else {
+        print("Rust pilot not wired —" +
+            " percentile / leaderboard unavailable")
+        return
+    }
+    print("Rust history aggregation:")
+    print("  totalRecords:    \(agg.totalRecords)")
+    print("  distinctSessions:\(agg.distinctSessions)")
+    if let pcts = snap.atomCountPercentiles {
+        print("Atom-count percentiles" +
+            " (Rust-native sort):")
+        print("  p50: \(pcts.p50)")
+        print("  p95: \(pcts.p95)")
+        print("  p99: \(pcts.p99)")
+    }
+    if let top = snap.topAtoms, !top.isEmpty {
+        print("Top atoms (top-5 from Rust):")
+        for (i, entry) in top.enumerated() {
+            print("  \(i + 1). atomID=" +
+                "\(entry.atomID.prefix(16)) " +
+                "count=\(entry.count)")
+        }
+    }
+    if let hash = snap.integrityChainHashHex {
+        print("Integrity chain hash:" +
+            " \(hash.prefix(16))...")
+    }
+}
+
 // MARK: - --health-snapshot output
 
 func printHealthSnapshot(
@@ -400,26 +487,39 @@ func runCLI() async {
         // makeWithAllPilots()。 --bare-brain reverts to
         // legacy makeWithDefaults() (C pilot only)。
         let brain: BASCognitiveBrain
+        // 主线 全面 — when --export-ndjson is set,
+        // allocate a small history buffer so the
+        // recordHealthSnapshot has somewhere to append。
+        let historyCapacity: Int =
+            args.exportNDJSON ? 4 : 0
         do {
             if args.bareBrain {
                 if let threshold = args.safetyThreshold {
                     brain = try await BASCognitiveBrain
                         .makeWithDefaults(
                             safetyConfidenceThreshold:
-                                threshold)
+                                threshold,
+                            healthSnapshotHistoryCapacity:
+                                historyCapacity)
                 } else {
                     brain = try await BASCognitiveBrain
-                        .makeWithDefaults()
+                        .makeWithDefaults(
+                            healthSnapshotHistoryCapacity:
+                                historyCapacity)
                 }
             } else {
                 if let threshold = args.safetyThreshold {
                     brain = try await BASCognitiveBrain
                         .makeWithAllPilots(
                             safetyConfidenceThreshold:
-                                threshold)
+                                threshold,
+                            healthSnapshotHistoryCapacity:
+                                historyCapacity)
                 } else {
                     brain = try await BASCognitiveBrain
-                        .makeWithAllPilots()
+                        .makeWithAllPilots(
+                            healthSnapshotHistoryCapacity:
+                                historyCapacity)
                 }
             }
         } catch {
@@ -444,6 +544,38 @@ func runCLI() async {
         if args.showHealthSnapshot {
             let snap = await brain.healthSnapshot()
             printHealthSnapshot(snap)
+            return
+        }
+        // --bloom-status:show C++ bloom + cache stats
+        if args.showBloomStatus {
+            let snap = await brain.healthSnapshot()
+            printBloomStatus(snap)
+            return
+        }
+        // --rust-percentile:show Rust-native sort
+        // outputs (top-K + percentiles + chain hash)
+        if args.showRustPercentile {
+            // Generate some activity so the
+            // percentiles aren't all empty
+            _ = await brain.summary("--rust-percentile" +
+                " sample input alpha")
+            _ = await brain.summary("--rust-percentile" +
+                " sample input alpha")
+            _ = await brain.summary("--rust-percentile" +
+                " sample input beta")
+            let snap = await brain.healthSnapshot()
+            printRustPercentile(snap)
+            return
+        }
+        // --export-ndjson:dump healthHistory as NDJSON
+        if args.exportNDJSON {
+            // Record a snapshot first (history was
+            // empty until now since brain was just
+            // constructed)
+            _ = await brain.recordHealthSnapshot()
+            let ndjson = await brain
+                .exportHealthHistoryJSON()
+            print(ndjson)
             return
         }
         // Use brain.summary() to capture latency。 We

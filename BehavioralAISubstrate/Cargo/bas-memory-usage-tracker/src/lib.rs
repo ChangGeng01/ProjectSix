@@ -1143,6 +1143,96 @@ pub extern "C" fn bas_rust_tracker_compute_chain_hash_version() -> c_int {
     1
 }
 
+// 主线 Integrity 抽取 — validator variant of the chain
+// hash。 Compares the live tracker's chain hash against
+// a provided expected 32-byte hash。 Saves the host
+// from doing the byte comparison in Swift。
+//
+// Returns:
+//   1   = hashes match (chain integrity verified)
+//   0   = hashes differ (tamper / drift detected)
+//   -1  = null pointer
+//   -2  = internal error (lock poisoned)
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_verify_chain_hash(
+    tracker: *mut Tracker,
+    expected_hash: *const c_uchar,
+) -> c_int {
+    if tracker.is_null() || expected_hash.is_null() {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let actual = match tref.compute_chain_hash() {
+        Ok(h) => h,
+        Err(_) => return -2,
+    };
+    let expected_slice = unsafe {
+        std::slice::from_raw_parts(expected_hash, 32)
+    };
+    if actual.as_slice() == expected_slice { 1 } else { 0 }
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_verify_chain_hash_version() -> c_int {
+    1
+}
+
+// 主线 Ledger 抽取 — stateless append-only chain step。
+// Pure function:given prev_hash + event_payload,
+// returns the next chain hash = SHA256(prev_hash ||
+// length(payload) big-endian || payload)。 No tracker
+// state involved。
+//
+// Hosts call this for each ledger append:they keep
+// their own ledger storage but delegate the cryptographic
+// chain step to Rust。 BASSovereignAuditLedger keeps its
+// Swift state machine + storage;Rust owns the hash
+// math。
+//
+// Returns:
+//   0  = success (out_hash filled)
+//   -1 = null pointer (any of 3)
+#[no_mangle]
+pub extern "C" fn bas_rust_ledger_append_step(
+    prev_hash: *const c_uchar,
+    payload: *const c_uchar,
+    payload_len: usize,
+    out_hash: *mut c_uchar,
+) -> c_int {
+    if prev_hash.is_null() || out_hash.is_null() {
+        return -1;
+    }
+    if payload.is_null() && payload_len > 0 {
+        return -1;
+    }
+    let prev_slice = unsafe {
+        std::slice::from_raw_parts(prev_hash, 32)
+    };
+    let payload_slice = if payload_len == 0 {
+        &[][..]
+    } else {
+        unsafe {
+            std::slice::from_raw_parts(
+                payload, payload_len)
+        }
+    };
+    let mut hasher = Sha256::new();
+    hasher.update(prev_slice);
+    feed_length_prefixed(
+        &mut hasher, payload_slice);
+    let digest = hasher.finalize();
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            digest.as_ptr(), out_hash, 32);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_ledger_append_step_version() -> c_int {
+    1
+}
+
 // MARK: - Tests
 
 #[cfg(test)]

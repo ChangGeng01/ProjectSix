@@ -174,6 +174,21 @@ public actor BASCognitiveBrain {
     /// (a ring buffer exists to append to)。
     fileprivate let healthSnapshotAutoCaptureEvery: Int
 
+    /// 主线 Metal cascade influence — optional threshold
+    /// for the Metal-derived signature。 When set AND
+    /// the per-input Metal signature exceeds the
+    /// threshold,brain.summary appends a typed hint
+    /// `"metal.high-signal=X.XXXX"` to the summary's
+    /// manipulationHints array。
+    ///
+    /// Hosts that consume manipulationHints (e.g. for
+    /// audit logging,UI annotation,or downstream
+    /// safety escalation) now see real Metal contribution
+    /// — not just a separate field they may or may not
+    /// read。 Default nil = disabled = no contribution
+    /// to hints。
+    fileprivate let metalSignalThreshold: Double?
+
     /// 持续性 发展 — counter for auto-capture cadence。
     /// Increments on every brain.summary call; modulo
     /// `healthSnapshotAutoCaptureEvery` triggers a
@@ -297,7 +312,8 @@ public actor BASCognitiveBrain {
         hostProfileService:
             (any BASHostProfileServicing)? = nil,
         healthSnapshotHistoryCapacity: Int = 0,
-        healthSnapshotAutoCaptureEvery: Int = 0
+        healthSnapshotAutoCaptureEvery: Int = 0,
+        metalSignalThreshold: Double? = nil
     ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
@@ -317,7 +333,8 @@ public actor BASCognitiveBrain {
             healthSnapshotHistoryCapacity:
                 healthSnapshotHistoryCapacity,
             healthSnapshotAutoCaptureEvery:
-                healthSnapshotAutoCaptureEvery)
+                healthSnapshotAutoCaptureEvery,
+            metalSignalThreshold: metalSignalThreshold)
     }
 
     /// 主线 加强 实用性 — fully-wired brain factory。
@@ -364,7 +381,8 @@ public actor BASCognitiveBrain {
         hostProfileService:
             (any BASHostProfileServicing)? = nil,
         healthSnapshotHistoryCapacity: Int = 0,
-        healthSnapshotAutoCaptureEvery: Int = 0
+        healthSnapshotAutoCaptureEvery: Int = 0,
+        metalSignalThreshold: Double? = nil
     ) async throws -> BASCognitiveBrain {
         let sqlTracker = BASMemoryUsageTracker()
         let sqlStore = BASSQLBrainHistoryStore(
@@ -394,7 +412,8 @@ public actor BASCognitiveBrain {
             healthSnapshotHistoryCapacity:
                 healthSnapshotHistoryCapacity,
             healthSnapshotAutoCaptureEvery:
-                healthSnapshotAutoCaptureEvery)
+                healthSnapshotAutoCaptureEvery,
+            metalSignalThreshold: metalSignalThreshold)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -419,7 +438,8 @@ public actor BASCognitiveBrain {
         hostProfileService:
             (any BASHostProfileServicing)? = nil,
         healthSnapshotHistoryCapacity: Int = 0,
-        healthSnapshotAutoCaptureEvery: Int = 0
+        healthSnapshotAutoCaptureEvery: Int = 0,
+        metalSignalThreshold: Double? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -431,6 +451,7 @@ public actor BASCognitiveBrain {
         self.cxxSummaryCache = cxxSummaryCache
         self.healthSnapshotAutoCaptureEvery =
             max(0, healthSnapshotAutoCaptureEvery)
+        self.metalSignalThreshold = metalSignalThreshold
         // 主线 继续 开发 — allocate the ring buffer when
         // capacity > 0,otherwise leave nil to avoid the
         // actor allocation for brains that don't use it。
@@ -556,7 +577,8 @@ public actor BASCognitiveBrain {
         safetyConfidenceThreshold: Double =
             BASCognitiveBrain.safetyConfidenceThreshold,
         healthSnapshotHistoryCapacity: Int = 0,
-        healthSnapshotAutoCaptureEvery: Int = 0
+        healthSnapshotAutoCaptureEvery: Int = 0,
+        metalSignalThreshold: Double? = nil
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -568,6 +590,7 @@ public actor BASCognitiveBrain {
         self.cxxSummaryCache = cxxSummaryCache
         self.healthSnapshotAutoCaptureEvery =
             max(0, healthSnapshotAutoCaptureEvery)
+        self.metalSignalThreshold = metalSignalThreshold
         if healthSnapshotHistoryCapacity > 0 {
             self.healthHistory =
                 BASCognitiveBrainHealthSnapshotHistory(
@@ -1390,6 +1413,23 @@ extension BASCognitiveBrain {
         } else {
             verdict = .safe
         }
+        // 主线 Metal cascade influence — when configured
+        // AND the per-input signature exceeds threshold,
+        // append a typed hint to the manipulationHints
+        // array。 Hosts that consume manipulationHints
+        // for downstream safety / audit logic now see
+        // real Metal contribution。
+        var hintsWithMetal: [String] =
+            result.contextFrame.manipulationHints
+        if let threshold = metalSignalThreshold,
+           let sig = metalSignal,
+           Double(sig) > threshold
+        {
+            hintsWithMetal.append(
+                String(
+                    format: "metal.high-signal=%.4f",
+                    Double(sig)))
+        }
         let summary = BASCognitiveBrainSummary(
             input: result.contextFrame.utterance,
             taskType: result.contextFrame.taskType,
@@ -1397,8 +1437,7 @@ extension BASCognitiveBrain {
             ambiguityScore:
                 result.contextFrame.ambiguityScore,
             safetyVerdict: verdict,
-            manipulationHints:
-                result.contextFrame.manipulationHints,
+            manipulationHints: hintsWithMetal,
             latencyNanos: latencyNanos,
             emotionalLoad:
                 result.contextFrame.emotionalLoad,
