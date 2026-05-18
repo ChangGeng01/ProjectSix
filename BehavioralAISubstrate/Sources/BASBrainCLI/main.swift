@@ -141,11 +141,16 @@ func printHelp() {
     Output:
       Default: human-readable
         taskType: <enum>
-        verdict:  <safe|warn|block>  (confidence=0.XX)
+        verdict:  <safe|warn|block>  (confidence=0.XX, latency=Xms)
+        signals:  emotional=0.XX urgency=0.XX consequence=0.XX
+                  relation=<neutral|tense>
+        risk:     <low|medium|high|extreme>  (total=0.XX,
+                  mode=<answer|compare|delay|...>)
+        hints:    <manipulation hints>           (only if any)
+        factors:  <elevated risk factors>        (only if any)
 
-      --json: single-line JSON
-        {"input":"...","taskType":"...","verdict":"...",
-         "confidence":0.XX,"latencyNanos":NNN}
+      --json: single-line JSON with all fields plus
+        riskLevel, totalRisk, riskFactors, recommendedMode
 
     Examples:
       BASBrainCLI "compile the swift package"
@@ -177,10 +182,15 @@ struct JSONOutput: Codable {
     let consequenceLevel: Double
     let relationPattern: String
     let manipulationHints: [String]
+    let riskLevel: String
+    let totalRisk: Double
+    let riskFactors: [String]
+    let recommendedMode: String
 }
 
 func printResult(
     summary: BASCognitiveBrainSummary,
+    risk: BASCognitiveBrainRiskBundle,
     json: Bool
 ) {
     if json {
@@ -194,7 +204,12 @@ func printResult(
             timePressure: summary.timePressure,
             consequenceLevel: summary.consequenceLevel,
             relationPattern: summary.relationPattern,
-            manipulationHints: summary.manipulationHints)
+            manipulationHints: summary.manipulationHints,
+            riskLevel: risk.riskLevel.rawValue,
+            totalRisk: risk.totalRisk,
+            riskFactors: risk.factors,
+            recommendedMode: risk.recommendedMode
+                .rawValue)
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys]
         if let data = try? enc.encode(payload),
@@ -226,10 +241,34 @@ func printResult(
             "signals:  emotional=\(emo)" +
             " urgency=\(urg) consequence=\(con)" +
             " relation=\(summary.relationPattern)")
+        // Show L5 risk line:level + totalRisk +
+        // recommendedMode。 Real cognitive cascade
+        // result — distinct from the L0-derived safety
+        // verdict above。
+        let riskStr = String(
+            format: "%.2f", risk.totalRisk)
+        print(
+            "risk:     \(risk.riskLevel.rawValue)" +
+            "  (total=\(riskStr)," +
+            " mode=\(risk.recommendedMode.rawValue))")
         if !summary.manipulationHints.isEmpty {
             let joined = summary.manipulationHints
                 .joined(separator: ", ")
             print("hints:    \(joined)")
+        }
+        if !risk.factors.isEmpty {
+            // Filter to elevated risk factors only
+            // (skip downstream-added codes like
+            // 'binding.primary_candidate' which carry
+            // a dot-prefix)。
+            let elevated = risk.factors.filter {
+                !$0.contains(".")
+            }
+            if !elevated.isEmpty {
+                let joined = elevated.joined(
+                    separator: ", ")
+                print("factors:  \(joined)")
+            }
         }
     }
 }
@@ -268,8 +307,20 @@ func runCLI() async {
         }
         // Use brain.summary() to capture latency too
         let summary = await brain.summary(args.input)
+        // L5 risk verdict — second active ML-touched
+        // layer in the cognitive cascade。 Runs the
+        // cascade twice in CLI mode (once for summary,
+        // once for risk) so the latency reported above
+        // reflects only the summary path。 Hosts wiring
+        // the brain directly should prefer one of:
+        //   - process(_:) + read result.contextFrame +
+        //     result.riskCard (one cascade run)
+        //   - separate summary() and riskVerdict() calls
+        //     when independent observability is preferred
+        let risk = await brain.riskVerdict(args.input)
         printResult(
             summary: summary,
+            risk: risk,
             json: args.jsonOutput)
         // --fail-on-block:exit code 3 when verdict
         // is .block。 Allows shell pipelines to halt

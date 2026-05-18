@@ -291,8 +291,12 @@ public actor BASCognitiveBrain {
                 BASPlaceholderLoopService(),
             triSelfService:
                 BASPlaceholderTriSelfService(),
-            riskService:
-                BASPlaceholderRiskService(),
+            // L5 risk: REAL service derived from L0
+            // context signals (manipulation / consequence
+            // / emotion / urgency / ambiguity)。 This is
+            // the SECOND active ML-touched layer in the
+            // cascade,after L0 context classification。
+            riskService: BASMLRiskService(),
             actionService:
                 BASPlaceholderActionService(),
             evolutionService:
@@ -518,6 +522,111 @@ public actor BASCognitiveBrain {
             verdict = .safe
         }
         return (verdict, taskType, confidence)
+    }
+
+    /// Compute a typed risk verdict for a user input
+    /// using the L5 risk service (BASMLRiskService when
+    /// the brain was built via the ML init path)。 Runs
+    /// the full cascade,extracts the BASRiskCard
+    /// produced by the risk service,returns a host-
+    /// friendly Codable bundle。
+    ///
+    /// **Why this exists**: hosts integrating the brain
+    /// for safety-aware UI need both the safety verdict
+    /// (typed L0 mapping) AND the typed risk level
+    /// (L5 deterministic derivation)。 The risk level
+    /// is more granular (4 classes: low/medium/high/
+    /// extreme) than the safety verdict (3 classes:
+    /// safe/warn/block) and includes the factors array
+    /// for telemetry。 This surface exposes it without
+    /// requiring hosts to dig through the full
+    /// BASEBrainTurnResult。
+    public func riskVerdict(
+        _ input: String,
+        deviceState: BASDeviceState =
+            BASCognitiveBrain.defaultDeviceState,
+        hostID: String =
+            BASCognitiveBrain.defaultHostID
+    ) async -> BASCognitiveBrainRiskBundle {
+        let result = await self.process(
+            input,
+            deviceState: deviceState,
+            hostID: hostID)
+        let card = result.riskCard
+        return BASCognitiveBrainRiskBundle(
+            input: input,
+            riskLevel: card.riskLevel,
+            totalRisk: card.totalRisk,
+            factors: card.factors,
+            recommendedMode: card.recommendedMode,
+            manipulationStrength: card
+                .manipulationStrength,
+            uncertainty: card.uncertainty,
+            irreversibility: card.irreversibility)
+    }
+}
+
+/// Lightweight Codable bundle returned by
+/// `BASCognitiveBrain.riskVerdict(_:)`。 Wraps the most
+/// useful BASRiskCard fields for typical host
+/// consumption without surfacing the full risk-frame
+/// internals。
+public struct BASCognitiveBrainRiskBundle: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// The user input as received。
+    public let input: String
+
+    /// Typed risk level — one of .low / .medium /
+    /// .high / .extreme。
+    public let riskLevel: BASBrainRiskLevel
+
+    /// Total risk score in [0, 1]。 0 = safe,1 =
+    /// maximum risk。 Derived from the L0 ML signals
+    /// via a documented weighted combination。
+    public let totalRisk: Double
+
+    /// Risk factors that contributed to the assessment。
+    /// Stable identifiers like "manipulation_detected",
+    /// "high_consequence",etc。 Empty when no factor
+    /// exceeded the elevated threshold。
+    public let factors: [String]
+
+    /// Recommended action permit mode based on risk
+    /// level。 .answer / .compare / .delay etc。
+    public let recommendedMode: BASActionPermitMode
+
+    /// Strength of the manipulation signal in [0, 1]。
+    /// Non-zero only when the L0 classifier surfaced
+    /// .manipulationRisk。
+    public let manipulationStrength: Double
+
+    /// Confidence-inverted ambiguity score from L0。
+    /// 0 = certain,1 = maximum uncertainty。
+    public let uncertainty: Double
+
+    /// Irreversibility echo of consequenceLevel in [0, 1]。
+    /// High value = action is hard to undo。
+    public let irreversibility: Double
+
+    public init(
+        input: String,
+        riskLevel: BASBrainRiskLevel,
+        totalRisk: Double,
+        factors: [String],
+        recommendedMode: BASActionPermitMode,
+        manipulationStrength: Double,
+        uncertainty: Double,
+        irreversibility: Double
+    ) {
+        self.input = input
+        self.riskLevel = riskLevel
+        self.totalRisk = totalRisk
+        self.factors = factors
+        self.recommendedMode = recommendedMode
+        self.manipulationStrength = manipulationStrength
+        self.uncertainty = uncertainty
+        self.irreversibility = irreversibility
     }
 }
 

@@ -322,4 +322,91 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
         XCTAssertNotNil(
             parsed["manipulationHints"] as? [String])
     }
+
+    // MARK: - L5 risk surface in CLI output
+
+    func testCLIHumanOutputContainsRiskLine() throws {
+        let result = try runCLI(args: [
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(
+            result.stdout.contains("risk:"),
+            "Human output must contain 'risk:' line." +
+            " stdout: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains("total="),
+            "Risk line must include total= score")
+        XCTAssertTrue(
+            result.stdout.contains("mode="),
+            "Risk line must include mode= action permit")
+    }
+
+    func testCLIManipulationOutputShowsRiskFactors() throws {
+        let result = try runCLI(args: [
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(
+            result.stdout.contains("factors:"),
+            "Manipulation input must surface 'factors:'" +
+            " line with elevated risk factors." +
+            " stdout: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains(
+                "manipulation_detected"),
+            "Manipulation input must surface" +
+            " 'manipulation_detected' risk factor")
+    }
+
+    func testCLIChatOutputOmitsRiskFactors() throws {
+        let result = try runCLI(args: ["hello"])
+        XCTAssertEqual(result.exitCode, 0)
+        // The 'factors:' line should not appear for
+        // chat (no elevated risk factors)。 But the
+        // 'risk:' line itself MUST always appear。
+        XCTAssertTrue(
+            result.stdout.contains("risk:"),
+            "Risk line must appear for ALL inputs")
+        XCTAssertFalse(
+            result.stdout.contains("factors:"),
+            "Chat input should NOT print 'factors:'" +
+            " line (no elevated risk factors)" +
+            " stdout: \(result.stdout)")
+    }
+
+    func testCLIJSONIncludesRiskFields() throws {
+        let result = try runCLI(args: [
+            "--json",
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        guard let data = result.stdout
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            .data(using: .utf8),
+              let parsed = try JSONSerialization
+                .jsonObject(with: data) as? [String: Any]
+        else {
+            return XCTFail(
+                "stdout not valid JSON: \(result.stdout)")
+        }
+        XCTAssertNotNil(parsed["riskLevel"] as? String,
+            "JSON must include riskLevel field")
+        XCTAssertNotNil(parsed["totalRisk"] as? Double)
+        XCTAssertNotNil(
+            parsed["riskFactors"] as? [String])
+        XCTAssertNotNil(
+            parsed["recommendedMode"] as? String)
+        // Sanity: manipulation input should produce
+        // medium-or-higher risk level + manipulation_detected
+        // factor in the JSON output。
+        let factors = parsed["riskFactors"] as? [String]
+            ?? []
+        XCTAssertTrue(
+            factors.contains("manipulation_detected"),
+            "JSON riskFactors must include" +
+            " 'manipulation_detected' for manipulation" +
+            " input")
+    }
 }
