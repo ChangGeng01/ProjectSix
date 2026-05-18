@@ -1347,4 +1347,84 @@ extension BASCognitiveBrain {
         }
         return result
     }
+
+    /// Pilot wire-up status snapshot — Codable bundle
+    /// reporting which of the 5 multi-language pilots
+    /// are active on this brain instance。 Hosts use
+    /// this for telemetry / adoption dashboards / debug
+    /// without needing to introspect each optional
+    /// pilot field individually。
+    ///
+    /// The 5 pilots:
+    ///   - C    — always active (built into latency
+    ///            measurement;not host-injectable)
+    ///   - SQL  — active when sqlHistoryStore != nil
+    ///   - C++  — active when cxxSummaryCache != nil
+    ///   - Rust — active when rustHistoryStore != nil
+    ///   - Metal — active when metalLibraryLoader != nil
+    public var pilotStatus: BASCognitiveBrainPilotStatus {
+        return BASCognitiveBrainPilotStatus(
+            cActive: true,
+            sqlActive: sqlHistoryStore != nil,
+            cxxActive: cxxSummaryCache != nil,
+            rustActive: rustHistoryStore != nil,
+            metalActive: metalLibraryLoader != nil)
+    }
+}
+
+/// Codable snapshot of which pilots are wired into a
+/// brain instance。 Returned by `brain.pilotStatus`。
+public struct BASCognitiveBrainPilotStatus: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// C pilot — high-resolution latency clock。
+    /// Always active (built into the brain;not
+    /// host-injectable)。
+    public let cActive: Bool
+
+    /// SQL pilot — durable SQLite-backed history
+    /// persistence。 Active when sqlHistoryStore was
+    /// passed at construction time。
+    public let sqlActive: Bool
+
+    /// C++ pilot — process-global summary cache。
+    /// Active when cxxSummaryCache was passed。
+    public let cxxActive: Bool
+
+    /// Rust pilot — fast in-process history telemetry。
+    /// Active when rustHistoryStore was passed。
+    public let rustActive: Bool
+
+    /// Metal pilot — kernel library accessor for
+    /// downstream Mamba/SSM compute。 Active when
+    /// metalLibraryLoader was passed。
+    public let metalActive: Bool
+
+    /// Convenience: total count of active pilots
+    /// (always at least 1 since C is always active)。
+    public var activeCount: Int {
+        return [cActive, sqlActive, cxxActive,
+            rustActive, metalActive]
+            .reduce(0) { $0 + ($1 ? 1 : 0) }
+    }
+
+    /// All 5 active = fully-wired production setup。
+    public var allActive: Bool {
+        return cActive && sqlActive && cxxActive
+            && rustActive && metalActive
+    }
+
+    public init(
+        cActive: Bool,
+        sqlActive: Bool,
+        cxxActive: Bool,
+        rustActive: Bool,
+        metalActive: Bool
+    ) {
+        self.cActive = cActive
+        self.sqlActive = sqlActive
+        self.cxxActive = cxxActive
+        self.rustActive = rustActive
+        self.metalActive = metalActive
+    }
 }
