@@ -207,6 +207,31 @@ public actor BASMPSGraphExecutableCacheCxxBridge {
                 .unknownReturnCode(rc)
         }
     }
+
+    /// 主线 解构 重构 — process-global cache content
+    /// byte-size estimate。 Iterates the cache inside the
+    /// C++ side under ONE mutex acquisition,sums every
+    /// stored key+value length。 Returns the total。
+    ///
+    /// Doing the same from Swift would require enumerating
+    /// keys (no such bridge API) AND issuing one lookup
+    /// per key (N+1 lock acquisitions)。 Pushing the
+    /// iteration into C++ keeps the work where the
+    /// container lives — 术业有专攻 example。
+    ///
+    /// V1 path (useCxxCache=false) returns 0 without
+    /// consulting the cache。 Throws `cxxInternalException`
+    /// on the rare allocation-failure-during-iteration
+    /// case。
+    public func byteSizeEstimate() throws -> Int64 {
+        guard useCxxCache else { return 0 }
+        let bytes = bas_mps_cache_byte_size_estimate()
+        if bytes < 0 {
+            throw BASMPSGraphExecutableCacheCxxBridgeError
+                .cxxInternalException
+        }
+        return bytes
+    }
 }
 
 // MARK: - Flag-aware factory

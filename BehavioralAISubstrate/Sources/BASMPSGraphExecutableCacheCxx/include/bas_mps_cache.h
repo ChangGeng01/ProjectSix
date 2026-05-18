@@ -67,6 +67,33 @@ int32_t bas_mps_cache_clear(void);
 /// behavior change。
 int32_t bas_mps_cache_version(void);
 
+/// 主线 解构 重构 — sum the byte sizes of every stored
+/// key + value under a single mutex acquisition,returning
+/// an estimated memory footprint of the cache contents。
+///
+/// Doing this from Swift would require iterating keys (no
+/// such API today) AND doing N+1 lock acquisitions (one per
+/// lookup)。 Pushing the iteration into C++ keeps it under
+/// one lock and inside the language that owns the container
+/// — exact 术业有专攻 example。
+///
+/// Returns the sum of `key.size() + value.size()` across
+/// the cache。 Excludes std::string per-instance overhead
+/// (typically 24-32 bytes per entry on libc++ small-string-
+/// optimization),excludes std::unordered_map node + bucket
+/// overhead。 Hosts wanting a tighter estimate can add a
+/// per-entry constant on top of this number。
+///
+/// - Returns:
+///   - >= 0: estimated content bytes
+///   - -1:   internal exception (extremely rare;only on
+///           allocation failure during iteration)
+int64_t bas_mps_cache_byte_size_estimate(void);
+
+/// ABI / behavior version pin for
+/// `bas_mps_cache_byte_size_estimate`。 Currently 1。
+int32_t bas_mps_cache_byte_size_estimate_version(void);
+
 #ifdef __cplusplus
 }
 #endif

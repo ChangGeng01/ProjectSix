@@ -126,14 +126,23 @@ public actor BASCxxBrainSummaryCache {
     /// Codable telemetry snapshot。 Combines hit/miss
     /// counters + cache size into one bundle for hosts
     /// monitoring cache effectiveness。
+    ///
+    /// 主线 解构 重构 — also includes
+    /// `contentByteSizeEstimate` (sum of stored key+value
+    /// bytes computed in C++ under one mutex acquisition)。
+    /// Best-effort: 0 on bridge failure (V1 path or rare
+    /// allocation-failure-during-iteration)。
     public func telemetrySnapshot() async
         -> BASCxxBrainSummaryCacheTelemetry
     {
         let sz = await bridge.size()
+        let bytes: Int64 =
+            (try? await bridge.byteSizeEstimate()) ?? 0
         return BASCxxBrainSummaryCacheTelemetry(
             hits: hitCount,
             misses: missCount,
-            cacheSize: Int(sz))
+            cacheSize: Int(sz),
+            contentByteSizeEstimate: Int(bytes))
     }
 }
 
@@ -154,6 +163,15 @@ public struct BASCxxBrainSummaryCacheTelemetry: Codable,
     /// snapshot)。
     public let cacheSize: Int
 
+    /// 主线 解构 重构 — sum of stored key+value bytes
+    /// computed by the C++ side under one mutex acquisition。
+    /// Excludes per-entry std::string + std::unordered_map
+    /// overhead — a content-only estimate hosts can compare
+    /// against a hard budget。 Set to 0 by the default
+    /// initializer (backward-compat for snapshots produced
+    /// before this field landed)。
+    public let contentByteSizeEstimate: Int
+
     /// Total lookups (hits + misses)。
     public var totalLookups: Int { hits + misses }
 
@@ -164,13 +182,23 @@ public struct BASCxxBrainSummaryCacheTelemetry: Codable,
         return Double(hits) / Double(totalLookups)
     }
 
+    /// Average bytes per entry (rounded down)。 0 when the
+    /// cache is empty。
+    public var averageBytesPerEntry: Int {
+        guard cacheSize > 0 else { return 0 }
+        return contentByteSizeEstimate / cacheSize
+    }
+
     public init(
         hits: Int,
         misses: Int,
-        cacheSize: Int
+        cacheSize: Int,
+        contentByteSizeEstimate: Int = 0
     ) {
         self.hits = hits
         self.misses = misses
         self.cacheSize = cacheSize
+        self.contentByteSizeEstimate =
+            contentByteSizeEstimate
     }
 }

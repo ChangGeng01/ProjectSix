@@ -115,6 +115,20 @@ public:
         return store_.size();
     }
 
+    // 主线 解构 重构 — atomic byte-size sum under shared
+    // lock。 One lock acquisition,one pass over the
+    // container,sum of key.size() + value.size() across
+    // every entry。 No Swift round-trips。
+    size_t byte_size_estimate() const {
+        std::lock_guard<std::mutex> r(rw_);
+        size_t total = 0;
+        for (const auto& kv : store_) {
+            total += kv.first.size();
+            total += kv.second.size();
+        }
+        return total;
+    }
+
     void clear() {
         std::lock_guard<std::mutex> w(rw_);
         store_.clear();
@@ -217,6 +231,19 @@ int32_t bas_mps_cache_version(void) {
     // ABI version pin。 Bumping requires updating
     // BASMPSGraphExecutableCacheCxxBridgeTests
     // .testCxxBridgeABIVersion simultaneously。
+    return 1;
+}
+
+int64_t bas_mps_cache_byte_size_estimate(void) {
+    try {
+        return static_cast<int64_t>(
+            BasMpsCache::instance().byte_size_estimate());
+    } catch (...) {
+        return -1;
+    }
+}
+
+int32_t bas_mps_cache_byte_size_estimate_version(void) {
     return 1;
 }
 
