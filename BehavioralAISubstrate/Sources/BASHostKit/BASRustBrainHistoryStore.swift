@@ -142,4 +142,95 @@ public actor BASRustBrainHistoryStore {
         let all = try await tracker.allRecords()
         return all.filter { $0.atomID == atomID }.count
     }
+
+    // MARK: - 主线 全面 提升: Rust-side aggregations
+
+    /// Records grouped by permit mode (i.e. by safety
+    /// verdict)。 Hosts use this for safety-dashboard
+    /// rollups:
+    ///   - "how many .block verdicts this session?"
+    ///   - "how many .warn?"
+    ///   - "how many .safe?"
+    ///
+    /// Goes through the Rust core's `allRecords()` then
+    /// aggregates Swift-side。 Future commits could push
+    /// the aggregation into Rust for true zero-copy hot
+    /// paths,but the Swift fold is fast enough at the
+    /// current corpus sizes。
+    public func recordCountByPermitMode() async throws
+        -> [String: Int]
+    {
+        let all = try await tracker.allRecords()
+        var counts: [String: Int] = [:]
+        for record in all {
+            counts[record.permitMode, default: 0] += 1
+        }
+        return counts
+    }
+
+    /// Records grouped by session reference。 Useful for
+    /// multi-session brain hosts that want to report
+    /// "how many turns per session" without scanning
+    /// the records array manually。
+    public func recordCountBySession() async throws
+        -> [String: Int]
+    {
+        let all = try await tracker.allRecords()
+        var counts: [String: Int] = [:]
+        for record in all {
+            counts[record.sessionRef, default: 0] += 1
+        }
+        return counts
+    }
+
+    /// Codable aggregation snapshot — bundles the two
+    /// rollups + total count for one-call telemetry。
+    public func aggregationSnapshot() async throws
+        -> BASRustBrainHistoryStoreAggregation
+    {
+        let all = try await tracker.allRecords()
+        var byPermit: [String: Int] = [:]
+        var bySession: [String: Int] = [:]
+        for record in all {
+            byPermit[record.permitMode, default: 0] += 1
+            bySession[record.sessionRef, default: 0] += 1
+        }
+        return BASRustBrainHistoryStoreAggregation(
+            totalRecords: all.count,
+            recordsByPermitMode: byPermit,
+            recordsBySession: bySession,
+            distinctSessions: bySession.count)
+    }
+}
+
+/// Codable aggregation snapshot from
+/// BASRustBrainHistoryStore.aggregationSnapshot()。 Hosts
+/// use this for dashboard / audit rollups。
+public struct BASRustBrainHistoryStoreAggregation: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// Total records across all sessions / permit modes。
+    public let totalRecords: Int
+
+    /// Record count grouped by permit mode
+    /// ("safe" / "warn" / "block")。
+    public let recordsByPermitMode: [String: Int]
+
+    /// Record count grouped by session UUID。
+    public let recordsBySession: [String: Int]
+
+    /// Number of distinct session UUIDs observed。
+    public let distinctSessions: Int
+
+    public init(
+        totalRecords: Int,
+        recordsByPermitMode: [String: Int],
+        recordsBySession: [String: Int],
+        distinctSessions: Int
+    ) {
+        self.totalRecords = totalRecords
+        self.recordsByPermitMode = recordsByPermitMode
+        self.recordsBySession = recordsBySession
+        self.distinctSessions = distinctSessions
+    }
 }
