@@ -81,11 +81,22 @@ public enum BASContextClassifierInputEncoder {
     /// Must match train.py `NUM_BUCKETS`。
     public static let numBuckets: Int = 256
 
-    /// Tokenize:lowercase + whitespace split。 Trivial
-    /// tokenization mirroring Python `tokenize(text)`。
+    /// Tokenize:lowercase + whitespace split mirroring
+    /// Python `text.lower().split()` semantics — splits
+    /// on ANY whitespace (space,tab,newline,multiple
+    /// consecutive whitespace) and drops empty tokens。
+    ///
+    /// Earlier this method used `split(separator: " ")`
+    /// which only split on the ASCII space character —
+    /// inputs containing tabs or newlines produced
+    /// different token sequences than the Python trainer,
+    /// silently breaking inference parity for any text
+    /// with non-space whitespace。 Fixed via
+    /// `whereSeparator: { $0.isWhitespace }` to match
+    /// Python's `str.split()`。
     public static func tokenize(_ text: String) -> [String] {
         return text.lowercased()
-            .split(separator: " ")
+            .split(whereSeparator: { $0.isWhitespace })
             .map(String.init)
             .filter { !$0.isEmpty }
     }
