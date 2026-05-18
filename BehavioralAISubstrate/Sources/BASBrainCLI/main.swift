@@ -66,6 +66,11 @@ struct CLIArgs {
     /// is the expected behavior — CLI's job is to
     /// SHOW the wire-up,not modify it。
     var showPilotStatus: Bool = false
+    /// 主线 全面 开发 — when true,capture a unified
+    /// brain.healthSnapshot() and dump it as JSON。
+    /// Skips input processing。 Useful for ops dumps
+    /// piped to a dashboard / health-check endpoint。
+    var showHealthSnapshot: Bool = false
 }
 
 func parseArgs(_ argv: [String]) throws -> CLIArgs {
@@ -85,6 +90,8 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
             args.failOnBlock = true
         case "--pilot-status":
             args.showPilotStatus = true
+        case "--health-snapshot":
+            args.showHealthSnapshot = true
         case "--threshold":
             i += 1
             guard i < argv.count else {
@@ -120,6 +127,7 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
                 in: .whitespacesAndNewlines)
     }
     if !args.showHelp && !args.showPilotStatus
+        && !args.showHealthSnapshot
         && args.input.isEmpty
     {
         throw CLIError.missingInput
@@ -172,6 +180,8 @@ func printHelp() {
         echo "blocked"
       BASBrainCLI --pilot-status         # show 5-pilot wire-up
       BASBrainCLI --pilot-status --json  # same, JSON format
+      BASBrainCLI --health-snapshot      # dump unified health JSON
+      BASBrainCLI --health-snapshot > snap.json  # for ops dashboards
 
     Exit codes:
       0 — input processed successfully (any verdict)
@@ -338,6 +348,27 @@ func printPilotStatus(
     print(" [\(mark(status.metalActive))] Metal — SSMScan kernel accessor")
 }
 
+// MARK: - --health-snapshot output
+
+func printHealthSnapshot(
+    _ snap: BASCognitiveBrainHealthSnapshot
+) {
+    let enc = JSONEncoder()
+    enc.outputFormatting = [.sortedKeys, .prettyPrinted]
+    enc.dateEncodingStrategy = .iso8601
+    guard let data = try? enc.encode(snap),
+          let str = String(data: data, encoding: .utf8)
+    else {
+        let msg = "BASBrainCLI: failed to encode" +
+            " health snapshot\n"
+        if let d = msg.data(using: .utf8) {
+            FileHandle.standardError.write(d)
+        }
+        return
+    }
+    print(str)
+}
+
 // MARK: - Main (top-level for main.swift)
 
 func runCLI() async {
@@ -376,6 +407,14 @@ func runCLI() async {
             let status = await brain.pilotStatus
             printPilotStatus(
                 status, json: args.jsonOutput)
+            return
+        }
+        // --health-snapshot:capture + dump the unified
+        // pilot health bundle as Codable JSON。 Skips
+        // cascade work — purely an ops dump entry point。
+        if args.showHealthSnapshot {
+            let snap = await brain.healthSnapshot()
+            printHealthSnapshot(snap)
             return
         }
         // Use brain.summary() to capture latency。 We
