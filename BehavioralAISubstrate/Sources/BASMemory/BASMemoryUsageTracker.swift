@@ -406,6 +406,73 @@ public actor BASMemoryUsageTracker {
         return db != nil
     }
 
+    /// 主线 解构 重构 — native `SELECT COUNT(*) WHERE
+    /// atom_id = ?` query。 Pushes the count operation
+    /// into SQLite when the tracker is SQLite-backed;
+    /// falls back to Swift filter+count for in-memory
+    /// mode。 Both paths return the same Int。
+    ///
+    /// Replaces the legacy Swift-fold path
+    /// (`usageCount(forAtomID:)`) for hosts running large
+    /// SQLite-backed corpora where the in-memory cache
+    /// fold is unnecessary work。
+    public func usageCountViaSQL(
+        forAtomID atomID: String
+    ) throws -> Int {
+        if let db {
+            return try Self.fetchUsageCount(
+                db: db, atomID: atomID)
+        }
+        return inMemory.values
+            .filter { $0.atomID == atomID }
+            .count
+    }
+
+    /// 主线 解构 重构 — native `SELECT COUNT(DISTINCT
+    /// session_ref)` query。 Pushes the distinct-count
+    /// into SQLite (the storage engine's specialty)。
+    /// Falls back to a Swift Set when in-memory only。
+    ///
+    /// Hosts use this for "how many distinct sessions
+    /// have ever written to this DB" rollups。
+    public func distinctSessionCountViaSQL() throws -> Int {
+        if let db {
+            return try Self.fetchDistinctSessionCount(db: db)
+        }
+        var seen = Set<String>()
+        for record in inMemory.values {
+            seen.insert(record.sessionRef)
+        }
+        return seen.count
+    }
+
+    /// 主线 解构 重构 — native `SELECT ... WHERE atom_id
+    /// = ? ORDER BY retrieved_at_ms DESC LIMIT ?` query。
+    /// Pushes the atom filter + ordering + limit into
+    /// SQLite,returning only the rows the caller asked
+    /// for instead of materializing the full atom-filtered
+    /// set in Swift first。
+    ///
+    /// Differs from `recentRecords(forAtomID:limit:)` (the
+    /// legacy Swift-fold path) by running the WHERE +
+    /// ORDER BY + LIMIT all inside the storage engine。
+    public func recentRecordsForAtomViaSQL(
+        atomID: String,
+        limit: Int
+    ) throws -> [BASMemoryUsageRecord] {
+        if let db {
+            return try Self.fetchRecentRecordsForAtomDesc(
+                db: db, atomID: atomID,
+                limit: max(0, limit))
+        }
+        let filtered = inMemory.values
+            .filter { $0.atomID == atomID }
+        let sorted = filtered.sorted {
+            $0.retrievedAt > $1.retrievedAt
+        }
+        return Array(sorted.prefix(max(0, limit)))
+    }
+
     /// Look up one record by ID. Returns nil if absent.
     public func record(forID id: String) -> BASMemoryUsageRecord? {
         inMemory[id]
@@ -750,6 +817,126 @@ public actor BASMemoryUsageTracker {
             counts[permitMode] = Int(n)
         }
         return counts
+    }
+
+    /// 主线 解构 重构 — native `SELECT COUNT(*) WHERE
+    /// atom_id = ?` query。 Uses the chapter 二百五十一
+    /// `memory_usage_atom_idx` index automatically (SQLite
+    /// query planner picks it up)。 Constant memory,
+    /// query-plan-time complexity O(log n) via index seek
+    /// + leaf scan。
+    fileprivate static func fetchUsageCount(
+        db: OpaquePointer,
+        atomID: String
+    ) throws -> Int {
+        let sql = """
+            SELECT COUNT(*)
+              FROM memory_usage_records
+             WHERE atom_id = ?
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, atomID)
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw TrackerError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    /// 主线 解构 重构 — native `SELECT COUNT(DISTINCT
+    /// session_ref)` query。 Uses the chapter 二百五十一
+    /// `memory_usage_session_idx` index for the distinct
+    /// scan。
+    fileprivate static func fetchDistinctSessionCount(
+        db: OpaquePointer
+    ) throws -> Int {
+        let sql = """
+            SELECT COUNT(DISTINCT session_ref)
+              FROM memory_usage_records
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else {
+            throw TrackerError.stepFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    /// 主线 解构 重构 — atom-filtered + time-ordered native
+    /// SELECT。 The query planner uses the atom-id index for
+    /// the WHERE filter,then orders the small filtered set
+    /// by retrieved_at_ms descending,then truncates to
+    /// LIMIT。 Constant Swift memory:only the LIMIT-sized
+    /// result array is materialized。
+    fileprivate static func fetchRecentRecordsForAtomDesc(
+        db: OpaquePointer,
+        atomID: String,
+        limit: Int
+    ) throws -> [BASMemoryUsageRecord] {
+        let sql = """
+            SELECT record_id, atom_id, retrieved_at_ms,
+                   session_ref, turn_ref, permit_mode,
+                   helped_state
+              FROM memory_usage_records
+             WHERE atom_id = ?
+             ORDER BY retrieved_at_ms DESC
+             LIMIT ?
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, atomID)
+        sqlite3_bind_int64(stmt, 2, Int64(limit))
+        var records: [BASMemoryUsageRecord] = []
+        records.reserveCapacity(limit)
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let recordID = readText(stmt, 0)
+            let aID = readText(stmt, 1)
+            let ms = sqlite3_column_int64(stmt, 2)
+            let sessionRef = readText(stmt, 3)
+            let turnRef = readText(stmt, 4)
+            let permitMode = readText(stmt, 5)
+            let helpedRaw = readText(stmt, 6)
+            let helped = BASMemoryUsageRecord.HelpedFlag(
+                rawValue: helpedRaw) ?? .unknown
+            records.append(BASMemoryUsageRecord(
+                recordID: recordID,
+                atomID: aID,
+                retrievedAt: Date(
+                    timeIntervalSince1970: Double(ms) / 1000),
+                sessionRef: sessionRef,
+                turnRef: turnRef,
+                permitMode: permitMode,
+                helpedFlag: helped))
+        }
+        return records
     }
 
     fileprivate static func deleteOlderThan(
