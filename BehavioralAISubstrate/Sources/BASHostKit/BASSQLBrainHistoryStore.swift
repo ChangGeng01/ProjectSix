@@ -142,4 +142,104 @@ public actor BASSQLBrainHistoryStore {
         return await tracker
             .usageCount(forAtomID: atomID)
     }
+
+    // MARK: - 主线 全面 提升: native SQL query surfaces
+
+    /// True when the underlying tracker has a SQLite database
+    /// handle。 Hosts can use this to decide whether queries via
+    /// `recentRecordsViaSQL` / `permitModeDistribution` will hit
+    /// the storage engine (true) or fall back to a Swift fold
+    /// over the in-memory cache (false)。
+    public var isSQLBacked: Bool {
+        get async { await tracker.isSQLBacked }
+    }
+
+    /// Read the N most-recent records via a native SQLite
+    /// `ORDER BY retrieved_at_ms DESC LIMIT ?` query when the
+    /// tracker is SQLite-backed。 Falls back to Swift fold when
+    /// the tracker is in-memory only。 Both paths return
+    /// logically identical results。
+    ///
+    /// Differs from `recentRecords(limit:)` (the legacy Swift-
+    /// fold path) by pushing the ordering + limit into the
+    /// storage engine。 Use this when running against large
+    /// SQLite-backed corpora where you don't want the full
+    /// record set materialized in Swift。
+    public func recentRecordsViaSQL(
+        limit: Int
+    ) async throws -> [BASMemoryUsageRecord] {
+        return try await tracker.recentRecordsViaSQL(
+            limit: limit)
+    }
+
+    /// Record counts grouped by permit mode (safety verdict)。
+    /// When SQLite-backed,uses a native `GROUP BY permit_mode`
+    /// aggregation query。 When in-memory,folds over the cache。
+    ///
+    /// Hosts use this for safety-dashboard rollups。 Mirrors the
+    /// equivalent surface on BASRustBrainHistoryStore so dashboards
+    /// can switch between SQL and Rust history backends without
+    /// rewriting consumer code。
+    public func permitModeDistribution() async throws
+        -> [String: Int]
+    {
+        return try await tracker.permitModeDistribution()
+    }
+
+    /// Codable aggregation snapshot bundling the count + permit-
+    /// mode distribution + this-session turn count into one
+    /// dashboard-shaped payload。 Mirrors
+    /// `BASRustBrainHistoryStoreAggregation` semantics across
+    /// the two history backends。
+    public func aggregationSnapshot() async throws
+        -> BASSQLBrainHistoryStoreAggregation
+    {
+        let count = await tracker.recordCount
+        let dist = try await tracker.permitModeDistribution()
+        let backed = await tracker.isSQLBacked
+        return BASSQLBrainHistoryStoreAggregation(
+            totalRecords: count,
+            recordsByPermitMode: dist,
+            turnsThisSession: turnCounter,
+            isSQLBacked: backed)
+    }
+}
+
+/// Codable aggregation snapshot from
+/// BASSQLBrainHistoryStore.aggregationSnapshot()。 Hosts use
+/// this for dashboard / audit rollups。 Mirrors
+/// BASRustBrainHistoryStoreAggregation so dashboards can switch
+/// between SQL and Rust history backends without rewriting
+/// consumer code。
+public struct BASSQLBrainHistoryStoreAggregation: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// Total records across all sessions / permit modes。
+    public let totalRecords: Int
+
+    /// Record count grouped by permit mode
+    /// ("safe" / "warn" / "block")。 Computed via native
+    /// `GROUP BY permit_mode` SQL query when the underlying
+    /// tracker is SQLite-backed。
+    public let recordsByPermitMode: [String: Int]
+
+    /// Turn counter for this brain instance (matches
+    /// `BASSQLBrainHistoryStore.turnsThisSession`)。
+    public let turnsThisSession: Int
+
+    /// True if the underlying tracker has a SQLite database
+    /// handle (queries hit the storage engine)。
+    public let isSQLBacked: Bool
+
+    public init(
+        totalRecords: Int,
+        recordsByPermitMode: [String: Int],
+        turnsThisSession: Int,
+        isSQLBacked: Bool
+    ) {
+        self.totalRecords = totalRecords
+        self.recordsByPermitMode = recordsByPermitMode
+        self.turnsThisSession = turnsThisSession
+        self.isSQLBacked = isSQLBacked
+    }
 }

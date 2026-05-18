@@ -336,6 +336,76 @@ public actor BASMemoryUsageTracker {
         }
     }
 
+    // MARK: - 主线 全面 提升: native SQL query paths
+    //
+    // The methods above (`allRecords`,`recentRecords(forAtomID:)`,
+    // `usageCount(forAtomID:)`,`recordCount`) read from the
+    // `inMemory` dictionary。 That's the write-through cache — fast
+    // O(1) recordCount + O(n) Swift sort + Array prefix。 Works for
+    // any corpus size that fits in RAM,but does NOT exercise the
+    // SQL pilot's query engine。
+    //
+    // These methods push the query into SQLite when a database
+    // handle is available。 ORDER BY,LIMIT,and GROUP BY all run
+    // inside the storage engine — the actual reason the chapter
+    // 702 SQL pilot exists。 In-memory mode (db == nil) falls back
+    // to the Swift fold so semantics stay consistent across both
+    // tracker modes。
+
+    /// Read the N most-recent records across ALL atoms,sorted
+    /// descending by `retrievedAt` (newest first)。
+    ///
+    /// When the tracker is SQLite-backed (databaseURL non-nil),
+    /// this executes a native `SELECT ... ORDER BY retrieved_at_ms
+    /// DESC LIMIT ?` query inside SQLite。 When the tracker is in-
+    /// memory only,it folds over `inMemory.values`。 Both paths
+    /// return logically identical results。
+    ///
+    /// Hosts running large corpora prefer this over `allRecords()
+    /// .sorted().prefix()` because the storage engine handles the
+    /// ordering + limit without materializing the full record set
+    /// in Swift。
+    public func recentRecordsViaSQL(
+        limit: Int
+    ) throws -> [BASMemoryUsageRecord] {
+        if let db {
+            return try Self.fetchRecentRecordsDesc(
+                db: db, limit: max(0, limit))
+        }
+        let sorted = inMemory.values.sorted {
+            $0.retrievedAt > $1.retrievedAt
+        }
+        return Array(sorted.prefix(max(0, limit)))
+    }
+
+    /// Record counts grouped by `permit_mode`。 When SQLite-
+    /// backed,runs a native `SELECT permit_mode, COUNT(*) ...
+    /// GROUP BY permit_mode` query。 When in-memory only,
+    /// folds over the cache。 Both paths return logically
+    /// identical results。
+    ///
+    /// Hosts use this for safety-dashboard rollups:
+    ///   - "how many .block verdicts logged this database?"
+    ///   - "how many .warn?"
+    ///   - "how many .safe?"
+    public func permitModeDistribution() throws -> [String: Int] {
+        if let db {
+            return try Self.fetchPermitModeDistribution(db: db)
+        }
+        var counts: [String: Int] = [:]
+        for record in inMemory.values {
+            counts[record.permitMode, default: 0] += 1
+        }
+        return counts
+    }
+
+    /// True when this tracker is SQLite-backed (has a real
+    /// `db` handle)。 Hosts can use this to log whether queries
+    /// will hit the engine or fall back to Swift folds。
+    public var isSQLBacked: Bool {
+        return db != nil
+    }
+
     /// Look up one record by ID. Returns nil if absent.
     public func record(forID id: String) -> BASMemoryUsageRecord? {
         inMemory[id]
@@ -594,6 +664,92 @@ public actor BASMemoryUsageTracker {
                 helpedFlag: helped))
         }
         return records
+    }
+
+    /// 主线 全面 提升 — native `ORDER BY retrieved_at_ms DESC
+    /// LIMIT ?` query。 Materializes the typed record at row read
+    /// time so callers see a fully-formed Swift array of newest-
+    /// first records — without dragging the entire table into
+    /// Swift memory first。 SQLite handles the ordering + limit
+    /// inside the storage engine。
+    fileprivate static func fetchRecentRecordsDesc(
+        db: OpaquePointer,
+        limit: Int
+    ) throws -> [BASMemoryUsageRecord] {
+        let sql = """
+            SELECT record_id, atom_id, retrieved_at_ms,
+                   session_ref, turn_ref, permit_mode,
+                   helped_state
+              FROM memory_usage_records
+             ORDER BY retrieved_at_ms DESC
+             LIMIT ?
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_int64(stmt, 1, Int64(limit))
+
+        var records: [BASMemoryUsageRecord] = []
+        records.reserveCapacity(limit)
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let recordID = readText(stmt, 0)
+            let atomID = readText(stmt, 1)
+            let ms = sqlite3_column_int64(stmt, 2)
+            let sessionRef = readText(stmt, 3)
+            let turnRef = readText(stmt, 4)
+            let permitMode = readText(stmt, 5)
+            let helpedRaw = readText(stmt, 6)
+            let helped = BASMemoryUsageRecord.HelpedFlag(
+                rawValue: helpedRaw) ?? .unknown
+            records.append(BASMemoryUsageRecord(
+                recordID: recordID,
+                atomID: atomID,
+                retrievedAt: Date(
+                    timeIntervalSince1970: Double(ms) / 1000),
+                sessionRef: sessionRef,
+                turnRef: turnRef,
+                permitMode: permitMode,
+                helpedFlag: helped))
+        }
+        return records
+    }
+
+    /// 主线 全面 提升 — native `GROUP BY permit_mode` aggregation。
+    /// Returns one row per distinct permit_mode value with the
+    /// COUNT(*) for that mode。 SQLite handles the grouping inside
+    /// the storage engine — no Swift-side fold over the cache。
+    fileprivate static func fetchPermitModeDistribution(
+        db: OpaquePointer
+    ) throws -> [String: Int] {
+        let sql = """
+            SELECT permit_mode, COUNT(*) AS n
+              FROM memory_usage_records
+             GROUP BY permit_mode
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil)
+            == SQLITE_OK,
+            let stmt
+        else {
+            throw TrackerError.prepareFailed(
+                sql: sql,
+                message: String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+        var counts: [String: Int] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let permitMode = readText(stmt, 0)
+            let n = sqlite3_column_int64(stmt, 1)
+            counts[permitMode] = Int(n)
+        }
+        return counts
     }
 
     fileprivate static func deleteOlderThan(
