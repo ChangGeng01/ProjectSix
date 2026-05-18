@@ -168,10 +168,18 @@ final class BASCognitiveBrainHealthSnapshotTests: XCTestCase {
         _ = await brain.summary("a")
         _ = await brain.summary("b")
         let original = await brain.healthSnapshot()
+        // Use millisecondsSince1970 strategy — SQL stores
+        // retrieved_at_ms at ms precision so .iso8601
+        // (whole-second default) would lose sub-second
+        // bits and break Equatable on the SQL aggregation
+        // sub-bundle that now carries oldestRecordAt /
+        // newestRecordAt。
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy =
+            .millisecondsSince1970
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy =
+            .millisecondsSince1970
         let data = try encoder.encode(original)
         let decoded = try decoder.decode(
             BASCognitiveBrainHealthSnapshot.self,

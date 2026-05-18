@@ -481,6 +481,87 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
             "Default CLI brain wires Metal pilot")
     }
 
+    // MARK: - --health-snapshot
+
+    func testCLIHealthSnapshotEmitsValidJSON() throws {
+        // 严查 修复 — this flag was shipped without a
+        // CLI integration test。 Fixing that gap now。
+        let result = try runCLI(args: [
+            "--health-snapshot",
+        ])
+        XCTAssertEqual(result.exitCode, 0,
+            "--health-snapshot must succeed without input")
+        let trimmed = result.stdout.trimmingCharacters(
+            in: .whitespacesAndNewlines)
+        XCTAssertFalse(trimmed.isEmpty,
+            "Expected non-empty JSON on stdout")
+        // Parse as JSON and verify expected keys
+        guard let data = trimmed.data(using: .utf8),
+              let parsed = try JSONSerialization
+                .jsonObject(with: data) as? [String: Any]
+        else {
+            return XCTFail(
+                "stdout not valid JSON: \(trimmed)")
+        }
+        // Must have the top-level pilotStatus + pilotMetrics
+        XCTAssertNotNil(parsed["pilotStatus"])
+        XCTAssertNotNil(parsed["pilotMetrics"])
+        XCTAssertNotNil(parsed["collectedAt"])
+        // 严查 修复 — must include the new cSystemProbes
+        // sub-bundle now that C probes are wired into
+        // the snapshot。
+        XCTAssertNotNil(parsed["cSystemProbes"],
+            "C system probes must surface in the JSON" +
+            " — this was the previous gap")
+        guard let probes = parsed["cSystemProbes"]
+            as? [String: Any]
+        else {
+            return XCTFail(
+                "cSystemProbes is not an object")
+        }
+        // On Apple silicon all five fields populate
+        XCTAssertNotNil(probes["residentMemoryBytes"],
+            "RSS must be present (V2 path)")
+        XCTAssertNotNil(probes["threadCount"])
+        XCTAssertNotNil(probes["logicalCpuCount"])
+        XCTAssertNotNil(probes["systemUptimeSeconds"])
+        XCTAssertNotNil(probes["physicalMemoryBytes"])
+    }
+
+    func testCLIHealthSnapshotPilotStatusFiveOfFive()
+        throws
+    {
+        // 严查 修复 — default brain is all-pilots,
+        // so the JSON's pilotStatus block should show
+        // all five active。
+        let result = try runCLI(args: [
+            "--health-snapshot",
+        ])
+        XCTAssertEqual(result.exitCode, 0)
+        guard let data = result.stdout
+            .trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            .data(using: .utf8),
+              let parsed = try JSONSerialization
+                .jsonObject(with: data) as? [String: Any],
+              let status = parsed["pilotStatus"]
+                as? [String: Any]
+        else {
+            return XCTFail(
+                "Could not extract pilotStatus from JSON")
+        }
+        XCTAssertEqual(
+            status["cActive"] as? Bool, true)
+        XCTAssertEqual(
+            status["sqlActive"] as? Bool, true)
+        XCTAssertEqual(
+            status["cxxActive"] as? Bool, true)
+        XCTAssertEqual(
+            status["rustActive"] as? Bool, true)
+        XCTAssertEqual(
+            status["metalActive"] as? Bool, true)
+    }
+
     func testCLIBareBrainFlagYieldsLegacyOnePilot()
         throws
     {

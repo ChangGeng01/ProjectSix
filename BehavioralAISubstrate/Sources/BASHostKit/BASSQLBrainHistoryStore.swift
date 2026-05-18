@@ -194,12 +194,25 @@ public actor BASSQLBrainHistoryStore {
         let backed = await tracker.isSQLBacked
         let distinctSessions = try await tracker
             .distinctSessionCountViaSQL()
+        // 严查 修复 — surface MIN/MAX(retrieved_at_ms)
+        // through the aggregation snapshot so the Round-3
+        // SQL native aggregates actually flow into
+        // brain.healthSnapshot()。
+        let oldest = try await tracker
+            .oldestRecordTimestampViaSQL()
+        let newest = try await tracker
+            .newestRecordTimestampViaSQL()
+        let helpedDist = try await tracker
+            .helpedFlagDistributionViaSQL()
         return BASSQLBrainHistoryStoreAggregation(
             totalRecords: count,
             recordsByPermitMode: dist,
             turnsThisSession: turnCounter,
             isSQLBacked: backed,
-            distinctSessions: distinctSessions)
+            distinctSessions: distinctSessions,
+            oldestRecordAt: oldest,
+            newestRecordAt: newest,
+            recordsByHelpedFlag: helpedDist)
     }
 
     // MARK: - 主线 解构 重构 — atom-scoped native queries
@@ -318,17 +331,48 @@ public struct BASSQLBrainHistoryStoreAggregation: Codable,
     /// before this field landed。
     public let distinctSessions: Int
 
+    /// 严查 修复 — oldest record timestamp via native
+    /// `SELECT MIN(retrieved_at_ms)`。 Nil when the
+    /// database is empty。 Default nil for backward-compat。
+    public let oldestRecordAt: Date?
+
+    /// Newest record timestamp via native `SELECT MAX
+    /// (retrieved_at_ms)`。 Nil when the database is
+    /// empty。
+    public let newestRecordAt: Date?
+
+    /// Records grouped by helped_state ("unknown" /
+    /// "helped" / "notHelped") via native `GROUP BY
+    /// helped_state` SQL query。 Empty map when no
+    /// records。 Default empty for backward-compat。
+    public let recordsByHelpedFlag: [String: Int]
+
     public init(
         totalRecords: Int,
         recordsByPermitMode: [String: Int],
         turnsThisSession: Int,
         isSQLBacked: Bool,
-        distinctSessions: Int = 0
+        distinctSessions: Int = 0,
+        oldestRecordAt: Date? = nil,
+        newestRecordAt: Date? = nil,
+        recordsByHelpedFlag: [String: Int] = [:]
     ) {
         self.totalRecords = totalRecords
         self.recordsByPermitMode = recordsByPermitMode
         self.turnsThisSession = turnsThisSession
         self.isSQLBacked = isSQLBacked
         self.distinctSessions = distinctSessions
+        self.oldestRecordAt = oldestRecordAt
+        self.newestRecordAt = newestRecordAt
+        self.recordsByHelpedFlag = recordsByHelpedFlag
+    }
+
+    /// 严查 修复 — convenience time-span derived from
+    /// MIN/MAX timestamps。 Nil when either bound is nil。
+    public var recordsTimeSpanSeconds: TimeInterval? {
+        guard let oldest = oldestRecordAt,
+              let newest = newestRecordAt
+        else { return nil }
+        return newest.timeIntervalSince(oldest)
     }
 }

@@ -1785,6 +1785,10 @@ extension BASCognitiveBrain {
         if let cache = cxxSummaryCache {
             cxxTele = await cache.telemetrySnapshot()
         } else { cxxTele = nil }
+        // 严查 修复 — actually surface the C-pilot probes
+        // that were created but never consumed。 Query each
+        // probe;best-effort,failures surface as nil。
+        let cProbes = await captureCSystemProbes()
         return BASCognitiveBrainHealthSnapshot(
             pilotStatus: status,
             pilotMetrics: metrics,
@@ -1792,7 +1796,94 @@ extension BASCognitiveBrain {
             rustAggregation: rustAgg,
             cxxTelemetry: cxxTele,
             warmupResult: warmupResult,
+            cSystemProbes: cProbes,
             collectedAt: Date())
+    }
+
+    /// 严查 修复 — gather C-pilot system probes into one
+    /// Codable bundle for inclusion in healthSnapshot。
+    /// All four V2 probes are queried; failures (V1 mode
+    /// or non-Apple platform) surface as nil per-field。
+    private func captureCSystemProbes() async
+        -> BASCognitiveBrainCSystemProbeSnapshot
+    {
+        let rssProbe = BASProcessMemoryProbe(
+            useCBridge: true)
+        let threadProbe = BASThreadCountProbe(
+            useCBridge: true)
+        let cpuProbe = BASCPUCountProbe(useCBridge: true)
+        let uptimeProbe = BASSystemUptimeProbe(
+            useCBridge: true)
+        let physProbe = BASPhysicalMemoryProbe(
+            useCBridge: true)
+        let rss = try? await rssProbe.current()
+        let threads = try? await threadProbe.current()
+        let cpus = try? await cpuProbe.current()
+        let uptime = try? await uptimeProbe.current()
+        let physMem = try? await physProbe.current()
+        return BASCognitiveBrainCSystemProbeSnapshot(
+            residentMemoryBytes: rss,
+            threadCount: threads.map { Int($0) },
+            logicalCpuCount: cpus.map { Int($0) },
+            systemUptimeSeconds: uptime,
+            physicalMemoryBytes: physMem)
+    }
+}
+
+/// 严查 修复 — Codable bundle of C-pilot OS-introspection
+/// probes,included in `brain.healthSnapshot()` so the C
+/// pilot's 5 native functions actually surface to
+/// consumers instead of floating in BASRuntimeCore unused。
+///
+/// All fields Optional — nil on V1 mode / non-Apple build
+/// hosts where the sysctl / mach calls return -3。 Hosts
+/// that need strict error propagation can query each
+/// probe directly via its actor。
+public struct BASCognitiveBrainCSystemProbeSnapshot: Codable,
+    Equatable, Sendable, Hashable
+{
+    /// `mach_task_basic_info(RESIDENT_SIZE)` — process RSS。
+    public let residentMemoryBytes: UInt64?
+
+    /// `task_threads()` — active Mach thread count for
+    /// this process。
+    public let threadCount: Int?
+
+    /// `sysctl(HW_NCPU)` — host's logical CPU count
+    /// (perf + efficiency cores combined on Apple silicon)。
+    public let logicalCpuCount: Int?
+
+    /// `sysctl(KERN_BOOTTIME) + gettimeofday` — host uptime
+    /// in seconds since boot。
+    public let systemUptimeSeconds: Int64?
+
+    /// `sysctl(HW_MEMSIZE)` — total physical RAM bytes
+    /// (uint64,supersedes legacy HW_PHYSMEM)。
+    public let physicalMemoryBytes: UInt64?
+
+    public init(
+        residentMemoryBytes: UInt64?,
+        threadCount: Int?,
+        logicalCpuCount: Int?,
+        systemUptimeSeconds: Int64?,
+        physicalMemoryBytes: UInt64?
+    ) {
+        self.residentMemoryBytes = residentMemoryBytes
+        self.threadCount = threadCount
+        self.logicalCpuCount = logicalCpuCount
+        self.systemUptimeSeconds = systemUptimeSeconds
+        self.physicalMemoryBytes = physicalMemoryBytes
+    }
+
+    /// Convenience:ratio of process RSS to total
+    /// physical memory in [0, 1]。 Nil when either field
+    /// is missing。 Useful for memory-pressure dashboards。
+    public var residentMemoryFraction: Double? {
+        guard let rss = residentMemoryBytes,
+              let phys = physicalMemoryBytes,
+              phys > 0
+        else { return nil }
+        return Double(rss) / Double(phys)
     }
 }
 
@@ -1843,6 +1934,15 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
     public let warmupResult:
         BASCognitiveBrainPilotWarmupResult?
 
+    /// 严查 修复 — C-pilot system probes (RSS / thread
+    /// count / CPU count / system uptime / physical
+    /// memory)。 Default nil for backward-compat with
+    /// historical snapshots produced before this field
+    /// landed。 New snapshots populate this from real
+    /// sysctl / mach calls when the host is Apple silicon。
+    public let cSystemProbes:
+        BASCognitiveBrainCSystemProbeSnapshot?
+
     /// When the snapshot was collected (host clock)。
     public let collectedAt: Date
 
@@ -1857,6 +1957,8 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
             BASCxxBrainSummaryCacheTelemetry?,
         warmupResult:
             BASCognitiveBrainPilotWarmupResult?,
+        cSystemProbes:
+            BASCognitiveBrainCSystemProbeSnapshot? = nil,
         collectedAt: Date
     ) {
         self.pilotStatus = pilotStatus
@@ -1865,6 +1967,7 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
         self.rustAggregation = rustAggregation
         self.cxxTelemetry = cxxTelemetry
         self.warmupResult = warmupResult
+        self.cSystemProbes = cSystemProbes
         self.collectedAt = collectedAt
     }
 
