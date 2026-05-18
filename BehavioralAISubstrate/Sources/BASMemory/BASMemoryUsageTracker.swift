@@ -853,7 +853,12 @@ public actor BASMemoryUsageTracker {
         sqlite3_bind_int64(stmt, 1, Int64(limit))
 
         var records: [BASMemoryUsageRecord] = []
-        records.reserveCapacity(limit)
+        // Clamp reserveCapacity to a sane upper bound —
+        // callers passing Int.max as limit (e.g.
+        // "all matching records") would otherwise trigger
+        // a fatal allocation when reserveCapacity tries to
+        // reserve Int.max × sizeof(record) bytes。
+        records.reserveCapacity(min(limit, 4096))
         while sqlite3_step(stmt) == SQLITE_ROW {
             let recordID = readText(stmt, 0)
             let atomID = readText(stmt, 1)
@@ -1004,7 +1009,12 @@ public actor BASMemoryUsageTracker {
         bindText(stmt, 1, atomID)
         sqlite3_bind_int64(stmt, 2, Int64(limit))
         var records: [BASMemoryUsageRecord] = []
-        records.reserveCapacity(limit)
+        // Clamp reserveCapacity to a sane upper bound —
+        // callers passing Int.max as limit (e.g.
+        // "all matching records") would otherwise trigger
+        // a fatal allocation when reserveCapacity tries to
+        // reserve Int.max × sizeof(record) bytes。
+        records.reserveCapacity(min(limit, 4096))
         while sqlite3_step(stmt) == SQLITE_ROW {
             let recordID = readText(stmt, 0)
             let aID = readText(stmt, 1)

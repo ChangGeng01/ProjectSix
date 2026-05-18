@@ -59,6 +59,7 @@ import BASMemory
 import BASPolicy
 import BASRuntimeCore
 import BASMetalSubstrate
+import BASRustCoreBridge
 
 /// One-line cognitive brain facade。 Wraps the 14-layer
 /// cognitive-OS cascade behind a `process(_:)` API。
@@ -272,6 +273,77 @@ public actor BASCognitiveBrain {
             rustHistoryStore: rustHistoryStore,
             cxxSummaryCache: cxxSummaryCache,
             metalLibraryLoader: metalLibraryLoader,
+            safetyConfidenceThreshold:
+                safetyConfidenceThreshold,
+            hostProfileService: hostProfileService)
+    }
+
+    /// 主线 加强 实用性 — fully-wired brain factory。
+    /// Constructs a brain with ALL FIVE native pilots
+    /// active by default (vs `makeWithDefaults()` which
+    /// leaves SQL / Rust / C++ / Metal opt-in)。
+    ///
+    /// **What gets wired automatically**:
+    ///   - SQL pilot:in-memory `BASMemoryUsageTracker`
+    ///     (no file URL → no disk I/O,no filesystem
+    ///     permissions needed,no test isolation pain)
+    ///   - Rust pilot:in-memory `BASRustMemoryUsageTracker
+    ///     Actor` (Rust core enabled on Apple platforms;
+    ///     throws on watchOS / Linux where the XCFramework
+    ///     slice is absent)
+    ///   - C++ pilot:process-global cache via
+    ///     `BASMPSGraphExecutableCacheCxxBridge`
+    ///     (useCxxCache: true)
+    ///   - Metal pilot:V2 loader via
+    ///     `BASMetalKernelLibraryLoader`
+    ///     (useMetalKernelV2: true)
+    ///   - C pilot:always-on latency clock (internal)
+    ///
+    /// **Why this exists**: hosts running the brain in
+    /// production want every native pilot online for
+    /// real telemetry + cache + history。 The 6-arg
+    /// `makeWithDefaults` left them opt-in,which made
+    /// the "default brain" a degenerate C-only case。
+    /// This factory makes the recommended 5/5 setup
+    /// one call。
+    ///
+    /// **What this trades off**: tests that want a
+    /// bare brain should keep using `makeWithDefaults()`
+    /// — useful when you want to assert "no native
+    /// pilot did anything" (e.g. test isolation)。
+    ///
+    /// **Backward compat**: `makeWithDefaults()` behavior
+    /// unchanged。 This is purely an additive factory。
+    public static func makeWithAllPilots(
+        summaryHistoryCapacity: Int =
+            BASCognitiveBrain.defaultSummaryHistoryCapacity,
+        safetyConfidenceThreshold: Double =
+            BASCognitiveBrain.safetyConfidenceThreshold,
+        hostProfileService:
+            (any BASHostProfileServicing)? = nil
+    ) async throws -> BASCognitiveBrain {
+        let sqlTracker = BASMemoryUsageTracker()
+        let sqlStore = BASSQLBrainHistoryStore(
+            tracker: sqlTracker)
+        let rustTracker =
+            try BASRustMemoryUsageTrackerActor(
+                useRustCore: true)
+        let rustStore = BASRustBrainHistoryStore(
+            tracker: rustTracker)
+        let cxxBridge =
+            BASMPSGraphExecutableCacheCxxBridge(
+                useCxxCache: true)
+        let cxxCache = BASCxxBrainSummaryCache(
+            bridge: cxxBridge)
+        let metalLoader = BASMetalKernelLibraryLoader(
+            useMetalKernelV2: true)
+        return try await makeWithDefaults(
+            summaryHistoryCapacity:
+                summaryHistoryCapacity,
+            sqlHistoryStore: sqlStore,
+            rustHistoryStore: rustStore,
+            cxxSummaryCache: cxxCache,
+            metalLibraryLoader: metalLoader,
             safetyConfidenceThreshold:
                 safetyConfidenceThreshold,
             hostProfileService: hostProfileService)
@@ -1026,6 +1098,41 @@ public struct BASCognitiveBrainSummary: Codable,
     /// aware UI affordances。
     public let relationPattern: String
 
+    /// 主线 加强 实用性 — number of times this exact input
+    /// has been seen BEFORE the current call,across the
+    /// native history pilots (SQL + Rust)。 Counts come
+    /// from the actual storage engine query (SQL `COUNT(*)
+    /// WHERE atom_id = ?` or Rust HashMap filter),NOT
+    /// from Swift-side folding。 Hosts use this to:
+    ///   - detect repeated manipulation attempts ("user
+    ///     has asked this 5 times in this conversation")
+    ///   - score user-input familiarity for ML cascade
+    ///     weighting
+    ///   - skip expensive downstream work on known-safe
+    ///     repeats
+    ///
+    /// 0 when no history pilot is wired OR the input is
+    /// genuinely first-seen。 Pre-history hosts (no SQL,
+    /// no Rust) always see 0 — the default value
+    /// preserves backward-compat for constructed-by-hand
+    /// summaries。
+    public let repetitionCount: Int
+
+    /// 主线 加强 实用性 — true when this exact input has
+    /// been observed across MULTIPLE distinct brain
+    /// sessions (different sessionRef values)。 Computed
+    /// from the native history pilot's per-atom record
+    /// set。 Captures "this input echoes across sessions"
+    /// — a signal that some users have a recurring topic
+    /// vs a one-off question。
+    ///
+    /// False when:
+    ///   - No history pilot wired
+    ///   - Input first-seen
+    ///   - All occurrences came from the same session
+    ///     (i.e. same brain instance)
+    public let crossSessionEcho: Bool
+
     public init(
         input: String,
         taskType: BASContextTaskType,
@@ -1037,7 +1144,9 @@ public struct BASCognitiveBrainSummary: Codable,
         emotionalLoad: Double = 0.0,
         timePressure: Double = 0.0,
         consequenceLevel: Double = 0.0,
-        relationPattern: String = "neutral"
+        relationPattern: String = "neutral",
+        repetitionCount: Int = 0,
+        crossSessionEcho: Bool = false
     ) {
         self.input = input
         self.taskType = taskType
@@ -1050,6 +1159,34 @@ public struct BASCognitiveBrainSummary: Codable,
         self.timePressure = timePressure
         self.consequenceLevel = consequenceLevel
         self.relationPattern = relationPattern
+        self.repetitionCount = repetitionCount
+        self.crossSessionEcho = crossSessionEcho
+    }
+
+    /// 主线 加强 实用性 — rebuild this summary with native-
+    /// pilot-derived fields populated。 Used by the cache-
+    /// hit path to layer fresh native-pilot signals onto
+    /// the cached ML-classification result (the ML parts
+    /// don't change across cache hits,but the repetition
+    /// counts MUST be computed per-call)。
+    public func withNativePilotSignals(
+        repetitionCount: Int,
+        crossSessionEcho: Bool
+    ) -> BASCognitiveBrainSummary {
+        return BASCognitiveBrainSummary(
+            input: input,
+            taskType: taskType,
+            confidence: confidence,
+            ambiguityScore: ambiguityScore,
+            safetyVerdict: safetyVerdict,
+            manipulationHints: manipulationHints,
+            latencyNanos: latencyNanos,
+            emotionalLoad: emotionalLoad,
+            timePressure: timePressure,
+            consequenceLevel: consequenceLevel,
+            relationPattern: relationPattern,
+            repetitionCount: repetitionCount,
+            crossSessionEcho: crossSessionEcho)
     }
 }
 
@@ -1076,12 +1213,28 @@ extension BASCognitiveBrain {
         // via clock_gettime_nsec_np (or DispatchTime
         // fallback)。
         let startNanos = await currentNanos()
+        // 主线 加强 实用性 — query native pilots for
+        // repetition signals BEFORE recording this call so
+        // the count reflects "occurrences BEFORE this one"。
+        let nativeSignals = await nativeRepetitionSignals(
+            forInput: input)
         if let cachedSummary = await cxxCachedSummary(
             forInput: input,
             startedAtNanos: startNanos)
         {
-            await recordSummaryObservation(cachedSummary)
-            return cachedSummary
+            // 主线 加强 实用性:layer fresh native-pilot
+            // signals onto the cached ML-classification
+            // result。 The ML parts don't change across
+            // cache hits,but repetitionCount MUST be
+            // computed per-call。
+            let layered = cachedSummary
+                .withNativePilotSignals(
+                    repetitionCount:
+                        nativeSignals.repetitionCount,
+                    crossSessionEcho:
+                        nativeSignals.crossSessionEcho)
+            await recordSummaryObservation(layered)
+            return layered
         }
         let result = await process(
             input,
@@ -1134,7 +1287,11 @@ extension BASCognitiveBrain {
             consequenceLevel:
                 result.contextFrame.consequenceLevel,
             relationPattern:
-                result.contextFrame.relationPattern)
+                result.contextFrame.relationPattern,
+            repetitionCount:
+                nativeSignals.repetitionCount,
+            crossSessionEcho:
+                nativeSignals.crossSessionEcho)
         await recordSummaryObservation(summary)
         // C++ pilot integration:persist to process-global
         // cache so subsequent calls with the same input
@@ -1194,6 +1351,67 @@ extension BASCognitiveBrain {
         if let store = rustHistoryStore {
             _ = try? await store.recordSummary(summary)
         }
+    }
+
+    /// 主线 加强 实用性 — query the native history pilots
+    /// for input-repetition signals BEFORE recording the
+    /// current call。 Returns a tuple of:
+    ///   - repetitionCount: prior occurrences of this
+    ///     input across all history (Rust preferred,SQL
+    ///     fallback,0 if neither wired)
+    ///   - crossSessionEcho: true if prior occurrences
+    ///     span >= 2 distinct sessionRef values
+    ///
+    /// Rust path uses the round-3 atom-filter FFI
+    /// (`recordsForAtom`) — query goes into Rust under
+    /// one read lock,no Swift-side allRecords() fold。
+    /// SQL path uses native `usageCountViaSQL` +
+    /// recordsForInputViaSQL — both push the WHERE into
+    /// the engine。
+    ///
+    /// Best-effort: failures surface as (0, false) rather
+    /// than throwing。 Hosts wanting strict propagation
+    /// can query the underlying stores directly。
+    private func nativeRepetitionSignals(
+        forInput input: String
+    ) async -> (repetitionCount: Int,
+                crossSessionEcho: Bool)
+    {
+        if let store = rustHistoryStore {
+            if let records = try? await store
+                .recordsForInputViaRust(forInput: input)
+            {
+                let priorCount = records.count
+                let currentSession = await store.sessionRef
+                // Cross-session echo:any prior record
+                // carries a sessionRef OTHER than this
+                // store's current one → input was seen
+                // outside this brain instance。
+                let echo = records.contains { record in
+                    record.sessionRef != currentSession
+                }
+                return (
+                    repetitionCount: priorCount,
+                    crossSessionEcho: echo)
+            }
+        }
+        if let store = sqlHistoryStore {
+            if let records = try? await store
+                .recentRecordsForInputViaSQL(
+                    forInput: input, limit: Int.max)
+            {
+                let priorCount = records.count
+                let currentSession = await store.sessionRef
+                let echo = records.contains { record in
+                    record.sessionRef != currentSession
+                }
+                return (
+                    repetitionCount: priorCount,
+                    crossSessionEcho: echo)
+            }
+        }
+        return (repetitionCount: 0,
+            crossSessionEcho: false)
     }
 
     /// Return up to `limit` most-recent summaries from the
