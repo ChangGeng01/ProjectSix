@@ -313,8 +313,13 @@ public actor BASCognitiveBrain {
             // the SECOND active ML-touched layer in the
             // cascade,after L0 context classification。
             riskService: BASMLRiskService(),
-            actionService:
-                BASPlaceholderActionService(),
+            // L6 action: REAL risk-aware rendered
+            // output。 Headline prefixed by mode, body
+            // augmented with risk caveat, alternative
+            // actions populated by risk level + global
+            // veto。 Explanation codes aggregate permit
+            // reason codes + risk factors。
+            actionService: BASMLActionService(),
             evolutionService:
                 BASPlaceholderEvolutionService())
         self.engine = BASTurnRuntimeEngine(
