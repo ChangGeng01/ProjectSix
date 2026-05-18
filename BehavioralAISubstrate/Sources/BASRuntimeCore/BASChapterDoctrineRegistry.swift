@@ -25038,7 +25038,69 @@ public enum BASChapterDoctrineRegistry {
                 "out + 13-file sync。 828 consecutive" +
                 " byte-equality clean commits。 273" +
                 " typed surfaces unchanged。 60/60" +
-                " score unchanged。")
+                " score unchanged。"),
+        BASChapterDoctrineRecord(
+            chapterTag: "chapter 七百三十四",
+            mNumberFirst: 2247,
+            mNumberLast: 2248,
+            v1MilestoneMNumber: 2248,
+            v1MilestoneStatus:
+                "chapter-734-factory-flag-state-divergence-matrix",
+            knives: [
+                BASChapterKnife(mNumber: 2247, knife: "第一刀",
+                    concept: "Tenth pillar of 5-pilot" +
+                        " ACTOR contract。 NEW BASFive" +
+                        "PilotFactoryFlagStateDivergence" +
+                        "MatrixTests.swift with 6 tests" +
+                        " proving make(flags:) with" +
+                        " different flag states produces" +
+                        " independent actors。 Complement" +
+                        " to chapter 732 — combined" +
+                        " 732+734 pin full sampling" +
+                        " contract。 All 6 tests pass。"),
+                BASChapterKnife(mNumber: 2248, knife: "第二刀",
+                    concept: "Chapter 734 close-out +" +
+                        " 13-file sync。 830 consecutive" +
+                        " byte-equality clean commits。" +
+                        " ADR-016 → M2248。 NO new" +
+                        " doctrines。 Honest mode update" +
+                        ":wakeup/cron mechanism NOT" +
+                        " firing in this session (cron" +
+                        " d16a95cf one-shot pinned to" +
+                        " 35 10 18 5 * never fired)。")
+            ],
+            entropyClassesAttacked: [
+                "pilot-factory-flag-state-divergence-untested"
+            ],
+            pinHeld: [
+                "不变量 #1", "不变量 #2", "不变量 #3", "红线 7",
+                "ADR-014 OPT-OUT preserved",
+                "ADR-016 → M2248",
+                "tier-a-b-c-complete-preserved",
+                "substrate-at-rest-preserved",
+                "saturation-invariant-preserved",
+                "830-consecutive-byte-equality-clean-commits",
+                "100-percent-sigbus-recovery-preserved",
+                "chapter-698-discipline-gate-honored-zero-new-doctrines",
+                "chapter-708-zero-warning-build-invariant-preserved",
+                "factory-flag-state-divergence-pinned-5-pilots",
+                "tenth-pillar-5-pilot-actor-contract-sealed"
+            ],
+            plannedFutureCuts: [
+                "Specialize chapter 705 generic C++" +
+                    " cache for MPSGraphExecutable" +
+                    " (needs host demand)。"
+            ],
+            summary: "FACTORY FLAG-STATE-DIVERGENCE" +
+                " MATRIX。 2-knife chapter。 M2247" +
+                " 第一刀 6 new tests proving flag" +
+                " values AT construction matter。" +
+                " Tenth pillar of 5-pilot ACTOR" +
+                " contract。 M2248 第二刀 close-out +" +
+                " 13-file sync。 830 consecutive byte-" +
+                "equality clean commits。 273 typed" +
+                " surfaces unchanged。 60/60 score" +
+                " unchanged。")
     ]
 
     /// Lookup by exact chapter tag string。 Returns

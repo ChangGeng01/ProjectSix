@@ -6827,7 +6827,29 @@ public enum BASEntropyChapterIndex {
                 " → M2246。 828 consecutive byte-" +
                 "equality clean commits。 273 typed" +
                 " surfaces unchanged。 60/60 score" +
-                " unchanged。")
+                " unchanged。"),
+        BASEntropyChapterEntry(
+            chapterTag: "chapter 七百三十四",
+            mNumberFirst: 2247, mNumberLast: 2248,
+            knivesCount: 2, entropyClassesCount: 1,
+            pinsCount: 0, futureCutsCount: 0,
+            summary: "FACTORY FLAG-STATE-DIVERGENCE" +
+                " MATRIX — 2-knife。 Tenth pillar of" +
+                " 5-pilot ACTOR contract。 M2247 第一刀" +
+                " NEW BASFivePilotFactoryFlagState" +
+                "DivergenceMatrixTests.swift with 6" +
+                " tests proving make(flags:) with" +
+                " different flag states produces" +
+                " independent actors。 Complement to" +
+                " chapter 732 (flag changes AFTER" +
+                " construction don't matter) — this" +
+                " proves flag values AT construction" +
+                " DO matter。 M2248 第二刀 close-out +" +
+                " 13-file sync。 ADR-014 OPT-OUT" +
+                " preserved。 ADR-016 → M2248。 830" +
+                " consecutive byte-equality clean" +
+                " commits。 273 typed surfaces" +
+                " unchanged。 60/60 score unchanged。")
     ]
 
     /// 24 pre-RADICAL Phase 2 chapter mirrors (chapters
