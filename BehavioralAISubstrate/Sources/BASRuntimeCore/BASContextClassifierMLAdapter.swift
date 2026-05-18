@@ -156,7 +156,16 @@ public enum BASContextClassifierMLAdapterError:
 /// Loads BASContextClassifier.mlmodel + exposes a typed
 /// `classify(text:)` API returning the predicted
 /// BASContextTaskType。
-public actor BASContextClassifierMLAdapter {
+///
+/// **Architecture note (Phase B-4)**: This is a
+/// `final class @unchecked Sendable` instead of an actor
+/// because `BASContextServicing.analyzeContext(...)` is
+/// SYNCHRONOUS (not async),which forces the underlying
+/// model-call to be synchronous too。 Apple documents
+/// `MLModel.prediction(from:)` as thread-safe + the model
+/// is immutable after init,so concurrent calls from
+/// multiple cognitive-OS coordinators are safe。
+public final class BASContextClassifierMLAdapter: @unchecked Sendable {
 
     /// 7 labels in the same order as Python label_index.json
     /// (matches the .mlmodel output dimension)。
@@ -278,7 +287,7 @@ public actor BASContextClassifierMLAdapter {
 
 /// Stub for platforms without CoreML (Linux build hosts)。
 /// All methods throw `.coreMLUnavailableOnPlatform`。
-public actor BASContextClassifierMLAdapter {
+public final class BASContextClassifierMLAdapter: @unchecked Sendable {
     public static let labels: [String] = [
         "chat",
         "task",

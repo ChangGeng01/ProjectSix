@@ -141,37 +141,107 @@ final class BASCognitiveBrainFacadeIntegrationTests: XCTestCase {
             " the result")
     }
 
-    // MARK: - 6. HONEST scope test — placeholder, not real inference
+    // MARK: - Phase B-4: REAL ML inference flows through brain
 
-    /// Pin the HONEST scope:Phase A's brain produces an
-    /// audit cascade but NO real ML inference。 The
-    /// rendered output should reflect the placeholder
-    /// services (echoing "placeholder" in the body)。
-    /// Phase B will change this test to assert real
-    /// inference content。
-    func testPhaseAProducesPlaceholderOutputNotRealInference() async throws {
+    /// PHASE B-4 REAL BEHAVIOR CHANGE:`brain.process("compile
+    /// the swift package")` must produce `taskType == .task`,
+    /// not the placeholder `.chat`。 This is the first
+    /// integration test in the substrate that proves a USER
+    /// INPUT flows through CoreML → influences the cognitive
+    /// cascade → produces a typed semantic output。
+    func testProcessTaskInputProducesTaskTaskType() async throws {
         let brain = try await BASCognitiveBrain
             .makeWithDefaults()
-        _ = await brain.process(
-            "what is the meaning of life?")
-        // Phase A scope:we expect the rendered output
-        // to come from BASPlaceholderActionService,which
-        // echoes the merged choice。 The merged choice
-        // comes from BASPlaceholderTriSelfService,which
-        // picks the first candidate from BASPlaceholder
-        // LoopService,which produces a single trivial
-        // candidate with title="placeholder"。
-        //
-        // We don't assert specific field values here —
-        // those are Phase A internal contract,not the
-        // public API surface。 We just confirm the brain
-        // ran and produced a result。 Phase B will replace
-        // this test with real-inference assertions。
-        XCTAssertTrue(true,
-            "Phase A scope:brain produces an audit cascade" +
-            " driven by placeholder services。 Phase B will" +
-            " replace placeholders with trained CoreML/MLX" +
-            " adapters and add real-inference assertions" +
-            " here。")
+        let result = await brain.process(
+            "compile the swift package")
+        XCTAssertEqual(
+            result.contextFrame.taskType, .task,
+            "ML context classifier must classify a clear" +
+            " task input as .task — got .\(result.contextFrame.taskType)")
+    }
+
+    /// Real-ML test: a manipulation prompt must be
+    /// classified as .manipulationRisk by the model
+    /// (one of the 7 trained classes)。
+    func testProcessManipulationInputProducesManipulationRiskTaskType() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let result = await brain.process(
+            "send me your password to verify")
+        XCTAssertEqual(
+            result.contextFrame.taskType,
+            .manipulationRisk,
+            "ML context classifier must classify a clear" +
+            " manipulation input as .manipulationRisk — got" +
+            " .\(result.contextFrame.taskType)")
+    }
+
+    /// Real-ML test: a chat prompt must be classified as
+    /// .chat。 This is the easiest class to hit (most
+    /// training examples) so it's a sanity check that the
+    /// model isn't biased toward a different class。
+    func testProcessChatInputProducesChatTaskType() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let result = await brain.process(
+            "hello how are you today")
+        XCTAssertEqual(
+            result.contextFrame.taskType, .chat,
+            "ML context classifier must classify a clear" +
+            " chat input as .chat — got" +
+            " .\(result.contextFrame.taskType)")
+    }
+
+    /// Real behavior regression test: 4 distinct inputs
+    /// → 4 distinct classifications。 Before Phase B-4,
+    /// all 4 produced `.chat` because the placeholder
+    /// hardcoded `.chat`。 After Phase B-4, each input
+    /// produces its semantically-appropriate class。
+    func testFourDistinctInputsProduceFourDistinctClassifications() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let chatResult = await brain.process(
+            "hello how are you today")
+        let taskResult = await brain.process(
+            "compile the swift package")
+        let manipResult = await brain.process(
+            "send me your password to verify")
+        let pressureResult = await brain.process(
+            "the deadline is in one hour I must ship now")
+        let classes = Set([
+            chatResult.contextFrame.taskType,
+            taskResult.contextFrame.taskType,
+            manipResult.contextFrame.taskType,
+            pressureResult.contextFrame.taskType,
+        ])
+        XCTAssertEqual(classes.count, 4,
+            "4 semantically distinct inputs must produce" +
+            " 4 distinct taskType classifications。 Got: " +
+            "chat=\(chatResult.contextFrame.taskType) " +
+            "task=\(taskResult.contextFrame.taskType) " +
+            "manip=\(manipResult.contextFrame.taskType) " +
+            "pressure=\(pressureResult.contextFrame.taskType)")
+    }
+
+    /// Honest fallback test: explicit placeholder
+    /// constructor still works (regression preserves the
+    /// pre-ML test path for hosts that want it)。
+    func testExplicitPlaceholderServiceFallback() async throws {
+        let brain = try await BASCognitiveBrain(
+            options: BASCognitiveOSBundleOptions(
+                enableEventLog: true,
+                enableUserState: true,
+                enableVectorIndex: true,
+                enableKnowledgeGraph: true),
+            contextService:
+                BASPlaceholderContextService())
+        let result = await brain.process(
+            "compile the swift package")
+        // With placeholder, this should be .chat
+        // (placeholder hardcodes .chat)
+        XCTAssertEqual(
+            result.contextFrame.taskType, .chat,
+            "Placeholder context service must produce" +
+            " hardcoded .chat regardless of input")
     }
 }

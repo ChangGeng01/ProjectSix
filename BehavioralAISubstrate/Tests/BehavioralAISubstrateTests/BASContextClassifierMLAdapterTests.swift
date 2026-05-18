@@ -108,14 +108,14 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
 
     // MARK: - Adapter — model loads from Bundle.module
 
-    func testAdapterLoadsModelFromBundle() async throws {
+    func testAdapterLoadsModelFromBundle() throws {
         let adapter = try BASContextClassifierMLAdapter()
         _ = adapter // just verifying construction
     }
 
-    func testAdapterClassifyReturnsNonEmpty() async throws {
+    func testAdapterClassifyReturnsNonEmpty() throws {
         let adapter = try BASContextClassifierMLAdapter()
-        let (label, logits) = try await adapter.classify(
+        let (label, logits) = try adapter.classify(
             text: "hello world")
         XCTAssertFalse(label.isEmpty,
             "Predicted label must be non-empty")
@@ -128,11 +128,11 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
             " classes: \(label)")
     }
 
-    func testAdapterClassifyDeterminism() async throws {
+    func testAdapterClassifyDeterminism() throws {
         let adapter = try BASContextClassifierMLAdapter()
-        let (a, _) = try await adapter.classify(
+        let (a, _) = try adapter.classify(
             text: "compile the swift package")
-        let (b, _) = try await adapter.classify(
+        let (b, _) = try adapter.classify(
             text: "compile the swift package")
         XCTAssertEqual(a, b,
             "Same input must produce same prediction")
@@ -149,7 +149,7 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
     /// HONEST: this proves the model memorized,not that
     /// it generalizes。 Phase B-2 will add held-out test
     /// set evaluation for real accuracy。
-    func testTrainedExamplesMemorizedCorrectly() async throws {
+    func testTrainedExamplesMemorizedCorrectly() throws {
         let adapter = try BASContextClassifierMLAdapter()
         let trainingExamples: [(String, String)] = [
             ("hello how are you today", "chat"),
@@ -165,7 +165,7 @@ final class BASContextClassifierMLAdapterTests: XCTestCase {
         ]
         var correct = 0
         for (text, expected) in trainingExamples {
-            let (predicted, _) = try await adapter
+            let (predicted, _) = try adapter
                 .classify(text: text)
             if predicted == expected {
                 correct += 1

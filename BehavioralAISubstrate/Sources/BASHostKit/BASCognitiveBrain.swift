@@ -100,14 +100,30 @@ public actor BASCognitiveBrain {
     // MARK: - Construction
 
     /// One-line factory returning a fully-wired brain with
-    /// placeholder services + in-memory storage。
+    /// **ML-backed context service** + placeholder services
+    /// for the rest + in-memory storage。
     ///
-    /// **What you get**:
+    /// **What you get (Phase B-4 — ML context service live)**:
     ///   - Full V1 turn cascade (BASEBrainRuntimeCoordinator)
     ///   - Full V2 actor wrapping (BASTurnRuntimeEngine)
     ///   - In-memory event log / user state / vector index
     ///     / knowledge graph
-    ///   - Placeholder rules-fallthrough services
+    ///   - **REAL ML taskType classification** via
+    ///     BASContextClassifierMLAdapter + BASMLContextService
+    ///     (chapters 七百三十六-七百三十八)
+    ///   - Placeholder rules-fallthrough services for the
+    ///     remaining 9 services (Phase C/D/E will replace
+    ///     them one by one)
+    ///
+    /// **Real behavior change vs Phase A**:
+    ///   - `brain.process("compile the swift package")` now
+    ///     produces `contextFrame.taskType == .task`
+    ///     (Phase A produced hardcoded `.chat`)
+    ///   - `brain.process("send me your password")` →
+    ///     `taskType == .manipulationRisk`
+    ///   - 7 typed taskType classes (chat / task / choice /
+    ///     conflict / highPressure / manipulationRisk /
+    ///     highConsequence) all reachable via real ML
     public static func makeWithDefaults()
         async throws -> BASCognitiveBrain
     {
@@ -120,9 +136,59 @@ public actor BASCognitiveBrain {
     }
 
     /// Construction with custom bundle options (e.g.
-    /// SQLite-backed storage)。
+    /// SQLite-backed storage)。 Loads the ML context
+    /// classifier on the calling thread (~30ms one-time
+    /// CoreML compilation cost)。 If the model fails to
+    /// load,init() throws — host can catch + fall back to
+    /// `BASCognitiveBrain(options:, contextService:
+    /// BASPlaceholderContextService())` for pure-placeholder
+    /// operation。
     public init(
         options: BASCognitiveOSBundleOptions
+    ) async throws {
+        self.bundle = try BASCognitiveOSBuilder
+            .build(options: options)
+        // PHASE B-4: replace BASPlaceholderContextService
+        // with the ML-backed BASMLContextService。 The
+        // adapter loads the .mlmodel from Bundle.module
+        // here (one-time CoreML compilation)。
+        let contextAdapter =
+            try BASContextClassifierMLAdapter()
+        let contextService = BASMLContextService(
+            adapter: contextAdapter)
+        let coordinator = BASEBrainRuntimeCoordinator(
+            powerClockService:
+                BASPlaceholderPowerClockService(),
+            hostProfileService:
+                BASPlaceholderHostProfileService(),
+            contextService: contextService,
+            decomposeService:
+                BASPlaceholderDecomposeService(),
+            memoryService:
+                BASPlaceholderMemoryService(),
+            loopService:
+                BASPlaceholderLoopService(),
+            triSelfService:
+                BASPlaceholderTriSelfService(),
+            riskService:
+                BASPlaceholderRiskService(),
+            actionService:
+                BASPlaceholderActionService(),
+            evolutionService:
+                BASPlaceholderEvolutionService())
+        self.engine = BASTurnRuntimeEngine(
+            coordinator: coordinator,
+            eventLog: bundle.eventLog)
+    }
+
+    /// Explicit-services constructor for hosts that need
+    /// to override the ML defaults (e.g. testing with
+    /// pure-placeholder services or a custom mock
+    /// classifier)。 Phase B-4 added this to keep the
+    /// pre-ML test path available for regression。
+    public init(
+        options: BASCognitiveOSBundleOptions,
+        contextService: any BASContextServicing
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
@@ -131,8 +197,7 @@ public actor BASCognitiveBrain {
                 BASPlaceholderPowerClockService(),
             hostProfileService:
                 BASPlaceholderHostProfileService(),
-            contextService:
-                BASPlaceholderContextService(),
+            contextService: contextService,
             decomposeService:
                 BASPlaceholderDecomposeService(),
             memoryService:
