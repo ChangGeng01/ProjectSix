@@ -83,6 +83,35 @@ public struct BASTopAtomEntry: Codable, Equatable,
     }
 }
 
+/// 持续性 发展 — three percentiles of the count-per-atom
+/// distribution computed inside the Rust tracker。 Each
+/// value is the count threshold at the percentile rank。
+/// Sentinel value -1 means "no records — no distribution"。
+public struct BASAtomCountPercentiles: Codable, Equatable,
+    Sendable, Hashable
+{
+    /// 50th-percentile (median) of count-per-atom。
+    public let p50: Int64
+
+    /// 95th-percentile of count-per-atom。
+    public let p95: Int64
+
+    /// 99th-percentile of count-per-atom。
+    public let p99: Int64
+
+    public init(p50: Int64, p95: Int64, p99: Int64) {
+        self.p50 = p50
+        self.p95 = p95
+        self.p99 = p99
+    }
+
+    /// True when all three percentiles are -1 (no records
+    /// to compute distribution over)。
+    public var isEmpty: Bool {
+        return p50 == -1 && p95 == -1 && p99 == -1
+    }
+}
+
 /// Typed wrapper errors mirroring the Rust ABI return
 /// codes + adding Swift-side platform-availability
 /// case。
@@ -371,6 +400,41 @@ public actor BASRustMemoryUsageTrackerActor {
     /// In Rust it's one read lock + one map iteration +
     /// partial sort + JSON encode。 术业有专攻。
     ///
+    /// 持续性 发展 — atom-count distribution percentiles
+    /// via Rust-native sort under one read lock。 Returns
+    /// p50 / p95 / p99 of count-per-atom values。
+    ///
+    /// Doing this from Swift would require pulling every
+    /// record,folding by atomID,then sorting the count
+    /// values — O(N log N) Swift work + N+1 allocations。
+    /// Rust does it under one lock with a single Vec
+    /// sort。 术业有专攻。
+    public func atomCountPercentiles() throws
+        -> BASAtomCountPercentiles
+    {
+        guard useRustCore, let h = handle else {
+            throw BASRustMemoryUsageTrackerActorError
+                .rustBridgeUnavailableOnPlatform
+        }
+        var p50: Int64 = 0
+        var p95: Int64 = 0
+        var p99: Int64 = 0
+        let rc =
+            bas_rust_tracker_atom_count_percentiles(
+                h, &p50, &p95, &p99)
+        switch rc {
+        case 0:
+            return BASAtomCountPercentiles(
+                p50: p50, p95: p95, p99: p99)
+        case -1:
+            throw BASRustMemoryUsageTrackerActorError
+                .nullPointer
+        default:
+            throw BASRustMemoryUsageTrackerActorError
+                .unknownReturnCode(rc)
+        }
+    }
+
     /// limit == 0 returns empty array; limit > distinct
     /// atoms returns ALL atoms (no padding)。
     public func topKAtoms(
@@ -604,6 +668,13 @@ public actor BASRustMemoryUsageTrackerActor {
     public func topKAtoms(
         limit: Int
     ) throws -> [BASTopAtomEntry] {
+        throw BASRustMemoryUsageTrackerActorError
+            .rustBridgeUnavailableOnPlatform
+    }
+
+    public func atomCountPercentiles() throws
+        -> BASAtomCountPercentiles
+    {
         throw BASRustMemoryUsageTrackerActorError
             .rustBridgeUnavailableOnPlatform
     }

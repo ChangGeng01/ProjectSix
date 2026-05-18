@@ -165,6 +165,46 @@ impl Tracker {
         }
     }
 
+    // 持续性 发展 — atom-count distribution percentiles。
+    // Counts occurrences per atom_id (HashMap pass),
+    // sorts the count values ascending,returns
+    // p50/p95/p99 via the nearest-rank method:
+    //   pK = sorted[clamp(0, n-1, ceil(n * K) - 1)]
+    //
+    // Returns (-1, -1, -1) when no records exist (no
+    // distribution to take percentiles of)。
+    fn atom_count_percentiles(&self) -> (i64, i64, i64) {
+        let r = match self.inner.read() {
+            Ok(g) => g,
+            Err(_) => return (-1, -1, -1),
+        };
+        if r.is_empty() {
+            return (-1, -1, -1);
+        }
+        let mut counts: HashMap<String, i64> = HashMap::new();
+        for rec in r.values() {
+            *counts
+                .entry(rec.atom_id.clone())
+                .or_insert(0) += 1;
+        }
+        if counts.is_empty() {
+            return (-1, -1, -1);
+        }
+        let mut sorted: Vec<i64> =
+            counts.values().copied().collect();
+        sorted.sort();
+        let n = sorted.len() as f64;
+        let idx = |p: f64| -> usize {
+            let raw = (n * p).ceil() as i64 - 1;
+            let clamped = raw.max(0).min(sorted.len() as i64 - 1);
+            clamped as usize
+        };
+        let p50 = sorted[idx(0.50)];
+        let p95 = sorted[idx(0.95)];
+        let p99 = sorted[idx(0.99)];
+        (p50, p95, p99)
+    }
+
     // 持续性 发展 — top-K most-frequent atoms。 Iterates
     // the HashMap once,counts occurrences per atom_id,
     // partial-sorts to keep only the top K。 JSON output
@@ -555,6 +595,40 @@ pub extern "C" fn bas_rust_tracker_top_k_atoms(
 
 #[no_mangle]
 pub extern "C" fn bas_rust_tracker_top_k_atoms_version() -> c_int {
+    1
+}
+
+// 持续性 发展 — atom-count distribution percentiles via
+// Rust-native sort under one read lock。 Out-params filled
+// with p50 / p95 / p99 of the count-per-atom distribution
+// using nearest-rank method。 Returns -1 for all three when
+// no records exist。
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_atom_count_percentiles(
+    tracker: *mut Tracker,
+    p50_out: *mut i64,
+    p95_out: *mut i64,
+    p99_out: *mut i64,
+) -> c_int {
+    if tracker.is_null()
+        || p50_out.is_null()
+        || p95_out.is_null()
+        || p99_out.is_null()
+    {
+        return -1;
+    }
+    let tref = unsafe { &*tracker };
+    let (p50, p95, p99) = tref.atom_count_percentiles();
+    unsafe {
+        *p50_out = p50;
+        *p95_out = p95;
+        *p99_out = p99;
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn bas_rust_tracker_atom_count_percentiles_version() -> c_int {
     1
 }
 

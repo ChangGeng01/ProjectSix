@@ -2239,9 +2239,15 @@ extension BASCognitiveBrain {
         // enough to include unconditionally without
         // bloating the snapshot。
         let topAtoms: [BASTopAtomEntry]?
+        let atomCountPercentiles: BASAtomCountPercentiles?
         if let store = rustHistoryStore {
             topAtoms = try? await store.topKAtoms(limit: 5)
-        } else { topAtoms = nil }
+            atomCountPercentiles = try? await store
+                .atomCountPercentiles()
+        } else {
+            topAtoms = nil
+            atomCountPercentiles = nil
+        }
         return BASCognitiveBrainHealthSnapshot(
             pilotStatus: status,
             pilotMetrics: metrics,
@@ -2251,6 +2257,7 @@ extension BASCognitiveBrain {
             warmupResult: warmupResult,
             cSystemProbes: cProbes,
             topAtoms: topAtoms,
+            atomCountPercentiles: atomCountPercentiles,
             collectedAt: Date())
     }
 
@@ -2272,19 +2279,23 @@ extension BASCognitiveBrain {
             useCBridge: true)
         let cpuTimeProbe = BASProcessCPUTimeProbe(
             useCBridge: true)
+        let diskIOProbe = BASProcessDiskIOProbe(
+            useCBridge: true)
         let rss = try? await rssProbe.current()
         let threads = try? await threadProbe.current()
         let cpus = try? await cpuProbe.current()
         let uptime = try? await uptimeProbe.current()
         let physMem = try? await physProbe.current()
         let cpuTime = try? await cpuTimeProbe.current()
+        let diskIO = try? await diskIOProbe.current()
         return BASCognitiveBrainCSystemProbeSnapshot(
             residentMemoryBytes: rss,
             threadCount: threads.map { Int($0) },
             logicalCpuCount: cpus.map { Int($0) },
             systemUptimeSeconds: uptime,
             physicalMemoryBytes: physMem,
-            cpuTime: cpuTime)
+            cpuTime: cpuTime,
+            diskIO: diskIO)
     }
 }
 
@@ -2376,13 +2387,21 @@ public struct BASCognitiveBrainCSystemProbeSnapshot: Codable,
     /// produced before this field landed。
     public let cpuTime: BASProcessCPUTimeSample?
 
+    /// 持续性 发展 — process disk I/O block counts
+    /// (ru_inblock + ru_oublock) from `getrusage`。
+    /// Cumulative since process start;hosts diff across
+    /// captures for I/O rate dashboards。 Default nil for
+    /// backward-compat。
+    public let diskIO: BASProcessDiskIOSample?
+
     public init(
         residentMemoryBytes: UInt64?,
         threadCount: Int?,
         logicalCpuCount: Int?,
         systemUptimeSeconds: Int64?,
         physicalMemoryBytes: UInt64?,
-        cpuTime: BASProcessCPUTimeSample? = nil
+        cpuTime: BASProcessCPUTimeSample? = nil,
+        diskIO: BASProcessDiskIOSample? = nil
     ) {
         self.residentMemoryBytes = residentMemoryBytes
         self.threadCount = threadCount
@@ -2390,6 +2409,7 @@ public struct BASCognitiveBrainCSystemProbeSnapshot: Codable,
         self.systemUptimeSeconds = systemUptimeSeconds
         self.physicalMemoryBytes = physicalMemoryBytes
         self.cpuTime = cpuTime
+        self.diskIO = diskIO
     }
 
     /// Convenience:ratio of process RSS to total
@@ -2469,6 +2489,14 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
     /// backward-compat。
     public let topAtoms: [BASTopAtomEntry]?
 
+    /// 持续性 发展 — atom-count distribution percentiles
+    /// (p50 / p95 / p99) computed inside Rust via sort
+    /// + nearest-rank。 Nil when Rust pilot is not
+    /// wired。 isEmpty when wired but no records exist。
+    /// Hosts use this for "what's the typical repetition
+    /// rate" dashboards。 Default nil for backward-compat。
+    public let atomCountPercentiles: BASAtomCountPercentiles?
+
     /// When the snapshot was collected (host clock)。
     public let collectedAt: Date
 
@@ -2486,6 +2514,8 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
         cSystemProbes:
             BASCognitiveBrainCSystemProbeSnapshot? = nil,
         topAtoms: [BASTopAtomEntry]? = nil,
+        atomCountPercentiles:
+            BASAtomCountPercentiles? = nil,
         collectedAt: Date
     ) {
         self.pilotStatus = pilotStatus
@@ -2496,6 +2526,7 @@ public struct BASCognitiveBrainHealthSnapshot: Codable,
         self.warmupResult = warmupResult
         self.cSystemProbes = cSystemProbes
         self.topAtoms = topAtoms
+        self.atomCountPercentiles = atomCountPercentiles
         self.collectedAt = collectedAt
     }
 

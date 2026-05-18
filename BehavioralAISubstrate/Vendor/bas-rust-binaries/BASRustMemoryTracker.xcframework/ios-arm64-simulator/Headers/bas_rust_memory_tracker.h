@@ -158,6 +158,27 @@ int32_t bas_rust_tracker_top_k_atoms(
 /// ABI version pin for `bas_rust_tracker_top_k_atoms`。
 int32_t bas_rust_tracker_top_k_atoms_version(void);
 
+/// 持续性 发展 — atom-count distribution percentiles
+/// via Rust-native sort under one read lock。 Fills the
+/// three out-params with p50 / p95 / p99 of the count-
+/// per-atom distribution。
+///
+/// Returns -1 for all three percentile values when no
+/// records exist (no distribution)。
+///
+/// Returns:
+///   - 0  = success (out-params filled)
+///   - -1 = null pointer (any of 4)
+int32_t bas_rust_tracker_atom_count_percentiles(
+    Tracker* tracker,
+    int64_t* p50_out,
+    int64_t* p95_out,
+    int64_t* p99_out);
+
+/// ABI version pin for
+/// `bas_rust_tracker_atom_count_percentiles`。
+int32_t bas_rust_tracker_atom_count_percentiles_version(void);
+
 #ifdef __cplusplus
 }
 #endif

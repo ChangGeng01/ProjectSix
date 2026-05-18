@@ -313,3 +313,33 @@ int32_t bas_process_cpu_time_micros(
 int32_t bas_process_cpu_time_micros_version(void) {
     return 1;
 }
+
+// MARK: - bas_process_disk_io_blocks
+// 持续性 发展 — block I/O counts via getrusage。 Same
+// rusage struct as CPU time;different fields。
+int32_t bas_process_disk_io_blocks(
+    int64_t *out_in,
+    int64_t *out_out) {
+    if (out_in == 0 || out_out == 0) {
+        return -1;
+    }
+#if __APPLE__
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage) != 0) {
+        *out_in = 0;
+        *out_out = 0;
+        return -2;
+    }
+    *out_in = (int64_t)usage.ru_inblock;
+    *out_out = (int64_t)usage.ru_oublock;
+    return 0;
+#else
+    *out_in = 0;
+    *out_out = 0;
+    return -3;
+#endif
+}
+
+int32_t bas_process_disk_io_blocks_version(void) {
+    return 1;
+}

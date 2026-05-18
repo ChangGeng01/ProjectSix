@@ -179,6 +179,16 @@ public actor BASRustBrainHistoryStore {
         return try await tracker.topKAtoms(limit: limit)
     }
 
+    /// 持续性 发展 — atom-count distribution percentiles
+    /// (p50 / p95 / p99) via Rust-native sort under one
+    /// read lock。 Returns sentinel -1 values when no
+    /// records exist。
+    public func atomCountPercentiles() async throws
+        -> BASAtomCountPercentiles
+    {
+        return try await tracker.atomCountPercentiles()
+    }
+
     // MARK: - 主线 全面 提升: Rust-side aggregations
 
     /// Records grouped by permit mode (i.e. by safety

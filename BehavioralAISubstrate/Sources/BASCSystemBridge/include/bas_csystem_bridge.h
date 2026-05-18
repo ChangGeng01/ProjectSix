@@ -207,6 +207,34 @@ int32_t bas_process_cpu_time_micros(
 /// `bas_process_cpu_time_micros`。 Currently 1。
 int32_t bas_process_cpu_time_micros_version(void);
 
+/// 持续性 发展 — process block I/O counts via
+/// `getrusage(RUSAGE_SELF)` ru_inblock / ru_oublock。
+/// Hosts use this to detect "is my brain doing
+/// unexpectedly heavy disk work" (e.g. SQL pilot WAL
+/// flushes,Codable persistence)。 Returns the
+/// CUMULATIVE counts since process start;hosts take
+/// differences across snapshots for rate dashboards。
+///
+/// **Apple platforms only**:Non-Apple fallback returns
+/// -3 with out-params zeroed。
+///
+/// - Parameters:
+///   - out_in:non-null pointer to receive input block
+///     count (reads)
+///   - out_out:non-null pointer to receive output block
+///     count (writes)
+/// - Returns:0 on success,negative on error。
+///   - -1 = null out pointer (either)
+///   - -2 = `getrusage` syscall failed
+///   - -3 = unsupported platform
+int32_t bas_process_disk_io_blocks(
+    int64_t *out_in,
+    int64_t *out_out);
+
+/// ABI / behavior version pin for
+/// `bas_process_disk_io_blocks`。 Currently 1。
+int32_t bas_process_disk_io_blocks_version(void);
+
 #ifdef __cplusplus
 }
 #endif
