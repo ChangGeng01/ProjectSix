@@ -55,6 +55,7 @@
 // replace the inside without changing the outside。
 
 import Foundation
+import CryptoKit
 import BASMemory
 import BASPolicy
 import BASRuntimeCore
@@ -1177,6 +1178,38 @@ public struct BASCognitiveBrainSummary: Codable,
     ///     (i.e. same brain instance)
     public let crossSessionEcho: Bool
 
+    /// 主线 继续 开发 — Metal-derived deterministic
+    /// signature。 Non-nil ONLY when the Metal pilot is
+    /// wired AND the brain.summary cascade actually
+    /// dispatched the SSMScan kernel for this input。
+    ///
+    /// Computation (deterministic for a given input):
+    ///   1. SHA256(input UTF-8) → first 8 bytes
+    ///   2. 8 bytes → 2 Float32 channels normalized to
+    ///      [-1, 1] via (raw_uint32 / UInt32.max) - 0.5
+    ///   3. Build (B=1, L=1, D=2) SSM scan inputs:
+    ///        x[i] = channel[i]
+    ///        delta[i] = abs(channel[i]) + 0.5
+    ///        A[i] = -0.5
+    ///        B[i] = 1.0
+    ///        C[i] = 1.0
+    ///   4. Dispatch on GPU,read back y[0..2]
+    ///   5. Signature = sqrt(y[0]² + y[1]²) — 2D norm
+    ///
+    /// Same input → identical bytes → identical signature
+    /// (chapter 392 replay-determinism preserved)。 Hosts
+    /// can use this as a cross-language input fingerprint
+    /// for clustering / dedup / "is this the same kind
+    /// of input as that one" questions WITHOUT the
+    /// CoreML classifier。
+    ///
+    /// Nil for backward-compat with summaries constructed
+    /// before this field existed,or for brains without
+    /// a Metal loader wired,or when Metal dispatch
+    /// failed (non-fatal — cascade always returns a
+    /// summary)。
+    public let metalDerivedSignal: Float?
+
     public init(
         input: String,
         taskType: BASContextTaskType,
@@ -1190,7 +1223,8 @@ public struct BASCognitiveBrainSummary: Codable,
         consequenceLevel: Double = 0.0,
         relationPattern: String = "neutral",
         repetitionCount: Int = 0,
-        crossSessionEcho: Bool = false
+        crossSessionEcho: Bool = false,
+        metalDerivedSignal: Float? = nil
     ) {
         self.input = input
         self.taskType = taskType
@@ -1205,6 +1239,7 @@ public struct BASCognitiveBrainSummary: Codable,
         self.relationPattern = relationPattern
         self.repetitionCount = repetitionCount
         self.crossSessionEcho = crossSessionEcho
+        self.metalDerivedSignal = metalDerivedSignal
     }
 
     /// 主线 加强 实用性 — rebuild this summary with native-
@@ -1213,9 +1248,14 @@ public struct BASCognitiveBrainSummary: Codable,
     /// the cached ML-classification result (the ML parts
     /// don't change across cache hits,but the repetition
     /// counts MUST be computed per-call)。
+    ///
+    /// 主线 继续 开发 — also takes the Metal-derived signal
+    /// (or nil) so cache-hit summaries can carry a fresh
+    /// Metal computation when re-dispatched。
     public func withNativePilotSignals(
         repetitionCount: Int,
-        crossSessionEcho: Bool
+        crossSessionEcho: Bool,
+        metalDerivedSignal: Float? = nil
     ) -> BASCognitiveBrainSummary {
         return BASCognitiveBrainSummary(
             input: input,
@@ -1230,7 +1270,8 @@ public struct BASCognitiveBrainSummary: Codable,
             consequenceLevel: consequenceLevel,
             relationPattern: relationPattern,
             repetitionCount: repetitionCount,
-            crossSessionEcho: crossSessionEcho)
+            crossSessionEcho: crossSessionEcho,
+            metalDerivedSignal: metalDerivedSignal)
     }
 }
 
@@ -1262,6 +1303,11 @@ extension BASCognitiveBrain {
         // the count reflects "occurrences BEFORE this one"。
         let nativeSignals = await nativeRepetitionSignals(
             forInput: input)
+        // 主线 继续 开发 — when Metal is wired,compute a
+        // deterministic per-input signature on the GPU。
+        // Nil-on-failure; cascade never blocks on Metal。
+        let metalSignal = await computeMetalDerivedSignal(
+            forInput: input)
         if let cachedSummary = await cxxCachedSummary(
             forInput: input,
             startedAtNanos: startNanos)
@@ -1269,14 +1315,15 @@ extension BASCognitiveBrain {
             // 主线 加强 实用性:layer fresh native-pilot
             // signals onto the cached ML-classification
             // result。 The ML parts don't change across
-            // cache hits,but repetitionCount MUST be
-            // computed per-call。
+            // cache hits,but repetitionCount + Metal
+            // signature MUST be computed per-call。
             let layered = cachedSummary
                 .withNativePilotSignals(
                     repetitionCount:
                         nativeSignals.repetitionCount,
                     crossSessionEcho:
-                        nativeSignals.crossSessionEcho)
+                        nativeSignals.crossSessionEcho,
+                    metalDerivedSignal: metalSignal)
             await recordSummaryObservation(layered)
             return layered
         }
@@ -1335,7 +1382,8 @@ extension BASCognitiveBrain {
             repetitionCount:
                 nativeSignals.repetitionCount,
             crossSessionEcho:
-                nativeSignals.crossSessionEcho)
+                nativeSignals.crossSessionEcho,
+            metalDerivedSignal: metalSignal)
         await recordSummaryObservation(summary)
         // C++ pilot integration:persist to process-global
         // cache so subsequent calls with the same input
@@ -1428,6 +1476,69 @@ extension BASCognitiveBrain {
     /// Best-effort: failures surface as (0, false) rather
     /// than throwing。 Hosts wanting strict propagation
     /// can query the underlying stores directly。
+    /// 主线 继续 开发 — compute the Metal-derived
+    /// deterministic signature for `input`。 Nil when:
+    ///   - No Metal loader wired
+    ///   - Dispatch failed (V1 mode,Metal unavailable,
+    ///     compile error)
+    ///   - Non-Apple platform (Metal not importable)
+    ///
+    /// Same input → identical signature across runs。
+    /// Hosts can use this as a cross-language fingerprint
+    /// without re-running CoreML。
+    private func computeMetalDerivedSignal(
+        forInput input: String
+    ) async -> Float? {
+        guard metalLibraryLoader != nil else {
+            return nil
+        }
+        // Derive 2-channel x[] from SHA256 prefix。 D=2
+        // gives 8 bytes of seed,sufficient for input
+        // sensitivity without blowing up dispatch cost。
+        let digest = SHA256.hash(
+            data: Data(input.utf8))
+        var seedBytes = [UInt8]()
+        seedBytes.reserveCapacity(8)
+        for (i, byte) in digest.enumerated() {
+            if i >= 8 { break }
+            seedBytes.append(byte)
+        }
+        // Decode 8 bytes → 2 UInt32 → 2 Float32 in [-0.5, 0.5)
+        let u0 = (UInt32(seedBytes[0]) << 24)
+            | (UInt32(seedBytes[1]) << 16)
+            | (UInt32(seedBytes[2]) << 8)
+            | UInt32(seedBytes[3])
+        let u1 = (UInt32(seedBytes[4]) << 24)
+            | (UInt32(seedBytes[5]) << 16)
+            | (UInt32(seedBytes[6]) << 8)
+            | UInt32(seedBytes[7])
+        let ch0 = Float(u0) / Float(UInt32.max) - 0.5
+        let ch1 = Float(u1) / Float(UInt32.max) - 0.5
+        // Build (B=1, L=1, D=2) inputs。 The math:
+        //   A_bar[d] = exp(delta[d] * A[d])
+        //   B_bar[d] = delta[d] * B[d]
+        //   h_1[d]   = B_bar[d] * x[0,d]
+        //   y_1[d]   = C[d] * h_1[d]
+        let shape = BASSSMScanShape(B: 1, L: 1, D: 2)
+        let x: [Float] = [ch0, ch1]
+        let delta: [Float] = [
+            abs(ch0) + 0.5, abs(ch1) + 0.5]
+        let A: [Float] = [-0.5, -0.5]
+        let B: [Float] = [1.0, 1.0]
+        let C: [Float] = [1.0, 1.0]
+        do {
+            let y = try await dispatchSSMScan(
+                x: x, delta: delta, A: A, B: B, C: C,
+                shape: shape)
+            guard y.count == 2 else { return nil }
+            // 2D magnitude — single deterministic scalar
+            // signature with sign invariance。
+            return sqrt(y[0] * y[0] + y[1] * y[1])
+        } catch {
+            return nil
+        }
+    }
+
     private func nativeRepetitionSignals(
         forInput input: String
     ) async -> (repetitionCount: Int,

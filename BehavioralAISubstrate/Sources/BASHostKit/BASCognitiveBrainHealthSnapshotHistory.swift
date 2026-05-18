@@ -109,6 +109,21 @@ public actor BASCognitiveBrainHealthSnapshotHistory {
             .contentByteSizeEstimate
         let cacheBytesNewest = newest.cxxTelemetry?
             .contentByteSizeEstimate
+        // 主线 继续 开发 — C-probe trend deltas。
+        // residentMemoryDelta + threadCountDelta surface
+        // memory-pressure / thread-leak signals。
+        let rssOldest = oldest.cSystemProbes?
+            .residentMemoryBytes
+        let rssNewest = newest.cSystemProbes?
+            .residentMemoryBytes
+        let threadOldest = oldest.cSystemProbes?
+            .threadCount
+        let threadNewest = newest.cSystemProbes?
+            .threadCount
+        let uptimeOldest = oldest.cSystemProbes?
+            .systemUptimeSeconds
+        let uptimeNewest = newest.cSystemProbes?
+            .systemUptimeSeconds
         // Time span
         let elapsed = newest.collectedAt
             .timeIntervalSince(oldest.collectedAt)
@@ -120,7 +135,13 @@ public actor BASCognitiveBrainHealthSnapshotHistory {
             hitRateDelta: deltaOptional(
                 hitRateOldest, hitRateNewest),
             cacheContentBytesDelta: deltaOptional(
-                cacheBytesOldest, cacheBytesNewest))
+                cacheBytesOldest, cacheBytesNewest),
+            residentMemoryDelta: deltaUInt64(
+                rssOldest, rssNewest),
+            threadCountDelta: deltaOptional(
+                threadOldest, threadNewest),
+            systemUptimeDelta: deltaOptional(
+                uptimeOldest, uptimeNewest))
     }
 
     private func deltaOptional<T: Numeric>(
@@ -128,6 +149,26 @@ public actor BASCognitiveBrainHealthSnapshotHistory {
     ) -> T? {
         guard let old, let new else { return nil }
         return new - old
+    }
+
+    /// 主线 继续 开发 — UInt64 delta as Int64 to allow
+    /// signed deltas (memory can drop as well as grow)。
+    private func deltaUInt64(
+        _ old: UInt64?, _ new: UInt64?
+    ) -> Int64? {
+        guard let old, let new else { return nil }
+        // Saturating signed delta so an enormous drop
+        // (extremely unlikely) doesn't overflow Int64。
+        if new >= old {
+            let raw = new - old
+            return raw <= UInt64(Int64.max)
+                ? Int64(raw)
+                : Int64.max
+        }
+        let raw = old - new
+        return raw <= UInt64(Int64.max)
+            ? -Int64(raw)
+            : Int64.min
     }
 }
 
@@ -160,12 +201,35 @@ public struct BASCognitiveBrainHealthSnapshotTrend: Codable,
     /// missing。 Positive = cache growing。
     public let cacheContentBytesDelta: Int?
 
+    /// 主线 继续 开发 — process resident memory delta in
+    /// bytes (signed Int64,positive = RSS grew,negative
+    /// = RSS shrank)。 Nil if C probes missing in either
+    /// snapshot。 Hosts use this to detect leaks across
+    /// trend windows。
+    public let residentMemoryDelta: Int64?
+
+    /// Thread count delta — positive = thread creation,
+    /// negative = thread teardown。 Nil if C probes
+    /// missing in either snapshot。
+    public let threadCountDelta: Int?
+
+    /// System uptime delta in seconds。 Should be
+    /// non-negative — host boot time doesn't change。
+    /// Nil if C probes missing in either snapshot。
+    /// Useful as a sanity-check for the time span
+    /// (should approximately equal spanSeconds rounded
+    /// down)。
+    public let systemUptimeDelta: Int64?
+
     public init(
         snapshotCount: Int,
         spanSeconds: TimeInterval,
         totalStorageEventsDelta: Int,
         hitRateDelta: Double?,
-        cacheContentBytesDelta: Int?
+        cacheContentBytesDelta: Int?,
+        residentMemoryDelta: Int64? = nil,
+        threadCountDelta: Int? = nil,
+        systemUptimeDelta: Int64? = nil
     ) {
         self.snapshotCount = snapshotCount
         self.spanSeconds = spanSeconds
@@ -173,6 +237,9 @@ public struct BASCognitiveBrainHealthSnapshotTrend: Codable,
             totalStorageEventsDelta
         self.hitRateDelta = hitRateDelta
         self.cacheContentBytesDelta = cacheContentBytesDelta
+        self.residentMemoryDelta = residentMemoryDelta
+        self.threadCountDelta = threadCountDelta
+        self.systemUptimeDelta = systemUptimeDelta
     }
 
     /// Convenience:storage-events per second over the
@@ -181,5 +248,16 @@ public struct BASCognitiveBrainHealthSnapshotTrend: Codable,
         guard spanSeconds > 0 else { return 0 }
         return Double(totalStorageEventsDelta)
             / spanSeconds
+    }
+
+    /// 主线 继续 开发 — residentMemoryDelta normalized to
+    /// bytes-per-second over the trend span。 Useful as
+    /// a "leak rate" signal。 Nil when delta or span
+    /// missing。 Sign preserved。
+    public var residentMemoryBytesPerSecond: Double? {
+        guard let delta = residentMemoryDelta,
+              spanSeconds > 0
+        else { return nil }
+        return Double(delta) / spanSeconds
     }
 }
