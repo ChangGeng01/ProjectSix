@@ -189,29 +189,34 @@ For richer routing logic the brain also exposes
 `classifyProbabilities(_:)` returning the full multi-class
 distribution map (returns nil for explicit-services brains)。
 
-### What's STILL placeholder
+### Cognitive cascade — 7 of 14 layers now ML-active
 
-The cognitive cascade has many other layers (decompose /
-loop / risk / action / evolution) that are currently
-rules-fallthrough placeholders. The cascade RUNS end-to-end
-and emits a full audit trail, but the inference within those
-layers is hardcoded nominal values pending Phase C/D/E ML
-adapters.
+The brain runs a 14-layer cognitive cascade. Real
+signal-derived logic now active in 7 layers:
 
-Fields in BASEBrainTurnResult that are placeholder:
+| Layer | Service | Behavior |
+| ----- | ------- | -------- |
+| L0 | BASMLContextService | 7-class CoreML classifier across 8 languages |
+| L2 | BASMLDecomposeService | Signal-surfacing from L0 into emotions / pressure / manipulation arrays |
+| L3 | BASMLLoopService | Generates 1-3 candidates (primary / cautious / decline) derived from L2 signals |
+| L4 | BASMLTriSelfService | Three-voice arbitration (id / ego / superego) with veto when superego < 0.3 |
+| L5 | BASMLRiskService | Risk verdict from weighted L0+L2 signals (low / medium / high / extreme) |
+| L6 | BASMLActionService | Risk-aware rendered output (headline with bracketed mode prefix + body caveat) |
+| L7 | BASMLEvolutionService | Update tickets when elevated_risk / manipulation / veto / feedback surfaces |
+
+Remaining placeholder layers (require domain integrations
+beyond pure cascade derivation):
+- L1 memory — needs host-specific retrieval ML
+- L8 power-clock — needs device-state telemetry
+- L9 host-profile — needs per-host profile synthesis
+- L10 tribunal / L11 audit / L12+ — downstream audit
+  surfaces requiring corpus-trained submodels
+
+The one remaining placeholder field on the otherwise-real
+contextFrame:
 - `contextFrame.hostRelevance` (hardcoded 0.5 — needs a
-  per-host retrieval ML)
-- `thoughtFrame.*` (single trivial candidate)
-- `riskCard.*` (low risk, no factors)
-- `renderedOutput.*` (echoes the merged choice title)
-
-Previously also placeholder (now REAL ML-derived):
-- `contextFrame.emotionalLoad` — was 0.1, now sum of
-  softmax mass on non-calm classes
-- `contextFrame.timePressure` — was 0.1, now P(highPressure)
-- `contextFrame.consequenceLevel` — was 0.1, now P(highConsequence)
-- `contextFrame.relationPattern` — was always "neutral", now
-  "tense" when P(conflict) ≥ 0.3, else "neutral"
+  per-host retrieval ML, out of scope for L0 signal
+  derivation)
 
 ### Model quality
 
