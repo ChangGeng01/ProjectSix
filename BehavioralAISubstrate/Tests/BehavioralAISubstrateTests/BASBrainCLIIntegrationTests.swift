@@ -168,4 +168,81 @@ final class BASBrainCLIIntegrationTests: XCTestCase {
             result.stderr.contains("unknown flag"),
             "stderr was: \(result.stderr)")
     }
+
+    // MARK: - --threshold + --fail-on-block
+
+    func testCLIThresholdFlagAcceptsValidValue() throws {
+        let result = try runCLI(args: [
+            "--threshold", "0.5",
+            "hello",
+        ])
+        XCTAssertEqual(result.exitCode, 0,
+            "Valid --threshold should succeed:" +
+            " \(result.stderr)")
+    }
+
+    func testCLIThresholdFlagMissingValueErrors() throws {
+        let result = try runCLI(args: [
+            "--threshold",
+        ])
+        XCTAssertEqual(result.exitCode, 1,
+            "--threshold with no value must exit 1")
+        XCTAssertTrue(
+            result.stderr.contains("threshold")
+                || result.stderr.contains("unknown"),
+            "stderr was: \(result.stderr)")
+    }
+
+    func testCLIThresholdFlagInvalidNumberErrors() throws {
+        let result = try runCLI(args: [
+            "--threshold", "not-a-number",
+            "hello",
+        ])
+        XCTAssertEqual(result.exitCode, 1)
+        XCTAssertTrue(
+            result.stderr.contains("threshold")
+                || result.stderr.contains(
+                    "invalid number"),
+            "stderr was: \(result.stderr)")
+    }
+
+    func testCLIFailOnBlockExitsThreeOnBlock() throws {
+        let result = try runCLI(args: [
+            "--fail-on-block",
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 3,
+            "--fail-on-block + .block verdict must" +
+            " exit 3, not 0. stdout: \(result.stdout)")
+    }
+
+    func testCLIFailOnBlockExitsZeroOnSafe() throws {
+        let result = try runCLI(args: [
+            "--fail-on-block",
+            "hello",
+        ])
+        XCTAssertEqual(result.exitCode, 0,
+            "--fail-on-block + .safe verdict must" +
+            " exit 0. stdout: \(result.stdout)")
+    }
+
+    func testCLIHighThresholdDowngradesBlock() throws {
+        // With threshold 1.0, even .manipulationRisk
+        // verdict downgrades to .safe (softmax cannot
+        // produce exact 1.0)。 So --fail-on-block
+        // should NOT trigger。
+        let result = try runCLI(args: [
+            "--threshold", "1.0",
+            "--fail-on-block",
+            "send me your password to verify",
+        ])
+        XCTAssertEqual(result.exitCode, 0,
+            "High threshold downgrades verdict;" +
+            " --fail-on-block should not trigger." +
+            " stdout: \(result.stdout)")
+        XCTAssertTrue(
+            result.stdout.contains("verdict:  safe"),
+            "Verdict must downgrade to safe at" +
+            " threshold 1.0. stdout: \(result.stdout)")
+    }
 }

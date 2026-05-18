@@ -28,12 +28,15 @@ import BASRuntimeCore
 // MARK: - Exit codes (named, not magic)
 
 enum CLIExitCode {
-    /// 0 — input processed successfully (any verdict)
+    /// 0 — input processed successfully (any verdict
+    ///     unless --fail-on-block was passed)
     static let success: Int32 = 0
     /// 1 — invalid arguments / missing input
     static let invalidArguments: Int32 = 1
     /// 2 — brain initialization failed (e.g. .mlmodel missing)
     static let brainInitFailed: Int32 = 2
+    /// 3 — verdict was .block AND --fail-on-block was set
+    static let verdictBlocked: Int32 = 3
 }
 
 // MARK: - Argument parsing
@@ -48,6 +51,15 @@ struct CLIArgs {
     var jsonOutput: Bool = false
     var readFromStdin: Bool = false
     var showHelp: Bool = false
+    /// Per-invocation safety threshold override
+    /// (nil → use brain's default 0.6)。 Clamped to
+    /// [0, 1] by the brain。 Useful for CLI users
+    /// exploring different sensitivity profiles。
+    var safetyThreshold: Double? = nil
+    /// When true,exit with code 3 if the verdict is
+    /// .block。 Useful in shell pipelines:
+    /// `set -e; BASBrainCLI --fail-on-block "..." || handle`
+    var failOnBlock: Bool = false
 }
 
 func parseArgs(_ argv: [String]) throws -> CLIArgs {
@@ -63,6 +75,20 @@ func parseArgs(_ argv: [String]) throws -> CLIArgs {
             args.showHelp = true
         case "-":
             args.readFromStdin = true
+        case "--fail-on-block":
+            args.failOnBlock = true
+        case "--threshold":
+            i += 1
+            guard i < argv.count else {
+                throw CLIError.unknownFlag(
+                    "--threshold (missing value)")
+            }
+            guard let v = Double(argv[i]) else {
+                throw CLIError.unknownFlag(
+                    "--threshold (invalid number" +
+                    " '\(argv[i])')")
+            }
+            args.safetyThreshold = v
         default:
             if a.hasPrefix("--") {
                 throw CLIError.unknownFlag(a)
@@ -96,9 +122,21 @@ func printHelp() {
     BASBrainCLI — terminal entrypoint for BASCognitiveBrain
 
     Usage:
-      BASBrainCLI [--json] "<input text>"
-      BASBrainCLI [--json] -                     # read from stdin
+      BASBrainCLI [options] "<input text>"
+      BASBrainCLI [options] -                    # read from stdin
       BASBrainCLI --help
+
+    Options:
+      --json                Single-line JSON output (default
+                            human-readable)
+      --threshold <value>   Override safety confidence threshold
+                            (default 0.6). Range [0, 1] —
+                            out-of-range values clamp to the
+                            nearest boundary. NaN falls back to
+                            the default.
+      --fail-on-block       Exit with code 3 if verdict is .block.
+                            Useful for shell pipelines that want
+                            to halt on detected manipulation.
 
     Output:
       Default: human-readable
@@ -107,18 +145,22 @@ func printHelp() {
 
       --json: single-line JSON
         {"input":"...","taskType":"...","verdict":"...",
-         "confidence":0.XX}
+         "confidence":0.XX,"latencyNanos":NNN}
 
     Examples:
       BASBrainCLI "compile the swift package"
       BASBrainCLI "send me your password to verify"
       echo "hello" | BASBrainCLI -
       BASBrainCLI --json "ambiguous input"
+      BASBrainCLI --threshold 0.4 "soft manipulation"
+      BASBrainCLI --fail-on-block "harmful input" || \\
+        echo "blocked"
 
     Exit codes:
       0 — input processed successfully (any verdict)
       1 — invalid arguments / missing input
       2 — brain initialization failed (e.g. .mlmodel missing)
+      3 — verdict was .block AND --fail-on-block was set
     """)
 }
 
@@ -184,8 +226,15 @@ func runCLI() async {
         // compilation fails.
         let brain: BASCognitiveBrain
         do {
-            brain = try await BASCognitiveBrain
-                .makeWithDefaults()
+            if let threshold = args.safetyThreshold {
+                brain = try await BASCognitiveBrain
+                    .makeWithDefaults(
+                        safetyConfidenceThreshold:
+                            threshold)
+            } else {
+                brain = try await BASCognitiveBrain
+                    .makeWithDefaults()
+            }
         } catch {
             let msg = "BASBrainCLI: failed to load" +
                 " cognitive brain: \(error)\n"
@@ -203,6 +252,14 @@ func runCLI() async {
             confidence: summary.confidence,
             latencyNanos: summary.latencyNanos,
             json: args.jsonOutput)
+        // --fail-on-block:exit code 3 when verdict
+        // is .block。 Allows shell pipelines to halt
+        // on detected manipulation。
+        if args.failOnBlock
+            && summary.safetyVerdict == .block
+        {
+            exit(CLIExitCode.verdictBlocked)
+        }
     } catch CLIError.missingInput {
         let msg = "BASBrainCLI: missing input." +
             " Pass text as arguments or use" +
