@@ -86,6 +86,26 @@ public actor BASCognitiveBrain {
     /// DispatchTime if the C bridge throws at runtime。
     private let monotonicClock: BASMonotonicNanos
 
+    /// Bounded in-memory ring buffer of recent summaries。
+    /// Each `summary(_:)` call appends here for host
+    /// retrieval via `recentSummaries(limit:)`。 Oldest
+    /// summaries evicted when the buffer reaches
+    /// `summaryHistoryCapacity`。
+    private var summaryHistory:
+        [BASCognitiveBrainSummary] = []
+
+    /// Maximum number of summaries retained in the in-memory
+    /// history buffer。 100 chosen as a reasonable host
+    /// inspection budget (≈1 minute of normal activity at
+    /// one summary every ~600ms) without unbounded memory
+    /// growth on long-running sessions。
+    public static let defaultSummaryHistoryCapacity: Int = 100
+
+    /// The actual configured history capacity for this
+    /// brain instance (defaults to
+    /// `defaultSummaryHistoryCapacity`)。
+    public let summaryHistoryCapacity: Int
+
     /// Named constants for the default device-state values。
     /// Each represents a "nominal everything" baseline that
     /// describes a healthy host environment — not magic
@@ -157,15 +177,18 @@ public actor BASCognitiveBrain {
     ///   - 7 typed taskType classes (chat / task / choice /
     ///     conflict / highPressure / manipulationRisk /
     ///     highConsequence) all reachable via real ML
-    public static func makeWithDefaults()
-        async throws -> BASCognitiveBrain
-    {
+    public static func makeWithDefaults(
+        summaryHistoryCapacity: Int =
+            BASCognitiveBrain.defaultSummaryHistoryCapacity
+    ) async throws -> BASCognitiveBrain {
         return try await BASCognitiveBrain(
             options: BASCognitiveOSBundleOptions(
                 enableEventLog: true,
                 enableUserState: true,
                 enableVectorIndex: true,
-                enableKnowledgeGraph: true))
+                enableKnowledgeGraph: true),
+            summaryHistoryCapacity:
+                summaryHistoryCapacity)
     }
 
     /// Construction with custom bundle options (e.g.
@@ -177,10 +200,14 @@ public actor BASCognitiveBrain {
     /// BASPlaceholderContextService())` for pure-placeholder
     /// operation。
     public init(
-        options: BASCognitiveOSBundleOptions
+        options: BASCognitiveOSBundleOptions,
+        summaryHistoryCapacity: Int =
+            BASCognitiveBrain.defaultSummaryHistoryCapacity
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
+        self.summaryHistoryCapacity =
+            max(0, summaryHistoryCapacity)
         // PHASE B-4: replace BASPlaceholderContextService
         // with the ML-backed BASMLContextService。 The
         // adapter loads the .mlmodel from Bundle.module
@@ -228,10 +255,14 @@ public actor BASCognitiveBrain {
     /// pre-ML test path available for regression。
     public init(
         options: BASCognitiveOSBundleOptions,
-        contextService: any BASContextServicing
+        contextService: any BASContextServicing,
+        summaryHistoryCapacity: Int =
+            BASCognitiveBrain.defaultSummaryHistoryCapacity
     ) async throws {
         self.bundle = try BASCognitiveOSBuilder
             .build(options: options)
+        self.summaryHistoryCapacity =
+            max(0, summaryHistoryCapacity)
         let coordinator = BASEBrainRuntimeCoordinator(
             powerClockService:
                 BASPlaceholderPowerClockService(),
@@ -535,7 +566,7 @@ extension BASCognitiveBrain {
         } else {
             verdict = .safe
         }
-        return BASCognitiveBrainSummary(
+        let summary = BASCognitiveBrainSummary(
             input: result.contextFrame.utterance,
             taskType: result.contextFrame.taskType,
             confidence: confidence,
@@ -545,5 +576,32 @@ extension BASCognitiveBrain {
             manipulationHints:
                 result.contextFrame.manipulationHints,
             latencyNanos: latencyNanos)
+        // Append to bounded history (LRU eviction)。
+        if summaryHistoryCapacity > 0 {
+            summaryHistory.append(summary)
+            while summaryHistory.count >
+                summaryHistoryCapacity
+            {
+                summaryHistory.removeFirst()
+            }
+        }
+        return summary
+    }
+
+    /// Return up to `limit` most-recent summaries from the
+    /// in-memory history buffer。 Newest last (append order)。
+    /// Empty if no summary() calls or history disabled
+    /// (`summaryHistoryCapacity == 0`)。
+    public func recentSummaries(
+        limit: Int = .max
+    ) -> [BASCognitiveBrainSummary] {
+        let take = min(max(0, limit), summaryHistory.count)
+        if take == 0 { return [] }
+        return Array(summaryHistory.suffix(take))
+    }
+
+    /// Number of summaries currently held in history。
+    public var summaryHistoryCount: Int {
+        return summaryHistory.count
     }
 }

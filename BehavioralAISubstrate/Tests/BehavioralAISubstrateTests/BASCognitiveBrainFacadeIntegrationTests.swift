@@ -350,6 +350,79 @@ final class BASCognitiveBrainFacadeIntegrationTests: XCTestCase {
             " reachable from real inputs")
     }
 
+    // MARK: - summaryHistory — in-memory session memory
+
+    func testEmptyHistoryBeforeAnyCall() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        let history = await brain.recentSummaries()
+        XCTAssertEqual(history.count, 0)
+        let count = await brain.summaryHistoryCount
+        XCTAssertEqual(count, 0)
+    }
+
+    func testHistoryAccumulatesAcrossCalls() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        _ = await brain.summary("input one")
+        _ = await brain.summary("input two")
+        _ = await brain.summary("input three")
+        let count = await brain.summaryHistoryCount
+        XCTAssertEqual(count, 3)
+        let recent = await brain.recentSummaries()
+        XCTAssertEqual(recent.count, 3)
+        XCTAssertEqual(recent[0].input, "input one")
+        XCTAssertEqual(recent[1].input, "input two")
+        XCTAssertEqual(recent[2].input, "input three")
+    }
+
+    func testHistoryLimitClampsToCount() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        _ = await brain.summary("a")
+        _ = await brain.summary("b")
+        let recent = await brain.recentSummaries(limit: 100)
+        XCTAssertEqual(recent.count, 2,
+            "Asking for limit > count should return all")
+    }
+
+    func testHistoryLimitReturnsRecentSuffix() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults()
+        _ = await brain.summary("a")
+        _ = await brain.summary("b")
+        _ = await brain.summary("c")
+        let last2 = await brain.recentSummaries(limit: 2)
+        XCTAssertEqual(last2.count, 2)
+        XCTAssertEqual(last2[0].input, "b")
+        XCTAssertEqual(last2[1].input, "c")
+    }
+
+    func testHistoryEvictsOldestAtCapacity() async throws {
+        // Tiny capacity for fast eviction test
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults(summaryHistoryCapacity: 3)
+        _ = await brain.summary("a")
+        _ = await brain.summary("b")
+        _ = await brain.summary("c")
+        _ = await brain.summary("d")  // evicts "a"
+        let recent = await brain.recentSummaries()
+        XCTAssertEqual(recent.count, 3)
+        XCTAssertEqual(recent.map { $0.input },
+            ["b", "c", "d"],
+            "Oldest should be evicted at capacity")
+    }
+
+    func testHistoryCapacityZeroDisablesBuffer() async throws {
+        let brain = try await BASCognitiveBrain
+            .makeWithDefaults(summaryHistoryCapacity: 0)
+        _ = await brain.summary("a")
+        _ = await brain.summary("b")
+        let count = await brain.summaryHistoryCount
+        XCTAssertEqual(count, 0,
+            "Capacity 0 must disable history buffer")
+    }
+
     // MARK: - C pilot integration — latency measurement
 
     /// Summary must carry a non-zero latencyNanos measured
